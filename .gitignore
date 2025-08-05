@@ -1,0 +1,33 @@
+# Node / Frontend
+node_modules
+dist
+.vite
+.eslintcache
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# OS / IDE
+.DS_Store
+.idea
+.vscode/*
+
+# Python / Backend
+backend/.venv
+backend/venv
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov
+
+# Database artifacts
+database/migrations/versions/*.py
+database/dumps/
+
+# ConPort local data
+context_portal/

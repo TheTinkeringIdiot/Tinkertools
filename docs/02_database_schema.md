@@ -1,0 +1,376 @@
+# Database Schema Design
+
+## Overview
+
+This document outlines the PostgreSQL database schema for TinkerTools, designed to support the six specialized applications while maintaining data integrity and performance. The schema is based on the legacy Django models provided, using proper relational design patterns to handle complex Anarchy Online game mechanics.
+
+## Design Principles
+
+### 1. Legacy Django Model Fidelity
+- **Direct translation**: Based on the exact Django model structure provided
+- **Proven patterns**: Maintains the successful relationships from the original system
+- **Data integrity**: Preserves unique constraints and foreign key relationships
+
+### 2. Data Separation Strategy
+- **Static game data**: Items, nanos, symbiants, spells (server-side for all users)
+- **User data**: Character profiles and preferences stored client-side only (LocalStorage)
+- **Application state**: Temporary caching only
+
+### 3. Performance Considerations
+- **Read optimization**: Most game data is read-heavy
+- **Proper indexing**: B-tree indexes for performance with selective GIN for full-text
+- **Reusable entities**: Efficient storage and querying through normalized design
+
+## Core Tables
+
+### 1. StatValue Table (Reusable Entities)
+
+```sql
+-- Reusable stat-value pairs with unique constraints (direct from Django StatValue model)
+CREATE TABLE stat_values (
+    id SERIAL PRIMARY KEY,
+    stat INTEGER NOT NULL,
+    value INTEGER NOT NULL,
+    
+    -- Unique constraint prevents duplicate stat-value pairs
+    CONSTRAINT unique_stat_value UNIQUE (stat, value)
+);
+
+-- Performance indexes
+CREATE INDEX idx_stat_values_stat_value ON stat_values(stat, value);
+CREATE INDEX idx_stat_values_value ON stat_values(value);
+CREATE INDEX idx_stat_values_stat ON stat_values(stat);
+```
+
+### 2. Criterion Table
+
+```sql
+-- Reusable criteria for spells and actions (direct from Django Criterion model)
+CREATE TABLE criteria (
+    id SERIAL PRIMARY KEY,
+    value1 INTEGER NOT NULL,
+    value2 INTEGER NOT NULL,
+    operator INTEGER NOT NULL,
+    
+    -- Unique constraint prevents duplicate criteria
+    CONSTRAINT unique_criterion UNIQUE (value1, value2, operator)
+);
+
+-- Performance indexes
+CREATE INDEX idx_criteria_values ON criteria(value1, value2, operator);
+```
+
+### 3. Spells Table
+
+```sql
+-- Individual spell definitions (direct from Django Spell model)
+CREATE TABLE spells (
+    id SERIAL PRIMARY KEY,
+    target INTEGER,
+    tick_count INTEGER,
+    tick_interval INTEGER,
+    spell_id INTEGER,
+    spell_format VARCHAR(512),
+    spell_params JSONB DEFAULT '[]'
+);
+
+-- Performance indexes
+CREATE INDEX idx_spells_spell_id ON spells (spell_id);
+CREATE INDEX idx_spells_target ON spells (target);
+CREATE INDEX idx_spells_params ON spells USING GIN (spell_params);
+```
+
+### 4. Spell Criteria Junction Table
+
+```sql
+-- Many-to-many relationship between spells and criteria (from Django Spell.criteria)
+CREATE TABLE spell_criteria (
+    spell_id INTEGER REFERENCES spells(id) ON DELETE CASCADE,
+    criterion_id INTEGER REFERENCES criteria(id) ON DELETE CASCADE,
+    
+    PRIMARY KEY (spell_id, criterion_id)
+);
+
+-- Performance indexes
+CREATE INDEX idx_spell_criteria_spell ON spell_criteria(spell_id);
+CREATE INDEX idx_spell_criteria_criterion ON spell_criteria(criterion_id);
+```
+
+### 5. Spell Data Table
+
+```sql
+-- Spell data events that contain multiple spells (direct from Django SpellData model)
+CREATE TABLE spell_data (
+    id SERIAL PRIMARY KEY,
+    event INTEGER
+);
+
+-- Performance indexes
+CREATE INDEX idx_spell_data_event ON spell_data (event);
+```
+
+### 6. Spell Data Spells Junction Table
+
+```sql
+-- Many-to-many relationship between spell_data and spells (from Django SpellData.spells)
+CREATE TABLE spell_data_spells (
+    spell_data_id INTEGER REFERENCES spell_data(id) ON DELETE CASCADE,
+    spell_id INTEGER REFERENCES spells(id) ON DELETE CASCADE,
+    
+    PRIMARY KEY (spell_data_id, spell_id)
+);
+
+-- Performance indexes
+CREATE INDEX idx_spell_data_spells_data ON spell_data_spells(spell_data_id);
+CREATE INDEX idx_spell_data_spells_spell ON spell_data_spells(spell_id);
+```
+
+### 7. Attack Defense Table
+
+```sql
+-- Attack/defense combinations (direct from Django AttackDefense model)
+CREATE TABLE attack_defense (
+    id SERIAL PRIMARY KEY
+);
+```
+
+### 8. Attack Defense Stats Junction Tables
+
+```sql
+-- Attack stats for attack_defense entities (from Django AttackDefense.attack)
+CREATE TABLE attack_defense_attack (
+    attack_defense_id INTEGER REFERENCES attack_defense(id) ON DELETE CASCADE,
+    stat_value_id INTEGER REFERENCES stat_values(id) ON DELETE CASCADE,
+    
+    PRIMARY KEY (attack_defense_id, stat_value_id)
+);
+
+-- Defense stats for attack_defense entities (from Django AttackDefense.defense)
+CREATE TABLE attack_defense_defense (
+    attack_defense_id INTEGER REFERENCES attack_defense(id) ON DELETE CASCADE,
+    stat_value_id INTEGER REFERENCES stat_values(id) ON DELETE CASCADE,
+    
+    PRIMARY KEY (attack_defense_id, stat_value_id)
+);
+
+-- Performance indexes
+CREATE INDEX idx_attack_defense_attack_ad ON attack_defense_attack(attack_defense_id);
+CREATE INDEX idx_attack_defense_attack_sv ON attack_defense_attack(stat_value_id);
+CREATE INDEX idx_attack_defense_defense_ad ON attack_defense_defense(attack_defense_id);
+CREATE INDEX idx_attack_defense_defense_sv ON attack_defense_defense(stat_value_id);
+```
+
+### 9. Animation Mesh Table
+
+```sql
+-- Animation and mesh data for items (direct from Django AnimationMesh model)
+CREATE TABLE animation_mesh (
+    id SERIAL PRIMARY KEY,
+    animation_id INTEGER REFERENCES stat_values(id) ON DELETE CASCADE,
+    mesh_id INTEGER REFERENCES stat_values(id) ON DELETE CASCADE
+);
+
+-- Performance indexes
+CREATE INDEX idx_animation_mesh_animation ON animation_mesh(animation_id);
+CREATE INDEX idx_animation_mesh_mesh ON animation_mesh(mesh_id);
+```
+
+### 10. Shop Hash Table
+
+```sql
+-- Shop/vendor mechanics (direct from Django ShopHash model)
+CREATE TABLE shop_hash (
+    id SERIAL PRIMARY KEY,
+    hash VARCHAR(4) NOT NULL,
+    min_level INTEGER,
+    max_level INTEGER,
+    base_amount INTEGER,
+    regen_amount INTEGER,
+    regen_interval INTEGER,
+    spawn_chance INTEGER,
+    
+);
+
+-- Performance indexes
+CREATE INDEX idx_shop_hash_hash ON shop_hash(hash);
+CREATE INDEX idx_shop_hash_level_range ON shop_hash(min_level, max_level);
+```
+
+### 11. Items Table
+
+```sql
+-- Main items table including nanos (direct from Django Item model)
+CREATE TABLE items (
+    id SERIAL PRIMARY KEY,
+    aoid INTEGER,  -- Anarchy Online ID
+    name VARCHAR(128) NOT NULL,
+    ql INTEGER,  -- Quality Level
+    description VARCHAR(8192),
+    item_class INTEGER,
+    is_nano BOOLEAN DEFAULT FALSE,
+    atkdef_id INTEGER REFERENCES attack_defense(id) ON DELETE SET NULL,
+    animation_mesh_id INTEGER REFERENCES animation_mesh(id) ON DELETE SET NULL,
+    
+);
+
+-- Performance indexes
+CREATE INDEX idx_items_aoid ON items (aoid);
+CREATE INDEX idx_items_name ON items USING GIN (to_tsvector('english', name));
+CREATE INDEX idx_items_ql ON items (ql);
+CREATE INDEX idx_items_item_class ON items (item_class);
+CREATE INDEX idx_items_is_nano ON items (is_nano);
+CREATE INDEX idx_items_atkdef ON items (atkdef_id);
+CREATE INDEX idx_items_animation_mesh ON items (animation_mesh_id);
+```
+
+### 12. Item Stats Junction Table
+
+```sql
+-- Many-to-many relationship between items and stat_values (from Django Item.stats)
+CREATE TABLE item_stats (
+    item_id INTEGER REFERENCES items(id) ON DELETE CASCADE,
+    stat_value_id INTEGER REFERENCES stat_values(id) ON DELETE CASCADE,
+    
+    PRIMARY KEY (item_id, stat_value_id),
+    
+);
+
+-- Performance indexes
+CREATE INDEX idx_item_stats_item ON item_stats(item_id);
+CREATE INDEX idx_item_stats_stat_value ON item_stats(stat_value_id);
+```
+
+### 13. Item Spell Data Junction Table
+
+```sql
+-- Many-to-many relationship between items and spell_data (from Django Item.spellData)
+CREATE TABLE item_spell_data (
+    item_id INTEGER REFERENCES items(id) ON DELETE CASCADE,
+    spell_data_id INTEGER REFERENCES spell_data(id) ON DELETE CASCADE,
+    
+    PRIMARY KEY (item_id, spell_data_id),
+
+);
+
+-- Performance indexes
+CREATE INDEX idx_item_spell_data_item ON item_spell_data(item_id);
+CREATE INDEX idx_item_spell_data_spell_data ON item_spell_data(spell_data_id);
+```
+
+### 14. Item Shop Hash Junction Table
+
+```sql
+-- Many-to-many relationship between items and shop_hash (from Django Item.shopHash)
+CREATE TABLE item_shop_hash (
+    item_id INTEGER REFERENCES items(id) ON DELETE CASCADE,
+    shop_hash_id INTEGER REFERENCES shop_hash(id) ON DELETE CASCADE,
+    
+    PRIMARY KEY (item_id, shop_hash_id)
+);
+
+-- Performance indexes
+CREATE INDEX idx_item_shop_hash_item ON item_shop_hash(item_id);
+CREATE INDEX idx_item_shop_hash_shop ON item_shop_hash(shop_hash_id);
+```
+
+### 15. Actions Table
+
+```sql
+-- Item actions with ordered criteria (direct from Django Action model)
+CREATE TABLE actions (
+    id SERIAL PRIMARY KEY,
+    action INTEGER,
+    item_id INTEGER REFERENCES items(id) ON DELETE CASCADE,
+    
+);
+
+-- Performance indexes
+CREATE INDEX idx_actions_action ON actions(action);
+CREATE INDEX idx_actions_item ON actions(item_id);
+```
+
+### 16. Action Criteria Junction Table
+
+```sql
+-- Many-to-many relationship between actions and criteria with ordering (from Django ActionCriterion model)
+CREATE TABLE action_criteria (
+    id SERIAL PRIMARY KEY,
+    action_id INTEGER REFERENCES actions(id) ON DELETE CASCADE,
+    criterion_id INTEGER REFERENCES criteria(id) ON DELETE CASCADE,
+    order_index INTEGER,
+    
+    -- Unique constraint on action + criterion
+    CONSTRAINT unique_action_criterion UNIQUE (action_id, criterion_id)
+);
+
+-- Performance indexes
+CREATE INDEX idx_action_criteria_action ON action_criteria(action_id);
+CREATE INDEX idx_action_criteria_criterion ON action_criteria(criterion_id);
+CREATE INDEX idx_action_criteria_order ON action_criteria(action_id, order_index);
+```
+
+### 17. Symbiants Table
+
+```sql
+-- Symbiant definitions (direct from Django Symbiant model)
+CREATE TABLE symbiants (
+    id SERIAL PRIMARY KEY,
+    aoid INTEGER NOT NULL,
+    family VARCHAR(32),
+    
+);
+
+-- Performance indexes
+CREATE INDEX idx_symbiants_aoid ON symbiants (aoid);
+CREATE INDEX idx_symbiants_family ON symbiants (family);
+```
+
+### 18. Pocket Bosses Table
+
+```sql
+-- Pocket boss information (direct from Django Pocketboss model)
+CREATE TABLE pocket_bosses (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(32) NOT NULL,
+    level INTEGER NOT NULL,
+    playfield VARCHAR(128),
+    location VARCHAR(265),
+    mobs VARCHAR(256),
+    
+);
+
+-- Performance indexes
+CREATE INDEX idx_pocket_bosses_name ON pocket_bosses (name);
+CREATE INDEX idx_pocket_bosses_level ON pocket_bosses (level);
+CREATE INDEX idx_pocket_bosses_playfield ON pocket_bosses (playfield);
+```
+
+### 19. Pocket Boss Symbiant Drops Junction Table
+
+```sql
+-- Many-to-many relationship between pocket bosses and symbiants (from Django Pocketboss.drops)
+CREATE TABLE pocket_boss_symbiant_drops (
+    pocket_boss_id INTEGER REFERENCES pocket_bosses(id) ON DELETE CASCADE,
+    symbiant_id INTEGER REFERENCES symbiants(id) ON DELETE CASCADE,
+    
+    PRIMARY KEY (pocket_boss_id, symbiant_id)
+);
+
+-- Performance indexes
+CREATE INDEX idx_pb_symbiant_drops_boss ON pocket_boss_symbiant_drops(pocket_boss_id);
+CREATE INDEX idx_pb_symbiant_drops_symbiant ON pocket_boss_symbiant_drops(symbiant_id);
+```
+
+### 20. Application Cache Table
+
+```sql
+CREATE TABLE application_cache (
+    cache_key VARCHAR(255) PRIMARY KEY,
+    cache_value JSONB NOT NULL,
+    expires_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_application_cache_expires_at ON application_cache (expires_at);
+```
+

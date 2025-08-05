@@ -1,0 +1,50 @@
+{
+  "name": "tinkertools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm run dev:frontend",
+    "dev:frontend": "cd frontend && vite",
+    "build": "cd frontend && vite build",
+    "preview": "cd frontend && vite preview --host",
+    "type-check": "cd frontend && vue-tsc --noEmit -p tsconfig.json",
+    "lint": "cd frontend && eslint .",
+    "format": "cd frontend && prettier --write .",
+    "test": "cd frontend && vitest run",
+    "test:ui": "cd frontend && vitest"
+  },
+  "dependencies": {
+    "@primeuix/themes": "^1.2.3",
+    "dayjs": "1.11.11",
+    "fuse.js": "7.0.0",
+    "lodash-es": "4.17.21",
+    "pinia": "2.2.2",
+    "primeicons": "7.0.0",
+    "primevue": "^3.53.1",
+    "tailwindcss": "3.4.10",
+    "vue": "3.4.38",
+    "vue-router": "4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.7.0",
+    "@types/node": "20.14.11",
+    "@vitejs/plugin-legacy": "5.4.2",
+    "@vitejs/plugin-vue": "5.1.2",
+    "@vitest/coverage-v8": "2.0.5",
+    "@vue/test-utils": "2.4.6",
+    "autoprefixer": "10.4.20",
+    "eslint": "9.7.0",
+    "eslint-config-prettier": "9.1.0",
+    "eslint-plugin-vue": "9.27.0",
+    "jsdom": "24.1.1",
+    "postcss": "8.4.44",
+    "postcss-nesting": "12.1.5",
+    "prettier": "3.3.3",
+    "typescript": "5.5.4",
+    "typescript-eslint": "8.2.0",
+    "vite": "5.4.2",
+    "vitest": "2.0.5",
+    "vue-tsc": "2.0.29"
+  }
+}

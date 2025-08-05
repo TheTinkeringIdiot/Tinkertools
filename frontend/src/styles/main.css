@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light dark;
+}
+
+html, body, #app {
+  height: 100%;
+}
+
+body {
+  @apply antialiased;
+  margin: 0;
+}
