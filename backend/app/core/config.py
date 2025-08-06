@@ -1,8 +1,9 @@
+from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    DATABASE_URL: str
+    DATABASE_URL: Optional[str] = None
     CORS_ORIGINS: str = "http://localhost:5173"
     APP_ENV: str = "development"
     LOG_LEVEL: str = "INFO"
