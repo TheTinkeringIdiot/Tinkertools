@@ -11,6 +11,8 @@ from app.api.routes.spells import router as spells_router
 from app.api.routes.symbiants import router as symbiants_router
 from app.api.routes.pocket_bosses import router as pocket_bosses_router
 from app.api.routes.stat_values import router as stat_values_router
+from app.api.routes.cache import router as cache_router
+from app.api.routes.performance import router as performance_router
 
 app = FastAPI(
     title="TinkerTools API",
@@ -69,6 +71,8 @@ app.include_router(spells_router, prefix="/api/v1")
 app.include_router(symbiants_router, prefix="/api/v1")
 app.include_router(pocket_bosses_router, prefix="/api/v1")
 app.include_router(stat_values_router, prefix="/api/v1")
+app.include_router(cache_router, prefix="/api/v1")
+app.include_router(performance_router, prefix="/api/v1")
 
 @app.get("/")
 async def root():

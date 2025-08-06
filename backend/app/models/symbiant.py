@@ -12,13 +12,7 @@ class Symbiant(Base):
     
     id = Column(Integer, primary_key=True)
     aoid = Column(Integer, nullable=False)
-    name = Column(String(512), nullable=False)
-    ql = Column(Integer, nullable=False)
-    family = Column(String(100))
-    symbiant_class = Column(String(50))
-    slot = Column(String(50))
-    stats = Column(Text)  # Could be JSON if needed
-    description = Column(Text)
+    family = Column(String(32))
     
     # Relationships
     pocket_boss_drops = relationship(

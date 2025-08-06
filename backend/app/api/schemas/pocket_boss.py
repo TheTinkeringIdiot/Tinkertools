@@ -9,11 +9,10 @@ from pydantic import BaseModel, Field
 class PocketBossBase(BaseModel):
     """Base PocketBoss schema."""
     name: str = Field(description="Boss name")
-    level: Optional[int] = Field(None, description="Boss level")
-    location: Optional[str] = Field(None, description="Boss location")
+    level: int = Field(description="Boss level")
     playfield: Optional[str] = Field(None, description="Playfield/zone")
-    encounter_info: Optional[str] = Field(None, description="Encounter information")
-    mob_composition: Optional[str] = Field(None, description="Mob composition")
+    location: Optional[str] = Field(None, description="Boss location")
+    mobs: Optional[str] = Field(None, description="Mob composition")
 
 
 class PocketBossCreate(PocketBossBase):
@@ -33,10 +32,7 @@ class SymbiantDrop(BaseModel):
     """Symbiant drop information."""
     id: int
     aoid: int
-    name: str
-    ql: int
     family: Optional[str]
-    symbiant_class: Optional[str]
     
     class Config:
         from_attributes = True

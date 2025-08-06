@@ -9,13 +9,7 @@ from pydantic import BaseModel, Field
 class SymbiantBase(BaseModel):
     """Base Symbiant schema."""
     aoid: int = Field(description="Anarchy Online symbiant ID")
-    name: str = Field(description="Symbiant name")
-    ql: int = Field(description="Quality level")
     family: Optional[str] = Field(None, description="Symbiant family")
-    symbiant_class: Optional[str] = Field(None, description="Symbiant class")
-    slot: Optional[str] = Field(None, description="Equipment slot")
-    stats: Optional[str] = Field(None, description="Symbiant stats")
-    description: Optional[str] = Field(None, description="Symbiant description")
 
 
 class SymbiantCreate(SymbiantBase):

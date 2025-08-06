@@ -11,12 +11,11 @@ class PocketBoss(Base):
     __tablename__ = 'pocket_bosses'
     
     id = Column(Integer, primary_key=True)
-    name = Column(String(512), nullable=False)
-    level = Column(Integer)
-    location = Column(String(255))
-    playfield = Column(String(255))
-    encounter_info = Column(Text)
-    mob_composition = Column(Text)
+    name = Column(String(32), nullable=False)
+    level = Column(Integer, nullable=False)
+    playfield = Column(String(128))
+    location = Column(String(265))
+    mobs = Column(String(256))
     
     # Relationships
     symbiant_drops = relationship(

@@ -14,11 +14,14 @@ from app.api.schemas import (
     SymbiantDetail,
     PaginatedResponse
 )
+from app.core.decorators import cached_response, performance_monitor
 
 router = APIRouter(prefix="/symbiants", tags=["symbiants"])
 
 
 @router.get("", response_model=PaginatedResponse[SymbiantResponse])
+@cached_response("symbiants")
+@performance_monitor
 def get_symbiants(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page"),
@@ -65,6 +68,8 @@ def get_symbiants(
 
 
 @router.get("/{symbiant_id}", response_model=SymbiantDetail)
+@cached_response("symbiants")
+@performance_monitor
 def get_symbiant(symbiant_id: int, db: Session = Depends(get_db)):
     """
     Get detailed information about a specific symbiant including drop sources.
@@ -91,6 +96,8 @@ def get_symbiant(symbiant_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{symbiant_id}/dropped-by", response_model=List[dict])
+@cached_response("symbiants")
+@performance_monitor
 def get_symbiant_drop_sources(symbiant_id: int, db: Session = Depends(get_db)):
     """
     Get list of pocket bosses that drop a specific symbiant.

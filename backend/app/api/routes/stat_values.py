@@ -9,11 +9,14 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models import StatValue
 from app.api.schemas import StatValueResponse
+from app.core.decorators import cached_response, performance_monitor
 
 router = APIRouter(prefix="/stat-values", tags=["stat-values"])
 
 
 @router.get("", response_model=List[StatValueResponse])
+@cached_response("stats")
+@performance_monitor
 def get_stat_values(
     skip: int = 0,
     limit: int = 100,
@@ -27,6 +30,8 @@ def get_stat_values(
 
 
 @router.get("/{stat_value_id}", response_model=StatValueResponse)
+@cached_response("stats")
+@performance_monitor
 def get_stat_value(stat_value_id: int, db: Session = Depends(get_db)):
     """
     Get a specific stat value by ID.

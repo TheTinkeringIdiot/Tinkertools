@@ -11,29 +11,18 @@ class Item(Base):
     __tablename__ = 'items'
     
     id = Column(Integer, primary_key=True)
-    aoid = Column(Integer, nullable=False)
-    name = Column(String(512), nullable=False)
-    ql = Column(Integer, nullable=False)
-    item_class = Column(String(50))
-    slot = Column(String(50))
-    default_pos = Column(String(10))
-    max_mass = Column(Integer)
-    duration = Column(Integer)
-    icon = Column(Integer)
-    apply_on_friendly = Column(Boolean, default=False)
-    apply_on_hostile = Column(Boolean, default=False)
-    apply_on_self = Column(Boolean, default=False)
-    dont_apply_on_self = Column(Boolean, default=False)
-    can_pick_up = Column(Boolean, default=True)
-    flags = Column(Integer)
-    description = Column(Text)
+    aoid = Column(Integer)
+    name = Column(String(128), nullable=False)
+    ql = Column(Integer)
+    item_class = Column(Integer)
+    description = Column(String(8192))
     is_nano = Column(Boolean, default=False)
     animation_mesh_id = Column(Integer, ForeignKey('animation_mesh.id'))
-    attack_defense_id = Column(Integer, ForeignKey('attack_defense.id'))
+    atkdef_id = Column(Integer, ForeignKey('attack_defense.id'))
     
     # Relationships
     animation_mesh = relationship('AnimationMesh', back_populates='items')
-    attack_defense = relationship('AttackDefense', back_populates='items')
+    attack_defense = relationship('AttackDefense', back_populates='items', foreign_keys=[atkdef_id])
     item_stats = relationship(
         'ItemStats',
         back_populates='item',
