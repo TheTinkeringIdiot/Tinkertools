@@ -11,8 +11,7 @@ class Action(Base):
     __tablename__ = 'actions'
     
     id = Column(Integer, primary_key=True)
-    action_type = Column(String(50))
-    target = Column(Integer)
+    action = Column(Integer)
     item_id = Column(Integer, ForeignKey('items.id'))
     
     # Relationships
@@ -30,7 +29,7 @@ class Action(Base):
         return [ac.criterion for ac in self.action_criteria]
     
     def __repr__(self):
-        return f"<Action(id={self.id}, type='{self.action_type}', item_id={self.item_id})>"
+        return f"<Action(id={self.id}, action={self.action}, item_id={self.item_id})>"
 
 
 class ActionCriteria(Base):
