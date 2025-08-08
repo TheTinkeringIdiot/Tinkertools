@@ -7,6 +7,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.config import settings
 from app.api.routes.health import router as health_router
 from app.api.routes.items import router as items_router
+from app.api.routes.nanos import router as nanos_router
 from app.api.routes.spells import router as spells_router
 from app.api.routes.symbiants import router as symbiants_router
 from app.api.routes.pocket_bosses import router as pocket_bosses_router
@@ -22,12 +23,11 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS
-allow_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+# CORS - Allow all origins for development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allow_origins or ["http://localhost:5173"],
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins for development
+    allow_credentials=False,  # Set to False when using allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -67,6 +67,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 # Include routers
 app.include_router(health_router, prefix="")
 app.include_router(items_router, prefix="/api/v1")
+app.include_router(nanos_router, prefix="/api/v1")
 app.include_router(spells_router, prefix="/api/v1")
 app.include_router(symbiants_router, prefix="/api/v1")
 app.include_router(pocket_bosses_router, prefix="/api/v1")

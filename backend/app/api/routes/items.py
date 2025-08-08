@@ -5,13 +5,13 @@ Items API endpoints.
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_, and_, func, text
+from sqlalchemy import or_, and_, func
 import math
 import time
 import logging
 
 from app.core.database import get_db
-from app.models import Item, ItemStats, StatValue
+from app.models import Item, ItemStats, StatValue, AttackDefense, AttackDefenseAttack, AttackDefenseDefense
 from app.api.schemas import (
     ItemResponse, 
     ItemDetail, 
@@ -78,6 +78,7 @@ def search_items(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page"),
     use_fulltext: bool = Query(True, description="Use PostgreSQL full-text search"),
+    weapons: bool = Query(False, description="Filter to weapons only (items with both attack and defense data)"),
     db: Session = Depends(get_db)
 ):
     """
@@ -94,12 +95,24 @@ def search_items(
             func.to_tsvector('english', Item.name + ' ' + func.coalesce(Item.description, '')).op('@@')(
                 func.to_tsquery('english', search_query)
             )
-        ).order_by(
-            func.ts_rank(
-                func.to_tsvector('english', Item.name + ' ' + func.coalesce(Item.description, '')),
-                func.to_tsquery('english', search_query)
-            ).desc()
         )
+        
+        # Apply weapons filter to fulltext search if requested
+        if weapons:
+            query = query.filter(Item.atkdef_id.isnot(None))\
+                        .join(AttackDefense, Item.atkdef_id == AttackDefense.id)\
+                        .join(AttackDefenseAttack, AttackDefense.id == AttackDefenseAttack.attack_defense_id)\
+                        .join(AttackDefenseDefense, AttackDefense.id == AttackDefenseDefense.attack_defense_id)\
+                        .distinct()\
+                        .order_by(Item.name)  # Simple ordering when using DISTINCT
+        else:
+            # Only use ts_rank ordering when not filtering for weapons
+            query = query.order_by(
+                func.ts_rank(
+                    func.to_tsvector('english', Item.name + ' ' + func.coalesce(Item.description, '')),
+                    func.to_tsquery('english', search_query)
+                ).desc()
+            )
     else:
         # Fallback to ILIKE for compatibility
         search_term = f"%{q}%"
@@ -109,6 +122,14 @@ def search_items(
                 Item.description.ilike(search_term)
             )
         ).order_by(Item.name)
+        
+        # Apply weapons filter to ILIKE search if requested
+        if weapons:
+            query = query.filter(Item.atkdef_id.isnot(None))\
+                        .join(AttackDefense, Item.atkdef_id == AttackDefense.id)\
+                        .join(AttackDefenseAttack, AttackDefense.id == AttackDefenseAttack.attack_defense_id)\
+                        .join(AttackDefenseDefense, AttackDefense.id == AttackDefenseDefense.attack_defense_id)\
+                        .distinct()
     
     # Get total count
     total = query.count()
@@ -399,16 +420,49 @@ def get_items_with_stats(
     )
 
 
-@router.get("/{item_id}", response_model=ItemResponse)
+@router.get("/{item_id}", response_model=ItemDetail)
 @cached_response("item_detail")
 @performance_monitor
 def get_item(item_id: int, db: Session = Depends(get_db)):
     """
-    Get detailed information about a specific item.
+    Get detailed information about a specific item including stats, spells, and attack/defense data.
     """
-    item = db.query(Item).filter(Item.id == item_id).first()
+    # Load item with all related data
+    item = db.query(Item).options(
+        joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
+        joinedload(Item.item_spell_data)
+    ).filter(Item.id == item_id).first()
     
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
     
-    return item
+    # Build detailed response
+    item_detail = ItemDetail(
+        id=item.id,
+        aoid=item.aoid,
+        name=item.name,
+        ql=item.ql,
+        item_class=item.item_class,
+        description=item.description,
+        is_nano=item.is_nano,
+        stats=[stat.stat_value for stat in item.item_stats] if item.item_stats else [],
+        attack_stats=[],
+        defense_stats=[],
+        spells=[]
+    )
+    
+    # Add attack/defense stats if available
+    if hasattr(item, 'attack_defense_id') and item.attack_defense_id:
+        # Get attack stats
+        attack_stats = db.query(StatValue).join(
+            AttackDefenseAttack, StatValue.id == AttackDefenseAttack.stat_value_id
+        ).filter(AttackDefenseAttack.attack_defense_id == item.attack_defense_id).all()
+        item_detail.attack_stats = attack_stats
+        
+        # Get defense stats  
+        defense_stats = db.query(StatValue).join(
+            AttackDefenseDefense, StatValue.id == AttackDefenseDefense.stat_value_id
+        ).filter(AttackDefenseDefense.attack_defense_id == item.attack_defense_id).all()
+        item_detail.defense_stats = defense_stats
+    
+    return item_detail
