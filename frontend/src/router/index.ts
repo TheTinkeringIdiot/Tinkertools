@@ -5,6 +5,19 @@ const routes: RouteRecordRaw[] = [
     path: '/',
     name: 'Home',
     component: () => import('@/views/Home.vue')
+  },
+  {
+    path: '/items',
+    name: 'TinkerItems',
+    component: () => import('@/views/TinkerItems.vue'),
+    children: [
+      {
+        path: ':id',
+        name: 'ItemDetail',
+        component: () => import('@/views/ItemDetail.vue'),
+        props: true
+      }
+    ]
   }
 ];
 

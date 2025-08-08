@@ -230,6 +230,43 @@ export interface ItemFilterRequest {
   has_spell_data?: boolean
 }
 
+export interface ItemFilters {
+  // Basic type filters
+  isNano?: boolean
+  isWeapon?: boolean
+  itemClasses?: number[]
+  
+  // Quality level filters
+  minQL?: number
+  maxQL?: number
+  
+  // Stat filters
+  statFilterMode?: 'any' | 'can_meet' | 'cannot_meet' | 'has_stats'
+  selectedStats?: number[]
+  statMinValues?: Record<number, number>
+  
+  // Property filters
+  hasEffects?: boolean | null
+  hasRequirements?: boolean | null
+  isTradeable?: boolean | null
+  isDroppable?: boolean | null
+  
+  // Source filters
+  sources?: string[]
+  
+  // Special filters
+  favorite_items?: boolean
+}
+
+export interface PaginationInfo {
+  page: number
+  limit: number
+  offset: number
+  total: number
+  hasNext: boolean
+  hasPrev: boolean
+}
+
 export interface ItemCompatibilityRequest {
   profile: TinkerProfile
   item_ids: number[]
