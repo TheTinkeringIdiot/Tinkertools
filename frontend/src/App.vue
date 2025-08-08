@@ -20,14 +20,12 @@ const menuItems = ref([
   {
     label: 'TinkerNanos',
     icon: 'pi pi-bolt',
-    command: () => router.push('/nanos'),
-    disabled: true
+    command: () => router.push('/nanos')
   },
   {
     label: 'TinkerFite',
     icon: 'pi pi-shield',
-    command: () => router.push('/fite'),
-    disabled: true
+    command: () => router.push('/fite')
   },
   {
     label: 'TinkerPlants',

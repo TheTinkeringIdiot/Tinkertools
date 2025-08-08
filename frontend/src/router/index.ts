@@ -18,6 +18,16 @@ const routes: RouteRecordRaw[] = [
         props: true
       }
     ]
+  },
+  {
+    path: '/nanos',
+    name: 'TinkerNanos',
+    component: () => import('@/views/TinkerNanos.vue')
+  },
+  {
+    path: '/fite',
+    name: 'TinkerFite',
+    component: () => import('@/views/TinkerFiteMinimal.vue')
   }
 ];
 
