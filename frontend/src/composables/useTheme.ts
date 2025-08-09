@@ -1,0 +1,167 @@
+/**
+ * Global Theme Management System
+ * Provides application-wide dark/light mode control with persistence and system preference detection
+ * Elevates theme management to the global application level
+ */
+
+import { ref, watch, computed, type Ref } from 'vue';
+
+export type ThemeMode = 'light' | 'dark';
+
+export interface ThemeState {
+  isDark: Ref<boolean>;
+  currentTheme: Ref<ThemeMode>;
+  toggle: () => void;
+  setTheme: (theme: ThemeMode) => void;
+  setDark: (dark: boolean) => void;
+}
+
+// ============================================================================
+// Global Theme State (Singleton Pattern)
+// ============================================================================
+
+const STORAGE_KEY = 'tinkertools-theme-mode';
+const currentTheme = ref<ThemeMode>('light');
+const isDark = computed(() => currentTheme.value === 'dark');
+
+// ============================================================================
+// Theme Application Functions
+// ============================================================================
+
+/**
+ * Apply theme to document element
+ */
+function applyTheme(theme: ThemeMode): void {
+  if (typeof document === 'undefined') return; // SSR safety
+  
+  const htmlElement = document.documentElement;
+  
+  // Remove existing theme classes
+  htmlElement.classList.remove('dark', 'light');
+  
+  // Apply new theme
+  htmlElement.classList.add(theme);
+  htmlElement.setAttribute('data-theme', theme);
+  
+  // Set CSS custom properties for theme-aware components
+  htmlElement.style.setProperty('--theme-mode', theme);
+  
+}
+
+
+/**
+ * Get system preferred theme
+ */
+function getSystemTheme(): ThemeMode {
+  if (typeof window === 'undefined') return 'light';
+  
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return prefersDark ? 'dark' : 'light';
+}
+
+/**
+ * Get saved theme preference or system default
+ */
+function getInitialTheme(): ThemeMode {
+  if (typeof localStorage === 'undefined') return getSystemTheme();
+  
+  const saved = localStorage.getItem(STORAGE_KEY) as ThemeMode | null;
+  return saved || getSystemTheme();
+}
+
+/**
+ * Save theme preference to localStorage
+ */
+function saveTheme(theme: ThemeMode): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(STORAGE_KEY, theme);
+}
+
+// ============================================================================
+// Global Theme Initialization (runs immediately on module load)
+// ============================================================================
+
+// Initialize theme state
+currentTheme.value = getInitialTheme();
+applyTheme(currentTheme.value);
+
+// Watch for theme changes and persist + apply
+watch(currentTheme, (newTheme) => {
+  applyTheme(newTheme);
+  saveTheme(newTheme);
+}, { immediate: false }); // Don't trigger on initialization since we already applied
+
+// Listen for system theme changes
+if (typeof window !== 'undefined') {
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  
+  const handleSystemThemeChange = (e: MediaQueryListEvent) => {
+    // Only auto-update if user hasn't set a manual preference
+    const hasManualPreference = typeof localStorage !== 'undefined' && 
+                               localStorage.getItem(STORAGE_KEY) !== null;
+    
+    if (!hasManualPreference) {
+      currentTheme.value = e.matches ? 'dark' : 'light';
+    }
+  };
+  
+  mediaQuery.addEventListener('change', handleSystemThemeChange);
+}
+
+// ============================================================================
+// Theme Composable (provides reactive theme state and controls)
+// ============================================================================
+
+export function useTheme(): ThemeState {
+  const toggle = () => {
+    currentTheme.value = currentTheme.value === 'dark' ? 'light' : 'dark';
+  };
+  
+  const setTheme = (theme: ThemeMode) => {
+    currentTheme.value = theme;
+  };
+  
+  const setDark = (dark: boolean) => {
+    currentTheme.value = dark ? 'dark' : 'light';
+  };
+  
+  return {
+    isDark,
+    currentTheme,
+    toggle,
+    setTheme,
+    setDark
+  };
+}
+
+// ============================================================================
+// Legacy Compatibility (for existing useDarkMode imports)
+// ============================================================================
+
+export interface DarkModeState {
+  isDark: Ref<boolean>;
+  toggle: () => void;
+  setDark: (value: boolean) => void;
+  setLight: (value: boolean) => void;
+}
+
+export function useDarkMode(): DarkModeState {
+  const { isDark: _isDark, toggle, setDark } = useTheme();
+  
+  const setLight = (value: boolean) => {
+    setDark(!value);
+  };
+  
+  return {
+    isDark: _isDark,
+    toggle,
+    setDark,
+    setLight
+  };
+}
+
+// Export reactive refs for direct access
+export { isDark, currentTheme };
+
+// Default export for convenience
+export default useTheme;

@@ -13,6 +13,7 @@ import type {
   UserFriendlyError
 } from '../types/api'
 import { apiClient } from '../services/api-client'
+import { enrichSymbiant } from '../utils/symbiantHelpers'
 
 export const useSymbiantsStore = defineStore('symbiants', () => {
   // ============================================================================
@@ -109,24 +110,31 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     try {
       const response: PaginatedResponse<Symbiant> = await apiClient.searchSymbiants(query)
       
-      if (response.success && response.data) {
-        // Store individual symbiants in cache
-        response.data.forEach(symbiant => {
+      if (response.items) {
+        // Enrich symbiants with display data and store in cache
+        const enrichedSymbiants = response.items.map(enrichSymbiant);
+        enrichedSymbiants.forEach(symbiant => {
           symbiants.value.set(symbiant.id, symbiant)
         })
         
         // Store search results
         searchResults.value = {
           query,
-          results: response.data,
-          pagination: response.pagination,
+          results: enrichedSymbiants,
+          pagination: {
+            page: response.page,
+            limit: response.page_size,
+            total: response.total,
+            hasNext: response.has_next,
+            hasPrev: response.has_prev
+          },
           timestamp: Date.now()
         }
         
         lastFetch.value = Date.now()
-        return response.data
+        return enrichedSymbiants
       } else {
-        throw new Error(response.error?.message || 'Search failed')
+        throw new Error('No symbiant data received')
       }
     } catch (err: any) {
       error.value = err
@@ -151,12 +159,13 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     try {
       const response = await apiClient.getSymbiant(id)
       
-      if (response.success && response.data) {
-        symbiants.value.set(id, response.data)
+      if (response.data) {
+        const enriched = enrichSymbiant(response.data);
+        symbiants.value.set(id, enriched)
         lastFetch.value = Date.now()
-        return response.data
+        return enriched
       } else {
-        throw new Error(response.error?.message || 'Symbiant not found')
+        throw new Error('Symbiant not found')
       }
     } catch (err: any) {
       error.value = err

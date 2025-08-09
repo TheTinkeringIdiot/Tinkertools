@@ -19,23 +19,23 @@
     </div>
     
     <!-- Quick Search Suggestions -->
-    <div v-if="showSuggestions && suggestions.length > 0" class="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-b-lg shadow-lg z-10 max-h-60 overflow-y-auto">
+    <div v-if="showSuggestions && suggestions.length > 0" class="absolute top-full left-0 right-0 bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-b-lg shadow-lg z-10 max-h-60 overflow-y-auto">
       <div 
         v-for="suggestion in suggestions" 
         :key="suggestion.type + suggestion.text"
         @click="applySuggestion(suggestion)"
-        class="px-4 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+        class="px-4 py-2 hover:bg-surface-50 dark:hover:bg-surface-900 cursor-pointer border-b border-surface-100 dark:border-surface-800 last:border-b-0"
       >
         <div class="flex items-center justify-between">
-          <span class="text-sm">{{ suggestion.text }}</span>
-          <span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">{{ suggestion.type }}</span>
+          <span class="text-sm text-surface-900 dark:text-surface-50">{{ suggestion.text }}</span>
+          <span class="text-xs text-surface-500 dark:text-surface-400 bg-surface-100 dark:bg-surface-800 px-2 py-1 rounded">{{ suggestion.type }}</span>
         </div>
       </div>
     </div>
     
     <!-- Search History -->
     <div v-if="searchHistory.length > 0 && searchQuery === ''" class="mt-2">
-      <div class="text-xs text-gray-500 mb-1">Recent searches:</div>
+      <div class="text-xs text-surface-500 dark:text-surface-400 mb-1">Recent searches:</div>
       <div class="flex flex-wrap gap-1">
         <Button
           v-for="term in searchHistory.slice(0, 5)"

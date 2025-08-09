@@ -104,7 +104,16 @@ export interface Item {
 export interface Symbiant {
   id: number
   aoid: number
+  name?: string
+  slot?: string
+  ql?: number
   family?: string
+  stat_bonuses?: StatBonus[]
+}
+
+export interface StatBonus {
+  stat: string
+  bonus: number
 }
 
 export interface PocketBoss {
@@ -114,7 +123,7 @@ export interface PocketBoss {
   playfield?: string
   location?: string
   mobs?: string
-  drops: Symbiant[]
+  dropped_symbiants?: Symbiant[]
 }
 
 // ============================================================================

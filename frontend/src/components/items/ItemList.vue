@@ -435,11 +435,11 @@ function onPageChange(event: any) {
 }
 
 .space-y-2::-webkit-scrollbar-track {
-  @apply bg-gray-100 dark:bg-gray-800;
+  @apply bg-surface-100 dark:bg-surface-800;
 }
 
 .space-y-2::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 dark:bg-gray-600 rounded-full;
+  @apply bg-surface-300 dark:bg-surface-600 rounded-full;
 }
 
 /* Grid responsive adjustments */

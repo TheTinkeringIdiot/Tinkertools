@@ -1,7 +1,7 @@
 <template>
-  <div class="bg-white rounded-lg shadow p-6">
+  <div class="bg-surface-0 dark:bg-surface-950 rounded-lg shadow-md dark:shadow-none border border-surface-200 dark:border-surface-700 p-6">
     <div class="flex items-center justify-between mb-4">
-      <h3 class="text-lg font-semibold text-gray-900">Character Skills</h3>
+      <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50">Character Skills</h3>
       <Button 
         @click="loadFromProfile"
         icon="pi pi-user"
@@ -13,10 +13,10 @@
     </div>
 
     <div v-if="Object.keys(skills).length === 0" class="text-center py-8">
-      <div class="text-gray-400 mb-2">
+      <div class="text-surface-400 dark:text-surface-500 mb-2">
         <i class="pi pi-info-circle text-2xl"></i>
       </div>
-      <p class="text-gray-600 mb-4">Enter your character's skills to see which weapons you can use</p>
+      <p class="text-surface-600 dark:text-surface-400 mb-4">Enter your character's skills to see which weapons you can use</p>
       <Button 
         @click="showQuickSetup = true"
         label="Quick Setup"
@@ -27,9 +27,9 @@
 
     <div v-else>
       <!-- Skills Summary -->
-      <div class="mb-4 p-3 bg-blue-50 rounded border">
+      <div class="mb-4 p-3 bg-primary-50 dark:bg-primary-900/20 rounded border border-primary-200 dark:border-primary-800">
         <div class="flex items-center justify-between">
-          <span class="text-sm font-medium text-blue-900">
+          <span class="text-sm font-medium text-primary-900 dark:text-primary-100">
             {{ Object.keys(skills).length }} skills configured
           </span>
           <div class="space-x-2">
@@ -57,13 +57,13 @@
         <div 
           v-for="[skillId, skillValue] in displayedSkills" 
           :key="skillId"
-          class="flex items-center justify-between p-3 border rounded hover:bg-gray-50"
+          class="flex items-center justify-between p-3 border border-surface-200 dark:border-surface-700 rounded hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
         >
           <div class="flex-1">
-            <label class="block text-sm font-medium text-gray-700">
+            <label class="block text-sm font-medium text-surface-700 dark:text-surface-300">
               {{ getSkillName(skillId) }}
             </label>
-            <div class="text-xs text-gray-500">ID: {{ skillId }}</div>
+            <div class="text-xs text-surface-500 dark:text-surface-400">ID: {{ skillId }}</div>
           </div>
           <div class="flex items-center space-x-2">
             <InputNumber
@@ -124,12 +124,12 @@
     >
       <div class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Character Level</label>
+          <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Character Level</label>
           <InputNumber v-model="quickLevel" :min="1" :max="220" class="w-full" />
         </div>
         
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Profession</label>
+          <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Profession</label>
           <Dropdown
             v-model="quickProfession"
             :options="professions"
@@ -141,7 +141,7 @@
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Focus Skills</label>
+          <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Focus Skills</label>
           <MultiSelect
             v-model="quickFocusSkills"
             :options="weaponSkills"

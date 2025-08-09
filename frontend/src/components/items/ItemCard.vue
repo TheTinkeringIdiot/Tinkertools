@@ -16,7 +16,7 @@ Shows item info with compatibility status and quick actions
     <template #header>
       <div class="relative">
         <!-- Item Image/Icon -->
-        <div class="h-32 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center">
+        <div class="h-32 bg-gradient-to-br from-surface-100 to-surface-200 dark:from-surface-800 dark:to-surface-900 flex items-center justify-center">
           <i class="pi pi-box text-3xl text-surface-400"></i>
         </div>
         

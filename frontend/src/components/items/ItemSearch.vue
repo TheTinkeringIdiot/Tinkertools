@@ -212,6 +212,7 @@ Provides full-text search with auto-complete and search suggestions
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import type { TinkerProfile } from '@/types/api'
 
+
 interface SearchSuggestion {
   text: string
   type: 'item' | 'category' | 'stat' | 'effect'

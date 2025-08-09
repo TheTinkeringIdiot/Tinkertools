@@ -1,13 +1,13 @@
 <template>
   <div>
     <!-- Header with sorting controls -->
-    <div class="p-4 border-b bg-gray-50">
+    <div class="p-4 border-b bg-surface-50 dark:bg-surface-900">
       <div class="flex items-center justify-between">
-        <h3 class="font-medium text-gray-900">
+        <h3 class="font-medium text-surface-900 dark:text-surface-50">
           {{ weapons.length }} weapon{{ weapons.length !== 1 ? 's' : '' }} found
         </h3>
         <div class="flex items-center space-x-2">
-          <span class="text-sm text-gray-600">Sort by:</span>
+          <span class="text-sm text-surface-600 dark:text-surface-400">Sort by:</span>
           <Button
             @click="$emit('sort', 'name', sortBy === 'name' ? !sortDescending : false)"
             :label="'Name'"
@@ -39,17 +39,17 @@
       <div
         v-for="weapon in weapons"
         :key="weapon.id"
-        class="bg-white border rounded-lg hover:shadow-md transition-shadow cursor-pointer"
+        class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
         @click="$emit('select', weapon)"
       >
         <!-- Weapon Header -->
-        <div class="p-4 border-b">
+        <div class="p-4 border-b border-surface-200 dark:border-surface-700">
           <div class="flex items-start justify-between">
             <div class="flex-1 min-w-0">
-              <h4 class="font-semibold text-gray-900 truncate">{{ weapon.name }}</h4>
+              <h4 class="font-semibold text-surface-900 dark:text-surface-50 truncate">{{ weapon.name }}</h4>
               <div class="flex items-center space-x-2 mt-1">
-                <span class="text-sm text-gray-600">QL {{ weapon.ql }}</span>
-                <span class="text-xs text-gray-500">ID: {{ weapon.aoid }}</span>
+                <span class="text-sm text-surface-600 dark:text-surface-400">QL {{ weapon.ql }}</span>
+                <span class="text-xs text-surface-500 dark:text-surface-400">ID: {{ weapon.aoid }}</span>
               </div>
             </div>
             <div class="flex space-x-1 ml-2">
@@ -81,7 +81,7 @@
 
         <!-- Attack Stats (if available) -->
         <div v-if="weapon.attack_stats && weapon.attack_stats.length > 0" class="px-4 pb-4">
-          <div class="text-xs font-medium text-gray-700 mb-2">Attack Stats</div>
+          <div class="text-xs font-medium text-surface-700 dark:text-surface-300 mb-2">Attack Stats</div>
           <div class="flex flex-wrap gap-1">
             <span
               v-for="stat in weapon.attack_stats.slice(0, 3)"
@@ -92,7 +92,7 @@
             </span>
             <span
               v-if="weapon.attack_stats.length > 3"
-              class="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-50 text-gray-600"
+              class="inline-flex items-center px-2 py-1 rounded text-xs bg-surface-50 dark:bg-surface-900 text-surface-600 dark:text-surface-400"
             >
               +{{ weapon.attack_stats.length - 3 }} more
             </span>
@@ -123,10 +123,10 @@
 
     <!-- Empty state -->
     <div v-if="weapons.length === 0" class="text-center py-12">
-      <div class="text-gray-400 mb-2">
+      <div class="text-surface-400 dark:text-surface-500 mb-2">
         <i class="pi pi-search text-3xl"></i>
       </div>
-      <p class="text-gray-600">No weapons match your current filters</p>
+      <p class="text-surface-600 dark:text-surface-400">No weapons match your current filters</p>
     </div>
   </div>
 </template>

@@ -29,13 +29,13 @@ const usability = computed(() => {
 
 const badgeClass = computed(() => {
   if (usability.value.canUse) {
-    return 'bg-green-100 text-green-800'
+    return 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300'
   } else {
     const missingCount = usability.value.missingRequirements.length
     if (missingCount <= 2) {
       return 'bg-yellow-100 text-yellow-800' // Close to usable
     } else {
-      return 'bg-red-100 text-red-800' // Far from usable
+      return 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300' // Far from usable
     }
   }
 })
