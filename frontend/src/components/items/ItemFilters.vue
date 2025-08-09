@@ -212,8 +212,8 @@ Provides dynamic filtering with real-time results and profile-aware options
                   {{ stat.label }}
                 </label>
                 <InputNumber
-                  v-if="tempFilters.selectedStats.includes(stat.value)"
-                  v-model="tempFilters.statMinValues[stat.value]"
+                  v-if="tempFilters.selectedStats?.includes(stat.value)"
+                  v-model="tempFilters.statMinValues![stat.value]"
                   :min="0"
                   :max="9999"
                   placeholder="Min"
@@ -396,8 +396,14 @@ const emit = defineEmits<{
   'update:filters': [filters: ItemFilters]
 }>()
 
-// State
-const tempFilters = ref<ItemFilters>({ ...props.filters })
+// State - ensure all arrays are initialized
+const tempFilters = ref<ItemFilters>({ 
+  ...props.filters,
+  selectedStats: props.filters.selectedStats || [],
+  statMinValues: props.filters.statMinValues || {},
+  itemClasses: props.filters.itemClasses || [],
+  sources: props.filters.sources || []
+})
 const openSections = ref([0, 1]) // Open first two sections by default
 const qlRange = ref([1, 300])
 const presetName = ref('')
@@ -523,7 +529,7 @@ const activeFilterSummary = computed(() => {
   
   if (tempFilters.value.selectedStats?.length) {
     summary.stats = { 
-      label: `${tempFilters.value.selectedStats.length} Stats`, 
+      label: `${tempFilters.value.selectedStats?.length || 0} Stats`, 
       severity: 'warning' 
     }
   }

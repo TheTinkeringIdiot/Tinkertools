@@ -2,20 +2,20 @@
   <div class="flex items-center justify-between">
     <div class="flex items-center space-x-6">
       <div>
-        <span class="text-2xl font-bold text-green-600">{{ usableCount }}</span>
-        <div class="text-sm text-gray-600">Usable</div>
+        <span class="text-2xl font-bold text-green-600 dark:text-green-400">{{ usableCount }}</span>
+        <div class="text-sm text-surface-600 dark:text-surface-400">Usable</div>
       </div>
       <div>
-        <span class="text-2xl font-bold text-yellow-600">{{ partialCount }}</span>
-        <div class="text-sm text-gray-600">Close (1-2 missing)</div>
+        <span class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{{ partialCount }}</span>
+        <div class="text-sm text-surface-600 dark:text-surface-400">Close (1-2 missing)</div>
       </div>
       <div>
-        <span class="text-2xl font-bold text-red-600">{{ unusableCount }}</span>
-        <div class="text-sm text-gray-600">Too many missing</div>
+        <span class="text-2xl font-bold text-red-600 dark:text-red-400">{{ unusableCount }}</span>
+        <div class="text-sm text-surface-600 dark:text-surface-400">Too many missing</div>
       </div>
     </div>
     <div class="text-right">
-      <div class="text-sm text-gray-600">Usability Rate</div>
+      <div class="text-sm text-surface-600 dark:text-surface-400">Usability Rate</div>
       <div class="text-lg font-semibold">{{ usabilityPercentage }}%</div>
     </div>
   </div>

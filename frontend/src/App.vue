@@ -3,14 +3,15 @@ import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import Button from 'primevue/button';
 import Menubar from 'primevue/menubar';
-import { useDarkMode } from './composables/useDarkMode';
+import { useTheme } from './composables/useTheme';
 import type { MenuItem } from 'primevue/menuitem';
 
 const router = useRouter();
-const { isDark, toggle } = useDarkMode();
+const { isDark, toggle, currentTheme } = useTheme();
 
-const darkModeIcon = computed(() => isDark.value ? 'pi pi-sun' : 'pi pi-moon');
-const darkModeLabel = computed(() => isDark.value ? 'Light Mode' : 'Dark Mode');
+const themeIcon = computed(() => isDark.value ? 'pi pi-sun' : 'pi pi-moon');
+const themeLabel = computed(() => isDark.value ? 'Switch to Light Mode' : 'Switch to Dark Mode');
+const currentThemeText = computed(() => isDark.value ? 'Dark' : 'Light');
 
 const menuItems = ref<MenuItem[]>([
   {
@@ -41,8 +42,7 @@ const menuItems = ref<MenuItem[]>([
   {
     label: 'TinkerPocket',
     icon: 'pi pi-map',
-    command: () => router.push('/pocket'),
-    disabled: true
+    command: () => router.push('/pocket')
   },
   {
     label: 'TinkerNukes',
@@ -66,16 +66,21 @@ const menuItems = ref<MenuItem[]>([
           </div>
           
           <!-- Quick Actions -->
-          <div class="flex items-center gap-2">
-            <!-- Dark Mode Toggle -->
-            <Button 
-              :icon="darkModeIcon"
-              :aria-label="darkModeLabel"
-              outlined 
-              size="small"
-              @click="toggle"
-              class="mr-2"
-            />
+          <div class="flex items-center gap-3">
+            <!-- Global Theme Toggle -->
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-surface-500 dark:text-surface-400 font-medium">
+                {{ currentThemeText }} Mode
+              </span>
+              <Button 
+                :icon="themeIcon"
+                :aria-label="themeLabel"
+                outlined 
+                size="small"
+                @click="toggle"
+                :pt="{ root: 'transition-all duration-200 hover:scale-105' }"
+              />
+            </div>
             <Button 
               icon="pi pi-database" 
               label="Items" 

@@ -168,7 +168,7 @@ Provides a hierarchical view of nano programs grouped by their nano schools
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import Avatar from 'primevue/avatar';
 import Badge from 'primevue/badge';
 import Checkbox from 'primevue/checkbox';
@@ -233,7 +233,8 @@ const nanoSchools = [
   'Psychological Modifications', 
   'Matter Creation',
   'Time and Space',
-  'Sensory Improvement'
+  'Sensory Improvement',
+  'Unknown School'
 ];
 
 // Computed
@@ -247,9 +248,10 @@ const schoolsWithNanos = computed(() => {
   
   // Group nanos by school
   props.nanos.forEach(nano => {
-    const nanos = schoolMap.get(nano.school) || [];
+    const school = nano.school || 'Unknown School';
+    const nanos = schoolMap.get(school) || [];
     nanos.push(nano);
-    schoolMap.set(nano.school, nanos);
+    schoolMap.set(school, nanos);
   });
   
   // Convert to array and filter out empty schools
@@ -259,7 +261,9 @@ const schoolsWithNanos = computed(() => {
 });
 
 // Methods
-const getSchoolShortName = (school: string): string => {
+const getSchoolShortName = (school: string | null | undefined): string => {
+  if (!school) return '?';
+  
   const shortNames: Record<string, string> = {
     'Matter Metamorphosis': 'MM',
     'Biological Metamorphosis': 'BM', 
@@ -271,7 +275,9 @@ const getSchoolShortName = (school: string): string => {
   return shortNames[school] || school.charAt(0);
 };
 
-const getSchoolAvatarClass = (school: string): string => {
+const getSchoolAvatarClass = (school: string | null | undefined): string => {
+  if (!school) return 'bg-surface-500 text-white';
+  
   const schoolColors: Record<string, string> = {
     'Matter Metamorphosis': 'bg-red-500 text-white',
     'Biological Metamorphosis': 'bg-green-500 text-white',
@@ -464,7 +470,14 @@ const toggleSchool = (schoolName: string) => {
   } else {
     expandedSchools.value.add(schoolName);
   }
-  saveExpandedState();
+  
+  // Save expanded state
+  try {
+    const state = Array.from(expandedSchools.value);
+    localStorage.setItem('tinkertools_nano_expanded_schools', JSON.stringify(state));
+  } catch (error) {
+    console.warn('Failed to save expanded state:', error);
+  }
 };
 
 const updateSort = () => {
@@ -480,30 +493,10 @@ const handleFavorite = (nanoId: number, isFavorite: boolean) => {
   emit('favorite', nanoId, isFavorite);
 };
 
-const savePreferences = () => {
-  try {
-    const preferences = {
-      organizeByStrain: organizeByStrain.value,
-      compactCards: compactCards.value,
-      sortBy: sortBy.value,
-      expandedSchools: Array.from(expandedSchools.value)
-    };
-    localStorage.setItem('tinkertools_nano_school_view_preferences', JSON.stringify(preferences));
-  } catch (error) {
-    console.warn('Failed to save school view preferences:', error);
-  }
-};
 
-const saveExpandedState = () => {
-  try {
-    const state = Array.from(expandedSchools.value);
-    localStorage.setItem('tinkertools_nano_expanded_schools', JSON.stringify(state));
-  } catch (error) {
-    console.warn('Failed to save expanded state:', error);
-  }
-};
-
-const loadPreferences = () => {
+// Component initialization - only run once when component mounts
+onMounted(() => {
+  // Load saved preferences from localStorage
   try {
     const preferences = localStorage.getItem('tinkertools_nano_school_view_preferences');
     if (preferences) {
@@ -519,29 +512,44 @@ const loadPreferences = () => {
   } catch (error) {
     console.warn('Failed to load school view preferences:', error);
   }
-};
-
-// Watch for changes to save preferences
-watch([organizeByStrain, compactCards, sortBy], () => {
-  savePreferences();
-});
-
-// Initialize by expanding first few schools if no preferences
-const initializeExpandedSchools = () => {
+  
+  // Initialize expanded schools if none are set
   if (expandedSchools.value.size === 0 && schoolsWithNanos.value.length > 0) {
-    // Auto-expand first 2 schools
     schoolsWithNanos.value.slice(0, 2).forEach(school => {
       expandedSchools.value.add(school.name);
     });
-    saveExpandedState();
+    try {
+      const state = Array.from(expandedSchools.value);
+      localStorage.setItem('tinkertools_nano_expanded_schools', JSON.stringify(state));
+    } catch (error) {
+      console.warn('Failed to save expanded state:', error);
+    }
   }
-};
+});
 
-// Load preferences on mount
-loadPreferences();
+// Watch for preference changes and save them
+watch([organizeByStrain, compactCards, sortBy], () => {
+  try {
+    const preferences = {
+      organizeByStrain: organizeByStrain.value,
+      compactCards: compactCards.value,
+      sortBy: sortBy.value,
+      expandedSchools: Array.from(expandedSchools.value)
+    };
+    localStorage.setItem('tinkertools_nano_school_view_preferences', JSON.stringify(preferences));
+  } catch (error) {
+    console.warn('Failed to save school view preferences:', error);
+  }
+});
+
+// Watch for school changes and update expanded state
 watch(schoolsWithNanos, () => {
-  initializeExpandedSchools();
-}, { immediate: true });
+  if (expandedSchools.value.size === 0 && schoolsWithNanos.value.length > 0) {
+    schoolsWithNanos.value.slice(0, 2).forEach(school => {
+      expandedSchools.value.add(school.name);
+    });
+  }
+});
 </script>
 
 <style scoped>

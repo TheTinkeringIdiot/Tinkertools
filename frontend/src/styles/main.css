@@ -35,8 +35,8 @@
   --primary-950: 4, 47, 46;
 }
 
-[data-theme="dark"] {
-  /* Dark theme surface colors */
+.dark {
+  /* Dark theme surface colors for Tailwind */
   --surface-0: 9, 9, 11;
   --surface-50: 24, 24, 27;
   --surface-100: 39, 39, 42;
@@ -50,11 +50,23 @@
   --surface-900: 250, 250, 250;
   --surface-950: 255, 255, 255;
   
-  /* Override PrimeVue CSS variables for dark theme */
+  /* Color scheme */
+  color-scheme: dark;
+}
+
+/* PrimeVue dark theme overrides */
+[data-theme="dark"] {
+  /* PrimeVue CSS variables for dark theme */
   --text-color: #e2e8f0;
   --text-color-secondary: #94a3b8;
   --primary-color: #14b8a6;
   --primary-color-text: #ffffff;
+  --surface-ground: #09090b;
+  --surface-section: #18181b;
+  --surface-card: #27272a;
+  --surface-overlay: #27272a;
+  --surface-border: #3f3f46;
+  --surface-hover: #3f3f46;
   --surface-0: #09090b;
   --surface-50: #18181b;
   --surface-100: #27272a;
@@ -67,17 +79,26 @@
   --surface-800: #f4f4f5;
   --surface-900: #fafafa;
   --surface-950: #ffffff;
-  --surface-ground: #18181b;
-  --surface-section: #27272a;
-  --surface-card: #27272a;
-  --surface-overlay: #27272a;
-  --surface-border: #3f3f46;
-  --surface-hover: #3f3f46;
   --highlight-bg: #0f2d2a;
   --highlight-text-color: #5eead4;
   
   /* Color scheme */
   color-scheme: dark;
+}
+
+/* Ensure PrimeVue components inherit theme */
+.dark .p-menubar,
+.dark .p-dropdown,
+.dark .p-button,
+.dark .p-card,
+.dark .p-panel,
+.dark .p-tabview,
+.dark .p-dialog,
+.dark .p-inputtext,
+.dark .p-inputswitch {
+  background-color: var(--surface-card);
+  color: var(--text-color);
+  border-color: var(--surface-border);
 }
 
 html, body, #app {

@@ -1,10 +1,10 @@
 <template>
   <div>
-    <div class="text-xs font-medium text-gray-700 mb-2">
+    <div class="text-xs font-medium text-surface-700 dark:text-surface-300 mb-2">
       {{ compact ? 'Key Requirements' : 'Skill Requirements' }}
     </div>
     
-    <div v-if="skillRequirements.length === 0" class="text-xs text-gray-500">
+    <div v-if="skillRequirements.length === 0" class="text-xs text-surface-500 dark:text-surface-400">
       No specific skill requirements detected
     </div>
     
@@ -20,18 +20,18 @@
           <span>{{ req.value }}</span>
           <i 
             v-if="characterSkills && Object.keys(characterSkills).length > 0"
-            :class="req.met ? 'pi pi-check text-green-600' : 'pi pi-times text-red-600'"
+            :class="req.met ? 'pi pi-check text-green-600 dark:text-green-400' : 'pi pi-times text-red-600 dark:text-red-400'"
           />
           <span 
             v-if="characterSkills && req.characterValue !== undefined"
-            class="text-gray-500"
+            class="text-surface-500 dark:text-surface-400"
           >
             ({{ req.characterValue }})
           </span>
         </div>
       </div>
       
-      <div v-if="compact && skillRequirements.length > maxCompactItems" class="text-xs text-gray-500">
+      <div v-if="compact && skillRequirements.length > maxCompactItems" class="text-xs text-surface-500 dark:text-surface-400">
         +{{ skillRequirements.length - maxCompactItems }} more requirements
       </div>
     </div>
@@ -118,11 +118,11 @@ const usability = computed<WeaponUsability>(() => {
 // Methods
 const getRequirementClass = (req: WeaponRequirement): string => {
   if (!props.characterSkills || req.characterValue === undefined) {
-    return 'text-gray-700'
+    return 'text-surface-700 dark:text-surface-300'
   }
   
   return req.met 
-    ? 'text-green-700 bg-green-50 px-2 py-1 rounded' 
-    : 'text-red-700 bg-red-50 px-2 py-1 rounded'
+    ? 'text-green-700 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded' 
+    : 'text-red-700 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded'
 }
 </script>

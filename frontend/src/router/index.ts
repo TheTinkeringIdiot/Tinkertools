@@ -33,6 +33,11 @@ const routes: RouteRecordRaw[] = [
     path: '/plants',
     name: 'TinkerPlants',
     component: () => import('@/views/TinkerPlants.vue')
+  },
+  {
+    path: '/pocket',
+    name: 'TinkerPocket',
+    component: () => import('@/views/TinkerPocket.vue')
   }
 ];
 

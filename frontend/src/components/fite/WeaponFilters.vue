@@ -3,7 +3,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       <!-- Weapon Types -->
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Weapon Types</label>
+        <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Weapon Types</label>
         <MultiSelect
           v-model="localFilters.weaponTypes"
           @update:model-value="updateFilters"
@@ -17,7 +17,7 @@
 
       <!-- Quality Levels -->
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Quality Levels</label>
+        <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Quality Levels</label>
         <MultiSelect
           v-model="localFilters.qualityLevels"
           @update:model-value="updateFilters"
@@ -31,7 +31,7 @@
 
       <!-- Usability Filter -->
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Usability</label>
+        <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Usability</label>
         <div class="flex items-center space-x-2 mt-2">
           <Checkbox 
             v-model="localFilters.usableOnly"
@@ -41,7 +41,7 @@
           />
           <label for="usable-only" class="text-sm">Show usable only</label>
         </div>
-        <div class="text-xs text-gray-500 mt-1">
+        <div class="text-xs text-surface-500 dark:text-surface-400 mt-1">
           {{ characterSkills && Object.keys(characterSkills).length > 0 
              ? 'Based on your character skills' 
              : 'Enter character skills to enable' }}
@@ -50,7 +50,7 @@
 
       <!-- Sorting -->
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+        <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Sort By</label>
         <div class="space-y-2">
           <Dropdown
             v-model="localFilters.sortBy"
@@ -75,7 +75,7 @@
 
     <!-- Quick Filters -->
     <div class="border-t pt-4">
-      <div class="text-sm font-medium text-gray-700 mb-2">Quick Filters</div>
+      <div class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Quick Filters</div>
       <div class="flex flex-wrap gap-2">
         <Button
           v-for="quickFilter in quickFilters"
@@ -92,7 +92,7 @@
     <!-- Active Filters Summary -->
     <div v-if="hasActiveFilters" class="border-t pt-4">
       <div class="flex items-center justify-between mb-2">
-        <span class="text-sm font-medium text-gray-700">Active Filters</span>
+        <span class="text-sm font-medium text-surface-700 dark:text-surface-300">Active Filters</span>
         <Button
           @click="clearAllFilters"
           label="Clear All"

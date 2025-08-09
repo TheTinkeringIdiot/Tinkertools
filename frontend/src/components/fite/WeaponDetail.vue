@@ -10,32 +10,32 @@
       <!-- Weapon Overview -->
       <div class="grid grid-cols-2 gap-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700">Name</label>
-          <p class="mt-1 text-sm text-gray-900">{{ weapon.name }}</p>
+          <label class="block text-sm font-medium text-surface-700 dark:text-surface-300">Name</label>
+          <p class="mt-1 text-sm text-surface-900 dark:text-surface-50">{{ weapon.name }}</p>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700">Quality Level</label>
-          <p class="mt-1 text-sm text-gray-900">{{ weapon.ql }}</p>
+          <label class="block text-sm font-medium text-surface-700 dark:text-surface-300">Quality Level</label>
+          <p class="mt-1 text-sm text-surface-900 dark:text-surface-50">{{ weapon.ql }}</p>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700">AOID</label>
-          <p class="mt-1 text-sm text-gray-900">{{ weapon.aoid }}</p>
+          <label class="block text-sm font-medium text-surface-700 dark:text-surface-300">AOID</label>
+          <p class="mt-1 text-sm text-surface-900 dark:text-surface-50">{{ weapon.aoid }}</p>
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700">Item Class</label>
-          <p class="mt-1 text-sm text-gray-900">{{ weapon.item_class }}</p>
+          <label class="block text-sm font-medium text-surface-700 dark:text-surface-300">Item Class</label>
+          <p class="mt-1 text-sm text-surface-900 dark:text-surface-50">{{ weapon.item_class }}</p>
         </div>
       </div>
 
       <!-- Description -->
       <div v-if="weapon.description">
-        <label class="block text-sm font-medium text-gray-700">Description</label>
-        <p class="mt-1 text-sm text-gray-900">{{ weapon.description }}</p>
+        <label class="block text-sm font-medium text-surface-700 dark:text-surface-300">Description</label>
+        <p class="mt-1 text-sm text-surface-900 dark:text-surface-50">{{ weapon.description }}</p>
       </div>
 
       <!-- Usability (if skills available) -->
       <div v-if="characterSkills && Object.keys(characterSkills).length > 0" class="border rounded-lg p-4">
-        <h4 class="font-medium text-gray-900 mb-3">Usability Check</h4>
+        <h4 class="font-medium text-surface-900 dark:text-surface-50 mb-3">Usability Check</h4>
         <WeaponRequirements 
           :weapon="weapon"
           :character-skills="characterSkills"
@@ -44,7 +44,7 @@
 
       <!-- Requirements -->
       <div class="border rounded-lg p-4">
-        <h4 class="font-medium text-gray-900 mb-3">All Requirements</h4>
+        <h4 class="font-medium text-surface-900 dark:text-surface-50 mb-3">All Requirements</h4>
         <WeaponRequirements 
           :weapon="weapon"
           :character-skills="characterSkills"
@@ -53,7 +53,7 @@
 
       <!-- Attack Stats -->
       <div v-if="weapon.attack_stats && weapon.attack_stats.length > 0" class="border rounded-lg p-4">
-        <h4 class="font-medium text-gray-900 mb-3">Attack Stats</h4>
+        <h4 class="font-medium text-surface-900 dark:text-surface-50 mb-3">Attack Stats</h4>
         <div class="grid grid-cols-2 gap-2">
           <div 
             v-for="stat in weapon.attack_stats"
@@ -68,7 +68,7 @@
 
       <!-- Defense Stats -->
       <div v-if="weapon.defense_stats && weapon.defense_stats.length > 0" class="border rounded-lg p-4">
-        <h4 class="font-medium text-gray-900 mb-3">Defense Stats</h4>
+        <h4 class="font-medium text-surface-900 dark:text-surface-50 mb-3">Defense Stats</h4>
         <div class="grid grid-cols-2 gap-2">
           <div 
             v-for="stat in weapon.defense_stats"
