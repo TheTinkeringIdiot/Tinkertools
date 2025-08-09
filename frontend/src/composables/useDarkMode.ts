@@ -22,33 +22,14 @@ export function useDarkMode(): DarkModeState {
     isDark.value = !value;
   };
 
-  // Apply dark mode class to document and switch PrimeVue theme
+  // Apply dark mode class to document
   const applyTheme = (dark: boolean) => {
     if (dark) {
       document.documentElement.classList.add('dark');
       document.documentElement.setAttribute('data-theme', 'dark');
-      // Switch to dark PrimeVue theme
-      switchPrimeVueTheme('aura-dark-teal');
     } else {
       document.documentElement.classList.remove('dark');
       document.documentElement.setAttribute('data-theme', 'light');
-      // Switch to light PrimeVue theme
-      switchPrimeVueTheme('aura-light-teal');
-    }
-  };
-
-  // Function to dynamically switch PrimeVue theme
-  const switchPrimeVueTheme = (theme: string) => {
-    // Find and update the existing theme link
-    const existingLink = document.querySelector('link[href*="primevue/resources/themes"]') as HTMLLinkElement;
-    if (existingLink) {
-      existingLink.href = `https://unpkg.com/primevue@^4/resources/themes/${theme}/theme.css`;
-    } else {
-      // Create new theme link if none exists
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = `https://unpkg.com/primevue@^4/resources/themes/${theme}/theme.css`;
-      document.head.appendChild(link);
     }
   };
 

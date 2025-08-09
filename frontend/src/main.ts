@@ -5,7 +5,6 @@ import router from './router';
 import Tooltip from 'primevue/tooltip';
 
 import 'primeicons/primeicons.css';
-import 'primevue/resources/themes/aura-light-teal/theme.css';
 import './styles/main.css';
 
 import App from './App.vue';
