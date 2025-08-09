@@ -30,8 +30,7 @@ const menuItems = ref([
   {
     label: 'TinkerPlants',
     icon: 'pi pi-cog',
-    command: () => router.push('/plants'),
-    disabled: true
+    command: () => router.push('/plants')
   },
   {
     label: 'TinkerPocket',

@@ -28,6 +28,11 @@ const routes: RouteRecordRaw[] = [
     path: '/fite',
     name: 'TinkerFite',
     component: () => import('@/views/TinkerFiteMinimal.vue')
+  },
+  {
+    path: '/plants',
+    name: 'TinkerPlants',
+    component: () => import('@/views/TinkerPlants.vue')
   }
 ];
 
