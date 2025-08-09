@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import Button from 'primevue/button';
 import Menubar from 'primevue/menubar';
+import { useDarkMode } from './composables/useDarkMode';
+import type { MenuItem } from 'primevue/menuitem';
 
 const router = useRouter();
+const { isDark, toggle } = useDarkMode();
 
-const menuItems = ref([
+const darkModeIcon = computed(() => isDark.value ? 'pi pi-sun' : 'pi pi-moon');
+const darkModeLabel = computed(() => isDark.value ? 'Light Mode' : 'Dark Mode');
+
+const menuItems = ref<MenuItem[]>([
   {
     label: 'Home',
     icon: 'pi pi-home',
@@ -61,6 +67,15 @@ const menuItems = ref([
           
           <!-- Quick Actions -->
           <div class="flex items-center gap-2">
+            <!-- Dark Mode Toggle -->
+            <Button 
+              :icon="darkModeIcon"
+              :aria-label="darkModeLabel"
+              outlined 
+              size="small"
+              @click="toggle"
+              class="mr-2"
+            />
             <Button 
               icon="pi pi-database" 
               label="Items" 
