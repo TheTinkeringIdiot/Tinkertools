@@ -256,6 +256,7 @@ import { useItems } from '@/composables/useItems'
 import { useProfileStore } from '@/stores/profile'
 import type { Item, ItemSearchQuery, ItemFilters } from '@/types/api'
 
+
 // Components
 import ItemSearch from '@/components/items/ItemSearch.vue'
 import ItemFiltersComponent from '@/components/items/ItemFilters.vue'
@@ -294,18 +295,18 @@ const {
 // Computed Properties
 const profileOptions = computed(() => [
   { label: 'No Profile (View All)', value: 'none' },
-  ...profileStore.profiles.map(profile => ({
-    label: `${profile.name} (${profile.level} ${profile.profession})`,
-    value: profile.id
+  ...Array.from(profileStore.profiles.values()).map(profile => ({
+    label: `${profile.Character.Name} (${profile.Character.Level} ${profile.Character.Profession})`,
+    value: profile.Character.Name // Using name as the key since profiles don't have an id field
   }))
 ])
 
 const hasActiveProfile = computed(() => 
-  selectedProfile.value !== 'none' && profileStore.getProfile(selectedProfile.value) !== null
+  selectedProfile.value !== 'none' && profileStore.profiles.get(selectedProfile.value) !== undefined
 )
 
 const activeProfile = computed(() => 
-  hasActiveProfile.value ? profileStore.getProfile(selectedProfile.value) : null
+  hasActiveProfile.value ? profileStore.profiles.get(selectedProfile.value) : null
 )
 
 const compatibilityProfile = computed(() => 
@@ -383,7 +384,7 @@ function onProfileChange() {
 function clearProfile() {
   selectedProfile.value = 'none'
   showCompatibility.value = false
-  profileStore.clearCurrentProfile()
+  profileStore.setCurrentProfile(null)
 }
 
 function onFiltersChanged() {
@@ -480,7 +481,7 @@ function onPageChange(page: number) {
 onMounted(() => {
   // Set current profile if available
   if (profileStore.currentProfile) {
-    selectedProfile.value = profileStore.currentProfile.id
+    selectedProfile.value = profileStore.currentProfile.Character.Name
     showCompatibility.value = true
   }
 })
@@ -488,7 +489,7 @@ onMounted(() => {
 // Watch for profile store changes
 watch(() => profileStore.currentProfile, (newProfile) => {
   if (newProfile && selectedProfile.value === 'none') {
-    selectedProfile.value = newProfile.id
+    selectedProfile.value = newProfile.Character.Name
     showCompatibility.value = true
   }
 })

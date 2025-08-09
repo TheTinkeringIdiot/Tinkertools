@@ -108,6 +108,7 @@ Provides nano database browsing, skill compatibility checking, and nano lineup m
           <!-- School-based Organization -->
           <NanoSchoolView
             v-if="viewMode"
+            key="school-view"
             :nanos="filteredNanos"
             :show-compatibility="showSkillCompatibility"
             :active-profile="activeProfile"

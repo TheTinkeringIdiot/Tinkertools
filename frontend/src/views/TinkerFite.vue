@@ -1,24 +1,24 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="tinker-fite h-full flex flex-col">
     <!-- Header -->
-    <div class="bg-white shadow">
-      <div class="container mx-auto px-4 py-6">
-        <div class="flex items-center justify-between">
-          <div>
-            <h1 class="text-3xl font-bold text-gray-900">TinkerFite</h1>
-            <p class="text-gray-600 mt-1">Skill-based weapon selection for Anarchy Online</p>
-          </div>
-          <div class="text-right">
-            <div class="text-sm text-gray-500">Total Weapons</div>
-            <div class="text-2xl font-bold text-blue-600">{{ totalWeapons }}</div>
-          </div>
+    <div class="bg-surface-50 dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 p-4">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div class="flex items-center gap-4">
+          <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50">
+            <i class="pi pi-shield mr-2"></i>
+            TinkerFite
+          </h1>
+          <Badge :value="totalWeapons" severity="info" v-if="totalWeapons > 0" />
+        </div>
+        <div class="text-surface-600 dark:text-surface-400">
+          Skill-based weapon selection for Anarchy Online
         </div>
       </div>
     </div>
 
     <!-- Content -->
-    <div class="container mx-auto px-4 py-8">
-      <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+    <div class="flex-1 overflow-hidden p-4">
+      <div class="h-full grid grid-cols-1 lg:grid-cols-4 gap-6">
         
         <!-- Character Skills Panel -->
         <div class="lg:col-span-1">
@@ -31,7 +31,7 @@
         <!-- Main Content Area -->
         <div class="lg:col-span-3">
           <!-- Search and Filters -->
-          <div class="bg-white rounded-lg shadow p-6 mb-6">
+          <div class="bg-surface-0 dark:bg-surface-950 rounded-lg border border-surface-200 dark:border-surface-700 p-6 mb-6">
             <div class="flex flex-col md:flex-row gap-4">
               <div class="flex-1">
                 <WeaponSearch 
@@ -51,7 +51,7 @@
             </div>
             
             <!-- Collapsible Filters -->
-            <div v-if="showFilters" class="mt-4 pt-4 border-t">
+            <div v-if="showFilters" class="mt-4 pt-4 border-t border-surface-200 dark:border-surface-700">
               <WeaponFilters
                 v-model:filters="weaponFilters"
                 @update:filters="onFiltersUpdated"
@@ -61,7 +61,7 @@
           </div>
 
           <!-- Usability Summary -->
-          <div v-if="characterSkills && Object.keys(characterSkills).length > 0" class="bg-white rounded-lg shadow p-4 mb-6">
+          <div v-if="characterSkills && Object.keys(characterSkills).length > 0" class="bg-surface-0 dark:bg-surface-950 rounded-lg border border-surface-200 dark:border-surface-700 p-4 mb-6">
             <UsabilitySummary 
               :weapons="filteredWeapons"
               :character-skills="characterSkills"
@@ -69,28 +69,28 @@
           </div>
 
           <!-- Results -->
-          <div class="bg-white rounded-lg shadow">
+          <div class="bg-surface-0 dark:bg-surface-950 rounded-lg border border-surface-200 dark:border-surface-700">
             <!-- Loading State -->
             <div v-if="loading" class="p-8 text-center">
               <ProgressSpinner class="w-8 h-8" />
-              <p class="text-gray-600 mt-2">Loading weapons...</p>
+              <p class="text-surface-600 dark:text-surface-400 mt-2">Loading weapons...</p>
             </div>
 
             <!-- Error State -->
             <div v-else-if="error" class="p-8 text-center">
-              <div class="text-red-600 mb-2">
+              <div class="text-red-600 dark:text-red-400 mb-2">
                 <i class="pi pi-exclamation-triangle text-2xl"></i>
               </div>
-              <p class="text-red-800">{{ error }}</p>
+              <p class="text-red-800 dark:text-red-300">{{ error }}</p>
               <Button @click="loadWeapons" label="Retry" class="mt-4" />
             </div>
 
             <!-- Empty State -->
             <div v-else-if="filteredWeapons.length === 0" class="p-8 text-center">
-              <div class="text-gray-400 mb-2">
+              <div class="text-surface-400 dark:text-surface-500 mb-2">
                 <i class="pi pi-search text-2xl"></i>
               </div>
-              <p class="text-gray-600">No weapons found matching your criteria</p>
+              <p class="text-surface-600 dark:text-surface-400">No weapons found matching your criteria</p>
               <Button @click="clearFilters" label="Clear Filters" severity="secondary" class="mt-4" />
             </div>
 
