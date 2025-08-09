@@ -1,3 +1,5 @@
+@import 'primevue/resources/themes/aura-light-teal/theme.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -47,6 +49,35 @@
   --surface-800: 244, 244, 245;
   --surface-900: 250, 250, 250;
   --surface-950: 255, 255, 255;
+  
+  /* Override PrimeVue CSS variables for dark theme */
+  --text-color: #e2e8f0;
+  --text-color-secondary: #94a3b8;
+  --primary-color: #14b8a6;
+  --primary-color-text: #ffffff;
+  --surface-0: #09090b;
+  --surface-50: #18181b;
+  --surface-100: #27272a;
+  --surface-200: #3f3f46;
+  --surface-300: #52525b;
+  --surface-400: #71717a;
+  --surface-500: #a1a1aa;
+  --surface-600: #d4d4d8;
+  --surface-700: #e4e4e7;
+  --surface-800: #f4f4f5;
+  --surface-900: #fafafa;
+  --surface-950: #ffffff;
+  --surface-ground: #18181b;
+  --surface-section: #27272a;
+  --surface-card: #27272a;
+  --surface-overlay: #27272a;
+  --surface-border: #3f3f46;
+  --surface-hover: #3f3f46;
+  --highlight-bg: #0f2d2a;
+  --highlight-text-color: #5eead4;
+  
+  /* Color scheme */
+  color-scheme: dark;
 }
 
 html, body, #app {
