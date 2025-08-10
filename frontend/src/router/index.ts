@@ -38,6 +38,11 @@ const routes: RouteRecordRaw[] = [
     path: '/pocket',
     name: 'TinkerPocket',
     component: () => import('@/views/TinkerPocket.vue')
+  },
+  {
+    path: '/nukes',
+    name: 'TinkerNukes',
+    component: () => import('@/views/TinkerNukes.vue')
   }
 ];
 
