@@ -1,576 +1,436 @@
 <!--
-TinkerPlants - Implant & Symbiant Planning Tool
-Provides character building, stat calculations, and build optimization
+TinkerPlants - Implant Planning Tool
+Grid-based implant selection following the legacy TinkerPlants format
 -->
 <template>
   <div class="tinker-plants h-full flex flex-col">
-    <!-- Header with Profile Selection and Options -->
+    <!-- Header -->
     <div class="bg-surface-50 dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 p-4">
       <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div class="flex items-center gap-4">
           <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50">
-            <i class="pi pi-cog mr-2"></i>
+            <i class="pi pi-cog mr-2" aria-hidden="true"></i>
             TinkerPlants
           </h1>
-          <Badge :value="symbiantsCount" severity="info" v-if="symbiantsCount > 0" />
+          <Badge 
+            value="Implant Planner" 
+            severity="info"
+            aria-label="Implant planning and construction tool"
+          />
         </div>
         
-        <!-- Profile & Display Options -->
+        <!-- Controls -->
         <div class="flex flex-col sm:flex-row gap-3">
-          <!-- Profile Selection -->
+          <!-- Quality Level Control -->
           <div class="flex items-center gap-2">
-            <label class="text-sm font-medium text-surface-700 dark:text-surface-300">
-              Profile:
+            <label for="ql-input" class="text-sm font-medium text-surface-700 dark:text-surface-300">
+              QL:
             </label>
-            <Dropdown 
-              v-model="selectedProfile"
-              :options="profileOptions"
-              option-label="label"
-              option-value="value"
-              placeholder="Select Profile"
-              class="w-40"
-              @change="onProfileChange"
+            <InputNumber 
+              id="ql-input"
+              v-model="qualityLevel"
+              :min="1"
+              :max="300"
+              :step="1"
+              class="w-20"
+              aria-describedby="ql-help"
             />
+            <span id="ql-help" class="sr-only">
+              Quality Level for implants, from 1 to 300
+            </span>
           </div>
           
-          <!-- Build Mode Toggle -->
-          <div class="flex items-center gap-2">
-            <ToggleButton 
-              v-model="buildMode"
-              on-label="Build Mode"
-              off-label="Browse Mode"
-              on-icon="pi pi-wrench"
-              off-icon="pi pi-search"
-              class="w-36"
-            />
+          <!-- Clear All Button -->
+          <Button
+            @click="clearAllImplants"
+            label="Clear All"
+            icon="pi pi-trash"
+            size="small"
+            severity="secondary"
+            outlined
+            aria-label="Clear all selected implants"
+          />
+          
+          <!-- Calculate Button -->
+          <Button
+            @click="calculateBuild"
+            label="Calculate"
+            icon="pi pi-calculator"
+            size="small"
+            :disabled="!hasAnyImplants"
+            aria-label="Calculate implant construction requirements"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 overflow-auto p-4">
+      <div class="max-w-6xl mx-auto">
+        <!-- Implant Grid -->
+        <div class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg overflow-hidden">
+          <!-- Grid Header -->
+          <div class="grid grid-cols-5 gap-0 bg-surface-100 dark:bg-surface-800 border-b border-surface-200 dark:border-surface-700">
+            <div class="p-3 font-semibold text-surface-900 dark:text-surface-50 border-r border-surface-200 dark:border-surface-700">
+              Slot
+            </div>
+            <div class="p-3 font-semibold text-surface-900 dark:text-surface-50 text-center border-r border-surface-200 dark:border-surface-700">
+              Shiny
+            </div>
+            <div class="p-3 font-semibold text-surface-900 dark:text-surface-50 text-center border-r border-surface-200 dark:border-surface-700">
+              Bright  
+            </div>
+            <div class="p-3 font-semibold text-surface-900 dark:text-surface-50 text-center border-r border-surface-200 dark:border-surface-700">
+              Faded
+            </div>
+            <div class="p-3 font-semibold text-surface-900 dark:text-surface-50 text-center">
+              QL
+            </div>
           </div>
           
-          <!-- View Mode Toggle -->
-          <div class="flex items-center gap-2">
-            <ToggleButton 
-              v-model="viewMode"
-              on-label="Family View"
-              off-label="List View"
-              on-icon="pi pi-th-large"
-              off-icon="pi pi-list"
-              class="w-32"
-            />
+          <!-- Grid Rows -->
+          <div 
+            v-for="(slot, index) in implantSlots" 
+            :key="slot.id"
+            class="grid grid-cols-5 gap-0 border-b border-surface-200 dark:border-surface-700 last:border-b-0 hover:bg-surface-50 dark:hover:bg-surface-900/50"
+          >
+            <!-- Slot Name -->
+            <div class="p-3 border-r border-surface-200 dark:border-surface-700 flex items-center">
+              <span class="font-medium text-surface-900 dark:text-surface-50">
+                {{ slot.name }}
+              </span>
+            </div>
+            
+            <!-- Shiny Dropdown -->
+            <div class="p-2 border-r border-surface-200 dark:border-surface-700">
+              <Dropdown
+                :id="`${slot.id}-shiny`"
+                v-model="implantSelections[slot.id].shiny"
+                :options="skillClusters"
+                option-label="name"
+                option-value="id"
+                placeholder="None"
+                show-clear
+                class="w-full"
+                :aria-label="`Select shiny skill cluster for ${slot.name} slot`"
+                @change="onImplantChange(slot.id, 'shiny', $event.value)"
+              />
+            </div>
+            
+            <!-- Bright Dropdown -->
+            <div class="p-2 border-r border-surface-200 dark:border-surface-700">
+              <Dropdown
+                :id="`${slot.id}-bright`"
+                v-model="implantSelections[slot.id].bright"
+                :options="skillClusters"
+                option-label="name"
+                option-value="id"
+                placeholder="None"
+                show-clear
+                class="w-full"
+                :aria-label="`Select bright skill cluster for ${slot.name} slot`"
+                @change="onImplantChange(slot.id, 'bright', $event.value)"
+              />
+            </div>
+            
+            <!-- Faded Dropdown -->
+            <div class="p-2 border-r border-surface-200 dark:border-surface-700">
+              <Dropdown
+                :id="`${slot.id}-faded`"
+                v-model="implantSelections[slot.id].faded"
+                :options="skillClusters"
+                option-label="name"
+                option-value="id"
+                placeholder="None"
+                show-clear
+                class="w-full"
+                :aria-label="`Select faded skill cluster for ${slot.name} slot`"
+                @change="onImplantChange(slot.id, 'faded', $event.value)"
+              />
+            </div>
+            
+            <!-- QL Input -->
+            <div class="p-2">
+              <InputNumber
+                :id="`${slot.id}-ql`"
+                v-model="implantSelections[slot.id].ql"
+                :min="1"
+                :max="300"
+                :step="1"
+                class="w-full"
+                :aria-label="`Quality Level for ${slot.name} implant`"
+                @input="onQLChange(slot.id, $event.value)"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Results Section -->
+        <div v-if="showResults" class="mt-6 space-y-4">
+          <!-- Stat Summary -->
+          <div class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
+            <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-3 flex items-center gap-2">
+              <i class="pi pi-chart-bar text-primary-500"></i>
+              Stat Bonuses
+            </h3>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+              <div 
+                v-for="(bonus, statName) in calculatedBonuses" 
+                :key="statName"
+                class="text-center p-2 bg-surface-50 dark:bg-surface-900 rounded"
+              >
+                <div class="text-xs text-surface-600 dark:text-surface-400 uppercase tracking-wide">
+                  {{ statName }}
+                </div>
+                <div class="text-lg font-bold text-primary-600 dark:text-primary-400">
+                  +{{ bonus }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Construction Requirements -->
+          <div class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
+            <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-3 flex items-center gap-2">
+              <i class="pi pi-wrench text-primary-500"></i>
+              Construction Requirements
+            </h3>
+            <div class="space-y-2">
+              <div 
+                v-for="requirement in constructionRequirements" 
+                :key="`${requirement.slot}-${requirement.type}`"
+                class="flex justify-between items-center py-1 border-b border-surface-100 dark:border-surface-800 last:border-b-0"
+              >
+                <span class="text-surface-700 dark:text-surface-300">
+                  {{ requirement.slot }} - {{ requirement.type }}
+                </span>
+                <span class="font-mono text-surface-900 dark:text-surface-50">
+                  {{ requirement.clusters.join(', ') }}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Main Content Area -->
-    <div class="flex-1 flex min-h-0">
-      <!-- Left Sidebar - Search & Filters or Character Builder -->
-      <div class="w-80 bg-surface-0 dark:bg-surface-950 border-r border-surface-200 dark:border-surface-700 flex flex-col">
-        <!-- Character Builder Mode -->
-        <div v-if="buildMode" class="flex-1 flex flex-col">
-          <!-- Character Stats Input -->
-          <CharacterStatsPanel
-            :profile="activeProfile"
-            :editable="!activeProfile"
-            @stats-changed="handleStatsChange"
-            class="border-b border-surface-200 dark:border-surface-700"
-          />
-          
-          <!-- Target Stats -->
-          <StatTargets
-            v-model="statTargets"
-            :current-stats="characterStats"
-            class="border-b border-surface-200 dark:border-surface-700"
-          />
-          
-          <!-- Build Summary -->
-          <BuildSummary
-            :current-build="currentBuild"
-            :stat-bonuses="buildStatBonuses"
-            :total-stats="totalCharacterStats"
-            class="flex-1 overflow-y-auto"
-          />
-          
-          <!-- Build Actions -->
-          <div class="p-3 border-t border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-900">
-            <div class="flex gap-2">
-              <Button
-                @click="saveBuild"
-                label="Save Build"
-                icon="pi pi-save"
-                size="small"
-                :disabled="!hasValidBuild"
-                class="flex-1"
-              />
-              <Button
-                @click="clearBuild"
-                label="Clear"
-                icon="pi pi-trash"
-                size="small"
-                severity="secondary"
-                text
-              />
-            </div>
-          </div>
-        </div>
-        
-        <!-- Browse Mode -->
-        <div v-else class="flex-1 flex flex-col">
-          <!-- Search -->
-          <SymbiantSearch
-            v-model="searchQuery"
-            @search="handleSearch"
-            class="border-b border-surface-200 dark:border-surface-700"
-          />
-          
-          <!-- Filters -->
-          <SymbiantFilters
-            v-model="filters"
-            :available-families="symbiantFamilies"
-            @filter-change="handleFilterChange"
-            class="flex-1 overflow-y-auto"
-          />
-          
-          <!-- Filter Summary -->
-          <div class="p-3 border-t border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-900">
-            <div class="text-xs text-surface-600 dark:text-surface-400">
-              Showing {{ filteredSymbiants.length }} of {{ symbiantsCount }} symbiants
-            </div>
-            <Button
-              v-if="hasActiveFilters"
-              @click="clearAllFilters"
-              label="Clear Filters"
-              size="small"
-              severity="secondary"
-              text
-              class="mt-1 p-0"
-            />
-          </div>
-        </div>
-      </div>
-
-      <!-- Main Content Area -->
-      <div class="flex-1 flex flex-col min-w-0">
-        <!-- Build Mode Content -->
-        <div v-if="buildMode" class="flex-1 overflow-hidden">
-          <CharacterBuilder
-            :profile="activeProfile"
-            :stat-targets="statTargets"
-            :available-symbiants="filteredSymbiants"
-            :current-build="currentBuild"
-            @build-changed="handleBuildChange"
-            @symbiant-selected="handleSymbiantSelect"
-            class="h-full"
-          />
-        </div>
-        
-        <!-- Browse Mode Content -->
-        <div v-else class="flex-1 overflow-hidden">
-          <!-- Family-based Organization -->
-          <SymbiantFamilyView
-            v-if="viewMode"
-            :symbiants="filteredSymbiants"
-            :families="symbiantFamilies"
-            :build-mode="false"
-            @symbiant-select="handleSymbiantSelect"
-            @add-to-build="handleAddToBuild"
-            class="h-full"
-          />
-          
-          <!-- List View -->
-          <SymbiantList
-            v-else
-            :symbiants="filteredSymbiants"
-            :loading="loading"
-            :build-mode="false"
-            @symbiant-select="handleSymbiantSelect"
-            @add-to-build="handleAddToBuild"
-            @page-change="handlePageChange"
-            class="h-full"
-          />
-        </div>
-
-        <!-- Loading State -->
-        <div
-          v-if="loading"
-          class="flex items-center justify-center h-32"
-        >
-          <ProgressSpinner />
-        </div>
-
-        <!-- Empty State -->
-        <div
-          v-else-if="filteredSymbiants.length === 0 && !loading"
-          class="flex flex-col items-center justify-center h-64 text-center"
-        >
-          <i class="pi pi-search text-4xl text-surface-400 dark:text-surface-600 mb-4"></i>
-          <h3 class="text-lg font-medium text-surface-700 dark:text-surface-300 mb-2">
-            No symbiants found
-          </h3>
-          <p class="text-surface-500 dark:text-surface-400">
-            Try adjusting your search criteria or filters
-          </p>
-        </div>
+    <!-- Loading Overlay -->
+    <div
+      v-if="loading"
+      class="absolute inset-0 bg-black/20 flex items-center justify-center z-50"
+      role="status"
+      aria-label="Loading implant data"
+    >
+      <div class="bg-surface-0 dark:bg-surface-950 p-4 rounded-lg shadow-lg">
+        <LoadingSpinner size="medium" loadingText="Loading implant data..." showText />
       </div>
     </div>
-
-    <!-- Symbiant Detail Dialog -->
-    <SymbiantDetail
-      v-model:visible="showSymbiantDetail"
-      :symbiant="selectedSymbiant"
-      :show-build-options="buildMode"
-      :current-build="currentBuild"
-      @add-to-build="handleAddToBuild"
-      @close="handleSymbiantDetailClose"
-    />
-
-    <!-- Build Comparison Dialog -->
-    <Dialog
-      v-model:visible="showBuildComparison"
-      header="Build Comparison"
-      modal
-      maximizable
-      :style="{ width: '90vw', height: '80vh' }"
-    >
-      <BuildComparison
-        :builds="savedBuilds"
-        :current-build="currentBuild"
-        @load-build="handleLoadBuild"
-        @delete-build="handleDeleteBuild"
-      />
-    </Dialog>
-
-    <!-- Saved Builds Dialog -->
-    <Dialog
-      v-model:visible="showSavedBuilds"
-      header="Saved Builds"
-      modal
-      :style="{ width: '800px', maxHeight: '80vh' }"
-    >
-      <SavedBuilds
-        :builds="savedBuilds"
-        @load-build="handleLoadBuild"
-        @delete-build="handleDeleteBuild"
-        @duplicate-build="handleDuplicateBuild"
-      />
-    </Dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
-import { storeToRefs } from 'pinia';
+import { ref, computed, onMounted, reactive } from 'vue';
+import { useAccessibility } from '@/composables/useAccessibility';
 import Badge from 'primevue/badge';
 import Button from 'primevue/button';
-import Dialog from 'primevue/dialog';
 import Dropdown from 'primevue/dropdown';
-import ProgressSpinner from 'primevue/progressspinner';
-import ToggleButton from 'primevue/togglebutton';
+import InputNumber from 'primevue/inputnumber';
+import LoadingSpinner from '@/components/shared/LoadingSpinner.vue';
 
-import CharacterStatsPanel from '@/components/plants/CharacterStatsPanel.vue';
-import StatTargets from '@/components/plants/StatTargets.vue';
-import BuildSummary from '@/components/plants/BuildSummary.vue';
-import CharacterBuilder from '@/components/plants/CharacterBuilder.vue';
-import SymbiantSearch from '@/components/plants/SymbiantSearch.vue';
-import SymbiantFilters from '@/components/plants/SymbiantFilters.vue';
-import SymbiantFamilyView from '@/components/plants/SymbiantFamilyView.vue';
-import SymbiantList from '@/components/plants/SymbiantList.vue';
-import SymbiantDetail from '@/components/plants/SymbiantDetail.vue';
-import BuildComparison from '@/components/plants/BuildComparison.vue';
-import SavedBuilds from '@/components/plants/SavedBuilds.vue';
+// Accessibility
+const { announce, setLoading } = useAccessibility();
 
-import { useSymbiantsStore } from '@/stores/symbiants';
-import { useProfilesStore } from '@/stores/profilesStore';
-import type { 
-  PlantSymbiant, 
-  SymbiantFilters as SymbiantFiltersType,
-  CharacterBuild,
-  StatTarget,
-  CharacterStats
-} from '@/types/plants';
+// State
+const loading = ref(false);
+const qualityLevel = ref(200);
+const showResults = ref(false);
 
-// Stores
-const symbiantsStore = useSymbiantsStore();
-const profilesStore = useProfilesStore();
-
-const { 
-  allSymbiants,
-  symbiantFamilies,
-  symbiantsCount,
-  loading, 
-  error
-} = storeToRefs(symbiantsStore);
-
-const { 
-  profiles, 
-  activeProfile 
-} = storeToRefs(profilesStore);
-
-// Reactive state
-const selectedProfile = ref<string | null>(null);
-const buildMode = ref(true); // Start in build mode
-const viewMode = ref(true); // true = family view, false = list view
-const searchQuery = ref('');
-const filters = ref<SymbiantFiltersType>({
-  families: [],
-  slots: [],
-  qualityLevels: [],
-  statBonuses: []
-});
-
-// Build state
-const statTargets = ref<StatTarget[]>([]);
-const characterStats = ref<CharacterStats>({});
-const currentBuild = ref<CharacterBuild>({
-  id: '',
-  name: '',
-  symbiants: {},
-  totalStats: {},
-  notes: ''
-});
-const savedBuilds = ref<CharacterBuild[]>([]);
-
-// Dialog state
-const selectedSymbiant = ref<PlantSymbiant | null>(null);
-const showSymbiantDetail = ref(false);
-const showBuildComparison = ref(false);
-const showSavedBuilds = ref(false);
-
-// Computed
-const profileOptions = computed(() => [
-  { label: 'No Profile', value: null },
-  ...profiles.value.map(profile => ({
-    label: profile.name,
-    value: profile.id
-  }))
+// Implant slots in the order from legacy TinkerPlants
+const implantSlots = ref([
+  { id: 'head', name: 'Head' },
+  { id: 'ear', name: 'Ear' },
+  { id: 'right_arm', name: 'Right Arm' },
+  { id: 'chest', name: 'Chest' },
+  { id: 'left_arm', name: 'Left Arm' },
+  { id: 'right_wrist', name: 'Right Wrist' },
+  { id: 'waist', name: 'Waist' },
+  { id: 'left_wrist', name: 'Left Wrist' },
+  { id: 'right_hand', name: 'Right Hand' },
+  { id: 'leg', name: 'Leg' },
+  { id: 'left_hand', name: 'Left Hand' },
+  { id: 'feet', name: 'Feet' }
 ]);
 
-const filteredSymbiants = computed(() => {
-  let result = [...allSymbiants.value] as PlantSymbiant[];
-  
-  // Apply search
-  if (searchQuery.value.trim()) {
-    const query = searchQuery.value.toLowerCase();
-    result = result.filter(symbiant => 
-      symbiant.name.toLowerCase().includes(query) ||
-      symbiant.description?.toLowerCase().includes(query) ||
-      symbiant.family?.toLowerCase().includes(query)
-    );
-  }
-  
-  // Apply filters
-  if (filters.value.families.length > 0) {
-    result = result.filter(symbiant => 
-      symbiant.family && filters.value.families.includes(symbiant.family)
-    );
-  }
-  
-  if (filters.value.slots.length > 0) {
-    result = result.filter(symbiant => 
-      symbiant.slot && filters.value.slots.includes(symbiant.slot)
-    );
-  }
-  
-  if (filters.value.qualityLevels.length > 0) {
-    result = result.filter(symbiant => 
-      symbiant.qualityLevel && filters.value.qualityLevels.includes(symbiant.qualityLevel)
-    );
-  }
-  
-  return result;
+// Skill clusters (from legacy TinkerPlants)
+const skillClusters = ref([
+  { id: 'elec_engi', name: 'Elec. Engi' },
+  { id: 'nano_progra', name: 'Nano Progra' },
+  { id: 'perception', name: 'Perception' },
+  { id: 'nano_pool', name: 'Nano Pool' },
+  { id: 'melee_ener', name: 'Melee Ener' },
+  { id: 'quantum_ft', name: 'Quantum FT' },
+  { id: 'strength', name: 'Strength' },
+  { id: 'stamina', name: 'Stamina' },
+  { id: 'agility', name: 'Agility' },
+  { id: 'sense', name: 'Sense' },
+  { id: 'intelligence', name: 'Intelligence' },
+  { id: 'psychic', name: 'Psychic' },
+  { id: 'comp_liter', name: 'Comp Liter' },
+  { id: 'psychology', name: 'Psychology' },
+  { id: 'bio_meta', name: 'Bio Meta' },
+  { id: 'mat_meta', name: 'Mat Meta' },
+  { id: 'psych_modi', name: 'Psych Modi' },
+  { id: 'sensory_imp', name: 'Sensory Imp' },
+  { id: 'time_space', name: 'Time & Space' },
+  { id: 'mat_creat', name: 'Mat Creat' },
+  { id: '1h_blunt', name: '1H Blunt' },
+  { id: '1h_edged', name: '1H Edged' },
+  { id: '2h_blunt', name: '2H Blunt' },
+  { id: '2h_edged', name: '2H Edged' },
+  { id: 'assault_rif', name: 'Assault Rif' },
+  { id: 'bow', name: 'Bow' },
+  { id: 'pistol', name: 'Pistol' },
+  { id: 'rifle', name: 'Rifle' },
+  { id: 'shotgun', name: 'Shotgun' },
+  { id: 'smg', name: 'SMG' },
+  { id: 'piercing', name: 'Piercing' }
+]);
+
+// Initialize implant selections
+const implantSelections = reactive<Record<string, { shiny: string | null; bright: string | null; faded: string | null; ql: number }>>({});
+
+// Initialize all slots
+implantSlots.value.forEach(slot => {
+  implantSelections[slot.id] = {
+    shiny: null,
+    bright: null,
+    faded: null,
+    ql: qualityLevel.value
+  };
 });
 
-const hasActiveFilters = computed(() => {
-  return searchQuery.value.trim() !== '' ||
-         filters.value.families.length > 0 ||
-         filters.value.slots.length > 0 ||
-         filters.value.qualityLevels.length > 0 ||
-         filters.value.statBonuses.length > 0;
+// Computed properties
+const hasAnyImplants = computed(() => {
+  return Object.values(implantSelections).some(selection => 
+    selection.shiny || selection.bright || selection.faded
+  );
 });
 
-const buildStatBonuses = computed(() => {
-  // Calculate total stat bonuses from current build
-  const bonuses: CharacterStats = {};
+const calculatedBonuses = computed(() => {
+  // Mock calculation - in real implementation this would calculate stat bonuses
+  const bonuses: Record<string, number> = {};
   
-  Object.values(currentBuild.value.symbiants).forEach(symbiant => {
-    if (symbiant && symbiant.statBonuses) {
-      symbiant.statBonuses.forEach(bonus => {
-        if (!bonuses[bonus.statId]) {
-          bonuses[bonus.statId] = 0;
+  Object.values(implantSelections).forEach(selection => {
+    [selection.shiny, selection.bright, selection.faded].forEach(clusterId => {
+      if (clusterId) {
+        const cluster = skillClusters.value.find(c => c.id === clusterId);
+        if (cluster) {
+          // Mock bonus calculation based on individual QL and cluster type
+          const bonus = Math.floor(selection.ql / 10);
+          bonuses[cluster.name] = (bonuses[cluster.name] || 0) + bonus;
         }
-        bonuses[bonus.statId] += bonus.value;
-      });
-    }
+      }
+    });
   });
   
   return bonuses;
 });
 
-const totalCharacterStats = computed(() => {
-  const total: CharacterStats = { ...characterStats.value };
+const constructionRequirements = computed(() => {
+  const requirements: Array<{ slot: string; type: string; clusters: string[] }> = [];
   
-  // Add build bonuses
-  Object.entries(buildStatBonuses.value).forEach(([statId, bonus]) => {
-    if (!total[statId]) {
-      total[statId] = 0;
-    }
-    total[statId] += bonus;
+  Object.entries(implantSelections).forEach(([slotId, selection]) => {
+    const slot = implantSlots.value.find(s => s.id === slotId);
+    if (!slot) return;
+    
+    ['shiny', 'bright', 'faded'].forEach(type => {
+      const clusterId = selection[type as keyof typeof selection];
+      if (clusterId) {
+        const cluster = skillClusters.value.find(c => c.id === clusterId);
+        if (cluster) {
+          requirements.push({
+            slot: slot.name,
+            type: type.charAt(0).toUpperCase() + type.slice(1),
+            clusters: [cluster.name]
+          });
+        }
+      }
+    });
   });
   
-  return total;
+  return requirements;
 });
 
-const hasValidBuild = computed(() => {
-  return Object.keys(currentBuild.value.symbiants).length > 0;
-});
-
-// Methods
-const handleSearch = (query: string) => {
-  searchQuery.value = query;
+// Event handlers
+const onImplantChange = (slotId: string, type: string, value: string | null) => {
+  announce(`${type} cluster ${value ? 'selected' : 'cleared'} for ${implantSlots.value.find(s => s.id === slotId)?.name} slot`);
 };
 
-const handleFilterChange = (newFilters: SymbiantFiltersType) => {
-  filters.value = { ...newFilters };
-};
-
-const handleSymbiantSelect = (symbiant: PlantSymbiant) => {
-  selectedSymbiant.value = symbiant;
-  showSymbiantDetail.value = true;
-};
-
-const handleSymbiantDetailClose = () => {
-  selectedSymbiant.value = null;
-  showSymbiantDetail.value = false;
-};
-
-const handleAddToBuild = (symbiant: PlantSymbiant, slot?: string) => {
-  if (!slot && symbiant.slot) {
-    slot = symbiant.slot;
-  }
-  
-  if (slot) {
-    currentBuild.value.symbiants[slot] = symbiant;
+const onQLChange = (slotId: string, value: number | null) => {
+  if (value !== null) {
+    announce(`Quality Level set to ${value} for ${implantSlots.value.find(s => s.id === slotId)?.name} slot`);
   }
 };
 
-const handleBuildChange = (build: CharacterBuild) => {
-  currentBuild.value = { ...build };
+const clearAllImplants = () => {
+  Object.keys(implantSelections).forEach(slotId => {
+    implantSelections[slotId] = {
+      shiny: null,
+      bright: null,
+      faded: null,
+      ql: qualityLevel.value
+    };
+  });
+  showResults.value = false;
+  announce('All implants cleared');
 };
 
-const handleStatsChange = (stats: CharacterStats) => {
-  characterStats.value = { ...stats };
-};
-
-const handlePageChange = (page: number) => {
-  console.log('Page change:', page);
-};
-
-const onProfileChange = () => {
-  if (selectedProfile.value) {
-    profilesStore.setActiveProfile(selectedProfile.value);
-  } else {
-    profilesStore.clearActiveProfile();
-  }
-};
-
-const clearAllFilters = () => {
-  searchQuery.value = '';
-  filters.value = {
-    families: [],
-    slots: [],
-    qualityLevels: [],
-    statBonuses: []
-  };
-};
-
-const saveBuild = () => {
-  if (!hasValidBuild.value) return;
+const calculateBuild = () => {
+  if (!hasAnyImplants.value) return;
   
-  const buildToSave: CharacterBuild = {
-    ...currentBuild.value,
-    id: `build_${Date.now()}`,
-    name: `Build ${savedBuilds.value.length + 1}`,
-    totalStats: { ...totalCharacterStats.value }
-  };
+  setLoading(true, 'Calculating implant build...');
   
-  savedBuilds.value.push(buildToSave);
-  
-  // Save to localStorage
-  localStorage.setItem('tinkerplants_builds', JSON.stringify(savedBuilds.value));
-};
-
-const clearBuild = () => {
-  currentBuild.value = {
-    id: '',
-    name: '',
-    symbiants: {},
-    totalStats: {},
-    notes: ''
-  };
-};
-
-const handleLoadBuild = (build: CharacterBuild) => {
-  currentBuild.value = { ...build };
-  showSavedBuilds.value = false;
-  showBuildComparison.value = false;
-};
-
-const handleDeleteBuild = (buildId: string) => {
-  const index = savedBuilds.value.findIndex(build => build.id === buildId);
-  if (index > -1) {
-    savedBuilds.value.splice(index, 1);
-    localStorage.setItem('tinkerplants_builds', JSON.stringify(savedBuilds.value));
-  }
-};
-
-const handleDuplicateBuild = (build: CharacterBuild) => {
-  const duplicatedBuild: CharacterBuild = {
-    ...build,
-    id: `build_${Date.now()}`,
-    name: `${build.name} (Copy)`
-  };
-  
-  savedBuilds.value.push(duplicatedBuild);
-  localStorage.setItem('tinkerplants_builds', JSON.stringify(savedBuilds.value));
+  // Simulate calculation delay
+  setTimeout(() => {
+    showResults.value = true;
+    setLoading(false);
+    announce(`Build calculated. Total stat bonuses: ${Object.keys(calculatedBonuses.value).length} different stats affected`);
+  }, 1000);
 };
 
 // Lifecycle
 onMounted(async () => {
-  // Load symbiants data
-  await symbiantsStore.preloadSymbiants();
+  setLoading(true, 'Loading implant planner...');
   
-  // Load profiles
-  await profilesStore.loadProfiles();
-  
-  // Set initial profile selection
-  if (activeProfile.value) {
-    selectedProfile.value = activeProfile.value.id;
-    characterStats.value = { ...activeProfile.value.stats };
-  }
-  
-  // Load saved builds
-  const savedBuildsData = localStorage.getItem('tinkerplants_builds');
-  if (savedBuildsData) {
-    try {
-      savedBuilds.value = JSON.parse(savedBuildsData);
-    } catch (error) {
-      console.warn('Failed to load saved builds:', error);
-    }
-  }
-});
-
-// Watch for profile changes
-watch(activeProfile, (newProfile) => {
-  if (newProfile) {
-    selectedProfile.value = newProfile.id;
-    characterStats.value = { ...newProfile.stats };
-  } else {
-    selectedProfile.value = null;
-    characterStats.value = {};
+  try {
+    // In a real implementation, this would load actual skill clusters and implant data
+    await new Promise(resolve => setTimeout(resolve, 500));
+    announce('Implant planner loaded successfully');
+  } catch (error) {
+    console.error('Failed to load implant data:', error);
+    announce('Failed to load implant data', 'assertive');
+  } finally {
+    setLoading(false);
   }
 });
 </script>
 
 <style scoped>
-.tinker-plants {
-  background: var(--surface-ground);
+/* Custom styles for the grid */
+.tinker-plants .grid {
+  display: grid;
+}
+
+/* Screen reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 </style>
