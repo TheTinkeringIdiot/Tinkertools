@@ -9,29 +9,46 @@ Allows users to input skills and view usable offensive nanos in a sortable table
       <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div class="flex items-center gap-4">
           <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50">
-            <i class="pi pi-sparkles mr-2"></i>
+            <i class="pi pi-sparkles mr-2" aria-hidden="true"></i>
             TinkerNukes
           </h1>
-          <Badge :value="usableNanos.length" severity="success" v-if="usableNanos.length > 0" />
-          <Badge value="NT Only" severity="warning" />
+          <Badge 
+            :value="usableNanos.length" 
+            severity="success" 
+            v-if="usableNanos.length > 0"
+            :aria-label="`${usableNanos.length} usable offensive nanos found`"
+          />
+          <Badge 
+            value="NT Only" 
+            severity="warning" 
+            aria-label="This tool is specialized for Nanotechnician profession only"
+          />
         </div>
         
         <!-- Profile & Display Options -->
         <div class="flex flex-col sm:flex-row gap-3">
           <!-- Profile Selection -->
           <div class="flex items-center gap-2">
-            <label class="text-sm font-medium text-surface-700 dark:text-surface-300">
+            <label 
+              for="profile-select-nukes"
+              class="text-sm font-medium text-surface-700 dark:text-surface-300"
+            >
               Profile:
             </label>
             <Dropdown 
+              id="profile-select-nukes"
               v-model="selectedProfile"
               :options="profileOptions"
               option-label="label"
               option-value="value"
               placeholder="Select Profile"
               class="w-40"
+              aria-describedby="profile-help-nukes"
               @change="onProfileChange"
             />
+            <span id="profile-help-nukes" class="sr-only">
+              Select a Nanotechnician profile to check nano casting requirements
+            </span>
           </div>
           
           <!-- Manual Skills Toggle -->
@@ -39,6 +56,7 @@ Allows users to input skills and view usable offensive nanos in a sortable table
             <InputSwitch 
               v-model="useManualSkills"
               input-id="manual-skills-toggle"
+              aria-describedby="manual-skills-help"
             />
             <label 
               for="manual-skills-toggle"
@@ -46,6 +64,9 @@ Allows users to input skills and view usable offensive nanos in a sortable table
             >
               Manual Skills
             </label>
+            <span id="manual-skills-help" class="sr-only">
+              Toggle to manually input your character's nano skills instead of using a profile
+            </span>
           </div>
         </div>
       </div>
@@ -127,6 +148,7 @@ Allows users to input skills and view usable offensive nanos in a sortable table
 
       <!-- Nano Table -->
       <DataTable 
+        ref="tableRef"
         :value="filteredNanos"
         :loading="loading"
         paginator
@@ -135,6 +157,9 @@ Allows users to input skills and view usable offensive nanos in a sortable table
         sortMode="multiple"
         class="nano-table"
         :globalFilter="searchQuery"
+        data-keyboard-nav-container
+        role="table"
+        :aria-label="`Table showing ${filteredNanos.length} offensive nano programs. Use arrow keys to navigate, Enter to select.`"
       >
         <!-- Name Column -->
         <Column field="name" header="Nano" sortable class="min-w-48">
@@ -222,6 +247,8 @@ Allows users to input skills and view usable offensive nanos in a sortable table
 import { ref, computed, watch, onMounted } from 'vue';
 import { useProfilesStore } from '@/stores/profilesStore';
 import { useNanosStore } from '@/stores/nanosStore';
+import { useAccessibility } from '@/composables/useAccessibility';
+import { useTableKeyboardNavigation } from '@/composables/useKeyboardNavigation';
 import Badge from 'primevue/badge';
 import Dropdown from 'primevue/dropdown';
 import InputSwitch from 'primevue/inputswitch';
@@ -235,6 +262,20 @@ import type { NanoProgram } from '@/types/nano';
 // Stores
 const profileStore = useProfilesStore();
 const nanosStore = useNanosStore();
+
+// Accessibility
+const { announce, setLoading } = useAccessibility();
+const tableRef = ref<HTMLElement>();
+
+// Keyboard navigation for data table
+const { focusFirst } = useTableKeyboardNavigation(tableRef, {
+  onRowActivate: (rowIndex: number) => {
+    const nano = filteredNanos.value[rowIndex];
+    if (nano) {
+      announce(`Selected nano: ${nano.name}`, 'polite');
+    }
+  }
+});
 
 // Reactive state
 const selectedProfile = ref<string | null>(null);
@@ -404,17 +445,19 @@ function getOffensiveEffects(nano: NanoProgram): string[] {
 
 // Lifecycle
 onMounted(async () => {
-  loading.value = true;
+  setLoading(true, 'Loading nano programs and profiles');
   try {
     // Load nanos if not already loaded
     if (nanosStore.nanos.length === 0) {
       await nanosStore.fetchNanos();
     }
     await profileStore.loadProfiles();
+    announce(`Loaded ${offensiveNanos.value.length} offensive nano programs for Nanotechnicians`);
   } catch (error) {
     console.error('Failed to load data:', error);
+    announce('Failed to load data. Please refresh the page and try again.', 'assertive');
   } finally {
-    loading.value = false;
+    setLoading(false);
   }
 });
 </script>

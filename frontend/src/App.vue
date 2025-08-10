@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import Button from 'primevue/button';
 import Menubar from 'primevue/menubar';
 import { useTheme } from './composables/useTheme';
+import AccessibilityAnnouncer from './components/shared/AccessibilityAnnouncer.vue';
 import type { MenuItem } from 'primevue/menuitem';
 
 const router = useRouter();
@@ -54,14 +55,32 @@ const menuItems = ref<MenuItem[]>([
 
 <template>
   <div class="min-h-screen bg-surface-0 text-surface-900 dark:bg-surface-950 dark:text-surface-50">
+    <!-- Skip Navigation Links -->
+    <a 
+      href="#main-content" 
+      class="skip-link sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-primary-500 focus:text-white focus:px-4 focus:py-2 focus:rounded"
+    >
+      Skip to main content
+    </a>
+    
     <!-- Header -->
-    <header class="bg-surface-0 dark:bg-surface-950 border-b border-surface-200 dark:border-surface-700 shadow-sm">
+    <header 
+      class="bg-surface-0 dark:bg-surface-950 border-b border-surface-200 dark:border-surface-700 shadow-sm"
+      role="banner"
+      aria-label="Site header"
+    >
       <div class="px-4 py-3">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <i class="pi pi-cog text-2xl text-primary-500"></i>
+            <i class="pi pi-cog text-2xl text-primary-500" aria-hidden="true"></i>
             <h1 class="text-xl font-bold">TinkerTools</h1>
-            <span class="text-xs text-surface-500 bg-surface-100 dark:bg-surface-800 px-2 py-1 rounded">BETA</span>
+            <span 
+              class="text-xs text-surface-500 bg-surface-100 dark:bg-surface-800 px-2 py-1 rounded"
+              role="status"
+              aria-label="Beta version"
+            >
+              BETA
+            </span>
           </div>
           
           <!-- Quick Actions -->
@@ -85,6 +104,7 @@ const menuItems = ref<MenuItem[]>([
               label="Items" 
               outlined 
               size="small"
+              aria-label="Go to TinkerItems application"
               @click="router.push('/items')"
             />
           </div>
@@ -92,15 +112,54 @@ const menuItems = ref<MenuItem[]>([
       </div>
       
       <!-- Navigation Menu -->
-      <Menubar :model="menuItems" class="border-0 bg-transparent" />
+      <nav role="navigation" aria-label="Main navigation">
+        <Menubar :model="menuItems" class="border-0 bg-transparent" />
+      </nav>
     </header>
 
     <!-- Main Content -->
-    <main class="min-h-0">
+    <main 
+      id="main-content" 
+      class="min-h-0" 
+      role="main"
+      aria-label="Main content"
+      tabindex="-1"
+    >
       <router-view />
     </main>
+    
+    <!-- Accessibility Announcer for screen readers -->
+    <AccessibilityAnnouncer />
   </div>
 </template>
 
 <style scoped>
+/* Screen reader only utility classes */
+:global(.sr-only) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+:global(.focus\:not-sr-only):focus {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 0.5rem 1rem;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+/* Skip link styles */
+:global(.skip-link) {
+  transition: all 0.2s ease-in-out;
+}
 </style>
