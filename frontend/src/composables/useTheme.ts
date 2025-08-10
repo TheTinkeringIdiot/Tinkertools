@@ -45,7 +45,6 @@ function applyTheme(theme: ThemeMode): void {
   
   // Set CSS custom properties for theme-aware components
   htmlElement.style.setProperty('--theme-mode', theme);
-  
 }
 
 
@@ -60,13 +59,30 @@ function getSystemTheme(): ThemeMode {
 }
 
 /**
- * Get saved theme preference or system default
+ * Get saved theme preference or dark default
  */
 function getInitialTheme(): ThemeMode {
-  if (typeof localStorage === 'undefined') return getSystemTheme();
+  if (typeof localStorage === 'undefined') return 'dark'; // Default to dark mode
   
   const saved = localStorage.getItem(STORAGE_KEY) as ThemeMode | null;
-  return saved || getSystemTheme();
+  
+  // Migration: legacy dark mode key ('tinkertools-dark-mode') -> unified STORAGE_KEY
+  if (!saved) {
+    const legacy = localStorage.getItem('tinkertools-dark-mode');
+    if (legacy) {
+      const migrated = legacy === 'dark' ? 'dark' : 'light';
+      try {
+        localStorage.setItem(STORAGE_KEY, migrated);
+        localStorage.removeItem('tinkertools-dark-mode');
+        return migrated;
+      } catch {
+        // Fallback to migrated value even if persisting failed
+        return migrated;
+      }
+    }
+  }
+  
+  return saved || 'dark'; // Default to dark mode instead of system preference
 }
 
 /**
@@ -91,22 +107,8 @@ watch(currentTheme, (newTheme) => {
   saveTheme(newTheme);
 }, { immediate: false }); // Don't trigger on initialization since we already applied
 
-// Listen for system theme changes
-if (typeof window !== 'undefined') {
-  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-  
-  const handleSystemThemeChange = (e: MediaQueryListEvent) => {
-    // Only auto-update if user hasn't set a manual preference
-    const hasManualPreference = typeof localStorage !== 'undefined' && 
-                               localStorage.getItem(STORAGE_KEY) !== null;
-    
-    if (!hasManualPreference) {
-      currentTheme.value = e.matches ? 'dark' : 'light';
-    }
-  };
-  
-  mediaQuery.addEventListener('change', handleSystemThemeChange);
-}
+// System theme changes are disabled - we always default to dark mode
+// Users can manually toggle between light and dark modes using the UI controls
 
 // ============================================================================
 // Theme Composable (provides reactive theme state and controls)
