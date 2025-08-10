@@ -47,8 +47,7 @@ const menuItems = ref<MenuItem[]>([
   {
     label: 'TinkerNukes',
     icon: 'pi pi-sparkles',
-    command: () => router.push('/nukes'),
-    disabled: true
+    command: () => router.push('/nukes')
   }
 ]);
 </script>
