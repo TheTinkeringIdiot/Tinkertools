@@ -1,4 +1,5 @@
 @import 'primevue/resources/themes/aura-light-teal/theme.css';
+@import 'primevue/resources/themes/aura-dark-teal/theme.css' (prefers-color-scheme: dark);
 
 @tailwind base;
 @tailwind components;
@@ -109,12 +110,134 @@
   border-color: var(--surface-border) !important;
 }
 
-/* Force dark background for root elements */
+/* Force dark background and light text for root elements */
 html.dark,
 html.dark body,
 html.dark #app {
   background-color: rgb(var(--surface-0)) !important;
   color: rgb(var(--surface-950)) !important;
+}
+
+/* Critical fix: Force all dark mode text to be visible */
+.dark * {
+  color: rgb(255, 255, 255) !important;
+}
+
+/* Allow specific components to override if needed */
+.dark .p-button,
+.dark .p-dropdown,
+.dark .p-inputtext,
+.dark .p-inputnumber input {
+  color: inherit !important;
+}
+
+/* Ensure dropdown options are visible */
+.dark .p-dropdown-panel .p-dropdown-item {
+  color: rgb(255, 255, 255) !important;
+  background-color: transparent !important;
+}
+
+.dark .p-dropdown-panel .p-dropdown-item:hover {
+  background-color: rgb(63, 63, 70) !important;
+  color: rgb(255, 255, 255) !important;
+}
+
+/* Fix badge and tag visibility */
+.dark .p-badge,
+.dark .p-tag {
+  background-color: rgb(20, 184, 166) !important;
+  color: rgb(255, 255, 255) !important;
+}
+
+/* Ensure button text is visible */
+.dark .p-button {
+  background-color: rgb(63, 63, 70) !important;
+  color: rgb(255, 255, 255) !important;
+  border-color: rgb(113, 113, 122) !important;
+}
+
+.dark .p-button:hover {
+  background-color: rgb(82, 82, 91) !important;
+}
+
+.dark .p-button:disabled {
+  background-color: rgb(39, 39, 42) !important;
+  color: rgb(113, 113, 122) !important;
+}
+
+/* Specific fixes for common text color classes */
+.dark .text-surface-900 {
+  color: rgb(255, 255, 255) !important;
+}
+
+.dark .text-surface-800 {
+  color: rgb(244, 244, 245) !important;
+}
+
+.dark .text-surface-700 {
+  color: rgb(228, 228, 231) !important;
+}
+
+.dark .text-surface-600 {
+  color: rgb(212, 212, 216) !important;
+}
+
+.dark .text-surface-500 {
+  color: rgb(161, 161, 170) !important;
+}
+
+.dark .text-surface-400 {
+  color: rgb(113, 113, 122) !important;
+}
+
+.dark .text-surface-300 {
+  color: rgb(82, 82, 91) !important;
+}
+
+/* Ensure grid and table headers are visible */
+.dark .font-semibold,
+.dark .font-medium,
+.dark .font-bold {
+  color: rgb(255, 255, 255) !important;
+}
+
+/* Fix hover states for grid rows */
+.dark .hover\:bg-surface-50:hover {
+  background-color: rgb(39, 39, 42) !important;
+}
+
+.dark .hover\:bg-surface-900\/50:hover {
+  background-color: rgba(39, 39, 42, 0.8) !important;
+}
+
+/* Border colors for dark mode */
+.dark .border-surface-200 {
+  border-color: rgb(63, 63, 70) !important;
+}
+
+.dark .border-surface-700 {
+  border-color: rgb(63, 63, 70) !important;
+}
+
+/* Background colors for components */
+.dark .bg-surface-50 {
+  background-color: rgb(24, 24, 27) !important;
+}
+
+.dark .bg-surface-100 {
+  background-color: rgb(39, 39, 42) !important;
+}
+
+.dark .bg-surface-900 {
+  background-color: rgb(39, 39, 42) !important;
+}
+
+.dark .bg-surface-0 {
+  background-color: rgb(9, 9, 11) !important;
+}
+
+.dark .bg-surface-950 {
+  background-color: rgb(9, 9, 11) !important;
 }
 
 /* Ensure tabview components are properly themed */
