@@ -86,19 +86,53 @@
   color-scheme: dark;
 }
 
-/* Ensure PrimeVue components inherit theme */
+/* Comprehensive PrimeVue dark theme overrides */
 .dark .p-menubar,
 .dark .p-dropdown,
 .dark .p-button,
 .dark .p-card,
 .dark .p-panel,
 .dark .p-tabview,
+.dark .p-tabview-nav,
+.dark .p-tabview-panels,
 .dark .p-dialog,
 .dark .p-inputtext,
-.dark .p-inputswitch {
-  background-color: var(--surface-card);
-  color: var(--text-color);
-  border-color: var(--surface-border);
+.dark .p-inputswitch,
+.dark .p-multiselect,
+.dark .p-slider,
+.dark .p-tag,
+.dark .p-dataview,
+.dark .p-dataview-content,
+.dark .p-paginator {
+  background-color: var(--surface-card) !important;
+  color: var(--text-color) !important;
+  border-color: var(--surface-border) !important;
+}
+
+/* Force dark background for root elements */
+html.dark,
+html.dark body,
+html.dark #app {
+  background-color: rgb(var(--surface-0)) !important;
+  color: rgb(var(--surface-950)) !important;
+}
+
+/* Ensure tabview components are properly themed */
+.dark .p-tabview-nav-link {
+  background: var(--surface-card) !important;
+  color: var(--text-color-secondary) !important;
+  border-color: var(--surface-border) !important;
+}
+
+.dark .p-tabview-nav-link:hover {
+  background: var(--surface-hover) !important;
+  color: var(--text-color) !important;
+}
+
+.dark .p-tabview-nav-link.p-tabview-nav-link-active {
+  background: var(--primary-color) !important;
+  color: white !important;
+  border-color: var(--primary-color) !important;
 }
 
 html, body, #app {
