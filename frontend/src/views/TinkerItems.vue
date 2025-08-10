@@ -19,18 +19,26 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
         <div class="flex flex-col sm:flex-row gap-3">
           <!-- Profile Selection -->
           <div class="flex items-center gap-2">
-            <label class="text-sm font-medium text-surface-700 dark:text-surface-300">
+            <label 
+              for="profile-select"
+              class="text-sm font-medium text-surface-700 dark:text-surface-300"
+            >
               Profile:
             </label>
             <Dropdown 
+              id="profile-select"
               v-model="selectedProfile"
               :options="profileOptions"
               option-label="label"
               option-value="value"
               placeholder="Select Profile"
               class="w-40"
+              aria-describedby="profile-help"
               @change="onProfileChange"
             />
+            <span id="profile-help" class="sr-only">
+              Select a character profile to check item compatibility
+            </span>
           </div>
           
           <!-- Profile Compatibility Toggle -->
@@ -39,6 +47,7 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
               v-model="showCompatibility"
               input-id="compatibility-toggle"
               :disabled="!hasActiveProfile"
+              aria-describedby="compatibility-help"
             />
             <label 
               for="compatibility-toggle"
@@ -47,6 +56,9 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
             >
               Show Compatibility
             </label>
+            <span id="compatibility-help" class="sr-only">
+              {{ hasActiveProfile ? 'Show which items your character can use based on their stats' : 'Select a profile first to enable compatibility checking' }}
+            </span>
           </div>
           
           <!-- View Options -->
