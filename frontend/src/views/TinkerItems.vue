@@ -15,49 +15,23 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
           <Badge :value="totalItems" severity="info" v-if="totalItems > 0" />
         </div>
         
-        <!-- Profile & Display Options -->
+        <!-- Display Options -->
         <div class="flex flex-col sm:flex-row gap-3">
-          <!-- Profile Selection -->
-          <div class="flex items-center gap-2">
-            <label 
-              for="profile-select"
-              class="text-sm font-medium text-surface-700 dark:text-surface-300"
-            >
-              Profile:
-            </label>
-            <Dropdown 
-              id="profile-select"
-              v-model="selectedProfile"
-              :options="profileOptions"
-              option-label="label"
-              option-value="value"
-              placeholder="Select Profile"
-              class="w-40"
-              aria-describedby="profile-help"
-              @change="onProfileChange"
-            />
-            <span id="profile-help" class="sr-only">
-              Select a character profile to check item compatibility
-            </span>
-          </div>
-          
-          <!-- Profile Compatibility Toggle -->
+          <!-- Usability Toggle -->
           <div class="flex items-center gap-2">
             <InputSwitch 
               v-model="showCompatibility"
-              input-id="compatibility-toggle"
-              :disabled="!hasActiveProfile"
-              aria-describedby="compatibility-help"
+              input-id="usability-toggle"
+              aria-describedby="usability-help"
             />
             <label 
-              for="compatibility-toggle"
+              for="usability-toggle"
               class="text-sm text-surface-700 dark:text-surface-300"
-              :class="{ 'opacity-50': !hasActiveProfile }"
             >
-              Show Compatibility
+              Usable
             </label>
-            <span id="compatibility-help" class="sr-only">
-              {{ hasActiveProfile ? 'Show which items your character can use based on their stats' : 'Select a profile first to enable compatibility checking' }}
+            <span id="usability-help" class="sr-only">
+              Show only items that your character can use based on their stats
             </span>
           </div>
           
@@ -80,25 +54,6 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
               v-tooltip.bottom="'List View'"
             />
           </div>
-        </div>
-      </div>
-      
-      <!-- Active Profile Info -->
-      <div v-if="hasActiveProfile && showCompatibility" class="mt-3 p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
-        <div class="flex items-center gap-2">
-          <i class="pi pi-user text-primary-600"></i>
-          <span class="text-sm text-primary-700 dark:text-primary-300">
-            Compatibility checking for: <strong>{{ activeProfile.name }}</strong>
-            (Level {{ activeProfile.level }} {{ activeProfile.profession }})
-          </span>
-          <Button
-            icon="pi pi-times"
-            size="small"
-            text
-            severity="secondary"
-            @click="clearProfile"
-            v-tooltip.bottom="'Clear Profile'"
-          />
         </div>
       </div>
     </div>
@@ -234,7 +189,7 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
             :items="searchResults"
             :view-mode="viewMode"
             :compatibility-profile="compatibilityProfile"
-            :show-compatibility="showCompatibility && hasActiveProfile"
+            :show-compatibility="showCompatibility && profilesStore.hasActiveProfile"
             :loading="searchLoading"
             :pagination="pagination"
             @item-click="onItemClick"
@@ -251,7 +206,7 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
       v-if="comparisonItems.length > 0"
       :items="comparisonItems"
       :profile="compatibilityProfile"
-      :show-compatibility="showCompatibility && hasActiveProfile"
+      :show-compatibility="showCompatibility && profilesStore.hasActiveProfile"
       @remove-item="removeFromComparison"
       @clear-all="clearComparison"
     />
@@ -262,10 +217,10 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useItems } from '@/composables/useItems'
-import { useProfileStore } from '@/stores/profile'
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
 import type { Item, ItemSearchQuery, ItemFilters } from '@/types/api'
 
 
@@ -276,11 +231,10 @@ import ItemList from '@/components/items/ItemList.vue'
 import ItemComparison from '@/components/items/ItemComparison.vue'
 
 const router = useRouter()
-const profileStore = useProfileStore()
+const profilesStore = useTinkerProfilesStore()
 
 // State
 const searchQuery = ref('')
-const selectedProfile = ref<string>('none')
 const showCompatibility = ref(false)
 const viewMode = ref<'grid' | 'list'>('grid')
 const activeFilters = ref<ItemFilters>({})
@@ -305,28 +259,13 @@ const {
 })
 
 // Computed Properties
-const profileOptions = computed(() => [
-  { label: 'No Profile (View All)', value: 'none' },
-  ...Array.from(profileStore.profiles.values()).map(profile => ({
-    label: `${profile.Character.Name} (${profile.Character.Level} ${profile.Character.Profession})`,
-    value: profile.Character.Name // Using name as the key since profiles don't have an id field
-  }))
-])
-
-const hasActiveProfile = computed(() => 
-  selectedProfile.value !== 'none' && profileStore.profiles.get(selectedProfile.value) !== undefined
-)
-
-const activeProfile = computed(() => 
-  hasActiveProfile.value ? profileStore.profiles.get(selectedProfile.value) : null
-)
-
 const compatibilityProfile = computed(() => 
-  showCompatibility.value ? activeProfile.value : null
+  showCompatibility.value && profilesStore.hasActiveProfile ? profilesStore.activeProfile : null
 )
 
 const favoriteCount = computed(() => 
-  profileStore.preferences.favoriteItems.length
+  // For now, return 0 since favorites might be handled differently with the new profile system
+  0
 )
 
 const activeFilterCount = computed(() => 
@@ -379,25 +318,6 @@ function clearSearch() {
   searchPerformed.value = false
 }
 
-function onProfileChange() {
-  // Auto-enable compatibility if profile is selected
-  if (selectedProfile.value !== 'none') {
-    showCompatibility.value = true
-  } else {
-    showCompatibility.value = false
-  }
-  
-  // Update profile in store if needed
-  if (hasActiveProfile.value) {
-    profileStore.setCurrentProfile(selectedProfile.value)
-  }
-}
-
-function clearProfile() {
-  selectedProfile.value = 'none'
-  showCompatibility.value = false
-  profileStore.setCurrentProfile(null)
-}
 
 function onFiltersChanged() {
   if (searchPerformed.value) {
@@ -461,11 +381,8 @@ function onItemClick(item: Item) {
 }
 
 function onItemFavorite(item: Item) {
-  if (profileStore.preferences.favoriteItems.includes(item.id)) {
-    profileStore.removeFavoriteItem(item.id)
-  } else {
-    profileStore.addFavoriteItem(item.id)
-  }
+  // TODO: Implement favorites with new profile system
+  console.log('Favorite item:', item.id)
 }
 
 function onItemCompare(item: Item) {
@@ -491,19 +408,7 @@ function onPageChange(page: number) {
 
 // Initialize
 onMounted(() => {
-  // Set current profile if available
-  if (profileStore.currentProfile) {
-    selectedProfile.value = profileStore.currentProfile.Character.Name
-    showCompatibility.value = true
-  }
-})
-
-// Watch for profile store changes
-watch(() => profileStore.currentProfile, (newProfile) => {
-  if (newProfile && selectedProfile.value === 'none') {
-    selectedProfile.value = newProfile.Character.Name
-    showCompatibility.value = true
-  }
+  // Nothing needed for initialization - profiles store auto-initializes
 })
 </script>
 
