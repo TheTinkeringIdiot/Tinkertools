@@ -68,7 +68,16 @@ export class ProfileStorage {
   async loadAllProfiles(): Promise<Map<string, TinkerProfile>> {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.PROFILES);
-      if (!data) {
+      
+      // Only attempt recovery if data is completely missing or truly empty
+      if (!data || data.trim() === '' || data === '{}' || data === 'null') {
+        console.log('Main profile storage empty, attempting recovery from backups...');
+        const recovered = await this.recoverFromBackups();
+        if (recovered.size > 0) {
+          console.log(`Successfully recovered ${recovered.size} profiles from backups`);
+          return recovered;
+        }
+        console.log('No profiles to recover, returning empty map');
         return new Map();
       }
       
@@ -78,6 +87,18 @@ export class ProfileStorage {
         parsed = await this.decompress(data);
       } else {
         parsed = JSON.parse(data);
+      }
+      
+      // Check if parsed data is actually empty or invalid
+      if (!parsed || Object.keys(parsed).length === 0) {
+        console.log('Parsed profile data is empty, attempting recovery from backups...');
+        const recovered = await this.recoverFromBackups();
+        if (recovered.size > 0) {
+          console.log(`Successfully recovered ${recovered.size} profiles from backups`);
+          return recovered;
+        }
+        console.log('No profiles to recover, returning empty map');
+        return new Map();
       }
       
       const profiles = new Map<string, TinkerProfile>();
@@ -96,6 +117,17 @@ export class ProfileStorage {
       
     } catch (error) {
       console.error('Failed to load profiles from storage:', error);
+      // Attempt recovery from backups as fallback
+      try {
+        console.log('Attempting recovery from backups due to parsing error...');
+        const recovered = await this.recoverFromBackups();
+        if (recovered.size > 0) {
+          console.log(`Recovered ${recovered.size} profiles from backups after error`);
+          return recovered;
+        }
+      } catch (recoveryError) {
+        console.error('Recovery from backups also failed:', recoveryError);
+      }
       return new Map();
     }
   }
@@ -269,6 +301,67 @@ export class ProfileStorage {
   }
   
   // ============================================================================
+  // Recovery Operations
+  // ============================================================================
+  
+  /**
+   * Recover profiles from backups when main storage is corrupted
+   */
+  private async recoverFromBackups(): Promise<Map<string, TinkerProfile>> {
+    try {
+      const backups = this.getBackups();
+      const activeProfileId = this.getActiveProfileId();
+      const profiles = new Map<string, TinkerProfile>();
+      
+      // Group backups by profile ID
+      const profileBackups: Record<string, any[]> = {};
+      
+      for (const [backupKey, backup] of Object.entries(backups)) {
+        if (backup?.profile?.id) {
+          const profileId = backup.profile.id;
+          if (!profileBackups[profileId]) {
+            profileBackups[profileId] = [];
+          }
+          profileBackups[profileId].push({ key: backupKey, ...backup });
+        }
+      }
+      
+      // For each profile, get the most recent backup
+      for (const [profileId, backupList] of Object.entries(profileBackups)) {
+        // Skip deletion backups unless it's the only backup
+        const nonDeletionBackups = backupList.filter(b => b.type !== 'deletion');
+        const backupsToUse = nonDeletionBackups.length > 0 ? nonDeletionBackups : backupList;
+        
+        // Sort by timestamp (newest first)
+        backupsToUse.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        
+        const mostRecent = backupsToUse[0];
+        if (mostRecent?.profile) {
+          profiles.set(profileId, mostRecent.profile);
+        }
+      }
+      
+      // If we recovered profiles, save them to main storage WITHOUT creating new backups
+      if (profiles.size > 0) {
+        await this.saveAllProfilesDirectly(profiles);
+        console.log(`Recovery complete: restored ${profiles.size} profiles to main storage`);
+        
+        // Ensure active profile is still valid
+        if (activeProfileId && !profiles.has(activeProfileId)) {
+          console.log(`Active profile ${activeProfileId} not found in recovery, clearing active profile`);
+          localStorage.removeItem(STORAGE_KEYS.ACTIVE_PROFILE);
+        }
+      }
+      
+      return profiles;
+      
+    } catch (error) {
+      console.error('Failed to recover profiles from backups:', error);
+      return new Map();
+    }
+  }
+
+  // ============================================================================
   // Migration
   // ============================================================================
   
@@ -322,6 +415,27 @@ export class ProfileStorage {
    * Save all profiles to storage
    */
   private async saveAllProfiles(profiles: Map<string, TinkerProfile>): Promise<void> {
+    try {
+      const profilesObject = Object.fromEntries(profiles.entries());
+      
+      let data: string;
+      if (this.options.compress) {
+        data = await this.compress(profilesObject);
+      } else {
+        data = JSON.stringify(profilesObject);
+      }
+      
+      localStorage.setItem(STORAGE_KEYS.PROFILES, data);
+      
+    } catch (error) {
+      throw new Error(`Failed to save profiles to storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Save all profiles directly to storage without creating backups (used during recovery)
+   */
+  private async saveAllProfilesDirectly(profiles: Map<string, TinkerProfile>): Promise<void> {
     try {
       const profilesObject = Object.fromEntries(profiles.entries());
       
