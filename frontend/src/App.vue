@@ -5,6 +5,7 @@ import Button from 'primevue/button';
 import Menubar from 'primevue/menubar';
 import { useTheme } from './composables/useTheme';
 import AccessibilityAnnouncer from './components/shared/AccessibilityAnnouncer.vue';
+import ProfileDropdown from './components/profiles/ProfileDropdown.vue';
 import type { MenuItem } from 'primevue/menuitem';
 
 const router = useRouter();
@@ -41,14 +42,14 @@ const menuItems = ref<MenuItem[]>([
     command: () => router.push('/plants')
   },
   {
-    label: 'TinkerPocket',
-    icon: 'pi pi-map',
-    command: () => router.push('/pocket')
-  },
-  {
     label: 'TinkerNukes',
     icon: 'pi pi-sparkles',
     command: () => router.push('/nukes')
+  },
+  {
+    label: 'TinkerPocket',
+    icon: 'pi pi-map',
+    command: () => router.push('/pocket')
   }
 ]);
 </script>
@@ -84,8 +85,13 @@ const menuItems = ref<MenuItem[]>([
           </div>
           
           <!-- Quick Actions -->
-          <div class="flex items-center gap-3">
-            <!-- Global Theme Toggle -->
+          <div class="flex items-center gap-4">
+            <!-- Profile Selector -->
+            <div class="profile-selector-container">
+              <ProfileDropdown />
+            </div>
+            
+            <!-- Theme Toggle -->
             <div class="flex items-center gap-2">
               <span class="text-xs text-surface-500 dark:text-surface-400 font-medium">
                 {{ currentThemeText }} Mode
@@ -99,14 +105,6 @@ const menuItems = ref<MenuItem[]>([
                 :pt="{ root: 'transition-all duration-200 hover:scale-105' }"
               />
             </div>
-            <Button 
-              icon="pi pi-database" 
-              label="Items" 
-              outlined 
-              size="small"
-              aria-label="Go to TinkerItems application"
-              @click="router.push('/items')"
-            />
           </div>
         </div>
       </div>
