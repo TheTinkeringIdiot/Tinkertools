@@ -1,0 +1,612 @@
+/**
+ * TinkerProfiles Manager - Core Profile Management Class
+ * 
+ * Main interface for all profile operations, combining storage, validation,
+ * transformation, and event handling capabilities
+ */
+
+import type { 
+  TinkerProfile, 
+  NanoCompatibleProfile,
+  ProfileMetadata,
+  ProfileExportFormat,
+  ProfileImportResult,
+  ProfileValidationResult,
+  ProfileStorageOptions,
+  ProfileEvents,
+  TinkerProfilesConfig,
+  ProfileSearchFilters,
+  ProfileSortOptions
+} from './types';
+
+import { ProfileStorage } from './storage';
+import { ProfileValidator } from './validator';
+import { ProfileTransformer } from './transformer';
+import { createDefaultProfile, createDefaultNanoProfile } from './constants';
+
+// Simple event emitter for profile events
+class ProfileEventEmitter {
+  private listeners: { [K in keyof ProfileEvents]?: Array<(data: ProfileEvents[K]) => void> } = {};
+  
+  on<K extends keyof ProfileEvents>(event: K, listener: (data: ProfileEvents[K]) => void): void {
+    if (!this.listeners[event]) {
+      this.listeners[event] = [];
+    }
+    this.listeners[event]!.push(listener);
+  }
+  
+  off<K extends keyof ProfileEvents>(event: K, listener: (data: ProfileEvents[K]) => void): void {
+    const eventListeners = this.listeners[event];
+    if (eventListeners) {
+      const index = eventListeners.indexOf(listener);
+      if (index > -1) {
+        eventListeners.splice(index, 1);
+      }
+    }
+  }
+  
+  emit<K extends keyof ProfileEvents>(event: K, data: ProfileEvents[K]): void {
+    const eventListeners = this.listeners[event];
+    if (eventListeners) {
+      eventListeners.forEach(listener => {
+        try {
+          listener(data);
+        } catch (error) {
+          console.error(`Error in profile event listener for ${event}:`, error);
+        }
+      });
+    }
+  }
+}
+
+export class TinkerProfilesManager {
+  private storage: ProfileStorage;
+  private validator: ProfileValidator;
+  private transformer: ProfileTransformer;
+  private events: ProfileEventEmitter;
+  private config: TinkerProfilesConfig;
+  
+  // Cache for performance
+  private profilesCache: Map<string, TinkerProfile> = new Map();
+  private metadataCache: ProfileMetadata[] | null = null;
+  private cacheInvalidated: boolean = true;
+  
+  constructor(config: Partial<TinkerProfilesConfig> = {}) {
+    this.config = {
+      storage: {
+        compress: false,
+        encrypt: false,
+        backup: true,
+        autoSave: true,
+        migrationEnabled: true,
+        ...config.storage
+      },
+      validation: {
+        strictMode: false,
+        autoCorrect: true,
+        allowLegacyFormats: true,
+        ...config.validation
+      },
+      events: {
+        enabled: true,
+        throttle: 100,
+        ...config.events
+      },
+      features: {
+        autoBackup: true,
+        compression: false,
+        migration: true,
+        analytics: false,
+        ...config.features
+      }
+    };
+    
+    this.storage = new ProfileStorage(this.config.storage);
+    this.validator = new ProfileValidator();
+    this.transformer = new ProfileTransformer();
+    this.events = new ProfileEventEmitter();
+  }
+  
+  // ============================================================================
+  // Profile CRUD Operations
+  // ============================================================================
+  
+  /**
+   * Create a new profile
+   */
+  async createProfile(name: string, initialData?: Partial<TinkerProfile>): Promise<string> {
+    try {
+      const profile = createDefaultProfile(name);
+      
+      if (initialData) {
+        Object.assign(profile, initialData);
+        profile.updated = new Date().toISOString();
+      }
+      
+      // Validate the profile
+      if (this.config.validation.strictMode) {
+        const validation = this.validator.validateProfile(profile);
+        if (!validation.valid) {
+          throw new Error(`Profile validation failed: ${validation.errors.join(', ')}`);
+        }
+      }
+      
+      await this.storage.saveProfile(profile);
+      this.invalidateCache();
+      
+      if (this.config.events.enabled) {
+        this.events.emit('profile:created', { profile });
+      }
+      
+      return profile.id;
+      
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Failed to create profile';
+      if (this.config.events.enabled) {
+        this.events.emit('storage:error', { 
+          error: new Error(errorMsg), 
+          operation: 'create' 
+        });
+      }
+      throw new Error(errorMsg);
+    }
+  }
+  
+  /**
+   * Load a profile by ID
+   */
+  async loadProfile(profileId: string): Promise<TinkerProfile | null> {
+    try {
+      // Check cache first
+      if (this.profilesCache.has(profileId) && !this.cacheInvalidated) {
+        return this.profilesCache.get(profileId)!;
+      }
+      
+      const profile = await this.storage.loadProfile(profileId);
+      
+      if (profile) {
+        // Validate and potentially auto-correct
+        const validation = this.validator.validateProfile(profile);
+        
+        if (!validation.valid && this.config.validation.strictMode) {
+          throw new Error(`Profile validation failed: ${validation.errors.join(', ')}`);
+        }
+        
+        if (this.config.validation.autoCorrect && validation.warnings.length > 0) {
+          // Apply auto-corrections here if needed
+          profile.updated = new Date().toISOString();
+          await this.storage.saveProfile(profile);
+        }
+        
+        // Update cache
+        this.profilesCache.set(profileId, profile);
+      }
+      
+      return profile;
+      
+    } catch (error) {
+      if (this.config.events.enabled) {
+        this.events.emit('storage:error', { 
+          error: error instanceof Error ? error : new Error('Failed to load profile'), 
+          operation: 'load' 
+        });
+      }
+      return null;
+    }
+  }
+  
+  /**
+   * Update a profile
+   */
+  async updateProfile(profileId: string, updates: Partial<TinkerProfile>): Promise<void> {
+    try {
+      const existing = await this.loadProfile(profileId);
+      if (!existing) {
+        throw new Error('Profile not found');
+      }
+      
+      const updated = { ...existing, ...updates, updated: new Date().toISOString() };
+      
+      // Validate the updated profile
+      if (this.config.validation.strictMode) {
+        const validation = this.validator.validateProfile(updated);
+        if (!validation.valid) {
+          throw new Error(`Profile validation failed: ${validation.errors.join(', ')}`);
+        }
+      }
+      
+      await this.storage.saveProfile(updated);
+      this.profilesCache.set(profileId, updated);
+      this.invalidateMetadataCache();
+      
+      if (this.config.events.enabled) {
+        this.events.emit('profile:updated', { profile: updated, changes: updates });
+      }
+      
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Failed to update profile';
+      if (this.config.events.enabled) {
+        this.events.emit('storage:error', { 
+          error: new Error(errorMsg), 
+          operation: 'update' 
+        });
+      }
+      throw new Error(errorMsg);
+    }
+  }
+  
+  /**
+   * Delete a profile
+   */
+  async deleteProfile(profileId: string): Promise<void> {
+    try {
+      await this.storage.deleteProfile(profileId);
+      this.profilesCache.delete(profileId);
+      this.invalidateCache();
+      
+      if (this.config.events.enabled) {
+        this.events.emit('profile:deleted', { profileId });
+      }
+      
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Failed to delete profile';
+      if (this.config.events.enabled) {
+        this.events.emit('storage:error', { 
+          error: new Error(errorMsg), 
+          operation: 'delete' 
+        });
+      }
+      throw new Error(errorMsg);
+    }
+  }
+  
+  /**
+   * Get all profile metadata (lightweight)
+   */
+  async getProfileMetadata(refresh: boolean = false): Promise<ProfileMetadata[]> {
+    try {
+      if (!refresh && this.metadataCache && !this.cacheInvalidated) {
+        return this.metadataCache;
+      }
+      
+      const metadata = await this.storage.getProfileMetadata();
+      this.metadataCache = metadata;
+      
+      return metadata;
+      
+    } catch (error) {
+      console.error('Failed to load profile metadata:', error);
+      return [];
+    }
+  }
+  
+  // ============================================================================
+  // Active Profile Management
+  // ============================================================================
+  
+  /**
+   * Set the active profile
+   */
+  async setActiveProfile(profileId: string | null): Promise<void> {
+    try {
+      if (profileId) {
+        const profile = await this.loadProfile(profileId);
+        if (!profile) {
+          throw new Error('Profile not found');
+        }
+        
+        await this.storage.setActiveProfile(profileId);
+        
+        if (this.config.events.enabled) {
+          this.events.emit('profile:activated', { profile });
+        }
+      } else {
+        await this.storage.setActiveProfile(null);
+      }
+      
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Failed to set active profile';
+      if (this.config.events.enabled) {
+        this.events.emit('storage:error', { 
+          error: new Error(errorMsg), 
+          operation: 'setActive' 
+        });
+      }
+      throw new Error(errorMsg);
+    }
+  }
+  
+  /**
+   * Get the active profile
+   */
+  async getActiveProfile(): Promise<TinkerProfile | null> {
+    return await this.storage.loadActiveProfile();
+  }
+  
+  /**
+   * Get the active profile ID
+   */
+  getActiveProfileId(): string | null {
+    return this.storage.getActiveProfileId();
+  }
+  
+  // ============================================================================
+  // Profile Search and Filtering
+  // ============================================================================
+  
+  /**
+   * Search profiles with filters
+   */
+  async searchProfiles(
+    filters: ProfileSearchFilters = {}, 
+    sort?: ProfileSortOptions
+  ): Promise<ProfileMetadata[]> {
+    const allMetadata = await this.getProfileMetadata();
+    
+    let filtered = allMetadata.filter(profile => {
+      // Name filter
+      if (filters.name && !profile.name.toLowerCase().includes(filters.name.toLowerCase())) {
+        return false;
+      }
+      
+      // Profession filter
+      if (filters.profession && filters.profession.length > 0 && !filters.profession.includes(profile.profession)) {
+        return false;
+      }
+      
+      // Level filter
+      if (filters.level && (profile.level < filters.level[0] || profile.level > filters.level[1])) {
+        return false;
+      }
+      
+      // Breed filter
+      if (filters.breed && filters.breed.length > 0 && !filters.breed.includes(profile.breed)) {
+        return false;
+      }
+      
+      // Faction filter
+      if (filters.faction && filters.faction.length > 0 && !filters.faction.includes(profile.faction)) {
+        return false;
+      }
+      
+      // Date filters
+      if (filters.created) {
+        const created = new Date(profile.created);
+        const start = new Date(filters.created[0]);
+        const end = new Date(filters.created[1]);
+        if (created < start || created > end) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+    
+    // Apply sorting
+    if (sort) {
+      filtered.sort((a, b) => {
+        let aVal: any, bVal: any;
+        
+        switch (sort.field) {
+          case 'name':
+            aVal = a.name.toLowerCase();
+            bVal = b.name.toLowerCase();
+            break;
+          case 'profession':
+            aVal = a.profession;
+            bVal = b.profession;
+            break;
+          case 'level':
+            aVal = a.level;
+            bVal = b.level;
+            break;
+          case 'created':
+            aVal = new Date(a.created);
+            bVal = new Date(b.created);
+            break;
+          case 'updated':
+            aVal = new Date(a.updated);
+            bVal = new Date(b.updated);
+            break;
+          default:
+            return 0;
+        }
+        
+        if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    
+    return filtered;
+  }
+  
+  // ============================================================================
+  // Profile Transformations
+  // ============================================================================
+  
+  /**
+   * Convert profile to nano-compatible format
+   */
+  async getAsNanoCompatible(profileId: string): Promise<NanoCompatibleProfile | null> {
+    const profile = await this.loadProfile(profileId);
+    if (!profile) return null;
+    
+    return this.transformer.toNanoCompatible(profile);
+  }
+  
+  /**
+   * Create profile from nano-compatible format
+   */
+  async createFromNanoCompatible(nanoProfile: NanoCompatibleProfile): Promise<string> {
+    const profile = this.transformer.fromNanoCompatible(nanoProfile);
+    return await this.createProfile(profile.Character.Name, profile);
+  }
+  
+  // ============================================================================
+  // Import/Export Operations
+  // ============================================================================
+  
+  /**
+   * Export a profile
+   */
+  async exportProfile(profileId: string, format: ProfileExportFormat = 'json'): Promise<string> {
+    const profile = await this.loadProfile(profileId);
+    if (!profile) {
+      throw new Error('Profile not found');
+    }
+    
+    const exported = this.transformer.exportProfile(profile, format);
+    
+    if (this.config.events.enabled) {
+      this.events.emit('profile:exported', { profile, format });
+    }
+    
+    return exported;
+  }
+  
+  /**
+   * Import a profile
+   */
+  async importProfile(data: string, sourceFormat?: string): Promise<ProfileImportResult> {
+    const result = this.transformer.importProfile(data, sourceFormat);
+    
+    if (result.success && result.profile) {
+      try {
+        // Validate imported profile
+        const validation = this.validator.validateProfile(result.profile);
+        
+        if (!validation.valid && this.config.validation.strictMode) {
+          result.success = false;
+          result.errors.push(...validation.errors);
+          return result;
+        }
+        
+        result.warnings.push(...validation.warnings);
+        
+        // Save the imported profile
+        await this.storage.saveProfile(result.profile);
+        this.invalidateCache();
+        
+        if (this.config.events.enabled) {
+          this.events.emit('profile:imported', { profile: result.profile, result });
+        }
+        
+      } catch (error) {
+        result.success = false;
+        result.errors.push(error instanceof Error ? error.message : 'Failed to save imported profile');
+      }
+    }
+    
+    return result;
+  }
+  
+  // ============================================================================
+  // Validation Operations
+  // ============================================================================
+  
+  /**
+   * Validate a profile
+   */
+  async validateProfile(profileId: string): Promise<ProfileValidationResult> {
+    const profile = await this.loadProfile(profileId);
+    if (!profile) {
+      return {
+        valid: false,
+        errors: ['Profile not found'],
+        warnings: [],
+        suggestions: []
+      };
+    }
+    
+    const result = this.validator.validateProfile(profile);
+    
+    if (!result.valid && this.config.events.enabled) {
+      this.events.emit('validation:failed', { profileId, errors: result.errors });
+    }
+    
+    return result;
+  }
+  
+  // ============================================================================
+  // Event System
+  // ============================================================================
+  
+  /**
+   * Subscribe to profile events
+   */
+  on<K extends keyof ProfileEvents>(event: K, listener: (data: ProfileEvents[K]) => void): void {
+    if (this.config.events.enabled) {
+      this.events.on(event, listener);
+    }
+  }
+  
+  /**
+   * Unsubscribe from profile events
+   */
+  off<K extends keyof ProfileEvents>(event: K, listener: (data: ProfileEvents[K]) => void): void {
+    this.events.off(event, listener);
+  }
+  
+  // ============================================================================
+  // Cache Management
+  // ============================================================================
+  
+  /**
+   * Clear all caches
+   */
+  clearCache(): void {
+    this.profilesCache.clear();
+    this.metadataCache = null;
+    this.cacheInvalidated = true;
+  }
+  
+  private invalidateCache(): void {
+    this.cacheInvalidated = true;
+    this.metadataCache = null;
+  }
+  
+  private invalidateMetadataCache(): void {
+    this.metadataCache = null;
+  }
+  
+  // ============================================================================
+  // Utility Methods
+  // ============================================================================
+  
+  /**
+   * Get storage statistics
+   */
+  getStorageStats(): { used: number; total: number; profiles: number } {
+    return this.storage.getStorageStats();
+  }
+  
+  /**
+   * Clear all profile data (dangerous!)
+   */
+  async clearAllData(): Promise<void> {
+    if (confirm('This will permanently delete all profile data. Are you sure?')) {
+      await this.storage.clearAllData();
+      this.clearCache();
+    }
+  }
+  
+  /**
+   * Get configuration
+   */
+  getConfig(): TinkerProfilesConfig {
+    return { ...this.config };
+  }
+  
+  /**
+   * Update configuration
+   */
+  updateConfig(updates: Partial<TinkerProfilesConfig>): void {
+    this.config = { ...this.config, ...updates };
+    
+    // Reinitialize components with new config if needed
+    if (updates.storage) {
+      this.storage = new ProfileStorage(this.config.storage);
+    }
+  }
+}

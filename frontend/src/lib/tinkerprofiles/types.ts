@@ -1,0 +1,184 @@
+/**
+ * TinkerProfiles Library Types
+ * 
+ * Unified type definitions for profile management across all TinkerTools applications
+ */
+
+// ============================================================================
+// Core Profile Types
+// ============================================================================
+
+/** Comprehensive profile structure following legacy TinkerProfiles format */
+export interface TinkerProfile {
+  // Profile metadata
+  id: string;
+  version: string;
+  created: string;
+  updated: string;
+  
+  // Character basic info
+  Character: {
+    Name: string;
+    Level: number;
+    Profession: string;
+    Breed: string;
+    Faction: string;
+    Expansion: string;
+    AccountType: string;
+  };
+  
+  // Complete skills structure from legacy format
+  Skills: {
+    Attributes: {
+      Intelligence: number;
+      Psychic: number;
+      Sense: number;
+      Stamina: number;
+      Strength: number;
+      Agility: number;
+    };
+    'Body & Defense': Record<string, number>;
+    ACs: Record<string, number>;
+    'Ranged Weapons': Record<string, number>;
+    'Ranged Specials': Record<string, number>;
+    'Melee Weapons': Record<string, number>;
+    'Melee Specials': Record<string, number>;
+    'Nanos & Casting': Record<string, number>;
+    Exploring: Record<string, number>;
+    'Trade & Repair': Record<string, number>;
+    'Combat & Healing': Record<string, number>;
+    Misc: Record<string, number>;
+  };
+  
+  // Equipment slots
+  Weapons: Record<string, any>;
+  Clothing: Record<string, any>;
+  Implants: Record<string, any>;
+  
+  // Additional data
+  PerksAndResearch: any[];
+}
+
+/** Simplified nano-compatible profile for TinkerNanos */
+export interface NanoCompatibleProfile {
+  id: string;
+  name: string;
+  profession: string;
+  level: number;
+  skills: Record<string, number>;
+  stats: Record<string, number>;
+  activeNanos?: number[];
+  memoryCapacity?: number;
+  nanoPoints?: number;
+}
+
+/** Profile metadata for management operations */
+export interface ProfileMetadata {
+  id: string;
+  name: string;
+  profession: string;
+  level: number;
+  breed: string;
+  faction: string;
+  created: string;
+  updated: string;
+  version: string;
+}
+
+// ============================================================================
+// Profile Management Types
+// ============================================================================
+
+/** Export format options */
+export type ProfileExportFormat = 'json' | 'legacy' | 'anarchy_online';
+
+/** Import result with validation info */
+export interface ProfileImportResult {
+  success: boolean;
+  profile?: TinkerProfile;
+  errors: string[];
+  warnings: string[];
+  metadata: {
+    source: string;
+    originalFormat?: string;
+    migrated: boolean;
+  };
+}
+
+/** Validation result */
+export interface ProfileValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+  suggestions: string[];
+}
+
+/** Storage options for persistence */
+export interface ProfileStorageOptions {
+  compress?: boolean;
+  encrypt?: boolean;
+  backup?: boolean;
+  autoSave?: boolean;
+  migrationEnabled?: boolean;
+}
+
+// ============================================================================
+// Event System Types
+// ============================================================================
+
+/** Profile management events */
+export interface ProfileEvents {
+  'profile:created': { profile: TinkerProfile };
+  'profile:updated': { profile: TinkerProfile; changes: Partial<TinkerProfile> };
+  'profile:deleted': { profileId: string };
+  'profile:activated': { profile: TinkerProfile };
+  'profile:imported': { profile: TinkerProfile; result: ProfileImportResult };
+  'profile:exported': { profile: TinkerProfile; format: ProfileExportFormat };
+  'storage:error': { error: Error; operation: string };
+  'validation:failed': { profileId: string; errors: string[] };
+}
+
+// ============================================================================
+// Search and Filter Types
+// ============================================================================
+
+/** Profile search filters */
+export interface ProfileSearchFilters {
+  name?: string;
+  profession?: string[];
+  level?: [number, number];
+  breed?: string[];
+  faction?: string[];
+  created?: [string, string];
+  tags?: string[];
+}
+
+/** Profile sorting options */
+export interface ProfileSortOptions {
+  field: 'name' | 'profession' | 'level' | 'created' | 'updated';
+  direction: 'asc' | 'desc';
+}
+
+// ============================================================================
+// Configuration Types
+// ============================================================================
+
+/** Library configuration */
+export interface TinkerProfilesConfig {
+  storage: ProfileStorageOptions;
+  validation: {
+    strictMode: boolean;
+    autoCorrect: boolean;
+    allowLegacyFormats: boolean;
+  };
+  events: {
+    enabled: boolean;
+    throttle: number;
+  };
+  features: {
+    autoBackup: boolean;
+    compression: boolean;
+    migration: boolean;
+    analytics: boolean;
+  };
+}

@@ -11,14 +11,21 @@ import AccordionTab from 'primevue/accordiontab';
 import Badge from 'primevue/badge';
 import Button from 'primevue/button';
 import Checkbox from 'primevue/checkbox';
+import ConfirmDialog from 'primevue/confirmdialog';
+import Dialog from 'primevue/dialog';
 import Dropdown from 'primevue/dropdown';
+import FileUpload from 'primevue/fileupload';
 import InputNumber from 'primevue/inputnumber';
 import InputSwitch from 'primevue/inputswitch';
 import InputText from 'primevue/inputtext';
 import MultiSelect from 'primevue/multiselect';
 import ProgressSpinner from 'primevue/progressspinner';
+import RadioButton from 'primevue/radiobutton';
 import Slider from 'primevue/slider';
+import TabView from 'primevue/tabview';
+import TabPanel from 'primevue/tabpanel';
 import Tag from 'primevue/tag';
+import Textarea from 'primevue/textarea';
 import TriStateCheckbox from 'primevue/tristatecheckbox';
 
 // Import global theme management system (initializes immediately)
@@ -43,14 +50,21 @@ app.component('AccordionTab', AccordionTab);
 app.component('Badge', Badge);
 app.component('Button', Button);
 app.component('Checkbox', Checkbox);
+app.component('ConfirmDialog', ConfirmDialog);
+app.component('Dialog', Dialog);
 app.component('Dropdown', Dropdown);
+app.component('FileUpload', FileUpload);
 app.component('InputNumber', InputNumber);
 app.component('InputSwitch', InputSwitch);
 app.component('InputText', InputText);
 app.component('MultiSelect', MultiSelect);
 app.component('ProgressSpinner', ProgressSpinner);
+app.component('RadioButton', RadioButton);
 app.component('Slider', Slider);
+app.component('TabView', TabView);
+app.component('TabPanel', TabPanel);
 app.component('Tag', Tag);
+app.component('Textarea', Textarea);
 app.component('TriStateCheckbox', TriStateCheckbox);
 
 // Global directives
