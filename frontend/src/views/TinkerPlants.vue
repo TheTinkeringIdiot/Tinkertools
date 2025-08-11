@@ -23,8 +23,8 @@ Grid-based implant selection following the legacy TinkerPlants format
         <div class="flex flex-col sm:flex-row gap-3">
           <!-- Quality Level Control -->
           <div class="flex items-center gap-2">
-            <label for="ql-input" class="text-sm font-medium text-surface-700 dark:text-surface-300">
-              QL:
+            <label for="ql-input" class="text-sm font-medium text-surface-700 dark:text-surface-300 whitespace-nowrap">
+              Set QL To:
             </label>
             <InputNumber 
               id="ql-input"
@@ -32,8 +32,10 @@ Grid-based implant selection following the legacy TinkerPlants format
               :min="1"
               :max="300"
               :step="1"
-              class="w-20"
+              :use-grouping="false"
+              class="header-ql-input"
               aria-describedby="ql-help"
+              @input="onGlobalQLChange"
             />
             <span id="ql-help" class="sr-only">
               Quality Level for implants, from 1 to 300
@@ -70,7 +72,7 @@ Grid-based implant selection following the legacy TinkerPlants format
         <!-- Implant Grid -->
         <div class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg overflow-hidden">
           <!-- Grid Header -->
-          <div class="grid grid-cols-5 gap-0 bg-surface-100 dark:bg-surface-800 border-b border-surface-200 dark:border-surface-700">
+          <div class="tinker-plants-grid gap-0 bg-surface-100 dark:bg-surface-800 border-b border-surface-200 dark:border-surface-700">
             <div class="p-3 font-semibold text-surface-900 dark:text-surface-50 border-r border-surface-200 dark:border-surface-700">
               Slot
             </div>
@@ -92,7 +94,7 @@ Grid-based implant selection following the legacy TinkerPlants format
           <div 
             v-for="(slot, index) in implantSlots" 
             :key="slot.id"
-            class="grid grid-cols-5 gap-0 border-b border-surface-200 dark:border-surface-700 last:border-b-0 hover:bg-surface-50 dark:hover:bg-surface-900/50"
+            class="tinker-plants-grid gap-0 border-b border-surface-200 dark:border-surface-700 last:border-b-0"
           >
             <!-- Slot Name -->
             <div class="p-3 border-r border-surface-200 dark:border-surface-700 flex items-center">
@@ -150,14 +152,14 @@ Grid-based implant selection following the legacy TinkerPlants format
             </div>
             
             <!-- QL Input -->
-            <div class="p-2">
+            <div class="p-2 flex items-center">
               <InputNumber
                 :id="`${slot.id}-ql`"
                 v-model="implantSelections[slot.id].ql"
                 :min="1"
                 :max="300"
                 :step="1"
-                class="w-full"
+                class="w-full ql-input"
                 :aria-label="`Quality Level for ${slot.name} implant`"
                 @input="onQLChange(slot.id, $event.value)"
               />
@@ -372,6 +374,20 @@ const onQLChange = (slotId: string, value: number | null) => {
   }
 };
 
+const onGlobalQLChange = (event: any) => {
+  const newQL = event.value;
+  if (newQL !== null && newQL !== undefined) {
+    // Ensure the value is within valid bounds before applying to all fields
+    const clampedQL = Math.max(1, Math.min(300, newQL));
+    
+    // Update all slot QL values with the clamped value
+    Object.keys(implantSelections).forEach(slotId => {
+      implantSelections[slotId].ql = clampedQL;
+    });
+    announce(`All Quality Levels set to ${clampedQL}`);
+  }
+};
+
 const clearAllImplants = () => {
   Object.keys(implantSelections).forEach(slotId => {
     implantSelections[slotId] = {
@@ -416,9 +432,44 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* Custom styles for the grid */
-.tinker-plants .grid {
+/* Custom grid layout with reduced QL column and expanded dropdown columns */
+.tinker-plants-grid {
   display: grid;
+  grid-template-columns: 1fr 2fr 2fr 2fr 100px;
+}
+
+/* QL input styling for centered text and proper padding */
+.ql-input :deep(.p-inputnumber) {
+  width: 100%;
+}
+
+.ql-input :deep(.p-inputnumber-input) {
+  text-align: center !important;
+  padding-left: 0.5rem !important;
+  padding-right: 0.5rem !important;
+  background-color: var(--p-inputtext-background) !important;
+  color: var(--p-inputtext-color) !important;
+  border: 1px solid var(--p-inputtext-border-color) !important;
+  width: 100% !important;
+}
+
+/* Header QL input styling - compact width and consistent appearance */
+.header-ql-input {
+  width: 80px;
+}
+
+.header-ql-input :deep(.p-inputnumber) {
+  width: 80px;
+}
+
+.header-ql-input :deep(.p-inputnumber-input) {
+  text-align: center !important;
+  width: 80px !important;
+  padding-left: 0.5rem !important;
+  padding-right: 0.5rem !important;
+  background-color: var(--p-inputtext-background) !important;
+  color: var(--p-inputtext-color) !important;
+  border: 1px solid var(--p-inputtext-border-color) !important;
 }
 
 /* Screen reader only utility */
