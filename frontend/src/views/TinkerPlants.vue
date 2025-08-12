@@ -108,9 +108,9 @@ Grid-based implant selection following the legacy TinkerPlants format
               <Dropdown
                 :id="`${slot.id}-shiny`"
                 v-model="implantSelections[slot.id].shiny"
-                :options="skillClusters"
-                option-label="name"
-                option-value="id"
+                :options="getSkillOptions(slot.name, 'shiny')"
+                option-label="label"
+                option-value="value"
                 placeholder="None"
                 show-clear
                 class="w-full"
@@ -124,9 +124,9 @@ Grid-based implant selection following the legacy TinkerPlants format
               <Dropdown
                 :id="`${slot.id}-bright`"
                 v-model="implantSelections[slot.id].bright"
-                :options="skillClusters"
-                option-label="name"
-                option-value="id"
+                :options="getSkillOptions(slot.name, 'bright')"
+                option-label="label"
+                option-value="value"
                 placeholder="None"
                 show-clear
                 class="w-full"
@@ -140,9 +140,9 @@ Grid-based implant selection following the legacy TinkerPlants format
               <Dropdown
                 :id="`${slot.id}-faded`"
                 v-model="implantSelections[slot.id].faded"
-                :options="skillClusters"
-                option-label="name"
-                option-value="id"
+                :options="getSkillOptions(slot.name, 'faded')"
+                option-label="label"
+                option-value="value"
                 placeholder="None"
                 show-clear
                 class="w-full"
@@ -249,54 +249,500 @@ const showResults = ref(false);
 
 // Implant slots in the order from legacy TinkerPlants
 const implantSlots = ref([
-  { id: 'head', name: 'Head' },
-  { id: 'ear', name: 'Ear' },
-  { id: 'right_arm', name: 'Right Arm' },
-  { id: 'chest', name: 'Chest' },
-  { id: 'left_arm', name: 'Left Arm' },
-  { id: 'right_wrist', name: 'Right Wrist' },
-  { id: 'waist', name: 'Waist' },
-  { id: 'left_wrist', name: 'Left Wrist' },
-  { id: 'right_hand', name: 'Right Hand' },
-  { id: 'leg', name: 'Leg' },
-  { id: 'left_hand', name: 'Left Hand' },
-  { id: 'feet', name: 'Feet' }
+  { id: 'Eye', name: 'Eye' },
+  { id: 'Head', name: 'Head' },
+  { id: 'Ear', name: 'Ear' },
+  { id: 'Right Arm', name: 'Right Arm' },
+  { id: 'Chest', name: 'Chest' },
+  { id: 'Left Arm', name: 'Left Arm' },
+  { id: 'Right Wrist', name: 'Right Wrist' },
+  { id: 'Waist', name: 'Waist' },
+  { id: 'Left Wrist', name: 'Left Wrist' },
+  { id: 'Right Hand', name: 'Right Hand' },
+  { id: 'Leg', name: 'Leg' },
+  { id: 'Left Hand', name: 'Left Hand' },
+  { id: 'Feet', name: 'Feet' }
 ]);
 
-// Skill clusters (from legacy TinkerPlants)
-const skillClusters = ref([
-  { id: 'elec_engi', name: 'Elec. Engi' },
-  { id: 'nano_progra', name: 'Nano Progra' },
-  { id: 'perception', name: 'Perception' },
-  { id: 'nano_pool', name: 'Nano Pool' },
-  { id: 'melee_ener', name: 'Melee Ener' },
-  { id: 'quantum_ft', name: 'Quantum FT' },
-  { id: 'strength', name: 'Strength' },
-  { id: 'stamina', name: 'Stamina' },
-  { id: 'agility', name: 'Agility' },
-  { id: 'sense', name: 'Sense' },
-  { id: 'intelligence', name: 'Intelligence' },
-  { id: 'psychic', name: 'Psychic' },
-  { id: 'comp_liter', name: 'Comp Liter' },
-  { id: 'psychology', name: 'Psychology' },
-  { id: 'bio_meta', name: 'Bio Meta' },
-  { id: 'mat_meta', name: 'Mat Meta' },
-  { id: 'psych_modi', name: 'Psych Modi' },
-  { id: 'sensory_imp', name: 'Sensory Imp' },
-  { id: 'time_space', name: 'Time & Space' },
-  { id: 'mat_creat', name: 'Mat Creat' },
-  { id: '1h_blunt', name: '1H Blunt' },
-  { id: '1h_edged', name: '1H Edged' },
-  { id: '2h_blunt', name: '2H Blunt' },
-  { id: '2h_edged', name: '2H Edged' },
-  { id: 'assault_rif', name: 'Assault Rif' },
-  { id: 'bow', name: 'Bow' },
-  { id: 'pistol', name: 'Pistol' },
-  { id: 'rifle', name: 'Rifle' },
-  { id: 'shotgun', name: 'Shotgun' },
-  { id: 'smg', name: 'SMG' },
-  { id: 'piercing', name: 'Piercing' }
-]);
+// Implant values data from docs/implant_values.json
+const implantValues = ref({
+  "Eye": {
+    "shiny": [
+      "Empty",
+      "Aimed Shot",
+      "Elec. Engi",
+      "Map Navig",
+      "RangeInc. Weapon",
+      "Rifle",
+      "Tutoring",
+      "Vehicle Air"
+    ],
+    "bright": [
+      "Empty",
+      "Chemistry",
+      "Comp. Liter",
+      "Grenade",
+      "Heavy Weapons",
+      "Intelligence",
+      "Mech. Engi",
+      "Mult. Melee",
+      "Nano Progra",
+      "NanoC. Init",
+      "Perception",
+      "Pharma Tech",
+      "Psycho Modi",
+      "Quantum FT",
+      "Ranged Ener",
+      "Sensory Impr",
+      "Treatment",
+      "Vehicle Grnd",
+      "Vehicle Hydr"
+    ],
+    "faded": [
+      "Empty",
+      "Assault Rif",
+      "Bow",
+      "Concealment",
+      "Matter Crea",
+      "Multi Ranged",
+      "Pistol",
+      "Psychology",
+      "Sharp Obj",
+      "Sneak Atck",
+      "Time & Space",
+      "Weapon Smt"
+    ]
+  },
+  "Head": {
+    "shiny": [
+      "Empty",
+      "Bio.Metamor",
+      "Bow Spc Att",
+      "Chemistry",
+      "Comp. Liter",
+      "Disease AC",
+      "First Aid",
+      "Intelligence",
+      "Matt.Metam",
+      "Matter Crea",
+      "Max Nano",
+      "Mech. Engi",
+      "Melee Ener",
+      "Nano Progra",
+      "Nano Resist",
+      "NanoC. Init",
+      "Pharma Tech",
+      "Psychic",
+      "Psycho Modi",
+      "Psychology",
+      "Quantum FT",
+      "Ranged Ener",
+      "Sensory Impr",
+      "Time & Space",
+      "Treatment",
+      "Vehicle Grnd",
+      "Vehicle Hydr"
+    ],
+    "bright": [
+      "Empty",
+      "Dimach",
+      "Elec. Engi",
+      "Map Navig",
+      "Nano Pool",
+      "Ranged. Init",
+      "Weapon Smt"
+    ],
+    "faded": [
+      "Empty",
+      "Perception",
+      "Sense",
+      "Trap Disarm",
+      "Tutoring",
+      "Vehicle Air"
+    ]
+  },
+  "Ear": {
+    "shiny": [
+      "Empty",
+      "Add. Xp",
+      "Max NCU",
+      "Perception"
+    ],
+    "bright": [
+      "Empty",
+      "Concealment",
+      "Nano Point Cost Modifier",
+      "Psychology",
+      "Tutoring",
+      "Vehicle Air"
+    ],
+    "faded": [
+      "Empty",
+      "Intelligence",
+      "Map Navig",
+      "Psychic",
+      "Psycho Modi",
+      "Vehicle Grnd",
+      "Vehicle Hydr"
+    ]
+  },
+  "Right Arm": {
+    "shiny": [
+      "Empty",
+      "1h Blunt",
+      "1h Edged Weapon",
+      "2h Blunt",
+      "2h Edged",
+      "Assault Rif",
+      "Bow",
+      "Break & Entry",
+      "Burst",
+      "Fling Shot",
+      "Full Auto",
+      "Grenade",
+      "Heavy Weapons",
+      "MG / SMG",
+      "Piercing",
+      "Shotgun",
+      "Strength"
+    ],
+    "bright": [
+      "Empty",
+      "Add All Def.",
+      "Add All Off",
+      "Brawling",
+      "Chemical AC",
+      "Nano Delta",
+      "Physic. Init",
+      "Swimming"
+    ],
+    "faded": [
+      "Empty",
+      "Fast Attack",
+      "Mech. Engi",
+      "Parry",
+      "Radiation AC",
+      "RangeInc. NF",
+      "RangeInc. Weapon",
+      "Riposte"
+    ]
+  },
+  "Chest": {
+    "shiny": [
+      "Empty",
+      "Body Dev",
+      "Dimach",
+      "Energy AC",
+      "Max Health",
+      "Melee/Ma AC",
+      "Nano Pool",
+      "Sense",
+      "Stamina"
+    ],
+    "bright": [
+      "Empty",
+      "Bio.Metamor",
+      "Imp/Proj AC",
+      "Matt.Metam",
+      "Psychic"
+    ],
+    "faded": [
+      "Empty",
+      "2h Blunt",
+      "Adventuring",
+      "Break & Entry",
+      "Disease AC",
+      "MG / SMG",
+      "Max Nano",
+      "Nano Formula Interrupt Modifier",
+      "NanoC. Init",
+      "Sensory Impr",
+      "Skill Time Lock Modifier",
+      "Strength"
+    ]
+  },
+  "Left Arm": {
+    "shiny": [
+      "Empty",
+      "Add All Def.",
+      "Add All Off",
+      "Brawling",
+      "Heal Delta",
+      "RangeInc. NF"
+    ],
+    "bright": [
+      "Empty",
+      "2h Blunt",
+      "2h Edged",
+      "Bow",
+      "Break & Entry",
+      "Piercing",
+      "Radiation AC",
+      "Strength"
+    ],
+    "faded": [
+      "Empty",
+      "Chemical AC",
+      "Matt.Metam",
+      "Nano Point Cost Modifier",
+      "Physic. Init",
+      "Swimming"
+    ]
+  },
+  "Right Wrist": {
+    "shiny": [
+      "Empty",
+      "Nano Delta",
+      "Parry",
+      "Pistol",
+      "Ranged. Init",
+      "Riposte",
+      "Run Speed",
+      "Sharp Obj"
+    ],
+    "bright": [
+      "Empty",
+      "1h Blunt",
+      "1h Edged Weapon",
+      "Aimed Shot",
+      "Burst",
+      "Full Auto",
+      "Max NCU",
+      "Multi Ranged",
+      "Nano Resist",
+      "Rifle",
+      "Sneak Atck"
+    ],
+    "faded": [
+      "Empty",
+      "Add. Chem. Dam.",
+      "Add. Energy Dam.",
+      "Add. Fire Dam.",
+      "Add. Melee Dam.",
+      "Add. Poison Dam.",
+      "Add. Proj. Dam.",
+      "Add.Rad. Dam.",
+      "Bow Spc Att",
+      "Fling Shot",
+      "Melee Ener",
+      "Mult. Melee"
+    ]
+  },
+  "Waist": {
+    "shiny": [
+      "Empty",
+      "Chemical AC",
+      "Cold AC",
+      "Fire AC",
+      "Nano Point Cost Modifier",
+      "Radiation AC"
+    ],
+    "bright": [
+      "Empty",
+      "Adventuring",
+      "Body Dev",
+      "Duck-Exp",
+      "Max Health",
+      "Max Nano",
+      "Melee/Ma AC",
+      "Sense"
+    ],
+    "faded": [
+      "Empty",
+      "2h Edged",
+      "Agility",
+      "Bio.Metamor",
+      "Brawling",
+      "Dimach",
+      "Dodge-Rng",
+      "Energy AC",
+      "Evade-ClsC",
+      "Full Auto",
+      "Imp/Proj AC",
+      "Melee. Init",
+      "Nano Pool",
+      "Piercing",
+      "Shotgun",
+      "Stamina"
+    ]
+  },
+  "Left Wrist": {
+    "shiny": [
+      "Empty",
+      "Mult. Melee",
+      "Multi Ranged",
+      "Shield Energy AC",
+      "Shield Fire AC",
+      "Shield Projectile AC",
+      "Shield Radiation AC"
+    ],
+    "bright": [
+      "Empty",
+      "Add. Chem. Dam.",
+      "Add. Energy Dam.",
+      "Add. Fire Dam.",
+      "Add. Melee Dam.",
+      "Add. Poison Dam.",
+      "Add. Proj. Dam.",
+      "Add.Rad. Dam.",
+      "Melee Ener",
+      "Parry",
+      "Riposte",
+      "Run Speed"
+    ],
+    "faded": [
+      "Empty",
+      "Nano Resist",
+      "Rifle",
+      "Shield Chemical AC",
+      "Shield Cold AC",
+      "Shield Melee AC",
+      "Shield Poison AC"
+    ]
+  },
+  "Right Hand": {
+    "shiny": [
+      "Empty",
+      "Add. Chem. Dam.",
+      "Add. Energy Dam.",
+      "Add. Fire Dam.",
+      "Add. Melee Dam.",
+      "Add. Poison Dam.",
+      "Add. Proj. Dam.",
+      "Add.Rad. Dam.",
+      "Martial Arts",
+      "Trap Disarm",
+      "Weapon Smt"
+    ],
+    "bright": [
+      "Empty",
+      "Assault Rif",
+      "Bow Spc Att",
+      "Cold AC",
+      "Fast Attack",
+      "First Aid",
+      "Fling Shot",
+      "MG / SMG",
+      "Matter Crea",
+      "Pistol",
+      "Sharp Obj",
+      "Shotgun",
+      "Time & Space"
+    ],
+    "faded": [
+      "Empty",
+      "1h Blunt",
+      "1h Edged Weapon",
+      "Aimed Shot",
+      "Burst",
+      "Chemistry",
+      "Comp. Liter",
+      "Elec. Engi",
+      "Fire AC",
+      "Grenade",
+      "Heavy Weapons",
+      "Nano Progra",
+      "Pharma Tech",
+      "Quantum FT",
+      "Ranged. Init",
+      "Treatment"
+    ]
+  },
+  "Leg": {
+    "shiny": [
+      "Empty",
+      "Adventuring",
+      "Agility",
+      "Dodge-Rng",
+      "Duck-Exp",
+      "Imp/Proj AC",
+      "Nano Formula Interrupt Modifier",
+      "Skill Time Lock Modifier",
+      "Swimming"
+    ],
+    "bright": [
+      "Empty",
+      "Disease AC",
+      "Energy AC",
+      "Evade-ClsC",
+      "Melee. Init",
+      "Stamina"
+    ],
+    "faded": [
+      "Empty",
+      "Add. Xp",
+      "Body Dev",
+      "Heal Delta",
+      "Max Health",
+      "Max NCU",
+      "Melee/Ma AC",
+      "Run Speed",
+      "Shield Energy AC",
+      "Shield Fire AC",
+      "Shield Projectile AC",
+      "Shield Radiation AC"
+    ]
+  },
+  "Left Hand": {
+    "shiny": [
+      "Empty",
+      "Fast Attack",
+      "Shield Chemical AC",
+      "Shield Cold AC",
+      "Shield Melee AC",
+      "Shield Poison AC"
+    ],
+    "bright": [
+      "Empty",
+      "Fire AC",
+      "Nano Formula Interrupt Modifier",
+      "RangeInc. NF",
+      "Shield Energy AC",
+      "Shield Fire AC",
+      "Shield Projectile AC",
+      "Shield Radiation AC",
+      "Skill Time Lock Modifier",
+      "Trap Disarm"
+    ],
+    "faded": [
+      "Empty",
+      "Cold AC",
+      "First Aid",
+      "Martial Arts",
+      "Ranged Ener"
+    ]
+  },
+  "Feet": {
+    "shiny": [
+      "Empty",
+      "Concealment",
+      "Evade-ClsC",
+      "Melee. Init",
+      "Physic. Init",
+      "Sneak Atck"
+    ],
+    "bright": [
+      "Empty",
+      "Add. Xp",
+      "Agility",
+      "Dodge-Rng",
+      "Heal Delta",
+      "Martial Arts",
+      "RangeInc. Weapon",
+      "Shield Chemical AC",
+      "Shield Cold AC",
+      "Shield Melee AC",
+      "Shield Poison AC"
+    ],
+    "faded": [
+      "Empty",
+      "Add All Def.",
+      "Add All Off",
+      "Duck-Exp",
+      "Nano Delta"
+    ]
+  }
+});
 
 // Initialize implant selections
 const implantSelections = reactive<Record<string, { shiny: string | null; bright: string | null; faded: string | null; ql: number }>>({});
@@ -311,6 +757,15 @@ implantSlots.value.forEach(slot => {
   };
 });
 
+// Helper function to get slot-specific skill options
+const getSkillOptions = (slotName: string, clusterType: 'shiny' | 'bright' | 'faded') => {
+  const slotData = implantValues.value[slotName as keyof typeof implantValues.value];
+  if (!slotData) return [];
+  
+  const skills = slotData[clusterType] || [];
+  return skills.map(skill => ({ value: skill, label: skill }));
+};
+
 // Computed properties
 const hasAnyImplants = computed(() => {
   return Object.values(implantSelections).some(selection => 
@@ -323,14 +778,11 @@ const calculatedBonuses = computed(() => {
   const bonuses: Record<string, number> = {};
   
   Object.values(implantSelections).forEach(selection => {
-    [selection.shiny, selection.bright, selection.faded].forEach(clusterId => {
-      if (clusterId) {
-        const cluster = skillClusters.value.find(c => c.id === clusterId);
-        if (cluster) {
-          // Mock bonus calculation based on individual QL and cluster type
-          const bonus = Math.floor(selection.ql / 10);
-          bonuses[cluster.name] = (bonuses[cluster.name] || 0) + bonus;
-        }
+    [selection.shiny, selection.bright, selection.faded].forEach(skillName => {
+      if (skillName && skillName !== 'Empty') {
+        // Mock bonus calculation based on individual QL and cluster type
+        const bonus = Math.floor(selection.ql / 10);
+        bonuses[skillName] = (bonuses[skillName] || 0) + bonus;
       }
     });
   });
@@ -346,16 +798,13 @@ const constructionRequirements = computed(() => {
     if (!slot) return;
     
     ['shiny', 'bright', 'faded'].forEach(type => {
-      const clusterId = selection[type as keyof typeof selection];
-      if (clusterId) {
-        const cluster = skillClusters.value.find(c => c.id === clusterId);
-        if (cluster) {
-          requirements.push({
-            slot: slot.name,
-            type: type.charAt(0).toUpperCase() + type.slice(1),
-            clusters: [cluster.name]
-          });
-        }
+      const skillName = selection[type as keyof typeof selection];
+      if (skillName && skillName !== 'Empty') {
+        requirements.push({
+          slot: slot.name,
+          type: type.charAt(0).toUpperCase() + type.slice(1),
+          clusters: [skillName]
+        });
       }
     });
   });
