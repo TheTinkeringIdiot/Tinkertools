@@ -2,6 +2,7 @@
  * Spells Store - Pinia Store for Spell Data Management
  * 
  * Manages spells and spell data with caching and search capabilities
+ * Enhanced with nano compatibility and effect analysis
  */
 
 import { defineStore } from 'pinia'
@@ -13,6 +14,9 @@ import type {
   UserFriendlyError
 } from '../types/api'
 import { apiClient } from '../services/api-client'
+import { nanoCompatibility } from '../utils/nano-compatibility'
+import { gameUtils } from '../services/game-utils'
+import { flagOperations } from '../utils/flag-operations'
 
 export const useSpellsStore = defineStore('spells', () => {
   // ============================================================================
@@ -256,6 +260,75 @@ export const useSpellsStore = defineStore('spells', () => {
   }
   
   /**
+   * Convert spell to nano format for compatibility checking
+   */
+  function convertSpellToNano(spell: Spell): any {
+    return {
+      id: spell.id,
+      name: spell.name,
+      school: spell.spell_params?.School || 0,
+      ncuCost: spell.spell_params?.NCU || 0,
+      nanoPoints: spell.spell_params?.NanoPoints || 0,
+      level: spell.spell_params?.Level,
+      requirements: spell.spell_params?.Criteria || [],
+      effects: spell.spell_params?.Effects || [],
+      duration: spell.spell_params?.Duration || 0,
+      stackingLine: spell.spell_params?.StackingLine,
+      attackTime: spell.spell_params?.AttackTime || 1000,
+      rechargeTime: spell.spell_params?.RechargeTime || 1000
+    }
+  }
+  
+  /**
+   * Validate nano requirements for character
+   */
+  function validateNanoForCharacter(spell: Spell, character: any) {
+    if (!character) return null
+    
+    const nano = convertSpellToNano(spell)
+    return nanoCompatibility.validateNanoRequirements(nano, character)
+  }
+  
+  /**
+   * Check nano school effectiveness for profession
+   */
+  function getNanoSchoolEffectiveness(spell: Spell, professionId: number): number {
+    const schoolId = spell.spell_params?.School || 0
+    return nanoCompatibility.getNanoSchoolEffectiveness(professionId, schoolId)
+  }
+  
+  /**
+   * Format spell effects for display
+   */
+  function formatSpellEffects(spell: Spell): string[] {
+    const effects = spell.spell_params?.Effects || []
+    return nanoCompatibility.formatNanoEffects(effects)
+  }
+  
+  /**
+   * Get nano difficulty rating
+   */
+  function getSpellDifficulty(spell: Spell): string {
+    const nano = convertSpellToNano(spell)
+    return nanoCompatibility.getNanoDifficulty(nano)
+  }
+  
+  /**
+   * Analyze NCU cost and requirements
+   */
+  function analyzeNanoCost(spell: Spell, character: any): any {
+    if (!character) return null
+    
+    const nano = convertSpellToNano(spell)
+    return {
+      ncuCost: nano.ncuCost,
+      nanoCost: nanoCompatibility.calculateNanoCost(nano, character),
+      initTime: nanoCompatibility.calculateNanoInitTime(nano, character),
+      difficulty: nanoCompatibility.getNanoDifficulty(nano)
+    }
+  }
+  
+  /**
    * Get spell statistics
    */
   const getStats = computed(() => ({
@@ -298,6 +371,14 @@ export const useSpellsStore = defineStore('spells', () => {
     clearSearch,
     clearError,
     clearCache,
-    preloadCommonSpells
+    preloadCommonSpells,
+    
+    // Enhanced nano analysis methods
+    convertSpellToNano,
+    validateNanoForCharacter,
+    getNanoSchoolEffectiveness,
+    formatSpellEffects,
+    getSpellDifficulty,
+    analyzeNanoCost
   }
 })

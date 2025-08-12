@@ -3,6 +3,8 @@
  * 
  * Manages character profiles, user preferences, and collection tracking
  * All data stored in LocalStorage following privacy-first approach (REQ-SEC-003)
+ * 
+ * Enhanced with unified game data utilities for character analysis
  */
 
 import { defineStore } from 'pinia'
@@ -13,6 +15,10 @@ import type {
   CollectionTracking,
   CharacterBuild
 } from '../types/api'
+import { useGameData, type Character } from '../composables/useGameData'
+import { gameUtils } from '../services/game-utils'
+import { professionBonuses } from '../utils/profession-bonuses'
+import { statCalculations } from '../utils/stat-calculations'
 
 // ============================================================================
 // Default Profile Structure
@@ -302,6 +308,179 @@ export const useProfileStore = defineStore('profile', () => {
     if (!skillCategory || typeof skillCategory !== 'object') return 0
     return (skillCategory as Record<string, number>)[skill] || 0
   })
+  
+  // ============================================================================
+  // Enhanced Character Analysis with Game Data Utilities
+  // ============================================================================
+  
+  /**
+   * Convert TinkerProfile to standardized Character format
+   */
+  const currentCharacter = computed((): Character | null => {
+    if (!currentProfile.value) return null
+    
+    const profile = currentProfile.value
+    const baseStats: Record<number, number> = {}
+    
+    // Map TinkerProfile attributes to game stat IDs
+    const attrMapping = {
+      'Strength': 16,
+      'Agility': 17, 
+      'Stamina': 18,
+      'Intelligence': 19,
+      'Sense': 20,
+      'Psychic': 21
+    }
+    
+    Object.entries(attrMapping).forEach(([attr, statId]) => {
+      baseStats[statId] = profile.Skills.Attributes[attr as keyof typeof profile.Skills.Attributes] || 0
+    })
+    
+    // Add other important stats from Skills
+    baseStats[53] = profile.Skills.Misc?.['Max Health'] || 0 // Health
+    baseStats[220] = profile.Skills.Misc?.['Max Nano'] || 0 // Nano Pool
+    baseStats[54] = profile.Character.Level || 1 // Level
+    
+    return {
+      level: profile.Character.Level || 1,
+      profession: gameUtils.getProfessionId(profile.Character.Profession) || 0,
+      breed: gameUtils.getBreedId(profile.Character.Breed) || 0,
+      faction: gameUtils.getFactionId(profile.Character.Faction) || 0,
+      baseStats
+    }
+  })
+  
+  /**
+   * Get comprehensive character analysis
+   */
+  const characterAnalysis = computed(() => {
+    if (!currentCharacter.value) return null
+    
+    const char = currentCharacter.value
+    
+    // Get breed information
+    const breedInfo = professionBonuses.getBreedSpecialAbilities(char.breed)
+    const breedModifiers = professionBonuses.getBreedAttributeModifiers(char.breed)
+    const breedSkillMods = professionBonuses.getBreedSkillModifiers(char.breed)
+    
+    // Get profession information
+    const professionCaps = professionBonuses.getProfessionSkillCaps(char.profession)
+    const professionNano = professionBonuses.getProfessionNanoEffectiveness(char.profession)
+    const professionPriorities = professionBonuses.getProfessionStatPriorities(char.profession)
+    
+    // Calculate total bonuses
+    const characterBonuses = professionBonuses.calculateCharacterBonuses(char)
+    
+    // Get stat recommendations
+    const statRecommendations = professionBonuses.getRecommendedStatDistribution(
+      char.breed, 
+      char.profession, 
+      char.level
+    )
+    
+    return {
+      breed: {
+        name: gameUtils.getBreedName(char.breed),
+        info: breedInfo,
+        attributeModifiers: breedModifiers,
+        skillModifiers: breedSkillMods
+      },
+      profession: {
+        name: gameUtils.getProfessionName(char.profession),
+        skillCaps: professionCaps,
+        nanoEffectiveness: professionNano,
+        statPriorities: professionPriorities
+      },
+      bonuses: characterBonuses,
+      recommendations: statRecommendations,
+      totalStats: calculateTotalStats()
+    }
+  })
+  
+  /**
+   * Calculate total character stats including all bonuses
+   */
+  function calculateTotalStats(): Record<number, number> {
+    if (!currentCharacter.value) return {}
+    
+    const char = currentCharacter.value
+    const baseStats = { ...char.baseStats }
+    
+    // Apply breed modifiers
+    const breedMods = professionBonuses.getBreedAttributeModifiers(char.breed)
+    Object.entries(breedMods).forEach(([stat, modifier]) => {
+      const statId = Number(stat)
+      baseStats[statId] = (baseStats[statId] || 0) + modifier
+    })
+    
+    // Apply breed skill modifiers (as percentage bonuses)
+    const breedSkillMods = professionBonuses.getBreedSkillModifiers(char.breed)
+    Object.entries(breedSkillMods).forEach(([skill, bonus]) => {
+      const skillId = Number(skill)
+      const currentValue = baseStats[skillId] || 0
+      baseStats[skillId] = Math.floor(currentValue * (1 + bonus / 100))
+    })
+    
+    return baseStats
+  }
+  
+  /**
+   * Get IP analysis for current character
+   */
+  const ipAnalysis = computed(() => {
+    if (!currentCharacter.value) return null
+    
+    const char = currentCharacter.value
+    const totalIP = statCalculations.calculateTotalIP(char)
+    const usedIP = statCalculations.calculateUsedIP(char.baseStats)
+    
+    return {
+      total: totalIP,
+      used: usedIP,
+      available: totalIP - usedIP,
+      efficiency: usedIP > 0 ? Math.round((usedIP / totalIP) * 100) : 0
+    }
+  })
+  
+  /**
+   * Validate character can meet item/nano requirements
+   */
+  function validateRequirements(requirements: Array<{ stat: number; value: number; operator?: string }>) {
+    if (!currentCharacter.value) return { valid: false, failures: [] }
+    
+    return statCalculations.validateRequirements(currentCharacter.value, requirements)
+  }
+  
+  /**
+   * Get profession effectiveness with specific item classes
+   */
+  function getProfessionItemEffectiveness(itemClass: number): number {
+    if (!currentCharacter.value) return 0
+    
+    const className = gameUtils.getItemClassName(itemClass)
+    if (!className) return 0
+    
+    const professionName = gameUtils.getProfessionName(currentCharacter.value.profession)
+    if (!professionName) return 0
+    
+    // This would use the item validation utilities
+    const effectiveness = {
+      'Soldier': { 'Weapon': 100, 'Armor': 100, 'Implant': 80 },
+      'Doctor': { 'Weapon': 60, 'Armor': 80, 'Implant': 100 },
+      // ... other profession mappings
+    }
+    
+    return effectiveness[professionName]?.[className] || 70
+  }
+  
+  /**
+   * Get nano school effectiveness for current profession
+   */
+  function getNanoSchoolEffectiveness(schoolId: number): number {
+    if (!currentCharacter.value) return 0
+    
+    return professionBonuses.getProfessionNanoEffectiveness(currentCharacter.value.profession)[schoolId] || 0
+  }
   
   // Get all builds for current profile
   const currentProfileBuilds = computed(() => {
@@ -752,6 +931,11 @@ export const useProfileStore = defineStore('profile', () => {
     getSkillValue,
     currentProfileBuilds,
     
+    // Enhanced character analysis
+    currentCharacter,
+    characterAnalysis,
+    ipAnalysis,
+    
     // Actions
     loadFromLocalStorage,
     saveToLocalStorage,
@@ -777,6 +961,11 @@ export const useProfileStore = defineStore('profile', () => {
     updateBuild,
     deleteBuild,
     clearError,
-    resetAllData
+    resetAllData,
+    
+    // Enhanced analysis methods
+    validateRequirements,
+    getProfessionItemEffectiveness,
+    getNanoSchoolEffectiveness
   }
 })
