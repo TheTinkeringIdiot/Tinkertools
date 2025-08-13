@@ -520,6 +520,43 @@ export function normalizeBreedName(name: string): string {
 }
 
 // ============================================================================
+// Icon and Image Functions
+// ============================================================================
+
+/**
+ * Extract icon ID from item stats
+ */
+export function getItemIconId(stats: Array<{stat: number, value: number}>): number | null {
+  const iconStat = stats.find(stat => stat.stat === 79); // Stat ID 79 is 'Icon'
+  return iconStat ? iconStat.value : null;
+}
+
+/**
+ * Get icon URL from icon ID
+ */
+export function getIconUrl(iconId: number): string {
+  return `https://cdn.tinkeringidiot.com/aoicons/${iconId}.png`;
+}
+
+/**
+ * Get item icon URL from item stats
+ */
+export function getItemIconUrl(stats: Array<{stat: number, value: number}>): string | null {
+  const iconId = getItemIconId(stats);
+  return iconId ? getIconUrl(iconId) : null;
+}
+
+/**
+ * Get item icon URL with fallback
+ */
+export function getItemIconUrlWithFallback(
+  stats: Array<{stat: number, value: number}>, 
+  fallbackUrl: string = '/default-item-icon.png'
+): string {
+  return getItemIconUrl(stats) || fallbackUrl;
+}
+
+// ============================================================================
 // Export all functions as a single object for easy importing
 // ============================================================================
 
@@ -578,5 +615,11 @@ export const gameUtils = {
   canProfessionUseNanoSchool,
   getCommonRequirementStats,
   normalizeProfessionName,
-  normalizeBreedName
+  normalizeBreedName,
+
+  // Icon functions
+  getItemIconId,
+  getIconUrl,
+  getItemIconUrl,
+  getItemIconUrlWithFallback
 };
