@@ -236,7 +236,7 @@ const profilesStore = useTinkerProfilesStore()
 // State
 const searchQuery = ref('')
 const showCompatibility = ref(false)
-const viewMode = ref<'grid' | 'list'>('grid')
+const viewMode = ref<'grid' | 'list'>('list')
 const activeFilters = ref<ItemFilters>({})
 const searchResults = ref<Item[]>([])
 const comparisonItems = ref<Item[]>([])
@@ -285,8 +285,17 @@ const sortOptions = [
   { label: 'Item Type', value: 'type' }
 ]
 
+// Search options from ItemSearch component
+const searchOptions = ref({ query: '', exactMatch: true })
+
 // Methods
-async function performSearch() {
+async function performSearch(options?: { query: string; exactMatch: boolean }) {
+  // Update search options if provided from ItemSearch component
+  if (options) {
+    searchOptions.value = options
+    searchQuery.value = options.query
+  }
+  
   if (!searchQuery.value.trim() && !hasActiveFilters.value) {
     return
   }
@@ -297,6 +306,7 @@ async function performSearch() {
   try {
     const query: ItemSearchQuery = {
       search: searchQuery.value,
+      exact_match: searchOptions.value.exactMatch,
       ...activeFilters.value,
       sort: sortOption.value.includes('_') ? sortOption.value.split('_')[0] : sortOption.value,
       sort_order: sortOption.value.includes('desc') ? 'desc' : 'asc'

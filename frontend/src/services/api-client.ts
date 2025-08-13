@@ -283,19 +283,63 @@ class TinkerToolsApiClient {
   // ============================================================================
   
   async searchItems(query: ItemSearchQuery): Promise<PaginatedResponse<Item>> {
-    const params = new URLSearchParams()
-    
-    if (query.search) params.append('search', query.search)
-    if (query.item_class?.length) query.item_class.forEach(c => params.append('item_class', c.toString()))
-    if (query.min_ql) params.append('min_ql', query.min_ql.toString())
-    if (query.max_ql) params.append('max_ql', query.max_ql.toString())
-    if (query.is_nano !== undefined) params.append('is_nano', query.is_nano.toString())
-    if (query.page) params.append('page', query.page.toString())
-    if (query.limit) params.append('limit', query.limit.toString())
-    if (query.sort) params.append('sort', query.sort)
-    if (query.sort_order) params.append('sort_order', query.sort_order)
-    
-    return this.get<Item[]>(`/items?${params.toString()}`) as Promise<PaginatedResponse<Item>>
+    try {
+      const params = new URLSearchParams()
+      
+      // Use correct parameter name for search endpoint
+      if (query.search) {
+        // Use the /search endpoint when search query is provided
+        params.append('q', query.search)
+        if (query.page) params.append('page', query.page.toString())
+        if (query.limit) params.append('page_size', query.limit.toString())
+        if (query.exact_match !== undefined) params.append('exact_match', query.exact_match.toString())
+        if (query.is_nano !== undefined) params.append('weapons', (!query.is_nano).toString())
+        
+        const response = await this.client.get(`/items/search?${params.toString()}`)
+        const backendResponse = response.data
+        
+        // Transform backend response format to frontend expected format
+        return {
+          success: true,
+          data: backendResponse.items || [],
+          pagination: {
+            page: backendResponse.page || 1,
+            limit: backendResponse.page_size || 50,
+            total: backendResponse.total || 0,
+            hasNext: backendResponse.has_next || false,
+            hasPrev: backendResponse.has_prev || false
+          }
+        }
+      } else {
+        // Use the regular /items endpoint for filtering without search
+        if (query.item_class?.length) query.item_class.forEach(c => params.append('item_class', c.toString()))
+        if (query.min_ql) params.append('min_ql', query.min_ql.toString())
+        if (query.max_ql) params.append('max_ql', query.max_ql.toString())
+        if (query.is_nano !== undefined) params.append('is_nano', query.is_nano.toString())
+        if (query.page) params.append('page', query.page.toString())
+        if (query.limit) params.append('page_size', query.limit.toString())
+        if (query.sort) params.append('sort', query.sort)
+        if (query.sort_order) params.append('sort_order', query.sort_order)
+        
+        const response = await this.client.get(`/items?${params.toString()}`)
+        const backendResponse = response.data
+        
+        // Transform backend response format to frontend expected format
+        return {
+          success: true,
+          data: backendResponse.items || [],
+          pagination: {
+            page: backendResponse.page || 1,
+            limit: backendResponse.page_size || 50,
+            total: backendResponse.total || 0,
+            hasNext: backendResponse.has_next || false,
+            hasPrev: backendResponse.has_prev || false
+          }
+        }
+      }
+    } catch (error: any) {
+      throw this.handleError(error)
+    }
   }
   
   async getItem(id: number): Promise<ApiResponse<Item>> {

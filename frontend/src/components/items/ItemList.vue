@@ -61,7 +61,14 @@ Shows items in grid or list view with pagination and compatibility indicators
             <div class="flex items-start gap-4">
               <!-- Item Icon/Image -->
               <div class="w-12 h-12 bg-surface-100 dark:bg-surface-800 rounded flex items-center justify-center flex-shrink-0">
-                <i class="pi pi-box text-surface-400"></i>
+                <img 
+                  v-if="getItemIconUrl(item)"
+                  :src="getItemIconUrl(item)" 
+                  :alt="`${item.name} icon`"
+                  class="w-10 h-10 object-contain"
+                  @error="(e) => handleIconError(e, item.id)"
+                />
+                <i v-else class="pi pi-box text-surface-400"></i>
               </div>
               
               <!-- Item Info -->
@@ -225,6 +232,7 @@ Shows items in grid or list view with pagination and compatibility indicators
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import type { Item, TinkerProfile, PaginationInfo, ItemRequirement } from '@/types/api'
+import { getItemIconUrl as getItemIconUrlUtil } from '@/services/game-utils'
 
 // Components (to be created)
 import ItemCard from './ItemCard.vue'
@@ -254,6 +262,7 @@ const currentOffset = ref(props.pagination?.offset || 0)
 const showQuickViewDialog = ref(false)
 const selectedItem = ref<Item | null>(null)
 const itemMenu = ref()
+const iconLoadErrors = ref<Set<number>>(new Set())
 
 // Context menu items
 const itemMenuItems = ref([
@@ -402,6 +411,15 @@ function shareItem(item: Item) {
 function onPageChange(event: any) {
   currentOffset.value = event.first
   emit('page-change', Math.floor(event.first / event.rows) + 1)
+}
+
+function getItemIconUrl(item: Item): string | null {
+  if (iconLoadErrors.value.has(item.id)) return null
+  return getItemIconUrlUtil(item.stats || [])
+}
+
+function handleIconError(event: Event, itemId: number) {
+  iconLoadErrors.value.add(itemId)
 }
 </script>
 
