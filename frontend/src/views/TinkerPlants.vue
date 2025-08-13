@@ -67,10 +67,16 @@ Grid-based implant selection following the legacy TinkerPlants format
     </div>
 
     <!-- Main Content -->
-    <div class="flex-1 overflow-auto p-4">
-      <div class="max-w-6xl mx-auto">
-        <!-- Implant Grid -->
-        <div class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg overflow-hidden">
+    <div class="flex-1 overflow-auto">
+      <div class="h-full">
+        <!-- Tabbed Content -->
+        <TabView class="h-full tinker-plants-tabs">
+          <!-- Build Tab -->
+          <TabPanel header="Build" class="h-full">
+            <div class="p-4">
+              <div class="max-w-6xl mx-auto">
+                <!-- Implant Grid -->
+                <div class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg overflow-hidden">
           <!-- Grid Header -->
           <div class="tinker-plants-grid gap-0 bg-surface-100 dark:bg-surface-800 border-b border-surface-200 dark:border-surface-700">
             <div class="p-3 font-semibold text-surface-900 dark:text-surface-50 border-r border-surface-200 dark:border-surface-700">
@@ -161,58 +167,74 @@ Grid-based implant selection following the legacy TinkerPlants format
                 :step="1"
                 class="w-full ql-input"
                 :aria-label="`Quality Level for ${slot.name} implant`"
-                @input="onQLChange(slot.id, $event.value)"
+                @input="onQLChange(slot.id, $event.value as number)"
               />
             </div>
           </div>
-        </div>
-
-        <!-- Results Section -->
-        <div v-if="showResults" class="mt-6 space-y-4">
-          <!-- Stat Summary -->
-          <div class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
-            <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-3 flex items-center gap-2">
-              <i class="pi pi-chart-bar text-primary-500"></i>
-              Stat Bonuses
-            </h3>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-              <div 
-                v-for="(bonus, statName) in calculatedBonuses" 
-                :key="statName"
-                class="text-center p-2 bg-surface-50 dark:bg-surface-900 rounded"
-              >
-                <div class="text-xs text-surface-600 dark:text-surface-400 uppercase tracking-wide">
-                  {{ statName }}
                 </div>
-                <div class="text-lg font-bold text-primary-600 dark:text-primary-400">
-                  +{{ bonus }}
+
+                <!-- Results Section -->
+                <div v-if="showResults" class="mt-6 space-y-4">
+                  <!-- Stat Summary -->
+                  <div class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
+                    <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-3 flex items-center gap-2">
+                      <i class="pi pi-chart-bar text-primary-500"></i>
+                      Stat Bonuses
+                    </h3>
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+                      <div 
+                        v-for="(bonus, statName) in calculatedBonuses" 
+                        :key="statName"
+                        class="text-center p-2 bg-surface-50 dark:bg-surface-900 rounded"
+                      >
+                        <div class="text-xs text-surface-600 dark:text-surface-400 uppercase tracking-wide">
+                          {{ statName }}
+                        </div>
+                        <div class="text-lg font-bold text-primary-600 dark:text-primary-400">
+                          +{{ bonus }}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Construction Requirements -->
+                  <div class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
+                    <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-3 flex items-center gap-2">
+                      <i class="pi pi-wrench text-primary-500"></i>
+                      Construction Requirements
+                    </h3>
+                    <div class="space-y-2">
+                      <div 
+                        v-for="requirement in constructionRequirements" 
+                        :key="`${requirement.slot}-${requirement.type}`"
+                        class="flex justify-between items-center py-1 border-b border-surface-100 dark:border-surface-800 last:border-b-0"
+                      >
+                        <span class="text-surface-700 dark:text-surface-300">
+                          {{ requirement.slot }} - {{ requirement.type }}
+                        </span>
+                        <span class="font-mono text-surface-900 dark:text-surface-50">
+                          {{ requirement.clusters.join(', ') }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </TabPanel>
 
-          <!-- Construction Requirements -->
-          <div class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
-            <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-3 flex items-center gap-2">
-              <i class="pi pi-wrench text-primary-500"></i>
-              Construction Requirements
-            </h3>
-            <div class="space-y-2">
-              <div 
-                v-for="requirement in constructionRequirements" 
-                :key="`${requirement.slot}-${requirement.type}`"
-                class="flex justify-between items-center py-1 border-b border-surface-100 dark:border-surface-800 last:border-b-0"
-              >
-                <span class="text-surface-700 dark:text-surface-300">
-                  {{ requirement.slot }} - {{ requirement.type }}
-                </span>
-                <span class="font-mono text-surface-900 dark:text-surface-50">
-                  {{ requirement.clusters.join(', ') }}
-                </span>
+          <!-- Construction Tab -->
+          <TabPanel header="Construction" class="h-full">
+            <div class="p-4">
+              <div class="max-w-6xl mx-auto">
+                <ConstructionPlanner 
+                  :implants="implantSelections"
+                  :current-build="calculatedBonuses"
+                />
               </div>
             </div>
-          </div>
-        </div>
+          </TabPanel>
+        </TabView>
       </div>
     </div>
 
@@ -237,7 +259,10 @@ import Badge from 'primevue/badge';
 import Button from 'primevue/button';
 import Dropdown from 'primevue/dropdown';
 import InputNumber from 'primevue/inputnumber';
+import TabView from 'primevue/tabview';
+import TabPanel from 'primevue/tabpanel';
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue';
+import ConstructionPlanner from '@/components/plants/ConstructionPlanner.vue';
 
 // Accessibility
 const { announce, setLoading } = useAccessibility();
@@ -803,7 +828,7 @@ const constructionRequirements = computed(() => {
         requirements.push({
           slot: slot.name,
           type: type.charAt(0).toUpperCase() + type.slice(1),
-          clusters: [skillName]
+          clusters: [skillName as string]
         });
       }
     });
@@ -919,6 +944,21 @@ onMounted(async () => {
   background-color: var(--p-inputtext-background) !important;
   color: var(--p-inputtext-color) !important;
   border: 1px solid var(--p-inputtext-border-color) !important;
+}
+
+/* TabView full height styling */
+.tinker-plants-tabs {
+  height: 100%;
+}
+
+.tinker-plants-tabs :deep(.p-tabview-panels) {
+  height: calc(100% - 60px); /* Subtract tab header height */
+  overflow: auto;
+}
+
+.tinker-plants-tabs :deep(.p-tabview-panel) {
+  height: 100%;
+  padding: 0 !important;
 }
 
 /* Screen reader only utility */
