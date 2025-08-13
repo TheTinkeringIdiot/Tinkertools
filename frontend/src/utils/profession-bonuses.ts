@@ -8,11 +8,13 @@
 import { 
   PROFESSION, 
   BREED, 
-  FACTION,
+  FACTION
+} from '../services/game-data';
+import {
   getProfessionName,
   getBreedName,
   getFactionName
-} from '../services/game-data';
+} from '../services/game-utils';
 import { type Character } from './stat-calculations';
 
 // ============================================================================
