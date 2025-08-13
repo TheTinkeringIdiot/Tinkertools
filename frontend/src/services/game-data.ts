@@ -733,7 +733,7 @@ export const STAT = {
  * Requirements mapping - used for item and nano requirements
  */
 export const REQUIREMENTS = {
-  -1: 'Any',
+  '-1': 'Any',
   102: '1hBlunt',
   103: '1hEdged',
   107: '2hBlunt',
@@ -938,7 +938,7 @@ export const REQUIREMENTS = {
  * Spell modified stats - stats that can be modified by spells/nanos
  */
 export const SPELL_MODIFIED_STATS = {
-  -1: 'Any',
+  '-1': 'Any',
   102: '1hBlunt',
   103: '1hEdged',
   107: '2hBlunt',
@@ -1994,7 +1994,144 @@ export const CLUSTER_MIN_QL = {
 } as const;
 
 // ============================================================================
-// Type Definitions for Implant Constants
+// TinkerNukes Constants (Nanotechnician Specialization Data)
+// ============================================================================
+
+/**
+ * Character breed ID to name mapping
+ */
+export const BREEDS = {
+  0: 'Solitus',
+  1: 'Opifex',
+  2: 'Nanomage',
+  3: 'Atrox'
+} as const;
+
+/**
+ * Cyberdeck types for Nanotechnician specialization
+ */
+export const DECKS = {
+  0: 'Worn Cyberdeck',
+  1: 'Basic Cyberdeck',
+  2: 'Augmented Cyberdeck',
+  4: 'Jobe-chipped Cyberdeck',
+  8: 'Izgimmer Modified Cyberdeck'
+} as const;
+
+/**
+ * Specialization level mapping
+ */
+export const SPECS = {
+  0: 0,
+  1: 1,
+  2: 2,
+  4: 3,
+  8: 4
+} as const;
+
+/**
+ * Humidity Extractor nano damage bonuses by level
+ */
+export const HUMIDITY = {
+  0: 0,
+  1: 0.333333,
+  2: 1.4,
+  3: 3.4,
+  4: 6.8,
+  5: 8.733333,
+  6: 12.7333,
+  7: 15.66666
+} as const;
+
+/**
+ * Crunchcom nano damage bonuses by level
+ */
+export const CRUNCHCOM = {
+  0: 0,
+  1: 6,
+  2: 9,
+  3: 11,
+  4: 13,
+  5: 18,
+  6: 22,
+  7: 28
+} as const;
+
+/**
+ * Notum Siphon nano damage bonuses by level
+ */
+export const NOTUM_SIPHON = {
+  0: 0.0,
+  1: 5.0,
+  2: 9.0,
+  3: 14.4444,
+  4: 21.1111,
+  5: 25.0,
+  6: 26.875,
+  7: 34.2857,
+  8: 37.1428,
+  9: 42.8571,
+  10: 83.4
+} as const;
+
+/**
+ * Channeling of Notum nano damage bonuses by level
+ */
+export const CHANNELING_OF_NOTUM = {
+  0: 0.0,
+  1: 1.7857,
+  2: 4.6153,
+  3: 7.5,
+  4: 15.4545
+} as const;
+
+/**
+ * Enhance Nano Damage bonuses by level
+ */
+export const ENHANCE_NANO_DAMAGE = {
+  0: 0,
+  1: 2,
+  2: 4,
+  3: 7,
+  4: 10,
+  5: 13,
+  6: 18
+} as const;
+
+/**
+ * Ancient Matrix nano damage bonuses by level
+ */
+export const ANCIENT_MATRIX = {
+  0: 0,
+  1: 0,
+  2: 0,
+  3: 1,
+  4: 1,
+  5: 1,
+  6: 2,
+  7: 2,
+  8: 2,
+  9: 3,
+  10: 3
+} as const;
+
+/**
+ * Damage type ID to name mapping
+ */
+export const DAMAGE_TYPES = {
+  0: 'All',
+  1: 'Chemical',
+  2: 'Cold',
+  3: 'Energy',
+  4: 'Fire',
+  5: 'Melee',
+  6: 'Poison',
+  7: 'Projectile',
+  8: 'Radiation'
+} as const;
+
+// ============================================================================
+// Type Definitions for All Constants
 // ============================================================================
 
 export type NPModKey = keyof typeof NP_MODS;
@@ -2005,3 +2142,10 @@ export type ImpSlotKey = keyof typeof IMP_SLOT_INDEX;
 export type ImpSlotName = typeof IMP_SLOTS[number];
 export type ClusterType = keyof typeof CLUSTER_SLOTS;
 export type ClusterMinQLKey = keyof typeof CLUSTER_MIN_QL;
+export type BreedId = keyof typeof BREEDS;
+export type BreedName = typeof BREEDS[BreedId];
+export type DeckId = keyof typeof DECKS;
+export type DeckName = typeof DECKS[DeckId];
+export type SpecId = keyof typeof SPECS;
+export type DamageTypeId = keyof typeof DAMAGE_TYPES;
+export type DamageTypeName = typeof DAMAGE_TYPES[DamageTypeId];

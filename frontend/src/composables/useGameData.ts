@@ -37,6 +37,8 @@ import { nanoCompatibility, type Nano, type NCUMemory } from '../utils/nano-comp
 import { itemValidation, type Item, type EquipmentSet } from '../utils/item-validation';
 import { flagOperations } from '../utils/flag-operations';
 import { professionBonuses } from '../utils/profession-bonuses';
+import { implantPlanning, type ImplantsData, type ImplantSlotData } from '../utils/implant-planning';
+import { nanotechnicianSpecialization, type NukesConfiguration, type DamageBonusResult } from '../utils/nanotechnician-specialization';
 
 // ============================================================================
 // Composable State
@@ -45,6 +47,8 @@ import { professionBonuses } from '../utils/profession-bonuses';
 const activeCharacter: Ref<Character | null> = ref(null);
 const activeEquipment: Ref<EquipmentSet | null> = ref(null);
 const activeNanos: Ref<Nano[]> = ref([]);
+const activeImplants: Ref<ImplantsData | null> = ref(null);
+const activeNukesConfig: Ref<NukesConfiguration | null> = ref(null);
 
 // ============================================================================
 // Main Composable Function
@@ -262,6 +266,158 @@ export function useGameData() {
   }
   
   // ========================================================================
+  // Implant Planning
+  // ========================================================================
+  
+  /**
+   * Set the active implant configuration
+   */
+  function setActiveImplants(implants: ImplantsData) {
+    activeImplants.value = implants;
+  }
+  
+  /**
+   * Get the current active implants
+   */
+  const implants = computed(() => activeImplants.value);
+  
+  /**
+   * Initialize new implant configuration
+   */
+  function initializeImplants() {
+    return implantPlanning.initialImplants();
+  }
+  
+  /**
+   * Validate implant configuration
+   */
+  function validateImplants(implants?: ImplantsData) {
+    const config = implants || activeImplants.value;
+    if (!config) {
+      return {
+        valid: false,
+        errors: ['No implant configuration'],
+        warnings: []
+      };
+    }
+    
+    return implantPlanning.validateImplantConfig(config);
+  }
+  
+  /**
+   * Calculate implant construction requirements
+   */
+  function calculateImplantBuild(implants?: ImplantsData) {
+    const config = implants || activeImplants.value;
+    if (!config || !activeCharacter.value) return null;
+    
+    const results = [];
+    const combineSkills = {
+      'Nanoprogramming': activeCharacter.value.baseStats?.[146] || 0 // Nanoprogramming stat ID
+    };
+    
+    for (const [slotName, slotData] of Object.entries(config)) {
+      ['Shiny', 'Bright', 'Faded'].forEach(clusterType => {
+        const skill = slotData[clusterType.toLowerCase() as keyof ImplantSlotData] as string;
+        if (skill && skill !== 'Empty') {
+          if (implantPlanning.isJobeSkill(skill)) {
+            const result = implantPlanning.jobeClusterQLBump(
+              clusterType as any,
+              skill,
+              combineSkills,
+              slotData.ql,
+              1
+            );
+            results.push({
+              slot: slotName,
+              cluster: clusterType,
+              skill,
+              ...result
+            });
+          } else {
+            const result = implantPlanning.rkClusterQLBump(
+              clusterType as any,
+              skill,
+              combineSkills,
+              slotData.ql,
+              1
+            );
+            results.push({
+              slot: slotName,
+              cluster: clusterType,
+              skill,
+              ...result
+            });
+          }
+        }
+      });
+    }
+    
+    return results;
+  }
+  
+  // ========================================================================
+  // Nanotechnician Specialization
+  // ========================================================================
+  
+  /**
+   * Set the active nanotechnician configuration
+   */
+  function setActiveNukesConfig(config: NukesConfiguration) {
+    activeNukesConfig.value = config;
+  }
+  
+  /**
+   * Get the current nanotechnician configuration
+   */
+  const nukesConfig = computed(() => activeNukesConfig.value);
+  
+  /**
+   * Initialize new nanotechnician configuration
+   */
+  function initializeNukesConfig() {
+    return nanotechnicianSpecialization.initialNukes();
+  }
+  
+  /**
+   * Calculate total nano damage bonuses
+   */
+  const nukeDamageBonuses = computed((): DamageBonusResult | null => {
+    if (!activeNukesConfig.value) return null;
+    
+    return nanotechnicianSpecialization.calculateTotalDamageBonus(activeNukesConfig.value);
+  });
+  
+  /**
+   * Validate nanotechnician configuration
+   */
+  function validateNukesConfig(config?: NukesConfiguration) {
+    const nukesConfig = config || activeNukesConfig.value;
+    if (!nukesConfig) {
+      return {
+        valid: false,
+        errors: ['No nanotechnician configuration'],
+        warnings: []
+      };
+    }
+    
+    return nanotechnicianSpecialization.validateNukesConfig(nukesConfig);
+  }
+  
+  /**
+   * Calculate nano pool and initiative
+   */
+  const nukesStats = computed(() => {
+    if (!activeNukesConfig.value) return null;
+    
+    return {
+      nanoPool: nanotechnicianSpecialization.calculateNanoPool(activeNukesConfig.value),
+      nanoInitiative: nanotechnicianSpecialization.calculateNanoInitiative(activeNukesConfig.value),
+      damageBonuses: nukeDamageBonuses.value
+    };
+  });
+
+  // ========================================================================
   // Profession & Breed Analysis
   // ========================================================================
   
@@ -415,6 +571,8 @@ export function useGameData() {
     character,
     equipment,
     nanos,
+    implants,
+    nukesConfig,
     
     // Computed
     constants,
@@ -422,6 +580,8 @@ export function useGameData() {
     characterStats,
     equipmentStats,
     ncuStatus,
+    nukeDamageBonuses,
+    nukesStats,
     
     // Character methods
     setActiveCharacter,
@@ -439,6 +599,17 @@ export function useGameData() {
     validateNanoCast,
     checkNanoConflicts,
     
+    // Implant methods
+    setActiveImplants,
+    initializeImplants,
+    validateImplants,
+    calculateImplantBuild,
+    
+    // Nanotechnician methods
+    setActiveNukesConfig,
+    initializeNukesConfig,
+    validateNukesConfig,
+    
     // Utility groups
     flags,
     calculations,
@@ -450,7 +621,9 @@ export function useGameData() {
     nanoCompatibility,
     itemValidation,
     flagOperations,
-    professionBonuses
+    professionBonuses,
+    implantPlanning,
+    nanotechnicianSpecialization
   };
 }
 
@@ -482,6 +655,10 @@ export type {
   Item,
   EquipmentSet,
   NCUMemory,
+  ImplantsData,
+  ImplantSlotData,
+  NukesConfiguration,
+  DamageBonusResult,
   StatId,
   RequirementId,
   ProfessionId,
