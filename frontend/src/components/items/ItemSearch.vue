@@ -239,7 +239,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  search: []
+  search: [options: { query: string; exactMatch: boolean }]
   clear: []
   'update:query': [query: string]
 }>()
@@ -254,7 +254,7 @@ const savedSearches = ref<SavedSearch[]>([])
 
 // Advanced search options
 const searchFields = ref<string[]>([])
-const matchType = ref('contains')
+const matchType = ref('exact') // Default to exact matching
 const caseSensitive = ref(false)
 const exactMatch = ref(false)
 const compatibleOnly = ref(false)
@@ -272,10 +272,8 @@ const searchFieldOptions = [
 ]
 
 const matchTypeOptions = [
-  { label: 'Contains', value: 'contains' },
-  { label: 'Starts with', value: 'starts_with' },
-  { label: 'Ends with', value: 'ends_with' },
-  { label: 'Exact match', value: 'exact' }
+  { label: 'Exact Match', value: 'exact', description: 'Find exact word matches (default)' },
+  { label: 'Fuzzy Search', value: 'fuzzy', description: 'Find similar words and word stems' }
 ]
 
 const quickFilters: QuickFilter[] = [
@@ -344,7 +342,12 @@ function performSearch() {
   
   hasSearched.value = true
   showSuggestions.value = false
-  emit('search')
+  
+  // Emit search with options
+  emit('search', {
+    query: searchQuery.value,
+    exactMatch: matchType.value === 'exact'
+  })
 }
 
 function clearSearch() {

@@ -17,7 +17,14 @@ Shows item info with compatibility status and quick actions
       <div class="relative">
         <!-- Item Image/Icon -->
         <div class="h-32 bg-gradient-to-br from-surface-100 to-surface-200 dark:from-surface-800 dark:to-surface-900 flex items-center justify-center">
-          <i class="pi pi-box text-3xl text-surface-400"></i>
+          <img 
+            v-if="itemIconUrl"
+            :src="itemIconUrl" 
+            :alt="`${item.name} icon`"
+            class="w-12 h-12 object-contain"
+            @error="onIconError"
+          />
+          <i v-else class="pi pi-box text-3xl text-surface-400"></i>
         </div>
         
         <!-- Overlay Badges -->
@@ -181,8 +188,9 @@ Shows item info with compatibility status and quick actions
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { Item, TinkerProfile, ItemRequirement } from '@/types/api'
+import { getItemIconUrl } from '@/services/game-utils'
 
 const props = defineProps<{
   item: Item
@@ -199,7 +207,15 @@ defineEmits<{
   'quick-view': [item: Item]
 }>()
 
+// State
+const iconLoadError = ref(false)
+
 // Computed Properties
+const itemIconUrl = computed(() => {
+  if (iconLoadError.value) return null
+  return getItemIconUrl(props.item.stats || [])
+})
+
 const keyStats = computed(() => {
   if (!props.item.stats || props.item.stats.length === 0) return []
   
@@ -276,6 +292,10 @@ function canMeetRequirement(requirement: ItemRequirement): boolean {
   
   const characterStat = props.profile.stats?.[requirement.stat] || 0
   return characterStat >= requirement.value
+}
+
+function onIconError() {
+  iconLoadError.value = true
 }
 </script>
 

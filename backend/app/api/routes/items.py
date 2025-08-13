@@ -11,7 +11,7 @@ import time
 import logging
 
 from app.core.database import get_db
-from app.models import Item, ItemStats, StatValue, AttackDefense, AttackDefenseAttack, AttackDefenseDefense
+from app.models import Item, ItemStats, StatValue, AttackDefense, AttackDefenseAttack, AttackDefenseDefense, ItemSpellData, SpellData
 from app.models.interpolated_item import InterpolatedItem, InterpolationRequest, InterpolationResponse
 from app.services.interpolation import InterpolationService
 from app.api.schemas import (
@@ -28,7 +28,7 @@ router = APIRouter(prefix="/items", tags=["items"])
 logger = logging.getLogger(__name__)
 
 
-@router.get("", response_model=PaginatedResponse[ItemResponse])
+@router.get("", response_model=PaginatedResponse[ItemDetail])
 def get_items(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page"),
@@ -39,9 +39,12 @@ def get_items(
     db: Session = Depends(get_db)
 ):
     """
-    Get paginated list of items with optional filters.
+    Get paginated list of items with optional filters and complete item details.
     """
-    query = db.query(Item)
+    query = db.query(Item).options(
+        joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
+        joinedload(Item.item_spell_data)
+    )
     
     # Apply filters
     if item_class:
@@ -63,8 +66,41 @@ def get_items(
     # Get items for current page
     items = query.offset(offset).limit(page_size).all()
     
-    return PaginatedResponse[ItemResponse](
-        items=items,
+    # Build detailed response items
+    detailed_items = []
+    for item in items:
+        item_detail = ItemDetail(
+            id=item.id,
+            aoid=item.aoid,
+            name=item.name,
+            ql=item.ql,
+            item_class=item.item_class,
+            description=item.description,
+            is_nano=item.is_nano,
+            stats=[stat.stat_value for stat in item.item_stats] if item.item_stats else [],
+            attack_stats=[],
+            defense_stats=[],
+            spells=[isd.spell_data for isd in item.item_spell_data] if item.item_spell_data else []
+        )
+        
+        # Add attack/defense stats if available
+        if hasattr(item, 'atkdef_id') and item.atkdef_id:
+            # Get attack stats
+            attack_stats = db.query(StatValue).join(
+                AttackDefenseAttack, StatValue.id == AttackDefenseAttack.stat_value_id
+            ).filter(AttackDefenseAttack.attack_defense_id == item.atkdef_id).all()
+            item_detail.attack_stats = attack_stats
+            
+            # Get defense stats  
+            defense_stats = db.query(StatValue).join(
+                AttackDefenseDefense, StatValue.id == AttackDefenseDefense.stat_value_id
+            ).filter(AttackDefenseDefense.attack_defense_id == item.atkdef_id).all()
+            item_detail.defense_stats = defense_stats
+        
+        detailed_items.append(item_detail)
+    
+    return PaginatedResponse[ItemDetail](
+        items=detailed_items,
         total=total,
         page=page,
         page_size=page_size,
@@ -74,26 +110,50 @@ def get_items(
     )
 
 
-@router.get("/search", response_model=PaginatedResponse[ItemResponse])
+@router.get("/search", response_model=PaginatedResponse[ItemDetail])
 def search_items(
     q: str = Query(..., min_length=1, description="Search query"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page"),
-    use_fulltext: bool = Query(True, description="Use PostgreSQL full-text search"),
+    exact_match: bool = Query(True, description="Use exact matching (default) vs fuzzy/stemmed search"),
     weapons: bool = Query(False, description="Filter to weapons only (items with both attack and defense data)"),
     db: Session = Depends(get_db)
 ):
     """
-    Search items by name or description using PostgreSQL full-text search or ILIKE fallback.
+    Search items by name or description using exact matching (default) or fuzzy/stemmed search.
+    Returns complete item details including stats, spells, and attack/defense data.
     """
     start_time = time.time()
     
-    if use_fulltext:
-        # Use PostgreSQL full-text search for better performance and ranking
+    if exact_match:
+        # Use ILIKE for exact word matching (default behavior)
+        search_term = f"%{q}%"
+        query = db.query(Item).options(
+            joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
+            joinedload(Item.item_spell_data)
+        ).filter(
+            or_(
+                Item.name.ilike(search_term),
+                Item.description.ilike(search_term)
+            )
+        ).order_by(Item.name)
+        
+        # Apply weapons filter to exact search if requested
+        if weapons:
+            query = query.filter(Item.atkdef_id.isnot(None))\
+                        .join(AttackDefense, Item.atkdef_id == AttackDefense.id)\
+                        .join(AttackDefenseAttack, AttackDefense.id == AttackDefenseAttack.attack_defense_id)\
+                        .join(AttackDefenseDefense, AttackDefense.id == AttackDefenseDefense.attack_defense_id)\
+                        .distinct()
+    else:
+        # Use PostgreSQL full-text search for fuzzy/stemmed matching
         search_query = q.replace(' ', ' & ')  # Convert spaces to AND operators
         
         # Full-text search with ranking
-        query = db.query(Item).filter(
+        query = db.query(Item).options(
+            joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
+            joinedload(Item.item_spell_data)
+        ).filter(
             func.to_tsvector('english', Item.name + ' ' + func.coalesce(Item.description, '')).op('@@')(
                 func.to_tsquery('english', search_query)
             )
@@ -115,23 +175,6 @@ def search_items(
                     func.to_tsquery('english', search_query)
                 ).desc()
             )
-    else:
-        # Fallback to ILIKE for compatibility
-        search_term = f"%{q}%"
-        query = db.query(Item).filter(
-            or_(
-                Item.name.ilike(search_term),
-                Item.description.ilike(search_term)
-            )
-        ).order_by(Item.name)
-        
-        # Apply weapons filter to ILIKE search if requested
-        if weapons:
-            query = query.filter(Item.atkdef_id.isnot(None))\
-                        .join(AttackDefense, Item.atkdef_id == AttackDefense.id)\
-                        .join(AttackDefenseAttack, AttackDefense.id == AttackDefenseAttack.attack_defense_id)\
-                        .join(AttackDefenseDefense, AttackDefense.id == AttackDefenseDefense.attack_defense_id)\
-                        .distinct()
     
     # Get total count
     total = query.count()
@@ -143,12 +186,46 @@ def search_items(
     # Get items for current page
     items = query.offset(offset).limit(page_size).all()
     
+    # Build detailed response items
+    detailed_items = []
+    for item in items:
+        item_detail = ItemDetail(
+            id=item.id,
+            aoid=item.aoid,
+            name=item.name,
+            ql=item.ql,
+            item_class=item.item_class,
+            description=item.description,
+            is_nano=item.is_nano,
+            stats=[stat.stat_value for stat in item.item_stats] if item.item_stats else [],
+            attack_stats=[],
+            defense_stats=[],
+            spells=[isd.spell_data for isd in item.item_spell_data] if item.item_spell_data else []
+        )
+        
+        # Add attack/defense stats if available
+        if hasattr(item, 'atkdef_id') and item.atkdef_id:
+            # Get attack stats
+            attack_stats = db.query(StatValue).join(
+                AttackDefenseAttack, StatValue.id == AttackDefenseAttack.stat_value_id
+            ).filter(AttackDefenseAttack.attack_defense_id == item.atkdef_id).all()
+            item_detail.attack_stats = attack_stats
+            
+            # Get defense stats  
+            defense_stats = db.query(StatValue).join(
+                AttackDefenseDefense, StatValue.id == AttackDefenseDefense.stat_value_id
+            ).filter(AttackDefenseDefense.attack_defense_id == item.atkdef_id).all()
+            item_detail.defense_stats = defense_stats
+        
+        detailed_items.append(item_detail)
+    
     # Log performance metrics
     query_time = time.time() - start_time
-    logger.info(f"Item search query='{q}' results={total} time={query_time:.3f}s method={'fulltext' if use_fulltext else 'ilike'}")
+    search_method = 'exact_ilike' if exact_match else 'fuzzy_fulltext'
+    logger.info(f"Item search query='{q}' results={total} time={query_time:.3f}s method={search_method}")
     
-    return PaginatedResponse[ItemResponse](
-        items=items,
+    return PaginatedResponse[ItemDetail](
+        items=detailed_items,
         total=total,
         page=page,
         page_size=page_size,
@@ -159,7 +236,7 @@ def search_items(
 
 
 
-@router.get("/filter", response_model=PaginatedResponse[ItemResponse])
+@router.get("/filter", response_model=PaginatedResponse[ItemDetail])
 @cached_response("items_list")
 @performance_monitor
 def filter_items_advanced(
@@ -189,7 +266,10 @@ def filter_items_advanced(
     """
     start_time = time.time()
     
-    query = db.query(Item)
+    query = db.query(Item).options(
+        joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
+        joinedload(Item.item_spell_data)
+    )
     
     # Apply basic filters
     if item_class:
@@ -241,12 +321,45 @@ def filter_items_advanced(
     # Get items for current page
     items = query.offset(offset).limit(page_size).all()
     
+    # Build detailed response items
+    detailed_items = []
+    for item in items:
+        item_detail = ItemDetail(
+            id=item.id,
+            aoid=item.aoid,
+            name=item.name,
+            ql=item.ql,
+            item_class=item.item_class,
+            description=item.description,
+            is_nano=item.is_nano,
+            stats=[stat.stat_value for stat in item.item_stats] if item.item_stats else [],
+            attack_stats=[],
+            defense_stats=[],
+            spells=[isd.spell_data for isd in item.item_spell_data] if item.item_spell_data else []
+        )
+        
+        # Add attack/defense stats if available
+        if hasattr(item, 'atkdef_id') and item.atkdef_id:
+            # Get attack stats
+            attack_stats = db.query(StatValue).join(
+                AttackDefenseAttack, StatValue.id == AttackDefenseAttack.stat_value_id
+            ).filter(AttackDefenseAttack.attack_defense_id == item.atkdef_id).all()
+            item_detail.attack_stats = attack_stats
+            
+            # Get defense stats  
+            defense_stats = db.query(StatValue).join(
+                AttackDefenseDefense, StatValue.id == AttackDefenseDefense.stat_value_id
+            ).filter(AttackDefenseDefense.attack_defense_id == item.atkdef_id).all()
+            item_detail.defense_stats = defense_stats
+        
+        detailed_items.append(item_detail)
+    
     # Log performance metrics
     query_time = time.time() - start_time
     logger.info(f"Item filter results={total} time={query_time:.3f}s filters=class:{item_class},ql:{min_ql}-{max_ql},nano:{is_nano}")
     
-    return PaginatedResponse[ItemResponse](
-        items=items,
+    return PaginatedResponse[ItemDetail](
+        items=detailed_items,
         total=total,
         page=page,
         page_size=page_size,
@@ -256,7 +369,7 @@ def filter_items_advanced(
     )
 
 
-@router.get("/with-stats", response_model=PaginatedResponse[ItemResponse])
+@router.get("/with-stats", response_model=PaginatedResponse[ItemDetail])
 @cached_response("items_list")
 @performance_monitor
 def get_items_with_stats(
