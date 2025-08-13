@@ -26,7 +26,11 @@ import type {
   BatchItemRequest,
   UserFriendlyError,
   ApiError,
-  ErrorCodes
+  ErrorCodes,
+  InterpolatedItem,
+  InterpolationRequest,
+  InterpolationResponse,
+  InterpolationInfo
 } from '../types/api'
 
 // ============================================================================
@@ -315,6 +319,59 @@ class TinkerToolsApiClient {
   
   async checkItemCompatibility(request: ItemCompatibilityRequest): Promise<ApiResponse<ItemCompatibilityResult[]>> {
     return this.post<ItemCompatibilityResult[]>('/items/compatibility', request)
+  }
+
+  // ============================================================================
+  // Item Interpolation API
+  // ============================================================================
+  
+  async interpolateItem(aoid: number, targetQl: number): Promise<InterpolationResponse> {
+    try {
+      const params = new URLSearchParams()
+      params.append('target_ql', targetQl.toString())
+      
+      const response = await this.client.get<InterpolationResponse>(`/items/${aoid}/interpolate?${params.toString()}`)
+      return response.data
+    } catch (error: any) {
+      throw this.handleError(error)
+    }
+  }
+  
+  async interpolateItemByRequest(request: InterpolationRequest): Promise<InterpolationResponse> {
+    try {
+      const response = await this.client.post<InterpolationResponse>('/items/interpolate', request)
+      return response.data
+    } catch (error: any) {
+      throw this.handleError(error)
+    }
+  }
+  
+  async getInterpolationInfo(aoid: number): Promise<ApiResponse<InterpolationInfo>> {
+    return this.get<InterpolationInfo>(`/items/${aoid}/interpolation-info`)
+  }
+  
+  async checkItemInterpolatable(aoid: number): Promise<boolean> {
+    try {
+      const response = await this.getInterpolationInfo(aoid)
+      return response.data?.interpolatable ?? false
+    } catch {
+      return false
+    }
+  }
+  
+  async getInterpolationRange(aoid: number): Promise<{ min: number; max: number } | null> {
+    try {
+      const response = await this.getInterpolationInfo(aoid)
+      if (response.data) {
+        return {
+          min: response.data.min_ql,
+          max: response.data.max_ql
+        }
+      }
+      return null
+    } catch {
+      return null
+    }
   }
   
   // ============================================================================

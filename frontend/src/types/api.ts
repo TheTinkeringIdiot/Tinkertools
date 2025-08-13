@@ -101,6 +101,77 @@ export interface Item {
   animation_mesh?: AnimationMesh
 }
 
+export interface InterpolatedSpell {
+  target?: number
+  tick_count?: number
+  tick_interval?: number
+  spell_id?: number
+  spell_format?: string
+  spell_params: Record<string, any>
+  criteria: Criterion[]
+}
+
+export interface InterpolatedSpellData {
+  event?: number
+  spells: InterpolatedSpell[]
+}
+
+export interface InterpolatedAction {
+  action?: number
+  criteria: Criterion[]
+}
+
+export interface InterpolatedItem {
+  // Original item data
+  id: number
+  aoid?: number
+  name: string
+  ql?: number
+  description?: string
+  item_class?: number
+  is_nano: boolean
+  
+  // Interpolation metadata
+  interpolating: boolean
+  low_ql?: number
+  high_ql?: number
+  target_ql?: number
+  ql_delta?: number
+  ql_delta_full?: number
+  
+  // Interpolated data
+  stats: StatValue[]
+  spell_data: InterpolatedSpellData[]
+  actions: InterpolatedAction[]
+  
+  // Optional related data
+  attack_defense_id?: number
+  animation_mesh_id?: number
+}
+
+export interface InterpolationRequest {
+  aoid: number
+  target_ql: number
+}
+
+export interface InterpolationResponse {
+  success: boolean
+  item?: InterpolatedItem
+  error?: string
+  interpolation_range?: {
+    min_ql: number
+    max_ql: number
+  }
+}
+
+export interface InterpolationInfo {
+  aoid: number
+  interpolatable: boolean
+  min_ql: number
+  max_ql: number
+  ql_range: number
+}
+
 export interface Symbiant {
   id: number
   aoid: number
