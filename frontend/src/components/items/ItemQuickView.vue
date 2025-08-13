@@ -7,7 +7,14 @@ Shows essential item information in a compact format
     <!-- Item Header -->
     <div class="flex items-start gap-4">
       <div class="w-16 h-16 bg-surface-100 dark:bg-surface-800 rounded-lg flex items-center justify-center flex-shrink-0">
-        <i class="pi pi-box text-2xl text-surface-400"></i>
+        <img 
+          v-if="itemIconUrl"
+          :src="itemIconUrl" 
+          :alt="`${item.name} icon`"
+          class="w-12 h-12 object-contain"
+          @error="onIconError"
+        />
+        <i v-else class="pi pi-box text-2xl text-surface-400"></i>
       </div>
       
       <div class="flex-1 min-w-0">
@@ -83,8 +90,9 @@ Shows essential item information in a compact format
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { Item, TinkerProfile, ItemRequirement } from '@/types/api'
+import { getItemIconUrl } from '@/services/game-utils'
 
 const props = defineProps<{
   item: Item
@@ -100,7 +108,15 @@ defineEmits<{
   compare: []
 }>()
 
-// Computed
+// State
+const iconLoadError = ref(false)
+
+// Computed Properties
+const itemIconUrl = computed(() => {
+  if (iconLoadError.value) return null
+  return getItemIconUrl(props.item.stats || [])
+})
+
 const keyStats = computed(() => {
   if (!props.item.stats || props.item.stats.length === 0) return []
   
@@ -128,6 +144,10 @@ function getStatName(statId: number): string {
     109: '2H Blunt', 133: 'Ranged Energy', 161: 'Computer Literacy'
   }
   return statNames[statId] || `Stat ${statId}`
+}
+
+function onIconError() {
+  iconLoadError.value = true
 }
 </script>
 

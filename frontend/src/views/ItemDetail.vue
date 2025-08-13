@@ -73,7 +73,14 @@ Shows all item data with profile compatibility and comparison options
               <div class="text-center space-y-4">
                 <!-- Item Image -->
                 <div class="h-32 bg-surface-100 dark:bg-surface-800 rounded-lg flex items-center justify-center">
-                  <i class="pi pi-box text-4xl text-surface-400"></i>
+                  <img 
+                    v-if="itemIconUrl"
+                    :src="itemIconUrl" 
+                    :alt="`${item.name} icon`"
+                    class="w-16 h-16 object-contain"
+                    @error="onIconError"
+                  />
+                  <i v-else class="pi pi-box text-4xl text-surface-400"></i>
                 </div>
                 
                 <!-- Basic Properties -->
@@ -356,6 +363,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useItemsStore } from '@/stores/items'
 import { useProfileStore } from '@/stores/profile'
+import { getItemIconUrl } from '@/services/game-utils'
 import type { Item, TinkerProfile, ItemRequirement } from '@/types/api'
 
 const route = useRoute()
@@ -374,6 +382,7 @@ const item = ref<Item | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const showAllStats = ref(false)
+const iconLoadError = ref(false)
 
 // Computed
 const profile = computed(() => profileStore.currentProfile)
@@ -395,6 +404,11 @@ const isFavorite = computed(() =>
 const hasSpecialEffects = computed(() => 
   item.value?.spell_data && item.value.spell_data.length > 0
 )
+
+const itemIconUrl = computed(() => {
+  if (iconLoadError.value || !item.value?.stats) return null
+  return getItemIconUrl(item.value.stats)
+})
 
 const displayedStats = computed(() => {
   if (!item.value?.stats) return []
@@ -521,6 +535,10 @@ function getActionName(actionId: number): string {
     6: 'Equip', 8: 'Attack', 9: 'Use'
   }
   return actions[actionId] || `Action ${actionId}`
+}
+
+function onIconError() {
+  iconLoadError.value = true
 }
 
 // Initialize
