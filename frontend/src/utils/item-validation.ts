@@ -12,12 +12,14 @@ import {
   ARMOR_SLOT_POSITION,
   IMPLANT_SLOT_POSITION,
   PROFESSION,
-  BREED,
+  BREED
+} from '../services/game-data';
+import {
   getStatName,
   getItemClassName,
   getProfessionName,
   getBreedName
-} from '../services/game-data';
+} from '../services/game-utils';
 import { validateRequirements, type Character, type StatModifier } from './stat-calculations';
 
 // ============================================================================

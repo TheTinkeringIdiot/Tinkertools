@@ -5,7 +5,8 @@
  * Handles level-based calculations, IP distributions, skill caps, and stat modifications.
  */
 
-import { STAT, BREED, PROFESSION, getStatName, getProfessionName, getBreedName } from '../services/game-data';
+import { STAT, BREED, PROFESSION } from '../services/game-data';
+import { getStatName, getProfessionName, getBreedName } from '../services/game-utils';
 
 // ============================================================================
 // Types and Interfaces
