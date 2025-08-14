@@ -64,6 +64,36 @@ Shows all item data with profile compatibility and comparison options
     </div>
 
     <div v-else-if="item" class="space-y-6 max-h-[70vh] overflow-y-auto">
+      <!-- CAN Flags and Advanced View Toggle -->
+      <div class="flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700">
+        <!-- CAN Flags (left side) -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-sm font-medium text-surface-700 dark:text-surface-300 mr-2">Capabilities:</span>
+          <Tag
+            v-for="flag in displayCanFlags"
+            :key="flag.name"
+            :value="flag.name"
+            :severity="flag.severity"
+            size="small"
+          />
+          <span v-if="displayCanFlags.length === 0" class="text-sm text-surface-500 dark:text-surface-400 italic">
+            No capabilities found
+          </span>
+        </div>
+        
+        <!-- Advanced View Toggle (right side) -->
+        <div class="flex items-center gap-2">
+          <label for="advanced-view-toggle" class="text-sm text-surface-700 dark:text-surface-300">
+            Advanced view
+          </label>
+          <InputSwitch 
+            id="advanced-view-toggle"
+            v-model="advancedView"
+            :disabled="true"
+          />
+        </div>
+      </div>
+      
       <!-- Item Overview -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Item Image and Basic Info -->
@@ -182,11 +212,33 @@ Shows all item data with profile compatibility and comparison options
         </div>
       </div>
 
-      <!-- Item Statistics -->
+      <!-- Weapon Statistics (for weapons only) -->
+      <WeaponStats 
+        v-if="item && isWeapon(item.item_class)"
+        :item="item"
+        :profile="profile"
+        :show-compatibility="showCompatibility"
+      />
+
+      <!-- Item Attributes -->
+      <ItemAttributes 
+        v-if="item"
+        :item="item"
+      />
+
+      <!-- Enhanced Requirements -->
+      <ItemRequirements
+        v-if="item && item.requirements?.length"
+        :item="item"
+        :profile="profile"
+        :show-compatibility="showCompatibility"
+      />
+
+      <!-- General Statistics -->
       <Card v-if="item.stats?.length">
         <template #header>
           <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold">Statistics</h3>
+            <h3 class="text-lg font-semibold">General Statistics</h3>
             <Button
               :label="showAllStats ? 'Show Key Stats' : 'Show All Stats'"
               size="small"
@@ -220,45 +272,6 @@ Shows all item data with profile compatibility and comparison options
         </template>
       </Card>
 
-      <!-- Requirements -->
-      <Card v-if="item.requirements?.length">
-        <template #header>
-          <h3 class="text-lg font-semibold">Requirements</h3>
-        </template>
-        <template #content>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div
-              v-for="req in item.requirements"
-              :key="req.stat"
-              class="flex justify-between items-center p-3 rounded"
-              :class="{
-                'bg-green-50 dark:bg-green-900/20': showCompatibility && canMeetRequirement(req),
-                'bg-red-50 dark:bg-red-900/20': showCompatibility && !canMeetRequirement(req),
-                'bg-surface-50 dark:bg-surface-900': !showCompatibility
-              }"
-            >
-              <div class="flex items-center gap-2">
-                <i
-                  v-if="showCompatibility"
-                  :class="{
-                    'pi pi-check text-green-600': canMeetRequirement(req),
-                    'pi pi-times text-red-600': !canMeetRequirement(req)
-                  }"
-                ></i>
-                <span class="text-sm text-surface-600 dark:text-surface-400">
-                  {{ getStatName(req.stat) }}
-                </span>
-              </div>
-              <div class="text-right">
-                <div class="font-mono font-medium">{{ req.value }}</div>
-                <div v-if="showCompatibility && profile" class="text-xs text-surface-500">
-                  (You: {{ getCharacterStat(req.stat) }})
-                </div>
-              </div>
-            </div>
-          </div>
-        </template>
-      </Card>
 
       <!-- Attack/Defense Data -->
       <Card v-if="item.attack_data || item.defense_data">
@@ -363,8 +376,13 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useItemsStore } from '@/stores/items'
 import { useProfileStore } from '@/stores/profile'
-import { getItemIconUrl } from '@/services/game-utils'
+import { getItemIconUrl, isWeapon, getDisplayCanFlags } from '@/services/game-utils'
 import type { Item, TinkerProfile, ItemRequirement } from '@/types/api'
+
+// Import new components
+import WeaponStats from '@/components/items/WeaponStats.vue'
+import ItemAttributes from '@/components/items/ItemAttributes.vue'
+import ItemRequirements from '@/components/items/ItemRequirements.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -383,6 +401,7 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const showAllStats = ref(false)
 const iconLoadError = ref(false)
+const advancedView = ref(false)
 
 // Computed
 const profile = computed(() => profileStore.currentProfile)
@@ -420,6 +439,11 @@ const displayedStats = computed(() => {
       .filter(stat => stat.value !== 0 && Math.abs(stat.value) > 5)
       .slice(0, 9)
   }
+})
+
+const displayCanFlags = computed(() => {
+  if (!item.value?.stats) return []
+  return getDisplayCanFlags(item.value.stats)
 })
 
 // Methods

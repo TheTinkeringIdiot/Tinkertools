@@ -21,6 +21,8 @@ import {
   WEAPON_SLOT_POSITIONS,
   ARMOR_SLOT_POSITION,
   IMPLANT_SLOT_POSITION,
+  CANFLAG,
+  ITEM_NONE_FLAG,
   type StatId,
   type StatName,
   type RequirementId,
@@ -557,6 +559,292 @@ export function getItemIconUrlWithFallback(
 }
 
 // ============================================================================
+// Bitflag Functions
+// ============================================================================
+
+/**
+ * Parse CAN flags from stat 30 bitflag value
+ */
+export function parseCanFlags(canFlagValue: number): string[] {
+  const flags: string[] = [];
+  
+  for (const [flagName, flagValue] of Object.entries(CANFLAG)) {
+    if (flagName !== 'NONE' && (canFlagValue & flagValue) === flagValue) {
+      flags.push(flagName);
+    }
+  }
+  
+  return flags;
+}
+
+/**
+ * Parse item flags from stat 0 bitflag value
+ */
+export function parseItemFlags(itemFlagValue: number): string[] {
+  const flags: string[] = [];
+  
+  for (const [flagName, flagValue] of Object.entries(ITEM_NONE_FLAG)) {
+    if (flagName !== 'NONE' && (itemFlagValue & flagValue) === flagValue) {
+      flags.push(flagName);
+    }
+  }
+  
+  return flags;
+}
+
+/**
+ * Get CAN flags from item stats
+ */
+export function getItemCanFlags(stats: Array<{stat: number, value: number}>): string[] {
+  const canStat = stats.find(stat => stat.stat === 30); // Stat 30 is 'Can'
+  return canStat ? parseCanFlags(canStat.value) : [];
+}
+
+/**
+ * Get item flags from item stats
+ */
+export function getItemFlags(stats: Array<{stat: number, value: number}>): string[] {
+  const flagStat = stats.find(stat => stat.stat === 0); // Stat 0 contains item flags
+  return flagStat ? parseItemFlags(flagStat.value) : [];
+}
+
+/**
+ * Check if item has specific CAN flag
+ */
+export function hasCanFlag(stats: Array<{stat: number, value: number}>, flagName: keyof typeof CANFLAG): boolean {
+  const canFlags = getItemCanFlags(stats);
+  return canFlags.includes(flagName);
+}
+
+/**
+ * Check if item has specific item flag
+ */
+export function hasItemFlag(stats: Array<{stat: number, value: number}>, flagName: keyof typeof ITEM_NONE_FLAG): boolean {
+  const itemFlags = getItemFlags(stats);
+  return itemFlags.includes(flagName);
+}
+
+/**
+ * Get important CAN flags for display (common ones users care about)
+ */
+export function getDisplayCanFlags(stats: Array<{stat: number, value: number}>): Array<{name: string, severity: string}> {
+  const canFlags = getItemCanFlags(stats);
+  const displayFlags: Array<{name: string, severity: string}> = [];
+  
+  // Map flags to display with appropriate severities
+  const flagSeverityMap: Record<string, string> = {
+    'Carry': 'info',
+    'Wear': 'success', 
+    'Use': 'info',
+    'Consume': 'warning',
+    'NoDrop': 'danger',
+    'Unique': 'warning',
+    'Stackable': 'secondary',
+    'Burst': 'warning',
+    'FlingShot': 'warning',
+    'FullAuto': 'warning',
+    'AimedShot': 'warning'
+  };
+  
+  canFlags.forEach(flag => {
+    const severity = flagSeverityMap[flag] || 'secondary';
+    displayFlags.push({ name: flag, severity });
+  });
+  
+  return displayFlags;
+}
+
+// ============================================================================
+// Weapon-Specific Functions
+// ============================================================================
+
+/**
+ * Weapon stat IDs for easy reference
+ */
+export const WEAPON_STATS = {
+  MIN_DAMAGE: 286,
+  MAX_DAMAGE: 285,
+  ATTACK_SPEED: 3,
+  BURST_RECHARGE: 374,
+  WEAPON_RANGE: 380,
+  DAMAGE_TYPE: 339,
+  BURST: 148,
+  FLING_SHOT: 150,
+  MULTI_RANGED: 134,
+  RANGED_ENERGY: 133,
+  RANGED_INIT: 119
+} as const;
+
+/**
+ * Damage type mapping
+ */
+export const DAMAGE_TYPES = {
+  0: 'None',
+  1: 'Melee',
+  2: 'Energy',
+  3: 'Chemical',
+  4: 'Radiation',
+  5: 'Cold',
+  6: 'Poison',
+  7: 'Fire',
+  8: 'Projectile'
+} as const;
+
+/**
+ * Get weapon statistics from item stats
+ */
+export function getWeaponStats(stats: Array<{stat: number, value: number}>): {
+  minDamage?: number;
+  maxDamage?: number;
+  attackSpeed?: number;
+  burstRecharge?: number;
+  range?: number;
+  damageType?: number;
+  burst?: number;
+  flingShot?: number;
+  multiRanged?: number;
+  rangedEnergy?: number;
+  rangedInit?: number;
+} {
+  const weaponStats: Record<string, number> = {};
+  
+  stats.forEach(stat => {
+    switch (stat.stat) {
+      case WEAPON_STATS.MIN_DAMAGE:
+        weaponStats.minDamage = stat.value;
+        break;
+      case WEAPON_STATS.MAX_DAMAGE:
+        weaponStats.maxDamage = stat.value;
+        break;
+      case WEAPON_STATS.ATTACK_SPEED:
+        weaponStats.attackSpeed = stat.value;
+        break;
+      case WEAPON_STATS.BURST_RECHARGE:
+        weaponStats.burstRecharge = stat.value;
+        break;
+      case WEAPON_STATS.WEAPON_RANGE:
+        weaponStats.range = stat.value;
+        break;
+      case WEAPON_STATS.DAMAGE_TYPE:
+        weaponStats.damageType = stat.value;
+        break;
+      case WEAPON_STATS.BURST:
+        weaponStats.burst = stat.value;
+        break;
+      case WEAPON_STATS.FLING_SHOT:
+        weaponStats.flingShot = stat.value;
+        break;
+      case WEAPON_STATS.MULTI_RANGED:
+        weaponStats.multiRanged = stat.value;
+        break;
+      case WEAPON_STATS.RANGED_ENERGY:
+        weaponStats.rangedEnergy = stat.value;
+        break;
+      case WEAPON_STATS.RANGED_INIT:
+        weaponStats.rangedInit = stat.value;
+        break;
+    }
+  });
+  
+  return weaponStats;
+}
+
+/**
+ * Get damage type name from ID
+ */
+export function getDamageTypeName(damageTypeId: number): string {
+  return DAMAGE_TYPES[damageTypeId as keyof typeof DAMAGE_TYPES] || `Type ${damageTypeId}`;
+}
+
+/**
+ * Format attack time (in ticks) to seconds
+ */
+export function formatAttackTime(attackSpeed: number): string {
+  // AO uses 1000 ticks per second
+  const seconds = attackSpeed / 1000;
+  return `${seconds.toFixed(2)}s`;
+}
+
+/**
+ * Format recharge time to seconds
+ */
+export function formatRechargeTime(rechargeTime: number): string {
+  const seconds = rechargeTime / 1000;
+  return `${seconds.toFixed(2)}s`;
+}
+
+/**
+ * Calculate DPS (Damage Per Second) for a weapon
+ */
+export function calculateWeaponDPS(minDamage: number, maxDamage: number, attackSpeed: number): number {
+  if (!minDamage || !maxDamage || !attackSpeed) return 0;
+  
+  const avgDamage = (minDamage + maxDamage) / 2;
+  const attacksPerSecond = 1000 / attackSpeed; // Convert ticks to seconds
+  
+  return avgDamage * attacksPerSecond;
+}
+
+/**
+ * Check if an item is a weapon based on item class
+ */
+export function isWeapon(itemClass: number): boolean {
+  // Item classes 1-5 are weapons: 1H Blunt, 1H Edged, 2H Blunt, 2H Edged, Ranged
+  return itemClass >= 1 && itemClass <= 5;
+}
+
+/**
+ * Check if an item is armor based on item class
+ */
+export function isArmor(itemClass: number): boolean {
+  // Item classes 6-10 are armor: Body, Head, Arm, Leg, Foot
+  return itemClass >= 6 && itemClass <= 10;
+}
+
+/**
+ * Get special attack skills for a weapon
+ */
+export function getWeaponSpecialSkills(stats: Array<{stat: number, value: number}>): string[] {
+  const skills: string[] = [];
+  
+  stats.forEach(stat => {
+    if (stat.value > 0) {
+      switch (stat.stat) {
+        case WEAPON_STATS.BURST:
+          skills.push('Burst');
+          break;
+        case WEAPON_STATS.FLING_SHOT:
+          skills.push('Fling Shot');
+          break;
+        case WEAPON_STATS.MULTI_RANGED:
+          skills.push('Multi Ranged');
+          break;
+      }
+    }
+  });
+  
+  return skills;
+}
+
+/**
+ * Format weapon range display
+ */
+export function formatWeaponRange(range: number): string {
+  return `${range}m`;
+}
+
+/**
+ * Get item class category name
+ */
+export function getItemCategoryName(itemClass: number): string {
+  if (isWeapon(itemClass)) return 'Weapon';
+  if (isArmor(itemClass)) return 'Armor';
+  if (itemClass === 15) return 'Implant';
+  if (itemClass === 20) return 'Utility';
+  return 'Item';
+}
+
+// ============================================================================
 // Export all functions as a single object for easy importing
 // ============================================================================
 
@@ -621,5 +909,26 @@ export const gameUtils = {
   getItemIconId,
   getIconUrl,
   getItemIconUrl,
-  getItemIconUrlWithFallback
+  getItemIconUrlWithFallback,
+
+  // Weapon functions
+  getWeaponStats,
+  getDamageTypeName,
+  formatAttackTime,
+  formatRechargeTime,
+  calculateWeaponDPS,
+  isWeapon,
+  isArmor,
+  getWeaponSpecialSkills,
+  formatWeaponRange,
+  getItemCategoryName,
+
+  // Bitflag functions
+  parseCanFlags,
+  parseItemFlags,
+  getItemCanFlags,
+  getItemFlags,
+  hasCanFlag,
+  hasItemFlag,
+  getDisplayCanFlags
 };
