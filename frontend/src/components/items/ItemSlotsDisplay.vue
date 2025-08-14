@@ -110,8 +110,8 @@ const gridCells = computed(() => {
       getPositionFn = getArmorSlotPosition;
       break;
     case 'implant':
-      rows = 4;
-      cols = 4;
+      rows = 5;
+      cols = 3;
       getPositionFn = getImplantSlotPosition;
       break;
     default:
@@ -165,6 +165,7 @@ function onIconError() {
 </script>
 
 <style scoped>
+/* Base slots display with uniform sizing */
 .slots-display {
   background-size: 100% 100%;
   background-repeat: no-repeat;
@@ -173,33 +174,34 @@ function onIconError() {
   position: relative;
   border-radius: 8px;
   overflow: hidden;
+  margin: 0 auto;
+  /* Uniform cell size for all types */
+  --cell-size: 55px;
 }
 
+/* All slot types use the same cell size for uniformity */
 .slots-display.weapon {
   background-image: url('https://cdn.tinkeringidiot.com/static/image/weapon_slots.png');
-  width: 165px;
-  height: 275px;
-  grid-template-rows: repeat(5, 55px);
-  grid-template-columns: repeat(3, 55px);
-  margin: 0 auto;
+  width: calc(var(--cell-size) * 3);
+  height: calc(var(--cell-size) * 5);
+  grid-template-rows: repeat(5, var(--cell-size));
+  grid-template-columns: repeat(3, var(--cell-size));
 }
 
 .slots-display.armor {
   background-image: url('https://cdn.tinkeringidiot.com/static/image/armor_slots.png');
-  width: 198px;
-  height: 330px;
-  grid-template-rows: repeat(5, 66px);
-  grid-template-columns: repeat(3, 66px);
-  margin: 0 auto;
+  width: calc(var(--cell-size) * 3);
+  height: calc(var(--cell-size) * 5);
+  grid-template-rows: repeat(5, var(--cell-size));
+  grid-template-columns: repeat(3, var(--cell-size));
 }
 
 .slots-display.implant {
   background-image: url('https://cdn.tinkeringidiot.com/static/image/implant_slots.png');
-  width: 264px;
-  height: 264px;
-  grid-template-rows: repeat(4, 66px);
-  grid-template-columns: repeat(4, 66px);
-  margin: 0 auto;
+  width: calc(var(--cell-size) * 3);
+  height: calc(var(--cell-size) * 5);
+  grid-template-rows: repeat(5, var(--cell-size));
+  grid-template-columns: repeat(3, var(--cell-size));
 }
 
 .slot-cell {
@@ -234,8 +236,8 @@ function onIconError() {
 }
 
 .slot-icon {
-  width: 42px;
-  height: 42px;
+  width: calc(var(--cell-size) * 0.75);
+  height: calc(var(--cell-size) * 0.75);
   object-fit: contain;
   filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.8));
   border-radius: 4px;
@@ -288,25 +290,12 @@ function onIconError() {
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .slots-display {
-    min-height: 200px;
-  }
-  
-  .slots-display.weapon,
-  .slots-display.implant {
-    grid-template: repeat(4, 50px) / repeat(4, 50px);
-  }
-  
-  .slots-display.armor {
-    grid-template: repeat(5, 50px) / repeat(3, 50px);
-  }
-  
-  .slot-icon {
-    width: 35px;
-    height: 35px;
+    --cell-size: 45px; /* Smaller cells on mobile */
+    min-height: 180px;
   }
   
   .slot-fallback-icon {
-    font-size: 20px;
+    font-size: 18px;
   }
 }
 </style>

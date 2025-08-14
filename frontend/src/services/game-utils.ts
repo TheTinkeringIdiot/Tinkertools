@@ -814,19 +814,24 @@ export function calculateWeaponDPS(minDamage: number, maxDamage: number, attackS
 }
 
 /**
- * Check if an item is a weapon based on item class
+ * Check if an item is a weapon based on ITEM_CLASS constant
  */
 export function isWeapon(itemClass: number): boolean {
-  // Item classes 1-5 are weapons: 1H Blunt, 1H Edged, 2H Blunt, 2H Edged, Ranged
-  return itemClass >= 1 && itemClass <= 5;
+  return itemClass === 1; // ITEM_CLASS[1] = 'Weapon'
 }
 
 /**
- * Check if an item is armor based on item class
+ * Check if an item is armor based on ITEM_CLASS constant
  */
 export function isArmor(itemClass: number): boolean {
-  // Item classes 6-10 are armor: Body, Head, Arm, Leg, Foot
-  return itemClass >= 6 && itemClass <= 10;
+  return itemClass === 2; // ITEM_CLASS[2] = 'Armor'
+}
+
+/**
+ * Check if an item is an implant based on ITEM_CLASS constant
+ */
+export function isImplant(itemClass: number): boolean {
+  return itemClass === 3; // ITEM_CLASS[3] = 'Implant'
 }
 
 /**
@@ -867,9 +872,8 @@ export function formatWeaponRange(range: number): string {
 export function getItemCategoryName(itemClass: number): string {
   if (isWeapon(itemClass)) return 'Weapon';
   if (isArmor(itemClass)) return 'Armor';
-  if (itemClass === 15) return 'Implant';
-  if (itemClass === 20) return 'Utility';
-  return 'Item';
+  if (isImplant(itemClass)) return 'Implant';
+  return getItemClassName(itemClass) || 'Item';
 }
 
 // ============================================================================
@@ -950,32 +954,45 @@ export function getItemSlotInfo(item: any): {
   const slotStat = item.stats?.find((stat: any) => stat.stat === 298);
   const slotValue = slotStat ? slotStat.value : 0;
   
-  switch (itemClass) {
-    case 1: // Weapon
-      return {
-        type: 'weapon',
-        slots: parseWeaponSlots(slotValue),
-        iconUrl
-      };
-    case 2: // Armor
-      return {
-        type: 'armor',
-        slots: parseArmorSlots(slotValue),
-        iconUrl
-      };
-    case 3: // Implant
-      return {
-        type: 'implant',
-        slots: parseImplantSlots(slotValue),
-        iconUrl
-      };
-    default:
-      return {
-        type: null,
-        slots: [],
-        iconUrl
-      };
+  // Determine slot type based on which slot parser returns valid results
+  // Some items (like gloves) have weapon item class but armor slot values
+  const weaponSlots = parseWeaponSlots(slotValue);
+  const armorSlots = parseArmorSlots(slotValue);
+  const implantSlots = parseImplantSlots(slotValue);
+  
+  // Check implants first (item class 3)
+  if (isImplant(itemClass) && implantSlots.length > 0) {
+    return {
+      type: 'implant',
+      slots: implantSlots,
+      iconUrl
+    };
   }
+  
+  // Check armor slots (can include weapons with armor slot values like gloves)
+  if (armorSlots.length > 0) {
+    return {
+      type: 'armor',
+      slots: armorSlots,
+      iconUrl
+    };
+  }
+  
+  // Check weapon slots
+  if (weaponSlots.length > 0) {
+    return {
+      type: 'weapon',
+      slots: weaponSlots,
+      iconUrl
+    };
+  }
+  
+  // No valid slots found
+  return {
+    type: null,
+    slots: [],
+    iconUrl
+  };
 }
 
 /**
@@ -1032,23 +1049,23 @@ export function getArmorSlotPosition(slotName: string): { row: number; col: numb
 }
 
 /**
- * Get implant slot grid position
+ * Get implant slot grid position (3x5 grid)
  */
 export function getImplantSlotPosition(slotName: string): { row: number; col: number } {
   const positions: Record<string, { row: number; col: number }> = {
     'Eyes': { row: 1, col: 1 },
     'Head': { row: 1, col: 2 },
     'Ears': { row: 1, col: 3 },
-    'LeftArm': { row: 2, col: 1 },
+    'RightArm': { row: 2, col: 1 },
     'Chest': { row: 2, col: 2 },
-    'RightArm': { row: 2, col: 3 },
-    'LeftWrist': { row: 3, col: 1 },
+    'LeftArm': { row: 2, col: 3 },
+    'RightWrist': { row: 3, col: 1 },
     'Waist': { row: 3, col: 2 },
-    'RightWrist': { row: 3, col: 3 },
-    'LeftHand': { row: 4, col: 1 },
+    'LeftWrist': { row: 3, col: 3 },
+    'RightHand': { row: 4, col: 1 },
     'Legs': { row: 4, col: 2 },
-    'RightHand': { row: 4, col: 3 },
-    'Feet': { row: 4, col: 4 }
+    'LeftHand': { row: 4, col: 3 },
+    'Feet': { row: 5, col: 2 }
   };
   
   return positions[slotName] || { row: 1, col: 1 };
