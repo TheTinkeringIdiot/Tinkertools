@@ -2116,6 +2116,334 @@ export const ANCIENT_MATRIX = {
 } as const;
 
 /**
+ * CAN flags - bitflags for item capabilities (stat 30)
+ */
+export const CANFLAG = {
+  NONE: 0,
+  Carry: 1 << 0,        // 2**0
+  Sit: 1 << 1,          // 2**1
+  Wear: 1 << 2,         // 2**2
+  Use: 1 << 3,          // 2**3
+  ConfirmUse: 1 << 4,   // 2**4
+  Consume: 1 << 5,      // 2**5
+  TutorChip: 1 << 6,    // 2**6
+  TutorDevice: 1 << 7,  // 2**7
+  BreakingAndEntering: 1 << 8,  // 2**8
+  Stackable: 1 << 9,    // 2**9
+  NoAmmo: 1 << 10,      // 2**10
+  Burst: 1 << 11,       // 2**11
+  FlingShot: 1 << 12,   // 2**12
+  FullAuto: 1 << 13,    // 2**13
+  AimedShot: 1 << 14,   // 2**14
+  Bow: 1 << 15,         // 2**15
+  ThrowAttack: 1 << 16, // 2**16
+  SneakAttack: 1 << 17, // 2**17
+  FastAttack: 1 << 18,  // 2**18
+  DisarmTraps: 1 << 19, // 2**19
+  AutoSelect: 1 << 20,  // 2**20
+  ApplyOnFriendly: 1 << 21, // 2**21
+  ApplyOnHostile: 1 << 22,  // 2**22
+  ApplyOnSelf: 1 << 23,     // 2**23
+  CantSplit: 1 << 24,       // 2**24
+  Brawl: 1 << 25,           // 2**25
+  Dimach: 1 << 26,          // 2**26
+  EnableHandAttractors: 1 << 27, // 2**27
+  CanBeWornWithSocialArmor: 1 << 28 // 2**28
+} as const;
+
+/**
+ * Item flags - bitflags for item properties (stat 0)
+ */
+export const ITEM_NONE_FLAG = {
+  NONE: 0,
+  Visible: 1 << 0,               // 2**0
+  ModifiedDescription: 1 << 1,   // 2**1
+  ModifiedName: 1 << 2,          // 2**2
+  CanBeTemplateItem: 1 << 3,     // 2**3
+  TurnOnUse: 1 << 4,             // 2**4
+  HasMultipleCount: 1 << 5,      // 2**5
+  Locked: 1 << 6,                // 2**6
+  Open: 1 << 7,                  // 2**7
+  ItemSocialArmour: 1 << 8,      // 2**8
+  TellCollision: 1 << 9,         // 2**9
+  NoSelectionIndicator: 1 << 10, // 2**10
+  UseEmptyDestruct: 1 << 11,     // 2**11
+  Stationary: 1 << 12,           // 2**12
+  Repulsive: 1 << 13,            // 2**13
+  DefaultTarget: 1 << 14,        // 2**14
+  ItemTextureOverride: 1 << 15,  // 2**15
+  Null: 1 << 16,                 // 2**16
+  HasAnimation: 1 << 17,         // 2**17
+  HasRotation: 1 << 18,          // 2**18
+  WantCollision: 1 << 19,        // 2**19
+  WantSignals: 1 << 20,          // 2**20
+  HasSentFirstIIR: 1 << 21,      // 2**21
+  HasEnergy: 1 << 22,            // 2**22
+  MirrorInLeftHand: 1 << 23,     // 2**23
+  IllegalClan: 1 << 24,          // 2**24
+  IllegalOmni: 1 << 25,          // 2**25
+  NoDrop: 1 << 26,               // 2**26
+  Unique: 1 << 27,               // 2**27
+  CanBeAttacked: 1 << 28,        // 2**28
+  DisableFalling: 1 << 29,       // 2**29
+  HasDamage: 1 << 30,            // 2**30
+  DisableStatelCollision: 1 << 31 // 2**31
+} as const;
+
+/**
+ * Specialization flags - bitflags for nano specializations
+ */
+export const SPECIALIZATION_FLAG = {
+  NONE: 0,
+  First: 1 << 0,    // 2**0
+  Second: 1 << 1,   // 2**1
+  Third: 1 << 2,    // 2**2
+  Fourth: 1 << 3,   // 2**3
+  Bit5: 1 << 5,     // 2**5
+  Bit6: 1 << 6,     // 2**6
+  Bit7: 1 << 7,     // 2**7
+  Bit8: 1 << 8      // 2**8
+} as const;
+
+/**
+ * Action flags - bitflags for available actions
+ */
+export const ACTION_FLAG = {
+  NONE: 0,
+  Bit0: 1 << 0,           // 2**0
+  Fighting: 1 << 1,       // 2**1
+  Moving: 1 << 2,         // 2**2
+  Falling: 1 << 3,        // 2**3
+  ImplantAccess: 1 << 4,  // 2**4
+  Chat: 1 << 5,           // 2**5
+  SkillTime: 1 << 6,      // 2**6
+  Concealment: 1 << 7,    // 2**7
+  CryForHelp: 1 << 8,     // 2**8
+  VicinityInfo: 1 << 9,   // 2**9
+  Attack: 1 << 10,        // 2**10
+  OnGrid: 1 << 11,        // 2**11
+  BankAccess: 1 << 12,    // 2**12
+  Zoning: 1 << 13,        // 2**13
+  Help: 1 << 14,          // 2**14
+  WalkOnLand: 1 << 15,    // 2**15
+  Bit15: 1 << 16,         // 2**16
+  SwimInWater: 1 << 17,   // 2**17
+  FlyInAir: 1 << 18,      // 2**18
+  Terminate: 1 << 19,     // 2**19
+  Bit20: 1 << 20,         // 2**20
+  Bit21: 1 << 21,         // 2**21
+  Bit22: 1 << 22,         // 2**22
+  Bit23: 1 << 23,         // 2**23
+  Anon: 1 << 24,          // 2**24
+  Bit25: 1 << 25,         // 2**25
+  PvP: 1 << 26,           // 2**26
+  Bit27: 1 << 27,         // 2**27
+  Bit28: 1 << 28          // 2**28
+} as const;
+
+/**
+ * Nano flags - bitflags for nano program properties
+ */
+export const NANO_NONE_FLAG = {
+  NONE: 0,
+  Visible: 1 << 0,                  // 2**0
+  NoResistCannotFumble: 1 << 1,     // 2**1
+  IsShapeChange: 1 << 2,            // 2**2
+  BreakOnAttack: 1 << 3,            // 2**3
+  TurnOnUse: 1 << 4,                // 2**4
+  BreakOnDebuff: 1 << 5,            // 2**5
+  BreakOnInterval: 1 << 6,          // 2**6
+  BreakOnSpellAttack: 1 << 7,       // 2**7
+  NoRemoveNoNCUFriendly: 1 << 8,    // 2**8
+  TellCollision: 1 << 9,            // 2**9
+  NoSelectionIndicator: 1 << 10,    // 2**10
+  UseEmptyDestruct: 1 << 11,        // 2**11
+  NoIIR: 1 << 12,                   // 2**12
+  NoResist: 1 << 13,                // 2**13
+  NotRemovable: 1 << 14,            // 2**14
+  IsHostile: 1 << 15,               // 2**15
+  IsBuff: 1 << 16,                  // 2**16
+  IsDebuff: 1 << 17,                // 2**17
+  PlayshiftRequirements: 1 << 18,   // 2**18
+  NoTimerNotify: 1 << 19,           // 2**19
+  NoTimeoutNotify: 1 << 20,         // 2**20
+  DontRemoveOnDeath: 1 << 21,       // 2**21
+  DontBreakOnAttack: 1 << 22,       // 2**22
+  CannotRefresh: 1 << 23,           // 2**23
+  IsHidden: 1 << 24,                // 2**24
+  ClassDebuffMMBM: 1 << 25,         // 2**25
+  ClassDebuffMCTS: 1 << 26,         // 2**26
+  ClassDebuffPMSI: 1 << 27,         // 2**27
+  ClassCombatDebuff: 1 << 28        // 2**28
+} as const;
+
+/**
+ * Expansion flags - bitflags for required expansions
+ */
+export const EXPANSION_FLAG = {
+  NONE: 0,
+  NotumWars: 1 << 0,              // 2**0
+  Shadowlands: 1 << 1,            // 2**1
+  ShadowlandsPreorder: 1 << 2,    // 2**2
+  AlienInvasion: 1 << 3,          // 2**3
+  AlienInvasionPreorder: 1 << 4,  // 2**4
+  LostEden: 1 << 5,               // 2**5
+  LostEdenPreorder: 1 << 6,       // 2**6
+  LexacyOfXan: 1 << 7,            // 2**7
+  LegacyOfXanPreorder: 1 << 8     // 2**8
+} as const;
+
+/**
+ * Worn item flags - bitflags for equipped items
+ */
+export const WORN_ITEM = {
+  BasicCyberDeck: 1 << 0,     // 2**0
+  AugmentedCyberDeck: 1 << 1, // 2**1
+  JobeCyberDeck: 1 << 2,      // 2**2
+  IzgimmerCyberDeck: 1 << 3,  // 2**3
+  GridArmor: 1 << 4,          // 2**4
+  SocialArmor: 1 << 5,        // 2**5
+  NanoDeck: 1 << 6,           // 2**6
+  MpSummonedWeapon: 1 << 7,   // 2**7
+  Bit8: 1 << 8,               // 2**8
+  Bit9: 1 << 9,               // 2**9
+  Bit10: 1 << 10,             // 2**10
+  Bit11: 1 << 11,             // 2**11
+  Bit12: 1 << 12,             // 2**12
+  Bit13: 1 << 13,             // 2**13
+  Bit14: 1 << 14,             // 2**14
+  Bit15: 1 << 15,             // 2**15
+  Bit16: 1 << 16,             // 2**16
+  Bit17: 1 << 17,             // 2**17
+  Bit18: 1 << 18,             // 2**18
+  Bit19: 1 << 19,             // 2**19
+  Bit20: 1 << 20,             // 2**20
+  Bit21: 1 << 21,             // 2**21
+  Bit22: 1 << 22,             // 2**22
+  Bit23: 1 << 23,             // 2**23
+  Bit24: 1 << 24,             // 2**24
+  Bit25: 1 << 25,             // 2**25
+  Bit26: 1 << 26,             // 2**26
+  Bit27: 1 << 27,             // 2**27
+  Bit28: 1 << 28,             // 2**28
+  Bit29: 1 << 29              // 2**29
+} as const;
+
+/**
+ * Weapon slot flags - bitflags for weapon slot positions
+ */
+export const WEAPON_SLOT = {
+  NONE: 0,
+  Bit0: 1 << 0,      // 2**0
+  Hud1: 1 << 1,      // 2**1
+  Hud3: 1 << 2,      // 2**2
+  Util1: 1 << 3,     // 2**3
+  Util2: 1 << 4,     // 2**4
+  Util3: 1 << 5,     // 2**5
+  RightHand: 1 << 6, // 2**6
+  Deck: 1 << 7,      // 2**7
+  LeftHand: 1 << 8,  // 2**8
+  Deck1: 1 << 9,     // 2**9
+  Deck2: 1 << 10,    // 2**10
+  Deck3: 1 << 11,    // 2**11
+  Deck4: 1 << 12,    // 2**12
+  Deck5: 1 << 13,    // 2**13
+  Deck6: 1 << 14,    // 2**14
+  Hud2: 1 << 15      // 2**15
+} as const;
+
+/**
+ * Armor slot flags - bitflags for armor slot positions
+ */
+export const ARMOR_SLOT = {
+  NONE: 0,
+  Bit0: 1 << 0,           // 2**0
+  Neck: 1 << 1,           // 2**1
+  Head: 1 << 2,           // 2**2
+  Back: 1 << 3,           // 2**3
+  RightShoulder: 1 << 4,  // 2**4
+  Chest: 1 << 5,          // 2**5
+  LeftShoulder: 1 << 6,   // 2**6
+  RightArm: 1 << 7,       // 2**7
+  Hands: 1 << 8,          // 2**8
+  LeftArm: 1 << 9,        // 2**9
+  RightWrist: 1 << 10,    // 2**10
+  Legs: 1 << 11,          // 2**11
+  LeftWrist: 1 << 12,     // 2**12
+  RightFinger: 1 << 13,   // 2**13
+  Feet: 1 << 14,          // 2**14
+  LeftFinger: 1 << 15,    // 2**15
+  PerkAction: 1 << 31     // 2**31
+} as const;
+
+/**
+ * Implant slot flags - bitflags for implant slot positions
+ */
+export const IMPLANT_SLOT = {
+  NONE: 0,
+  Bit0: 1 << 0,      // 2**0
+  Eyes: 1 << 1,      // 2**1
+  Head: 1 << 2,      // 2**2
+  Ears: 1 << 3,      // 2**3
+  RightArm: 1 << 4,  // 2**4
+  Chest: 1 << 5,     // 2**5
+  LeftArm: 1 << 6,   // 2**6
+  RightWrist: 1 << 7, // 2**7
+  Waist: 1 << 8,     // 2**8
+  LeftWrist: 1 << 9, // 2**9
+  RightHand: 1 << 10, // 2**10
+  Legs: 1 << 11,     // 2**11
+  LeftHand: 1 << 12, // 2**12
+  Feet: 1 << 13      // 2**13
+} as const;
+
+/**
+ * Weapon type flags - bitflags for weapon types
+ */
+export const WEAPON_TYPE = {
+  NONE: 0,
+  Fists: 1 << 0,         // 2**0
+  Melee: 1 << 1,         // 2**1
+  Ranged: 1 << 2,        // 2**2
+  Bow: 1 << 3,           // 2**3
+  SMG: 1 << 4,           // 2**4
+  OneHandEdge: 1 << 5,   // 2**5
+  OneHandBlunt: 1 << 6,  // 2**6
+  TwoHandEdge: 1 << 7,   // 2**7
+  TwoHandBlunt: 1 << 8,  // 2**8
+  Piercing: 1 << 9,      // 2**9
+  Pistol: 1 << 10,       // 2**10
+  AssaultRifle: 1 << 11, // 2**11
+  Rifle: 1 << 12,        // 2**12
+  Shotgun: 1 << 13,      // 2**13
+  Energy: 1 << 14,       // 2**14
+  Grenade: 1 << 15,      // 2**15
+  HeavyWeapons: 1 << 16, // 2**16
+  Bit17: 1 << 17,        // 2**17
+  Bit18: 1 << 18,        // 2**18
+  Bit19: 1 << 19,        // 2**19
+  Bit20: 1 << 20,        // 2**20
+  Bit21: 1 << 21,        // 2**21
+  Bit22: 1 << 22,        // 2**22
+  TestItem: 1 << 23,     // 2**23
+  Bit24: 1 << 24,        // 2**24
+  Bit25: 1 << 25,        // 2**25
+  Bit26: 1 << 26,        // 2**26
+  Bit27: 1 << 27,        // 2**27
+  Bit28: 1 << 28         // 2**28
+} as const;
+
+/**
+ * Shadowlands zone protection flags
+ */
+export const SL_ZONE_PROTECTION = {
+  Adonis: 0,            // Special case - no protection needed
+  Penumbra: 1 << 0,     // 2**0
+  Inferno: 1 << 1,      // 2**1
+  Pandemonium: 1 << 2   // 2**2
+} as const;
+
+/**
  * Damage type ID to name mapping
  */
 export const DAMAGE_TYPES = {
