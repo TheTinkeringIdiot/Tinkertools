@@ -232,6 +232,38 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 - TailwindCSS + PrimeVue integration
 - Persistent theme preferences
 
+### Global Tag Styling System (`frontend/src/styles/main.css`)
+
+**Outlined Tag Components:**
+- Custom CSS classes for consistent flag display across all TinkerTools
+- Overrides PrimeVue Tag components to provide outlined appearance
+- Supports all standard severity levels with appropriate color coding
+
+**Available Classes:**
+```css
+.outline-tag                 /* Base outline styling */
+.outline-tag-danger         /* Red outline (e.g., NoDrop flags) */
+.outline-tag-secondary      /* Gray outline (standard informational) */
+.outline-tag-success        /* Green outline (positive indicators) */
+.outline-tag-warning        /* Yellow outline (caution indicators) */
+.outline-tag-info          /* Blue outline (informational) */
+```
+
+**Usage Example:**
+```vue
+<Tag 
+  :value="flag.name" 
+  :severity="flag.severity"
+  :class="['outline-tag', `outline-tag-${flag.severity}`]" 
+/>
+```
+
+**Features:**
+- Automatic dark mode color adjustments
+- Transparent backgrounds with colored borders
+- Consistent color palette across light/dark themes
+- Works with all PrimeVue Tag severity levels
+
 ---
 
 ## 🗄️ Database Schema Reference

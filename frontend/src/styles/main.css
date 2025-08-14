@@ -266,3 +266,94 @@ body {
   @apply antialiased;
   margin: 0;
 }
+
+/* ============================================================================
+ * Global Tag Outline Styles
+ * 
+ * Custom outlined tag styling for consistent flag display across TinkerTools.
+ * These styles override PrimeVue Tag components to provide outlined appearance
+ * with appropriate color coding for different severity levels.
+ * ============================================================================ */
+
+/* Base outline tag styling - use higher specificity to override PrimeVue */
+.p-tag.outline-tag {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 1px solid currentColor !important;
+}
+
+/* Danger severity (red) - used for important flags like NoDrop */
+.p-tag.outline-tag-danger {
+  color: rgb(239 68 68) !important; /* red-500 */
+  border-color: rgb(239 68 68) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Secondary severity (gray) - used for standard informational flags */
+.p-tag.outline-tag-secondary {
+  color: rgb(107 114 128) !important; /* gray-500 */
+  border-color: rgb(107 114 128) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Success severity (green) - used for positive flags */
+.p-tag.outline-tag-success {
+  color: rgb(34 197 94) !important; /* green-500 */
+  border-color: rgb(34 197 94) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Warning severity (yellow) - used for caution flags */
+.p-tag.outline-tag-warning {
+  color: rgb(234 179 8) !important; /* yellow-500 */
+  border-color: rgb(234 179 8) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Info severity (blue) - used for informational flags */
+.p-tag.outline-tag-info {
+  color: rgb(59 130 246) !important; /* blue-500 */
+  border-color: rgb(59 130 246) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Dark mode adjustments */
+.dark .p-tag.outline-tag-danger {
+  color: rgb(248 113 113) !important; /* red-400 */
+  border-color: rgb(248 113 113) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+.dark .p-tag.outline-tag-secondary {
+  color: rgb(156 163 175) !important; /* gray-400 */
+  border-color: rgb(156 163 175) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+.dark .p-tag.outline-tag-success {
+  color: rgb(74 222 128) !important; /* green-400 */
+  border-color: rgb(74 222 128) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+.dark .p-tag.outline-tag-warning {
+  color: rgb(250 204 21) !important; /* yellow-400 */
+  border-color: rgb(250 204 21) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+.dark .p-tag.outline-tag-info {
+  color: rgb(96 165 250) !important; /* blue-400 */
+  border-color: rgb(96 165 250) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
