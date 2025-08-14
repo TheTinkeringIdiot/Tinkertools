@@ -654,6 +654,31 @@ export function getDisplayCanFlags(stats: Array<{stat: number, value: number}>):
   return displayFlags;
 }
 
+/**
+ * Get important item flags for display (stat 0 - ITEM_NONE_FLAG)
+ */
+export function getDisplayItemFlags(stats: Array<{stat: number, value: number}>): Array<{name: string, severity: string}> {
+  const itemFlags = getItemFlags(stats);
+  const displayFlags: Array<{name: string, severity: string}> = [];
+  
+  // Filter to important flags that users care about
+  const importantFlags = [
+    'Visible', 'NoDrop', 'Unique', 'Locked', 'Open', 'ItemSocialArmour',
+    'Stationary', 'IllegalClan', 'IllegalOmni', 'CanBeAttacked', 'HasDamage',
+    'ModifiedName', 'ModifiedDescription', 'HasAnimation'
+  ];
+  
+  itemFlags.forEach(flag => {
+    if (importantFlags.includes(flag)) {
+      // NoDrop gets danger severity (red), all others get secondary
+      const severity = flag === 'NoDrop' ? 'danger' : 'secondary';
+      displayFlags.push({ name: flag, severity });
+    }
+  });
+  
+  return displayFlags;
+}
+
 // ============================================================================
 // Weapon-Specific Functions
 // ============================================================================
@@ -930,5 +955,6 @@ export const gameUtils = {
   getItemFlags,
   hasCanFlag,
   hasItemFlag,
-  getDisplayCanFlags
+  getDisplayCanFlags,
+  getDisplayItemFlags
 };

@@ -244,8 +244,16 @@ class TinkerToolsApiClient {
   
   async get<T>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     try {
-      const response = await this.client.get<ApiResponse<T>>(url, config)
-      return response.data
+      const response = await this.client.get<T>(url, config)
+      // Check if response is already wrapped in ApiResponse format
+      if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+        return response.data as ApiResponse<T>
+      }
+      // Wrap raw response in ApiResponse format
+      return {
+        success: true,
+        data: response.data
+      } as ApiResponse<T>
     } catch (error: any) {
       throw this.handleError(error)
     }
