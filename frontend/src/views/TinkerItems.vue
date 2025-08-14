@@ -117,7 +117,7 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
             </div>
             
             <!-- Sorting and Actions -->
-            <div class="flex items-center gap-2" v-if="hasResults">
+            <div class="flex items-center gap-2" v-if="hasLocalResults">
               <Dropdown
                 v-model="sortOption"
                 :options="sortOptions"
@@ -149,7 +149,7 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
           </div>
           
           <!-- Empty State -->
-          <div v-else-if="!hasResults && searchPerformed" class="text-center py-16">
+          <div v-else-if="!hasLocalResults && searchPerformed" class="text-center py-16">
             <i class="pi pi-search text-4xl text-surface-400 mb-4"></i>
             <h3 class="text-lg font-medium text-surface-600 dark:text-surface-400 mb-2">
               No items found
@@ -211,8 +211,6 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
       @clear-all="clearComparison"
     />
 
-    <!-- Router View for Item Details -->
-    <router-view />
   </div>
 </template>
 
@@ -221,6 +219,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useItems } from '@/composables/useItems'
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
+import { useItemsStore } from '@/stores/items'
 import type { Item, ItemSearchQuery, ItemFilters } from '@/types/api'
 
 
@@ -275,6 +274,8 @@ const activeFilterCount = computed(() =>
 const hasActiveFilters = computed(() => activeFilterCount.value > 0)
 
 const totalResults = computed(() => pagination.value?.total || 0)
+
+const hasLocalResults = computed(() => searchResults.value.length > 0)
 
 const sortOptions = [
   { label: 'Relevance', value: 'relevance' },
@@ -418,7 +419,23 @@ function onPageChange(page: number) {
 
 // Initialize
 onMounted(() => {
-  // Nothing needed for initialization - profiles store auto-initializes
+  // Check if we have cached search results and restore them
+  const itemsStore = useItemsStore()
+  if (itemsStore.currentSearchResults.length > 0 && itemsStore.currentSearchQuery) {
+    searchResults.value = itemsStore.currentSearchResults
+    searchQuery.value = itemsStore.currentSearchQuery.search || ''
+    searchPerformed.value = true
+    // Restore any active filters from the cached query
+    if (itemsStore.currentSearchQuery) {
+      const query = itemsStore.currentSearchQuery
+      activeFilters.value = {
+        ...(query.item_class && { item_class: query.item_class }),
+        ...(query.min_ql && { min_ql: query.min_ql }),
+        ...(query.max_ql && { max_ql: query.max_ql }),
+        ...(query.is_nano !== undefined && { is_nano: query.is_nano })
+      }
+    }
+  }
 })
 </script>
 
