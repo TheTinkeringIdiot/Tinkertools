@@ -74,6 +74,7 @@ Shows all item data with profile compatibility and comparison options
             :value="flag.name"
             :severity="flag.severity"
             size="small"
+            :class="['outline-tag', flag.severity === 'danger' ? 'outline-tag-danger' : 'outline-tag-secondary']"
           />
           <span v-if="displayItemFlags.length === 0" class="text-sm text-surface-500 dark:text-surface-400 italic">
             No special properties
@@ -431,6 +432,7 @@ Shows all item data with profile compatibility and comparison options
             :value="flag.name"
             :severity="flag.severity"
             size="small"
+            :class="['outline-tag', flag.severity === 'danger' ? 'outline-tag-danger' : 'outline-tag-secondary']"
           />
           <span v-if="displayItemFlags.length === 0" class="text-sm text-surface-500 dark:text-surface-400 italic">
             No special properties
@@ -982,4 +984,5 @@ watch(() => route.params.id, () => {
 .overflow-y-auto::-webkit-scrollbar-thumb {
   @apply bg-surface-300 dark:bg-surface-600 rounded-full;
 }
+
 </style>
