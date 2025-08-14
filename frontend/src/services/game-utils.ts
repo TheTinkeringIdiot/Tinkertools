@@ -23,6 +23,9 @@ import {
   IMPLANT_SLOT_POSITION,
   CANFLAG,
   ITEM_NONE_FLAG,
+  WEAPON_SLOT,
+  ARMOR_SLOT,
+  IMPLANT_SLOT,
   type StatId,
   type StatName,
   type RequirementId,
@@ -870,6 +873,188 @@ export function getItemCategoryName(itemClass: number): string {
 }
 
 // ============================================================================
+// Slot Functions
+// ============================================================================
+
+/**
+ * Get item class from item stats or property
+ */
+export function getItemClass(item: any): number {
+  // First try the ItemClass stat (stat 76)
+  const itemClassStat = item.stats?.find((stat: any) => stat.stat === 76);
+  if (itemClassStat) {
+    return itemClassStat.value;
+  }
+  
+  // Fallback to item_class property
+  return item.item_class || 0;
+}
+
+/**
+ * Parse weapon slot bitflags
+ */
+export function parseWeaponSlots(slotValue: number): string[] {
+  const slots: string[] = [];
+  
+  for (const [slotName, slotBit] of Object.entries(WEAPON_SLOT)) {
+    if (slotName !== 'NONE' && slotName !== 'Bit0' && (slotValue & slotBit) === slotBit) {
+      slots.push(slotName);
+    }
+  }
+  
+  return slots;
+}
+
+/**
+ * Parse armor slot bitflags
+ */
+export function parseArmorSlots(slotValue: number): string[] {
+  const slots: string[] = [];
+  
+  for (const [slotName, slotBit] of Object.entries(ARMOR_SLOT)) {
+    if (slotName !== 'NONE' && slotName !== 'Bit0' && (slotValue & slotBit) === slotBit) {
+      slots.push(slotName);
+    }
+  }
+  
+  return slots;
+}
+
+/**
+ * Parse implant slot bitflags
+ */
+export function parseImplantSlots(slotValue: number): string[] {
+  const slots: string[] = [];
+  
+  for (const [slotName, slotBit] of Object.entries(IMPLANT_SLOT)) {
+    if (slotName !== 'NONE' && slotName !== 'Bit0' && (slotValue & slotBit) === slotBit) {
+      slots.push(slotName);
+    }
+  }
+  
+  return slots;
+}
+
+/**
+ * Get item slot information
+ */
+export function getItemSlotInfo(item: any): {
+  type: 'weapon' | 'armor' | 'implant' | null;
+  slots: string[];
+  iconUrl: string | null;
+} {
+  const itemClass = getItemClass(item);
+  const iconUrl = getItemIconUrl(item.stats);
+  
+  // Get slot value from stat 298
+  const slotStat = item.stats?.find((stat: any) => stat.stat === 298);
+  const slotValue = slotStat ? slotStat.value : 0;
+  
+  switch (itemClass) {
+    case 1: // Weapon
+      return {
+        type: 'weapon',
+        slots: parseWeaponSlots(slotValue),
+        iconUrl
+      };
+    case 2: // Armor
+      return {
+        type: 'armor',
+        slots: parseArmorSlots(slotValue),
+        iconUrl
+      };
+    case 3: // Implant
+      return {
+        type: 'implant',
+        slots: parseImplantSlots(slotValue),
+        iconUrl
+      };
+    default:
+      return {
+        type: null,
+        slots: [],
+        iconUrl
+      };
+  }
+}
+
+/**
+ * Get weapon slot grid position (3x5 grid)
+ */
+export function getWeaponSlotPosition(slotName: string): { row: number; col: number } {
+  const positions: Record<string, { row: number; col: number }> = {
+    'Hud1': { row: 1, col: 1 },
+    'Hud2': { row: 1, col: 2 },
+    'Hud3': { row: 1, col: 3 },
+    'Utils1': { row: 2, col: 1 },
+    'Util1': { row: 2, col: 1 }, // Alternative name
+    'Utils2': { row: 2, col: 2 },
+    'Util2': { row: 2, col: 2 }, // Alternative name
+    'Utils3': { row: 2, col: 3 },
+    'Util3': { row: 2, col: 3 }, // Alternative name
+    'LeftHand': { row: 3, col: 1 },
+    'RightHand': { row: 3, col: 3 },
+    'Deck': { row: 4, col: 2 },
+    'Deck1': { row: 4, col: 1 },
+    'Deck2': { row: 4, col: 2 },
+    'Deck3': { row: 4, col: 3 },
+    'Deck4': { row: 5, col: 1 },
+    'Deck5': { row: 5, col: 2 },
+    'Deck6': { row: 5, col: 3 }
+  };
+  
+  return positions[slotName] || { row: 1, col: 1 };
+}
+
+/**
+ * Get armor slot grid position
+ */
+export function getArmorSlotPosition(slotName: string): { row: number; col: number } {
+  const positions: Record<string, { row: number; col: number }> = {
+    'Head': { row: 1, col: 2 },
+    'Neck': { row: 1, col: 1 },
+    'Back': { row: 1, col: 3 },
+    'LeftShoulder': { row: 2, col: 1 },
+    'Chest': { row: 2, col: 2 },
+    'RightShoulder': { row: 2, col: 3 },
+    'LeftArm': { row: 3, col: 1 },
+    'Hands': { row: 3, col: 2 },
+    'RightArm': { row: 3, col: 3 },
+    'LeftWrist': { row: 4, col: 1 },
+    'Legs': { row: 4, col: 2 },
+    'RightWrist': { row: 4, col: 3 },
+    'LeftFinger': { row: 5, col: 1 },
+    'Feet': { row: 5, col: 2 },
+    'RightFinger': { row: 5, col: 3 }
+  };
+  
+  return positions[slotName] || { row: 1, col: 1 };
+}
+
+/**
+ * Get implant slot grid position
+ */
+export function getImplantSlotPosition(slotName: string): { row: number; col: number } {
+  const positions: Record<string, { row: number; col: number }> = {
+    'Eyes': { row: 1, col: 1 },
+    'Head': { row: 1, col: 2 },
+    'Ears': { row: 1, col: 3 },
+    'LeftArm': { row: 2, col: 1 },
+    'Chest': { row: 2, col: 2 },
+    'RightArm': { row: 2, col: 3 },
+    'LeftWrist': { row: 3, col: 1 },
+    'Waist': { row: 3, col: 2 },
+    'RightWrist': { row: 3, col: 3 },
+    'LeftHand': { row: 4, col: 1 },
+    'Legs': { row: 4, col: 2 },
+    'RightHand': { row: 4, col: 3 },
+    'Feet': { row: 4, col: 4 }
+  };
+  
+  return positions[slotName] || { row: 1, col: 1 };
+}
+
+// ============================================================================
 // Export all functions as a single object for easy importing
 // ============================================================================
 
@@ -956,5 +1141,15 @@ export const gameUtils = {
   hasCanFlag,
   hasItemFlag,
   getDisplayCanFlags,
-  getDisplayItemFlags
+  getDisplayItemFlags,
+
+  // Slot functions
+  getItemClass,
+  parseWeaponSlots,
+  parseArmorSlots,
+  parseImplantSlots,
+  getItemSlotInfo,
+  getWeaponSlotPosition,
+  getArmorSlotPosition,
+  getImplantSlotPosition
 };

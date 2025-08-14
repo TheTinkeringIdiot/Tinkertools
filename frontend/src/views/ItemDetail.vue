@@ -95,39 +95,14 @@ Shows all item data with profile compatibility and comparison options
       </div>
       
       <!-- Item Overview -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Item Image and Basic Info -->
+      <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <!-- Item Slots Display and Basic Info -->
         <div class="lg:col-span-1">
           <Card>
             <template #content>
-              <div class="text-center space-y-4">
-                <!-- Item Image -->
-                <div class="h-32 bg-surface-100 dark:bg-surface-800 rounded-lg flex items-center justify-center">
-                  <img 
-                    v-if="itemIconUrl"
-                    :src="itemIconUrl" 
-                    :alt="`${item.name} icon`"
-                    class="w-16 h-16 object-contain"
-                    @error="onIconError"
-                  />
-                  <i v-else class="pi pi-box text-4xl text-surface-400"></i>
-                </div>
-                
-                <!-- Basic Properties -->
-                <div class="space-y-2">
-                  <div class="flex justify-between items-center">
-                    <span class="text-sm text-surface-600 dark:text-surface-400">Quality Level:</span>
-                    <Badge :value="item.ql.toString()" severity="info" />
-                  </div>
-                  <div class="flex justify-between items-center">
-                    <span class="text-sm text-surface-600 dark:text-surface-400">Item Class:</span>
-                    <span class="text-sm font-medium">{{ getItemClassName(item.item_class) }}</span>
-                  </div>
-                  <div v-if="item.item_type" class="flex justify-between items-center">
-                    <span class="text-sm text-surface-600 dark:text-surface-400">Type:</span>
-                    <span class="text-sm font-medium">{{ item.item_type }}</span>
-                  </div>
-                </div>
+              <div class="space-y-4">
+                <!-- Item Slots Display or Icon -->
+                <ItemSlotsDisplay :item="item" />
                 
                 <!-- Compatibility Status -->
                 <div v-if="profile && showCompatibility" class="p-3 rounded-lg"
@@ -157,7 +132,7 @@ Shows all item data with profile compatibility and comparison options
         </div>
         
         <!-- Item Description and Properties -->
-        <div class="lg:col-span-2">
+        <div class="lg:col-span-3">
           <Card>
             <template #header>
               <h3 class="text-lg font-semibold">Description & Properties</h3>
@@ -453,39 +428,14 @@ Shows all item data with profile compatibility and comparison options
       </div>
       
       <!-- Item Overview -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Item Image and Basic Info -->
+      <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <!-- Item Slots Display and Basic Info -->
         <div class="lg:col-span-1">
           <Card>
             <template #content>
-              <div class="text-center space-y-4">
-                <!-- Item Image -->
-                <div class="h-32 bg-surface-100 dark:bg-surface-800 rounded-lg flex items-center justify-center">
-                  <img 
-                    v-if="itemIconUrl"
-                    :src="itemIconUrl" 
-                    :alt="`${item.name} icon`"
-                    class="w-16 h-16 object-contain"
-                    @error="onIconError"
-                  />
-                  <i v-else class="pi pi-box text-4xl text-surface-400"></i>
-                </div>
-                
-                <!-- Basic Properties -->
-                <div class="space-y-2">
-                  <div class="flex justify-between items-center">
-                    <span class="text-sm text-surface-600 dark:text-surface-400">Quality Level:</span>
-                    <Badge :value="item.ql.toString()" severity="info" />
-                  </div>
-                  <div class="flex justify-between items-center">
-                    <span class="text-sm text-surface-600 dark:text-surface-400">Item Class:</span>
-                    <span class="text-sm font-medium">{{ getItemClassName(item.item_class) }}</span>
-                  </div>
-                  <div v-if="item.item_type" class="flex justify-between items-center">
-                    <span class="text-sm text-surface-600 dark:text-surface-400">Type:</span>
-                    <span class="text-sm font-medium">{{ item.item_type }}</span>
-                  </div>
-                </div>
+              <div class="space-y-4">
+                <!-- Item Slots Display or Icon -->
+                <ItemSlotsDisplay :item="item" />
                 
                 <!-- Compatibility Status -->
                 <div v-if="profile && showCompatibility" class="p-3 rounded-lg"
@@ -515,7 +465,7 @@ Shows all item data with profile compatibility and comparison options
         </div>
         
         <!-- Item Description and Properties -->
-        <div class="lg:col-span-2">
+        <div class="lg:col-span-3">
           <Card>
             <template #header>
               <h3 class="text-lg font-semibold">Description & Properties</h3>
@@ -741,6 +691,7 @@ import type { Item, TinkerProfile, ItemRequirement } from '@/types/api'
 import WeaponStats from '@/components/items/WeaponStats.vue'
 import ItemAttributes from '@/components/items/ItemAttributes.vue'
 import ItemRequirements from '@/components/items/ItemRequirements.vue'
+import ItemSlotsDisplay from '@/components/items/ItemSlotsDisplay.vue'
 
 const route = useRoute()
 const router = useRouter()
