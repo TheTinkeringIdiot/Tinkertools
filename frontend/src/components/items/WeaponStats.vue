@@ -21,15 +21,23 @@ Shows detailed weapon information including damage, timing, range, and special s
             <div v-if="weaponStats.minDamage && weaponStats.maxDamage" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
               <span class="text-sm text-surface-600 dark:text-surface-400">Damage Range</span>
               <span class="font-mono font-medium text-red-600 dark:text-red-400">
-                {{ weaponStats.minDamage }} - {{ weaponStats.maxDamage }}
+                {{ weaponStats.minDamage }} - {{ weaponStats.maxDamage }}{{ weaponStats.criticalBonus ? ` (${weaponStats.criticalBonus})` : '' }}
               </span>
             </div>
             
-            <!-- Average Damage -->
-            <div v-if="averageDamage > 0" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
-              <span class="text-sm text-surface-600 dark:text-surface-400">Average Damage</span>
+            <!-- Damage Type -->
+            <div v-if="weaponStats.damageType" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
+              <span class="text-sm text-surface-600 dark:text-surface-400">Damage Type</span>
               <span class="font-mono font-medium text-red-600 dark:text-red-400">
-                {{ averageDamage.toFixed(1) }}
+                {{ getStatName(weaponStats.damageType) }}
+              </span>
+            </div>
+            
+            <!-- Attack Range -->
+            <div v-if="weaponStats.attackRange" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
+              <span class="text-sm text-surface-600 dark:text-surface-400">Attack Range</span>
+              <span class="font-mono font-medium text-red-600 dark:text-red-400">
+                {{ weaponStats.attackRange }}m
               </span>
             </div>
             
@@ -40,19 +48,29 @@ Shows detailed weapon information including damage, timing, range, and special s
                 {{ dps.toFixed(1) }}
               </span>
             </div>
-            
-            <!-- Damage Type -->
-            <div v-if="damageTypeName" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
-              <span class="text-sm text-surface-600 dark:text-surface-400">Damage Type</span>
-              <Tag :value="damageTypeName" severity="info" />
-            </div>
           </div>
         </div>
 
         <!-- Timing Information -->
-        <div v-if="weaponStats.attackSpeed || weaponStats.burstRecharge">
+        <div v-if="weaponStats.attackSpeed || weaponStats.burstRecharge || (weaponStats.attackDelay && weaponStats.rechargeDelay) || weaponStats.initiativeType">
           <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">Timing</h4>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Attack Speed -->
+            <div v-if="weaponStats.attackDelay && weaponStats.rechargeDelay" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
+              <span class="text-sm text-surface-600 dark:text-surface-400">Attack Speed</span>
+              <span class="font-mono font-medium text-blue-600 dark:text-blue-400">
+                {{ formatCentisecondsToSeconds(weaponStats.attackDelay) }}s/{{ formatCentisecondsToSeconds(weaponStats.rechargeDelay) }}s
+              </span>
+            </div>
+            
+            <!-- Initiative -->
+            <div v-if="weaponStats.initiativeType" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
+              <span class="text-sm text-surface-600 dark:text-surface-400">Initiative</span>
+              <span class="font-mono font-medium text-green-600 dark:text-green-400">
+                {{ getStatName(weaponStats.initiativeType) }}
+              </span>
+            </div>
+            
             <!-- Attack Time -->
             <div v-if="weaponStats.attackSpeed" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
               <span class="text-sm text-surface-600 dark:text-surface-400">Attack Time</span>
@@ -80,9 +98,23 @@ Shows detailed weapon information including damage, timing, range, and special s
         </div>
 
         <!-- Range and Special Properties -->
-        <div v-if="weaponStats.range || specialSkills.length > 0">
+        <div v-if="weaponStats.multiRanged || weaponStats.multiMelee || weaponStats.range || (weaponStats.maxEnergy && weaponStats.ammoType) || weaponStats.maxBeneficialSkill">
           <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">Properties</h4>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Multi Ranged/Melee -->
+            <div v-if="weaponStats.multiRanged" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
+              <span class="text-sm text-surface-600 dark:text-surface-400">Multi Ranged</span>
+              <span class="font-mono font-medium">
+                {{ weaponStats.multiRanged }}
+              </span>
+            </div>
+            <div v-else-if="weaponStats.multiMelee" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
+              <span class="text-sm text-surface-600 dark:text-surface-400">Multi Melee</span>
+              <span class="font-mono font-medium">
+                {{ weaponStats.multiMelee }}
+              </span>
+            </div>
+            
             <!-- Range -->
             <div v-if="weaponStats.range" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
               <span class="text-sm text-surface-600 dark:text-surface-400">Range</span>
@@ -91,18 +123,20 @@ Shows detailed weapon information including damage, timing, range, and special s
               </span>
             </div>
             
-            <!-- Special Skills -->
-            <div v-if="specialSkills.length > 0" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
-              <span class="text-sm text-surface-600 dark:text-surface-400">Special Skills</span>
-              <div class="flex flex-wrap gap-1">
-                <Tag
-                  v-for="skill in specialSkills"
-                  :key="skill"
-                  :value="skill"
-                  severity="warning"
-                  size="small"
-                />
-              </div>
+            <!-- Clip -->
+            <div v-if="weaponStats.maxEnergy && weaponStats.ammoType" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
+              <span class="text-sm text-surface-600 dark:text-surface-400">Clip</span>
+              <span class="font-mono font-medium">
+                {{ weaponStats.maxEnergy }} {{ getAmmoTypeName(weaponStats.ammoType) }}
+              </span>
+            </div>
+            
+            <!-- Max Beneficial Skill -->
+            <div v-if="weaponStats.maxBeneficialSkill" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
+              <span class="text-sm text-surface-600 dark:text-surface-400">Max Beneficial Skill</span>
+              <span class="font-mono font-medium">
+                {{ weaponStats.maxBeneficialSkill }}
+              </span>
             </div>
           </div>
         </div>
@@ -161,7 +195,8 @@ import {
   isWeapon,
   getWeaponSpecialSkills,
   formatWeaponRange,
-  getStatName
+  getStatName,
+  getAmmoTypeName
 } from '@/services/game-utils'
 
 const props = defineProps<{
@@ -238,6 +273,12 @@ function formatSkillRequirement(statId: number, value: number): string {
   }
   
   return value.toString()
+}
+
+function formatCentisecondsToSeconds(centiseconds: number): string {
+  // Convert centiseconds to seconds with 2 decimal places
+  const seconds = centiseconds / 100
+  return seconds.toFixed(2)
 }
 </script>
 
