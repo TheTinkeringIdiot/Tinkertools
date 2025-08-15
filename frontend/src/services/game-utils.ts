@@ -692,13 +692,22 @@ export function getDisplayItemFlags(stats: Array<{stat: number, value: number}>)
 export const WEAPON_STATS = {
   MIN_DAMAGE: 286,
   MAX_DAMAGE: 285,
+  CRITICAL_BONUS: 284,
+  ATTACK_RANGE: 287,
+  ATTACK_DELAY: 294,
+  RECHARGE_DELAY: 210,
+  INITIATIVE_TYPE: 440,
   ATTACK_SPEED: 3,
   BURST_RECHARGE: 374,
   WEAPON_RANGE: 380,
-  DAMAGE_TYPE: 339,
+  DAMAGE_TYPE: 436,
+  MAX_ENERGY: 212,
+  AMMO_TYPE: 420,
+  MAX_BENEFICIAL_SKILL: 538,
   BURST: 148,
   FLING_SHOT: 150,
   MULTI_RANGED: 134,
+  MULTI_MELEE: 101,
   RANGED_ENERGY: 133,
   RANGED_INIT: 119
 } as const;
@@ -724,13 +733,22 @@ export const DAMAGE_TYPES = {
 export function getWeaponStats(stats: Array<{stat: number, value: number}>): {
   minDamage?: number;
   maxDamage?: number;
+  criticalBonus?: number;
+  attackRange?: number;
+  attackDelay?: number;
+  rechargeDelay?: number;
+  initiativeType?: number;
   attackSpeed?: number;
   burstRecharge?: number;
   range?: number;
   damageType?: number;
+  maxEnergy?: number;
+  ammoType?: number;
+  maxBeneficialSkill?: number;
   burst?: number;
   flingShot?: number;
   multiRanged?: number;
+  multiMelee?: number;
   rangedEnergy?: number;
   rangedInit?: number;
 } {
@@ -744,6 +762,21 @@ export function getWeaponStats(stats: Array<{stat: number, value: number}>): {
       case WEAPON_STATS.MAX_DAMAGE:
         weaponStats.maxDamage = stat.value;
         break;
+      case WEAPON_STATS.CRITICAL_BONUS:
+        weaponStats.criticalBonus = stat.value;
+        break;
+      case WEAPON_STATS.ATTACK_RANGE:
+        weaponStats.attackRange = stat.value;
+        break;
+      case WEAPON_STATS.ATTACK_DELAY:
+        weaponStats.attackDelay = stat.value;
+        break;
+      case WEAPON_STATS.RECHARGE_DELAY:
+        weaponStats.rechargeDelay = stat.value;
+        break;
+      case WEAPON_STATS.INITIATIVE_TYPE:
+        weaponStats.initiativeType = stat.value;
+        break;
       case WEAPON_STATS.ATTACK_SPEED:
         weaponStats.attackSpeed = stat.value;
         break;
@@ -756,6 +789,15 @@ export function getWeaponStats(stats: Array<{stat: number, value: number}>): {
       case WEAPON_STATS.DAMAGE_TYPE:
         weaponStats.damageType = stat.value;
         break;
+      case WEAPON_STATS.MAX_ENERGY:
+        weaponStats.maxEnergy = stat.value;
+        break;
+      case WEAPON_STATS.AMMO_TYPE:
+        weaponStats.ammoType = stat.value;
+        break;
+      case WEAPON_STATS.MAX_BENEFICIAL_SKILL:
+        weaponStats.maxBeneficialSkill = stat.value;
+        break;
       case WEAPON_STATS.BURST:
         weaponStats.burst = stat.value;
         break;
@@ -764,6 +806,9 @@ export function getWeaponStats(stats: Array<{stat: number, value: number}>): {
         break;
       case WEAPON_STATS.MULTI_RANGED:
         weaponStats.multiRanged = stat.value;
+        break;
+      case WEAPON_STATS.MULTI_MELEE:
+        weaponStats.multiMelee = stat.value;
         break;
       case WEAPON_STATS.RANGED_ENERGY:
         weaponStats.rangedEnergy = stat.value;
