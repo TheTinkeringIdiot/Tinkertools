@@ -131,55 +131,64 @@ Shows all item data with profile compatibility and comparison options
           </Card>
         </div>
         
-        <!-- Item Description and Properties -->
-        <div class="lg:col-span-3">
+        <!-- Item Description -->
+        <div class="lg:col-span-2">
           <Card>
             <template #header>
-              <h3 class="text-lg font-semibold">Description & Properties</h3>
+              <h3 class="text-lg font-semibold">Description</h3>
             </template>
             <template #content>
-              <div class="space-y-4">
-                <!-- Description -->
-                <div v-if="item.description">
-                  <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Description</h4>
-                  <p class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                    {{ item.description }}
-                  </p>
-                </div>
-                
-                <!-- Item Properties -->
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Properties</h4>
-                    <div class="space-y-1">
-                      <div class="flex justify-between text-sm">
-                        <span>Nano Program:</span>
-                        <span class="font-medium">{{ item.is_nano ? 'Yes' : 'No' }}</span>
-                      </div>
-                      <div class="flex justify-between text-sm">
-                        <span>Tradeable:</span>
-                        <span class="font-medium">{{ getTradeableText() }}</span>
-                      </div>
-                      <div class="flex justify-between text-sm">
-                        <span>Droppable:</span>
-                        <span class="font-medium">{{ getDroppableText() }}</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div v-if="item.action_data">
-                    <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Usage</h4>
-                    <div class="space-y-1">
-                      <div class="flex justify-between text-sm">
-                        <span>Actions:</span>
-                        <span class="font-medium">{{ item.action_data.length || 0 }}</span>
-                      </div>
-                      <div v-if="hasSpecialEffects" class="flex justify-between text-sm">
-                        <span>Special Effects:</span>
-                        <span class="font-medium">Yes</span>
-                      </div>
-                    </div>
-                  </div>
+              <div v-if="item.description">
+                <p class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
+                  {{ item.description }}
+                </p>
+              </div>
+              <div v-else class="text-sm text-surface-500 dark:text-surface-400 italic">
+                No description available
+              </div>
+            </template>
+          </Card>
+        </div>
+        
+        <!-- You can help! -->
+        <div class="lg:col-span-1">
+          <Card>
+            <template #header>
+              <h3 class="text-lg font-semibold flex items-center gap-2">
+                <i class="pi pi-lightbulb"></i>
+                You can help!
+              </h3>
+            </template>
+            <template #content>
+              <div class="text-sm text-surface-600 dark:text-surface-400">
+                <p class="mb-4 leading-relaxed">
+                  TinkerItems and the other TinkerTools are a player-run project. Your kind help keeping them online and ad-free is GREATLY appreciated!
+                </p>
+                <div class="flex items-center gap-2">
+                  <a 
+                    href="https://patreon.com/tinkeringidiot" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    class="hover:opacity-80 transition-opacity flex-1"
+                  >
+                    <img 
+                      src="https://cdn.tinkeringidiot.com/static/image/patreon_name.png" 
+                      alt="Support on Patreon"
+                      class="h-10 w-full object-fill"
+                    />
+                  </a>
+                  <a 
+                    href="https://discord.gg/a7baGx76un" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    class="hover:opacity-80 transition-opacity flex-1"
+                  >
+                    <img 
+                      src="https://cdn.tinkeringidiot.com/static/image/discord_logo.svg" 
+                      alt="Join Discord"
+                      class="h-10 w-full object-fill"
+                    />
+                  </a>
                 </div>
               </div>
             </template>
@@ -464,55 +473,64 @@ Shows all item data with profile compatibility and comparison options
           </Card>
         </div>
         
-        <!-- Item Description and Properties -->
-        <div class="lg:col-span-3">
+        <!-- Item Description -->
+        <div class="lg:col-span-2">
           <Card>
             <template #header>
-              <h3 class="text-lg font-semibold">Description & Properties</h3>
+              <h3 class="text-lg font-semibold">Description</h3>
             </template>
             <template #content>
-              <div class="space-y-4">
-                <!-- Description -->
-                <div v-if="item.description">
-                  <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Description</h4>
-                  <p class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                    {{ item.description }}
-                  </p>
-                </div>
-                
-                <!-- Item Properties -->
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Properties</h4>
-                    <div class="space-y-1">
-                      <div class="flex justify-between text-sm">
-                        <span>Nano Program:</span>
-                        <span class="font-medium">{{ item.is_nano ? 'Yes' : 'No' }}</span>
-                      </div>
-                      <div class="flex justify-between text-sm">
-                        <span>Tradeable:</span>
-                        <span class="font-medium">{{ getTradeableText() }}</span>
-                      </div>
-                      <div class="flex justify-between text-sm">
-                        <span>Droppable:</span>
-                        <span class="font-medium">{{ getDroppableText() }}</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div v-if="item.action_data">
-                    <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Usage</h4>
-                    <div class="space-y-1">
-                      <div class="flex justify-between text-sm">
-                        <span>Actions:</span>
-                        <span class="font-medium">{{ item.action_data.length || 0 }}</span>
-                      </div>
-                      <div v-if="hasSpecialEffects" class="flex justify-between text-sm">
-                        <span>Special Effects:</span>
-                        <span class="font-medium">Yes</span>
-                      </div>
-                    </div>
-                  </div>
+              <div v-if="item.description">
+                <p class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
+                  {{ item.description }}
+                </p>
+              </div>
+              <div v-else class="text-sm text-surface-500 dark:text-surface-400 italic">
+                No description available
+              </div>
+            </template>
+          </Card>
+        </div>
+        
+        <!-- You can help! -->
+        <div class="lg:col-span-1">
+          <Card>
+            <template #header>
+              <h3 class="text-lg font-semibold flex items-center gap-2">
+                <i class="pi pi-lightbulb"></i>
+                You can help!
+              </h3>
+            </template>
+            <template #content>
+              <div class="text-sm text-surface-600 dark:text-surface-400">
+                <p class="mb-4 leading-relaxed">
+                  TinkerItems and the other TinkerTools are a player-run project. Your kind help keeping them online and ad-free is GREATLY appreciated!
+                </p>
+                <div class="flex items-center gap-2">
+                  <a 
+                    href="https://patreon.com/tinkeringidiot" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    class="hover:opacity-80 transition-opacity flex-1"
+                  >
+                    <img 
+                      src="https://cdn.tinkeringidiot.com/static/image/patreon_name.png" 
+                      alt="Support on Patreon"
+                      class="h-10 w-full object-fill"
+                    />
+                  </a>
+                  <a 
+                    href="https://discord.gg/a7baGx76un" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    class="hover:opacity-80 transition-opacity flex-1"
+                  >
+                    <img 
+                      src="https://cdn.tinkeringidiot.com/static/image/discord_logo.svg" 
+                      alt="Join Discord"
+                      class="h-10 w-full object-fill"
+                    />
+                  </a>
                 </div>
               </div>
             </template>
