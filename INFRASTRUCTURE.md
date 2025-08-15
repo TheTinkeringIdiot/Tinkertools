@@ -210,6 +210,15 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 - Game-specific formatting functions
 - Cross-application utility functions
 
+**Special Attack Calculations:**
+- `calculateFling(attackTime)`: Fling Shot skill requirements and damage cap
+- `calculateBurst(attackTime, rechTime, burstCycle)`: Burst fire calculations
+- `calculateFullAuto(attackTime, rechTime, faCycle)`: Full Auto requirements
+- `calculateAimedShot(attackTime, rechTime)`: Aimed Shot calculations
+- `calculateFastAttack(attackTime)`: Fast Attack requirements
+
+*Note: Special attack functions migrated from legacy TinkerPlants codebase (~/projects/Tinkerplants/tinkertools/views.py) to provide unified weapon analysis capabilities across all TinkerTools applications.*
+
 ---
 
 ## 🎨 Shared UI Components

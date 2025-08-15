@@ -858,6 +858,81 @@ export function calculateWeaponDPS(minDamage: number, maxDamage: number, attackS
   return avgDamage * attacksPerSecond;
 }
 
+// ============================================================================
+// Special Attack Calculation Functions
+// ============================================================================
+
+/**
+ * Special attack result containing skill requirement and damage cap
+ */
+export interface SpecialAttackResult {
+  skill: number;
+  cap: number;
+}
+
+/**
+ * Calculate Fling Shot special attack requirements
+ * @param attackTime Attack time in centiseconds
+ * @returns Object with skill requirement and damage cap
+ */
+export function calculateFling(attackTime: number): SpecialAttackResult {
+  const cap = Math.floor(5 + (attackTime / 100));
+  const skill = Math.round((16 * (attackTime / 100) - 6 - 1) * 100) + 1;
+  return { skill, cap };
+}
+
+/**
+ * Calculate Burst special attack requirements
+ * @param attackTime Attack time in centiseconds
+ * @param rechTime Recharge time in centiseconds
+ * @param burstCycle Burst cycle time in centiseconds
+ * @returns Object with skill requirement and damage cap
+ */
+export function calculateBurst(attackTime: number, rechTime: number, burstCycle: number): SpecialAttackResult {
+  const cap = Math.floor(8 + (attackTime / 100));
+  const skill = Math.floor((((rechTime / 100) * 20) + (burstCycle / 100) - 9 - 1 + (attackTime / 100)) * 25) + 1;
+  return { skill, cap };
+}
+
+/**
+ * Calculate Full Auto special attack requirements
+ * @param attackTime Attack time in centiseconds
+ * @param rechTime Recharge time in centiseconds
+ * @param faCycle Full auto cycle time in centiseconds (defaults to 1000 if 0)
+ * @returns Object with skill requirement and damage cap
+ */
+export function calculateFullAuto(attackTime: number, rechTime: number, faCycle: number): SpecialAttackResult {
+  const cap = Math.floor(10 + (attackTime / 100));
+  if (faCycle === 0) {
+    faCycle = 1000;
+  }
+  const skill = Math.floor((((rechTime / 100) * 40 + (faCycle / 100) - 11 - 1 + (attackTime / 100)) * 25)) + 1;
+  return { skill, cap };
+}
+
+/**
+ * Calculate Aimed Shot special attack requirements
+ * @param attackTime Attack time in centiseconds
+ * @param rechTime Recharge time in centiseconds
+ * @returns Object with skill requirement and damage cap
+ */
+export function calculateAimedShot(attackTime: number, rechTime: number): SpecialAttackResult {
+  const cap = Math.floor(10 + (attackTime / 100));
+  const skill = Math.ceil((((rechTime / 100) * 40) + (attackTime / 100) - 11 - 1) * 100 / 3);
+  return { skill, cap };
+}
+
+/**
+ * Calculate Fast Attack special attack requirements
+ * @param attackTime Attack time in centiseconds
+ * @returns Object with skill requirement and damage cap
+ */
+export function calculateFastAttack(attackTime: number): SpecialAttackResult {
+  const cap = Math.floor(5 + (attackTime / 100));
+  const skill = Math.round(((attackTime / 100) * 16 - 5 - 1) * 100) + 1;
+  return { skill, cap };
+}
+
 /**
  * Check if an item is a weapon based on ITEM_CLASS constant
  */
@@ -1203,6 +1278,13 @@ export const gameUtils = {
   getWeaponSpecialSkills,
   formatWeaponRange,
   getItemCategoryName,
+
+  // Special attack calculations
+  calculateFling,
+  calculateBurst,
+  calculateFullAuto,
+  calculateAimedShot,
+  calculateFastAttack,
 
   // Bitflag functions
   parseCanFlags,
