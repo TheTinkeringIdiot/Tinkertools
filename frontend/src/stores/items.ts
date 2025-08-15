@@ -21,7 +21,7 @@ import { flagOperations } from '../utils/flag-operations'
 
 interface ItemsState {
   // Data
-  items: Map<number, Item>
+  items: Map<number, Item> // Map of AOID -> Item
   searchResults: {
     query: ItemSearchQuery | null
     results: Item[]
@@ -43,7 +43,7 @@ export const useItemsStore = defineStore('items', () => {
   // State
   // ============================================================================
   
-  const items = ref(new Map<number, Item>())
+  const items = ref(new Map<number, Item>()) // Cache by AOID
   const searchResults = ref<ItemsState['searchResults']>(null)
   const loading = ref(false)
   const error = ref<UserFriendlyError | null>(null)
@@ -134,22 +134,22 @@ export const useItemsStore = defineStore('items', () => {
   }
   
   /**
-   * Get a single item by ID
+   * Get a single item by AOID
    */
-  async function getItem(id: number, forceRefresh = false): Promise<Item | null> {
-    // Check cache first
-    if (!forceRefresh && items.value.has(id)) {
-      return items.value.get(id) || null
+  async function getItem(aoid: number, forceRefresh = false): Promise<Item | null> {
+    // Check cache first (cache by AOID)
+    if (!forceRefresh && items.value.has(aoid)) {
+      return items.value.get(aoid) || null
     }
     
     loading.value = true
     error.value = null
     
     try {
-      const response = await apiClient.getItem(id)
+      const response = await apiClient.getItem(aoid)
       
       if (response.success && response.data) {
-        items.value.set(id, response.data)
+        items.value.set(aoid, response.data)
         lastFetch.value = Date.now()
         return response.data
       } else {
@@ -194,7 +194,7 @@ export const useItemsStore = defineStore('items', () => {
         
         if (response.success && response.data) {
           response.data.forEach(item => {
-            items.value.set(item.id, item)
+            items.value.set(item.aoid!, item) // Cache by AOID
             results.push(item)
           })
           lastFetch.value = Date.now()

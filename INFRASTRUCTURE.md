@@ -70,7 +70,7 @@ This document provides a comprehensive overview of the shared infrastructure, da
 ```typescript
 // Items
 getItems(query: ItemSearchQuery): Promise<PaginatedResponse<Item>>
-getItem(id: number): Promise<ApiResponse<Item>>
+getItem(aoid: number): Promise<ApiResponse<Item>>  // Uses AOID for item lookup
 interpolateItem(aoid: number, targetQl: number): Promise<InterpolationResponse>
 
 // Spells/Nanos  
@@ -112,10 +112,16 @@ getPocketBosses(query: PocketBossSearchQuery): Promise<PaginatedResponse<PocketB
 **Available Stores:**
 - **useAppStore**: Global application state, theme, notifications
 - **useProfileStore**: Character profile management, LocalStorage persistence
-- **useItemsStore**: Item data caching and search state
+- **useItemsStore**: Item data caching and search state (cached by AOID)
 - **useSpellsStore**: Nano/spell data management
 - **useSymbiantsStore**: Symbiant data for TinkerPlants
 - **usePocketBossesStore**: Pocket boss data for TinkerPocket
+
+**Items Store Features:**
+- **AOID-Based Caching**: Items cached using Anarchy Online Item ID as key
+- **Efficient Lookup**: Direct item access via `getItem(aoid)` function
+- **URL Consistency**: Store caching aligns with AOID-based routing system
+- **Game Data Alignment**: Cache keys match game item identification system
 
 ### Store Initialization (`frontend/src/stores/index.ts`)
 
@@ -328,12 +334,33 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 - **ProfileValidator**: Data validation and integrity
 - **ProfileTransformer**: Data format conversion
 
-### Navigation & Routing
+### Navigation & Routing (`frontend/src/router/index.ts`)
 
 **Vue Router Configuration:**
 - SPA navigation without page refreshes
 - Cross-app context preservation
 - Route-based application switching
+
+**AOID-Based URL System:**
+- **Item URLs**: `/items/{aoid}` where `aoid` is the Anarchy Online Item ID
+- **User-Friendly**: URLs use game-recognizable item identifiers instead of database IDs
+- **Shareable**: Direct links work with AOIDs that players recognize from the game
+- **API Consistency**: Backend `/items/{aoid}` endpoint uses same identifier as URLs
+
+**Route Examples:**
+```
+/items/72226         // Anarchy Online Item ID (AOID)
+/nanos               // Nano programs list
+/fite                // Weapon comparison tool
+/plants              // Implant planning
+/pocket              // Pocket boss tracker
+```
+
+**Implementation Details:**
+- **Frontend Store Caching**: Items cached by AOID for efficient lookup
+- **Backend Database Query**: `Item.aoid` field used for item retrieval
+- **URL Generation**: Item links automatically use `item.aoid` for navigation
+- **Share Functionality**: Generated URLs use AOID for game-relevant sharing
 
 ### Collection Tracking (TinkerPocket Integration)
 
@@ -437,4 +464,4 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 
 ---
 
-*Last Updated: This document reflects the current state after successful implementation of Tasks 1-11, including the comprehensive interpolation system.*
+*Last Updated: This document reflects the current state after successful implementation of Tasks 1-11, including the comprehensive interpolation system, special attack calculations, and AOID-based URL routing system.*

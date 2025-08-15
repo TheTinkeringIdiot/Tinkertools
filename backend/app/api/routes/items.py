@@ -535,10 +535,10 @@ def get_items_with_stats(
     )
 
 
-@router.get("/{item_id}", response_model=ItemDetail)
+@router.get("/{aoid}", response_model=ItemDetail)
 @cached_response("item_detail")
 @performance_monitor
-def get_item(item_id: int, db: Session = Depends(get_db)):
+def get_item(aoid: int, db: Session = Depends(get_db)):
     """
     Get detailed information about a specific item including stats, spells, and attack/defense data.
     """
@@ -546,7 +546,7 @@ def get_item(item_id: int, db: Session = Depends(get_db)):
     item = db.query(Item).options(
         joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
         joinedload(Item.item_spell_data)
-    ).filter(Item.id == item_id).first()
+    ).filter(Item.aoid == aoid).first()
     
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")

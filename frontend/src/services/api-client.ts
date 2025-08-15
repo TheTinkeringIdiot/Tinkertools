@@ -350,8 +350,8 @@ class TinkerToolsApiClient {
     }
   }
   
-  async getItem(id: number): Promise<ApiResponse<Item>> {
-    return this.get<Item>(`/items/${id}`)
+  async getItem(aoid: number): Promise<ApiResponse<Item>> {
+    return this.get<Item>(`/items/${aoid}`)
   }
   
   async getItems(ids: number[]): Promise<ApiResponse<Item[]>> {
