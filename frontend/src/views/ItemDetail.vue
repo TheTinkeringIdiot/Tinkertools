@@ -716,7 +716,7 @@ const profileStore = useProfileStore()
 
 // Props
 const props = defineProps<{
-  id?: string
+  aoid?: string
 }>()
 
 // State
@@ -787,14 +787,14 @@ const displayItemFlags = computed(() => {
 
 // Methods
 async function loadItem() {
-  const itemId = props.id || route.params.id as string
-  if (!itemId) return
+  const itemAoid = props.aoid || route.params.aoid as string
+  if (!itemAoid) return
   
   loading.value = true
   error.value = null
   
   try {
-    const loadedItem = await itemsStore.getItem(parseInt(itemId))
+    const loadedItem = await itemsStore.getItem(parseInt(itemAoid))
     if (loadedItem) {
       item.value = loadedItem
     } else {
@@ -845,7 +845,7 @@ function addToComparison() {
 function shareItem() {
   if (!item.value) return
   
-  const url = `${window.location.origin}/items/${item.value.id}`
+  const url = `${window.location.origin}/items/${item.value.aoid}`
   
   if (navigator.share) {
     navigator.share({
@@ -929,7 +929,7 @@ onMounted(() => {
 })
 
 // Watch for route changes
-watch(() => route.params.id, () => {
+watch(() => route.params.aoid, () => {
   if (route.name === 'ItemDetail') {
     loadItem()
   }

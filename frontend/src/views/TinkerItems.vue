@@ -388,7 +388,7 @@ function showFavorites() {
 }
 
 function onItemClick(item: Item) {
-  router.push({ name: 'ItemDetail', params: { id: item.id.toString() } })
+  router.push({ name: 'ItemDetail', params: { aoid: item.aoid!.toString() } })
 }
 
 function onItemFavorite(item: Item) {
