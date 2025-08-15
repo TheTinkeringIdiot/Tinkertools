@@ -67,7 +67,6 @@ Shows all item data with profile compatibility and comparison options
       <div class="flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700">
         <!-- Item Flags (left side) -->
         <div class="flex items-center gap-2 flex-wrap">
-          <span class="text-sm font-medium text-surface-700 dark:text-surface-300 mr-2">Item Properties:</span>
           <Tag
             v-for="flag in displayItemFlags"
             :key="flag.name"
@@ -409,7 +408,6 @@ Shows all item data with profile compatibility and comparison options
       <div class="flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700">
         <!-- Item Flags (left side) -->
         <div class="flex items-center gap-2 flex-wrap">
-          <span class="text-sm font-medium text-surface-700 dark:text-surface-300 mr-2">Item Properties:</span>
           <Tag
             v-for="flag in displayItemFlags"
             :key="flag.name"
@@ -702,7 +700,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useItemsStore } from '@/stores/items'
 import { useProfileStore } from '@/stores/profile'
-import { getItemIconUrl, isWeapon, getDisplayItemFlags } from '@/services/game-utils'
+import { getItemIconUrl, isWeapon, getDisplayItemFlags, getDisplayCanFlags } from '@/services/game-utils'
 import type { Item, TinkerProfile, ItemRequirement } from '@/types/api'
 
 // Import new components
@@ -778,7 +776,13 @@ const displayedStats = computed(() => {
 
 const displayItemFlags = computed(() => {
   if (!item.value?.stats) return []
-  return getDisplayItemFlags(item.value.stats)
+  
+  // Combine CAN flags and item flags
+  const canFlags = getDisplayCanFlags(item.value.stats)
+  const itemFlags = getDisplayItemFlags(item.value.stats)
+  
+  // CAN flags first, then item flags
+  return [...canFlags, ...itemFlags]
 })
 
 // Methods
