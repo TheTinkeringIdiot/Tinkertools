@@ -969,6 +969,15 @@ export function getItemSlotInfo(item: any): {
     };
   }
   
+  // Check weapon slots first for weapon item classes
+  if (isWeapon(itemClass) && weaponSlots.length > 0) {
+    return {
+      type: 'weapon',
+      slots: weaponSlots,
+      iconUrl
+    };
+  }
+  
   // Check armor slots (can include weapons with armor slot values like gloves)
   if (armorSlots.length > 0) {
     return {
@@ -978,7 +987,7 @@ export function getItemSlotInfo(item: any): {
     };
   }
   
-  // Check weapon slots
+  // Check weapon slots for non-weapon classes that might still be wieldable
   if (weaponSlots.length > 0) {
     return {
       type: 'weapon',
