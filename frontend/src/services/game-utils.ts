@@ -709,7 +709,9 @@ export const WEAPON_STATS = {
   MULTI_RANGED: 134,
   MULTI_MELEE: 101,
   RANGED_ENERGY: 133,
-  RANGED_INIT: 119
+  RANGED_INIT: 119,
+  FULL_AUTO: 167,
+  FULL_AUTO_RECHARGE: 375
 } as const;
 
 /**
@@ -751,6 +753,8 @@ export function getWeaponStats(stats: Array<{stat: number, value: number}>): {
   multiMelee?: number;
   rangedEnergy?: number;
   rangedInit?: number;
+  fullAuto?: number;
+  fullAutoRecharge?: number;
 } {
   const weaponStats: Record<string, number> = {};
   
@@ -815,6 +819,12 @@ export function getWeaponStats(stats: Array<{stat: number, value: number}>): {
         break;
       case WEAPON_STATS.RANGED_INIT:
         weaponStats.rangedInit = stat.value;
+        break;
+      case WEAPON_STATS.FULL_AUTO:
+        weaponStats.fullAuto = stat.value;
+        break;
+      case WEAPON_STATS.FULL_AUTO_RECHARGE:
+        weaponStats.fullAutoRecharge = stat.value;
         break;
     }
   });
@@ -931,6 +941,86 @@ export function calculateFastAttack(attackTime: number): SpecialAttackResult {
   const cap = Math.floor(5 + (attackTime / 100));
   const skill = Math.round(((attackTime / 100) * 16 - 5 - 1) * 100) + 1;
   return { skill, cap };
+}
+
+/**
+ * Special attack information with calculated requirements
+ */
+export interface WeaponSpecialAttack {
+  name: string;
+  skill: number;
+  cap: number;
+}
+
+/**
+ * Get all special attacks available on a weapon based on CAN flags and stats
+ * @param stats Array of stat objects from item
+ * @returns Array of special attacks with calculated skill and cap values
+ */
+export function getWeaponSpecialAttacks(stats: Array<{stat: number, value: number}>): WeaponSpecialAttack[] {
+  const specialAttacks: WeaponSpecialAttack[] = [];
+  const canFlags = getItemCanFlags(stats);
+  const weaponStats = getWeaponStats(stats);
+  
+  // Get required timing stats
+  const attackDelay = weaponStats.attackDelay;
+  const rechargeDelay = weaponStats.rechargeDelay;
+  
+  if (!attackDelay || !rechargeDelay) {
+    return specialAttacks; // Can't calculate without timing stats
+  }
+  
+  // Check each special attack type
+  if (canFlags.includes('FlingShot')) {
+    const result = calculateFling(attackDelay);
+    specialAttacks.push({
+      name: 'Fling Shot',
+      skill: result.skill,
+      cap: result.cap
+    });
+  }
+  
+  if (canFlags.includes('Burst')) {
+    // Use BurstRecharge stat if available, otherwise default to 1000
+    const burstCycle = weaponStats.burstRecharge || 1000;
+    const result = calculateBurst(attackDelay, rechargeDelay, burstCycle);
+    specialAttacks.push({
+      name: 'Burst',
+      skill: result.skill,
+      cap: result.cap
+    });
+  }
+  
+  if (canFlags.includes('FullAuto')) {
+    // Use FullAuto stat, then FullAutoRecharge stat, then default to 0
+    const faCycle = weaponStats.fullAuto || weaponStats.fullAutoRecharge || 0;
+    const result = calculateFullAuto(attackDelay, rechargeDelay, faCycle);
+    specialAttacks.push({
+      name: 'Full Auto',
+      skill: result.skill,
+      cap: result.cap
+    });
+  }
+  
+  if (canFlags.includes('AimedShot')) {
+    const result = calculateAimedShot(attackDelay, rechargeDelay);
+    specialAttacks.push({
+      name: 'Aimed Shot',
+      skill: result.skill,
+      cap: result.cap
+    });
+  }
+  
+  if (canFlags.includes('FastAttack')) {
+    const result = calculateFastAttack(attackDelay);
+    specialAttacks.push({
+      name: 'Fast Attack',
+      skill: result.skill,
+      cap: result.cap
+    });
+  }
+  
+  return specialAttacks;
 }
 
 /**
@@ -1285,6 +1375,7 @@ export const gameUtils = {
   calculateFullAuto,
   calculateAimedShot,
   calculateFastAttack,
+  getWeaponSpecialAttacks,
 
   // Bitflag functions
   parseCanFlags,

@@ -141,6 +141,25 @@ Shows detailed weapon information including damage, timing, range, and special s
           </div>
         </div>
 
+        <!-- Special Attacks -->
+        <div v-if="specialAttacks.length > 0">
+          <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">Special Attacks</h4>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div
+              v-for="attack in specialAttacks"
+              :key="attack.name"
+              class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded"
+            >
+              <span class="text-sm text-surface-600 dark:text-surface-400">
+                {{ attack.name }}
+              </span>
+              <span class="font-mono font-medium text-purple-600 dark:text-purple-400">
+                {{ attack.skill }} / {{ attack.cap }}s
+              </span>
+            </div>
+          </div>
+        </div>
+
         <!-- Skill Requirements (Weapon-specific) -->
         <div v-if="weaponSkillRequirements.length > 0">
           <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">Skill Requirements</h4>
@@ -196,7 +215,8 @@ import {
   getWeaponSpecialSkills,
   formatWeaponRange,
   getStatName,
-  getAmmoTypeName
+  getAmmoTypeName,
+  getWeaponSpecialAttacks
 } from '@/services/game-utils'
 
 const props = defineProps<{
@@ -239,6 +259,11 @@ const damageTypeName = computed(() => {
 const specialSkills = computed(() => {
   if (!props.item.stats) return []
   return getWeaponSpecialSkills(props.item.stats)
+})
+
+const specialAttacks = computed(() => {
+  if (!props.item.stats) return []
+  return getWeaponSpecialAttacks(props.item.stats)
 })
 
 const weaponSkillRequirements = computed(() => {
