@@ -307,12 +307,15 @@ class TinkerToolsApiClient {
         const backendResponse = response.data
         
         // Transform backend response format to frontend expected format
+        const page = backendResponse.page || 1
+        const pageSize = backendResponse.page_size || 50
         return {
           success: true,
           data: backendResponse.items || [],
           pagination: {
-            page: backendResponse.page || 1,
-            limit: backendResponse.page_size || 50,
+            page: page,
+            limit: pageSize,
+            offset: (page - 1) * pageSize,
             total: backendResponse.total || 0,
             hasNext: backendResponse.has_next || false,
             hasPrev: backendResponse.has_prev || false
@@ -333,12 +336,15 @@ class TinkerToolsApiClient {
         const backendResponse = response.data
         
         // Transform backend response format to frontend expected format
+        const page = backendResponse.page || 1
+        const pageSize = backendResponse.page_size || 50
         return {
           success: true,
           data: backendResponse.items || [],
           pagination: {
-            page: backendResponse.page || 1,
-            limit: backendResponse.page_size || 50,
+            page: page,
+            limit: pageSize,
+            offset: (page - 1) * pageSize,
             total: backendResponse.total || 0,
             hasNext: backendResponse.has_next || false,
             hasPrev: backendResponse.has_prev || false

@@ -101,21 +101,6 @@ Shows items in grid or list view with pagination and compatibility indicators
                     </div>
                     
                     <!-- Requirements (if showing compatibility) -->
-                    <div v-if="showCompatibility && item.requirements?.length" class="flex flex-wrap gap-1">
-                      <Tag
-                        v-for="req in item.requirements.slice(0, 3)"
-                        :key="req.stat"
-                        :value="`${getStatName(req.stat)}: ${req.value}`"
-                        :severity="canMeetRequirement(req) ? 'success' : 'danger'"
-                        size="small"
-                      />
-                      <Tag
-                        v-if="item.requirements.length > 3"
-                        :value="`+${item.requirements.length - 3} more`"
-                        severity="secondary"
-                        size="small"
-                      />
-                    </div>
                   </div>
                   
                   <!-- Actions -->
@@ -230,8 +215,8 @@ Shows items in grid or list view with pagination and compatibility indicators
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import type { Item, TinkerProfile, PaginationInfo, ItemRequirement } from '@/types/api'
+import { ref, computed, watch } from 'vue'
+import type { Item, TinkerProfile, PaginationInfo } from '@/types/api'
 import { getItemIconUrl as getItemIconUrlUtil } from '@/services/game-utils'
 
 // Components (to be created)
@@ -263,6 +248,13 @@ const showQuickViewDialog = ref(false)
 const selectedItem = ref<Item | null>(null)
 const itemMenu = ref()
 const iconLoadErrors = ref<Set<number>>(new Set())
+
+// Watch for pagination changes to update currentOffset
+watch(() => props.pagination?.offset, (newOffset) => {
+  if (newOffset !== undefined) {
+    currentOffset.value = newOffset
+  }
+}, { immediate: true })
 
 // Context menu items
 const itemMenuItems = ref([
@@ -355,21 +347,6 @@ function getStatName(statId: number): string {
   return statNameMap.value[statId] || `Stat ${statId}`
 }
 
-function getCompatibilityStatus(item: Item): 'compatible' | 'incompatible' | 'unknown' {
-  if (!props.showCompatibility || !props.compatibilityProfile || !item.requirements) {
-    return 'unknown'
-  }
-  
-  const canMeetAll = item.requirements.every(req => canMeetRequirement(req))
-  return canMeetAll ? 'compatible' : 'incompatible'
-}
-
-function canMeetRequirement(requirement: ItemRequirement): boolean {
-  if (!props.compatibilityProfile) return false
-  
-  const characterStat = props.compatibilityProfile.stats?.[requirement.stat] || 0
-  return characterStat >= requirement.value
-}
 
 function showQuickView(item: Item) {
   selectedItem.value = item
