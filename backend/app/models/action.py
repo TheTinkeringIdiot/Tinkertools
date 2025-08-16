@@ -2,7 +2,7 @@
 Action model and junction table for ordered criteria.
 """
 
-from sqlalchemy import Column, Integer, String, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 
@@ -35,17 +35,14 @@ class Action(Base):
 class ActionCriteria(Base):
     __tablename__ = 'action_criteria'
     
-    action_id = Column(Integer, ForeignKey('actions.id', ondelete='CASCADE'), primary_key=True)
-    criterion_id = Column(Integer, ForeignKey('criteria.id', ondelete='CASCADE'), primary_key=True)
+    id = Column(Integer, primary_key=True)
+    action_id = Column(Integer, ForeignKey('actions.id', ondelete='CASCADE'))
+    criterion_id = Column(Integer, ForeignKey('criteria.id', ondelete='CASCADE'))
     order_index = Column(Integer, nullable=False)
     
     # Relationships
     action = relationship('Action', back_populates='action_criteria')
     criterion = relationship('Criterion', back_populates='action_criteria')
-    
-    __table_args__ = (
-        UniqueConstraint('action_id', 'criterion_id', name='unique_action_criterion'),
-    )
     
     def __repr__(self):
         return f"<ActionCriteria(action_id={self.action_id}, criterion_id={self.criterion_id}, order={self.order_index})>"
