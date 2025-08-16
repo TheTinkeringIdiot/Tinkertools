@@ -112,7 +112,6 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
                 v-if="hasActiveFilters"
                 :value="activeFilterCount"
                 severity="info"
-                size="small"
               />
             </div>
             
@@ -259,7 +258,7 @@ const {
 
 // Computed Properties
 const compatibilityProfile = computed(() => 
-  showCompatibility.value && profilesStore.hasActiveProfile ? profilesStore.activeProfile : null
+  showCompatibility.value && profilesStore.hasActiveProfile ? profilesStore.activeProfile as any : null
 )
 
 const favoriteCount = computed(() => 
@@ -309,8 +308,10 @@ async function performSearch(options?: { query: string; exactMatch: boolean }) {
       search: searchQuery.value,
       exact_match: searchOptions.value.exactMatch,
       ...activeFilters.value,
-      sort: sortOption.value.includes('_') ? sortOption.value.split('_')[0] : sortOption.value,
-      sort_order: sortOption.value.includes('desc') ? 'desc' : 'asc'
+      sort: sortOption.value.includes('_') ? sortOption.value.split('_')[0] as 'name' | 'ql' | 'item_class' | 'aoid' : sortOption.value as 'name' | 'ql' | 'item_class' | 'aoid',
+      sort_order: sortOption.value.includes('desc') ? 'desc' : 'asc',
+      limit: pagination.value?.limit || 24,
+      page: pagination.value?.page || 1
     }
     
     const results = await searchItems(query)
@@ -363,17 +364,17 @@ function refreshResults() {
 async function quickSearch(type: string) {
   switch (type) {
     case 'high-ql':
-      activeFilters.value = { min_ql: 200 }
+      activeFilters.value = { minQL: 200 }
       sortOption.value = 'ql_desc'
       break
     case 'weapons':
-      activeFilters.value = { item_class: [1, 2, 3, 4, 5] } // Weapon classes
+      activeFilters.value = { itemClasses: [1, 2, 3, 4, 5] } // Weapon classes
       break
     case 'implants':
-      activeFilters.value = { item_class: [15] } // Implant class
+      activeFilters.value = { itemClasses: [15] } // Implant class
       break
     case 'nanos':
-      activeFilters.value = { is_nano: true }
+      activeFilters.value = { isNano: true }
       break
   }
   
@@ -411,9 +412,26 @@ function clearComparison() {
 }
 
 function onPageChange(page: number) {
-  // Handle pagination
+  // Handle pagination - update the search query with the new page number
   if (searchPerformed.value) {
-    performSearch()
+    const query: ItemSearchQuery = {
+      search: searchQuery.value,
+      exact_match: searchOptions.value.exactMatch,
+      ...activeFilters.value,
+      sort: sortOption.value.includes('_') ? sortOption.value.split('_')[0] as 'name' | 'ql' | 'item_class' | 'aoid' : sortOption.value as 'name' | 'ql' | 'item_class' | 'aoid',
+      sort_order: sortOption.value.includes('desc') ? 'desc' : 'asc',
+      page: page,
+      limit: pagination.value?.limit || 24
+    }
+    
+    searchLoading.value = true
+    searchItems(query).then(results => {
+      searchResults.value = results
+    }).catch(error => {
+      console.error('Pagination search failed:', error)
+    }).finally(() => {
+      searchLoading.value = false
+    })
   }
 }
 
@@ -429,10 +447,10 @@ onMounted(() => {
     if (itemsStore.currentSearchQuery) {
       const query = itemsStore.currentSearchQuery
       activeFilters.value = {
-        ...(query.item_class && { item_class: query.item_class }),
-        ...(query.min_ql && { min_ql: query.min_ql }),
-        ...(query.max_ql && { max_ql: query.max_ql }),
-        ...(query.is_nano !== undefined && { is_nano: query.is_nano })
+        ...(query.item_class && { itemClasses: query.item_class }),
+        ...(query.min_ql && { minQL: query.min_ql }),
+        ...(query.max_ql && { maxQL: query.max_ql }),
+        ...(query.is_nano !== undefined && { isNano: query.is_nano })
       }
     }
   }
