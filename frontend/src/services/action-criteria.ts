@@ -610,8 +610,90 @@ function buildTreeFromRPN(
   }
   
   const root = stack[0]
-  finalizeTreeStructure(root, 0)
-  return root
+  
+  // Apply logical consolidation to flatten unnecessary nested AND operations
+  const consolidatedRoot = consolidateNestedLogic(root)
+  
+  finalizeTreeStructure(consolidatedRoot, 0)
+  return consolidatedRoot
+}
+
+/**
+ * Consolidate nested logical operations to reduce unnecessary nesting
+ * Using logical properties: (A ∧ B) ∧ C = A ∧ B ∧ C
+ */
+function consolidateNestedLogic(node: CriteriaTreeNode): CriteriaTreeNode {
+  if (!node.children || node.children.length === 0) {
+    return node
+  }
+  
+  // Recursively consolidate children first
+  const consolidatedChildren = node.children.map(consolidateNestedLogic)
+  
+  // Only consolidate AND operations
+  if (node.type === 'operator' && node.operator === 'AND') {
+    const flattenedChildren: CriteriaTreeNode[] = []
+    
+    for (const child of consolidatedChildren) {
+      // If child is also an AND operation, flatten its children into this level
+      if (child.type === 'operator' && child.operator === 'AND' && child.children) {
+        flattenedChildren.push(...child.children)
+      } else {
+        flattenedChildren.push(child)
+      }
+    }
+    
+    // Recalculate stats after flattening
+    const { metCount, totalCount } = calculateNodeStats(flattenedChildren)
+    
+    return {
+      ...node,
+      children: flattenedChildren,
+      metCount,
+      totalCount,
+      status: metCount === totalCount ? 'met' : (metCount > 0 ? 'partial' : 'unmet')
+    }
+  }
+  
+  // For OR and NOT operations, just update children but don't flatten
+  if (node.type === 'operator' && (node.operator === 'OR' || node.operator === 'NOT')) {
+    const { metCount, totalCount } = calculateNodeStats(consolidatedChildren)
+    
+    let status: 'met' | 'unmet' | 'partial' | 'unknown'
+    if (node.operator === 'OR') {
+      status = metCount > 0 ? 'met' : 'unmet'
+    } else { // NOT
+      const childStatus = consolidatedChildren[0]?.status
+      status = childStatus === 'unmet' ? 'met' : (childStatus === 'met' ? 'unmet' : 'unknown')
+    }
+    
+    return {
+      ...node,
+      children: consolidatedChildren,
+      metCount,
+      totalCount,
+      status
+    }
+  }
+  
+  // For group nodes, update children
+  if (node.type === 'group') {
+    const { metCount, totalCount } = calculateNodeStats(consolidatedChildren)
+    
+    return {
+      ...node,
+      children: consolidatedChildren,
+      metCount,
+      totalCount,
+      status: metCount === totalCount ? 'met' : (metCount > 0 ? 'partial' : 'unmet')
+    }
+  }
+  
+  // Return node unchanged for other types
+  return {
+    ...node,
+    children: consolidatedChildren
+  }
 }
 
 /**
@@ -805,3 +887,8 @@ export const actionCriteriaService = {
   DISPLAY_OPERATORS,
   STATE_OPERATORS
 }
+
+/**
+ * Export consolidation function for external use if needed
+ */
+export { consolidateNestedLogic }
