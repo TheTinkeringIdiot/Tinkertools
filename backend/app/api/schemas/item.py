@@ -5,7 +5,15 @@ Pydantic schemas for Item models.
 from typing import Optional, List
 from pydantic import BaseModel, Field
 from .stat_value import StatValueResponse
-from .spell import SpellWithCriteria
+from .spell import SpellWithCriteria, SpellDataResponse
+from .action import ActionResponse
+
+
+class ItemRequirement(BaseModel):
+    """Schema for item requirements."""
+    stat: int = Field(description="Stat ID")
+    value: int = Field(description="Required value")
+    operator: str = Field(description="Comparison operator")
 
 
 class ItemBase(BaseModel):
@@ -35,9 +43,10 @@ class ItemResponse(ItemBase):
 class ItemDetail(ItemResponse):
     """Detailed Item response with related data."""
     stats: List[StatValueResponse] = Field(default_factory=list, description="Item stats")
-    spells: List[SpellWithCriteria] = Field(default_factory=list, description="Item spells")
+    spell_data: List[SpellDataResponse] = Field(default_factory=list, description="Item spell data")
     attack_stats: List[StatValueResponse] = Field(default_factory=list, description="Attack stats")
     defense_stats: List[StatValueResponse] = Field(default_factory=list, description="Defense stats")
+    actions: List[ActionResponse] = Field(default_factory=list, description="Item actions")
     
     class Config:
         from_attributes = True
