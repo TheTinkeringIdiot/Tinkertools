@@ -11,13 +11,22 @@ import time
 import logging
 
 from app.core.database import get_db
-from app.models import Item, ItemStats, StatValue, AttackDefense, AttackDefenseAttack, AttackDefenseDefense, ItemSpellData, SpellData
+from app.models import (
+    Item, ItemStats, StatValue, AttackDefense, AttackDefenseAttack, AttackDefenseDefense, 
+    ItemSpellData, SpellData, Action, ActionCriteria, Criterion, Spell, SpellCriterion,
+    SpellDataSpells
+)
 from app.models.interpolated_item import InterpolatedItem, InterpolationRequest, InterpolationResponse
 from app.services.interpolation import InterpolationService
 from app.api.schemas import (
     ItemResponse, 
     ItemDetail, 
     ItemSearch,
+    SpellDataResponse,
+    SpellWithCriteria,
+    ActionResponse,
+    CriterionResponse,
+    StatValueResponse,
     PaginatedResponse
 )
 from app.core.decorators import cached_response, performance_monitor
@@ -26,6 +35,116 @@ router = APIRouter(prefix="/items", tags=["items"])
 
 # Set up logging for performance monitoring
 logger = logging.getLogger(__name__)
+
+
+def build_item_detail(item: Item, db: Session) -> ItemDetail:
+    """
+    Build a complete ItemDetail response with all related data.
+    """
+    # Get basic stats
+    stats = [stat.stat_value for stat in item.item_stats] if item.item_stats else []
+    
+    # Get spell data with nested spells and criteria
+    spell_data_list = []
+    for isd in item.item_spell_data:
+        spell_data = isd.spell_data
+        
+        # Get spells for this spell_data
+        spells_with_criteria = []
+        for sds in spell_data.spell_data_spells:
+            spell = sds.spell
+            
+            # Get criteria for this spell
+            criteria = [
+                CriterionResponse(
+                    id=sc.criterion.id,
+                    value1=sc.criterion.value1,
+                    value2=sc.criterion.value2,
+                    operator=sc.criterion.operator
+                )
+                for sc in spell.spell_criteria
+            ]
+            
+            spells_with_criteria.append(SpellWithCriteria(
+                id=spell.id,
+                target=spell.target,
+                tick_count=spell.tick_count,
+                tick_interval=spell.tick_interval,
+                spell_id=spell.spell_id,
+                spell_format=spell.spell_format,
+                spell_params=spell.spell_params or {},
+                criteria=criteria
+            ))
+        
+        spell_data_list.append(SpellDataResponse(
+            id=spell_data.id,
+            event=spell_data.event,
+            spells=spells_with_criteria
+        ))
+    
+    # Get attack/defense stats
+    attack_stats = []
+    defense_stats = []
+    if hasattr(item, 'atkdef_id') and item.atkdef_id:
+        # Get attack stats
+        attack_stats = db.query(StatValue).join(
+            AttackDefenseAttack, StatValue.id == AttackDefenseAttack.stat_value_id
+        ).filter(AttackDefenseAttack.attack_defense_id == item.atkdef_id).all()
+        
+        # Get defense stats  
+        defense_stats = db.query(StatValue).join(
+            AttackDefenseDefense, StatValue.id == AttackDefenseDefense.stat_value_id
+        ).filter(AttackDefenseDefense.attack_defense_id == item.atkdef_id).all()
+    
+    # Get actions with criteria
+    actions = []
+    for action in item.actions:
+        criteria = [
+            CriterionResponse(
+                id=ac.criterion.id,
+                value1=ac.criterion.value1,
+                value2=ac.criterion.value2,
+                operator=ac.criterion.operator
+            )
+            for ac in action.action_criteria
+        ]
+        
+        actions.append(ActionResponse(
+            id=action.id,
+            action=action.action,
+            item_id=action.item_id,
+            criteria=criteria
+        ))
+    
+    
+    # Convert stats to StatValueResponse objects
+    stats_response = [
+        StatValueResponse(id=stat.id, stat=stat.stat, value=stat.value)
+        for stat in stats
+    ]
+    attack_stats_response = [
+        StatValueResponse(id=stat.id, stat=stat.stat, value=stat.value)
+        for stat in attack_stats
+    ]
+    defense_stats_response = [
+        StatValueResponse(id=stat.id, stat=stat.stat, value=stat.value)
+        for stat in defense_stats
+    ]
+    
+    return ItemDetail(
+        id=item.id,
+        aoid=item.aoid,
+        name=item.name,
+        ql=item.ql,
+        item_class=item.item_class,
+        description=item.description,
+        is_nano=item.is_nano,
+        stats=stats_response,
+        spell_data=spell_data_list,
+        attack_stats=attack_stats_response,
+        defense_stats=defense_stats_response,
+        actions=actions
+    )
 
 
 @router.get("", response_model=PaginatedResponse[ItemDetail])
@@ -43,7 +162,8 @@ def get_items(
     """
     query = db.query(Item).options(
         joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
-        joinedload(Item.item_spell_data)
+        joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data).joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell).joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
+        joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion)
     )
     
     # Apply filters
@@ -67,37 +187,7 @@ def get_items(
     items = query.offset(offset).limit(page_size).all()
     
     # Build detailed response items
-    detailed_items = []
-    for item in items:
-        item_detail = ItemDetail(
-            id=item.id,
-            aoid=item.aoid,
-            name=item.name,
-            ql=item.ql,
-            item_class=item.item_class,
-            description=item.description,
-            is_nano=item.is_nano,
-            stats=[stat.stat_value for stat in item.item_stats] if item.item_stats else [],
-            attack_stats=[],
-            defense_stats=[],
-            spells=[isd.spell_data for isd in item.item_spell_data] if item.item_spell_data else []
-        )
-        
-        # Add attack/defense stats if available
-        if hasattr(item, 'atkdef_id') and item.atkdef_id:
-            # Get attack stats
-            attack_stats = db.query(StatValue).join(
-                AttackDefenseAttack, StatValue.id == AttackDefenseAttack.stat_value_id
-            ).filter(AttackDefenseAttack.attack_defense_id == item.atkdef_id).all()
-            item_detail.attack_stats = attack_stats
-            
-            # Get defense stats  
-            defense_stats = db.query(StatValue).join(
-                AttackDefenseDefense, StatValue.id == AttackDefenseDefense.stat_value_id
-            ).filter(AttackDefenseDefense.attack_defense_id == item.atkdef_id).all()
-            item_detail.defense_stats = defense_stats
-        
-        detailed_items.append(item_detail)
+    detailed_items = [build_item_detail(item, db) for item in items]
     
     return PaginatedResponse[ItemDetail](
         items=detailed_items,
@@ -545,42 +635,14 @@ def get_item(aoid: int, db: Session = Depends(get_db)):
     # Load item with all related data
     item = db.query(Item).options(
         joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
-        joinedload(Item.item_spell_data)
+        joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data).joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell).joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
+        joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion)
     ).filter(Item.aoid == aoid).first()
     
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
     
-    # Build detailed response
-    item_detail = ItemDetail(
-        id=item.id,
-        aoid=item.aoid,
-        name=item.name,
-        ql=item.ql,
-        item_class=item.item_class,
-        description=item.description,
-        is_nano=item.is_nano,
-        stats=[stat.stat_value for stat in item.item_stats] if item.item_stats else [],
-        attack_stats=[],
-        defense_stats=[],
-        spells=[]
-    )
-    
-    # Add attack/defense stats if available
-    if hasattr(item, 'attack_defense_id') and item.attack_defense_id:
-        # Get attack stats
-        attack_stats = db.query(StatValue).join(
-            AttackDefenseAttack, StatValue.id == AttackDefenseAttack.stat_value_id
-        ).filter(AttackDefenseAttack.attack_defense_id == item.attack_defense_id).all()
-        item_detail.attack_stats = attack_stats
-        
-        # Get defense stats  
-        defense_stats = db.query(StatValue).join(
-            AttackDefenseDefense, StatValue.id == AttackDefenseDefense.stat_value_id
-        ).filter(AttackDefenseDefense.attack_defense_id == item.attack_defense_id).all()
-        item_detail.defense_stats = defense_stats
-    
-    return item_detail
+    return build_item_detail(item, db)
 
 
 @router.get("/{aoid}/interpolate", response_model=InterpolationResponse)
