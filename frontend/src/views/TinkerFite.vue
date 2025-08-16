@@ -308,5 +308,5 @@ watch(searchQuery, (newQuery) => {
   if (newQuery === '') {
     loadWeapons()
   }
-}, { debounce: 500 })
+})
 </script>

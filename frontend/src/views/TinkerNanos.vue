@@ -347,8 +347,8 @@ const checkSkillCompatibility = (nano: NanoProgram): boolean => {
   
   return nano.castingRequirements?.every(req => {
     if (req.type === 'skill') {
-      const profileSkill = activeProfile.value.skills[req.requirement as string];
-      return profileSkill >= req.value;
+      const profileSkill = activeProfile.value?.skills[req.requirement as string];
+      return profileSkill ? profileSkill >= req.value : false;
     }
     return true;
   }) ?? true;
@@ -361,13 +361,13 @@ const checkCastability = (nano: NanoProgram): boolean => {
   return nano.castingRequirements?.every(req => {
     switch (req.type) {
       case 'skill':
-        const profileSkill = activeProfile.value.skills[req.requirement as string];
-        return profileSkill >= req.value;
+        const profileSkill = activeProfile.value?.skills[req.requirement as string];
+        return profileSkill ? profileSkill >= req.value : false;
       case 'stat':
-        const profileStat = activeProfile.value.stats[req.requirement as string];
-        return profileStat >= req.value;
+        const profileStat = activeProfile.value?.stats[req.requirement as string];
+        return profileStat ? profileStat >= req.value : false;
       case 'level':
-        return activeProfile.value.level >= req.value;
+        return activeProfile.value ? activeProfile.value.level >= req.value : false;
       default:
         return true;
     }
