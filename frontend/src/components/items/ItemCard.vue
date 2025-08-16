@@ -29,9 +29,9 @@ Shows item info with compatibility status and quick actions
         
         <!-- Overlay Badges -->
         <div class="absolute top-2 left-2 flex flex-col gap-1">
-          <Badge :value="`QL ${item.ql}`" severity="info" size="small" />
-          <Badge v-if="item.is_nano" value="Nano" severity="success" size="small" />
-          <Badge v-if="isRare" value="Rare" severity="warning" size="small" />
+          <Badge :value="`QL ${item.ql}`" severity="info" />
+          <Badge v-if="item.is_nano" value="Nano" severity="success" />
+          <Badge v-if="isRare" value="Rare" severity="warning" />
         </div>
         
         <!-- Compatibility Status -->
@@ -254,7 +254,7 @@ const itemProperties = computed(() => {
   }
   
   // Add more properties based on item data
-  if (props.item.attack_data) {
+  if (props.item.attack_stats) {
     props_list.push({ name: 'Weapon', severity: 'warning' })
   }
   
