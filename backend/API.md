@@ -69,24 +69,76 @@ Search items by name or description.
 - `page` (int): Page number
 - `page_size` (int): Items per page
 
-#### GET /api/v1/items/{item_id}
-Get detailed information about a specific item.
+#### GET /api/v1/items/{aoid}
+Get detailed information about a specific item by its Anarchy Online ID (AOID).
+
+**Path Parameters:**
+- `aoid` (int): Anarchy Online item ID
 
 **Response:**
 ```json
 {
   "id": 1,
   "aoid": 12345,
-  "name": "Item Name",
-  "ql": 200,
-  "item_class": "Weapon",
-  "slot": "Right Hand",
-  "stats": [...],
-  "spells": [...],
-  "attack_stats": [...],
-  "defense_stats": [...]
+  "name": "Enhanced Leather Vest",
+  "ql": 25,
+  "item_class": 4,
+  "description": "A sturdy leather vest...",
+  "is_nano": false,
+  "stats": [
+    {
+      "id": 101,
+      "stat": 16,
+      "value": 15
+    }
+  ],
+  "spell_data": [
+    {
+      "id": 201,
+      "event": 1,
+      "spells": [
+        {
+          "id": 301,
+          "target": 1,
+          "tick_count": null,
+          "tick_interval": null,
+          "spell_id": 12345,
+          "spell_format": "Increase {stat} by {value}",
+          "spell_params": {
+            "stat": 96,
+            "value": 10
+          },
+          "criteria": []
+        }
+      ]
+    }
+  ],
+  "attack_stats": [],
+  "defense_stats": [],
+  "actions": [
+    {
+      "id": 401,
+      "action": 1,
+      "item_id": 1,
+      "criteria": [
+        {
+          "id": 501,
+          "value1": 16,
+          "value2": 100,
+          "operator": 1
+        }
+      ]
+    }
+  ]
 }
 ```
+
+**Field Descriptions:**
+- `stats`: Basic item statistics
+- `spell_data`: Spell effects with nested spells and their criteria  
+- `attack_stats`: Attack-related statistics for weapons
+- `defense_stats`: Defense-related statistics for weapons
+- `actions`: Item actions with criteria (equipping, using, etc.)
 
 #### GET /api/v1/items/with-stats
 Get items that have specific stat requirements.
@@ -199,6 +251,26 @@ The API is optimized to meet the following performance requirements:
 Currently, no rate limiting is implemented as the API serves cached game reference data.
 
 ## Changelog
+
+### Version 1.2.0  
+- **API Cleanup**: Removed redundant alias fields to simplify API structure
+- **Fields Removed**:
+  - `attack_data` (use `attack_stats` instead)
+  - `defense_data` (use `defense_stats` instead)
+  - `action_data` (use `actions` instead)
+  - `requirements` (derive from action criteria on frontend if needed)
+- **Simplified Response**: Cleaner API responses with single source of truth for each data type
+- **Reduced Payload Size**: Smaller JSON responses due to eliminated redundancy
+
+### Version 1.1.0
+- **Enhanced Item Detail API**: Completely populated all missing fields in item detail endpoint
+- **New Fields Added**:
+  - `spell_data`: Complete spell effects with nested spells and criteria
+  - `attack_stats`/`defense_stats`: Attack and defense statistics
+  - `actions`: Item actions with full criteria information
+- **Data Structure Improvements**: Fixed spell_params to support both list and dictionary formats
+- **Backend Schema Updates**: Created SpellDataResponse and ActionResponse schemas
+- **Frontend Integration**: Updated TypeScript interfaces to match API responses
 
 ### Version 1.0.0
 - Initial release with basic CRUD endpoints
