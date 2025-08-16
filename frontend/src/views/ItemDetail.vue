@@ -195,6 +195,20 @@ Shows all item data with profile compatibility and comparison options
         :show-compatibility="showCompatibility"
       />
 
+      <!-- Actions and Usage -->
+      <Card v-if="item.actions?.length">
+        <template #header>
+          <h3 class="text-lg font-semibold">Actions & Requirements</h3>
+        </template>
+        <template #content>
+          <ActionRequirements 
+            :actions="item.actions"
+            :character-stats="characterStats"
+            :expanded="true"
+          />
+        </template>
+      </Card>
+
       <!-- Item Attributes -->
       <ItemAttributes 
         v-if="item"
@@ -298,19 +312,6 @@ Shows all item data with profile compatibility and comparison options
         </template>
       </Card>
 
-      <!-- Actions and Usage -->
-      <Card v-if="item.actions?.length">
-        <template #header>
-          <h3 class="text-lg font-semibold">Actions & Requirements</h3>
-        </template>
-        <template #content>
-          <ActionRequirements 
-            :actions="item.actions"
-            :character-stats="characterStats"
-            :expanded="true"
-          />
-        </template>
-      </Card>
     </div>
   </div>
 
@@ -510,6 +511,20 @@ Shows all item data with profile compatibility and comparison options
         :show-compatibility="showCompatibility"
       />
 
+      <!-- Actions and Usage -->
+      <Card v-if="item.actions?.length">
+        <template #header>
+          <h3 class="text-lg font-semibold">Actions & Requirements</h3>
+        </template>
+        <template #content>
+          <ActionRequirements 
+            :actions="item.actions"
+            :character-stats="characterStats"
+            :expanded="true"
+          />
+        </template>
+      </Card>
+
       <!-- Item Attributes -->
       <ItemAttributes 
         v-if="item"
@@ -614,19 +629,6 @@ Shows all item data with profile compatibility and comparison options
         </template>
       </Card>
 
-      <!-- Actions and Usage -->
-      <Card v-if="item.actions?.length">
-        <template #header>
-          <h3 class="text-lg font-semibold">Actions & Requirements</h3>
-        </template>
-        <template #content>
-          <ActionRequirements 
-            :actions="item.actions"
-            :character-stats="characterStats"
-            :expanded="true"
-          />
-        </template>
-      </Card>
     </div>
 
     <template #footer>
