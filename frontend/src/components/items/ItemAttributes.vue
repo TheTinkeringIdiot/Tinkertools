@@ -103,9 +103,9 @@ Shows tradeable status, drop restrictions, special flags, and other item propert
             </div>
             
             <!-- Actions Available -->
-            <div v-if="item.action_data?.length" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
+            <div v-if="item.actions?.length" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
               <span class="text-sm text-surface-600 dark:text-surface-400">Actions</span>
-              <Badge :value="item.action_data.length.toString()" severity="info" />
+              <Badge :value="item.actions.length.toString()" severity="info" />
             </div>
             
             <!-- Special Effects -->
@@ -228,7 +228,7 @@ const isMultiWieldable = computed(() => {
 const hasUsageInfo = computed(() => {
   return (
     equipmentSlots.value.length > 0 ||
-    props.item.action_data?.length ||
+    props.item.actions?.length ||
     props.item.spell_data?.length ||
     isMultiWieldable.value
   )

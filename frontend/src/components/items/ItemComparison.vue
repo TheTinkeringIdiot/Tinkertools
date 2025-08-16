@@ -418,15 +418,15 @@ const hasRequirementsComparison = computed(() =>
 )
 
 const hasCombatStats = computed(() => 
-  props.items.some(item => item.attack_data || item.defense_data)
+  props.items.some(item => item.attack_stats || item.defense_stats)
 )
 
 const hasAttackData = computed(() => 
-  props.items.some(item => item.attack_data)
+  props.items.some(item => item.attack_stats)
 )
 
 const hasDefenseData = computed(() => 
-  props.items.some(item => item.defense_data)
+  props.items.some(item => item.defense_stats)
 )
 
 const commonAttackStats = computed(() => {
@@ -434,7 +434,7 @@ const commonAttackStats = computed(() => {
   
   const allAttackStats = new Set<number>()
   props.items.forEach(item => {
-    item.attack_data?.forEach(attack => allAttackStats.add(attack.stat))
+    item.attack_stats?.forEach(attack => allAttackStats.add(attack.stat))
   })
   
   return Array.from(allAttackStats)
@@ -445,7 +445,7 @@ const commonDefenseStats = computed(() => {
   
   const allDefenseStats = new Set<number>()
   props.items.forEach(item => {
-    item.defense_data?.forEach(defense => allDefenseStats.add(defense.stat))
+    item.defense_stats?.forEach(defense => allDefenseStats.add(defense.stat))
   })
   
   return Array.from(allDefenseStats)
@@ -528,12 +528,12 @@ function getItemRequirement(item: Item, statId: number): number | null {
 }
 
 function getItemAttackStat(item: Item, statId: number): number | null {
-  const attack = item.attack_data?.find(a => a.stat === statId)
+  const attack = item.attack_stats?.find(a => a.stat === statId)
   return attack?.value || null
 }
 
 function getItemDefenseStat(item: Item, statId: number): number | null {
-  const defense = item.defense_data?.find(d => d.stat === statId)
+  const defense = item.defense_stats?.find(d => d.stat === statId)
   return defense?.value || null
 }
 
