@@ -1,198 +1,100 @@
 <!--
-WeaponStats - Dedicated weapon statistics display component
-Shows detailed weapon information including damage, timing, range, and special skills
+WeaponStats - Compact weapon statistics display component
+Shows essential weapon information in a dense, scannable table format
 -->
 <template>
   <Card v-if="isWeaponItem">
-    <template #header>
-      <div class="flex items-center gap-2">
-        <i class="pi pi-bolt text-orange-500"></i>
-        <h3 class="text-lg font-semibold">Weapon Statistics</h3>
-      </div>
-    </template>
-    
     <template #content>
-      <div class="space-y-6">
-        <!-- Damage Information -->
-        <div v-if="weaponStats.minDamage || weaponStats.maxDamage">
-          <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">Damage</h4>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <!-- Min/Max Damage -->
-            <div v-if="weaponStats.minDamage && weaponStats.maxDamage" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
-              <span class="text-sm text-surface-600 dark:text-surface-400">Damage Range</span>
-              <span class="font-mono font-medium text-red-600 dark:text-red-400">
-                {{ weaponStats.minDamage }} - {{ weaponStats.maxDamage }}{{ weaponStats.criticalBonus ? ` (${weaponStats.criticalBonus})` : '' }}
-              </span>
-            </div>
-            
-            <!-- Damage Type -->
-            <div v-if="weaponStats.damageType" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
-              <span class="text-sm text-surface-600 dark:text-surface-400">Damage Type</span>
-              <span class="font-mono font-medium text-red-600 dark:text-red-400">
-                {{ getStatName(weaponStats.damageType) }}
-              </span>
-            </div>
-            
-            <!-- Attack Range -->
-            <div v-if="weaponStats.attackRange" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
-              <span class="text-sm text-surface-600 dark:text-surface-400">Attack Range</span>
-              <span class="font-mono font-medium text-red-600 dark:text-red-400">
-                {{ weaponStats.attackRange }}m
-              </span>
-            </div>
-            
-            <!-- DPS -->
-            <div v-if="dps > 0" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
-              <span class="text-sm text-surface-600 dark:text-surface-400">DPS</span>
-              <span class="font-mono font-medium text-red-600 dark:text-red-400">
-                {{ dps.toFixed(1) }}
-              </span>
-            </div>
+      <div class="weapon-stats-compact weapon-stats-component">
+        <!-- Header with DPS Badge -->
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <i class="pi pi-bolt text-orange-500"></i>
+            <h3 class="text-base font-semibold">Weapon Statistics</h3>
+          </div>
+          <div v-if="dps > 0" class="dps-badge">
+            {{ dps.toFixed(1) }} DPS
           </div>
         </div>
-
-        <!-- Timing Information -->
-        <div v-if="weaponStats.attackSpeed || weaponStats.burstRecharge || (weaponStats.attackDelay && weaponStats.rechargeDelay) || weaponStats.initiativeType">
-          <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">Timing</h4>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <!-- Attack Speed -->
-            <div v-if="weaponStats.attackDelay && weaponStats.rechargeDelay" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
-              <span class="text-sm text-surface-600 dark:text-surface-400">Attack Speed</span>
-              <span class="font-mono font-medium text-blue-600 dark:text-blue-400">
-                {{ formatCentisecondsToSeconds(weaponStats.attackDelay) }}s/{{ formatCentisecondsToSeconds(weaponStats.rechargeDelay) }}s
-              </span>
-            </div>
-            
-            <!-- Initiative -->
-            <div v-if="weaponStats.initiativeType" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
-              <span class="text-sm text-surface-600 dark:text-surface-400">Initiative</span>
-              <span class="font-mono font-medium text-green-600 dark:text-green-400">
-                {{ getStatName(weaponStats.initiativeType) }}
-              </span>
-            </div>
-            
-            <!-- Attack Time -->
-            <div v-if="weaponStats.attackSpeed" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
-              <span class="text-sm text-surface-600 dark:text-surface-400">Attack Time</span>
-              <span class="font-mono font-medium">
-                {{ formatAttackTime(weaponStats.attackSpeed) }}
-              </span>
-            </div>
-            
-            <!-- Recharge Time -->
-            <div v-if="weaponStats.burstRecharge" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
-              <span class="text-sm text-surface-600 dark:text-surface-400">Recharge Time</span>
-              <span class="font-mono font-medium">
-                {{ formatRechargeTime(weaponStats.burstRecharge) }}
-              </span>
-            </div>
-            
-            <!-- Attacks per Second -->
-            <div v-if="attacksPerSecond > 0" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
-              <span class="text-sm text-surface-600 dark:text-surface-400">Attacks/Second</span>
-              <span class="font-mono font-medium">
-                {{ attacksPerSecond.toFixed(2) }}
-              </span>
-            </div>
+        
+        <!-- Compact Stats Table -->
+        <div class="stats-table">
+          <!-- Headers Row -->
+          <div class="stats-row header-row">
+            <div class="stat-group header-cell">Damage</div>
+            <div class="stat-group header-cell">Speed</div>
+            <div class="stat-group header-cell">Properties</div>
+            <div class="stat-group header-cell">Special Attacks</div>
           </div>
-        </div>
-
-        <!-- Range and Special Properties -->
-        <div v-if="weaponStats.multiRanged || weaponStats.multiMelee || weaponStats.range || (weaponStats.maxEnergy && weaponStats.ammoType) || weaponStats.maxBeneficialSkill">
-          <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">Properties</h4>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <!-- Multi Ranged/Melee -->
-            <div v-if="weaponStats.multiRanged" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
-              <span class="text-sm text-surface-600 dark:text-surface-400">Multi Ranged</span>
-              <span class="font-mono font-medium">
-                {{ weaponStats.multiRanged }}
-              </span>
-            </div>
-            <div v-else-if="weaponStats.multiMelee" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
-              <span class="text-sm text-surface-600 dark:text-surface-400">Multi Melee</span>
-              <span class="font-mono font-medium">
-                {{ weaponStats.multiMelee }}
-              </span>
-            </div>
-            
-            <!-- Range -->
-            <div v-if="weaponStats.range" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
-              <span class="text-sm text-surface-600 dark:text-surface-400">Range</span>
-              <span class="font-mono font-medium">
-                {{ formatWeaponRange(weaponStats.range) }}
-              </span>
-            </div>
-            
-            <!-- Clip -->
-            <div v-if="weaponStats.maxEnergy && weaponStats.ammoType" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
-              <span class="text-sm text-surface-600 dark:text-surface-400">Clip</span>
-              <span class="font-mono font-medium">
-                {{ weaponStats.maxEnergy }} {{ getAmmoTypeName(weaponStats.ammoType) }}
-              </span>
-            </div>
-            
-            <!-- Max Beneficial Skill -->
-            <div v-if="weaponStats.maxBeneficialSkill" class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded">
-              <span class="text-sm text-surface-600 dark:text-surface-400">Max Beneficial Skill</span>
-              <span class="font-mono font-medium">
-                {{ weaponStats.maxBeneficialSkill }}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Special Attacks -->
-        <div v-if="specialAttacks.length > 0">
-          <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">Special Attacks</h4>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div
-              v-for="attack in specialAttacks"
-              :key="attack.name"
-              class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded"
-            >
-              <span class="text-sm text-surface-600 dark:text-surface-400">
-                {{ attack.name }}
-              </span>
-              <span class="font-mono font-medium text-purple-600 dark:text-purple-400">
-                {{ attack.skill }} / {{ attack.cap }}s
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Skill Requirements (Weapon-specific) -->
-        <div v-if="weaponSkillRequirements.length > 0">
-          <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">Skill Requirements</h4>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div
-              v-for="req in weaponSkillRequirements"
-              :key="req.stat"
-              class="flex justify-between items-center p-3 rounded"
-              :class="{
-                'bg-green-50 dark:bg-green-900/20': showCompatibility && canMeetRequirement(req),
-                'bg-red-50 dark:bg-red-900/20': showCompatibility && !canMeetRequirement(req),
-                'bg-surface-50 dark:bg-surface-900': !showCompatibility
-              }"
-            >
-              <div class="flex items-center gap-2">
-                <i
-                  v-if="showCompatibility"
-                  :class="{
-                    'pi pi-check text-green-600': canMeetRequirement(req),
-                    'pi pi-times text-red-600': !canMeetRequirement(req)
-                  }"
-                ></i>
-                <span class="text-sm text-surface-600 dark:text-surface-400">
-                  {{ getStatName(req.stat) }}
-                </span>
+          
+          <!-- Data Row -->
+          <div class="stats-row data-row">
+            <!-- Damage Column -->
+            <div class="stat-group">
+              <div class="damage-display">
+                <div v-if="weaponStats.minDamage" class="damage-stat">
+                  <div class="damage-label">Min</div>
+                  <div class="damage-value">{{ weaponStats.minDamage }}</div>
+                </div>
+                <div v-if="weaponStats.minDamage && weaponStats.maxDamage" class="damage-divider"></div>
+                <div v-if="weaponStats.maxDamage" class="damage-stat">
+                  <div class="damage-label">Max</div>
+                  <div class="damage-value max">{{ weaponStats.maxDamage }}</div>
+                </div>
+                <div v-if="weaponStats.criticalBonus" class="damage-divider"></div>
+                <div v-if="weaponStats.criticalBonus" class="damage-stat">
+                  <div class="damage-label">Crit</div>
+                  <div class="damage-value crit">{{ weaponStats.criticalBonus }}</div>
+                </div>
               </div>
-              <div class="text-right">
-                <div class="font-mono font-medium">
-                  {{ formatSkillRequirement(req.stat, req.value) }}
+              <div v-if="weaponStats.damageType" class="stat-pair">
+                <span class="stat-name">Type</span>
+                <span class="stat-val val-damage">🔥 {{ getStatName(weaponStats.damageType) }}</span>
+              </div>
+            </div>
+            
+            <!-- Speed Column -->
+            <div class="stat-group">
+              <div v-if="weaponStats.attackDelay" class="stat-pair">
+                <span class="stat-name">Attack</span>
+                <span class="stat-val val-speed">{{ formatCentisecondsToSeconds(weaponStats.attackDelay) }}s</span>
+              </div>
+              <div v-if="weaponStats.rechargeDelay" class="stat-pair">
+                <span class="stat-name">Recharge</span>
+                <span class="stat-val val-speed">{{ formatCentisecondsToSeconds(weaponStats.rechargeDelay) }}s</span>
+              </div>
+              <div v-if="weaponStats.initiativeType" class="stat-pair">
+                <span class="stat-name">Initiative</span>
+                <span class="stat-val val-speed">{{ getStatName(weaponStats.initiativeType).replace('Init', '') }}</span>
+              </div>
+            </div>
+            
+            <!-- Properties Column -->
+            <div class="stat-group">
+              <div v-if="weaponStats.attackRange" class="stat-pair">
+                <span class="stat-name">Range</span>
+                <span class="stat-val val-range">{{ weaponStats.attackRange }}m</span>
+              </div>
+              <div v-if="weaponStats.multiRanged || weaponStats.multiMelee" class="stat-pair">
+                <span class="stat-name">Multi</span>
+                <span class="stat-val val-range">{{ weaponStats.multiRanged || weaponStats.multiMelee }}</span>
+              </div>
+              <div v-if="weaponStats.maxEnergy && weaponStats.ammoType" class="stat-pair">
+                <span class="stat-name">Clip</span>
+                <span class="stat-val val-ammo">{{ weaponStats.maxEnergy }} {{ getAmmoTypeName(weaponStats.ammoType) }}</span>
+              </div>
+            </div>
+            
+            <!-- Special Attacks Column -->
+            <div class="stat-group">
+              <div v-if="specialAttacks.length > 0" class="attacks-inline">
+                <div v-for="attack in specialAttacks" :key="attack.name" class="attack-badge">
+                  <div class="attack-label">{{ getAttackIcon(attack.name) }} {{ attack.name }}</div>
+                  <div class="attack-dmg">{{ attack.skill }} / {{ attack.cap }}s</div>
                 </div>
-                <div v-if="showCompatibility && profile" class="text-xs text-surface-500">
-                  (You: {{ formatSkillRequirement(req.stat, getCharacterStat(req.stat)) }})
-                </div>
+              </div>
+              <div v-else class="text-xs text-surface-500 dark:text-surface-400 text-center py-4">
+                No special attacks
               </div>
             </div>
           </div>
@@ -305,24 +207,184 @@ function formatCentisecondsToSeconds(centiseconds: number): string {
   const seconds = centiseconds / 100
   return seconds.toFixed(2)
 }
+
+function getAttackIcon(attackName: string): string {
+  // Return appropriate icon for attack types
+  const iconMap: Record<string, string> = {
+    'Fling Shot': '🎯',
+    'FlingShot': '🎯',
+    'Burst': '💥',
+    'Aimed Shot': '🎯',
+    'Fast Attack': '⚡',
+    'Bow Special Attack': '🏹',
+    'Sneak Attack': '🗡️'
+  }
+  return iconMap[attackName] || '⚔️'
+}
 </script>
 
-<style scoped>
-.font-mono {
-  font-family: 'Courier New', 'Monaco', 'Lucida Console', monospace;
+<style>
+/* Component scoping */
+.weapon-stats-component .dps-badge {
+  padding: 4px 12px;
+  background: linear-gradient(135deg, #dc2626, #f97316);
+  border-radius: 16px;
+  font-size: 14px;
+  font-weight: bold;
+  color: white;
 }
 
-/* Ensure consistent spacing */
-.grid > div {
-  min-height: 3rem;
+/* Compact Table Layout */
+.weapon-stats-component .stats-table {
+  display: table;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 2px;
 }
 
-/* Color coding for damage values */
-.text-red-600 {
-  color: rgb(220, 38, 38);
+.weapon-stats-component .stats-row {
+  display: table-row;
 }
 
-.dark .text-red-400 {
-  color: rgb(248, 113, 113);
+.weapon-stats-component .stat-group {
+  display: table-cell;
+  padding: 8px;
+  background: #f8fafc;
+  border: 1px solid #d1d5db;
+  vertical-align: middle;
+}
+
+.dark .weapon-stats-component .stat-group {
+  background: #0c0a09 !important;
+  border-color: #374151 !important;
+  color: #e5e7eb !important;
+}
+
+.weapon-stats-component .stat-group.header-cell {
+  background: #e5e7eb;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #4b5563;
+  padding: 6px 8px;
+  text-align: center;
+}
+
+.dark .weapon-stats-component .stat-group.header-cell {
+  background: #374151 !important;
+  color: #9ca3af !important;
+}
+
+/* Inline stat pairs */
+.weapon-stats-component .stat-pair {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.weapon-stats-component .stat-pair:last-child {
+  margin-bottom: 0;
+}
+
+.weapon-stats-component .stat-name {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.dark .weapon-stats-component .stat-name {
+  color: #9ca3af !important;
+}
+
+.weapon-stats-component .stat-val {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Color coding */
+.weapon-stats-component .val-damage { color: #ef4444; }
+.weapon-stats-component .val-speed { color: #3b82f6; }
+.weapon-stats-component .val-range { color: #10b981; }
+.weapon-stats-component .val-ammo { color: #fbbf24; }
+.weapon-stats-component .val-special { color: #a78bfa; }
+
+/* Damage display */
+.weapon-stats-component .damage-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 6px 0;
+  margin-bottom: 8px;
+}
+
+.weapon-stats-component .damage-stat {
+  text-align: center;
+}
+
+.weapon-stats-component .damage-label {
+  font-size: 9px;
+  color: #6b7280;
+  text-transform: uppercase;
+}
+
+.dark .weapon-stats-component .damage-label {
+  color: #9ca3af !important;
+}
+
+.weapon-stats-component .damage-value {
+  font-size: 14px;
+  font-weight: bold;
+  color: #ef4444;
+}
+
+.weapon-stats-component .damage-value.max {
+  color: #fbbf24;
+}
+
+.weapon-stats-component .damage-value.crit {
+  color: #10b981;
+}
+
+.weapon-stats-component .damage-divider {
+  width: 1px;
+  height: 20px;
+  background: #d1d5db;
+}
+
+.dark .weapon-stats-component .damage-divider {
+  background: #4b5563 !important;
+}
+
+/* Special attacks inline */
+.weapon-stats-component .attacks-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.weapon-stats-component .attack-badge {
+  padding: 4px 6px;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid #7c3aed;
+  border-radius: 4px;
+  font-size: 10px;
+  text-align: center;
+}
+
+.dark .weapon-stats-component .attack-badge {
+  background: rgba(139, 92, 246, 0.2) !important;
+}
+
+.weapon-stats-component .attack-label {
+  color: #a78bfa;
+  margin-bottom: 2px;
+  font-size: 10px;
+}
+
+.weapon-stats-component .attack-dmg {
+  color: #fbbf24;
+  font-weight: bold;
+  font-size: 11px;
 }
 </style>
