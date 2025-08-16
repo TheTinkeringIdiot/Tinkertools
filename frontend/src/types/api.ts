@@ -59,6 +59,7 @@ export interface Spell {
   spell_id?: number
   spell_format?: string
   spell_params: Record<string, any>
+  criteria: Criterion[]
 }
 
 export interface SpellData {
@@ -86,6 +87,7 @@ export interface Action {
   criteria: Criterion[]
 }
 
+
 export interface Item {
   id: number
   aoid?: number
@@ -99,6 +101,8 @@ export interface Item {
   actions: Action[]
   attack_defense?: AttackDefense
   animation_mesh?: AnimationMesh
+  attack_stats: StatValue[]
+  defense_stats: StatValue[]
 }
 
 export interface InterpolatedSpell {
