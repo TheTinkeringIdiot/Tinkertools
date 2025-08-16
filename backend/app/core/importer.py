@@ -365,8 +365,7 @@ class DataImporter:
             db.add(action)
             db.flush()
             
-            # Process criteria (with deduplication by criterion_id)
-            processed_criteria = set()
+            # Process criteria (allowing duplicates)
             current_order = 0
             
             for crit_data in action_data.get('Criteria', []):
@@ -375,14 +374,13 @@ class DataImporter:
                     crit_data['Value2'],
                     crit_data['Operator']
                 ))
-                if criterion and criterion.id not in processed_criteria:
+                if criterion:
                     action_criterion = ActionCriteria(
                         action_id=action.id,
                         criterion_id=criterion.id,
                         order_index=current_order
                     )
                     db.add(action_criterion)
-                    processed_criteria.add(criterion.id)
                     current_order += 1
     
     def _process_spell_data(self, db: Session, item: Item, item_data: Dict):
