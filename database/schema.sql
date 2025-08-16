@@ -236,10 +236,7 @@ CREATE TABLE action_criteria (
     id SERIAL PRIMARY KEY,
     action_id INTEGER REFERENCES actions(id) ON DELETE CASCADE,
     criterion_id INTEGER REFERENCES criteria(id) ON DELETE CASCADE,
-    order_index INTEGER,
-    
-    -- Unique constraint on action + criterion
-    CONSTRAINT unique_action_criterion UNIQUE (action_id, criterion_id)
+    order_index INTEGER NOT NULL
 );
 
 -- Performance indexes for action_criteria
