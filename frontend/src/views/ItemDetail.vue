@@ -26,23 +26,20 @@ Shows all item data with profile compatibility and comparison options
           :label="isFavorite ? 'Favorited' : 'Favorite'"
           :severity="isFavorite ? 'danger' : 'secondary'"
           outlined
-          size="small"
-          @click="toggleFavorite"
+                    @click="toggleFavorite"
         />
         <Button
           icon="pi pi-clone"
           label="Compare"
           severity="primary"
           outlined
-          size="small"
-          @click="addToComparison"
+                    @click="addToComparison"
         />
         <Button
           icon="pi pi-share-alt"
           severity="secondary"
           outlined
-          size="small"
-          @click="shareItem"
+                    @click="shareItem"
           v-tooltip.bottom="'Share Item'"
         />
       </div>
@@ -72,8 +69,7 @@ Shows all item data with profile compatibility and comparison options
             :key="flag.name"
             :value="flag.name"
             :severity="flag.severity"
-            size="small"
-            :class="['outline-tag', flag.severity === 'danger' ? 'outline-tag-danger' : 'outline-tag-secondary']"
+                        :class="['outline-tag', flag.severity === 'danger' ? 'outline-tag-danger' : 'outline-tag-secondary']"
           />
           <span v-if="displayItemFlags.length === 0" class="text-sm text-surface-500 dark:text-surface-400 italic">
             No special properties
@@ -106,23 +102,19 @@ Shows all item data with profile compatibility and comparison options
                 <!-- Compatibility Status -->
                 <div v-if="profile && showCompatibility" class="p-3 rounded-lg"
                   :class="{
-                    'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800': isCompatible,
-                    'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800': !isCompatible && hasRequirements,
-                    'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800': !hasRequirements
+                    'bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800': true
                   }"
                 >
                   <div class="flex items-center gap-2 mb-2">
                     <i :class="{
-                      'pi pi-check-circle text-green-600': isCompatible,
-                      'pi pi-times-circle text-red-600': !isCompatible && hasRequirements,
-                      'pi pi-info-circle text-yellow-600': !hasRequirements
+                      'pi pi-info-circle text-gray-600': true
                     }"></i>
                     <span class="text-sm font-medium">
-                      {{ getCompatibilityText() }}
+                      Compatible with your character
                     </span>
                   </div>
                   <div class="text-xs text-surface-600 dark:text-surface-400">
-                    Profile: {{ profile.name }} (Level {{ profile.level }})
+                    Profile: {{ profile.Character.Name }} (Level {{ profile.Character.Level }})
                   </div>
                 </div>
               </div>
@@ -197,7 +189,7 @@ Shows all item data with profile compatibility and comparison options
 
       <!-- Weapon Statistics (for weapons only) -->
       <WeaponStats 
-        v-if="item && isWeapon(item.item_class)"
+        v-if="item && item.item_class && isWeapon(item.item_class)"
         :item="item"
         :profile="profile"
         :show-compatibility="showCompatibility"
@@ -209,13 +201,6 @@ Shows all item data with profile compatibility and comparison options
         :item="item"
       />
 
-      <!-- Enhanced Requirements -->
-      <ItemRequirements
-        v-if="item && item.requirements?.length"
-        :item="item"
-        :profile="profile"
-        :show-compatibility="showCompatibility"
-      />
 
       <!-- General Statistics -->
       <Card v-if="item.stats?.length">
@@ -224,8 +209,7 @@ Shows all item data with profile compatibility and comparison options
             <h3 class="text-lg font-semibold">General Statistics</h3>
             <Button
               :label="showAllStats ? 'Show Key Stats' : 'Show All Stats'"
-              size="small"
-              text
+                            text
               @click="showAllStats = !showAllStats"
             />
           </div>
@@ -256,17 +240,17 @@ Shows all item data with profile compatibility and comparison options
       </Card>
 
       <!-- Attack/Defense Data -->
-      <Card v-if="item.attack_data || item.defense_data">
+      <Card v-if="item.attack_stats || item.defense_stats">
         <template #header>
           <h3 class="text-lg font-semibold">Combat Information</h3>
         </template>
         <template #content>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div v-if="item.attack_data">
+            <div v-if="item.attack_stats">
               <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">Attack</h4>
               <div class="space-y-2">
                 <div
-                  v-for="attack in item.attack_data"
+                  v-for="attack in item.attack_stats"
                   :key="attack.stat"
                   class="flex justify-between p-2 bg-surface-50 dark:bg-surface-900 rounded"
                 >
@@ -276,11 +260,11 @@ Shows all item data with profile compatibility and comparison options
               </div>
             </div>
             
-            <div v-if="item.defense_data">
+            <div v-if="item.defense_stats">
               <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">Defense</h4>
               <div class="space-y-2">
                 <div
-                  v-for="defense in item.defense_data"
+                  v-for="defense in item.defense_stats"
                   :key="defense.stat"
                   class="flex justify-between p-2 bg-surface-50 dark:bg-surface-900 rounded"
                 >
@@ -307,10 +291,7 @@ Shows all item data with profile compatibility and comparison options
             >
               <div class="flex items-center justify-between mb-2">
                 <span class="text-sm font-medium">Effect {{ index + 1 }}</span>
-                <Badge :value="getEffectTrigger(spell.event)" severity="info" size="small" />
-              </div>
-              <div v-if="spell.description" class="text-sm text-surface-600 dark:text-surface-400">
-                {{ spell.description }}
+                <Badge :value="getEffectTrigger(spell.event || 0)" severity="info" />
               </div>
             </div>
           </div>
@@ -318,23 +299,16 @@ Shows all item data with profile compatibility and comparison options
       </Card>
 
       <!-- Actions and Usage -->
-      <Card v-if="item.action_data?.length">
+      <Card v-if="item.actions?.length">
         <template #header>
-          <h3 class="text-lg font-semibold">Actions</h3>
+          <h3 class="text-lg font-semibold">Actions & Requirements</h3>
         </template>
         <template #content>
-          <div class="space-y-3">
-            <div
-              v-for="(action, index) in item.action_data"
-              :key="index"
-              class="p-3 bg-surface-50 dark:bg-surface-900 rounded"
-            >
-              <div class="flex items-center justify-between">
-                <span class="text-sm font-medium">{{ getActionName(action.action) }}</span>
-                <Badge :value="action.criteria?.length || 0" severity="secondary" size="small" />
-              </div>
-            </div>
-          </div>
+          <ActionRequirements 
+            :actions="item.actions"
+            :character-stats="characterStats"
+            :expanded="true"
+          />
         </template>
       </Card>
     </div>
@@ -366,23 +340,20 @@ Shows all item data with profile compatibility and comparison options
             :label="isFavorite ? 'Favorited' : 'Favorite'"
             :severity="isFavorite ? 'danger' : 'secondary'"
             outlined
-            size="small"
-            @click="toggleFavorite"
+                        @click="toggleFavorite"
           />
           <Button
             icon="pi pi-clone"
             label="Compare"
             severity="primary"
             outlined
-            size="small"
-            @click="addToComparison"
+                        @click="addToComparison"
           />
           <Button
             icon="pi pi-share-alt"
             severity="secondary"
             outlined
-            size="small"
-            @click="shareItem"
+                        @click="shareItem"
             v-tooltip.bottom="'Share Item'"
           />
         </div>
@@ -413,8 +384,7 @@ Shows all item data with profile compatibility and comparison options
             :key="flag.name"
             :value="flag.name"
             :severity="flag.severity"
-            size="small"
-            :class="['outline-tag', flag.severity === 'danger' ? 'outline-tag-danger' : 'outline-tag-secondary']"
+                        :class="['outline-tag', flag.severity === 'danger' ? 'outline-tag-danger' : 'outline-tag-secondary']"
           />
           <span v-if="displayItemFlags.length === 0" class="text-sm text-surface-500 dark:text-surface-400 italic">
             No special properties
@@ -447,23 +417,19 @@ Shows all item data with profile compatibility and comparison options
                 <!-- Compatibility Status -->
                 <div v-if="profile && showCompatibility" class="p-3 rounded-lg"
                   :class="{
-                    'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800': isCompatible,
-                    'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800': !isCompatible && hasRequirements,
-                    'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800': !hasRequirements
+                    'bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800': true
                   }"
                 >
                   <div class="flex items-center gap-2 mb-2">
                     <i :class="{
-                      'pi pi-check-circle text-green-600': isCompatible,
-                      'pi pi-times-circle text-red-600': !isCompatible && hasRequirements,
-                      'pi pi-info-circle text-yellow-600': !hasRequirements
+                      'pi pi-info-circle text-gray-600': true
                     }"></i>
                     <span class="text-sm font-medium">
-                      {{ getCompatibilityText() }}
+                      Compatible with your character
                     </span>
                   </div>
                   <div class="text-xs text-surface-600 dark:text-surface-400">
-                    Profile: {{ profile.name }} (Level {{ profile.level }})
+                    Profile: {{ profile.Character.Name }} (Level {{ profile.Character.Level }})
                   </div>
                 </div>
               </div>
@@ -538,7 +504,7 @@ Shows all item data with profile compatibility and comparison options
 
       <!-- Weapon Statistics (for weapons only) -->
       <WeaponStats 
-        v-if="item && isWeapon(item.item_class)"
+        v-if="item && item.item_class && isWeapon(item.item_class)"
         :item="item"
         :profile="profile"
         :show-compatibility="showCompatibility"
@@ -550,13 +516,6 @@ Shows all item data with profile compatibility and comparison options
         :item="item"
       />
 
-      <!-- Enhanced Requirements -->
-      <ItemRequirements
-        v-if="item && item.requirements?.length"
-        :item="item"
-        :profile="profile"
-        :show-compatibility="showCompatibility"
-      />
 
       <!-- General Statistics -->
       <Card v-if="item.stats?.length">
@@ -565,8 +524,7 @@ Shows all item data with profile compatibility and comparison options
             <h3 class="text-lg font-semibold">General Statistics</h3>
             <Button
               :label="showAllStats ? 'Show Key Stats' : 'Show All Stats'"
-              size="small"
-              text
+                            text
               @click="showAllStats = !showAllStats"
             />
           </div>
@@ -598,17 +556,17 @@ Shows all item data with profile compatibility and comparison options
 
 
       <!-- Attack/Defense Data -->
-      <Card v-if="item.attack_data || item.defense_data">
+      <Card v-if="item.attack_stats || item.defense_stats">
         <template #header>
           <h3 class="text-lg font-semibold">Combat Information</h3>
         </template>
         <template #content>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div v-if="item.attack_data">
+            <div v-if="item.attack_stats">
               <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">Attack</h4>
               <div class="space-y-2">
                 <div
-                  v-for="attack in item.attack_data"
+                  v-for="attack in item.attack_stats"
                   :key="attack.stat"
                   class="flex justify-between p-2 bg-surface-50 dark:bg-surface-900 rounded"
                 >
@@ -618,11 +576,11 @@ Shows all item data with profile compatibility and comparison options
               </div>
             </div>
             
-            <div v-if="item.defense_data">
+            <div v-if="item.defense_stats">
               <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">Defense</h4>
               <div class="space-y-2">
                 <div
-                  v-for="defense in item.defense_data"
+                  v-for="defense in item.defense_stats"
                   :key="defense.stat"
                   class="flex justify-between p-2 bg-surface-50 dark:bg-surface-900 rounded"
                 >
@@ -649,10 +607,7 @@ Shows all item data with profile compatibility and comparison options
             >
               <div class="flex items-center justify-between mb-2">
                 <span class="text-sm font-medium">Effect {{ index + 1 }}</span>
-                <Badge :value="getEffectTrigger(spell.event)" severity="info" size="small" />
-              </div>
-              <div v-if="spell.description" class="text-sm text-surface-600 dark:text-surface-400">
-                {{ spell.description }}
+                <Badge :value="getEffectTrigger(spell.event || 0)" severity="info" />
               </div>
             </div>
           </div>
@@ -660,23 +615,16 @@ Shows all item data with profile compatibility and comparison options
       </Card>
 
       <!-- Actions and Usage -->
-      <Card v-if="item.action_data?.length">
+      <Card v-if="item.actions?.length">
         <template #header>
-          <h3 class="text-lg font-semibold">Actions</h3>
+          <h3 class="text-lg font-semibold">Actions & Requirements</h3>
         </template>
         <template #content>
-          <div class="space-y-3">
-            <div
-              v-for="(action, index) in item.action_data"
-              :key="index"
-              class="p-3 bg-surface-50 dark:bg-surface-900 rounded"
-            >
-              <div class="flex items-center justify-between">
-                <span class="text-sm font-medium">{{ getActionName(action.action) }}</span>
-                <Badge :value="action.criteria?.length || 0" severity="secondary" size="small" />
-              </div>
-            </div>
-          </div>
+          <ActionRequirements 
+            :actions="item.actions"
+            :character-stats="characterStats"
+            :expanded="true"
+          />
         </template>
       </Card>
     </div>
@@ -700,14 +648,14 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useItemsStore } from '@/stores/items'
 import { useProfileStore } from '@/stores/profile'
-import { getItemIconUrl, isWeapon, getDisplayItemFlags, getDisplayCanFlags } from '@/services/game-utils'
-import type { Item, TinkerProfile, ItemRequirement } from '@/types/api'
+import { getItemIconUrl, isWeapon, getDisplayItemFlags, getDisplayCanFlags, getProfessionId, getBreedId, getStatId } from '@/services/game-utils'
+import type { Item, TinkerProfile } from '@/types/api'
 
 // Import new components
 import WeaponStats from '@/components/items/WeaponStats.vue'
 import ItemAttributes from '@/components/items/ItemAttributes.vue'
-import ItemRequirements from '@/components/items/ItemRequirements.vue'
 import ItemSlotsDisplay from '@/components/items/ItemSlotsDisplay.vue'
+import ActionRequirements from '@/components/ActionRequirements.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -732,6 +680,50 @@ const advancedView = ref(false)
 const profile = computed(() => profileStore.currentProfile)
 const showCompatibility = computed(() => !!profile.value)
 
+// Character stats for action requirements
+const characterStats = computed(() => {
+  if (!profile.value?.Character) return null
+  
+  // Convert character stats to the format expected by action criteria
+  const stats: Record<number, number> = {}
+  
+  // Add basic character stats
+  if (profile.value.Character.Level) {
+    stats[54] = profile.value.Character.Level // Level
+  }
+  if (profile.value.Character.Profession) {
+    const professionId = getProfessionId(profile.value.Character.Profession)
+    if (professionId) {
+      stats[60] = professionId // Profession
+    }
+  }
+  if (profile.value.Character.Breed) {
+    const breedId = getBreedId(profile.value.Character.Breed)
+    if (breedId) {
+      stats[4] = breedId // Breed
+    }
+  }
+  
+  // Add skill stats if available
+  if (profile.value.Skills) {
+    // Flatten all skill categories into one stats object
+    Object.values(profile.value.Skills).forEach(skillCategory => {
+      if (skillCategory && typeof skillCategory === 'object') {
+        Object.entries(skillCategory).forEach(([statName, value]) => {
+          if (typeof value === 'number') {
+            const statId = getStatId(statName)
+            if (statId) {
+              stats[statId] = value
+            }
+          }
+        })
+      }
+    })
+  }
+  
+  return stats
+})
+
 // Determine if we're in modal mode (opened from items list) or page mode (direct URL)
 const isModal = computed(() => {
   // If there's an ID prop passed from parent, we're in modal mode
@@ -740,14 +732,6 @@ const isModal = computed(() => {
   return false // Always use page mode for now
 })
 
-const hasRequirements = computed(() => 
-  item.value?.requirements && item.value.requirements.length > 0
-)
-
-const isCompatible = computed(() => {
-  if (!profile.value || !hasRequirements.value) return true
-  return item.value!.requirements!.every(req => canMeetRequirement(req))
-})
 
 const isFavorite = computed(() => 
   item.value ? profileStore.preferences.favoriteItems.includes(item.value.id) : false
@@ -859,19 +843,18 @@ function shareItem() {
   }
 }
 
-function getCompatibilityText(): string {
-  if (!hasRequirements.value) return 'No requirements'
-  return isCompatible.value ? 'You can use this item' : 'Requirements not met'
-}
-
-function canMeetRequirement(requirement: ItemRequirement): boolean {
-  if (!profile.value) return false
-  const characterStat = profile.value.stats?.[requirement.stat] || 0
-  return characterStat >= requirement.value
-}
 
 function getCharacterStat(statId: number): number {
-  return profile.value?.stats?.[statId] || 0
+  if (!profile.value?.Skills) return 0
+  
+  // Search through all skill categories for the stat
+  const skills = profile.value.Skills
+  for (const category of Object.values(skills)) {
+    if (category && typeof category === 'object' && statId in category) {
+      return category[statId] || 0
+    }
+  }
+  return 0
 }
 
 // Utility functions
@@ -910,13 +893,6 @@ function getEffectTrigger(event: number): string {
     0: 'On Use', 5: 'On Hit', 14: 'When Equipped', 15: 'Passive'
   }
   return triggers[event] || `Event ${event}`
-}
-
-function getActionName(actionId: number): string {
-  const actions: Record<number, string> = {
-    6: 'Equip', 8: 'Attack', 9: 'Use'
-  }
-  return actions[actionId] || `Action ${actionId}`
 }
 
 function onIconError() {
