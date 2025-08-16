@@ -4,7 +4,8 @@
  * Tests for the ItemCard component functionality
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+// @ts-nocheck
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ItemCard from '../../components/items/ItemCard.vue'

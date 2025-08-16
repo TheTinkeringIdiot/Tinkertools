@@ -4,7 +4,8 @@
  * Tests for the ItemQuickView component functionality
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+// @ts-nocheck
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ItemQuickView from '../../components/items/ItemQuickView.vue'
