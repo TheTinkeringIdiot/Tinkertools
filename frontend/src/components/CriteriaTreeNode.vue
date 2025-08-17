@@ -12,7 +12,6 @@
           <span class="operator">{{ node.criterion.displaySymbol }}</span>
           <span class="value">{{ formattedValue }}</span>
           <span v-if="showCurrentValue" class="current-value">({{ currentValue }})</span>
-          <span class="status-icon">{{ statusIcon }}</span>
         </div>
       </div>
       
