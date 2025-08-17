@@ -146,9 +146,10 @@ describe('API Client', () => {
       target: 2,
       tick_count: 1,
       tick_interval: 0,
-      spell_id: 12345,
-      spell_format: 'Test spell format',
-      spell_params: {}
+      spell_id: 53002, // Use a known spell format ID for testing
+      spell_format: 'Test spell format', // This will be ignored in favor of spell_id lookup
+      spell_params: {},
+      criteria: []
     }
 
     beforeEach(() => {
