@@ -197,6 +197,14 @@ Shows all item data with profile compatibility and comparison options
         :defense-stats="item.defense_stats"
       />
 
+      <!-- Spell Data Effects (for items with spell_data) -->
+      <SpellDataDisplay
+        v-if="item && item.spell_data && item.spell_data.length > 0"
+        :spell-data="item.spell_data"
+        :profile="profile"
+        :show-hidden="false"
+      />
+
       <!-- Actions and Usage -->
       <Card v-if="item.actions?.length">
         <template #header>
@@ -478,6 +486,14 @@ Shows all item data with profile compatibility and comparison options
         :defense-stats="item.defense_stats"
       />
 
+      <!-- Spell Data Effects (for items with spell_data) -->
+      <SpellDataDisplay
+        v-if="item && item.spell_data && item.spell_data.length > 0"
+        :spell-data="item.spell_data"
+        :profile="profile"
+        :show-hidden="false"
+      />
+
       <!-- Actions and Usage -->
       <Card v-if="item.actions?.length">
         <template #header>
@@ -585,6 +601,7 @@ import type { Item, TinkerProfile } from '@/types/api'
 
 // Import new components
 import WeaponStats from '@/components/items/WeaponStats.vue'
+import SpellDataDisplay from '@/components/items/SpellDataDisplay.vue'
 import ItemAttributes from '@/components/items/ItemAttributes.vue'
 import ItemSlotsDisplay from '@/components/items/ItemSlotsDisplay.vue'
 import ActionRequirements from '@/components/ActionRequirements.vue'

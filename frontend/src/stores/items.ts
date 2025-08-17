@@ -164,6 +164,13 @@ export const useItemsStore = defineStore('items', () => {
   }
   
   /**
+   * Get item from cache only (no API call)
+   */
+  function getItemFromCache(aoid: number): Item | null {
+    return items.value.get(aoid) || null
+  }
+  
+  /**
    * Get multiple items by IDs (uses batching)
    */
   async function getItems(ids: number[], forceRefresh = false): Promise<Item[]> {
@@ -392,6 +399,7 @@ export const useItemsStore = defineStore('items', () => {
     // Actions
     searchItems,
     getItem,
+    getItemFromCache,
     getItems,
     filterItems,
     getItemsWithStats,
