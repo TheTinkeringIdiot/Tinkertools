@@ -57,6 +57,7 @@ export interface Spell {
   tick_count?: number
   tick_interval?: number
   spell_id?: number
+  /** @deprecated Use spell_id to look up format from SPELL_FORMATS constant instead */
   spell_format?: string
   spell_params: Record<string, any>
   criteria: Criterion[]

@@ -5,7 +5,7 @@
  * Handles event translations, parameter formatting, and spell text interpolation.
  */
 
-import { TEMPLATE_EVENT, TARGET } from './game-data'
+import { TEMPLATE_EVENT, TARGET, SPELL_FORMATS } from './game-data'
 import { getStatName, getFlagNameFromBit } from './game-utils'
 import type { SpellData, Spell, Criterion } from '@/types/api'
 
@@ -78,6 +78,12 @@ export function getEventDisplayPriority(eventId: number): number {
   return priorityMap[eventId] || 10
 }
 
+/**
+ * Get spell format string from SPELL_FORMATS constant using spell_id
+ */
+export function getSpellFormat(spellId: number): string | undefined {
+  return SPELL_FORMATS[spellId as keyof typeof SPELL_FORMATS]
+}
 
 // ============================================================================
 // Parameter Formatting
@@ -263,14 +269,24 @@ export function formatSpell(spell: Spell): FormattedSpell {
   // Most spells should be visible, even instant ones (tick_count = 1)
   const isHidden = false // For now, show all spells
   
-  // Generate formatted text
+  // Generate formatted text using spell_id to look up format from SPELL_FORMATS
   let formattedText = ''
-  if (spell.spell_format) {
-    formattedText = interpolateSpellText(spell.spell_format, spell.spell_params || {})
+  const formatString = spell.spell_id ? getSpellFormat(spell.spell_id) : undefined
+  if (formatString) {
+    // Combine spell parameters with spell fields for interpolation
+    const interpolationParams = {
+      ...spell.spell_params,
+      // Add spell fields that may be referenced in format strings
+      TickCount: spell.tick_count,
+      TickInterval: spell.tick_interval,
+      Target: spell.target,
+      SpellId: spell.spell_id
+    }
+    formattedText = interpolateSpellText(formatString, interpolationParams)
   }
   
-  // Fallback if interpolation didn't work or no format string
-  if (!formattedText || formattedText === spell.spell_format) {
+  // Fallback if interpolation didn't work or no format string found
+  if (!formattedText || formattedText === formatString) {
     formattedText = generateFallbackSpellText({
       id: spell.id,
       target: spell.target,
@@ -394,6 +410,7 @@ export const spellDataUtils = {
   getEventName,
   getTargetName,
   getEventDisplayPriority,
+  getSpellFormat,
   
   // Parameter formatting
   formatSpellParameter,
