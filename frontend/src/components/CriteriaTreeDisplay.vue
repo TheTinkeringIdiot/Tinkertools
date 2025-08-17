@@ -194,35 +194,45 @@ function toggleExpanded() {
 }
 </script>
 
-<style scoped>
+<style>
+/* Component styling matching WeaponStats aesthetic */
 .criteria-tree-display {
   width: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .no-requirements {
   padding: 12px;
   text-align: center;
-}
-
-.text-muted {
   color: #6b7280;
 }
 
-/* Tree container */
+/* Tree container with Card-style appearance */
 .tree-container {
-  background: #1f2937;
+  background: #f8fafc;
+  border: 1px solid #d1d5db;
   border-radius: 8px;
   overflow: hidden;
 }
 
-/* Summary header */
+.dark .tree-container {
+  background: #0c0a09 !important;
+  border-color: #374151 !important;
+}
+
+/* Header with WeaponStats-inspired design */
 .summary-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
-  background: #111827;
-  border-bottom: 1px solid #374151;
+  padding: 4px 6px;
+  background: #e5e7eb;
+  border-bottom: 1px solid #d1d5db;
+}
+
+.dark .summary-header {
+  background: #374151 !important;
+  border-bottom-color: #4b5563 !important;
 }
 
 .summary-title {
@@ -233,13 +243,21 @@ function toggleExpanded() {
 
 .title-text {
   font-weight: 600;
-  color: #93c5fd;
-  font-size: 15px;
+  color: #1f2937;
+  font-size: 16px;
+}
+
+.dark .title-text {
+  color: #e5e7eb !important;
 }
 
 .requirement-count {
   font-size: 13px;
   color: #6b7280;
+}
+
+.dark .requirement-count {
+  color: #9ca3af !important;
 }
 
 .summary-status {
@@ -253,28 +271,32 @@ function toggleExpanded() {
   gap: 8px;
 }
 
+/* Enhanced status badges with pill styling */
 .status-badge {
-  padding: 2px 8px;
-  border-radius: 12px;
+  padding: 4px 12px;
+  border-radius: 16px;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  border: 1px solid;
 }
 
 .status-badge.met {
-  background: #064e3b;
-  color: #6ee7b7;
+  background: linear-gradient(135deg, #059669, #10b981);
+  border-color: #059669;
+  color: white;
 }
 
 .status-badge.unmet {
-  background: #7f1d1d;
-  color: #fca5a5;
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  border-color: #dc2626;
+  color: white;
 }
 
 .overall-status {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .status-met {
@@ -293,25 +315,45 @@ function toggleExpanded() {
   color: #6b7280;
 }
 
-/* Tree content */
+/* Tree content with improved spacing */
 .tree-content {
-  padding: 16px 20px;
+  padding: 6px;
+  background: #f8fafc;
+}
+
+.dark .tree-content {
+  background: #0c0a09 !important;
+  color: #e5e7eb !important;
 }
 
 .tree-content.with-summary {
-  /* Additional padding when header is present */
+  border-top: 1px solid #e5e7eb;
 }
 
-/* Evaluation section */
+.dark .tree-content.with-summary {
+  border-top-color: #374151 !important;
+}
+
+/* Evaluation section with cleaner design */
 .evaluation-section {
-  background: #111827;
-  padding: 16px 20px;
+  background: #f3f4f6;
+  padding: 5px 6px;
+  border-top: 1px solid #d1d5db;
+}
+
+.dark .evaluation-section {
+  background: #111827 !important;
+  border-top-color: #374151 !important;
 }
 
 .divider {
   height: 1px;
-  background: #374151;
-  margin: 0 -20px 16px;
+  background: #d1d5db;
+  margin: 0 -16px 16px;
+}
+
+.dark .divider {
+  background: #374151 !important;
 }
 
 .evaluation-header {
@@ -319,13 +361,14 @@ function toggleExpanded() {
 }
 
 .evaluation-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: #ef4444;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
+/* Improved unmet requirements list */
 .unmet-list {
   display: flex;
   flex-direction: column;
@@ -337,31 +380,44 @@ function toggleExpanded() {
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;
-  background: #7f1d1d;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid #dc2626;
   border-radius: 6px;
-  border: 1px solid #ef4444;
+}
+
+.dark .unmet-item {
+  background: #7f1d1d !important;
 }
 
 .stat-name {
   font-weight: 500;
-  color: #fca5a5;
+  color: #dc2626;
+}
+
+.dark .stat-name {
+  color: #fca5a5 !important;
 }
 
 .requirement-gap {
-  font-family: monospace;
-  font-size: 13px;
-  color: #fca5a5;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #dc2626;
+}
+
+.dark .requirement-gap {
+  color: #fca5a5 !important;
 }
 
 .shortfall {
-  margin-left: 8px;
-  font-size: 12px;
+  margin-left: 6px;
+  font-size: 11px;
   opacity: 0.8;
 }
 
-/* Collapsible view */
+/* Enhanced collapsible view */
 .collapsed-view {
-  padding: 16px 20px;
+  padding: 6px;
 }
 
 .expand-button {
@@ -370,79 +426,104 @@ function toggleExpanded() {
   align-items: center;
   width: 100%;
   padding: 12px 16px;
-  background: #374151;
-  border: none;
+  background: #e5e7eb;
+  border: 1px solid #d1d5db;
   border-radius: 6px;
-  color: #e5e7eb;
+  color: #374151;
   font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+}
+
+.dark .expand-button {
+  background: #374151 !important;
+  border-color: #4b5563 !important;
+  color: #e5e7eb !important;
 }
 
 .expand-button:hover {
-  background: #4b5563;
+  background: #d1d5db;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.dark .expand-button:hover {
+  background: #4b5563 !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
 }
 
 .expand-button i {
-  transition: transform 0.2s;
+  transition: transform 0.2s ease;
+  opacity: 0.7;
 }
 
 .expand-button i.expanded {
   transform: rotate(180deg);
 }
 
-/* Responsive design */
+/* Light mode specific adjustments */
+@media (prefers-color-scheme: light) {
+  .tree-container {
+    background: #ffffff;
+    border-color: #e5e7eb;
+  }
+  
+  .summary-header {
+    background: #f9fafb;
+    border-bottom-color: #e5e7eb;
+  }
+  
+  .title-text {
+    color: #111827;
+  }
+  
+  .tree-content {
+    background: #ffffff;
+  }
+  
+  .evaluation-section {
+    background: #f9fafb;
+    border-top-color: #e5e7eb;
+  }
+}
+
+/* Responsive design improvements */
 @media (max-width: 640px) {
   .summary-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
-    padding: 12px 16px;
+    gap: 3px;
+    padding: 4px 5px;
   }
   
   .summary-status {
     flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
+    gap: 3px;
+    width: 100%;
   }
   
   .status-badges {
-    gap: 6px;
+    gap: 2px;
+    flex-wrap: wrap;
   }
   
   .tree-content,
   .evaluation-section,
   .collapsed-view {
-    padding: 12px 16px;
+    padding: 4px 5px;
   }
   
   .unmet-item {
     flex-direction: column;
     align-items: flex-start;
-    gap: 4px;
+    gap: 1px;
   }
   
   .requirement-gap {
-    font-size: 12px;
+    font-size: 11px;
   }
-}
-
-/* Dark mode adjustments */
-@media (prefers-color-scheme: dark) {
-  .tree-container {
-    background: #1f2937;
-  }
-  
-  .summary-header,
-  .evaluation-section {
-    background: #111827;
-  }
-}
-
-/* Animation for expand/collapse */
-.tree-content {
-  transition: max-height 0.3s ease;
-  overflow: hidden;
 }
 
 /* Focus states for accessibility */
@@ -453,5 +534,19 @@ function toggleExpanded() {
 
 .expand-button:focus:not(:focus-visible) {
   outline: none;
+}
+
+/* Animation improvements */
+.tree-content {
+  transition: all 0.3s ease;
+}
+
+.status-badge {
+  transition: all 0.2s ease;
+}
+
+.status-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 </style>

@@ -99,6 +99,44 @@ Shows essential weapon information in a dense, scannable table format
             </div>
           </div>
         </div>
+        
+        <!-- Damage Modifiers Section -->
+        <div v-if="hasAttackDefenseStats" class="stats-table mt-3">
+          <!-- Headers Row -->
+          <div class="stats-row header-row">
+            <div class="stat-group header-cell">Attack Skills</div>
+            <div class="stat-group header-cell">Defense Skills</div>
+          </div>
+          
+          <!-- Data Row -->
+          <div class="stats-row data-row">
+            <!-- Attack Skills Column -->
+            <div class="stat-group">
+              <div v-if="attackStatsFormatted.length > 0" class="modifier-list">
+                <div v-for="modifier in attackStatsFormatted" :key="modifier.stat" class="stat-pair">
+                  <span class="stat-name">{{ modifier.name }}</span>
+                  <span class="stat-val val-attack">{{ modifier.formattedValue }}</span>
+                </div>
+              </div>
+              <div v-else class="text-xs text-surface-500 dark:text-surface-400 text-center py-4">
+                No attack skills
+              </div>
+            </div>
+            
+            <!-- Defense Skills Column -->
+            <div class="stat-group">
+              <div v-if="defenseStatsFormatted.length > 0" class="modifier-list">
+                <div v-for="modifier in defenseStatsFormatted" :key="modifier.stat" class="stat-pair">
+                  <span class="stat-name">{{ modifier.name }}</span>
+                  <span class="stat-val val-defense">{{ modifier.formattedValue }}</span>
+                </div>
+              </div>
+              <div v-else class="text-xs text-surface-500 dark:text-surface-400 text-center py-4">
+                No defense skills
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </template>
   </Card>
@@ -125,6 +163,8 @@ const props = defineProps<{
   item: Item
   profile?: TinkerProfile | null
   showCompatibility?: boolean
+  attackStats?: Array<{stat: number, value: number}>
+  defenseStats?: Array<{stat: number, value: number}>
 }>()
 
 // Computed Properties
@@ -180,6 +220,29 @@ const weaponSkillRequirements = computed(() => {
   return props.item.requirements.filter(req => weaponSkillIds.includes(req.stat))
 })
 
+const hasAttackDefenseStats = computed(() => {
+  return (props.attackStats && props.attackStats.length > 0) || 
+         (props.defenseStats && props.defenseStats.length > 0)
+})
+
+const attackStatsFormatted = computed(() => {
+  if (!props.attackStats) return []
+  return props.attackStats.map(stat => ({
+    stat: stat.stat,
+    name: getStatName(stat.stat),
+    formattedValue: formatPercentageValue(stat.value)
+  }))
+})
+
+const defenseStatsFormatted = computed(() => {
+  if (!props.defenseStats) return []
+  return props.defenseStats.map(stat => ({
+    stat: stat.stat,
+    name: getStatName(stat.stat),
+    formattedValue: formatPercentageValue(stat.value)
+  }))
+})
+
 // Methods
 function canMeetRequirement(requirement: ItemRequirement): boolean {
   if (!props.profile) return false
@@ -220,6 +283,11 @@ function getAttackIcon(attackName: string): string {
     'Sneak Attack': '🗡️'
   }
   return iconMap[attackName] || '⚔️'
+}
+
+function formatPercentageValue(value: number): string {
+  const sign = value >= 0 ? '+' : ''
+  return `${sign}${value}%`
 }
 </script>
 
@@ -308,6 +376,8 @@ function getAttackIcon(attackName: string): string {
 .weapon-stats-component .val-range { color: #10b981; }
 .weapon-stats-component .val-ammo { color: #fbbf24; }
 .weapon-stats-component .val-special { color: #a78bfa; }
+.weapon-stats-component .val-attack { color: #ef4444; font-weight: 600; }
+.weapon-stats-component .val-defense { color: #3b82f6; font-weight: 600; }
 
 /* Damage display */
 .weapon-stats-component .damage-display {
@@ -386,5 +456,12 @@ function getAttackIcon(attackName: string): string {
   color: #fbbf24;
   font-weight: bold;
   font-size: 11px;
+}
+
+/* Modifier list styling */
+.weapon-stats-component .modifier-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 </style>

@@ -173,45 +173,210 @@ function getActionHeader(action: any): string {
 }
 </script>
 
-<style scoped>
+<style>
+/* Component styling matching WeaponStats aesthetic */
 .action-requirements {
-  @apply w-full;
+  width: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+/* Primary action with enhanced Card styling */
 .primary-action {
-  @apply border border-surface-200 dark:border-surface-700 rounded-lg p-4 bg-surface-0 dark:bg-surface-950;
+  background: #f8fafc;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 6px;
+  transition: all 0.2s ease;
 }
 
+.dark .primary-action {
+  background: #0c0a09 !important;
+  border-color: #374151 !important;
+}
+
+@media (prefers-color-scheme: light) {
+  .primary-action {
+    background: #ffffff;
+    border-color: #e5e7eb;
+  }
+}
+
+.primary-action:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dark .primary-action:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Other actions spacing */
 .other-actions {
-  @apply space-y-2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
+/* Requirements list with improved spacing */
 .requirements-list {
-  @apply space-y-2;
+  margin-top: 4px;
 }
 
+/* Text colors with better contrast */
 .text-muted {
-  @apply text-surface-500 dark:text-surface-400;
+  color: #6b7280;
+}
+
+.dark .text-muted {
+  color: #9ca3af !important;
 }
 
 .text-danger {
-  @apply text-red-500 dark:text-red-400;
+  color: #dc2626;
+}
+
+.dark .text-danger {
+  color: #fca5a5 !important;
 }
 
 .text-primary {
-  @apply text-primary-500 dark:text-primary-400;
+  color: #3b82f6;
 }
 
-/* Accordion styling adjustments */
+.dark .text-primary {
+  color: #93bbfc !important;
+}
+
+/* Enhanced accordion styling to match component theme */
 :deep(.p-accordion-tab) {
-  @apply mb-2;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #d1d5db;
+}
+
+.dark :deep(.p-accordion-tab) {
+  border-color: #374151 !important;
 }
 
 :deep(.p-accordion-header) {
-  @apply bg-surface-50 dark:bg-surface-900;
+  background: #f9fafb;
+  border: none;
+  border-radius: 0;
+  transition: all 0.2s ease;
+}
+
+.dark :deep(.p-accordion-header) {
+  background: #1f2937 !important;
+}
+
+:deep(.p-accordion-header:hover) {
+  background: #f3f4f6;
+}
+
+.dark :deep(.p-accordion-header:hover) {
+  background: #374151 !important;
+}
+
+:deep(.p-accordion-header-link) {
+  padding: 4px 6px;
+  color: #374151;
+  font-weight: 500;
+  border-radius: 0;
+}
+
+.dark :deep(.p-accordion-header-link) {
+  color: #e5e7eb !important;
 }
 
 :deep(.p-accordion-content) {
-  @apply bg-surface-0 dark:bg-surface-950;
+  background: #ffffff;
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  padding: 6px;
+}
+
+.dark :deep(.p-accordion-content) {
+  background: #0c0a09 !important;
+  border-top-color: #374151 !important;
+}
+
+@media (prefers-color-scheme: light) {
+  :deep(.p-accordion-header) {
+    background: #f9fafb;
+  }
+  
+  :deep(.p-accordion-header:hover) {
+    background: #f3f4f6;
+  }
+  
+  :deep(.p-accordion-content) {
+    background: #ffffff;
+    border-top-color: #e5e7eb;
+  }
+}
+
+/* Focus states for accessibility */
+:deep(.p-accordion-header-link:focus) {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+:deep(.p-accordion-header-link:focus:not(:focus-visible)) {
+  outline: none;
+}
+
+/* Improved summary section */
+.action-requirements > div:last-child {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 6px;
+  margin-top: 6px;
+}
+
+.dark .action-requirements > div:last-child {
+  background: #111827 !important;
+  border-color: #374151 !important;
+}
+
+/* Enhanced tag styling within the component */
+:deep(.p-tag) {
+  border-radius: 16px;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 12px;
+}
+
+:deep(.p-tag.p-tag-success) {
+  background: linear-gradient(135deg, #059669, #10b981);
+  border-color: #059669;
+  color: white;
+}
+
+:deep(.p-tag.p-tag-danger) {
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  border-color: #dc2626;
+  color: white;
+}
+
+/* Responsive improvements */
+@media (max-width: 640px) {
+  .primary-action {
+    padding: 4px;
+  }
+  
+  .requirements-list {
+    margin-top: 3px;
+  }
+  
+  :deep(.p-accordion-header-link) {
+    padding: 3px 4px;
+  }
+  
+  :deep(.p-accordion-content) {
+    padding: 4px;
+  }
 }
 </style>
