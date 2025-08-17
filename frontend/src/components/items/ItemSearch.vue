@@ -151,22 +151,8 @@ Provides full-text search with auto-complete and search suggestions
         </div>
         
         <!-- Search modifiers -->
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap gap-2" v-if="profile">
           <div class="flex items-center">
-            <Checkbox v-model="caseSensitive" input-id="case-sensitive" />
-            <label for="case-sensitive" class="ml-2 text-sm text-surface-600 dark:text-surface-400">
-              Case sensitive
-            </label>
-          </div>
-          
-          <div class="flex items-center">
-            <Checkbox v-model="exactMatch" input-id="exact-match" />
-            <label for="exact-match" class="ml-2 text-sm text-surface-600 dark:text-surface-400">
-              Exact match
-            </label>
-          </div>
-          
-          <div class="flex items-center" v-if="profile">
             <Checkbox v-model="compatibleOnly" input-id="compatible-only" />
             <label for="compatible-only" class="ml-2 text-sm text-surface-600 dark:text-surface-400">
               Compatible items only
@@ -255,8 +241,6 @@ const savedSearches = ref<SavedSearch[]>([])
 // Advanced search options
 const searchFields = ref<string[]>([])
 const matchType = ref('exact') // Default to exact matching
-const caseSensitive = ref(false)
-const exactMatch = ref(false)
 const compatibleOnly = ref(false)
 
 // Search stats
