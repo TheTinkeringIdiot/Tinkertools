@@ -208,14 +208,6 @@ Shows all item data with profile compatibility and comparison options
         :defense-stats="item.defense_stats"
       />
 
-      <!-- Spell Data Effects (for items with spell_data) -->
-      <SpellDataDisplay
-        v-if="item && item.spell_data && item.spell_data.length > 0"
-        :spell-data="item.spell_data"
-        :profile="profile"
-        :show-hidden="false"
-      />
-
       <!-- Actions and Usage -->
       <Card v-if="item.actions?.length">
         <template #content>
@@ -236,6 +228,14 @@ Shows all item data with profile compatibility and comparison options
           </div>
         </template>
       </Card>
+
+      <!-- Spell Data Effects (for items with spell_data) -->
+      <SpellDataDisplay
+        v-if="item && item.spell_data && item.spell_data.length > 0"
+        :spell-data="item.spell_data"
+        :profile="profile"
+        :show-hidden="false"
+      />
 
 
 
@@ -454,14 +454,6 @@ Shows all item data with profile compatibility and comparison options
         :defense-stats="item.defense_stats"
       />
 
-      <!-- Spell Data Effects (for items with spell_data) -->
-      <SpellDataDisplay
-        v-if="item && item.spell_data && item.spell_data.length > 0"
-        :spell-data="item.spell_data"
-        :profile="profile"
-        :show-hidden="false"
-      />
-
       <!-- Actions and Usage -->
       <Card v-if="item.actions?.length">
         <template #content>
@@ -482,6 +474,14 @@ Shows all item data with profile compatibility and comparison options
           </div>
         </template>
       </Card>
+
+      <!-- Spell Data Effects (for items with spell_data) -->
+      <SpellDataDisplay
+        v-if="item && item.spell_data && item.spell_data.length > 0"
+        :spell-data="item.spell_data"
+        :profile="profile"
+        :show-hidden="false"
+      />
 
 
 
