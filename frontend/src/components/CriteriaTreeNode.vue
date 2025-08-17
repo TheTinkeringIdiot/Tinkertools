@@ -56,7 +56,7 @@
 import { computed } from 'vue'
 import type { CriteriaTreeNode } from '../services/action-criteria'
 import type { CharacterStats } from '../composables/useActionCriteria'
-import { getStatName, getProfessionName, getBreedName, getGenderName, getFlagNameFromValue } from '../services/game-utils'
+import { getStatName, getProfessionName, getBreedName, getGenderName, getFlagNameFromValue, getNPCFamilyName } from '../services/game-utils'
 
 // ============================================================================
 // Props
@@ -147,6 +147,8 @@ const formattedValue = computed(() => {
       return getBreedName(value) || value.toString()
     case 59: // Gender
       return getGenderName(value) || value.toString()
+    case 455: // NPCFamily
+      return getNPCFamilyName(value) || value.toString()
     default:
       return value.toString()
   }

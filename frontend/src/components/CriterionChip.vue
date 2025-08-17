@@ -38,7 +38,7 @@
 import { computed } from 'vue'
 import type { DisplayCriterion } from '../services/action-criteria'
 import type { CharacterStats } from '../composables/useActionCriteria'
-import { getStatName, getProfessionName, getBreedName, getGenderName, getFlagNameFromValue } from '../services/game-utils'
+import { getStatName, getProfessionName, getBreedName, getGenderName, getFlagNameFromValue, getNPCFamilyName } from '../services/game-utils'
 
 // ============================================================================
 // Props
@@ -117,6 +117,10 @@ const formattedValue = computed(() => {
     case 59: // Gender
       const genderName = getGenderName(value)
       return genderName || value.toString()
+      
+    case 455: // NPCFamily
+      const npcFamilyName = getNPCFamilyName(value)
+      return npcFamilyName || value.toString()
       
     case 54: // Level
       return value.toString()

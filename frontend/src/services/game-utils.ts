@@ -28,6 +28,7 @@ import {
   IMPLANT_SLOT,
   WORN_ITEM,
   WEAPON_TYPE,
+  NPCFAMILY,
   type StatId,
   type StatName,
   type RequirementId,
@@ -88,6 +89,13 @@ export function getFactionName(id: number): FactionName | undefined {
  */
 export function getGenderName(id: number): string | undefined {
   return GENDER[id as keyof typeof GENDER];
+}
+
+/**
+ * Get NPC family name from ID
+ */
+export function getNPCFamilyName(id: number): string | undefined {
+  return NPCFAMILY[id as keyof typeof NPCFAMILY];
 }
 
 /**
@@ -1333,6 +1341,7 @@ export function getFlagNameFromValue(statId: number, bitValue: number): string {
   const flagConstants: Record<number, Record<string, number>> = {
     30: CANFLAG,        // Can flags
     355: WORN_ITEM,     // WornItem flags
+    455: NPCFAMILY,     // NPCFamily flags
     // Add more stat ID to flag mappings as needed
   }
   
@@ -1363,6 +1372,7 @@ export const gameUtils = {
   getBreedName,
   getFactionName,
   getGenderName,
+  getNPCFamilyName,
   getNanoSchoolName,
   getNanoStrainName,
   getAmmoTypeName,
