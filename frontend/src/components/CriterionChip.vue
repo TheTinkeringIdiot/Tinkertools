@@ -162,89 +162,198 @@ const statusClasses = computed(() => {
 })
 </script>
 
-<style scoped>
+<style>
+/* Component-scoped styling matching WeaponStats aesthetic */
 .criterion-chip {
-  @apply inline-flex items-center rounded-lg border transition-colors duration-200;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 16px;
+  border: 1px solid;
+  transition: all 0.2s ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  white-space: nowrap;
 }
 
-/* Size variants */
+/* Size variants with WeaponStats-inspired sizing */
 .size-small {
-  @apply px-2 py-1 text-xs;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .size-normal {
-  @apply px-3 py-1.5 text-sm;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .size-large {
-  @apply px-4 py-2 text-base;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
 }
 
-/* Status variants */
+/* Status variants with improved contrast and colors */
 .requirement-met {
-  @apply bg-green-100 border-green-300 text-green-800 dark:bg-green-900/30 dark:border-green-700 dark:text-green-300;
+  background: #064e3b;
+  border-color: #059669;
+  color: #6ee7b7;
 }
 
 .requirement-unmet {
-  @apply bg-red-100 border-red-300 text-red-800 dark:bg-red-900/30 dark:border-red-700 dark:text-red-300;
+  background: #7f1d1d;
+  border-color: #dc2626;
+  color: #fca5a5;
 }
 
 .requirement-unknown {
-  @apply bg-surface-100 border-surface-300 text-surface-800 dark:bg-surface-800 dark:border-surface-600 dark:text-surface-200;
+  background: #374151;
+  border-color: #6b7280;
+  color: #d1d5db;
 }
 
 .requirement-neutral {
-  @apply bg-surface-100 border-surface-300 text-surface-800 dark:bg-surface-800 dark:border-surface-600 dark:text-surface-200;
+  background: #374151;
+  border-color: #6b7280;
+  color: #d1d5db;
 }
 
-/* Type variants */
+/* Light mode overrides */
+@media (prefers-color-scheme: light) {
+  .requirement-met {
+    background: rgba(34, 197, 94, 0.1);
+    border-color: #16a34a;
+    color: #059669;
+  }
+
+  .requirement-unmet {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: #dc2626;
+    color: #dc2626;
+  }
+
+  .requirement-unknown,
+  .requirement-neutral {
+    background: #f8fafc;
+    border-color: #d1d5db;
+    color: #4b5563;
+  }
+}
+
+/* Type-specific styling */
 .stat-requirement-chip .stat-name {
-  @apply font-medium;
+  font-weight: 500;
+  color: inherit;
 }
 
 .stat-requirement-chip .operator {
-  @apply mx-1 font-mono;
+  margin: 0 4px;
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  font-size: 11px;
 }
 
 .stat-requirement-chip .value {
-  @apply font-semibold;
+  font-weight: 600;
+  color: inherit;
 }
 
 .logical-operator-chip {
-  @apply bg-blue-100 border-blue-300 text-blue-800 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300;
+  background: rgba(59, 130, 246, 0.1);
+  border-color: #3b82f6;
+  color: #93bbfc;
+}
+
+@media (prefers-color-scheme: light) {
+  .logical-operator-chip {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: #3b82f6;
+    color: #1d4ed8;
+  }
 }
 
 .state-requirement-chip {
-  @apply bg-purple-100 border-purple-300 text-purple-800 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-300;
+  background: rgba(139, 92, 246, 0.1);
+  border-color: #7c3aed;
+  color: #c4b5fd;
 }
 
-/* Status indicators */
+@media (prefers-color-scheme: light) {
+  .state-requirement-chip {
+    background: rgba(139, 92, 246, 0.1);
+    border-color: #7c3aed;
+    color: #6d28d9;
+  }
+}
+
+/* Status indicators with improved visibility */
 .status {
-  @apply ml-2 text-xs font-mono;
+  margin-left: 6px;
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  opacity: 0.9;
 }
 
 .status-met {
-  @apply text-green-600 dark:text-green-400;
+  color: #6ee7b7;
 }
 
 .status-unmet {
-  @apply text-red-600 dark:text-red-400;
+  color: #fca5a5;
 }
 
 .status-neutral {
-  @apply text-surface-500 dark:text-surface-400;
+  color: #9ca3af;
 }
 
-/* Content styling */
+@media (prefers-color-scheme: light) {
+  .status-met {
+    color: #059669;
+  }
+
+  .status-unmet {
+    color: #dc2626;
+  }
+
+  .status-neutral {
+    color: #6b7280;
+  }
+}
+
+/* Content layout improvements */
 .stat-requirement,
 .state-requirement,
 .logical-operator,
 .unknown-criterion {
-  @apply flex items-center;
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .state-requirement i,
 .logical-operator i {
-  @apply text-current opacity-70;
+  opacity: 0.8;
+  margin-right: 4px;
+}
+
+/* Hover effects for better interaction */
+.criterion-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.dark .criterion-chip:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Focus states for accessibility */
+.criterion-chip:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.criterion-chip:focus:not(:focus-visible) {
+  outline: none;
 }
 </style>

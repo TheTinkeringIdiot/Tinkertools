@@ -193,6 +193,8 @@ Shows all item data with profile compatibility and comparison options
         :item="item"
         :profile="profile"
         :show-compatibility="showCompatibility"
+        :attack-stats="item.attack_stats"
+        :defense-stats="item.defense_stats"
       />
 
       <!-- Actions and Usage -->
@@ -253,43 +255,6 @@ Shows all item data with profile compatibility and comparison options
         </template>
       </Card>
 
-      <!-- Attack/Defense Data -->
-      <Card v-if="item.attack_stats || item.defense_stats">
-        <template #header>
-          <h3 class="text-lg font-semibold">Combat Information</h3>
-        </template>
-        <template #content>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div v-if="item.attack_stats">
-              <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">Attack</h4>
-              <div class="space-y-2">
-                <div
-                  v-for="attack in item.attack_stats"
-                  :key="attack.stat"
-                  class="flex justify-between p-2 bg-surface-50 dark:bg-surface-900 rounded"
-                >
-                  <span class="text-sm">{{ getStatName(attack.stat) }}</span>
-                  <span class="font-mono font-medium">{{ attack.value }}</span>
-                </div>
-              </div>
-            </div>
-            
-            <div v-if="item.defense_stats">
-              <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">Defense</h4>
-              <div class="space-y-2">
-                <div
-                  v-for="defense in item.defense_stats"
-                  :key="defense.stat"
-                  class="flex justify-between p-2 bg-surface-50 dark:bg-surface-900 rounded"
-                >
-                  <span class="text-sm">{{ getStatName(defense.stat) }}</span>
-                  <span class="font-mono font-medium">{{ defense.value }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </template>
-      </Card>
 
       <!-- Special Effects -->
       <Card v-if="item.spell_data?.length">
@@ -509,6 +474,8 @@ Shows all item data with profile compatibility and comparison options
         :item="item"
         :profile="profile"
         :show-compatibility="showCompatibility"
+        :attack-stats="item.attack_stats"
+        :defense-stats="item.defense_stats"
       />
 
       <!-- Actions and Usage -->
@@ -570,43 +537,6 @@ Shows all item data with profile compatibility and comparison options
       </Card>
 
 
-      <!-- Attack/Defense Data -->
-      <Card v-if="item.attack_stats || item.defense_stats">
-        <template #header>
-          <h3 class="text-lg font-semibold">Combat Information</h3>
-        </template>
-        <template #content>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div v-if="item.attack_stats">
-              <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">Attack</h4>
-              <div class="space-y-2">
-                <div
-                  v-for="attack in item.attack_stats"
-                  :key="attack.stat"
-                  class="flex justify-between p-2 bg-surface-50 dark:bg-surface-900 rounded"
-                >
-                  <span class="text-sm">{{ getStatName(attack.stat) }}</span>
-                  <span class="font-mono font-medium">{{ attack.value }}</span>
-                </div>
-              </div>
-            </div>
-            
-            <div v-if="item.defense_stats">
-              <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-3">Defense</h4>
-              <div class="space-y-2">
-                <div
-                  v-for="defense in item.defense_stats"
-                  :key="defense.stat"
-                  class="flex justify-between p-2 bg-surface-50 dark:bg-surface-900 rounded"
-                >
-                  <span class="text-sm">{{ getStatName(defense.stat) }}</span>
-                  <span class="font-mono font-medium">{{ defense.value }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </template>
-      </Card>
 
       <!-- Special Effects -->
       <Card v-if="item.spell_data?.length">
