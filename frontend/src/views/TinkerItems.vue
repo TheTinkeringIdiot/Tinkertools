@@ -418,6 +418,7 @@ function onPageChange(page: number) {
     const query: ItemSearchQuery = {
       search: searchQuery.value,
       exact_match: searchOptions.value.exactMatch,
+      search_fields: searchOptions.value.searchFields.length > 0 ? searchOptions.value.searchFields : undefined,
       ...activeFilters.value,
       sort: sortOption.value.includes('_') ? sortOption.value.split('_')[0] as 'name' | 'ql' | 'item_class' | 'aoid' : sortOption.value as 'name' | 'ql' | 'item_class' | 'aoid',
       sort_order: sortOption.value.includes('desc') ? 'desc' : 'asc',
