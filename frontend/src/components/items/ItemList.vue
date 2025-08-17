@@ -89,16 +89,6 @@ Shows items in grid or list view with pagination and compatibility indicators
                       {{ item.description }}
                     </p>
                     
-                    <!-- Key Stats -->
-                    <div class="flex flex-wrap gap-2 mb-2">
-                      <Tag
-                        v-for="stat in getKeyStats(item)"
-                        :key="stat.name"
-                        :value="`${stat.name}: ${stat.value}`"
-                        severity="secondary"
-                        size="small"
-                      />
-                    </div>
                     
                     <!-- Requirements (if showing compatibility) -->
                   </div>
@@ -331,17 +321,6 @@ function isComparing(itemId: number): boolean {
   return props.comparisonItems?.includes(itemId) || false
 }
 
-function getKeyStats(item: Item): Array<{ name: string; value: string }> {
-  if (!item.stats || item.stats.length === 0) return []
-  
-  return item.stats
-    .filter(stat => stat.value !== 0)
-    .slice(0, 3)
-    .map(stat => ({
-      name: getStatName(stat.stat),
-      value: stat.value > 0 ? `+${stat.value}` : stat.value.toString()
-    }))
-}
 
 function getStatName(statId: number): string {
   return statNameMap.value[statId] || `Stat ${statId}`
