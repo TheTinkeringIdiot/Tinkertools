@@ -38,7 +38,7 @@
 import { computed } from 'vue'
 import type { DisplayCriterion } from '../services/action-criteria'
 import type { CharacterStats } from '../composables/useActionCriteria'
-import { getStatName, getProfessionName, getBreedName, getGenderName } from '../services/game-utils'
+import { getStatName, getProfessionName, getBreedName, getGenderName, getFlagNameFromValue } from '../services/game-utils'
 
 // ============================================================================
 // Props
@@ -98,6 +98,11 @@ const requirementMet = computed(() => {
 
 const formattedValue = computed(() => {
   const value = props.criterion.displayValue
+  
+  // Handle flag operators - use resolved flag names
+  if (props.criterion.displaySymbol === 'has' || props.criterion.displaySymbol === 'lacks') {
+    return getFlagNameFromValue(props.criterion.stat, value)
+  }
   
   // Special formatting for certain stats
   switch (props.criterion.stat) {
