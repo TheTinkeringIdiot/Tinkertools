@@ -26,6 +26,8 @@ import {
   WEAPON_SLOT,
   ARMOR_SLOT,
   IMPLANT_SLOT,
+  WORN_ITEM,
+  WEAPON_TYPE,
   type StatId,
   type StatName,
   type RequirementId,
@@ -1291,6 +1293,65 @@ export function getImplantSlotPosition(slotName: string): { row: number; col: nu
 }
 
 // ============================================================================
+// Flag Bit Resolution
+// ============================================================================
+
+/**
+ * Get flag name from bit number and stat ID
+ * Shared utility for resolving bit numbers to flag names across criteria and spell data
+ */
+export function getFlagNameFromBit(statId: number, bitNum: number): string {
+  // Map stat IDs to their corresponding flag constants
+  const flagConstants: Record<number, Record<string, number>> = {
+    30: CANFLAG,        // Can flags
+    355: WORN_ITEM,     // WornItem flags
+    // Add more stat ID to flag mappings as needed
+  }
+  
+  const flagConstant = flagConstants[statId]
+  if (!flagConstant) {
+    return `Bit ${bitNum}`
+  }
+  
+  // Find the flag name that corresponds to the bit position
+  const bitValue = 1 << bitNum // Convert bit position to bit value
+  for (const [flagName, flagValue] of Object.entries(flagConstant)) {
+    if (flagValue === bitValue) {
+      return flagName
+    }
+  }
+  
+  return `Bit ${bitNum}`
+}
+
+/**
+ * Get flag name from bit value and stat ID
+ * Similar to getFlagNameFromBit but works with the actual bit value instead of position
+ */
+export function getFlagNameFromValue(statId: number, bitValue: number): string {
+  // Map stat IDs to their corresponding flag constants
+  const flagConstants: Record<number, Record<string, number>> = {
+    30: CANFLAG,        // Can flags
+    355: WORN_ITEM,     // WornItem flags
+    // Add more stat ID to flag mappings as needed
+  }
+  
+  const flagConstant = flagConstants[statId]
+  if (!flagConstant) {
+    return `Flag ${bitValue}`
+  }
+  
+  // Find the flag name that corresponds to the bit value
+  for (const [flagName, flagValue] of Object.entries(flagConstant)) {
+    if (flagValue === bitValue) {
+      return flagName
+    }
+  }
+  
+  return `Flag ${bitValue}`
+}
+
+// ============================================================================
 // Export all functions as a single object for easy importing
 // ============================================================================
 
@@ -1395,5 +1456,9 @@ export const gameUtils = {
   getItemSlotInfo,
   getWeaponSlotPosition,
   getArmorSlotPosition,
-  getImplantSlotPosition
+  getImplantSlotPosition,
+  
+  // Flag resolution functions
+  getFlagNameFromBit,
+  getFlagNameFromValue
 };

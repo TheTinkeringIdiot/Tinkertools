@@ -13,7 +13,7 @@ import {
   BREED,
   GENDER
 } from './game-data'
-import { getStatName, getProfessionName, getBreedName, getGenderName } from './game-utils'
+import { getStatName, getProfessionName, getBreedName, getGenderName, getFlagNameFromValue } from './game-utils'
 import type { Action, Criterion } from '../types/api'
 
 // ============================================================================
@@ -204,7 +204,7 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
     case 22: // StatBitSet
       displayOperator = 'Has bit flag'
       displaySymbol = 'has'
-      description = `${statName} has flag ${value}`
+      description = `${statName} has ${getFlagNameFromValue(stat, value)}`
       break
       
     case 24: // StatNotEqual
@@ -217,7 +217,7 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
     case 107: // StatBitNotSet
       displayOperator = 'Lacks bit flag'
       displaySymbol = 'lacks'
-      description = `${statName} lacks flag ${value}`
+      description = `${statName} lacks ${getFlagNameFromValue(stat, value)}`
       break
       
     default:

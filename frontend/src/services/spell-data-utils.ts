@@ -5,8 +5,8 @@
  * Handles event translations, parameter formatting, and spell text interpolation.
  */
 
-import { TEMPLATE_EVENT, TARGET, WORN_ITEM, CANFLAG, WEAPON_SLOT, ARMOR_SLOT, IMPLANT_SLOT, WEAPON_TYPE } from './game-data'
-import { getStatName } from './game-utils'
+import { TEMPLATE_EVENT, TARGET } from './game-data'
+import { getStatName, getFlagNameFromBit } from './game-utils'
 import type { SpellData, Spell, Criterion } from '@/types/api'
 
 // ============================================================================
@@ -78,36 +78,6 @@ export function getEventDisplayPriority(eventId: number): number {
   return priorityMap[eventId] || 10
 }
 
-// ============================================================================
-// Flag Bit Resolution
-// ============================================================================
-
-/**
- * Get flag name from bit number and stat ID
- */
-export function getFlagNameFromBit(statId: number, bitNum: number): string {
-  // Map stat IDs to their corresponding flag constants
-  const flagConstants: Record<number, Record<string, number>> = {
-    30: CANFLAG,        // Can flags
-    355: WORN_ITEM,     // WornItem flags
-    // Add more stat ID to flag mappings as needed
-  }
-  
-  const flagConstant = flagConstants[statId]
-  if (!flagConstant) {
-    return `Bit ${bitNum}`
-  }
-  
-  // Find the flag name that corresponds to the bit position
-  const bitValue = 1 << bitNum // Convert bit position to bit value
-  for (const [flagName, flagValue] of Object.entries(flagConstant)) {
-    if (flagValue === bitValue) {
-      return flagName
-    }
-  }
-  
-  return `Bit ${bitNum}`
-}
 
 // ============================================================================
 // Parameter Formatting
@@ -397,8 +367,8 @@ export function getEventColor(eventId: number): string {
  * Determine if spell data should be displayed in compact mode
  */
 export function shouldUseCompactMode(spellDataList: FormattedSpellData[]): boolean {
-  const totalSpells = spellDataList.reduce((sum, data) => sum + data.spells.length, 0)
-  return totalSpells <= 3 && spellDataList.length <= 2
+  // Always use table mode for consistency
+  return false
 }
 
 /**
