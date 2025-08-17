@@ -225,24 +225,52 @@ def search_items(
         if not fields_to_search:  # Fallback if no valid fields provided
             fields_to_search = ['name', 'description']
     
+    # Log search parameters for debugging
+    logger.info(f"Search query='{q}' search_fields='{search_fields}' parsed_fields={fields_to_search} exact_match={exact_match}")
+    
     if exact_match:
         # Use ILIKE for exact word matching (default behavior)
         search_term = f"%{q}%"
         
         # Build search conditions based on requested fields
         search_conditions = []
+        
+        # Explicitly check each field and log what we're searching
         if 'name' in fields_to_search:
-            search_conditions.append(Item.name.ilike(search_term))
+            name_condition = Item.name.ilike(search_term)
+            search_conditions.append(name_condition)
+            logger.info(f"Added name search condition: name ILIKE '{search_term}'")
+            
         if 'description' in fields_to_search:
-            search_conditions.append(Item.description.ilike(search_term))
+            desc_condition = Item.description.ilike(search_term)
+            search_conditions.append(desc_condition)
+            logger.info(f"Added description search condition: description ILIKE '{search_term}'")
+            
         # Note: 'effects' and 'stats' would require more complex joins and are not implemented yet
         
+        # Validate we have search conditions - this should never be empty with current logic
+        if not search_conditions:
+            logger.error(f"No search conditions built for fields {fields_to_search}! This should not happen.")
+            # Fallback to searching name only
+            search_conditions.append(Item.name.ilike(search_term))
+        
+        logger.info(f"Final query: searching {len(search_conditions)} field(s) for term '{q}' in fields {fields_to_search}")
+        
+        # Build the query with explicit OR conditions
         query = db.query(Item).options(
             joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
             joinedload(Item.item_spell_data)
-        ).filter(
-            or_(*search_conditions) if search_conditions else Item.name.ilike(search_term)
-        ).order_by(Item.name)
+        )
+        
+        # Apply the search filter
+        if len(search_conditions) == 1:
+            # Single condition - no need for OR
+            query = query.filter(search_conditions[0])
+        else:
+            # Multiple conditions - use OR
+            query = query.filter(or_(*search_conditions))
+            
+        query = query.order_by(Item.name)
         
         # Apply weapons filter to exact search if requested
         if weapons:
