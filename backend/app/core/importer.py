@@ -357,6 +357,9 @@ class DataImporter:
         if not action_data or not action_data.get('Actions'):
             return
         
+        # First, clear existing actions for this item (in case of update)
+        db.query(Action).filter(Action.item_id == item.id).delete()
+        
         for action_data in action_data['Actions']:
             action = Action(
                 action=action_data.get('Action'),
@@ -385,6 +388,9 @@ class DataImporter:
     
     def _process_spell_data(self, db: Session, item: Item, item_data: Dict):
         """Process SpellData."""
+        # First, clear existing spell_data relationships for this item (in case of update)
+        db.query(ItemSpellData).filter(ItemSpellData.item_id == item.id).delete()
+        
         for spell_data in item_data.get('SpellData', []):
             spell_data_obj = SpellData(
                 event=spell_data.get('Event')

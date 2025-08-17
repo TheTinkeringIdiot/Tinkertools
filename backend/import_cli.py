@@ -36,6 +36,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 
 from app.core.importer import DataImporter
+from app.core.database import create_tables, get_table_count
 
 # Setup logging
 logging.basicConfig(
@@ -50,9 +51,33 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def ensure_tables_exist():
+    """Ensure database tables exist, create them if they don't."""
+    try:
+        table_count = get_table_count()
+        logger.info(f"Current table count: {table_count}")
+        
+        if table_count == 0:
+            logger.info("No tables found, creating database schema...")
+            create_tables()
+            new_count = get_table_count()
+            logger.info(f"Created {new_count} tables")
+        else:
+            logger.info("Database tables already exist")
+        
+        return True
+    except Exception as e:
+        logger.error(f"Failed to ensure tables exist: {e}")
+        return False
+
+
 def import_symbiants(args):
     """Import symbiants from CSV."""
     logger.info("Starting symbiant import...")
+    
+    # Ensure database tables exist
+    if not ensure_tables_exist():
+        return False
     
     file_path = "symbiants.csv"
     if not Path(file_path).exists():
@@ -72,6 +97,10 @@ def import_symbiants(args):
 def import_items(args):
     """Import items from JSON."""
     logger.info("Starting items import...")
+    
+    # Ensure database tables exist
+    if not ensure_tables_exist():
+        return False
     
     file_path = "items.json"
     if not Path(file_path).exists():
@@ -94,6 +123,10 @@ def import_items(args):
 def import_nanos(args):
     """Import nanos from JSON."""
     logger.info("Starting nanos import...")
+    
+    # Ensure database tables exist
+    if not ensure_tables_exist():
+        return False
     
     file_path = "nanos.json"
     if not Path(file_path).exists():
