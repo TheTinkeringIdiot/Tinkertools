@@ -2463,7 +2463,7 @@ export const DAMAGE_TYPES = {
  * Used for formatting spell descriptions with parameter interpolation
  */
 export const SPELL_FORMATS = {
-  53002: 'Hit {Stat} for {MinValue} to {MaxValue} {TickCount}x @ {TickInterval}s',
+  53002: 'Hit {Stat} for {MinValue} to {MaxValue}',
   53003: 'Animation effect, A={A} B={B} C={C} D={D} E={E}',
   53012: 'Modify {Stat} by {Amount}',
   53014: 'Modify {Stat} for {Duration}s by {Amount}',
