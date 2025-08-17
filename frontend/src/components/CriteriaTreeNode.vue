@@ -56,7 +56,7 @@
 import { computed } from 'vue'
 import type { CriteriaTreeNode } from '../services/action-criteria'
 import type { CharacterStats } from '../composables/useActionCriteria'
-import { getStatName, getProfessionName, getBreedName, getGenderName } from '../services/game-utils'
+import { getStatName, getProfessionName, getBreedName, getGenderName, getFlagNameFromValue } from '../services/game-utils'
 
 // ============================================================================
 // Props
@@ -132,6 +132,12 @@ const formattedValue = computed(() => {
   
   const value = props.node.criterion.displayValue
   const stat = props.node.criterion.stat
+  const displaySymbol = props.node.criterion.displaySymbol
+  
+  // Handle flag operators - use resolved flag names
+  if (displaySymbol === 'has' || displaySymbol === 'lacks') {
+    return getFlagNameFromValue(stat, value)
+  }
   
   // Special formatting for certain stats
   switch (stat) {
