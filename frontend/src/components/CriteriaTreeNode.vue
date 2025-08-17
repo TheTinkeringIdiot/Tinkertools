@@ -142,6 +142,8 @@ const formattedValue = computed(() => {
   switch (stat) {
     case 60: // Profession
       return getProfessionName(value) || value.toString()
+    case 368: // VisualProfession
+      return getProfessionName(value) || value.toString()
     case 4: // Breed  
       return getBreedName(value) || value.toString()
     case 59: // Gender

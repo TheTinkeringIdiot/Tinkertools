@@ -110,6 +110,10 @@ const formattedValue = computed(() => {
       const professionName = getProfessionName(value)
       return professionName || value.toString()
       
+    case 368: // VisualProfession
+      const visualProfessionName = getProfessionName(value)
+      return visualProfessionName || value.toString()
+      
     case 4: // Breed
       const breedName = getBreedName(value)
       return breedName || value.toString()
