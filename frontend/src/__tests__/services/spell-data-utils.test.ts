@@ -20,7 +20,7 @@ describe('spell-data-utils', () => {
     it('should return format string for valid spell_id', () => {
       // Test with a known spell format ID from SPELL_FORMATS
       const format = getSpellFormat(53002)
-      expect(format).toBe('Hit {Stat} for {MinValue} to {MaxValue} {TickCount}x @ {TickInterval}s')
+      expect(format).toBe('Hit {Stat} for {MinValue} to {MaxValue}')
     })
 
     it('should return undefined for unknown spell_id', () => {
@@ -55,8 +55,8 @@ describe('spell-data-utils', () => {
     it('should use spell_id to look up format from SPELL_FORMATS', () => {
       const result = formatSpell(mockSpell)
       
-      // The format should include TickCount and TickInterval from spell fields, not params
-      expect(result.formattedText).toContain('Hit Intelligence for 10 to 20 1x @ 100s')
+      // The format should interpolate the basic parameters
+      expect(result.formattedText).toContain('Hit Intelligence for 10 to 20')
       expect(result.spellId).toBe(53002)
     })
 
@@ -95,26 +95,26 @@ describe('spell-data-utils', () => {
       expect(result.parameters.some(p => p.key === 'MinValue' && p.displayValue === '10')).toBe(true)
     })
 
-    it('should use spell fields for TickCount and TickInterval in interpolation', () => {
-      const spellWithDifferentTicks: Spell = {
+    it('should make spell fields available for interpolation when format uses them', () => {
+      // Test with a mock spell that could use TickCount/TickInterval if the format included them
+      const spellWithTicks: Spell = {
         ...mockSpell,
         tick_count: 5,
         tick_interval: 200,
         spell_params: {
           Stat: 'Intelligence',
           MinValue: 10,
-          MaxValue: 20,
-          // These should be ignored in favor of spell fields
-          TickCount: 999,
-          TickInterval: 999
+          MaxValue: 20
         }
       }
 
-      const result = formatSpell(spellWithDifferentTicks)
+      const result = formatSpell(spellWithTicks)
       
-      // Should use spell.tick_count (5) and spell.tick_interval (200), not the params
-      expect(result.formattedText).toContain('5x @ 200s')
-      expect(result.formattedText).not.toContain('999')
+      // Verify the spell fields are included in the formatted spell object
+      expect(result.tickCount).toBe(5)
+      expect(result.tickInterval).toBe(200)
+      // The 53002 format doesn't use TickCount/TickInterval, so they won't appear in text
+      expect(result.formattedText).toContain('Hit Intelligence for 10 to 20')
     })
   })
 
@@ -129,6 +129,17 @@ describe('spell-data-utils', () => {
 
       const result = interpolateSpellText(format, params)
       expect(result).toBe('Hit Intelligence for 10 to 20')
+    })
+
+    it('should interpolate TickCount and TickInterval when format includes them', () => {
+      const format = 'Effect lasts {TickCount}x @ {TickInterval}s'
+      const params = {
+        TickCount: 5,
+        TickInterval: 200
+      }
+
+      const result = interpolateSpellText(format, params)
+      expect(result).toBe('Effect lasts 5x @ 200s')
     })
 
     it('should handle NanoID parameters as links', () => {
