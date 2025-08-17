@@ -207,6 +207,7 @@ def search_items(
     page_size: int = Query(50, ge=1, le=200, description="Items per page"),
     exact_match: bool = Query(True, description="Use exact matching (default) vs fuzzy/stemmed search"),
     weapons: bool = Query(False, description="Filter to weapons only (items with both attack and defense data)"),
+    search_fields: Optional[str] = Query(None, description="Comma-separated list of fields to search: name,description,effects,stats"),
     db: Session = Depends(get_db)
 ):
     """
@@ -215,17 +216,32 @@ def search_items(
     """
     start_time = time.time()
     
+    # Parse search fields
+    fields_to_search = ['name', 'description']  # Default fields
+    if search_fields:
+        requested_fields = [f.strip().lower() for f in search_fields.split(',')]
+        valid_fields = {'name', 'description', 'effects', 'stats'}
+        fields_to_search = [f for f in requested_fields if f in valid_fields]
+        if not fields_to_search:  # Fallback if no valid fields provided
+            fields_to_search = ['name', 'description']
+    
     if exact_match:
         # Use ILIKE for exact word matching (default behavior)
         search_term = f"%{q}%"
+        
+        # Build search conditions based on requested fields
+        search_conditions = []
+        if 'name' in fields_to_search:
+            search_conditions.append(Item.name.ilike(search_term))
+        if 'description' in fields_to_search:
+            search_conditions.append(Item.description.ilike(search_term))
+        # Note: 'effects' and 'stats' would require more complex joins and are not implemented yet
+        
         query = db.query(Item).options(
             joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
             joinedload(Item.item_spell_data)
         ).filter(
-            or_(
-                Item.name.ilike(search_term),
-                Item.description.ilike(search_term)
-            )
+            or_(*search_conditions) if search_conditions else Item.name.ilike(search_term)
         ).order_by(Item.name)
         
         # Apply weapons filter to exact search if requested
@@ -239,12 +255,30 @@ def search_items(
         # Use PostgreSQL full-text search for fuzzy/stemmed matching
         search_query = q.replace(' ', ' & ')  # Convert spaces to AND operators
         
+        # Build full-text search expression based on requested fields
+        search_expression_parts = []
+        if 'name' in fields_to_search:
+            search_expression_parts.append(Item.name)
+        if 'description' in fields_to_search:
+            search_expression_parts.append(func.coalesce(Item.description, ''))
+        
+        # If no valid parts, default to name + description
+        if not search_expression_parts:
+            search_expression = Item.name + ' ' + func.coalesce(Item.description, '')
+        elif len(search_expression_parts) == 1:
+            search_expression = search_expression_parts[0]
+        else:
+            # Concatenate multiple fields with spaces
+            search_expression = search_expression_parts[0]
+            for part in search_expression_parts[1:]:
+                search_expression = search_expression + ' ' + part
+        
         # Full-text search with ranking
         query = db.query(Item).options(
             joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
             joinedload(Item.item_spell_data)
         ).filter(
-            func.to_tsvector('english', Item.name + ' ' + func.coalesce(Item.description, '')).op('@@')(
+            func.to_tsvector('english', search_expression).op('@@')(
                 func.to_tsquery('english', search_query)
             )
         )
@@ -261,7 +295,7 @@ def search_items(
             # Only use ts_rank ordering when not filtering for weapons
             query = query.order_by(
                 func.ts_rank(
-                    func.to_tsvector('english', Item.name + ' ' + func.coalesce(Item.description, '')),
+                    func.to_tsvector('english', search_expression),
                     func.to_tsquery('english', search_query)
                 ).desc()
             )

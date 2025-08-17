@@ -302,6 +302,9 @@ class TinkerToolsApiClient {
         if (query.limit) params.append('page_size', query.limit.toString())
         if (query.exact_match !== undefined) params.append('exact_match', query.exact_match.toString())
         if (query.is_nano !== undefined) params.append('weapons', (!query.is_nano).toString())
+        if (query.search_fields && query.search_fields.length > 0) {
+          params.append('search_fields', query.search_fields.join(','))
+        }
         
         const response = await this.client.get(`/items/search?${params.toString()}`)
         const backendResponse = response.data

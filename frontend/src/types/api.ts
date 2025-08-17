@@ -261,6 +261,7 @@ export interface CollectionTracking {
 export interface ItemSearchQuery {
   search?: string
   exact_match?: boolean
+  search_fields?: string[]
   item_class?: number[]
   min_ql?: number
   max_ql?: number
