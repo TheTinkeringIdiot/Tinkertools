@@ -239,7 +239,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  search: [options: { query: string; exactMatch: boolean }]
+  search: [options: { query: string; exactMatch: boolean; searchFields: string[] }]
   clear: []
   'update:query': [query: string]
 }>()
@@ -346,7 +346,8 @@ function performSearch() {
   // Emit search with options
   emit('search', {
     query: searchQuery.value,
-    exactMatch: matchType.value === 'exact'
+    exactMatch: matchType.value === 'exact',
+    searchFields: searchFields.value
   })
 }
 
