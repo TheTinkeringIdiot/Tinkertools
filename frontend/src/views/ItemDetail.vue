@@ -237,71 +237,10 @@ Shows all item data with profile compatibility and comparison options
         </template>
       </Card>
 
-      <!-- Item Attributes -->
-      <ItemAttributes 
-        v-if="item"
-        :item="item"
-      />
 
 
-      <!-- General Statistics -->
-      <Card v-if="item.stats?.length">
-        <template #header>
-          <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold">General Statistics</h3>
-            <Button
-              :label="showAllStats ? 'Show Key Stats' : 'Show All Stats'"
-                            text
-              @click="showAllStats = !showAllStats"
-            />
-          </div>
-        </template>
-        <template #content>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div
-              v-for="stat in displayedStats"
-              :key="stat.stat"
-              class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded"
-            >
-              <span class="text-sm text-surface-600 dark:text-surface-400">
-                {{ getStatName(stat.stat) }}
-              </span>
-              <span
-                class="font-mono font-medium"
-                :class="{
-                  'text-green-600 dark:text-green-400': stat.value > 0,
-                  'text-red-600 dark:text-red-400': stat.value < 0,
-                  'text-surface-700 dark:text-surface-300': stat.value === 0
-                }"
-              >
-                {{ stat.value > 0 ? '+' : '' }}{{ stat.value }}
-              </span>
-            </div>
-          </div>
-        </template>
-      </Card>
 
 
-      <!-- Special Effects -->
-      <Card v-if="item.spell_data?.length">
-        <template #header>
-          <h3 class="text-lg font-semibold">Special Effects</h3>
-        </template>
-        <template #content>
-          <div class="space-y-4">
-            <div
-              v-for="(spell, index) in item.spell_data"
-              :key="index"
-              class="p-4 bg-surface-50 dark:bg-surface-900 rounded-lg"
-            >
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-sm font-medium">Effect {{ index + 1 }}</span>
-                <Badge :value="getEffectTrigger(spell.event || 0)" severity="info" />
-              </div>
-            </div>
-          </div>
-        </template>
-      </Card>
 
     </div>
   </div>
@@ -544,72 +483,11 @@ Shows all item data with profile compatibility and comparison options
         </template>
       </Card>
 
-      <!-- Item Attributes -->
-      <ItemAttributes 
-        v-if="item"
-        :item="item"
-      />
-
-
-      <!-- General Statistics -->
-      <Card v-if="item.stats?.length">
-        <template #header>
-          <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold">General Statistics</h3>
-            <Button
-              :label="showAllStats ? 'Show Key Stats' : 'Show All Stats'"
-                            text
-              @click="showAllStats = !showAllStats"
-            />
-          </div>
-        </template>
-        <template #content>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div
-              v-for="stat in displayedStats"
-              :key="stat.stat"
-              class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded"
-            >
-              <span class="text-sm text-surface-600 dark:text-surface-400">
-                {{ getStatName(stat.stat) }}
-              </span>
-              <span
-                class="font-mono font-medium"
-                :class="{
-                  'text-green-600 dark:text-green-400': stat.value > 0,
-                  'text-red-600 dark:text-red-400': stat.value < 0,
-                  'text-surface-700 dark:text-surface-300': stat.value === 0
-                }"
-              >
-                {{ stat.value > 0 ? '+' : '' }}{{ stat.value }}
-              </span>
-            </div>
-          </div>
-        </template>
-      </Card>
 
 
 
-      <!-- Special Effects -->
-      <Card v-if="item.spell_data?.length">
-        <template #header>
-          <h3 class="text-lg font-semibold">Special Effects</h3>
-        </template>
-        <template #content>
-          <div class="space-y-4">
-            <div
-              v-for="(spell, index) in item.spell_data"
-              :key="index"
-              class="p-4 bg-surface-50 dark:bg-surface-900 rounded-lg"
-            >
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-sm font-medium">Effect {{ index + 1 }}</span>
-                <Badge :value="getEffectTrigger(spell.event || 0)" severity="info" />
-              </div>
-            </div>
-          </div>
-        </template>
-      </Card>
+
+
 
     </div>
 
