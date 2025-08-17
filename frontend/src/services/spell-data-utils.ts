@@ -5,7 +5,7 @@
  * Handles event translations, parameter formatting, and spell text interpolation.
  */
 
-import { TEMPLATE_EVENT, TARGET } from './game-data'
+import { TEMPLATE_EVENT, TARGET, WORN_ITEM, CANFLAG, WEAPON_SLOT, ARMOR_SLOT, IMPLANT_SLOT, WEAPON_TYPE } from './game-data'
 import { getStatName } from './game-utils'
 import type { SpellData, Spell, Criterion } from '@/types/api'
 
@@ -76,6 +76,37 @@ export function getEventDisplayPriority(eventId: number): number {
     // All others get priority 10
   }
   return priorityMap[eventId] || 10
+}
+
+// ============================================================================
+// Flag Bit Resolution
+// ============================================================================
+
+/**
+ * Get flag name from bit number and stat ID
+ */
+export function getFlagNameFromBit(statId: number, bitNum: number): string {
+  // Map stat IDs to their corresponding flag constants
+  const flagConstants: Record<number, Record<string, number>> = {
+    30: CANFLAG,        // Can flags
+    355: WORN_ITEM,     // WornItem flags
+    // Add more stat ID to flag mappings as needed
+  }
+  
+  const flagConstant = flagConstants[statId]
+  if (!flagConstant) {
+    return `Bit ${bitNum}`
+  }
+  
+  // Find the flag name that corresponds to the bit position
+  const bitValue = 1 << bitNum // Convert bit position to bit value
+  for (const [flagName, flagValue] of Object.entries(flagConstant)) {
+    if (flagValue === bitValue) {
+      return flagName
+    }
+  }
+  
+  return `Bit ${bitNum}`
 }
 
 // ============================================================================
@@ -176,6 +207,12 @@ export function interpolateSpellText(format: string, params: Record<string, any>
   
   let result = format
   
+  // Remove alignment/formatting tags
+  result = result.replace(/\{\|right\|\}/g, '')
+  result = result.replace(/\{\|left\|\}/g, '')
+  result = result.replace(/\{\|\/right\|\}/g, '')
+  result = result.replace(/\{\|\/left\|\}/g, '')
+  
   // Handle {param} style placeholders
   result = result.replace(/\{(\w+)\}/g, (match, paramName) => {
     const value = params[paramName]
@@ -187,6 +224,17 @@ export function interpolateSpellText(format: string, params: Record<string, any>
       } else if (paramName.toLowerCase().includes('chance')) {
         // For Chance, display as percentage
         return `${value}%`
+      } else if (paramName.toLowerCase().includes('stat') && typeof value === 'number') {
+        // For Stat, display as stat name
+        const statName = getStatName(value)
+        return statName || `Stat ${value}`
+      } else if (paramName.toLowerCase().includes('bitnum') && typeof value === 'number') {
+        // For BitNum, resolve to flag name using the Stat parameter
+        const statId = params.Stat || params.stat
+        if (statId !== undefined && statId !== null) {
+          return getFlagNameFromBit(statId, value)
+        }
+        return `Bit ${value}`
       }
       return String(value)
     }
