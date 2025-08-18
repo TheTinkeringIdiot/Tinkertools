@@ -204,14 +204,11 @@ def get_items(
     if faction is not None and faction > 0:
         requirement_filters.append((33, faction))    # Stat 33 = Faction
     
-    # Apply requirement filters
+    # Apply requirement filters - look in actions where item requirements are stored
     for stat_id, required_value in requirement_filters:
-        query = query.join(ItemSpellData, Item.id == ItemSpellData.item_id)\
-                    .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
-                    .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
-                    .join(Spell, SpellDataSpells.spell_id == Spell.id)\
-                    .join(SpellCriterion, Spell.id == SpellCriterion.spell_id)\
-                    .join(Criterion, SpellCriterion.criterion_id == Criterion.id)\
+        query = query.join(Action, Item.id == Action.item_id)\
+                    .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
+                    .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
                     .filter(Criterion.value1 == stat_id, Criterion.value2 == required_value)
     
     # Froob friendly filter (exclude items with expansion requirements)
@@ -463,14 +460,11 @@ def search_items(
     if faction is not None and faction > 0:
         requirement_filters.append((33, faction))    # Stat 33 = Faction
     
-    # Apply requirement filters
+    # Apply requirement filters - look in actions where item requirements are stored
     for stat_id, required_value in requirement_filters:
-        query = query.join(ItemSpellData, Item.id == ItemSpellData.item_id)\
-                    .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
-                    .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
-                    .join(Spell, SpellDataSpells.spell_id == Spell.id)\
-                    .join(SpellCriterion, Spell.id == SpellCriterion.spell_id)\
-                    .join(Criterion, SpellCriterion.criterion_id == Criterion.id)\
+        query = query.join(Action, Item.id == Action.item_id)\
+                    .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
+                    .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
                     .filter(Criterion.value1 == stat_id, Criterion.value2 == required_value)
     
     # Froob friendly filter (exclude items with expansion requirements)
