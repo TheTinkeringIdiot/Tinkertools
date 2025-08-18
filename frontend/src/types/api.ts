@@ -263,11 +263,20 @@ export interface ItemSearchQuery {
   search?: string
   exact_match?: boolean
   search_fields?: string[]
-  item_class?: number[]
+  item_class?: number | number[]  // Support both single value and array for backwards compatibility
   min_ql?: number
   max_ql?: number
   is_nano?: boolean
   has_stats?: number[]
+  // New advanced search parameters
+  slot?: number
+  profession?: number
+  breed?: number
+  gender?: number
+  faction?: number
+  froob_friendly?: boolean
+  nodrop?: boolean
+  stat_bonuses?: number[]
   page?: number
   limit?: number
   sort?: 'name' | 'ql' | 'item_class' | 'aoid'

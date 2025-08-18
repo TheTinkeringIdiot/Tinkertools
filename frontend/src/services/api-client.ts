@@ -306,6 +306,24 @@ class TinkerToolsApiClient {
           params.append('search_fields', query.search_fields.join(','))
         }
         
+        // Add new advanced search parameters
+        if (query.min_ql !== undefined) params.append('min_ql', query.min_ql.toString())
+        if (query.max_ql !== undefined) params.append('max_ql', query.max_ql.toString())
+        if (query.item_class !== undefined) {
+          const itemClass = Array.isArray(query.item_class) ? query.item_class[0] : query.item_class
+          params.append('item_class', itemClass.toString())
+        }
+        if (query.slot !== undefined) params.append('slot', query.slot.toString())
+        if (query.profession !== undefined) params.append('profession', query.profession.toString())
+        if (query.breed !== undefined) params.append('breed', query.breed.toString())
+        if (query.gender !== undefined) params.append('gender', query.gender.toString())
+        if (query.faction !== undefined) params.append('faction', query.faction.toString())
+        if (query.froob_friendly !== undefined) params.append('froob_friendly', query.froob_friendly.toString())
+        if (query.nodrop !== undefined) params.append('nodrop', query.nodrop.toString())
+        if (query.stat_bonuses && query.stat_bonuses.length > 0) {
+          params.append('stat_bonuses', query.stat_bonuses.join(','))
+        }
+        
         const response = await this.client.get(`/items/search?${params.toString()}`)
         const backendResponse = response.data
         
@@ -326,7 +344,13 @@ class TinkerToolsApiClient {
         }
       } else {
         // Use the regular /items endpoint for filtering without search
-        if (query.item_class?.length) query.item_class.forEach(c => params.append('item_class', c.toString()))
+        if (query.item_class !== undefined) {
+          if (Array.isArray(query.item_class)) {
+            query.item_class.forEach(c => params.append('item_class', c.toString()))
+          } else {
+            params.append('item_class', query.item_class.toString())
+          }
+        }
         if (query.min_ql) params.append('min_ql', query.min_ql.toString())
         if (query.max_ql) params.append('max_ql', query.max_ql.toString())
         if (query.is_nano !== undefined) params.append('is_nano', query.is_nano.toString())
@@ -334,6 +358,18 @@ class TinkerToolsApiClient {
         if (query.limit) params.append('page_size', query.limit.toString())
         if (query.sort) params.append('sort', query.sort)
         if (query.sort_order) params.append('sort_order', query.sort_order)
+        
+        // Add new advanced search parameters for regular endpoint too
+        if (query.slot !== undefined) params.append('slot', query.slot.toString())
+        if (query.profession !== undefined) params.append('profession', query.profession.toString())
+        if (query.breed !== undefined) params.append('breed', query.breed.toString())
+        if (query.gender !== undefined) params.append('gender', query.gender.toString())
+        if (query.faction !== undefined) params.append('faction', query.faction.toString())
+        if (query.froob_friendly !== undefined) params.append('froob_friendly', query.froob_friendly.toString())
+        if (query.nodrop !== undefined) params.append('nodrop', query.nodrop.toString())
+        if (query.stat_bonuses && query.stat_bonuses.length > 0) {
+          params.append('stat_bonuses', query.stat_bonuses.join(','))
+        }
         
         const response = await this.client.get(`/items?${params.toString()}`)
         const backendResponse = response.data
