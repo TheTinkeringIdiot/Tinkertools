@@ -155,6 +155,15 @@ def get_items(
     min_ql: Optional[int] = Query(None, description="Minimum quality level"),
     max_ql: Optional[int] = Query(None, description="Maximum quality level"),
     is_nano: Optional[bool] = Query(None, description="Filter nano programs"),
+    # Add new advanced filter parameters
+    slot: Optional[int] = Query(None, description="Filter by equipment slot (stat 298)"),
+    profession: Optional[int] = Query(None, description="Filter by profession requirement"),
+    breed: Optional[int] = Query(None, description="Filter by breed requirement"),
+    gender: Optional[int] = Query(None, description="Filter by gender requirement"),
+    faction: Optional[int] = Query(None, description="Filter by faction requirement"),
+    froob_friendly: Optional[bool] = Query(None, description="Filter items without expansion requirements"),
+    nodrop: Optional[bool] = Query(None, description="Filter items with NODROP flag"),
+    stat_bonuses: Optional[str] = Query(None, description="Comma-separated list of stat IDs to check for bonuses"),
     db: Session = Depends(get_db)
 ):
     """
@@ -175,6 +184,80 @@ def get_items(
         query = query.filter(Item.ql <= max_ql)
     if is_nano is not None:
         query = query.filter(Item.is_nano == is_nano)
+    
+    # Apply advanced search filters
+    # Equipment slot filter (stat 298 - EquippedIn)
+    if slot is not None and slot > 0:
+        # Join with stats to check EquippedIn (stat 298) bit flags
+        query = query.join(ItemStats, Item.id == ItemStats.item_id)\
+                    .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
+                    .filter(StatValue.stat == 298, StatValue.value.op('&')(1 << slot) > 0)
+    
+    # Requirement filters - join with criteria via spell data
+    requirement_filters = []
+    if profession is not None and profession > 0:
+        requirement_filters.append((60, profession))  # Stat 60 = Profession
+    if breed is not None and breed > 0:
+        requirement_filters.append((4, breed))       # Stat 4 = Breed
+    if gender is not None and gender > 0:
+        requirement_filters.append((59, gender))     # Stat 59 = Gender
+    if faction is not None and faction > 0:
+        requirement_filters.append((33, faction))    # Stat 33 = Faction
+    
+    # Apply requirement filters
+    for stat_id, required_value in requirement_filters:
+        query = query.join(ItemSpellData, Item.id == ItemSpellData.item_id)\
+                    .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
+                    .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
+                    .join(Spell, SpellDataSpells.spell_id == Spell.id)\
+                    .join(SpellCriterion, Spell.id == SpellCriterion.spell_id)\
+                    .join(Criterion, SpellCriterion.criterion_id == Criterion.id)\
+                    .filter(Criterion.value1 == stat_id, Criterion.value2 == required_value)
+    
+    # Froob friendly filter (exclude items with expansion requirements)
+    if froob_friendly is True:
+        # Exclude items that have stat 389 (Expansion) requirements
+        subquery = db.query(Item.id).join(ItemStats, Item.id == ItemStats.item_id)\
+                     .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
+                     .filter(StatValue.stat == 389).subquery()
+        query = query.filter(~Item.id.in_(subquery))
+    
+    # NoDrop filter (stat 0 - ITEM_NONE_FLAG)
+    if nodrop is not None:
+        if nodrop:
+            # Items WITH NODROP flag (bit 14 = 16384)
+            query = query.join(ItemStats, Item.id == ItemStats.item_id)\
+                        .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
+                        .filter(StatValue.stat == 0, StatValue.value.op('&')(16384) > 0)
+        else:
+            # Items WITHOUT NODROP flag
+            subquery = db.query(Item.id).join(ItemStats, Item.id == ItemStats.item_id)\
+                         .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
+                         .filter(StatValue.stat == 0, StatValue.value.op('&')(16384) > 0).subquery()
+            query = query.filter(~Item.id.in_(subquery))
+    
+    # Stat bonus filters
+    if stat_bonuses:
+        try:
+            bonus_stat_ids = [int(stat_id.strip()) for stat_id in stat_bonuses.split(',') if stat_id.strip()]
+            if bonus_stat_ids:
+                # Find items that have spells which modify any of the requested stats
+                stat_bonus_subquery = db.query(Item.id)\
+                    .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
+                    .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
+                    .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
+                    .join(Spell, SpellDataSpells.spell_id == Spell.id)\
+                    .join(SpellCriterion, Spell.id == SpellCriterion.spell_id)\
+                    .join(Criterion, SpellCriterion.criterion_id == Criterion.id)\
+                    .filter(Criterion.value1.in_(bonus_stat_ids))\
+                    .distinct().subquery()
+                query = query.filter(Item.id.in_(stat_bonus_subquery))
+        except ValueError:
+            logger.warning(f"Invalid stat_bonuses parameter: {stat_bonuses}")
+    
+    # If we have any joins that might cause duplicates, make sure to use distinct
+    if any([slot, requirement_filters, nodrop is not None]):
+        query = query.distinct()
     
     # Get total count
     total = query.count()
@@ -208,6 +291,18 @@ def search_items(
     exact_match: bool = Query(True, description="Use exact matching (default) vs fuzzy/stemmed search"),
     weapons: bool = Query(False, description="Filter to weapons only (items with both attack and defense data)"),
     search_fields: Optional[str] = Query(None, description="Comma-separated list of fields to search: name,description,effects,stats"),
+    # New advanced search parameters
+    min_ql: Optional[int] = Query(None, ge=1, le=999, description="Minimum quality level"),
+    max_ql: Optional[int] = Query(None, ge=1, le=999, description="Maximum quality level"),
+    item_class: Optional[int] = Query(None, description="Filter by item class (stat 76)"),
+    slot: Optional[int] = Query(None, description="Filter by equipment slot (stat 298)"),
+    profession: Optional[int] = Query(None, description="Filter by profession requirement"),
+    breed: Optional[int] = Query(None, description="Filter by breed requirement"),
+    gender: Optional[int] = Query(None, description="Filter by gender requirement"),
+    faction: Optional[int] = Query(None, description="Filter by faction requirement"),
+    froob_friendly: Optional[bool] = Query(None, description="Filter items without expansion requirements"),
+    nodrop: Optional[bool] = Query(None, description="Filter items with NODROP flag"),
+    stat_bonuses: Optional[str] = Query(None, description="Comma-separated list of stat IDs to check for bonuses"),
     db: Session = Depends(get_db)
 ):
     """
@@ -327,6 +422,93 @@ def search_items(
                     func.to_tsquery('english', search_query)
                 ).desc()
             )
+    
+    # Apply advanced search filters
+    # Quality level filters
+    if min_ql is not None:
+        query = query.filter(Item.ql >= min_ql)
+    if max_ql is not None:
+        query = query.filter(Item.ql <= max_ql)
+    
+    # Item class filter
+    if item_class is not None and item_class > 0:
+        # Filter by stat 76 (ItemClass)
+        query = query.join(ItemStats, Item.id == ItemStats.item_id)\
+                    .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
+                    .filter(StatValue.stat == 76, StatValue.value == item_class)
+    
+    # Equipment slot filter (stat 298 - EquippedIn)
+    if slot is not None and slot > 0:
+        # Join with stats to check EquippedIn (stat 298) bit flags
+        query = query.join(ItemStats, Item.id == ItemStats.item_id)\
+                    .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
+                    .filter(StatValue.stat == 298, StatValue.value.op('&')(1 << slot) > 0)
+    
+    # Requirement filters - join with criteria via spell data
+    requirement_filters = []
+    if profession is not None and profession > 0:
+        requirement_filters.append((60, profession))  # Stat 60 = Profession
+    if breed is not None and breed > 0:
+        requirement_filters.append((4, breed))       # Stat 4 = Breed
+    if gender is not None and gender > 0:
+        requirement_filters.append((59, gender))     # Stat 59 = Gender
+    if faction is not None and faction > 0:
+        requirement_filters.append((33, faction))    # Stat 33 = Faction
+    
+    # Apply requirement filters
+    for stat_id, required_value in requirement_filters:
+        query = query.join(ItemSpellData, Item.id == ItemSpellData.item_id)\
+                    .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
+                    .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
+                    .join(Spell, SpellDataSpells.spell_id == Spell.id)\
+                    .join(SpellCriterion, Spell.id == SpellCriterion.spell_id)\
+                    .join(Criterion, SpellCriterion.criterion_id == Criterion.id)\
+                    .filter(Criterion.value1 == stat_id, Criterion.value2 == required_value)
+    
+    # Froob friendly filter (exclude items with expansion requirements)
+    if froob_friendly is True:
+        # Exclude items that have stat 389 (Expansion) requirements
+        subquery = db.query(Item.id).join(ItemStats, Item.id == ItemStats.item_id)\
+                     .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
+                     .filter(StatValue.stat == 389).subquery()
+        query = query.filter(~Item.id.in_(subquery))
+    
+    # NoDrop filter (stat 0 - ITEM_NONE_FLAG)
+    if nodrop is not None:
+        if nodrop:
+            # Items WITH NODROP flag (bit 14 = 16384)
+            query = query.join(ItemStats, Item.id == ItemStats.item_id)\
+                        .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
+                        .filter(StatValue.stat == 0, StatValue.value.op('&')(16384) > 0)
+        else:
+            # Items WITHOUT NODROP flag
+            subquery = db.query(Item.id).join(ItemStats, Item.id == ItemStats.item_id)\
+                         .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
+                         .filter(StatValue.stat == 0, StatValue.value.op('&')(16384) > 0).subquery()
+            query = query.filter(~Item.id.in_(subquery))
+    
+    # Stat bonus filters
+    if stat_bonuses:
+        try:
+            bonus_stat_ids = [int(stat_id.strip()) for stat_id in stat_bonuses.split(',') if stat_id.strip()]
+            if bonus_stat_ids:
+                # Find items that have spells which modify any of the requested stats
+                stat_bonus_subquery = db.query(Item.id)\
+                    .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
+                    .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
+                    .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
+                    .join(Spell, SpellDataSpells.spell_id == Spell.id)\
+                    .join(SpellCriterion, Spell.id == SpellCriterion.spell_id)\
+                    .join(Criterion, SpellCriterion.criterion_id == Criterion.id)\
+                    .filter(Criterion.value1.in_(bonus_stat_ids))\
+                    .distinct().subquery()
+                query = query.filter(Item.id.in_(stat_bonus_subquery))
+        except ValueError:
+            logger.warning(f"Invalid stat_bonuses parameter: {stat_bonuses}")
+    
+    # If we have any joins that might cause duplicates, make sure to use distinct
+    if any([item_class, slot, requirement_filters, nodrop is not None]):
+        query = query.distinct()
     
     # Get total count
     total = query.count()

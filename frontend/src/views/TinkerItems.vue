@@ -60,43 +60,14 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
 
     <!-- Main Content Area -->
     <div class="flex-1 flex min-h-0">
-      <!-- Sidebar with Search and Filters -->
-      <div class="w-80 border-r border-surface-200 dark:border-surface-700 flex flex-col bg-surface-0 dark:bg-surface-950">
-        <!-- Search Section -->
-        <div class="p-4 border-b border-surface-200 dark:border-surface-700">
-          <ItemSearch
-            v-model:query="searchQuery"
-            v-model:loading="searchLoading"
-            :profile="compatibilityProfile"
-            @search="performSearch"
-            @clear="clearSearch"
-          />
-        </div>
-        
-        <!-- Filters Section -->
-        <div class="flex-1 overflow-y-auto">
-          <ItemFiltersComponent
-            v-model:filters="activeFilters"
-            :profile="compatibilityProfile"
-            :search-results="searchResults"
-            @filter-change="onFiltersChanged"
-            @clear-filters="clearFilters"
-          />
-        </div>
-        
-        <!-- Favorites Quick Access -->
-        <div class="p-4 border-t border-surface-200 dark:border-surface-700">
-          <Button
-            icon="pi pi-heart"
-            label="My Favorites"
-            :badge="favoriteCount.toString()"
-            outlined
-            size="small"
-            class="w-full"
-            @click="showFavorites"
-            v-if="favoriteCount > 0"
-          />
-        </div>
+      <!-- Advanced Search Sidebar -->
+      <div class="w-80 border-r border-surface-200 dark:border-surface-700">
+        <AdvancedItemSearch
+          :loading="searchLoading"
+          :result-count="totalResults"
+          @search="performAdvancedSearch"
+          @clear="clearSearch"
+        />
       </div>
 
       <!-- Main Results Area -->
@@ -108,11 +79,6 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
               <span class="text-sm text-surface-600 dark:text-surface-400">
                 {{ searchPerformed ? `${totalResults} items found` : 'Enter search terms or browse categories' }}
               </span>
-              <Badge 
-                v-if="hasActiveFilters"
-                :value="activeFilterCount"
-                severity="info"
-              />
             </div>
             
             <!-- Sorting and Actions -->
@@ -156,13 +122,7 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
             <p class="text-surface-500 dark:text-surface-500 mb-4">
               Try adjusting your search terms or filters
             </p>
-            <Button
-              label="Clear Filters"
-              icon="pi pi-filter-slash"
-              outlined
-              @click="clearAllFilters"
-              v-if="hasActiveFilters"
-            />
+            <!-- Clear filters button removed - now handled by AdvancedItemSearch component -->
           </div>
           
           <!-- Default State -->
@@ -219,12 +179,11 @@ import { useRouter } from 'vue-router'
 import { useItems } from '@/composables/useItems'
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
 import { useItemsStore } from '@/stores/items'
-import type { Item, ItemSearchQuery, ItemFilters } from '@/types/api'
+import type { Item, ItemSearchQuery } from '@/types/api'
 
 
 // Components
-import ItemSearch from '@/components/items/ItemSearch.vue'
-import ItemFiltersComponent from '@/components/items/ItemFilters.vue'
+import AdvancedItemSearch from '@/components/items/AdvancedItemSearch.vue'
 import ItemList from '@/components/items/ItemList.vue'
 import ItemComparison from '@/components/items/ItemComparison.vue'
 
@@ -235,7 +194,7 @@ const profilesStore = useTinkerProfilesStore()
 const searchQuery = ref('')
 const showCompatibility = ref(false)
 const viewMode = ref<'grid' | 'list'>('list')
-const activeFilters = ref<ItemFilters>({})
+// Note: activeFilters removed - now handled by AdvancedItemSearch component
 const searchResults = ref<Item[]>([])
 const comparisonItems = ref<Item[]>([])
 const sortOption = ref('relevance')
@@ -266,11 +225,7 @@ const favoriteCount = computed(() =>
   0
 )
 
-const activeFilterCount = computed(() => 
-  Object.values(activeFilters.value).filter(Boolean).length
-)
-
-const hasActiveFilters = computed(() => activeFilterCount.value > 0)
+// Note: activeFilterCount and hasActiveFilters removed - now handled by AdvancedItemSearch
 
 const totalResults = computed(() => pagination.value?.total || 0)
 
@@ -289,39 +244,41 @@ const sortOptions = [
 const searchOptions = ref({ query: '', exactMatch: true, searchFields: [] as string[] })
 
 // Methods
-async function performSearch(options?: { query: string; exactMatch: boolean; searchFields: string[] }) {
-  // Update search options if provided from ItemSearch component
-  if (options) {
-    searchOptions.value = options
-    searchQuery.value = options.query
-  }
-  
-  if (!searchQuery.value.trim() && !hasActiveFilters.value) {
-    return
-  }
-  
+async function performAdvancedSearch(query: ItemSearchQuery) {
   searchLoading.value = true
   searchPerformed.value = true
   
   try {
-    const query: ItemSearchQuery = {
-      search: searchQuery.value,
-      exact_match: searchOptions.value.exactMatch,
-      search_fields: searchOptions.value.searchFields.length > 0 ? searchOptions.value.searchFields : undefined,
-      ...activeFilters.value,
+    // Add pagination and sorting to the query
+    const searchQuery: ItemSearchQuery = {
+      ...query,
       sort: sortOption.value.includes('_') ? sortOption.value.split('_')[0] as 'name' | 'ql' | 'item_class' | 'aoid' : sortOption.value as 'name' | 'ql' | 'item_class' | 'aoid',
       sort_order: sortOption.value.includes('desc') ? 'desc' : 'asc',
       limit: pagination.value?.limit || 24,
       page: pagination.value?.page || 1
     }
     
-    const results = await searchItems(query)
+    const results = await searchItems(searchQuery)
     searchResults.value = results
   } catch (error) {
-    console.error('Search failed:', error)
+    console.error('Advanced search failed:', error)
   } finally {
     searchLoading.value = false
   }
+}
+
+// Legacy method for backwards compatibility with quick search
+async function performSearch(options?: { query: string; exactMatch: boolean; searchFields: string[] }) {
+  // Convert legacy options to new format
+  const query: ItemSearchQuery = {}
+  
+  if (options?.query) {
+    query.search = options.query
+    query.exact_match = options.exactMatch
+    query.search_fields = options.searchFields
+  }
+  
+  await performAdvancedSearch(query)
 }
 
 function clearSearch() {
@@ -332,23 +289,7 @@ function clearSearch() {
 }
 
 
-function onFiltersChanged() {
-  if (searchPerformed.value) {
-    performSearch()
-  }
-}
-
-function clearFilters() {
-  activeFilters.value = {}
-  if (searchPerformed.value) {
-    performSearch()
-  }
-}
-
-function clearAllFilters() {
-  clearFilters()
-  clearSearch()
-}
+// Note: onFiltersChanged, clearFilters, and clearAllFilters removed - now handled by AdvancedItemSearch
 
 function onSortChanged() {
   if (searchPerformed.value) {
@@ -363,30 +304,35 @@ function refreshResults() {
 }
 
 async function quickSearch(type: string) {
+  const query: ItemSearchQuery = {}
+  
   switch (type) {
     case 'high-ql':
-      activeFilters.value = { minQL: 200 }
+      query.min_ql = 200
       sortOption.value = 'ql_desc'
       break
     case 'weapons':
-      activeFilters.value = { itemClasses: [1, 2, 3, 4, 5] } // Weapon classes
+      query.item_class = 1 // Weapon class
       break
     case 'implants':
-      activeFilters.value = { itemClasses: [15] } // Implant class
+      query.item_class = 3 // Implant class
       break
     case 'nanos':
-      activeFilters.value = { isNano: true }
+      query.is_nano = true
       break
   }
   
-  await performSearch()
+  await performAdvancedSearch(query)
 }
 
 function showFavorites() {
   // Implementation for showing favorite items
   searchQuery.value = ''
-  activeFilters.value = { favorite_items: true }
-  performSearch()
+  // TODO: Implement favorites filtering with new search system
+  const query: ItemSearchQuery = {
+    // Add favorites filter when implemented
+  }
+  performAdvancedSearch(query)
 }
 
 function onItemClick(item: Item) {
@@ -413,28 +359,14 @@ function clearComparison() {
 }
 
 function onPageChange(page: number) {
-  // Handle pagination - update the search query with the new page number
-  if (searchPerformed.value) {
-    const query: ItemSearchQuery = {
-      search: searchQuery.value,
-      exact_match: searchOptions.value.exactMatch,
-      search_fields: searchOptions.value.searchFields.length > 0 ? searchOptions.value.searchFields : undefined,
-      ...activeFilters.value,
-      sort: sortOption.value.includes('_') ? sortOption.value.split('_')[0] as 'name' | 'ql' | 'item_class' | 'aoid' : sortOption.value as 'name' | 'ql' | 'item_class' | 'aoid',
-      sort_order: sortOption.value.includes('desc') ? 'desc' : 'asc',
-      page: page,
-      limit: pagination.value?.limit || 24
-    }
-    
-    searchLoading.value = true
-    searchItems(query).then(results => {
-      searchResults.value = results
-    }).catch(error => {
-      console.error('Pagination search failed:', error)
-    }).finally(() => {
-      searchLoading.value = false
-    })
+  // Handle pagination - this will need to be integrated with the AdvancedItemSearch component
+  // For now, we'll store the page and it will be used in the next search
+  if (pagination.value) {
+    pagination.value.page = page
   }
+  
+  // TODO: Integrate with AdvancedItemSearch to trigger search with new page
+  console.log('Page change to:', page, 'Integration with AdvancedItemSearch needed')
 }
 
 // Initialize
@@ -445,16 +377,8 @@ onMounted(() => {
     searchResults.value = itemsStore.currentSearchResults
     searchQuery.value = itemsStore.currentSearchQuery.search || ''
     searchPerformed.value = true
-    // Restore any active filters from the cached query
-    if (itemsStore.currentSearchQuery) {
-      const query = itemsStore.currentSearchQuery
-      activeFilters.value = {
-        ...(query.item_class && { itemClasses: query.item_class }),
-        ...(query.min_ql && { minQL: query.min_ql }),
-        ...(query.max_ql && { maxQL: query.max_ql }),
-        ...(query.is_nano !== undefined && { isNano: query.is_nano })
-      }
-    }
+    // Note: Filter restoration would need to be handled by AdvancedItemSearch component
+    // when implementing state persistence
   }
 })
 </script>
