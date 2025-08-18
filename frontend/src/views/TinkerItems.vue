@@ -258,8 +258,8 @@ async function performAdvancedSearch(query: ItemSearchQuery) {
       ...query,
       sort: sortOption.value.includes('_') ? sortOption.value.split('_')[0] as 'name' | 'ql' | 'item_class' | 'aoid' : sortOption.value as 'name' | 'ql' | 'item_class' | 'aoid',
       sort_order: sortOption.value.includes('desc') ? 'desc' : 'asc',
-      limit: pagination.value?.limit || 24,
-      page: pagination.value?.page || 1
+      limit: query.limit || pagination.value?.limit || 24,
+      page: query.page || 1
     }
     
     const results = await searchItems(searchQuery)
@@ -374,14 +374,14 @@ function clearComparison() {
 }
 
 function onPageChange(page: number) {
-  // Update pagination page
-  if (pagination.value) {
-    pagination.value.page = page
-  }
-  
   // Re-run the last advanced search with the new page
   if (lastAdvancedSearchQuery.value) {
-    performAdvancedSearch(lastAdvancedSearchQuery.value)
+    // Create updated query with new page number
+    const updatedQuery = {
+      ...lastAdvancedSearchQuery.value,
+      page: page
+    }
+    performAdvancedSearch(updatedQuery)
   }
 }
 
@@ -393,6 +393,7 @@ onMounted(() => {
     searchResults.value = itemsStore.currentSearchResults
     searchQuery.value = itemsStore.currentSearchQuery.search || ''
     searchPerformed.value = true
+    lastAdvancedSearchQuery.value = itemsStore.currentSearchQuery
     // Note: Filter restoration would need to be handled by AdvancedItemSearch component
     // when implementing state persistence
   }
