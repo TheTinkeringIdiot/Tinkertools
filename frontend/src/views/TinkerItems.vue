@@ -197,6 +197,7 @@ const viewMode = ref<'grid' | 'list'>('list')
 // Note: activeFilters removed - now handled by AdvancedItemSearch component
 const searchResults = ref<Item[]>([])
 const comparisonItems = ref<Item[]>([])
+const lastAdvancedSearchQuery = ref<ItemSearchQuery | null>(null)
 const sortOption = ref('relevance')
 const searchLoading = ref(false)
 const searchPerformed = ref(false)
@@ -248,6 +249,9 @@ async function performAdvancedSearch(query: ItemSearchQuery) {
   searchLoading.value = true
   searchPerformed.value = true
   
+  // Store the query for pagination
+  lastAdvancedSearchQuery.value = query
+  
   try {
     // Add pagination and sorting to the query
     const searchQuery: ItemSearchQuery = {
@@ -286,6 +290,7 @@ function clearSearch() {
   resetSearch()
   searchResults.value = []
   searchPerformed.value = false
+  lastAdvancedSearchQuery.value = null
 }
 
 
@@ -293,13 +298,23 @@ function clearSearch() {
 
 function onSortChanged() {
   if (searchPerformed.value) {
-    performSearch()
+    // If we have an advanced search query, use it; otherwise fall back to legacy search
+    if (lastAdvancedSearchQuery.value) {
+      performAdvancedSearch(lastAdvancedSearchQuery.value)
+    } else {
+      performSearch()
+    }
   }
 }
 
 function refreshResults() {
   if (searchPerformed.value) {
-    performSearch()
+    // If we have an advanced search query, use it; otherwise fall back to legacy search
+    if (lastAdvancedSearchQuery.value) {
+      performAdvancedSearch(lastAdvancedSearchQuery.value)
+    } else {
+      performSearch()
+    }
   }
 }
 
@@ -359,14 +374,15 @@ function clearComparison() {
 }
 
 function onPageChange(page: number) {
-  // Handle pagination - this will need to be integrated with the AdvancedItemSearch component
-  // For now, we'll store the page and it will be used in the next search
+  // Update pagination page
   if (pagination.value) {
     pagination.value.page = page
   }
   
-  // TODO: Integrate with AdvancedItemSearch to trigger search with new page
-  console.log('Page change to:', page, 'Integration with AdvancedItemSearch needed')
+  // Re-run the last advanced search with the new page
+  if (lastAdvancedSearchQuery.value) {
+    performAdvancedSearch(lastAdvancedSearchQuery.value)
+  }
 }
 
 // Initialize
