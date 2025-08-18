@@ -228,6 +228,7 @@ Provides all advanced search capabilities including item class, slot, requiremen
         <div class="space-y-2">
           <div class="flex items-center">
             <Checkbox
+              :key="`froob-${checkboxKey}`"
               v-model="searchForm.froob_friendly"
               input-id="froob-friendly"
               class="enhanced-checkbox"
@@ -239,6 +240,7 @@ Provides all advanced search capabilities including item class, slot, requiremen
           
           <div class="flex items-center">
             <Checkbox
+              :key="`nodrop-${checkboxKey}`"
               v-model="searchForm.nodrop"
               input-id="nodrop"
               class="enhanced-checkbox"
@@ -295,8 +297,9 @@ Provides all advanced search capabilities including item class, slot, requiremen
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import type { ItemSearchQuery } from '@/types/api'
+import { useItemsStore } from '@/stores/items'
 import {
   ITEM_CLASS,
   WEAPON_SLOT_POSITIONS,
@@ -343,6 +346,10 @@ const searchForm = ref<SearchFormData>({
 
 const selectedStatBonuses = ref<number[]>([])
 const hasSearched = ref(false)
+const checkboxKey = ref(0) // Used to force checkbox re-render
+
+// Store
+const itemsStore = useItemsStore()
 
 // Options
 const matchTypeOptions = [
@@ -547,6 +554,86 @@ function clearAll() {
   emit('clear')
 }
 
+async function restoreSearchState() {
+  const storedQuery = itemsStore.currentSearchQuery
+  if (!storedQuery) return
+  
+  console.log('Restoring search state, stored query:', storedQuery)
+  
+  // Restore basic search fields
+  if (storedQuery.search) {
+    searchForm.value.search = storedQuery.search
+    searchForm.value.matchType = storedQuery.exact_match ? 'exact' : 'fuzzy'
+    
+    // Determine search fields
+    if (storedQuery.search_fields) {
+      if (storedQuery.search_fields.length === 1) {
+        searchForm.value.searchFields = storedQuery.search_fields[0]
+      } else {
+        searchForm.value.searchFields = 'both'
+      }
+    }
+  }
+  
+  // Restore quality level
+  if (storedQuery.min_ql) searchForm.value.min_ql = storedQuery.min_ql
+  if (storedQuery.max_ql) searchForm.value.max_ql = storedQuery.max_ql
+  
+  // Restore item class and slot
+  if (storedQuery.item_class) searchForm.value.item_class = storedQuery.item_class
+  if (storedQuery.slot) searchForm.value.slot = storedQuery.slot
+  
+  // Restore requirements
+  if (storedQuery.profession) searchForm.value.profession = storedQuery.profession
+  if (storedQuery.breed) searchForm.value.breed = storedQuery.breed
+  if (storedQuery.gender) searchForm.value.gender = storedQuery.gender
+  if (storedQuery.faction) searchForm.value.faction = storedQuery.faction
+  
+  // Restore special filters using key-based component re-rendering
+  console.log('Froob friendly in stored query:', storedQuery.froob_friendly, typeof storedQuery.froob_friendly)
+  if (storedQuery.froob_friendly !== undefined) {
+    searchForm.value.froob_friendly = storedQuery.froob_friendly
+    console.log('Set froob_friendly to:', searchForm.value.froob_friendly)
+  }
+  if (storedQuery.nodrop !== undefined) {
+    searchForm.value.nodrop = storedQuery.nodrop
+  }
+  
+  // Force checkbox components to re-render with updated state
+  checkboxKey.value++
+  
+  // Restore stat bonuses
+  if (storedQuery.stat_bonuses && Array.isArray(storedQuery.stat_bonuses)) {
+    selectedStatBonuses.value = storedQuery.stat_bonuses
+  }
+  
+  // Mark as having searched if we restored any criteria
+  hasSearched.value = true
+  
+  console.log('Final searchForm after restoration:', searchForm.value)
+  
+  // Wait for component re-render and force DOM sync
+  await nextTick()
+  console.log('Components re-rendered with new key, checkbox should be updated')
+  
+  // Additional DOM sync for checkboxes after component re-render
+  await nextTick()
+  if (storedQuery.froob_friendly) {
+    const froobCheckbox = document.querySelector('#froob-friendly')
+    if (froobCheckbox && !froobCheckbox.checked) {
+      froobCheckbox.checked = true
+      console.log('Manually synced froob checkbox to DOM')
+    }
+  }
+  if (storedQuery.nodrop) {
+    const nodropCheckbox = document.querySelector('#nodrop')
+    if (nodropCheckbox && !nodropCheckbox.checked) {
+      nodropCheckbox.checked = true
+      console.log('Manually synced nodrop checkbox to DOM')
+    }
+  }
+}
+
 function setQLRange(min: number, max: number) {
   searchForm.value.min_ql = min
   searchForm.value.max_ql = max
@@ -565,6 +652,11 @@ function saveSearch() {
 // Watch for item class changes to clear slot
 watch(() => searchForm.value.item_class, () => {
   searchForm.value.slot = undefined
+})
+
+// Restore search state on mount
+onMounted(async () => {
+  await restoreSearchState()
 })
 </script>
 
