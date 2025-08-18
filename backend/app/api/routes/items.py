@@ -5,7 +5,7 @@ Items API endpoints.
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_, and_, func
+from sqlalchemy import or_, and_, func, Integer, text
 import math
 import time
 import logging
@@ -236,21 +236,21 @@ def get_items(
                          .filter(StatValue.stat == 0, StatValue.value.op('&')(16384) > 0).subquery()
             query = query.filter(~Item.id.in_(subquery))
     
-    # Stat bonus filters
+    # Stat bonus filters - look for stat modification spells (spell_id 53045)
     if stat_bonuses:
         try:
             bonus_stat_ids = [int(stat_id.strip()) for stat_id in stat_bonuses.split(',') if stat_id.strip()]
             if bonus_stat_ids:
-                # Find items that have spells which modify any of the requested stats
-                stat_bonus_subquery = db.query(Item.id)\
+                # Find items that have "Modify Stat" spells (spell_id 53045) which modify any of the requested stats
+                # The stat ID is stored in the spell_params JSON as the "Stat" field
+                stat_bonus_subquery = db.query(Item.id.distinct())\
                     .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
                     .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
                     .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
                     .join(Spell, SpellDataSpells.spell_id == Spell.id)\
-                    .join(SpellCriterion, Spell.id == SpellCriterion.spell_id)\
-                    .join(Criterion, SpellCriterion.criterion_id == Criterion.id)\
-                    .filter(Criterion.value1.in_(bonus_stat_ids))\
-                    .distinct().subquery()
+                    .filter(Spell.spell_id == 53045)\
+                    .filter(func.cast(Spell.spell_params.op('->>')(text("'Stat'")), Integer).in_(bonus_stat_ids))
+                
                 query = query.filter(Item.id.in_(stat_bonus_subquery))
         except ValueError:
             logger.warning(f"Invalid stat_bonuses parameter: {stat_bonuses}")
@@ -487,21 +487,21 @@ def search_items(
                          .filter(StatValue.stat == 0, StatValue.value.op('&')(16384) > 0).subquery()
             query = query.filter(~Item.id.in_(subquery))
     
-    # Stat bonus filters
+    # Stat bonus filters - look for stat modification spells (spell_id 53045)
     if stat_bonuses:
         try:
             bonus_stat_ids = [int(stat_id.strip()) for stat_id in stat_bonuses.split(',') if stat_id.strip()]
             if bonus_stat_ids:
-                # Find items that have spells which modify any of the requested stats
-                stat_bonus_subquery = db.query(Item.id)\
+                # Find items that have "Modify Stat" spells (spell_id 53045) which modify any of the requested stats
+                # The stat ID is stored in the spell_params JSON as the "Stat" field
+                stat_bonus_subquery = db.query(Item.id.distinct())\
                     .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
                     .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
                     .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
                     .join(Spell, SpellDataSpells.spell_id == Spell.id)\
-                    .join(SpellCriterion, Spell.id == SpellCriterion.spell_id)\
-                    .join(Criterion, SpellCriterion.criterion_id == Criterion.id)\
-                    .filter(Criterion.value1.in_(bonus_stat_ids))\
-                    .distinct().subquery()
+                    .filter(Spell.spell_id == 53045)\
+                    .filter(func.cast(Spell.spell_params.op('->>')(text("'Stat'")), Integer).in_(bonus_stat_ids))
+                
                 query = query.filter(Item.id.in_(stat_bonus_subquery))
         except ValueError:
             logger.warning(f"Invalid stat_bonuses parameter: {stat_bonuses}")
