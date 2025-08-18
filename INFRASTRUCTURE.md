@@ -53,6 +53,13 @@ This document provides a comprehensive overview of the shared infrastructure, da
 - **SPECS**: Specialization level mapping (0-4)
 - **DAMAGE_TYPES**: Chemical, Cold, Energy, Fire, Melee, Poison, Projectile, Radiation
 
+### Spell Data Constants
+
+- **SPELL_FORMATS** (111+ entries): Spell format ID to format string mapping
+  - Used for spell description interpolation with parameter substitution
+  - Example: `53002: 'Hit {Stat} for {MinValue} to {MaxValue}'`
+  - Supports dynamic parameter interpolation (NanoID links, percentages, stat names)
+
 ---
 
 ## 🌐 API Infrastructure
@@ -165,11 +172,15 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 
 **Game Data Models:**
 - **Item**: Complete item structure with stats, spells, actions
-- **Spell**: Nano program data with parameters and requirements
+- **Spell**: Nano program data with parameters and requirements (spell_format deprecated)
 - **Symbiant**: Symbiant data with stat bonuses and requirements
 - **PocketBoss**: Pocket boss data with drop information
 - **StatValue**: Stat ID and value pairs
 - **Criterion**: Requirement criteria for items/spells
+
+**Enhanced Search Types:**
+- **ItemSearchQuery**: Includes `search_fields` parameter for targeted field searching
+- **Advanced Search Support**: Search within specific fields (name, description, etc.)
 
 ### Application-Specific Types
 
@@ -216,6 +227,18 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 - Game-specific formatting functions
 - Cross-application utility functions
 
+**Flag Resolution Functions:**
+- `getFlagNameFromValue(statId, value)`: Resolves flag values to human-readable names
+- `getFlagNameFromBit(statId, bitNumber)`: Resolves bit flags to names
+- `resolveFlags(statId, value)`: Universal flag resolution with automatic detection
+
+**Name Resolution Functions:**
+- `getStatName(statId)`: Get stat name from STAT constant
+- `getProfessionName(professionId)`: Get profession name from PROFESSION constant
+- `getBreedName(breedId)`: Get breed name from BREED constant
+- `getGenderName(genderId)`: Get gender name from GENDER constant
+- `getNPCFamilyName(familyId)`: Get NPC family name resolution
+
 **Special Attack Calculations:**
 - `calculateFling(attackTime)`: Fling Shot skill requirements and damage cap
 - `calculateBurst(attackTime, rechTime, burstCycle)`: Burst fire calculations
@@ -224,6 +247,26 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 - `calculateFastAttack(attackTime)`: Fast Attack requirements
 
 *Note: Special attack functions migrated from legacy TinkerPlants codebase (~/projects/Tinkerplants/tinkertools/views.py) to provide unified weapon analysis capabilities across all TinkerTools applications.*
+
+### Spell Data Utilities (`frontend/src/services/spell-data-utils.ts`)
+
+**Core Functions:**
+- `getSpellFormat(spellId)`: Look up format strings from SPELL_FORMATS constant using spell_id
+- `formatSpell(spell)`: Format spell data with spell_id-based format lookup
+- `interpolateSpellText(format, params)`: Interpolate spell format strings with parameters
+- `formatSpellParameters(params)`: Format spell parameters for display
+
+**Text Interpolation Features:**
+- Parameter substitution: `{Stat}`, `{MinValue}`, `{MaxValue}`, `{TickCount}`, `{TickInterval}`
+- NanoID/ItemID links: Converts to `[LINK:12345]` format for component processing
+- Chance percentages: Automatically converts to percentage display
+- Stat name resolution: Converts stat IDs to human-readable names
+- Spell field integration: Uses `spell.tick_count` and `spell.tick_interval` for timing data
+
+**Event and Target Translation:**
+- `getEventName(eventId)`: Translate event IDs (Use, Wield, Wear, etc.)
+- `getTargetName(targetId)`: Translate target IDs (Self, User, Target, etc.)
+- `getEventDisplayPriority(eventId)`: Sorting priority for spell events
 
 ---
 
@@ -234,6 +277,23 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 - **LoadingSpinner.vue**: Consistent loading indicators
 - **AccessibilityAnnouncer.vue**: Screen reader announcements
 - **InterpolationControl.vue**: Quality level adjustment UI
+
+### Criteria Display Components (`frontend/src/components/`)
+
+**Core Components:**
+- **CriteriaDisplay.vue**: Main criteria display with tree/chip mode detection
+- **CriteriaTreeDisplay.vue**: Tree-structured criteria display with summary
+- **CriteriaTreeNode.vue**: Individual tree nodes with status indicators
+- **CriterionChip.vue**: Individual criterion chips with status colors
+- **ActionRequirements.vue**: Action-based requirements display
+
+**Features:**
+- Automatic tree vs. chip display mode based on complexity
+- Character stat evaluation with met/unmet status
+- Professional name resolution (VisualProfession → "NanoTechnician")
+- Flag name resolution for WornItem and other flag-based criteria
+- NPCFamily name resolution for targeting criteria
+- Expandable/collapsible requirements sections
 
 ### Theme System
 
@@ -380,6 +440,12 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 - Frontend: Service tests, composable tests, UI tests
 - Test runner: `./run_interpolation_tests.sh`
 
+**Spell Data System** (23+ test scenarios):
+- `spell-data-utils.test.ts`: Comprehensive spell formatting and interpolation tests
+- Format lookup testing with SPELL_FORMATS constant
+- Parameter interpolation validation (TickCount, TickInterval, stat names)
+- Event and target name translation testing
+
 **Application Tests:**
 - Unit tests for all stores and services
 - Integration tests for cross-app functionality
@@ -464,4 +530,10 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 
 ---
 
-*Last Updated: This document reflects the current state after successful implementation of Tasks 1-11, including the comprehensive interpolation system, special attack calculations, and AOID-based URL routing system.*
+*Last Updated: This document reflects the current state after successful implementation of Tasks 1-11, plus major infrastructure enhancements including:*
+
+*- **Comprehensive Criteria System**: Tree-structured requirement display with status evaluation*
+*- **Spell Data Infrastructure**: spell_id-based format lookup with SPELL_FORMATS constant*  
+*- **Enhanced Search System**: Advanced search with field-specific filtering*
+*- **Flag Resolution System**: Unified flag name resolution across all criteria types*
+*- **Professional/Family Name Resolution**: Support for VisualProfession and NPCFamily display*
