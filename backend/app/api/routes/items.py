@@ -216,11 +216,19 @@ def get_items(
     
     # Froob friendly filter (exclude items with expansion requirements)
     if froob_friendly is True:
-        # Exclude items that have stat 389 (Expansion) requirements
-        subquery = db.query(Item.id).join(ItemStats, Item.id == ItemStats.item_id)\
-                     .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
-                     .filter(StatValue.stat == 389).subquery()
-        query = query.filter(~Item.id.in_(subquery))
+        # Exclude items that have stat 389 (Expansion) requirements in stats
+        stats_subquery = db.query(Item.id).join(ItemStats, Item.id == ItemStats.item_id)\
+                         .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
+                         .filter(StatValue.stat == 389).subquery()
+        
+        # Exclude items that have stat 389 (Expansion) requirements in action criteria
+        criteria_subquery = db.query(Item.id)\
+                           .join(Action, Item.id == Action.item_id)\
+                           .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
+                           .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
+                           .filter(Criterion.value1 == 389).subquery()
+        
+        query = query.filter(~Item.id.in_(stats_subquery), ~Item.id.in_(criteria_subquery))
     
     # NoDrop filter (stat 0 - ITEM_NONE_FLAG)
     if nodrop is not None:
@@ -467,11 +475,19 @@ def search_items(
     
     # Froob friendly filter (exclude items with expansion requirements)
     if froob_friendly is True:
-        # Exclude items that have stat 389 (Expansion) requirements
-        subquery = db.query(Item.id).join(ItemStats, Item.id == ItemStats.item_id)\
-                     .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
-                     .filter(StatValue.stat == 389).subquery()
-        query = query.filter(~Item.id.in_(subquery))
+        # Exclude items that have stat 389 (Expansion) requirements in stats
+        stats_subquery = db.query(Item.id).join(ItemStats, Item.id == ItemStats.item_id)\
+                         .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
+                         .filter(StatValue.stat == 389).subquery()
+        
+        # Exclude items that have stat 389 (Expansion) requirements in action criteria
+        criteria_subquery = db.query(Item.id)\
+                           .join(Action, Item.id == Action.item_id)\
+                           .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
+                           .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
+                           .filter(Criterion.value1 == 389).subquery()
+        
+        query = query.filter(~Item.id.in_(stats_subquery), ~Item.id.in_(criteria_subquery))
     
     # NoDrop filter (stat 0 - ITEM_NONE_FLAG)
     if nodrop is not None:
