@@ -84,7 +84,6 @@ Shows all item data with profile compatibility and comparison options
           <InputSwitch 
             id="advanced-view-toggle"
             v-model="advancedView"
-            :disabled="true"
           />
         </div>
       </div>
@@ -235,6 +234,14 @@ Shows all item data with profile compatibility and comparison options
         :spell-data="item.spell_data"
         :profile="profile"
         :show-hidden="false"
+        :advanced-view="advancedView"
+      />
+
+      <!-- Raw Stats (only visible in advanced view) -->
+      <RawStats
+        v-if="item && item.stats"
+        v-show="advancedView"
+        :stats="item.stats"
       />
 
 
@@ -330,7 +337,6 @@ Shows all item data with profile compatibility and comparison options
           <InputSwitch 
             id="advanced-view-toggle"
             v-model="advancedView"
-            :disabled="true"
           />
         </div>
       </div>
@@ -481,6 +487,14 @@ Shows all item data with profile compatibility and comparison options
         :spell-data="item.spell_data"
         :profile="profile"
         :show-hidden="false"
+        :advanced-view="advancedView"
+      />
+
+      <!-- Raw Stats (only visible in advanced view) -->
+      <RawStats
+        v-if="item && item.stats"
+        v-show="advancedView"
+        :stats="item.stats"
       />
 
 
@@ -519,6 +533,7 @@ import SpellDataDisplay from '@/components/items/SpellDataDisplay.vue'
 import ItemAttributes from '@/components/items/ItemAttributes.vue'
 import ItemSlotsDisplay from '@/components/items/ItemSlotsDisplay.vue'
 import ActionRequirements from '@/components/ActionRequirements.vue'
+import RawStats from '@/components/items/RawStats.vue'
 
 const route = useRoute()
 const router = useRouter()

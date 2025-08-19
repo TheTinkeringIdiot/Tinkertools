@@ -148,12 +148,14 @@ interface Props {
   spellData: SpellData[]
   profile?: TinkerProfile | null
   showHidden?: boolean
+  advancedView?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   spellData: () => [],
   profile: null,
-  showHidden: false
+  showHidden: false,
+  advancedView: false
 })
 
 // ============================================================================
@@ -164,11 +166,23 @@ const hasSpellData = computed(() => {
   return props.spellData && props.spellData.length > 0
 })
 
-const formattedSpellData = computed(() => {
+const filteredSpellData = computed(() => {
   if (!hasSpellData.value) {
     return []
   }
-  return formatSpellDataList(props.spellData)
+  
+  if (!props.advancedView) {
+    // Filter out spell_data containing spells with spell_id 53065 (Attractor Effects)
+    return props.spellData.filter(spellData => 
+      !spellData.spells.some(spell => spell.spell_id === 53065)
+    )
+  }
+  
+  return props.spellData
+})
+
+const formattedSpellData = computed(() => {
+  return formatSpellDataList(filteredSpellData.value)
 })
 
 const useCompactMode = computed(() => {
