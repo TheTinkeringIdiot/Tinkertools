@@ -207,6 +207,16 @@ Shows all item data with profile compatibility and comparison options
         :defense-stats="item.defense_stats"
       />
 
+      <!-- Nano Statistics (for nanos only) -->
+      <NanoStatistics 
+        v-if="item && item.is_nano"
+        :item="item"
+        :profile="profile"
+        :show-compatibility="showCompatibility"
+        :skill-requirements="item.skill_requirements"
+        :skill-bonuses="item.skill_bonuses"
+      />
+
       <!-- Actions and Usage -->
       <Card v-if="item.actions?.length">
         <template #content>
@@ -460,6 +470,16 @@ Shows all item data with profile compatibility and comparison options
         :defense-stats="item.defense_stats"
       />
 
+      <!-- Nano Statistics (for nanos only) -->
+      <NanoStatistics 
+        v-if="item && item.is_nano"
+        :item="item"
+        :profile="profile"
+        :show-compatibility="showCompatibility"
+        :skill-requirements="item.skill_requirements"
+        :skill-bonuses="item.skill_bonuses"
+      />
+
       <!-- Actions and Usage -->
       <Card v-if="item.actions?.length">
         <template #content>
@@ -529,6 +549,7 @@ import type { Item, TinkerProfile } from '@/types/api'
 
 // Import new components
 import WeaponStats from '@/components/items/WeaponStats.vue'
+import NanoStatistics from '@/components/items/NanoStatistics.vue'
 import SpellDataDisplay from '@/components/items/SpellDataDisplay.vue'
 import ItemAttributes from '@/components/items/ItemAttributes.vue'
 import ItemSlotsDisplay from '@/components/items/ItemSlotsDisplay.vue'
