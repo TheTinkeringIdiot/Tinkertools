@@ -259,6 +259,13 @@ export interface CollectionTracking {
 // Search and Filter Types
 // ============================================================================
 
+export interface StatFilter {
+  function: 'requires' | 'modifies'
+  stat: number
+  operator: '==' | '<=' | '>=' | '!='
+  value: number
+}
+
 export interface ItemSearchQuery {
   search?: string
   exact_match?: boolean
@@ -277,6 +284,7 @@ export interface ItemSearchQuery {
   froob_friendly?: boolean
   nodrop?: boolean
   stat_bonuses?: number[]
+  stat_filters?: StatFilter[]
   page?: number
   limit?: number
   sort?: 'name' | 'ql' | 'item_class' | 'aoid'

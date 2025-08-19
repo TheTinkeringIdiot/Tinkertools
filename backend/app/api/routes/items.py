@@ -37,6 +37,103 @@ router = APIRouter(prefix="/items", tags=["items"])
 logger = logging.getLogger(__name__)
 
 
+def apply_stat_filters(query, stat_filters: str, db: Session):
+    """
+    Apply stat filters to the query.
+    Format: 'function:stat:operator:value' separated by commas
+    Example: 'requires:16:>=:500,modifies:124:>=:20'
+    """
+    if not stat_filters:
+        return query
+    
+    try:
+        filters = []
+        for filter_str in stat_filters.split(','):
+            parts = filter_str.strip().split(':')
+            if len(parts) != 4:
+                logger.warning(f"Invalid stat filter format: {filter_str}")
+                continue
+            
+            function, stat_str, operator, value_str = parts
+            
+            # Validate function
+            if function not in ['requires', 'modifies']:
+                logger.warning(f"Invalid stat filter function: {function}")
+                continue
+            
+            # Validate operator
+            if operator not in ['==', '<=', '>=', '!=']:
+                logger.warning(f"Invalid stat filter operator: {operator}")
+                continue
+            
+            try:
+                stat_id = int(stat_str)
+                value = int(value_str)
+            except ValueError:
+                logger.warning(f"Invalid stat ID or value in filter: {filter_str}")
+                continue
+            
+            filters.append((function, stat_id, operator, value))
+        
+        if not filters:
+            return query
+        
+        # Apply each filter
+        for function, stat_id, operator, value in filters:
+            if function == 'requires':
+                # Look for requirement criteria in actions
+                subquery = db.query(Item.id.distinct())\
+                    .join(Action, Item.id == Action.item_id)\
+                    .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
+                    .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
+                    .filter(Criterion.value1 == stat_id)
+                
+                # Apply operator to the requirement value
+                if operator == '>=':
+                    subquery = subquery.filter(Criterion.value2 >= value)
+                elif operator == '<=':
+                    subquery = subquery.filter(Criterion.value2 <= value)
+                elif operator == '==':
+                    subquery = subquery.filter(Criterion.value2 == value)
+                elif operator == '!=':
+                    subquery = subquery.filter(Criterion.value2 != value)
+                
+                query = query.filter(Item.id.in_(subquery))
+                
+            elif function == 'modifies':
+                # Look for stat modification spells
+                # Most stat modifications use spell_id 53045 (Modify Stat)
+                subquery = db.query(Item.id.distinct())\
+                    .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
+                    .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
+                    .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
+                    .join(Spell, SpellDataSpells.spell_id == Spell.id)\
+                    .filter(Spell.spell_id == 53045)\
+                    .filter(func.cast(Spell.spell_params.op('->>')(text("'Stat'")), Integer) == stat_id)
+                
+                # Apply operator to the modification value
+                if operator == '>=':
+                    subquery = subquery.filter(func.cast(Spell.spell_params.op('->>')(text("'Amount'")), Integer) >= value)
+                elif operator == '<=':
+                    subquery = subquery.filter(func.cast(Spell.spell_params.op('->>')(text("'Amount'")), Integer) <= value)
+                elif operator == '==':
+                    subquery = subquery.filter(func.cast(Spell.spell_params.op('->>')(text("'Amount'")), Integer) == value)
+                elif operator == '!=':
+                    subquery = subquery.filter(func.cast(Spell.spell_params.op('->>')(text("'Amount'")), Integer) != value)
+                
+                query = query.filter(Item.id.in_(subquery))
+        
+        # Use distinct to avoid duplicates from joins
+        query = query.distinct()
+        
+    except Exception as e:
+        logger.error(f"Error applying stat filters: {e}")
+        # Return original query if there's an error parsing filters
+        return query
+    
+    return query
+
+
 def build_item_detail(item: Item, db: Session) -> ItemDetail:
     """
     Build a complete ItemDetail response with all related data.
@@ -164,6 +261,7 @@ def get_items(
     froob_friendly: Optional[bool] = Query(None, description="Filter items without expansion requirements"),
     nodrop: Optional[bool] = Query(None, description="Filter items with NODROP flag"),
     stat_bonuses: Optional[str] = Query(None, description="Comma-separated list of stat IDs to check for bonuses"),
+    stat_filters: Optional[str] = Query(None, description="Stat filters in format 'function:stat:operator:value' separated by commas"),
     db: Session = Depends(get_db)
 ):
     """
@@ -260,8 +358,11 @@ def get_items(
         except ValueError:
             logger.warning(f"Invalid stat_bonuses parameter: {stat_bonuses}")
     
+    # Apply stat filters
+    query = apply_stat_filters(query, stat_filters, db)
+    
     # If we have any joins that might cause duplicates, make sure to use distinct
-    if any([slot, requirement_filters, nodrop is not None]):
+    if any([slot, requirement_filters, nodrop is not None, stat_filters]):
         query = query.distinct()
     
     # Get total count
@@ -308,6 +409,7 @@ def search_items(
     froob_friendly: Optional[bool] = Query(None, description="Filter items without expansion requirements"),
     nodrop: Optional[bool] = Query(None, description="Filter items with NODROP flag"),
     stat_bonuses: Optional[str] = Query(None, description="Comma-separated list of stat IDs to check for bonuses"),
+    stat_filters: Optional[str] = Query(None, description="Stat filters in format 'function:stat:operator:value' separated by commas"),
     db: Session = Depends(get_db)
 ):
     """
@@ -516,8 +618,11 @@ def search_items(
         except ValueError:
             logger.warning(f"Invalid stat_bonuses parameter: {stat_bonuses}")
     
+    # Apply stat filters
+    query = apply_stat_filters(query, stat_filters, db)
+    
     # If we have any joins that might cause duplicates, make sure to use distinct
-    if any([item_class, slot, requirement_filters, nodrop is not None]):
+    if any([item_class, slot, requirement_filters, nodrop is not None, stat_filters]):
         query = query.distinct()
     
     # Get total count

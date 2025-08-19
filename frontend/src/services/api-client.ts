@@ -324,6 +324,14 @@ class TinkerToolsApiClient {
           params.append('stat_bonuses', query.stat_bonuses.join(','))
         }
         
+        // Add stat filters
+        if (query.stat_filters && query.stat_filters.length > 0) {
+          const statFiltersParam = query.stat_filters.map(filter => 
+            `${filter.function}:${filter.stat}:${filter.operator}:${filter.value}`
+          ).join(',')
+          params.append('stat_filters', statFiltersParam)
+        }
+        
         const response = await this.client.get(`/items/search?${params.toString()}`)
         const backendResponse = response.data
         
@@ -369,6 +377,14 @@ class TinkerToolsApiClient {
         if (query.nodrop !== undefined) params.append('nodrop', query.nodrop.toString())
         if (query.stat_bonuses && query.stat_bonuses.length > 0) {
           params.append('stat_bonuses', query.stat_bonuses.join(','))
+        }
+        
+        // Add stat filters
+        if (query.stat_filters && query.stat_filters.length > 0) {
+          const statFiltersParam = query.stat_filters.map(filter => 
+            `${filter.function}:${filter.stat}:${filter.operator}:${filter.value}`
+          ).join(',')
+          params.append('stat_filters', statFiltersParam)
         }
         
         const response = await this.client.get(`/items?${params.toString()}`)

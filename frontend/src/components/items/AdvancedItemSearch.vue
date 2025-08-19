@@ -276,6 +276,45 @@ Provides all advanced search capabilities including item class, slot, requiremen
           </div>
         </div>
       </div>
+
+      <!-- Stat Filters -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300">
+            Stat Filters
+          </h3>
+          <Button
+            label="Add Filter"
+            icon="pi pi-plus"
+            size="small"
+            outlined
+            @click="showStatFilterModal = true"
+          />
+        </div>
+        
+        <div v-if="statFilters.length === 0" class="text-sm text-surface-500 dark:text-surface-400 text-center py-4 border border-dashed border-surface-300 dark:border-surface-600 rounded">
+          No stat filters added. Click "Add Filter" to search by stat requirements or modifications.
+        </div>
+        
+        <div v-else class="space-y-2">
+          <StatFilterCard
+            v-for="(filter, index) in statFilters"
+            :key="`filter-${index}`"
+            :filter="filter"
+            @remove="removeStatFilter(index)"
+          />
+        </div>
+        
+        <div v-if="statFilters.length > 0" class="text-xs text-surface-500 dark:text-surface-400">
+          <div class="flex items-center gap-1">
+            <i class="pi pi-info-circle"></i>
+            <span>
+              <strong>REQ:</strong> Items that need the stat to equip/use.
+              <strong>MOD:</strong> Items that boost the stat when equipped.
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Search Results Summary -->
@@ -293,12 +332,20 @@ Provides all advanced search capabilities including item class, slot, requiremen
         />
       </div>
     </div>
+
+    <!-- Stat Filter Modal -->
+    <StatFilterModal
+      v-model:visible="showStatFilterModal"
+      @add-filter="addStatFilter"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
-import type { ItemSearchQuery } from '@/types/api'
+import type { ItemSearchQuery, StatFilter } from '@/types/api'
+import StatFilterModal from './StatFilterModal.vue'
+import StatFilterCard from './StatFilterCard.vue'
 import { useItemsStore } from '@/stores/items'
 import {
   ITEM_CLASS,
@@ -345,8 +392,10 @@ const searchForm = ref<SearchFormData>({
 })
 
 const selectedStatBonuses = ref<number[]>([])
+const statFilters = ref<StatFilter[]>([])
 const hasSearched = ref(false)
 const checkboxKey = ref(0) // Used to force checkbox re-render
+const showStatFilterModal = ref(false)
 
 // Store
 const itemsStore = useItemsStore()
@@ -445,7 +494,8 @@ const hasSearchCriteria = computed(() => {
     (searchForm.value.faction && searchForm.value.faction > 0) ||
     searchForm.value.froob_friendly ||
     searchForm.value.nodrop ||
-    selectedStatBonuses.value.length > 0
+    selectedStatBonuses.value.length > 0 ||
+    statFilters.value.length > 0
   )
 })
 
@@ -539,6 +589,20 @@ function performSearch() {
     query.stat_bonuses = [...selectedStatBonuses.value]
   }
   
+  // Stat filters
+  if (statFilters.value.length > 0) {
+    // Only include complete filters (all fields filled)
+    const completeFilters = statFilters.value.filter(filter => 
+      filter.function && 
+      filter.stat !== undefined && 
+      filter.operator && 
+      filter.value !== undefined
+    )
+    if (completeFilters.length > 0) {
+      query.stat_filters = completeFilters
+    }
+  }
+  
   hasSearched.value = true
   emit('search', query)
 }
@@ -550,6 +614,7 @@ function clearAll() {
     searchFields: 'both'
   }
   selectedStatBonuses.value = []
+  statFilters.value = []
   hasSearched.value = false
   emit('clear')
 }
@@ -607,6 +672,11 @@ async function restoreSearchState() {
     selectedStatBonuses.value = storedQuery.stat_bonuses
   }
   
+  // Restore stat filters
+  if (storedQuery.stat_filters && Array.isArray(storedQuery.stat_filters)) {
+    statFilters.value = storedQuery.stat_filters.map(filter => ({ ...filter }))
+  }
+  
   // Mark as having searched if we restored any criteria
   hasSearched.value = true
   
@@ -647,6 +717,17 @@ function onItemClassChange() {
 function saveSearch() {
   // TODO: Implement saved searches functionality
   console.log('Save search functionality not yet implemented')
+}
+
+// Stat filter management methods
+function addStatFilter(filter: StatFilter) {
+  statFilters.value.push({ ...filter })
+}
+
+function removeStatFilter(index: number) {
+  if (index >= 0 && index < statFilters.value.length) {
+    statFilters.value.splice(index, 1)
+  }
 }
 
 // Watch for item class changes to clear slot
