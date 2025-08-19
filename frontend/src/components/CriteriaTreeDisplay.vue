@@ -39,7 +39,7 @@
           :node="tree"
           :character-stats="characterStats"
           :show-connector="false"
-          :show-group-label="!showSummary"
+          :show-group-label="true"
         />
       </div>
       

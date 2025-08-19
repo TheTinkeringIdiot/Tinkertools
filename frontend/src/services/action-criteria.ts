@@ -104,7 +104,8 @@ const STATE_OPERATORS = {
   86: 'Must be player or player pet',
   89: 'Must be falling',
   111: 'Must not be in vehicle',
-  112: 'Flying allowed'
+  112: 'Flying allowed',
+  18: 'State check'
 } as const
 
 // ============================================================================
@@ -137,6 +138,7 @@ export function parseCriterion(criterion: Criterion): ParsedCriterion {
 export function transformCriterionForDisplay(criterion: Criterion): DisplayCriterion {
   const { id, value1: stat, value2: value, operator } = criterion
   const statName = getStatName(stat) || `Stat ${stat}`
+  
   
   // Check for logical operators (separators and logical ops)
   if (stat === 0 && value === 0) {
@@ -580,6 +582,15 @@ function buildTreeFromRPN(
   characterStats?: Record<number, number>
 ): CriteriaTreeNode | null {
   const stack: CriteriaTreeNode[] = []
+  const statRequirements = displayCriteria.filter(c => c.isStatRequirement)
+  const logicalOperators = displayCriteria.filter(c => c.isLogicalOperator)
+  
+  // Special case: if all logical operators are AND and we have multiple stat requirements
+  // Just create a simple requirements list (common pattern: REQ1 REQ2 AND REQ3 AND ...)
+  if (logicalOperators.every(op => op.displayOperator === 'AND') && 
+      statRequirements.length > 1) {
+    return createSimpleRequirementsList(statRequirements, characterStats)
+  }
   
   for (const criterion of displayCriteria) {
     if (criterion.isStatRequirement) {
@@ -603,10 +614,7 @@ function buildTreeFromRPN(
   // Should have exactly one node left (the root)
   if (stack.length !== 1) {
     // Fallback: create a simple group
-    return createSimpleRequirementsList(
-      displayCriteria.filter(c => c.isStatRequirement),
-      characterStats
-    )
+    return createSimpleRequirementsList(statRequirements, characterStats)
   }
   
   const root = stack[0]
