@@ -21,6 +21,7 @@ Shows essential nano information in a dense, scannable table format
         <div class="stats-table">
           <!-- Headers Row -->
           <div class="stats-row header-row">
+            <div v-if="hasDamageRange" class="stat-group header-cell">Damage</div>
             <div class="stat-group header-cell">Cost & Usage</div>
             <div class="stat-group header-cell">Range & Duration</div>
             <div class="stat-group header-cell">Properties</div>
@@ -28,23 +29,38 @@ Shows essential nano information in a dense, scannable table format
           
           <!-- Data Row -->
           <div class="stats-row data-row">
-            <!-- Cost & Usage Column -->
+            <!-- Damage Column (only for damage-dealing nanos) -->
+            <div v-if="hasDamageRange" class="stat-group">
+              <div class="damage-display">
+                <div v-if="damageRange.minDamage" class="damage-stat">
+                  <div class="damage-label">Min</div>
+                  <div class="damage-value">{{ damageRange.minDamage }}</div>
+                </div>
+                <div v-if="damageRange.minDamage && damageRange.maxDamage" class="damage-divider"></div>
+                <div v-if="damageRange.maxDamage" class="damage-stat">
+                  <div class="damage-label">Max</div>
+                  <div class="damage-value max">{{ damageRange.maxDamage }}</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Cost & Usage Column (always show) -->
             <div class="stat-group">
               <div v-if="nanoStats.nanoCost" class="stat-pair">
                 <span class="stat-name">Cost</span>
                 <span class="stat-val val-cost">{{ nanoStats.nanoCost }} NP</span>
               </div>
-              <div v-if="nanoStats.nanoDelta" class="stat-pair">
-                <span class="stat-name">Delta</span>
-                <span class="stat-val val-delta">{{ nanoStats.nanoDelta }}</span>
-              </div>
               <div v-if="nanoStats.castTime" class="stat-pair">
                 <span class="stat-name">Cast Time</span>
-                <span class="stat-val val-cast">{{ formatCastTime(nanoStats.castTime) }}</span>
+                <span class="stat-val val-cast">{{ formatCentisecondsToSeconds(nanoStats.castTime) }}</span>
               </div>
               <div v-if="nanoStats.rechargeTime" class="stat-pair">
                 <span class="stat-name">Recharge</span>
-                <span class="stat-val val-cast">{{ formatCastTime(nanoStats.rechargeTime) }}</span>
+                <span class="stat-val val-cast">{{ formatCentisecondsToSeconds(nanoStats.rechargeTime) }}</span>
+              </div>
+              <div v-if="nanoStats.nanoDelta" class="stat-pair">
+                <span class="stat-name">Delta</span>
+                <span class="stat-val val-delta">{{ nanoStats.nanoDelta }}</span>
               </div>
             </div>
             
@@ -66,9 +82,13 @@ Shows essential nano information in a dense, scannable table format
             
             <!-- Properties Column -->
             <div class="stat-group">
+              <div v-if="nanoStats.nanoSchool" class="stat-pair">
+                <span class="stat-name">School</span>
+                <span class="stat-val val-school">{{ NANOSCHOOL[nanoStats.nanoSchool] || `School ${nanoStats.nanoSchool}` }}</span>
+              </div>
               <div v-if="nanoStats.nanoStrain" class="stat-pair">
                 <span class="stat-name">Strain</span>
-                <span class="stat-val val-strain">{{ getNanoStrainName(nanoStats.nanoStrain) || nanoStats.nanoStrain }}</span>
+                <span class="stat-val val-strain">{{ NANO_STRAIN[nanoStats.nanoStrain] || `Strain ${nanoStats.nanoStrain}` }}</span>
               </div>
               <div v-if="nanoStats.stackingOrder" class="stat-pair">
                 <span class="stat-name">Stacking</span>
@@ -81,6 +101,44 @@ Shows essential nano information in a dense, scannable table format
               <div v-if="nanoStats.flags && nanoStats.flags.length > 0" class="stat-pair">
                 <span class="stat-name">Flags</span>
                 <span class="stat-val val-flags">{{ nanoStats.flags.slice(0, 2).join(', ') }}{{ nanoStats.flags.length > 2 ? '...' : '' }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Attack & Defense Modifiers Section -->
+        <div v-if="hasAttackDefenseStats" class="stats-table mt-3">
+          <!-- Headers Row -->
+          <div class="stats-row header-row">
+            <div class="stat-group header-cell">Attack Modifiers</div>
+            <div class="stat-group header-cell">Defense Modifiers</div>
+          </div>
+          
+          <!-- Data Row -->
+          <div class="stats-row data-row">
+            <!-- Attack Stats Column -->
+            <div class="stat-group">
+              <div v-if="attackStatsFormatted.length > 0" class="modifier-list">
+                <div v-for="modifier in attackStatsFormatted" :key="modifier.stat" class="stat-pair">
+                  <span class="stat-name">{{ modifier.name }}</span>
+                  <span class="stat-val val-attack">{{ modifier.formattedValue }}</span>
+                </div>
+              </div>
+              <div v-else class="text-xs text-surface-500 dark:text-surface-400 text-center py-4">
+                No attack modifiers
+              </div>
+            </div>
+            
+            <!-- Defense Stats Column -->
+            <div class="stat-group">
+              <div v-if="defenseStatsFormatted.length > 0" class="modifier-list">
+                <div v-for="modifier in defenseStatsFormatted" :key="modifier.stat" class="stat-pair">
+                  <span class="stat-name">{{ modifier.name }}</span>
+                  <span class="stat-val val-defense">{{ modifier.formattedValue }}</span>
+                </div>
+              </div>
+              <div v-else class="text-xs text-surface-500 dark:text-surface-400 text-center py-4">
+                No defense modifiers
               </div>
             </div>
           </div>
@@ -136,6 +194,7 @@ import {
   getNanoSchoolName,
   getNanoStrainName
 } from '@/services/game-utils'
+import { NANOSCHOOL, NANO_STRAIN, SPELL_FORMATS } from '@/services/game-data'
 
 const props = defineProps<{
   item: Item
@@ -143,6 +202,8 @@ const props = defineProps<{
   showCompatibility?: boolean
   skillRequirements?: Array<{stat: number, value: number}>
   skillBonuses?: Array<{stat: number, value: number}>
+  attackStats?: Array<{stat: number, value: number}>
+  defenseStats?: Array<{stat: number, value: number}>
 }>()
 
 // Computed Properties
@@ -157,16 +218,16 @@ const nanoStats = computed(() => {
   const stats = props.item.stats
   return {
     // Core nano properties
-    nanoCost: stats.find(s => s.stat === 318)?.value, // NanoCost
+    nanoCost: stats.find(s => s.stat === 407)?.value, // NanoPoints
     nanoDelta: stats.find(s => s.stat === 364)?.value, // NanoDelta
-    nanoRange: stats.find(s => s.stat === 381)?.value, // NanoRange
+    nanoRange: stats.find(s => s.stat === 287)?.value, // AttackRange
     duration: stats.find(s => s.stat === 8)?.value, // Duration
-    nanoSchool: stats.find(s => s.stat === 56)?.value, // NanoSchool (if available)
-    nanoStrain: stats.find(s => s.stat === 534)?.value, // NanoStrain (if available)
+    nanoSchool: stats.find(s => s.stat === 405)?.value, // NanoSchool
+    nanoStrain: stats.find(s => s.stat === 75)?.value, // NanoStrain
     
     // Timing
-    castTime: stats.find(s => s.stat === 32)?.value, // CastTime
-    rechargeTime: stats.find(s => s.stat === 31)?.value, // RechargeDelay
+    castTime: stats.find(s => s.stat === 294)?.value, // AttackDelay
+    rechargeTime: stats.find(s => s.stat === 210)?.value, // RechargeDelay
     
     // Advanced properties
     areaOfEffect: stats.find(s => s.stat === 457)?.value, // AreaOfEffect
@@ -181,6 +242,60 @@ const nanoStats = computed(() => {
 const hasSkillModifiers = computed(() => {
   return (props.skillRequirements && props.skillRequirements.length > 0) || 
          (props.skillBonuses && props.skillBonuses.length > 0)
+})
+
+const damageRange = computed(() => {
+  // First, try to find damage in spell_data
+  if (props.item.spell_data) {
+    const damageSpellIds = [53002, 53073, 53185, 53196] // Damage-dealing spell formats
+    
+    for (const spellData of props.item.spell_data) {
+      if (spellData.spells && Array.isArray(spellData.spells)) {
+        for (const spell of spellData.spells) {
+          if (damageSpellIds.includes(spell.spell_id)) {
+            // Extract damage values - some spells use MinValue/MaxValue, others use MinAmount/MaxAmount
+            const minDamage = Math.abs(spell.spell_params?.MinValue || spell.spell_params?.MinAmount || 0)
+            const maxDamage = Math.abs(spell.spell_params?.MaxValue || spell.spell_params?.MaxAmount || 0)
+            
+            // Only consider it a damage nano if the damage is meaningful (> 10)
+            // Some utility nanos have 1/1 damage for technical purposes
+            if ((minDamage > 10 || maxDamage > 10)) {
+              return {
+                minDamage,
+                maxDamage,
+                spellId: spell.spell_id,
+                format: SPELL_FORMATS[spell.spell_id as keyof typeof SPELL_FORMATS] || 'Unknown damage format'
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // Fallback: try to extract damage from description text for nanos that cast other nanos
+  if (props.item.description) {
+    const damageMatch = props.item.description.match(/(\d{1,3}(?:,\d{3})*)-(\d{1,3}(?:,\d{3})*)\s+points?\s+of\s+damage/i)
+    if (damageMatch) {
+      const minDamage = parseInt(damageMatch[1].replace(/,/g, ''))
+      const maxDamage = parseInt(damageMatch[2].replace(/,/g, ''))
+      return {
+        minDamage,
+        maxDamage,
+        spellId: 0, // Not from a direct spell
+        format: 'Description-based damage'
+      }
+    }
+  }
+  
+  return null
+})
+
+const hasDamageRange = computed(() => damageRange.value !== null)
+
+const hasAttackDefenseStats = computed(() => {
+  return (props.attackStats && props.attackStats.length > 0) || 
+         (props.defenseStats && props.defenseStats.length > 0)
 })
 
 const skillRequirementsFormatted = computed(() => {
@@ -201,18 +316,25 @@ const skillBonusesFormatted = computed(() => {
   }))
 })
 
-// Methods
-function formatCastTime(centiseconds: number | undefined): string {
-  if (!centiseconds) return 'Instant'
-  if (centiseconds === 100) return '1s'
-  
-  const seconds = centiseconds / 100
-  if (seconds < 1) {
-    return `${centiseconds / 10}ms`
-  }
-  return `${seconds.toFixed(1)}s`
-}
+const attackStatsFormatted = computed(() => {
+  if (!props.attackStats) return []
+  return props.attackStats.map(stat => ({
+    stat: stat.stat,
+    name: getStatName(stat.stat),
+    formattedValue: formatPercentageValue(stat.value)
+  }))
+})
 
+const defenseStatsFormatted = computed(() => {
+  if (!props.defenseStats) return []
+  return props.defenseStats.map(stat => ({
+    stat: stat.stat,
+    name: getStatName(stat.stat),
+    formattedValue: formatPercentageValue(stat.value)
+  }))
+})
+
+// Methods
 function formatRange(range: number | undefined): string {
   if (!range || range === 0) return 'Self'
   if (range === 1) return 'Touch'
@@ -223,10 +345,20 @@ function formatDuration(duration: number | undefined): string {
   if (!duration || duration === 0) return 'Instant'
   if (duration === -1) return 'Permanent'
   
-  // Duration is usually in seconds
-  if (duration < 60) return `${duration}s`
-  if (duration < 3600) return `${Math.round(duration / 60)}m`
-  return `${Math.round(duration / 3600)}h`
+  // Duration is in centiseconds, convert to seconds
+  const seconds = duration / 100
+  
+  if (seconds < 60) return `${seconds.toFixed(2)}s`
+  if (seconds < 3600) return `${(seconds / 60).toFixed(2)}m`
+  return `${(seconds / 3600).toFixed(2)}h`
+}
+
+function formatCentisecondsToSeconds(centiseconds: number | undefined): string {
+  if (!centiseconds || centiseconds === 0) return '0.00s'
+  
+  // Convert centiseconds to seconds with 2 decimal places
+  const seconds = centiseconds / 100
+  return `${seconds.toFixed(2)}s`
 }
 
 function formatTargetType(targetType: number | undefined): string {
@@ -266,6 +398,11 @@ function extractNanoFlags(item: Item): string[] {
 function formatBonusValue(value: number): string {
   const sign = value >= 0 ? '+' : ''
   return `${sign}${value}`
+}
+
+function formatPercentageValue(value: number): string {
+  const sign = value >= 0 ? '+' : ''
+  return `${sign}${value}%`
 }
 </script>
 
@@ -354,12 +491,63 @@ function formatBonusValue(value: number): string {
 .nano-stats-component .val-cast { color: #f59e0b; }
 .nano-stats-component .val-range { color: #10b981; }
 .nano-stats-component .val-duration { color: #06b6d4; }
+.nano-stats-component .val-school { color: #7c3aed; }
 .nano-stats-component .val-strain { color: #ef4444; }
 .nano-stats-component .val-stack { color: #84cc16; }
 .nano-stats-component .val-target { color: #64748b; }
 .nano-stats-component .val-flags { color: #a78bfa; }
 .nano-stats-component .val-requirement { color: #ef4444; font-weight: 600; }
 .nano-stats-component .val-bonus { color: #10b981; font-weight: 600; }
+.nano-stats-component .val-attack { color: #dc2626; font-weight: 600; }
+.nano-stats-component .val-defense { color: #059669; font-weight: 600; }
+
+/* Damage display styling (similar to WeaponStats) */
+.nano-stats-component .damage-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 4px;
+}
+
+.nano-stats-component .damage-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.nano-stats-component .damage-label {
+  font-size: 10px;
+  color: #6b7280;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dark .nano-stats-component .damage-label {
+  color: #9ca3af !important;
+}
+
+.nano-stats-component .damage-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #dc2626;
+}
+
+.nano-stats-component .damage-value.max {
+  color: #b91c1c;
+}
+
+.nano-stats-component .damage-divider {
+  width: 1px;
+  height: 24px;
+  background: #d1d5db;
+}
+
+.dark .nano-stats-component .damage-divider {
+  background: #4b5563 !important;
+}
 
 /* Modifier list styling */
 .nano-stats-component .modifier-list {

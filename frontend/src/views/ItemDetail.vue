@@ -215,6 +215,8 @@ Shows all item data with profile compatibility and comparison options
         :show-compatibility="showCompatibility"
         :skill-requirements="item.skill_requirements"
         :skill-bonuses="item.skill_bonuses"
+        :attack-stats="item.attack_stats"
+        :defense-stats="item.defense_stats"
       />
 
       <!-- Actions and Usage -->
@@ -478,6 +480,8 @@ Shows all item data with profile compatibility and comparison options
         :show-compatibility="showCompatibility"
         :skill-requirements="item.skill_requirements"
         :skill-bonuses="item.skill_bonuses"
+        :attack-stats="item.attack_stats"
+        :defense-stats="item.defense_stats"
       />
 
       <!-- Actions and Usage -->
