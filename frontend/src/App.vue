@@ -56,14 +56,6 @@ const menuItems = ref<MenuItem[]>([
 
 <template>
   <div class="min-h-screen bg-surface-0 text-surface-900 dark:bg-surface-950 dark:text-surface-50">
-    <!-- Skip Navigation Links -->
-    <a 
-      href="#main-content" 
-      class="skip-link sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-primary-500 focus:text-white focus:px-4 focus:py-2 focus:rounded"
-    >
-      Skip to main content
-    </a>
-    
     <!-- Header -->
     <header 
       class="bg-surface-0 dark:bg-surface-950 border-b border-surface-200 dark:border-surface-700 shadow-sm"
