@@ -43,3 +43,6 @@ backend/symbiants.csv
 
 # Documentation background files
 docs/background/
+
+# Playwright MCP screenshots (temporary testing artifacts)
+.playwright-mcp/
