@@ -23,6 +23,7 @@ import {
   IMPLANT_SLOT_POSITION,
   CANFLAG,
   ITEM_NONE_FLAG,
+  SPECIALIZATION_FLAG,
   WEAPON_SLOT,
   ARMOR_SLOT,
   IMPLANT_SLOT,
@@ -1340,6 +1341,7 @@ export function getFlagNameFromValue(statId: number, bitValue: number): string {
   // Map stat IDs to their corresponding flag constants
   const flagConstants: Record<number, Record<string, number>> = {
     30: CANFLAG,        // Can flags
+    182: SPECIALIZATION_FLAG,  // Specialization flags
     355: WORN_ITEM,     // WornItem flags
     455: NPCFAMILY,     // NPCFamily flags
     // Add more stat ID to flag mappings as needed
