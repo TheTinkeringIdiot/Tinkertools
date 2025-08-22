@@ -294,8 +294,6 @@ def get_items(
     
     # Requirement filters - join with criteria via spell data
     requirement_filters = []
-    if profession is not None and profession > 0:
-        requirement_filters.append((60, profession))  # Stat 60 = Profession
     if breed is not None and breed > 0:
         requirement_filters.append((4, breed))       # Stat 4 = Breed
     if gender is not None and gender > 0:
@@ -303,12 +301,28 @@ def get_items(
     if faction is not None and faction > 0:
         requirement_filters.append((33, faction))    # Stat 33 = Faction
     
-    # Apply requirement filters - look in actions where item requirements are stored
+    # Apply non-profession requirement filters first
     for stat_id, required_value in requirement_filters:
         query = query.join(Action, Item.id == Action.item_id)\
                     .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
                     .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
                     .filter(Criterion.value1 == stat_id, Criterion.value2 == required_value)
+    
+    # Handle profession filtering - check both Profession (60) and VisualProfession (368)
+    if profession is not None and profession > 0:
+        # Create a subquery for items with Profession requirement
+        profession_subquery = db.query(Item.id)\
+                                .join(Action, Item.id == Action.item_id)\
+                                .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
+                                .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
+                                .filter(
+                                    or_(
+                                        and_(Criterion.value1 == 60, Criterion.value2 == profession),   # Profession
+                                        and_(Criterion.value1 == 368, Criterion.value2 == profession)   # VisualProfession
+                                    )
+                                ).subquery()
+        
+        query = query.filter(Item.id.in_(profession_subquery))
     
     # Froob friendly filter (exclude items with expansion requirements)
     if froob_friendly is True:
@@ -561,8 +575,6 @@ def search_items(
     
     # Requirement filters - join with criteria via spell data
     requirement_filters = []
-    if profession is not None and profession > 0:
-        requirement_filters.append((60, profession))  # Stat 60 = Profession
     if breed is not None and breed > 0:
         requirement_filters.append((4, breed))       # Stat 4 = Breed
     if gender is not None and gender > 0:
@@ -570,12 +582,28 @@ def search_items(
     if faction is not None and faction > 0:
         requirement_filters.append((33, faction))    # Stat 33 = Faction
     
-    # Apply requirement filters - look in actions where item requirements are stored
+    # Apply non-profession requirement filters first
     for stat_id, required_value in requirement_filters:
         query = query.join(Action, Item.id == Action.item_id)\
                     .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
                     .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
                     .filter(Criterion.value1 == stat_id, Criterion.value2 == required_value)
+    
+    # Handle profession filtering - check both Profession (60) and VisualProfession (368)
+    if profession is not None and profession > 0:
+        # Create a subquery for items with Profession requirement
+        profession_subquery = db.query(Item.id)\
+                                .join(Action, Item.id == Action.item_id)\
+                                .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
+                                .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
+                                .filter(
+                                    or_(
+                                        and_(Criterion.value1 == 60, Criterion.value2 == profession),   # Profession
+                                        and_(Criterion.value1 == 368, Criterion.value2 == profession)   # VisualProfession
+                                    )
+                                ).subquery()
+        
+        query = query.filter(Item.id.in_(profession_subquery))
     
     # Froob friendly filter (exclude items with expansion requirements)
     if froob_friendly is True:
