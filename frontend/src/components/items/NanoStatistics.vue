@@ -74,6 +74,10 @@ Shows essential nano information in a dense, scannable table format
                 <span class="stat-name">Duration</span>
                 <span class="stat-val val-duration">{{ formatDuration(nanoStats.duration) }}</span>
               </div>
+              <div v-if="tickInfo" class="stat-pair" data-testid="ticks-row">
+                <span class="stat-name">Ticks</span>
+                <span class="stat-val val-ticks">{{ formatTicks(tickInfo.tickCount, tickInfo.tickInterval) }}</span>
+              </div>
               <div v-if="nanoStats.areaOfEffect" class="stat-pair">
                 <span class="stat-name">Area</span>
                 <span class="stat-val val-range">{{ nanoStats.areaOfEffect }}m</span>
@@ -239,6 +243,28 @@ const nanoStats = computed(() => {
   }
 })
 
+const tickInfo = computed(() => {
+  if (!props.item.spell_data) return null
+  
+  // Look through all spell data for spells with ticks
+  for (const spellData of props.item.spell_data) {
+    if (spellData.spells && Array.isArray(spellData.spells)) {
+      for (const spell of spellData.spells) {
+        // Check if spell has tick_count > 1 and tick_interval > 0
+        if (spell.tick_count && spell.tick_count > 1 && 
+            spell.tick_interval && spell.tick_interval > 0) {
+          return {
+            tickCount: spell.tick_count,
+            tickInterval: spell.tick_interval
+          }
+        }
+      }
+    }
+  }
+  
+  return null
+})
+
 const hasSkillModifiers = computed(() => {
   return (props.skillRequirements && props.skillRequirements.length > 0) || 
          (props.skillBonuses && props.skillBonuses.length > 0)
@@ -359,6 +385,12 @@ function formatCentisecondsToSeconds(centiseconds: number | undefined): string {
   // Convert centiseconds to seconds with 2 decimal places
   const seconds = centiseconds / 100
   return `${seconds.toFixed(2)}s`
+}
+
+function formatTicks(tickCount: number, tickInterval: number): string {
+  // Convert tick_interval from centiseconds to seconds
+  const intervalInSeconds = tickInterval / 100
+  return `${tickCount} @ ${intervalInSeconds.toFixed(2)}s`
 }
 
 function formatTargetType(targetType: number | undefined): string {
@@ -491,6 +523,7 @@ function formatPercentageValue(value: number): string {
 .nano-stats-component .val-cast { color: #f59e0b; }
 .nano-stats-component .val-range { color: #10b981; }
 .nano-stats-component .val-duration { color: #06b6d4; }
+.nano-stats-component .val-ticks { color: #e11d48; font-weight: 600; }
 .nano-stats-component .val-school { color: #7c3aed; }
 .nano-stats-component .val-strain { color: #ef4444; }
 .nano-stats-component .val-stack { color: #84cc16; }
