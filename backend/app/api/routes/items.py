@@ -262,6 +262,7 @@ def get_items(
     nodrop: Optional[bool] = Query(None, description="Filter items with NODROP flag"),
     stat_bonuses: Optional[str] = Query(None, description="Comma-separated list of stat IDs to check for bonuses"),
     stat_filters: Optional[str] = Query(None, description="Stat filters in format 'function:stat:operator:value' separated by commas"),
+    strain: Optional[int] = Query(None, description="Filter by nano strain (stat 75)"),
     db: Session = Depends(get_db)
 ):
     """
@@ -361,8 +362,14 @@ def get_items(
     # Apply stat filters
     query = apply_stat_filters(query, stat_filters, db)
     
+    # Strain filter (stat 75 - NanoStrain)
+    if strain is not None and strain > 0:
+        query = query.join(ItemStats, Item.id == ItemStats.item_id)\
+                    .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
+                    .filter(StatValue.stat == 75, StatValue.value == strain)
+    
     # If we have any joins that might cause duplicates, make sure to use distinct
-    if any([slot, requirement_filters, nodrop is not None, stat_filters]):
+    if any([slot, requirement_filters, nodrop is not None, stat_filters, strain is not None]):
         query = query.distinct()
     
     # Get total count
@@ -410,6 +417,7 @@ def search_items(
     nodrop: Optional[bool] = Query(None, description="Filter items with NODROP flag"),
     stat_bonuses: Optional[str] = Query(None, description="Comma-separated list of stat IDs to check for bonuses"),
     stat_filters: Optional[str] = Query(None, description="Stat filters in format 'function:stat:operator:value' separated by commas"),
+    strain: Optional[int] = Query(None, description="Filter by nano strain (stat 75)"),
     db: Session = Depends(get_db)
 ):
     """
@@ -621,8 +629,14 @@ def search_items(
     # Apply stat filters
     query = apply_stat_filters(query, stat_filters, db)
     
+    # Strain filter (stat 75 - NanoStrain)
+    if strain is not None and strain > 0:
+        query = query.join(ItemStats, Item.id == ItemStats.item_id)\
+                    .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
+                    .filter(StatValue.stat == 75, StatValue.value == strain)
+    
     # If we have any joins that might cause duplicates, make sure to use distinct
-    if any([item_class, slot, requirement_filters, nodrop is not None, stat_filters]):
+    if any([item_class, slot, requirement_filters, nodrop is not None, stat_filters, strain is not None]):
         query = query.distinct()
     
     # Get total count

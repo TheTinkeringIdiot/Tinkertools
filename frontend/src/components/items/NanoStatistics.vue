@@ -92,7 +92,15 @@ Shows essential nano information in a dense, scannable table format
               </div>
               <div v-if="nanoStats.nanoStrain" class="stat-pair">
                 <span class="stat-name">Strain</span>
-                <span class="stat-val val-strain">{{ NANO_STRAIN[nanoStats.nanoStrain] || `Strain ${nanoStats.nanoStrain}` }}</span>
+                <RouterLink 
+                  :to="{ 
+                    name: 'TinkerItems', 
+                    query: { strain: nanoStats.nanoStrain, is_nano: 'true' } 
+                  }"
+                  class="stat-val val-strain clickable-link"
+                >
+                  {{ NANO_STRAIN[nanoStats.nanoStrain] || `Strain ${nanoStats.nanoStrain}` }}
+                </RouterLink>
               </div>
               <div v-if="nanoStats.stackingOrder" class="stat-pair">
                 <span class="stat-name">Stacking</span>
@@ -526,6 +534,14 @@ function formatPercentageValue(value: number): string {
 .nano-stats-component .val-ticks { color: #e11d48; font-weight: 600; }
 .nano-stats-component .val-school { color: #7c3aed; }
 .nano-stats-component .val-strain { color: #ef4444; }
+.nano-stats-component .clickable-link {
+  text-decoration: underline;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.nano-stats-component .clickable-link:hover {
+  opacity: 0.8;
+}
 .nano-stats-component .val-stack { color: #84cc16; }
 .nano-stats-component .val-target { color: #64748b; }
 .nano-stats-component .val-flags { color: #a78bfa; }

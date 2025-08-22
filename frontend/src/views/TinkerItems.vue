@@ -175,7 +175,7 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useItems } from '@/composables/useItems'
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
 import { useItemsStore } from '@/stores/items'
@@ -188,6 +188,7 @@ import ItemList from '@/components/items/ItemList.vue'
 import ItemComparison from '@/components/items/ItemComparison.vue'
 
 const router = useRouter()
+const route = useRoute()
 const profilesStore = useTinkerProfilesStore()
 
 // State
@@ -387,6 +388,23 @@ function onPageChange(page: number) {
 
 // Initialize
 onMounted(() => {
+  // Check for strain query parameter and trigger search if present
+  const strainParam = route.query.strain
+  const isNanoParam = route.query.is_nano
+  
+  if (strainParam) {
+    // Create a search query for the specified strain
+    const strainQuery: ItemSearchQuery = {
+      strain: parseInt(strainParam as string),
+      is_nano: isNanoParam === 'true' // Filter to nanos if specified
+      // Don't include 'search' parameter to use basic /items endpoint
+    }
+    
+    // Trigger the advanced search
+    performAdvancedSearch(strainQuery)
+    return
+  }
+  
   // Check if we have cached search results and restore them
   const itemsStore = useItemsStore()
   if (itemsStore.currentSearchResults.length > 0 && itemsStore.currentSearchQuery) {
