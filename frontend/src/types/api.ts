@@ -285,6 +285,7 @@ export interface ItemSearchQuery {
   nodrop?: boolean
   stat_bonuses?: number[]
   stat_filters?: StatFilter[]
+  strain?: number
   page?: number
   limit?: number
   sort?: 'name' | 'ql' | 'item_class' | 'aoid'

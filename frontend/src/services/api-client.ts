@@ -331,6 +331,7 @@ class TinkerToolsApiClient {
           ).join(',')
           params.append('stat_filters', statFiltersParam)
         }
+        if (query.strain !== undefined) params.append('strain', query.strain.toString())
         
         const response = await this.client.get(`/items/search?${params.toString()}`)
         const backendResponse = response.data
@@ -385,6 +386,11 @@ class TinkerToolsApiClient {
             `${filter.function}:${filter.stat}:${filter.operator}:${filter.value}`
           ).join(',')
           params.append('stat_filters', statFiltersParam)
+        }
+        
+        // Add strain filter
+        if (query.strain !== undefined) {
+          params.append('strain', query.strain.toString())
         }
         
         const response = await this.client.get(`/items?${params.toString()}`)

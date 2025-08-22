@@ -8,6 +8,12 @@ const CardMock = {
   template: '<div><slot name="content"></slot></div>'
 }
 
+// Mock Vue Router components
+const RouterLinkMock = {
+  template: '<a :href="to.name"><slot></slot></a>',
+  props: ['to']
+}
+
 describe('NanoStatistics', () => {
   describe('tick display functionality', () => {
     it('should display ticks when spell has tick_count > 1 and tick_interval > 0', () => {
@@ -41,7 +47,8 @@ describe('NanoStatistics', () => {
         },
         global: {
           components: {
-            Card: CardMock
+            Card: CardMock,
+            RouterLink: RouterLinkMock
           }
         }
       })
@@ -84,7 +91,8 @@ describe('NanoStatistics', () => {
         },
         global: {
           components: {
-            Card: CardMock
+            Card: CardMock,
+            RouterLink: RouterLinkMock
           }
         }
       })
@@ -123,7 +131,8 @@ describe('NanoStatistics', () => {
         },
         global: {
           components: {
-            Card: CardMock
+            Card: CardMock,
+            RouterLink: RouterLinkMock
           }
         }
       })
@@ -162,13 +171,85 @@ describe('NanoStatistics', () => {
         },
         global: {
           components: {
-            Card: CardMock
+            Card: CardMock,
+            RouterLink: RouterLinkMock
           }
         }
       })
 
       const ticksValue = wrapper.find('.val-ticks')
       expect(ticksValue.text()).toBe('3 @ 2.50s')
+    })
+  })
+
+  describe('strain link functionality', () => {
+    it('should display strain as a clickable RouterLink when strain is present', () => {
+      const mockNanoWithStrain: Item = {
+        id: 5,
+        name: 'Test Nano with Strain',
+        is_nano: true,
+        stats: [
+          { id: 1, stat: 75, value: 123 } // NanoStrain stat
+        ],
+        spell_data: [],
+        attack_stats: [],
+        defense_stats: [],
+        actions: []
+      }
+
+      const wrapper = mount(NanoStatistics, {
+        props: {
+          item: mockNanoWithStrain
+        },
+        global: {
+          components: {
+            Card: CardMock,
+            RouterLink: RouterLinkMock
+          }
+        }
+      })
+
+      // Check if strain is displayed as a RouterLink
+      const strainLink = wrapper.find('a[href="TinkerItems"]')
+      expect(strainLink.exists()).toBe(true)
+      
+      // Check if the strain text is displayed correctly (strain 123 = "General Poison AC Debuff")
+      expect(strainLink.text()).toBe('General Poison AC Debuff')
+    })
+
+    it('should not display strain row when strain is not present', () => {
+      const mockNanoWithoutStrain: Item = {
+        id: 6,
+        name: 'Test Nano without Strain',
+        is_nano: true,
+        stats: [
+          { id: 1, stat: 407, value: 100 }
+        ],
+        spell_data: [],
+        attack_stats: [],
+        defense_stats: [],
+        actions: []
+      }
+
+      const wrapper = mount(NanoStatistics, {
+        props: {
+          item: mockNanoWithoutStrain
+        },
+        global: {
+          components: {
+            Card: CardMock,
+            RouterLink: RouterLinkMock
+          }
+        }
+      })
+
+      // Check that strain row is not displayed by looking for the strain stat-name
+      const strainRows = wrapper.findAll('.stat-pair')
+      const hasStrainRow = strainRows.some(row => 
+        row.find('.stat-name').exists() && 
+        row.find('.stat-name').text() === 'Strain'
+      )
+      expect(hasStrainRow).toBe(false)
     })
   })
 })
