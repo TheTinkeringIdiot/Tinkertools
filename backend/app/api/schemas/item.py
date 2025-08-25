@@ -2,7 +2,7 @@
 Pydantic schemas for Item models.
 """
 
-from typing import Optional, List
+from typing import Optional, List, Any, Dict
 from pydantic import BaseModel, Field
 from .stat_value import StatValueResponse
 from .spell import SpellWithCriteria, SpellDataResponse
@@ -47,6 +47,7 @@ class ItemDetail(ItemResponse):
     attack_stats: List[StatValueResponse] = Field(default_factory=list, description="Attack stats")
     defense_stats: List[StatValueResponse] = Field(default_factory=list, description="Defense stats")
     actions: List[ActionResponse] = Field(default_factory=list, description="Item actions")
+    sources: List[Any] = Field(default_factory=list, description="Item sources")
     
     class Config:
         from_attributes = True

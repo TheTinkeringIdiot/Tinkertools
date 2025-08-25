@@ -287,10 +287,71 @@ CREATE INDEX idx_pb_symbiant_drops_boss ON pocket_boss_symbiant_drops(pocket_bos
 CREATE INDEX idx_pb_symbiant_drops_symbiant ON pocket_boss_symbiant_drops(symbiant_id);
 
 -- ============================================================================
+-- Source System Tables
+-- ============================================================================
+
+-- 21. Source Types Table
+CREATE TABLE source_types (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) UNIQUE NOT NULL,
+    description TEXT
+);
+
+-- Performance indexes for source_types
+CREATE INDEX idx_source_types_name ON source_types(name);
+
+-- Insert initial source types
+INSERT INTO source_types (name, description) VALUES
+    ('item', 'Items that create/upload other items (e.g., nanocrystals)'),
+    ('npc', 'NPCs and mobs that drop items'),
+    ('boss', 'Boss encounters that drop items'),
+    ('mission', 'Missions that reward items'),
+    ('vendor', 'Vendors and shops that sell items');
+
+-- 22. Sources Table
+CREATE TABLE sources (
+    id SERIAL PRIMARY KEY,
+    source_type_id INTEGER NOT NULL REFERENCES source_types(id) ON DELETE CASCADE,
+    source_id INTEGER NOT NULL,  -- References the actual entity (item.id, npc.id, etc.)
+    name VARCHAR(255) NOT NULL,  -- Denormalized name for performance
+    metadata JSONB DEFAULT '{}',  -- Flexible metadata storage
+    
+    -- Unique constraint to prevent duplicate sources
+    CONSTRAINT unique_source UNIQUE (source_type_id, source_id)
+);
+
+-- Performance indexes for sources
+CREATE INDEX idx_sources_type_id ON sources(source_type_id);
+CREATE INDEX idx_sources_source_id ON sources(source_id);
+CREATE INDEX idx_sources_name ON sources(name);
+CREATE INDEX idx_sources_metadata ON sources USING GIN (metadata);
+CREATE INDEX idx_sources_type_source ON sources(source_type_id, source_id);
+
+-- 23. Item Sources Junction Table
+CREATE TABLE item_sources (
+    item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    source_id INTEGER NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+    drop_rate DECIMAL(5,2),  -- Optional drop rate percentage (0.01 to 100.00)
+    min_ql INTEGER,  -- Minimum QL for this source (for level-based drops)
+    max_ql INTEGER,  -- Maximum QL for this source
+    conditions TEXT,  -- Optional conditions or requirements
+    metadata JSONB DEFAULT '{}',  -- Additional flexible data
+    
+    PRIMARY KEY (item_id, source_id)
+);
+
+-- Performance indexes for item_sources
+CREATE INDEX idx_item_sources_item ON item_sources(item_id);
+CREATE INDEX idx_item_sources_source ON item_sources(source_id);
+CREATE INDEX idx_item_sources_ql_range ON item_sources(min_ql, max_ql);
+CREATE INDEX idx_item_sources_drop_rate ON item_sources(drop_rate);
+CREATE INDEX idx_item_sources_metadata ON item_sources USING GIN (metadata);
+
+-- ============================================================================
 -- Application Cache Table
 -- ============================================================================
 
--- 21. Application Cache Table (only table with timestamps for cache expiration)
+-- 24. Application Cache Table (only table with timestamps for cache expiration)
 CREATE TABLE application_cache (
     cache_key VARCHAR(255) PRIMARY KEY,
     cache_value JSONB NOT NULL,
@@ -304,8 +365,11 @@ CREATE INDEX idx_application_cache_expires_at ON application_cache (expires_at);
 -- Schema Validation Comments
 -- ============================================================================
 
-COMMENT ON DATABASE tinkertools IS 'TinkerTools database schema - 20 tables, no timestamps except cache expiration';
+COMMENT ON DATABASE tinkertools IS 'TinkerTools database schema - 23 tables, no timestamps except cache expiration';
 COMMENT ON TABLE stat_values IS 'Reusable stat-value pairs with unique constraints';
 COMMENT ON TABLE criteria IS 'Reusable criteria for spells and actions';
 COMMENT ON TABLE items IS 'Main items table including nanos (is_nano=true)';
+COMMENT ON TABLE source_types IS 'Types of sources that can provide items (crystals, NPCs, missions, etc.)';
+COMMENT ON TABLE sources IS 'Polymorphic source instances that can provide items';
+COMMENT ON TABLE item_sources IS 'Many-to-many relationship between items and their sources with metadata';
 COMMENT ON TABLE application_cache IS 'Only table with timestamps for cache expiration';

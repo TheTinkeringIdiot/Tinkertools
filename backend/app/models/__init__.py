@@ -13,6 +13,7 @@ from .item import Item, ItemStats, ItemSpellData, ItemShopHash
 from .action import Action, ActionCriteria
 from .symbiant import Symbiant
 from .pocket_boss import PocketBoss, PocketBossSymbiantDrops
+from .source import SourceType, Source, ItemSource
 from .application_cache import ApplicationCache
 
 __all__ = [
@@ -36,5 +37,8 @@ __all__ = [
     'Symbiant',
     'PocketBoss',
     'PocketBossSymbiantDrops',
+    'SourceType',
+    'Source',
+    'ItemSource',
     'ApplicationCache',
 ]

@@ -89,13 +89,14 @@ psql -U tinkertools_user -d tinkertools -f database/tests/test_schema.sql
 ### Technology Stack
 - **Frontend**: Vue 3, TypeScript, Vite, Vue Router, Pinia, TailwindCSS, PrimeVue (Aura theme)
 - **Backend**: FastAPI, SQLAlchemy (async), Pydantic, asyncpg
-- **Database**: PostgreSQL 12+ with 20 core tables plus caching
+- **Database**: PostgreSQL 12+ with 23 core tables plus caching (includes source system)
 - **Testing**: Vitest (frontend), pytest (backend)
 
 ### Database Schema
 The database follows a legacy-compatible design with:
-- **Core Tables**: items, spells, symbiants, pocket_bosses, stat_values, criteria
-- **Junction Tables**: For many-to-many relationships (item_stats, spell_criteria, etc.)
+- **Core Tables**: items, spells, symbiants, pocket_bosses, stat_values, criteria, source_types, sources
+- **Junction Tables**: For many-to-many relationships (item_stats, spell_criteria, item_sources, etc.)
+- **Source System**: Polymorphic design for tracking item origins (crystals, NPCs, missions, etc.)
 - **No Timestamps**: Static game data doesn't require audit trails
 - **Optimized Indexes**: B-tree for queries, GIN for full-text search
 
@@ -137,6 +138,7 @@ The database follows a legacy-compatible design with:
 - **Component Library**: All TinkerFite, TinkerPocket, and core components now support proper light/dark themes
 - **PrimeVue Integration**: Fixed global component registration and theme switching issues
 - **TinkerPocket Implementation**: Complete pocket boss database, collection tracking, and symbiant lookup functionality
+- **Source System**: Implemented polymorphic source tracking for item origins (crystals→nanos, future NPCs/missions/bosses)
 
 ### Application Status Summary
 **Complete Applications:**
