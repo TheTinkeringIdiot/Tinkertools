@@ -43,6 +43,11 @@ class Item(Base):
         back_populates='item',
         cascade='all, delete-orphan'
     )
+    item_sources = relationship(
+        'ItemSource',
+        back_populates='item',
+        cascade='all, delete-orphan'
+    )
     
     # Access related data directly
     @property
@@ -56,6 +61,10 @@ class Item(Base):
     @property
     def shop_hashes(self):
         return [ish.shop_hash for ish in self.item_shop_hashes]
+    
+    @property
+    def sources(self):
+        return [item_source.source for item_source in self.item_sources]
     
     def __repr__(self):
         return f"<Item(id={self.id}, aoid={self.aoid}, name='{self.name}', ql={self.ql})>"

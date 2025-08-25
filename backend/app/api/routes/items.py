@@ -14,7 +14,7 @@ from app.core.database import get_db
 from app.models import (
     Item, ItemStats, StatValue, AttackDefense, AttackDefenseAttack, AttackDefenseDefense, 
     ItemSpellData, SpellData, Action, ActionCriteria, Criterion, Spell, SpellCriterion,
-    SpellDataSpells
+    SpellDataSpells, Source, SourceType, ItemSource
 )
 from app.models.interpolated_item import InterpolatedItem, InterpolationRequest, InterpolationResponse
 from app.services.interpolation import InterpolationService
@@ -27,6 +27,9 @@ from app.api.schemas import (
     ActionResponse,
     CriterionResponse,
     StatValueResponse,
+    SourceResponse,
+    SourceTypeResponse,
+    ItemSourceResponse,
     PaginatedResponse
 )
 from app.core.decorators import cached_response, performance_monitor
@@ -213,6 +216,31 @@ def build_item_detail(item: Item, db: Session) -> ItemDetail:
             criteria=criteria
         ))
     
+    # Get sources
+    sources = []
+    for item_source in item.item_sources:
+        source = item_source.source
+        source_response = SourceResponse(
+            id=source.id,
+            source_type_id=source.source_type_id,
+            source_id=source.source_id,
+            name=source.name,
+            extra_data=source.extra_data,
+            source_type=SourceTypeResponse(
+                id=source.source_type.id,
+                name=source.source_type.name,
+                description=source.source_type.description
+            ) if source.source_type else None
+        )
+        
+        sources.append(ItemSourceResponse(
+            source=source_response,
+            drop_rate=float(item_source.drop_rate) if item_source.drop_rate else None,
+            min_ql=item_source.min_ql,
+            max_ql=item_source.max_ql,
+            conditions=item_source.conditions,
+            extra_data=item_source.extra_data
+        ))
     
     # Convert stats to StatValueResponse objects
     stats_response = [
@@ -240,14 +268,15 @@ def build_item_detail(item: Item, db: Session) -> ItemDetail:
         spell_data=spell_data_list,
         attack_stats=attack_stats_response,
         defense_stats=defense_stats_response,
-        actions=actions
+        actions=actions,
+        sources=sources
     )
 
 
 @router.get("", response_model=PaginatedResponse[ItemDetail])
 def get_items(
     page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(50, ge=1, le=200, description="Items per page"),
+    page_size: int = Query(50, ge=1, le=1000, description="Items per page"),
     item_class: Optional[int] = Query(None, description="Filter by item class"),
     min_ql: Optional[int] = Query(None, description="Minimum quality level"),
     max_ql: Optional[int] = Query(None, description="Maximum quality level"),
@@ -308,20 +337,32 @@ def get_items(
                     .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
                     .filter(Criterion.value1 == stat_id, Criterion.value2 == required_value)
     
-    # Handle profession filtering - check both Profession (60) and VisualProfession (368)
+    # Handle profession filtering with precedence: Profession (60) takes precedence over VisualProfession (368)
     if profession is not None and profession > 0:
-        # Create a subquery for items with Profession requirement
-        profession_subquery = db.query(Item.id)\
-                                .join(Action, Item.id == Action.item_id)\
-                                .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
-                                .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
-                                .filter(
-                                    or_(
-                                        and_(Criterion.value1 == 60, Criterion.value2 == profession),   # Profession
-                                        and_(Criterion.value1 == 368, Criterion.value2 == profession)   # VisualProfession
-                                    )
-                                ).subquery()
-        
+        # Items that match on Profession requirement
+        profession_match = db.query(Item.id)\
+                            .join(Action, Item.id == Action.item_id)\
+                            .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
+                            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
+                            .filter(Criterion.value1 == 60, Criterion.value2 == profession)
+
+        # Items with NO Profession requirement but matching VisualProfession
+        visual_only_match = db.query(Item.id)\
+                             .join(Action, Item.id == Action.item_id)\
+                             .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
+                             .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
+                             .filter(Criterion.value1 == 368, Criterion.value2 == profession)\
+                             .filter(~Item.id.in_(
+                                 # Exclude ALL items that have ANY Profession requirement
+                                 db.query(Item.id)
+                                 .join(Action, Item.id == Action.item_id)
+                                 .join(ActionCriteria, Action.id == ActionCriteria.action_id)
+                                 .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
+                                 .filter(Criterion.value1 == 60)
+                             ))
+
+        # Combine both cases
+        profession_subquery = profession_match.union(visual_only_match).subquery()
         query = query.filter(Item.id.in_(profession_subquery))
     
     # Froob friendly filter (exclude items with expansion requirements)
@@ -414,7 +455,7 @@ def get_items(
 def search_items(
     q: str = Query(..., min_length=1, description="Search query"),
     page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(50, ge=1, le=200, description="Items per page"),
+    page_size: int = Query(50, ge=1, le=1000, description="Items per page"),
     exact_match: bool = Query(True, description="Use exact matching (default) vs fuzzy/stemmed search"),
     weapons: bool = Query(False, description="Filter to weapons only (items with both attack and defense data)"),
     search_fields: Optional[str] = Query(None, description="Comma-separated list of fields to search: name,description,effects,stats"),
@@ -589,20 +630,32 @@ def search_items(
                     .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
                     .filter(Criterion.value1 == stat_id, Criterion.value2 == required_value)
     
-    # Handle profession filtering - check both Profession (60) and VisualProfession (368)
+    # Handle profession filtering with precedence: Profession (60) takes precedence over VisualProfession (368)
     if profession is not None and profession > 0:
-        # Create a subquery for items with Profession requirement
-        profession_subquery = db.query(Item.id)\
-                                .join(Action, Item.id == Action.item_id)\
-                                .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
-                                .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
-                                .filter(
-                                    or_(
-                                        and_(Criterion.value1 == 60, Criterion.value2 == profession),   # Profession
-                                        and_(Criterion.value1 == 368, Criterion.value2 == profession)   # VisualProfession
-                                    )
-                                ).subquery()
-        
+        # Items that match on Profession requirement
+        profession_match = db.query(Item.id)\
+                            .join(Action, Item.id == Action.item_id)\
+                            .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
+                            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
+                            .filter(Criterion.value1 == 60, Criterion.value2 == profession)
+
+        # Items with NO Profession requirement but matching VisualProfession
+        visual_only_match = db.query(Item.id)\
+                             .join(Action, Item.id == Action.item_id)\
+                             .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
+                             .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
+                             .filter(Criterion.value1 == 368, Criterion.value2 == profession)\
+                             .filter(~Item.id.in_(
+                                 # Exclude ALL items that have ANY Profession requirement
+                                 db.query(Item.id)
+                                 .join(Action, Item.id == Action.item_id)
+                                 .join(ActionCriteria, Action.id == ActionCriteria.action_id)
+                                 .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
+                                 .filter(Criterion.value1 == 60)
+                             ))
+
+        # Combine both cases
+        profession_subquery = profession_match.union(visual_only_match).subquery()
         query = query.filter(Item.id.in_(profession_subquery))
     
     # Froob friendly filter (exclude items with expansion requirements)
@@ -744,7 +797,7 @@ def filter_items_advanced(
     
     # Pagination
     page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(50, ge=1, le=200, description="Items per page"),
+    page_size: int = Query(50, ge=1, le=1000, description="Items per page"),
     
     # Sorting
     sort_by: str = Query("name", description="Sort by: name, ql, item_class"),
@@ -875,7 +928,7 @@ def get_items_with_stats(
     
     # Pagination
     page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(50, ge=1, le=200, description="Items per page"),
+    page_size: int = Query(50, ge=1, le=1000, description="Items per page"),
     
     db: Session = Depends(get_db)
 ):
@@ -1031,19 +1084,84 @@ def get_items_with_stats(
 @performance_monitor
 def get_item(aoid: int, db: Session = Depends(get_db)):
     """
-    Get detailed information about a specific item including stats, spells, and attack/defense data.
+    Get detailed information about a specific item including stats, spells, attack/defense data, and sources.
+    
+    Returns:
+        ItemDetail: Complete item information including:
+        - Basic item data (name, QL, description, etc.)
+        - Item stats and modifiers
+        - Spell data and criteria
+        - Attack/defense statistics
+        - Sources (crystals for nanos, NPCs/missions for other items)
     """
     # Load item with all related data
     item = db.query(Item).options(
         joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
         joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data).joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell).joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
-        joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion)
+        joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion),
+        joinedload(Item.item_sources).joinedload(ItemSource.source).joinedload(Source.source_type)
     ).filter(Item.aoid == aoid).first()
     
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
     
     return build_item_detail(item, db)
+
+
+@router.get("/{aoid}/sources", response_model=List[ItemSourceResponse])
+@cached_response("item_sources")
+@performance_monitor
+def get_item_sources(aoid: int, db: Session = Depends(get_db)):
+    """
+    Get all sources for a specific item.
+    
+    Args:
+        aoid: Anarchy Online item ID
+        
+    Returns:
+        List[ItemSourceResponse]: All sources for the item including:
+        - Source information (name, type, metadata)
+        - Drop rates and QL ranges
+        - Special conditions or requirements
+        
+    Example:
+        For nano programs: Returns nanocrystals that upload the nano
+        For weapons: Returns NPCs/bosses that drop the weapon (future)
+        For mission rewards: Returns missions that award the item (future)
+    """
+    item = db.query(Item).options(
+        joinedload(Item.item_sources).joinedload(ItemSource.source).joinedload(Source.source_type)
+    ).filter(Item.aoid == aoid).first()
+    
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    
+    sources = []
+    for item_source in item.item_sources:
+        source = item_source.source
+        source_response = SourceResponse(
+            id=source.id,
+            source_type_id=source.source_type_id,
+            source_id=source.source_id,
+            name=source.name,
+            extra_data=source.extra_data,
+            source_type=SourceTypeResponse(
+                id=source.source_type.id,
+                name=source.source_type.name,
+                description=source.source_type.description
+            ) if source.source_type else None
+        )
+        
+        sources.append(ItemSourceResponse(
+            source=source_response,
+            drop_rate=float(item_source.drop_rate) if item_source.drop_rate else None,
+            min_ql=item_source.min_ql,
+            max_ql=item_source.max_ql,
+            conditions=item_source.conditions,
+            extra_data=item_source.extra_data
+        ))
+    
+    return sources
 
 
 @router.get("/{aoid}/interpolate", response_model=InterpolationResponse)

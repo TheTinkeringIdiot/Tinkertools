@@ -7,7 +7,7 @@ This document provides a comprehensive overview of the shared infrastructure, da
 - **Game Data Constants**: 2,150+ entries in `frontend/src/services/game-data.ts`
 - **API Client**: Unified typed client in `frontend/src/services/api-client.ts`
 - **State Management**: Pinia stores with cross-app sharing in `frontend/src/stores/`
-- **Database**: 20 core tables with PostgreSQL backend
+- **Database**: 23 core tables with PostgreSQL backend (includes source system)
 - **Interpolation System**: Quality level interpolation across all items
 - **Profile System**: Character data management in `frontend/src/lib/tinkerprofiles/`
 
@@ -77,7 +77,8 @@ This document provides a comprehensive overview of the shared infrastructure, da
 ```typescript
 // Items
 getItems(query: ItemSearchQuery): Promise<PaginatedResponse<Item>>
-getItem(aoid: number): Promise<ApiResponse<Item>>  // Uses AOID for item lookup
+getItem(aoid: number): Promise<ApiResponse<Item>>  // Uses AOID for item lookup, includes sources
+getItemSources(aoid: number): Promise<ApiResponse<ItemSource[]>>  // Get sources for specific item
 interpolateItem(aoid: number, targetQl: number): Promise<InterpolationResponse>
 
 // Spells/Nanos  
@@ -93,11 +94,12 @@ getPocketBosses(query: PocketBossSearchQuery): Promise<PaginatedResponse<PocketB
 
 ### Backend API Routes (`backend/app/api/routes/`)
 
-- **items.py**: Item database, search, filtering, interpolation endpoints
+- **items.py**: Item database, search, filtering, interpolation, and source endpoints
 - **spells.py**: Nano/spell programs with filtering by school
 - **symbiants.py**: Symbiant data for TinkerPlants integration
 - **pocket_bosses.py**: Pocket boss database for TinkerPocket
 - **stat_values.py**: Stat value lookups and calculations
+- **sources**: Source system for tracking item origins (crystals, NPCs, missions, etc.)
 - **health.py**: System health monitoring and diagnostics
 - **cache.py**: Cache management and performance metrics
 - **performance.py**: Performance monitoring endpoints
@@ -109,6 +111,32 @@ getPocketBosses(query: PocketBossSearchQuery): Promise<PaginatedResponse<PocketB
 - Session management with FastAPI dependency injection
 - Environment-based configuration via DATABASE_URL
 - Connection pre-ping validation for reliability
+
+### Source System (`backend/app/models/source.py`)
+
+**Polymorphic source tracking for item origins:**
+- **SourceType**: Categories of sources (item, npc, boss, mission, vendor)
+- **Source**: Polymorphic references to actual source entities
+- **ItemSource**: Junction table with drop rates, QL ranges, and conditions
+
+**Current Implementation:**
+- Nanocrystals → Nanoprograms (via update_nanos.py)
+- Ready for NPCs, missions, bosses, vendors (future)
+- JSONB metadata for flexible data storage
+- Performance optimized with proper indexing
+
+### Data Migration Utilities (`backend/`)
+
+**update_nanos.py**: Nano source system migration
+- Migrates crystal-nano relationships from CSV
+- Uses DATABASE_URL environment variable
+- Idempotent design (safe to run multiple times)
+- Extensible for future nano data updates
+
+**Other utilities:**
+- `substrain_manager.py`: Substrain ID assignment
+- `compact_nanos.py`: CSV compaction tool
+- `comprehensive_nano_extractor.py`: Database export tool
 
 ---
 

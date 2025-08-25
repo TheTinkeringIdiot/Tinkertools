@@ -47,7 +47,7 @@ The TinkerTools database follows these design principles:
 
 ### Schema Overview
 
-The database contains **20 core tables** plus 1 cache table:
+The database contains **23 core tables** plus 1 cache table:
 
 #### Core Entity Tables
 - `stat_values` - Reusable stat-value pairs with unique constraints
@@ -56,6 +56,8 @@ The database contains **20 core tables** plus 1 cache table:
 - `spells` - Individual spell definitions
 - `symbiants` - Symbiant definitions
 - `pocket_bosses` - Pocket boss information
+- `source_types` - Types of sources that provide items (crystals, NPCs, missions, etc.)
+- `sources` - Polymorphic source instances (references various entity types)
 
 #### System Tables
 - `attack_defense` - Attack/defense combinations
@@ -74,6 +76,7 @@ The database contains **20 core tables** plus 1 cache table:
 - `item_shop_hash` - Items ↔ Shop Hash
 - `action_criteria` - Actions ↔ Criteria (with ordering)
 - `pocket_boss_symbiant_drops` - Pocket Bosses ↔ Symbiants
+- `item_sources` - Items ↔ Sources (with drop rates and metadata)
 
 #### Cache Table
 - `application_cache` - Application caching with TTL expiration
@@ -108,6 +111,9 @@ psql -U tinkertools_user -d tinkertools -f database/migrations/000_create_migrat
 
 # Run initial schema
 psql -U tinkertools_user -d tinkertools -f database/migrations/001_initial_schema.sql
+
+# Add source system
+psql -U tinkertools_user -d tinkertools -f database/migrations/002_add_source_system.sql
 ```
 
 ### Backup and Restore
@@ -199,7 +205,37 @@ FROM pocket_bosses pb
 JOIN pocket_boss_symbiant_drops pbsd ON pb.id = pbsd.pocket_boss_id
 JOIN symbiants s ON pbsd.symbiant_id = s.id
 WHERE pb.level BETWEEN 150 AND 200;
+
+-- Source system queries (polymorphic design)
+SELECT i.name, s.name as source_name, st.name as source_type
+FROM items i
+JOIN item_sources is ON i.id = is.item_id
+JOIN sources s ON is.source_id = s.id
+JOIN source_types st ON s.source_type_id = st.id
+WHERE i.aoid = 25980;  -- Find sources for a specific nano
+
+-- Find all nanos uploaded by a specific crystal
+SELECT i.name, i.ql, is.min_ql, is.max_ql
+FROM items i
+JOIN item_sources is ON i.id = is.item_id
+JOIN sources s ON is.source_id = s.id
+WHERE s.source_type_id = 1 AND s.source_id = 26017;  -- Crystal AOID
 ```
+
+### Source System Design
+
+The source system uses a polymorphic design to track where items come from:
+
+- **source_types**: Defines categories (item, npc, mission, boss, vendor)
+- **sources**: Polymorphic references to actual entities (crystal items, NPCs, etc.)
+- **item_sources**: Junction table with metadata (drop rates, conditions, QL ranges)
+
+This design allows tracking that:
+- Nanocrystals upload nanoprograms
+- NPCs drop specific items (future)
+- Missions reward certain items (future)
+- Bosses have loot tables (future)
+- Vendors sell items at specific locations (future)
 
 #### Performance Targets
 - Complex stat-based queries: **< 500ms** (REQ-PERF-001)
