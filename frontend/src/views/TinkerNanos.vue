@@ -20,7 +20,7 @@ Browse nano programs organized by profession with strain-based grouping
       <!-- Left Panel - Profession List -->
       <div class="w-80 border-r border-surface-200 dark:border-surface-700">
         <ProfessionList
-          :selected-profession="selectedProfession"
+          :selected-profession="nanosStore.selectedProfession"
           @profession-selected="onProfessionSelected"
         />
       </div>
@@ -28,7 +28,7 @@ Browse nano programs organized by profession with strain-based grouping
       <!-- Right Panel - Profession Nanos -->
       <div class="flex-1">
         <ProfessionNanoDisplay
-          :selected-profession="selectedProfession"
+          :selected-profession="nanosStore.selectedProfession"
           :loading="loading"
         />
       </div>
@@ -42,21 +42,24 @@ import Badge from 'primevue/badge'
 import ProfessionList from '@/components/nanos/ProfessionList.vue'
 import ProfessionNanoDisplay from '@/components/nanos/ProfessionNanoDisplay.vue'
 import { PROFESSION } from '@/services/game-data'
+import { useNanosStore } from '@/stores/nanosStore'
 
-// State
-const selectedProfession = ref<number | null>(null)
+// Store
+const nanosStore = useNanosStore()
+
+// Local state
 const loading = ref(false)
 
 // Computed
 const selectedProfessionName = computed(() => {
-  if (!selectedProfession.value) return null
-  return PROFESSION[selectedProfession.value as keyof typeof PROFESSION] || 'Unknown'
+  if (!nanosStore.selectedProfession) return null
+  return PROFESSION[nanosStore.selectedProfession as keyof typeof PROFESSION] || 'Unknown'
 })
 
 // Methods
 function onProfessionSelected(professionId: number) {
   console.log('Profession selected:', professionId)
-  selectedProfession.value = professionId
+  nanosStore.setSelectedProfession(professionId)
 }
 </script>
 

@@ -344,7 +344,8 @@ def get_items(
                             .join(Action, Item.id == Action.item_id)\
                             .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
                             .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
-                            .filter(Criterion.value1 == 60, Criterion.value2 == profession)
+                            .filter(Criterion.value1 == 60, Criterion.value2 == profession)\
+                            .filter(Action.action == 3)  # Only USE action
 
         # Items with NO Profession requirement but matching VisualProfession
         visual_only_match = db.query(Item.id)\
@@ -352,13 +353,15 @@ def get_items(
                              .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
                              .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
                              .filter(Criterion.value1 == 368, Criterion.value2 == profession)\
+                             .filter(Action.action == 3)\
                              .filter(~Item.id.in_(
                                  # Exclude ALL items that have ANY Profession requirement
                                  db.query(Item.id)
                                  .join(Action, Item.id == Action.item_id)
                                  .join(ActionCriteria, Action.id == ActionCriteria.action_id)
                                  .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
-                                 .filter(Criterion.value1 == 60)
+                                 .filter(Criterion.value1 == 60)\
+                                 .filter(Action.action == 3)  # Only USE action
                              ))
 
         # Combine both cases
@@ -637,7 +640,8 @@ def search_items(
                             .join(Action, Item.id == Action.item_id)\
                             .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
                             .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
-                            .filter(Criterion.value1 == 60, Criterion.value2 == profession)
+                            .filter(Criterion.value1 == 60, Criterion.value2 == profession)\
+                            .filter(Action.action == 3)  # Only USE action
 
         # Items with NO Profession requirement but matching VisualProfession
         visual_only_match = db.query(Item.id)\
@@ -645,13 +649,15 @@ def search_items(
                              .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
                              .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
                              .filter(Criterion.value1 == 368, Criterion.value2 == profession)\
+                             .filter(Action.action == 3)\
                              .filter(~Item.id.in_(
                                  # Exclude ALL items that have ANY Profession requirement
                                  db.query(Item.id)
                                  .join(Action, Item.id == Action.item_id)
                                  .join(ActionCriteria, Action.id == ActionCriteria.action_id)
                                  .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
-                                 .filter(Criterion.value1 == 60)
+                                 .filter(Criterion.value1 == 60)\
+                                 .filter(Action.action == 3)  # Only USE action
                              ))
 
         # Combine both cases

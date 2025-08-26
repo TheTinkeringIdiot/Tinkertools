@@ -16,6 +16,7 @@ export const useNanosStore = defineStore('nanos', () => {
   const error = ref<string | null>(null);
   const totalCount = ref(0);
   const selectedNano = ref<NanoProgram | null>(null);
+  const selectedProfession = ref<number | null>(null);
   const favorites = ref<number[]>([]);
   const searchHistory = ref<string[]>([]);
   
@@ -316,6 +317,11 @@ export const useNanosStore = defineStore('nanos', () => {
     selectedNano.value = nano;
   };
 
+  const setSelectedProfession = (professionId: number | null): void => {
+    selectedProfession.value = professionId;
+    saveSelectedProfession();
+  };
+
   const toggleFavorite = (nanoId: number): void => {
     const index = favorites.value.indexOf(nanoId);
     if (index > -1) {
@@ -463,6 +469,25 @@ export const useNanosStore = defineStore('nanos', () => {
     }
   };
 
+  const saveSelectedProfession = (): void => {
+    try {
+      localStorage.setItem('tinkertools_nano_selected_profession', JSON.stringify(selectedProfession.value));
+    } catch (error) {
+      console.warn('Failed to save selected profession:', error);
+    }
+  };
+
+  const loadSelectedProfession = (): void => {
+    try {
+      const saved = localStorage.getItem('tinkertools_nano_selected_profession');
+      if (saved) {
+        selectedProfession.value = JSON.parse(saved);
+      }
+    } catch (error) {
+      console.warn('Failed to load selected profession:', error);
+    }
+  };
+
   // Initialize store
   const initialize = (): void => {
     loadNanosFromStorage();
@@ -470,6 +495,7 @@ export const useNanosStore = defineStore('nanos', () => {
     loadFilters();
     loadPreferences();
     loadSearchHistory();
+    loadSelectedProfession();
   };
 
   // Call initialize immediately
@@ -482,6 +508,7 @@ export const useNanosStore = defineStore('nanos', () => {
     error: error as Readonly<typeof error>,
     totalCount: totalCount as Readonly<typeof totalCount>,
     selectedNano: selectedNano as Readonly<typeof selectedNano>,
+    selectedProfession: selectedProfession as Readonly<typeof selectedProfession>,
     favorites: favorites as Readonly<typeof favorites>,
     filters: filters as Readonly<typeof filters>,
     preferences: preferences as Readonly<typeof preferences>,
@@ -500,6 +527,7 @@ export const useNanosStore = defineStore('nanos', () => {
     setFilters,
     clearFilters,
     selectNano,
+    setSelectedProfession,
     toggleFavorite,
     addToFavorites,
     removeFromFavorites,
