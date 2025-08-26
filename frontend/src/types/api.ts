@@ -88,6 +88,30 @@ export interface Action {
   criteria: Criterion[]
 }
 
+export interface SourceType {
+  id: number
+  name: string
+  description?: string
+}
+
+export interface Source {
+  id: number
+  source_type_id: number
+  source_id: number
+  name: string
+  extra_data: Record<string, any>
+  source_type?: SourceType
+}
+
+export interface ItemSource {
+  source: Source
+  drop_rate?: number
+  min_ql?: number
+  max_ql?: number
+  conditions?: string
+  extra_data: Record<string, any>
+}
+
 
 export interface Item {
   id: number
@@ -104,6 +128,7 @@ export interface Item {
   animation_mesh?: AnimationMesh
   attack_stats: StatValue[]
   defense_stats: StatValue[]
+  sources?: ItemSource[]
 }
 
 export interface InterpolatedSpell {

@@ -36,7 +36,11 @@ class NanoDataUpdater:
             'crystals_created': 0,
             'relationships_created': 0,
             'existing_crystals': 0,
-            'existing_relationships': 0
+            'existing_relationships': 0,
+            'ql_updates': 0,
+            'stat_updates': 0,
+            'strain_updates': 0,
+            'substrain_updates': 0
         }
     
     async def connect(self):
@@ -163,21 +167,38 @@ class NanoDataUpdater:
         # Get current stats for this nano
         current_stats = await self.get_item_stats(nano_item_id)
         
-        # Update QL (stat 54)
+        # Get current items.ql value
+        current_item_ql = await self.conn.fetchval("""
+            SELECT ql FROM items WHERE id = $1
+        """, nano_item_id)
+        
+        # Update QL (stat 54 AND items.ql column)
         if current_stats.get(54) != nano_ql:
             await self.update_item_stat(nano_item_id, 54, nano_ql)
+            self.stats['stat_updates'] += 1
+        
+        # Update items.ql column if different
+        if current_item_ql != nano_ql:
+            await self.conn.execute("""
+                UPDATE items 
+                SET ql = $1 
+                WHERE id = $2
+            """, nano_ql, nano_item_id)
+            self.stats['ql_updates'] += 1
         
         # Update NanoStrain (stat 75) if strain_id is valid
         if strain_id and strain_id.isdigit() and int(strain_id) > 0:
             strain_value = int(strain_id)
             if current_stats.get(75) != strain_value:
                 await self.update_item_stat(nano_item_id, 75, strain_value)
+                self.stats['strain_updates'] += 1
         
         # Update NanoSubStrain (stat 1003) if sub_strain_id is valid and > 0
         if sub_strain_id and sub_strain_id.isdigit() and int(sub_strain_id) > 0:
             sub_strain_value = int(sub_strain_id)
             if current_stats.get(1003) != sub_strain_value:
                 await self.update_item_stat(nano_item_id, 1003, sub_strain_value)
+                self.stats['substrain_updates'] += 1
     
     async def process_nano_csv(self):
         """Process the compacted nano CSV and create source relationships"""
@@ -276,6 +297,12 @@ class NanoDataUpdater:
         print(f"  Crystal sources existing: {self.stats['existing_crystals']:,}")
         print(f"  Item-source relationships created: {self.stats['relationships_created']:,}")
         print(f"  Item-source relationships existing: {self.stats['existing_relationships']:,}")
+        print(f"")
+        print(f"📈 Stat Updates:")
+        print(f"  QL column updates (items.ql): {self.stats['ql_updates']:,}")
+        print(f"  QL stat updates (stat 54): {self.stats['stat_updates']:,}")
+        print(f"  Strain stat updates (stat 75): {self.stats['strain_updates']:,}")
+        print(f"  Substrain stat updates (stat 1003): {self.stats['substrain_updates']:,}")
         
         # Verify data integrity
         total_sources = await self.conn.fetchval("""

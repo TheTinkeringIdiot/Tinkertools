@@ -46,6 +46,8 @@ import {
   type NanoStrainName
 } from './game-data';
 
+import type { Item, ItemSource } from '@/types/api';
+
 // ============================================================================
 // ID to Name Translation Functions
 // ============================================================================
@@ -1472,5 +1474,70 @@ export const gameUtils = {
   
   // Flag resolution functions
   getFlagNameFromBit,
-  getFlagNameFromValue
+  getFlagNameFromValue,
+  
+  // Nanoskill functions
+  getNanoskillRequirements,
+  getPrimarySource
 };
+
+// ============================================================================
+// Nanoskill Functions
+// ============================================================================
+
+export interface NanoskillRequirements {
+  mm?: number;  // Matter Metamorphosis (127)
+  bm?: number;  // Biological Metamorphosis (128)
+  pm?: number;  // Psychological Modification (129)
+  si?: number;  // Sensory Improvement (122)
+  mc?: number;  // Matter Creation (130)
+  ts?: number;  // Time and Space (131)
+}
+
+/**
+ * Extract nanoskill requirements from item USE action
+ * Returns requirements in order: MM, BM, PM, SI, MC, TS
+ */
+export function getNanoskillRequirements(item: Item): NanoskillRequirements {
+  const requirements: NanoskillRequirements = {};
+  
+  // Find USE action (action = 3)
+  const useAction = item.actions?.find(action => action.action === 3);
+  if (!useAction) return requirements;
+  
+  // Map stat IDs to nanoskill properties
+  const skillMap = {
+    127: 'mm' as const,  // Matter Metamorphosis
+    128: 'bm' as const,  // Biological Metamorphosis
+    129: 'pm' as const,  // Psychological Modification
+    122: 'si' as const,  // Sensory Improvement
+    130: 'mc' as const,  // Matter Creation
+    131: 'ts' as const   // Time and Space
+  };
+  
+  // Extract requirements from criteria
+  for (const criterion of useAction.criteria || []) {
+    const skillKey = skillMap[criterion.value1 as keyof typeof skillMap];
+    if (skillKey && criterion.value2 > 0) {
+      requirements[skillKey] = criterion.value2;
+    }
+  }
+  
+  return requirements;
+}
+
+/**
+ * Get primary source name for display (first crystal name if available)
+ */
+export function getPrimarySource(item: Item): string | null {
+  if (!item.sources || item.sources.length === 0) {
+    return null;
+  }
+  
+  // Find the shortest name (usually the most descriptive)
+  const shortestSource = item.sources.reduce((shortest, current) => 
+    current.source.name.length < shortest.source.name.length ? current : shortest
+  );
+  
+  return shortestSource.source.name;
+}
