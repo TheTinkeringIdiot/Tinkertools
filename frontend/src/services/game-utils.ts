@@ -30,6 +30,7 @@ import {
   WORN_ITEM,
   WEAPON_TYPE,
   NPCFAMILY,
+  SPECS,
   type StatId,
   type StatName,
   type RequirementId,
@@ -1478,7 +1479,9 @@ export const gameUtils = {
   
   // Nanoskill functions
   getNanoskillRequirements,
-  getPrimarySource
+  getPrimarySource,
+  getNanoSpecialization,
+  getNanoExpansion
 };
 
 // ============================================================================
@@ -1540,4 +1543,52 @@ export function getPrimarySource(item: Item): string | null {
   );
   
   return shortestSource.source.name;
+}
+
+/**
+ * Extract specialization requirement from item USE action (stat 182)
+ * Returns specialization level number or null
+ */
+export function getNanoSpecialization(item: Item): number | null {
+  // Find USE action (action = 3)
+  const useAction = item.actions?.find(action => action.action === 3);
+  if (!useAction) return null;
+  
+  // Find specialization criterion (stat 182)
+  const specCriterion = useAction.criteria?.find(criterion => criterion.value1 === 182);
+  if (!specCriterion || specCriterion.value2 <= 0) return null;
+  
+  // Map using SPECS constant (bitflag to level number)
+  const specValue = specCriterion.value2;
+  return SPECS[specValue as keyof typeof SPECS] || specValue;
+}
+
+/**
+ * Extract expansion requirement from item USE action (stat 389)
+ * Returns expansion abbreviation or null
+ */
+export function getNanoExpansion(item: Item): string | null {
+  // Find USE action (action = 3)
+  const useAction = item.actions?.find(action => action.action === 3);
+  if (!useAction) return null;
+  
+  // Find expansion criterion (stat 389)
+  const expansionCriterion = useAction.criteria?.find(criterion => criterion.value1 === 389);
+  if (!expansionCriterion || expansionCriterion.value2 <= 0) return null;
+  
+  // Map expansion flags to abbreviations
+  const expansionValue = expansionCriterion.value2;
+  const expansionNames: { [key: number]: string } = {
+    1: 'NW',   // Notum Wars
+    2: 'SL',   // Shadowlands
+    4: 'SL-P', // Shadowlands Preorder
+    8: 'AI',   // Alien Invasion
+    16: 'AI-P', // Alien Invasion Preorder
+    32: 'LE',   // Lost Eden
+    64: 'LE-P', // Lost Eden Preorder
+    128: 'LoX', // Legacy of Xan
+    256: 'LoX-P' // Legacy of Xan Preorder
+  };
+  
+  return expansionNames[expansionValue] || `Exp ${expansionValue}`;
 }
