@@ -115,19 +115,21 @@ Shows nanos organized by strain in decreasing QL order
 
               <!-- Nanos in Substrain - Table View -->
               <div class="overflow-x-auto rounded-lg border border-surface-200 dark:border-surface-700">
-                <table class="w-full min-w-[800px] bg-surface-0 dark:bg-surface-900">
+                <table class="w-full min-w-[900px] bg-surface-0 dark:bg-surface-900 table-fixed">
                   <thead class="bg-surface-100 dark:bg-surface-800 sticky top-0">
                     <tr class="text-xs text-surface-600 dark:text-surface-400 uppercase tracking-wider">
-                      <th class="px-3 py-3 text-left w-10"></th> <!-- Icon -->
-                      <th class="px-3 py-3 text-left min-w-[200px]">Name</th>
-                      <th class="px-3 py-3 text-center w-16">QL</th>
-                      <th class="px-3 py-3 text-center w-16 font-mono">MM</th>
-                      <th class="px-3 py-3 text-center w-16 font-mono">BM</th>
-                      <th class="px-3 py-3 text-center w-16 font-mono">PM</th>
-                      <th class="px-3 py-3 text-center w-16 font-mono">SI</th>
-                      <th class="px-3 py-3 text-center w-16 font-mono">MC</th>
-                      <th class="px-3 py-3 text-center w-16 font-mono">TS</th>
-                      <th class="px-3 py-3 text-left min-w-[180px]">Source</th>
+                      <th class="px-3 py-3 text-left" style="width: 40px;"></th> <!-- Icon -->
+                      <th class="px-3 py-3 text-left" style="width: 280px;">Name</th>
+                      <th class="px-3 py-3 text-center" style="width: 80px;">QL</th>
+                      <th class="px-3 py-3 text-center" style="width: 80px;">Spec</th>
+                      <th class="px-3 py-3 text-center" style="width: 100px;">Expansion</th>
+                      <th class="px-3 py-3 text-center font-mono" style="width: 60px;">MM</th>
+                      <th class="px-3 py-3 text-center font-mono" style="width: 60px;">BM</th>
+                      <th class="px-3 py-3 text-center font-mono" style="width: 60px;">PM</th>
+                      <th class="px-3 py-3 text-center font-mono" style="width: 60px;">SI</th>
+                      <th class="px-3 py-3 text-center font-mono" style="width: 60px;">MC</th>
+                      <th class="px-3 py-3 text-center font-mono" style="width: 60px;">TS</th>
+                      <th class="px-3 py-3 text-left" style="width: 200px;">Source</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -161,6 +163,16 @@ Shows nanos organized by strain in decreasing QL order
                       <!-- QL -->
                       <td class="px-3 py-4 text-center">
                         <Badge :value="nano.ql || 1" severity="secondary" size="small" />
+                      </td>
+                      
+                      <!-- Spec -->
+                      <td class="px-3 py-4 text-center text-sm" :class="getNanoSpecialization(nano) ? 'text-surface-900 dark:text-surface-100' : 'text-surface-400 dark:text-surface-500'">
+                        {{ getNanoSpecialization(nano) ? `Spec ${getNanoSpecialization(nano)}` : '-' }}
+                      </td>
+                      
+                      <!-- Expansion -->
+                      <td class="px-3 py-4 text-center text-sm" :class="getNanoExpansion(nano) ? 'text-surface-900 dark:text-surface-100' : 'text-surface-400 dark:text-surface-500'">
+                        {{ getNanoExpansion(nano) || '-' }}
                       </td>
                       
                       <!-- Nanoskills -->
@@ -218,7 +230,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import SimpleNanoCard from '@/components/nanos/SimpleNanoCard.vue'
 // import NanoDetail from '@/components/nanos/NanoDetail.vue'
 import { PROFESSION, NANO_STRAIN, NANO_SUBSTRAINS } from '@/services/game-data'
-import { getItemIconUrl, getNanoskillRequirements, getPrimarySource, type NanoskillRequirements } from '@/services/game-utils'
+import { getItemIconUrl, getNanoskillRequirements, getPrimarySource, getNanoSpecialization, getNanoExpansion, type NanoskillRequirements } from '@/services/game-utils'
 import type { Item } from '@/types/api'
 
 interface SubstrainGroup {
