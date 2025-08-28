@@ -22,7 +22,8 @@ Shows where items can be obtained (crystals, NPCs, missions, etc.)
           <div 
             v-for="(source, index) in sources" 
             :key="`source-${index}`"
-            class="source-item p-3 rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800"
+            class="source-item p-3 rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 cursor-pointer"
+            @click="navigateToSourceItem(source)"
           >
             <div class="flex items-start gap-3">
               <!-- Source Item Icon -->
@@ -80,6 +81,7 @@ Shows where items can be obtained (crystals, NPCs, missions, etc.)
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { getItemIconUrl } from '@/services/game-utils'
 import type { ItemSource } from '@/types/api'
 
@@ -87,6 +89,9 @@ import type { ItemSource } from '@/types/api'
 const props = defineProps<{
   sources?: ItemSource[]
 }>()
+
+// Router
+const router = useRouter()
 
 // Computed
 const sources = computed(() => props.sources || [])
@@ -178,6 +183,16 @@ function onIconError(event: Event) {
   const img = event.target as HTMLImageElement
   img.style.display = 'none'
 }
+
+function navigateToSourceItem(source: ItemSource) {
+  // Get the source item's AOID from source_id
+  const sourceItemId = source.source.source_id
+  
+  if (sourceItemId) {
+    // Navigate to the source item's detail page
+    router.push(`/items/${sourceItemId}`)
+  }
+}
 </script>
 
 <style scoped>
@@ -187,6 +202,8 @@ function onIconError(event: Event) {
 
 .source-item:hover {
   @apply bg-surface-100 dark:bg-surface-700 border-surface-300 dark:border-surface-600;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* Ensure icon images are crisp */
