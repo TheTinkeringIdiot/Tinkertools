@@ -434,7 +434,12 @@ function handleIconError(event: Event) {
 
 function getNanoskillValue(nano: Item, skill: keyof NanoskillRequirements): number | null {
   const requirements = getNanoskillRequirements(nano)
-  return requirements[skill] || null
+  const requirement = requirements[skill]
+  
+  // Add 1 to show the usable minimum skill level
+  // Game database checks "current skill > requirement", so stored requirement
+  // is one less than the actual minimum skill needed to use the nano
+  return requirement ? requirement + 1 : null
 }
 
 function getFormattedSource(nano: Item): string | null {
