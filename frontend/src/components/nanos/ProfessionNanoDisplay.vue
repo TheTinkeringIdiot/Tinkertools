@@ -388,7 +388,7 @@ async function loadNanos() {
   }
 
   try {
-    const url = `/api/v1/items?is_nano=true&profession=${props.selectedProfession}&page_size=1000&sort=ql&sort_order=desc`
+    const url = `/api/v1/nanos/profession/${props.selectedProfession}?page_size=1000&sort=ql&sort_order=desc`
     console.log('Fetching from URL:', url)
     
     const response = await fetch(url)

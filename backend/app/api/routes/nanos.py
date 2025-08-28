@@ -10,8 +10,11 @@ import math
 import logging
 
 from app.core.database import get_db
-from app.models import Item, ItemSpellData, SpellData, SpellDataSpells, Spell, SpellCriterion, Criterion
-from app.api.schemas import PaginatedResponse
+from app.models import (
+    Item, ItemStats, StatValue, ItemSpellData, SpellData, SpellDataSpells, Spell, SpellCriterion, Criterion,
+    Action, ActionCriteria, Source, SourceType, ItemSource
+)
+from app.api.schemas import PaginatedResponse, ItemDetail
 from app.api.schemas.nano import (
     NanoProgram,
     NanoProgramWithSpells, 
@@ -368,3 +371,116 @@ def get_nano(nano_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Failed to parse nano {nano_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to process nano data")
+
+
+@router.get("/profession/{profession_id}", response_model=PaginatedResponse[ItemDetail])
+@cached_response("nanos_profession")
+@performance_monitor
+def get_nanos_by_profession(
+    profession_id: int,
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(1000, ge=1, le=1000, description="Items per page"),
+    sort: str = Query("ql", description="Sort field: name, ql"),
+    sort_order: str = Query("desc", description="Sort order: asc, desc"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get nano programs filtered by profession requirement.
+    Optimized endpoint specifically for TinkerNanos profession-based filtering.
+    """
+    # Build base query with all required joins for nano display
+    query = db.query(Item).filter(Item.is_nano == True).options(
+        joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
+        joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
+            .joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell)
+            .joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
+        joinedload(Item.actions).joinedload(Action.action_criteria)
+            .joinedload(ActionCriteria.criterion),
+        joinedload(Item.item_sources).joinedload(ItemSource.source)
+            .joinedload(Source.source_type)
+    )
+    
+    # Filter by profession requirement (USE action only)
+    if profession_id > 0:
+        query = query.join(Action, Item.id == Action.item_id)\
+                     .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
+                     .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
+                     .filter(Action.action == 3)\
+                     .filter(or_(
+                         and_(Criterion.value1 == 60, Criterion.value2 == profession_id),
+                         and_(Criterion.value1 == 368, Criterion.value2 == profession_id)
+                     ))
+    
+    # Apply sorting
+    if sort == "name":
+        query = query.order_by(desc(Item.name) if sort_order == "desc" else asc(Item.name))
+    elif sort == "ql":
+        query = query.order_by(desc(Item.ql) if sort_order == "desc" else asc(Item.ql))
+    else:
+        query = query.order_by(desc(Item.ql) if sort_order == "desc" else asc(Item.ql))
+    
+    # Get total count
+    total = query.count()
+    
+    # Apply pagination
+    pages = math.ceil(total / page_size) if total > 0 else 1
+    offset = (page - 1) * page_size
+    items = query.offset(offset).limit(page_size).all()
+    
+    # Convert to ItemDetail objects with all necessary data
+    detailed_items = []
+    for item in items:
+        # Skip test items and unwanted strains
+        if item.name.startswith('TESTLIVEITEM'):
+            continue
+            
+        strain_stat = next((stat for stat in item.item_stats if stat.stat_value and stat.stat_value.stat == 75), None)
+        strain = strain_stat.stat_value.value if strain_stat else 0
+        if strain == 0 or strain == 99999:
+            continue
+        
+        # Build stats response
+        stats_response = [stat.stat_value for stat in item.item_stats] if item.item_stats else []
+        
+        # Build spell data response
+        spell_data_list = [isd.spell_data for isd in item.item_spell_data] if item.item_spell_data else []
+        
+        # Build actions response
+        actions = [action for action in item.actions] if item.actions else []
+        
+        # Build sources response
+        sources = []
+        if item.item_sources:
+            for item_source in item.item_sources:
+                if item_source.source and item_source.source.source_type:
+                    sources.append({
+                        'source_type': item_source.source.source_type.name,
+                        'source_name': item_source.source.name,
+                        'extra_data': item_source.source.extra_data or {}
+                    })
+        
+        detailed_items.append(ItemDetail(
+            id=item.id,
+            aoid=item.aoid,
+            name=item.name,
+            ql=item.ql,
+            item_class=item.item_class,
+            description=item.description,
+            is_nano=item.is_nano,
+            stats=stats_response,
+            spell_data=spell_data_list,
+            attack_stats=[],  # Nanos don't have attack stats
+            defense_stats=[], # Nanos don't have defense stats
+            actions=actions,
+            sources=sources
+        ))
+    
+    return PaginatedResponse[ItemDetail](
+        items=detailed_items,
+        total=len(detailed_items),  # Note: Filtered count after exclusions
+        page=page,
+        page_size=page_size,
+        pages=pages,
+        has_next=page < pages,
+        has_prev=page > 1
+    )

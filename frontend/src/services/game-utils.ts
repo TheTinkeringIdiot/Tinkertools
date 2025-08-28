@@ -1538,11 +1538,14 @@ export function getPrimarySource(item: Item): string | null {
   }
   
   // Find the shortest name (usually the most descriptive)
-  const shortestSource = item.sources.reduce((shortest, current) => 
-    current.source.name.length < shortest.source.name.length ? current : shortest
-  );
+  const shortestSource = item.sources.reduce((shortest, current) => {
+    // Handle both old format (current.source.name) and new format (current.source_name)
+    const currentName = current.source_name || current.source?.name || '';
+    const shortestName = shortest.source_name || shortest.source?.name || '';
+    return currentName.length < shortestName.length ? current : shortest;
+  });
   
-  return shortestSource.source.name;
+  return shortestSource.source_name || shortestSource.source?.name || null;
 }
 
 /**

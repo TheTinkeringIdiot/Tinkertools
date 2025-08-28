@@ -297,13 +297,16 @@ def get_items(
     """
     Get paginated list of items with optional filters and complete item details.
     """
+    # Standard data loading for all items
     query = db.query(Item).options(
         joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
         joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data).joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell).joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
-        joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion)
+        joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion),
+        joinedload(Item.item_sources).joinedload(ItemSource.source).joinedload(Source.source_type)
     )
     
     # Apply filters
+    # NOTE: item_class is NOT used for nano filtering - use is_nano=true instead
     if item_class:
         query = query.filter(Item.item_class == item_class)
     if min_ql is not None:
@@ -337,36 +340,16 @@ def get_items(
                     .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
                     .filter(Criterion.value1 == stat_id, Criterion.value2 == required_value)
     
-    # Handle profession filtering with precedence: Profession (60) takes precedence over VisualProfession (368)
+    # Handle profession filtering: Both Profession (stat 60) and VisualProfession (stat 368) are valid
     if profession is not None and profession > 0:
-        # Items that match on Profession requirement
-        profession_match = db.query(Item.id)\
-                            .join(Action, Item.id == Action.item_id)\
-                            .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
-                            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
-                            .filter(Criterion.value1 == 60, Criterion.value2 == profession)\
-                            .filter(Action.action == 3)  # Only USE action
-
-        # Items with NO Profession requirement but matching VisualProfession
-        visual_only_match = db.query(Item.id)\
-                             .join(Action, Item.id == Action.item_id)\
-                             .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
-                             .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
-                             .filter(Criterion.value1 == 368, Criterion.value2 == profession)\
-                             .filter(Action.action == 3)\
-                             .filter(~Item.id.in_(
-                                 # Exclude ALL items that have ANY Profession requirement
-                                 db.query(Item.id)
-                                 .join(Action, Item.id == Action.item_id)
-                                 .join(ActionCriteria, Action.id == ActionCriteria.action_id)
-                                 .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
-                                 .filter(Criterion.value1 == 60)\
-                                 .filter(Action.action == 3)  # Only USE action
-                             ))
-
-        # Combine both cases
-        profession_subquery = profession_match.union(visual_only_match).subquery()
-        query = query.filter(Item.id.in_(profession_subquery))
+        query = query.join(Action, Item.id == Action.item_id)\
+                     .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
+                     .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
+                     .filter(Action.action == 3)\
+                     .filter(or_(
+                         and_(Criterion.value1 == 60, Criterion.value2 == profession),
+                         and_(Criterion.value1 == 368, Criterion.value2 == profession)
+                     ))
     
     # Froob friendly filter (exclude items with expansion requirements)
     if froob_friendly is True:
@@ -633,36 +616,16 @@ def search_items(
                     .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
                     .filter(Criterion.value1 == stat_id, Criterion.value2 == required_value)
     
-    # Handle profession filtering with precedence: Profession (60) takes precedence over VisualProfession (368)
+    # Handle profession filtering: Both Profession (stat 60) and VisualProfession (stat 368) are valid
     if profession is not None and profession > 0:
-        # Items that match on Profession requirement
-        profession_match = db.query(Item.id)\
-                            .join(Action, Item.id == Action.item_id)\
-                            .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
-                            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
-                            .filter(Criterion.value1 == 60, Criterion.value2 == profession)\
-                            .filter(Action.action == 3)  # Only USE action
-
-        # Items with NO Profession requirement but matching VisualProfession
-        visual_only_match = db.query(Item.id)\
-                             .join(Action, Item.id == Action.item_id)\
-                             .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
-                             .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
-                             .filter(Criterion.value1 == 368, Criterion.value2 == profession)\
-                             .filter(Action.action == 3)\
-                             .filter(~Item.id.in_(
-                                 # Exclude ALL items that have ANY Profession requirement
-                                 db.query(Item.id)
-                                 .join(Action, Item.id == Action.item_id)
-                                 .join(ActionCriteria, Action.id == ActionCriteria.action_id)
-                                 .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
-                                 .filter(Criterion.value1 == 60)\
-                                 .filter(Action.action == 3)  # Only USE action
-                             ))
-
-        # Combine both cases
-        profession_subquery = profession_match.union(visual_only_match).subquery()
-        query = query.filter(Item.id.in_(profession_subquery))
+        query = query.join(Action, Item.id == Action.item_id)\
+                     .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
+                     .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
+                     .filter(Action.action == 3)\
+                     .filter(or_(
+                         and_(Criterion.value1 == 60, Criterion.value2 == profession),
+                         and_(Criterion.value1 == 368, Criterion.value2 == profession)
+                     ))
     
     # Froob friendly filter (exclude items with expansion requirements)
     if froob_friendly is True:
