@@ -256,6 +256,12 @@ Shows all item data with profile compatibility and comparison options
         :stats="item.stats"
       />
 
+      <!-- Item Sources -->
+      <ItemSources
+        v-if="item && item.sources && item.sources.length > 0"
+        :sources="item.sources"
+      />
+
 
 
 
@@ -521,6 +527,12 @@ Shows all item data with profile compatibility and comparison options
         :stats="item.stats"
       />
 
+      <!-- Item Sources -->
+      <ItemSources
+        v-if="item && item.sources && item.sources.length > 0"
+        :sources="item.sources"
+      />
+
 
 
 
@@ -559,6 +571,7 @@ import ItemAttributes from '@/components/items/ItemAttributes.vue'
 import ItemSlotsDisplay from '@/components/items/ItemSlotsDisplay.vue'
 import ActionRequirements from '@/components/ActionRequirements.vue'
 import RawStats from '@/components/items/RawStats.vue'
+import ItemSources from '@/components/items/ItemSources.vue'
 
 const route = useRoute()
 const router = useRouter()
