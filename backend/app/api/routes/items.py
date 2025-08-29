@@ -1188,24 +1188,31 @@ def get_interpolation_info(aoid: int, db: Session = Depends(get_db)):
     """
     Get interpolation information for an item.
     
-    Returns whether the item can be interpolated and its quality level range.
+    Returns whether the item can be interpolated and its quality level ranges.
     """
     try:
         interpolation_service = InterpolationService(db)
         
-        # Check if item exists and can be interpolated
-        is_interpolatable = interpolation_service.is_item_interpolatable(aoid)
-        interpolation_range = interpolation_service.get_interpolation_range(aoid)
+        # Get interpolation ranges
+        interpolation_ranges = interpolation_service.get_interpolation_ranges(aoid)
         
-        if interpolation_range is None:
+        if interpolation_ranges is None:
             raise HTTPException(status_code=404, detail=f"Item with AOID {aoid} not found")
+        
+        # Check if any range is interpolatable
+        is_interpolatable = any(r["interpolatable"] for r in interpolation_ranges)
+        
+        # Calculate overall min/max for backward compatibility
+        overall_min = interpolation_ranges[0]["min_ql"]
+        overall_max = interpolation_ranges[-1]["max_ql"]
         
         return {
             "aoid": aoid,
             "interpolatable": is_interpolatable,
-            "min_ql": interpolation_range[0],
-            "max_ql": interpolation_range[1],
-            "ql_range": interpolation_range[1] - interpolation_range[0] + 1
+            "ranges": interpolation_ranges,
+            "min_ql": overall_min,
+            "max_ql": overall_max,
+            "ql_range": overall_max - overall_min + 1
         }
         
     except HTTPException:

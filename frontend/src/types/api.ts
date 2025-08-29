@@ -194,9 +194,17 @@ export interface InterpolationResponse {
   }
 }
 
+export interface InterpolationRange {
+  min_ql: number
+  max_ql: number
+  interpolatable: boolean
+  base_aoid: number
+}
+
 export interface InterpolationInfo {
   aoid: number
   interpolatable: boolean
+  ranges: InterpolationRange[]
   min_ql: number
   max_ql: number
   ql_range: number

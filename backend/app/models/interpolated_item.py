@@ -139,7 +139,7 @@ class InterpolatedItem(BaseModel):
             # Interpolation between two items
             self.interpolating = True
             self.low_ql = lo_item.ql
-            self.high_ql = hi_item.ql - 1  # Following legacy logic
+            self.high_ql = hi_item.ql
             self.target_ql = target_ql
             self.ql_delta_full = hi_item.ql - lo_item.ql
             self.ql_delta = target_ql - lo_item.ql

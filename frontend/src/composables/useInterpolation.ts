@@ -96,6 +96,18 @@ export function useInterpolation(
     return 'idle'
   })
 
+  const interpolationRanges = computed(() => {
+    return interpolationInfo.value?.ranges ?? []
+  })
+
+  const validRangeForQl = computed(() => {
+    if (!targetQl.value || !interpolationRanges.value.length) return null
+    
+    return interpolationRanges.value.find(range => 
+      targetQl.value! >= range.min_ql && targetQl.value! <= range.max_ql
+    ) ?? null
+  })
+
   // ============================================================================
   // Methods
   // ============================================================================
@@ -236,27 +248,31 @@ export function useInterpolation(
   }
 
   /**
-   * Get suggested quality levels for UI
+   * Get suggested quality levels for UI, accounting for multiple ranges
    */
   function getSuggestedQualityLevels(): number[] {
-    if (!qualityRange.value) return []
+    if (!interpolationRanges.value.length) return []
 
-    const { min, max } = qualityRange.value
     const suggestions: number[] = []
 
-    // Add min and max
-    suggestions.push(min, max)
-
-    // Add some intermediate values
-    const range = max - min
-    if (range > 20) {
-      const step = Math.floor(range / 4)
-      for (let i = 1; i < 4; i++) {
-        suggestions.push(min + (step * i))
+    // Add suggestions for each range
+    for (const range of interpolationRanges.value) {
+      // Always add range boundaries
+      suggestions.push(range.min_ql, range.max_ql)
+      
+      // Add intermediate values for interpolatable ranges
+      if (range.interpolatable) {
+        const rangeSize = range.max_ql - range.min_ql
+        if (rangeSize > 20) {
+          const step = Math.floor(rangeSize / 4)
+          for (let i = 1; i < 4; i++) {
+            suggestions.push(range.min_ql + (step * i))
+          }
+        } else if (rangeSize > 5) {
+          const mid = Math.floor((range.min_ql + range.max_ql) / 2)
+          suggestions.push(mid)
+        }
       }
-    } else if (range > 5) {
-      const mid = Math.floor((min + max) / 2)
-      suggestions.push(mid)
     }
 
     // Remove duplicates and sort
@@ -311,6 +327,8 @@ export function useInterpolation(
     qualityRange,
     isTargetQlValid,
     interpolationStatus,
+    interpolationRanges,
+    validRangeForQl,
 
     // Methods
     loadInterpolationInfo,
