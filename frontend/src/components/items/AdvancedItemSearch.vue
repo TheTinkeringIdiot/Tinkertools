@@ -86,7 +86,7 @@ Provides all advanced search capabilities including item class, slot, requiremen
               :min="1"
               :max="999"
               placeholder="1"
-              class="w-full"
+              class="w-16 ql-input"
             />
           </div>
           <div>
@@ -98,7 +98,7 @@ Provides all advanced search capabilities including item class, slot, requiremen
               :min="1"
               :max="999"
               placeholder="999"
-              class="w-full"
+              class="w-16 ql-input"
             />
           </div>
         </div>
@@ -833,5 +833,10 @@ onMounted(async () => {
 :deep(.enhanced-checkbox .p-checkbox-box:focus-visible) {
   outline: 2px solid #3b82f6 !important;
   outline-offset: 2px !important;
+}
+
+/* QL input field width override */
+:deep(.ql-input .p-inputnumber-input) {
+  width: 4rem !important;
 }
 </style>
