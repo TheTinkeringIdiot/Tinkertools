@@ -60,8 +60,8 @@ Shows all item data with profile compatibility and comparison options
     </div>
 
     <div v-else-if="item" class="space-y-3">
-      <!-- Item Flags and Advanced View Toggle -->
-      <div class="flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700">
+      <!-- Item Flags, Interpolation Controls, and Advanced View Toggle -->
+      <div class="flex items-center gap-4 p-4 bg-surface-50 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700">
         <!-- Item Flags (left side) -->
         <div class="flex items-center gap-2 flex-wrap">
           <Tag
@@ -74,6 +74,16 @@ Shows all item data with profile compatibility and comparison options
           <span v-if="displayItemFlags.length === 0" class="text-sm text-surface-500 dark:text-surface-400 italic">
             No special properties
           </span>
+        </div>
+        
+        <!-- Interpolation Controls (right-aligned) -->
+        <div class="flex-1 flex justify-end">
+          <ItemInterpolationBar 
+            :item="item"
+            :initial-ql="route.query.ql ? parseInt(route.query.ql as string) : undefined"
+            @item-update="handleInterpolatedItem"
+            @error="handleInterpolationError"
+          />
         </div>
         
         <!-- Advanced View Toggle (right side) -->
@@ -200,7 +210,7 @@ Shows all item data with profile compatibility and comparison options
       <!-- Weapon Statistics (for weapons only) -->
       <WeaponStats 
         v-if="item && item.item_class && isWeapon(item.item_class)"
-        :item="item"
+        :item="displayedItem"
         :profile="profile"
         :show-compatibility="showCompatibility"
         :attack-stats="item.attack_stats"
@@ -210,7 +220,7 @@ Shows all item data with profile compatibility and comparison options
       <!-- Nano Statistics (for nanos only) -->
       <NanoStatistics 
         v-if="item && item.is_nano"
-        :item="item"
+        :item="displayedItem"
         :profile="profile"
         :show-compatibility="showCompatibility"
         :skill-requirements="item.skill_requirements"
@@ -232,7 +242,7 @@ Shows all item data with profile compatibility and comparison options
             </div>
             
             <ActionRequirements 
-              :actions="item.actions"
+              :actions="displayedItem.actions"
               :character-stats="characterStats"
               :expanded="true"
             />
@@ -242,8 +252,8 @@ Shows all item data with profile compatibility and comparison options
 
       <!-- Spell Data Effects (for items with spell_data) -->
       <SpellDataDisplay
-        v-if="item && item.spell_data && item.spell_data.length > 0"
-        :spell-data="item.spell_data"
+        v-if="displayedItem && displayedItem.spell_data && displayedItem.spell_data.length > 0"
+        :spell-data="displayedItem.spell_data"
         :profile="profile"
         :show-hidden="false"
         :advanced-view="advancedView"
@@ -285,7 +295,7 @@ Shows all item data with profile compatibility and comparison options
       <div class="flex items-center gap-3 w-full">
         <div class="flex items-center gap-2 flex-1">
           <h2 class="text-xl font-bold">{{ item?.name || 'Loading...' }}</h2>
-          <Badge v-if="item" :value="`QL ${item.ql}`" severity="info" />
+          <Badge v-if="displayedItem" :value="`QL ${displayedItem.ql}`" severity="info" />
           <Badge v-if="item?.is_nano" value="Nano" severity="success" />
         </div>
         
@@ -471,7 +481,7 @@ Shows all item data with profile compatibility and comparison options
       <!-- Weapon Statistics (for weapons only) -->
       <WeaponStats 
         v-if="item && item.item_class && isWeapon(item.item_class)"
-        :item="item"
+        :item="displayedItem"
         :profile="profile"
         :show-compatibility="showCompatibility"
         :attack-stats="item.attack_stats"
@@ -481,7 +491,7 @@ Shows all item data with profile compatibility and comparison options
       <!-- Nano Statistics (for nanos only) -->
       <NanoStatistics 
         v-if="item && item.is_nano"
-        :item="item"
+        :item="displayedItem"
         :profile="profile"
         :show-compatibility="showCompatibility"
         :skill-requirements="item.skill_requirements"
@@ -503,7 +513,7 @@ Shows all item data with profile compatibility and comparison options
             </div>
             
             <ActionRequirements 
-              :actions="item.actions"
+              :actions="displayedItem.actions"
               :character-stats="characterStats"
               :expanded="true"
             />
@@ -513,8 +523,8 @@ Shows all item data with profile compatibility and comparison options
 
       <!-- Spell Data Effects (for items with spell_data) -->
       <SpellDataDisplay
-        v-if="item && item.spell_data && item.spell_data.length > 0"
-        :spell-data="item.spell_data"
+        v-if="displayedItem && displayedItem.spell_data && displayedItem.spell_data.length > 0"
+        :spell-data="displayedItem.spell_data"
         :profile="profile"
         :show-hidden="false"
         :advanced-view="advancedView"
@@ -561,7 +571,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useItemsStore } from '@/stores/items'
 import { useProfileStore } from '@/stores/profile'
 import { getItemIconUrl, isWeapon, getDisplayItemFlags, getDisplayCanFlags, getProfessionId, getBreedId, getStatId } from '@/services/game-utils'
-import type { Item, TinkerProfile } from '@/types/api'
+import type { Item, TinkerProfile, InterpolatedItem, InterpolationInfo } from '@/types/api'
 
 // Import new components
 import WeaponStats from '@/components/items/WeaponStats.vue'
@@ -572,6 +582,7 @@ import ItemSlotsDisplay from '@/components/items/ItemSlotsDisplay.vue'
 import ActionRequirements from '@/components/ActionRequirements.vue'
 import RawStats from '@/components/items/RawStats.vue'
 import ItemSources from '@/components/items/ItemSources.vue'
+import ItemInterpolationBar from '@/components/items/ItemInterpolationBar.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -591,6 +602,18 @@ const error = ref<string | null>(null)
 const showAllStats = ref(false)
 const iconLoadError = ref(false)
 const advancedView = ref(false)
+
+// Interpolation state
+const interpolationInfo = ref<InterpolationInfo | null>(null)
+const interpolatedItem = ref<InterpolatedItem | null>(null)
+const isInterpolating = ref(false)
+const interpolationError = ref<string | null>(null)
+
+// Current QL for interpolation (from query param or item's base QL)
+const currentQl = computed(() => {
+  const queryQl = route.query.ql ? parseInt(route.query.ql as string) : null
+  return queryQl || item.value?.ql || null
+})
 
 // Computed
 const profile = computed(() => profileStore.currentProfile)
@@ -683,6 +706,11 @@ const displayItemFlags = computed(() => {
   
   // CAN flags first, then item flags
   return [...canFlags, ...itemFlags]
+})
+
+// Use interpolated item if available, otherwise use original item
+const displayedItem = computed(() => {
+  return interpolatedItem.value || item.value
 })
 
 // Methods
@@ -815,6 +843,15 @@ function onIconError() {
   iconLoadError.value = true
 }
 
+// Interpolation methods
+function handleInterpolatedItem(interpolated: InterpolatedItem | null) {
+  interpolatedItem.value = interpolated
+}
+
+function handleInterpolationError(errorMessage: string) {
+  interpolationError.value = errorMessage
+}
+
 // Initialize
 onMounted(() => {
   loadItem()
@@ -826,6 +863,8 @@ watch(() => route.params.aoid, () => {
     loadItem()
   }
 })
+
+// Route QL handling is now done entirely by ItemInterpolationBar
 </script>
 
 <style scoped>
