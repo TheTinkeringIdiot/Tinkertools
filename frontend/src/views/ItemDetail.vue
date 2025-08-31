@@ -15,7 +15,7 @@ Shows all item data with profile compatibility and comparison options
           @click="goBack"
         />
         <h1 class="text-2xl font-bold">{{ item?.name || 'Loading Item...' }}</h1>
-        <Badge v-if="item" :value="`QL ${item.ql}`" severity="info" />
+        <Badge v-if="displayedItem && currentQl" :value="`QL ${currentQl}`" severity="info" />
         <Badge v-if="item?.is_nano" value="Nano" severity="success" />
       </div>
       
@@ -295,7 +295,7 @@ Shows all item data with profile compatibility and comparison options
       <div class="flex items-center gap-3 w-full">
         <div class="flex items-center gap-2 flex-1">
           <h2 class="text-xl font-bold">{{ item?.name || 'Loading...' }}</h2>
-          <Badge v-if="displayedItem" :value="`QL ${displayedItem.ql}`" severity="info" />
+          <Badge v-if="displayedItem && currentQl" :value="`QL ${currentQl}`" severity="info" />
           <Badge v-if="item?.is_nano" value="Nano" severity="success" />
         </div>
         
