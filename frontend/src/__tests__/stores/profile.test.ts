@@ -24,6 +24,10 @@ Object.defineProperty(window, 'localStorage', {
 
 // Mock data
 const mockProfile: TinkerProfile = {
+  id: 'test_profile_123',
+  version: '2.0.0',
+  created: '2024-01-01T00:00:00Z',
+  updated: '2024-01-01T00:00:00Z',
   Character: {
     Name: 'TestChar',
     Level: 200,
@@ -31,27 +35,27 @@ const mockProfile: TinkerProfile = {
     Breed: 'Atrox',
     Faction: 'Clan',
     Expansion: 'Shadowlands',
-    AccountType: 'Premium'
+    AccountType: 'Premium',
+    MaxHealth: 4000,
+    MaxNano: 2500
   },
   Skills: {
     Attributes: {
-      Intelligence: 500,
-      Psychic: 400,
-      Sense: 300,
-      Stamina: 600,
-      Strength: 200,
-      Agility: 350
+      Intelligence: { value: 500, ipSpent: 0, pointFromIp: 0 },
+      Psychic: { value: 400, ipSpent: 0, pointFromIp: 0 },
+      Sense: { value: 300, ipSpent: 0, pointFromIp: 0 },
+      Stamina: { value: 600, ipSpent: 0, pointFromIp: 0 },
+      Strength: { value: 200, ipSpent: 0, pointFromIp: 0 },
+      Agility: { value: 350, ipSpent: 0, pointFromIp: 0 }
     },
     'Body & Defense': {
-      'Max Nano': 2500,
-      'Nano Pool': 2500,
-      'Nano Resist': 800,
-      'Max Health': 4000,
-      'Body Dev.': 1000,
-      'Dodge-Rng': 600,
-      'Duck-Exp': 650,
-      'Evade-ClsC': 550,
-      'Deflect': 500
+      'Nano Pool': { value: 2500, ipSpent: 0, pointFromIp: 0 },
+      'Nano Resist': { value: 800, ipSpent: 0, pointFromIp: 0 },
+      'Body Dev.': { value: 1000, ipSpent: 0, pointFromIp: 0 },
+      'Dodge-Rng': { value: 600, ipSpent: 0, pointFromIp: 0 },
+      'Duck-Exp': { value: 650, ipSpent: 0, pointFromIp: 0 },
+      'Evade-ClsC': { value: 550, ipSpent: 0, pointFromIp: 0 },
+      'Deflect': { value: 500, ipSpent: 0, pointFromIp: 0 }
     },
     ACs: {
       'Imp/Proj AC': 1200,
@@ -68,13 +72,13 @@ const mockProfile: TinkerProfile = {
     'Melee Weapons': {},
     'Melee Specials': {},
     'Nanos & Casting': {
-      'Matter Crea': 1000,
-      'NanoC. Init.': 800,
-      'Psycho Modi': 900,
-      'Sensory Impr': 750,
-      'Time&Space': 850,
-      'Bio Metamor': 950,
-      'Matt. Metam': 800
+      'Matter Crea': { value: 1000, ipSpent: 0, pointFromIp: 0 },
+      'NanoC. Init.': { value: 800, ipSpent: 0, pointFromIp: 0 },
+      'Psycho Modi': { value: 900, ipSpent: 0, pointFromIp: 0 },
+      'Sensory Impr': { value: 750, ipSpent: 0, pointFromIp: 0 },
+      'Time&Space': { value: 850, ipSpent: 0, pointFromIp: 0 },
+      'Bio Metamor': { value: 950, ipSpent: 0, pointFromIp: 0 },
+      'Matt. Metam': { value: 800, ipSpent: 0, pointFromIp: 0 }
     },
     Exploring: {},
     'Trade & Repair': {},
@@ -263,8 +267,8 @@ describe('Profile Store', () => {
       
       store.updateSkills('Attributes', skillUpdates)
       
-      expect(store.currentProfile!.Skills.Attributes.Intelligence).toBe(600)
-      expect(store.currentProfile!.Skills.Attributes.Strength).toBe(400)
+      expect(store.currentProfile!.Skills.Attributes.Intelligence.value).toBe(600)
+      expect(store.currentProfile!.Skills.Attributes.Strength.value).toBe(400)
     })
 
     it('should get skill value', () => {

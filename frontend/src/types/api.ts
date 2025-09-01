@@ -239,6 +239,13 @@ export interface PocketBoss {
 // Character Profile Types (LocalStorage)
 // ============================================================================
 
+/** Skill entry with IP tracking */
+export interface SkillWithIP {
+  value: number
+  ipSpent: number
+  pointFromIp: number
+}
+
 export interface TinkerProfile {
   Character: {
     Name: string
@@ -248,20 +255,29 @@ export interface TinkerProfile {
     Faction: string
     Expansion: string
     AccountType: string
+    MaxHealth: number
+    MaxNano: number
   }
   Skills: {
-    Attributes: Record<string, number>
-    'Body & Defense': Record<string, number>
+    Attributes: {
+      Intelligence: SkillWithIP
+      Psychic: SkillWithIP
+      Sense: SkillWithIP
+      Stamina: SkillWithIP
+      Strength: SkillWithIP
+      Agility: SkillWithIP
+    }
+    'Body & Defense': Record<string, SkillWithIP>
     ACs: Record<string, number>
-    'Ranged Weapons': Record<string, number>
-    'Ranged Specials': Record<string, number>
-    'Melee Weapons': Record<string, number>
-    'Melee Specials': Record<string, number>
-    'Nanos & Casting': Record<string, number>
-    Exploring: Record<string, number>
-    'Trade & Repair': Record<string, number>
-    'Combat & Healing': Record<string, number>
-    Misc: Record<string, number>
+    'Ranged Weapons': Record<string, SkillWithIP>
+    'Ranged Specials': Record<string, SkillWithIP>
+    'Melee Weapons': Record<string, SkillWithIP>
+    'Melee Specials': Record<string, SkillWithIP>
+    'Nanos & Casting': Record<string, SkillWithIP>
+    Exploring: Record<string, SkillWithIP>
+    'Trade & Repair': Record<string, SkillWithIP>
+    'Combat & Healing': Record<string, SkillWithIP>
+    Misc: Record<string, number> // Misc doesn't use IP tracking
   }
   Weapons: Record<string, Item | null>
   Clothing: Record<string, Item | null>

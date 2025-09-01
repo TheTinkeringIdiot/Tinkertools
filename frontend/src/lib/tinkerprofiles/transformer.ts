@@ -40,43 +40,43 @@ export class ProfileTransformer {
     // Map attributes to stats
     if (profile.Skills.Attributes) {
       nanoProfile.stats = {
-        'Strength': profile.Skills.Attributes.Strength || 10,
-        'Stamina': profile.Skills.Attributes.Stamina || 10,
-        'Agility': profile.Skills.Attributes.Agility || 10,
-        'Sense': profile.Skills.Attributes.Sense || 10,
-        'Intelligence': profile.Skills.Attributes.Intelligence || 10,
-        'Psychic': profile.Skills.Attributes.Psychic || 10
+        'Strength': profile.Skills.Attributes.Strength?.value || 10,
+        'Stamina': profile.Skills.Attributes.Stamina?.value || 10,
+        'Agility': profile.Skills.Attributes.Agility?.value || 10,
+        'Sense': profile.Skills.Attributes.Sense?.value || 10,
+        'Intelligence': profile.Skills.Attributes.Intelligence?.value || 10,
+        'Psychic': profile.Skills.Attributes.Psychic?.value || 10
       };
     }
     
     // Map nano schools and relevant skills
     if (profile.Skills['Nanos & Casting']) {
       const nanoCasting = profile.Skills['Nanos & Casting'];
-      nanoProfile.skills['Biological Metamorphosis'] = nanoCasting['Bio Metamor'] || 1;
-      nanoProfile.skills['Matter Creation'] = nanoCasting['Matter Crea'] || 1;
-      nanoProfile.skills['Matter Metamorphosis'] = nanoCasting['Matt. Metam'] || 1;
-      nanoProfile.skills['Psychological Modifications'] = nanoCasting['Psycho Modi'] || 1;
-      nanoProfile.skills['Sensory Improvement'] = nanoCasting['Sensory Impr'] || 1;
-      nanoProfile.skills['Time and Space'] = nanoCasting['Time&Space'] || 1;
+      nanoProfile.skills['Biological Metamorphosis'] = nanoCasting['Bio Metamor']?.value || 1;
+      nanoProfile.skills['Matter Creation'] = nanoCasting['Matter Crea']?.value || 1;
+      nanoProfile.skills['Matter Metamorphosis'] = nanoCasting['Matt. Metam']?.value || 1;
+      nanoProfile.skills['Psychological Modifications'] = nanoCasting['Psycho Modi']?.value || 1;
+      nanoProfile.skills['Sensory Improvement'] = nanoCasting['Sensory Impr']?.value || 1;
+      nanoProfile.skills['Time and Space'] = nanoCasting['Time&Space']?.value || 1;
     }
     
     // Map core skills
     if (profile.Skills['Trade & Repair']) {
-      nanoProfile.skills['Nano Programming'] = profile.Skills['Trade & Repair']['Nano Progra'] || 1;
-      nanoProfile.skills['Computer Literacy'] = profile.Skills['Trade & Repair']['Comp. Liter'] || 1;
-      nanoProfile.skills['Tutoring'] = profile.Skills['Trade & Repair']['Tutoring'] || 1;
+      nanoProfile.skills['Nano Programming'] = profile.Skills['Trade & Repair']['Nano Progra']?.value || 1;
+      nanoProfile.skills['Computer Literacy'] = profile.Skills['Trade & Repair']['Comp. Liter']?.value || 1;
+      nanoProfile.skills['Tutoring'] = profile.Skills['Trade & Repair']['Tutoring']?.value || 1;
     }
     
     if (profile.Skills['Combat & Healing']) {
-      nanoProfile.skills['First Aid'] = profile.Skills['Combat & Healing']['First Aid'] || 1;
-      nanoProfile.skills['Treatment'] = profile.Skills['Combat & Healing']['Treatment'] || 1;
+      nanoProfile.skills['First Aid'] = profile.Skills['Combat & Healing']['First Aid']?.value || 1;
+      nanoProfile.skills['Treatment'] = profile.Skills['Combat & Healing']['Treatment']?.value || 1;
     }
     
     // Estimate memory capacity based on level and profession
     nanoProfile.memoryCapacity = this.estimateMemoryCapacity(profile.Character.Level, profile.Character.Profession);
     
     // Estimate nano points based on level and intelligence
-    const intel = profile.Skills.Attributes?.Intelligence || 10;
+    const intel = profile.Skills.Attributes?.Intelligence?.value || 10;
     nanoProfile.nanoPoints = this.estimateNanoPoints(profile.Character.Level, intel);
     
     return nanoProfile;
@@ -95,50 +95,50 @@ export class ProfileTransformer {
     
     // Map stats to attributes
     if (nanoProfile.stats) {
-      profile.Skills.Attributes.Strength = nanoProfile.stats.Strength || 10;
-      profile.Skills.Attributes.Stamina = nanoProfile.stats.Stamina || 10;
-      profile.Skills.Attributes.Agility = nanoProfile.stats.Agility || 10;
-      profile.Skills.Attributes.Sense = nanoProfile.stats.Sense || 10;
-      profile.Skills.Attributes.Intelligence = nanoProfile.stats.Intelligence || 10;
-      profile.Skills.Attributes.Psychic = nanoProfile.stats.Psychic || 10;
+      profile.Skills.Attributes.Strength.value = nanoProfile.stats.Strength || 10;
+      profile.Skills.Attributes.Stamina.value = nanoProfile.stats.Stamina || 10;
+      profile.Skills.Attributes.Agility.value = nanoProfile.stats.Agility || 10;
+      profile.Skills.Attributes.Sense.value = nanoProfile.stats.Sense || 10;
+      profile.Skills.Attributes.Intelligence.value = nanoProfile.stats.Intelligence || 10;
+      profile.Skills.Attributes.Psychic.value = nanoProfile.stats.Psychic || 10;
     }
     
     // Map nano skills
     if (nanoProfile.skills) {
       if (nanoProfile.skills['Biological Metamorphosis']) {
-        profile.Skills['Nanos & Casting']['Bio Metamor'] = nanoProfile.skills['Biological Metamorphosis'];
+        profile.Skills['Nanos & Casting']['Bio Metamor'].value = nanoProfile.skills['Biological Metamorphosis'];
       }
       if (nanoProfile.skills['Matter Creation']) {
-        profile.Skills['Nanos & Casting']['Matter Crea'] = nanoProfile.skills['Matter Creation'];
+        profile.Skills['Nanos & Casting']['Matter Crea'].value = nanoProfile.skills['Matter Creation'];
       }
       if (nanoProfile.skills['Matter Metamorphosis']) {
-        profile.Skills['Nanos & Casting']['Matt. Metam'] = nanoProfile.skills['Matter Metamorphosis'];
+        profile.Skills['Nanos & Casting']['Matt. Metam'].value = nanoProfile.skills['Matter Metamorphosis'];
       }
       if (nanoProfile.skills['Psychological Modifications']) {
-        profile.Skills['Nanos & Casting']['Psycho Modi'] = nanoProfile.skills['Psychological Modifications'];
+        profile.Skills['Nanos & Casting']['Psycho Modi'].value = nanoProfile.skills['Psychological Modifications'];
       }
       if (nanoProfile.skills['Sensory Improvement']) {
-        profile.Skills['Nanos & Casting']['Sensory Impr'] = nanoProfile.skills['Sensory Improvement'];
+        profile.Skills['Nanos & Casting']['Sensory Impr'].value = nanoProfile.skills['Sensory Improvement'];
       }
       if (nanoProfile.skills['Time and Space']) {
-        profile.Skills['Nanos & Casting']['Time&Space'] = nanoProfile.skills['Time and Space'];
+        profile.Skills['Nanos & Casting']['Time&Space'].value = nanoProfile.skills['Time and Space'];
       }
       
       // Map other skills
       if (nanoProfile.skills['Nano Programming']) {
-        profile.Skills['Trade & Repair']['Nano Progra'] = nanoProfile.skills['Nano Programming'];
+        profile.Skills['Trade & Repair']['Nano Progra'].value = nanoProfile.skills['Nano Programming'];
       }
       if (nanoProfile.skills['Computer Literacy']) {
-        profile.Skills['Trade & Repair']['Comp. Liter'] = nanoProfile.skills['Computer Literacy'];
+        profile.Skills['Trade & Repair']['Comp. Liter'].value = nanoProfile.skills['Computer Literacy'];
       }
       if (nanoProfile.skills['Tutoring']) {
-        profile.Skills['Trade & Repair']['Tutoring'] = nanoProfile.skills['Tutoring'];
+        profile.Skills['Trade & Repair']['Tutoring'].value = nanoProfile.skills['Tutoring'];
       }
       if (nanoProfile.skills['First Aid']) {
-        profile.Skills['Combat & Healing']['First Aid'] = nanoProfile.skills['First Aid'];
+        profile.Skills['Combat & Healing']['First Aid'].value = nanoProfile.skills['First Aid'];
       }
       if (nanoProfile.skills['Treatment']) {
-        profile.Skills['Combat & Healing']['Treatment'] = nanoProfile.skills['Treatment'];
+        profile.Skills['Combat & Healing']['Treatment'].value = nanoProfile.skills['Treatment'];
       }
     }
     
@@ -439,7 +439,11 @@ export class ProfileTransformer {
       if (typeof categorySkills === 'object' && categorySkills !== null) {
         Object.entries(categorySkills).forEach(([skill, value]) => {
           if (typeof value === 'number') {
+            // Handle Misc category which uses raw numbers
             flattened[`${category}.${skill}`] = value;
+          } else if (value && typeof value === 'object' && 'value' in value) {
+            // Handle other categories which use SkillWithIP structure
+            flattened[`${category}.${skill}`] = value.value;
           }
         });
       }
@@ -454,8 +458,17 @@ export class ProfileTransformer {
       if (parts.length === 2) {
         const [category, skill] = parts;
         if (targetSkills[category as keyof typeof targetSkills]) {
-          const categorySkills = targetSkills[category as keyof typeof targetSkills] as Record<string, number>;
-          categorySkills[skill] = value;
+          if (category === 'Misc') {
+            // Handle Misc category which uses raw numbers
+            const categorySkills = targetSkills[category as keyof typeof targetSkills] as Record<string, number>;
+            categorySkills[skill] = value;
+          } else {
+            // Handle other categories which use SkillWithIP structure
+            const categorySkills = targetSkills[category as keyof typeof targetSkills] as Record<string, any>;
+            if (categorySkills[skill] && typeof categorySkills[skill] === 'object' && 'value' in categorySkills[skill]) {
+              categorySkills[skill].value = value;
+            }
+          }
         }
       }
     });

@@ -1,8 +1,8 @@
 /**
  * TinkerProfiles Storage Manager
  * 
- * Handles persistent storage for profiles with compression, encryption,
- * and backup capabilities
+ * Handles persistent storage for profiles with compression and encryption
+ * capabilities
  */
 
 import type { 
@@ -19,11 +19,13 @@ export class ProfileStorage {
     this.options = {
       compress: false,
       encrypt: false,
-      backup: true,
       autoSave: true,
       migrationEnabled: true,
       ...options
     };
+    
+    // Clean up legacy backup data on initialization
+    this.cleanupLegacyBackups();
   }
   
   // ============================================================================
@@ -39,10 +41,6 @@ export class ProfileStorage {
       profiles.set(profile.id, profile);
       
       await this.saveAllProfiles(profiles);
-      
-      if (this.options.backup) {
-        await this.createBackup(profile);
-      }
       
     } catch (error) {
       throw new Error(`Failed to save profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -69,15 +67,7 @@ export class ProfileStorage {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.PROFILES);
       
-      // Only attempt recovery if data is completely missing or truly empty
       if (!data || data.trim() === '' || data === '{}' || data === 'null') {
-        console.log('Main profile storage empty, attempting recovery from backups...');
-        const recovered = await this.recoverFromBackups();
-        if (recovered.size > 0) {
-          console.log(`Successfully recovered ${recovered.size} profiles from backups`);
-          return recovered;
-        }
-        console.log('No profiles to recover, returning empty map');
         return new Map();
       }
       
@@ -89,15 +79,7 @@ export class ProfileStorage {
         parsed = JSON.parse(data);
       }
       
-      // Check if parsed data is actually empty or invalid
       if (!parsed || Object.keys(parsed).length === 0) {
-        console.log('Parsed profile data is empty, attempting recovery from backups...');
-        const recovered = await this.recoverFromBackups();
-        if (recovered.size > 0) {
-          console.log(`Successfully recovered ${recovered.size} profiles from backups`);
-          return recovered;
-        }
-        console.log('No profiles to recover, returning empty map');
         return new Map();
       }
       
@@ -117,17 +99,6 @@ export class ProfileStorage {
       
     } catch (error) {
       console.error('Failed to load profiles from storage:', error);
-      // Attempt recovery from backups as fallback
-      try {
-        console.log('Attempting recovery from backups due to parsing error...');
-        const recovered = await this.recoverFromBackups();
-        if (recovered.size > 0) {
-          console.log(`Recovered ${recovered.size} profiles from backups after error`);
-          return recovered;
-        }
-      } catch (recoveryError) {
-        console.error('Recovery from backups also failed:', recoveryError);
-      }
       return new Map();
     }
   }
@@ -140,17 +111,12 @@ export class ProfileStorage {
       const profiles = await this.loadAllProfiles();
       
       if (profiles.has(profileId)) {
-        // Create backup before deletion
-        if (this.options.backup) {
-          const profile = profiles.get(profileId)!;
-          await this.createDeletionBackup(profile);
-        }
-        
         profiles.delete(profileId);
         await this.saveAllProfiles(profiles);
       }
       
     } catch (error) {
+      console.error(`[ProfileStorage] Failed to delete profile ${profileId}:`, error);
       throw new Error(`Failed to delete profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -221,145 +187,6 @@ export class ProfileStorage {
     return await this.loadProfile(activeId);
   }
   
-  // ============================================================================
-  // Backup Operations
-  // ============================================================================
-  
-  /**
-   * Create a backup of a profile
-   */
-  private async createBackup(profile: TinkerProfile): Promise<void> {
-    try {
-      const backups = this.getBackups();
-      const timestamp = new Date().toISOString();
-      const backupKey = `${profile.id}_${timestamp}`;
-      
-      backups[backupKey] = {
-        profile,
-        timestamp,
-        type: 'update'
-      };
-      
-      // Keep only last 10 backups per profile
-      this.pruneBackups(profile.id, backups);
-      
-      localStorage.setItem(STORAGE_KEYS.PROFILE_BACKUPS, JSON.stringify(backups));
-      
-    } catch (error) {
-      console.warn('Failed to create profile backup:', error);
-    }
-  }
-  
-  /**
-   * Create a backup before deletion
-   */
-  private async createDeletionBackup(profile: TinkerProfile): Promise<void> {
-    try {
-      const backups = this.getBackups();
-      const timestamp = new Date().toISOString();
-      const backupKey = `${profile.id}_deleted_${timestamp}`;
-      
-      backups[backupKey] = {
-        profile,
-        timestamp,
-        type: 'deletion'
-      };
-      
-      localStorage.setItem(STORAGE_KEYS.PROFILE_BACKUPS, JSON.stringify(backups));
-      
-    } catch (error) {
-      console.warn('Failed to create deletion backup:', error);
-    }
-  }
-  
-  /**
-   * Get all backups
-   */
-  private getBackups(): Record<string, any> {
-    try {
-      const data = localStorage.getItem(STORAGE_KEYS.PROFILE_BACKUPS);
-      return data ? JSON.parse(data) : {};
-    } catch (error) {
-      console.warn('Failed to load backups:', error);
-      return {};
-    }
-  }
-  
-  /**
-   * Prune old backups for a profile
-   */
-  private pruneBackups(profileId: string, backups: Record<string, any>): void {
-    const profileBackups = Object.entries(backups)
-      .filter(([key]) => key.startsWith(profileId))
-      .sort(([, a], [, b]) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    
-    // Keep only the 10 most recent backups
-    const toRemove = profileBackups.slice(10);
-    toRemove.forEach(([key]) => {
-      delete backups[key];
-    });
-  }
-  
-  // ============================================================================
-  // Recovery Operations
-  // ============================================================================
-  
-  /**
-   * Recover profiles from backups when main storage is corrupted
-   */
-  private async recoverFromBackups(): Promise<Map<string, TinkerProfile>> {
-    try {
-      const backups = this.getBackups();
-      const activeProfileId = this.getActiveProfileId();
-      const profiles = new Map<string, TinkerProfile>();
-      
-      // Group backups by profile ID
-      const profileBackups: Record<string, any[]> = {};
-      
-      for (const [backupKey, backup] of Object.entries(backups)) {
-        if (backup?.profile?.id) {
-          const profileId = backup.profile.id;
-          if (!profileBackups[profileId]) {
-            profileBackups[profileId] = [];
-          }
-          profileBackups[profileId].push({ key: backupKey, ...backup });
-        }
-      }
-      
-      // For each profile, get the most recent backup
-      for (const [profileId, backupList] of Object.entries(profileBackups)) {
-        // Skip deletion backups unless it's the only backup
-        const nonDeletionBackups = backupList.filter(b => b.type !== 'deletion');
-        const backupsToUse = nonDeletionBackups.length > 0 ? nonDeletionBackups : backupList;
-        
-        // Sort by timestamp (newest first)
-        backupsToUse.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-        
-        const mostRecent = backupsToUse[0];
-        if (mostRecent?.profile) {
-          profiles.set(profileId, mostRecent.profile);
-        }
-      }
-      
-      // If we recovered profiles, save them to main storage WITHOUT creating new backups
-      if (profiles.size > 0) {
-        await this.saveAllProfilesDirectly(profiles);
-        console.log(`Recovery complete: restored ${profiles.size} profiles to main storage`);
-        
-        // Ensure active profile is still valid
-        if (activeProfileId && !profiles.has(activeProfileId)) {
-          console.log(`Active profile ${activeProfileId} not found in recovery, clearing active profile`);
-          localStorage.removeItem(STORAGE_KEYS.ACTIVE_PROFILE);
-        }
-      }
-      
-      return profiles;
-      
-    } catch (error) {
-      console.error('Failed to recover profiles from backups:', error);
-      return new Map();
-    }
-  }
 
   // ============================================================================
   // Migration
@@ -417,6 +244,7 @@ export class ProfileStorage {
   private async saveAllProfiles(profiles: Map<string, TinkerProfile>): Promise<void> {
     try {
       const profilesObject = Object.fromEntries(profiles.entries());
+      console.log(`[ProfileStorage] Saving ${profiles.size} profiles to localStorage:`, Array.from(profiles.keys()));
       
       let data: string;
       if (this.options.compress) {
@@ -426,30 +254,29 @@ export class ProfileStorage {
       }
       
       localStorage.setItem(STORAGE_KEYS.PROFILES, data);
+      console.log(`[ProfileStorage] Successfully saved ${profiles.size} profiles to localStorage`);
       
     } catch (error) {
       throw new Error(`Failed to save profiles to storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
+  
+  // ============================================================================
+  // Legacy Data Cleanup
+  // ============================================================================
+  
   /**
-   * Save all profiles directly to storage without creating backups (used during recovery)
+   * Clean up legacy backup data from localStorage
    */
-  private async saveAllProfilesDirectly(profiles: Map<string, TinkerProfile>): Promise<void> {
+  private cleanupLegacyBackups(): void {
     try {
-      const profilesObject = Object.fromEntries(profiles.entries());
-      
-      let data: string;
-      if (this.options.compress) {
-        data = await this.compress(profilesObject);
-      } else {
-        data = JSON.stringify(profilesObject);
+      if (localStorage.getItem('tinkertools_profile_backups')) {
+        localStorage.removeItem('tinkertools_profile_backups');
+        console.log('[ProfileStorage] Cleaned up legacy backup data');
       }
-      
-      localStorage.setItem(STORAGE_KEYS.PROFILES, data);
-      
     } catch (error) {
-      throw new Error(`Failed to save profiles to storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.warn('[ProfileStorage] Failed to clean up legacy backups:', error);
     }
   }
   
@@ -465,6 +292,10 @@ export class ProfileStorage {
       Object.values(STORAGE_KEYS).forEach(key => {
         localStorage.removeItem(key);
       });
+      
+      // Clean up legacy backup data that might still exist
+      localStorage.removeItem('tinkertools_profile_backups');
+      
     } catch (error) {
       throw new Error(`Failed to clear profile data: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }

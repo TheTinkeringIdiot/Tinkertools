@@ -571,6 +571,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useItemsStore } from '@/stores/items'
 import { useProfileStore } from '@/stores/profile'
 import { getItemIconUrl, isWeapon, getDisplayItemFlags, getDisplayCanFlags, getProfessionId, getBreedId, getStatId } from '@/services/game-utils'
+import { mapProfileToStats, getProfileStat } from '@/utils/profile-stats-mapper'
 import type { Item, TinkerProfile, InterpolatedItem, InterpolationInfo } from '@/types/api'
 
 // Import new components
@@ -621,46 +622,10 @@ const showCompatibility = computed(() => !!profile.value)
 
 // Character stats for action requirements
 const characterStats = computed(() => {
-  if (!profile.value?.Character) return null
+  if (!profile.value) return null
   
-  // Convert character stats to the format expected by action criteria
-  const stats: Record<number, number> = {}
-  
-  // Add basic character stats
-  if (profile.value.Character.Level) {
-    stats[54] = profile.value.Character.Level // Level
-  }
-  if (profile.value.Character.Profession) {
-    const professionId = getProfessionId(profile.value.Character.Profession)
-    if (professionId) {
-      stats[60] = professionId // Profession
-    }
-  }
-  if (profile.value.Character.Breed) {
-    const breedId = getBreedId(profile.value.Character.Breed)
-    if (breedId) {
-      stats[4] = breedId // Breed
-    }
-  }
-  
-  // Add skill stats if available
-  if (profile.value.Skills) {
-    // Flatten all skill categories into one stats object
-    Object.values(profile.value.Skills).forEach(skillCategory => {
-      if (skillCategory && typeof skillCategory === 'object') {
-        Object.entries(skillCategory).forEach(([statName, value]) => {
-          if (typeof value === 'number') {
-            const statId = getStatId(statName)
-            if (statId) {
-              stats[statId] = value
-            }
-          }
-        })
-      }
-    })
-  }
-  
-  return stats
+  // Use the profile stats mapper utility to convert TinkerProfile to flat stat map
+  return mapProfileToStats(profile.value)
 })
 
 // Determine if we're in modal mode (opened from items list) or page mode (direct URL)
@@ -789,16 +754,10 @@ function shareItem() {
 
 
 function getCharacterStat(statId: number): number {
-  if (!profile.value?.Skills) return 0
+  if (!profile.value) return 0
   
-  // Search through all skill categories for the stat
-  const skills = profile.value.Skills
-  for (const category of Object.values(skills)) {
-    if (category && typeof category === 'object' && statId in category) {
-      return category[statId] || 0
-    }
-  }
-  return 0
+  // Use the profile stats mapper utility
+  return getProfileStat(profile.value, statId)
 }
 
 // Utility functions

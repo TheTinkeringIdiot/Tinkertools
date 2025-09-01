@@ -33,7 +33,6 @@ describe('TinkerProfiles Library', () => {
     // Create new profile manager instance
     profileManager = new TinkerProfilesManager({
       storage: {
-        backup: false, // Disable backup for tests
         autoSave: true
       },
       validation: {
@@ -52,8 +51,8 @@ describe('TinkerProfiles Library', () => {
       expect(profile.Character.Profession).toBe('Adventurer');
       expect(profile.Character.Breed).toBe('Solitus');
       expect(profile.Character.Faction).toBe('Neutral');
-      expect(profile.Skills.Attributes.Strength).toBe(10);
-      expect(profile.Skills.Attributes.Intelligence).toBe(10);
+      expect(profile.Skills.Attributes.Strength.value).toBe(10);
+      expect(profile.Skills.Attributes.Intelligence.value).toBe(10);
       expect(profile.version).toBeTruthy();
       expect(profile.id).toBeTruthy();
       expect(profile.created).toBeTruthy();
@@ -338,12 +337,12 @@ describe('TinkerProfiles Library', () => {
         },
         Skills: {
           Attributes: {
-            Intelligence: 500,
-            Psychic: 400,
-            Sense: 300,
-            Stamina: 200,
-            Strength: 150,
-            Agility: 250
+            Intelligence: { value: 500, ipSpent: 0, pointFromIp: 0 },
+            Psychic: { value: 400, ipSpent: 0, pointFromIp: 0 },
+            Sense: { value: 300, ipSpent: 0, pointFromIp: 0 },
+            Stamina: { value: 200, ipSpent: 0, pointFromIp: 0 },
+            Strength: { value: 150, ipSpent: 0, pointFromIp: 0 },
+            Agility: { value: 250, ipSpent: 0, pointFromIp: 0 }
           }
         }
       });
@@ -372,7 +371,7 @@ describe('TinkerProfiles Library', () => {
       expect(createdProfile?.Character.Name).toBe('From Nano');
       expect(createdProfile?.Character.Profession).toBe('Nanotechnician');
       expect(createdProfile?.Character.Level).toBe(25);
-      expect(createdProfile?.Skills.Attributes.Intelligence).toBe(300);
+      expect(createdProfile?.Skills.Attributes.Intelligence.value).toBe(300);
     });
   });
   

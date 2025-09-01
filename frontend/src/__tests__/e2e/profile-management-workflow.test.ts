@@ -492,19 +492,6 @@ describe('Profile Management Workflow E2E', () => {
       expect(wrapper.vm.profiles).toEqual([]) || expect(wrapper.exists()).toBe(true)
     })
 
-    it('should backup profiles before major changes', async () => {
-      mockLocalStorage.setItem('tinkertools_profiles', JSON.stringify(mockProfiles))
-
-      // Perform destructive operation
-      wrapper.vm.resetAllProfiles()
-      await nextTick()
-
-      // Should create backup before deletion
-      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-        expect.stringContaining('backup'),
-        expect.any(String)
-      )
-    })
   })
 
   describe('Multi-Profile Comparison', () => {
