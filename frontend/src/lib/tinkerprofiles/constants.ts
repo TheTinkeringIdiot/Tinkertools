@@ -60,23 +60,21 @@ export const ACCOUNT_TYPES = [
 
 export const DEFAULT_SKILLS = {
   Attributes: {
-    Intelligence: 10,
-    Psychic: 10,
-    Sense: 10,
-    Stamina: 10,
-    Strength: 10,
-    Agility: 10
+    Intelligence: { value: 10, ipSpent: 0, pointFromIp: 0 },
+    Psychic: { value: 10, ipSpent: 0, pointFromIp: 0 },
+    Sense: { value: 10, ipSpent: 0, pointFromIp: 0 },
+    Stamina: { value: 10, ipSpent: 0, pointFromIp: 0 },
+    Strength: { value: 10, ipSpent: 0, pointFromIp: 0 },
+    Agility: { value: 10, ipSpent: 0, pointFromIp: 0 }
   },
   'Body & Defense': {
-    'Max Nano': 1,
-    'Nano Pool': 1,
-    'Nano Resist': 1,
-    'Max Health': 1,
-    'Body Dev.': 1,
-    'Dodge-Rng': 1,
-    'Duck-Exp': 1,
-    'Evade-ClsC': 1,
-    'Deflect': 1
+    'Nano Pool': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Nano Resist': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Body Dev.': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Dodge-Rng': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Duck-Exp': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Evade-ClsC': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Deflect': { value: 1, ipSpent: 0, pointFromIp: 0 }
   },
   ACs: {
     'Imp/Proj AC': 1,
@@ -89,79 +87,79 @@ export const DEFAULT_SKILLS = {
     'Disease AC': 1
   },
   'Ranged Weapons': {
-    'Pistol': 1,
-    'Ranged. Init.': 1,
-    'Grenade': 1,
-    'Heavy Weapons': 1,
-    'Bow': 1,
-    'Rifle': 1,
-    'MG / SMG': 1,
-    'Shotgun': 1,
-    'Assault Rif': 1,
-    'Multi Ranged': 1
+    'Pistol': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Ranged. Init.': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Grenade': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Heavy Weapons': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Bow': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Rifle': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'MG / SMG': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Shotgun': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Assault Rif': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Multi Ranged': { value: 1, ipSpent: 0, pointFromIp: 0 }
   },
   'Ranged Specials': {
-    'Fling Shot': 1,
-    'Sharp Obj': 1,
-    'Bow Spc Att': 1,
-    'Burst': 1,
-    'Full Auto': 1,
-    'Aimed Shot': 1
+    'Fling Shot': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Sharp Obj': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Bow Spc Att': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Burst': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Full Auto': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Aimed Shot': { value: 1, ipSpent: 0, pointFromIp: 0 }
   },
   'Melee Weapons': {
-    'Piercing': 1,
-    'Melee. Init.': 1,
-    'Physic. Init': 1,
-    '1h Blunt': 1,
-    '1h Edged': 1,
-    'Melee Ener.': 1,
-    '2h Edged': 1,
-    '2h Blunt': 1,
-    'Martial Arts': 1,
-    'Mult. Melee': 1
+    'Piercing': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Melee. Init.': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Physic. Init': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    '1h Blunt': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    '1h Edged': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Melee Ener.': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    '2h Edged': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    '2h Blunt': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Martial Arts': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Mult. Melee': { value: 1, ipSpent: 0, pointFromIp: 0 }
   },
   'Melee Specials': {
-    'Riposte': 1,
-    'Dimach': 1,
-    'Sneak Atck': 1,
-    'Fast Attack': 1,
-    'Brawling': 1
+    'Riposte': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Dimach': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Sneak Atck': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Fast Attack': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Brawling': { value: 1, ipSpent: 0, pointFromIp: 0 }
   },
   'Nanos & Casting': {
-    'Matter Crea': 1,
-    'NanoC. Init.': 1,
-    'Psycho Modi': 1,
-    'Sensory Impr': 1,
-    'Time&Space': 1,
-    'Bio Metamor': 1,
-    'Matt. Metam': 1
+    'Matter Crea': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'NanoC. Init.': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Psycho Modi': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Sensory Impr': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Time&Space': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Bio Metamor': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Matt. Metam': { value: 1, ipSpent: 0, pointFromIp: 0 }
   },
   Exploring: {
-    'Vehicle Air': 1,
-    'Vehicle Ground': 1,
-    'Vehicle Water': 1,
-    'Adventuring': 1,
-    'Run Speed': 1
+    'Vehicle Air': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Vehicle Ground': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Vehicle Water': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Adventuring': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Run Speed': { value: 1, ipSpent: 0, pointFromIp: 0 }
   },
   'Trade & Repair': {
-    'Chemistry': 1,
-    'Comp. Liter': 1,
-    'Elec. Engi': 1,
-    'Mech. Engi': 1,
-    'Nano Progra': 1,
-    'Pharma Tech': 1,
-    'Quantum FT': 1,
-    'Tutoring': 1,
-    'Weapon Smt': 1,
-    'Break&Entry': 1
+    'Chemistry': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Comp. Liter': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Elec. Engi': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Mech. Engi': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Nano Progra': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Pharma Tech': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Quantum FT': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Tutoring': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Weapon Smt': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Break&Entry': { value: 1, ipSpent: 0, pointFromIp: 0 }
   },
   'Combat & Healing': {
-    'Concealment': 1,
-    'Perception': 1,
-    'Psychology': 1,
-    'Treatment': 1,
-    'First Aid': 1,
-    'Trap Disarm.': 1
+    'Concealment': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Perception': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Psychology': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Treatment': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'First Aid': { value: 1, ipSpent: 0, pointFromIp: 0 },
+    'Trap Disarm.': { value: 1, ipSpent: 0, pointFromIp: 0 }
   },
   Misc: {
     '% Add. Xp': 0,
@@ -266,7 +264,6 @@ export const STORAGE_KEYS = {
   ACTIVE_PROFILE: 'tinkertools_active_profile',
   PROFILE_METADATA: 'tinkertools_profile_metadata',
   PROFILE_PREFERENCES: 'tinkertools_profile_preferences',
-  PROFILE_BACKUPS: 'tinkertools_profile_backups',
   VERSION: 'tinkertools_profiles_version'
 } as const;
 
@@ -300,7 +297,9 @@ export function createDefaultProfile(name: string = 'New Character'): TinkerProf
       Breed: 'Solitus',
       Faction: 'Neutral',
       Expansion: 'Lost Eden',
-      AccountType: 'Paid'
+      AccountType: 'Paid',
+      MaxHealth: 1,
+      MaxNano: 1
     },
     
     Skills: structuredClone(DEFAULT_SKILLS),

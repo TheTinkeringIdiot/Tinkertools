@@ -15,6 +15,7 @@ import type {
   CollectionTracking,
   CharacterBuild
 } from '../types/api'
+import { createDefaultProfile as createTinkerProfile } from '../lib/tinkerprofiles'
 import { useGameData, type Character } from '../composables/useGameData'
 import { gameUtils } from '../services/game-utils'
 import { professionBonuses } from '../utils/profession-bonuses'
@@ -24,209 +25,16 @@ import { statCalculations } from '../utils/stat-calculations'
 // Default Profile Structure
 // ============================================================================
 
-const createDefaultProfile = (): TinkerProfile => ({
-  Character: {
-    Name: '',
-    Level: 1,
-    Profession: '',
-    Breed: '',
-    Faction: '',
-    Expansion: '',
-    AccountType: ''
-  },
-  Skills: {
-    Attributes: {
-      Intelligence: 0,
-      Psychic: 0,
-      Sense: 0,
-      Stamina: 0,
-      Strength: 0,
-      Agility: 0
-    },
-    'Body & Defense': {
-      'Max Nano': 0,
-      'Nano Pool': 0,
-      'Nano Resist': 0,
-      'Max Health': 0,
-      'Body Dev.': 0,
-      'Dodge-Rng': 0,
-      'Duck-Exp': 0,
-      'Evade-ClsC': 0,
-      'Deflect': 0
-    },
-    ACs: {
-      'Imp/Proj AC': 0,
-      'Energy AC': 0,
-      'Melee/ma AC': 0,
-      'Fire AC': 0,
-      'Cold AC': 0,
-      'Chemical AC': 0,
-      'Radiation AC': 0,
-      'Disease AC': 0
-    },
-    'Ranged Weapons': {
-      'Pistol': 0,
-      'Ranged. Init.': 0,
-      'Grenade': 0,
-      'Heavy Weapons': 0,
-      'Bow': 0,
-      'Rifle': 0,
-      'MG / SMG': 0,
-      'Shotgun': 0,
-      'Assault Rif': 0,
-      'Multi Ranged': 0
-    },
-    'Ranged Specials': {
-      'Fling Shot': 0,
-      'Sharp Obj': 0,
-      'Bow Spc Att': 0,
-      'Burst': 0,
-      'Full Auto': 0,
-      'Aimed Shot': 0
-    },
-    'Melee Weapons': {
-      'Piercing': 0,
-      'Melee. Init.': 0,
-      'Physic. Init': 0,
-      '1h Blunt': 0,
-      '1h Edged': 0,
-      'Melee Ener.': 0,
-      '2h Edged': 0,
-      '2h Blunt': 0,
-      'Martial Arts': 0,
-      'Mult. Melee': 0
-    },
-    'Melee Specials': {
-      'Riposte': 0,
-      'Dimach': 0,
-      'Sneak Atck': 0,
-      'Fast Attack': 0,
-      'Brawling': 0
-    },
-    'Nanos & Casting': {
-      'Matter Crea': 0,
-      'NanoC. Init.': 0,
-      'Psycho Modi': 0,
-      'Sensory Impr': 0,
-      'Time&Space': 0,
-      'Bio Metamor': 0,
-      'Matt. Metam': 0
-    },
-    Exploring: {
-      'Vehicle Air': 0,
-      'Vehicle Ground': 0,
-      'Vehicle Water': 0,
-      'Adventuring': 0,
-      'Run Speed': 0
-    },
-    'Trade & Repair': {
-      'Chemistry': 0,
-      'Comp. Liter': 0,
-      'Elec. Engi': 0,
-      'Mech. Engi': 0,
-      'Nano Progra': 0,
-      'Pharma Tech': 0,
-      'Quantum FT': 0,
-      'Tutoring': 0,
-      'Weapon Smt': 0,
-      'Break&Entry': 0
-    },
-    'Combat & Healing': {
-      'Concealment': 0,
-      'Perception': 0,
-      'Psychology': 0,
-      'Treatment': 0,
-      'First Aid': 0,
-      'Trap Disarm.': 0
-    },
-    Misc: {
-      '% Add. Xp': 0,
-      '% Add. Nano Cost': 0,
-      'Max NCU': 0,
-      'Decreased Nano-Interrupt Modifier %': 0,
-      'SkillLockModifier': 0,
-      'HealDelta': 0,
-      'Add All Def.': 0,
-      'NanoDelta': 0,
-      'RangeInc. NF': 0,
-      'RangeInc. Weapon': 0,
-      'CriticalIncrease': 0,
-      'Free deck slot': 0,
-      'Healing Efficiency': 0,
-      'Add All Off.': 0,
-      'Add. Proj. Dam.': 0,
-      'Add. Melee Dam.': 0,
-      'Add. Energy Dam.': 0,
-      'Add. Chem. Dam.': 0,
-      'Add. Rad. Dam.': 0,
-      'Add. Cold Dam.': 0,
-      'Add. Fire Dam.': 0,
-      'Add. Poison Dam.': 0,
-      'ShieldMeleeAC': 0,
-      'ShieldProjectileAC': 0,
-      'ShieldEnergyAC': 0,
-      'ShieldFireAC': 0,
-      'ShieldColdAC': 0,
-      'ShieldChemicalAC': 0,
-      'ShieldRadiationAC': 0,
-      'ShieldPoisonAC': 0,
-      'Direct Nano Damage Efficiency': 0,
-      'Add. Nano Dam.': 0,
-      'Scale': 0
-    }
-  },
-  Weapons: {
-    HUD1: null,
-    HUD2: null,
-    HUD3: null,
-    UTILS1: null,
-    UTILS2: null,
-    UTILS3: null,
-    RHand: null,
-    Waist: null,
-    LHand: null,
-    NCU1: null,
-    NCU2: null,
-    NCU3: null,
-    NCU4: null,
-    NCU5: null,
-    NCU6: null
-  },
-  Clothing: {
-    Head: null,
-    Back: null,
-    Body: null,
-    RightArm: null,
-    LeftArm: null,
-    RightWrist: null,
-    LeftWrist: null,
-    Hands: null,
-    Legs: null,
-    Feet: null,
-    RightShoulder: null,
-    LeftShoulder: null,
-    RightFinger: null,
-    LeftFinger: null,
-    Neck: null,
-    Belt: null
-  },
-  Implants: {
-    Head: null,
-    Eye: null,
-    Ear: null,
-    Chest: null,
-    RightArm: null,
-    LeftArm: null,
-    Waist: null,
-    RightWrist: null,
-    LeftWrist: null,
-    Leg: null,
-    RightHand: null,
-    LeftHand: null,
-    Feet: null
-  },
-  PerksAndResearch: []
-})
+const createDefaultProfile = (): TinkerProfile => {
+  // Use the TinkerProfiles library to create a proper default profile
+  const profile = createTinkerProfile('')
+  
+  // Clear the name since this is a template
+  profile.Character.Name = ''
+  
+  // Return the profile with the correct structure
+  return profile as TinkerProfile
+}
 
 const createDefaultPreferences = (): UserPreferences => ({
   theme: 'light',

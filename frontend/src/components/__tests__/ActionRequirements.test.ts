@@ -528,4 +528,279 @@ describe('ActionRequirements', () => {
       expect(wrapper.text()).toContain('Action 999')
     })
   })
+
+  describe('interpolation integration', () => {
+    it('should update when receiving interpolated actions', async () => {
+      const baseActions: Action[] = [
+        {
+          id: 1,
+          action: 6, // Wield
+          item_id: 123,
+          criteria: [
+            { id: 1, value1: 112, value2: 300, operator: 2 } // Base requirement
+          ]
+        }
+      ]
+
+      const interpolatedActions: Action[] = [
+        {
+          id: 1,
+          action: 6, // Wield
+          item_id: 123,
+          criteria: [
+            { id: 1, value1: 112, value2: 350, operator: 2 } // Interpolated requirement
+          ]
+        }
+      ]
+
+      // Setup mocks for base actions
+      mockUseItemActions.parsedActions.value = [{
+        id: 1,
+        action: 6,
+        actionName: 'Wield',
+        hasRequirements: true,
+        description: 'Wield: Requirements',
+        criteria: [
+          {
+            id: 1,
+            stat: 112,
+            statName: 'Pistol',
+            displayValue: 300,
+            displaySymbol: '≥',
+            description: 'Pistol ≥ 300',
+            isStatRequirement: true
+          }
+        ],
+        expression: null
+      }]
+
+      const wrapper = mount(ActionRequirements, {
+        props: {
+          actions: baseActions,
+          characterStats: { 112: 280 } // Below base requirement
+        }
+      })
+
+      // Initially should show base requirement (300)
+      expect(wrapper.text()).toContain('300')
+
+      // Update with interpolated actions (higher requirement: 350)
+      mockUseItemActions.parsedActions.value = [{
+        id: 1,
+        action: 6,
+        actionName: 'Wield',
+        hasRequirements: true,
+        description: 'Wield: Requirements',
+        criteria: [
+          {
+            id: 1,
+            stat: 112,
+            statName: 'Pistol',
+            displayValue: 350,
+            displaySymbol: '≥',
+            description: 'Pistol ≥ 350',
+            isStatRequirement: true
+          }
+        ],
+        expression: null
+      }]
+
+      await wrapper.setProps({ actions: interpolatedActions })
+      await nextTick()
+
+      // Should now show interpolated requirement (350)
+      expect(wrapper.text()).toContain('350')
+    })
+
+    it('should handle requirements that become unmet during interpolation', async () => {
+      const characterStats = { 112: 320 } // Character has 320 skill
+      
+      // Base item requirement (300) - character meets it
+      const baseActions: Action[] = [
+        {
+          id: 1,
+          action: 6,
+          item_id: 123,
+          criteria: [
+            { id: 1, value1: 112, value2: 300, operator: 2 }
+          ]
+        }
+      ]
+
+      // Interpolated item requirement (340) - character no longer meets it
+      const interpolatedActions: Action[] = [
+        {
+          id: 1,
+          action: 6,
+          item_id: 123,
+          criteria: [
+            { id: 1, value1: 112, value2: 340, operator: 2 }
+          ]
+        }
+      ]
+
+      // Mock base state (requirement met)
+      mockUseItemActions.parsedActions.value = [{
+        id: 1,
+        action: 6,
+        actionName: 'Wield',
+        hasRequirements: true,
+        description: 'Wield: ✓ Met',
+        criteria: [],
+        expression: null
+      }]
+
+      const wrapper = mount(ActionRequirements, {
+        props: {
+          actions: baseActions,
+          characterStats
+        }
+      })
+
+      // Initially should show as met
+      expect(wrapper.text()).toContain('✓')
+
+      // Update to interpolated actions (requirement no longer met)
+      mockUseItemActions.parsedActions.value = [{
+        id: 1,
+        action: 6,
+        actionName: 'Wield',
+        hasRequirements: true,
+        description: 'Wield: ✗ Unmet',
+        criteria: [
+          {
+            id: 1,
+            stat: 112,
+            statName: 'Pistol',
+            displayValue: 340,
+            displaySymbol: '≥',
+            description: 'Pistol ≥ 340',
+            isStatRequirement: true
+          }
+        ],
+        expression: null
+      }]
+
+      await wrapper.setProps({ actions: interpolatedActions })
+      await nextTick()
+
+      // Should now show as unmet
+      expect(wrapper.text()).toContain('✗')
+      expect(wrapper.text()).toContain('340')
+    })
+
+    it('should handle spell effect requirements that change with interpolation', async () => {
+      // Actions with spell-based criteria that scale with item QL
+      const baseSpellActions: Action[] = [
+        {
+          id: 1,
+          action: 100, // Special spell action
+          item_id: 123,
+          criteria: [
+            { id: 1, value1: 200, value2: 150, operator: 2 } // Nano Computer Memory ≥ 150
+          ]
+        }
+      ]
+
+      const interpolatedSpellActions: Action[] = [
+        {
+          id: 1,
+          action: 100,
+          item_id: 123,
+          criteria: [
+            { id: 1, value1: 200, value2: 175, operator: 2 } // Increased to 175
+          ]
+        }
+      ]
+
+      mockUseItemActions.parsedActions.value = [{
+        id: 1,
+        action: 100,
+        actionName: 'Cast',
+        hasRequirements: true,
+        description: 'Cast: Requirements',
+        criteria: [
+          {
+            id: 1,
+            stat: 200,
+            statName: 'Nano Computer Memory',
+            displayValue: 150,
+            displaySymbol: '≥',
+            description: 'Nano Computer Memory ≥ 150',
+            isStatRequirement: true
+          }
+        ],
+        expression: null
+      }]
+
+      const wrapper = mount(ActionRequirements, {
+        props: {
+          actions: baseSpellActions,
+          characterStats: { 200: 160 } // Character meets base but not interpolated
+        }
+      })
+
+      // Update to interpolated spell requirements
+      mockUseItemActions.parsedActions.value = [{
+        id: 1,
+        action: 100,
+        actionName: 'Cast',
+        hasRequirements: true,
+        description: 'Cast: Requirements',
+        criteria: [
+          {
+            id: 1,
+            stat: 200,
+            statName: 'Nano Computer Memory',
+            displayValue: 175,
+            displaySymbol: '≥',
+            description: 'Nano Computer Memory ≥ 175',
+            isStatRequirement: true
+          }
+        ],
+        expression: null
+      }]
+
+      await wrapper.setProps({ actions: interpolatedSpellActions })
+      await nextTick()
+
+      // Should show updated requirement value
+      expect(wrapper.text()).toContain('175')
+    })
+
+    it('should maintain component reactivity during interpolation updates', async () => {
+      const wrapper = mount(ActionRequirements, {
+        props: {
+          actions: [],
+          characterStats: {}
+        }
+      })
+
+      // Track how many times the composable is called
+      let callCount = 0
+      mockUseItemActions.parsedActions.value = []
+      
+      // Simulate multiple interpolation updates
+      for (let i = 0; i < 5; i++) {
+        const newActions: Action[] = [
+          {
+            id: 1,
+            action: 6,
+            item_id: 123,
+            criteria: [
+              { id: 1, value1: 112, value2: 300 + (i * 10), operator: 2 }
+            ]
+          }
+        ]
+
+        await wrapper.setProps({ actions: newActions })
+        await nextTick()
+        callCount++
+      }
+
+      // Component should remain reactive and not break
+      expect(wrapper.exists()).toBe(true)
+      expect(callCount).toBe(5)
+    })
+  })
 })

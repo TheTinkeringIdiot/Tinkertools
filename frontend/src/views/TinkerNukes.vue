@@ -245,7 +245,7 @@ Allows users to input skills and view usable offensive nanos in a sortable table
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
-import { useProfilesStore } from '@/stores/profilesStore';
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { useNanosStore } from '@/stores/nanosStore';
 import { useAccessibility } from '@/composables/useAccessibility';
 import { useTableKeyboardNavigation } from '@/composables/useKeyboardNavigation';
@@ -260,7 +260,7 @@ import Tag from 'primevue/tag';
 import type { NanoProgram } from '@/types/nano';
 
 // Stores
-const profileStore = useProfilesStore();
+const profileStore = useTinkerProfilesStore();
 const nanosStore = useNanosStore();
 
 // Accessibility
@@ -311,16 +311,16 @@ const nanoSkills = [
 // Computed properties
 const activeProfile = computed(() => {
   if (!selectedProfile.value) return null;
-  return profileStore.profiles.find(p => p?.name === selectedProfile.value);
+  return Array.from(profileStore.profiles.values()).find(p => p?.Character.Name === selectedProfile.value);
 });
 
 const profileOptions = computed(() => [
   { label: 'None', value: null },
-  ...profileStore.profiles
-    .filter((profile: any) => profile?.profession === 'Nanotechnician')
+  ...Array.from(profileStore.profiles.values())
+    .filter((profile: any) => profile?.Character.Profession === 'Nanotechnician')
     .map((profile: any) => ({
-      label: `${profile.name} (${profile.level})`,
-      value: profile.name
+      label: `${profile.Character.Name} (${profile.Character.Level})`,
+      value: profile.Character.Name
     }))
 ]);
 

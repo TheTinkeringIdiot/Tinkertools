@@ -4,7 +4,7 @@
  * Tests for the ItemSearch component functionality
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
@@ -65,14 +65,45 @@ vi.mock('primevue/checkbox', () => ({
 
 const mockProfile: TinkerProfile = {
   id: 'test-profile',
-  name: 'Test Character',
-  level: 200,
-  profession: 'Engineer',
-  stats: {
-    16: 500, // Strength
-    17: 400, // Agility
-    19: 600  // Intelligence
-  }
+  version: '2.0.0',
+  created: '2024-01-01T00:00:00Z',
+  updated: '2024-01-01T00:00:00Z',
+  Character: {
+    Name: 'Test Character',
+    Level: 200,
+    Profession: 'Engineer',
+    Breed: 'Solitus',
+    Faction: 'Neutral',
+    Expansion: 'Lost Eden',
+    AccountType: 'Paid',
+    MaxHealth: 2000,
+    MaxNano: 1500
+  },
+  Skills: {
+    Attributes: {
+      Intelligence: { value: 600, ipSpent: 0, pointFromIp: 0 },
+      Psychic: { value: 300, ipSpent: 0, pointFromIp: 0 },
+      Sense: { value: 400, ipSpent: 0, pointFromIp: 0 },
+      Stamina: { value: 350, ipSpent: 0, pointFromIp: 0 },
+      Strength: { value: 500, ipSpent: 0, pointFromIp: 0 },
+      Agility: { value: 400, ipSpent: 0, pointFromIp: 0 }
+    },
+    'Body & Defense': {},
+    ACs: {},
+    'Ranged Weapons': {},
+    'Ranged Specials': {},
+    'Melee Weapons': {},
+    'Melee Specials': {},
+    'Nanos & Casting': {},
+    Exploring: {},
+    'Trade & Repair': {},
+    'Combat & Healing': {},
+    Misc: {}
+  },
+  Weapons: {},
+  Clothing: {},
+  Implants: {},
+  PerksAndResearch: []
 }
 
 describe('ItemSearch', () => {

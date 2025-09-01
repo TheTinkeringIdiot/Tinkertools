@@ -158,8 +158,10 @@ Shows item requirements organized by category with compatibility checking
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { Item, TinkerProfile, ItemRequirement } from '@/types/api'
+import type { Item, TinkerProfile } from '@/types/api'
 import { getStatName, getProfessionName, getBreedName } from '@/services/game-utils'
+import { mapProfileToStats, profileMeetsRequirement } from '@/utils/profile-stats-mapper'
+import type { Criterion } from '@/types/api'
 
 const props = defineProps<{
   item: Item
@@ -167,50 +169,77 @@ const props = defineProps<{
   showCompatibility?: boolean
 }>()
 
+// Extract requirements from actions criteria
+const extractedRequirements = computed(() => {
+  if (!props.item.actions || props.item.actions.length === 0) return []
+  
+  const requirements: Array<{stat: number, operator: number, value: number}> = []
+  
+  props.item.actions.forEach(action => {
+    if (action.criteria) {
+      action.criteria.forEach((criterion: Criterion) => {
+        if (criterion.stat !== null && criterion.op !== null && criterion.value !== null) {
+          requirements.push({
+            stat: criterion.stat,
+            operator: criterion.op,
+            value: criterion.value
+          })
+        }
+      })
+    }
+  })
+  
+  // Remove duplicates based on stat + operator + value
+  const unique = requirements.filter((req, index, self) => 
+    index === self.findIndex(r => r.stat === req.stat && r.operator === req.operator && r.value === req.value)
+  )
+  
+  return unique
+})
+
 // Computed Properties
 const hasRequirements = computed(() => 
-  props.item.requirements && props.item.requirements.length > 0
+  extractedRequirements.value.length > 0
 )
 
 const attributeRequirements = computed(() => {
-  if (!props.item.requirements) return []
   // Attributes: 16-21 (Strength, Agility, Stamina, Intelligence, Sense, Psychic)
-  return props.item.requirements.filter(req => req.stat >= 16 && req.stat <= 21)
+  return extractedRequirements.value.filter(req => req.stat >= 16 && req.stat <= 21)
 })
 
 const skillRequirements = computed(() => {
-  if (!props.item.requirements) return []
   // Skills: 100-200 range approximately
   const skillIds = [
-    100, 101, 102, 103, 104, 105, 106, 107, 108, // Combat skills
-    148, 150, 134, 133, 119, // Special attack skills
-    123, 124, 125, 126, 127, 128, 129, 130, 131, // Support skills
-    160, 161, 162, 163 // Trade skills
+    100, 101, 102, 103, 104, 105, 106, 107, 108, 109, // Combat skills
+    110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, // More combat/init skills
+    123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, // Support & special skills
+    136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, // More specials
+    149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, // Body & trade skills
+    162, 163, 164, 165, 166, 167, 168, 169, // More trade and exploration
+    229 // MultiRanged
   ]
-  return props.item.requirements.filter(req => skillIds.includes(req.stat))
+  return extractedRequirements.value.filter(req => skillIds.includes(req.stat))
 })
 
 const characterRequirements = computed(() => {
-  if (!props.item.requirements) return []
-  // Character: Level (54), Profession (60), Breed (4), Gender (59)
-  const characterIds = [4, 54, 59, 60]
-  return props.item.requirements.filter(req => characterIds.includes(req.stat))
+  // Character: Level (54), Profession (60), Breed (4), Gender (59), MaxHealth (1), MaxNano (214)
+  const characterIds = [1, 4, 54, 59, 60, 214]
+  return extractedRequirements.value.filter(req => characterIds.includes(req.stat))
 })
 
 const otherRequirements = computed(() => {
-  if (!props.item.requirements) return []
   const knownIds = [
     ...attributeRequirements.value.map(r => r.stat),
     ...skillRequirements.value.map(r => r.stat),
     ...characterRequirements.value.map(r => r.stat)
   ]
-  return props.item.requirements.filter(req => !knownIds.includes(req.stat))
+  return extractedRequirements.value.filter(req => !knownIds.includes(req.stat))
 })
 
 const overallCompatibility = computed(() => {
-  if (!props.showCompatibility || !props.profile || !props.item.requirements) return null
+  if (!props.showCompatibility || !props.profile || extractedRequirements.value.length === 0) return null
   
-  const unmetRequirements = props.item.requirements.filter(req => !canMeetRequirement(req))
+  const unmetRequirements = extractedRequirements.value.filter(req => !canMeetRequirement(req))
   
   if (unmetRequirements.length === 0) {
     return {
@@ -228,10 +257,10 @@ const overallCompatibility = computed(() => {
 })
 
 const requirementsSummary = computed(() => {
-  if (!props.showCompatibility || !props.profile || !props.item.requirements) return null
+  if (!props.showCompatibility || !props.profile || extractedRequirements.value.length === 0) return null
   
-  const total = props.item.requirements.length
-  const met = props.item.requirements.filter(req => canMeetRequirement(req)).length
+  const total = extractedRequirements.value.length
+  const met = extractedRequirements.value.filter(req => canMeetRequirement(req)).length
   const unmet = total - met
   
   if (unmet === 0) {
@@ -259,17 +288,18 @@ const requirementsSummary = computed(() => {
 })
 
 // Methods
-function canMeetRequirement(requirement: ItemRequirement): boolean {
+function canMeetRequirement(requirement: {stat: number, operator: number, value: number}): boolean {
   if (!props.profile) return false
-  const characterStat = props.profile.stats?.[requirement.stat] || 0
-  return characterStat >= requirement.value
+  return profileMeetsRequirement(props.profile, requirement.stat, requirement.operator, requirement.value)
 }
 
 function getCharacterStat(statId: number): number {
-  return props.profile?.stats?.[statId] || 0
+  if (!props.profile) return 0
+  const stats = mapProfileToStats(props.profile)
+  return stats[statId] || 0
 }
 
-function getRequirementClass(requirement: ItemRequirement): string {
+function getRequirementClass(requirement: {stat: number, operator: number, value: number}): string {
   if (!props.showCompatibility) {
     return 'bg-surface-50 dark:bg-surface-900'
   }
@@ -280,7 +310,7 @@ function getRequirementClass(requirement: ItemRequirement): string {
     : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
 }
 
-function getCompatibilityIcon(requirement: ItemRequirement): string {
+function getCompatibilityIcon(requirement: {stat: number, operator: number, value: number}): string {
   const canMeet = canMeetRequirement(requirement)
   return canMeet 
     ? 'pi pi-check text-green-600'

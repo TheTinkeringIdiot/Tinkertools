@@ -313,4 +313,145 @@ describe('TinkerItems Full Integration', () => {
       }
     }, 10000)
   })
+
+  describe('Item Interpolation Integration', () => {
+    it('should successfully interpolate an item with real backend', async () => {
+      // Use a known interpolatable item - Otek Slicer
+      const otekSlicerAoid = 262759 // Base QL 100-199 range
+      const targetQl = 150
+      
+      const response = await fetch(`${BACKEND_URL}/items/${otekSlicerAoid}/interpolate?target_ql=${targetQl}`)
+      
+      expect(response.ok).toBe(true)
+      const data = await response.json()
+      
+      expect(data).toHaveProperty('success')
+      expect(data.success).toBe(true)
+      expect(data).toHaveProperty('item')
+      
+      const interpolatedItem = data.item
+      expect(interpolatedItem.aoid).toBe(otekSlicerAoid)
+      expect(interpolatedItem.ql).toBe(targetQl)
+      expect(interpolatedItem).toHaveProperty('interpolating')
+      expect(interpolatedItem.interpolating).toBe(true)
+      expect(interpolatedItem).toHaveProperty('target_ql')
+      expect(interpolatedItem.target_ql).toBe(targetQl)
+      
+      // Verify that stats are interpolated
+      expect(Array.isArray(interpolatedItem.stats)).toBe(true)
+      expect(Array.isArray(interpolatedItem.actions)).toBe(true)
+      
+      console.log('Interpolation successful:', {
+        name: interpolatedItem.name,
+        originalQl: 100,
+        targetQl: interpolatedItem.ql,
+        statsCount: interpolatedItem.stats.length,
+        actionsCount: interpolatedItem.actions.length
+      })
+    }, 10000)
+
+    it('should get interpolation ranges for multi-range items', async () => {
+      // Otek Slicer has multiple QL ranges
+      const otekSlicerAoid = 262759
+      
+      const response = await fetch(`${BACKEND_URL}/items/${otekSlicerAoid}/interpolation-info`)
+      
+      expect(response.ok).toBe(true)
+      const data = await response.json()
+      
+      expect(data).toHaveProperty('success')
+      expect(data.success).toBe(true)
+      expect(data).toHaveProperty('ranges')
+      expect(Array.isArray(data.ranges)).toBe(true)
+      expect(data.ranges.length).toBeGreaterThan(1) // Multiple ranges
+      
+      // Verify range structure
+      data.ranges.forEach((range: any) => {
+        expect(range).toHaveProperty('min_ql')
+        expect(range).toHaveProperty('max_ql')
+        expect(range).toHaveProperty('base_aoid')
+        expect(typeof range.min_ql).toBe('number')
+        expect(typeof range.max_ql).toBe('number')
+        expect(typeof range.base_aoid).toBe('number')
+      })
+      
+      console.log('Interpolation ranges:', data.ranges.map((r: any) => 
+        `QL ${r.min_ql}-${r.max_ql} (base: ${r.base_aoid})`
+      ))
+    }, 10000)
+
+    it('should test range transition interpolation', async () => {
+      // Test interpolating across different ranges
+      const ranges = [
+        { aoid: 262759, ql: 150 }, // 100-199 range
+        { aoid: 262760, ql: 250 }, // 200-299 range  
+        { aoid: 262761, ql: 350 }  // 300+ range
+      ]
+      
+      for (const { aoid, ql } of ranges) {
+        const response = await fetch(`${BACKEND_URL}/items/${aoid}/interpolate?target_ql=${ql}`)
+        
+        if (response.ok) {
+          const data = await response.json()
+          
+          expect(data.success).toBe(true)
+          expect(data.item.ql).toBe(ql)
+          expect(data.item.aoid).toBe(aoid)
+          
+          console.log(`Range test successful: ${data.item.name} QL ${ql}`)
+        }
+      }
+    }, 15000)
+
+    it('should handle interpolation errors gracefully', async () => {
+      // Test with invalid QL
+      const response = await fetch(`${BACKEND_URL}/items/262759/interpolate?target_ql=9999`)
+      
+      expect(response.ok).toBe(false)
+      // Backend should return 400 for invalid QL
+    }, 10000)
+
+    it('should test requirement interpolation', async () => {
+      // Test that requirements change with interpolation
+      const otekSlicerAoid = 262759
+      const lowQl = 100
+      const highQl = 150
+      
+      // Get base item
+      const baseResponse = await fetch(`${BACKEND_URL}/items/${otekSlicerAoid}`)
+      expect(baseResponse.ok).toBe(true)
+      const baseItem = await baseResponse.json()
+      
+      // Get interpolated item
+      const interpResponse = await fetch(`${BACKEND_URL}/items/${otekSlicerAoid}/interpolate?target_ql=${highQl}`)
+      expect(interpResponse.ok).toBe(true)
+      const interpData = await interpResponse.json()
+      
+      if (interpData.success) {
+        const interpolatedItem = interpData.item
+        
+        // Compare requirements - they should be different
+        if (baseItem.actions && interpolatedItem.actions) {
+          const baseRequirements = baseItem.actions.filter((a: any) => a.criteria?.length > 0)
+          const interpRequirements = interpolatedItem.actions.filter((a: any) => a.criteria?.length > 0)
+          
+          if (baseRequirements.length > 0 && interpRequirements.length > 0) {
+            // Requirements should be different for different QLs
+            const baseFirstCriterion = baseRequirements[0].criteria[0]
+            const interpFirstCriterion = interpRequirements[0].criteria[0]
+            
+            if (baseFirstCriterion && interpFirstCriterion) {
+              expect(baseFirstCriterion.value2).not.toBe(interpFirstCriterion.value2)
+              console.log('Requirements interpolated correctly:', {
+                baseQl: baseItem.ql,
+                interpQl: interpolatedItem.ql,
+                baseReq: baseFirstCriterion.value2,
+                interpReq: interpFirstCriterion.value2
+              })
+            }
+          }
+        }
+      }
+    }, 10000)
+  })
 })

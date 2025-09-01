@@ -22,7 +22,15 @@ vi.mock('../../services/interpolation-service', () => ({
     interpolateItem: vi.fn(),
     getInterpolationInfo: vi.fn(),
     isItemInterpolatable: vi.fn(),
-    itemToInterpolatedItem: vi.fn()
+    itemToInterpolatedItem: vi.fn(),
+    getInterpolationRanges: vi.fn()
+  }
+}))
+
+// Mock API client for range testing
+vi.mock('../../services/api-client', () => ({
+  apiClient: {
+    getInterpolationInfo: vi.fn()
   }
 }))
 
@@ -35,6 +43,7 @@ describe('useInterpolation', () => {
     getInterpolationInfo: Mock
     isItemInterpolatable: Mock
     itemToInterpolatedItem: Mock
+    getInterpolationRanges: Mock
   }
 
   const sampleItem: Item = {
@@ -719,5 +728,152 @@ describe('useInterpolationBatch', () => {
     await promise
 
     expect(isLoading.value).toBe(false)
+  })
+})
+
+// ============================================================================
+// getInterpolationRanges Tests (New Functionality)
+// ============================================================================
+
+describe('getInterpolationRanges', () => {
+  const { apiClient } = await import('../../services/api-client')
+  const mockApiClient = apiClient as {
+    getInterpolationInfo: Mock
+  }
+
+  const sampleRanges = [
+    { min_ql: 100, max_ql: 199, base_aoid: 12345 },
+    { min_ql: 200, max_ql: 299, base_aoid: 12346 },
+    { min_ql: 300, max_ql: 300, base_aoid: 12347 }
+  ]
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('should retrieve multiple interpolation ranges', async () => {
+    const aoidRef = ref(12345)
+    const { getInterpolationRanges } = useInterpolation(aoidRef, { autoLoad: false })
+
+    mockApiClient.getInterpolationInfo.mockResolvedValue({
+      success: true,
+      ranges: sampleRanges
+    })
+
+    const ranges = await getInterpolationRanges(12345)
+
+    expect(ranges).toEqual(sampleRanges)
+    expect(mockApiClient.getInterpolationInfo).toHaveBeenCalledWith(12345)
+  })
+
+  it('should return empty array for non-interpolatable items', async () => {
+    const aoidRef = ref(12345)
+    const { getInterpolationRanges } = useInterpolation(aoidRef, { autoLoad: false })
+
+    mockApiClient.getInterpolationInfo.mockResolvedValue({
+      success: false,
+      error: 'Item not interpolatable'
+    })
+
+    const ranges = await getInterpolationRanges(12345)
+
+    expect(ranges).toEqual([])
+  })
+
+  it('should handle API errors gracefully', async () => {
+    const aoidRef = ref(12345)
+    const { getInterpolationRanges } = useInterpolation(aoidRef, { autoLoad: false })
+
+    mockApiClient.getInterpolationInfo.mockRejectedValue(new Error('Network error'))
+
+    const ranges = await getInterpolationRanges(12345)
+
+    expect(ranges).toEqual([])
+  })
+
+  it('should sort ranges by min_ql', async () => {
+    const aoidRef = ref(12345)
+    const { getInterpolationRanges } = useInterpolation(aoidRef, { autoLoad: false })
+
+    const unsortedRanges = [
+      { min_ql: 200, max_ql: 299, base_aoid: 12346 },
+      { min_ql: 100, max_ql: 199, base_aoid: 12345 },
+      { min_ql: 300, max_ql: 300, base_aoid: 12347 }
+    ]
+
+    mockApiClient.getInterpolationInfo.mockResolvedValue({
+      success: true,
+      ranges: unsortedRanges
+    })
+
+    const ranges = await getInterpolationRanges(12345)
+
+    expect(ranges[0].min_ql).toBe(100)
+    expect(ranges[1].min_ql).toBe(200)
+    expect(ranges[2].min_ql).toBe(300)
+  })
+
+  it('should cache range results', async () => {
+    const aoidRef = ref(12345)
+    const { getInterpolationRanges } = useInterpolation(aoidRef, { autoLoad: false })
+
+    mockApiClient.getInterpolationInfo.mockResolvedValue({
+      success: true,
+      ranges: sampleRanges
+    })
+
+    // First call
+    const ranges1 = await getInterpolationRanges(12345)
+    
+    // Second call should use cache
+    const ranges2 = await getInterpolationRanges(12345)
+
+    expect(ranges1).toEqual(sampleRanges)
+    expect(ranges2).toEqual(sampleRanges)
+    expect(mockApiClient.getInterpolationInfo).toHaveBeenCalledTimes(1)
+  })
+
+  it('should validate range structure', async () => {
+    const aoidRef = ref(12345)
+    const { getInterpolationRanges } = useInterpolation(aoidRef, { autoLoad: false })
+
+    const validRanges = [
+      { min_ql: 100, max_ql: 199, base_aoid: 12345 },
+      { min_ql: 200, max_ql: 299, base_aoid: 12346 }
+    ]
+
+    mockApiClient.getInterpolationInfo.mockResolvedValue({
+      success: true,
+      ranges: validRanges
+    })
+
+    const ranges = await getInterpolationRanges(12345)
+
+    ranges.forEach(range => {
+      expect(range).toHaveProperty('min_ql')
+      expect(range).toHaveProperty('max_ql')
+      expect(range).toHaveProperty('base_aoid')
+      expect(typeof range.min_ql).toBe('number')
+      expect(typeof range.max_ql).toBe('number')
+      expect(typeof range.base_aoid).toBe('number')
+      expect(range.min_ql).toBeLessThanOrEqual(range.max_ql)
+    })
+  })
+
+  it('should handle single-range items', async () => {
+    const aoidRef = ref(12345)
+    const { getInterpolationRanges } = useInterpolation(aoidRef, { autoLoad: false })
+
+    const singleRange = [{ min_ql: 1, max_ql: 300, base_aoid: 12345 }]
+
+    mockApiClient.getInterpolationInfo.mockResolvedValue({
+      success: true,
+      ranges: singleRange
+    })
+
+    const ranges = await getInterpolationRanges(12345)
+
+    expect(ranges).toEqual(singleRange)
+    expect(ranges.length).toBe(1)
   })
 })

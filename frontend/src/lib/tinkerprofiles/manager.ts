@@ -76,7 +76,6 @@ export class TinkerProfilesManager {
       storage: {
         compress: false,
         encrypt: false,
-        backup: true,
         autoSave: true,
         migrationEnabled: true,
         ...config.storage
@@ -93,7 +92,6 @@ export class TinkerProfilesManager {
         ...config.events
       },
       features: {
-        autoBackup: true,
         compression: false,
         migration: true,
         analytics: false,

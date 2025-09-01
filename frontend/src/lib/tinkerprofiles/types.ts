@@ -8,6 +8,13 @@
 // Core Profile Types
 // ============================================================================
 
+/** Skill entry with IP tracking */
+export interface SkillWithIP {
+  value: number;
+  ipSpent: number;
+  pointFromIp: number;
+}
+
 /** Comprehensive profile structure following legacy TinkerProfiles format */
 export interface TinkerProfile {
   // Profile metadata
@@ -25,29 +32,31 @@ export interface TinkerProfile {
     Faction: string;
     Expansion: string;
     AccountType: string;
+    MaxHealth: number;
+    MaxNano: number;
   };
   
-  // Complete skills structure from legacy format
+  // Complete skills structure with IP tracking (except Misc)
   Skills: {
     Attributes: {
-      Intelligence: number;
-      Psychic: number;
-      Sense: number;
-      Stamina: number;
-      Strength: number;
-      Agility: number;
+      Intelligence: SkillWithIP;
+      Psychic: SkillWithIP;
+      Sense: SkillWithIP;
+      Stamina: SkillWithIP;
+      Strength: SkillWithIP;
+      Agility: SkillWithIP;
     };
-    'Body & Defense': Record<string, number>;
+    'Body & Defense': Record<string, SkillWithIP>;
     ACs: Record<string, number>;
-    'Ranged Weapons': Record<string, number>;
-    'Ranged Specials': Record<string, number>;
-    'Melee Weapons': Record<string, number>;
-    'Melee Specials': Record<string, number>;
-    'Nanos & Casting': Record<string, number>;
-    Exploring: Record<string, number>;
-    'Trade & Repair': Record<string, number>;
-    'Combat & Healing': Record<string, number>;
-    Misc: Record<string, number>;
+    'Ranged Weapons': Record<string, SkillWithIP>;
+    'Ranged Specials': Record<string, SkillWithIP>;
+    'Melee Weapons': Record<string, SkillWithIP>;
+    'Melee Specials': Record<string, SkillWithIP>;
+    'Nanos & Casting': Record<string, SkillWithIP>;
+    Exploring: Record<string, SkillWithIP>;
+    'Trade & Repair': Record<string, SkillWithIP>;
+    'Combat & Healing': Record<string, SkillWithIP>;
+    Misc: Record<string, number>; // Misc doesn't use IP tracking
   };
   
   // Equipment slots
@@ -117,7 +126,6 @@ export interface ProfileValidationResult {
 export interface ProfileStorageOptions {
   compress?: boolean;
   encrypt?: boolean;
-  backup?: boolean;
   autoSave?: boolean;
   migrationEnabled?: boolean;
 }
