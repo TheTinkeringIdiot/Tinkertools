@@ -5,7 +5,7 @@
  */
 
 import { ref, computed, watch } from 'vue'
-import { useProfileStore } from '../stores/profile'
+import { useTinkerProfilesStore } from '../stores/tinkerProfiles'
 import type { Item, TinkerProfile } from '../types/api'
 
 export interface ItemFilter {
@@ -59,7 +59,7 @@ export interface UseFiltersOptions {
 }
 
 export function useFilters(options: UseFiltersOptions = {}) {
-  const profileStore = useProfileStore()
+  const profilesStore = useTinkerProfilesStore()
   
   // ============================================================================
   // Reactive State
@@ -122,9 +122,9 @@ export function useFilters(options: UseFiltersOptions = {}) {
   )
   
   // Character-based computed properties
-  const characterLevel = computed(() => profileStore.currentCharacterLevel)
-  const characterProfession = computed(() => profileStore.currentCharacterProfession)
-  const hasCharacterProfile = computed(() => profileStore.hasCurrentProfile)
+  const characterLevel = computed(() => profilesStore.activeProfileLevel)
+  const characterProfession = computed(() => profilesStore.activeProfileProfession)
+  const hasCharacterProfile = computed(() => profilesStore.hasActiveProfile)
   
   // ============================================================================
   // Item Filtering
@@ -316,15 +316,14 @@ export function useFilters(options: UseFiltersOptions = {}) {
       filtered = filtered.filter(item => item.attack_defense !== null)
     }
     
-    if (filters.favoriteOnly && profileStore.preferences) {
-      filtered = filtered.filter(item => 
-        profileStore.preferences.favoriteItems.includes(item.id)
-      )
+    if (filters.favoriteOnly) {
+      // TODO: Add favorites to tinkerProfiles store  
+      filtered = []
     }
     
     // Character compatibility (simplified)
-    if (filters.checkCompatibility && profileStore.currentProfile) {
-      filtered = filtered.filter(item => checkItemCompatibility(item, profileStore.currentProfile!))
+    if (filters.checkCompatibility && profilesStore.activeProfile) {
+      filtered = filtered.filter(item => checkItemCompatibility(item, profilesStore.activeProfile!))
     }
     
     // Profession filter

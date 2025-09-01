@@ -6,7 +6,7 @@
 
 // Store exports
 export { useAppStore } from './app'
-export { useProfileStore } from './profile'
+export { useTinkerProfilesStore } from './tinkerProfiles'
 export { useItemsStore } from './items'
 export { useSpellsStore } from './spells'
 export { useSymbiantsStore } from './symbiants'
@@ -35,17 +35,17 @@ export async function initializeStores(): Promise<void> {
   try {
     // Initialize in order of dependencies
     const { useAppStore } = await import('./app')
-    const { useProfileStore } = await import('./profile')
+    const { useTinkerProfilesStore } = await import('./tinkerProfiles')
     const { offlineManager } = await import('../services/offline-manager')
     
     const appStore = useAppStore()
-    const profileStore = useProfileStore()
+    const profilesStore = useTinkerProfilesStore()
     
     // Initialize app store first (sets up global state)
     await appStore.initialize()
     
-    // Load profile data from LocalStorage
-    profileStore.loadFromLocalStorage()
+    // Load profile data from storage
+    await profilesStore.loadProfiles()
     
     // Initialize offline capabilities
     await offlineManager.initialize()
@@ -91,7 +91,7 @@ async function preloadCommonData(): Promise<void> {
  */
 export async function resetAllStores(): Promise<void> {
   const { useAppStore } = await import('./app')
-  const { useProfileStore } = await import('./profile')
+  const { useTinkerProfilesStore } = await import('./tinkerProfiles')
   const { useItemsStore } = await import('./items')
   const { useSpellsStore } = await import('./spells')
   const { useSymbiantsStore } = await import('./symbiants')

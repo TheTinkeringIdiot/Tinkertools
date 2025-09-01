@@ -9,7 +9,7 @@ import { useItemsStore } from '../stores/items'
 import { useSpellsStore } from '../stores/spells'
 import { useSymbiantsStore } from '../stores/symbiants'
 import { usePocketBossesStore } from '../stores/pocket-bosses'
-import { useProfileStore } from '../stores/profile'
+import { useTinkerProfilesStore } from '../stores/tinkerProfiles'
 import type { Item, Spell, Symbiant, PocketBoss } from '../types/api'
 
 export type SearchableEntity = Item | Spell | Symbiant | PocketBoss
@@ -35,7 +35,7 @@ export function useSearch(options: UseSearchOptions = {}) {
   const spellsStore = useSpellsStore()
   const symbiantsStore = useSymbiantsStore()
   const pocketBossesStore = usePocketBossesStore()
-  const profileStore = useProfileStore()
+  const profilesStore = useTinkerProfilesStore()
   
   // ============================================================================
   // Reactive State
@@ -138,7 +138,8 @@ export function useSearch(options: UseSearchOptions = {}) {
       // Save to search history
       if (options.enableHistory && searchQuery.trim()) {
         addToSearchHistory(searchQuery.trim())
-        profileStore.addRecentSearch(searchQuery.trim())
+        // TODO: Add recent searches to tinkerProfiles store
+        // profilesStore.addRecentSearch(searchQuery.trim())
       }
       
       return results.value

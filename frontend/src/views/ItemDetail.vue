@@ -569,7 +569,7 @@ Shows all item data with profile compatibility and comparison options
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useItemsStore } from '@/stores/items'
-import { useProfileStore } from '@/stores/profile'
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
 import { getItemIconUrl, isWeapon, getDisplayItemFlags, getDisplayCanFlags, getProfessionId, getBreedId, getStatId } from '@/services/game-utils'
 import { mapProfileToStats, getProfileStat } from '@/utils/profile-stats-mapper'
 import type { Item, TinkerProfile, InterpolatedItem, InterpolationInfo } from '@/types/api'
@@ -588,7 +588,7 @@ import ItemInterpolationBar from '@/components/items/ItemInterpolationBar.vue'
 const route = useRoute()
 const router = useRouter()
 const itemsStore = useItemsStore()
-const profileStore = useProfileStore()
+const profilesStore = useTinkerProfilesStore()
 
 // Props
 const props = defineProps<{
@@ -617,7 +617,7 @@ const currentQl = computed(() => {
 })
 
 // Computed
-const profile = computed(() => profileStore.currentProfile)
+const profile = computed(() => profilesStore.activeProfile)
 const showCompatibility = computed(() => !!profile.value)
 
 // Character stats for action requirements
@@ -638,7 +638,8 @@ const isModal = computed(() => {
 
 
 const isFavorite = computed(() => 
-  item.value ? profileStore.preferences.favoriteItems.includes(item.value.id) : false
+  // TODO: Add favorites to tinkerProfiles store
+  false
 )
 
 const hasSpecialEffects = computed(() => 
@@ -721,13 +722,8 @@ function goBack() {
 }
 
 function toggleFavorite() {
-  if (item.value) {
-    if (isFavorite.value) {
-      profileStore.removeFavoriteItem(item.value.id)
-    } else {
-      profileStore.addFavoriteItem(item.value.id)
-    }
-  }
+  // TODO: Add favorites to tinkerProfiles store
+  console.log('Favorite toggle not yet implemented for tinkerProfiles store')
 }
 
 function addToComparison() {
@@ -812,7 +808,11 @@ function handleInterpolationError(errorMessage: string) {
 }
 
 // Initialize
-onMounted(() => {
+onMounted(async () => {
+  // Load profiles if not already loaded
+  if (!profilesStore.hasProfiles) {
+    await profilesStore.loadProfiles()
+  }
   loadItem()
 })
 
