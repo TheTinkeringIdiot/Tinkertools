@@ -66,7 +66,6 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   function initialize(config: Partial<TinkerProfilesConfig> = {}) {
     profileManager = new TinkerProfilesManager({
       features: {
-        autoBackup: true,
         compression: false,
         migration: true,
         analytics: false

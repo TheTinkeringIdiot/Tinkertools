@@ -6,7 +6,7 @@
 
 import { ref, computed, watch, readonly, type Ref } from 'vue'
 import { useItemsStore } from '../stores/items'
-import { useProfileStore } from '../stores/profile'
+import { useTinkerProfilesStore } from '../stores/tinkerProfiles'
 import type { Item, ItemSearchQuery, ItemCompatibilityRequest, ItemCompatibilityResult } from '../types/api'
 import { apiClient } from '../services/api-client'
 
@@ -18,7 +18,7 @@ export interface UseItemsOptions {
 
 export function useItems(options: UseItemsOptions = {}) {
   const itemsStore = useItemsStore()
-  const profileStore = useProfileStore()
+  const profilesStore = useTinkerProfilesStore()
   
   // ============================================================================
   // Reactive State
@@ -63,7 +63,7 @@ export function useItems(options: UseItemsOptions = {}) {
   
   // Filter results based on current profile compatibility
   const compatibleItems = computed(() => {
-    if (!profileStore.hasCurrentProfile) return searchResults.value
+    if (!profilesStore.hasActiveProfile) return searchResults.value
     
     // This would need more complex logic based on character stats
     // For now, return all items
@@ -71,9 +71,8 @@ export function useItems(options: UseItemsOptions = {}) {
   })
   
   const favoriteResults = computed(() => 
-    searchResults.value.filter(item => 
-      profileStore.preferences.favoriteItems.includes(item.id)
-    )
+    // TODO: Add favorites to tinkerProfiles store
+    []
   )
   
   // ============================================================================
@@ -191,15 +190,13 @@ export function useItems(options: UseItemsOptions = {}) {
   }
   
   function toggleFavorite(itemId: number) {
-    if (profileStore.preferences.favoriteItems.includes(itemId)) {
-      profileStore.removeFavoriteItem(itemId)
-    } else {
-      profileStore.addFavoriteItem(itemId)
-    }
+    // TODO: Add favorites to tinkerProfiles store
+    console.log('Favorite toggle not yet implemented for tinkerProfiles store')
   }
   
   function isFavorite(itemId: number): boolean {
-    return profileStore.preferences.favoriteItems.includes(itemId)
+    // TODO: Add favorites to tinkerProfiles store
+    return false
   }
   
   // ============================================================================
@@ -207,13 +204,13 @@ export function useItems(options: UseItemsOptions = {}) {
   // ============================================================================
   
   async function checkItemCompatibility(itemIds: number[]): Promise<ItemCompatibilityResult[]> {
-    if (!profileStore.currentProfile) {
+    if (!profilesStore.activeProfile) {
       return []
     }
     
     try {
       const request: ItemCompatibilityRequest = {
-        profile: profileStore.currentProfile,
+        profile: profilesStore.activeProfile,
         item_ids: itemIds,
         check_type: 'equip'
       }
