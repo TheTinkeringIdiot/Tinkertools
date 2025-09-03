@@ -12,6 +12,17 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/TinkerItems.vue')
   },
   {
+    path: '/profiles',
+    name: 'TinkerProfiles',
+    component: () => import('@/views/TinkerProfiles.vue')
+  },
+  {
+    path: '/profiles/:profileId',
+    name: 'TinkerProfileDetail',
+    component: () => import('@/views/TinkerProfileDetail.vue'),
+    props: true
+  },
+  {
     path: '/items/:aoid',
     name: 'ItemDetail',
     component: () => import('@/views/ItemDetail.vue'),

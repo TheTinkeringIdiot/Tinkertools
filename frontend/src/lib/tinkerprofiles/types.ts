@@ -13,6 +13,23 @@ export interface SkillWithIP {
   value: number;
   ipSpent: number;
   pointFromIp: number;
+  trickleDown?: number; // Bonus from abilities
+  cap?: number; // Effective skill cap
+}
+
+/** Comprehensive IP tracking information */
+export interface IPTracker {
+  totalAvailable: number;
+  totalUsed: number;
+  remaining: number;
+  abilityIP: number;
+  skillIP: number;
+  efficiency: number; // Percentage of IP used
+  lastCalculated: string; // Timestamp of last calculation
+  breakdown: {
+    abilities: Record<string, number>; // IP spent per ability
+    skillCategories: Record<string, number>; // IP spent per skill category
+  };
 }
 
 /** Comprehensive profile structure following legacy TinkerProfiles format */
@@ -35,6 +52,9 @@ export interface TinkerProfile {
     MaxHealth: number;
     MaxNano: number;
   };
+
+  // IP tracking (new)
+  IPTracker?: IPTracker;
   
   // Complete skills structure with IP tracking (except Misc)
   Skills: {
