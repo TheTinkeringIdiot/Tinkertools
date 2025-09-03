@@ -483,6 +483,85 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     
     return await createProfile(duplicated.Character.Name, duplicated);
   }
+
+  /**
+   * Modify a specific skill value
+   */
+  async function modifySkill(profileId: string, category: string, skillName: string, newValue: number): Promise<void> {
+    if (!profileManager) {
+      throw new Error('Profile manager not initialized');
+    }
+
+    const profile = await loadProfile(profileId);
+    if (!profile) {
+      throw new Error('Profile not found');
+    }
+
+    // Update the skill value
+    if (profile.Skills && profile.Skills[category as keyof typeof profile.Skills]) {
+      const skillCategory = profile.Skills[category as keyof typeof profile.Skills];
+      if (typeof skillCategory === 'object' && skillCategory !== null && skillName in skillCategory) {
+        if (category === 'Misc') {
+          // Misc skills don't use IP tracking
+          (skillCategory as any)[skillName] = newValue;
+        } else {
+          // Other skills use SkillWithIP structure
+          const skill = (skillCategory as any)[skillName];
+          if (skill && typeof skill === 'object') {
+            skill.value = newValue;
+            // IP cost will be recalculated when IP tracker is refreshed
+          }
+        }
+      }
+    }
+
+    await updateProfile(profileId, profile);
+  }
+
+  /**
+   * Modify a specific ability value
+   */
+  async function modifyAbility(profileId: string, abilityName: string, newValue: number): Promise<void> {
+    if (!profileManager) {
+      throw new Error('Profile manager not initialized');
+    }
+
+    const profile = await loadProfile(profileId);
+    if (!profile) {
+      throw new Error('Profile not found');
+    }
+
+    // Update the ability value
+    if (profile.Skills?.Attributes && abilityName in profile.Skills.Attributes) {
+      const ability = profile.Skills.Attributes[abilityName as keyof typeof profile.Skills.Attributes];
+      if (ability && typeof ability === 'object') {
+        ability.value = newValue;
+        // IP cost will be recalculated when IP tracker is refreshed
+      }
+    }
+
+    await updateProfile(profileId, profile);
+  }
+
+  /**
+   * Recalculate IP tracking for a profile
+   */
+  async function recalculateProfileIP(profileId: string): Promise<void> {
+    if (!profileManager) {
+      throw new Error('Profile manager not initialized');
+    }
+
+    const profile = await loadProfile(profileId);
+    if (!profile) {
+      throw new Error('Profile not found');
+    }
+
+    // Use the IP integrator to recalculate IP tracking
+    const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
+    const updatedProfile = await updateProfileWithIPTracking(profile);
+    
+    await updateProfile(profileId, updatedProfile);
+  }
   
   // ============================================================================
   // Auto-initialization
@@ -534,6 +613,11 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     // Backward compatibility
     getProfileById,
     duplicateProfile,
+    
+    // Profile modification methods
+    modifySkill,
+    modifyAbility,
+    recalculateProfileIP,
     
     // Direct access to manager (for advanced use cases)
     getManager: () => profileManager

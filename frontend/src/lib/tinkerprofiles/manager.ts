@@ -16,13 +16,15 @@ import type {
   ProfileEvents,
   TinkerProfilesConfig,
   ProfileSearchFilters,
-  ProfileSortOptions
+  ProfileSortOptions,
+  IPTracker
 } from './types';
 
 import { ProfileStorage } from './storage';
 import { ProfileValidator } from './validator';
 import { ProfileTransformer } from './transformer';
 import { createDefaultProfile, createDefaultNanoProfile } from './constants';
+import { ipIntegrator } from './ip-integrator';
 
 // Simple event emitter for profile events
 class ProfileEventEmitter {
@@ -163,8 +165,15 @@ export class TinkerProfilesManager {
       const profile = await this.storage.loadProfile(profileId);
       
       if (profile) {
+        // Ensure IP tracking is initialized
+        let updatedProfile = profile;
+        if (!profile.IPTracker) {
+          updatedProfile = ipIntegrator.recalculateProfileIP(profile);
+          await this.storage.saveProfile(updatedProfile); // Save the updated profile
+        }
+        
         // Validate and potentially auto-correct
-        const validation = this.validator.validateProfile(profile);
+        const validation = this.validator.validateProfile(updatedProfile);
         
         if (!validation.valid && this.config.validation.strictMode) {
           throw new Error(`Profile validation failed: ${validation.errors.join(', ')}`);
@@ -172,15 +181,16 @@ export class TinkerProfilesManager {
         
         if (this.config.validation.autoCorrect && validation.warnings.length > 0) {
           // Apply auto-corrections here if needed
-          profile.updated = new Date().toISOString();
-          await this.storage.saveProfile(profile);
+          updatedProfile.updated = new Date().toISOString();
+          await this.storage.saveProfile(updatedProfile);
         }
         
         // Update cache
-        this.profilesCache.set(profileId, profile);
+        this.profilesCache.set(profileId, updatedProfile);
+        return updatedProfile;
       }
       
-      return profile;
+      return null;
       
     } catch (error) {
       if (this.config.events.enabled) {
@@ -606,5 +616,132 @@ export class TinkerProfilesManager {
     if (updates.storage) {
       this.storage = new ProfileStorage(this.config.storage);
     }
+  }
+
+  // ============================================================================
+  // IP Management Methods
+  // ============================================================================
+
+  /**
+   * Get IP analysis for a profile
+   */
+  async getProfileIPAnalysis(profileId: string): Promise<IPTracker | null> {
+    const profile = await this.loadProfile(profileId);
+    if (!profile) return null;
+    
+    return profile.IPTracker || ipIntegrator.calculateProfileIP(profile);
+  }
+
+  /**
+   * Recalculate IP information for a profile
+   */
+  async recalculateProfileIP(profileId: string): Promise<void> {
+    const profile = await this.loadProfile(profileId);
+    if (!profile) {
+      throw new Error('Profile not found');
+    }
+
+    const updatedProfile = ipIntegrator.recalculateProfileIP(profile);
+    await this.updateProfile(profileId, updatedProfile);
+  }
+
+  /**
+   * Validate profile IP constraints
+   */
+  async validateProfileIP(profileId: string): Promise<{
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+  }> {
+    const profile = await this.loadProfile(profileId);
+    if (!profile) {
+      throw new Error('Profile not found');
+    }
+
+    const validation = ipIntegrator.validateProfileIP(profile);
+    return {
+      valid: validation.valid,
+      errors: validation.errors,
+      warnings: validation.warnings
+    };
+  }
+
+  /**
+   * Safely modify a skill value with IP validation
+   */
+  async modifySkill(
+    profileId: string,
+    category: string,
+    skillName: string,
+    newValue: number
+  ): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    const profile = await this.loadProfile(profileId);
+    if (!profile) {
+      throw new Error('Profile not found');
+    }
+
+    const result = ipIntegrator.modifySkill(profile, category, skillName, newValue);
+    
+    if (result.success && result.updatedProfile) {
+      await this.updateProfile(profileId, result.updatedProfile);
+    }
+
+    return {
+      success: result.success,
+      error: result.error
+    };
+  }
+
+  /**
+   * Safely modify an ability value with IP validation
+   */
+  async modifyAbility(
+    profileId: string,
+    abilityName: string,
+    newValue: number
+  ): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    const profile = await this.loadProfile(profileId);
+    if (!profile) {
+      throw new Error('Profile not found');
+    }
+
+    const result = ipIntegrator.modifyAbility(profile, abilityName, newValue);
+    
+    if (result.success && result.updatedProfile) {
+      await this.updateProfile(profileId, result.updatedProfile);
+    }
+
+    return {
+      success: result.success,
+      error: result.error
+    };
+  }
+
+  /**
+   * Get available IP for spending
+   */
+  async getAvailableIP(profileId: string): Promise<number> {
+    const profile = await this.loadProfile(profileId);
+    if (!profile) return 0;
+    
+    const ipInfo = profile.IPTracker || ipIntegrator.calculateProfileIP(profile);
+    return ipInfo.remaining;
+  }
+
+  /**
+   * Get IP efficiency percentage
+   */
+  async getIPEfficiency(profileId: string): Promise<number> {
+    const profile = await this.loadProfile(profileId);
+    if (!profile) return 0;
+    
+    const ipInfo = profile.IPTracker || ipIntegrator.calculateProfileIP(profile);
+    return ipInfo.efficiency;
   }
 }

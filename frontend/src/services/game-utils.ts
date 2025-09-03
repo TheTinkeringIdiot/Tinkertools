@@ -1366,6 +1366,276 @@ export function getFlagNameFromValue(statId: number, bitValue: number): string {
 }
 
 // ============================================================================
+// IP Calculation Integration
+// ============================================================================
+
+import {
+  calcIP,
+  calcTitleLevel,
+  calcAbilityCap,
+  calcLevelCap,
+  calcSkillAbilityCap,
+  calcAbilityCost,
+  calcSkillCost,
+  calcTotalAbilityCost,
+  calcTotalSkillCost,
+  calcTrickleDown,
+  calcAllTrickleDown,
+  calcHP,
+  calcNP,
+  calcSkillCap,
+  calcIPAnalysis,
+  validateCharacterBuild,
+  getSkillCostFactor,
+  getAbilityCostFactor,
+  getBreedInitValue,
+  PROFESSION_NAMES,
+  BREED_NAMES,
+  ABILITY_NAMES,
+  SKILL_NAMES,
+  type CharacterStats,
+  type IPCalculationResult,
+  type SkillCap,
+  type TrickleDownResult
+} from '../lib/tinkerprofiles/ip-calculator';
+
+/**
+ * Calculate total IP available for a character level
+ */
+export function calculateTotalIP(level: number): number {
+  return calcIP(level);
+}
+
+/**
+ * Calculate character's title level
+ */
+export function calculateTitleLevel(level: number): number {
+  return calcTitleLevel(level);
+}
+
+/**
+ * Calculate ability cap for character
+ */
+export function calculateAbilityCap(level: number, breed: number, abilityId: number): number {
+  return calcAbilityCap(level, breed, abilityId);
+}
+
+/**
+ * Calculate skill cap based on level and profession
+ */
+export function calculateLevelSkillCap(level: number, profession: number, skillId: number): number {
+  return calcLevelCap(level, profession, skillId);
+}
+
+/**
+ * Calculate IP cost for next ability point
+ */
+export function calculateAbilityIPCost(currentValue: number, breed: number, abilityId: number): number {
+  return calcAbilityCost(currentValue, breed, abilityId);
+}
+
+/**
+ * Calculate IP cost for next skill point
+ */
+export function calculateSkillIPCost(currentValue: number, profession: number, skillId: number): number {
+  return calcSkillCost(currentValue, profession, skillId);
+}
+
+/**
+ * Calculate total IP spent on an ability
+ */
+export function calculateTotalAbilityIP(improvements: number, breed: number, abilityId: number): number {
+  return calcTotalAbilityCost(improvements, breed, abilityId);
+}
+
+/**
+ * Calculate total IP spent on a skill
+ */
+export function calculateTotalSkillIP(improvements: number, profession: number, skillId: number): number {
+  return calcTotalSkillCost(improvements, profession, skillId);
+}
+
+/**
+ * Calculate trickle-down bonus for a skill
+ */
+export function calculateTrickleDown(abilities: number[], skillId: number): number {
+  return calcTrickleDown(abilities, skillId);
+}
+
+/**
+ * Calculate all trickle-down bonuses for a character
+ */
+export function calculateAllTrickleDown(abilities: number[]): TrickleDownResult {
+  return calcAllTrickleDown(abilities);
+}
+
+/**
+ * Calculate character's health
+ */
+export function calculateHealth(bodyDev: number, level: number, breed: number, profession: number): number {
+  return calcHP(bodyDev, level, breed, profession);
+}
+
+/**
+ * Calculate character's nano pool
+ */
+export function calculateNanoPool(nanoPool: number, level: number, breed: number, profession: number): number {
+  return calcNP(nanoPool, level, breed, profession);
+}
+
+/**
+ * Calculate comprehensive skill cap information
+ */
+export function calculateSkillCaps(level: number, profession: number, skillId: number, abilities: number[]): SkillCap {
+  return calcSkillCap(level, profession, skillId, abilities);
+}
+
+/**
+ * Perform comprehensive IP analysis for a character
+ */
+export function performIPAnalysis(stats: CharacterStats): IPCalculationResult {
+  return calcIPAnalysis(stats);
+}
+
+/**
+ * Validate character build against all constraints
+ */
+export function validateCharacter(stats: CharacterStats): {
+  valid: boolean;
+  errors: string[];
+  ipAnalysis: IPCalculationResult;
+} {
+  return validateCharacterBuild(stats);
+}
+
+/**
+ * Get cost factor for a profession/skill combination
+ */
+export function getSkillCost(profession: number, skillId: number): number {
+  return getSkillCostFactor(profession, skillId);
+}
+
+/**
+ * Get cost factor for a breed/ability combination
+ */
+export function getAbilityCost(breed: number, abilityId: number): number {
+  return getAbilityCostFactor(breed, abilityId);
+}
+
+/**
+ * Get breed starting value for an ability
+ */
+export function getBreedStartingValue(breed: number, abilityId: number): number {
+  return getBreedInitValue(breed, abilityId);
+}
+
+/**
+ * Format IP value for display
+ */
+export function formatIPValue(ipValue: number): string {
+  return ipValue.toLocaleString();
+}
+
+/**
+ * Format skill/ability value for display
+ */
+export function formatSkillValue(baseValue: number, improvements: number, trickle: number = 0): string {
+  const total = baseValue + improvements + trickle;
+  if (trickle > 0) {
+    return `${total} (${baseValue + improvements} + ${trickle})`;
+  }
+  return total.toString();
+}
+
+/**
+ * Get profession specialization for skills
+ */
+export function getProfessionSpecialization(profession: number): {
+  excellent: number[]; // Skills with cost factor <= 1.2
+  good: number[];      // Skills with cost factor <= 2.0
+  average: number[];   // Skills with cost factor <= 3.0
+  poor: number[];      // Skills with cost factor > 3.0
+} {
+  const specialization = {
+    excellent: [] as number[],
+    good: [] as number[],
+    average: [] as number[],
+    poor: [] as number[]
+  };
+
+  for (let skillId = 0; skillId < 97; skillId++) { // First 97 skills
+    const cost = getSkillCostFactor(profession, skillId);
+    if (cost <= 1.2) {
+      specialization.excellent.push(skillId);
+    } else if (cost <= 2.0) {
+      specialization.good.push(skillId);
+    } else if (cost <= 3.0) {
+      specialization.average.push(skillId);
+    } else {
+      specialization.poor.push(skillId);
+    }
+  }
+
+  return specialization;
+}
+
+/**
+ * Get breed specialization for abilities
+ */
+export function getBreedSpecialization(breed: number): {
+  excellent: number[]; // Abilities with cost factor = 1
+  average: number[];   // Abilities with cost factor = 2  
+  poor: number[];      // Abilities with cost factor = 3
+} {
+  const specialization = {
+    excellent: [] as number[],
+    average: [] as number[],
+    poor: [] as number[]
+  };
+
+  for (let abilityId = 0; abilityId < 6; abilityId++) {
+    const cost = getAbilityCostFactor(breed, abilityId);
+    if (cost === 1) {
+      specialization.excellent.push(abilityId);
+    } else if (cost === 2) {
+      specialization.average.push(abilityId);
+    } else {
+      specialization.poor.push(abilityId);
+    }
+  }
+
+  return specialization;
+}
+
+/**
+ * Get recommended stat distribution for a breed/profession combination
+ */
+export function getRecommendedStatDistribution(
+  breed: number,
+  profession: number,
+  level: number
+): {
+  primary: number[];    // Most important abilities
+  secondary: number[];  // Somewhat important abilities  
+  tertiary: number[];   // Less important abilities
+} {
+  const breedSpec = getBreedSpecialization(breed);
+  const profSpec = getProfessionSpecialization(profession);
+
+  // This is a simplified recommendation system
+  // In practice, this would use more sophisticated analysis
+  const recommendation = {
+    primary: [...breedSpec.excellent],
+    secondary: [...breedSpec.average],
+    tertiary: [...breedSpec.poor]
+  };
+
+  // Adjust based on profession needs
+  // This would need more detailed profession analysis
+  return recommendation;
+}
+
+// ============================================================================
 // Export all functions as a single object for easy importing
 // ============================================================================
 
@@ -1481,7 +1751,32 @@ export const gameUtils = {
   getNanoskillRequirements,
   getPrimarySource,
   getNanoSpecialization,
-  getNanoExpansion
+  getNanoExpansion,
+
+  // IP Calculation functions
+  calculateTotalIP,
+  calculateTitleLevel,
+  calculateAbilityCap,
+  calculateLevelSkillCap,
+  calculateAbilityIPCost,
+  calculateSkillIPCost,
+  calculateTotalAbilityIP,
+  calculateTotalSkillIP,
+  calculateTrickleDown,
+  calculateAllTrickleDown,
+  calculateHealth,
+  calculateNanoPool,
+  calculateSkillCaps,
+  performIPAnalysis,
+  validateCharacter,
+  getSkillCost,
+  getAbilityCost,
+  getBreedStartingValue,
+  formatIPValue,
+  formatSkillValue,
+  getProfessionSpecialization,
+  getBreedSpecialization,
+  getRecommendedStatDistribution
 };
 
 // ============================================================================
