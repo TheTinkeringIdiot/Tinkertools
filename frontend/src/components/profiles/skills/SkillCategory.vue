@@ -49,6 +49,7 @@ Shows skills in a category with IP cost calculations and interactive value adjus
               :is-ability="isAbilities"
               :is-read-only="isReadOnly"
               :category="title"
+              :breed="breed"
               @skill-changed="handleSkillChanged"
               @ability-changed="handleAbilityChanged"
             />
@@ -77,6 +78,7 @@ const props = defineProps<{
   skills: Record<string, any>;
   isAbilities?: boolean;
   isReadOnly?: boolean;
+  breed?: string;
 }>();
 
 // Emits

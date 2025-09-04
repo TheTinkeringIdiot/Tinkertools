@@ -38,7 +38,7 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
       <!-- Slider takes up available space but leaves room for other controls -->
       <Slider
         v-model="sliderValue"
-        :min="0"
+        :min="minValue"
         :max="maxValue"
         :step="1"
         class="flex-1 min-w-[100px] max-w-none"
@@ -48,7 +48,7 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
       <!-- Input Number for precise entry with proper width -->
       <InputNumber
         v-model="sliderValue"
-        :min="0"
+        :min="minValue"
         :max="maxValue"
         :step="1"
         size="small"
@@ -103,7 +103,8 @@ import { ref, computed, watch } from 'vue';
 import InputNumber from 'primevue/inputnumber';
 import Slider from 'primevue/slider';
 import Button from 'primevue/button';
-import { calcIP } from '@/lib/tinkerprofiles/ip-calculator';
+import { calcIP, getBreedInitValue } from '@/lib/tinkerprofiles/ip-calculator';
+import { getBreedId } from '@/services/game-utils';
 
 // Props
 const props = defineProps<{
@@ -112,6 +113,7 @@ const props = defineProps<{
   isAbility?: boolean;
   isReadOnly?: boolean;
   category: string;
+  breed?: string;
 }>();
 
 // Emits
@@ -120,10 +122,34 @@ const emit = defineEmits<{
   'ability-changed': [abilityName: string, newValue: number];
 }>();
 
+// Helper functions
+const getAbilityIndex = (abilityName: string): number => {
+  const abilityMap: Record<string, number> = {
+    'Strength': 0,
+    'Agility': 1,
+    'Stamina': 2,
+    'Intelligence': 3,
+    'Sense': 4,
+    'Psychic': 5
+  };
+  return abilityMap[abilityName] ?? -1;
+};
+
 // State
 const sliderValue = ref(props.skillData?.value || 0);
 
 // Computed
+const minValue = computed(() => {
+  if (props.isAbility && props.breed) {
+    const breedId = getBreedId(props.breed) || 0;
+    const abilityIndex = getAbilityIndex(props.skillName);
+    if (abilityIndex !== -1) {
+      return getBreedInitValue(breedId, abilityIndex);
+    }
+  }
+  return 1; // Base skill value for regular skills
+});
+
 const displayValue = computed(() => {
   const baseValue = sliderValue.value || 0;
   const trickleDown = props.skillData?.trickleDown || 0;
@@ -190,7 +216,7 @@ const capInfo = computed(() => {
 function onValueChanged(newValue: number | null) {
   if (newValue === null || newValue === undefined) return;
   
-  const clampedValue = Math.max(0, Math.min(newValue, maxValue.value));
+  const clampedValue = Math.max(minValue.value, Math.min(newValue, maxValue.value));
   sliderValue.value = clampedValue;
   
   if (props.isAbility) {
@@ -207,9 +233,17 @@ function setToMax() {
 // Watchers
 watch(() => props.skillData?.value, (newValue) => {
   if (newValue !== undefined && newValue !== sliderValue.value) {
-    sliderValue.value = newValue;
+    sliderValue.value = Math.max(newValue, minValue.value);
   }
 }, { immediate: true });
+
+// Watch minValue changes to ensure current value respects minimum
+watch(minValue, (newMinValue) => {
+  if (sliderValue.value < newMinValue) {
+    sliderValue.value = newMinValue;
+    onValueChanged(newMinValue);
+  }
+});
 </script>
 
 <style scoped>

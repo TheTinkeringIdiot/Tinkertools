@@ -30,8 +30,36 @@ export const PROFESSION_NAMES = [
   'Shade', 'Soldier', 'Trader'
 ];
 
+// Mapping from game-data profession IDs to IP calculator array indices
+// game-data uses 1-based IDs, IP calculator arrays use 0-based indices in specific order
+const PROFESSION_ID_TO_ARRAY_INDEX: Record<number, number> = {
+  0: -1,  // Unknown - invalid
+  1: 12,  // Soldier → 'Soldier' at index 12
+  2: 8,   // MartialArtist → 'Martial Artist' at index 8
+  3: 5,   // Engineer → 'Engineer' at index 5
+  4: 6,   // Fixer → 'Fixer' at index 6
+  5: 1,   // Agent → 'Agent' at index 1
+  6: 0,   // Adventurer → 'Adventurer' at index 0
+  7: 13,  // Trader → 'Trader' at index 13
+  8: 2,   // Bureaucrat → 'Bureaucrat' at index 2
+  9: 4,   // Enforcer → 'Enforcer' at index 4
+  10: 3,  // Doctor → 'Doctor' at index 3
+  11: 10, // NanoTechnician → 'Nano-Technician' at index 10
+  12: 9,  // MetaPhysicist → 'Meta-Physicist' at index 9
+  13: -1, // Monster - not in IP calculator
+  14: 7   // Keeper → 'Keeper' at index 7
+};
+
+/**
+ * Convert game-data profession ID to IP calculator array index
+ */
+function getProfessionArrayIndex(professionId: number): number {
+  const index = PROFESSION_ID_TO_ARRAY_INDEX[professionId];
+  return index !== undefined && index >= 0 ? index : 0; // Default to Adventurer if invalid
+}
+
 // Breed names
-export const BREED_NAMES = ['Solitus', 'Opifex', 'Nanomage', 'Atrox'];
+export const BREED_NAMES = ['Unknown', 'Solitus', 'Opifex', 'Nanomage', 'Atrox']; // Index matches game-data BREED constant
 
 // Ability names
 export const ABILITY_NAMES = ['Strength', 'Agility', 'Stamina', 'Intelligence', 'Sense', 'Psychic'];
@@ -142,47 +170,51 @@ const COST_TO_RATE: number[][] = [
 
 // Breed ability caps (pre-201) [breed][ability]
 const BREED_CAPS: number[][] = [
-  [472, 480, 480, 480, 480, 480], // Solitus
-  [464, 544, 480, 464, 512, 448], // Opifex
-  [464, 464, 448, 512, 480, 512], // Nanomage
-  [512, 480, 512, 400, 400, 400]  // Atrox
+  [0, 0, 0, 0, 0, 0],              // Index 0 - Unused (Unknown breed)
+  [472, 480, 480, 480, 480, 480], // Index 1 - Solitus
+  [464, 544, 480, 464, 512, 448], // Index 2 - Opifex
+  [464, 464, 448, 512, 480, 512], // Index 3 - Nanomage
+  [512, 480, 512, 400, 400, 400]  // Index 4 - Atrox
 ];
 
 // Breed ability increase per level (post-201) [breed][ability]
 const BREED_CAPS2: number[][] = [
-  [15, 15, 15, 15, 15, 15], // Solitus
-  [15, 20, 10, 15, 20, 15], // Opifex
-  [10, 10, 15, 20, 15, 20], // Nanomage
-  [20, 15, 20, 10, 10, 10]  // Atrox
+  [0, 0, 0, 0, 0, 0],       // Index 0 - Unused (Unknown breed)
+  [15, 15, 15, 15, 15, 15], // Index 1 - Solitus
+  [15, 20, 10, 15, 20, 15], // Index 2 - Opifex
+  [10, 10, 15, 20, 15, 20], // Index 3 - Nanomage
+  [20, 15, 20, 10, 10, 10]  // Index 4 - Atrox
 ];
 
 // Initial ability values by breed [breed][ability]
 const BREED_INIT: number[][] = [
-  [6, 6, 6, 6, 6, 6],    // Solitus
-  [3, 15, 6, 6, 10, 3],  // Opifex
-  [3, 3, 3, 15, 6, 10],  // Nanomage
-  [15, 6, 10, 3, 3, 3]   // Atrox
+  [0, 0, 0, 0, 0, 0],    // Index 0 - Unused (Unknown breed)
+  [6, 6, 6, 6, 6, 6],    // Index 1 - Solitus
+  [3, 15, 6, 6, 10, 3],  // Index 2 - Opifex
+  [3, 3, 3, 15, 6, 10],  // Index 3 - Nanomage
+  [15, 6, 10, 3, 3, 3]   // Index 4 - Atrox
 ];
 
 // Ability cost factors by breed [breed][ability]
 const BREED_COSTS: number[][] = [
-  [2, 2, 2, 2, 2, 2], // Solitus
-  [2, 1, 3, 2, 1, 2], // Opifex
-  [3, 3, 2, 1, 2, 1], // Nanomage
-  [1, 2, 1, 3, 3, 3]  // Atrox
+  [0, 0, 0, 0, 0, 0], // Index 0 - Unused (Unknown breed)
+  [2, 2, 2, 2, 2, 2], // Index 1 - Solitus
+  [2, 1, 3, 2, 1, 2], // Index 2 - Opifex
+  [3, 3, 2, 1, 2, 1], // Index 3 - Nanomage
+  [1, 2, 1, 3, 3, 3]  // Index 4 - Atrox
 ];
 
 // Base HP/NP values by breed
-const BREED_BASE_HP = [10, 15, 10, 25]; // Solitus, Opifex, Nanomage, Atrox
-const BREED_BASE_NP = [10, 10, 15, 8];
+const BREED_BASE_HP = [0, 10, 15, 10, 25]; // Index 0 unused, 1: Solitus, 2: Opifex, 3: Nanomage, 4: Atrox
+const BREED_BASE_NP = [0, 10, 10, 15, 8];
 
 // HP/NP factors by breed  
-const BREED_BODY_FAC = [3, 3, 2, 4];
-const BREED_NANO_FAC = [3, 3, 4, 2];
+const BREED_BODY_FAC = [0, 3, 3, 2, 4];
+const BREED_NANO_FAC = [0, 3, 3, 4, 2];
 
 // HP/NP level modifiers by breed
-const BREED_HP = [0, -1, -1, 0];
-const BREED_NP = [0, -1, 1, -2];
+const BREED_HP = [0, 0, -1, -1, 0];
+const BREED_NP = [0, 0, -1, 1, -2];
 
 // Profession HP per level by title level [tl][profession]
 const PROF_HP: number[][] = [
@@ -316,7 +348,8 @@ export function calcSkillCost(currentValue: number, profession: number, skillId:
   if (!SKILL_COSTS[skillId]) {
     return currentValue * 1.0; // Default cost if skill not found
   }
-  return currentValue * SKILL_COSTS[skillId][profession];
+  const professionIndex = getProfessionArrayIndex(profession);
+  return currentValue * SKILL_COSTS[skillId][professionIndex];
 }
 
 /**
@@ -338,6 +371,17 @@ export function calcTotalSkillCost(improvements: number, profession: number, ski
 export function calcAbilityCap(level: number, breed: number, abilityId: number): number {
   let abilityMax: number;
   
+  // Debug logging for Strength (abilityId 0)
+  if (abilityId === 0) {
+    console.log(`[DEBUG] calcAbilityCap called:`, {
+      level,
+      breed,
+      abilityId,
+      breedInit: BREED_INIT[breed][abilityId],
+      formula: `(${level} * 3) + ${BREED_INIT[breed][abilityId]} = ${(level * 3) + BREED_INIT[breed][abilityId]}`
+    });
+  }
+  
   if (level < 201) {
     abilityMax = (level * 3) + BREED_INIT[breed][abilityId];
     abilityMax = Math.min(abilityMax, BREED_CAPS[breed][abilityId]);
@@ -345,7 +389,6 @@ export function calcAbilityCap(level: number, breed: number, abilityId: number):
     abilityMax = BREED_CAPS[breed][abilityId] + (level - 200) * BREED_CAPS2[breed][abilityId];
   }
   
-  abilityMax = abilityMax - BREED_INIT[breed][abilityId];
   return abilityMax;
 }
 
@@ -358,7 +401,8 @@ export function calcLevelCap(level: number, profession: number, skillId: number)
   }
   
   const tl = calcTitleLevel(level);
-  const costFac = SKILL_COSTS[skillId][profession];
+  const professionIndex = getProfessionArrayIndex(profession);
+  const costFac = SKILL_COSTS[skillId][professionIndex];
   const costIndex = Math.min(Math.floor(costFac * 10) - 10, COST_TO_RATE.length - 1);
   
   if (costIndex < 0 || costIndex >= COST_TO_RATE.length) {
@@ -438,7 +482,8 @@ export function calcHP(bodyDev: number, level: number, breed: number, profession
   let tl = calcTitleLevel(level);
   tl = tl === 7 ? 6 : tl; // Cap at TL6 for HP calculation
   
-  const levelHP = (PROF_HP[tl - 1][profession] + BREED_HP[breed]) * level;
+  const professionIndex = getProfessionArrayIndex(profession);
+  const levelHP = (PROF_HP[tl - 1][professionIndex] + BREED_HP[breed]) * level;
   return BREED_BASE_HP[breed] + (bodyDev * BREED_BODY_FAC[breed]) + levelHP;
 }
 
@@ -449,7 +494,8 @@ export function calcNP(nanoPool: number, level: number, breed: number, professio
   let tl = calcTitleLevel(level);
   tl = tl === 7 ? 6 : tl; // Cap at TL6 for NP calculation
   
-  const levelNP = (PROF_NP[tl - 1][profession] + BREED_NP[breed]) * level;
+  const professionIndex = getProfessionArrayIndex(profession);
+  const levelNP = (PROF_NP[tl - 1][professionIndex] + BREED_NP[breed]) * level;
   return BREED_BASE_NP[breed] + (nanoPool * BREED_NANO_FAC[breed]) + levelNP;
 }
 
@@ -547,10 +593,11 @@ export function validateCharacterBuild(stats: CharacterStats): {
  * Get skill cost factor for a profession and skill
  */
 export function getSkillCostFactor(profession: number, skillId: number): number {
-  if (!SKILL_COSTS[skillId] || profession < 0 || profession >= PROFESSION_NAMES.length) {
+  if (!SKILL_COSTS[skillId]) {
     return 1.0;
   }
-  return SKILL_COSTS[skillId][profession];
+  const professionIndex = getProfessionArrayIndex(profession);
+  return SKILL_COSTS[skillId][professionIndex];
 }
 
 /**
@@ -573,18 +620,9 @@ export function getBreedInitValue(breed: number, abilityId: number): number {
   return BREED_INIT[breed][abilityId];
 }
 
-/**
- * Get breed ID from breed name
- */
-export function getBreedId(breedName: string): number | null {
-  const index = BREED_NAMES.findIndex(name => name.toLowerCase() === breedName.toLowerCase());
-  return index >= 0 ? index : null;
-}
+// getBreedId function removed - use the one from game-utils.ts instead
 
 /**
  * Get profession ID from profession name
  */
-export function getProfessionId(professionName: string): number | null {
-  const index = PROFESSION_NAMES.findIndex(name => name.toLowerCase() === professionName.toLowerCase());
-  return index >= 0 ? index : null;
-}
+// getProfessionId function removed - use the one from game-utils.ts instead

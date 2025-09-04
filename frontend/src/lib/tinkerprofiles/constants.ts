@@ -5,6 +5,8 @@
  */
 
 import type { TinkerProfile, NanoCompatibleProfile } from './types';
+import { getBreedInitValue } from './ip-calculator';
+import { getBreedId } from '../../services/game-utils';
 
 // ============================================================================
 // Game Constants
@@ -58,16 +60,22 @@ export const ACCOUNT_TYPES = [
 // Default Skills Structure
 // ============================================================================
 
-export const DEFAULT_SKILLS = {
-  Attributes: {
-    Intelligence: { value: 10, ipSpent: 0, pointFromIp: 0 },
-    Psychic: { value: 10, ipSpent: 0, pointFromIp: 0 },
-    Sense: { value: 10, ipSpent: 0, pointFromIp: 0 },
-    Stamina: { value: 10, ipSpent: 0, pointFromIp: 0 },
-    Strength: { value: 10, ipSpent: 0, pointFromIp: 0 },
-    Agility: { value: 10, ipSpent: 0, pointFromIp: 0 }
-  },
-  'Body & Defense': {
+/**
+ * Get default skills structure for a specific breed
+ */
+export function getDefaultSkillsForBreed(breed: string) {
+  const breedId = getBreedId(breed) || 0; // Default to Solitus if breed not found
+  
+  return {
+    Attributes: {
+      Strength: { value: getBreedInitValue(breedId, 0), ipSpent: 0, pointFromIp: 0 },
+      Agility: { value: getBreedInitValue(breedId, 1), ipSpent: 0, pointFromIp: 0 },
+      Stamina: { value: getBreedInitValue(breedId, 2), ipSpent: 0, pointFromIp: 0 },
+      Intelligence: { value: getBreedInitValue(breedId, 3), ipSpent: 0, pointFromIp: 0 },
+      Sense: { value: getBreedInitValue(breedId, 4), ipSpent: 0, pointFromIp: 0 },
+      Psychic: { value: getBreedInitValue(breedId, 5), ipSpent: 0, pointFromIp: 0 }
+    },
+    'Body & Defense': {
     'Nano Pool': { value: 1, ipSpent: 0, pointFromIp: 0 },
     'Nano Resist': { value: 1, ipSpent: 0, pointFromIp: 0 },
     'Body Dev.': { value: 1, ipSpent: 0, pointFromIp: 0 },
@@ -194,9 +202,13 @@ export const DEFAULT_SKILLS = {
     'ShieldPoisonAC': 0,
     'Direct Nano Damage Efficiency': 0,
     'Add. Nano Dam.': 0,
-    'Scale': 1
-  }
-} as const;
+      'Scale': 1
+    }
+  };
+}
+
+// Keep the old DEFAULT_SKILLS for backward compatibility (uses Solitus breed)
+export const DEFAULT_SKILLS = getDefaultSkillsForBreed('Solitus');
 
 // ============================================================================
 // Default Equipment Slots
@@ -281,7 +293,7 @@ export const SUPPORTED_VERSIONS = ['1.0.0', '1.1.0', '2.0.0'];
 /**
  * Create a default comprehensive TinkerProfile
  */
-export function createDefaultProfile(name: string = 'New Character'): TinkerProfile {
+export function createDefaultProfile(name: string = 'New Character', breed: string = 'Solitus'): TinkerProfile {
   const now = new Date().toISOString();
   
   return {
@@ -294,7 +306,7 @@ export function createDefaultProfile(name: string = 'New Character'): TinkerProf
       Name: name,
       Level: 1,
       Profession: 'Adventurer',
-      Breed: 'Solitus',
+      Breed: breed,
       Faction: 'Neutral',
       Expansion: 'Lost Eden',
       AccountType: 'Paid',
@@ -302,7 +314,7 @@ export function createDefaultProfile(name: string = 'New Character'): TinkerProf
       MaxNano: 1
     },
     
-    Skills: structuredClone(DEFAULT_SKILLS),
+    Skills: structuredClone(getDefaultSkillsForBreed(breed)),
     
     Weapons: structuredClone(DEFAULT_WEAPONS),
     Clothing: structuredClone(DEFAULT_CLOTHING),
@@ -315,7 +327,9 @@ export function createDefaultProfile(name: string = 'New Character'): TinkerProf
 /**
  * Create a simplified nano-compatible profile
  */
-export function createDefaultNanoProfile(name: string = 'New Character'): NanoCompatibleProfile {
+export function createDefaultNanoProfile(name: string = 'New Character', breed: string = 'Solitus'): NanoCompatibleProfile {
+  const breedId = getBreedId(breed) || 0;
+  
   return {
     id: `nano_profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     name,
@@ -338,12 +352,12 @@ export function createDefaultNanoProfile(name: string = 'New Character'): NanoCo
       'Treatment': 1
     },
     stats: {
-      'Strength': 10,
-      'Stamina': 10,
-      'Agility': 10,
-      'Sense': 10,
-      'Intelligence': 10,
-      'Psychic': 10
+      'Strength': getBreedInitValue(breedId, 0),
+      'Agility': getBreedInitValue(breedId, 1),
+      'Stamina': getBreedInitValue(breedId, 2),
+      'Intelligence': getBreedInitValue(breedId, 3),
+      'Sense': getBreedInitValue(breedId, 4),
+      'Psychic': getBreedInitValue(breedId, 5)
     },
     activeNanos: [],
     memoryCapacity: 500,

@@ -45,6 +45,13 @@ Complete character management with skills, equipment, and IP tracking
           <!-- Header Actions -->
           <div class="flex items-center gap-2">
             <Button
+              icon="pi pi-pencil"
+              label="Edit Character"
+              severity="primary"
+              outlined
+              @click="showEditDialog = true"
+            />
+            <Button
               v-if="!isActiveProfile"
               icon="pi pi-check"
               label="Set Active"
@@ -174,6 +181,13 @@ Complete character management with skills, equipment, and IP tracking
         </div>
       </div>
     </div>
+    
+    <!-- Edit Character Dialog -->
+    <EditCharacterDialog
+      v-model:visible="showEditDialog"
+      :profile="profileData"
+      @save="handleCharacterUpdate"
+    />
   </div>
 </template>
 
@@ -188,6 +202,7 @@ import CharacterInfoPanel from '@/components/profiles/CharacterInfoPanel.vue';
 import IPTrackerPanel from '@/components/profiles/IPTrackerPanel.vue';
 import EquipmentGrid from '@/components/profiles/equipment/EquipmentGrid.vue';
 import SkillsManager from '@/components/profiles/skills/SkillsManager.vue';
+import EditCharacterDialog from '@/components/profiles/EditCharacterDialog.vue';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
 
 // Router
@@ -207,6 +222,7 @@ const recalculating = ref(false);
 const error = ref<string | null>(null);
 const profileData = ref<TinkerProfile | null>(null);
 const hasChanges = ref(false);
+const showEditDialog = ref(false);
 const pendingChanges = ref<{
   skills: Record<string, Record<string, number>>;
   abilities: Record<string, number>;
@@ -362,6 +378,36 @@ async function saveChanges() {
     error.value = err instanceof Error ? err.message : 'Failed to save changes';
   } finally {
     saving.value = false;
+  }
+}
+
+async function handleCharacterUpdate(changes: any) {
+  if (!profileData.value) return;
+
+  try {
+    const result = await profilesStore.updateCharacterMetadata(props.profileId, changes);
+    
+    if (result.success) {
+      // Reload profile to show updated data
+      await loadProfile();
+      showEditDialog.value = false;
+      
+      // Show success message if there are warnings
+      if (result.warnings.length > 0) {
+        console.info('Character updated with warnings:', result.warnings);
+      }
+      
+      if (result.ipDelta !== undefined && result.ipDelta !== 0) {
+        const change = result.ipDelta > 0 ? 'increased' : 'decreased';
+        console.info(`IP usage ${change} by ${Math.abs(result.ipDelta)} points`);
+      }
+    } else {
+      console.error('Failed to update character:', result.errors);
+      error.value = result.errors.join(', ');
+    }
+  } catch (err) {
+    console.error('Error updating character:', err);
+    error.value = err instanceof Error ? err.message : 'Failed to update character';
   }
 }
 
