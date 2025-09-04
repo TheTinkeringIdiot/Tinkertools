@@ -13,17 +13,20 @@ export { ProfileTransformer } from './transformer';
 
 export type {
   TinkerProfile,
+  SkillWithIP,
   ProfileMetadata,
   ProfileExportFormat,
   ProfileImportResult,
   ProfileValidationResult,
   ProfileStorageOptions,
-  ProfileEvents
+  ProfileEvents,
+  TinkerProfilesConfig
 } from './types';
 
 export {
   createDefaultProfile,
   createDefaultNanoProfile,
+  getDefaultSkillsForBreed,
   ANARCHY_PROFESSIONS,
   ANARCHY_BREEDS,
   ANARCHY_FACTIONS,

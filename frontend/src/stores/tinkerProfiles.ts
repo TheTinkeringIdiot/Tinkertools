@@ -150,9 +150,13 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       // Load active profile
       const active = await profileManager.getActiveProfile();
       if (active) {
-        activeProfile.value = active;
-        activeProfileId.value = active.id;
-        profiles.value.set(active.id, active);
+        // Ensure caps and trickle-down are calculated for display
+        const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
+        const activeWithCaps = updateProfileWithIPTracking(active);
+        
+        activeProfile.value = activeWithCaps;
+        activeProfileId.value = activeWithCaps.id;
+        profiles.value.set(activeWithCaps.id, activeWithCaps);
       }
       
     } catch (err) {
@@ -242,7 +246,12 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     try {
       const profile = await profileManager.loadProfile(profileId);
       if (profile) {
-        profiles.value.set(profileId, profile);
+        // Ensure caps and trickle-down are calculated for display
+        const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
+        const profileWithCaps = updateProfileWithIPTracking(profile);
+        
+        profiles.value.set(profileId, profileWithCaps);
+        return profileWithCaps;
       }
       return profile;
       
@@ -562,6 +571,66 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     
     await updateProfile(profileId, updatedProfile);
   }
+
+  /**
+   * Update character metadata with proper recalculation of dependent values
+   */
+  async function updateCharacterMetadata(profileId: string, changes: {
+    name?: string;
+    level?: number;
+    profession?: string;
+    breed?: string;
+    faction?: string;
+    accountType?: string;
+  }): Promise<{
+    success: boolean;
+    warnings: string[];
+    errors: string[];
+    ipDelta?: number;
+  }> {
+    if (!profileManager) {
+      throw new Error('Profile manager not initialized');
+    }
+
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const profile = await loadProfile(profileId);
+      if (!profile) {
+        throw new Error('Profile not found');
+      }
+
+      // Use the profile update service
+      const { updateCharacterMetadata } = await import('@/services/profile-update-service');
+      const result = await updateCharacterMetadata(profile, changes);
+
+      if (result.success && result.updatedProfile) {
+        // Update the profile in storage
+        await updateProfile(profileId, result.updatedProfile);
+        
+        // Refresh active profile if this is the active one
+        if (activeProfileId.value === profileId) {
+          activeProfile.value = result.updatedProfile;
+        }
+      } else if (result.errors.length > 0) {
+        error.value = result.errors.join(', ');
+      }
+
+      return result;
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update character metadata';
+      error.value = errorMessage;
+      return {
+        success: false,
+        warnings: [],
+        errors: [errorMessage]
+      };
+    } finally {
+      loading.value = false;
+    }
+  }
   
   // ============================================================================
   // Auto-initialization
@@ -618,6 +687,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     modifySkill,
     modifyAbility,
     recalculateProfileIP,
+    updateCharacterMetadata,
     
     // Direct access to manager (for advanced use cases)
     getManager: () => profileManager

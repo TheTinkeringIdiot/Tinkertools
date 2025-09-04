@@ -116,12 +116,19 @@ export class TinkerProfilesManager {
    */
   async createProfile(name: string, initialData?: Partial<TinkerProfile>): Promise<string> {
     try {
-      const profile = createDefaultProfile(name);
+      // Extract breed from initialData to create profile with correct breed-specific values
+      const breed = initialData?.Character?.Breed || 'Solitus';
+      const profile = createDefaultProfile(name, breed);
       
       if (initialData) {
         Object.assign(profile, initialData);
         profile.updated = new Date().toISOString();
       }
+      
+      // Calculate caps and trickle-down for the new profile
+      const { updateProfileWithIPTracking } = await import('./ip-integrator');
+      const profileWithCaps = updateProfileWithIPTracking(profile);
+      Object.assign(profile, profileWithCaps);
       
       // Validate the profile
       if (this.config.validation.strictMode) {

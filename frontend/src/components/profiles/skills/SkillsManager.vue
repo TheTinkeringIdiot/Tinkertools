@@ -10,6 +10,7 @@ Interactive skill categories with expandable panels and sliders with IP calculat
       icon="pi pi-user"
       :skills="coreAbilities"
       :is-abilities="true"
+      :breed="breed"
       @ability-changed="handleAbilityChange"
       @skill-changed="handleSkillChange"
     />
@@ -46,6 +47,10 @@ const emit = defineEmits<{
 // Computed
 const coreAbilities = computed(() => {
   return props.profile.Skills?.Attributes || {};
+});
+
+const breed = computed(() => {
+  return props.profile.Character?.Breed || 'Solitus';
 });
 
 const skillCategories = computed(() => {

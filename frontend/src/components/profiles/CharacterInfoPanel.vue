@@ -105,9 +105,14 @@ Shows character stats, health, nano, and other core information
             {{ getAbilityDisplayName(abilityName) }}
           </span>
           <div class="flex items-center gap-2">
-            <span class="text-sm font-bold text-surface-900 dark:text-surface-50">
-              {{ ability.value || 0 }}
-            </span>
+            <div class="text-right">
+              <div class="text-sm font-bold text-surface-900 dark:text-surface-50">
+                {{ ability.value || 0 }}
+              </div>
+              <div class="text-xs text-surface-500 dark:text-surface-400">
+                Base: {{ breedBaseValues[abilityName as string as keyof typeof breedBaseValues] }}
+              </div>
+            </div>
             <span v-if="ability.trickleDown" class="text-xs text-green-600 dark:text-green-400">
               (+{{ ability.trickleDown }})
             </span>
@@ -144,7 +149,8 @@ Shows character stats, health, nano, and other core information
 import { computed } from 'vue';
 import Badge from 'primevue/badge';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
-import { calculateTitleLevel } from '@/services/game-utils';
+import { calculateTitleLevel, getBreedId } from '@/services/game-utils';
+import { getBreedInitValue } from '@/lib/tinkerprofiles/ip-calculator';
 
 // Props
 const props = defineProps<{
@@ -213,6 +219,20 @@ const factionColor = computed(() => {
     'Neutral': 'text-surface-400'
   };
   return colorMap[props.profile.Character?.Faction || ''] || 'text-surface-400';
+});
+
+const breedBaseValues = computed(() => {
+  const breed = props.profile.Character?.Breed || 'Solitus';
+  const breedId = getBreedId(breed) || 0;
+  
+  return {
+    'Strength': getBreedInitValue(breedId, 0),
+    'Agility': getBreedInitValue(breedId, 1),
+    'Stamina': getBreedInitValue(breedId, 2),
+    'Intelligence': getBreedInitValue(breedId, 3),
+    'Sense': getBreedInitValue(breedId, 4),
+    'Psychic': getBreedInitValue(breedId, 5)
+  };
 });
 
 // Methods

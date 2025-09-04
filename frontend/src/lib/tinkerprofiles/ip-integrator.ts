@@ -13,6 +13,7 @@ import {
   calcTotalSkillCost,
   calcAllTrickleDown,
   calcSkillCap,
+  calcAbilityCap,
   calcIPAnalysis,
   validateCharacterBuild,
   ABILITY_NAMES,
@@ -22,6 +23,7 @@ import {
 } from './ip-calculator';
 
 import { getBreedId, getProfessionId } from '../../services/game-utils';
+import { getSkillId } from './skill-mappings';
 
 // ============================================================================
 // Profile to CharacterStats Conversion
@@ -61,12 +63,29 @@ export function profileToCharacterStats(profile: TinkerProfile): CharacterStats 
     skills[i] = 0;
   }
   
-  // Fill in known skills from profile
-  // This is simplified - in practice would need complete mapping
-  Object.entries(profile.Skills['Body & Defense'] || {}).forEach(([skillName, skillData]) => {
-    const skillIndex = SKILL_NAMES.indexOf(skillName);
-    if (skillIndex >= 0 && skillData.pointFromIp !== undefined) {
-      skills[skillIndex] = skillData.pointFromIp;
+  // Category names for skill extraction
+  const categories = [
+    'Body & Defense',
+    'Ranged Weapons', 
+    'Ranged Specials',
+    'Melee Weapons',
+    'Melee Specials',
+    'Nanos & Casting',
+    'Exploring',
+    'Trade & Repair',
+    'Combat & Healing'
+  ];
+  
+  // Fill in known skills from profile using complete mapping
+  categories.forEach(categoryName => {
+    const category = profile.Skills[categoryName as keyof typeof profile.Skills];
+    if (category && typeof category === 'object') {
+      Object.entries(category).forEach(([skillName, skillData]: [string, any]) => {
+        const skillIndex = getSkillId(skillName);
+        if (skillIndex !== null && skillIndex >= 0 && skillData.pointFromIp !== undefined) {
+          skills[skillIndex] = skillData.pointFromIp;
+        }
+      });
     }
   });
   
@@ -140,12 +159,26 @@ export function calculateProfileIP(profile: TinkerProfile): IPTracker {
 }
 
 /**
- * Update all skill caps and trickle-down bonuses in a profile
+ * Update all skill caps, ability caps, and trickle-down bonuses in a profile
  */
 export function updateProfileSkillInfo(profile: TinkerProfile): void {
   const characterStats = profileToCharacterStats(profile);
   const trickleDownResults = calcAllTrickleDown(characterStats.abilities);
   
+  // Update ability caps
+  if (profile.Skills.Attributes) {
+    const abilityNames = ['Strength', 'Agility', 'Stamina', 'Intelligence', 'Sense', 'Psychic'];
+    abilityNames.forEach((abilityName, index) => {
+      const ability = profile.Skills.Attributes![abilityName as keyof typeof profile.Skills.Attributes] as SkillWithIP;
+      if (ability) {
+        // Calculate and set ability cap
+        const abilityCap = calcAbilityCap(characterStats.level, characterStats.breed, index);
+        ability.cap = abilityCap;
+      }
+    });
+  }
+  
+  // Update skill caps and trickle-down
   const categories = [
     'Body & Defense',
     'Ranged Weapons', 
@@ -162,8 +195,8 @@ export function updateProfileSkillInfo(profile: TinkerProfile): void {
     const category = profile.Skills[categoryName as keyof typeof profile.Skills];
     if (category && typeof category === 'object') {
       Object.entries(category).forEach(([skillName, skillData]: [string, any]) => {
-        const skillIndex = SKILL_NAMES.indexOf(skillName);
-        if (skillIndex >= 0) {
+        const skillIndex = getSkillId(skillName);
+        if (skillIndex !== null && skillIndex >= 0) {
           // Update trickle-down bonus
           skillData.trickleDown = trickleDownResults[skillIndex] || 0;
           
@@ -281,11 +314,11 @@ export function modifySkill(
   }
   
   // Calculate IP cost
-  const skillIndex = SKILL_NAMES.indexOf(skillName);
+  const skillIndex = getSkillId(skillName);
   const profession = getProfessionId(profile.Character.Profession) || 0;
   let ipCost = 0;
   
-  if (skillIndex >= 0) {
+  if (skillIndex !== null && skillIndex >= 0) {
     if (improvementDiff > 0) {
       // Calculate cost to raise skill
       for (let i = oldImprovements; i < newImprovements; i++) {
@@ -396,12 +429,23 @@ export function modifyAbility(
 // Export Functions
 // ============================================================================
 
+// ============================================================================
+// Main Entry Point
+// ============================================================================
+
+/**
+ * Main function to update profile with IP tracking (alias for recalculateProfileIP)
+ * This is the primary entry point used by stores and other components
+ */
+export const updateProfileWithIPTracking = recalculateProfileIP;
+
 export const ipIntegrator = {
   profileToCharacterStats,
   calculateProfileIP,
   updateProfileSkillInfo,
   validateProfileIP,
   recalculateProfileIP,
+  updateProfileWithIPTracking,
   modifySkill,
   modifyAbility
 };
