@@ -1275,6 +1275,10 @@ export const BREED = {
   7: 'HumanMonster'
 } as const;
 
+// Arrays for backwards compatibility with ip-calculator
+export const PROFESSION_NAMES = Object.values(PROFESSION);
+export const BREED_NAMES = Object.values(BREED);
+
 /**
  * Expansion playfield types
  */
@@ -3734,3 +3738,448 @@ export type DamageTypeId = keyof typeof DAMAGE_TYPES;
 export type DamageTypeName = typeof DAMAGE_TYPES[DamageTypeId];
 export type SpellFormatId = keyof typeof SPELL_FORMATS;
 export type SpellFormatString = typeof SPELL_FORMATS[SpellFormatId];
+
+// ============================================================================
+// IP Calculator Data - Breed and Profession Constants
+// ============================================================================
+
+/**
+ * Breed ability data indexed by BREED constant IDs
+ */
+export const BREED_ABILITY_DATA = {
+  // Initial ability values by breed [breed][ability: str, agi, sta, int, sen, psy]
+  initial: {
+    0: [0, 0, 0, 0, 0, 0],    // Unknown breed
+    1: [6, 6, 6, 6, 6, 6],    // Solitus
+    2: [3, 15, 6, 6, 10, 3],  // Opifex
+    3: [3, 3, 3, 15, 6, 10],  // Nanomage
+    4: [15, 6, 10, 3, 3, 3]   // Atrox
+  } as Record<number, number[]>,
+
+  // Ability caps pre-level 201 by breed [breed][ability]
+  caps_pre201: {
+    0: [0, 0, 0, 0, 0, 0],              // Unknown breed
+    1: [472, 480, 480, 480, 480, 480],  // Solitus
+    2: [464, 544, 480, 464, 512, 448],  // Opifex
+    3: [464, 464, 448, 512, 480, 512],  // Nanomage
+    4: [512, 480, 512, 400, 400, 400]   // Atrox
+  } as Record<number, number[]>,
+
+  // Ability increase per level post-201 by breed [breed][ability]
+  caps_post201_per_level: {
+    0: [0, 0, 0, 0, 0, 0],       // Unknown breed
+    1: [15, 15, 15, 15, 15, 15], // Solitus
+    2: [15, 20, 10, 15, 20, 15], // Opifex
+    3: [10, 10, 15, 20, 15, 20], // Nanomage
+    4: [20, 15, 20, 10, 10, 10]  // Atrox
+  } as Record<number, number[]>,
+
+  // Ability cost factors by breed [breed][ability]
+  cost_factors: {
+    0: [0, 0, 0, 0, 0, 0], // Unknown breed
+    1: [2, 2, 2, 2, 2, 2], // Solitus
+    2: [2, 1, 3, 2, 1, 2], // Opifex
+    3: [3, 3, 2, 1, 2, 1], // Nanomage
+    4: [1, 2, 1, 3, 3, 3]  // Atrox
+  } as Record<number, number[]>,
+
+  // Base HP values by breed
+  base_hp: {
+    0: 0,  // Unknown
+    1: 10, // Solitus
+    2: 15, // Opifex
+    3: 10, // Nanomage
+    4: 25  // Atrox
+  } as Record<number, number>,
+
+  // Base NP values by breed
+  base_np: {
+    0: 0,  // Unknown
+    1: 10, // Solitus
+    2: 10, // Opifex
+    3: 15, // Nanomage
+    4: 8   // Atrox
+  } as Record<number, number>,
+
+  // HP factors by breed
+  body_factor: {
+    0: 0, // Unknown
+    1: 3, // Solitus
+    2: 3, // Opifex
+    3: 2, // Nanomage
+    4: 4  // Atrox
+  } as Record<number, number>,
+
+  // NP factors by breed
+  nano_factor: {
+    0: 0, // Unknown
+    1: 3, // Solitus
+    2: 3, // Opifex
+    3: 4, // Nanomage
+    4: 2  // Atrox
+  } as Record<number, number>,
+
+  // HP level modifiers by breed
+  hp_modifier: {
+    0: 0,  // Unknown
+    1: 0,  // Solitus
+    2: -1, // Opifex
+    3: -1, // Nanomage
+    4: 0   // Atrox
+  } as Record<number, number>,
+
+  // NP level modifiers by breed
+  np_modifier: {
+    0: 0,  // Unknown
+    1: 0,  // Solitus
+    2: -1, // Opifex
+    3: 1,  // Nanomage
+    4: -2  // Atrox
+  } as Record<number, number>
+} as const;
+
+/**
+ * Profession HP and NP per level by title level
+ * Indexed by profession ID from PROFESSION constant
+ */
+export const PROFESSION_VITALS = {
+  // HP per level by title level [profession_id][tl1, tl2, tl3, tl4, tl5, tl6]
+  hp_per_level: {
+    1: [6, 7, 8, 8, 9, 9],   // Soldier
+    2: [6, 7, 7, 8, 9, 12],  // MartialArtist
+    3: [6, 6, 6, 6, 6, 6],   // Engineer
+    4: [6, 7, 7, 8, 8, 10],  // Fixer
+    5: [6, 7, 7, 8, 8, 9],   // Agent
+    6: [6, 7, 8, 8, 9, 9],   // Adventurer
+    7: [6, 6, 7, 7, 8, 9],   // Trader
+    8: [6, 7, 7, 7, 8, 9],   // Bureaucrat
+    9: [7, 8, 9, 10, 11, 12], // Enforcer
+    10: [6, 6, 6, 6, 6, 6],  // Doctor
+    11: [6, 6, 6, 6, 6, 6],  // NanoTechnician
+    12: [6, 6, 6, 6, 6, 6],  // MetaPhysicist
+    14: [6, 7, 8, 9, 10, 11], // Keeper
+    15: [6, 7, 8, 9, 9, 10]  // Shade
+  } as Record<number, number[]>,
+
+  // NP per level by title level [profession_id][tl1, tl2, tl3, tl4, tl5, tl6]
+  np_per_level: {
+    1: [4, 4, 4, 4, 4, 4],   // Soldier
+    2: [4, 4, 4, 4, 4, 4],   // MartialArtist
+    3: [4, 5, 6, 7, 8, 9],   // Engineer
+    4: [4, 4, 4, 4, 4, 4],   // Fixer
+    5: [5, 5, 6, 6, 7, 7],   // Agent
+    6: [4, 5, 5, 6, 6, 7],   // Adventurer
+    7: [4, 5, 5, 5, 6, 7],   // Trader
+    8: [4, 5, 5, 5, 6, 7],   // Bureaucrat
+    9: [4, 4, 4, 4, 4, 4],   // Enforcer
+    10: [4, 5, 6, 7, 8, 10], // Doctor
+    11: [4, 5, 6, 7, 8, 10], // NanoTechnician
+    12: [4, 5, 6, 7, 8, 10], // MetaPhysicist
+    14: [4, 4, 4, 4, 4, 4],  // Keeper
+    15: [4, 4, 4, 6, 6, 6]   // Shade
+  } as Record<number, number[]>
+} as const;
+
+/**
+ * Skill cost factors indexed by STAT ID and Profession ID
+ * Complete data from AOSkills4 VB source (97 skills × 14 professions)
+ */
+export const SKILL_COST_FACTORS: Record<number, Record<number, number>> = {
+  152: { // Body Dev (BodyDevelopment)
+    6: 1.2,   // Adventurer
+    5: 2.4,   // Agent
+    8: 2.4,   // Bureaucrat
+    10: 2.0,  // Doctor
+    9: 1.0,   // Enforcer
+    3: 2.4,   // Engineer
+    4: 1.8,   // Fixer
+    14: 1.2,  // Keeper
+    2: 1.5,   // MartialArtist
+    12: 2.4,  // MetaPhysicist
+    11: 2.4,  // NanoTechnician
+    15: 2.6,  // Shade
+    1: 1.1,   // Soldier
+    7: 2.0    // Trader
+  },
+  132: { // Nano Pool
+    6: 1.6, 5: 1.2, 8: 1.4, 10: 1.0, 9: 2.0, 3: 1.8, 4: 1.6, 14: 2.2, 2: 1.6, 12: 1.0, 11: 1.0, 15: 2.5, 1: 2.0, 7: 1.2
+  },
+  100: { // Martial Arts
+    6: 2.8, 5: 1.6, 8: 2.8, 10: 2.0, 9: 1.6, 3: 2.8, 4: 2.8, 14: 3.0, 2: 1.0, 12: 2.8, 11: 2.8, 15: 1.6, 1: 2.0, 7: 2.0
+  },
+  142: { // Brawl
+    6: 2.4, 5: 2.8, 8: 3.2, 10: 2.8, 9: 1.0, 3: 2.4, 4: 1.8, 14: 2.0, 2: 1.2, 12: 2.8, 11: 2.8, 15: 4.0, 1: 2.0, 7: 2.0
+  },
+  144: { // Dimach
+    6: 4.0, 5: 1.6, 8: 3.0, 10: 4.0, 9: 4.0, 3: 4.0, 4: 4.0, 14: 1.3, 2: 1.2, 12: 2.5, 11: 2.5, 15: 1.0, 1: 4.0, 7: 4.0
+  },
+  143: { // Riposte
+    6: 3.2, 5: 3.0, 8: 3.2, 10: 3.2, 9: 1.2, 3: 3.2, 4: 2.4, 14: 1.0, 2: 1.0, 12: 3.2, 11: 2.4, 15: 1.4, 1: 2.4, 7: 3.2
+  },
+  137: { // Adventuring
+    6: 1.0, 5: 3.0, 8: 2.0, 10: 2.0, 9: 1.5, 3: 2.0, 4: 2.0, 14: 1.8, 2: 1.6, 12: 2.0, 11: 2.0, 15: 1.6, 1: 1.5, 7: 1.4
+  },
+  138: { // Swimming
+    6: 1.0, 5: 1.6, 8: 2.0, 10: 2.0, 9: 2.0, 3: 2.0, 4: 2.0, 14: 1.8, 2: 1.4, 12: 2.0, 11: 2.0, 15: 1.4, 1: 1.5, 7: 1.5
+  },
+  102: { // 1h Blunt
+    6: 1.5, 5: 1.6, 8: 3.2, 10: 2.4, 9: 1.0, 3: 2.4, 4: 2.5, 14: 3.2, 2: 2.5, 12: 2.6, 11: 4.0, 15: 4.0, 1: 2.5, 7: 1.8
+  },
+  103: { // 1h Edged
+    6: 1.0, 5: 2.0, 8: 4.0, 10: 2.4, 9: 1.0, 3: 3.2, 4: 2.0, 14: 3.2, 2: 2.0, 12: 4.0, 11: 4.0, 15: 4.0, 1: 2.0, 7: 3.2
+  },
+  106: { // Piercing
+    6: 1.5, 5: 2.5, 8: 4.0, 10: 2.4, 9: 1.0, 3: 3.2, 4: 2.5, 14: 3.2, 2: 2.0, 12: 3.2, 11: 4.0, 15: 1.0, 1: 2.5, 7: 2.5
+  },
+  107: { // 2h Blunt
+    6: 1.5, 5: 2.5, 8: 4.0, 10: 3.2, 9: 1.4, 3: 3.2, 4: 3.2, 14: 3.2, 2: 2.0, 12: 4.0, 11: 3.2, 15: 4.0, 1: 2.5, 7: 2.5
+  },
+  105: { // 2h Edged
+    6: 1.5, 5: 2.5, 8: 4.0, 10: 3.2, 9: 1.0, 3: 3.2, 4: 2.5, 14: 1.0, 2: 2.0, 12: 2.5, 11: 2.5, 15: 4.0, 1: 2.5, 7: 2.5
+  },
+  104: { // Melee Energy
+    6: 1.5, 5: 3.2, 8: 4.0, 10: 3.2, 9: 1.8, 3: 4.0, 4: 3.2, 14: 3.2, 2: 3.0, 12: 4.0, 11: 3.2, 15: 4.0, 1: 2.2, 7: 2.5
+  },
+  145: { // Parry (mapped from Deflect in VB)
+    6: 1.5, 5: 1.6, 8: 3.2, 10: 2.4, 9: 1.4, 3: 4.0, 4: 2.4, 14: 1.0, 2: 1.5, 12: 4.0, 11: 3.2, 15: 1.4, 1: 2.5, 7: 2.5
+  },
+  146: { // Sneak Attack
+    6: 1.5, 5: 1.0, 8: 2.4, 10: 3.2, 9: 2.0, 3: 4.0, 4: 3.9, 14: 4.0, 2: 3.0, 12: 4.0, 11: 3.2, 15: 1.0, 1: 3.0, 7: 4.0
+  },
+  101: { // Multi Melee (mapped from Mult. Melee)
+    6: 1.4, 5: 2.5, 8: 4.0, 10: 3.2, 9: 1.0, 3: 4.0, 4: 2.5, 14: 3.2, 2: 2.5, 12: 4.0, 11: 4.0, 15: 1.0, 1: 2.0, 7: 3.2
+  },
+  147: { // Fast Attack
+    6: 2.0, 5: 2.5, 8: 4.0, 10: 2.4, 9: 1.5, 3: 4.0, 4: 2.5, 14: 1.0, 2: 2.0, 12: 4.0, 11: 3.2, 15: 1.4, 1: 2.4, 7: 3.0
+  },
+  108: { // Sharp Objects
+    6: 1.6, 5: 1.2, 8: 3.2, 10: 3.2, 9: 1.6, 3: 3.2, 4: 2.5, 14: 4.0, 2: 1.0, 12: 3.2, 11: 2.4, 15: 1.6, 1: 1.6, 7: 2.4
+  },
+  109: { // Grenade
+    6: 1.6, 5: 1.6, 8: 4.0, 10: 3.2, 9: 2.5, 3: 2.0, 4: 2.2, 14: 4.0, 2: 2.4, 12: 4.0, 11: 2.4, 15: 4.0, 1: 1.6, 7: 2.4
+  },
+  110: { // Heavy Weapons
+    6: 3.0, 5: 3.0, 8: 4.0, 10: 4.0, 9: 2.5, 3: 2.0, 4: 2.5, 14: 4.0, 2: 4.0, 12: 4.0, 11: 4.0, 15: 4.0, 1: 1.0, 7: 4.0
+  },
+  111: { // Bow
+    6: 1.8, 5: 2.0, 8: 4.0, 10: 4.0, 9: 4.0, 3: 4.0, 4: 2.4, 14: 4.0, 2: 1.0, 12: 2.5, 11: 4.0, 15: 4.0, 1: 2.4, 7: 4.0
+  },
+  112: { // Pistol
+    6: 1.0, 5: 1.8, 8: 1.6, 10: 1.6, 9: 3.0, 3: 1.5, 4: 1.6, 14: 4.0, 2: 3.5, 12: 2.4, 11: 1.6, 15: 4.0, 1: 1.0, 7: 2.0
+  },
+  116: { // Assault Rifle
+    6: 1.6, 5: 3.0, 8: 4.0, 10: 4.0, 9: 3.5, 3: 3.0, 4: 2.8, 14: 4.0, 2: 4.0, 12: 4.0, 11: 4.5, 15: 4.0, 1: 1.0, 7: 4.0
+  },
+  114: { // MG/SMG
+    6: 2.5, 5: 2.5, 8: 3.2, 10: 3.2, 9: 2.5, 3: 3.2, 4: 1.0, 14: 4.0, 2: 3.0, 12: 3.2, 11: 3.2, 15: 4.0, 1: 1.5, 7: 2.4
+  },
+  115: { // Shotgun
+    6: 2.4, 5: 3.2, 8: 3.2, 10: 2.4, 9: 2.5, 3: 3.2, 4: 1.8, 14: 4.0, 2: 4.0, 12: 4.0, 11: 3.0, 15: 4.0, 1: 1.5, 7: 1.5
+  },
+  113: { // Rifle
+    6: 1.7, 5: 1.3, 8: 4.0, 10: 4.0, 9: 4.0, 3: 4.0, 4: 2.0, 14: 4.0, 2: 4.0, 12: 4.0, 11: 4.0, 15: 4.0, 1: 2.0, 7: 2.8
+  },
+  133: { // Ranged Energy
+    6: 2.4, 5: 2.5, 8: 4.0, 10: 4.0, 9: 4.0, 3: 3.0, 4: 2.5, 14: 4.0, 2: 4.0, 12: 4.0, 11: 4.0, 15: 4.0, 1: 1.0, 7: 3.0
+  },
+  150: { // Fling Shot
+    6: 1.0, 5: 3.2, 8: 4.0, 10: 2.4, 9: 3.5, 3: 3.2, 4: 1.6, 14: 4.0, 2: 3.2, 12: 4.0, 11: 4.0, 15: 4.0, 1: 1.0, 7: 2.5
+  },
+  151: { // Aimed Shot
+    6: 2.2, 5: 1.1, 8: 4.0, 10: 3.2, 9: 3.5, 3: 4.0, 4: 2.5, 14: 4.0, 2: 3.0, 12: 4.0, 11: 3.2, 15: 4.0, 1: 1.8, 7: 2.5
+  },
+  148: { // Burst
+    6: 1.8, 5: 3.2, 8: 4.0, 10: 3.0, 9: 3.0, 3: 3.0, 4: 1.5, 14: 4.0, 2: 4.0, 12: 4.0, 11: 4.0, 15: 4.0, 1: 1.5, 7: 3.5
+  },
+  167: { // Full Auto
+    6: 2.4, 5: 4.0, 8: 4.0, 10: 4.0, 9: 3.0, 3: 3.0, 4: 2.2, 14: 4.0, 2: 4.0, 12: 4.0, 11: 5.0, 15: 4.0, 1: 1.5, 7: 3.5
+  },
+  121: { // Bow Special Attack
+    6: 1.6, 5: 2.0, 8: 4.0, 10: 4.0, 9: 2.0, 3: 3.5, 4: 2.0, 14: 4.0, 2: 1.0, 12: 2.5, 11: 4.0, 15: 4.0, 1: 2.0, 7: 4.0
+  },
+  134: { // Multi Ranged
+    6: 1.5, 5: 1.8, 8: 4.0, 10: 4.0, 9: 4.0, 3: 4.0, 4: 2.0, 14: 4.0, 2: 4.0, 12: 2.5, 11: 4.0, 15: 4.0, 1: 2.0, 7: 2.5
+  },
+  118: { // Melee Init
+    6: 1.8, 5: 1.6, 8: 4.0, 10: 3.2, 9: 1.0, 3: 3.2, 4: 2.5, 14: 1.0, 2: 2.0, 12: 3.0, 11: 3.5, 15: 1.0, 1: 2.4, 7: 3.2
+  },
+  119: { // Ranged Init
+    6: 2.0, 5: 1.6, 8: 3.2, 10: 3.2, 9: 3.0, 3: 3.2, 4: 1.6, 14: 3.8, 2: 2.4, 12: 4.0, 11: 3.0, 15: 4.0, 1: 1.0, 7: 2.5
+  },
+  120: { // Physical Init
+    6: 1.6, 5: 1.6, 8: 2.0, 10: 2.0, 9: 1.6, 3: 3.0, 4: 2.4, 14: 3.8, 2: 1.0, 12: 3.2, 11: 3.2, 15: 3.4, 1: 2.4, 7: 3.2
+  },
+  149: { // Nano Init
+    6: 2.0, 5: 1.6, 8: 1.0, 10: 1.0, 9: 2.4, 3: 1.6, 4: 2.4, 14: 3.2, 2: 2.5, 12: 1.0, 11: 1.0, 15: 2.8, 1: 4.0, 7: 1.5
+  },
+  154: { // Dodge Ranged
+    6: 1.6, 5: 2.1, 8: 2.4, 10: 2.4, 9: 2.0, 3: 2.5, 4: 1.0, 14: 1.6, 2: 1.0, 12: 1.6, 11: 2.4, 15: 2.4, 1: 1.5, 7: 1.9
+  },
+  155: { // Evade Close Combat
+    6: 1.8, 5: 2.4, 8: 2.4, 10: 3.2, 9: 1.5, 3: 4.0, 4: 1.6, 14: 1.4, 2: 1.0, 12: 1.6, 11: 3.2, 15: 1.0, 1: 2.0, 7: 1.9
+  },
+  153: { // Duck Explosions
+    6: 1.6, 5: 1.6, 8: 2.4, 10: 2.4, 9: 2.0, 3: 2.2, 4: 1.0, 14: 1.6, 2: 1.0, 12: 2.4, 11: 2.4, 15: 1.2, 1: 1.8, 7: 1.9
+  },
+  168: { // Nano Resist
+    6: 2.4, 5: 1.6, 8: 1.6, 10: 1.2, 9: 2.2, 3: 1.5, 4: 1.6, 14: 1.8, 2: 1.6, 12: 1.6, 11: 1.0, 15: 1.5, 1: 2.2, 7: 1.6
+  },
+  156: { // Run Speed
+    6: 1.0, 5: 1.6, 8: 2.4, 10: 2.4, 9: 2.4, 3: 2.0, 4: 1.0, 14: 2.0, 2: 1.0, 12: 2.4, 11: 2.4, 15: 1.0, 1: 2.0, 7: 1.9
+  },
+  125: { // Mechanical Engineering
+    6: 1.2, 5: 1.5, 8: 1.8, 10: 2.0, 9: 2.0, 3: 1.0, 4: 1.5, 14: 3.2, 2: 2.4, 12: 2.0, 11: 2.0, 15: 3.2, 1: 2.0, 7: 1.2
+  },
+  126: { // Electrical Engineering
+    6: 1.6, 5: 2.0, 8: 2.4, 10: 1.6, 9: 1.8, 3: 1.0, 4: 1.5, 14: 3.2, 2: 3.2, 12: 2.0, 11: 1.6, 15: 3.2, 1: 2.4, 7: 1.0
+  },
+  157: { // Quantum FT
+    6: 1.6, 5: 2.0, 8: 2.4, 10: 1.6, 9: 3.2, 3: 1.0, 4: 1.5, 14: 3.2, 2: 3.2, 12: 2.4, 11: 1.6, 15: 1.4, 1: 2.4, 7: 1.2
+  },
+  158: { // Weapon Smithing
+    6: 1.6, 5: 4.0, 8: 2.5, 10: 1.5, 9: 1.5, 3: 1.0, 4: 1.3, 14: 2.0, 2: 2.4, 12: 2.5, 11: 3.2, 15: 3.2, 1: 1.5, 7: 1.0
+  },
+  159: { // Pharmaceuticals
+    6: 2.4, 5: 1.6, 8: 2.4, 10: 1.0, 9: 1.6, 3: 1.5, 4: 1.5, 14: 3.2, 2: 2.4, 12: 2.0, 11: 2.4, 15: 1.8, 1: 2.0, 7: 1.0
+  },
+  160: { // Nano Programming
+    6: 4.0, 5: 2.4, 8: 1.6, 10: 1.6, 9: 2.4, 3: 1.2, 4: 2.0, 14: 3.2, 2: 2.4, 12: 1.0, 11: 1.0, 15: 4.0, 1: 2.0, 7: 1.4
+  },
+  161: { // Computer Literacy
+    6: 1.6, 5: 1.6, 8: 1.0, 10: 1.0, 9: 1.6, 3: 1.3, 4: 1.0, 14: 2.4, 2: 2.0, 12: 1.0, 11: 1.0, 15: 2.4, 1: 2.0, 7: 1.5
+  },
+  162: { // Psychology
+    6: 1.6, 5: 1.0, 8: 1.0, 10: 2.3, 9: 1.0, 3: 2.4, 4: 1.5, 14: 1.0, 2: 1.6, 12: 1.6, 11: 2.4, 15: 2.4, 1: 1.5, 7: 1.0
+  },
+  163: { // Chemistry
+    6: 1.6, 5: 1.5, 8: 2.4, 10: 2.0, 9: 1.0, 3: 1.2, 4: 2.0, 14: 3.2, 2: 2.4, 12: 2.0, 11: 2.0, 15: 3.2, 1: 2.4, 7: 1.3
+  },
+  141: { // Tutoring
+    6: 1.0, 5: 1.0, 8: 1.0, 10: 1.0, 9: 1.0, 3: 1.0, 4: 1.0, 14: 1.0, 2: 1.0, 12: 1.0, 11: 1.0, 15: 1.0, 1: 1.0, 7: 1.0
+  },
+  127: { // Material Metamorphose
+    6: 1.8, 5: 1.2, 8: 1.6, 10: 1.0, 9: 2.5, 3: 1.0, 4: 2.4, 14: 3.2, 2: 2.0, 12: 1.0, 11: 1.0, 15: 3.2, 1: 2.0, 7: 1.6
+  },
+  128: { // Biological Metamorphose
+    6: 1.5, 5: 1.6, 8: 1.0, 10: 1.0, 9: 2.5, 3: 2.4, 4: 3.2, 14: 1.8, 2: 1.6, 12: 1.0, 11: 1.0, 15: 1.9, 1: 2.4, 7: 1.8
+  },
+  129: { // Psychological Modification
+    6: 1.8, 5: 1.6, 8: 1.0, 10: 1.6, 9: 2.5, 3: 2.4, 4: 2.4, 14: 1.6, 2: 2.0, 12: 1.6, 11: 1.0, 15: 1.4, 1: 2.0, 7: 1.5
+  },
+  130: { // Material Creation
+    6: 1.8, 5: 1.4, 8: 1.6, 10: 1.6, 9: 2.5, 3: 1.0, 4: 2.5, 14: 3.2, 2: 2.4, 12: 1.0, 11: 1.0, 15: 3.2, 1: 2.5, 7: 1.5
+  },
+  131: { // Space Time
+    6: 1.8, 5: 2.4, 8: 1.6, 10: 1.6, 9: 2.5, 3: 1.0, 4: 3.2, 14: 1.4, 2: 1.6, 12: 1.0, 11: 1.0, 15: 1.9, 1: 3.2, 7: 1.5
+  },
+  122: { // Sensory Improvement
+    6: 1.6, 5: 1.6, 8: 1.0, 10: 1.6, 9: 2.5, 3: 2.4, 4: 2.4, 14: 2.4, 2: 1.6, 12: 1.6, 11: 1.0, 15: 1.6, 1: 2.4, 7: 1.8
+  },
+  123: { // First Aid
+    6: 1.2, 5: 2.0, 8: 2.0, 10: 1.0, 9: 1.6, 3: 2.0, 4: 1.2, 14: 1.2, 2: 1.6, 12: 2.0, 11: 2.0, 15: 2.5, 1: 2.0, 7: 1.6
+  },
+  124: { // Treatment
+    6: 1.0, 5: 2.0, 8: 2.0, 10: 1.0, 9: 2.0, 3: 1.6, 4: 1.2, 14: 1.8, 2: 2.0, 12: 2.0, 11: 2.0, 15: 1.5, 1: 2.0, 7: 1.6
+  },
+  164: { // Concealment
+    6: 1.7, 5: 1.0, 8: 2.4, 10: 2.4, 9: 2.0, 3: 3.2, 4: 1.5, 14: 3.2, 2: 1.5, 12: 2.5, 11: 2.5, 15: 1.0, 1: 2.0, 7: 1.8
+  },
+  165: { // Breaking Entry
+    6: 2.0, 5: 1.5, 8: 2.0, 10: 2.0, 9: 2.0, 3: 1.6, 4: 1.0, 14: 2.4, 2: 2.0, 12: 2.4, 11: 2.5, 15: 1.6, 1: 2.0, 7: 1.8
+  },
+  135: { // Trap Disarm
+    6: 1.6, 5: 2.0, 8: 2.4, 10: 2.4, 9: 2.4, 3: 1.6, 4: 1.0, 14: 2.4, 2: 2.5, 12: 2.4, 11: 2.4, 15: 1.8, 1: 2.4, 7: 2.4
+  },
+  136: { // Perception
+    6: 1.6, 5: 1.0, 8: 1.6, 10: 2.4, 9: 2.4, 3: 2.4, 4: 1.0, 14: 1.2, 2: 1.6, 12: 2.4, 11: 2.4, 15: 2.4, 1: 2.4, 7: 1.4
+  },
+  139: { // Vehicle Air
+    6: 1.0, 5: 2.4, 8: 2.0, 10: 2.4, 9: 1.6, 3: 1.6, 4: 1.0, 14: 2.4, 2: 3.0, 12: 2.5, 11: 2.4, 15: 3.2, 1: 1.6, 7: 1.4
+  },
+  166: { // Vehicle Ground
+    6: 1.0, 5: 2.4, 8: 2.4, 10: 1.6, 9: 1.0, 3: 1.6, 4: 1.0, 14: 2.4, 2: 2.5, 12: 2.5, 11: 2.4, 15: 3.2, 1: 1.0, 7: 1.4
+  },
+  117: { // Vehicle Water
+    6: 1.0, 5: 2.4, 8: 2.4, 10: 2.4, 9: 1.6, 3: 1.6, 4: 1.0, 14: 2.4, 2: 2.5, 12: 2.5, 11: 2.4, 15: 3.2, 1: 1.6, 7: 1.4
+  },
+  140: { // Map Navigation
+    6: 1.0, 5: 1.6, 8: 2.0, 10: 1.6, 9: 1.6, 3: 1.6, 4: 2.0, 14: 1.2, 2: 2.0, 12: 2.0, 11: 1.6, 15: 2.4, 1: 1.6, 7: 1.3
+  }
+} as const;
+
+/**
+ * Skill trickle-down factors indexed by STAT ID
+ * Factors for how abilities contribute to skill bonuses [str, agi, sta, int, sen, psy]
+ * Complete data from AOSkills4 VB source (97 skills × 6 abilities)
+ */
+export const SKILL_TRICKLE_DOWN: Record<number, number[]> = {
+  152: [0.0, 0.0, 1.0, 0.0, 0.0, 0.0], // Body Dev → Stamina
+  132: [0.0, 0.0, 0.1, 0.1, 0.1, 0.7], // Nano Pool → Mixed, heavy Psychic
+  100: [0.2, 0.5, 0.0, 0.0, 0.0, 0.3], // Martial Arts → Agility/Psychic
+  142: [0.6, 0.0, 0.4, 0.0, 0.0, 0.0], // Brawl → Strength/Stamina
+  144: [0.0, 0.0, 0.0, 0.0, 0.8, 0.2], // Dimach → Sense/Psychic
+  143: [0.0, 0.5, 0.0, 0.0, 0.5, 0.0], // Riposte → Agility/Sense
+  137: [0.2, 0.5, 0.3, 0.0, 0.0, 0.0], // Adventuring → Physical stats
+  138: [0.2, 0.2, 0.6, 0.0, 0.0, 0.0], // Swimming → Stamina heavy
+  102: [0.5, 0.1, 0.4, 0.0, 0.0, 0.0], // 1h Blunt → Strength/Stamina
+  103: [0.3, 0.4, 0.3, 0.0, 0.0, 0.0], // 1h Edged → Strength/Agility/Stamina
+  106: [0.2, 0.5, 0.3, 0.0, 0.0, 0.0], // Piercing → Agility/Stamina/Strength
+  107: [0.5, 0.0, 0.5, 0.0, 0.0, 0.0], // 2h Blunt → Strength/Stamina
+  105: [0.6, 0.0, 0.4, 0.0, 0.0, 0.0], // 2h Edged → Strength/Stamina
+  104: [0.0, 0.0, 0.5, 0.5, 0.0, 0.0], // Melee Energy → Stamina/Intelligence
+  145: [0.5, 0.2, 0.0, 0.0, 0.3, 0.0], // Parry → Strength/Agility/Sense
+  146: [0.0, 0.5, 0.0, 0.3, 0.2, 0.0], // Sneak Attack → Agility/Intelligence/Sense
+  101: [0.3, 0.6, 0.1, 0.0, 0.0, 0.0], // Multi Melee → Agility/Strength
+  147: [0.0, 0.6, 0.0, 0.0, 0.4, 0.0], // Fast Attack → Agility/Sense
+  108: [0.2, 0.6, 0.0, 0.0, 0.2, 0.0], // Sharp Objects → Agility/Strength/Sense
+  109: [0.0, 0.4, 0.0, 0.2, 0.4, 0.0], // Grenade → Agility/Intelligence/Sense
+  110: [0.4, 0.6, 0.0, 0.0, 0.0, 0.0], // Heavy Weapons → Agility/Strength
+  111: [0.2, 0.4, 0.0, 0.0, 0.4, 0.0], // Bow → Agility/Strength/Sense
+  112: [0.0, 0.6, 0.0, 0.0, 0.4, 0.0], // Pistol → Agility/Sense
+  116: [0.1, 0.3, 0.4, 0.0, 0.2, 0.0], // Assault Rifle → Mixed physical
+  114: [0.3, 0.3, 0.3, 0.0, 0.1, 0.0], // MG/SMG → Physical stats
+  115: [0.4, 0.6, 0.0, 0.0, 0.0, 0.0], // Shotgun → Agility/Strength
+  113: [0.0, 0.6, 0.0, 0.0, 0.4, 0.0], // Rifle → Agility/Sense
+  133: [0.0, 0.0, 0.0, 0.2, 0.4, 0.4], // Ranged Energy → Intelligence/Sense/Psychic
+  150: [0.0, 1.0, 0.0, 0.0, 0.0, 0.0], // Fling Shot → Agility
+  151: [0.0, 0.0, 0.0, 0.0, 1.0, 0.0], // Aimed Shot → Sense
+  148: [0.3, 0.5, 0.2, 0.0, 0.0, 0.0], // Burst → Physical stats
+  167: [0.6, 0.0, 0.4, 0.0, 0.0, 0.0], // Full Auto → Strength/Stamina
+  121: [0.1, 0.5, 0.0, 0.0, 0.4, 0.0], // Bow Special Attack → Agility/Sense
+  134: [0.0, 0.6, 0.0, 0.4, 0.0, 0.0], // Multi Ranged → Agility/Intelligence
+  118: [0.0, 0.1, 0.0, 0.1, 0.6, 0.2], // Melee Init → Sense/Psychic
+  119: [0.0, 0.1, 0.0, 0.1, 0.6, 0.2], // Ranged Init → Sense/Psychic
+  120: [0.0, 0.1, 0.0, 0.1, 0.6, 0.2], // Physical Init → Sense/Psychic
+  149: [0.0, 0.4, 0.0, 0.0, 0.6, 0.0], // Nano Init → Sense/Agility
+  154: [0.0, 0.5, 0.0, 0.2, 0.3, 0.0], // Dodge Ranged → Agility/Intelligence/Sense
+  155: [0.0, 0.5, 0.0, 0.2, 0.3, 0.0], // Evade Close → Agility/Intelligence/Sense
+  153: [0.0, 0.5, 0.0, 0.2, 0.3, 0.0], // Duck Explosions → Agility/Intelligence/Sense
+  168: [0.0, 0.0, 0.0, 0.2, 0.0, 0.8], // Nano Resist → Intelligence/Psychic
+  156: [0.2, 0.4, 0.4, 0.0, 0.1, 0.0], // Run Speed → Physical stats
+  125: [0.0, 0.5, 0.0, 0.5, 0.0, 0.0], // Mechanical Engineering → Agility/Intelligence
+  126: [0.0, 0.3, 0.2, 0.5, 0.0, 0.0], // Electrical Engineering → Mixed
+  157: [0.0, 0.0, 0.0, 0.5, 0.0, 0.5], // Quantum FT → Intelligence/Psychic
+  158: [0.5, 0.0, 0.0, 0.5, 0.0, 0.0], // Weapon Smithing → Strength/Intelligence
+  159: [0.0, 0.2, 0.0, 0.8, 0.0, 0.0], // Pharmaceuticals → Intelligence/Agility
+  160: [0.0, 0.0, 0.0, 1.0, 0.0, 0.0], // Nano Programming → Intelligence
+  161: [0.0, 0.0, 0.0, 1.0, 0.0, 0.0], // Computer Literacy → Intelligence
+  162: [0.0, 0.0, 0.0, 0.5, 0.5, 0.0], // Psychology → Intelligence/Sense
+  163: [0.0, 0.0, 0.5, 0.5, 0.0, 0.0], // Chemistry → Stamina/Intelligence
+  141: [0.0, 0.0, 0.0, 0.7, 0.2, 0.1], // Tutoring → Intelligence/Sense/Psychic
+  127: [0.0, 0.0, 0.0, 0.8, 0.0, 0.2], // Material Metamorphose → Intelligence/Psychic
+  128: [0.0, 0.0, 0.0, 0.8, 0.0, 0.2], // Biological Metamorphose → Intelligence/Psychic
+  129: [0.0, 0.0, 0.0, 0.8, 0.2, 0.0], // Psychological Modification → Intelligence/Sense
+  130: [0.0, 0.0, 0.2, 0.8, 0.0, 0.0], // Material Creation → Intelligence/Stamina
+  131: [0.0, 0.2, 0.0, 0.8, 0.0, 0.0], // Space Time → Intelligence/Agility
+  122: [0.2, 0.0, 0.0, 0.8, 0.0, 0.0], // Sensory Improvement → Intelligence/Strength
+  123: [0.0, 0.3, 0.0, 0.3, 0.4, 0.0], // First Aid → Mixed
+  124: [0.0, 0.3, 0.0, 0.5, 0.2, 0.0], // Treatment → Intelligence/Agility/Sense
+  164: [0.0, 0.3, 0.0, 0.0, 0.7, 0.0], // Concealment → Sense/Agility
+  165: [0.0, 0.4, 0.0, 0.0, 0.3, 0.3], // Breaking Entry → Agility/Sense/Psychic
+  135: [0.0, 0.2, 0.0, 0.2, 0.6, 0.0], // Trap Disarm → Sense/Agility/Intelligence
+  136: [0.0, 0.0, 0.0, 0.3, 0.7, 0.0], // Perception → Sense/Intelligence
+  139: [0.0, 0.2, 0.0, 0.2, 0.6, 0.0], // Vehicle Air → Sense/Agility/Intelligence
+  166: [0.0, 0.2, 0.0, 0.2, 0.6, 0.0], // Vehicle Ground → Sense/Agility/Intelligence
+  117: [0.0, 0.2, 0.0, 0.2, 0.6, 0.0], // Vehicle Water → Sense/Agility/Intelligence
+  140: [0.0, 0.0, 0.0, 0.4, 0.5, 0.1]  // Map Navigation → Intelligence/Sense/Psychic
+} as const;
