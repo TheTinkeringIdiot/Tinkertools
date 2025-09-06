@@ -38,14 +38,14 @@ export function profileToCharacterStats(profile: TinkerProfile): CharacterStats 
   const breed = getBreedId(profile.Character.Breed) || 0;
   const profession = getProfessionId(profile.Character.Profession) || 0;
   
-  // Extract abilities (total values for skill cap calculations)
+  // Extract abilities (improvements only for IP calculations)
   const abilities = [
-    profile.Skills.Attributes.Strength.value,
-    profile.Skills.Attributes.Agility.value,
-    profile.Skills.Attributes.Stamina.value,
-    profile.Skills.Attributes.Intelligence.value,
-    profile.Skills.Attributes.Sense.value,
-    profile.Skills.Attributes.Psychic.value
+    profile.Skills.Attributes.Strength.pointFromIp || 0,
+    profile.Skills.Attributes.Agility.pointFromIp || 0,
+    profile.Skills.Attributes.Stamina.pointFromIp || 0,
+    profile.Skills.Attributes.Intelligence.pointFromIp || 0,
+    profile.Skills.Attributes.Sense.pointFromIp || 0,
+    profile.Skills.Attributes.Psychic.pointFromIp || 0
   ];
   
   // Extract skills (improvements only)
@@ -114,7 +114,8 @@ export function calculateProfileIP(profile: TinkerProfile): IPTracker {
   const abilityBreakdown: Record<string, number> = {};
   ABILITY_NAMES.forEach((abilityName, index) => {
     const breed = getBreedId(profile.Character.Breed) || 0;
-    const improvements = characterStats.abilities[index];
+    const ability = profile.Skills.Attributes[abilityName as keyof typeof profile.Skills.Attributes] as SkillWithIP;
+    const improvements = ability?.pointFromIp || 0;
     const abilityStatId = ABILITY_INDEX_TO_STAT_ID[index];
     abilityBreakdown[abilityName] = calcTotalAbilityCost(improvements, breed, abilityStatId);
   });
