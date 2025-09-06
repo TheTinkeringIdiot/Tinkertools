@@ -8,6 +8,9 @@ import type { TinkerProfile, NanoCompatibleProfile } from './types';
 import { getBreedInitValue } from './ip-calculator';
 import { getBreedId } from '../../services/game-utils';
 
+// Import BASE_SKILL constant from ip-calculator
+const BASE_SKILL = 5; // Base skill value that all characters start with
+
 // ============================================================================
 // Game Constants
 // ============================================================================
@@ -68,21 +71,21 @@ export function getDefaultSkillsForBreed(breed: string) {
   
   return {
     Attributes: {
-      Strength: { value: getBreedInitValue(breedId, 0), ipSpent: 0, pointFromIp: 0 },
-      Agility: { value: getBreedInitValue(breedId, 1), ipSpent: 0, pointFromIp: 0 },
-      Stamina: { value: getBreedInitValue(breedId, 2), ipSpent: 0, pointFromIp: 0 },
-      Intelligence: { value: getBreedInitValue(breedId, 3), ipSpent: 0, pointFromIp: 0 },
-      Sense: { value: getBreedInitValue(breedId, 4), ipSpent: 0, pointFromIp: 0 },
-      Psychic: { value: getBreedInitValue(breedId, 5), ipSpent: 0, pointFromIp: 0 }
+      Strength: { value: getBreedInitValue(breedId, 0), ipSpent: 0, pointFromIp: 0, cap: undefined },
+      Agility: { value: getBreedInitValue(breedId, 1), ipSpent: 0, pointFromIp: 0, cap: undefined },
+      Stamina: { value: getBreedInitValue(breedId, 2), ipSpent: 0, pointFromIp: 0, cap: undefined },
+      Intelligence: { value: getBreedInitValue(breedId, 3), ipSpent: 0, pointFromIp: 0, cap: undefined },
+      Sense: { value: getBreedInitValue(breedId, 4), ipSpent: 0, pointFromIp: 0, cap: undefined },
+      Psychic: { value: getBreedInitValue(breedId, 5), ipSpent: 0, pointFromIp: 0, cap: undefined }
     },
     'Body & Defense': {
-    'Nano Pool': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Nano Resist': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Body Dev.': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Dodge-Rng': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Duck-Exp': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Evade-ClsC': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Deflect': { value: 1, ipSpent: 0, pointFromIp: 0 }
+    'Nano Pool': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Nano Resist': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Body Dev.': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Dodge-Rng': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Duck-Exp': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Evade-ClsC': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Deflect': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined }
   },
   ACs: {
     'Imp/Proj AC': 1,
@@ -95,79 +98,79 @@ export function getDefaultSkillsForBreed(breed: string) {
     'Disease AC': 1
   },
   'Ranged Weapons': {
-    'Pistol': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Ranged. Init.': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Grenade': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Heavy Weapons': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Bow': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Rifle': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'MG / SMG': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Shotgun': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Assault Rif': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Multi Ranged': { value: 1, ipSpent: 0, pointFromIp: 0 }
+    'Pistol': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Ranged Init': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Grenade': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Heavy Weapons': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Bow': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Rifle': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'MG/SMG': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Shotgun': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Assault Rif': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Multi Ranged': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined }
   },
   'Ranged Specials': {
-    'Fling Shot': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Sharp Obj': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Bow Spc Att': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Burst': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Full Auto': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Aimed Shot': { value: 1, ipSpent: 0, pointFromIp: 0 }
+    'Fling Shot': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Sharp Obj': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Bow Spc Att': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Burst': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Full Auto': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Aimed Shot': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined }
   },
   'Melee Weapons': {
-    'Piercing': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Melee. Init.': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Physic. Init': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    '1h Blunt': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    '1h Edged': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Melee Ener.': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    '2h Edged': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    '2h Blunt': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Martial Arts': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Mult. Melee': { value: 1, ipSpent: 0, pointFromIp: 0 }
+    'Piercing': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Melee Init': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Physical Init': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    '1h Blunt': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    '1h Edged': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Melee Energy': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    '2h Edged': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    '2h Blunt': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Martial Arts': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Multi Melee': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined }
   },
   'Melee Specials': {
-    'Riposte': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Dimach': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Sneak Atck': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Fast Attack': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Brawling': { value: 1, ipSpent: 0, pointFromIp: 0 }
+    'Riposte': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Dimach': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Sneak Attack': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Fast Attack': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Brawling': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined }
   },
   'Nanos & Casting': {
-    'Matter Crea': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'NanoC. Init.': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Psycho Modi': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Sensory Impr': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Time&Space': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Bio Metamor': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Matt. Metam': { value: 1, ipSpent: 0, pointFromIp: 0 }
+    'Matter Creation': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'NanoC Init': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Psycho Modi': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Sensory Improvement': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Time & Space': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Bio Metamor': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Matt Metam': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined }
   },
   Exploring: {
-    'Vehicle Air': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Vehicle Ground': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Vehicle Water': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Adventuring': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Run Speed': { value: 1, ipSpent: 0, pointFromIp: 0 }
+    'Vehicle Air': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Vehicle Ground': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Vehicle Water': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Adventuring': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Run Speed': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined }
   },
   'Trade & Repair': {
-    'Chemistry': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Comp. Liter': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Elec. Engi': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Mech. Engi': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Nano Progra': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Pharma Tech': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Quantum FT': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Tutoring': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Weapon Smt': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Break&Entry': { value: 1, ipSpent: 0, pointFromIp: 0 }
+    'Chemistry': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Computer Literacy': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Elec Eng': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Mech Eng': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Nano Programming': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Pharma Tech': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Quantum FT': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Tutoring': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Weapon Smith': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Break & Entry': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined }
   },
   'Combat & Healing': {
-    'Concealment': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Perception': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Psychology': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Treatment': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'First Aid': { value: 1, ipSpent: 0, pointFromIp: 0 },
-    'Trap Disarm.': { value: 1, ipSpent: 0, pointFromIp: 0 }
+    'Concealment': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Perception': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Psychology': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Treatment': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'First Aid': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Trap Disarm.': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined }
   },
   Misc: {
     '% Add. Xp': 0,
@@ -337,19 +340,19 @@ export function createDefaultNanoProfile(name: string = 'New Character', breed: 
     level: 1,
     skills: {
       // Nano Schools
-      'Biological Metamorphosis': 1,
-      'Matter Creation': 1,
-      'Matter Metamorphosis': 1,
-      'Psychological Modifications': 1,
-      'Sensory Improvement': 1,
-      'Time and Space': 1,
+      'Biological Metamorphosis': BASE_SKILL,
+      'Matter Creation': BASE_SKILL,
+      'Matter Metamorphosis': BASE_SKILL,
+      'Psychological Modifications': BASE_SKILL,
+      'Sensory Improvement': BASE_SKILL,
+      'Time and Space': BASE_SKILL,
       
       // Core Skills
-      'Nano Programming': 1,
-      'Computer Literacy': 1,
-      'Tutoring': 1,
-      'First Aid': 1,
-      'Treatment': 1
+      'Nano Programming': BASE_SKILL,
+      'Computer Literacy': BASE_SKILL,
+      'Tutoring': BASE_SKILL,
+      'First Aid': BASE_SKILL,
+      'Treatment': BASE_SKILL
     },
     stats: {
       'Strength': getBreedInitValue(breedId, 0),
