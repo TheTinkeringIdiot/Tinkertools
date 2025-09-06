@@ -13,10 +13,11 @@ import {
   calcTotalSkillCost,
   calcAllTrickleDown,
   calcSkillCap,
-  calcAbilityCap,
+  calcAbilityMaxValue,
   calcIPAnalysis,
   validateCharacterBuild,
   ABILITY_NAMES,
+  ABILITY_INDEX_TO_STAT_ID,
   SKILL_NAMES,
   type CharacterStats,
   type IPCalculationResult
@@ -37,14 +38,14 @@ export function profileToCharacterStats(profile: TinkerProfile): CharacterStats 
   const breed = getBreedId(profile.Character.Breed) || 0;
   const profession = getProfessionId(profile.Character.Profession) || 0;
   
-  // Extract abilities (improvements only, not total values)
+  // Extract abilities (total values for skill cap calculations)
   const abilities = [
-    profile.Skills.Attributes.Strength.pointFromIp,
-    profile.Skills.Attributes.Agility.pointFromIp,
-    profile.Skills.Attributes.Stamina.pointFromIp,
-    profile.Skills.Attributes.Intelligence.pointFromIp,
-    profile.Skills.Attributes.Sense.pointFromIp,
-    profile.Skills.Attributes.Psychic.pointFromIp
+    profile.Skills.Attributes.Strength.value,
+    profile.Skills.Attributes.Agility.value,
+    profile.Skills.Attributes.Stamina.value,
+    profile.Skills.Attributes.Intelligence.value,
+    profile.Skills.Attributes.Sense.value,
+    profile.Skills.Attributes.Psychic.value
   ];
   
   // Extract skills (improvements only)
@@ -109,12 +110,13 @@ export function calculateProfileIP(profile: TinkerProfile): IPTracker {
   const characterStats = profileToCharacterStats(profile);
   const ipAnalysis = calcIPAnalysis(characterStats);
   
-  // Calculate breakdown by abilities
+  // Calculate breakdown by abilities using STAT IDs
   const abilityBreakdown: Record<string, number> = {};
   ABILITY_NAMES.forEach((abilityName, index) => {
     const breed = getBreedId(profile.Character.Breed) || 0;
     const improvements = characterStats.abilities[index];
-    abilityBreakdown[abilityName] = calcTotalAbilityCost(improvements, breed, index);
+    const abilityStatId = ABILITY_INDEX_TO_STAT_ID[index];
+    abilityBreakdown[abilityName] = calcTotalAbilityCost(improvements, breed, abilityStatId);
   });
   
   // Calculate breakdown by skill categories
@@ -171,8 +173,9 @@ export function updateProfileSkillInfo(profile: TinkerProfile): void {
     abilityNames.forEach((abilityName, index) => {
       const ability = profile.Skills.Attributes![abilityName as keyof typeof profile.Skills.Attributes] as SkillWithIP;
       if (ability) {
-        // Calculate and set ability cap
-        const abilityCap = calcAbilityCap(characterStats.level, characterStats.breed, index);
+        // Calculate and set ability cap using STAT ID
+        const abilityStatId = ABILITY_INDEX_TO_STAT_ID[index];
+        const abilityCap = calcAbilityMaxValue(characterStats.level, characterStats.breed, characterStats.profession, abilityStatId);
         ability.cap = abilityCap;
       }
     });
@@ -207,7 +210,7 @@ export function updateProfileSkillInfo(profile: TinkerProfile): void {
             skillIndex,
             characterStats.abilities
           );
-          skillData.cap = skillCap.effectiveCap;
+          skillData.cap = skillCap;
         }
       });
     }

@@ -103,7 +103,7 @@ import { ref, computed, watch } from 'vue';
 import InputNumber from 'primevue/inputnumber';
 import Slider from 'primevue/slider';
 import Button from 'primevue/button';
-import { calcIP, getBreedInitValue } from '@/lib/tinkerprofiles/ip-calculator';
+import { calcIP, getBreedInitValue, ABILITY_INDEX_TO_STAT_ID } from '@/lib/tinkerprofiles/ip-calculator';
 import { getBreedId } from '@/services/game-utils';
 
 // Props
@@ -144,10 +144,11 @@ const minValue = computed(() => {
     const breedId = getBreedId(props.breed) || 0;
     const abilityIndex = getAbilityIndex(props.skillName);
     if (abilityIndex !== -1) {
-      return getBreedInitValue(breedId, abilityIndex);
+      const abilityStatId = ABILITY_INDEX_TO_STAT_ID[abilityIndex];
+      return getBreedInitValue(breedId, abilityStatId);
     }
   }
-  return 1; // Base skill value for regular skills
+  return 5; // BASE_SKILL value for regular skills
 });
 
 const displayValue = computed(() => {
