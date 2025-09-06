@@ -185,7 +185,7 @@ import InputText from 'primevue/inputtext';
 import InputNumber from 'primevue/inputnumber';
 import Dropdown from 'primevue/dropdown';
 import Button from 'primevue/button';
-import { PROFESSION_NAMES, BREED_NAMES } from '@/lib/tinkerprofiles/ip-calculator';
+import { PROFESSION_NAMES, BREED_NAMES } from '@/services/game-data';
 
 // Props
 const props = defineProps<{
