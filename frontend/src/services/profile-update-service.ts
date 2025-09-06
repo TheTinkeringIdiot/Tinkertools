@@ -4,9 +4,8 @@
  */
 
 import type { TinkerProfile, SkillWithIP } from '@/lib/tinkerprofiles';
+import { PROFESSION_NAMES, BREED_NAMES } from '@/services/game-data';
 import { 
-  PROFESSION_NAMES, 
-  BREED_NAMES,
   getBreedInitValue,
   calcTotalAbilityCost,
   calcTotalSkillCost,

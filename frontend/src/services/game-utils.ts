@@ -1372,9 +1372,8 @@ export function getFlagNameFromValue(statId: number, bitValue: number): string {
 import {
   calcIP,
   calcTitleLevel,
-  calcAbilityCap,
-  calcLevelCap,
-  calcSkillAbilityCap,
+  calcAbilityMaxValue,
+  calcIPAdjustableRange,
   calcAbilityCost,
   calcSkillCost,
   calcTotalAbilityCost,
@@ -1416,15 +1415,15 @@ export function calculateTitleLevel(level: number): number {
 /**
  * Calculate ability cap for character
  */
-export function calculateAbilityCap(level: number, breed: number, abilityId: number): number {
-  return calcAbilityCap(level, breed, abilityId);
+export function calculateAbilityCap(level: number, breed: number, profession: number, abilityId: number): number {
+  return calcAbilityMaxValue(level, breed, profession, abilityId);
 }
 
 /**
  * Calculate skill cap based on level and profession
  */
-export function calculateLevelSkillCap(level: number, profession: number, skillId: number): number {
-  return calcLevelCap(level, profession, skillId);
+export function calculateIPAdjustableRange(level: number, profession: number, skillId: number): number {
+  return calcIPAdjustableRange(level, profession, skillId);
 }
 
 /**
@@ -1757,7 +1756,7 @@ export const gameUtils = {
   calculateTotalIP,
   calculateTitleLevel,
   calculateAbilityCap,
-  calculateLevelSkillCap,
+  calculateIPAdjustableRange,
   calculateAbilityIPCost,
   calculateSkillIPCost,
   calculateTotalAbilityIP,
