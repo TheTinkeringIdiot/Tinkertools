@@ -197,7 +197,8 @@ export class ProfileStorage {
    */
   private async migrateProfile(profile: TinkerProfile): Promise<TinkerProfile> {
     if (profile.version === CURRENT_VERSION) {
-      return profile;
+      // Even for current version profiles, check for BASE_SKILL migration
+      return await this.migrateBaseSkillValues(profile);
     }
     
     // Clone the profile for migration
@@ -213,6 +214,94 @@ export class ProfileStorage {
       if (!migrated.created) {
         migrated.created = new Date().toISOString();
       }
+    }
+    
+    // Apply BASE_SKILL migration to all profiles
+    return await this.migrateBaseSkillValues(migrated);
+  }
+
+  /**
+   * Migrate skills from value 1 to BASE_SKILL (5) for existing profiles
+   * Only updates skills that are currently at 1 to avoid overwriting user modifications
+   * Also adds cap field to all skills and calculates caps
+   */
+  private async migrateBaseSkillValues(profile: TinkerProfile): Promise<TinkerProfile> {
+    const BASE_SKILL = 5;
+    
+    if (!profile.Skills) {
+      return profile;
+    }
+    
+    // Clone the profile to avoid mutating the original
+    const migrated = structuredClone(profile);
+    let skillsUpdated = 0;
+    let capsAdded = 0;
+    
+    // IP-based skill categories to update
+    const ipBasedCategories = [
+      'Body & Defense',
+      'Ranged Weapons', 
+      'Ranged Specials',
+      'Melee Weapons',
+      'Melee Specials', 
+      'Nanos & Casting',
+      'Exploring',
+      'Trade & Repair',
+      'Combat & Healing'
+    ];
+    
+    // Update IP-based skills
+    for (const categoryName of ipBasedCategories) {
+      const category = migrated.Skills[categoryName as keyof typeof migrated.Skills];
+      
+      if (category && typeof category === 'object') {
+        for (const [skillName, skill] of Object.entries(category)) {
+          if (skill && typeof skill === 'object' && 'value' in skill) {
+            const skillData = skill as any;
+            
+            // Only update skills that are currently at 1 and have not been modified by user
+            if (skillData.value === 1 && (!skillData.pointFromIp || skillData.pointFromIp === 0)) {
+              skillData.value = BASE_SKILL;
+              skillsUpdated++;
+            }
+            
+            // Add cap field if missing
+            if (skillData.cap === undefined) {
+              skillData.cap = undefined; // Will be calculated by updateProfileSkillInfo
+              capsAdded++;
+            }
+          }
+        }
+      }
+    }
+    
+    // Update abilities to have cap field if missing
+    if (migrated.Skills.Attributes) {
+      const abilityNames = ['Strength', 'Agility', 'Stamina', 'Intelligence', 'Sense', 'Psychic'];
+      abilityNames.forEach(abilityName => {
+        const ability = migrated.Skills.Attributes![abilityName as keyof typeof migrated.Skills.Attributes] as any;
+        if (ability && ability.cap === undefined) {
+          ability.cap = undefined; // Will be calculated by updateProfileSkillInfo
+          capsAdded++;
+        }
+      });
+    }
+    
+    // Recalculate caps using the IP integrator
+    if (capsAdded > 0) {
+      try {
+        // Import dynamically to avoid circular dependencies
+        const { updateProfileSkillInfo } = await import('./ip-integrator');
+        updateProfileSkillInfo(migrated);
+      } catch (error) {
+        console.warn('[ProfileStorage] Could not calculate caps during migration:', error);
+      }
+    }
+    
+    // If we updated any skills or added caps, mark the profile as updated
+    if (skillsUpdated > 0 || capsAdded > 0) {
+      migrated.updated = new Date().toISOString();
+      console.log(`[ProfileStorage] Migrated profile ${migrated.Character.Name}: ${skillsUpdated} skills from value 1 to BASE_SKILL (${BASE_SKILL}), ${capsAdded} caps added`);
     }
     
     return migrated;
