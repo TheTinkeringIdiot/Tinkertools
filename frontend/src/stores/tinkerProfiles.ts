@@ -528,9 +528,13 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   }
 
   /**
-   * Modify a specific ability value
+   * Modify a specific ability value with real-time trickle-down updates
    */
-  async function modifyAbility(profileId: string, abilityName: string, newValue: number): Promise<void> {
+  async function modifyAbility(profileId: string, abilityName: string, newValue: number): Promise<{
+    success: boolean;
+    error?: string;
+    trickleDownChanges?: Record<string, { old: number; new: number }>;
+  }> {
     if (!profileManager) {
       throw new Error('Profile manager not initialized');
     }
@@ -540,16 +544,30 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       throw new Error('Profile not found');
     }
 
-    // Update the ability value
-    if (profile.Skills?.Attributes && abilityName in profile.Skills.Attributes) {
-      const ability = profile.Skills.Attributes[abilityName as keyof typeof profile.Skills.Attributes];
-      if (ability && typeof ability === 'object') {
-        ability.value = newValue;
-        // IP cost will be recalculated when IP tracker is refreshed
-      }
-    }
+    // Use enhanced IP integrator for ability modification
+    const { modifyAbility } = await import('@/lib/tinkerprofiles/ip-integrator');
+    const result = modifyAbility(profile, abilityName, newValue);
 
-    await updateProfile(profileId, profile);
+    if (result.success && result.updatedProfile) {
+      // Update the profile in storage and reactive state
+      await updateProfile(profileId, result.updatedProfile);
+      
+      // Update active profile if this is the active one
+      if (activeProfileId.value === profileId) {
+        activeProfile.value = result.updatedProfile;
+        profiles.value.set(profileId, result.updatedProfile);
+      }
+
+      return {
+        success: true,
+        trickleDownChanges: result.trickleDownChanges
+      };
+    } else {
+      return {
+        success: false,
+        error: result.error
+      };
+    }
   }
 
   /**

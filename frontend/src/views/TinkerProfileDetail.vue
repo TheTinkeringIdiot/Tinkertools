@@ -364,9 +364,23 @@ async function saveChanges() {
       }
     }
     
-    // Apply ability changes
+    // Apply ability changes with trickle-down feedback
+    let totalTrickleDownChanges = 0;
     for (const [abilityName, newValue] of Object.entries(pendingChanges.value.abilities)) {
-      await profilesStore.modifyAbility(props.profileId, abilityName, newValue);
+      const result = await profilesStore.modifyAbility(props.profileId, abilityName, newValue);
+      
+      if (result.success && result.trickleDownChanges) {
+        // Count skills with meaningful trickle-down changes
+        const changedSkills = Object.entries(result.trickleDownChanges).filter(
+          ([_, change]) => Math.abs(change.new - change.old) > 0
+        );
+        totalTrickleDownChanges += changedSkills.length;
+      }
+    }
+    
+    // Show feedback about trickle-down updates
+    if (totalTrickleDownChanges > 0) {
+      showTrickleDownFeedback(totalTrickleDownChanges);
     }
     
     // Reload profile data
@@ -409,6 +423,20 @@ async function handleCharacterUpdate(changes: any) {
     console.error('Error updating character:', err);
     error.value = err instanceof Error ? err.message : 'Failed to update character';
   }
+}
+
+// Feedback functions
+function showTrickleDownFeedback(affectedSkillsCount: number) {
+  // Simple console feedback for now - could be enhanced with toast notifications
+  console.info(`✨ Ability change updated trickle-down bonuses for ${affectedSkillsCount} skills`);
+  
+  // Could add a toast notification here if PrimeVue Toast is set up:
+  // toast.add({
+  //   severity: 'success',
+  //   summary: 'Trickle-down Updated',
+  //   detail: `${affectedSkillsCount} skills received updated bonuses from ability changes`,
+  //   life: 3000
+  // });
 }
 
 // Watchers

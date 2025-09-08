@@ -10,16 +10,23 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
         <span class="font-medium text-surface-900 dark:text-surface-50 truncate">
           {{ skillName }}
         </span>
-        <span v-if="skillData.trickleDown" class="text-xs text-green-600 dark:text-green-400">
-          (+{{ skillData.trickleDown }})
+        <span v-if="trickleDownBonus > 0" 
+              class="text-xs text-green-600 dark:text-green-400 font-medium transition-all duration-300"
+              :class="{ 'trickle-down-pulse': trickleDownChanged }">
+          (+{{ trickleDownBonus }})
         </span>
       </div>
       
       <div class="skill-values flex items-center gap-2 flex-shrink-0 min-w-[7rem]">
-        <!-- Current Value Display -->
+        <!-- Current Value Display with Breakdown -->
         <div class="flex items-center gap-2">
           <span class="text-sm text-surface-600 dark:text-surface-400 min-w-[4rem] text-right">
-            {{ displayValue }} / {{ maxValue }}
+            {{ totalValue }} / {{ maxTotalValue }}
+          </span>
+          <span v-if="showBreakdown && trickleDownBonus > 0" 
+                class="text-xs text-surface-500 dark:text-surface-400 cursor-help"
+                :title="valueBreakdown">
+            <i class="pi pi-info-circle"></i>
           </span>
         </div>
         
@@ -42,18 +49,18 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
         :max="maxValue"
         :step="1"
         class="flex-1 min-w-[100px] max-w-none"
-        @update:model-value="onValueChanged"
+        @update:model-value="onSliderChanged"
       />
       
       <!-- Input Number for precise entry with proper width -->
       <InputNumber
-        v-model="sliderValue"
-        :min="minValue"
-        :max="maxValue"
+        v-model="inputValue"
+        :min="props.isAbility ? minValue : baseValue + trickleDownBonus"
+        :max="props.isAbility ? maxValue : maxTotalValue"
         :step="1"
         size="small"
         class="flex-shrink-0"
-        @update:model-value="onValueChanged"
+        @update:model-value="onInputChanged"
       />
       
       <!-- Max Button with proper sizing -->
@@ -63,7 +70,7 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
         severity="secondary"
         outlined
         @click="setToMax"
-        :disabled="sliderValue >= maxValue"
+        :disabled="props.isAbility ? sliderValue >= maxValue : inputValue >= maxTotalValue"
         class="flex-shrink-0 min-w-[3rem]"
       />
     </div>
@@ -72,7 +79,7 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
     <div v-else class="flex items-center justify-center py-2">
       <div class="text-center">
         <div class="text-lg font-bold text-surface-900 dark:text-surface-50 mb-1">
-          {{ displayValue }}
+          {{ totalValue }}
         </div>
         <div class="text-xs text-surface-500 dark:text-surface-400">
           {{ category === 'ACs' ? 'Armor Class' : 'Misc Skill' }} (Read-Only)
@@ -136,7 +143,16 @@ const getAbilityIndex = (abilityName: string): number => {
 };
 
 // State
-const sliderValue = ref(props.skillData?.value || 0);
+// For skills: slider should only represent IP spent, not total value including trickle-down
+const sliderValue = ref(props.isAbility ? (props.skillData?.value || 0) : (props.skillData?.pointFromIp || 0));
+
+// Input field value - shows total skill value for display/editing
+const inputValue = ref(0);
+const trickleDownChanged = ref(false);
+const previousTrickleDown = ref(0);
+
+// Flag to prevent watchers from interfering during user interaction
+const isUserInteracting = ref(false);
 
 // Computed
 const minValue = computed(() => {
@@ -148,31 +164,76 @@ const minValue = computed(() => {
       return getBreedInitValue(breedId, abilityStatId);
     }
   }
-  return 5; // BASE_SKILL value for regular skills
+  // For skills: slider minimum is 0 (no IP spent), regardless of trickle-down
+  return 0;
 });
 
-const displayValue = computed(() => {
-  const baseValue = sliderValue.value || 0;
-  const trickleDown = props.skillData?.trickleDown || 0;
-  return baseValue + trickleDown;
+// Core skill value components
+const baseValue = computed(() => props.isAbility ? minValue.value : 5); // Base skill value
+const trickleDownBonus = computed(() => props.skillData?.trickleDown || 0);
+const ipContribution = computed(() => props.skillData?.pointFromIp || 0);
+
+// Total displayed value (what the user sees)
+const totalValue = computed(() => {
+  if (props.isAbility) {
+    // For abilities: use the actual value from profile
+    return sliderValue.value || 0;
+  } else {
+    // For skills: base + trickle-down + IP improvements
+    return baseValue.value + trickleDownBonus.value + ipContribution.value;
+  }
 });
 
-const maxValue = computed(() => {
-  // Use the skill cap if available, otherwise use a reasonable default
-  if (props.skillData?.cap !== undefined) {
-    return props.skillData.cap;
+// Value breakdown tooltip
+const valueBreakdown = computed(() => {
+  if (props.isAbility) {
+    const breedBase = minValue.value;
+    const improvements = Math.max(0, totalValue.value - breedBase);
+    return `Breed Base: ${breedBase} + Improvements: ${improvements} = ${totalValue.value}`;
+  } else {
+    return `Base: ${baseValue.value} + Trickle-down: ${trickleDownBonus.value} + IP: ${ipContribution.value} = ${totalValue.value}`;
+  }
+});
+
+const showBreakdown = computed(() => {
+  return !props.isAbility && (trickleDownBonus.value > 0 || ipContribution.value > 0);
+});
+
+// Maximum total skill value (for display purposes)
+const maxTotalValue = computed(() => {
+  if (props.isAbility) {
+    // For abilities: use the skill cap directly
+    if (props.skillData?.cap !== undefined) {
+      return props.skillData.cap;
+    }
+    return 1000; // Default ability cap
   }
   
-  // Default caps based on category
+  // For skills: return the total skill cap (base + trickle + max IP improvements)
+  return props.skillData?.cap || 500; // Total skill cap from IP calculator
+});
+
+// Maximum IP that can be spent (for slider limits)
+const maxValue = computed(() => {
   if (props.isAbility) {
-    return 1000; // Abilities can go higher
+    // For abilities: use the skill cap directly
+    if (props.skillData?.cap !== undefined) {
+      return props.skillData.cap;
+    }
+    return 1000; // Default ability cap
   }
+  
+  // For skills: slider max is the amount of IP that can be spent
+  // This is the skill cap minus the effective base (base + trickle-down)
+  const skillCap = props.skillData?.cap || 500; // Default skill cap
+  const effectiveBase = baseValue.value + trickleDownBonus.value;
   
   if (props.category === 'Misc') {
     return 100; // Misc skills typically lower
   }
   
-  return 500; // Default skill cap
+  // Max IP spendable is cap minus effective base
+  return Math.max(0, skillCap - effectiveBase);
 });
 
 const ipCost = computed(() => {
@@ -183,8 +244,8 @@ const ipCost = computed(() => {
 });
 
 const progressPercentage = computed(() => {
-  if (maxValue.value === 0) return 0;
-  return Math.min((displayValue.value / maxValue.value) * 100, 100);
+  if (maxTotalValue.value === 0) return 0;
+  return Math.min((totalValue.value / maxTotalValue.value) * 100, 100);
 });
 
 const progressColor = computed(() => {
@@ -203,38 +264,104 @@ const showCapInfo = computed(() => {
 const capInfo = computed(() => {
   if (!showCapInfo.value) return '';
   
-  const remaining = maxValue.value - displayValue.value;
+  const remaining = maxTotalValue.value - totalValue.value;
   if (remaining <= 0) {
     return 'At skill cap';
   } else if (remaining <= 10) {
     return `${remaining} points to cap`;
   } else {
-    return `Cap: ${maxValue.value}`;
+    return `Cap: ${maxTotalValue.value}`;
   }
 });
 
 // Methods
-function onValueChanged(newValue: number | null) {
+function onSliderChanged(newValue: number | null) {
   if (newValue === null || newValue === undefined) return;
+  
+  isUserInteracting.value = true;
   
   const clampedValue = Math.max(minValue.value, Math.min(newValue, maxValue.value));
   sliderValue.value = clampedValue;
   
+  // Update input value to reflect the change
   if (props.isAbility) {
+    inputValue.value = clampedValue;
     emit('ability-changed', props.skillName, clampedValue);
   } else {
-    emit('skill-changed', props.category, props.skillName, clampedValue);
+    // For skills, the slider value represents IP improvements only
+    // The total skill value will be: base + trickle-down + IP improvements
+    const totalSkillValue = baseValue.value + trickleDownBonus.value + clampedValue;
+    inputValue.value = totalSkillValue;
+    emit('skill-changed', props.category, props.skillName, totalSkillValue);
   }
+  
+  // Reset interaction flag after a short delay
+  setTimeout(() => {
+    isUserInteracting.value = false;
+  }, 100);
+}
+
+function onInputChanged(newValue: number | null) {
+  if (newValue === null || newValue === undefined) return;
+  
+  isUserInteracting.value = true;
+  
+  if (props.isAbility) {
+    const clampedValue = Math.max(minValue.value, Math.min(newValue, maxValue.value));
+    sliderValue.value = clampedValue;
+    inputValue.value = clampedValue;
+    emit('ability-changed', props.skillName, clampedValue);
+  } else {
+    // For skills: calculate the IP portion from total value
+    const minTotal = baseValue.value + trickleDownBonus.value;
+    const clampedTotal = Math.max(minTotal, Math.min(newValue, maxTotalValue.value));
+    const ipPortion = Math.max(0, clampedTotal - baseValue.value - trickleDownBonus.value);
+    
+    sliderValue.value = ipPortion;
+    inputValue.value = clampedTotal;
+    emit('skill-changed', props.category, props.skillName, clampedTotal);
+  }
+  
+  // Reset interaction flag after a short delay
+  setTimeout(() => {
+    isUserInteracting.value = false;
+  }, 100);
 }
 
 function setToMax() {
-  onValueChanged(maxValue.value);
+  if (props.isAbility) {
+    onSliderChanged(maxValue.value);
+  } else {
+    // For skills: set input to max total value, which will calculate the IP portion
+    onInputChanged(maxTotalValue.value);
+  }
 }
 
 // Watchers
-watch(() => props.skillData?.value, (newValue) => {
-  if (newValue !== undefined && newValue !== sliderValue.value) {
+// For skills: only watch the IP portion (pointFromIp), not the total value
+watch(() => props.isAbility ? props.skillData?.value : props.skillData?.pointFromIp, (newValue) => {
+  if (newValue !== undefined && newValue !== sliderValue.value && !isUserInteracting.value) {
     sliderValue.value = Math.max(newValue, minValue.value);
+    // Update input value when slider data changes
+    if (props.isAbility) {
+      inputValue.value = sliderValue.value;
+    } else {
+      inputValue.value = totalValue.value;
+    }
+  }
+}, { immediate: true });
+
+// Watch for changes that affect the total value to update input field
+watch([baseValue, trickleDownBonus, sliderValue], () => {
+  if (!props.isAbility && !isUserInteracting.value) {
+    inputValue.value = totalValue.value;
+  }
+}, { immediate: true });
+
+// Initialize input value for abilities
+watch(() => props.isAbility && sliderValue.value, (newValue) => {
+  if (props.isAbility && newValue !== undefined && !isUserInteracting.value) {
+    inputValue.value = sliderValue.value;
   }
 }, { immediate: true });
 
@@ -242,9 +369,21 @@ watch(() => props.skillData?.value, (newValue) => {
 watch(minValue, (newMinValue) => {
   if (sliderValue.value < newMinValue) {
     sliderValue.value = newMinValue;
-    onValueChanged(newMinValue);
+    onSliderChanged(newMinValue);
   }
 });
+
+// Watch for trickle-down changes to trigger visual feedback
+watch(trickleDownBonus, (newValue, oldValue) => {
+  if (newValue !== oldValue && oldValue !== undefined && previousTrickleDown.value !== 0) {
+    trickleDownChanged.value = true;
+    // Reset the animation after a delay
+    setTimeout(() => {
+      trickleDownChanged.value = false;
+    }, 2000);
+  }
+  previousTrickleDown.value = newValue;
+}, { immediate: true });
 </script>
 
 <style scoped>
@@ -277,6 +416,26 @@ watch(minValue, (newMinValue) => {
 
 :deep(.p-slider-range) {
   background: #3b82f6;
+}
+
+/* Trickle-down change animation */
+.trickle-down-pulse {
+  @apply animate-pulse;
+  animation: trickleDownGlow 2s ease-in-out;
+  background: linear-gradient(45deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.3));
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.25rem;
+}
+
+@keyframes trickleDownGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(34, 197, 94, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 10px rgba(34, 197, 94, 0.8);
+    transform: scale(1.05);
+  }
 }
 
 /* Responsive adjustments */
