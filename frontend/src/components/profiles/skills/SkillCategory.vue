@@ -88,7 +88,8 @@ const emit = defineEmits<{
 }>();
 
 // State
-const isExpanded = ref(false);
+// Core Abilities and Body & Defense should default to expanded, others collapsed
+const isExpanded = ref(props.title === 'Core Abilities' || props.title === 'Body & Defense');
 
 // Computed
 const skillCount = computed(() => {

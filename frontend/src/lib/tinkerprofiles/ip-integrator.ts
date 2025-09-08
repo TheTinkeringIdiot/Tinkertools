@@ -166,7 +166,16 @@ export function calculateProfileIP(profile: TinkerProfile): IPTracker {
  */
 export function updateProfileSkillInfo(profile: TinkerProfile): void {
   const characterStats = profileToCharacterStats(profile);
-  const trickleDownResults = calcAllTrickleDown(characterStats.abilities);
+  // For trickle-down, we need full ability values, not improvements
+  const fullAbilityValues = [
+    profile.Skills.Attributes.Strength.value || 0,
+    profile.Skills.Attributes.Agility.value || 0,
+    profile.Skills.Attributes.Stamina.value || 0,
+    profile.Skills.Attributes.Intelligence.value || 0,
+    profile.Skills.Attributes.Sense.value || 0,
+    profile.Skills.Attributes.Psychic.value || 0
+  ];
+  const trickleDownResults = calcAllTrickleDown(fullAbilityValues);
   
   // Update ability caps
   if (profile.Skills.Attributes) {
@@ -204,18 +213,80 @@ export function updateProfileSkillInfo(profile: TinkerProfile): void {
           // Update trickle-down bonus
           skillData.trickleDown = trickleDownResults[skillIndex] || 0;
           
-          // Update skill cap
+          // Update total skill value: base + trickle-down + IP improvements
+          skillData.value = 5 + (skillData.trickleDown || 0) + (skillData.pointFromIp || 0);
+          
+          // Update skill cap (using full ability values for ability cap calculation)
           const skillCap = calcSkillCap(
             characterStats.level,
             characterStats.profession,
             skillIndex,
-            characterStats.abilities
+            fullAbilityValues
           );
           skillData.cap = skillCap;
         }
       });
     }
   });
+}
+
+/**
+ * Update only trickle-down bonuses for all skills (optimized for ability changes)
+ */
+export function updateProfileTrickleDown(profile: TinkerProfile): TinkerProfile {
+  // Create a deep copy to avoid mutations
+  const updatedProfile = JSON.parse(JSON.stringify(profile)) as TinkerProfile;
+  
+  // Extract current abilities from profile (full values, not just improvements)
+  const abilities = [
+    updatedProfile.Skills.Attributes.Strength.value,
+    updatedProfile.Skills.Attributes.Agility.value,
+    updatedProfile.Skills.Attributes.Stamina.value,
+    updatedProfile.Skills.Attributes.Intelligence.value,
+    updatedProfile.Skills.Attributes.Sense.value,
+    updatedProfile.Skills.Attributes.Psychic.value
+  ];
+  
+  // Calculate new trickle-down values
+  const trickleDownResults = calcAllTrickleDown(abilities);
+  
+  // Update trickle-down for all skill categories
+  const categories = [
+    'Body & Defense',
+    'Ranged Weapons', 
+    'Ranged Specials',
+    'Melee Weapons',
+    'Melee Specials',
+    'Nanos & Casting',
+    'Exploring',
+    'Trade & Repair',
+    'Combat & Healing'
+  ];
+  
+  categories.forEach(categoryName => {
+    const category = updatedProfile.Skills[categoryName as keyof typeof updatedProfile.Skills];
+    if (category && typeof category === 'object') {
+      Object.entries(category).forEach(([skillName, skillData]: [string, any]) => {
+        const skillIndex = getSkillId(skillName);
+        if (skillIndex !== null && skillIndex >= 0 && skillData) {
+          const newTrickleDown = trickleDownResults[skillIndex] || 0;
+          const oldTrickleDown = skillData.trickleDown || 0;
+          
+          // Update trickle-down bonus
+          skillData.trickleDown = newTrickleDown;
+          
+          // Recalculate total skill value: base + trickle-down + IP improvements
+          // Note: pointFromIp represents the IP-based improvements beyond base+trickle
+          skillData.value = 5 + newTrickleDown + (skillData.pointFromIp || 0);
+        }
+      });
+    }
+  });
+  
+  // Update timestamp
+  updatedProfile.updated = new Date().toISOString();
+  
+  return updatedProfile;
 }
 
 /**
@@ -371,6 +442,7 @@ export function modifyAbility(
   success: boolean;
   error?: string;
   updatedProfile?: TinkerProfile;
+  trickleDownChanges?: Record<string, { old: number; new: number }>;
 } {
   const abilityData = (profile.Skills.Attributes as any)[abilityName];
   if (!abilityData) {
@@ -414,6 +486,25 @@ export function modifyAbility(
     };
   }
   
+  // Capture old trickle-down values for change tracking
+  const oldTrickleDownChanges: Record<string, { old: number; new: number }> = {};
+  const categories = [
+    'Body & Defense', 'Ranged Weapons', 'Ranged Specials',
+    'Melee Weapons', 'Melee Specials', 'Nanos & Casting',
+    'Exploring', 'Trade & Repair', 'Combat & Healing'
+  ];
+  
+  categories.forEach(categoryName => {
+    const category = profile.Skills[categoryName as keyof typeof profile.Skills];
+    if (category && typeof category === 'object') {
+      Object.entries(category).forEach(([skillName, skillData]: [string, any]) => {
+        if (skillData && skillData.trickleDown !== undefined) {
+          oldTrickleDownChanges[skillName] = { old: skillData.trickleDown, new: 0 };
+        }
+      });
+    }
+  });
+  
   // Create updated profile
   const updatedProfile = JSON.parse(JSON.stringify(profile)) as TinkerProfile;
   const updatedAbility = (updatedProfile.Skills.Attributes as any)[abilityName];
@@ -422,10 +513,28 @@ export function modifyAbility(
   updatedAbility.pointFromIp = newImprovements;
   updatedAbility.ipSpent = updatedAbility.ipSpent + ipCost;
   
-  // Recalculate all IP information (abilities affect trickle-down)
+  // Apply optimized trickle-down update
+  const profileWithTrickleDown = updateProfileTrickleDown(updatedProfile);
+  
+  // Capture new trickle-down values
+  categories.forEach(categoryName => {
+    const category = profileWithTrickleDown.Skills[categoryName as keyof typeof profileWithTrickleDown.Skills];
+    if (category && typeof category === 'object') {
+      Object.entries(category).forEach(([skillName, skillData]: [string, any]) => {
+        if (skillData && oldTrickleDownChanges[skillName] !== undefined) {
+          oldTrickleDownChanges[skillName].new = skillData.trickleDown || 0;
+        }
+      });
+    }
+  });
+  
+  // Full IP recalculation (for IP tracker)
+  const finalProfile = recalculateProfileIP(profileWithTrickleDown);
+  
   return {
     success: true,
-    updatedProfile: recalculateProfileIP(updatedProfile)
+    updatedProfile: finalProfile,
+    trickleDownChanges: oldTrickleDownChanges
   };
 }
 
@@ -447,6 +556,7 @@ export const ipIntegrator = {
   profileToCharacterStats,
   calculateProfileIP,
   updateProfileSkillInfo,
+  updateProfileTrickleDown,
   validateProfileIP,
   recalculateProfileIP,
   updateProfileWithIPTracking,
