@@ -183,3 +183,4 @@ The database follows a legacy-compatible design with:
 - **Database Documentation**: DATABASE.md
 - **Architecture Documents**: docs/ folder
 - **API Documentation**: Available at http://localhost:8000/docs when backend is running
+- You are able to use Playwright MCP server to evaluate the application in a web browser
