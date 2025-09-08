@@ -285,9 +285,11 @@ export function calcIPAdjustableRange(level: number, profession: number, skillId
   
   if (level < 201) {
     if (tl === 1) {
-      // For TL1, adjustable range is what can be gained through leveling
-      adjustableRange = rateData[1] * level;
-      console.log(`[DEBUG] calcIPAdjustableRange: Level ${level}, TL1, skill ${skillId}, rateData[1](${rateData[1]}) * level(${level}) = ${adjustableRange}`);
+      // For TL1, adjustable range is limited by both leveling and TL1 cap
+      const potentialRange = rateData[1] * level;
+      const tl1Cap = rateData[2]; // TL1 cap from COST_TO_RATE table
+      adjustableRange = Math.min(potentialRange, tl1Cap);
+      console.log(`[DEBUG] calcIPAdjustableRange: Level ${level}, TL1, skill ${skillId}, potential(${potentialRange}) capped at TL1(${tl1Cap}) = ${adjustableRange}`);
     } else {
       // For higher TLs, sum all previous TL caps plus current TL progress
       let totalRange = 0;
@@ -359,28 +361,30 @@ export function calcAbilityIPAdjustableRange(level: number, breed: number, abili
     // Cost factor 3 (expensive abilities): 2 points per level
     const basePointsPerLevel = costFactor === 1 ? 5 : (costFactor === 2 ? 3 : 2);
     
-    if (tl === 1) {
-      adjustableRange = basePointsPerLevel * level;
-      console.log(`[DEBUG] calcAbilityIPAdjustableRange: Level ${level}, TL1, ability ${abilityStatId}, cost factor ${costFactor}, ${basePointsPerLevel} * level(${level}) = ${adjustableRange}`);
-    } else {
-      // For higher TLs, calculate cumulative progression
-      let totalRange = 0;
+    // All abilities grow at 3 points per level until hitting TL caps
+    const ABILITY_INC_PER_LEVEL = 3;
+    
+    // Get the appropriate TL caps for this cost factor from COST_TO_RATE
+    const costIndex = Math.min(Math.floor(costFactor * 10) - 10, COST_TO_RATE.length - 1);
+    const rateData = COST_TO_RATE[costIndex] || COST_TO_RATE[10]; // Default to cost factor 2.0
+    
+    // Calculate adjustable range with TL caps
+    let totalRange = 0;
+    for (let lvl = 1; lvl <= level; lvl++) {
+      const currentTL = calcTitleLevel(lvl);
+      const currentCap = rateData[currentTL + 1]; // TL1 is index 2, TL2 is index 3, etc.
       
-      // Add TL1 range (always complete for TL2+)
-      const tl1Levels = Math.min(level, TITLE_LEVELS[1] - 1);
-      totalRange += basePointsPerLevel * tl1Levels;
-      
-      // Add any additional TL progression
-      if (level > TITLE_LEVELS[1] - 1) {
-        const remainingLevels = level - (TITLE_LEVELS[1] - 1);
-        // Scale down progression for higher TLs
-        const higherTLMultiplier = 0.8;
-        totalRange += Math.floor(basePointsPerLevel * higherTLMultiplier * remainingLevels);
+      // Add 3 points but don't exceed current TL's cap
+      if (totalRange + ABILITY_INC_PER_LEVEL <= currentCap) {
+        totalRange += ABILITY_INC_PER_LEVEL;
+      } else {
+        // Cap reached, stop growing until next TL
+        totalRange = Math.min(totalRange, currentCap);
       }
-      
-      adjustableRange = totalRange;
-      console.log(`[DEBUG] calcAbilityIPAdjustableRange: Level ${level}, TL${tl}, ability ${abilityStatId}, cost factor ${costFactor}, total adjustable range: ${adjustableRange}`);
     }
+    
+    adjustableRange = totalRange;
+    console.log(`[DEBUG] calcAbilityIPAdjustableRange: Level ${level}, TL${tl}, ability ${abilityStatId}, cost factor ${costFactor}, total adjustable range: ${adjustableRange}`);
   } else {
     // Post-201: Use breed-specific post-201 progression
     const post201PerLevel = BREED_ABILITY_DATA.caps_post201_per_level[breed]?.[abilityIndex] || 15;
@@ -490,10 +494,48 @@ export function calcNP(nanoPool: number, level: number, breed: number, professio
 }
 
 /**
- * Calculate skill cap for a character (simplified - just returns max value)
+ * Calculate ability-dependent cap for skill improvements based on weighted ability values
+ * Returns the maximum number of IP improvements that can be made to a skill
+ * Based on AOSkills4 calcAbilityCap function
+ */
+export function calcAbilityCapImprovements(abilities: number[], skillId: number): number {
+  const trickleFactors = SKILL_TRICKLE_DOWN[skillId];
+  if (!trickleFactors) {
+    return 999; // No ability dependency for skills without trickle-down
+  }
+  
+  // Calculate weighted ability value using the same trickle-down factors
+  let weightedAbility = 0;
+  for (let i = 0; i < 6; i++) {
+    weightedAbility += abilities[i] * trickleFactors[i];
+  }
+  
+  // AOSkills4 formula: round(((weightedAbility - 5) * 2) + 5)
+  // This returns the maximum number of improvements that can be made via IP
+  return roundAO(((weightedAbility - 5) * 2) + 5);
+}
+
+/**
+ * Calculate skill cap for a character taking both level-based and ability-based limits into account
  */
 export function calcSkillCap(level: number, profession: number, skillId: number, abilities: number[]): number {
-  return calcSkillMaxValue(level, profession, skillId, abilities);
+  const baseValue = BASE_SKILL;
+  const trickleDown = calcTrickleDown(abilities, skillId);
+  
+  // Level-based cap: how many improvements are allowed by level/profession
+  const levelBasedImprovements = calcIPAdjustableRange(level, profession, skillId);
+  
+  // Ability-based cap: how many improvements are allowed by abilities
+  const abilityBasedImprovements = calcAbilityCapImprovements(abilities, skillId);
+  
+  // The actual cap is the minimum of both limits
+  const maxImprovements = Math.min(levelBasedImprovements, abilityBasedImprovements);
+  
+  const totalCap = baseValue + trickleDown + maxImprovements;
+  
+  console.log(`[DEBUG] calcSkillCap: skill ${skillId}, base(${baseValue}) + trickle(${trickleDown}) + min(level:${levelBasedImprovements}, ability:${abilityBasedImprovements}) = ${totalCap}`);
+  
+  return totalCap;
 }
 
 /**
