@@ -7,6 +7,12 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
     <!-- Skill Info Row -->
     <div class="skill-info-row flex items-center justify-between mb-2">
       <div class="flex items-center gap-2 flex-1 min-w-0 max-w-[16rem]">
+        <!-- Cost Factor Dot -->
+        <div 
+          v-if="costFactorColor" 
+          class="cost-factor-dot flex-shrink-0"
+          :style="{ backgroundColor: costFactorColor.primary }"
+        ></div>
         <span class="font-medium text-surface-900 dark:text-surface-50 truncate">
           {{ skillName }}
         </span>
@@ -53,7 +59,26 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
       />
       
       <!-- Input Number for precise entry with proper width -->
+      <div 
+        v-if="costFactorColor" 
+        class="input-gradient-wrapper flex-shrink-0"
+        :style="{ 
+          '--gradient-color-primary': costFactorColor.primary,
+          '--gradient-color-secondary': costFactorColor.secondary 
+        }"
+      >
+        <InputNumber
+          v-model="inputValue"
+          :min="props.isAbility ? minValue : baseValue + trickleDownBonus"
+          :max="props.isAbility ? maxValue : maxTotalValue"
+          :step="1"
+          size="small"
+          class="gradient-input"
+          @update:model-value="onInputChanged"
+        />
+      </div>
       <InputNumber
+        v-else
         v-model="inputValue"
         :min="props.isAbility ? minValue : baseValue + trickleDownBonus"
         :max="props.isAbility ? maxValue : maxTotalValue"
@@ -87,16 +112,6 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
       </div>
     </div>
     
-    <!-- Progress Bar (Visual Indicator for interactive skills only) -->
-    <div v-if="!isReadOnly" class="mt-2">
-      <div class="h-1 bg-surface-200 dark:bg-surface-700 rounded-full overflow-hidden">
-        <div 
-          class="h-full transition-all duration-300 rounded-full"
-          :class="progressColor"
-          :style="{ width: progressPercentage + '%' }"
-        ></div>
-      </div>
-    </div>
     
     <!-- Skill Cap Info -->
     <div v-if="showCapInfo" class="mt-1 text-xs text-surface-500 dark:text-surface-400">
@@ -112,6 +127,8 @@ import Slider from 'primevue/slider';
 import Button from 'primevue/button';
 import { calcIP, getBreedInitValue, ABILITY_INDEX_TO_STAT_ID } from '@/lib/tinkerprofiles/ip-calculator';
 import { getBreedId } from '@/services/game-utils';
+import { SKILL_COST_FACTORS, BREED_ABILITY_DATA } from '@/services/game-data';
+import { getSkillIdFromName } from '@/utils/skill-mappings';
 
 // Props
 const props = defineProps<{
@@ -121,6 +138,8 @@ const props = defineProps<{
   isReadOnly?: boolean;
   category: string;
   breed?: string;
+  profession?: string;
+  skillId?: number;
 }>();
 
 // Emits
@@ -243,19 +262,6 @@ const ipCost = computed(() => {
   return props.skillData?.ipSpent || 0;
 });
 
-const progressPercentage = computed(() => {
-  if (maxTotalValue.value === 0) return 0;
-  return Math.min((totalValue.value / maxTotalValue.value) * 100, 100);
-});
-
-const progressColor = computed(() => {
-  const percentage = progressPercentage.value;
-  if (percentage >= 90) return 'bg-red-500';
-  if (percentage >= 75) return 'bg-orange-500';
-  if (percentage >= 50) return 'bg-yellow-500';
-  if (percentage >= 25) return 'bg-blue-500';
-  return 'bg-green-500';
-});
 
 const showCapInfo = computed(() => {
   return props.skillData?.cap !== undefined;
@@ -272,6 +278,61 @@ const capInfo = computed(() => {
   } else {
     return `Cap: ${maxTotalValue.value}`;
   }
+});
+
+// Cost factor calculation
+const costFactor = computed(() => {
+  if (props.isAbility && props.breed) {
+    // For abilities: use breed-based cost factors
+    const breedId = getBreedId(props.breed);
+    const abilityIndex = getAbilityIndex(props.skillName);
+    if (breedId !== null && abilityIndex !== -1) {
+      return BREED_ABILITY_DATA.cost_factors[breedId]?.[abilityIndex] || null;
+    }
+  } else if (!props.isAbility && props.profession && props.skillId) {
+    // For skills: use profession-based cost factors with skillId
+    const professionMap: Record<string, number> = {
+      'Adventurer': 6, 'Agent': 5, 'Bureaucrat': 8, 'Doctor': 10, 'Enforcer': 9,
+      'Engineer': 3, 'Fixer': 4, 'Keeper': 14, 'Martial Artist': 2, 'Meta-Physicist': 15,
+      'Nano-Technician': 12, 'Soldier': 1, 'Trader': 7, 'Shade': 11
+    };
+    const professionId = professionMap[props.profession];
+    if (professionId) {
+      return SKILL_COST_FACTORS[props.skillId]?.[professionId] || null;
+    }
+  } else if (!props.isAbility && props.profession) {
+    // Fallback: try to get skillId from skill name
+    const skillId = getSkillIdFromName(props.skillName);
+    if (skillId) {
+      const professionMap: Record<string, number> = {
+        'Adventurer': 6, 'Agent': 5, 'Bureaucrat': 8, 'Doctor': 10, 'Enforcer': 9,
+        'Engineer': 3, 'Fixer': 4, 'Keeper': 14, 'Martial Artist': 2, 'Meta-Physicist': 15,
+        'Nano-Technician': 12, 'Soldier': 1, 'Trader': 7, 'Shade': 11
+      };
+      const professionId = professionMap[props.profession];
+      if (professionId) {
+        return SKILL_COST_FACTORS[skillId]?.[professionId] || null;
+      }
+    }
+  }
+  return null;
+});
+
+// Cost factor color classification
+const costFactorColor = computed(() => {
+  const factor = costFactor.value;
+  if (factor === null) return null;
+  
+  if (factor >= 1.0 && factor <= 1.1) {
+    return { primary: '#09B178', secondary: '#0AB885' }; // Green - cheapest
+  } else if (factor >= 1.2 && factor <= 1.5) {
+    return { primary: '#08AFB0', secondary: '#09C5C6' }; // Teal - moderate
+  } else if (factor >= 1.6 && factor <= 2.1) {
+    return { primary: '#0D6495', secondary: '#0F75AA' }; // Blue - expensive
+  } else if (factor >= 2.2) {
+    return { primary: '#3366FF', secondary: '#4D7AFF' }; // Bright blue - most expensive
+  }
+  return null;
 });
 
 // Methods
@@ -436,6 +497,37 @@ watch(trickleDownBonus, (newValue, oldValue) => {
     box-shadow: 0 0 10px rgba(34, 197, 94, 0.8);
     transform: scale(1.05);
   }
+}
+
+/* Cost Factor Dot */
+.cost-factor-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Input Gradient Wrapper */
+.input-gradient-wrapper {
+  position: relative;
+  border-radius: 6px;
+  padding: 2px;
+  background: linear-gradient(90deg, 
+    var(--gradient-color-primary) 0%, 
+    transparent 25%, 
+    transparent 75%, 
+    var(--gradient-color-secondary) 100%
+  );
+}
+
+.input-gradient-wrapper .gradient-input :deep(.p-inputnumber-input) {
+  border-radius: 4px;
+  border: none;
+  background: var(--p-surface-0);
+}
+
+.dark .input-gradient-wrapper .gradient-input :deep(.p-inputnumber-input) {
+  background: var(--p-surface-900);
 }
 
 /* Responsive adjustments */

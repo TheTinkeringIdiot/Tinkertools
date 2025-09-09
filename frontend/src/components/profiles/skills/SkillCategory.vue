@@ -50,6 +50,8 @@ Shows skills in a category with IP cost calculations and interactive value adjus
               :is-read-only="isReadOnly"
               :category="title"
               :breed="breed"
+              :profession="profession"
+              :skill-id="getSkillId(skillName)"
               @skill-changed="handleSkillChanged"
               @ability-changed="handleAbilityChanged"
             />
@@ -70,6 +72,7 @@ Shows skills in a category with IP cost calculations and interactive value adjus
 import { ref, computed } from 'vue';
 import Badge from 'primevue/badge';
 import SkillSlider from './SkillSlider.vue';
+import { getSkillIdFromName } from '@/utils/skill-mappings';
 
 // Props
 const props = defineProps<{
@@ -79,6 +82,7 @@ const props = defineProps<{
   isAbilities?: boolean;
   isReadOnly?: boolean;
   breed?: string;
+  profession?: string;
 }>();
 
 // Emits
@@ -114,6 +118,10 @@ const totalIPCost = computed(() => {
 // Methods
 function toggleExpanded() {
   isExpanded.value = !isExpanded.value;
+}
+
+function getSkillId(skillName: string): number | undefined {
+  return getSkillIdFromName(skillName) || undefined;
 }
 
 function handleSkillChanged(category: string, skillName: string, newValue: number) {
