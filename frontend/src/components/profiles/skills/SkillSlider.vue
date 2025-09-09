@@ -128,7 +128,6 @@ import Button from 'primevue/button';
 import { calcIP, getBreedInitValue, ABILITY_INDEX_TO_STAT_ID } from '@/lib/tinkerprofiles/ip-calculator';
 import { getBreedId } from '@/services/game-utils';
 import { SKILL_COST_FACTORS, BREED_ABILITY_DATA } from '@/services/game-data';
-import { getSkillIdFromName } from '@/utils/skill-mappings';
 
 // Props
 const props = defineProps<{
@@ -139,7 +138,7 @@ const props = defineProps<{
   category: string;
   breed?: string;
   profession?: string;
-  skillId?: number;
+  skillId: number;
 }>();
 
 // Emits
@@ -289,7 +288,7 @@ const costFactor = computed(() => {
     if (breedId !== null && abilityIndex !== -1) {
       return BREED_ABILITY_DATA.cost_factors[breedId]?.[abilityIndex] || null;
     }
-  } else if (!props.isAbility && props.profession && props.skillId) {
+  } else if (!props.isAbility && props.profession) {
     // For skills: use profession-based cost factors with skillId
     const professionMap: Record<string, number> = {
       'Adventurer': 6, 'Agent': 5, 'Bureaucrat': 8, 'Doctor': 10, 'Enforcer': 9,
@@ -297,22 +296,8 @@ const costFactor = computed(() => {
       'Nano-Technician': 12, 'Soldier': 1, 'Trader': 7, 'Shade': 11
     };
     const professionId = professionMap[props.profession];
-    if (professionId) {
+    if (professionId && props.skillId) {
       return SKILL_COST_FACTORS[props.skillId]?.[professionId] || null;
-    }
-  } else if (!props.isAbility && props.profession) {
-    // Fallback: try to get skillId from skill name
-    const skillId = getSkillIdFromName(props.skillName);
-    if (skillId) {
-      const professionMap: Record<string, number> = {
-        'Adventurer': 6, 'Agent': 5, 'Bureaucrat': 8, 'Doctor': 10, 'Enforcer': 9,
-        'Engineer': 3, 'Fixer': 4, 'Keeper': 14, 'Martial Artist': 2, 'Meta-Physicist': 15,
-        'Nano-Technician': 12, 'Soldier': 1, 'Trader': 7, 'Shade': 11
-      };
-      const professionId = professionMap[props.profession];
-      if (professionId) {
-        return SKILL_COST_FACTORS[skillId]?.[professionId] || null;
-      }
     }
   }
   return null;
