@@ -120,23 +120,6 @@ Complete character management with skills, equipment, and IP tracking
                 
                 <div class="flex items-center gap-2">
                   <Button
-                    v-if="hasChanges"
-                    icon="pi pi-undo"
-                    label="Reset Changes"
-                    severity="secondary"
-                    outlined
-                    size="small"
-                    @click="resetChanges"
-                  />
-                  <Button
-                    v-if="hasChanges"
-                    icon="pi pi-check"
-                    label="Save Changes"
-                    size="small"
-                    :loading="saving"
-                    @click="saveChanges"
-                  />
-                  <Button
                     icon="pi pi-refresh"
                     severity="secondary"
                     outlined
@@ -217,19 +200,13 @@ const props = defineProps<{
 
 // State
 const loading = ref(false);
-const saving = ref(false);
+// Auto-save - no saving state needed
 const recalculating = ref(false);
 const error = ref<string | null>(null);
 const profileData = ref<TinkerProfile | null>(null);
-const hasChanges = ref(false);
+// Auto-save - no hasChanges tracking needed
 const showEditDialog = ref(false);
-const pendingChanges = ref<{
-  skills: Record<string, Record<string, number>>;
-  abilities: Record<string, number>;
-}>({
-  skills: {},
-  abilities: {}
-});
+// Auto-save - no pending changes tracking needed
 
 // Computed
 const isActiveProfile = computed(() => 
@@ -275,7 +252,6 @@ async function loadProfile() {
     const profile = await profilesStore.loadProfile(props.profileId);
     if (profile) {
       profileData.value = profile;
-      resetChanges();
     } else {
       error.value = 'Profile not found';
     }
@@ -331,69 +307,34 @@ async function recalculateIP() {
   }
 }
 
-function handleSkillChange(category: string, skillName: string, newValue: number) {
-  if (!pendingChanges.value.skills[category]) {
-    pendingChanges.value.skills[category] = {};
-  }
-  pendingChanges.value.skills[category][skillName] = newValue;
-  hasChanges.value = true;
-}
-
-function handleAbilityChange(abilityName: string, newValue: number) {
-  pendingChanges.value.abilities[abilityName] = newValue;
-  hasChanges.value = true;
-}
-
-function resetChanges() {
-  pendingChanges.value = {
-    skills: {},
-    abilities: {}
-  };
-  hasChanges.value = false;
-}
-
-async function saveChanges() {
-  if (!hasChanges.value || !profileData.value) return;
-  
-  saving.value = true;
+async function handleSkillChange(category: string, skillName: string, newValue: number) {
   try {
-    // Apply skill changes
-    for (const [category, skills] of Object.entries(pendingChanges.value.skills)) {
-      for (const [skillName, newValue] of Object.entries(skills)) {
-        await profilesStore.modifySkill(props.profileId, category, skillName, newValue);
-      }
-    }
-    
-    // Apply ability changes with trickle-down feedback
-    let totalTrickleDownChanges = 0;
-    for (const [abilityName, newValue] of Object.entries(pendingChanges.value.abilities)) {
-      const result = await profilesStore.modifyAbility(props.profileId, abilityName, newValue);
-      
-      if (result.success && result.trickleDownChanges) {
-        // Count skills with meaningful trickle-down changes
-        const changedSkills = Object.entries(result.trickleDownChanges).filter(
-          ([_, change]) => Math.abs(change.new - change.old) > 0
-        );
-        totalTrickleDownChanges += changedSkills.length;
-      }
-    }
+    await profilesStore.modifySkill(props.profileId, category, skillName, newValue);
+  } catch (err) {
+    console.error('Failed to modify skill:', err);
+    error.value = err instanceof Error ? err.message : 'Failed to modify skill';
+  }
+}
+
+async function handleAbilityChange(abilityName: string, newValue: number) {
+  try {
+    const result = await profilesStore.modifyAbility(props.profileId, abilityName, newValue);
     
     // Show feedback about trickle-down updates
-    if (totalTrickleDownChanges > 0) {
-      showTrickleDownFeedback(totalTrickleDownChanges);
+    if (result.success && result.trickleDownChanges) {
+      const changedSkills = Object.entries(result.trickleDownChanges).filter(
+        ([_, change]) => Math.abs(change.new - change.old) > 0
+      );
+      if (changedSkills.length > 0) {
+        showTrickleDownFeedback(changedSkills.length);
+      }
     }
-    
-    // Reload profile data
-    await loadProfile();
-    resetChanges();
-    
   } catch (err) {
-    console.error('Failed to save changes:', err);
-    error.value = err instanceof Error ? err.message : 'Failed to save changes';
-  } finally {
-    saving.value = false;
+    console.error('Failed to modify ability:', err);
+    error.value = err instanceof Error ? err.message : 'Failed to modify ability';
   }
 }
+
 
 async function handleCharacterUpdate(changes: any) {
   if (!profileData.value) return;
@@ -446,13 +387,6 @@ watch(() => props.profileId, () => {
   }
 }, { immediate: true });
 
-// Handle browser navigation away with unsaved changes
-window.addEventListener('beforeunload', (e) => {
-  if (hasChanges.value) {
-    e.preventDefault();
-    e.returnValue = '';
-  }
-});
 </script>
 
 <style scoped>
