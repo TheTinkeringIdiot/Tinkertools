@@ -11,6 +11,7 @@ Interactive skill categories with expandable panels and sliders with IP calculat
       :skills="coreAbilities"
       :is-abilities="true"
       :breed="breed"
+      :profession="profession"
       @ability-changed="handleAbilityChange"
       @skill-changed="handleSkillChange"
     />
@@ -23,6 +24,8 @@ Interactive skill categories with expandable panels and sliders with IP calculat
       :icon="getCategoryIcon(categoryName)"
       :skills="skills"
       :is-read-only="isReadOnlyCategory(categoryName)"
+      :breed="breed"
+      :profession="profession"
       @skill-changed="handleSkillChange"
     />
   </div>
@@ -51,6 +54,10 @@ const coreAbilities = computed(() => {
 
 const breed = computed(() => {
   return props.profile.Character?.Breed || 'Solitus';
+});
+
+const profession = computed(() => {
+  return props.profile.Character?.Profession || 'Adventurer';
 });
 
 const skillCategories = computed(() => {
