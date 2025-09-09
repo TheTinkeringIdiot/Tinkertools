@@ -291,41 +291,22 @@ export function calcIPAdjustableRange(level: number, profession: number, skillId
       adjustableRange = Math.min(potentialRange, tl1Cap);
       console.log(`[DEBUG] calcIPAdjustableRange: Level ${level}, TL1, skill ${skillId}, potential(${potentialRange}) capped at TL1(${tl1Cap}) = ${adjustableRange}`);
     } else {
-      // For higher TLs, sum all previous TL caps plus current TL progress
-      let totalRange = 0;
-      
-      // Add all complete previous TL ranges
-      for (let i = 2; i <= tl - 1; i++) {
-        totalRange += rateData[i];
-      }
-      
-      // Add TL1 range (always complete for TL2+)
-      const tl1Levels = Math.min(level, TITLE_LEVELS[1] - 1);
-      totalRange += rateData[1] * tl1Levels;
-      
-      // Add current TL progress
-      const prevTLMax = TITLE_LEVELS[tl - 1] - 1;
-      const currentTLLevels = level - prevTLMax;
-      totalRange += Math.min(currentTLLevels * rateData[1], rateData[tl]);
-      
-      adjustableRange = totalRange;
-      console.log(`[DEBUG] calcIPAdjustableRange: Level ${level}, TL${tl}, skill ${skillId}, total adjustable range: ${adjustableRange}`);
+      // For TL2-6, the adjustable range is simply the cumulative cap for that title level
+      // The COST_TO_RATE table already contains cumulative maximum values, not incremental ones
+      adjustableRange = rateData[tl + 1]; // TL2 is index 3, TL3 is index 4, etc.
+      console.log(`[DEBUG] calcIPAdjustableRange: Level ${level}, TL${tl}, skill ${skillId}, using cumulative TL${tl} cap: ${adjustableRange}`);
     }
   } else {
-    // Post-201: All TL1-TL6 ranges plus post-201 progression
-    let totalRange = 0;
+    // Post-201: TL6 cap plus post-201 progression
+    // For post-201 characters, we start with the TL6 cap and add post-201 progression
+    // The TL caps in COST_TO_RATE are cumulative maximums, not additive ranges
+    adjustableRange = rateData[7]; // TL6 cap (e.g., 595 for Body Dev)
     
-    // Sum TL1-TL6 complete ranges
-    totalRange += rateData[1] * (TITLE_LEVELS[1] - 1); // TL1
-    for (let i = 2; i <= 6; i++) {
-      totalRange += rateData[i];
-    }
+    // Add post-201 progression: levels beyond 200 * post-201 increment per level
+    const post201Levels = level - 200;
+    adjustableRange += post201Levels * rateData[8];
     
-    // Add post-201 progression
-    totalRange += rateData[7] + (level - 200) * rateData[8];
-    
-    adjustableRange = totalRange;
-    console.log(`[DEBUG] calcIPAdjustableRange: Post-201 level ${level}, skill ${skillId}, total adjustable range: ${adjustableRange}`);
+    console.log(`[DEBUG] calcIPAdjustableRange: Post-201 level ${level}, skill ${skillId}, TL6 cap(${rateData[7]}) + post201(${post201Levels}*${rateData[8]}=${post201Levels * rateData[8]}) = ${adjustableRange}`);
   }
   
   return adjustableRange;
