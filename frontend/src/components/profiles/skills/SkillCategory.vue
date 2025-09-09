@@ -72,7 +72,7 @@ Shows skills in a category with IP cost calculations and interactive value adjus
 import { ref, computed } from 'vue';
 import Badge from 'primevue/badge';
 import SkillSlider from './SkillSlider.vue';
-import { getSkillIdFromName } from '@/utils/skill-mappings';
+import { getSkillStatId } from '@/utils/skill-registry';
 
 // Props
 const props = defineProps<{
@@ -121,7 +121,7 @@ function toggleExpanded() {
 }
 
 function getSkillId(skillName: string): number | undefined {
-  return getSkillIdFromName(skillName) || undefined;
+  return getSkillStatId(skillName) || undefined;
 }
 
 function handleSkillChanged(category: string, skillName: string, newValue: number) {
