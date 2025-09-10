@@ -336,7 +336,7 @@ async function recalculateTrickleDown(profile: TinkerProfile): Promise<void> {
 /**
  * Recalculate health and nano based on current stats
  */
-async function recalculateHealthAndNano(profile: TinkerProfile): Promise<void> {
+export async function recalculateHealthAndNano(profile: TinkerProfile): Promise<void> {
   if (!profile.Character || !profile.Skills?.Attributes) return;
 
   const level = profile.Character.Level || 1;
@@ -344,8 +344,8 @@ async function recalculateHealthAndNano(profile: TinkerProfile): Promise<void> {
   const professionId = getProfessionId(profile.Character.Profession || 'Adventurer') || 0;
 
   // Get Body Dev and Nano Pool values
-  const bodyDev = profile.Skills.Body_Defense?.Body_Dev?.value || 0;
-  const nanoPool = profile.Skills.Body_Defense?.Nano_Pool?.value || 0;
+  const bodyDev = profile.Skills['Body & Defense']?.['Body Dev.']?.value || 0;
+  const nanoPool = profile.Skills['Body & Defense']?.['Nano Pool']?.value || 0;
 
   // Calculate health and nano
   const health = calcHP(bodyDev, level, breedId, professionId);

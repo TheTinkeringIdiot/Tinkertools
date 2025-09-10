@@ -175,7 +175,7 @@ export class TinkerProfilesManager {
         // Ensure IP tracking is initialized
         let updatedProfile = profile;
         if (!profile.IPTracker) {
-          updatedProfile = ipIntegrator.recalculateProfileIP(profile);
+          updatedProfile = await ipIntegrator.recalculateProfileIP(profile);
           await this.storage.saveProfile(updatedProfile); // Save the updated profile
         }
         
@@ -648,7 +648,7 @@ export class TinkerProfilesManager {
       throw new Error('Profile not found');
     }
 
-    const updatedProfile = ipIntegrator.recalculateProfileIP(profile);
+    const updatedProfile = await ipIntegrator.recalculateProfileIP(profile);
     await this.updateProfile(profileId, updatedProfile);
   }
 

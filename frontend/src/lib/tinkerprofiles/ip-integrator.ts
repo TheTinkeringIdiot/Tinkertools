@@ -25,6 +25,7 @@ import {
 
 import { getBreedId, getProfessionId } from '../../services/game-utils';
 import { getSkillId } from './skill-mappings';
+import { recalculateHealthAndNano } from '../../services/profile-update-service';
 
 // ============================================================================
 // Profile to CharacterStats Conversion
@@ -330,7 +331,7 @@ export function validateProfileIP(profile: TinkerProfile): {
 /**
  * Recalculate all IP-related information for a profile
  */
-export function recalculateProfileIP(profile: TinkerProfile): TinkerProfile {
+export async function recalculateProfileIP(profile: TinkerProfile): Promise<TinkerProfile> {
   // Create a deep copy to avoid mutations
   const updatedProfile = JSON.parse(JSON.stringify(profile)) as TinkerProfile;
   
@@ -339,6 +340,13 @@ export function recalculateProfileIP(profile: TinkerProfile): TinkerProfile {
   
   // Recalculate IP tracker
   updatedProfile.IPTracker = calculateProfileIP(updatedProfile);
+  
+  // Recalculate health and nano since trickle-down effects might impact Body Dev and Nano Pool
+  try {
+    await recalculateHealthAndNano(updatedProfile);
+  } catch (error) {
+    console.warn('Could not recalculate health/nano in IP tracker update:', error);
+  }
   
   // Update timestamp
   updatedProfile.updated = new Date().toISOString();
@@ -353,16 +361,16 @@ export function recalculateProfileIP(profile: TinkerProfile): TinkerProfile {
 /**
  * Safely modify a skill value while maintaining IP constraints
  */
-export function modifySkill(
+export async function modifySkill(
   profile: TinkerProfile,
   category: string,
   skillName: string,
   newValue: number
-): {
+): Promise<{
   success: boolean;
   error?: string;
   updatedProfile?: TinkerProfile;
-} {
+}> {
   const skillData = (profile.Skills as any)[category]?.[skillName];
   if (!skillData) {
     return {
@@ -427,23 +435,23 @@ export function modifySkill(
   // Recalculate all IP information
   return {
     success: true,
-    updatedProfile: recalculateProfileIP(updatedProfile)
+    updatedProfile: await recalculateProfileIP(updatedProfile)
   };
 }
 
 /**
  * Safely modify an ability value while maintaining IP constraints
  */
-export function modifyAbility(
+export async function modifyAbility(
   profile: TinkerProfile,
   abilityName: string,
   newValue: number
-): {
+): Promise<{
   success: boolean;
   error?: string;
   updatedProfile?: TinkerProfile;
   trickleDownChanges?: Record<string, { old: number; new: number }>;
-} {
+}> {
   const abilityData = (profile.Skills.Attributes as any)[abilityName];
   if (!abilityData) {
     return {
@@ -529,7 +537,7 @@ export function modifyAbility(
   });
   
   // Full IP recalculation (for IP tracker)
-  const finalProfile = recalculateProfileIP(profileWithTrickleDown);
+  const finalProfile = await recalculateProfileIP(profileWithTrickleDown);
   
   return {
     success: true,

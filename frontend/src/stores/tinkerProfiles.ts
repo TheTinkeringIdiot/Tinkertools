@@ -152,7 +152,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       if (active) {
         // Ensure caps and trickle-down are calculated for display
         const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
-        const activeWithCaps = updateProfileWithIPTracking(active);
+        const activeWithCaps = await updateProfileWithIPTracking(active);
         
         activeProfile.value = activeWithCaps;
         activeProfileId.value = activeWithCaps.id;
@@ -248,7 +248,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       if (profile) {
         // Ensure caps and trickle-down are calculated for display
         const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
-        const profileWithCaps = updateProfileWithIPTracking(profile);
+        const profileWithCaps = await updateProfileWithIPTracking(profile);
         
         profiles.value.set(profileId, profileWithCaps);
         return profileWithCaps;
@@ -517,11 +517,25 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
           // Other skills use SkillWithIP structure
           const skill = (skillCategory as any)[skillName];
           if (skill && typeof skill === 'object') {
+            // Calculate the pointFromIp value based on the formula:
+            // value = 5 + trickleDown + pointFromIp
+            // Therefore: pointFromIp = value - 5 - trickleDown
+            const trickleDown = skill.trickleDown || 0;
+            const baseSkillValue = 5; // BASE_SKILL constant
+            const pointFromIp = Math.max(0, newValue - baseSkillValue - trickleDown);
+            
+            // Update both the total value and the IP portion
             skill.value = newValue;
-            // IP cost will be recalculated when IP tracker is refreshed
+            skill.pointFromIp = pointFromIp;
           }
         }
       }
+    }
+
+    // Recalculate health and nano if Body Dev or Nano Pool skills changed
+    if (category === 'Body & Defense' && (skillName === 'Body Dev.' || skillName === 'Nano Pool')) {
+      const { recalculateHealthAndNano } = await import('@/services/profile-update-service');
+      await recalculateHealthAndNano(profile);
     }
 
     await updateProfile(profileId, profile);

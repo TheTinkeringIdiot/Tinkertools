@@ -161,8 +161,8 @@ const getAbilityIndex = (abilityName: string): number => {
 };
 
 // State
-// For skills: slider should only represent IP spent, not total value including trickle-down
-const sliderValue = ref(props.isAbility ? (props.skillData?.value || 0) : (props.skillData?.pointFromIp || 0));
+// Initialize slider value properly for both abilities and skills
+const sliderValue = ref(0);
 
 // Input field value - shows total skill value for display/editing
 const inputValue = ref(0);
@@ -197,8 +197,8 @@ const totalValue = computed(() => {
     // For abilities: use the actual value from profile
     return sliderValue.value || 0;
   } else {
-    // For skills: base + trickle-down + IP improvements
-    return baseValue.value + trickleDownBonus.value + ipContribution.value;
+    // For skills: use the total value from skill data directly
+    return props.skillData?.value || 0;
   }
 });
 
@@ -384,30 +384,45 @@ function setToMax() {
 }
 
 // Watchers
-// For skills: only watch the IP portion (pointFromIp), not the total value
-watch(() => props.isAbility ? props.skillData?.value : props.skillData?.pointFromIp, (newValue) => {
-  if (newValue !== undefined && newValue !== sliderValue.value && !isUserInteracting.value) {
-    sliderValue.value = Math.max(newValue, minValue.value);
-    // Update input value when slider data changes
-    if (props.isAbility) {
-      inputValue.value = sliderValue.value;
-    } else {
-      inputValue.value = totalValue.value;
+// For abilities: watch the value field, for skills: watch the value field too (not pointFromIp)
+watch(() => props.skillData?.value, (newValue, oldValue) => {
+  if (newValue !== undefined) {
+    // Always update on initial load (oldValue is undefined) or when not interacting
+    const isInitialLoad = oldValue === undefined;
+    if (isInitialLoad || !isUserInteracting.value) {
+      if (props.isAbility) {
+        // For abilities: the value directly represents the ability score
+        sliderValue.value = Math.max(newValue, minValue.value);
+        inputValue.value = sliderValue.value;
+      } else {
+        // For skills: the value represents the total skill value, 
+        // we need to calculate the IP portion for the slider
+        const totalSkillValue = newValue;
+        const ipPortion = Math.max(0, totalSkillValue - baseValue.value - trickleDownBonus.value);
+        sliderValue.value = Math.max(ipPortion, 0);
+        inputValue.value = totalSkillValue;
+      }
     }
   }
 }, { immediate: true });
 
 // Watch for changes that affect the total value to update input field
-watch([baseValue, trickleDownBonus, sliderValue], () => {
-  if (!props.isAbility && !isUserInteracting.value) {
-    inputValue.value = totalValue.value;
+watch([baseValue, trickleDownBonus, sliderValue], (newValues, oldValues) => {
+  if (!props.isAbility) {
+    const isInitialLoad = oldValues === undefined || oldValues.some(v => v === undefined);
+    if (isInitialLoad || !isUserInteracting.value) {
+      inputValue.value = totalValue.value;
+    }
   }
 }, { immediate: true });
 
 // Initialize input value for abilities
-watch(() => props.isAbility && sliderValue.value, (newValue) => {
-  if (props.isAbility && newValue !== undefined && !isUserInteracting.value) {
-    inputValue.value = sliderValue.value;
+watch(() => props.isAbility && sliderValue.value, (newValue, oldValue) => {
+  if (props.isAbility && newValue !== undefined) {
+    const isInitialLoad = oldValue === undefined;
+    if (isInitialLoad || !isUserInteracting.value) {
+      inputValue.value = sliderValue.value;
+    }
   }
 }, { immediate: true });
 
