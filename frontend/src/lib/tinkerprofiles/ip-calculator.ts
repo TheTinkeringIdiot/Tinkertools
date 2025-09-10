@@ -441,14 +441,12 @@ export function calcHP(bodyDev: number, level: number, breed: number, profession
     return 0;
   }
   
-  // For now, we'll use temporary constants until we move all breed vitals data
-  // TODO: Move these breed vitals constants to game-data.ts
-  const BREED_BASE_HP = [0, 6, 6, 6, 6]; // [unknown, solitus, opifex, nanomage, atrox]
-  const BREED_BODY_FAC = [1, 1, 1, 1, 1]; // Body factor multipliers
-  const BREED_HP = [0, 0, 0, 0, 0]; // HP bonus per level
+  const breedBaseHP = BREED_ABILITY_DATA.base_hp[breed] || 0;
+  const breedBodyFactor = BREED_ABILITY_DATA.body_factor[breed] || 1;
+  const breedHPModifier = BREED_ABILITY_DATA.hp_modifier[breed] || 0;
   
-  const levelHP = (professionHPPerLevel[tl - 1] + BREED_HP[breed]) * level;
-  return BREED_BASE_HP[breed] + (bodyDev * BREED_BODY_FAC[breed]) + levelHP;
+  const levelHP = (professionHPPerLevel[tl - 1] + breedHPModifier) * level;
+  return breedBaseHP + (bodyDev * breedBodyFactor) + levelHP;
 }
 
 /**
@@ -464,14 +462,12 @@ export function calcNP(nanoPool: number, level: number, breed: number, professio
     return 0;
   }
   
-  // For now, we'll use temporary constants until we move all breed vitals data
-  // TODO: Move these breed vitals constants to game-data.ts  
-  const BREED_BASE_NP = [0, 10, 10, 15, 5]; // [unknown, solitus, opifex, nanomage, atrox]
-  const BREED_NANO_FAC = [1, 1, 1, 1, 1]; // Nano factor multipliers
-  const BREED_NP = [0, 0, 0, 0, 0]; // NP bonus per level
+  const breedBaseNP = BREED_ABILITY_DATA.base_np[breed] || 0;
+  const breedNanoFactor = BREED_ABILITY_DATA.nano_factor[breed] || 1;
+  const breedNPModifier = BREED_ABILITY_DATA.np_modifier[breed] || 0;
   
-  const levelNP = (professionNPPerLevel[tl - 1] + BREED_NP[breed]) * level;
-  return BREED_BASE_NP[breed] + (nanoPool * BREED_NANO_FAC[breed]) + levelNP;
+  const levelNP = (professionNPPerLevel[tl - 1] + breedNPModifier) * level;
+  return breedBaseNP + (nanoPool * breedNanoFactor) + levelNP;
 }
 
 /**

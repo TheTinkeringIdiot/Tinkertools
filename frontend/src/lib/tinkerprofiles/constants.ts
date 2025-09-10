@@ -294,10 +294,34 @@ export const SUPPORTED_VERSIONS = ['1.0.0', '1.1.0', '2.0.0'];
 // ============================================================================
 
 /**
+ * Get breed ID from breed name
+ */
+function getBreedIdFromBreedName(breed: string): number {
+  const breedMap: Record<string, number> = {
+    'Solitus': 1,
+    'Opifex': 2,
+    'Nanomage': 3,
+    'Atrox': 4
+  };
+  return breedMap[breed] || 1; // Default to Solitus
+}
+
+/**
  * Create a default comprehensive TinkerProfile
  */
 export function createDefaultProfile(name: string = 'New Character', breed: string = 'Solitus'): TinkerProfile {
   const now = new Date().toISOString();
+  
+  // Calculate initial health and nano based on level 1 defaults
+  const level = 1;
+  const breedId = getBreedIdFromBreedName(breed);
+  const professionId = 6; // Adventurer
+  const bodyDev = BASE_SKILL; // 5
+  const nanoPool = BASE_SKILL; // 5
+  
+  const { calcHP, calcNP } = require('./ip-calculator');
+  const initialHealth = calcHP(bodyDev, level, breedId, professionId);
+  const initialNano = calcNP(nanoPool, level, breedId, professionId);
   
   return {
     id: `profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -313,8 +337,8 @@ export function createDefaultProfile(name: string = 'New Character', breed: stri
       Faction: 'Neutral',
       Expansion: 'Lost Eden',
       AccountType: 'Paid',
-      MaxHealth: 1,
-      MaxNano: 1
+      MaxHealth: initialHealth,
+      MaxNano: initialNano
     },
     
     Skills: structuredClone(getDefaultSkillsForBreed(breed)),
