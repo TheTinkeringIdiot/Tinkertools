@@ -95,8 +95,59 @@ Complete character management with skills, equipment, and IP tracking
     
     <!-- Profile Content -->
     <div v-else-if="profileData" class="max-w-7xl mx-auto px-6 py-6">
+      <!-- Equipment Row -->
+      <div class="mb-6">
+        <h2 class="text-xl font-semibold text-surface-900 dark:text-surface-50 mb-4">Equipment</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <!-- Weapons -->
+          <div class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
+            <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2">
+              <i class="pi pi-shield text-orange-500"></i>
+              Weapons
+            </h3>
+            <div class="flex justify-center">
+              <ItemSlotsDisplay 
+                :item="getFirstEquippedWeapon(profileData.Weapons)"
+                :slot-type="'weapon'"
+                :show-labels="false"
+              />
+            </div>
+          </div>
+
+          <!-- Armor -->
+          <div class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
+            <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2">
+              <i class="pi pi-user text-blue-500"></i>
+              Armor
+            </h3>
+            <div class="flex justify-center">
+              <ItemSlotsDisplay 
+                :item="getFirstEquippedArmor(profileData.Clothing)"
+                :slot-type="'armor'"
+                :show-labels="false"
+              />
+            </div>
+          </div>
+
+          <!-- Implants -->
+          <div class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
+            <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2">
+              <i class="pi pi-cpu text-green-500"></i>
+              Implants
+            </h3>
+            <div class="flex justify-center">
+              <ItemSlotsDisplay 
+                :item="getFirstEquippedImplant(profileData.Implants)"
+                :slot-type="'implant'"
+                :show-labels="false"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+      
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Left Column: Character Info & Equipment -->
+        <!-- Left Column: Character Info & IP Tracker -->
         <div class="lg:col-span-1 space-y-6">
           <!-- Character Info Panel -->
           <CharacterInfoPanel :profile="profileData" />
@@ -104,8 +155,6 @@ Complete character management with skills, equipment, and IP tracking
           <!-- IP Tracker -->
           <IPTrackerPanel :profile="profileData" />
           
-          <!-- Equipment Grid -->
-          <EquipmentGrid :profile="profileData" />
         </div>
         
         <!-- Right Column: Skills Management -->
@@ -183,7 +232,7 @@ import ProgressSpinner from 'primevue/progressspinner';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import CharacterInfoPanel from '@/components/profiles/CharacterInfoPanel.vue';
 import IPTrackerPanel from '@/components/profiles/IPTrackerPanel.vue';
-import EquipmentGrid from '@/components/profiles/equipment/EquipmentGrid.vue';
+import ItemSlotsDisplay from '@/components/items/ItemSlotsDisplay.vue';
 import SkillsManager from '@/components/profiles/skills/SkillsManager.vue';
 import EditCharacterDialog from '@/components/profiles/EditCharacterDialog.vue';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
@@ -378,6 +427,22 @@ function showTrickleDownFeedback(affectedSkillsCount: number) {
   //   detail: `${affectedSkillsCount} skills received updated bonuses from ability changes`,
   //   life: 3000
   // });
+}
+
+// Equipment helper functions
+function getFirstEquippedWeapon(weapons: Record<string, any>) {
+  const equippedWeapons = Object.values(weapons || {}).filter(weapon => weapon && weapon.name);
+  return equippedWeapons.length > 0 ? equippedWeapons[0] : null;
+}
+
+function getFirstEquippedArmor(clothing: Record<string, any>) {
+  const equippedArmor = Object.values(clothing || {}).filter(armor => armor && armor.name);
+  return equippedArmor.length > 0 ? equippedArmor[0] : null;
+}
+
+function getFirstEquippedImplant(implants: Record<string, any>) {
+  const equippedImplants = Object.values(implants || {}).filter(implant => implant && implant.name);
+  return equippedImplants.length > 0 ? equippedImplants[0] : null;
 }
 
 // Watchers

@@ -25,7 +25,6 @@ import {
 
 import { getBreedId, getProfessionId } from '../../services/game-utils';
 import { getSkillId } from './skill-mappings';
-import { recalculateHealthAndNano } from '../../services/profile-update-service';
 
 // ============================================================================
 // Profile to CharacterStats Conversion
@@ -343,6 +342,7 @@ export async function recalculateProfileIP(profile: TinkerProfile): Promise<Tink
   
   // Recalculate health and nano since trickle-down effects might impact Body Dev and Nano Pool
   try {
+    const { recalculateHealthAndNano } = await import('@/services/profile-update-service');
     await recalculateHealthAndNano(updatedProfile);
   } catch (error) {
     console.warn('Could not recalculate health/nano in IP tracker update:', error);

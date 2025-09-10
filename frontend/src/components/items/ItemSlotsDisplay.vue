@@ -17,7 +17,7 @@ Shows where an item can be equipped with the item's icon in valid slots
       <img 
         v-if="cell.isValid && slotInfo.iconUrl" 
         :src="slotInfo.iconUrl"
-        :alt="`${item.name} can be equipped in ${cell.slotName}`"
+        :alt="`${item?.name || 'Item'} can be equipped in ${cell.slotName}`"
         class="slot-icon"
         @error="onIconError"
       />
@@ -43,7 +43,7 @@ Shows where an item can be equipped with the item's icon in valid slots
       <img 
         v-if="slotInfo.iconUrl"
         :src="slotInfo.iconUrl" 
-        :alt="`${item.name} icon`"
+        :alt="`${item?.name || 'Item'} icon`"
         class="w-16 h-16 object-contain"
         @error="onIconError"
       />
@@ -53,7 +53,7 @@ Shows where an item can be equipped with the item's icon in valid slots
     <!-- Item Type -->
     <div class="text-center">
       <span class="text-sm text-surface-600 dark:text-surface-400">
-        {{ getItemCategoryName(getItemClass(item)) }}
+        {{ item ? getItemCategoryName(getItemClass(item)) : 'Equipment' }}
       </span>
     </div>
   </div>
@@ -72,7 +72,8 @@ import {
 
 // Props
 interface Props {
-  item: any;
+  item?: any;
+  slotType?: 'weapon' | 'armor' | 'implant';
   showLabels?: boolean;
 }
 
@@ -84,7 +85,18 @@ const props = withDefaults(defineProps<Props>(), {
 const iconError = ref(false);
 
 // Computed properties
-const slotInfo = computed(() => getItemSlotInfo(props.item));
+const slotInfo = computed(() => {
+  // If slotType is explicitly provided without an item, use it for empty slot display
+  if (props.slotType && !props.item) {
+    return {
+      type: props.slotType,
+      slots: [], // Empty slots array shows just the grid background
+      iconUrl: null
+    };
+  }
+  // Otherwise fall back to item-based detection
+  return props.item ? getItemSlotInfo(props.item) : { type: null, slots: [], iconUrl: null };
+});
 
 const gridCells = computed(() => {
   if (!slotInfo.value.type) return [];
