@@ -95,57 +95,6 @@ Complete character management with skills, equipment, and IP tracking
     
     <!-- Profile Content -->
     <div v-else-if="profileData" class="max-w-7xl mx-auto px-6 py-6">
-      <!-- Equipment Row -->
-      <div class="mb-6">
-        <h2 class="text-xl font-semibold text-surface-900 dark:text-surface-50 mb-4">Equipment</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <!-- Weapons -->
-          <div class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
-            <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2">
-              <i class="pi pi-shield text-orange-500"></i>
-              Weapons
-            </h3>
-            <div class="flex justify-center">
-              <ItemSlotsDisplay 
-                :item="getFirstEquippedWeapon(profileData.Weapons)"
-                :slot-type="'weapon'"
-                :show-labels="false"
-              />
-            </div>
-          </div>
-
-          <!-- Armor -->
-          <div class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
-            <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2">
-              <i class="pi pi-user text-blue-500"></i>
-              Armor
-            </h3>
-            <div class="flex justify-center">
-              <ItemSlotsDisplay 
-                :item="getFirstEquippedArmor(profileData.Clothing)"
-                :slot-type="'armor'"
-                :show-labels="false"
-              />
-            </div>
-          </div>
-
-          <!-- Implants -->
-          <div class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
-            <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2">
-              <i class="pi pi-cpu text-green-500"></i>
-              Implants
-            </h3>
-            <div class="flex justify-center">
-              <ItemSlotsDisplay 
-                :item="getFirstEquippedImplant(profileData.Implants)"
-                :slot-type="'implant'"
-                :show-labels="false"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-      
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Left Column: Character Info & IP Tracker -->
         <div class="lg:col-span-1 space-y-6">
@@ -157,8 +106,54 @@ Complete character management with skills, equipment, and IP tracking
           
         </div>
         
-        <!-- Right Column: Skills Management -->
-        <div class="lg:col-span-2">
+        <!-- Right Column: Equipment & Skills Management -->
+        <div class="lg:col-span-2 space-y-6">
+          <!-- Equipment Section -->
+          <div class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
+            <h2 class="text-xl font-semibold text-surface-900 dark:text-surface-50 mb-4">Equipment</h2>
+            <div class="grid grid-cols-3 gap-4">
+              <!-- Weapons -->
+              <div class="text-center">
+                <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2 flex items-center justify-center gap-1">
+                  <i class="pi pi-shield text-orange-500 text-xs"></i>
+                  Weapons
+                </h3>
+                <ItemSlotsDisplay 
+                  :item="getFirstEquippedWeapon(profileData.Weapons)"
+                  :slot-type="'weapon'"
+                  :show-labels="false"
+                />
+              </div>
+
+              <!-- Armor -->
+              <div class="text-center">
+                <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2 flex items-center justify-center gap-1">
+                  <i class="pi pi-user text-blue-500 text-xs"></i>
+                  Armor
+                </h3>
+                <ItemSlotsDisplay 
+                  :item="getFirstEquippedArmor(profileData.Clothing)"
+                  :slot-type="'armor'"
+                  :show-labels="false"
+                />
+              </div>
+
+              <!-- Implants -->
+              <div class="text-center">
+                <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2 flex items-center justify-center gap-1">
+                  <i class="pi pi-cpu text-green-500 text-xs"></i>
+                  Implants
+                </h3>
+                <ItemSlotsDisplay 
+                  :item="getFirstEquippedImplant(profileData.Implants)"
+                  :slot-type="'implant'"
+                  :show-labels="false"
+                />
+              </div>
+            </div>
+          </div>
+          
+          <!-- Skills Management -->
           <div class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg">
             <!-- Skills Header -->
             <div class="p-6 border-b border-surface-200 dark:border-surface-700">
