@@ -7,6 +7,14 @@
 
 // Skill IDs using official Anarchy Online STAT IDs from game-data.ts
 export const SKILL_ID_MAP: Record<string, number> = {
+  // Attributes
+  'Strength': 16,
+  'Agility': 17,
+  'Stamina': 18,
+  'Intelligence': 19,
+  'Sense': 20,
+  'Psychic': 21,
+  
   // Body & Defense category
   'Body Dev.': 152,
   'Nano Pool': 132,
@@ -72,6 +80,7 @@ export const SKILL_ID_MAP: Record<string, number> = {
   'Pharma Tech': 159,
   'Nano Programming': 160,
   'Computer Literacy': 161,
+  'Comp. Liter': 161,
   'Psychology': 162,
   'Chemistry': 163,
   'Tutoring': 141,
@@ -96,7 +105,27 @@ export const SKILL_ID_MAP: Record<string, number> = {
   'Vehicle Air': 139,
   'Vehicle Ground': 166,
   'Vehicle Water': 117,
-  'Map Navigation': 140
+  'Map Navigation': 140,
+  
+  // AOSetups skill name variations
+  'Break&Entry': 165,        // AOSetups variant of 'Break & Entry'
+  'Elec. Engi': 126,         // AOSetups variant of 'Elec Eng'  
+  'MG / SMG': 114,           // AOSetups variant of 'MG/SMG'
+  'Matt. Metam': 127,        // AOSetups variant of 'Matt Metam'
+  'Matter Crea': 130,        // AOSetups variant of 'Matter Creation'
+  'Mech. Engi': 125,         // AOSetups variant of 'Mech Eng'
+  'Melee Ener.': 104,        // AOSetups variant of 'Melee Energy'
+  'Melee. Init.': 118,       // AOSetups variant of 'Melee Init'
+  'Mult. Melee': 101,        // AOSetups variant of 'Multi Melee'
+  'Nano Progra': 160,        // AOSetups variant of 'Nano Programming'
+  'NanoC. Init.': 149,       // AOSetups variant of 'NanoC Init'
+  'Physic. Init': 120,       // AOSetups variant of 'Physical Init'
+  'Ranged Ener': 133,        // AOSetups variant of 'Ranged Energy'
+  'Ranged. Init.': 119,      // AOSetups variant of 'Ranged Init'
+  'Sensory Impr': 122,       // AOSetups variant of 'Sensory Improvement'
+  'Sneak Atck': 146,         // AOSetups variant of 'Sneak Attack'
+  'Time&Space': 131,         // AOSetups variant of 'Time & Space'
+  'Weapon Smt': 158          // AOSetups variant of 'Weapon Smith'
 };
 
 /**
