@@ -14,6 +14,7 @@ import type {
   ProfileImportResult
 } from './types';
 import { createDefaultProfile, createDefaultNanoProfile } from './constants';
+import { SKILL_CATEGORIES, getSkillId } from './skill-mappings';
 
 export class ProfileTransformer {
   
@@ -203,6 +204,10 @@ export class ProfileTransformer {
           profile = this.importFromAO(data, result);
           break;
           
+        case 'aosetups':
+          profile = this.importFromAOSetups(data, result);
+          break;
+          
         default:
           result.errors.push('Unable to detect or unsupported format');
           return result;
@@ -334,6 +339,195 @@ export class ProfileTransformer {
     return profile;
   }
   
+  private importFromAOSetups(data: string, result: ProfileImportResult): TinkerProfile {
+    const aosetups = JSON.parse(data);
+    result.metadata.migrated = true;
+    
+    const profile = createDefaultProfile();
+    
+    // Map character data
+    if (aosetups.character) {
+      profile.Character.Name = aosetups.character.name || aosetups.name || 'AOSetups Import';
+      profile.Character.Level = aosetups.character.level || 1;
+      profile.Character.Profession = aosetups.character.profession || 'Adventurer';
+      profile.Character.Breed = aosetups.character.breed || 'Solitus';
+      profile.Character.Faction = 'Neutral'; // Default, not in AOSetups
+      profile.Character.Expansion = 'Lost Eden'; // Default
+      profile.Character.AccountType = 'Paid'; // Default
+      
+      // Calculate base health and nano based on breed and level
+      const level = profile.Character.Level;
+      const healthPerLevel = profile.Character.Breed === 'Atrox' ? 10 : 
+                           profile.Character.Breed === 'Opifex' ? 6 : 8;
+      const nanoPerLevel = profile.Character.Breed === 'Atrox' ? 4 : 
+                          profile.Character.Breed === 'Opifex' ? 6 : 5;
+      
+      profile.Character.MaxHealth = level * healthPerLevel;
+      profile.Character.MaxNano = level * nanoPerLevel;
+      
+      // Map skills with IP expenditure
+      if (aosetups.character.skills && Array.isArray(aosetups.character.skills)) {
+        for (const skill of aosetups.character.skills) {
+          this.mapAOSetupsSkill(skill, profile, result);
+        }
+      }
+    }
+    
+    // Map equipment (implants, weapons, clothing)
+    this.mapAOSetupsEquipment(aosetups, profile, result);
+    
+    // Map perks to PerksAndResearch
+    if (aosetups.perks && Array.isArray(aosetups.perks)) {
+      profile.PerksAndResearch = aosetups.perks.map((perk: any) => ({
+        id: perk.aoid?.toString() || perk._id,
+        name: `Perk ${perk.aoid}`, // Would need item lookup for actual name
+        type: 'perk'
+      }));
+    }
+    
+    result.warnings.push('Profile imported from AOSetups format');
+    result.warnings.push('Equipment highids preserved but item names need database lookup');
+    
+    return profile;
+  }
+  
+  private mapAOSetupsSkill(skill: any, profile: TinkerProfile, result: ProfileImportResult): void {
+    const skillName = skill.name;
+    const ipExpenditure = skill.ipExpenditure || 0;
+    const pointsFromIp = skill.pointsFromIp || 0;
+    
+    // Check if this skill exists in SKILL_ID_MAP (now includes AOSetups variants)
+    const skillId = getSkillId(skillName);
+    if (!skillId) {
+      result.warnings.push(`Unknown skill mapping: ${skillName}`);
+      return;
+    }
+    
+    // Find which category and key this skill belongs to using SKILL_CATEGORIES
+    let foundCategory: keyof typeof profile.Skills | null = null;
+    let foundKey: string | null = null;
+    
+    // Search through SKILL_CATEGORIES to find the skill
+    for (const [category, skills] of Object.entries(SKILL_CATEGORIES)) {
+      if (skills.includes(skillName)) {
+        foundCategory = category as keyof typeof profile.Skills;
+        foundKey = skillName;
+        break;
+      }
+    }
+    
+    if (foundCategory && foundKey && profile.Skills[foundCategory]) {
+      const categorySkills = profile.Skills[foundCategory] as Record<string, any>;
+      if (categorySkills[foundKey]) {
+        categorySkills[foundKey].ipSpent = ipExpenditure;
+        categorySkills[foundKey].pointFromIp = pointsFromIp;
+        // Calculate total value (base + IP points)
+        categorySkills[foundKey].value = (categorySkills[foundKey].value || 0) + pointsFromIp;
+      }
+    } else {
+      result.warnings.push(`Skill '${skillName}' not found in profile categories`);
+    }
+  }
+  
+  private mapAOSetupsEquipment(aosetups: any, profile: TinkerProfile, result: ProfileImportResult): void {
+    // Map implants/symbiants
+    if (aosetups.implants && Array.isArray(aosetups.implants)) {
+      for (const implant of aosetups.implants) {
+        if (implant && implant.slot) {
+          const slotMapping: Record<string, keyof typeof profile.Implants> = {
+            'head': 'Head',
+            'eye': 'Eye', 
+            'ear': 'Ear',
+            'chest': 'Chest',
+            'rarm': 'RightArm',
+            'larm': 'LeftArm',
+            'waist': 'Waist',
+            'rwrist': 'RightWrist',
+            'lwrist': 'LeftWrist',
+            'leg': 'Leg',
+            'rhand': 'RightHand',
+            'lhand': 'LeftHand',
+            'feet': 'Feet'
+          };
+          
+          const slot = slotMapping[implant.slot];
+          if (slot) {
+            profile.Implants[slot] = {
+              id: implant.symbiant?.highid?.toString() || implant._id,
+              name: `Item ${implant.symbiant?.highid}`, // Would need item lookup
+              ql: implant.symbiant?.selectedQl || implant.ql || 1,
+              highId: implant.symbiant?.highid || null,
+              stats: [], // Empty stats array to prevent errors
+              lowId: null,
+              isContainer: false
+            };
+          }
+        }
+      }
+    }
+    
+    // Map weapons  
+    if (aosetups.weapons && Array.isArray(aosetups.weapons)) {
+      for (let i = 0; i < aosetups.weapons.length; i++) {
+        const weapon = aosetups.weapons[i];
+        if (weapon && weapon.highid) {
+          const slotMapping = ['HUD1', 'HUD2', 'HUD3', 'UTILS1', 'UTILS2', 'UTILS3', 'RHand', 'Waist', 'LHand', 'NCU1', 'NCU2', 'NCU3', 'NCU4', 'NCU5', 'NCU6'];
+          const slot = slotMapping[i] as keyof typeof profile.Weapons;
+          if (slot) {
+            profile.Weapons[slot] = {
+              id: weapon.highid.toString(),
+              name: `Item ${weapon.highid}`, // Would need item lookup
+              ql: weapon.selectedQl || 1,
+              highId: weapon.highid,
+              stats: [], // Empty stats array to prevent errors
+              lowId: null,
+              isContainer: false
+            };
+          }
+        }
+      }
+    }
+    
+    // Map clothing
+    if (aosetups.clothes && Array.isArray(aosetups.clothes)) {
+      for (const clothing of aosetups.clothes) {
+        if (clothing && clothing.slot && clothing.highid) {
+          const slotMapping: Record<string, keyof typeof profile.Clothing> = {
+            'HEAD': 'Head',
+            'BACK': 'Back', 
+            'BODY': 'Body',
+            'ARM_R': 'RightArm',
+            'ARM_L': 'LeftArm',
+            'WRIST_R': 'RightWrist',
+            'WRIST_L': 'LeftWrist',
+            'HANDS': 'Hands',
+            'LEGS': 'Legs',
+            'FEET': 'Feet',
+            'SHOULDER_R': 'RightShoulder',
+            'SHOULDER_L': 'LeftShoulder',
+            'FINGER_R': 'RightFinger',
+            'FINGER_L': 'LeftFinger',
+            'NECK': 'Neck',
+            'BELT': 'Belt'
+          };
+          
+          const slot = slotMapping[clothing.slot];
+          if (slot) {
+            profile.Clothing[slot] = {
+              id: clothing.highid.toString(),
+              name: `Item ${clothing.highid}`, // Would need item lookup
+              ql: clothing.selectedQl || 1,
+              highId: clothing.highid,
+              stats: [], // Empty stats array to prevent errors
+              lowId: null,
+              isContainer: false
+            };
+          }
+        }
+      }
+    }
+  }
+  
   // ============================================================================
   // Format Detection and Validation
   // ============================================================================
@@ -345,6 +539,11 @@ export class ProfileTransformer {
       // Check for TinkerProfile format
       if (parsed.Character && parsed.Skills && parsed.version) {
         return 'json';
+      }
+      
+      // Check for AOSetups format
+      if (parsed.character && parsed.implants && parsed.weapons && parsed.clothes) {
+        return 'aosetups';
       }
       
       // Check for legacy format
