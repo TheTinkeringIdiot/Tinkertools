@@ -9,6 +9,11 @@ dist
 .env.local
 .env.*.local
 
+# Claude Code specific environment files (NEVER COMMIT)
+.env.claude
+.env.claude.*
+*.env.claude
+
 # OS / IDE
 .DS_Store
 .idea
