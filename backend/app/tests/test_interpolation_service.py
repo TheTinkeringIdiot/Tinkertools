@@ -579,3 +579,209 @@ def test_interpolate_value_parametrized(ql_delta, ql_delta_full, lo_val, hi_val,
     
     result = interpolated.interpolate_value(lo_val, hi_val)
     assert result == expected
+
+
+class TestInterpolationRangesSimplified:
+    """Test cases for the simplified interpolation ranges logic."""
+
+    @pytest.fixture
+    def mock_db(self):
+        """Create a mock database session."""
+        return Mock(spec=Session)
+
+    @pytest.fixture
+    def service(self, mock_db):
+        """Create an InterpolationService instance with mock database."""
+        return InterpolationService(mock_db)
+
+    def test_get_interpolation_ranges_two_variants(self, service, mock_db):
+        """Test interpolation ranges with two variants (like item 231123)."""
+        # Mock base item
+        mock_item = Mock(spec=Item)
+        mock_item.name = "Apprentice Sword of Sir Tristram"
+        mock_item.description = "Test description"
+        
+        # Mock the query to return the base item
+        mock_db.query.return_value.filter.return_value.first.return_value = mock_item
+        
+        # Mock variants - QL 1 and QL 19
+        variant1 = Mock(spec=Item)
+        variant1.ql = 1
+        variant1.aoid = 231123
+        
+        variant2 = Mock(spec=Item)
+        variant2.ql = 19
+        variant2.aoid = 231124
+        
+        variants = [variant1, variant2]
+        
+        with patch.object(service, '_find_item_variants') as mock_find:
+            mock_find.return_value = variants
+            
+            result = service.get_interpolation_ranges(231123)
+            
+            assert result is not None
+            assert len(result) == 1  # One interpolatable range
+            assert result[0]["min_ql"] == 1
+            assert result[0]["max_ql"] == 19
+            assert result[0]["interpolatable"] is True
+            assert result[0]["base_aoid"] == 231123
+
+    def test_get_interpolation_ranges_single_variant(self, service, mock_db):
+        """Test interpolation ranges with single variant (not interpolatable)."""
+        # Mock base item
+        mock_item = Mock(spec=Item)
+        mock_item.name = "Single Item"
+        mock_item.description = "Test description"
+        
+        # Mock the query to return the base item
+        mock_db.query.return_value.filter.return_value.first.return_value = mock_item
+        
+        # Mock single variant
+        variant1 = Mock(spec=Item)
+        variant1.ql = 100
+        variant1.aoid = 12345
+        
+        variants = [variant1]
+        
+        with patch.object(service, '_find_item_variants') as mock_find:
+            mock_find.return_value = variants
+            
+            result = service.get_interpolation_ranges(12345)
+            
+            assert result is not None
+            assert len(result) == 1
+            assert result[0]["min_ql"] == 100
+            assert result[0]["max_ql"] == 100
+            assert result[0]["interpolatable"] is False
+            assert result[0]["base_aoid"] == 12345
+
+    def test_get_interpolation_ranges_multiple_variants(self, service, mock_db):
+        """Test interpolation ranges with multiple variants."""
+        # Mock base item
+        mock_item = Mock(spec=Item)
+        mock_item.name = "Multi Weapon"
+        mock_item.description = "Test description"
+        
+        # Mock the query to return the base item
+        mock_db.query.return_value.filter.return_value.first.return_value = mock_item
+        
+        # Mock variants - QL 1, 50, 100, 200
+        variants = []
+        for i, (ql, aoid) in enumerate([(1, 1001), (50, 1002), (100, 1003), (200, 1004)]):
+            variant = Mock(spec=Item)
+            variant.ql = ql
+            variant.aoid = aoid
+            variants.append(variant)
+        
+        with patch.object(service, '_find_item_variants') as mock_find:
+            mock_find.return_value = variants
+            
+            result = service.get_interpolation_ranges(1001)
+            
+            assert result is not None
+            assert len(result) == 3  # 1-50, 50-100, 100-200
+            
+            # Check first range: 1-50
+            assert result[0]["min_ql"] == 1
+            assert result[0]["max_ql"] == 50
+            assert result[0]["interpolatable"] is True
+            assert result[0]["base_aoid"] == 1001
+            
+            # Check second range: 50-100
+            assert result[1]["min_ql"] == 50
+            assert result[1]["max_ql"] == 100
+            assert result[1]["interpolatable"] is True
+            assert result[1]["base_aoid"] == 1002
+            
+            # Check third range: 100-200
+            assert result[2]["min_ql"] == 100
+            assert result[2]["max_ql"] == 200
+            assert result[2]["interpolatable"] is True
+            assert result[2]["base_aoid"] == 1003
+
+    def test_get_interpolation_ranges_item_not_found(self, service, mock_db):
+        """Test interpolation ranges when item is not found."""
+        # Mock the query to return None
+        mock_db.query.return_value.filter.return_value.first.return_value = None
+        
+        result = service.get_interpolation_ranges(99999)
+        
+        assert result is None
+
+    def test_is_item_interpolatable_two_variants(self, service, mock_db):
+        """Test is_item_interpolatable with two variants."""
+        # Mock base item (not nano, not control point)
+        mock_item = Mock(spec=Item)
+        mock_item.name = "Test Item"
+        mock_item.description = "Test description"
+        mock_item.is_nano = False
+        
+        # Mock the query to return the base item
+        mock_db.query.return_value.filter.return_value.first.return_value = mock_item
+        
+        # Mock two variants
+        variant1 = Mock(spec=Item)
+        variant1.ql = 1
+        variant2 = Mock(spec=Item)
+        variant2.ql = 19
+        variants = [variant1, variant2]
+        
+        with patch.object(service, '_find_item_variants') as mock_find:
+            mock_find.return_value = variants
+            
+            result = service.is_item_interpolatable(231123)
+            
+            assert result is True
+
+    def test_is_item_interpolatable_nano_item(self, service, mock_db):
+        """Test is_item_interpolatable with nano item (should be false)."""
+        # Mock nano item
+        mock_item = Mock(spec=Item)
+        mock_item.name = "Test Nano"
+        mock_item.description = "Test description"
+        mock_item.is_nano = True
+        
+        # Mock the query to return the nano item
+        mock_db.query.return_value.filter.return_value.first.return_value = mock_item
+        
+        result = service.is_item_interpolatable(12345)
+        
+        assert result is False
+
+    def test_is_item_interpolatable_control_point(self, service, mock_db):
+        """Test is_item_interpolatable with control point item (should be false)."""
+        # Mock control point item
+        mock_item = Mock(spec=Item)
+        mock_item.name = "Control Point Tower"
+        mock_item.description = "Test description"
+        mock_item.is_nano = False
+        
+        # Mock the query to return the control point item
+        mock_db.query.return_value.filter.return_value.first.return_value = mock_item
+        
+        result = service.is_item_interpolatable(12345)
+        
+        assert result is False
+
+    def test_is_item_interpolatable_single_variant(self, service, mock_db):
+        """Test is_item_interpolatable with single variant (should be false)."""
+        # Mock base item
+        mock_item = Mock(spec=Item)
+        mock_item.name = "Single Item"
+        mock_item.description = "Test description"
+        mock_item.is_nano = False
+        
+        # Mock the query to return the base item
+        mock_db.query.return_value.filter.return_value.first.return_value = mock_item
+        
+        # Mock single variant
+        variant1 = Mock(spec=Item)
+        variants = [variant1]
+        
+        with patch.object(service, '_find_item_variants') as mock_find:
+            mock_find.return_value = variants
+            
+            result = service.is_item_interpolatable(12345)
+            
+            assert result is False

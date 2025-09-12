@@ -90,10 +90,10 @@ class InterpolationService:
 
     def get_interpolation_ranges(self, aoid: int) -> Optional[List[Dict[str, Any]]]:
         """
-        Get interpolation ranges for an item, detecting discrete QL segments.
+        Get interpolation ranges for an item.
         
-        For items with gaps in QL progression (like Otek Slicer: 1,99,100,199,200,299,300),
-        this returns multiple ranges where interpolation is valid.
+        If an item has multiple variants, it creates ranges between consecutive
+        variants that allow interpolation between them.
         
         Args:
             aoid: Anarchy Online ID of the item
@@ -114,56 +114,32 @@ class InterpolationService:
             return [{
                 "min_ql": item_variants[0].ql,
                 "max_ql": item_variants[0].ql,
-                "interpolatable": False
+                "interpolatable": False,
+                "base_aoid": item_variants[0].aoid
             }]
         
-        # Create ranges by finding pairs that define interpolation boundaries
-        # Pattern: items at QL 1,99,100,199,200,299,300 should create ranges:
-        # 1-99, 100-199, 200-299, 300 (single item)
-        
+        # Create ranges between consecutive variants
+        # All ranges with multiple variants are interpolatable
         ranges = []
-        used_indices = set()
         
-        for i, start_item in enumerate(item_variants):
-            if i in used_indices:
-                continue
-                
-            range_start_ql = start_item.ql
-            range_end_ql = range_start_ql
-            end_index = i
-            
-            # Look for an end item that forms a natural range boundary
-            for j in range(i + 1, len(item_variants)):
-                if j in used_indices:
-                    continue
-                    
-                candidate_end = item_variants[j]
-                gap = candidate_end.ql - range_start_ql
-                
-                # Look for typical tier boundaries (around 99 QL difference)
-                # This handles cases like 1→99, 100→199, 200→299
-                if 95 <= gap <= 102:
-                    range_end_ql = candidate_end.ql
-                    end_index = j
-                    break
-                # Also check for small consecutive ranges like 299→300
-                elif gap == 1 and j == i + 1:
-                    range_end_ql = candidate_end.ql
-                    end_index = j
-                    break
-            
-            # Mark used indices
-            used_indices.add(i)
-            if end_index != i:
-                used_indices.add(end_index)
-            
-            # Add the range
-            ranges.append({
-                "min_ql": range_start_ql,
-                "max_ql": range_end_ql,
-                "interpolatable": range_start_ql < range_end_ql,
-                "base_aoid": start_item.aoid  # Base item for this range
-            })
+        for i in range(len(item_variants)):
+            if i < len(item_variants) - 1:
+                # Create interpolatable range between current and next variant
+                ranges.append({
+                    "min_ql": item_variants[i].ql,
+                    "max_ql": item_variants[i + 1].ql,
+                    "interpolatable": True,
+                    "base_aoid": item_variants[i].aoid
+                })
+            else:
+                # Last item - only if it's not covered by the previous range
+                if len(item_variants) == 1 or item_variants[i].ql > item_variants[i-1].ql:
+                    ranges.append({
+                        "min_ql": item_variants[i].ql,
+                        "max_ql": item_variants[i].ql,
+                        "interpolatable": False,
+                        "base_aoid": item_variants[i].aoid
+                    })
         
         return ranges
 
