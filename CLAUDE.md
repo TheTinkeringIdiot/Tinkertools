@@ -84,6 +84,43 @@ cd database
 psql -U tinkertools_user -d tinkertools -f database/tests/test_schema.sql
 ```
 
+## Claude Code Configuration
+
+This section provides configuration information specifically for Claude Code (claude.ai/code).
+
+### Environment Configuration
+
+Claude Code uses `backend/.env.claude` for sensitive configuration values. This file:
+- Contains actual database credentials and paths needed for development
+- Is excluded from git tracking via `.gitignore` 
+- Should NEVER be committed to the repository
+
+**Required values in `.env.claude`:**
+```bash
+DATABASE_URL=postgresql://aodbuser:password@localhost:5432/tinkertools
+VENV_PATH=backend/venv
+```
+
+**Usage for Claude Code:**
+- Always use the virtual environment at `backend/venv` for Python operations
+- Use the DATABASE_URL from `.env.claude` for database connections
+- Load environment from `.env.claude` when running backend commands
+
+**Security Notes:**
+- The `.env.claude` file contains real credentials and must never be committed
+- Multiple layers of protection are in place:
+  - `.gitignore` excludes all `.env.claude*` files
+  - Pre-commit checks can validate no secrets are being committed
+  - Clear documentation prevents accidental inclusion
+
+**Example backend startup command:**
+```bash
+# Load environment from .env.claude and start backend
+cd backend && source venv/bin/activate && \
+export $(cat .env.claude | xargs) && \
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
 ## Architecture Overview
 
 ### Technology Stack
