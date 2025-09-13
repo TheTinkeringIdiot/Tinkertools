@@ -118,8 +118,8 @@ Complete character management with skills, equipment, and IP tracking
                   <i class="pi pi-shield text-orange-500 text-xs"></i>
                   Weapons
                 </h3>
-                <ItemSlotsDisplay 
-                  :item="getFirstEquippedWeapon(profileData.Weapons)"
+                <EquipmentSlotsDisplay 
+                  :equipment="getEquippedWeapons(profileData.Weapons)"
                   :slot-type="'weapon'"
                   :show-labels="false"
                 />
@@ -131,8 +131,8 @@ Complete character management with skills, equipment, and IP tracking
                   <i class="pi pi-user text-blue-500 text-xs"></i>
                   Armor
                 </h3>
-                <ItemSlotsDisplay 
-                  :item="getFirstEquippedArmor(profileData.Clothing)"
+                <EquipmentSlotsDisplay 
+                  :equipment="getEquippedArmor(profileData.Clothing)"
                   :slot-type="'armor'"
                   :show-labels="false"
                 />
@@ -144,8 +144,8 @@ Complete character management with skills, equipment, and IP tracking
                   <i class="pi pi-cpu text-green-500 text-xs"></i>
                   Implants
                 </h3>
-                <ItemSlotsDisplay 
-                  :item="getFirstEquippedImplant(profileData.Implants)"
+                <EquipmentSlotsDisplay 
+                  :equipment="getEquippedImplants(profileData.Implants)"
                   :slot-type="'implant'"
                   :show-labels="false"
                 />
@@ -177,21 +177,16 @@ Complete character management with skills, equipment, and IP tracking
               
               <!-- IP Summary -->
               <div v-if="profileData.IPTracker" class="mt-4 p-3 bg-surface-50 dark:bg-surface-800 rounded-lg">
-                <div class="flex items-center justify-between text-sm">
-                  <div class="flex items-center gap-4">
-                    <span class="text-surface-600 dark:text-surface-400">
-                      Available IP: <strong class="text-surface-900 dark:text-surface-50">{{ profileData.IPTracker.totalAvailable }}</strong>
-                    </span>
-                    <span class="text-surface-600 dark:text-surface-400">
-                      Used: <strong class="text-surface-900 dark:text-surface-50">{{ profileData.IPTracker.totalUsed }}</strong>
-                    </span>
-                    <span class="text-surface-600 dark:text-surface-400">
-                      Remaining: <strong :class="remainingIPColor">{{ profileData.IPTracker.remaining }}</strong>
-                    </span>
-                  </div>
-                  <div class="text-surface-600 dark:text-surface-400">
-                    Efficiency: <strong class="text-surface-900 dark:text-surface-50">{{ profileData.IPTracker.efficiency }}%</strong>
-                  </div>
+                <div class="flex items-center gap-4 text-sm">
+                  <span class="text-surface-600 dark:text-surface-400">
+                    Available IP: <strong class="text-surface-900 dark:text-surface-50">{{ profileData.IPTracker.totalAvailable }}</strong>
+                  </span>
+                  <span class="text-surface-600 dark:text-surface-400">
+                    Used: <strong class="text-surface-900 dark:text-surface-50">{{ profileData.IPTracker.totalUsed }}</strong>
+                  </span>
+                  <span class="text-surface-600 dark:text-surface-400">
+                    Remaining: <strong :class="remainingIPColor">{{ profileData.IPTracker.remaining }}</strong>
+                  </span>
                 </div>
               </div>
             </div>
@@ -228,9 +223,11 @@ import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import CharacterInfoPanel from '@/components/profiles/CharacterInfoPanel.vue';
 import IPTrackerPanel from '@/components/profiles/IPTrackerPanel.vue';
 import ItemSlotsDisplay from '@/components/items/ItemSlotsDisplay.vue';
+import EquipmentSlotsDisplay from '@/components/items/EquipmentSlotsDisplay.vue';
 import SkillsManager from '@/components/profiles/skills/SkillsManager.vue';
 import EditCharacterDialog from '@/components/profiles/EditCharacterDialog.vue';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
+import type { Item } from '@/types/api';
 
 // Router
 const route = useRoute();
@@ -424,20 +421,17 @@ function showTrickleDownFeedback(affectedSkillsCount: number) {
   // });
 }
 
-// Equipment helper functions
-function getFirstEquippedWeapon(weapons: Record<string, any>) {
-  const equippedWeapons = Object.values(weapons || {}).filter(weapon => weapon && weapon.name);
-  return equippedWeapons.length > 0 ? equippedWeapons[0] : null;
+// Equipment helper functions - now return complete equipment records
+function getEquippedWeapons(weapons: Record<string, Item | null>) {
+  return weapons || {};
 }
 
-function getFirstEquippedArmor(clothing: Record<string, any>) {
-  const equippedArmor = Object.values(clothing || {}).filter(armor => armor && armor.name);
-  return equippedArmor.length > 0 ? equippedArmor[0] : null;
+function getEquippedArmor(clothing: Record<string, Item | null>) {
+  return clothing || {};
 }
 
-function getFirstEquippedImplant(implants: Record<string, any>) {
-  const equippedImplants = Object.values(implants || {}).filter(implant => implant && implant.name);
-  return equippedImplants.length > 0 ? equippedImplants[0] : null;
+function getEquippedImplants(implants: Record<string, Item | null>) {
+  return implants || {};
 }
 
 // Watchers
