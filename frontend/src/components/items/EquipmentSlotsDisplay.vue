@@ -20,12 +20,16 @@ Shows all equipped items in a slot grid layout for a specific equipment type
         :src="cell.iconUrl"
         :alt="`${cell.item.name} equipped in ${cell.slotName}`"
         class="item-icon"
+        :title="`QL ${cell.item.ql} ${cell.item.name}`"
         @error="onIconError"
+        @click="navigateToItem(cell.item)"
       />
       <!-- Fallback icon for equipped items without icon -->
       <i 
         v-else-if="cell.item && !cell.iconUrl"
         class="pi pi-box item-fallback-icon"
+        :title="`QL ${cell.item.ql} ${cell.item.name}`"
+        @click="navigateToItem(cell.item)"
       ></i>
       <!-- Slot label for debugging (optional) -->
       <span 
@@ -40,6 +44,7 @@ Shows all equipped items in a slot grid layout for a specific equipment type
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { 
   getWeaponSlotPosition, 
   getArmorSlotPosition, 
@@ -59,6 +64,9 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   showLabels: false
 });
+
+// Router setup
+const router = useRouter();
 
 // Computed properties
 const gridCells = computed(() => {
@@ -189,6 +197,19 @@ function getAllSlotsForType(slotType: string): string[] {
 function onIconError() {
   console.warn('Failed to load item icon');
 }
+
+function navigateToItem(item: Item) {
+  // Navigate to ItemDetail page for the specific item at the equipped QL
+  router.push({
+    name: 'ItemDetail',
+    params: {
+      aoid: item.aoid.toString()
+    },
+    query: {
+      ql: item.ql.toString()
+    }
+  });
+}
 </script>
 
 <style scoped>
@@ -264,12 +285,26 @@ function onIconError() {
   object-fit: contain;
   filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.8));
   border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.1s ease, filter 0.1s ease;
+}
+
+.item-icon:hover {
+  transform: scale(1.05);
+  filter: drop-shadow(0 0 5px rgba(0, 0, 0, 1));
 }
 
 .item-fallback-icon {
   font-size: 24px;
   color: rgba(255, 255, 255, 0.8);
   filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
+  cursor: pointer;
+  transition: transform 0.1s ease, color 0.1s ease;
+}
+
+.item-fallback-icon:hover {
+  transform: scale(1.1);
+  color: rgba(255, 255, 255, 1);
 }
 
 .slot-label {
