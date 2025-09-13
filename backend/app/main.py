@@ -7,6 +7,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.config import settings
 from app.api.routes.health import router as health_router
 from app.api.routes.items import router as items_router
+from app.api.routes.implants import router as implants_router
 from app.api.routes.nanos import router as nanos_router
 from app.api.routes.spells import router as spells_router
 from app.api.routes.symbiants import router as symbiants_router
@@ -68,6 +69,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 # Include routers
 app.include_router(health_router, prefix="")
 app.include_router(items_router, prefix="/api/v1")
+app.include_router(implants_router, prefix="/api/v1")
 app.include_router(nanos_router, prefix="/api/v1")
 app.include_router(spells_router, prefix="/api/v1")
 app.include_router(symbiants_router, prefix="/api/v1")
