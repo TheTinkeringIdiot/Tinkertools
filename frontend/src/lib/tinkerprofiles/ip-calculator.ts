@@ -276,7 +276,6 @@ export function calcIPAdjustableRange(level: number, profession: number, skillId
   const costIndex = Math.min(Math.floor(costFac * 10) - 10, COST_TO_RATE.length - 1);
   
   if (costIndex < 0 || costIndex >= COST_TO_RATE.length) {
-    console.log(`[DEBUG] calcIPAdjustableRange: Invalid costIndex ${costIndex} for skill ${skillId}, profession ${profession}, costFac ${costFac}`);
     return 0;
   }
   
@@ -289,12 +288,10 @@ export function calcIPAdjustableRange(level: number, profession: number, skillId
       const potentialRange = rateData[1] * level;
       const tl1Cap = rateData[2]; // TL1 cap from COST_TO_RATE table
       adjustableRange = Math.min(potentialRange, tl1Cap);
-      console.log(`[DEBUG] calcIPAdjustableRange: Level ${level}, TL1, skill ${skillId}, potential(${potentialRange}) capped at TL1(${tl1Cap}) = ${adjustableRange}`);
     } else {
       // For TL2-6, the adjustable range is simply the cumulative cap for that title level
       // The COST_TO_RATE table already contains cumulative maximum values, not incremental ones
       adjustableRange = rateData[tl + 1]; // TL2 is index 3, TL3 is index 4, etc.
-      console.log(`[DEBUG] calcIPAdjustableRange: Level ${level}, TL${tl}, skill ${skillId}, using cumulative TL${tl} cap: ${adjustableRange}`);
     }
   } else {
     // Post-201: TL6 cap plus post-201 progression
@@ -306,7 +303,6 @@ export function calcIPAdjustableRange(level: number, profession: number, skillId
     const post201Levels = level - 200;
     adjustableRange += post201Levels * rateData[8];
     
-    console.log(`[DEBUG] calcIPAdjustableRange: Post-201 level ${level}, skill ${skillId}, TL6 cap(${rateData[7]}) + post201(${post201Levels}*${rateData[8]}=${post201Levels * rateData[8]}) = ${adjustableRange}`);
   }
   
   return adjustableRange;
@@ -510,7 +506,6 @@ export function calcSkillCap(level: number, profession: number, skillId: number,
   
   const totalCap = baseValue + trickleDown + maxImprovements;
   
-  console.log(`[DEBUG] calcSkillCap: skill ${skillId}, base(${baseValue}) + trickle(${trickleDown}) + min(level:${levelBasedImprovements}, ability:${abilityBasedImprovements}) = ${totalCap}`);
   
   return totalCap;
 }

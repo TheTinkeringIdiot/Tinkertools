@@ -30,6 +30,16 @@ Shows all profiles in a card-based layout with management actions
             outlined
             @click="showImportModal = true"
           />
+          <Button
+            icon="pi pi-download"
+            label="Export All"
+            severity="secondary"
+            outlined
+            @click="exportAllProfiles"
+            :loading="loading"
+            :disabled="filteredProfiles.length === 0"
+            v-tooltip.bottom="filteredProfiles.length === 0 ? 'No profiles to export' : `Export all ${filteredProfiles.length} profiles`"
+          />
         </div>
       </div>
       
@@ -64,12 +74,6 @@ Shows all profiles in a card-based layout with management actions
             class="w-40"
           />
           
-          <Dropdown
-            v-model="sortBy"
-            :options="sortOptions"
-            placeholder="Sort by..."
-            class="w-40"
-          />
         </div>
         
         <!-- View Toggle -->
@@ -320,7 +324,6 @@ const error = ref<string | null>(null);
 const searchQuery = ref('');
 const selectedProfession = ref<string | null>(null);
 const selectedBreed = ref<string | null>(null);
-const sortBy = ref('updated');
 const viewMode = ref<'grid' | 'list'>('grid');
 const showCreateModal = ref(false);
 const showImportModal = ref(false);
@@ -333,13 +336,6 @@ const activeProfile = computed(() => profilesStore.activeProfile);
 // Filter and sort options
 const professionOptions = ANARCHY_PROFESSIONS.map(p => p);
 const breedOptions = ANARCHY_BREEDS.map(b => b);
-const sortOptions = [
-  { label: 'Name', value: 'name' },
-  { label: 'Level', value: 'level' },
-  { label: 'Profession', value: 'profession' },
-  { label: 'Last Updated', value: 'updated' },
-  { label: 'Created', value: 'created' }
-];
 
 // Filtered and sorted profiles
 const filteredProfiles = computed(() => {
@@ -369,21 +365,9 @@ const filteredProfiles = computed(() => {
     );
   }
   
-  // Apply sorting
+  // Apply default sorting by last updated
   filtered.sort((a, b) => {
-    switch (sortBy.value) {
-      case 'name':
-        return a.name.localeCompare(b.name);
-      case 'level':
-        return b.level - a.level;
-      case 'profession':
-        return a.profession.localeCompare(b.profession);
-      case 'created':
-        return new Date(b.created).getTime() - new Date(a.created).getTime();
-      case 'updated':
-      default:
-        return new Date(b.updated).getTime() - new Date(a.updated).getTime();
-    }
+    return new Date(b.updated).getTime() - new Date(a.updated).getTime();
   });
   
   return filtered;
@@ -406,7 +390,6 @@ function clearFilters() {
   searchQuery.value = '';
   selectedProfession.value = null;
   selectedBreed.value = null;
-  sortBy.value = 'updated';
 }
 
 function viewProfileDetails(profile: ProfileMetadata) {
@@ -436,9 +419,46 @@ async function duplicateProfile(profile: ProfileMetadata) {
 
 async function exportProfile(profile: ProfileMetadata) {
   try {
-    await profilesStore.exportProfile(profile.id, 'json');
+    const exported = await profilesStore.exportProfile(profile.id, 'json');
+    
+    // Create download
+    const blob = new Blob([exported], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${profile.name}_profile.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
   } catch (err) {
     console.error('Failed to export profile:', err);
+  }
+}
+
+async function exportAllProfiles() {
+  try {
+    const exported = await profilesStore.exportAllProfiles();
+    
+    // Create download
+    const blob = new Blob([exported], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    
+    // Generate filename with timestamp
+    const now = new Date();
+    const timestamp = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+    a.download = `tinkerprofiles_all_${timestamp}.json`;
+    
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+  } catch (err) {
+    console.error('Failed to export all profiles:', err);
   }
 }
 

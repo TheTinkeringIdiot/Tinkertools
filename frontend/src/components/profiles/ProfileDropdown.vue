@@ -42,11 +42,6 @@ Global profile selection dropdown for the top navigation bar
           <i class="pi pi-user-minus text-surface-400"></i>
           <span class="text-surface-600 dark:text-surface-300">{{ slotProps.option.label }}</span>
         </div>
-        <div v-else-if="slotProps.option.value === 'divider'" class="border-t border-surface-200 dark:border-surface-700 my-1"></div>
-        <div v-else-if="slotProps.option.value === 'manage'" class="flex items-center gap-2 py-1 font-medium text-primary-600 dark:text-primary-400">
-          <i class="pi pi-cog"></i>
-          <span>{{ slotProps.option.label }}</span>
-        </div>
         <div v-else class="flex items-center gap-2 py-1">
           <div class="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
             <i class="pi pi-user text-primary-600 dark:text-primary-400 text-sm"></i>
@@ -66,12 +61,6 @@ Global profile selection dropdown for the top navigation bar
       </template>
     </Dropdown>
     
-    <!-- Manage Profiles Modal -->
-    <ProfileManagerModal
-      v-model:visible="showManageModal"
-      @profile-selected="onProfileSelected"
-      @refresh="refreshProfiles"
-    />
   </div>
 </template>
 
@@ -79,14 +68,12 @@ Global profile selection dropdown for the top navigation bar
 import { ref, computed, onMounted, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import Dropdown from 'primevue/dropdown';
-import ProfileManagerModal from './ProfileManagerModal.vue';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 
 // Store
 const profilesStore = useTinkerProfilesStore();
 
 // Local state
-const showManageModal = ref(false);
 const selectedProfileId = ref<string | null>(null);
 
 // Computed
@@ -100,9 +87,7 @@ const {
 } = storeToRefs(profilesStore);
 
 const profileOptions = computed(() => [
-  ...storeProfileOptions.value,
-  { label: '─────────', value: 'divider' },
-  { label: 'Manage Profiles...', value: 'manage' }
+  ...storeProfileOptions.value
 ]);
 
 const dropdownPlaceholder = computed(() => {
@@ -123,19 +108,6 @@ function getProfileDetails(option: any): string {
 async function onProfileChange(event: any) {
   const value = event.value;
   
-  if (value === 'manage') {
-    // Reset selection and show manage modal
-    selectedProfileId.value = profilesStore.activeProfileId;
-    showManageModal.value = true;
-    return;
-  }
-  
-  if (value === 'divider') {
-    // Ignore divider clicks
-    selectedProfileId.value = profilesStore.activeProfileId;
-    return;
-  }
-  
   try {
     await profilesStore.setActiveProfile(value);
   } catch (error) {
@@ -145,13 +117,6 @@ async function onProfileChange(event: any) {
   }
 }
 
-function onProfileSelected(profileId: string) {
-  selectedProfileId.value = profileId;
-}
-
-async function refreshProfiles() {
-  await profilesStore.loadProfiles();
-}
 
 // Watchers
 watch(() => profilesStore.activeProfileId, (newId) => {
