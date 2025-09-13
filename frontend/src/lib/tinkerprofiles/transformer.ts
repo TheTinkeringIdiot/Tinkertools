@@ -11,10 +11,19 @@ import type {
   TinkerProfile, 
   NanoCompatibleProfile,
   ProfileExportFormat,
-  ProfileImportResult
+  ProfileImportResult,
+  Item,
+  ImplantWithClusters,
+  ImplantCluster
 } from './types';
 import { createDefaultProfile, createDefaultNanoProfile } from './constants';
 import { SKILL_CATEGORIES, getSkillId } from './skill-mappings';
+import { 
+  getClusterMapping, 
+  getSlotPosition,
+  AOSETUPS_SLOT_TO_BITFLAG 
+} from './cluster-mappings';
+import { apiClient } from '@/services/api-client';
 
 export class ProfileTransformer {
   
@@ -172,7 +181,7 @@ export class ProfileTransformer {
   /**
    * Import profile from various formats
    */
-  importProfile(data: string, sourceFormat?: string): ProfileImportResult {
+  async importProfile(data: string, sourceFormat?: string): Promise<ProfileImportResult> {
     const result: ProfileImportResult = {
       success: false,
       errors: [],
@@ -205,7 +214,7 @@ export class ProfileTransformer {
           break;
           
         case 'aosetups':
-          profile = this.importFromAOSetups(data, result);
+          profile = await this.importFromAOSetups(data, result);
           break;
           
         default:
@@ -339,7 +348,7 @@ export class ProfileTransformer {
     return profile;
   }
   
-  private importFromAOSetups(data: string, result: ProfileImportResult): TinkerProfile {
+  private async importFromAOSetups(data: string, result: ProfileImportResult): Promise<TinkerProfile> {
     const aosetups = JSON.parse(data);
     result.metadata.migrated = true;
     
@@ -374,7 +383,7 @@ export class ProfileTransformer {
     }
     
     // Map equipment (implants, weapons, clothing)
-    this.mapAOSetupsEquipment(aosetups, profile, result);
+    await this.mapAOSetupsEquipment(aosetups, profile, result);
     
     // Map perks to PerksAndResearch
     if (aosetups.perks && Array.isArray(aosetups.perks)) {
@@ -386,7 +395,7 @@ export class ProfileTransformer {
     }
     
     result.warnings.push('Profile imported from AOSetups format');
-    result.warnings.push('Equipment highids preserved but item names need database lookup');
+    result.warnings.push('Equipment items fetched from database with interpolated stats at target QLs');
     
     return profile;
   }
@@ -429,103 +438,437 @@ export class ProfileTransformer {
     }
   }
   
-  private mapAOSetupsEquipment(aosetups: any, profile: TinkerProfile, result: ProfileImportResult): void {
-    // Map implants/symbiants
+  private async mapAOSetupsEquipment(aosetups: any, profile: TinkerProfile, result: ProfileImportResult): Promise<void> {
+    // First pass: collect all item requests
+    const itemRequests: Array<{aoid: number, targetQl?: number}> = [];
+    const itemPlacement: Array<{
+      type: 'implant' | 'weapon' | 'clothing',
+      slot: string,
+      aoid: number,
+      targetQl?: number,
+      clusters?: Record<string, { ClusterID: number }>,
+      implantType?: 'implant' | 'symbiant'
+    }> = [];
+    
+    // Collect implant/symbiant requests
     if (aosetups.implants && Array.isArray(aosetups.implants)) {
       for (const implant of aosetups.implants) {
-        if (implant && implant.slot) {
-          const slotMapping: Record<string, keyof typeof profile.Implants> = {
-            'head': 'Head',
-            'eye': 'Eye', 
-            'ear': 'Ear',
-            'chest': 'Chest',
-            'rarm': 'RightArm',
-            'larm': 'LeftArm',
-            'waist': 'Waist',
-            'rwrist': 'RightWrist',
-            'lwrist': 'LeftWrist',
-            'leg': 'Leg',
-            'rhand': 'RightHand',
-            'lhand': 'LeftHand',
-            'feet': 'Feet'
-          };
+        // Handle symbiant implants (has symbiant.highid)
+        if (implant && implant.slot && implant.symbiant?.highid) {
+          const aoid = implant.symbiant.highid;
+          const targetQl = implant.symbiant.selectedQl;
           
-          const slot = slotMapping[implant.slot];
-          if (slot) {
-            profile.Implants[slot] = {
-              id: implant.symbiant?.highid?.toString() || implant._id,
-              name: `Item ${implant.symbiant?.highid}`, // Would need item lookup
-              ql: implant.symbiant?.selectedQl || implant.ql || 1,
-              highId: implant.symbiant?.highid || null,
-              stats: [], // Empty stats array to prevent errors
-              lowId: null,
-              isContainer: false
-            };
-          }
+          itemRequests.push({ aoid, targetQl });
+          itemPlacement.push({
+            type: 'implant',
+            slot: implant.slot,
+            aoid,
+            targetQl,
+            implantType: 'symbiant'
+          });
+        }
+        // Handle regular implants (has type: 'implant', clusters, ql)
+        else if (implant && implant.slot && implant.type === 'implant' && implant.ql) {
+          // For regular implants, we don't have an AOID but we have cluster data
+          // We'll create a placeholder item and focus on the cluster data
+          itemPlacement.push({
+            type: 'implant',
+            slot: implant.slot,
+            aoid: 0, // Placeholder - no actual item to fetch
+            targetQl: implant.ql,
+            clusters: implant.clusters,
+            implantType: 'implant'
+          });
         }
       }
     }
     
-    // Map weapons  
+    // Collect weapon requests
     if (aosetups.weapons && Array.isArray(aosetups.weapons)) {
       for (let i = 0; i < aosetups.weapons.length; i++) {
         const weapon = aosetups.weapons[i];
         if (weapon && weapon.highid) {
-          const slotMapping = ['HUD1', 'HUD2', 'HUD3', 'UTILS1', 'UTILS2', 'UTILS3', 'RHand', 'Waist', 'LHand', 'NCU1', 'NCU2', 'NCU3', 'NCU4', 'NCU5', 'NCU6'];
-          const slot = slotMapping[i] as keyof typeof profile.Weapons;
-          if (slot) {
+          const aoid = weapon.highid;
+          const targetQl = weapon.selectedQl;
+          
+          itemRequests.push({ aoid, targetQl });
+          itemPlacement.push({
+            type: 'weapon',
+            slot: i.toString(),
+            aoid,
+            targetQl
+          });
+        }
+      }
+    }
+    
+    // Collect clothing requests
+    if (aosetups.clothes && Array.isArray(aosetups.clothes)) {
+      for (const clothing of aosetups.clothes) {
+        if (clothing && clothing.slot && clothing.highid) {
+          const aoid = clothing.highid;
+          const targetQl = clothing.selectedQl;
+          
+          itemRequests.push({ aoid, targetQl });
+          itemPlacement.push({
+            type: 'clothing',
+            slot: clothing.slot,
+            aoid,
+            targetQl
+          });
+        }
+      }
+    }
+    
+    // Fetch all items
+    const itemMap = await this.fetchItems(itemRequests);
+    
+    // Second pass: populate equipment with fetched items
+    for (const placement of itemPlacement) {
+      const key = `${placement.aoid}:${placement.targetQl || 'base'}`;
+      const item = itemMap.get(key);
+      
+      if (placement.type === 'implant') {
+        const transformedImplant = await this.transformAOSetupsImplant(placement, item, result);
+        if (transformedImplant) {
+          // Use bitflag values as keys instead of string slot names
+          const slotBitflag = getSlotPosition(placement.slot);
+          if (slotBitflag) {
+            profile.Implants[slotBitflag.toString()] = transformedImplant;
+          }
+        }
+      } else if (placement.type === 'weapon') {
+        const slotMapping = ['HUD1', 'HUD2', 'HUD3', 'UTILS1', 'UTILS2', 'UTILS3', 'RHand', 'Waist', 'LHand', 'NCU1', 'NCU2', 'NCU3', 'NCU4', 'NCU5', 'NCU6'];
+        const slotIndex = parseInt(placement.slot);
+        const slot = slotMapping[slotIndex] as keyof typeof profile.Weapons;
+        
+        if (slot) {
+          if (item) {
+            profile.Weapons[slot] = item;
+          } else {
+            // Fallback to basic data if item fetch failed
             profile.Weapons[slot] = {
-              id: weapon.highid.toString(),
-              name: `Item ${weapon.highid}`, // Would need item lookup
-              ql: weapon.selectedQl || 1,
-              highId: weapon.highid,
-              stats: [], // Empty stats array to prevent errors
-              lowId: null,
-              isContainer: false
+              id: placement.aoid,
+              aoid: placement.aoid,
+              name: `Item ${placement.aoid} (fetch failed)`,
+              ql: placement.targetQl || 1,
+              description: null,
+              item_class: null,
+              is_nano: false,
+              stats: [],
+              spell_data: [],
+              actions: [],
+              attack_stats: [],
+              defense_stats: [],
+              sources: []
+            } as Item;
+            result.warnings.push(`Failed to fetch weapon item AOID ${placement.aoid}`);
+          }
+        }
+      } else if (placement.type === 'clothing') {
+        const slotMapping: Record<string, keyof typeof profile.Clothing> = {
+          'HEAD': 'Head',
+          'BACK': 'Back', 
+          'BODY': 'Chest',
+          'ARM_R': 'RightArm',
+          'ARM_L': 'LeftArm',
+          'WRIST_R': 'RightWrist',
+          'WRIST_L': 'LeftWrist',
+          'HANDS': 'Hands',
+          'LEGS': 'Legs',
+          'FEET': 'Feet',
+          'SHOULDER_R': 'RightShoulder',
+          'SHOULDER_L': 'LeftShoulder',
+          'FINGER_R': 'RightFinger',
+          'FINGER_L': 'LeftFinger',
+          'NECK': 'Neck',
+          'BELT': 'Belt'
+        };
+        
+        const slot = slotMapping[placement.slot];
+        if (slot) {
+          if (item) {
+            profile.Clothing[slot] = item;
+          } else {
+            // Fallback to basic data if item fetch failed
+            profile.Clothing[slot] = {
+              id: placement.aoid,
+              aoid: placement.aoid,
+              name: `Item ${placement.aoid} (fetch failed)`,
+              ql: placement.targetQl || 1,
+              description: null,
+              item_class: null,
+              is_nano: false,
+              stats: [],
+              spell_data: [],
+              actions: [],
+              attack_stats: [],
+              defense_stats: [],
+              sources: []
+            } as Item;
+            result.warnings.push(`Failed to fetch clothing item AOID ${placement.aoid}`);
+          }
+        }
+      }
+    }
+  }
+  
+  /**
+   * Transform AOSetups implant data using backend API lookup
+   */
+  private async transformAOSetupsImplant(
+    placement: {
+      type: string,
+      slot: string,
+      aoid: number,
+      targetQl?: number,
+      clusters?: Record<string, { ClusterID: number }>,
+      implantType?: 'implant' | 'symbiant'
+    },
+    item: Item | undefined | null,
+    result: ProfileImportResult
+  ): Promise<ImplantWithClusters | null> {
+    // Get numeric slot position
+    const slotPosition = getSlotPosition(placement.slot);
+    if (!slotPosition) {
+      result.warnings.push(`Unknown implant slot: ${placement.slot}`);
+      return null;
+    }
+    
+    // Handle symbiants (use fetched item data)
+    if (placement.implantType === 'symbiant' && item) {
+      const enhancedImplant: ImplantWithClusters = {
+        ...item,
+        slot: slotPosition,
+        type: 'symbiant'
+      };
+      
+      result.warnings.push(`Mapped symbiant ${item.name || placement.aoid} to slot ${placement.slot}`);
+      return enhancedImplant;
+    }
+    
+    // Handle regular implants with clusters using backend API
+    if (placement.implantType === 'implant' && placement.clusters) {
+      try {
+        // Convert ClusterIDs to STAT numbers
+        const clusters: Record<string, number> = {};
+        let hasValidClusters = false;
+        
+        for (const [position, clusterData] of Object.entries(placement.clusters)) {
+          if (clusterData && clusterData.ClusterID) {
+            const mapping = getClusterMapping(clusterData.ClusterID);
+            if (mapping) {
+              clusters[position] = mapping.stat;
+              hasValidClusters = true;
+            } else {
+              result.warnings.push(`Unknown ClusterID: ${clusterData.ClusterID}`);
+            }
+          }
+        }
+        
+        if (!hasValidClusters) {
+          result.warnings.push(`No valid clusters found for implant in slot ${placement.slot}`);
+          return null;
+        }
+        
+        // Call backend API to lookup the exact implant
+        const lookupItem = await apiClient.lookupImplant(
+          slotPosition,
+          placement.targetQl || 100,
+          clusters
+        );
+        
+        // Create enhanced implant with the real data
+        const enhancedImplant: ImplantWithClusters = {
+          ...lookupItem,
+          slot: slotPosition,
+          type: 'implant',
+          clusters: {}
+        };
+        
+        // Add cluster metadata for UI display
+        for (const [position, statId] of Object.entries(clusters)) {
+          const mapping = Object.values(getClusterMapping.bind(this)).find(
+            (m: any) => m && m.stat === statId
+          );
+          
+          if (mapping) {
+            const positionMap: Record<string, keyof NonNullable<ImplantWithClusters['clusters']>> = {
+              'Shiny': 'Shiny',
+              'Bright': 'Bright', 
+              'Faded': 'Faded'
             };
+            
+            const mappedPosition = positionMap[position];
+            if (mappedPosition && enhancedImplant.clusters) {
+              enhancedImplant.clusters[mappedPosition] = {
+                stat: statId,
+                skillName: (mapping as any).skillName
+              };
+            }
+          }
+        }
+        
+        const clusterCount = Object.keys(clusters).length;
+        result.warnings.push(`Found implant with ${clusterCount} clusters for slot ${placement.slot} (${lookupItem.name})`);
+        
+        return enhancedImplant;
+        
+      } catch (error) {
+        result.warnings.push(`Failed to lookup implant for slot ${placement.slot}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        
+        // Fallback to placeholder implant
+        return this.createPlaceholderImplant(placement, result, slotPosition);
+      }
+    }
+    
+    // Fallback for cases where we can't lookup from backend
+    return this.createPlaceholderImplant(placement, result, slotPosition);
+  }
+  
+  /**
+   * Create a placeholder implant when backend lookup fails
+   */
+  private createPlaceholderImplant(
+    placement: {
+      type: string,
+      slot: string,
+      aoid: number,
+      targetQl?: number,
+      clusters?: Record<string, { ClusterID: number }>,
+      implantType?: 'implant' | 'symbiant'
+    },
+    result: ProfileImportResult,
+    slotPosition: number
+  ): ImplantWithClusters {
+    const placeholderItem: Item = {
+      id: 0,
+      aoid: placement.aoid || 0,
+      name: placement.implantType === 'implant' ? `Implant QL${placement.targetQl || 100}` : `Symbiant ${placement.aoid}`,
+      ql: placement.targetQl || 1,
+      description: null,
+      item_class: 3,
+      is_nano: false,
+      stats: [],
+      spell_data: [],
+      actions: [],
+      attack_stats: [],
+      defense_stats: [],
+      sources: []
+    };
+    
+    const enhancedImplant: ImplantWithClusters = {
+      ...placeholderItem,
+      slot: slotPosition,
+      type: placement.implantType || 'implant'
+    };
+    
+    // Add cluster information as metadata
+    if (placement.clusters) {
+      enhancedImplant.clusters = {};
+      
+      for (const [position, clusterData] of Object.entries(placement.clusters)) {
+        if (clusterData && clusterData.ClusterID) {
+          const mapping = getClusterMapping(clusterData.ClusterID);
+          if (mapping) {
+            const positionMap: Record<string, keyof NonNullable<ImplantWithClusters['clusters']>> = {
+              'Shiny': 'Shiny',
+              'Bright': 'Bright', 
+              'Faded': 'Faded'
+            };
+            
+            const mappedPosition = positionMap[position];
+            if (mappedPosition) {
+              enhancedImplant.clusters[mappedPosition] = {
+                stat: mapping.stat,
+                skillName: mapping.skillName
+              };
+            }
           }
         }
       }
     }
     
-    // Map clothing
-    if (aosetups.clothes && Array.isArray(aosetups.clothes)) {
-      for (const clothing of aosetups.clothes) {
-        if (clothing && clothing.slot && clothing.highid) {
-          const slotMapping: Record<string, keyof typeof profile.Clothing> = {
-            'HEAD': 'Head',
-            'BACK': 'Back', 
-            'BODY': 'Body',
-            'ARM_R': 'RightArm',
-            'ARM_L': 'LeftArm',
-            'WRIST_R': 'RightWrist',
-            'WRIST_L': 'LeftWrist',
-            'HANDS': 'Hands',
-            'LEGS': 'Legs',
-            'FEET': 'Feet',
-            'SHOULDER_R': 'RightShoulder',
-            'SHOULDER_L': 'LeftShoulder',
-            'FINGER_R': 'RightFinger',
-            'FINGER_L': 'LeftFinger',
-            'NECK': 'Neck',
-            'BELT': 'Belt'
-          };
-          
-          const slot = slotMapping[clothing.slot];
-          if (slot) {
-            profile.Clothing[slot] = {
-              id: clothing.highid.toString(),
-              name: `Item ${clothing.highid}`, // Would need item lookup
-              ql: clothing.selectedQl || 1,
-              highId: clothing.highid,
-              stats: [], // Empty stats array to prevent errors
-              lowId: null,
-              isContainer: false
-            };
-          }
-        }
-      }
+    result.warnings.push(`Using placeholder data for ${placement.implantType} in slot ${placement.slot}`);
+    return enhancedImplant;
+  }
+  
+  // ============================================================================
+  // Item Fetching Utilities
+  // ============================================================================
+  
+  /**
+   * Fetch multiple items from the backend API
+   * @param itemRequests Array of {aoid: number, targetQl?: number}
+   * @returns Promise<Map<string, Item | null>> - Map of "aoid:ql" to Item
+   */
+  private async fetchItems(itemRequests: Array<{aoid: number, targetQl?: number}>): Promise<Map<string, Item | null>> {
+    const itemMap = new Map<string, Item | null>();
+    
+    if (itemRequests.length === 0) {
+      return itemMap;
     }
+    
+    console.log(`[ProfileTransformer] Fetching ${itemRequests.length} items from backend...`);
+    
+    // Process each item request
+    const fetchPromises = itemRequests.map(async (request) => {
+      const key = `${request.aoid}:${request.targetQl || 'base'}`;
+      
+      try {
+        let itemResponse;
+        
+        if (request.targetQl && request.targetQl > 1) {
+          // Use interpolation API for specific quality levels
+          console.log(`[ProfileTransformer] Fetching interpolated item AOID ${request.aoid} at QL ${request.targetQl}`);
+          const interpolationResponse = await apiClient.interpolateItem(request.aoid, request.targetQl);
+          if (interpolationResponse.success && interpolationResponse.item) {
+            // Convert InterpolatedItem to Item format for TinkerProfile
+            itemResponse = {
+              success: true,
+              data: {
+                id: interpolationResponse.item.id,
+                aoid: interpolationResponse.item.aoid,
+                name: interpolationResponse.item.name,
+                ql: interpolationResponse.item.ql,
+                description: interpolationResponse.item.description,
+                item_class: interpolationResponse.item.item_class,
+                is_nano: interpolationResponse.item.is_nano,
+                stats: interpolationResponse.item.stats || [],
+                spell_data: interpolationResponse.item.spell_data || [],
+                actions: interpolationResponse.item.actions || [],
+                attack_stats: [],
+                defense_stats: [],
+                sources: []
+              } as Item
+            };
+          } else {
+            throw new Error(`Interpolation failed: ${interpolationResponse.error || 'Unknown error'}`);
+          }
+        } else {
+          // Use regular item API for base item
+          console.log(`[ProfileTransformer] Fetching base item AOID ${request.aoid}`);
+          itemResponse = await apiClient.getItem(request.aoid);
+        }
+        
+        if (itemResponse.success && itemResponse.data) {
+          itemMap.set(key, itemResponse.data);
+          console.log(`[ProfileTransformer] Successfully fetched ${itemResponse.data.name} (AOID: ${request.aoid})`);
+        } else {
+          console.warn(`[ProfileTransformer] Failed to fetch item AOID ${request.aoid}: No data returned`);
+          itemMap.set(key, null);
+        }
+      } catch (error) {
+        console.warn(`[ProfileTransformer] Failed to fetch item AOID ${request.aoid}:`, error);
+        itemMap.set(key, null);
+      }
+    });
+    
+    // Wait for all fetches to complete
+    await Promise.all(fetchPromises);
+    
+    console.log(`[ProfileTransformer] Completed item fetching: ${itemMap.size} items processed`);
+    return itemMap;
   }
   
   // ============================================================================

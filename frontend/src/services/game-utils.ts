@@ -545,7 +545,8 @@ export function normalizeBreedName(name: string): string {
 /**
  * Extract icon ID from item stats
  */
-export function getItemIconId(stats: Array<{stat: number, value: number}>): number | null {
+export function getItemIconId(stats: Array<{stat: number, value: number}> | undefined | null): number | null {
+  if (!stats || !Array.isArray(stats)) return null;
   const iconStat = stats.find(stat => stat.stat === 79); // Stat ID 79 is 'Icon'
   return iconStat ? iconStat.value : null;
 }
@@ -560,7 +561,7 @@ export function getIconUrl(iconId: number): string {
 /**
  * Get item icon URL from item stats
  */
-export function getItemIconUrl(stats: Array<{stat: number, value: number}>): string | null {
+export function getItemIconUrl(stats: Array<{stat: number, value: number}> | undefined | null): string | null {
   const iconId = getItemIconId(stats);
   return iconId ? getIconUrl(iconId) : null;
 }
@@ -1171,6 +1172,9 @@ export function getItemSlotInfo(item: any): {
   slots: string[];
   iconUrl: string | null;
 } {
+  if (!item) {
+    return { type: null, slots: [], iconUrl: null };
+  }
   const itemClass = getItemClass(item);
   const iconUrl = getItemIconUrl(item.stats);
   
@@ -1266,6 +1270,7 @@ export function getArmorSlotPosition(slotName: string): { row: number; col: numb
     'Back': { row: 1, col: 3 },
     'LeftShoulder': { row: 2, col: 1 },
     'Chest': { row: 2, col: 2 },
+    'Body': { row: 2, col: 2 }, // Legacy compatibility - same as Chest
     'RightShoulder': { row: 2, col: 3 },
     'LeftArm': { row: 3, col: 1 },
     'Hands': { row: 3, col: 2 },
@@ -1302,6 +1307,30 @@ export function getImplantSlotPosition(slotName: string): { row: number; col: nu
   };
   
   return positions[slotName] || { row: 1, col: 1 };
+}
+
+/**
+ * Get implant slot grid position from bitflag value (3x5 grid)
+ * Maps IMPLANT_SLOT bitflag values to their display positions
+ */
+export function getImplantSlotPositionFromBitflag(bitflag: number): { row: number; col: number } {
+  const positions: Record<number, { row: number; col: number }> = {
+    2: { row: 1, col: 1 },      // Eyes - 1 << 1
+    4: { row: 1, col: 2 },      // Head - 1 << 2  
+    8: { row: 1, col: 3 },      // Ears - 1 << 3
+    16: { row: 2, col: 1 },     // RightArm - 1 << 4
+    32: { row: 2, col: 2 },     // Chest - 1 << 5
+    64: { row: 2, col: 3 },     // LeftArm - 1 << 6
+    128: { row: 3, col: 1 },    // RightWrist - 1 << 7
+    256: { row: 3, col: 2 },    // Waist - 1 << 8
+    512: { row: 3, col: 3 },    // LeftWrist - 1 << 9
+    1024: { row: 4, col: 1 },   // RightHand - 1 << 10
+    2048: { row: 4, col: 2 },   // Legs - 1 << 11
+    4096: { row: 4, col: 3 },   // LeftHand - 1 << 12
+    8192: { row: 5, col: 2 }    // Feet - 1 << 13
+  };
+  
+  return positions[bitflag] || { row: 1, col: 1 };
 }
 
 // ============================================================================
@@ -1741,6 +1770,7 @@ export const gameUtils = {
   getWeaponSlotPosition,
   getArmorSlotPosition,
   getImplantSlotPosition,
+  getImplantSlotPositionFromBitflag,
   
   // Flag resolution functions
   getFlagNameFromBit,
