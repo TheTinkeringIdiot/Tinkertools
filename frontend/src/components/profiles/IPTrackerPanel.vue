@@ -18,49 +18,6 @@ Shows IP allocation, usage, and breakdown with visual indicators
     
     <!-- IP Summary -->
     <div v-if="ipTracker" class="space-y-4">
-      <!-- Circular Progress -->
-      <div class="flex items-center justify-center mb-6">
-        <div class="relative">
-          <!-- SVG Progress Ring -->
-          <svg class="w-32 h-32 transform -rotate-90" viewBox="0 0 120 120">
-            <!-- Background ring -->
-            <circle
-              cx="60"
-              cy="60"
-              r="52"
-              stroke="currentColor"
-              stroke-width="8"
-              fill="transparent"
-              class="text-surface-200 dark:text-surface-700"
-            />
-            
-            <!-- Progress ring -->
-            <circle
-              cx="60"
-              cy="60"
-              r="52"
-              stroke="currentColor"
-              stroke-width="8"
-              fill="transparent"
-              :stroke-dasharray="circumference"
-              :stroke-dashoffset="progressOffset"
-              :class="progressColor"
-              class="transition-all duration-500 ease-in-out"
-              stroke-linecap="round"
-            />
-          </svg>
-          
-          <!-- Center content -->
-          <div class="absolute inset-0 flex flex-col items-center justify-center">
-            <div class="text-2xl font-bold text-surface-900 dark:text-surface-50">
-              {{ Math.round(ipTracker.efficiency) }}%
-            </div>
-            <div class="text-xs text-surface-500 dark:text-surface-400">
-              Efficiency
-            </div>
-          </div>
-        </div>
-      </div>
       
       <!-- IP Stats Grid -->
       <div class="grid grid-cols-3 gap-4 mb-4">
@@ -209,20 +166,25 @@ const titleLevel = computed(() => {
 
 const circumference = computed(() => 2 * Math.PI * 52); // radius = 52
 
+const ipUsagePercent = computed(() => {
+  if (!ipTracker.value || ipTracker.value.totalAvailable === 0) return 0;
+  return (ipTracker.value.totalUsed / ipTracker.value.totalAvailable) * 100;
+});
+
 const progressOffset = computed(() => {
   if (!ipTracker.value) return circumference.value;
-  const progress = ipTracker.value.efficiency / 100;
+  const progress = ipUsagePercent.value / 100;
   return circumference.value - (progress * circumference.value);
 });
 
 const progressColor = computed(() => {
   if (!ipTracker.value) return 'text-surface-300';
   
-  const efficiency = ipTracker.value.efficiency;
-  if (efficiency >= 90) return 'text-green-500';
-  if (efficiency >= 75) return 'text-blue-500';
-  if (efficiency >= 50) return 'text-orange-500';
-  return 'text-red-500';
+  const usage = ipUsagePercent.value;
+  if (usage <= 50) return 'text-green-500';   // Low usage - green
+  if (usage <= 75) return 'text-blue-500';    // Medium usage - blue  
+  if (usage <= 90) return 'text-orange-500';  // High usage - orange
+  return 'text-red-500';                      // Very high usage - red
 });
 
 const remainingColor = computed(() => {
