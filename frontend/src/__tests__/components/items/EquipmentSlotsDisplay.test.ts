@@ -9,6 +9,16 @@ import { mount } from '@vue/test-utils';
 import EquipmentSlotsDisplay from '@/components/items/EquipmentSlotsDisplay.vue';
 import type { Item } from '@/types/api';
 
+// Mock router 
+const mockRouter = {
+  push: vi.fn()
+};
+
+// Mock vue-router
+vi.mock('vue-router', () => ({
+  useRouter: () => mockRouter
+}));
+
 // Mock the game-utils functions
 import * as gameUtils from '@/services/game-utils';
 
@@ -529,6 +539,162 @@ describe('EquipmentSlotsDisplay', () => {
       // won't be called for 'invalidString' at all
       const uniqueCalls = mockFn.mock.calls.length;
       expect(uniqueCalls).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('Item Navigation', () => {
+    beforeEach(() => {
+      mockRouter.push.mockClear();
+    });
+
+    it('should navigate to ItemDetail with correct AOID and QL when item is clicked', async () => {
+      const testItem: Item = {
+        id: 123,
+        aoid: 456789,
+        name: 'Test Head Armor',
+        ql: 150,
+        item_class: 2,
+        description: 'Test armor description',
+        is_nano: false,
+        stats: [{
+          id: 1,
+          stat: 79,
+          value: 999
+        }]
+      };
+
+      const armorEquipment = {
+        'Head': testItem
+      };
+
+      const wrapper = mount(EquipmentSlotsDisplay, {
+        props: {
+          equipment: armorEquipment,
+          slotType: 'armor'
+        },
+      });
+
+      // Find and click the item icon
+      const itemIcon = wrapper.find('.item-icon');
+      expect(itemIcon.exists()).toBe(true);
+      
+      await itemIcon.trigger('click');
+
+      // Verify navigation was called with correct parameters
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: 'ItemDetail',
+        params: {
+          aoid: '456789'  // Should use AOID, not database ID
+        },
+        query: {
+          ql: '150'  // Should include the equipped QL
+        }
+      });
+    });
+
+    it('should navigate with correct parameters for fallback icon clicks', async () => {
+      const testItem: Item = {
+        id: 999,
+        aoid: 111222,
+        name: 'Test Item Without Icon',
+        ql: 250,
+        item_class: 3,
+        description: 'Test item',
+        is_nano: false,
+        stats: [] // No icon stat
+      };
+
+      const implantEquipment = {
+        '32': testItem // Chest implant bitflag
+      };
+
+      const wrapper = mount(EquipmentSlotsDisplay, {
+        props: {
+          equipment: implantEquipment,
+          slotType: 'implant'
+        },
+      });
+
+      // Find and click the fallback icon
+      const fallbackIcon = wrapper.find('.item-fallback-icon');
+      expect(fallbackIcon.exists()).toBe(true);
+      
+      await fallbackIcon.trigger('click');
+
+      // Verify navigation was called with correct parameters
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: 'ItemDetail',
+        params: {
+          aoid: '111222'
+        },
+        query: {
+          ql: '250'
+        }
+      });
+    });
+
+    it('should show correct tooltip with QL and name on hover', () => {
+      const testItem: Item = {
+        id: 555,
+        aoid: 777888,
+        name: 'Epic Weapon',
+        ql: 300,
+        item_class: 1,
+        description: 'Epic weapon description',
+        is_nano: false,
+        stats: [{
+          id: 2,
+          stat: 79,
+          value: 888
+        }]
+      };
+
+      const weaponEquipment = {
+        'Right-Hand': testItem
+      };
+
+      const wrapper = mount(EquipmentSlotsDisplay, {
+        props: {
+          equipment: weaponEquipment,
+          slotType: 'weapon'
+        }
+      });
+
+      const itemIcon = wrapper.find('.item-icon');
+      expect(itemIcon.exists()).toBe(true);
+      
+      // Check tooltip title attribute
+      expect(itemIcon.attributes('title')).toBe('QL 300 Epic Weapon');
+    });
+
+    it('should show tooltip on fallback icon as well', () => {
+      const testItem: Item = {
+        id: 666,
+        aoid: 999000,
+        name: 'Mysterious Item',
+        ql: 50,
+        item_class: 2,
+        description: 'No icon available',
+        is_nano: false,
+        stats: [] // No icon
+      };
+
+      const armorEquipment = {
+        'Chest': testItem
+      };
+
+      const wrapper = mount(EquipmentSlotsDisplay, {
+        props: {
+          equipment: armorEquipment,
+          slotType: 'armor'
+        }
+      });
+
+      const fallbackIcon = wrapper.find('.item-fallback-icon');
+      expect(fallbackIcon.exists()).toBe(true);
+      
+      // Check tooltip title attribute
+      expect(fallbackIcon.attributes('title')).toBe('QL 50 Mysterious Item');
     });
   });
 });

@@ -128,11 +128,11 @@ class InterpolatedItem(BaseModel):
         Set the interpolation metadata based on low/high items and target QL.
         """
         if hi_item is None:
-            # No interpolation needed
+            # No interpolation needed - but still update QL to target
             self.interpolating = False
             self.low_ql = lo_item.ql
             self.high_ql = lo_item.ql
-            self.target_ql = lo_item.ql
+            self.target_ql = target_ql  # Fix: Use target_ql instead of lo_item.ql
             self.ql_delta = 0
             self.ql_delta_full = 0
         else:
@@ -143,6 +143,9 @@ class InterpolatedItem(BaseModel):
             self.target_ql = target_ql
             self.ql_delta_full = hi_item.ql - lo_item.ql
             self.ql_delta = target_ql - lo_item.ql
+            
+        # Always update the main QL field to the target QL
+        self.ql = target_ql
 
 
 class InterpolationRequest(BaseModel):
