@@ -4,6 +4,8 @@
  * Unified type definitions for profile management across all TinkerTools applications
  */
 
+import type { Item } from '@/types/api';
+
 // ============================================================================
 // Core Profile Types
 // ============================================================================
@@ -29,6 +31,24 @@ export interface IPTracker {
   breakdown: {
     abilities: Record<string, number>; // IP spent per ability
     skillCategories: Record<string, number>; // IP spent per skill category
+  };
+}
+
+/** Implant cluster information from AOSetups */
+export interface ImplantCluster {
+  stat: number;        // STAT ID from game-data
+  skillName: string;   // Human-readable skill name
+  value?: number;      // Cluster value/bonus (if applicable)
+}
+
+/** Enhanced implant item with cluster information */
+export interface ImplantWithClusters extends Item {
+  slot: number;        // Numeric slot position from IMPLANT_SLOT_POSITION
+  type: 'implant' | 'symbiant';
+  clusters?: {
+    Shiny?: ImplantCluster;
+    Bright?: ImplantCluster;
+    Faded?: ImplantCluster;
   };
 }
 
@@ -80,9 +100,9 @@ export interface TinkerProfile {
   };
   
   // Equipment slots
-  Weapons: Record<string, any>;
-  Clothing: Record<string, any>;
-  Implants: Record<string, any>;
+  Weapons: Record<string, Item | null>;
+  Clothing: Record<string, Item | null>;
+  Implants: Record<string, ImplantWithClusters | null>;
   
   // Additional data
   PerksAndResearch: any[];
@@ -131,6 +151,27 @@ export interface ProfileImportResult {
     source: string;
     originalFormat?: string;
     migrated: boolean;
+  };
+}
+
+/** Bulk import result for multiple profiles */
+export interface BulkImportResult {
+  totalProfiles: number;
+  successCount: number;
+  failureCount: number;
+  skippedCount: number;
+  results: Array<{
+    profileName: string;
+    profileId?: string;
+    success: boolean;
+    skipped: boolean;
+    error?: string;
+    warnings?: string[];
+  }>;
+  metadata: {
+    source: string;
+    exportVersion?: string;
+    exportDate?: string;
   };
 }
 

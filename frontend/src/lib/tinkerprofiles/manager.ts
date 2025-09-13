@@ -484,7 +484,7 @@ export class TinkerProfilesManager {
    * Import a profile
    */
   async importProfile(data: string, sourceFormat?: string): Promise<ProfileImportResult> {
-    const result = this.transformer.importProfile(data, sourceFormat);
+    const result = await this.transformer.importProfile(data, sourceFormat);
     
     if (result.success && result.profile) {
       try {

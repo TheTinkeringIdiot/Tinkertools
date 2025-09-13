@@ -5,7 +5,7 @@
  */
 
 import type { TinkerProfile, NanoCompatibleProfile } from './types';
-import { getBreedInitValue } from './ip-calculator';
+import { getBreedInitValue, calcHP, calcNP } from './ip-calculator';
 import { getBreedId } from '../../services/game-utils';
 
 // Import BASE_SKILL constant from ip-calculator
@@ -319,7 +319,6 @@ export function createDefaultProfile(name: string = 'New Character', breed: stri
   const bodyDev = BASE_SKILL; // 5
   const nanoPool = BASE_SKILL; // 5
   
-  const { calcHP, calcNP } = require('./ip-calculator');
   const initialHealth = calcHP(bodyDev, level, breedId, professionId);
   const initialNano = calcNP(nanoPool, level, breedId, professionId);
   
