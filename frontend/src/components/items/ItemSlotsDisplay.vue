@@ -189,31 +189,27 @@ function onIconError() {
   margin: 0 auto;
   /* Uniform cell size for all types */
   --cell-size: 55px;
+  /* Always define grid structure */
+  grid-template-rows: repeat(5, var(--cell-size));
+  grid-template-columns: repeat(3, var(--cell-size));
+  width: calc(var(--cell-size) * 3);
+  height: calc(var(--cell-size) * 5);
+  /* Ensure minimum visibility */
+  min-height: calc(var(--cell-size) * 5);
+  min-width: calc(var(--cell-size) * 3);
 }
 
 /* All slot types use the same cell size for uniformity */
 .slots-display.weapon {
   background-image: url('https://cdn.tinkeringidiot.com/static/image/weapon_slots.png');
-  width: calc(var(--cell-size) * 3);
-  height: calc(var(--cell-size) * 5);
-  grid-template-rows: repeat(5, var(--cell-size));
-  grid-template-columns: repeat(3, var(--cell-size));
 }
 
 .slots-display.armor {
   background-image: url('https://cdn.tinkeringidiot.com/static/image/armor_slots.png');
-  width: calc(var(--cell-size) * 3);
-  height: calc(var(--cell-size) * 5);
-  grid-template-rows: repeat(5, var(--cell-size));
-  grid-template-columns: repeat(3, var(--cell-size));
 }
 
 .slots-display.implant {
   background-image: url('https://cdn.tinkeringidiot.com/static/image/implant_slots.png');
-  width: calc(var(--cell-size) * 3);
-  height: calc(var(--cell-size) * 5);
-  grid-template-rows: repeat(5, var(--cell-size));
-  grid-template-columns: repeat(3, var(--cell-size));
 }
 
 .slot-cell {
@@ -243,8 +239,8 @@ function onIconError() {
 }
 
 .slot-cell.empty {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: transparent;
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .slot-icon {

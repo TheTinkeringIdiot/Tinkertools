@@ -388,6 +388,23 @@ function onPageChange(page: number) {
 
 // Initialize
 onMounted(() => {
+  // Check for itemId and ql query parameters (from equipment navigation)
+  const itemIdParam = route.query.itemId
+  const qlParam = route.query.ql
+  
+  if (itemIdParam && qlParam) {
+    // Create a search query for the specific item and QL
+    const itemQuery: ItemSearchQuery = {
+      aoid: parseInt(itemIdParam as string),
+      min_ql: parseInt(qlParam as string),
+      max_ql: parseInt(qlParam as string)
+    }
+    
+    // Trigger the advanced search
+    performAdvancedSearch(itemQuery)
+    return
+  }
+  
   // Check for strain query parameter and trigger search if present
   const strainParam = route.query.strain
   const isNanoParam = route.query.is_nano
