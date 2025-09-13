@@ -22,14 +22,14 @@ const menuItems = ref<MenuItem[]>([
     command: () => router.push('/')
   },
   {
-    label: 'TinkerItems',
-    icon: 'pi pi-database',
-    command: () => router.push('/items')
-  },
-  {
     label: 'TinkerProfiles',
     icon: 'pi pi-users',
     command: () => router.push('/profiles')
+  },
+  {
+    label: 'TinkerItems',
+    icon: 'pi pi-database',
+    command: () => router.push('/items')
   },
   {
     label: 'TinkerNanos',
