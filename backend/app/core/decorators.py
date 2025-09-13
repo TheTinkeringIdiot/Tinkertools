@@ -7,6 +7,7 @@ import functools
 import logging
 from typing import Callable, Any
 from fastapi import Request
+import asyncio
 from app.core.cache import cache_key_for_query, get_cached_response, cache_response, CACHE_TTL
 
 logger = logging.getLogger(__name__)
@@ -53,9 +54,31 @@ def cached_response(cache_type: str, ttl: int = None):
 def performance_monitor(func: Callable) -> Callable:
     """
     Decorator to monitor endpoint performance and log slow queries.
+    Handles both sync and async functions.
     """
     @functools.wraps(func)
-    def wrapper(*args, **kwargs):
+    async def async_wrapper(*args, **kwargs):
+        start_time = time.time()
+        
+        try:
+            result = await func(*args, **kwargs)
+            execution_time = time.time() - start_time
+            
+            # Log slow queries (>500ms per REQ-PERF-001)
+            if execution_time > 0.5:
+                logger.warning(f"Slow query in {func.__name__}: {execution_time:.3f}s - {kwargs}")
+            elif execution_time > 0.2:
+                logger.info(f"Moderate query in {func.__name__}: {execution_time:.3f}s")
+            
+            return result
+        
+        except Exception as e:
+            execution_time = time.time() - start_time
+            logger.error(f"Error in {func.__name__} after {execution_time:.3f}s: {e}")
+            raise
+    
+    @functools.wraps(func)
+    def sync_wrapper(*args, **kwargs):
         start_time = time.time()
         
         try:
@@ -75,7 +98,11 @@ def performance_monitor(func: Callable) -> Callable:
             logger.error(f"Error in {func.__name__} after {execution_time:.3f}s: {e}")
             raise
     
-    return wrapper
+    # Return the appropriate wrapper based on whether the function is async
+    if asyncio.iscoroutinefunction(func):
+        return async_wrapper
+    else:
+        return sync_wrapper
 
 
 def log_query_params(func: Callable) -> Callable:
