@@ -14,6 +14,7 @@ import {
   type ProfileMetadata,
   type ProfileExportFormat,
   type ProfileImportResult,
+  type BulkImportResult,
   type ProfileValidationResult,
   type TinkerProfilesConfig
 } from '@/lib/tinkerprofiles';
@@ -347,6 +348,46 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   }
   
   /**
+   * Export all profiles as a single JSON file
+   */
+  async function exportAllProfiles(): Promise<string> {
+    if (!profileManager) {
+      throw new Error('Profile manager not initialized');
+    }
+    
+    loading.value = true;
+    error.value = null;
+    
+    try {
+      const allProfiles: TinkerProfile[] = [];
+      
+      // Load all profiles
+      for (const metadata of profileMetadata.value) {
+        const profile = await loadProfile(metadata.id);
+        if (profile) {
+          allProfiles.push(profile);
+        }
+      }
+      
+      // Create export object
+      const exportData = {
+        version: "1.0",
+        exportDate: new Date().toISOString(),
+        profileCount: allProfiles.length,
+        profiles: allProfiles
+      };
+      
+      return JSON.stringify(exportData, null, 2);
+      
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to export all profiles';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+  
+  /**
    * Import a profile
    */
   async function importProfile(data: string, sourceFormat?: string): Promise<ProfileImportResult> {
@@ -368,6 +409,120 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to import profile';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+  
+  /**
+   * Import multiple profiles from export all format
+   */
+  async function importAllProfiles(data: string, options: { 
+    skipDuplicates?: boolean; 
+    overwriteExisting?: boolean; 
+  } = {}): Promise<BulkImportResult> {
+    if (!profileManager) {
+      throw new Error('Profile manager not initialized');
+    }
+    
+    loading.value = true;
+    error.value = null;
+    
+    try {
+      // Parse the bulk export data
+      let exportData: any;
+      try {
+        exportData = JSON.parse(data);
+      } catch (parseError) {
+        throw new Error('Invalid JSON format');
+      }
+      
+      // Validate bulk export structure
+      if (!exportData.version || !exportData.profiles || !Array.isArray(exportData.profiles)) {
+        throw new Error('Invalid bulk export format');
+      }
+      
+      const profiles = exportData.profiles as TinkerProfile[];
+      const existingProfiles = profileMetadata.value.map(p => p.name.toLowerCase());
+      
+      const result: BulkImportResult = {
+        totalProfiles: profiles.length,
+        successCount: 0,
+        failureCount: 0,
+        skippedCount: 0,
+        results: [],
+        metadata: {
+          source: 'TinkerProfiles Bulk Export',
+          exportVersion: exportData.version,
+          exportDate: exportData.exportDate
+        }
+      };
+      
+      // Process each profile
+      for (const profile of profiles) {
+        const profileResult = {
+          profileName: profile.Character?.Name || 'Unknown',
+          profileId: undefined as string | undefined,
+          success: false,
+          skipped: false,
+          error: undefined as string | undefined,
+          warnings: [] as string[]
+        };
+        
+        try {
+          // Check for duplicates
+          const isDuplicate = existingProfiles.includes(profileResult.profileName.toLowerCase());
+          
+          if (isDuplicate) {
+            if (options.skipDuplicates) {
+              profileResult.skipped = true;
+              result.skippedCount++;
+              result.results.push(profileResult);
+              continue;
+            } else if (!options.overwriteExisting) {
+              // Generate unique name
+              let counter = 1;
+              let newName = `${profileResult.profileName} (${counter})`;
+              while (existingProfiles.includes(newName.toLowerCase())) {
+                counter++;
+                newName = `${profileResult.profileName} (${counter})`;
+              }
+              profile.Character.Name = newName;
+              profileResult.profileName = newName;
+              profileResult.warnings?.push('Profile renamed to avoid duplicate');
+            }
+          }
+          
+          // Import the individual profile
+          const profileJson = JSON.stringify(profile);
+          const importResult = await importProfile(profileJson);
+          
+          if (importResult.success && importResult.profile) {
+            profileResult.success = true;
+            profileResult.profileId = importResult.profile.id;
+            profileResult.warnings?.push(...(importResult.warnings || []));
+            result.successCount++;
+            
+            // Add to existing profiles list to prevent duplicates within this batch
+            existingProfiles.push(profileResult.profileName.toLowerCase());
+          } else {
+            profileResult.error = importResult.errors.join(', ');
+            result.failureCount++;
+          }
+          
+        } catch (profileError) {
+          profileResult.error = profileError instanceof Error ? profileError.message : 'Unknown error';
+          result.failureCount++;
+        }
+        
+        result.results.push(profileResult);
+      }
+      
+      return result;
+      
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to import profiles';
       throw err;
     } finally {
       loading.value = false;
@@ -703,7 +858,9 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     getAsNanoCompatible,
     createFromNanoCompatible,
     exportProfile,
+    exportAllProfiles,
     importProfile,
+    importAllProfiles,
     validateProfile,
     searchProfiles,
     refreshMetadata,

@@ -441,6 +441,43 @@ class TinkerToolsApiClient {
   }
 
   // ============================================================================
+  // Implant API
+  // ============================================================================
+  
+  async lookupImplant(slot: number, ql: number, clusters: Record<string, number>): Promise<Item> {
+    try {
+      const request = { slot, ql, clusters };
+      const response = await this.client.post('/implants/lookup', request);
+      
+      if (response.data.success && response.data.item) {
+        return response.data.item;
+      } else {
+        throw new Error(response.data.message || 'Implant lookup failed');
+      }
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
+  }
+
+  async getAvailableImplants(slot: number, ql: number = 1): Promise<Item[]> {
+    try {
+      const response = await this.client.get(`/implants/slots/${slot}/available?ql=${ql}`);
+      return response.data || [];
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
+  }
+
+  async validateClusters(clusters: Record<string, number>): Promise<{ valid: boolean; message: string }> {
+    try {
+      const response = await this.client.post('/implants/validate-clusters', clusters);
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
+  }
+
+  // ============================================================================
   // Item Interpolation API
   // ============================================================================
   
