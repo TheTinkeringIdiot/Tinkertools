@@ -45,8 +45,8 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
       
       const stats = profileToCharacterStats(testProfile);
       
-      // Should find the skill improvement
-      expect(stats.skills.some(improvement => improvement === 15)).toBe(true);
+      // Should find the skill improvement in the skills Record
+      expect(Object.values(stats.skills).includes(15)).toBe(true);
     });
 
     it('should handle missing skill data gracefully', () => {
@@ -56,7 +56,7 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
       expect(stats.breed).toBeGreaterThanOrEqual(0);
       expect(stats.profession).toBeGreaterThanOrEqual(0);
       expect(stats.abilities).toHaveLength(6);
-      expect(stats.skills.length).toBeGreaterThan(0);
+      expect(Object.keys(stats.skills).length).toBeGreaterThan(0);
     });
   });
 
@@ -92,6 +92,7 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
     it('should calculate correct skill caps with higher abilities', () => {
       // Set significantly higher Stamina which affects Body Dev
       testProfile.Skills.Attributes.Stamina.value = 50; // Body Dev only depends on Stamina
+      testProfile.Skills.Attributes.Stamina.pointFromIp = 44; // 50 - 6 (breed base) = 44 improvements
       // Keep others at base
       testProfile.Skills.Attributes.Strength.value = 6;
       testProfile.Skills.Attributes.Agility.value = 6;
@@ -245,7 +246,7 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
       const bodyDev = testProfile.Skills['Body & Defense']['Body Dev.'];
       if (bodyDev) {
         expect(bodyDev.cap).toBeGreaterThan(bodyDev.value);
-        expect(bodyDev.value).toBe(5 + (bodyDev.trickleDown || 0) + (bodyDev.pointFromIp || 0));
+        expect(bodyDev.value).toBe(5 + (bodyDev.trickleDown || 0) + (bodyDev.pointFromIp || 0) + (bodyDev.equipmentBonus || 0));
       }
     });
 
@@ -267,6 +268,156 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
         expect(bodyDev.cap).toBe(13); // The famous Body Dev cap issue should be fixed
         expect(bodyDev.value).toBe(5 + (bodyDev.trickleDown || 0)); // Base + trickle only
       }
+    });
+  });
+
+  describe('Equipment Bonuses on Abilities', () => {
+    it('should apply equipment bonuses to abilities', () => {
+      // Mock equipment that boosts Strength
+      testProfile.Weapons = {
+        'Right Hand': {
+          id: 1,
+          aoid: 12345,
+          name: 'Test Weapon',
+          spell_data: [
+            {
+              event: 2, // Wield event
+              spells: [
+                {
+                  spell_id: 53045,
+                  nano_crystal: null,
+                  nano_school: 0,
+                  spell_params: {
+                    Stat: 16,
+                    Amount: 10
+                  }
+                }
+              ]
+            }
+          ]
+        } as any
+      };
+
+      updateProfileSkillInfo(testProfile);
+
+      // Check that Strength has equipment bonus applied
+      const strength = testProfile.Skills.Attributes.Strength;
+      expect(strength.equipmentBonus).toBe(10);
+      expect(strength.baseValue).toBeDefined();
+      expect(strength.value).toBe((strength.baseValue || 0) + 10);
+    });
+
+    it('should include equipment bonuses in trickle-down calculations', () => {
+      // Setup: Give Stamina a +20 equipment bonus
+      testProfile.Clothing = {
+        'Body': {
+          id: 2,
+          aoid: 54321,
+          name: 'Test Armor',
+          spell_data: [
+            {
+              event: 14, // Wear event
+              spells: [
+                {
+                  spell_id: 53045,
+                  nano_crystal: null,
+                  nano_school: 0,
+                  spell_params: {
+                    Stat: 18,
+                    Amount: 20
+                  }
+                }
+              ]
+            }
+          ]
+        } as any
+      };
+
+      // Set base Stamina to 30
+      testProfile.Skills.Attributes.Stamina.value = 30;
+      testProfile.Skills.Attributes.Stamina.pointFromIp = 24; // 6 base + 24 improvements
+
+      updateProfileSkillInfo(testProfile);
+
+      // Stamina should be 30 base + 20 equipment = 50
+      expect(testProfile.Skills.Attributes.Stamina.value).toBe(50);
+      expect(testProfile.Skills.Attributes.Stamina.equipmentBonus).toBe(20);
+
+      // Body Dev should get trickle-down from the total Stamina (50)
+      // Body Dev factors: [0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
+      // Trickle-down = floor((50*1.0) / 4) = floor(12.5) = 12
+      const bodyDev = testProfile.Skills['Body & Defense']['Body Dev.'];
+      expect(bodyDev.trickleDown).toBe(12);
+    });
+
+    it('should track base value separately from total value for abilities', () => {
+      // Setup equipment with multiple ability bonuses
+      testProfile.Implants = {
+        'Head': {
+          id: 3,
+          aoid: 11111,
+          name: 'Test Implant',
+          type: 'implant',
+          slot: 1,
+          spell_data: [
+            {
+              event: 14, // Wear event
+              spells: [
+                {
+                  spell_id: 53045,
+                  nano_crystal: null,
+                  nano_school: 0,
+                  spell_params: {
+                    Stat: 19,
+                    Amount: 15
+                  }
+                },
+                {
+                  spell_id: 53045,
+                  nano_crystal: null,
+                  nano_school: 0,
+                  spell_params: {
+                    Stat: 21,
+                    Amount: 8
+                  }
+                }
+              ]
+            }
+          ]
+        } as any
+      };
+
+      updateProfileSkillInfo(testProfile);
+
+      // Check Intelligence
+      const intelligence = testProfile.Skills.Attributes.Intelligence;
+      expect(intelligence.equipmentBonus).toBe(15);
+      expect(intelligence.baseValue).toBeDefined();
+      expect(intelligence.value).toBe((intelligence.baseValue || 0) + 15);
+
+      // Check Psychic
+      const psychic = testProfile.Skills.Attributes.Psychic;
+      expect(psychic.equipmentBonus).toBe(8);
+      expect(psychic.baseValue).toBeDefined();
+      expect(psychic.value).toBe((psychic.baseValue || 0) + 8);
+    });
+
+    it('should handle profiles with no equipment gracefully', () => {
+      // Clear all equipment
+      testProfile.Weapons = {};
+      testProfile.Clothing = {};
+      testProfile.Implants = {};
+
+      updateProfileSkillInfo(testProfile);
+
+      // All abilities should have zero equipment bonus
+      const abilityNames = ['Strength', 'Agility', 'Stamina', 'Intelligence', 'Sense', 'Psychic'];
+      abilityNames.forEach(abilityName => {
+        const ability = testProfile.Skills.Attributes[abilityName as keyof typeof testProfile.Skills.Attributes];
+        expect(ability.equipmentBonus).toBe(0);
+        expect(ability.baseValue).toBeDefined();
+        expect(ability.value).toBe(ability.baseValue);
+      });
     });
   });
 });
