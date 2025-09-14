@@ -224,15 +224,19 @@ const CLUSTER_NAME_TO_SKILL_NAME: Record<string, string> = {
   'Psychology': 'Psychology',
   'Treatment': 'Treatment',
   
-  // ACs (these don't have skill equivalents in TinkerProfiles)
+  // ACs (these are stats, not trainable skills, but appear in profiles)
   'Chemical AC': 'Chemical AC',
-  'Cold AC': 'Cold AC', 
+  'Cold AC': 'Cold AC',
   'Energy AC': 'Energy AC',
   'Fire AC': 'Fire AC',
   'Melee AC': 'Melee AC',
   'Poison AC': 'Poison AC',
   'Projectile AC': 'Projectile AC',
-  'Radiation AC': 'Radiation AC'
+  'Radiation AC': 'Radiation AC',
+
+  // Special stats (not trainable skills but appear in cluster data)
+  'Max Health': 'Max Health',
+  'Max Nano': 'Max Nano'
 };
 
 /**

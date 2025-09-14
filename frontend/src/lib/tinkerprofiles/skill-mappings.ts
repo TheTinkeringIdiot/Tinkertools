@@ -96,6 +96,20 @@ export const SKILL_ID_MAP: Record<string, number> = {
   // Combat & Healing category
   'First Aid': 123,
   'Treatment': 124,
+
+  // AC (Armor Class) stats - not trainable skills but stats that appear in profiles
+  'Chemical AC': 93,
+  'Cold AC': 95,
+  'Energy AC': 92,
+  'Fire AC': 97,
+  'Projectile AC': 90,
+  'Melee AC': 91,
+  'Radiation AC': 94,
+  'Poison AC': 96,
+
+  // Special stats that appear in cluster data but aren't trainable skills
+  'Max Health': 1,      // MaxHealth stat
+  'Max Nano': 221,      // MaxNanoEnergy stat
   
   // Exploring category
   'Concealment': 164,
@@ -107,9 +121,48 @@ export const SKILL_ID_MAP: Record<string, number> = {
   'Vehicle Water': 117,
   'Map Navigation': 140,
   
+  // Misc category skills - damage modifiers and combat bonuses
+  'Add All Off.': 276,       // AddAllOffense
+  'Add All Def.': 277,       // AddAllDefense
+  'Add. Proj. Dam.': 278,    // ProjectileDamageModifier
+  'Add. Melee Dam.': 279,    // MeleeDamageModifier
+  'Add. Energy Dam.': 280,   // EnergyDamageModifier
+  'Add. Chem. Dam.': 281,    // ChemicalDamageModifier
+  'Add. Rad. Dam.': 282,     // RadiationDamageModifier
+  'Add. Cold Dam.': 311,     // ColdDamageModifier
+  'Add. Fire Dam.': 316,     // FireDamageModifier
+  'Add. Poison Dam.': 317,   // PoisonDamageModifier
+  'Add. Nano Dam.': 315,     // NanoDamageModifier
+
+  // Other Misc skills
+  '% Add. Xp': 319,          // XPModifier
+  '% Add. Nano Cost': 318,   // NanoCost (modifier)
+  'Max NCU': 181,            // MaxNCU
+  'Decreased Nano-Interrupt Modifier %': 383, // NanoInterruptModifier
+  'SkillLockModifier': 382,  // SkillLockModifier
+  'HealDelta': 343,          // HealDelta
+  'NanoDelta': 364,          // NanoDelta
+  'RangeInc. NF': 381,       // NanoRange
+  'RangeInc. Weapon': 287,   // AttackRange
+  'CriticalIncrease': 379,   // CriticalIncrease
+  'Free deck slot': 428,     // BeltSlots (used for deck slots)
+  'Healing Efficiency': 535, // HealMultiplier
+  'Direct Nano Damage Efficiency': 536, // NanoDamageMultiplier
+  'Scale': 360,              // Scale
+
+  // Shield AC skills
+  'ShieldProjectileAC': 226, // ShieldProjectileAC
+  'ShieldMeleeAC': 227,      // ShieldMeleeAC
+  'ShieldEnergyAC': 228,     // ShieldEnergyAC
+  'ShieldChemicalAC': 229,   // ShieldChemicalAC
+  'ShieldRadiationAC': 230,  // ShieldRadiationAC
+  'ShieldColdAC': 231,       // ShieldColdAC
+  'ShieldFireAC': 233,       // ShieldFireAC
+  'ShieldPoisonAC': 234,     // ShieldPoisonAC
+
   // AOSetups skill name variations
   'Break&Entry': 165,        // AOSetups variant of 'Break & Entry'
-  'Elec. Engi': 126,         // AOSetups variant of 'Elec Eng'  
+  'Elec. Engi': 126,         // AOSetups variant of 'Elec Eng'
   'MG / SMG': 114,           // AOSetups variant of 'MG/SMG'
   'Matt. Metam': 127,        // AOSetups variant of 'Matt Metam'
   'Matter Crea': 130,        // AOSetups variant of 'Matter Creation'
