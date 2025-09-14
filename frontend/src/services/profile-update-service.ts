@@ -5,7 +5,7 @@
 
 import type { TinkerProfile, SkillWithIP } from '@/lib/tinkerprofiles';
 import { PROFESSION_NAMES, BREED_NAMES } from '@/services/game-data';
-import { 
+import {
   getBreedInitValue,
   calcTotalAbilityCost,
   calcTotalSkillCost,
@@ -14,7 +14,8 @@ import {
   calcHP,
   calcNP,
   getSkillCostFactor,
-  getAbilityCostFactor
+  getAbilityCostFactor,
+  ABILITY_INDEX_TO_STAT_ID
 } from '@/lib/tinkerprofiles/ip-calculator';
 import { getBreedId, getProfessionId } from './game-utils';
 import { updateProfileWithIPTracking } from '@/lib/tinkerprofiles/ip-integrator';
@@ -34,6 +35,13 @@ export interface UpdateResult {
   warnings: string[];
   errors: string[];
   ipDelta?: number; // Change in IP spent
+}
+
+export interface EquipmentBonusResult {
+  success: boolean;
+  updatedProfile?: TinkerProfile;
+  warnings: string[];
+  errors: string[];
 }
 
 /**
@@ -85,7 +93,7 @@ export async function updateCharacterMetadata(
     let newBreed = originalBreed;
     if (changes.breed !== undefined) {
       const breedId = getBreedId(changes.breed);
-      if (breedId !== null && breedId !== originalBreed) {
+      if (breedId !== null && breedId !== undefined && breedId !== originalBreed) {
         newBreed = breedId;
         updatedProfile.Character.Breed = changes.breed;
         
@@ -109,7 +117,7 @@ export async function updateCharacterMetadata(
     let newProfession = originalProfession;
     if (changes.profession !== undefined) {
       const professionId = getProfessionId(changes.profession);
-      if (professionId !== null && professionId !== originalProfession) {
+      if (professionId !== null && professionId !== undefined && professionId !== originalProfession) {
         newProfession = professionId;
         updatedProfile.Character.Profession = changes.profession;
         
@@ -159,8 +167,20 @@ export async function updateCharacterMetadata(
     return result;
 
   } catch (error) {
-    console.error('Error updating character metadata:', error);
-    result.errors.push(`Failed to update character: ${error.message || 'Unknown error'}`);
+    const errorMessage = `Critical error updating character metadata: ${error instanceof Error ? error.message : String(error)}`;
+    console.error('Critical error updating character metadata:', error);
+
+    result.errors.push(errorMessage);
+    result.success = false;
+
+    // Log detailed error information for debugging
+    console.error('Error details:', {
+      error,
+      profileName: profile?.Character?.Name || 'unknown',
+      changes,
+      stack: error instanceof Error ? error.stack : undefined
+    });
+
     return result;
   }
 }
@@ -192,8 +212,9 @@ async function updateForBreedChange(
     if (!ability) continue;
 
     // Get old and new base values
-    const oldBaseValue = getBreedInitValue(oldBreedId, i);
-    const newBaseValue = getBreedInitValue(newBreedId, i);
+    const abilityStatId = ABILITY_INDEX_TO_STAT_ID[i];
+    const oldBaseValue = getBreedInitValue(oldBreedId, abilityStatId);
+    const newBaseValue = getBreedInitValue(newBreedId, abilityStatId);
     
     // Calculate improvements (how much the user invested)
     const improvements = ability.value - oldBaseValue;
@@ -203,7 +224,7 @@ async function updateForBreedChange(
     
     // Recalculate IP cost with new breed cost factors
     if (improvements > 0) {
-      ability.ipSpent = calcTotalAbilityCost(improvements, newBreedId, i);
+      ability.ipSpent = calcTotalAbilityCost(improvements, newBreedId, abilityStatId);
       ability.pointFromIp = improvements;
     } else {
       ability.ipSpent = 0;
@@ -363,25 +384,81 @@ async function recalculateIPTracking(profile: TinkerProfile): Promise<{ warnings
   const errors: string[] = [];
 
   try {
-    // Use the integrated IP tracker which handles caps, trickle-down, and comprehensive IP calculations
-    const updatedProfile = updateProfileWithIPTracking(profile);
-    
-    // Copy the updated calculations back to the original profile
-    profile.IPTracker = updatedProfile.IPTracker;
-    profile.Skills = updatedProfile.Skills; // This includes updated caps and trickle-down values
-
-    // Check for IP overflow
-    if (profile.IPTracker && profile.IPTracker.remaining < 0) {
-      errors.push(`Character exceeds available IP by ${Math.abs(profile.IPTracker.remaining)} points`);
+    // Validate profile structure
+    if (!profile) {
+      errors.push('Profile data is missing for IP recalculation');
+      return { warnings, errors };
     }
 
-    // Add warnings for skills near caps
-    if (profile.IPTracker && profile.IPTracker.efficiency < 80) {
-      warnings.push(`Low IP efficiency: ${profile.IPTracker.efficiency.toFixed(1)}% of available IP used`);
+    if (!profile.Character) {
+      errors.push('Profile missing character data for IP recalculation');
+      return { warnings, errors };
+    }
+
+    // Use the integrated IP tracker which handles caps, trickle-down, and comprehensive IP calculations
+    let updatedProfile: TinkerProfile;
+    try {
+      updatedProfile = await updateProfileWithIPTracking(profile);
+      console.log('IP tracking recalculation completed successfully');
+    } catch (ipError) {
+      const errorMessage = `IP tracking calculation failed: ${ipError instanceof Error ? ipError.message : String(ipError)}`;
+      errors.push(errorMessage);
+      console.error('Error in updateProfileWithIPTracking:', ipError);
+      return { warnings, errors };
+    }
+
+    // Safely copy the updated calculations back to the original profile
+    try {
+      if (updatedProfile.IPTracker) {
+        profile.IPTracker = updatedProfile.IPTracker;
+      } else {
+        warnings.push('Updated profile missing IP tracker data');
+      }
+
+      if (updatedProfile.Skills) {
+        profile.Skills = updatedProfile.Skills; // This includes updated caps and trickle-down values
+      } else {
+        warnings.push('Updated profile missing skills data');
+      }
+    } catch (copyError) {
+      errors.push(`Failed to copy updated IP data back to profile: ${copyError instanceof Error ? copyError.message : String(copyError)}`);
+      console.error('Error copying IP data:', copyError);
+      return { warnings, errors };
+    }
+
+    // Check for IP overflow with error handling
+    try {
+      if (profile.IPTracker && typeof profile.IPTracker.remaining === 'number' && profile.IPTracker.remaining < 0) {
+        errors.push(`Character exceeds available IP by ${Math.abs(profile.IPTracker.remaining)} points`);
+      }
+    } catch (overflowError) {
+      warnings.push('Unable to check IP overflow due to data inconsistency');
+      console.warn('Error checking IP overflow:', overflowError);
+    }
+
+    // Add warnings for skills near caps with error handling
+    try {
+      if (profile.IPTracker && typeof profile.IPTracker.efficiency === 'number' && profile.IPTracker.efficiency < 80) {
+        warnings.push(`Low IP efficiency: ${profile.IPTracker.efficiency.toFixed(1)}% of available IP used`);
+      }
+    } catch (efficiencyError) {
+      warnings.push('Unable to calculate IP efficiency due to data inconsistency');
+      console.warn('Error calculating IP efficiency:', efficiencyError);
     }
 
   } catch (error) {
-    errors.push(`Failed to recalculate IP tracking: ${error.message || 'Unknown error'}`);
+    const errorMessage = `Critical error during IP tracking recalculation: ${error instanceof Error ? error.message : String(error)}`;
+    errors.push(errorMessage);
+    console.error('Critical error in recalculateIPTracking:', error);
+
+    // Log additional context for debugging
+    console.error('IP recalculation error context:', {
+      error,
+      profileName: profile?.Character?.Name || 'unknown',
+      hasSkills: !!profile?.Skills,
+      hasIPTracker: !!profile?.IPTracker,
+      stack: error instanceof Error ? error.stack : undefined
+    });
   }
 
   return { warnings, errors };
@@ -457,4 +534,106 @@ export function validateCharacterBuild(profile: TinkerProfile): {
     errors,
     warnings
   };
+}
+
+/**
+ * Handle equipment bonus recalculation when equipment changes are detected
+ */
+export async function handleEquipmentBonusRecalculation(
+  profile: TinkerProfile
+): Promise<EquipmentBonusResult> {
+  const result: EquipmentBonusResult = {
+    success: false,
+    warnings: [],
+    errors: []
+  };
+
+  try {
+    // Validate input profile
+    if (!profile) {
+      result.errors.push('Profile data is missing');
+      console.error('Equipment bonus recalculation called with null/undefined profile');
+      return result;
+    }
+
+    // Create a deep copy of the profile to work with
+    let updatedProfile: TinkerProfile;
+    try {
+      updatedProfile = JSON.parse(JSON.stringify(profile));
+    } catch (error) {
+      result.errors.push('Failed to create profile copy - profile may contain invalid data');
+      console.error('Error creating profile copy:', error);
+      return result;
+    }
+
+    // Use the IP integrator to recalculate everything including equipment bonuses
+    // This will call the equipment bonus calculator if it's integrated into the IP system
+    let ipUpdatedProfile: TinkerProfile;
+    try {
+      ipUpdatedProfile = await updateProfileWithIPTracking(updatedProfile);
+      console.log('Equipment bonus recalculation completed successfully');
+    } catch (error) {
+      result.errors.push(`Failed to update profile with IP tracking: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Error in IP tracking update during equipment bonus recalculation:', error);
+
+      // Try to continue with the original profile as fallback
+      ipUpdatedProfile = updatedProfile;
+      result.warnings.push('Using profile without full IP recalculation due to processing error');
+    }
+
+    // Update timestamps
+    try {
+      ipUpdatedProfile.updated = new Date().toISOString();
+    } catch (error) {
+      result.warnings.push('Failed to update profile timestamp');
+      console.warn('Error updating profile timestamp:', error);
+    }
+
+    // Final validation
+    let validation: { valid: boolean; errors: string[]; warnings: string[] };
+    try {
+      validation = validateCharacterBuild(ipUpdatedProfile);
+      result.warnings.push(...validation.warnings);
+      result.errors.push(...validation.errors);
+    } catch (error) {
+      result.warnings.push('Profile validation failed - profile may have data consistency issues');
+      console.warn('Error during profile validation:', error);
+      validation = { valid: true, errors: [], warnings: [] }; // Assume valid to allow continuation
+    }
+
+    // Even if there are warnings, we should still update the profile
+    // Only fail if there are critical errors
+    result.success = result.errors.length === 0;
+    result.updatedProfile = ipUpdatedProfile;
+
+    // Log summary for debugging
+    if (result.warnings.length > 0) {
+      console.warn(`Equipment bonus recalculation completed with ${result.warnings.length} warnings:`, result.warnings);
+    }
+
+    if (result.errors.length > 0) {
+      console.error(`Equipment bonus recalculation completed with ${result.errors.length} errors:`, result.errors);
+    }
+
+    return result;
+
+  } catch (error) {
+    const errorMessage = `Critical error during equipment bonus recalculation: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    console.error('Critical error during equipment bonus recalculation:', error);
+
+    result.errors.push(errorMessage);
+    result.success = false;
+
+    // Try to provide some meaningful fallback
+    try {
+      if (profile) {
+        result.updatedProfile = profile; // Return original profile as fallback
+        result.warnings.push('Returned original profile due to processing error');
+      }
+    } catch (fallbackError) {
+      console.error('Even fallback failed:', fallbackError);
+    }
+
+    return result;
+  }
 }

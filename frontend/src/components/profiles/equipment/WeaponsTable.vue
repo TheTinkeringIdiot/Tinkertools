@@ -7,21 +7,21 @@ Visual grid showing weapon slot positions with equipped items as icons
     <div class="equipment-grid">
       <!-- First row: Right Hand, Left Hand -->
       <div class="grid grid-cols-2 gap-2 mb-2">
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Right Hand"
-          :item="weapons['Right Hand']"
+          :item="getWeaponBySlot('Right Hand')"
         />
-        <EquipmentSlot 
-          slot-name="Left Hand" 
-          :item="weapons['Left Hand']"
+        <EquipmentSlot
+          slot-name="Left Hand"
+          :item="getWeaponBySlot('Left Hand')"
         />
       </div>
       
       <!-- Second row: Belt (centered) -->
       <div class="flex justify-center">
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Belt"
-          :item="weapons['Belt']"
+          :item="getWeaponBySlot('Belt')"
         />
       </div>
     </div>
@@ -52,17 +52,31 @@ Visual grid showing weapon slot positions with equipped items as icons
 <script setup lang="ts">
 import { computed } from 'vue';
 import EquipmentSlot from './EquipmentSlot.vue';
+import { EquipmentSlotMapper, getWeaponSlot } from '../../../services/equipment-slot-mapper';
 
 // Props
 const props = defineProps<{
   weapons: Record<string, any>;
 }>();
 
+// Create normalized weapon access
+const weaponProxy = computed(() => {
+  return EquipmentSlotMapper.createEquipmentProxy(props.weapons || {}, 'weapons');
+});
+
 // Computed
 const equippedWeapons = computed(() => {
-  return Object.fromEntries(
-    Object.entries(props.weapons || {}).filter(([_, item]) => item && getItemName(item))
-  );
+  const equipped: Record<string, any> = {};
+  const validSlots = EquipmentSlotMapper.getValidUISlots('weapons');
+
+  for (const uiSlot of validSlots) {
+    const item = weaponProxy.value[uiSlot];
+    if (item && getItemName(item)) {
+      equipped[uiSlot] = item;
+    }
+  }
+
+  return equipped;
 });
 
 const hasEquippedItems = computed(() => {
@@ -73,6 +87,10 @@ const hasEquippedItems = computed(() => {
 function getItemName(item: any): string {
   if (!item) return '';
   return item.name || item.Name || '';
+}
+
+function getWeaponBySlot(slotName: string): any {
+  return getWeaponSlot(props.weapons, slotName);
 }
 </script>
 
