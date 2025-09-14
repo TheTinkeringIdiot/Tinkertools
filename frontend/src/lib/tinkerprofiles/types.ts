@@ -17,6 +17,8 @@ export interface SkillWithIP {
   pointFromIp: number;
   trickleDown?: number; // Bonus from abilities
   cap?: number; // Effective skill cap
+  equipmentBonus?: number; // Total bonus from all equipped items
+  baseValue?: number; // Value without equipment (base + trickle + IP)
 }
 
 /** Comprehensive IP tracking information */

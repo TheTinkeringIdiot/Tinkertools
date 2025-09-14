@@ -15,7 +15,7 @@ Shows skills in a category with IP cost calculations and interactive value adjus
           <h4 class="text-lg font-semibold text-surface-900 dark:text-surface-50">
             {{ title }}
           </h4>
-          <Badge v-if="skillCount > 0" :value="skillCount.toString()" severity="info" size="small" />
+          <Badge v-if="skillCount > 0" :value="skillCount.toString()" severity="info" />
         </div>
         
         <div class="flex items-center gap-2">
@@ -36,31 +36,49 @@ Shows skills in a category with IP cost calculations and interactive value adjus
     <!-- Category Content -->
     <Transition name="expand">
       <div v-if="isExpanded" class="category-content">
-        <div class="p-4 space-y-3">
-          <!-- Skills/Abilities List -->
-          <div 
-            v-for="(skill, skillName) in skills"
-            :key="skillName"
-            class="skill-item"
-          >
-            <SkillSlider
-              :skill-name="skillName"
-              :skill-data="skill"
-              :is-ability="isAbilities"
-              :is-read-only="isReadOnly"
+        <div class="p-4">
+          <!-- Grid Layout -->
+          <div v-if="useGridLayout" class="grid-container">
+            <SkillsGrid
+              :skills="skills"
               :category="title"
+              :is-abilities="isAbilities"
+              :is-read-only="isReadOnly"
               :breed="breed"
               :profession="profession"
-              :skill-id="getSkillId(skillName)"
+              :grid-mode="gridMode"
               @skill-changed="handleSkillChanged"
               @ability-changed="handleAbilityChanged"
             />
           </div>
-          
-          <!-- Empty State -->
-          <div v-if="skillCount === 0" class="text-center py-4">
-            <i class="pi pi-info-circle text-2xl text-surface-300 dark:text-surface-600 mb-2"></i>
-            <p class="text-sm text-surface-500 dark:text-surface-400">No skills in this category</p>
+
+          <!-- List Layout (Default) -->
+          <div v-else class="space-y-3">
+            <!-- Skills/Abilities List -->
+            <div
+              v-for="(skill, skillName) in skills"
+              :key="skillName"
+              class="skill-item"
+            >
+              <SkillSlider
+                :skill-name="skillName"
+                :skill-data="skill"
+                :is-ability="isAbilities"
+                :is-read-only="isReadOnly"
+                :category="title"
+                :breed="breed"
+                :profession="profession"
+                :skill-id="getSkillId(skillName)"
+                @skill-changed="handleSkillChanged"
+                @ability-changed="handleAbilityChanged"
+              />
+            </div>
+
+            <!-- Empty State -->
+            <div v-if="skillCount === 0" class="text-center py-4">
+              <i class="pi pi-info-circle text-2xl text-surface-300 dark:text-surface-600 mb-2"></i>
+              <p class="text-sm text-surface-500 dark:text-surface-400">No skills in this category</p>
+            </div>
           </div>
         </div>
       </div>
@@ -72,6 +90,7 @@ Shows skills in a category with IP cost calculations and interactive value adjus
 import { ref, computed } from 'vue';
 import Badge from 'primevue/badge';
 import SkillSlider from './SkillSlider.vue';
+import SkillsGrid from './SkillsGrid.vue';
 import { getSkillStatId } from '@/utils/skill-registry';
 
 // Props
@@ -83,6 +102,8 @@ const props = defineProps<{
   isReadOnly?: boolean;
   breed?: string;
   profession?: string;
+  useGridLayout?: boolean;
+  gridMode?: 'compact' | 'detailed' | 'list';
 }>();
 
 // Emits

@@ -25,6 +25,7 @@ import {
 
 import { getBreedId, getProfessionId } from '../../services/game-utils';
 import { getSkillId } from './skill-mappings';
+import { calculateEquipmentBonuses } from '../../services/equipment-bonus-calculator';
 
 // ============================================================================
 // Profile to CharacterStats Conversion
@@ -153,7 +154,43 @@ export function calculateProfileIP(profile: TinkerProfile): IPTracker {
  */
 export function updateProfileSkillInfo(profile: TinkerProfile): void {
   const characterStats = profileToCharacterStats(profile);
-  // For trickle-down, we need full ability values, not improvements
+
+  // Calculate equipment bonuses first
+  const equipmentBonuses = calculateEquipmentBonuses(profile);
+
+  // First, ensure pointFromIp is set for all abilities (needed for tests that set value directly)
+  if (profile.Skills.Attributes) {
+    const abilityNames = ['Strength', 'Agility', 'Stamina', 'Intelligence', 'Sense', 'Psychic'];
+    abilityNames.forEach((abilityName, index) => {
+      const ability = profile.Skills.Attributes![abilityName as keyof typeof profile.Skills.Attributes] as SkillWithIP;
+      if (ability) {
+        const abilityStatId = ABILITY_INDEX_TO_STAT_ID[index];
+        const breedInitValue = getBreedInitValue(characterStats.breed, abilityStatId);
+        const equipmentBonus = equipmentBonuses[abilityName] || 0;
+
+        // If pointFromIp is not set, calculate it from current value
+        if (ability.pointFromIp === undefined || ability.pointFromIp === null) {
+          ability.pointFromIp = Math.max(0, (ability.value || breedInitValue) - breedInitValue - equipmentBonus);
+        }
+
+        // Calculate and set ability cap
+        const abilityCap = calcAbilityMaxValue(characterStats.level, characterStats.breed, characterStats.profession, abilityStatId);
+        ability.cap = abilityCap;
+
+        // Store equipment bonus
+        ability.equipmentBonus = equipmentBonus;
+
+        // Calculate base value (breed init + IP improvements, no equipment)
+        const baseValue = breedInitValue + (ability.pointFromIp || 0);
+        ability.baseValue = baseValue;
+
+        // Update total value with equipment bonus
+        ability.value = baseValue + equipmentBonus;
+      }
+    });
+  }
+
+  // For trickle-down, use full ability values INCLUDING equipment bonuses
   const fullAbilityValues = [
     profile.Skills.Attributes.Strength.value || 0,
     profile.Skills.Attributes.Agility.value || 0,
@@ -163,20 +200,6 @@ export function updateProfileSkillInfo(profile: TinkerProfile): void {
     profile.Skills.Attributes.Psychic.value || 0
   ];
   const trickleDownResults = calcAllTrickleDown(fullAbilityValues);
-  
-  // Update ability caps
-  if (profile.Skills.Attributes) {
-    const abilityNames = ['Strength', 'Agility', 'Stamina', 'Intelligence', 'Sense', 'Psychic'];
-    abilityNames.forEach((abilityName, index) => {
-      const ability = profile.Skills.Attributes![abilityName as keyof typeof profile.Skills.Attributes] as SkillWithIP;
-      if (ability) {
-        // Calculate and set ability cap using STAT ID
-        const abilityStatId = ABILITY_INDEX_TO_STAT_ID[index];
-        const abilityCap = calcAbilityMaxValue(characterStats.level, characterStats.breed, characterStats.profession, abilityStatId);
-        ability.cap = abilityCap;
-      }
-    });
-  }
   
   // Update skill caps and trickle-down
   const categories = [
@@ -199,10 +222,20 @@ export function updateProfileSkillInfo(profile: TinkerProfile): void {
         if (skillIndex !== null && skillIndex >= 0) {
           // Update trickle-down bonus
           skillData.trickleDown = trickleDownResults[skillIndex] || 0;
-          
-          // Update total skill value: base + trickle-down + IP improvements
-          skillData.value = 5 + (skillData.trickleDown || 0) + (skillData.pointFromIp || 0);
-          
+
+          // Calculate base value: base skill + trickle-down + IP improvements
+          // This is the value without equipment bonuses, used for IP calculations
+          const baseValue = 5 + (skillData.trickleDown || 0) + (skillData.pointFromIp || 0);
+          skillData.baseValue = baseValue;
+
+          // Get equipment bonus for this skill (if any)
+          const equipmentBonus = equipmentBonuses[skillName] || 0;
+          skillData.equipmentBonus = equipmentBonus;
+
+          // Calculate final skill value: base value + equipment bonuses
+          // Equipment bonuses are applied after IP calculations to avoid affecting IP cost
+          skillData.value = baseValue + equipmentBonus;
+
           // Update skill cap (using full ability values for ability cap calculation)
           const skillCap = calcSkillCap(
             characterStats.level,

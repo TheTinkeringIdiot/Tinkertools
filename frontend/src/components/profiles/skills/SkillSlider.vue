@@ -3,7 +3,7 @@ SkillSlider - Interactive skill value slider with IP calculations
 Shows skill name, current value, IP cost, and interactive slider for value adjustment
 -->
 <template>
-  <div class="skill-slider">
+  <div class="skill-slider" :class="{ 'has-equipment-bonus': hasEquipmentBonus }">
     <!-- Skill Info Row -->
     <div class="skill-info-row flex items-center justify-between mb-2">
       <div class="flex items-center gap-2 flex-1 min-w-0 max-w-[16rem]">
@@ -26,13 +26,21 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
       <div class="skill-values flex items-center gap-2 flex-shrink-0 min-w-[7rem]">
         <!-- Current Value Display with Breakdown -->
         <div class="flex items-center gap-2">
-          <span class="text-sm text-surface-600 dark:text-surface-400 min-w-[4rem] text-right">
+          <span
+            class="text-sm text-surface-600 dark:text-surface-400 min-w-[4rem] text-right cursor-help skill-value-display"
+            v-tooltip.top="simpleTooltipContent"
+          >
             {{ totalValue }} / {{ maxTotalValue }}
           </span>
-          <span v-if="showBreakdown && trickleDownBonus > 0" 
-                class="text-xs text-surface-500 dark:text-surface-400 cursor-help"
-                :title="valueBreakdown">
-            <i class="pi pi-info-circle"></i>
+          <span v-if="hasEquipmentBonus"
+                class="text-xs cursor-help equipment-bonus-indicator"
+                :class="equipmentBonusColorClass"
+                v-tooltip.top="equipmentBonusTooltip"
+          >
+            <i class="pi pi-shield"></i>
+            <span class="ml-1 font-medium equipment-bonus-value">
+              {{ equipmentBonus > 0 ? '+' : '' }}{{ equipmentBonus }}
+            </span>
           </span>
         </div>
         
@@ -190,6 +198,24 @@ const minValue = computed(() => {
 const baseValue = computed(() => props.isAbility ? minValue.value : 5); // Base skill value
 const trickleDownBonus = computed(() => props.skillData?.trickleDown || 0);
 const ipContribution = computed(() => props.skillData?.pointFromIp || 0);
+const equipmentBonus = computed(() => props.skillData?.equipmentBonus || 0);
+const hasEquipmentBonus = computed(() => equipmentBonus.value !== 0);
+
+// Equipment bonus visual indicators
+const equipmentBonusColorClass = computed(() => {
+  if (equipmentBonus.value > 0) {
+    return 'text-green-500 dark:text-green-400'; // Positive bonus - green
+  } else if (equipmentBonus.value < 0) {
+    return 'text-red-500 dark:text-red-400'; // Negative bonus - red
+  }
+  return 'text-blue-500 dark:text-blue-400'; // Neutral - blue (fallback)
+});
+
+const equipmentBonusTooltip = computed(() => {
+  const bonusType = equipmentBonus.value > 0 ? 'bonus' : 'penalty';
+  const bonusValue = Math.abs(equipmentBonus.value);
+  return `Equipment ${bonusType}: ${equipmentBonus.value > 0 ? '+' : '-'}${bonusValue} to ${props.skillName}`;
+});
 
 // Total displayed value (what the user sees)
 const totalValue = computed(() => {
@@ -214,7 +240,36 @@ const valueBreakdown = computed(() => {
 });
 
 const showBreakdown = computed(() => {
-  return !props.isAbility && (trickleDownBonus.value > 0 || ipContribution.value > 0);
+  return !props.isAbility && (trickleDownBonus.value > 0 || ipContribution.value > 0 || equipmentBonus.value !== 0);
+});
+
+// Simple tooltip content for PrimeVue v-tooltip directive
+const simpleTooltipContent = computed(() => {
+  if (props.isAbility) {
+    const breedBase = minValue.value;
+    const improvements = ipContribution.value; // Use ipContribution which tracks pointFromIp
+    const equipBonus = equipmentBonus.value;
+
+    // Build tooltip parts
+    const parts = [`Breed Base: ${breedBase}`];
+    if (improvements > 0) parts.push(`Improvements: +${improvements}`);
+    if (equipBonus !== 0) {
+      parts.push(`Equipment: ${equipBonus > 0 ? '+' : ''}${equipBonus}`);
+    }
+
+    const breakdown = parts.join('\n');
+    return `${props.skillName} Breakdown:\n${breakdown}\nTotal: ${totalValue.value}`;
+  } else {
+    const parts = [`Base: ${baseValue.value}`];
+    if (trickleDownBonus.value > 0) parts.push(`Trickle-down: +${trickleDownBonus.value}`);
+    if (equipmentBonus.value !== 0) {
+      parts.push(`Equipment: ${equipmentBonus.value > 0 ? '+' : ''}${equipmentBonus.value}`);
+    }
+    if (ipContribution.value > 0) parts.push(`IP: +${ipContribution.value}`);
+
+    const breakdown = parts.join('\n');
+    return `${props.skillName} Breakdown:\n${breakdown}\nTotal: ${totalValue.value}`;
+  }
 });
 
 // Maximum total skill value (for display purposes)
@@ -530,12 +585,72 @@ watch(trickleDownBonus, (newValue, oldValue) => {
   background: var(--p-surface-900);
 }
 
+/* Tooltip styling */
+:deep(.stat-breakdown-tooltip-root) {
+  @apply max-w-none;
+}
+
+:deep(.stat-breakdown-tooltip-text) {
+  @apply p-0;
+}
+
+/* Equipment bonus indicator styling */
+.equipment-bonus-indicator {
+  @apply transition-all duration-200 flex items-center;
+}
+
+.equipment-bonus-indicator:hover {
+  @apply transform scale-110;
+}
+
+.equipment-bonus-indicator .pi-shield {
+  @apply transition-all duration-200;
+}
+
+.equipment-bonus-value {
+  @apply transition-all duration-200;
+}
+
+/* Equipment bonus highlighting for the entire skill slider */
+.skill-slider.has-equipment-bonus {
+  position: relative;
+}
+
+.skill-slider.has-equipment-bonus::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -4px;
+  right: -4px;
+  bottom: -2px;
+  background: linear-gradient(135deg,
+    rgba(59, 130, 246, 0.1) 0%,
+    transparent 25%,
+    transparent 75%,
+    rgba(59, 130, 246, 0.1) 100%
+  );
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: -1;
+  transition: all 0.3s ease;
+}
+
+.skill-slider.has-equipment-bonus:hover::before {
+  background: linear-gradient(135deg,
+    rgba(59, 130, 246, 0.2) 0%,
+    rgba(59, 130, 246, 0.05) 25%,
+    rgba(59, 130, 246, 0.05) 75%,
+    rgba(59, 130, 246, 0.2) 100%
+  );
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
+}
+
 /* Responsive adjustments */
 @media (max-width: 640px) {
   .skill-info-row {
     @apply flex-col items-start gap-2;
   }
-  
+
   .skill-values {
     @apply w-full justify-start;
   }
