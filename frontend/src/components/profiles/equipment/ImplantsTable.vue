@@ -7,81 +7,81 @@ Visual grid showing implant slot positions with equipped implants as icons
     <div class="equipment-grid">
       <!-- First row: Ocular, Head, Ear -->
       <div class="grid grid-cols-3 gap-2 mb-2">
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Ocular"
-          :item="implants['Ocular']"
+          :item="getImplantBySlot('Ocular')"
         />
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Head"
-          :item="implants['Head']"
+          :item="getImplantBySlot('Head')"
         />
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Ear"
-          :item="implants['Ear']"
+          :item="getImplantBySlot('Ear')"
         />
       </div>
       
       <!-- Second row: Right Arm, Chest, Left Arm -->
       <div class="grid grid-cols-3 gap-2 mb-2">
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Right Arm"
-          :item="implants['Right Arm']"
+          :item="getImplantBySlot('Right Arm')"
         />
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Chest"
-          :item="implants['Chest']"
+          :item="getImplantBySlot('Chest')"
         />
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Left Arm"
-          :item="implants['Left Arm']"
+          :item="getImplantBySlot('Left Arm')"
         />
       </div>
       
       <!-- Third row: Right Wrist, Waist, Left Wrist -->
       <div class="grid grid-cols-3 gap-2 mb-2">
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Right Wrist"
-          :item="implants['Right Wrist']"
+          :item="getImplantBySlot('Right Wrist')"
         />
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Waist"
-          :item="implants['Waist']"
+          :item="getImplantBySlot('Waist')"
         />
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Left Wrist"
-          :item="implants['Left Wrist']"
+          :item="getImplantBySlot('Left Wrist')"
         />
       </div>
       
       <!-- Fourth row: Right Hand, Thigh, Left Hand -->
       <div class="grid grid-cols-3 gap-2 mb-2">
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Right Hand"
-          :item="implants['Right Hand']"
+          :item="getImplantBySlot('Right Hand')"
         />
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Thigh"
-          :item="implants['Thigh']"
+          :item="getImplantBySlot('Thigh')"
         />
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Left Hand"
-          :item="implants['Left Hand']"
+          :item="getImplantBySlot('Left Hand')"
         />
       </div>
       
       <!-- Fifth row: Right Leg, Feet, Left Leg -->
       <div class="grid grid-cols-3 gap-2">
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Right Leg"
-          :item="implants['Right Leg']"
+          :item="getImplantBySlot('Right Leg')"
         />
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Feet"
-          :item="implants['Feet']"
+          :item="getImplantBySlot('Feet')"
         />
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Left Leg"
-          :item="implants['Left Leg']"
+          :item="getImplantBySlot('Left Leg')"
         />
       </div>
     </div>
@@ -112,17 +112,31 @@ Visual grid showing implant slot positions with equipped implants as icons
 <script setup lang="ts">
 import { computed } from 'vue';
 import EquipmentSlot from './EquipmentSlot.vue';
+import { EquipmentSlotMapper, getImplantSlot } from '../../../services/equipment-slot-mapper';
 
 // Props
 const props = defineProps<{
   implants: Record<string, any>;
 }>();
 
+// Create normalized implant access
+const implantProxy = computed(() => {
+  return EquipmentSlotMapper.createEquipmentProxy(props.implants || {}, 'implants');
+});
+
 // Computed
 const equippedImplants = computed(() => {
-  return Object.fromEntries(
-    Object.entries(props.implants || {}).filter(([_, item]) => item && getItemName(item))
-  );
+  const equipped: Record<string, any> = {};
+  const validSlots = EquipmentSlotMapper.getValidUISlots('implants');
+
+  for (const uiSlot of validSlots) {
+    const item = implantProxy.value[uiSlot];
+    if (item && getItemName(item)) {
+      equipped[uiSlot] = item;
+    }
+  }
+
+  return equipped;
 });
 
 const hasEquippedItems = computed(() => {
@@ -133,6 +147,10 @@ const hasEquippedItems = computed(() => {
 function getItemName(item: any): string {
   if (!item) return '';
   return item.name || item.Name || '';
+}
+
+function getImplantBySlot(slotName: string): any {
+  return getImplantSlot(props.implants, slotName);
 }
 </script>
 

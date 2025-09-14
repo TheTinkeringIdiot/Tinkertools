@@ -6,18 +6,38 @@
  */
 
 import { defineStore } from 'pinia';
-import { ref, computed, readonly } from 'vue';
-import { 
+import { ref, computed, readonly, watch } from 'vue';
+import {
   TinkerProfilesManager,
   type TinkerProfile,
-  type NanoCompatibleProfile,
   type ProfileMetadata,
   type ProfileExportFormat,
   type ProfileImportResult,
-  type BulkImportResult,
   type ProfileValidationResult,
   type TinkerProfilesConfig
 } from '@/lib/tinkerprofiles';
+
+// Types that may not be exported yet
+type NanoCompatibleProfile = any; // TODO: Add proper type when available
+type BulkImportResult = {
+  totalProfiles: number;
+  successCount: number;
+  failureCount: number;
+  skippedCount: number;
+  results: Array<{
+    profileName: string;
+    profileId?: string;
+    success: boolean;
+    skipped: boolean;
+    error?: string;
+    warnings: string[];
+  }>;
+  metadata: {
+    source: string;
+    exportVersion: string;
+    exportDate: string;
+  };
+};
 
 export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   // ============================================================================
@@ -67,6 +87,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   function initialize(config: Partial<TinkerProfilesConfig> = {}) {
     profileManager = new TinkerProfilesManager({
       features: {
+        autoBackup: false,
         compression: false,
         migration: true,
         analytics: false
@@ -820,9 +841,183 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   }
   
   // ============================================================================
+  // Equipment Change Detection
+  // ============================================================================
+
+  // Debounce timer for equipment changes
+  let equipmentDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Batch update state to prevent multiple simultaneous updates
+  const equipmentUpdateState = ref({
+    isUpdating: false,
+    pendingUpdate: false,
+    lastUpdateTime: 0,
+    batchedChanges: [] as string[] // Track which equipment slots changed
+  });
+
+  /**
+   * Handle equipment changes with optimized debouncing and batching
+   */
+  async function handleEquipmentChange(slotName?: string): Promise<void> {
+    if (!activeProfile.value) return;
+
+    // Track which slots are changing for better debugging
+    if (slotName) {
+      equipmentUpdateState.value.batchedChanges.push(slotName);
+    }
+
+    // If currently updating, mark pending and return
+    if (equipmentUpdateState.value.isUpdating) {
+      equipmentUpdateState.value.pendingUpdate = true;
+      return;
+    }
+
+    // Clear existing timer
+    if (equipmentDebounceTimer) {
+      clearTimeout(equipmentDebounceTimer);
+    }
+
+    // Use requestAnimationFrame for UI batching, then setTimeout for debouncing
+    requestAnimationFrame(() => {
+      equipmentDebounceTimer = setTimeout(async () => {
+        await executeEquipmentUpdate();
+      }, 100); // 100ms debounce as specified in requirements
+    });
+  }
+
+  // Flag to prevent recursive updates when setting profile from equipment recalculation
+  let isUpdatingFromEquipmentBonus = false;
+
+  /**
+   * Execute the actual equipment bonus recalculation
+   */
+  async function executeEquipmentUpdate(): Promise<void> {
+    if (!activeProfile.value || equipmentUpdateState.value.isUpdating) {
+      return;
+    }
+
+    equipmentUpdateState.value.isUpdating = true;
+    equipmentUpdateState.value.lastUpdateTime = performance.now();
+    const changedSlots = [...equipmentUpdateState.value.batchedChanges];
+    equipmentUpdateState.value.batchedChanges = [];
+
+    try {
+      const { handleEquipmentBonusRecalculation } = await import('@/services/profile-update-service');
+      const result = await handleEquipmentBonusRecalculation(activeProfile.value);
+
+      if (result.success && result.updatedProfile) {
+        // Set flag to prevent watchers from triggering
+        isUpdatingFromEquipmentBonus = true;
+
+        // Batch DOM updates by using nextTick
+        await new Promise(resolve => {
+          // Update profile data first
+          activeProfile.value = result.updatedProfile!;
+          profiles.value.set(result.updatedProfile!.id, result.updatedProfile!);
+
+          // Then persist to storage
+          updateProfile(activeProfile.value.id, result.updatedProfile!).then(resolve);
+        });
+
+        // Clear flag after update
+        isUpdatingFromEquipmentBonus = false;
+
+        // Log performance metrics for debugging
+        const updateTime = performance.now() - equipmentUpdateState.value.lastUpdateTime;
+        if (updateTime > 100) {
+          console.warn(`Equipment update took ${updateTime.toFixed(2)}ms (slots: ${changedSlots.join(', ')})`);
+        }
+
+      } else if (result.errors.length > 0) {
+        console.warn('Equipment bonus calculation errors:', result.errors);
+        // Don't set global error for equipment bonus issues, just log them
+      }
+    } catch (err) {
+      console.error('Equipment change handling failed:', err);
+      isUpdatingFromEquipmentBonus = false; // Ensure flag is cleared on error
+    } finally {
+      equipmentUpdateState.value.isUpdating = false;
+
+      // Process any pending updates
+      if (equipmentUpdateState.value.pendingUpdate) {
+        equipmentUpdateState.value.pendingUpdate = false;
+        // Use a microtask to avoid stack overflow
+        Promise.resolve().then(() => handleEquipmentChange());
+      }
+    }
+  }
+
+  /**
+   * Set up optimized equipment change watchers for the active profile
+   */
+  function setupEquipmentWatchers(): void {
+    if (!activeProfile.value) return;
+
+    // Watch for changes to equipment objects with slot identification
+    watch(
+      () => activeProfile.value?.Weapons,
+      (newWeapons, oldWeapons) => {
+        // Skip if we're updating from equipment bonus recalculation
+        if (isUpdatingFromEquipmentBonus) return;
+        // Only trigger if there are actual changes
+        if (newWeapons !== oldWeapons) {
+          handleEquipmentChange('Weapons');
+        }
+      },
+      { deep: true, flush: 'post' }
+    );
+
+    watch(
+      () => activeProfile.value?.Clothing,
+      (newClothing, oldClothing) => {
+        // Skip if we're updating from equipment bonus recalculation
+        if (isUpdatingFromEquipmentBonus) return;
+        if (newClothing !== oldClothing) {
+          handleEquipmentChange('Clothing');
+        }
+      },
+      { deep: true, flush: 'post' }
+    );
+
+    watch(
+      () => activeProfile.value?.Implants,
+      (newImplants, oldImplants) => {
+        // Skip if we're updating from equipment bonus recalculation
+        if (isUpdatingFromEquipmentBonus) return;
+        if (newImplants !== oldImplants) {
+          handleEquipmentChange('Implants');
+        }
+      },
+      { deep: true, flush: 'post' }
+    );
+  }
+
+  // Set up watchers when active profile changes
+  watch(
+    activeProfile,
+    (newProfile, oldProfile) => {
+      // Clear any pending updates when switching profiles
+      if (oldProfile && newProfile?.id !== oldProfile.id) {
+        if (equipmentDebounceTimer) {
+          clearTimeout(equipmentDebounceTimer);
+          equipmentDebounceTimer = null;
+        }
+        equipmentUpdateState.value.isUpdating = false;
+        equipmentUpdateState.value.pendingUpdate = false;
+        equipmentUpdateState.value.batchedChanges = [];
+      }
+
+      if (newProfile) {
+        setupEquipmentWatchers();
+      }
+    },
+    { immediate: true }
+  );
+
+  // ============================================================================
   // Auto-initialization
   // ============================================================================
-  
+
   // Initialize the store automatically
   initialize();
   
@@ -879,6 +1074,13 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     updateCharacterMetadata,
     
     // Direct access to manager (for advanced use cases)
-    getManager: () => profileManager
+    getManager: () => profileManager,
+
+    // Performance monitoring
+    getEquipmentUpdateStats: () => ({
+      isUpdating: equipmentUpdateState.value.isUpdating,
+      lastUpdateTime: equipmentUpdateState.value.lastUpdateTime,
+      hasPendingUpdate: equipmentUpdateState.value.pendingUpdate
+    })
   };
 });

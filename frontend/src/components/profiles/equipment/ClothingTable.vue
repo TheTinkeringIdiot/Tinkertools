@@ -8,71 +8,71 @@ Visual grid showing clothing slot positions with equipped items as icons
       <!-- First row: Head, Shoulder -->
       <div class="grid grid-cols-3 gap-2 mb-2">
         <div></div> <!-- Empty space -->
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Head"
-          :item="clothing['Head']"
+          :item="getClothingBySlot('Head')"
         />
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Shoulder"
-          :item="clothing['Shoulder']"
+          :item="getClothingBySlot('Shoulder')"
         />
       </div>
       
       <!-- Second row: Back, Chest, Arms -->
       <div class="grid grid-cols-3 gap-2 mb-2">
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Back"
-          :item="clothing['Back']"
+          :item="getClothingBySlot('Back')"
         />
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Chest"
-          :item="clothing['Chest']"
+          :item="getClothingBySlot('Chest')"
         />
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Arms"
-          :item="clothing['Arms']"
+          :item="getClothingBySlot('Arms')"
         />
       </div>
       
       <!-- Third row: Wrists, Hands -->
       <div class="grid grid-cols-3 gap-2 mb-2">
         <div></div> <!-- Empty space -->
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Wrists"
-          :item="clothing['Wrists']"
+          :item="getClothingBySlot('Wrists')"
         />
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Hands"
-          :item="clothing['Hands']"
+          :item="getClothingBySlot('Hands')"
         />
       </div>
       
       <!-- Fourth row: Waist, Legs, Feet -->
       <div class="grid grid-cols-3 gap-2 mb-2">
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Waist"
-          :item="clothing['Waist']"
+          :item="getClothingBySlot('Waist')"
         />
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Legs"
-          :item="clothing['Legs']"
+          :item="getClothingBySlot('Legs')"
         />
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Feet"
-          :item="clothing['Feet']"
+          :item="getClothingBySlot('Feet')"
         />
       </div>
       
       <!-- Fifth row: Ring, Deck -->
       <div class="grid grid-cols-3 gap-2">
         <div></div> <!-- Empty space -->
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Ring"
-          :item="clothing['Ring']"
+          :item="getClothingBySlot('Ring')"
         />
-        <EquipmentSlot 
+        <EquipmentSlot
           slot-name="Deck"
-          :item="clothing['Deck']"
+          :item="getClothingBySlot('Deck')"
         />
       </div>
     </div>
@@ -103,17 +103,31 @@ Visual grid showing clothing slot positions with equipped items as icons
 <script setup lang="ts">
 import { computed } from 'vue';
 import EquipmentSlot from './EquipmentSlot.vue';
+import { EquipmentSlotMapper, getClothingSlot } from '../../../services/equipment-slot-mapper';
 
 // Props
 const props = defineProps<{
   clothing: Record<string, any>;
 }>();
 
+// Create normalized clothing access
+const clothingProxy = computed(() => {
+  return EquipmentSlotMapper.createEquipmentProxy(props.clothing || {}, 'clothing');
+});
+
 // Computed
 const equippedClothing = computed(() => {
-  return Object.fromEntries(
-    Object.entries(props.clothing || {}).filter(([_, item]) => item && getItemName(item))
-  );
+  const equipped: Record<string, any> = {};
+  const validSlots = EquipmentSlotMapper.getValidUISlots('clothing');
+
+  for (const uiSlot of validSlots) {
+    const item = clothingProxy.value[uiSlot];
+    if (item && getItemName(item)) {
+      equipped[uiSlot] = item;
+    }
+  }
+
+  return equipped;
 });
 
 const hasEquippedItems = computed(() => {
@@ -124,6 +138,10 @@ const hasEquippedItems = computed(() => {
 function getItemName(item: any): string {
   if (!item) return '';
   return item.name || item.Name || '';
+}
+
+function getClothingBySlot(slotName: string): any {
+  return getClothingSlot(props.clothing, slotName);
 }
 </script>
 
