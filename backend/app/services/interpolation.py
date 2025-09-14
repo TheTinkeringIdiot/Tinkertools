@@ -362,28 +362,48 @@ class InterpolationService:
 
         return interpolated_spell_data
 
-    def _interpolate_spells(self, lo_spells: List[InterpolatedSpell], hi_spells: List[InterpolatedSpell], 
+    def _interpolate_spells(self, lo_spells: List[InterpolatedSpell], hi_spells: List[InterpolatedSpell],
                            interpolated: InterpolatedItem) -> List[InterpolatedSpell]:
         """
         Interpolate individual spells based on spell ID and parameters.
         """
         interpolated_spells = []
-        
-        # Create mapping by spell_id for easier lookup
-        hi_spells_map = {spell.spell_id: spell for spell in hi_spells}
-        
+
         for lo_spell in lo_spells:
             if lo_spell.spell_id in self.INTERPOLATABLE_SPELLS:
-                hi_spell = hi_spells_map.get(lo_spell.spell_id)
+                # Find matching high spell by comparing both spell_id and stat parameter
+                hi_spell = self._find_matching_spell(lo_spell, hi_spells)
                 if hi_spell is not None:
                     interpolated_spell = self._interpolate_single_spell(lo_spell, hi_spell, interpolated)
                     interpolated_spells.append(interpolated_spell)
                     continue
-            
+
             # No interpolation needed or possible
             interpolated_spells.append(lo_spell)
 
         return interpolated_spells
+
+    def _find_matching_spell(self, lo_spell: InterpolatedSpell, hi_spells: List[InterpolatedSpell]) -> Optional[InterpolatedSpell]:
+        """
+        Find a matching spell from hi_spells that has the same spell_id and stat/skill parameter.
+        """
+        for hi_spell in hi_spells:
+            if hi_spell.spell_id != lo_spell.spell_id:
+                continue
+
+            # For stat-based spells, match on the Stat parameter
+            if 'Stat' in lo_spell.spell_params and 'Stat' in hi_spell.spell_params:
+                if lo_spell.spell_params['Stat'] == hi_spell.spell_params['Stat']:
+                    return hi_spell
+            # For skill-based spells, match on the Skill parameter
+            elif 'Skill' in lo_spell.spell_params and 'Skill' in hi_spell.spell_params:
+                if lo_spell.spell_params['Skill'] == hi_spell.spell_params['Skill']:
+                    return hi_spell
+            # For other spells without stat/skill, just match on spell_id
+            elif 'Stat' not in lo_spell.spell_params and 'Skill' not in lo_spell.spell_params:
+                return hi_spell
+
+        return None
 
     def _interpolate_single_spell(self, lo_spell: InterpolatedSpell, hi_spell: InterpolatedSpell,
                                  interpolated: InterpolatedItem) -> InterpolatedSpell:
