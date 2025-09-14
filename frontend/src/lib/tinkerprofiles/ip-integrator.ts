@@ -6,7 +6,7 @@
  */
 
 import type { TinkerProfile, IPTracker, SkillWithIP } from './types';
-import { 
+import {
   calcIP,
   calcTitleLevel,
   calcTotalAbilityCost,
@@ -16,9 +16,9 @@ import {
   calcAbilityMaxValue,
   calcIPAnalysis,
   validateCharacterBuild,
+  getBreedInitValue,
   ABILITY_NAMES,
   ABILITY_INDEX_TO_STAT_ID,
-  SKILL_NAMES,
   type CharacterStats,
   type IPCalculationResult
 } from './ip-calculator';
@@ -48,21 +48,8 @@ export function profileToCharacterStats(profile: TinkerProfile): CharacterStats 
     profile.Skills.Attributes.Psychic.pointFromIp || 0
   ];
   
-  // Extract skills (improvements only)
-  const skills: number[] = [];
-  
-  // Map profile skills to skill array indices
-  const skillMapping = {
-    // Body & Defense
-    'Max Health': 0,
-    'Max Nano': 1,
-    // Add more mappings as needed based on SKILL_NAMES
-  };
-  
-  // Initialize skills array with defaults
-  for (let i = 0; i < 97; i++) {
-    skills[i] = 0;
-  }
+  // Extract skills (improvements only) using STAT ID mapping
+  const skills: Record<string, number> = {};
   
   // Category names for skill extraction
   const categories = [
@@ -77,14 +64,14 @@ export function profileToCharacterStats(profile: TinkerProfile): CharacterStats 
     'Combat & Healing'
   ];
   
-  // Fill in known skills from profile using complete mapping
+  // Fill in known skills from profile using proper STAT ID mapping
   categories.forEach(categoryName => {
     const category = profile.Skills[categoryName as keyof typeof profile.Skills];
     if (category && typeof category === 'object') {
       Object.entries(category).forEach(([skillName, skillData]: [string, any]) => {
-        const skillIndex = getSkillId(skillName);
-        if (skillIndex !== null && skillIndex >= 0 && skillData.pointFromIp !== undefined) {
-          skills[skillIndex] = skillData.pointFromIp;
+        const skillStatId = getSkillId(skillName);
+        if (skillStatId !== null && skillStatId >= 0 && skillData.pointFromIp !== undefined) {
+          skills[skillStatId.toString()] = skillData.pointFromIp;
         }
       });
     }
@@ -461,10 +448,11 @@ export async function modifyAbility(
   }
   
   const abilityIndex = ABILITY_NAMES.indexOf(abilityName);
+  const abilityStatId = ABILITY_INDEX_TO_STAT_ID[abilityIndex];
   const breed = getBreedId(profile.Character.Breed) || 0;
-  
+
   // Calculate new improvement value
-  const breedBase = getBreedId(profile.Character.Breed) || 6; // Default base
+  const breedBase = getBreedInitValue(breed, abilityStatId);
   const newImprovements = Math.max(0, newValue - breedBase);
   const oldImprovements = abilityData.pointFromIp;
   const improvementDiff = newImprovements - oldImprovements;
@@ -477,11 +465,11 @@ export async function modifyAbility(
   let ipCost = 0;
   if (improvementDiff > 0) {
     for (let i = oldImprovements; i < newImprovements; i++) {
-      ipCost += calcTotalAbilityCost(1, breed, abilityIndex);
+      ipCost += calcTotalAbilityCost(1, breed, abilityStatId);
     }
   } else {
     for (let i = newImprovements; i < oldImprovements; i++) {
-      ipCost -= calcTotalAbilityCost(1, breed, abilityIndex);
+      ipCost -= calcTotalAbilityCost(1, breed, abilityStatId);
     }
   }
   

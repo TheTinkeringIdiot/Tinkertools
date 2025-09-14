@@ -715,7 +715,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
     // Use enhanced IP integrator for ability modification
     const { modifyAbility } = await import('@/lib/tinkerprofiles/ip-integrator');
-    const result = modifyAbility(profile, abilityName, newValue);
+    const result = await modifyAbility(profile, abilityName, newValue);
 
     if (result.success && result.updatedProfile) {
       // Update the profile in storage and reactive state
