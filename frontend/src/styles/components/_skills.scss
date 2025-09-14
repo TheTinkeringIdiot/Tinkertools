@@ -1,0 +1,218 @@
+// Equipment Bonus Visual Indicators for Skills Components
+// Provides specialized styling for equipment bonus highlighting and indicators
+
+// Equipment bonus color variants
+$equipment-bonus-positive: #10b981; // green-500
+$equipment-bonus-positive-dark: #34d399; // green-400
+$equipment-bonus-negative: #ef4444; // red-500
+$equipment-bonus-negative-dark: #f87171; // red-400
+$equipment-bonus-neutral: #3b82f6; // blue-500
+$equipment-bonus-neutral-dark: #60a5fa; // blue-400
+
+// Equipment bonus glow effects
+$equipment-bonus-glow: rgba(59, 130, 246, 0.3);
+$equipment-bonus-glow-light: rgba(59, 130, 246, 0.1);
+$equipment-bonus-glow-medium: rgba(59, 130, 246, 0.2);
+
+// Equipment bonus indicator mixins
+@mixin equipment-bonus-glow($color: $equipment-bonus-glow) {
+  box-shadow: 0 0 8px $color;
+}
+
+@mixin equipment-bonus-gradient($opacity: 0.1) {
+  background: linear-gradient(135deg,
+    rgba(59, 130, 246, $opacity) 0%,
+    transparent 25%,
+    transparent 75%,
+    rgba(59, 130, 246, $opacity) 100%
+  );
+}
+
+// Base equipment bonus styles
+.equipment-bonus {
+  // Positive bonus styling
+  &--positive {
+    color: $equipment-bonus-positive;
+
+    .dark & {
+      color: $equipment-bonus-positive-dark;
+    }
+  }
+
+  // Negative bonus styling
+  &--negative {
+    color: $equipment-bonus-negative;
+
+    .dark & {
+      color: $equipment-bonus-negative-dark;
+    }
+  }
+
+  // Neutral/default bonus styling
+  &--neutral {
+    color: $equipment-bonus-neutral;
+
+    .dark & {
+      color: $equipment-bonus-neutral-dark;
+    }
+  }
+}
+
+// Skill container with equipment bonus
+.skill-with-equipment-bonus {
+  position: relative;
+  transition: all 0.3s ease;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -4px;
+    right: -4px;
+    bottom: -2px;
+    @include equipment-bonus-gradient(0.1);
+    border-radius: 6px;
+    pointer-events: none;
+    z-index: -1;
+    transition: all 0.3s ease;
+  }
+
+  &:hover::before {
+    @include equipment-bonus-gradient(0.2);
+    @include equipment-bonus-glow();
+  }
+}
+
+// Equipment bonus value display
+.equipment-bonus-value {
+  font-weight: 600;
+  font-size: 0.75rem;
+  transition: all 0.2s ease;
+
+  &--positive {
+    @extend .equipment-bonus--positive;
+  }
+
+  &--negative {
+    @extend .equipment-bonus--negative;
+  }
+
+  &--neutral {
+    @extend .equipment-bonus--neutral;
+  }
+}
+
+// Equipment bonus icon styling
+.equipment-bonus-icon {
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: scale(1.1);
+  }
+
+  &--positive {
+    @extend .equipment-bonus--positive;
+  }
+
+  &--negative {
+    @extend .equipment-bonus--negative;
+  }
+
+  &--neutral {
+    @extend .equipment-bonus--neutral;
+  }
+}
+
+// Equipment bonus tooltip styling
+.equipment-bonus-tooltip {
+  max-width: 200px;
+
+  .tooltip-content {
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    border-radius: 4px;
+    font-size: 0.875rem;
+
+    .dark & {
+      background: rgba(255, 255, 255, 0.9);
+      color: black;
+    }
+  }
+}
+
+// Skills grid with equipment bonuses
+.skills-grid {
+  .skill-item {
+    &--has-equipment-bonus {
+      @extend .skill-with-equipment-bonus;
+    }
+  }
+}
+
+// Animation for equipment bonus changes
+@keyframes equipment-bonus-pulse {
+  0% {
+    box-shadow: 0 0 0 rgba(59, 130, 246, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.8);
+    transform: scale(1.02);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(59, 130, 246, 0.4);
+    transform: scale(1);
+  }
+}
+
+.equipment-bonus-change {
+  animation: equipment-bonus-pulse 2s ease-in-out;
+}
+
+// Responsive adjustments for equipment bonus indicators
+@media (max-width: 640px) {
+  .equipment-bonus-value {
+    font-size: 0.625rem;
+  }
+
+  .equipment-bonus-icon {
+    font-size: 0.75rem;
+  }
+
+  .skill-with-equipment-bonus::before {
+    left: -2px;
+    right: -2px;
+  }
+}
+
+// High contrast mode support
+@media (prefers-contrast: high) {
+  .equipment-bonus {
+    &--positive {
+      color: #008000; // High contrast green
+    }
+
+    &--negative {
+      color: #ff0000; // High contrast red
+    }
+
+    &--neutral {
+      color: #0000ff; // High contrast blue
+    }
+  }
+}
+
+// Reduced motion support
+@media (prefers-reduced-motion: reduce) {
+  .equipment-bonus-icon,
+  .equipment-bonus-value,
+  .skill-with-equipment-bonus,
+  .skill-with-equipment-bonus::before {
+    transition: none;
+  }
+
+  .equipment-bonus-change {
+    animation: none;
+  }
+}

@@ -49,6 +49,16 @@ export const ABILITY_STAT_IDS = {
 // Map from 0-based ability index to STAT ID
 export const ABILITY_INDEX_TO_STAT_ID = [16, 17, 18, 19, 20, 21];
 
+// Reverse mapping: STAT ID to 0-based ability index for efficient lookups
+export const STAT_ID_TO_ABILITY_INDEX: Record<number, number> = {
+  16: 0, // Strength
+  17: 1, // Agility
+  18: 2, // Stamina
+  19: 3, // Intelligence
+  20: 4, // Sense
+  21: 5  // Psychic
+};
+
 // Cost factor to skill cap conversion table
 // [cost_factor, inc_per_level, tl1_cap, tl2_cap, tl3_cap, tl4_cap, tl5_cap, tl6_cap, post201_inc_per_level]
 const COST_TO_RATE: number[][] = [
@@ -123,7 +133,7 @@ export interface CharacterStats {
   breed: number; // 0-3
   profession: number; // 0-13
   abilities: number[]; // 6 abilities
-  skills: number[]; // 97+ skills
+  skills: Record<string, number>; // skills mapped by STAT ID
 }
 
 // ============================================================================
@@ -185,8 +195,8 @@ export function calcIP(level: number): number {
  */
 export function calcAbilityCost(currentValue: number, breed: number, abilityStatId: number): number {
   // Convert STAT ID to ability index for breed data lookup
-  const abilityIndex = ABILITY_INDEX_TO_STAT_ID.indexOf(abilityStatId);
-  if (abilityIndex === -1) {
+  const abilityIndex = STAT_ID_TO_ABILITY_INDEX[abilityStatId];
+  if (abilityIndex === undefined) {
     console.warn(`[calcAbilityCost] Unknown ability STAT ID ${abilityStatId}`);
     return currentValue * 2; // Conservative fallback
   }
@@ -199,8 +209,8 @@ export function calcAbilityCost(currentValue: number, breed: number, abilityStat
  */
 export function calcTotalAbilityCost(improvements: number, breed: number, abilityStatId: number): number {
   // Convert STAT ID to ability index for breed data lookup
-  const abilityIndex = ABILITY_INDEX_TO_STAT_ID.indexOf(abilityStatId);
-  if (abilityIndex === -1) {
+  const abilityIndex = STAT_ID_TO_ABILITY_INDEX[abilityStatId];
+  if (abilityIndex === undefined) {
     console.warn(`[calcTotalAbilityCost] Unknown ability STAT ID ${abilityStatId}`);
     return improvements * 10; // Conservative fallback
   }
@@ -245,8 +255,8 @@ export function calcTotalSkillCost(improvements: number, profession: number, ski
  */
 export function calcAbilityMaxValue(level: number, breed: number, profession: number, abilityStatId: number): number {
   // Convert STAT ID to ability index for breed data lookup
-  const abilityIndex = ABILITY_INDEX_TO_STAT_ID.indexOf(abilityStatId);
-  if (abilityIndex === -1) {
+  const abilityIndex = STAT_ID_TO_ABILITY_INDEX[abilityStatId];
+  if (abilityIndex === undefined) {
     console.warn(`[calcAbilityMaxValue] Unknown ability STAT ID ${abilityStatId}`);
     return 10; // Conservative fallback
   }
@@ -314,8 +324,8 @@ export function calcIPAdjustableRange(level: number, profession: number, skillId
  */
 export function calcAbilityIPAdjustableRange(level: number, breed: number, abilityStatId: number): number {
   // Convert STAT ID to ability index for breed data lookup
-  const abilityIndex = ABILITY_INDEX_TO_STAT_ID.indexOf(abilityStatId);
-  if (abilityIndex === -1) {
+  const abilityIndex = STAT_ID_TO_ABILITY_INDEX[abilityStatId];
+  if (abilityIndex === undefined) {
     console.warn(`[calcAbilityIPAdjustableRange] Unknown ability STAT ID ${abilityStatId}`);
     return 3; // Conservative fallback
   }
@@ -524,9 +534,10 @@ export function calcIPAnalysis(stats: CharacterStats): IPCalculationResult {
     abilityIP += calcTotalAbilityCost(stats.abilities[i], stats.breed, abilityStatId);
   }
   
-  // Calculate skill costs
-  for (let i = 0; i < stats.skills.length; i++) {
-    skillIP += calcTotalSkillCost(stats.skills[i], stats.profession, i);
+  // Calculate skill costs using proper STAT IDs
+  for (const [statIdStr, skillValue] of Object.entries(stats.skills)) {
+    const statId = parseInt(statIdStr);
+    skillIP += calcTotalSkillCost(skillValue, stats.profession, statId);
   }
   
   const usedIP = abilityIP + skillIP;
@@ -568,13 +579,13 @@ export function validateCharacterBuild(stats: CharacterStats): {
     }
   }
   
-  // Check skill caps (we'll use skill IDs directly since we moved to ID-based system)
-  // Note: This validation function may need to be redesigned for the new ID-based skill system
-  for (let i = 0; i < stats.skills.length; i++) {
-    const skillCap = calcSkillCap(stats.level, stats.profession, i, stats.abilities);
-    if (stats.skills[i] > skillCap) {
-      const skillName = STAT[i as keyof typeof STAT] || `Skill ${i}`;
-      errors.push(`${skillName} exceeds cap of ${skillCap} (current: ${stats.skills[i]})`);
+  // Check skill caps using proper STAT IDs
+  for (const [statIdStr, skillValue] of Object.entries(stats.skills)) {
+    const statId = parseInt(statIdStr);
+    const skillCap = calcSkillCap(stats.level, stats.profession, statId, stats.abilities);
+    if (skillValue > skillCap) {
+      const skillName = STAT[statId as keyof typeof STAT] || `Skill ${statId}`;
+      errors.push(`${skillName} exceeds cap of ${skillCap} (current: ${skillValue})`);
     }
   }
   
@@ -605,8 +616,8 @@ export function getSkillCostFactor(profession: number, skillId: number): number 
  */
 export function getAbilityCostFactor(breed: number, abilityStatId: number): number {
   // Convert STAT ID to ability index for breed data lookup
-  const abilityIndex = ABILITY_INDEX_TO_STAT_ID.indexOf(abilityStatId);
-  if (abilityIndex === -1 || breed < 0) {
+  const abilityIndex = STAT_ID_TO_ABILITY_INDEX[abilityStatId];
+  if (abilityIndex === undefined || breed < 0) {
     return 2.0; // Conservative fallback
   }
   
@@ -622,8 +633,8 @@ export function getAbilityCostFactor(breed: number, abilityStatId: number): numb
  */
 export function getBreedInitValue(breed: number, abilityStatId: number): number {
   // Convert STAT ID to ability index for breed data lookup
-  const abilityIndex = ABILITY_INDEX_TO_STAT_ID.indexOf(abilityStatId);
-  if (abilityIndex === -1 || breed < 0) {
+  const abilityIndex = STAT_ID_TO_ABILITY_INDEX[abilityStatId];
+  if (abilityIndex === undefined || breed < 0) {
     return 6; // Conservative fallback
   }
   
