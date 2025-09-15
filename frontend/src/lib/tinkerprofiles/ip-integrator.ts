@@ -152,11 +152,11 @@ export function calculateProfileIP(profile: TinkerProfile): IPTracker {
 /**
  * Update all skill caps, ability caps, and trickle-down bonuses in a profile
  */
-export function updateProfileSkillInfo(profile: TinkerProfile): void {
+export function updateProfileSkillInfo(profile: TinkerProfile, providedEquipmentBonuses?: Record<string, number>): void {
   const characterStats = profileToCharacterStats(profile);
 
-  // Calculate equipment bonuses first
-  const equipmentBonuses = calculateEquipmentBonuses(profile);
+  // Use provided equipment bonuses or calculate them
+  const equipmentBonuses = providedEquipmentBonuses || calculateEquipmentBonuses(profile);
 
   // First, ensure pointFromIp is set for all abilities (needed for tests that set value directly)
   if (profile.Skills.Attributes) {
@@ -173,9 +173,9 @@ export function updateProfileSkillInfo(profile: TinkerProfile): void {
           ability.pointFromIp = Math.max(0, (ability.value || breedInitValue) - breedInitValue - equipmentBonus);
         }
 
-        // Calculate and set ability cap
+        // Calculate and set ability cap (including equipment bonus for display)
         const abilityCap = calcAbilityMaxValue(characterStats.level, characterStats.breed, characterStats.profession, abilityStatId);
-        ability.cap = abilityCap;
+        ability.cap = abilityCap + equipmentBonus;
 
         // Store equipment bonus
         ability.equipmentBonus = equipmentBonus;
@@ -236,14 +236,14 @@ export function updateProfileSkillInfo(profile: TinkerProfile): void {
           // Equipment bonuses are applied after IP calculations to avoid affecting IP cost
           skillData.value = baseValue + equipmentBonus;
 
-          // Update skill cap (using full ability values for ability cap calculation)
+          // Update skill cap (including equipment bonus for display)
           const skillCap = calcSkillCap(
             characterStats.level,
             characterStats.profession,
             skillIndex,
             fullAbilityValues
           );
-          skillData.cap = skillCap;
+          skillData.cap = skillCap + equipmentBonus;
         }
       });
     }
