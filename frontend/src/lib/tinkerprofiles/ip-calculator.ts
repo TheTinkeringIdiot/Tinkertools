@@ -299,22 +299,54 @@ export function calcIPAdjustableRange(level: number, profession: number, skillId
       const tl1Cap = rateData[2]; // TL1 cap from COST_TO_RATE table
       adjustableRange = Math.min(potentialRange, tl1Cap);
     } else {
-      // For TL2-6, the adjustable range is simply the cumulative cap for that title level
-      // The COST_TO_RATE table already contains cumulative maximum values, not incremental ones
-      adjustableRange = rateData[tl + 1]; // TL2 is index 3, TL3 is index 4, etc.
+      // For TL2-6, caps grow by inc_per_level for each level within the title level
+      // Start with the previous TL's cap and add inc_per_level for each level into the current TL
+
+      const prevTLCap = tl > 1 ? rateData[tl] : 0;  // Cap from previous TL (or 0 if TL2)
+      const incPerLevel = rateData[1];               // Inc per level from COST_TO_RATE table
+      const currentTLMaxCap = rateData[tl + 1];      // Maximum cap for current TL
+
+      // Calculate the level range for current TL
+      const tlStartLevel = TITLE_LEVELS[tl - 1];     // Start level of current TL
+
+      // Calculate how many levels into the current TL we are
+      const levelsIntoTL = level - tlStartLevel + 1; // +1 because levels 50-60 is 11 levels, not 10
+
+      // Cap increases by inc_per_level for each level, but cannot exceed the TL max cap
+      adjustableRange = Math.min(prevTLCap + (incPerLevel * levelsIntoTL), currentTLMaxCap);
+
+      // Debug for Body Dev
+      if (skillId === 152) {
+        console.log(`[DEBUG] TL${tl} cap calculation:
+          Level ${level}, TL start: ${tlStartLevel}
+          Previous TL cap: ${prevTLCap}
+          Inc per level: ${incPerLevel}
+          Levels into TL: ${levelsIntoTL} (levels ${tlStartLevel}-${level} inclusive)
+          Calculated: ${prevTLCap} + (${incPerLevel} * ${levelsIntoTL}) = ${prevTLCap + (incPerLevel * levelsIntoTL)}
+          Capped at TL${tl} max: ${currentTLMaxCap}
+          Final adjustable range: ${adjustableRange}`);
+      }
     }
   } else {
     // Post-201: TL6 cap plus post-201 progression
     // For post-201 characters, we start with the TL6 cap and add post-201 progression
     // The TL caps in COST_TO_RATE are cumulative maximums, not additive ranges
     adjustableRange = rateData[7]; // TL6 cap (e.g., 595 for Body Dev)
-    
+
     // Add post-201 progression: levels beyond 200 * post-201 increment per level
     const post201Levels = level - 200;
     adjustableRange += post201Levels * rateData[8];
-    
+
   }
-  
+
+  // Debug logging for Body Dev (skill ID 152)
+  if (skillId === 152) {
+    console.log(`[DEBUG] calcIPAdjustableRange for Body Dev (${skillId}):
+      Level: ${level}, TL: ${tl}, Profession: ${profession}
+      Cost factor: ${costFac}, Cost index: ${costIndex}
+      Adjustable range: ${adjustableRange}`);
+  }
+
   return adjustableRange;
 }
 
@@ -486,16 +518,27 @@ export function calcAbilityCapImprovements(abilities: number[], skillId: number)
   if (!trickleFactors) {
     return 999; // No ability dependency for skills without trickle-down
   }
-  
+
   // Calculate weighted ability value using the same trickle-down factors
   let weightedAbility = 0;
   for (let i = 0; i < 6; i++) {
     weightedAbility += abilities[i] * trickleFactors[i];
   }
-  
+
   // AOSkills4 formula: round(((weightedAbility - 5) * 2) + 5)
   // This returns the maximum number of improvements that can be made via IP
-  return roundAO(((weightedAbility - 5) * 2) + 5);
+  const result = roundAO(((weightedAbility - 5) * 2) + 5);
+
+  // Debug logging for Body Dev
+  if (skillId === 152) {
+    console.log(`[DEBUG] calcAbilityCapImprovements for Body Dev (${skillId}):
+      Abilities: [${abilities.join(', ')}]
+      Trickle factors: [${trickleFactors.join(', ')}]
+      Weighted ability: ${weightedAbility}
+      Ability cap improvements: ${result}`);
+  }
+
+  return result;
 }
 
 /**
@@ -504,19 +547,30 @@ export function calcAbilityCapImprovements(abilities: number[], skillId: number)
 export function calcSkillCap(level: number, profession: number, skillId: number, abilities: number[]): number {
   const baseValue = BASE_SKILL;
   const trickleDown = calcTrickleDown(abilities, skillId);
-  
+
   // Level-based cap: how many improvements are allowed by level/profession
   const levelBasedImprovements = calcIPAdjustableRange(level, profession, skillId);
-  
+
   // Ability-based cap: how many improvements are allowed by abilities
   const abilityBasedImprovements = calcAbilityCapImprovements(abilities, skillId);
-  
+
   // The actual cap is the minimum of both limits
   const maxImprovements = Math.min(levelBasedImprovements, abilityBasedImprovements);
-  
+
   const totalCap = baseValue + trickleDown + maxImprovements;
-  
-  
+
+  // Debug logging for Body Dev (skill ID 152)
+  if (skillId === 152) {
+    console.log(`[DEBUG] calcSkillCap for Body Dev (${skillId}):
+      Level: ${level}, Profession: ${profession}
+      Base: ${baseValue}
+      Trickle-down: ${trickleDown}
+      Level-based improvements: ${levelBasedImprovements}
+      Ability-based improvements: ${abilityBasedImprovements}
+      Max improvements (min of both): ${maxImprovements}
+      Total cap: ${totalCap}`);
+  }
+
   return totalCap;
 }
 
