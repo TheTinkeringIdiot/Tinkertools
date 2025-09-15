@@ -14,7 +14,7 @@ import { STORAGE_KEYS, CURRENT_VERSION } from './constants';
 
 export class ProfileStorage {
   private options: ProfileStorageOptions;
-  
+
   constructor(options: ProfileStorageOptions = {}) {
     this.options = {
       compress: false,
@@ -23,9 +23,12 @@ export class ProfileStorage {
       migrationEnabled: true,
       ...options
     };
-    
+
     // Clean up legacy backup data on initialization
     this.cleanupLegacyBackups();
+
+    // Migrate from old storage format if needed
+    this.migrateFromLegacyStorage();
   }
   
   // ============================================================================
@@ -37,11 +40,16 @@ export class ProfileStorage {
    */
   async saveProfile(profile: TinkerProfile): Promise<void> {
     try {
-      const profiles = await this.loadAllProfiles();
-      profiles.set(profile.id, profile);
-      
-      await this.saveAllProfiles(profiles);
-      
+      // Save the individual profile
+      const profileKey = `${STORAGE_KEYS.PROFILE_PREFIX}${profile.id}`;
+      const data = this.options.compress ? await this.compress(profile) : JSON.stringify(profile);
+      localStorage.setItem(profileKey, data);
+
+      // Update the index
+      await this.updateProfileIndex(profile.id, 'add');
+
+      console.log(`[ProfileStorage] Saved profile ${profile.id} to individual key`);
+
     } catch (error) {
       throw new Error(`Failed to save profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -52,8 +60,27 @@ export class ProfileStorage {
    */
   async loadProfile(profileId: string): Promise<TinkerProfile | null> {
     try {
-      const profiles = await this.loadAllProfiles();
-      return profiles.get(profileId) || null;
+      const profileKey = `${STORAGE_KEYS.PROFILE_PREFIX}${profileId}`;
+      const data = localStorage.getItem(profileKey);
+
+      if (!data || data.trim() === '' || data === 'null') {
+        return null;
+      }
+
+      let profile: TinkerProfile;
+
+      if (this.options.compress) {
+        profile = await this.decompress(data);
+      } else {
+        profile = JSON.parse(data);
+      }
+
+      // Migrate if needed
+      if (this.options.migrationEnabled) {
+        profile = await this.migrateProfile(profile);
+      }
+
+      return profile;
     } catch (error) {
       console.error('Failed to load profile:', error);
       return null;
@@ -65,38 +92,21 @@ export class ProfileStorage {
    */
   async loadAllProfiles(): Promise<Map<string, TinkerProfile>> {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.PROFILES);
-      
-      if (!data || data.trim() === '' || data === '{}' || data === 'null') {
-        return new Map();
-      }
-      
-      let parsed: Record<string, TinkerProfile>;
-      
-      if (this.options.compress) {
-        parsed = await this.decompress(data);
-      } else {
-        parsed = JSON.parse(data);
-      }
-      
-      if (!parsed || Object.keys(parsed).length === 0) {
-        return new Map();
-      }
-      
       const profiles = new Map<string, TinkerProfile>();
-      
-      for (const [id, profile] of Object.entries(parsed)) {
-        // Migrate if needed
-        if (this.options.migrationEnabled) {
-          const migrated = await this.migrateProfile(profile);
-          profiles.set(id, migrated);
-        } else {
-          profiles.set(id, profile);
+
+      // Get the profile index
+      const index = await this.getProfileIndex();
+
+      // Load each profile individually
+      for (const profileId of index) {
+        const profile = await this.loadProfile(profileId);
+        if (profile) {
+          profiles.set(profileId, profile);
         }
       }
-      
+
       return profiles;
-      
+
     } catch (error) {
       console.error('Failed to load profiles from storage:', error);
       return new Map();
@@ -108,13 +118,15 @@ export class ProfileStorage {
    */
   async deleteProfile(profileId: string): Promise<void> {
     try {
-      const profiles = await this.loadAllProfiles();
-      
-      if (profiles.has(profileId)) {
-        profiles.delete(profileId);
-        await this.saveAllProfiles(profiles);
-      }
-      
+      // Remove the individual profile
+      const profileKey = `${STORAGE_KEYS.PROFILE_PREFIX}${profileId}`;
+      localStorage.removeItem(profileKey);
+
+      // Update the index
+      await this.updateProfileIndex(profileId, 'remove');
+
+      console.log(`[ProfileStorage] Deleted profile ${profileId}`);
+
     } catch (error) {
       console.error(`[ProfileStorage] Failed to delete profile ${profileId}:`, error);
       throw new Error(`Failed to delete profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -126,20 +138,29 @@ export class ProfileStorage {
    */
   async getProfileMetadata(): Promise<ProfileMetadata[]> {
     try {
-      const profiles = await this.loadAllProfiles();
-      
-      return Array.from(profiles.values()).map(profile => ({
-        id: profile.id,
-        name: profile.Character.Name,
-        profession: profile.Character.Profession,
-        level: profile.Character.Level,
-        breed: profile.Character.Breed,
-        faction: profile.Character.Faction,
-        created: profile.created,
-        updated: profile.updated,
-        version: profile.version
-      }));
-      
+      const metadata: ProfileMetadata[] = [];
+      const index = await this.getProfileIndex();
+
+      // Load each profile's metadata individually
+      for (const profileId of index) {
+        const profile = await this.loadProfile(profileId);
+        if (profile) {
+          metadata.push({
+            id: profile.id,
+            name: profile.Character.Name,
+            profession: profile.Character.Profession,
+            level: profile.Character.Level,
+            breed: profile.Character.Breed,
+            faction: profile.Character.Faction,
+            created: profile.created,
+            updated: profile.updated,
+            version: profile.version
+          });
+        }
+      }
+
+      return metadata;
+
     } catch (error) {
       console.error('Failed to load profile metadata:', error);
       return [];
@@ -326,27 +347,106 @@ export class ProfileStorage {
   // ============================================================================
   // Private Utilities
   // ============================================================================
-  
+
   /**
-   * Save all profiles to storage
+   * Get the profile index (list of profile IDs)
+   */
+  private async getProfileIndex(): Promise<string[]> {
+    try {
+      const indexData = localStorage.getItem(STORAGE_KEYS.PROFILE_INDEX);
+      if (!indexData || indexData === 'null' || indexData === '[]') {
+        return [];
+      }
+      return JSON.parse(indexData);
+    } catch (error) {
+      console.error('Failed to load profile index:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Update the profile index
+   */
+  private async updateProfileIndex(profileId: string, action: 'add' | 'remove'): Promise<void> {
+    try {
+      const index = await this.getProfileIndex();
+
+      if (action === 'add') {
+        if (!index.includes(profileId)) {
+          index.push(profileId);
+        }
+      } else if (action === 'remove') {
+        const idx = index.indexOf(profileId);
+        if (idx > -1) {
+          index.splice(idx, 1);
+        }
+      }
+
+      localStorage.setItem(STORAGE_KEYS.PROFILE_INDEX, JSON.stringify(index));
+    } catch (error) {
+      console.error('Failed to update profile index:', error);
+      throw new Error(`Failed to update profile index: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Migrate from legacy storage format to individual profile keys
+   */
+  private async migrateFromLegacyStorage(): Promise<void> {
+    try {
+      // Check if legacy data exists
+      const legacyData = localStorage.getItem(STORAGE_KEYS.PROFILES);
+      if (!legacyData || legacyData === 'null' || legacyData === '{}') {
+        return; // No legacy data to migrate
+      }
+
+      console.log('[ProfileStorage] Migrating from legacy storage format...');
+
+      // Parse the legacy data
+      let legacyProfiles: Record<string, TinkerProfile>;
+      try {
+        legacyProfiles = JSON.parse(legacyData);
+      } catch (error) {
+        console.error('[ProfileStorage] Failed to parse legacy data:', error);
+        return;
+      }
+
+      if (!legacyProfiles || Object.keys(legacyProfiles).length === 0) {
+        return;
+      }
+
+      // Migrate each profile to individual storage
+      const profileIds: string[] = [];
+      for (const [id, profile] of Object.entries(legacyProfiles)) {
+        const profileKey = `${STORAGE_KEYS.PROFILE_PREFIX}${id}`;
+        localStorage.setItem(profileKey, JSON.stringify(profile));
+        profileIds.push(id);
+      }
+
+      // Save the index
+      localStorage.setItem(STORAGE_KEYS.PROFILE_INDEX, JSON.stringify(profileIds));
+
+      // Remove the legacy data
+      localStorage.removeItem(STORAGE_KEYS.PROFILES);
+
+      console.log(`[ProfileStorage] Successfully migrated ${profileIds.length} profiles to individual storage`);
+    } catch (error) {
+      console.error('[ProfileStorage] Migration failed:', error);
+      // Don't throw - allow the app to continue even if migration fails
+    }
+  }
+
+  /**
+   * Save all profiles to storage (DEPRECATED - kept for backward compatibility)
    */
   private async saveAllProfiles(profiles: Map<string, TinkerProfile>): Promise<void> {
-    try {
-      const profilesObject = Object.fromEntries(profiles.entries());
-      console.log(`[ProfileStorage] Saving ${profiles.size} profiles to localStorage:`, Array.from(profiles.keys()));
-      
-      let data: string;
-      if (this.options.compress) {
-        data = await this.compress(profilesObject);
-      } else {
-        data = JSON.stringify(profilesObject);
-      }
-      
-      localStorage.setItem(STORAGE_KEYS.PROFILES, data);
-      console.log(`[ProfileStorage] Successfully saved ${profiles.size} profiles to localStorage`);
-      
-    } catch (error) {
-      throw new Error(`Failed to save profiles to storage: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    // This method is no longer used but kept to avoid breaking changes
+    // Individual profiles are now saved separately
+    console.warn('[ProfileStorage] saveAllProfiles is deprecated - profiles are now saved individually');
+
+    // Save each profile individually
+    for (const [id, profile] of profiles.entries()) {
+      await this.saveProfile(profile);
     }
   }
 
@@ -378,13 +478,28 @@ export class ProfileStorage {
    */
   async clearAllData(): Promise<void> {
     try {
-      Object.values(STORAGE_KEYS).forEach(key => {
-        localStorage.removeItem(key);
-      });
-      
-      // Clean up legacy backup data that might still exist
+      // Get all profile IDs from index
+      const index = await this.getProfileIndex();
+
+      // Remove each individual profile
+      for (const profileId of index) {
+        const profileKey = `${STORAGE_KEYS.PROFILE_PREFIX}${profileId}`;
+        localStorage.removeItem(profileKey);
+      }
+
+      // Remove the index
+      localStorage.removeItem(STORAGE_KEYS.PROFILE_INDEX);
+
+      // Remove other storage keys
+      localStorage.removeItem(STORAGE_KEYS.ACTIVE_PROFILE);
+      localStorage.removeItem(STORAGE_KEYS.PROFILE_METADATA);
+      localStorage.removeItem(STORAGE_KEYS.PROFILE_PREFERENCES);
+      localStorage.removeItem(STORAGE_KEYS.VERSION);
+
+      // Clean up legacy data
+      localStorage.removeItem(STORAGE_KEYS.PROFILES);
       localStorage.removeItem('tinkertools_profile_backups');
-      
+
     } catch (error) {
       throw new Error(`Failed to clear profile data: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -396,21 +511,46 @@ export class ProfileStorage {
   getStorageStats(): { used: number; total: number; profiles: number } {
     try {
       let used = 0;
-      Object.values(STORAGE_KEYS).forEach(key => {
+
+      // Count index size
+      const indexData = localStorage.getItem(STORAGE_KEYS.PROFILE_INDEX);
+      if (indexData) {
+        used += indexData.length;
+      }
+
+      // Count individual profile sizes
+      const index = indexData ? JSON.parse(indexData) : [];
+      for (const profileId of index) {
+        const profileKey = `${STORAGE_KEYS.PROFILE_PREFIX}${profileId}`;
+        const profileData = localStorage.getItem(profileKey);
+        if (profileData) {
+          used += profileData.length;
+        }
+      }
+
+      // Count other storage keys
+      const otherKeys = [
+        STORAGE_KEYS.ACTIVE_PROFILE,
+        STORAGE_KEYS.PROFILE_METADATA,
+        STORAGE_KEYS.PROFILE_PREFERENCES,
+        STORAGE_KEYS.VERSION
+      ];
+
+      for (const key of otherKeys) {
         const item = localStorage.getItem(key);
         if (item) {
           used += item.length;
         }
-      });
-      
+      }
+
       const profiles = this.getProfileCount();
-      
+
       return {
         used: used,
         total: 5 * 1024 * 1024, // 5MB typical localStorage limit
         profiles: profiles
       };
-      
+
     } catch (error) {
       return { used: 0, total: 0, profiles: 0 };
     }
@@ -421,12 +561,14 @@ export class ProfileStorage {
    */
   private getProfileCount(): number {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.PROFILES);
-      if (!data) return 0;
-      
-      const profiles = JSON.parse(data);
-      return Object.keys(profiles).length;
-      
+      const indexData = localStorage.getItem(STORAGE_KEYS.PROFILE_INDEX);
+      if (!indexData || indexData === 'null' || indexData === '[]') {
+        return 0;
+      }
+
+      const index = JSON.parse(indexData);
+      return index.length;
+
     } catch (error) {
       return 0;
     }
