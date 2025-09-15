@@ -63,7 +63,7 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
         :max="maxValue"
         :step="1"
         class="flex-1 min-w-[100px] max-w-none"
-        @update:model-value="onSliderChanged"
+        @slideend="onSliderChanged"
       />
       
       <!-- Input Number for precise entry with proper width -->
@@ -377,13 +377,14 @@ const costFactorColor = computed(() => {
 
 // Methods
 function onSliderChanged(newValue: number | null) {
-  if (newValue === null || newValue === undefined) return;
-  
+  // This is called when the user releases the slider (slideend event)
+  // We use the current sliderValue which has been updated during dragging
+  const valueToUse = sliderValue.value;
+
   isUserInteracting.value = true;
-  
-  const clampedValue = Math.max(minValue.value, Math.min(newValue, maxValue.value));
-  sliderValue.value = clampedValue;
-  
+
+  const clampedValue = Math.max(minValue.value, Math.min(valueToUse, maxValue.value));
+
   // Update input value to reflect the change
   if (props.isAbility) {
     inputValue.value = clampedValue;
@@ -395,7 +396,7 @@ function onSliderChanged(newValue: number | null) {
     inputValue.value = totalSkillValue;
     emit('skill-changed', props.category, props.skillName, totalSkillValue);
   }
-  
+
   // Reset interaction flag after a short delay
   setTimeout(() => {
     isUserInteracting.value = false;
@@ -461,22 +462,27 @@ watch(() => props.skillData?.value, (newValue, oldValue) => {
   }
 }, { immediate: true });
 
+// Watch for slider value changes to update input field display (visual feedback only)
+watch(sliderValue, (newValue) => {
+  if (newValue !== undefined) {
+    if (props.isAbility) {
+      // For abilities, update the input display directly
+      inputValue.value = newValue;
+    } else {
+      // For skills, update the input value display as the slider moves
+      // This provides visual feedback without triggering expensive equipment updates
+      const totalSkillValue = baseValue.value + trickleDownBonus.value + newValue;
+      inputValue.value = totalSkillValue;
+    }
+  }
+});
+
 // Watch for changes that affect the total value to update input field
-watch([baseValue, trickleDownBonus, sliderValue], (newValues, oldValues) => {
+watch([baseValue, trickleDownBonus], (newValues, oldValues) => {
   if (!props.isAbility) {
     const isInitialLoad = oldValues === undefined || oldValues.some(v => v === undefined);
     if (isInitialLoad || !isUserInteracting.value) {
       inputValue.value = totalValue.value;
-    }
-  }
-}, { immediate: true });
-
-// Initialize input value for abilities
-watch(() => props.isAbility && sliderValue.value, (newValue, oldValue) => {
-  if (props.isAbility && newValue !== undefined) {
-    const isInitialLoad = oldValue === undefined;
-    if (isInitialLoad || !isUserInteracting.value) {
-      inputValue.value = sliderValue.value;
     }
   }
 }, { immediate: true });
