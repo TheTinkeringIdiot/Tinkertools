@@ -275,7 +275,9 @@ export const DEFAULT_IMPLANTS = {
 // ============================================================================
 
 export const STORAGE_KEYS = {
-  PROFILES: 'tinkertools_profiles',
+  PROFILES: 'tinkertools_profiles', // Legacy - for migration only
+  PROFILE_INDEX: 'tinkertools_profile_index', // List of profile IDs
+  PROFILE_PREFIX: 'tinkertools_profile_', // Individual profile prefix
   ACTIVE_PROFILE: 'tinkertools_active_profile',
   PROFILE_METADATA: 'tinkertools_profile_metadata',
   PROFILE_PREFERENCES: 'tinkertools_profile_preferences',
