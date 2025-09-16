@@ -3833,7 +3833,7 @@ export const BREED_ABILITY_DATA = {
     0: 0,  // Unknown
     1: 0,  // Solitus
     2: -1, // Opifex
-    3: 1,  // Nanomage
+    3: -1,  // Nanomage
     4: -2  // Atrox
   } as Record<number, number>
 } as const;
@@ -3863,20 +3863,20 @@ export const PROFESSION_VITALS = {
 
   // NP per level by title level [profession_id][tl1, tl2, tl3, tl4, tl5, tl6]
   np_per_level: {
-    1: [4, 4, 4, 4, 4, 4],   // Soldier
-    2: [4, 4, 4, 4, 4, 4],   // MartialArtist
-    3: [4, 5, 6, 7, 8, 9],   // Engineer
-    4: [4, 4, 4, 4, 4, 4],   // Fixer
-    5: [5, 5, 6, 6, 7, 7],   // Agent
-    6: [4, 5, 5, 6, 6, 7],   // Adventurer
-    7: [4, 5, 5, 5, 6, 7],   // Trader
-    8: [4, 5, 5, 5, 6, 7],   // Bureaucrat
-    9: [4, 4, 4, 4, 4, 4],   // Enforcer
-    10: [4, 5, 6, 7, 8, 10], // Doctor
-    11: [4, 5, 6, 7, 8, 10], // NanoTechnician
-    12: [4, 5, 6, 7, 8, 10], // MetaPhysicist
-    14: [4, 4, 4, 4, 4, 4],  // Keeper
-    15: [4, 4, 4, 6, 6, 6]   // Shade
+    1: [4, 4, 4, 4, 4, 4, 5],   // Soldier
+    2: [4, 4, 4, 4, 4, 4, 5],   // MartialArtist
+    3: [4, 5, 6, 7, 8, 9, 10],   // Engineer
+    4: [4, 4, 4, 4, 4, 4, 5],   // Fixer
+    5: [5, 5, 6, 6, 7, 7, 8],   // Agent
+    6: [4, 5, 5, 6, 6, 7, 8],   // Adventurer
+    7: [4, 5, 5, 5, 6, 7, 8],   // Trader
+    8: [4, 5, 5, 5, 6, 7, 8],   // Bureaucrat
+    9: [4, 4, 4, 4, 4, 4, 5],   // Enforcer
+    10: [4, 5, 6, 7, 8, 10, 11], // Doctor
+    11: [4, 5, 6, 7, 8, 10, 14], // NanoTechnician
+    12: [4, 5, 6, 7, 8, 10, 14], // MetaPhysicist
+    14: [4, 4, 4, 4, 4, 4, 5],  // Keeper
+    15: [4, 4, 4, 6, 6, 6, 7]   // Shade
   } as Record<number, number[]>
 } as const;
 
