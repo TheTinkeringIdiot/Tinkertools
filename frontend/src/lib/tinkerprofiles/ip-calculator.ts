@@ -507,23 +507,43 @@ export function calcHP(bodyDev: number, level: number, breed: number, profession
 
 /**
  * Calculate maximum nano pool
+ * Uses cumulative nano calculation through title levels
  */
 export function calcNP(nanoPool: number, level: number, breed: number, profession: number): number {
-  let tl = calcTitleLevel(level);
-  tl = tl === 7 ? 6 : tl; // Cap at TL6 for NP calculation
-  
   const professionNPPerLevel = PROFESSION_VITALS.np_per_level[profession];
   if (!professionNPPerLevel) {
     console.warn(`Unknown profession ID: ${profession}`);
     return 0;
   }
-  
+
   const breedBaseNP = BREED_ABILITY_DATA.base_np[breed] || 0;
   const breedNanoFactor = BREED_ABILITY_DATA.nano_factor[breed] || 1;
   const breedNPModifier = BREED_ABILITY_DATA.np_modifier[breed] || 0;
-  
-  const levelNP = (professionNPPerLevel[tl - 1] + breedNPModifier) * level;
-  return breedBaseNP + (nanoPool * breedNanoFactor) + levelNP;
+
+  // Calculate cumulative nano from levels
+  let cumulativeNano = 0;
+
+  // Title level ranges with their end levels
+  const tlRanges = [
+    { start: 1, end: 14, tlIndex: 0 },    // TL1
+    { start: 15, end: 49, tlIndex: 1 },   // TL2
+    { start: 50, end: 99, tlIndex: 2 },   // TL3
+    { start: 100, end: 149, tlIndex: 3 }, // TL4
+    { start: 150, end: 189, tlIndex: 4 }, // TL5
+    { start: 190, end: 204, tlIndex: 5 }, // TL6
+    { start: 205, end: 220, tlIndex: 6 }  // TL7
+  ];
+
+  // Accumulate nano through each title level range
+  for (const range of tlRanges) {
+    if (level < range.start) break;
+
+    const levelsInRange = Math.min(level, range.end) - range.start + 1;
+    const nanoPerLevel = professionNPPerLevel[range.tlIndex] + breedNPModifier;
+    cumulativeNano += levelsInRange * nanoPerLevel;
+  }
+
+  return breedBaseNP + (nanoPool * breedNanoFactor) + cumulativeNano;
 }
 
 /**
