@@ -432,6 +432,7 @@ function onInputChanged(newValue: number | null) {
 
 function setToMax() {
   if (props.isAbility) {
+    sliderValue.value = maxValue.value;
     onSliderChanged(maxValue.value);
   } else {
     // For skills: set input to max total value, which will calculate the IP portion
