@@ -972,14 +972,20 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     }
   }
 
+  // Store watcher stop handles to clean them up later
+  let equipmentWatcherStopHandles: Array<() => void> = [];
+
   /**
    * Set up optimized equipment change watchers for the active profile
    */
   function setupEquipmentWatchers(): void {
     if (!activeProfile.value) return;
 
+    // Clean up any existing watchers before setting up new ones
+    cleanupEquipmentWatchers();
+
     // Watch for changes to equipment objects with slot identification
-    watch(
+    const weaponsWatcher = watch(
       () => activeProfile.value?.Weapons,
       (newWeapons, oldWeapons) => {
         // Skip if we're updating from equipment bonus recalculation or skills
@@ -992,7 +998,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       { deep: true, flush: 'post' }
     );
 
-    watch(
+    const clothingWatcher = watch(
       () => activeProfile.value?.Clothing,
       (newClothing, oldClothing) => {
         // Skip if we're updating from equipment bonus recalculation or skills
@@ -1004,7 +1010,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       { deep: true, flush: 'post' }
     );
 
-    watch(
+    const implantsWatcher = watch(
       () => activeProfile.value?.Implants,
       (newImplants, oldImplants) => {
         // Skip if we're updating from equipment bonus recalculation or skills
@@ -1015,6 +1021,17 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       },
       { deep: true, flush: 'post' }
     );
+
+    // Store the stop handles for cleanup
+    equipmentWatcherStopHandles = [weaponsWatcher, clothingWatcher, implantsWatcher];
+  }
+
+  /**
+   * Clean up equipment watchers to prevent memory leaks
+   */
+  function cleanupEquipmentWatchers(): void {
+    equipmentWatcherStopHandles.forEach(stopWatcher => stopWatcher());
+    equipmentWatcherStopHandles = [];
   }
 
   // Set up watchers when active profile changes
@@ -1034,6 +1051,9 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
       if (newProfile) {
         setupEquipmentWatchers();
+      } else {
+        // Clean up watchers when no profile is active
+        cleanupEquipmentWatchers();
       }
     },
     { immediate: true }
