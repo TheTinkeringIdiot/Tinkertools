@@ -271,7 +271,10 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
         // Ensure caps and trickle-down are calculated for display
         const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
         const profileWithCaps = await updateProfileWithIPTracking(profile);
-        
+
+        // Save the updated profile back to storage to persist the recalculated values
+        await profileManager.updateProfile(profileId, profileWithCaps);
+
         profiles.value.set(profileId, profileWithCaps);
         return profileWithCaps;
       }
@@ -682,39 +685,47 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       throw new Error('Profile not found');
     }
 
-    // Update the skill value
-    if (profile.Skills && profile.Skills[category as keyof typeof profile.Skills]) {
-      const skillCategory = profile.Skills[category as keyof typeof profile.Skills];
-      if (typeof skillCategory === 'object' && skillCategory !== null && skillName in skillCategory) {
-        if (category === 'Misc') {
-          // Misc skills don't use IP tracking
-          (skillCategory as any)[skillName] = newValue;
-        } else {
-          // Other skills use SkillWithIP structure
-          const skill = (skillCategory as any)[skillName];
-          if (skill && typeof skill === 'object') {
-            // Calculate the pointFromIp value based on the formula:
-            // value = 5 + trickleDown + pointFromIp
-            // Therefore: pointFromIp = value - 5 - trickleDown
-            const trickleDown = skill.trickleDown || 0;
-            const baseSkillValue = 5; // BASE_SKILL constant
-            const pointFromIp = Math.max(0, newValue - baseSkillValue - trickleDown);
-            
-            // Update both the total value and the IP portion
-            skill.value = newValue;
-            skill.pointFromIp = pointFromIp;
+    // Set flag to prevent equipment watchers from firing
+    isUpdatingSkills = true;
+
+    try {
+      // Update the skill value
+      if (profile.Skills && profile.Skills[category as keyof typeof profile.Skills]) {
+        const skillCategory = profile.Skills[category as keyof typeof profile.Skills];
+        if (typeof skillCategory === 'object' && skillCategory !== null && skillName in skillCategory) {
+          if (category === 'Misc') {
+            // Misc skills don't use IP tracking
+            (skillCategory as any)[skillName] = newValue;
+          } else {
+            // Other skills use SkillWithIP structure
+            const skill = (skillCategory as any)[skillName];
+            if (skill && typeof skill === 'object') {
+              // Calculate the pointFromIp value based on the formula:
+              // value = 5 + trickleDown + pointFromIp
+              // Therefore: pointFromIp = value - 5 - trickleDown
+              const trickleDown = skill.trickleDown || 0;
+              const baseSkillValue = 5; // BASE_SKILL constant
+              const pointFromIp = Math.max(0, newValue - baseSkillValue - trickleDown);
+
+              // Update both the total value and the IP portion
+              skill.value = newValue;
+              skill.pointFromIp = pointFromIp;
+            }
           }
         }
       }
-    }
 
-    // Recalculate health and nano if Body Dev or Nano Pool skills changed
-    if (category === 'Body & Defense' && (skillName === 'Body Dev.' || skillName === 'Nano Pool')) {
-      const { recalculateHealthAndNano } = await import('@/services/profile-update-service');
-      await recalculateHealthAndNano(profile);
-    }
+      // Recalculate health and nano if Body Dev or Nano Pool skills changed
+      if (category === 'Body & Defense' && (skillName === 'Body Dev.' || skillName === 'Nano Pool')) {
+        const { recalculateHealthAndNano } = await import('@/services/profile-update-service');
+        await recalculateHealthAndNano(profile);
+      }
 
-    await updateProfile(profileId, profile);
+      await updateProfile(profileId, profile);
+    } finally {
+      // Always clear the flag
+      isUpdatingSkills = false;
+    }
   }
 
   /**
@@ -734,29 +745,37 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       throw new Error('Profile not found');
     }
 
-    // Use enhanced IP integrator for ability modification
-    const { modifyAbility } = await import('@/lib/tinkerprofiles/ip-integrator');
-    const result = await modifyAbility(profile, abilityName, newValue);
+    // Set flag to prevent equipment watchers from firing
+    isUpdatingSkills = true;
 
-    if (result.success && result.updatedProfile) {
-      // Update the profile in storage and reactive state
-      await updateProfile(profileId, result.updatedProfile);
-      
-      // Update active profile if this is the active one
-      if (activeProfileId.value === profileId) {
-        activeProfile.value = result.updatedProfile;
-        profiles.value.set(profileId, result.updatedProfile);
+    try {
+      // Use enhanced IP integrator for ability modification
+      const { modifyAbility } = await import('@/lib/tinkerprofiles/ip-integrator');
+      const result = await modifyAbility(profile, abilityName, newValue);
+
+      if (result.success && result.updatedProfile) {
+        // Update the profile in storage and reactive state
+        await updateProfile(profileId, result.updatedProfile);
+
+        // Update active profile if this is the active one
+        if (activeProfileId.value === profileId) {
+          activeProfile.value = result.updatedProfile;
+          profiles.value.set(profileId, result.updatedProfile);
+        }
+
+        return {
+          success: true,
+          trickleDownChanges: result.trickleDownChanges
+        };
+      } else {
+        return {
+          success: false,
+          error: result.error
+        };
       }
-
-      return {
-        success: true,
-        trickleDownChanges: result.trickleDownChanges
-      };
-    } else {
-      return {
-        success: false,
-        error: result.error
-      };
+    } finally {
+      // Always clear the flag
+      isUpdatingSkills = false;
     }
   }
 
@@ -861,6 +880,14 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   async function handleEquipmentChange(slotName?: string): Promise<void> {
     if (!activeProfile.value) return;
 
+    // Clear existing timer first to prevent accumulation
+    if (equipmentDebounceTimer) {
+      clearTimeout(equipmentDebounceTimer);
+      // Clear the batched changes when cancelling a timer
+      // to prevent accumulation of duplicate slot names
+      equipmentUpdateState.value.batchedChanges = [];
+    }
+
     // Track which slots are changing for better debugging
     if (slotName) {
       equipmentUpdateState.value.batchedChanges.push(slotName);
@@ -870,11 +897,6 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     if (equipmentUpdateState.value.isUpdating) {
       equipmentUpdateState.value.pendingUpdate = true;
       return;
-    }
-
-    // Clear existing timer
-    if (equipmentDebounceTimer) {
-      clearTimeout(equipmentDebounceTimer);
     }
 
     // Use requestAnimationFrame for UI batching, then setTimeout for debouncing
@@ -887,6 +909,9 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
   // Flag to prevent recursive updates when setting profile from equipment recalculation
   let isUpdatingFromEquipmentBonus = false;
+
+  // Flag to prevent equipment watchers from firing during skill/ability updates
+  let isUpdatingSkills = false;
 
   /**
    * Execute the actual equipment bonus recalculation
@@ -957,8 +982,8 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     watch(
       () => activeProfile.value?.Weapons,
       (newWeapons, oldWeapons) => {
-        // Skip if we're updating from equipment bonus recalculation
-        if (isUpdatingFromEquipmentBonus) return;
+        // Skip if we're updating from equipment bonus recalculation or skills
+        if (isUpdatingFromEquipmentBonus || isUpdatingSkills) return;
         // Only trigger if there are actual changes
         if (newWeapons !== oldWeapons) {
           handleEquipmentChange('Weapons');
@@ -970,8 +995,8 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     watch(
       () => activeProfile.value?.Clothing,
       (newClothing, oldClothing) => {
-        // Skip if we're updating from equipment bonus recalculation
-        if (isUpdatingFromEquipmentBonus) return;
+        // Skip if we're updating from equipment bonus recalculation or skills
+        if (isUpdatingFromEquipmentBonus || isUpdatingSkills) return;
         if (newClothing !== oldClothing) {
           handleEquipmentChange('Clothing');
         }
@@ -982,8 +1007,8 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     watch(
       () => activeProfile.value?.Implants,
       (newImplants, oldImplants) => {
-        // Skip if we're updating from equipment bonus recalculation
-        if (isUpdatingFromEquipmentBonus) return;
+        // Skip if we're updating from equipment bonus recalculation or skills
+        if (isUpdatingFromEquipmentBonus || isUpdatingSkills) return;
         if (newImplants !== oldImplants) {
           handleEquipmentChange('Implants');
         }
