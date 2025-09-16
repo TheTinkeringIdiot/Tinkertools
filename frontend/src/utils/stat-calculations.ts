@@ -5,8 +5,8 @@
  * Handles level-based calculations, IP distributions, skill caps, and stat modifications.
  */
 
-import { STAT, BREED, PROFESSION } from '../services/game-data';
-import { getStatName, getProfessionName, getBreedName } from '../services/game-utils';
+import { STAT, BREED, PROFESSION, BREED_ABILITY_DATA, PROFESSION_VITALS } from '../services/game-data';
+import { getStatName, getProfessionName, getBreedName, calculateTitleLevel } from '../services/game-utils';
 
 // ============================================================================
 // Types and Interfaces
@@ -348,21 +348,65 @@ export function calculateEffectiveSkill(
 }
 
 /**
- * Calculate health and nano points based on stats
+ * Calculate cumulative HP from profession vitals across title levels
+ */
+export function calculateCumulativeHPFromLevels(level: number, professionId: number): number {
+  const hpPerLevel = PROFESSION_VITALS.hp_per_level[professionId] || PROFESSION_VITALS.hp_per_level[6]; // Default to Adventurer
+  const titleLevels = [1, 15, 50, 100, 150, 190, 205]; // Title level breakpoints
+
+  let totalHP = 0;
+  let currentLevel = 1;
+
+  for (let tl = 0; tl < 6; tl++) {
+    const tlStart = titleLevels[tl];
+    const tlEnd = tl < 5 ? titleLevels[tl + 1] - 1 : 220;
+    const hpForTL = hpPerLevel[tl];
+
+    if (level < tlStart) break;
+
+    const endLevel = Math.min(level, tlEnd);
+    const levelsInRange = endLevel - currentLevel + 1;
+    totalHP += levelsInRange * hpForTL;
+
+    currentLevel = endLevel + 1;
+    if (currentLevel > level) break;
+  }
+
+  return totalHP;
+}
+
+/**
+ * Calculate health and nano points based on stats using accurate AO formula
  */
 export function calculateHealthAndNano(character: Character): { health: number; nano: number } {
   const baseStats = character.baseStats || {};
   const level = character.level;
-  
-  // Health calculation: base + (Stamina * multiplier) + level bonus
-  const stamina = baseStats[18] || 15; // Default to 15 if not set
-  const health = Math.floor(10 + (stamina * 1.5) + (level * 10));
-  
+  const breedId = character.breed || 1; // Default to Solitus
+  const professionId = character.profession || 6; // Default to Adventurer
+
+  // Get Body Development value (stat ID 152)
+  const bodyDev = baseStats[152] || 0;
+
+  // Get Stamina value (stat ID 18)
+  const stamina = baseStats[18] || 15;
+
+  // Get Max Health bonus from equipment/implants (stat ID 1)
+  const maxHealthBonus = baseStats[1] || 0;
+
+  // Health calculation using accurate AO formula:
+  // HP = base_hp + cumulative_hp_from_levels + (body_dev * 3) + floor(stamina / 4) + max_health_bonus
+  const baseHP = BREED_ABILITY_DATA.base_hp[breedId] || BREED_ABILITY_DATA.base_hp[1];
+  const cumulativeHP = calculateCumulativeHPFromLevels(level, professionId);
+  const bodyDevBonus = bodyDev * 3;
+  const staminaBonus = Math.floor(stamina / 4);
+
+  const health = baseHP + cumulativeHP + bodyDevBonus + staminaBonus + maxHealthBonus;
+
   // Nano calculation: base + (Intelligence + Psychic) * multiplier + level bonus
   const intelligence = baseStats[19] || 15;
   const psychic = baseStats[21] || 15;
   const nano = Math.floor(10 + ((intelligence + psychic) * 1.2) + (level * 8));
-  
+
   return { health, nano };
 }
 

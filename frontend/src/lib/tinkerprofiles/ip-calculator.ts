@@ -469,22 +469,40 @@ export function calcAllTrickleDown(abilities: number[]): TrickleDownResult {
 /**
  * Calculate maximum health
  */
-export function calcHP(bodyDev: number, level: number, breed: number, profession: number): number {
-  let tl = calcTitleLevel(level);
-  tl = tl === 7 ? 6 : tl; // Cap at TL6 for HP calculation
-  
+export function calcHP(bodyDev: number, level: number, breed: number, profession: number, stamina: number = 0, maxHealthBonus: number = 0): number {
   const professionHPPerLevel = PROFESSION_VITALS.hp_per_level[profession];
   if (!professionHPPerLevel) {
     console.warn(`Unknown profession ID: ${profession}`);
     return 0;
   }
-  
+
   const breedBaseHP = BREED_ABILITY_DATA.base_hp[breed] || 0;
   const breedBodyFactor = BREED_ABILITY_DATA.body_factor[breed] || 1;
-  const breedHPModifier = BREED_ABILITY_DATA.hp_modifier[breed] || 0;
-  
-  const levelHP = (professionHPPerLevel[tl - 1] + breedHPModifier) * level;
-  return breedBaseHP + (bodyDev * breedBodyFactor) + levelHP;
+
+  // Calculate cumulative HP from levels across title level ranges
+  // This correctly sums HP for each level range with its appropriate title level multiplier
+  let cumulativeHP = 0;
+  let currentLevel = 1;
+
+  for (let tl = 0; tl < 6; tl++) {
+    const tlStart = TITLE_LEVELS[tl];
+    const tlEnd = tl < 5 ? TITLE_LEVELS[tl + 1] - 1 : 220;
+    const hpForTL = professionHPPerLevel[tl];
+
+    if (level < tlStart) break;
+
+    const endLevel = Math.min(level, tlEnd);
+    const levelsInRange = endLevel - currentLevel + 1;
+    cumulativeHP += levelsInRange * hpForTL;
+
+    currentLevel = endLevel + 1;
+    if (currentLevel > level) break;
+  }
+
+  // Calculate using accurate AO formula:
+  // HP = base_hp + cumulative_hp + (body_dev * breed_factor) + floor(stamina / 4) + max_health_bonus
+  const staminaBonus = Math.floor(stamina / 4);
+  return breedBaseHP + cumulativeHP + (bodyDev * breedBodyFactor) + staminaBonus + maxHealthBonus;
 }
 
 /**
