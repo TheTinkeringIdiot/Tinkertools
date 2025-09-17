@@ -12,13 +12,16 @@ import type { Item } from '@/types/api';
 
 /** Skill entry with IP tracking */
 export interface SkillWithIP {
-  value: number;
-  ipSpent: number;
-  pointFromIp: number;
-  trickleDown?: number; // Bonus from abilities
-  cap?: number; // Effective skill cap
+  // Stored values (persisted to localStorage)
+  pointFromIp: number;  // IP improvements made by player
+  ipSpent: number;      // Total IP cost
+
+  // Computed values (calculated at runtime, never stored)
+  value?: number;         // Total: base + trickle + IP + equipment (capped)
+  baseValue?: number;     // Base + trickle + IP (no equipment)
+  trickleDown?: number;   // Bonus from abilities
   equipmentBonus?: number; // Total bonus from all equipped items
-  baseValue?: number; // Value without equipment (base + trickle + IP)
+  cap?: number;           // Effective skill cap (including equipment for display)
 }
 
 /** Comprehensive IP tracking information */

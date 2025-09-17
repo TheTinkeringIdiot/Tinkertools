@@ -168,24 +168,31 @@ export function updateProfileSkillInfo(profile: TinkerProfile, providedEquipment
         const breedInitValue = getBreedInitValue(characterStats.breed, abilityStatId);
         const equipmentBonus = equipmentBonuses[abilityName] || 0;
 
-        // If pointFromIp is not set, calculate it from current value
+        // Ensure pointFromIp is set (required field)
         if (ability.pointFromIp === undefined || ability.pointFromIp === null) {
-          ability.pointFromIp = Math.max(0, (ability.value || breedInitValue) - breedInitValue - equipmentBonus);
+          ability.pointFromIp = 0; // Default to no IP spent
         }
 
-        // Calculate and set ability cap (including equipment bonus for display)
-        const abilityCap = calcAbilityMaxValue(characterStats.level, characterStats.breed, characterStats.profession, abilityStatId);
-        ability.cap = abilityCap + equipmentBonus;
-
-        // Store equipment bonus
-        ability.equipmentBonus = equipmentBonus;
+        // Calculate base ability cap (without equipment)
+        const baseAbilityCap = calcAbilityMaxValue(characterStats.level, characterStats.breed, characterStats.profession, abilityStatId);
 
         // Calculate base value (breed init + IP improvements, no equipment)
-        const baseValue = breedInitValue + (ability.pointFromIp || 0);
-        ability.baseValue = baseValue;
+        const baseValue = breedInitValue + ability.pointFromIp;
 
-        // Update total value with equipment bonus
-        ability.value = baseValue + equipmentBonus;
+        // Cap the base value at the ability's natural cap
+        const cappedBaseValue = Math.min(baseValue, baseAbilityCap);
+
+        // Store computed values
+        ability.baseValue = cappedBaseValue;
+        ability.equipmentBonus = equipmentBonus;
+        ability.trickleDown = 0; // Abilities don't have trickle-down
+
+        // Final value: capped base + equipment, but total can exceed natural cap
+        // This is how AO works - equipment can push you over the natural cap
+        ability.value = cappedBaseValue + equipmentBonus;
+
+        // Display cap includes equipment bonus for UI
+        ability.cap = baseAbilityCap + equipmentBonus;
       }
     });
   }
@@ -220,30 +227,41 @@ export function updateProfileSkillInfo(profile: TinkerProfile, providedEquipment
       Object.entries(category).forEach(([skillName, skillData]: [string, any]) => {
         const skillIndex = getSkillId(skillName);
         if (skillIndex !== null && skillIndex >= 0) {
+          // Ensure pointFromIp is set (required field)
+          if (skillData.pointFromIp === undefined || skillData.pointFromIp === null) {
+            skillData.pointFromIp = 0; // Default to no IP spent
+          }
+
           // Update trickle-down bonus
           skillData.trickleDown = trickleDownResults[skillIndex] || 0;
 
-          // Calculate base value: base skill + trickle-down + IP improvements
-          // This is the value without equipment bonuses, used for IP calculations
-          const baseValue = 5 + (skillData.trickleDown || 0) + (skillData.pointFromIp || 0);
-          skillData.baseValue = baseValue;
-
-          // Get equipment bonus for this skill (if any)
-          const equipmentBonus = equipmentBonuses[skillName] || 0;
-          skillData.equipmentBonus = equipmentBonus;
-
-          // Calculate final skill value: base value + equipment bonuses
-          // Equipment bonuses are applied after IP calculations to avoid affecting IP cost
-          skillData.value = baseValue + equipmentBonus;
-
-          // Update skill cap (including equipment bonus for display)
-          const skillCap = calcSkillCap(
+          // Calculate base skill cap (without equipment)
+          const baseSkillCap = calcSkillCap(
             characterStats.level,
             characterStats.profession,
             skillIndex,
             fullAbilityValues
           );
-          skillData.cap = skillCap + equipmentBonus;
+
+          // Calculate base value: base skill + trickle-down + IP improvements
+          const baseValue = 5 + skillData.trickleDown + skillData.pointFromIp;
+
+          // Cap the base value at the skill's natural cap
+          const cappedBaseValue = Math.min(baseValue, baseSkillCap);
+
+          // Get equipment bonus for this skill
+          const equipmentBonus = equipmentBonuses[skillName] || 0;
+
+          // Store computed values
+          skillData.baseValue = cappedBaseValue;
+          skillData.equipmentBonus = equipmentBonus;
+
+          // Final value: capped base + equipment, but total can exceed natural cap
+          // This is how AO works - equipment can push you over the natural cap
+          skillData.value = cappedBaseValue + equipmentBonus;
+
+          // Display cap includes equipment bonus for UI
+          skillData.cap = baseSkillCap + equipmentBonus;
         }
       });
     }
@@ -294,10 +312,14 @@ export function updateProfileTrickleDown(profile: TinkerProfile): TinkerProfile 
           
           // Update trickle-down bonus
           skillData.trickleDown = newTrickleDown;
-          
-          // Recalculate total skill value: base + trickle-down + IP improvements
-          // Note: pointFromIp represents the IP-based improvements beyond base+trickle
-          skillData.value = 5 + newTrickleDown + (skillData.pointFromIp || 0);
+
+          // Recalculate base value first
+          const baseValue = 5 + newTrickleDown + (skillData.pointFromIp || 0);
+          skillData.baseValue = baseValue;
+
+          // Always include equipment bonus in final value
+          const equipmentBonus = skillData.equipmentBonus || 0;
+          skillData.value = baseValue + equipmentBonus;
         }
       });
     }
