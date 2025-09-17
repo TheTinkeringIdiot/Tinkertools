@@ -264,7 +264,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     if (!profileManager) {
       throw new Error('Profile manager not initialized');
     }
-    
+
     try {
       const profile = await profileManager.loadProfile(profileId);
       if (profile) {
@@ -700,28 +700,36 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
             // Other skills use SkillWithIP structure
             const skill = (skillCategory as any)[skillName];
             if (skill && typeof skill === 'object') {
-              // Calculate the pointFromIp value based on the formula:
-              // value = 5 + trickleDown + pointFromIp
-              // Therefore: pointFromIp = value - 5 - trickleDown
+              // In the new structure, we only update pointFromIp
+              // The value passed is the desired total value
               const trickleDown = skill.trickleDown || 0;
+              const equipmentBonus = skill.equipmentBonus || 0;
               const baseSkillValue = 5; // BASE_SKILL constant
-              const pointFromIp = Math.max(0, newValue - baseSkillValue - trickleDown);
 
-              // Update both the total value and the IP portion
-              skill.value = newValue;
+              // Calculate how much IP is needed for this value
+              // newValue = baseSkillValue + trickleDown + pointFromIp + equipmentBonus
+              // Therefore: pointFromIp = newValue - equipmentBonus - trickleDown - baseSkillValue
+              const pointFromIp = Math.max(0, newValue - equipmentBonus - trickleDown - baseSkillValue);
+
+              // Only update the stored value
               skill.pointFromIp = pointFromIp;
             }
           }
         }
       }
 
-      // Recalculate health and nano if Body Dev or Nano Pool skills changed
-      if (category === 'Body & Defense' && (skillName === 'Body Dev.' || skillName === 'Nano Pool')) {
-        const { recalculateHealthAndNano } = await import('@/services/profile-update-service');
-        await recalculateHealthAndNano(profile);
-      }
+      // Recalculate all values after any skill change
+      const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
+      const updatedProfile = await updateProfileWithIPTracking(profile);
 
-      await updateProfile(profileId, profile);
+      // Update the profile in storage and state
+      await updateProfile(profileId, updatedProfile);
+
+      // Update active profile if this is the active one
+      if (activeProfileId.value === profileId) {
+        activeProfile.value = updatedProfile;
+        profiles.value.set(profileId, updatedProfile);
+      }
     } finally {
       // Always clear the flag
       isUpdatingSkills = false;
@@ -923,40 +931,26 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
     equipmentUpdateState.value.isUpdating = true;
     equipmentUpdateState.value.lastUpdateTime = performance.now();
-    const changedSlots = [...equipmentUpdateState.value.batchedChanges];
     equipmentUpdateState.value.batchedChanges = [];
 
     try {
-      const { handleEquipmentBonusRecalculation } = await import('@/services/profile-update-service');
-      const result = await handleEquipmentBonusRecalculation(activeProfile.value);
+      // Simply recalculate everything - the new structure handles it correctly
+      const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
+      const updatedProfile = await updateProfileWithIPTracking(activeProfile.value);
 
-      if (result.success && result.updatedProfile) {
-        // Set flag to prevent watchers from triggering
-        isUpdatingFromEquipmentBonus = true;
+      // Set flag to prevent watchers from triggering
+      isUpdatingFromEquipmentBonus = true;
 
-        // Batch DOM updates by using nextTick
-        await new Promise(resolve => {
-          // Update profile data first
-          activeProfile.value = result.updatedProfile!;
-          profiles.value.set(result.updatedProfile!.id, result.updatedProfile!);
+      // Update profile data
+      activeProfile.value = updatedProfile;
+      profiles.value.set(updatedProfile.id, updatedProfile);
 
-          // Then persist to storage
-          updateProfile(activeProfile.value.id, result.updatedProfile!).then(resolve);
-        });
+      // Persist to storage
+      await updateProfile(activeProfile.value.id, updatedProfile);
 
-        // Clear flag after update
-        isUpdatingFromEquipmentBonus = false;
+      // Clear flag after update
+      isUpdatingFromEquipmentBonus = false;
 
-        // Log performance metrics for debugging
-        const updateTime = performance.now() - equipmentUpdateState.value.lastUpdateTime;
-        if (updateTime > 100) {
-          console.warn(`Equipment update took ${updateTime.toFixed(2)}ms (slots: ${changedSlots.join(', ')})`);
-        }
-
-      } else if (result.errors.length > 0) {
-        console.warn('Equipment bonus calculation errors:', result.errors);
-        // Don't set global error for equipment bonus issues, just log them
-      }
     } catch (err) {
       console.error('Equipment change handling failed:', err);
       isUpdatingFromEquipmentBonus = false; // Ensure flag is cleared on error

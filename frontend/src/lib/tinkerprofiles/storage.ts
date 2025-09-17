@@ -36,19 +36,63 @@ export class ProfileStorage {
   // ============================================================================
   
   /**
+   * Strip computed values from skills before saving
+   */
+  private stripComputedValues(profile: TinkerProfile): TinkerProfile {
+    // Create a deep clone to avoid modifying the original
+    const stripped = structuredClone(profile);
+
+    // Strip computed values from skills
+    if (stripped.Skills) {
+      // Process all skill categories
+      Object.keys(stripped.Skills).forEach(category => {
+        const skillCategory = stripped.Skills[category as keyof typeof stripped.Skills];
+        if (skillCategory && typeof skillCategory === 'object') {
+          Object.values(skillCategory).forEach((skill: any) => {
+            if (skill && typeof skill === 'object') {
+              // Keep only stored values
+              const stored = {
+                pointFromIp: skill.pointFromIp || 0,
+                ipSpent: skill.ipSpent || 0
+              };
+              // Remove all computed values
+              delete skill.value;
+              delete skill.baseValue;
+              delete skill.trickleDown;
+              delete skill.equipmentBonus;
+              delete skill.cap;
+              // Set the stored values
+              skill.pointFromIp = stored.pointFromIp;
+              skill.ipSpent = stored.ipSpent;
+            }
+          });
+        }
+      });
+    }
+
+    // Update version to 3.0.0
+    stripped.version = '3.0.0';
+
+    return stripped;
+  }
+
+  /**
    * Save a profile to localStorage
    */
   async saveProfile(profile: TinkerProfile): Promise<void> {
     try {
+      // Strip computed values before saving
+      const profileToSave = this.stripComputedValues(profile);
+
       // Save the individual profile
       const profileKey = `${STORAGE_KEYS.PROFILE_PREFIX}${profile.id}`;
-      const data = this.options.compress ? await this.compress(profile) : JSON.stringify(profile);
+      const data = this.options.compress ? await this.compress(profileToSave) : JSON.stringify(profileToSave);
       localStorage.setItem(profileKey, data);
 
       // Update the index
       await this.updateProfileIndex(profile.id, 'add');
 
-      console.log(`[ProfileStorage] Saved profile ${profile.id} to individual key`);
+      console.log(`[ProfileStorage] Saved profile ${profile.id} to individual key (v3 minimal format)`);
 
     } catch (error) {
       throw new Error(`Failed to save profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -75,10 +119,10 @@ export class ProfileStorage {
         profile = JSON.parse(data);
       }
 
-      // Migrate if needed
-      if (this.options.migrationEnabled) {
-        profile = await this.migrateProfile(profile);
-      }
+      // For v3 profiles, we need to recalculate all computed values
+      // Import dynamically to avoid circular dependencies
+      const { updateProfileWithIPTracking } = await import('./ip-integrator');
+      profile = await updateProfileWithIPTracking(profile);
 
       return profile;
     } catch (error) {
