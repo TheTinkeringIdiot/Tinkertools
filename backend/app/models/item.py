@@ -17,6 +17,7 @@ class Item(Base):
     item_class = Column(Integer)
     description = Column(String(8192))
     is_nano = Column(Boolean, default=False)
+    is_perk = Column(Boolean, default=False)
     animation_mesh_id = Column(Integer, ForeignKey('animation_mesh.id'))
     atkdef_id = Column(Integer, ForeignKey('attack_defense.id'))
     

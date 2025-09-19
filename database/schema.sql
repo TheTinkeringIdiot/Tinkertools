@@ -163,6 +163,7 @@ CREATE TABLE items (
     description VARCHAR(8192),
     item_class INTEGER,
     is_nano BOOLEAN DEFAULT FALSE,
+    is_perk BOOLEAN DEFAULT FALSE,
     atkdef_id INTEGER REFERENCES attack_defense(id) ON DELETE SET NULL,
     animation_mesh_id INTEGER REFERENCES animation_mesh(id) ON DELETE SET NULL
 );
@@ -173,6 +174,7 @@ CREATE INDEX idx_items_name ON items USING GIN (to_tsvector('english', name));
 CREATE INDEX idx_items_ql ON items (ql);
 CREATE INDEX idx_items_item_class ON items (item_class);
 CREATE INDEX idx_items_is_nano ON items (is_nano);
+CREATE INDEX idx_items_is_perk ON items (is_perk);
 CREATE INDEX idx_items_atkdef ON items (atkdef_id);
 CREATE INDEX idx_items_animation_mesh ON items (animation_mesh_id);
 
@@ -368,7 +370,7 @@ CREATE INDEX idx_application_cache_expires_at ON application_cache (expires_at);
 COMMENT ON DATABASE tinkertools IS 'TinkerTools database schema - 23 tables, no timestamps except cache expiration';
 COMMENT ON TABLE stat_values IS 'Reusable stat-value pairs with unique constraints';
 COMMENT ON TABLE criteria IS 'Reusable criteria for spells and actions';
-COMMENT ON TABLE items IS 'Main items table including nanos (is_nano=true)';
+COMMENT ON TABLE items IS 'Main items table including nanos (is_nano=true) and perks (is_perk=true)';
 COMMENT ON TABLE source_types IS 'Types of sources that can provide items (crystals, NPCs, missions, etc.)';
 COMMENT ON TABLE sources IS 'Polymorphic source instances that can provide items';
 COMMENT ON TABLE item_sources IS 'Many-to-many relationship between items and their sources with metadata';
