@@ -1,0 +1,622 @@
+"""
+Perk Service for TinkerTools.
+
+Handles perk lookup, validation, effect calculation, and business logic.
+Perks are items with spell_data that provide stat modifications following
+three distinct type systems: SL (Shadowlands), AI (Alien Invasion), and LE (Lost Eden).
+"""
+
+from typing import List, Optional, Dict, Tuple, Any
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import and_, func, text, Integer, or_, distinct
+import logging
+
+from app.models.item import Item, ItemSpellData
+from app.models.spell_data import SpellData, SpellDataSpells
+from app.models.spell import Spell
+from app.api.schemas.perk import (
+    PerkResponse, PerkDetail, PerkSeries, PerkValidationResponse,
+    PerkCalculationResponse, PerkRequirement, PerkEffect, PerkPointCost
+)
+from app.api.schemas.spell import SpellDataResponse
+
+logger = logging.getLogger(__name__)
+
+
+class PerkService:
+    """Service for perk-related operations."""
+
+    # Perk type constants
+    PERK_TYPES = ['SL', 'AI', 'LE']
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    async def get_available_perks(
+        self,
+        character_level: Optional[int] = None,
+        character_profession: Optional[str] = None,
+        character_breed: Optional[str] = None,
+        ai_title_level: Optional[int] = None,
+        perk_types: Optional[List[str]] = None,
+        available_sl_points: Optional[int] = None,
+        available_ai_points: Optional[int] = None,
+        owned_perks: Optional[Dict[str, int]] = None
+    ) -> List[PerkResponse]:
+        """
+        Get available perks filtered by character constraints.
+
+        Args:
+            character_level: Character level for requirement filtering
+            character_profession: Character profession for filtering
+            character_breed: Character breed for filtering
+            ai_title_level: AI title level for AI perk requirements
+            perk_types: Filter by perk types (SL, AI, LE)
+            available_sl_points: Available SL points for affordability check
+            available_ai_points: Available AI points for affordability check
+            owned_perks: Currently owned perks {name: level} for progression validation
+
+        Returns:
+            List of PerkResponse objects that meet the criteria
+        """
+        logger.info(f"Getting available perks for character level {character_level}, profession {character_profession}")
+
+        # Start with base query for perks (items with is_perk=True and spell_data)
+        query = self.db.query(Item)\
+            .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
+            .filter(Item.is_perk == True)
+
+        # Apply character level requirement filtering
+        if character_level is not None:
+            # Filter perks that require higher level than character has
+            # This would need to be implemented based on how level requirements are stored
+            # For now, we'll skip this filter until the exact storage format is known
+            pass
+
+        # Apply profession filtering
+        if character_profession is not None:
+            # Filter perks that don't match character profession
+            # This would need profession requirement data from the database
+            pass
+
+        # Apply breed filtering
+        if character_breed is not None:
+            # Filter perks that don't match character breed
+            # This would need breed requirement data from the database
+            pass
+
+        # Apply perk type filtering
+        if perk_types is not None:
+            # Filter by perk types - this would need type information stored in metadata
+            pass
+
+        # Execute query with proper loading of relationships
+        results = query.options(
+            joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
+        ).distinct().all()
+
+        # Convert to response objects
+        perk_responses = []
+        for item in results:
+            # Extract perk metadata (type, counter, etc.) from item data
+            perk_type = self._extract_perk_type(item)
+            perk_counter = self._extract_perk_counter(item)
+
+            # Validate ownership progression
+            if owned_perks and not self._can_purchase_level(item.name, perk_counter, owned_perks):
+                continue
+
+            # Check point affordability
+            if not self._is_affordable(perk_type, perk_counter, available_sl_points, available_ai_points, owned_perks, item.name):
+                continue
+
+            perk_response = PerkResponse(
+                id=item.id,
+                aoid=item.aoid,
+                name=item.name,
+                counter=perk_counter,
+                type=perk_type,
+                professions=self._extract_professions(item),
+                breeds=self._extract_breeds(item),
+                level=self._extract_level_requirement(item),
+                ai_title=self._extract_ai_title_requirement(item),
+                description=item.description,
+                ql=item.ql
+            )
+            perk_responses.append(perk_response)
+
+        logger.info(f"Found {len(perk_responses)} available perks")
+        return perk_responses
+
+    async def get_perk_series(self, perk_name: str) -> Optional[PerkSeries]:
+        """
+        Get all levels of a perk series (levels 1-10).
+
+        Args:
+            perk_name: Base name of the perk series
+
+        Returns:
+            PerkSeries with all available levels or None if not found
+        """
+        logger.info(f"Getting perk series for '{perk_name}'")
+
+        # Query all levels of the perk by name pattern
+        # Perk names typically follow pattern: "Perk Name" for level 1, "Perk Name 2" for level 2, etc.
+        query = self.db.query(Item)\
+            .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
+            .filter(Item.is_perk == True)\
+\
+            .filter(or_(
+                Item.name == perk_name,  # Level 1 (no suffix)
+                Item.name.like(f"{perk_name} %")  # Levels 2-10 (with numeric suffix)
+            ))\
+            .options(
+                joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
+            )\
+            .order_by(Item.name)
+
+        perk_items = query.all()
+
+        if not perk_items:
+            logger.info(f"No perk series found for '{perk_name}'")
+            return None
+
+        # Convert to PerkDetail objects
+        perk_levels = []
+        total_cost = 0
+        perk_type = None
+        professions = []
+        breeds = []
+
+        for item in perk_items:
+            counter = self._extract_perk_counter(item)
+            if perk_type is None:
+                perk_type = self._extract_perk_type(item)
+                professions = self._extract_professions(item)
+                breeds = self._extract_breeds(item)
+
+            # Calculate point cost for this level
+            cost = 1 if perk_type in ['SL', 'AI'] else 0  # LE research is free
+            cumulative_cost = counter * cost if perk_type in ['SL', 'AI'] else 0
+            if counter > total_cost:
+                total_cost = cumulative_cost
+
+            point_cost = PerkPointCost(
+                level=counter,
+                cost=cost,
+                cumulative_cost=cumulative_cost
+            )
+
+            # Get spell data and effects
+            spell_data_responses = await self._get_spell_data_responses(item)
+            effects = await self._extract_perk_effects(item)
+            requirements = self._extract_perk_requirements(item)
+
+            perk_detail = PerkDetail(
+                id=item.id,
+                aoid=item.aoid,
+                name=item.name,
+                counter=counter,
+                type=perk_type,
+                professions=professions,
+                breeds=breeds,
+                level=self._extract_level_requirement(item),
+                ai_title=self._extract_ai_title_requirement(item),
+                description=item.description,
+                ql=item.ql,
+                requirements=requirements,
+                effects=effects,
+                spell_data=spell_data_responses,
+                point_cost=point_cost
+            )
+            perk_levels.append(perk_detail)
+
+        # Sort by counter level
+        perk_levels.sort(key=lambda p: p.counter)
+
+        perk_series = PerkSeries(
+            name=perk_name,
+            type=perk_type or 'SL',
+            professions=professions,
+            breeds=breeds,
+            levels=perk_levels,
+            max_level=len(perk_levels),
+            total_point_cost=total_cost
+        )
+
+        logger.info(f"Found perk series '{perk_name}' with {len(perk_levels)} levels")
+        return perk_series
+
+    async def calculate_perk_effects(self, owned_perks: Dict[str, int]) -> Dict[str, int]:
+        """
+        Calculate aggregate spell_data effects from owned perks.
+
+        Args:
+            owned_perks: Dictionary mapping perk names to owned levels
+
+        Returns:
+            Dictionary mapping stat names to aggregated values
+        """
+        logger.info(f"Calculating effects for {len(owned_perks)} owned perks")
+
+        total_effects = {}
+
+        for perk_name, owned_level in owned_perks.items():
+            # Get all levels from 1 to owned_level
+            for level in range(1, owned_level + 1):
+                # Find the perk item for this level
+                level_name = perk_name if level == 1 else f"{perk_name} {level}"
+
+                perk_item = self.db.query(Item)\
+                    .filter(Item.name == level_name)\
+                    .filter(Item.is_perk == True)\
+        \
+                    .first()
+
+                if not perk_item:
+                    logger.warning(f"Perk level not found: {level_name}")
+                    continue
+
+                # Extract effects from spell data
+                effects = await self._extract_perk_effects(perk_item)
+
+                # Aggregate effects
+                for effect in effects:
+                    stat_name = effect.stat_id
+                    if stat_name not in total_effects:
+                        total_effects[stat_name] = 0
+
+                    # Apply effect based on modifier type
+                    if effect.modifier == 'add':
+                        total_effects[stat_name] += effect.value
+                    elif effect.modifier == 'multiply':
+                        # For multiplicative effects, we'd need a more complex system
+                        # For now, treat as additive
+                        total_effects[stat_name] += effect.value
+                    elif effect.modifier == 'set':
+                        # Set effects override previous values
+                        total_effects[stat_name] = effect.value
+
+        logger.info(f"Calculated effects for {len(total_effects)} stats")
+        return total_effects
+
+    async def get_perk_info_by_aoid(self, aoid: int) -> Optional[Dict[str, Any]]:
+        """
+        Get basic perk info by its AOID (Anarchy Online ID).
+
+        Args:
+            aoid: The AOID of the perk item
+
+        Returns:
+            Dictionary with basic perk information or None if not found
+        """
+        logger.info(f"Looking up perk info by AOID: {aoid}")
+
+        # Query the perk item by AOID
+        perk_item = self.db.query(Item)\
+            .filter(Item.aoid == aoid)\
+            .filter(Item.is_perk == True)\
+            .first()
+
+        if not perk_item:
+            logger.info(f"No perk found with AOID {aoid}")
+            return None
+
+        # Extract basic perk information
+        perk_type = self._extract_perk_type(perk_item)
+        perk_counter = self._extract_perk_counter(perk_item)
+
+        perk_info = {
+            "id": perk_item.id,
+            "aoid": perk_item.aoid,
+            "name": perk_item.name,
+            "counter": perk_counter,
+            "type": perk_type,
+            "description": perk_item.description,
+            "ql": perk_item.ql
+        }
+
+        logger.info(f"Found perk: {perk_item.name} (type: {perk_type}, level: {perk_counter})")
+        return perk_info
+
+    async def get_perk_by_aoid(self, aoid: int) -> Optional[PerkDetail]:
+        """
+        Get a perk by its AOID (Anarchy Online ID).
+
+        Args:
+            aoid: The AOID of the perk item
+
+        Returns:
+            PerkDetail with full perk information or None if not found
+        """
+        logger.info(f"Looking up perk by AOID: {aoid}")
+
+        # Query the perk item by AOID
+        # Perks are items with is_perk=True and spell_data
+        perk_item = self.db.query(Item)\
+            .filter(Item.aoid == aoid)\
+            .filter(Item.is_perk == True)\
+            .options(
+                joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
+            )\
+            .first()
+
+        if not perk_item:
+            logger.info(f"No perk found with AOID {aoid}")
+            return None
+
+        # Extract perk information
+        perk_type = self._extract_perk_type(perk_item)
+        perk_counter = self._extract_perk_counter(perk_item)
+        professions = self._extract_professions(perk_item)
+        breeds = self._extract_breeds(perk_item)
+
+        # Calculate point cost
+        cost = 1 if perk_type in ['SL', 'AI'] else 0
+        cumulative_cost = perk_counter * cost if perk_type in ['SL', 'AI'] else 0
+
+        point_cost = PerkPointCost(
+            level=perk_counter,
+            cost=cost,
+            cumulative_cost=cumulative_cost
+        )
+
+        # Get spell data and effects
+        spell_data_responses = await self._get_spell_data_responses(perk_item)
+        effects = await self._extract_perk_effects(perk_item)
+        requirements = self._extract_perk_requirements(perk_item)
+
+        perk_detail = PerkDetail(
+            id=perk_item.id,
+            aoid=perk_item.aoid,
+            name=perk_item.name,
+            counter=perk_counter,
+            type=perk_type,
+            professions=professions,
+            breeds=breeds,
+            level=self._extract_level_requirement(perk_item),
+            ai_title=self._extract_ai_title_requirement(perk_item),
+            description=perk_item.description,
+            ql=perk_item.ql,
+            requirements=requirements,
+            effects=effects,
+            spell_data=spell_data_responses,
+            point_cost=point_cost
+        )
+
+        logger.info(f"Found perk: {perk_item.name} (type: {perk_type}, level: {perk_counter})")
+        return perk_detail
+
+    async def validate_perk_requirements(
+        self,
+        perk_name: str,
+        target_level: int,
+        character_level: int,
+        character_profession: str,
+        character_breed: str,
+        ai_title_level: Optional[int] = None,
+        owned_perks: Optional[Dict[str, int]] = None
+    ) -> PerkValidationResponse:
+        """
+        Validate if a character can purchase a specific perk level.
+
+        Args:
+            perk_name: Name of the perk to validate
+            target_level: Target perk level to purchase
+            character_level: Character's level
+            character_profession: Character's profession
+            character_breed: Character's breed
+            ai_title_level: Character's AI title level
+            owned_perks: Currently owned perks {name: level}
+
+        Returns:
+            PerkValidationResponse with validation results
+        """
+        logger.info(f"Validating perk '{perk_name}' level {target_level}")
+
+        errors = []
+        warnings = []
+        owned_perks = owned_perks or {}
+
+        # Find the target perk item
+        target_name = perk_name if target_level == 1 else f"{perk_name} {target_level}"
+        perk_item = self.db.query(Item)\
+            .filter(Item.name == target_name)\
+            .filter(Item.is_perk == True)\
+\
+            .first()
+
+        if not perk_item:
+            errors.append(f"Perk '{perk_name}' level {target_level} not found")
+            return PerkValidationResponse(
+                valid=False,
+                errors=errors,
+                warnings=warnings
+            )
+
+        # Extract requirements
+        required_level = self._extract_level_requirement(perk_item)
+        required_ai_title = self._extract_ai_title_requirement(perk_item)
+        required_professions = self._extract_professions(perk_item)
+        required_breeds = self._extract_breeds(perk_item)
+
+        # Validate character level
+        if character_level < required_level:
+            errors.append(f"Requires character level {required_level} (current: {character_level})")
+
+        # Validate AI title level for AI perks
+        if required_ai_title and (not ai_title_level or ai_title_level < required_ai_title):
+            current_ai = ai_title_level or 0
+            errors.append(f"Requires AI title level {required_ai_title} (current: {current_ai})")
+
+        # Validate profession restriction
+        if required_professions and character_profession not in required_professions:
+            errors.append(f"Not available for {character_profession} (requires: {', '.join(required_professions)})")
+
+        # Validate breed restriction
+        if required_breeds and character_breed not in required_breeds:
+            errors.append(f"Not available for {character_breed} (requires: {', '.join(required_breeds)})")
+
+        # Validate sequential purchase requirement
+        current_level = owned_perks.get(perk_name, 0)
+        if target_level > current_level + 1:
+            errors.append(f"Must purchase level {current_level + 1} first (sequential purchase required)")
+
+        # Get prerequisites
+        prerequisite_perks = []
+        if current_level < target_level - 1:
+            for level in range(current_level + 1, target_level):
+                prerequisite_perks.append(f"{perk_name} level {level}")
+
+        return PerkValidationResponse(
+            valid=len(errors) == 0,
+            errors=errors,
+            warnings=warnings,
+            required_level=required_level,
+            required_ai_title=required_ai_title,
+            required_professions=required_professions,
+            required_breeds=required_breeds,
+            prerequisite_perks=prerequisite_perks
+        )
+
+    # Helper methods
+
+    def _extract_perk_type(self, item: Item) -> str:
+        """Extract perk type (SL/AI/LE) from item data."""
+        # This would need to be implemented based on how perk types are stored
+        # For now, return default
+        return 'SL'
+
+    def _extract_perk_counter(self, item: Item) -> int:
+        """Extract perk level counter from item name or data."""
+        # Extract counter from item name pattern
+        # Example: "Perk Name" = level 1, "Perk Name 5" = level 5
+        name_parts = item.name.split()
+        if name_parts[-1].isdigit():
+            return int(name_parts[-1])
+        return 1
+
+    def _extract_professions(self, item: Item) -> List[str]:
+        """Extract required professions from item criteria."""
+        # This would analyze spell criteria for profession requirements
+        return []
+
+    def _extract_breeds(self, item: Item) -> List[str]:
+        """Extract required breeds from item criteria."""
+        # This would analyze spell criteria for breed requirements
+        return []
+
+    def _extract_level_requirement(self, item: Item) -> int:
+        """Extract character level requirement from item."""
+        # This would analyze spell criteria for level requirements
+        return 1
+
+    def _extract_ai_title_requirement(self, item: Item) -> Optional[int]:
+        """Extract AI title level requirement from item."""
+        # This would analyze spell criteria for AI title requirements
+        return None
+
+    def _can_purchase_level(self, perk_name: str, target_level: int, owned_perks: Dict[str, int]) -> bool:
+        """Check if character can purchase the target perk level (sequential validation)."""
+        current_level = owned_perks.get(perk_name, 0)
+        return target_level <= current_level + 1
+
+    def _is_affordable(
+        self,
+        perk_type: str,
+        perk_level: int,
+        available_sl_points: Optional[int],
+        available_ai_points: Optional[int],
+        owned_perks: Optional[Dict[str, int]],
+        perk_name: str
+    ) -> bool:
+        """Check if character has enough points to purchase the perk."""
+        if perk_type == 'LE':
+            return True  # LE research is free
+
+        # Calculate cost (1 point per level)
+        current_level = owned_perks.get(perk_name, 0) if owned_perks else 0
+        cost = perk_level - current_level
+
+        if perk_type == 'SL' and available_sl_points is not None:
+            return available_sl_points >= cost
+        elif perk_type == 'AI' and available_ai_points is not None:
+            return available_ai_points >= cost
+
+        return True  # If no point limits specified, assume affordable
+
+    async def _get_spell_data_responses(self, item: Item) -> List[SpellDataResponse]:
+        """Convert item spell data to response format."""
+        # This would convert the item's spell_data to SpellDataResponse objects
+        # For now, return empty list
+        return []
+
+    async def _extract_perk_effects(self, item: Item) -> List[PerkEffect]:
+        """Extract stat effects from item spell data."""
+        effects = []
+
+        # Query spell data for this item
+        spell_data_query = self.db.query(SpellData)\
+            .join(ItemSpellData, SpellData.id == ItemSpellData.spell_data_id)\
+            .filter(ItemSpellData.item_id == item.id)
+
+        for spell_data in spell_data_query.all():
+            # Query spells in this spell data
+            spells_query = self.db.query(Spell)\
+                .join(SpellDataSpells, Spell.id == SpellDataSpells.spell_id)\
+                .filter(SpellDataSpells.spell_data_id == spell_data.id)
+
+            for spell in spells_query.all():
+                # Extract stat modifications from spell parameters
+                if spell.spell_params and isinstance(spell.spell_params, dict):
+                    stat_id = spell.spell_params.get('Stat')
+                    value = spell.spell_params.get('Value', 0)
+
+                    if stat_id:
+                        effect = PerkEffect(
+                            stat_id=str(stat_id),
+                            value=int(value) if isinstance(value, (int, float)) else 0,
+                            modifier='add',  # Default modifier
+                            conditions=[]
+                        )
+                        effects.append(effect)
+
+        return effects
+
+    def _extract_perk_requirements(self, item: Item) -> List[PerkRequirement]:
+        """Extract all requirements from item data."""
+        requirements = []
+
+        # Extract level requirement
+        level_req = self._extract_level_requirement(item)
+        if level_req > 1:
+            requirements.append(PerkRequirement(
+                type='level',
+                requirement='character_level',
+                value=level_req
+            ))
+
+        # Extract AI title requirement
+        ai_title_req = self._extract_ai_title_requirement(item)
+        if ai_title_req:
+            requirements.append(PerkRequirement(
+                type='ai_title',
+                requirement='ai_title_level',
+                value=ai_title_req
+            ))
+
+        # Extract profession requirements
+        for profession in self._extract_professions(item):
+            requirements.append(PerkRequirement(
+                type='profession',
+                requirement=profession
+            ))
+
+        # Extract breed requirements
+        for breed in self._extract_breeds(item):
+            requirements.append(PerkRequirement(
+                type='breed',
+                requirement=breed
+            ))
+
+        return requirements

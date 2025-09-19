@@ -73,10 +73,45 @@ class DataImporter:
         # Store singleton objects to avoid repeated DB queries
         self._stat_value_cache: Dict[Tuple[int, int], StatValue] = {}
         self._criterion_cache: Dict[Tuple[int, int, int], Criterion] = {}
+        self._perk_aoids: set = set()
+
+        # Load perk AOIDs during initialization
+        self.load_perk_aoids()
     
     def get_db_session(self) -> Session:
         """Get database session."""
         return self.SessionLocal()
+
+    def load_perk_aoids(self):
+        """Load perk AOIDs from perks.json file for O(1) lookup during import."""
+        try:
+            # Get the path to perks.json relative to the backend directory
+            backend_dir = Path(__file__).parent.parent.parent
+            perks_file = backend_dir / "database" / "perks.json"
+
+            logger.info(f"Loading perk AOIDs from {perks_file}")
+
+            with open(perks_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            # Extract AOIDs from columnar format
+            # The first column is "aoid" and values is a list of rows
+            aoid_column_index = data["columns"].index("aoid")
+
+            for row in data["values"]:
+                aoid = row[aoid_column_index]
+                self._perk_aoids.add(aoid)
+
+            logger.info(f"Loaded {len(self._perk_aoids)} perk AOIDs")
+
+        except FileNotFoundError:
+            error_msg = f"Critical error: perks.json file not found at {perks_file}. This file is required for perk identification."
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        except (KeyError, IndexError, json.JSONDecodeError) as e:
+            error_msg = f"Critical error: Invalid perks.json format: {e}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
     
     def clear_existing_data(self, db: Session, clear_items: bool = False):
         """Clear existing data for fresh import."""
@@ -250,6 +285,12 @@ class DataImporter:
             item.name = item_data.get('Name', '')
             item.description = item_data.get('Description', '')
             item.is_nano = is_nano
+
+            # Set is_perk based on AOID presence in perk list (only for non-nano items)
+            if not is_nano:
+                item.is_perk = aoid in self._perk_aoids
+            else:
+                item.is_perk = False
             
             # Process StatValues to extract item_class and ql
             for sv_data in item_data.get('StatValues', []):
@@ -557,3 +598,4 @@ class DataImporter:
         
         logger.info(f"Symbiant import completed. Imported {count} symbiants.")
         return count
+
