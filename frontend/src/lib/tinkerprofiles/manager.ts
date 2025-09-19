@@ -25,6 +25,14 @@ import { ProfileValidator } from './validator';
 import { ProfileTransformer } from './transformer';
 import { createDefaultProfile, createDefaultNanoProfile } from './constants';
 import { ipIntegrator } from './ip-integrator';
+import { perkManager } from './perk-manager';
+import type {
+  PerkInfo,
+  PerkValidationResult,
+  PerkChangeEvent,
+  PerkEffectSummary,
+  PerkPointCalculation
+} from './perk-types';
 
 // Simple event emitter for profile events
 class ProfileEventEmitter {
@@ -94,6 +102,7 @@ export class TinkerProfilesManager {
         ...config.events
       },
       features: {
+        autoBackup: false,
         compression: false,
         migration: true,
         analytics: false,
@@ -690,8 +699,8 @@ export class TinkerProfilesManager {
       throw new Error('Profile not found');
     }
 
-    const result = ipIntegrator.modifySkill(profile, category, skillName, newValue);
-    
+    const result = await ipIntegrator.modifySkill(profile, category, skillName, newValue);
+
     if (result.success && result.updatedProfile) {
       await this.updateProfile(profileId, result.updatedProfile);
     }
@@ -718,8 +727,8 @@ export class TinkerProfilesManager {
       throw new Error('Profile not found');
     }
 
-    const result = ipIntegrator.modifyAbility(profile, abilityName, newValue);
-    
+    const result = await ipIntegrator.modifyAbility(profile, abilityName, newValue);
+
     if (result.success && result.updatedProfile) {
       await this.updateProfile(profileId, result.updatedProfile);
     }
@@ -747,8 +756,174 @@ export class TinkerProfilesManager {
   async getIPEfficiency(profileId: string): Promise<number> {
     const profile = await this.loadProfile(profileId);
     if (!profile) return 0;
-    
+
     const ipInfo = profile.IPTracker || ipIntegrator.calculateProfileIP(profile);
     return ipInfo.efficiency;
+  }
+
+  // ============================================================================
+  // Perk Management Methods
+  // ============================================================================
+
+  /**
+   * Add or upgrade a perk for a profile
+   */
+  async addPerk(
+    profileId: string,
+    perkInfo: PerkInfo,
+    targetLevel: number = 1
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    changeEvent?: PerkChangeEvent;
+  }> {
+    const profile = await this.loadProfile(profileId);
+    if (!profile) {
+      throw new Error('Profile not found');
+    }
+
+    const result = perkManager.addPerk(profile, perkInfo, targetLevel);
+
+    if (result.success && result.updatedProfile) {
+      await this.updateProfile(profileId, result.updatedProfile);
+
+      // Emit perk change event
+      if (this.config.events.enabled && result.changeEvent) {
+        this.events.emit('profile:updated', {
+          profile: result.updatedProfile,
+          changes: { PerksAndResearch: result.updatedProfile.PerksAndResearch }
+        });
+      }
+    }
+
+    return {
+      success: result.success,
+      error: result.error,
+      changeEvent: result.changeEvent
+    };
+  }
+
+  /**
+   * Remove or downgrade a perk from a profile
+   */
+  async removePerk(
+    profileId: string,
+    perkName: string,
+    targetLevel: number = 0
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    changeEvent?: PerkChangeEvent;
+  }> {
+    const profile = await this.loadProfile(profileId);
+    if (!profile) {
+      throw new Error('Profile not found');
+    }
+
+    const result = perkManager.removePerk(profile, perkName, targetLevel);
+
+    if (result.success && result.updatedProfile) {
+      await this.updateProfile(profileId, result.updatedProfile);
+
+      // Emit perk change event
+      if (this.config.events.enabled && result.changeEvent) {
+        this.events.emit('profile:updated', {
+          profile: result.updatedProfile,
+          changes: { PerksAndResearch: result.updatedProfile.PerksAndResearch }
+        });
+      }
+    }
+
+    return {
+      success: result.success,
+      error: result.error,
+      changeEvent: result.changeEvent
+    };
+  }
+
+  /**
+   * Validate if a perk can be purchased/upgraded
+   */
+  async validatePerkPurchase(
+    profileId: string,
+    perkInfo: PerkInfo,
+    targetLevel: number
+  ): Promise<PerkValidationResult> {
+    const profile = await this.loadProfile(profileId);
+    if (!profile) {
+      return {
+        valid: false,
+        errors: ['Profile not found'],
+        warnings: []
+      };
+    }
+
+    // Import the validation function to avoid circular dependency
+    const { validatePerkRequirements } = await import('./perk-manager');
+    return validatePerkRequirements(profile, perkInfo, targetLevel);
+  }
+
+  /**
+   * Get available perk points for a profile
+   */
+  async getPerkPointsInfo(profileId: string): Promise<PerkPointCalculation | null> {
+    const profile = await this.loadProfile(profileId);
+    if (!profile) return null;
+
+    return perkManager.calculateAvailablePoints(profile);
+  }
+
+  /**
+   * Get aggregated perk effects for a profile
+   */
+  async getPerkEffects(profileId: string): Promise<PerkEffectSummary> {
+    const profile = await this.loadProfile(profileId);
+    if (!profile) return {};
+
+    return perkManager.getPerkEffects(profile);
+  }
+
+  /**
+   * Recalculate perk points when character level or AI level changes
+   */
+  async recalculatePerkPoints(profileId: string): Promise<void> {
+    const profile = await this.loadProfile(profileId);
+    if (!profile) {
+      throw new Error('Profile not found');
+    }
+
+    const updatedProfile = perkManager.recalculatePerkPoints(profile);
+    await this.updateProfile(profileId, updatedProfile);
+  }
+
+  /**
+   * Initialize perk system for a profile that doesn't have one
+   */
+  async initializePerkSystem(profileId: string): Promise<void> {
+    const profile = await this.loadProfile(profileId);
+    if (!profile) {
+      throw new Error('Profile not found');
+    }
+
+    if (!profile.PerksAndResearch) {
+      // Force initialization by adding a dummy perk and removing it
+      const dummyPerk: PerkInfo = {
+        aoid: 0,
+        name: 'dummy',
+        level: 1,
+        type: 'SL',
+        cost: 1,
+        requirements: {},
+        effects: []
+      };
+
+      const result = perkManager.addPerk(profile, dummyPerk, 1);
+      if (result.success && result.updatedProfile) {
+        const removeResult = perkManager.removePerk(result.updatedProfile, 'dummy', 0);
+        if (removeResult.success && removeResult.updatedProfile) {
+          await this.updateProfile(profileId, removeResult.updatedProfile);
+        }
+      }
+    }
   }
 }

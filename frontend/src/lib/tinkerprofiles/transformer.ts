@@ -7,16 +7,17 @@
  * - Legacy format migrations
  */
 
-import type { 
-  TinkerProfile, 
+import type {
+  TinkerProfile,
   NanoCompatibleProfile,
   ProfileExportFormat,
   ProfileImportResult,
-  Item,
   ImplantWithClusters,
   ImplantCluster
 } from './types';
+import type { Item } from '@/types/api';
 import { createDefaultProfile, createDefaultNanoProfile } from './constants';
+import type { PerkSystem } from './perk-types';
 import { SKILL_CATEGORIES, getSkillId } from './skill-mappings';
 import { 
   getClusterMapping, 
@@ -165,14 +166,14 @@ export class ProfileTransformer {
   exportProfile(profile: TinkerProfile, format: ProfileExportFormat = 'json'): string {
     switch (format) {
       case 'json':
-        return JSON.stringify(profile, null, 2);
-        
+        return this.exportJSONFormat(profile);
+
       case 'legacy':
         return this.exportLegacyFormat(profile);
-        
+
       case 'anarchy_online':
         return this.exportAOFormat(profile);
-        
+
       default:
         throw new Error(`Unsupported export format: ${format}`);
     }
@@ -235,9 +236,27 @@ export class ProfileTransformer {
   // ============================================================================
   // Format-Specific Import/Export
   // ============================================================================
+
+  private exportJSONFormat(profile: TinkerProfile): string {
+    // Enhanced JSON export with proper perk serialization
+    const exportData = {
+      ...profile,
+      // Ensure perks are properly structured
+      PerksAndResearch: this.serializePerkSystem(profile.PerksAndResearch),
+      // Add export metadata
+      exportMetadata: {
+        exportedAt: new Date().toISOString(),
+        exportFormat: 'tinkerprofiles-json',
+        version: profile.version,
+        includesPerks: true
+      }
+    };
+
+    return JSON.stringify(exportData, null, 2);
+  }
   
   private exportLegacyFormat(profile: TinkerProfile): string {
-    // Export in the legacy TinkerProfiles format
+    // Export in the legacy TinkerProfiles format with converted perks
     const legacy = {
       character: {
         name: profile.Character.Name,
@@ -252,12 +271,15 @@ export class ProfileTransformer {
         clothing: profile.Clothing,
         implants: profile.Implants
       },
+      // Convert structured perks back to legacy array format for compatibility
+      perksAndResearch: this.convertToLegacyPerks(profile.PerksAndResearch),
       metadata: {
         created: profile.created,
-        version: profile.version
+        version: profile.version,
+        perkFormat: 'legacy-array'
       }
     };
-    
+
     return JSON.stringify(legacy, null, 2);
   }
   
@@ -274,15 +296,17 @@ export class ProfileTransformer {
         ...profile.Weapons,
         ...profile.Clothing,
         ...profile.Implants
-      }
+      },
+      // Add perk data in a simple format for AO compatibility
+      Perks: this.convertToAOPerks(profile.PerksAndResearch)
     };
-    
+
     return JSON.stringify(aoFormat, null, 2);
   }
   
   private importFromJSON(data: string, result: ProfileImportResult): TinkerProfile {
     const parsed = JSON.parse(data);
-    
+
     // Check if it's already a valid TinkerProfile
     if (this.isValidTinkerProfile(parsed)) {
       // Generate new ID and timestamps for imported profile
@@ -290,9 +314,14 @@ export class ProfileTransformer {
       importedProfile.id = `profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       importedProfile.created = new Date().toISOString();
       importedProfile.updated = new Date().toISOString();
-      return importedProfile;
+
+      // Import and normalize perk data
+      importedProfile.PerksAndResearch = this.importPerksFromData(parsed, result);
+
+      // Ensure perk system is properly migrated with point calculation
+      return this.migrateProfilePerks(importedProfile);
     }
-    
+
     // Try to convert from other JSON formats
     return this.convertToTinkerProfile(parsed, result);
   }
@@ -300,9 +329,9 @@ export class ProfileTransformer {
   private importFromLegacy(data: string, result: ProfileImportResult): TinkerProfile {
     const legacy = JSON.parse(data);
     result.metadata.migrated = true;
-    
+
     const profile = createDefaultProfile();
-    
+
     if (legacy.character) {
       profile.Character.Name = legacy.character.name || 'Imported Character';
       profile.Character.Level = legacy.character.level || 1;
@@ -310,42 +339,50 @@ export class ProfileTransformer {
       profile.Character.Breed = legacy.character.breed || 'Solitus';
       profile.Character.Faction = legacy.character.faction || 'Neutral';
     }
-    
+
     if (legacy.skills) {
       profile.Skills = { ...profile.Skills, ...legacy.skills };
     }
-    
+
     if (legacy.equipment) {
       if (legacy.equipment.weapons) profile.Weapons = legacy.equipment.weapons;
       if (legacy.equipment.clothing) profile.Clothing = legacy.equipment.clothing;
       if (legacy.equipment.implants) profile.Implants = legacy.equipment.implants;
     }
-    
+
+    // Import perk data from legacy format
+    profile.PerksAndResearch = this.importPerksFromData(legacy, result);
+
     result.warnings.push('Profile migrated from legacy format');
-    
-    return profile;
+
+    // Ensure perk system is migrated with point calculation
+    return this.migrateProfilePerks(profile);
   }
   
   private importFromAO(data: string, result: ProfileImportResult): TinkerProfile {
     const ao = JSON.parse(data);
     result.metadata.migrated = true;
-    
+
     const profile = createDefaultProfile();
-    
+
     profile.Character.Name = ao.CharacterName || 'AO Import';
     profile.Character.Level = ao.Level || 1;
     profile.Character.Profession = ao.Profession || 'Adventurer';
     profile.Character.Breed = ao.Breed || 'Solitus';
     profile.Character.Faction = ao.Faction || 'Neutral';
-    
+
     if (ao.Skills) {
       // Unflatten skills back to categorized structure
       this.unflattenSkills(ao.Skills, profile.Skills);
     }
-    
+
+    // Import perk data from AO format
+    profile.PerksAndResearch = this.importPerksFromData(ao, result);
+
     result.warnings.push('Profile imported from Anarchy Online format');
-    
-    return profile;
+
+    // Ensure perk system is migrated with point calculation
+    return this.migrateProfilePerks(profile);
   }
   
   private async importFromAOSetups(data: string, result: ProfileImportResult): Promise<TinkerProfile> {
@@ -385,19 +422,69 @@ export class ProfileTransformer {
     // Map equipment (implants, weapons, clothing)
     await this.mapAOSetupsEquipment(aosetups, profile, result);
     
-    // Map perks to PerksAndResearch
+    // Map perks to PerksAndResearch (fetch details from backend)
     if (aosetups.perks && Array.isArray(aosetups.perks)) {
-      profile.PerksAndResearch = aosetups.perks.map((perk: any) => ({
-        id: perk.aoid?.toString() || perk._id,
-        name: `Perk ${perk.aoid}`, // Would need item lookup for actual name
-        type: 'perk'
-      }));
+      const legacyPerks = [];
+
+      for (const perk of aosetups.perks) {
+        if (!perk.aoid) continue;
+
+        try {
+          // Try to fetch perk details from backend
+          const perkDetails = await apiClient.lookupPerkByAoid(perk.aoid);
+
+          if (perkDetails) {
+            // Extract base perk name (without level suffix)
+            let baseName = perkDetails.name;
+            if (baseName && perkDetails.counter > 1) {
+              // Remove the level suffix if present (e.g., "Perk Name 5" -> "Perk Name")
+              const nameParts = baseName.split(' ');
+              if (nameParts.length > 1 && nameParts[nameParts.length - 1] === perkDetails.counter.toString()) {
+                baseName = nameParts.slice(0, -1).join(' ');
+              }
+            }
+
+            legacyPerks.push({
+              aoid: perk.aoid,
+              name: baseName,
+              level: perkDetails.counter || 1,
+              type: perkDetails.type || 'SL'
+            });
+
+            console.log(`[ProfileTransformer] Fetched perk: ${baseName} (level ${perkDetails.counter}, type: ${perkDetails.type})`);
+          } else {
+            // Fallback if perk not found in database
+            legacyPerks.push({
+              aoid: perk.aoid,
+              name: `Unknown Perk (${perk.aoid})`,
+              level: 1,
+              type: 'SL'
+            });
+            result.warnings.push(`Could not find perk with AOID ${perk.aoid} in database`);
+          }
+        } catch (error) {
+          // Fallback on API error
+          console.warn(`[ProfileTransformer] Failed to fetch perk AOID ${perk.aoid}:`, error);
+          legacyPerks.push({
+            aoid: perk.aoid,
+            name: `Unknown Perk (${perk.aoid})`,
+            level: 1,
+            type: 'SL'
+          });
+          result.warnings.push(`Failed to fetch perk details for AOID ${perk.aoid}`);
+        }
+      }
+
+      // Set as legacy array format, will be migrated by migrateProfilePerks
+      (profile as any).PerksAndResearch = legacyPerks;
+      result.warnings.push(`Imported ${legacyPerks.length} perks from AOSetups format`);
     }
     
     result.warnings.push('Profile imported from AOSetups format');
     result.warnings.push('Equipment items fetched from database with interpolated stats at target QLs');
-    
-    return profile;
+
+    // Ensure perk system is migrated
+    return this.migrateProfilePerks(profile);
   }
   
   private mapAOSetupsSkill(skill: any, profile: TinkerProfile, result: ProfileImportResult): void {
@@ -552,8 +639,8 @@ export class ProfileTransformer {
               aoid: placement.aoid,
               name: `Item ${placement.aoid} (fetch failed)`,
               ql: placement.targetQl || 1,
-              description: null,
-              item_class: null,
+              description: undefined,
+              item_class: undefined,
               is_nano: false,
               stats: [],
               spell_data: [],
@@ -596,8 +683,8 @@ export class ProfileTransformer {
               aoid: placement.aoid,
               name: `Item ${placement.aoid} (fetch failed)`,
               ql: placement.targetQl || 1,
-              description: null,
-              item_class: null,
+              description: undefined,
+              item_class: undefined,
               is_nano: false,
               stats: [],
               spell_data: [],
@@ -746,7 +833,7 @@ export class ProfileTransformer {
       aoid: placement.aoid || 0,
       name: placement.implantType === 'implant' ? `Implant QL${placement.targetQl || 100}` : `Symbiant ${placement.aoid}`,
       ql: placement.targetQl || 1,
-      description: null,
+      description: undefined,
       item_class: 3,
       is_nano: false,
       stats: [],
@@ -840,7 +927,7 @@ export class ProfileTransformer {
                 attack_stats: [],
                 defense_stats: [],
                 sources: []
-              } as Item
+              } as unknown as Item
             };
           } else {
             throw new Error(`Interpolation failed: ${interpolationResponse.error || 'Unknown error'}`);
@@ -919,7 +1006,7 @@ export class ProfileTransformer {
   
   private convertToTinkerProfile(data: any, result: ProfileImportResult): TinkerProfile {
     const profile = createDefaultProfile();
-    
+
     // Check if this looks like an incomplete TinkerProfile
     if (data.Character && data.Skills) {
       // Copy all Character data
@@ -930,30 +1017,366 @@ export class ProfileTransformer {
       if (data.Character.Faction) profile.Character.Faction = data.Character.Faction;
       if (data.Character.Expansion) profile.Character.Expansion = data.Character.Expansion;
       if (data.Character.AccountType) profile.Character.AccountType = data.Character.AccountType;
-      
+
       // Copy Skills if present
       if (data.Skills) {
         profile.Skills = { ...profile.Skills, ...data.Skills };
       }
-      
+
       // Copy Equipment if present
       if (data.Weapons) profile.Weapons = data.Weapons;
       if (data.Clothing) profile.Clothing = data.Clothing;
       if (data.Implants) profile.Implants = data.Implants;
-      
+
       result.warnings.push('Profile imported with missing required fields - filled with defaults');
     } else {
       // Try to map common fields from other formats
       if (data.name) profile.Character.Name = data.name;
       if (data.level) profile.Character.Level = data.level;
       if (data.profession) profile.Character.Profession = data.profession;
-      
+
       result.warnings.push('Profile converted from unrecognized format - some data may be lost');
     }
-    
-    return profile;
+
+    // Import perk data from any available format
+    profile.PerksAndResearch = this.importPerksFromData(data, result);
+
+    // Ensure perk system is migrated with point calculation
+    return this.migrateProfilePerks(profile);
   }
   
+  // ============================================================================
+  // Profile Migration
+  // ============================================================================
+
+  /**
+   * Migrate profile to include structured PerkSystem
+   * Handles migration from legacy PerksAndResearch formats
+   */
+  migrateProfilePerks(profile: TinkerProfile): TinkerProfile {
+    // Check if already using structured PerkSystem
+    if (profile.PerksAndResearch &&
+        typeof profile.PerksAndResearch === 'object' &&
+        'perks' in profile.PerksAndResearch &&
+        'standardPerkPoints' in profile.PerksAndResearch &&
+        'aiPerkPoints' in profile.PerksAndResearch) {
+      return profile; // Already migrated
+    }
+
+    console.log(`[ProfileTransformer] Migrating profile ${profile.Character.Name} to structured PerkSystem`);
+
+    // Calculate available perk points based on current levels
+    const characterLevel = profile.Character.Level || 1;
+    const alienLevel = profile.Character.AlienLevel || 0;
+
+    const standardPerkPoints = this.calculateStandardPerkPoints(characterLevel);
+    const aiPerkPoints = this.calculateAIPerkPoints(alienLevel);
+
+    // Create new structured perk system
+    const newPerkSystem: PerkSystem = {
+      perks: [],
+      standardPerkPoints: {
+        total: standardPerkPoints,
+        spent: 0,
+        available: standardPerkPoints
+      },
+      aiPerkPoints: {
+        total: aiPerkPoints,
+        spent: 0,
+        available: aiPerkPoints
+      },
+      research: [],
+      lastCalculated: new Date().toISOString()
+    };
+
+    // Preserve any existing PerksAndResearch data if possible
+    const legacyPerksAndResearch = profile.PerksAndResearch as any;
+    if (legacyPerksAndResearch && Array.isArray(legacyPerksAndResearch)) {
+      // Legacy array format - try to convert if possible
+      console.log(`[ProfileTransformer] Found legacy perk array with ${legacyPerksAndResearch.length} entries`);
+
+      for (const perkEntry of legacyPerksAndResearch) {
+        if (perkEntry && typeof perkEntry === 'object') {
+          try {
+            // Try to map legacy perk entries to new format
+            if ('aoid' in perkEntry && 'name' in perkEntry && 'level' in perkEntry) {
+              const legacyPerk = perkEntry as any;
+
+              // Determine perk type (default to SL if not specified)
+              const perkType = legacyPerk.type || 'SL';
+
+              if (perkType === 'LE') {
+                // LE research perk (free)
+                newPerkSystem.research.push({
+                  aoid: legacyPerk.aoid,
+                  name: legacyPerk.name,
+                  level: legacyPerk.level,
+                  type: 'LE'
+                });
+              } else {
+                // SL or AI perk (costs points)
+                const cost = legacyPerk.level; // 1 point per level
+                newPerkSystem.perks.push({
+                  aoid: legacyPerk.aoid,
+                  name: legacyPerk.name,
+                  level: legacyPerk.level,
+                  type: perkType as 'SL' | 'AI'
+                });
+
+                // Update spent points
+                if (perkType === 'AI') {
+                  newPerkSystem.aiPerkPoints.spent += cost;
+                  newPerkSystem.aiPerkPoints.available -= cost;
+                } else {
+                  newPerkSystem.standardPerkPoints.spent += cost;
+                  newPerkSystem.standardPerkPoints.available -= cost;
+                }
+              }
+            }
+          } catch (error) {
+            console.warn(`[ProfileTransformer] Failed to migrate perk entry:`, perkEntry, error);
+          }
+        }
+      }
+
+      console.log(`[ProfileTransformer] Migrated ${newPerkSystem.perks.length} perks and ${newPerkSystem.research.length} research entries`);
+    }
+
+    // Ensure point totals don't go negative
+    newPerkSystem.standardPerkPoints.available = Math.max(0, newPerkSystem.standardPerkPoints.available);
+    newPerkSystem.aiPerkPoints.available = Math.max(0, newPerkSystem.aiPerkPoints.available);
+
+    // Update the profile
+    const migratedProfile = structuredClone(profile);
+    migratedProfile.PerksAndResearch = newPerkSystem;
+    migratedProfile.updated = new Date().toISOString();
+
+    return migratedProfile;
+  }
+
+  /**
+   * Calculate standard perk points based on character level
+   */
+  private calculateStandardPerkPoints(level: number): number {
+    if (level < 10) return 0;
+
+    // 1 point every 10 levels up to level 200 (20 points)
+    const pointsUpTo200 = Math.min(Math.floor(level / 10), 20);
+
+    // 1 point per level from 201-220 (20 points)
+    const pointsAfter200 = level > 200 ? Math.min(level - 200, 20) : 0;
+
+    // Total: maximum 40 points at level 220
+    return pointsUpTo200 + pointsAfter200;
+  }
+
+  /**
+   * Calculate AI perk points based on alien level
+   */
+  private calculateAIPerkPoints(alienLevel: number): number {
+    // 1 AI perk point per alien level, max 30
+    return Math.min(alienLevel, 30);
+  }
+
+  // ============================================================================
+  // Perk Serialization Utilities
+  // ============================================================================
+
+  /**
+   * Serialize PerkSystem for export, ensuring proper structure
+   */
+  private serializePerkSystem(perkSystem: any): PerkSystem | any {
+    // If already a structured PerkSystem, return as-is
+    if (perkSystem &&
+        typeof perkSystem === 'object' &&
+        'perks' in perkSystem &&
+        'standardPerkPoints' in perkSystem &&
+        'aiPerkPoints' in perkSystem) {
+      return perkSystem;
+    }
+
+    // If legacy format or undefined, create empty structured system
+    return {
+      perks: [],
+      standardPerkPoints: {
+        total: 0,
+        spent: 0,
+        available: 0
+      },
+      aiPerkPoints: {
+        total: 0,
+        spent: 0,
+        available: 0
+      },
+      research: [],
+      lastCalculated: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Convert structured PerkSystem to legacy array format
+   */
+  private convertToLegacyPerks(perkSystem: any): any[] {
+    const legacyPerks: any[] = [];
+
+    if (!perkSystem || typeof perkSystem !== 'object') {
+      return legacyPerks;
+    }
+
+    // Add SL and AI perks
+    if (Array.isArray(perkSystem.perks)) {
+      for (const perk of perkSystem.perks) {
+        legacyPerks.push({
+          aoid: perk.aoid,
+          name: perk.name,
+          level: perk.level,
+          type: perk.type
+        });
+      }
+    }
+
+    // Add LE research
+    if (Array.isArray(perkSystem.research)) {
+      for (const research of perkSystem.research) {
+        legacyPerks.push({
+          aoid: research.aoid,
+          name: research.name,
+          level: research.level,
+          type: research.type
+        });
+      }
+    }
+
+    return legacyPerks;
+  }
+
+  /**
+   * Convert PerkSystem to AO-compatible format
+   */
+  private convertToAOPerks(perkSystem: any): any[] {
+    const aoPerks: any[] = [];
+
+    if (!perkSystem || typeof perkSystem !== 'object') {
+      return aoPerks;
+    }
+
+    // Convert SL and AI perks to simple format
+    if (Array.isArray(perkSystem.perks)) {
+      for (const perk of perkSystem.perks) {
+        aoPerks.push({
+          aoid: perk.aoid,
+          name: perk.name,
+          level: perk.level,
+          type: perk.type,
+          category: perk.type === 'AI' ? 'Alien' : 'Standard'
+        });
+      }
+    }
+
+    // Convert LE research
+    if (Array.isArray(perkSystem.research)) {
+      for (const research of perkSystem.research) {
+        aoPerks.push({
+          aoid: research.aoid,
+          name: research.name,
+          level: research.level,
+          type: research.type,
+          category: 'Research'
+        });
+      }
+    }
+
+    return aoPerks;
+  }
+
+  /**
+   * Import perks from various formats and normalize to PerkSystem
+   */
+  private importPerksFromData(data: any, result: ProfileImportResult): PerkSystem {
+    // Handle structured PerkSystem
+    if (data.PerksAndResearch &&
+        typeof data.PerksAndResearch === 'object' &&
+        'perks' in data.PerksAndResearch) {
+      result.warnings.push('Imported structured perk system');
+      return data.PerksAndResearch as PerkSystem;
+    }
+
+    // Handle legacy array format
+    if (data.PerksAndResearch && Array.isArray(data.PerksAndResearch)) {
+      result.warnings.push(`Converted ${data.PerksAndResearch.length} perks from legacy array format`);
+      return this.convertLegacyPerksToSystem(data.PerksAndResearch);
+    }
+
+    // Handle legacy format with different key
+    if (data.perksAndResearch && Array.isArray(data.perksAndResearch)) {
+      result.warnings.push(`Converted ${data.perksAndResearch.length} perks from legacy format`);
+      return this.convertLegacyPerksToSystem(data.perksAndResearch);
+    }
+
+    // Handle AO format
+    if (data.Perks && Array.isArray(data.Perks)) {
+      result.warnings.push(`Converted ${data.Perks.length} perks from AO format`);
+      return this.convertLegacyPerksToSystem(data.Perks);
+    }
+
+    // Return empty system if no perks found
+    return {
+      perks: [],
+      standardPerkPoints: { total: 0, spent: 0, available: 0 },
+      aiPerkPoints: { total: 0, spent: 0, available: 0 },
+      research: [],
+      lastCalculated: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Convert legacy perk array to structured PerkSystem
+   */
+  private convertLegacyPerksToSystem(legacyPerks: any[]): PerkSystem {
+    const system: PerkSystem = {
+      perks: [],
+      standardPerkPoints: { total: 0, spent: 0, available: 0 },
+      aiPerkPoints: { total: 0, spent: 0, available: 0 },
+      research: [],
+      lastCalculated: new Date().toISOString()
+    };
+
+    for (const perk of legacyPerks) {
+      if (!perk || typeof perk !== 'object') continue;
+
+      const perkType = perk.type || 'SL';
+      const perkLevel = perk.level || 1;
+
+      if (perkType === 'LE') {
+        // Research perk
+        system.research.push({
+          aoid: perk.aoid || 0,
+          name: perk.name || `Research ${perk.aoid}`,
+          level: perkLevel,
+          type: 'LE'
+        });
+      } else {
+        // SL or AI perk
+        system.perks.push({
+          aoid: perk.aoid || 0,
+          name: perk.name || `Perk ${perk.aoid}`,
+          level: perkLevel,
+          type: perkType as 'SL' | 'AI'
+        });
+
+        // Update point tracking
+        const cost = perkLevel; // 1 point per level
+        if (perkType === 'AI') {
+          system.aiPerkPoints.spent += cost;
+        } else {
+          system.standardPerkPoints.spent += cost;
+        }
+      }
+    }
+
+    return system;
+  }
+
   // ============================================================================
   // Utility Methods
   // ============================================================================

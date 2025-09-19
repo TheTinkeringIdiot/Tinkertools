@@ -106,99 +106,155 @@ Complete character management with skills, equipment, and IP tracking
           
         </div>
         
-        <!-- Right Column: Equipment & Skills Management -->
-        <div class="lg:col-span-2 space-y-6">
-          <!-- Equipment Section -->
-          <div class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
-            <h2 class="text-xl font-semibold text-surface-900 dark:text-surface-50 mb-4">Equipment</h2>
-            <div class="grid grid-cols-3 gap-4">
-              <!-- Weapons -->
-              <div class="text-center">
-                <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2 flex items-center justify-center gap-1">
-                  <i class="pi pi-shield text-orange-500 text-xs"></i>
-                  Weapons
-                </h3>
-                <EquipmentSlotsDisplay 
-                  :equipment="getEquippedWeapons(profileData.Weapons)"
-                  :slot-type="'weapon'"
-                  :show-labels="false"
-                />
-              </div>
+        <!-- Right Column: Tabbed Management -->
+        <div class="lg:col-span-2">
+          <div class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg h-full">
+            <TabView class="h-full profile-tabs">
+              <!-- Equipment Tab -->
+              <TabPanel class="h-full">
+                <template #header>
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-shield text-orange-500"></i>
+                    <span>Equipment</span>
+                  </div>
+                </template>
 
-              <!-- Armor -->
-              <div class="text-center">
-                <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2 flex items-center justify-center gap-1">
-                  <i class="pi pi-user text-blue-500 text-xs"></i>
-                  Armor
-                </h3>
-                <EquipmentSlotsDisplay 
-                  :equipment="getEquippedArmor(profileData.Clothing)"
-                  :slot-type="'armor'"
-                  :show-labels="false"
-                />
-              </div>
+                <div class="p-6">
+                  <h2 class="text-xl font-semibold text-surface-900 dark:text-surface-50 mb-4">Equipment</h2>
+                  <div class="grid grid-cols-3 gap-4">
+                    <!-- Weapons -->
+                    <div class="text-center">
+                      <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2 flex items-center justify-center gap-1">
+                        <i class="pi pi-shield text-orange-500 text-xs"></i>
+                        Weapons
+                      </h3>
+                      <EquipmentSlotsDisplay
+                        :equipment="getEquippedWeapons(profileData.Weapons)"
+                        :slot-type="'weapon'"
+                        :show-labels="false"
+                      />
+                    </div>
 
-              <!-- Implants -->
-              <div class="text-center">
-                <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2 flex items-center justify-center gap-1">
-                  <i class="pi pi-cpu text-green-500 text-xs"></i>
-                  Implants
-                </h3>
-                <EquipmentSlotsDisplay 
-                  :equipment="getEquippedImplants(profileData.Implants)"
-                  :slot-type="'implant'"
-                  :show-labels="false"
-                />
-              </div>
-            </div>
-          </div>
-          
-          <!-- Skills Management -->
-          <div class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg">
-            <!-- Skills Header -->
-            <div class="p-6 border-b border-surface-200 dark:border-surface-700">
-              <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold text-surface-900 dark:text-surface-50">
-                  Skills & Abilities
-                </h2>
-                
-                <div class="flex items-center gap-2">
-                  <Button
-                    icon="pi pi-refresh"
-                    severity="secondary"
-                    outlined
-                    size="small"
-                    @click="recalculateIP"
-                    :loading="recalculating"
-                    v-tooltip.bottom="'Recalculate IP & Caps'"
-                  />
+                    <!-- Armor -->
+                    <div class="text-center">
+                      <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2 flex items-center justify-center gap-1">
+                        <i class="pi pi-user text-blue-500 text-xs"></i>
+                        Armor
+                      </h3>
+                      <EquipmentSlotsDisplay
+                        :equipment="getEquippedArmor(profileData.Clothing)"
+                        :slot-type="'armor'"
+                        :show-labels="false"
+                      />
+                    </div>
+
+                    <!-- Implants -->
+                    <div class="text-center">
+                      <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2 flex items-center justify-center gap-1">
+                        <i class="pi pi-cpu text-green-500 text-xs"></i>
+                        Implants
+                      </h3>
+                      <EquipmentSlotsDisplay
+                        :equipment="getEquippedImplants(profileData.Implants)"
+                        :slot-type="'implant'"
+                        :show-labels="false"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
-              
-              <!-- IP Summary -->
-              <div v-if="profileData.IPTracker" class="mt-4 p-3 bg-surface-50 dark:bg-surface-800 rounded-lg">
-                <div class="flex items-center gap-4 text-sm">
-                  <span class="text-surface-600 dark:text-surface-400">
-                    Available IP: <strong class="text-surface-900 dark:text-surface-50">{{ profileData.IPTracker.totalAvailable }}</strong>
-                  </span>
-                  <span class="text-surface-600 dark:text-surface-400">
-                    Used: <strong class="text-surface-900 dark:text-surface-50">{{ profileData.IPTracker.totalUsed }}</strong>
-                  </span>
-                  <span class="text-surface-600 dark:text-surface-400">
-                    Remaining: <strong :class="remainingIPColor">{{ profileData.IPTracker.remaining }}</strong>
-                  </span>
+              </TabPanel>
+
+              <!-- Skills Tab -->
+              <TabPanel class="h-full">
+                <template #header>
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-cog text-blue-500"></i>
+                    <span>Skills</span>
+                  </div>
+                </template>
+
+                <div class="h-full flex flex-col">
+                  <!-- Skills Header -->
+                  <div class="p-6 border-b border-surface-200 dark:border-surface-700">
+                    <div class="flex items-center justify-between">
+                      <h2 class="text-xl font-semibold text-surface-900 dark:text-surface-50">
+                        Skills & Abilities
+                      </h2>
+
+                      <div class="flex items-center gap-2">
+                        <Button
+                          icon="pi pi-refresh"
+                          severity="secondary"
+                          outlined
+                          size="small"
+                          @click="recalculateIP"
+                          :loading="recalculating"
+                          v-tooltip.bottom="'Recalculate IP & Caps'"
+                        />
+                      </div>
+                    </div>
+
+                    <!-- IP Summary -->
+                    <div v-if="profileData.IPTracker" class="mt-4 p-3 bg-surface-50 dark:bg-surface-800 rounded-lg">
+                      <div class="flex items-center gap-4 text-sm">
+                        <span class="text-surface-600 dark:text-surface-400">
+                          Available IP: <strong class="text-surface-900 dark:text-surface-50">{{ profileData.IPTracker.totalAvailable }}</strong>
+                        </span>
+                        <span class="text-surface-600 dark:text-surface-400">
+                          Used: <strong class="text-surface-900 dark:text-surface-50">{{ profileData.IPTracker.totalUsed }}</strong>
+                        </span>
+                        <span class="text-surface-600 dark:text-surface-400">
+                          Remaining: <strong :class="remainingIPColor">{{ profileData.IPTracker.remaining }}</strong>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Skills Content -->
+                  <div class="flex-1 p-6 overflow-y-auto">
+                    <SkillsManager
+                      :profile="profileData"
+                      @skill-changed="handleSkillChange"
+                      @ability-changed="handleAbilityChange"
+                    />
+                  </div>
                 </div>
-              </div>
-            </div>
-            
-            <!-- Skills Content -->
-            <div class="p-6">
-              <SkillsManager 
-                :profile="profileData"
-                @skill-changed="handleSkillChange"
-                @ability-changed="handleAbilityChange"
-              />
-            </div>
+              </TabPanel>
+
+              <!-- Perks Tab -->
+              <TabPanel class="h-full">
+                <template #header>
+                  <div class="flex items-center gap-2">
+                    <i class="pi pi-star text-primary-500"></i>
+                    <span>Perks</span>
+                  </div>
+                </template>
+
+                <div class="h-full flex flex-col">
+                  <!-- Perks Header -->
+                  <div class="p-6 border-b border-surface-200 dark:border-surface-700">
+                    <div class="flex items-center justify-between">
+                      <h2 class="text-xl font-semibold text-surface-900 dark:text-surface-50">
+                        Perks & Research
+                      </h2>
+                    </div>
+                  </div>
+
+                  <!-- Perks Content -->
+                  <div class="flex-1 flex">
+                    <!-- Perk Points Tracker Sidebar -->
+                    <div class="w-80 border-r border-surface-200 dark:border-surface-700 p-4 overflow-y-auto">
+                      <PerkPointsTracker :profile="profileData" />
+                    </div>
+
+                    <!-- Perk Selector Main Area -->
+                    <div class="flex-1 overflow-hidden">
+                      <PerkSelector :profile-id="profileId" />
+                    </div>
+                  </div>
+                </div>
+              </TabPanel>
+            </TabView>
           </div>
         </div>
       </div>
@@ -219,6 +275,8 @@ import { useRoute, useRouter } from 'vue-router';
 import Button from 'primevue/button';
 import Badge from 'primevue/badge';
 import ProgressSpinner from 'primevue/progressspinner';
+import TabView from 'primevue/tabview';
+import TabPanel from 'primevue/tabpanel';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import CharacterInfoPanel from '@/components/profiles/CharacterInfoPanel.vue';
 import IPTrackerPanel from '@/components/profiles/IPTrackerPanel.vue';
@@ -226,6 +284,8 @@ import ItemSlotsDisplay from '@/components/items/ItemSlotsDisplay.vue';
 import EquipmentSlotsDisplay from '@/components/items/EquipmentSlotsDisplay.vue';
 import SkillsManager from '@/components/profiles/skills/SkillsManager.vue';
 import EditCharacterDialog from '@/components/profiles/EditCharacterDialog.vue';
+import PerkSelector from '@/components/profiles/perks/PerkSelector.vue';
+import PerkPointsTracker from '@/components/profiles/perks/PerkPointsTracker.vue';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
 import type { Item } from '@/types/api';
 
@@ -470,5 +530,25 @@ watch(() => props.profileId, () => {
 :deep(.skills-manager) {
   max-height: calc(100vh - 400px);
   overflow-y: auto;
+}
+
+/* Profile tabs styling */
+.profile-tabs {
+  height: 100%;
+}
+
+.profile-tabs :deep(.p-tabview-panels) {
+  height: calc(100% - 60px); /* Subtract tab header height */
+  overflow: hidden;
+}
+
+.profile-tabs :deep(.p-tabview-panel) {
+  height: 100%;
+  padding: 0 !important;
+}
+
+/* Tab header styling */
+.profile-tabs :deep(.p-tabview-nav-link) {
+  padding: 1rem 1.5rem;
 }
 </style>
