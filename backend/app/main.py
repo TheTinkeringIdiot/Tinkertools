@@ -17,6 +17,7 @@ from app.api.routes.cache import router as cache_router
 from app.api.routes.performance import router as performance_router
 from app.api.routes.aosetups import router as aosetups_router
 from app.api.routes.equipment_bonuses import router as equipment_bonuses_router
+from app.api.routes.perks import router as perks_router
 
 app = FastAPI(
     title="TinkerTools API",
@@ -80,6 +81,7 @@ app.include_router(cache_router, prefix="/api/v1")
 app.include_router(performance_router, prefix="/api/v1")
 app.include_router(aosetups_router, prefix="/api/v1")
 app.include_router(equipment_bonuses_router, prefix="/api/v1")
+app.include_router(perks_router, prefix="/api/v1")
 
 @app.get("/")
 async def root():

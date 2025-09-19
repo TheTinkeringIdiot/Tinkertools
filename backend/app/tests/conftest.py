@@ -12,6 +12,10 @@ from app.main import app
 from app.core.database import Base, get_db
 from app.models import *
 
+# Import all fixtures from fixture modules
+from app.tests.fixtures.perk_fixtures import *
+from app.tests.fixtures.import_fixtures import *
+
 # Use PostgreSQL database from environment variable
 DATABASE_URL = os.getenv('DATABASE_URL')
 if not DATABASE_URL:
