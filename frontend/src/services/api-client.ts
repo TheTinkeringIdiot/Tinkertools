@@ -478,9 +478,27 @@ class TinkerToolsApiClient {
   }
 
   // ============================================================================
+  // Perk API
+  // ============================================================================
+
+  async lookupPerkByAoid(aoid: number): Promise<any> {
+    try {
+      const response = await this.client.get(`/perks/lookup/${aoid}`)
+      return response.data
+    } catch (error: any) {
+      // Return null if perk not found
+      if (error.response?.status === 404) {
+        console.warn(`Perk with AOID ${aoid} not found`)
+        return null
+      }
+      throw this.handleError(error)
+    }
+  }
+
+  // ============================================================================
   // Item Interpolation API
   // ============================================================================
-  
+
   async interpolateItem(aoid: number, targetQl: number): Promise<InterpolationResponse> {
     try {
       const params = new URLSearchParams()

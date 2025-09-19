@@ -5,6 +5,7 @@
  */
 
 import type { TinkerProfile, NanoCompatibleProfile } from './types';
+import type { PerkSystem } from './perk-types';
 import { getBreedInitValue, calcHP, calcNP } from './ip-calculator';
 import { getBreedId } from '../../services/game-utils';
 
@@ -296,6 +297,31 @@ export const SUPPORTED_VERSIONS = ['1.0.0', '1.1.0', '2.0.0'];
 // ============================================================================
 
 /**
+ * Create a default empty PerkSystem for new profiles
+ */
+function createDefaultPerkSystem(level: number = 1, alienLevel: number = 0): PerkSystem {
+  // Calculate available perk points based on level
+  const standardPerkPoints = level >= 10 ? Math.min(Math.floor(level / 10), 20) + (level > 200 ? Math.min(level - 200, 20) : 0) : 0;
+  const aiPerkPoints = Math.min(alienLevel, 30);
+
+  return {
+    perks: [],
+    standardPerkPoints: {
+      total: standardPerkPoints,
+      spent: 0,
+      available: standardPerkPoints
+    },
+    aiPerkPoints: {
+      total: aiPerkPoints,
+      spent: 0,
+      available: aiPerkPoints
+    },
+    research: [],
+    lastCalculated: new Date().toISOString()
+  };
+}
+
+/**
  * Get breed ID from breed name
  */
 function getBreedIdFromBreedName(breed: string): number {
@@ -348,7 +374,7 @@ export function createDefaultProfile(name: string = 'New Character', breed: stri
     Clothing: structuredClone(DEFAULT_CLOTHING),
     Implants: structuredClone(DEFAULT_IMPLANTS),
     
-    PerksAndResearch: []
+    PerksAndResearch: createDefaultPerkSystem(level, 0)
   };
 }
 

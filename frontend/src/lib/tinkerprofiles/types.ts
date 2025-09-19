@@ -5,6 +5,7 @@
  */
 
 import type { Item } from '@/types/api';
+import type { PerkSystem } from './perk-types';
 
 // ============================================================================
 // Core Profile Types
@@ -17,11 +18,12 @@ export interface SkillWithIP {
   ipSpent: number;      // Total IP cost
 
   // Computed values (calculated at runtime, never stored)
-  value?: number;         // Total: base + trickle + IP + equipment (capped)
-  baseValue?: number;     // Base + trickle + IP (no equipment)
+  value?: number;         // Total: base + trickle + IP + equipment + perks (capped)
+  baseValue?: number;     // Base + trickle + IP (no equipment/perks)
   trickleDown?: number;   // Bonus from abilities
   equipmentBonus?: number; // Total bonus from all equipped items
-  cap?: number;           // Effective skill cap (including equipment for display)
+  perkBonus?: number;     // Total bonus from all equipped perks
+  cap?: number;           // Effective skill cap (including equipment and perks for display)
 }
 
 /** Comprehensive IP tracking information */
@@ -76,6 +78,7 @@ export interface TinkerProfile {
     AccountType: string;
     MaxHealth: number;
     MaxNano: number;
+    AlienLevel?: number; // 0-30, for AI perk points calculation
   };
 
   // IP tracking (new)
@@ -109,8 +112,8 @@ export interface TinkerProfile {
   Clothing: Record<string, Item | null>;
   Implants: Record<string, ImplantWithClusters | null>;
   
-  // Additional data
-  PerksAndResearch: any[];
+  // Perk system with structured tracking for SL/AI points and LE research
+  PerksAndResearch: PerkSystem;
 }
 
 /** Simplified nano-compatible profile for TinkerNanos */

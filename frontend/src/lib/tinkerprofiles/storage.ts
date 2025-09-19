@@ -119,6 +119,9 @@ export class ProfileStorage {
         profile = JSON.parse(data);
       }
 
+      // Apply migrations including perk system migration
+      profile = await this.migrateProfile(profile);
+
       // For v3 profiles, we need to recalculate all computed values
       // Import dynamically to avoid circular dependencies
       const { updateProfileWithIPTracking } = await import('./ip-integrator');
@@ -262,27 +265,31 @@ export class ProfileStorage {
    */
   private async migrateProfile(profile: TinkerProfile): Promise<TinkerProfile> {
     if (profile.version === CURRENT_VERSION) {
-      // Even for current version profiles, check for BASE_SKILL migration
-      return await this.migrateBaseSkillValues(profile);
+      // Even for current version profiles, check for BASE_SKILL and perk migrations
+      const skillMigrated = await this.migrateBaseSkillValues(profile);
+      return await this.migratePerkSystem(skillMigrated);
     }
-    
+
     // Clone the profile for migration
     const migrated = structuredClone(profile);
-    
+
     // Version-specific migrations
     if (!migrated.version || migrated.version < '2.0.0') {
       // Migrate from v1.x to v2.0
       migrated.version = CURRENT_VERSION;
       migrated.updated = new Date().toISOString();
-      
+
       // Add any missing fields from current structure
       if (!migrated.created) {
         migrated.created = new Date().toISOString();
       }
     }
-    
+
     // Apply BASE_SKILL migration to all profiles
-    return await this.migrateBaseSkillValues(migrated);
+    const skillMigrated = await this.migrateBaseSkillValues(migrated);
+
+    // Apply perk system migration
+    return await this.migratePerkSystem(skillMigrated);
   }
 
   /**
@@ -371,7 +378,69 @@ export class ProfileStorage {
     
     return migrated;
   }
-  
+
+  /**
+   * Migrate perk system to structured format if needed
+   */
+  private async migratePerkSystem(profile: TinkerProfile): Promise<TinkerProfile> {
+    // Check if perk system migration is needed
+    if (profile.PerksAndResearch &&
+        typeof profile.PerksAndResearch === 'object' &&
+        'perks' in profile.PerksAndResearch &&
+        'standardPerkPoints' in profile.PerksAndResearch &&
+        'aiPerkPoints' in profile.PerksAndResearch) {
+      return profile; // Already migrated
+    }
+
+    console.log(`[ProfileStorage] Migrating perk system for profile ${profile.Character.Name}`);
+
+    try {
+      // Import transformer dynamically to avoid circular dependencies
+      const { ProfileTransformer } = await import('./transformer');
+      const transformer = new ProfileTransformer();
+
+      const migratedProfile = transformer.migrateProfilePerks(profile);
+      console.log(`[ProfileStorage] Successfully migrated perk system for profile ${profile.Character.Name}`);
+
+      return migratedProfile;
+    } catch (error) {
+      console.error(`[ProfileStorage] Failed to migrate perk system for profile ${profile.Character.Name}:`, error);
+
+      // Fallback: Create default perk system if migration fails
+      const fallbackProfile = structuredClone(profile);
+      const level = profile.Character.Level || 1;
+      const alienLevel = profile.Character.AlienLevel || 0;
+
+      // Calculate standard perk points
+      const standardPerkPoints = level < 10 ? 0 :
+        Math.min(Math.floor(level / 10), 20) + (level > 200 ? Math.min(level - 200, 20) : 0);
+
+      // Calculate AI perk points
+      const aiPerkPoints = Math.min(alienLevel, 30);
+
+      fallbackProfile.PerksAndResearch = {
+        perks: [],
+        standardPerkPoints: {
+          total: standardPerkPoints,
+          spent: 0,
+          available: standardPerkPoints
+        },
+        aiPerkPoints: {
+          total: aiPerkPoints,
+          spent: 0,
+          available: aiPerkPoints
+        },
+        research: [],
+        lastCalculated: new Date().toISOString()
+      };
+
+      fallbackProfile.updated = new Date().toISOString();
+      console.log(`[ProfileStorage] Created fallback perk system for profile ${profile.Character.Name}`);
+
+      return fallbackProfile;
+    }
+  }
+
   // ============================================================================
   // Compression (Future Enhancement)
   // ============================================================================
