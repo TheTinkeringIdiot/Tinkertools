@@ -16,38 +16,68 @@ logger = logging.getLogger(__name__)
 def cached_response(cache_type: str, ttl: int = None):
     """
     Decorator to cache API responses based on query parameters.
-    
+
     Args:
         cache_type: Type of cache (must be in CACHE_TTL)
         ttl: Time to live in seconds (overrides default from CACHE_TTL)
     """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        async def async_wrapper(*args, **kwargs):
             # Generate cache key from function parameters
             # Remove 'db' session from cache key as it's not relevant
             cache_params = {k: v for k, v in kwargs.items() if k != 'db'}
             cache_key = cache_key_for_query(f"{func.__module__}.{func.__name__}", **cache_params)
-            
+
             # Try to get cached response
             cached = get_cached_response(cache_key)
             if cached is not None:
                 logger.debug(f"Cache hit for {func.__name__}: {cache_key}")
                 return cached
-            
+
+            # Execute function and cache result
+            start_time = time.time()
+            result = await func(*args, **kwargs)
+            execution_time = time.time() - start_time
+
+            # Cache the result
+            cache_ttl = ttl or CACHE_TTL.get(cache_type, 300)
+            cache_response(cache_key, result, cache_ttl)
+
+            logger.debug(f"Cache miss for {func.__name__}: {cache_key} (executed in {execution_time:.3f}s)")
+            return result
+
+        @functools.wraps(func)
+        def sync_wrapper(*args, **kwargs):
+            # Generate cache key from function parameters
+            # Remove 'db' session from cache key as it's not relevant
+            cache_params = {k: v for k, v in kwargs.items() if k != 'db'}
+            cache_key = cache_key_for_query(f"{func.__module__}.{func.__name__}", **cache_params)
+
+            # Try to get cached response
+            cached = get_cached_response(cache_key)
+            if cached is not None:
+                logger.debug(f"Cache hit for {func.__name__}: {cache_key}")
+                return cached
+
             # Execute function and cache result
             start_time = time.time()
             result = func(*args, **kwargs)
             execution_time = time.time() - start_time
-            
+
             # Cache the result
             cache_ttl = ttl or CACHE_TTL.get(cache_type, 300)
             cache_response(cache_key, result, cache_ttl)
-            
+
             logger.debug(f"Cache miss for {func.__name__}: {cache_key} (executed in {execution_time:.3f}s)")
             return result
-        
-        return wrapper
+
+        # Return appropriate wrapper based on whether function is async
+        import asyncio
+        if asyncio.iscoroutinefunction(func):
+            return async_wrapper
+        else:
+            return sync_wrapper
     return decorator
 
 

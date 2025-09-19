@@ -13,16 +13,16 @@ Usage:
     python import_cli.py symbiants --clear
     python import_cli.py items --chunk-size 50
     python import_cli.py nanos
-    
+
     # Import all data
     python import_cli.py all --clear
-    
+
     # Validate files exist
     python import_cli.py validate
 
 Requirements:
     - items.json (407MB)
-    - nanos.json (44MB) 
+    - nanos.json (44MB)
     - symbiants.csv (208KB)
 """
 
@@ -74,19 +74,20 @@ def ensure_tables_exist():
 def import_symbiants(args):
     """Import symbiants from CSV."""
     logger.info("Starting symbiant import...")
-    
+
     # Ensure database tables exist
     if not ensure_tables_exist():
         return False
-    
-    file_path = "symbiants.csv"
-    if not Path(file_path).exists():
+
+    # Look for file in database directory
+    file_path = Path(__file__).parent / "database" / "symbiants.csv"
+    if not file_path.exists():
         logger.error(f"File {file_path} not found")
         return False
     
     importer = DataImporter(chunk_size=args.chunk_size)
     try:
-        count = importer.import_symbiants_from_csv(file_path, args.clear)
+        count = importer.import_symbiants_from_csv(str(file_path), args.clear)
         logger.info(f"Successfully imported {count} symbiants")
         return True
     except Exception as e:
@@ -97,19 +98,20 @@ def import_symbiants(args):
 def import_items(args):
     """Import items from JSON."""
     logger.info("Starting items import...")
-    
+
     # Ensure database tables exist
     if not ensure_tables_exist():
         return False
-    
-    file_path = "items.json"
-    if not Path(file_path).exists():
+
+    # Look for file in database directory
+    file_path = Path(__file__).parent / "database" / "items.json"
+    if not file_path.exists():
         logger.error(f"File {file_path} not found")
         return False
     
     importer = DataImporter(chunk_size=args.chunk_size)
     try:
-        stats = importer.import_items_from_json(file_path, is_nano=False, clear_existing=args.clear)
+        stats = importer.import_items_from_json(str(file_path), is_nano=False, clear_existing=args.clear)
         logger.info(f"Items import completed: "
                    f"Created={stats.items_created}, "
                    f"Updated={stats.items_updated}, "
@@ -123,19 +125,20 @@ def import_items(args):
 def import_nanos(args):
     """Import nanos from JSON."""
     logger.info("Starting nanos import...")
-    
+
     # Ensure database tables exist
     if not ensure_tables_exist():
         return False
-    
-    file_path = "nanos.json"
-    if not Path(file_path).exists():
+
+    # Look for file in database directory
+    file_path = Path(__file__).parent / "database" / "nanos.json"
+    if not file_path.exists():
         logger.error(f"File {file_path} not found")
         return False
-    
+
     importer = DataImporter(chunk_size=args.chunk_size)
     try:
-        stats = importer.import_items_from_json(file_path, is_nano=True, clear_existing=False)
+        stats = importer.import_items_from_json(str(file_path), is_nano=True, clear_existing=False)
         logger.info(f"Nanos import completed: "
                    f"Created={stats.items_created}, "
                    f"Updated={stats.items_updated}, "
@@ -149,54 +152,56 @@ def import_nanos(args):
 def import_all(args):
     """Import all data files in order."""
     logger.info("Starting full data import...")
-    
+
     # Import in order: symbiants (smallest), items, then nanos
     success = True
-    
+
     # Symbiants first (smallest file)
     logger.info("=== Importing Symbiants ===")
     if not import_symbiants(args):
         success = False
         logger.error("Symbiant import failed, continuing with items...")
-    
+
     # Items (largest file)
     logger.info("=== Importing Items ===")
     if not import_items(args):
         success = False
         logger.error("Items import failed, continuing with nanos...")
-    
+
     # Nanos
     logger.info("=== Importing Nanos ===")
     if not import_nanos(args):
         success = False
         logger.error("Nanos import failed")
-    
+
     if success:
         logger.info("All imports completed successfully!")
     else:
         logger.warning("Some imports failed, check logs for details")
-    
+
     return success
 
 
 def validate_files():
     """Validate that all required files exist."""
+    # Files should be in the database directory
+    base_dir = Path(__file__).parent / "database"
     files = ["symbiants.csv", "items.json", "nanos.json"]
     missing = []
-    
+
     for file in files:
-        path = Path(file)
+        path = base_dir / file
         if path.exists():
             size_mb = path.stat().st_size / (1024 * 1024)
             logger.info(f"✓ {file}: {size_mb:.1f} MB")
         else:
             missing.append(file)
             logger.error(f"✗ {file}: Not found")
-    
+
     if missing:
         logger.error(f"Missing files: {', '.join(missing)}")
         return False
-    
+
     logger.info("All import files found")
     return True
 
