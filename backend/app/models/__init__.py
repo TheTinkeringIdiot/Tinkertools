@@ -10,6 +10,7 @@ from .attack_defense import AttackDefense, AttackDefenseAttack, AttackDefenseDef
 from .animation_mesh import AnimationMesh
 from .shop_hash import ShopHash
 from .item import Item, ItemStats, ItemSpellData, ItemShopHash
+from .perk import Perk
 from .action import Action, ActionCriteria
 from .symbiant import Symbiant
 from .pocket_boss import PocketBoss, PocketBossSymbiantDrops
@@ -32,6 +33,7 @@ __all__ = [
     'ItemStats',
     'ItemSpellData',
     'ItemShopHash',
+    'Perk',
     'Action',
     'ActionCriteria',
     'Symbiant',

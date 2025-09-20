@@ -230,28 +230,9 @@ Complete character management with skills, equipment, and IP tracking
                   </div>
                 </template>
 
-                <div class="h-full flex flex-col">
-                  <!-- Perks Header -->
-                  <div class="p-6 border-b border-surface-200 dark:border-surface-700">
-                    <div class="flex items-center justify-between">
-                      <h2 class="text-xl font-semibold text-surface-900 dark:text-surface-50">
-                        Perks & Research
-                      </h2>
-                    </div>
-                  </div>
-
-                  <!-- Perks Content -->
-                  <div class="flex-1 flex">
-                    <!-- Perk Points Tracker Sidebar -->
-                    <div class="w-80 border-r border-surface-200 dark:border-surface-700 p-4 overflow-y-auto">
-                      <PerkPointsTracker :profile="profileData" />
-                    </div>
-
-                    <!-- Perk Selector Main Area -->
-                    <div class="flex-1 overflow-hidden">
-                      <PerkSelector :profile-id="profileId" />
-                    </div>
-                  </div>
+                <div class="h-full">
+                  <!-- Use the new PerkTabs component -->
+                  <PerkTabs :profile="profileData" />
                 </div>
               </TabPanel>
             </TabView>
@@ -284,8 +265,7 @@ import ItemSlotsDisplay from '@/components/items/ItemSlotsDisplay.vue';
 import EquipmentSlotsDisplay from '@/components/items/EquipmentSlotsDisplay.vue';
 import SkillsManager from '@/components/profiles/skills/SkillsManager.vue';
 import EditCharacterDialog from '@/components/profiles/EditCharacterDialog.vue';
-import PerkSelector from '@/components/profiles/perks/PerkSelector.vue';
-import PerkPointsTracker from '@/components/profiles/perks/PerkPointsTracker.vue';
+import PerkTabs from '@/components/profiles/perks/PerkTabs.vue';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
 import type { Item } from '@/types/api';
 

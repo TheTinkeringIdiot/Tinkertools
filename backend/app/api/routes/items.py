@@ -507,10 +507,12 @@ def search_items(
         
         logger.info(f"Final query: searching {len(search_conditions)} field(s) for term '{q}' in fields {fields_to_search}")
         
-        # Build the query with explicit OR conditions
+        # Build the query with explicit OR conditions - load all relationships needed
         query = db.query(Item).options(
             joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
-            joinedload(Item.item_spell_data)
+            joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data).joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell).joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
+            joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion),
+            joinedload(Item.item_sources).joinedload(ItemSource.source).joinedload(Source.source_type)
         )
         
         # Apply the search filter
@@ -552,10 +554,12 @@ def search_items(
             for part in search_expression_parts[1:]:
                 search_expression = search_expression + ' ' + part
         
-        # Full-text search with ranking
+        # Full-text search with ranking - load all relationships needed
         query = db.query(Item).options(
             joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
-            joinedload(Item.item_spell_data)
+            joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data).joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell).joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
+            joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion),
+            joinedload(Item.item_sources).joinedload(ItemSource.source).joinedload(Source.source_type)
         ).filter(
             func.to_tsvector('english', search_expression).op('@@')(
                 func.to_tsquery('english', search_query)
@@ -699,38 +703,8 @@ def search_items(
     # Get items for current page
     items = query.offset(offset).limit(page_size).all()
     
-    # Build detailed response items
-    detailed_items = []
-    for item in items:
-        item_detail = ItemDetail(
-            id=item.id,
-            aoid=item.aoid,
-            name=item.name,
-            ql=item.ql,
-            item_class=item.item_class,
-            description=item.description,
-            is_nano=item.is_nano,
-            stats=[stat.stat_value for stat in item.item_stats] if item.item_stats else [],
-            attack_stats=[],
-            defense_stats=[],
-            spells=[isd.spell_data for isd in item.item_spell_data] if item.item_spell_data else []
-        )
-        
-        # Add attack/defense stats if available
-        if hasattr(item, 'atkdef_id') and item.atkdef_id:
-            # Get attack stats
-            attack_stats = db.query(StatValue).join(
-                AttackDefenseAttack, StatValue.id == AttackDefenseAttack.stat_value_id
-            ).filter(AttackDefenseAttack.attack_defense_id == item.atkdef_id).all()
-            item_detail.attack_stats = attack_stats
-            
-            # Get defense stats  
-            defense_stats = db.query(StatValue).join(
-                AttackDefenseDefense, StatValue.id == AttackDefenseDefense.stat_value_id
-            ).filter(AttackDefenseDefense.attack_defense_id == item.atkdef_id).all()
-            item_detail.defense_stats = defense_stats
-        
-        detailed_items.append(item_detail)
+    # Build detailed response items using the same function as get_items
+    detailed_items = [build_item_detail(item, db) for item in items]
     
     # Log performance metrics
     query_time = time.time() - start_time
@@ -781,7 +755,9 @@ def filter_items_advanced(
     
     query = db.query(Item).options(
         joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
-        joinedload(Item.item_spell_data)
+        joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data).joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell).joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
+        joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion),
+        joinedload(Item.item_sources).joinedload(ItemSource.source).joinedload(Source.source_type)
     )
     
     # Apply basic filters
@@ -834,38 +810,8 @@ def filter_items_advanced(
     # Get items for current page
     items = query.offset(offset).limit(page_size).all()
     
-    # Build detailed response items
-    detailed_items = []
-    for item in items:
-        item_detail = ItemDetail(
-            id=item.id,
-            aoid=item.aoid,
-            name=item.name,
-            ql=item.ql,
-            item_class=item.item_class,
-            description=item.description,
-            is_nano=item.is_nano,
-            stats=[stat.stat_value for stat in item.item_stats] if item.item_stats else [],
-            attack_stats=[],
-            defense_stats=[],
-            spells=[isd.spell_data for isd in item.item_spell_data] if item.item_spell_data else []
-        )
-        
-        # Add attack/defense stats if available
-        if hasattr(item, 'atkdef_id') and item.atkdef_id:
-            # Get attack stats
-            attack_stats = db.query(StatValue).join(
-                AttackDefenseAttack, StatValue.id == AttackDefenseAttack.stat_value_id
-            ).filter(AttackDefenseAttack.attack_defense_id == item.atkdef_id).all()
-            item_detail.attack_stats = attack_stats
-            
-            # Get defense stats  
-            defense_stats = db.query(StatValue).join(
-                AttackDefenseDefense, StatValue.id == AttackDefenseDefense.stat_value_id
-            ).filter(AttackDefenseDefense.attack_defense_id == item.atkdef_id).all()
-            item_detail.defense_stats = defense_stats
-        
-        detailed_items.append(item_detail)
+    # Build detailed response items using the same function as get_items
+    detailed_items = [build_item_detail(item, db) for item in items]
     
     # Log performance metrics
     query_time = time.time() - start_time

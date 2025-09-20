@@ -8,7 +8,8 @@ alembic==1.13.2
 python-dotenv==1.0.1
 redis==5.0.7
 typing-extensions==4.12.2
-# Optional alternatives/tools:
+# Database drivers for bulk import optimization:
+psycopg2-binary==2.9.9
 psycopg[binary]==3.2.1
 pytest==8.3.2
 pytest-asyncio==0.23.8
@@ -20,3 +21,8 @@ isort==5.13.2
 ruff==0.5.7
 pandas==2.2.2
 numpy==1.26.4
+# Memory-efficient JSON processing for large import files
+ijson==3.2.3
+psutil==5.9.8
+# Interactive progress display for import operations
+rich==13.7.1

@@ -22,8 +22,10 @@ from app.models import (
     Item, StatValue, Criterion, Spell, SpellData, AttackDefense,
     AnimationMesh, Action, ActionCriteria, SpellCriterion,
     ItemStats, Symbiant, AttackDefenseAttack, AttackDefenseDefense,
-    SpellDataSpells, ItemSpellData
+    SpellDataSpells, ItemSpellData, Perk
 )
+from app.core import perk_validator
+from app.core.migration_runner import MigrationRunner
 
 logger = logging.getLogger(__name__)
 
@@ -73,36 +75,67 @@ class DataImporter:
         # Store singleton objects to avoid repeated DB queries
         self._stat_value_cache: Dict[Tuple[int, int], StatValue] = {}
         self._criterion_cache: Dict[Tuple[int, int, int], Criterion] = {}
-        self._perk_aoids: set = set()
+        self._perk_data: Dict[int, Dict] = {}
 
-        # Load perk AOIDs during initialization
-        self.load_perk_aoids()
+        # Load perk metadata during initialization
+        self.load_perk_metadata()
     
     def get_db_session(self) -> Session:
         """Get database session."""
         return self.SessionLocal()
 
-    def load_perk_aoids(self):
-        """Load perk AOIDs from perks.json file for O(1) lookup during import."""
+    def load_perk_metadata(self):
+        """Load perk metadata from perks.json file for O(1) lookup during import."""
         try:
             # Get the path to perks.json relative to the backend directory
             backend_dir = Path(__file__).parent.parent.parent
             perks_file = backend_dir / "database" / "perks.json"
 
-            logger.info(f"Loading perk AOIDs from {perks_file}")
+            logger.info(f"Loading perk metadata from {perks_file}")
 
             with open(perks_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
-            # Extract AOIDs from columnar format
-            # The first column is "aoid" and values is a list of rows
-            aoid_column_index = data["columns"].index("aoid")
+            # Parse columnar format to extract full metadata
+            columns = data["columns"]
+            expected_columns = ["aoid", "name", "counter", "type", "professions", "breeds", "level", "aiTitle"]
 
+            # Validate expected columns are present
+            for col in expected_columns:
+                if col not in columns:
+                    raise ValueError(f"Missing expected column '{col}' in perks.json")
+
+            # Get column indices
+            column_indices = {col: columns.index(col) for col in expected_columns}
+
+            # Process each perk row
             for row in data["values"]:
-                aoid = row[aoid_column_index]
-                self._perk_aoids.add(aoid)
+                try:
+                    aoid = row[column_indices["aoid"]]
+                    name = row[column_indices["name"]]
+                    counter = row[column_indices["counter"]]
+                    perk_type = row[column_indices["type"]]
+                    professions = row[column_indices["professions"]]
+                    breeds = row[column_indices["breeds"]]
+                    level = row[column_indices["level"]]
+                    ai_title = row[column_indices["aiTitle"]]
 
-            logger.info(f"Loaded {len(self._perk_aoids)} perk AOIDs")
+                    # Store full metadata for this perk
+                    self._perk_data[aoid] = {
+                        "name": name,
+                        "counter": counter,
+                        "type": perk_type,
+                        "professions": professions or [],
+                        "breeds": breeds or [],
+                        "level": level,
+                        "aiTitle": ai_title
+                    }
+
+                except (IndexError, TypeError) as e:
+                    logger.warning(f"Skipping malformed perk row: {row}. Error: {e}")
+                    continue
+
+            logger.info(f"Loaded {len(self._perk_data)} perk metadata entries")
 
         except FileNotFoundError:
             error_msg = f"Critical error: perks.json file not found at {perks_file}. This file is required for perk identification."
@@ -113,11 +146,41 @@ class DataImporter:
             logger.error(error_msg)
             raise ValueError(error_msg)
     
-    def clear_existing_data(self, db: Session, clear_items: bool = False):
-        """Clear existing data for fresh import."""
-        logger.info("Clearing existing data...")
-        
-        if clear_items:
+    def clear_existing_data(self, db: Session, clear_items: bool = False, full_reset: bool = False):
+        """
+        Clear existing data for fresh import.
+
+        Args:
+            db: Database session
+            clear_items: If True, clear item-related data
+            full_reset: If True, drop all tables and recreate from migrations
+        """
+        logger.info(f"Clearing existing data (full_reset={full_reset})...")
+
+        if full_reset:
+            # Use migration runner to drop all tables and recreate schema
+            logger.info("Performing full database reset with migrations...")
+
+            # Close current session as we'll be dropping tables
+            db.close()
+
+            # Create migration runner and reset database
+            runner = MigrationRunner(db_url=self.db_url)
+            success = runner.reset_database()
+
+            if not success:
+                raise RuntimeError("Failed to reset database with migrations")
+
+            # Clear caches since we dropped everything
+            self._stat_value_cache.clear()
+            self._criterion_cache.clear()
+
+            logger.info("Full database reset completed successfully")
+
+        elif clear_items:
+            # Original behavior: just delete data without dropping tables
+            logger.info("Clearing data without dropping tables...")
+
             # Clear in correct order to respect foreign keys
             db.execute(text("DELETE FROM spell_criteria"))
             db.execute(text("DELETE FROM action_criteria"))
@@ -130,9 +193,10 @@ class DataImporter:
             db.execute(text("DELETE FROM animation_mesh"))
             db.execute(text("DELETE FROM stat_values"))
             db.execute(text("DELETE FROM criteria"))
+            db.execute(text("DELETE FROM perks"))  # Add perks table
             db.commit()
-        
-        logger.info("Data cleared successfully")
+
+            logger.info("Data cleared successfully")
     
     def preprocess_singletons(self, data: List[Dict]) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int, int]]]:
         """Extract all unique StatValues and Criteria from data for bulk creation."""
@@ -286,11 +350,6 @@ class DataImporter:
             item.description = item_data.get('Description', '')
             item.is_nano = is_nano
 
-            # Set is_perk based on AOID presence in perk list (only for non-nano items)
-            if not is_nano:
-                item.is_perk = aoid in self._perk_aoids
-            else:
-                item.is_perk = False
             
             # Process StatValues to extract item_class and ql
             for sv_data in item_data.get('StatValues', []):
@@ -310,7 +369,11 @@ class DataImporter:
             
             db.add(item)
             db.flush()  # Get the ID
-            
+
+            # Create perk record if this item is a perk
+            if not is_nano and aoid in self._perk_data:
+                self._create_perk_record(db, item, aoid)
+
             # Process StatValues relationships
             self._process_item_stats(db, item, item_data)
             
@@ -332,7 +395,63 @@ class DataImporter:
             logger.error(f"Error importing item {item_data.get('Name', 'Unknown')}: {e}")
             self.stats.errors += 1
             return None
-    
+
+    def _create_perk_record(self, db: Session, item: Item, aoid: int):
+        """Create a perk record for the given item using metadata from perks.json."""
+        try:
+            perk_data = self._perk_data[aoid]
+
+            # Extract base perk series name (name without counter)
+            perk_series = perk_data["name"]
+
+            # Validate and map profession strings to IDs
+            profession_ids = []
+            for prof_name in perk_data["professions"]:
+                try:
+                    profession_ids.append(perk_validator.map_profession_to_id(prof_name))
+                except ValueError as e:
+                    logger.warning(f"Failed to map profession '{prof_name}' for perk AOID {aoid}: {e}")
+
+            # Validate and map breed strings to IDs
+            breed_ids = []
+            for breed_name in perk_data["breeds"]:
+                try:
+                    breed_ids.append(perk_validator.map_breed_to_id(breed_name))
+                except ValueError as e:
+                    logger.warning(f"Failed to map breed '{breed_name}' for perk AOID {aoid}: {e}")
+
+            # Validate and parse other fields
+            try:
+                counter = perk_validator.validate_counter(perk_data["counter"])
+                perk_type = perk_validator.validate_perk_type(perk_data["type"])
+                level_required = perk_validator.parse_level_requirement(perk_data["level"])
+                ai_level_required = perk_validator.parse_level_requirement(perk_data["aiTitle"])
+            except ValueError as e:
+                logger.warning(f"Validation failed for perk AOID {aoid}: {e}")
+                return
+
+            # Format full perk name (e.g., "Accumulator 1")
+            perk_name = f"{perk_series} {counter}"
+
+            # Create perk record
+            perk = Perk(
+                item_id=item.id,
+                name=perk_name,
+                perk_series=perk_series,
+                counter=counter,
+                type=perk_type,
+                level_required=level_required,
+                ai_level_required=ai_level_required,
+                professions=profession_ids,
+                breeds=breed_ids
+            )
+
+            db.add(perk)
+            logger.debug(f"Created perk record: {perk_name}")
+
+        except Exception as e:
+            logger.warning(f"Failed to create perk record for AOID {aoid}: {e}")
+
     def _process_item_stats(self, db: Session, item: Item, item_data: Dict):
         """Process item stats relationships, handling duplicates."""
         # First, clear existing stats for this item (in case of update)
@@ -518,14 +637,34 @@ class DataImporter:
         
         item.animation_mesh_id = animesh.id
     
-    def import_items_from_json(self, file_path: str, is_nano: bool = False, 
-                              clear_existing: bool = False) -> ImportStats:
-        """Import items from JSON file with chunked processing."""
-        logger.info(f"Starting import from {file_path} (is_nano={is_nano})")
-        
+    def import_items_from_json(self, file_path: str, is_nano: bool = False,
+                              clear_existing: bool = False, full_reset: bool = False) -> ImportStats:
+        """
+        Import items from JSON file with chunked processing.
+
+        Args:
+            file_path: Path to JSON file to import
+            is_nano: Whether importing nano programs
+            clear_existing: Clear existing data before import
+            full_reset: Drop all tables and recreate from migrations before import
+        """
+        logger.info(f"Starting import from {file_path} (is_nano={is_nano}, full_reset={full_reset})")
+
+        # Handle full reset if requested
+        if full_reset:
+            # Do the full reset outside of session context
+            runner = MigrationRunner(db_url=self.db_url)
+            success = runner.reset_database()
+            if not success:
+                raise RuntimeError("Failed to reset database with migrations")
+            # Clear caches
+            self._stat_value_cache.clear()
+            self._criterion_cache.clear()
+
         with self.get_db_session() as db:
-            if clear_existing:
-                self.clear_existing_data(db, clear_items=True)
+            if clear_existing and not full_reset:
+                # Only clear data if not doing full reset (which already cleared everything)
+                self.clear_existing_data(db, clear_items=True, full_reset=False)
             
             # Load and process data
             logger.info("Loading JSON data...")
@@ -562,13 +701,27 @@ class DataImporter:
         
         return self.stats
     
-    def import_symbiants_from_csv(self, file_path: str, clear_existing: bool = False) -> int:
-        """Import symbiants from CSV file."""
-        logger.info(f"Starting symbiant import from {file_path}")
-        
+    def import_symbiants_from_csv(self, file_path: str, clear_existing: bool = False, full_reset: bool = False) -> int:
+        """
+        Import symbiants from CSV file.
+
+        Args:
+            file_path: Path to CSV file to import
+            clear_existing: Clear existing symbiant data before import
+            full_reset: Drop all tables and recreate from migrations before import
+        """
+        logger.info(f"Starting symbiant import from {file_path} (full_reset={full_reset})")
+
+        # Handle full reset if requested
+        if full_reset:
+            runner = MigrationRunner(db_url=self.db_url)
+            success = runner.reset_database()
+            if not success:
+                raise RuntimeError("Failed to reset database with migrations")
+
         count = 0
         with self.get_db_session() as db:
-            if clear_existing:
+            if clear_existing and not full_reset:
                 db.query(Symbiant).delete()
                 db.commit()
             

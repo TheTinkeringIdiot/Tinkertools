@@ -75,8 +75,8 @@ def import_symbiants(args):
     """Import symbiants from CSV."""
     logger.info("Starting symbiant import...")
 
-    # Ensure database tables exist
-    if not ensure_tables_exist():
+    # Ensure database tables exist (unless we're doing a full reset)
+    if not args.clear and not ensure_tables_exist():
         return False
 
     # Look for file in database directory
@@ -84,10 +84,15 @@ def import_symbiants(args):
     if not file_path.exists():
         logger.error(f"File {file_path} not found")
         return False
-    
+
     importer = DataImporter(chunk_size=args.chunk_size)
     try:
-        count = importer.import_symbiants_from_csv(str(file_path), args.clear)
+        # Use full_reset=True when --clear is specified
+        count = importer.import_symbiants_from_csv(
+            str(file_path),
+            clear_existing=False,  # Don't use old clear method
+            full_reset=args.clear  # Use new full reset with migrations
+        )
         logger.info(f"Successfully imported {count} symbiants")
         return True
     except Exception as e:
@@ -99,8 +104,8 @@ def import_items(args):
     """Import items from JSON."""
     logger.info("Starting items import...")
 
-    # Ensure database tables exist
-    if not ensure_tables_exist():
+    # Ensure database tables exist (unless we're doing a full reset)
+    if not args.clear and not ensure_tables_exist():
         return False
 
     # Look for file in database directory
@@ -108,10 +113,15 @@ def import_items(args):
     if not file_path.exists():
         logger.error(f"File {file_path} not found")
         return False
-    
+
     importer = DataImporter(chunk_size=args.chunk_size)
     try:
-        stats = importer.import_items_from_json(str(file_path), is_nano=False, clear_existing=args.clear)
+        stats = importer.import_items_from_json(
+            str(file_path),
+            is_nano=False,
+            clear_existing=False,  # Don't use old clear method
+            full_reset=args.clear  # Use new full reset with migrations
+        )
         logger.info(f"Items import completed: "
                    f"Created={stats.items_created}, "
                    f"Updated={stats.items_updated}, "
@@ -126,8 +136,8 @@ def import_nanos(args):
     """Import nanos from JSON."""
     logger.info("Starting nanos import...")
 
-    # Ensure database tables exist
-    if not ensure_tables_exist():
+    # Ensure database tables exist (unless we're doing a full reset)
+    if not args.clear and not ensure_tables_exist():
         return False
 
     # Look for file in database directory
@@ -138,7 +148,15 @@ def import_nanos(args):
 
     importer = DataImporter(chunk_size=args.chunk_size)
     try:
-        stats = importer.import_items_from_json(str(file_path), is_nano=True, clear_existing=False)
+        # Note: For nanos, we typically don't want to reset the entire database
+        # since they're usually imported after items. Only use full_reset if
+        # this is the first/only import being done.
+        stats = importer.import_items_from_json(
+            str(file_path),
+            is_nano=True,
+            clear_existing=False,
+            full_reset=False  # Don't reset for nanos (they're usually imported after items)
+        )
         logger.info(f"Nanos import completed: "
                    f"Created={stats.items_created}, "
                    f"Updated={stats.items_updated}, "
@@ -153,24 +171,47 @@ def import_all(args):
     """Import all data files in order."""
     logger.info("Starting full data import...")
 
+    # If --clear is specified, do the full reset once at the beginning
+    if args.clear:
+        logger.info("=== Performing full database reset with --clear flag ===")
+        from app.core.migration_runner import MigrationRunner
+
+        try:
+            runner = MigrationRunner()
+            success = runner.reset_database()
+            if not success:
+                logger.error("Failed to reset database")
+                return False
+            logger.info("Database reset completed successfully")
+        except Exception as e:
+            logger.error(f"Failed to reset database: {e}")
+            return False
+
     # Import in order: symbiants (smallest), items, then nanos
     success = True
 
+    # Create a modified args object that doesn't trigger reset for individual imports
+    import argparse
+    individual_args = argparse.Namespace(
+        chunk_size=args.chunk_size,
+        clear=False  # Don't reset for individual imports since we did it above
+    )
+
     # Symbiants first (smallest file)
     logger.info("=== Importing Symbiants ===")
-    if not import_symbiants(args):
+    if not import_symbiants(individual_args):
         success = False
         logger.error("Symbiant import failed, continuing with items...")
 
     # Items (largest file)
     logger.info("=== Importing Items ===")
-    if not import_items(args):
+    if not import_items(individual_args):
         success = False
         logger.error("Items import failed, continuing with nanos...")
 
     # Nanos
     logger.info("=== Importing Nanos ===")
-    if not import_nanos(args):
+    if not import_nanos(individual_args):
         success = False
         logger.error("Nanos import failed")
 
@@ -231,7 +272,7 @@ Environment:
     parser.add_argument(
         "--clear",
         action="store_true",
-        help="Clear existing data before import (WARNING: destructive!)"
+        help="Drop all TinkerTools tables and recreate from migrations before import (WARNING: DESTRUCTIVE! All TinkerTools data will be lost!)"
     )
     parser.add_argument(
         "--chunk-size",
@@ -267,15 +308,17 @@ Environment:
     
     # Warn about destructive operations
     if args.clear:
-        logger.warning("⚠️  --clear flag specified: This will DELETE existing data!")
+        logger.warning("⚠️  --clear flag specified: This will DROP ALL TINKERTOOLS TABLES and recreate them from migrations!")
+        logger.warning("    All existing TinkerTools data will be permanently deleted.")
+        logger.warning("    The TinkerTools schema will be rebuilt from scratch.")
         try:
-            response = input("Continue? (y/N): ").strip().lower()
+            response = input("Are you sure you want to continue? (y/N): ").strip().lower()
             if response != 'y':
                 logger.info("Import cancelled")
                 sys.exit(0)
         except EOFError:
             # Non-interactive environment, assume yes
-            logger.info("Non-interactive environment detected, proceeding with clear operation")
+            logger.info("Non-interactive environment detected, proceeding with full database reset")
     
     # Run import command
     success = False

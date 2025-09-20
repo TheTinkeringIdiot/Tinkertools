@@ -24,7 +24,6 @@ class ItemBase(BaseModel):
     item_class: Optional[int] = Field(None, description="Item class/category")
     description: Optional[str] = Field(None, description="Item description")
     is_nano: bool = Field(False, description="Is this a nano program")
-    is_perk: bool = Field(False, description="Is this a perk item")
 
 
 class ItemCreate(ItemBase):
