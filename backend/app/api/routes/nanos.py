@@ -543,7 +543,7 @@ def get_nanos_by_profession_fast(
         AND NOT i.name LIKE 'TESTLIVEITEM%'
         AND EXISTS (
             SELECT 1 FROM item_stats ist 
-            JOIN stat_values sv ON ist.stat_id = sv.id 
+            JOIN stat_values sv ON ist.stat_value_id = sv.id 
             WHERE ist.item_id = i.id AND sv.stat = 75 
             AND sv.value > 0 AND sv.value != 99999
         )
@@ -566,7 +566,7 @@ def get_nanos_by_profession_fast(
         AND NOT i.name LIKE 'TESTLIVEITEM%'
         AND EXISTS (
             SELECT 1 FROM item_stats ist 
-            JOIN stat_values sv ON ist.stat_id = sv.id 
+            JOIN stat_values sv ON ist.stat_value_id = sv.id 
             WHERE ist.item_id = i.id AND sv.stat = 75 
             AND sv.value > 0 AND sv.value != 99999
         )

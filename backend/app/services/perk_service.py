@@ -12,6 +12,7 @@ from sqlalchemy import and_, func, text, Integer, or_, distinct
 import logging
 
 from app.models.item import Item, ItemSpellData
+from app.models.perk import Perk
 from app.models.spell_data import SpellData, SpellDataSpells
 from app.models.spell import Spell
 from app.api.schemas.perk import (
@@ -21,6 +22,33 @@ from app.api.schemas.perk import (
 from app.api.schemas.spell import SpellDataResponse
 
 logger = logging.getLogger(__name__)
+
+# Game data mappings for ID to name conversion
+PROFESSION_NAMES = {
+    1: 'Soldier',
+    2: 'MartialArtist',
+    3: 'Engineer',
+    4: 'Fixer',
+    5: 'Agent',
+    6: 'Adventurer',
+    7: 'Trader',
+    8: 'Bureaucrat',
+    9: 'Enforcer',
+    10: 'Doctor',
+    11: 'NanoTechnician',
+    12: 'MetaPhysicist',
+    13: 'Monster',
+    14: 'Keeper',
+    15: 'Shade'
+}
+
+BREED_NAMES = {
+    1: 'Solitus',
+    2: 'Opifex',
+    3: 'Nanomage',
+    4: 'Atrox',
+    7: 'HumanMonster'
+}
 
 
 class PerkService:
@@ -61,67 +89,96 @@ class PerkService:
         """
         logger.info(f"Getting available perks for character level {character_level}, profession {character_profession}")
 
-        # Start with base query for perks (items with is_perk=True and spell_data)
+        # Start with base query joining items with perks table
         query = self.db.query(Item)\
-            .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
-            .filter(Item.is_perk == True)
+            .join(Perk, Item.id == Perk.item_id)\
+            .join(ItemSpellData, Item.id == ItemSpellData.item_id)
 
         # Apply character level requirement filtering
         if character_level is not None:
-            # Filter perks that require higher level than character has
-            # This would need to be implemented based on how level requirements are stored
-            # For now, we'll skip this filter until the exact storage format is known
-            pass
+            query = query.filter(Perk.level_required <= character_level)
 
         # Apply profession filtering
         if character_profession is not None:
-            # Filter perks that don't match character profession
-            # This would need profession requirement data from the database
-            pass
+            profession_id = self._profession_name_to_id(character_profession)
+            if profession_id is not None:
+                # Use PostgreSQL array contains operator - empty array means all professions
+                query = query.filter(
+                    or_(
+                        func.array_length(Perk.professions, 1).is_(None),  # NULL array
+                        func.array_length(Perk.professions, 1) == 0,      # Empty array
+                        Perk.professions.contains([profession_id])         # Contains profession
+                    )
+                )
 
         # Apply breed filtering
         if character_breed is not None:
-            # Filter perks that don't match character breed
-            # This would need breed requirement data from the database
-            pass
+            breed_id = self._breed_name_to_id(character_breed)
+            if breed_id is not None:
+                # Use PostgreSQL array contains operator - empty array means all breeds
+                query = query.filter(
+                    or_(
+                        func.array_length(Perk.breeds, 1).is_(None),       # NULL array
+                        func.array_length(Perk.breeds, 1) == 0,           # Empty array
+                        Perk.breeds.contains([breed_id])                   # Contains breed
+                    )
+                )
+
+        # Apply AI title level filtering
+        if ai_title_level is not None:
+            query = query.filter(Perk.ai_level_required <= ai_title_level)
 
         # Apply perk type filtering
         if perk_types is not None:
-            # Filter by perk types - this would need type information stored in metadata
-            pass
+            query = query.filter(Perk.type.in_(perk_types))
 
         # Execute query with proper loading of relationships
         results = query.options(
+            joinedload(Item.perk),
             joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
         ).distinct().all()
 
         # Convert to response objects
         perk_responses = []
         for item in results:
-            # Extract perk metadata (type, counter, etc.) from item data
-            perk_type = self._extract_perk_type(item)
-            perk_counter = self._extract_perk_counter(item)
+            # Get perk metadata from perks table
+            perk = item.perk
+            if not perk:
+                logger.warning(f"Item {item.id} has no perk relationship")
+                continue
 
             # Validate ownership progression
-            if owned_perks and not self._can_purchase_level(item.name, perk_counter, owned_perks):
+            if owned_perks and not self._can_purchase_level(perk.name, perk.counter, owned_perks):
                 continue
 
             # Check point affordability
-            if not self._is_affordable(perk_type, perk_counter, available_sl_points, available_ai_points, owned_perks, item.name):
+            if not self._is_affordable(perk.type, perk.counter, available_sl_points, available_ai_points, owned_perks, perk.name):
                 continue
+
+            # Handle empty arrays as "all professions/breeds allowed" according to task requirements
+            professions = self._profession_ids_to_names(perk.professions or [])
+            breeds = self._breed_ids_to_names(perk.breeds or [])
+
+            # If arrays are empty or None, it means all professions/breeds are allowed
+            if not perk.professions or len(perk.professions) == 0:
+                professions = []  # Empty list indicates "all allowed"
+            if not perk.breeds or len(perk.breeds) == 0:
+                breeds = []  # Empty list indicates "all allowed"
 
             perk_response = PerkResponse(
                 id=item.id,
                 aoid=item.aoid,
-                name=item.name,
-                counter=perk_counter,
-                type=perk_type,
-                professions=self._extract_professions(item),
-                breeds=self._extract_breeds(item),
-                level=self._extract_level_requirement(item),
-                ai_title=self._extract_ai_title_requirement(item),
+                name=perk.name,
+                counter=perk.counter,
+                type=perk.type,
+                professions=professions,
+                breeds=breeds,
+                level=perk.level_required,
+                ai_title=perk.ai_level_required if perk.ai_level_required > 0 else None,
                 description=item.description,
-                ql=item.ql
+                ql=item.ql,
+                perk_series=perk.perk_series,  # Add perk_series for grouping
+                formatted_name=f"{perk.name} {perk.counter}"  # Add formatted name with counter
             )
             perk_responses.append(perk_response)
 
@@ -140,20 +197,16 @@ class PerkService:
         """
         logger.info(f"Getting perk series for '{perk_name}'")
 
-        # Query all levels of the perk by name pattern
-        # Perk names typically follow pattern: "Perk Name" for level 1, "Perk Name 2" for level 2, etc.
+        # Query all levels of the perk by perk series
         query = self.db.query(Item)\
+            .join(Perk, Item.id == Perk.item_id)\
             .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
-            .filter(Item.is_perk == True)\
-\
-            .filter(or_(
-                Item.name == perk_name,  # Level 1 (no suffix)
-                Item.name.like(f"{perk_name} %")  # Levels 2-10 (with numeric suffix)
-            ))\
+            .filter(Perk.perk_series == perk_name)\
             .options(
+                joinedload(Item.perk),
                 joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
             )\
-            .order_by(Item.name)
+            .order_by(Perk.counter)
 
         perk_items = query.all()
 
@@ -169,11 +222,23 @@ class PerkService:
         breeds = []
 
         for item in perk_items:
-            counter = self._extract_perk_counter(item)
+            perk = item.perk
+            if not perk:
+                logger.warning(f"Item {item.id} has no perk relationship")
+                continue
+
+            counter = perk.counter
             if perk_type is None:
-                perk_type = self._extract_perk_type(item)
-                professions = self._extract_professions(item)
-                breeds = self._extract_breeds(item)
+                perk_type = perk.type
+                # Handle empty arrays as "all professions/breeds allowed"
+                professions = self._profession_ids_to_names(perk.professions or [])
+                breeds = self._breed_ids_to_names(perk.breeds or [])
+
+                # If arrays are empty or None, it means all professions/breeds are allowed
+                if not perk.professions or len(perk.professions) == 0:
+                    professions = []  # Empty list indicates "all allowed"
+                if not perk.breeds or len(perk.breeds) == 0:
+                    breeds = []  # Empty list indicates "all allowed"
 
             # Calculate point cost for this level
             cost = 1 if perk_type in ['SL', 'AI'] else 0  # LE research is free
@@ -195,19 +260,21 @@ class PerkService:
             perk_detail = PerkDetail(
                 id=item.id,
                 aoid=item.aoid,
-                name=item.name,
+                name=perk.name,
                 counter=counter,
                 type=perk_type,
                 professions=professions,
                 breeds=breeds,
-                level=self._extract_level_requirement(item),
-                ai_title=self._extract_ai_title_requirement(item),
+                level=perk.level_required,
+                ai_title=perk.ai_level_required if perk.ai_level_required > 0 else None,
                 description=item.description,
                 ql=item.ql,
                 requirements=requirements,
                 effects=effects,
                 spell_data=spell_data_responses,
-                point_cost=point_cost
+                point_cost=point_cost,
+                perk_series=perk.perk_series,  # Add perk_series for grouping
+                formatted_name=f"{perk.name} {counter}"  # Add formatted name with counter
             )
             perk_levels.append(perk_detail)
 
@@ -245,16 +312,14 @@ class PerkService:
             # Get all levels from 1 to owned_level
             for level in range(1, owned_level + 1):
                 # Find the perk item for this level
-                level_name = perk_name if level == 1 else f"{perk_name} {level}"
-
                 perk_item = self.db.query(Item)\
-                    .filter(Item.name == level_name)\
-                    .filter(Item.is_perk == True)\
-        \
+                    .join(Perk, Item.id == Perk.item_id)\
+                    .filter(Perk.perk_series == perk_name)\
+                    .filter(Perk.counter == level)\
                     .first()
 
                 if not perk_item:
-                    logger.warning(f"Perk level not found: {level_name}")
+                    logger.warning(f"Perk level not found: {perk_name} level {level}")
                     continue
 
                 # Extract effects from spell data
@@ -294,29 +359,48 @@ class PerkService:
 
         # Query the perk item by AOID
         perk_item = self.db.query(Item)\
+            .join(Perk, Item.id == Perk.item_id)\
             .filter(Item.aoid == aoid)\
-            .filter(Item.is_perk == True)\
+            .options(joinedload(Item.perk))\
             .first()
 
         if not perk_item:
             logger.info(f"No perk found with AOID {aoid}")
             return None
 
-        # Extract basic perk information
-        perk_type = self._extract_perk_type(perk_item)
-        perk_counter = self._extract_perk_counter(perk_item)
+        # Extract basic perk information from perk table
+        perk = perk_item.perk
+        if not perk:
+            logger.warning(f"Item {perk_item.id} has no perk relationship")
+            return None
+
+        # Handle empty arrays as "all professions/breeds allowed"
+        professions = self._profession_ids_to_names(perk.professions or [])
+        breeds = self._breed_ids_to_names(perk.breeds or [])
+
+        # If arrays are empty or None, it means all professions/breeds are allowed
+        if not perk.professions or len(perk.professions) == 0:
+            professions = []  # Empty list indicates "all allowed"
+        if not perk.breeds or len(perk.breeds) == 0:
+            breeds = []  # Empty list indicates "all allowed"
 
         perk_info = {
             "id": perk_item.id,
             "aoid": perk_item.aoid,
-            "name": perk_item.name,
-            "counter": perk_counter,
-            "type": perk_type,
+            "name": perk.name,
+            "counter": perk.counter,
+            "type": perk.type,
             "description": perk_item.description,
-            "ql": perk_item.ql
+            "ql": perk_item.ql,
+            "perk_series": perk.perk_series,  # Add perk_series for grouping
+            "formatted_name": f"{perk.name} {perk.counter}",  # Add formatted name with counter
+            "professions": professions,  # Add profession names
+            "breeds": breeds,  # Add breed names
+            "level": perk.level_required,  # Add level requirement
+            "ai_title": perk.ai_level_required if perk.ai_level_required > 0 else None  # Add AI title requirement
         }
 
-        logger.info(f"Found perk: {perk_item.name} (type: {perk_type}, level: {perk_counter})")
+        logger.info(f"Found perk: {perk.name} (type: {perk.type}, level: {perk.counter})")
         return perk_info
 
     async def get_perk_by_aoid(self, aoid: int) -> Optional[PerkDetail]:
@@ -332,11 +416,11 @@ class PerkService:
         logger.info(f"Looking up perk by AOID: {aoid}")
 
         # Query the perk item by AOID
-        # Perks are items with is_perk=True and spell_data
         perk_item = self.db.query(Item)\
+            .join(Perk, Item.id == Perk.item_id)\
             .filter(Item.aoid == aoid)\
-            .filter(Item.is_perk == True)\
             .options(
+                joinedload(Item.perk),
                 joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
             )\
             .first()
@@ -345,18 +429,18 @@ class PerkService:
             logger.info(f"No perk found with AOID {aoid}")
             return None
 
-        # Extract perk information
-        perk_type = self._extract_perk_type(perk_item)
-        perk_counter = self._extract_perk_counter(perk_item)
-        professions = self._extract_professions(perk_item)
-        breeds = self._extract_breeds(perk_item)
+        # Extract perk information from perk table
+        perk = perk_item.perk
+        if not perk:
+            logger.warning(f"Item {perk_item.id} has no perk relationship")
+            return None
 
         # Calculate point cost
-        cost = 1 if perk_type in ['SL', 'AI'] else 0
-        cumulative_cost = perk_counter * cost if perk_type in ['SL', 'AI'] else 0
+        cost = 1 if perk.type in ['SL', 'AI'] else 0
+        cumulative_cost = perk.counter * cost if perk.type in ['SL', 'AI'] else 0
 
         point_cost = PerkPointCost(
-            level=perk_counter,
+            level=perk.counter,
             cost=cost,
             cumulative_cost=cumulative_cost
         )
@@ -366,25 +450,37 @@ class PerkService:
         effects = await self._extract_perk_effects(perk_item)
         requirements = self._extract_perk_requirements(perk_item)
 
+        # Handle empty arrays as "all professions/breeds allowed"
+        professions = self._profession_ids_to_names(perk.professions or [])
+        breeds = self._breed_ids_to_names(perk.breeds or [])
+
+        # If arrays are empty or None, it means all professions/breeds are allowed
+        if not perk.professions or len(perk.professions) == 0:
+            professions = []  # Empty list indicates "all allowed"
+        if not perk.breeds or len(perk.breeds) == 0:
+            breeds = []  # Empty list indicates "all allowed"
+
         perk_detail = PerkDetail(
             id=perk_item.id,
             aoid=perk_item.aoid,
-            name=perk_item.name,
-            counter=perk_counter,
-            type=perk_type,
+            name=perk.name,
+            counter=perk.counter,
+            type=perk.type,
             professions=professions,
             breeds=breeds,
-            level=self._extract_level_requirement(perk_item),
-            ai_title=self._extract_ai_title_requirement(perk_item),
+            level=perk.level_required,
+            ai_title=perk.ai_level_required if perk.ai_level_required > 0 else None,
             description=perk_item.description,
             ql=perk_item.ql,
             requirements=requirements,
             effects=effects,
             spell_data=spell_data_responses,
-            point_cost=point_cost
+            point_cost=point_cost,
+            perk_series=perk.perk_series,  # Add perk_series for grouping
+            formatted_name=f"{perk.name} {perk.counter}"  # Add formatted name with counter
         )
 
-        logger.info(f"Found perk: {perk_item.name} (type: {perk_type}, level: {perk_counter})")
+        logger.info(f"Found perk: {perk.name} (type: {perk.type}, level: {perk.counter})")
         return perk_detail
 
     async def validate_perk_requirements(
@@ -419,11 +515,11 @@ class PerkService:
         owned_perks = owned_perks or {}
 
         # Find the target perk item
-        target_name = perk_name if target_level == 1 else f"{perk_name} {target_level}"
         perk_item = self.db.query(Item)\
-            .filter(Item.name == target_name)\
-            .filter(Item.is_perk == True)\
-\
+            .join(Perk, Item.id == Perk.item_id)\
+            .filter(Perk.perk_series == perk_name)\
+            .filter(Perk.counter == target_level)\
+            .options(joinedload(Item.perk))\
             .first()
 
         if not perk_item:
@@ -434,11 +530,27 @@ class PerkService:
                 warnings=warnings
             )
 
-        # Extract requirements
-        required_level = self._extract_level_requirement(perk_item)
-        required_ai_title = self._extract_ai_title_requirement(perk_item)
-        required_professions = self._extract_professions(perk_item)
-        required_breeds = self._extract_breeds(perk_item)
+        # Extract requirements from perk table
+        perk = perk_item.perk
+        if not perk:
+            errors.append(f"Perk '{perk_name}' level {target_level} has no perk data")
+            return PerkValidationResponse(
+                valid=False,
+                errors=errors,
+                warnings=warnings
+            )
+
+        required_level = perk.level_required
+        required_ai_title = perk.ai_level_required if perk.ai_level_required > 0 else None
+        # Handle empty arrays as "all professions/breeds allowed"
+        required_professions = self._profession_ids_to_names(perk.professions or [])
+        required_breeds = self._breed_ids_to_names(perk.breeds or [])
+
+        # If arrays are empty or None, it means all professions/breeds are allowed
+        if not perk.professions or len(perk.professions) == 0:
+            required_professions = []  # Empty list indicates "all allowed"
+        if not perk.breeds or len(perk.breeds) == 0:
+            required_breeds = []  # Empty list indicates "all allowed"
 
         # Validate character level
         if character_level < required_level:
@@ -449,11 +561,11 @@ class PerkService:
             current_ai = ai_title_level or 0
             errors.append(f"Requires AI title level {required_ai_title} (current: {current_ai})")
 
-        # Validate profession restriction
+        # Validate profession restriction - only check if there are specific requirements
         if required_professions and character_profession not in required_professions:
             errors.append(f"Not available for {character_profession} (requires: {', '.join(required_professions)})")
 
-        # Validate breed restriction
+        # Validate breed restriction - only check if there are specific requirements
         if required_breeds and character_breed not in required_breeds:
             errors.append(f"Not available for {character_breed} (requires: {', '.join(required_breeds)})")
 
@@ -479,42 +591,33 @@ class PerkService:
             prerequisite_perks=prerequisite_perks
         )
 
+    # Helper methods for ID/name conversion
+
+    def _profession_ids_to_names(self, profession_ids: List[int]) -> List[str]:
+        """Convert profession IDs to names."""
+        return [PROFESSION_NAMES.get(prof_id, f'Unknown({prof_id})') for prof_id in profession_ids if prof_id in PROFESSION_NAMES]
+
+    def _breed_ids_to_names(self, breed_ids: List[int]) -> List[str]:
+        """Convert breed IDs to names."""
+        return [BREED_NAMES.get(breed_id, f'Unknown({breed_id})') for breed_id in breed_ids if breed_id in BREED_NAMES]
+
+    def _profession_name_to_id(self, profession_name: str) -> Optional[int]:
+        """Convert profession name to ID."""
+        for prof_id, name in PROFESSION_NAMES.items():
+            if name == profession_name:
+                return prof_id
+        return None
+
+    def _breed_name_to_id(self, breed_name: str) -> Optional[int]:
+        """Convert breed name to ID."""
+        for breed_id, name in BREED_NAMES.items():
+            if name == breed_name:
+                return breed_id
+        return None
+
     # Helper methods
 
-    def _extract_perk_type(self, item: Item) -> str:
-        """Extract perk type (SL/AI/LE) from item data."""
-        # This would need to be implemented based on how perk types are stored
-        # For now, return default
-        return 'SL'
-
-    def _extract_perk_counter(self, item: Item) -> int:
-        """Extract perk level counter from item name or data."""
-        # Extract counter from item name pattern
-        # Example: "Perk Name" = level 1, "Perk Name 5" = level 5
-        name_parts = item.name.split()
-        if name_parts[-1].isdigit():
-            return int(name_parts[-1])
-        return 1
-
-    def _extract_professions(self, item: Item) -> List[str]:
-        """Extract required professions from item criteria."""
-        # This would analyze spell criteria for profession requirements
-        return []
-
-    def _extract_breeds(self, item: Item) -> List[str]:
-        """Extract required breeds from item criteria."""
-        # This would analyze spell criteria for breed requirements
-        return []
-
-    def _extract_level_requirement(self, item: Item) -> int:
-        """Extract character level requirement from item."""
-        # This would analyze spell criteria for level requirements
-        return 1
-
-    def _extract_ai_title_requirement(self, item: Item) -> Optional[int]:
-        """Extract AI title level requirement from item."""
-        # This would analyze spell criteria for AI title requirements
-        return None
+# Old helper methods removed - now using Perk table data directly
 
     def _can_purchase_level(self, perk_name: str, target_level: int, owned_perks: Dict[str, int]) -> bool:
         """Check if character can purchase the target perk level (sequential validation)."""
@@ -584,39 +687,42 @@ class PerkService:
         return effects
 
     def _extract_perk_requirements(self, item: Item) -> List[PerkRequirement]:
-        """Extract all requirements from item data."""
+        """Extract all requirements from perk data."""
         requirements = []
+        perk = item.perk
+        if not perk:
+            return requirements
 
         # Extract level requirement
-        level_req = self._extract_level_requirement(item)
-        if level_req > 1:
+        if perk.level_required > 1:
             requirements.append(PerkRequirement(
                 type='level',
                 requirement='character_level',
-                value=level_req
+                value=perk.level_required
             ))
 
         # Extract AI title requirement
-        ai_title_req = self._extract_ai_title_requirement(item)
-        if ai_title_req:
+        if perk.ai_level_required > 0:
             requirements.append(PerkRequirement(
                 type='ai_title',
                 requirement='ai_title_level',
-                value=ai_title_req
+                value=perk.ai_level_required
             ))
 
-        # Extract profession requirements
-        for profession in self._extract_professions(item):
-            requirements.append(PerkRequirement(
-                type='profession',
-                requirement=profession
-            ))
+        # Extract profession requirements - handle empty arrays as "all allowed"
+        if perk.professions and len(perk.professions) > 0:
+            for profession in self._profession_ids_to_names(perk.professions):
+                requirements.append(PerkRequirement(
+                    type='profession',
+                    requirement=profession
+                ))
 
-        # Extract breed requirements
-        for breed in self._extract_breeds(item):
-            requirements.append(PerkRequirement(
-                type='breed',
-                requirement=breed
-            ))
+        # Extract breed requirements - handle empty arrays as "all allowed"
+        if perk.breeds and len(perk.breeds) > 0:
+            for breed in self._breed_ids_to_names(perk.breeds):
+                requirements.append(PerkRequirement(
+                    type='breed',
+                    requirement=breed
+                ))
 
         return requirements

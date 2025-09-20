@@ -18,7 +18,7 @@ from app.services.perk_service import PerkService
 from app.api.schemas.perk import (
     PerkResponse, PerkDetail, PerkSeries, PerkSearchRequest,
     PerkStatsResponse, PerkCalculationRequest, PerkCalculationResponse,
-    PerkValidationResponse
+    PerkValidationResponse, PerkSeriesResponse, PerkSeriesPerk
 )
 from app.api.schemas import PaginatedResponse
 from app.core.decorators import cached_response, performance_monitor
@@ -32,6 +32,160 @@ def get_perk_service(db: Session = Depends(get_db)) -> PerkService:
     return PerkService(db)
 
 
+async def _get_filtered_perks_from_service(
+    perk_service: PerkService,
+    type: Optional[str] = None,
+    profession: Optional[str] = None,
+    breed: Optional[str] = None,
+    min_level: Optional[int] = None,
+    max_level: Optional[int] = None,
+    ai_level: Optional[int] = None,
+    series: Optional[str] = None,
+    search: Optional[str] = None,
+    character_level: Optional[int] = None,
+    character_profession: Optional[str] = None,
+    character_breed: Optional[str] = None,
+    ai_title_level: Optional[int] = None,
+    available_sl_points: Optional[int] = None,
+    available_ai_points: Optional[int] = None
+) -> List[PerkResponse]:
+    """
+    Get filtered perks using efficient database queries.
+
+    This function builds database queries to filter perks based on the new
+    perks table structure, avoiding JSON-based filtering for better performance.
+    """
+    from app.models.perk import Perk
+    from app.models.item import Item, ItemSpellData
+    from sqlalchemy import and_, or_, func
+
+    # Start with base query joining items with perks table
+    query = perk_service.db.query(Item)\
+        .join(Perk, Item.id == Perk.item_id)\
+        .join(ItemSpellData, Item.id == ItemSpellData.item_id)
+
+    # Apply basic filters using database queries
+    if type:
+        query = query.filter(Perk.type == type)
+
+    if series:
+        query = query.filter(Perk.perk_series == series)
+
+    if search:
+        query = query.filter(Perk.name.ilike(f'%{search}%'))
+
+    # Apply level filtering
+    if min_level is not None:
+        query = query.filter(Perk.level_required >= min_level)
+    if max_level is not None:
+        query = query.filter(Perk.level_required <= max_level)
+
+    # Apply AI level filtering
+    if ai_level is not None:
+        query = query.filter(Perk.ai_level_required <= ai_level)
+
+    # Apply profession filtering (handle both name and ID)
+    if profession:
+        try:
+            # Try as integer ID first
+            profession_id = int(profession)
+        except ValueError:
+            # Convert name to ID
+            profession_id = perk_service._profession_name_to_id(profession)
+
+        if profession_id is not None:
+            query = query.filter(
+                or_(
+                    func.array_length(Perk.professions, 1).is_(None),
+                    func.array_length(Perk.professions, 1) == 0,
+                    Perk.professions.contains([profession_id])
+                )
+            )
+
+    # Apply breed filtering (handle both name and ID)
+    if breed:
+        try:
+            # Try as integer ID first
+            breed_id = int(breed)
+        except ValueError:
+            # Convert name to ID
+            breed_id = perk_service._breed_name_to_id(breed)
+
+        if breed_id is not None:
+            query = query.filter(
+                or_(
+                    func.array_length(Perk.breeds, 1).is_(None),
+                    func.array_length(Perk.breeds, 1) == 0,
+                    Perk.breeds.contains([breed_id])
+                )
+            )
+
+    # Execute query with proper loading of relationships
+    from sqlalchemy.orm import joinedload
+    results = query.options(
+        joinedload(Item.perk),
+        joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
+    ).distinct().all()
+
+    # Convert to response objects with character compatibility checks
+    perk_responses = []
+    for item in results:
+        perk = item.perk
+        if not perk:
+            continue
+
+        # Apply character compatibility filtering if provided
+        if character_level is not None and perk.level_required > character_level:
+            continue
+
+        if character_profession and perk.professions and len(perk.professions) > 0:
+            char_prof_id = perk_service._profession_name_to_id(character_profession)
+            if char_prof_id and char_prof_id not in perk.professions:
+                continue
+
+        if character_breed and perk.breeds and len(perk.breeds) > 0:
+            char_breed_id = perk_service._breed_name_to_id(character_breed)
+            if char_breed_id and char_breed_id not in perk.breeds:
+                continue
+
+        if ai_title_level is not None and perk.ai_level_required > ai_title_level:
+            continue
+
+        # Check point affordability
+        if not perk_service._is_affordable(
+            perk.type, perk.counter, available_sl_points, available_ai_points, None, perk.name
+        ):
+            continue
+
+        # Handle empty arrays as "all professions/breeds allowed"
+        professions = perk_service._profession_ids_to_names(perk.professions or [])
+        breeds = perk_service._breed_ids_to_names(perk.breeds or [])
+
+        if not perk.professions or len(perk.professions) == 0:
+            professions = []
+        if not perk.breeds or len(perk.breeds) == 0:
+            breeds = []
+
+        perk_response = PerkResponse(
+            id=item.id,
+            aoid=item.aoid,
+            name=perk.name,
+            counter=perk.counter,
+            type=perk.type,
+            professions=professions,
+            breeds=breeds,
+            level=perk.level_required,
+            ai_title=perk.ai_level_required if perk.ai_level_required > 0 else None,
+            description=item.description,
+            ql=item.ql,
+            perk_series=perk.perk_series,
+            formatted_name=f"{perk.name} {perk.counter}"
+        )
+        perk_responses.append(perk_response)
+
+    return perk_responses
+
+
 @router.get("", response_model=PaginatedResponse[PerkResponse])
 @cached_response("perks_list")
 @performance_monitor
@@ -39,14 +193,12 @@ async def get_perks(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page"),
     type: Optional[str] = Query(None, description="Filter by perk type (SL, AI, LE)"),
-    profession: Optional[str] = Query(None, description="Filter by required profession"),
-    breed: Optional[str] = Query(None, description="Filter by required breed"),
-    level_min: Optional[int] = Query(None, description="Minimum character level requirement"),
-    level_max: Optional[int] = Query(None, description="Maximum character level requirement"),
-    ai_title_min: Optional[int] = Query(None, description="Minimum AI title level requirement"),
-    ai_title_max: Optional[int] = Query(None, description="Maximum AI title level requirement"),
-    counter_min: Optional[int] = Query(None, description="Minimum perk level (1-10)"),
-    counter_max: Optional[int] = Query(None, description="Maximum perk level (1-10)"),
+    profession: Optional[str] = Query(None, description="Filter by required profession name or ID"),
+    breed: Optional[str] = Query(None, description="Filter by required breed name or ID"),
+    min_level: Optional[int] = Query(None, description="Minimum character level requirement"),
+    max_level: Optional[int] = Query(None, description="Maximum character level requirement"),
+    ai_level: Optional[int] = Query(None, description="AI title level requirement"),
+    series: Optional[str] = Query(None, description="Filter by perk series name"),
     search: Optional[str] = Query(None, description="Search by perk name"),
     character_level: Optional[int] = Query(None, description="Character level for compatibility filtering"),
     character_profession: Optional[str] = Query(None, description="Character profession for filtering"),
@@ -62,48 +214,36 @@ async def get_perks(
     Get paginated list of perks with filtering and character compatibility checks.
 
     This endpoint supports comprehensive filtering by perk attributes and character constraints.
-    It can filter perks based on character level, profession, breed, and available points,
+    It can filter perks based on character level, profession, breed, series, and available points,
     ensuring only purchasable perks are returned when character data is provided.
-    """
-    logger.info(f"Getting perks: page={page}, character_level={character_level}, profession={character_profession}")
 
-    # Get available perks from service
-    perk_types = [type] if type else None
-    perks = await perk_service.get_available_perks(
+    Examples:
+        - Filter by series: ?series=Aimed Shot
+        - Filter by profession: ?profession=Agent or ?profession=5
+        - Filter by breed: ?breed=Solitus or ?breed=1
+        - Filter by type: ?type=SL
+        - Combined filters: ?series=Aimed Shot&profession=Agent&type=SL
+    """
+    logger.info(f"Getting perks: page={page}, series={series}, profession={profession}, type={type}")
+
+    # Get filtered perks using database queries for better performance
+    filtered_perks = await _get_filtered_perks_from_service(
+        perk_service=perk_service,
+        type=type,
+        profession=profession,
+        breed=breed,
+        min_level=min_level,
+        max_level=max_level,
+        ai_level=ai_level,
+        series=series,
+        search=search,
         character_level=character_level,
         character_profession=character_profession,
         character_breed=character_breed,
         ai_title_level=ai_title_level,
-        perk_types=perk_types,
         available_sl_points=available_sl_points,
-        available_ai_points=available_ai_points,
-        owned_perks=None  # No owned perks filter in this endpoint
+        available_ai_points=available_ai_points
     )
-
-    # Apply additional filtering
-    filtered_perks = []
-    for perk in perks:
-        # Apply filters
-        if profession and profession not in perk.professions:
-            continue
-        if breed and breed not in perk.breeds:
-            continue
-        if level_min and perk.level < level_min:
-            continue
-        if level_max and perk.level > level_max:
-            continue
-        if ai_title_min and (perk.ai_title is None or perk.ai_title < ai_title_min):
-            continue
-        if ai_title_max and (perk.ai_title is None or perk.ai_title > ai_title_max):
-            continue
-        if counter_min and perk.counter < counter_min:
-            continue
-        if counter_max and perk.counter > counter_max:
-            continue
-        if search and search.lower() not in perk.name.lower():
-            continue
-
-        filtered_perks.append(perk)
 
     # Apply sorting
     reverse = sort_desc
@@ -286,6 +426,110 @@ async def get_perk_stats(
 
     logger.info(f"Perk stats: {stats.total_perks} perks, {stats.total_series} series")
     return stats
+
+
+@router.get("/series", response_model=List[PerkSeriesResponse])
+@cached_response("perks_series")
+@performance_monitor
+async def get_perk_series_grouped(
+    profession: Optional[str] = Query(None, description="Filter by required profession"),
+    breed: Optional[str] = Query(None, description="Filter by required breed"),
+    type: Optional[str] = Query(None, description="Filter by perk type (SL, AI, LE)"),
+    perk_service: PerkService = Depends(get_perk_service)
+):
+    """
+    Get perks grouped by series name.
+
+    Returns all perk series with their counters (1-10), showing profession/breed requirements,
+    type information, and level requirements for each series.
+    """
+    logger.info(f"Getting perk series grouped - profession: {profession}, breed: {breed}, type: {type}")
+
+    # Import Perk model here to avoid circular imports
+    from app.models.perk import Perk
+    from app.models.item import Item
+
+    # Get database session from perk_service
+    db = perk_service.db
+
+    # Build base query to get all perks with their series
+    query = db.query(Perk.perk_series, Perk.type, Perk.professions, Perk.breeds)\
+        .join(Item, Perk.item_id == Item.id)\
+        .distinct(Perk.perk_series)
+
+    # Apply filtering
+    if profession:
+        # Convert profession name to ID for filtering
+        profession_id = perk_service._profession_name_to_id(profession)
+        if profession_id is not None:
+            query = query.filter(
+                or_(
+                    func.array_length(Perk.professions, 1).is_(None),
+                    func.array_length(Perk.professions, 1) == 0,
+                    Perk.professions.contains([profession_id])
+                )
+            )
+
+    if breed:
+        # Convert breed name to ID for filtering
+        breed_id = perk_service._breed_name_to_id(breed)
+        if breed_id is not None:
+            query = query.filter(
+                or_(
+                    func.array_length(Perk.breeds, 1).is_(None),
+                    func.array_length(Perk.breeds, 1) == 0,
+                    Perk.breeds.contains([breed_id])
+                )
+            )
+
+    if type:
+        query = query.filter(Perk.type == type)
+
+    # Execute query to get series metadata
+    series_results = query.all()
+
+    # For each series, get all perks in that series
+    series_responses = []
+
+    for series_name, series_type, professions, breeds in series_results:
+        # Get all perks in this series
+        perks_query = db.query(Perk, Item.aoid)\
+            .join(Item, Perk.item_id == Item.id)\
+            .filter(Perk.perk_series == series_name)\
+            .order_by(Perk.counter)
+
+        perk_items = perks_query.all()
+
+        # Convert to PerkSeriesPerk objects
+        series_perks = []
+        for perk, aoid in perk_items:
+            series_perk = PerkSeriesPerk(
+                counter=perk.counter,
+                aoid=aoid,
+                level_required=perk.level_required,
+                ai_level_required=perk.ai_level_required if perk.ai_level_required > 0 else None
+            )
+            series_perks.append(series_perk)
+
+        # Convert profession and breed IDs to names
+        profession_names = perk_service._profession_ids_to_names(professions or [])
+        breed_names = perk_service._breed_ids_to_names(breeds or [])
+
+        # Create series response
+        series_response = PerkSeriesResponse(
+            series_name=series_name,
+            type=series_type,
+            professions=profession_names,
+            breeds=breed_names,
+            perks=series_perks
+        )
+        series_responses.append(series_response)
+
+    # Sort by series name
+    series_responses.sort(key=lambda s: s.series_name)
+
+    logger.info(f"Found {len(series_responses)} perk series")
+    return series_responses
 
 
 @router.get("/{perk_name}", response_model=PerkSeries)

@@ -10,6 +10,6 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     checksum VARCHAR(64)
 );
 
-CREATE INDEX idx_schema_migrations_applied_at ON schema_migrations(applied_at);
+CREATE INDEX IF NOT EXISTS idx_schema_migrations_applied_at ON schema_migrations(applied_at);
 
 \echo 'Schema migrations table created successfully!'

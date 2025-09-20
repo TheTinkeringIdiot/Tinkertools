@@ -33,6 +33,8 @@ class PerkResponse(PerkBase):
     id: int = Field(description="Database ID")
     description: Optional[str] = Field(None, description="Perk description")
     ql: Optional[int] = Field(None, description="Quality level")
+    perk_series: Optional[str] = Field(None, description="Perk series name for grouping")
+    formatted_name: Optional[str] = Field(None, description="Formatted name with counter")
 
     class Config:
         from_attributes = True
@@ -153,3 +155,20 @@ class PerkValidationResponse(BaseModel):
     required_professions: List[str] = Field(default_factory=list, description="Required professions")
     required_breeds: List[str] = Field(default_factory=list, description="Required breeds")
     prerequisite_perks: List[str] = Field(default_factory=list, description="Required lower-level perks")
+
+
+class PerkSeriesPerk(BaseModel):
+    """Individual perk in a series."""
+    counter: int = Field(..., description="Perk level (1-10)", ge=1, le=10)
+    aoid: int = Field(..., description="Anarchy Online perk ID")
+    level_required: int = Field(..., description="Required character level", ge=1)
+    ai_level_required: Optional[int] = Field(None, description="Required AI title level")
+
+
+class PerkSeriesResponse(BaseModel):
+    """Response for perk series grouping."""
+    series_name: str = Field(..., description="Perk series name")
+    type: str = Field(..., description="Perk type (SL/AI/LE)")
+    professions: List[str] = Field(default_factory=list, description="Required professions")
+    breeds: List[str] = Field(default_factory=list, description="Required breeds")
+    perks: List[PerkSeriesPerk] = Field(..., description="All counters (1-10) for this series")
