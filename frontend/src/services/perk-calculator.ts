@@ -460,9 +460,9 @@ export class PerkCalculatorService {
 
     for (const currentPerk of currentPerks) {
       if (currentPerk.type === 'SL') {
-        spentStandardPoints += currentPerk.level
+        spentStandardPoints += currentPerk.level  // Each level costs 1 point
       } else if (currentPerk.type === 'AI') {
-        spentAIPoints += currentPerk.level
+        spentAIPoints += currentPerk.level  // Each level costs 1 point
       }
       // LE perks don't cost points
     }

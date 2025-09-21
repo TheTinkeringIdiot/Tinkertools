@@ -430,16 +430,16 @@ export class ProfileTransformer {
         if (!perk.aoid) continue;
 
         try {
-          // Try to fetch perk details from backend
+          // Try to fetch complete perk details from backend
           const perkDetails = await apiClient.lookupPerkByAoid(perk.aoid);
 
           if (perkDetails) {
             // Extract base perk name (without level suffix)
-            let baseName = perkDetails.name;
-            if (baseName && perkDetails.counter > 1) {
+            let baseName = perkDetails.perk_name || perkDetails.name;
+            if (baseName && perkDetails.perk_counter > 1) {
               // Remove the level suffix if present (e.g., "Perk Name 5" -> "Perk Name")
               const nameParts = baseName.split(' ');
-              if (nameParts.length > 1 && nameParts[nameParts.length - 1] === perkDetails.counter.toString()) {
+              if (nameParts.length > 1 && nameParts[nameParts.length - 1] === perkDetails.perk_counter.toString()) {
                 baseName = nameParts.slice(0, -1).join(' ');
               }
             }
@@ -447,11 +447,12 @@ export class ProfileTransformer {
             legacyPerks.push({
               aoid: perk.aoid,
               name: baseName,
-              level: perkDetails.counter || 1,
-              type: perkDetails.type || 'SL'
+              level: perkDetails.perk_counter || perkDetails.counter || 1,
+              type: perkDetails.perk_type || perkDetails.type || 'SL',
+              item: perkDetails  // Store complete item details
             });
 
-            console.log(`[ProfileTransformer] Fetched perk: ${baseName} (level ${perkDetails.counter}, type: ${perkDetails.type})`);
+            console.log(`[ProfileTransformer] Fetched complete perk item: ${baseName} (level ${perkDetails.perk_counter || perkDetails.counter}, type: ${perkDetails.perk_type || perkDetails.type})`);
           } else {
             // Fallback if perk not found in database
             legacyPerks.push({
@@ -1107,21 +1108,31 @@ export class ProfileTransformer {
 
               if (perkType === 'LE') {
                 // LE research perk (free)
-                newPerkSystem.research.push({
+                const researchEntry: any = {
                   aoid: legacyPerk.aoid,
                   name: legacyPerk.name,
                   level: legacyPerk.level,
                   type: 'LE'
-                });
+                };
+                // Preserve item details if available
+                if (legacyPerk.item) {
+                  researchEntry.item = legacyPerk.item;
+                }
+                newPerkSystem.research.push(researchEntry);
               } else {
                 // SL or AI perk (costs points)
-                const cost = legacyPerk.level; // 1 point per level
-                newPerkSystem.perks.push({
+                const cost = 1; // Each perk costs exactly 1 point regardless of level
+                const perkEntry: any = {
                   aoid: legacyPerk.aoid,
                   name: legacyPerk.name,
                   level: legacyPerk.level,
                   type: perkType as 'SL' | 'AI'
-                });
+                };
+                // Preserve item details if available
+                if (legacyPerk.item) {
+                  perkEntry.item = legacyPerk.item;
+                }
+                newPerkSystem.perks.push(perkEntry);
 
                 // Update spent points
                 if (perkType === 'AI') {
@@ -1365,7 +1376,7 @@ export class ProfileTransformer {
         });
 
         // Update point tracking
-        const cost = perkLevel; // 1 point per level
+        const cost = 1; // Each perk costs exactly 1 point regardless of level
         if (perkType === 'AI') {
           system.aiPerkPoints.spent += cost;
         } else {

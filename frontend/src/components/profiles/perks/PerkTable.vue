@@ -34,15 +34,6 @@ Shows owned perks with their levels, points used, and stat bonuses
         </template>
       </Column>
 
-      <!-- Points Used Column (not for LE) -->
-      <Column v-if="perkType !== 'LE'" field="level" header="Points" :sortable="true" class="w-20">
-        <template #body="{ data }">
-          <div class="text-center">
-            <Badge :value="data.level" :severity="perkType === 'AI' ? 'info' : 'success'" />
-          </div>
-        </template>
-      </Column>
-
       <!-- Effects Column -->
       <Column field="effects" header="Effects" class="min-w-64">
         <template #body="{ data }">
@@ -123,7 +114,6 @@ import { computed } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
-import Badge from 'primevue/badge'
 import type { PerkEntry, ResearchEntry, PerkEffect } from '@/lib/tinkerprofiles/perk-types'
 
 // Props
