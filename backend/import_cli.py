@@ -8,11 +8,16 @@ Uses the DATABASE_URL environment variable to connect to the database.
 Usage:
     # Set database URL
     export DATABASE_URL="postgresql://aodbuser:password@localhost:5432/tinkertools"
-    
-    # Import individual datasets
+
+    # Import individual datasets (standard mode)
     python import_cli.py symbiants --clear
     python import_cli.py items --chunk-size 50
     python import_cli.py nanos
+
+    # Import with optimized mode (10-20x faster)
+    python import_cli.py items --optimized --batch-size 2000
+    python import_cli.py nanos --optimized
+    python import_cli.py all --optimized --clear
 
     # Import all data
     python import_cli.py all --clear
@@ -36,6 +41,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 
 from app.core.importer import DataImporter
+from app.core.optimized_importer import OptimizedImporter
 from app.core.database import create_tables, get_table_count
 
 # Setup logging
@@ -73,7 +79,7 @@ def ensure_tables_exist():
 
 def import_symbiants(args):
     """Import symbiants from CSV."""
-    logger.info("Starting symbiant import...")
+    logger.info(f"Starting symbiant import (optimized={args.optimized})...")
 
     # Ensure database tables exist (unless we're doing a full reset)
     if not args.clear and not ensure_tables_exist():
@@ -85,6 +91,7 @@ def import_symbiants(args):
         logger.error(f"File {file_path} not found")
         return False
 
+    # Note: Optimized importer doesn't have symbiant support yet, use regular for CSV
     importer = DataImporter(chunk_size=args.chunk_size)
     try:
         # Use full_reset=True when --clear is specified
@@ -102,7 +109,8 @@ def import_symbiants(args):
 
 def import_items(args):
     """Import items from JSON."""
-    logger.info("Starting items import...")
+    mode = "OPTIMIZED" if args.optimized else "STANDARD"
+    logger.info(f"Starting items import ({mode} mode)...")
 
     # Ensure database tables exist (unless we're doing a full reset)
     if not args.clear and not ensure_tables_exist():
@@ -114,27 +122,50 @@ def import_items(args):
         logger.error(f"File {file_path} not found")
         return False
 
-    importer = DataImporter(chunk_size=args.chunk_size)
     try:
-        stats = importer.import_items_from_json(
-            str(file_path),
-            is_nano=False,
-            clear_existing=False,  # Don't use old clear method
-            full_reset=args.clear  # Use new full reset with migrations
-        )
-        logger.info(f"Items import completed: "
-                   f"Created={stats.items_created}, "
-                   f"Updated={stats.items_updated}, "
-                   f"Errors={stats.errors}")
-        return stats.errors == 0
+        if args.optimized:
+            # Use optimized importer with larger batch size
+            batch_size = args.batch_size if args.batch_size else 1000
+            logger.info(f"Using OptimizedImporter with batch_size={batch_size}")
+            importer = OptimizedImporter(batch_size=batch_size)
+
+            stats = importer.import_items_from_json(
+                str(file_path),
+                is_nano=False,
+                clear_existing=args.clear
+            )
+
+            logger.info(f"Items import completed: "
+                       f"Created={stats['items_created']}, "
+                       f"Updated={stats['items_updated']}, "
+                       f"Errors={stats['errors']}, "
+                       f"Rate={stats.get('items_per_second', 0):.1f} items/sec")
+            return stats['errors'] == 0
+        else:
+            # Use standard importer
+            importer = DataImporter(chunk_size=args.chunk_size)
+            stats = importer.import_items_from_json(
+                str(file_path),
+                is_nano=False,
+                clear_existing=False,  # Don't use old clear method
+                full_reset=args.clear  # Use new full reset with migrations
+            )
+            logger.info(f"Items import completed: "
+                       f"Created={stats.items_created}, "
+                       f"Updated={stats.items_updated}, "
+                       f"Errors={stats.errors}")
+            return stats.errors == 0
     except Exception as e:
         logger.error(f"Items import failed: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return False
 
 
 def import_nanos(args):
     """Import nanos from JSON."""
-    logger.info("Starting nanos import...")
+    mode = "OPTIMIZED" if args.optimized else "STANDARD"
+    logger.info(f"Starting nanos import ({mode} mode)...")
 
     # Ensure database tables exist (unless we're doing a full reset)
     if not args.clear and not ensure_tables_exist():
@@ -146,24 +177,45 @@ def import_nanos(args):
         logger.error(f"File {file_path} not found")
         return False
 
-    importer = DataImporter(chunk_size=args.chunk_size)
     try:
-        # Note: For nanos, we typically don't want to reset the entire database
-        # since they're usually imported after items. Only use full_reset if
-        # this is the first/only import being done.
-        stats = importer.import_items_from_json(
-            str(file_path),
-            is_nano=True,
-            clear_existing=False,
-            full_reset=False  # Don't reset for nanos (they're usually imported after items)
-        )
-        logger.info(f"Nanos import completed: "
-                   f"Created={stats.items_created}, "
-                   f"Updated={stats.items_updated}, "
-                   f"Errors={stats.errors}")
-        return stats.errors == 0
+        if args.optimized:
+            # Use optimized importer
+            batch_size = args.batch_size if args.batch_size else 1000
+            logger.info(f"Using OptimizedImporter with batch_size={batch_size}")
+            importer = OptimizedImporter(batch_size=batch_size)
+
+            stats = importer.import_items_from_json(
+                str(file_path),
+                is_nano=True,
+                clear_existing=False  # Don't clear for nanos
+            )
+
+            logger.info(f"Nanos import completed: "
+                       f"Created={stats['items_created']}, "
+                       f"Updated={stats['items_updated']}, "
+                       f"Errors={stats['errors']}, "
+                       f"Rate={stats.get('items_per_second', 0):.1f} items/sec")
+            return stats['errors'] == 0
+        else:
+            # Use standard importer
+            importer = DataImporter(chunk_size=args.chunk_size)
+            # Note: For nanos, we typically don't want to reset the entire database
+            # since they're usually imported after items.
+            stats = importer.import_items_from_json(
+                str(file_path),
+                is_nano=True,
+                clear_existing=False,
+                full_reset=False  # Don't reset for nanos
+            )
+            logger.info(f"Nanos import completed: "
+                       f"Created={stats.items_created}, "
+                       f"Updated={stats.items_updated}, "
+                       f"Errors={stats.errors}")
+            return stats.errors == 0
     except Exception as e:
         logger.error(f"Nanos import failed: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return False
 
 
@@ -193,7 +245,9 @@ def import_all(args):
     # Create a modified args object that doesn't trigger reset for individual imports
     import argparse
     individual_args = argparse.Namespace(
-        chunk_size=args.chunk_size,
+        chunk_size=args.chunk_size if hasattr(args, 'chunk_size') else 100,
+        batch_size=args.batch_size if hasattr(args, 'batch_size') else 1000,
+        optimized=args.optimized if hasattr(args, 'optimized') else False,
         clear=False  # Don't reset for individual imports since we did it above
     )
 
@@ -255,8 +309,13 @@ def main():
 Examples:
   python import_cli.py validate                    # Check if files exist
   python import_cli.py symbiants --clear           # Import symbiants, clearing existing data
-  python import_cli.py items --chunk-size 50       # Import items with smaller chunks
-  python import_cli.py all --clear                 # Import everything, clearing existing data
+  python import_cli.py items --chunk-size 50       # Import items with smaller chunks (standard mode)
+  python import_cli.py items --optimized           # Import items using optimized importer (10-20x faster)
+  python import_cli.py all --optimized --clear     # Import everything with optimized mode, clearing existing data
+
+Optimization Modes:
+  Standard mode: Uses original importer, processes items one at a time (slower but stable)
+  Optimized mode (--optimized): Batch operations, singleton preloading, reduced flushes (10-20x faster)
 
 Environment:
   DATABASE_URL    Database connection string (required)
@@ -278,7 +337,18 @@ Environment:
         "--chunk-size",
         type=int,
         default=100,
-        help="Number of items to process per chunk (default: 100)"
+        help="Number of items to process per chunk (default: 100, used in standard mode)"
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=1000,
+        help="Batch size for optimized importer (default: 1000, used with --optimized)"
+    )
+    parser.add_argument(
+        "--optimized",
+        action="store_true",
+        help="Use optimized importer (10-20x faster, maintains data accuracy)"
     )
     parser.add_argument(
         "--database-url",
