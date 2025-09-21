@@ -489,7 +489,7 @@ function onAddLevel(level: number) {
     name: props.category.name,
     level: level,
     type: props.category.type,
-    cost: props.category.type === 'LE' ? 0 : level,
+    cost: props.category.type === 'LE' ? 0 : 1,  // Each perk level costs 1 point
     requirements: baseRequirements.value,
     effects: []
   };
