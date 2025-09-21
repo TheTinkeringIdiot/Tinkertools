@@ -28,12 +28,21 @@ class SourceType(Base):
 
 class Source(Base):
     __tablename__ = 'sources'
-    
+
     id = Column(Integer, primary_key=True)
     source_type_id = Column(Integer, ForeignKey('source_types.id', ondelete='CASCADE'), nullable=False)
     source_id = Column(Integer, nullable=False)  # References the actual entity ID
     name = Column(String(255), nullable=False)  # Denormalized for performance
-    extra_data = Column(JSONB, default={})
+    source_metadata = Column('metadata', JSONB, default={})  # Column in DB is named 'metadata'
+
+    # Alias for backward compatibility
+    @property
+    def extra_data(self):
+        return self.source_metadata
+
+    @extra_data.setter
+    def extra_data(self, value):
+        self.source_metadata = value
     
     # Relationships
     source_type = relationship('SourceType', back_populates='sources')
@@ -54,14 +63,23 @@ class Source(Base):
 
 class ItemSource(Base):
     __tablename__ = 'item_sources'
-    
+
     item_id = Column(Integer, ForeignKey('items.id', ondelete='CASCADE'), primary_key=True)
     source_id = Column(Integer, ForeignKey('sources.id', ondelete='CASCADE'), primary_key=True)
     drop_rate = Column(DECIMAL(5, 2))  # 0.01 to 100.00
     min_ql = Column(Integer)
     max_ql = Column(Integer)
     conditions = Column(Text)
-    extra_data = Column(JSONB, default={})
+    source_metadata = Column('metadata', JSONB, default={})  # Column in DB is named 'metadata'
+
+    # Alias for backward compatibility
+    @property
+    def extra_data(self):
+        return self.source_metadata
+
+    @extra_data.setter
+    def extra_data(self, value):
+        self.source_metadata = value
     
     # Relationships
     item = relationship('Item', back_populates='item_sources')
