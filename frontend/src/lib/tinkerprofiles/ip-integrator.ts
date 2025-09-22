@@ -26,7 +26,7 @@ import {
 import { getBreedId, getProfessionId } from '../../services/game-utils';
 import { getSkillId, getSkillName } from './skill-mappings';
 import { calculateEquipmentBonuses } from '../../services/equipment-bonus-calculator';
-import { aggregatePerkEffects } from '../../services/perk-calculator';
+import { calculatePerkBonuses as calculatePerkBonusesService } from '../../services/perk-bonus-calculator';
 import type { AnyPerkEntry } from './perk-types';
 
 // ============================================================================
@@ -102,33 +102,35 @@ async function calculatePerkBonuses(profile: TinkerProfile): Promise<Record<stri
   }
 
   try {
-    // Collect all perks (both SL/AI perks and LE research)
-    const allPerks: AnyPerkEntry[] = [
-      ...profile.PerksAndResearch.perks,
-      ...profile.PerksAndResearch.research
-    ];
+    // Collect all equipped perks (both SL/AI perks and LE research)
+    const allPerkItems: any[] = [];
 
-    if (allPerks.length === 0) {
+    // Add SL/AI perks that have item data
+    if (profile.PerksAndResearch.perks && Array.isArray(profile.PerksAndResearch.perks)) {
+      profile.PerksAndResearch.perks.forEach(perkEntry => {
+        if (perkEntry && perkEntry.item) {
+          allPerkItems.push(perkEntry.item);
+        }
+      });
+    }
+
+    // Add LE research that have item data
+    if (profile.PerksAndResearch.research && Array.isArray(profile.PerksAndResearch.research)) {
+      profile.PerksAndResearch.research.forEach(researchEntry => {
+        if (researchEntry && researchEntry.item) {
+          allPerkItems.push(researchEntry.item);
+        }
+      });
+    }
+
+    if (allPerkItems.length === 0) {
       return {};
     }
 
-    // Use the perk calculator to aggregate effects
-    const perkEffects = await aggregatePerkEffects(allPerks);
+    // Use the perk bonus calculator service to extract and aggregate stat bonuses
+    const perkBonuses = calculatePerkBonusesService(allPerkItems);
 
-    // Convert stat IDs to skill names (similar to equipment bonus calculator pattern)
-    const bonusBySkillName: Record<string, number> = {};
-
-    for (const [statIdStr, bonus] of Object.entries(perkEffects)) {
-      const statId = parseInt(statIdStr, 10);
-      if (!isNaN(statId) && typeof bonus === 'number') {
-        const skillName = getSkillName(statId);
-        if (skillName) {
-          bonusBySkillName[skillName] = bonus;
-        }
-      }
-    }
-
-    return bonusBySkillName;
+    return perkBonuses;
   } catch (error) {
     console.warn('Failed to calculate perk bonuses:', error);
     return {};
@@ -210,7 +212,7 @@ export function updateProfileSkillInfo(
   // Use provided equipment bonuses or calculate them
   const equipmentBonuses = providedEquipmentBonuses || calculateEquipmentBonuses(profile);
 
-  // Use provided perk bonuses or calculate them (will be empty for now since perk effects aren't implemented yet)
+  // Use provided perk bonuses or calculate them
   const perkBonuses = providedPerkBonuses || {};
 
   // First, ensure pointFromIp is set for all abilities (needed for tests that set value directly)

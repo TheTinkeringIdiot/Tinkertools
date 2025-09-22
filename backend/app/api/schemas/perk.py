@@ -9,6 +9,7 @@ and LE (Lost Eden) with different point systems and requirements.
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 from .spell import SpellDataResponse
+from .item import ItemDetail
 
 
 class PerkBase(BaseModel):
@@ -147,6 +148,27 @@ class PerkCalculationResponse(BaseModel):
 
 class PerkValidationResponse(BaseModel):
     """Response for perk requirement validation."""
+    valid: bool = Field(..., description="Whether the perk can be purchased")
+
+
+class PerkItemDetail(ItemDetail):
+    """Complete perk item with full item details and perk metadata."""
+    # Perk-specific metadata
+    perk_name: str = Field(..., description="Base perk name (without level suffix)")
+    perk_counter: int = Field(..., description="Perk level (1-10)")
+    perk_type: str = Field(..., description="Perk type (SL/AI/LE)")
+    perk_series: str = Field(..., description="Perk series name for grouping")
+    perk_professions: List[str] = Field(default_factory=list, description="Required professions")
+    perk_breeds: List[str] = Field(default_factory=list, description="Required breeds")
+    perk_level_required: int = Field(..., description="Required character level")
+    perk_ai_level_required: Optional[int] = Field(None, description="Required AI title level")
+
+    class Config:
+        from_attributes = True
+
+
+class PerkValidationDetail(BaseModel):
+    """Detailed validation response for perk requirements."""
     valid: bool = Field(..., description="Whether the perk can be purchased")
     errors: List[str] = Field(default_factory=list, description="Validation error messages")
     warnings: List[str] = Field(default_factory=list, description="Validation warnings")

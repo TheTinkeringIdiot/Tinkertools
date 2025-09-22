@@ -38,9 +38,9 @@ Shows owned perks with their levels, points used, and stat bonuses
       <Column field="effects" header="Effects" class="min-w-64">
         <template #body="{ data }">
           <div class="perk-effects">
-            <div v-if="data.effects && data.effects.length > 0" class="space-y-1">
+            <div v-if="getPerkEffects(data).length > 0" class="space-y-1">
               <div
-                v-for="(effect, index) in getDisplayEffects(data.effects)"
+                v-for="(effect, index) in getPerkEffects(data)"
                 :key="index"
                 class="text-sm"
               >
@@ -115,6 +115,8 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
 import type { PerkEntry, ResearchEntry, PerkEffect } from '@/lib/tinkerprofiles/perk-types'
+import { parseItemForStatBonuses } from '@/services/perk-bonus-calculator'
+import type { Item } from '@/types/api'
 
 // Props
 const props = defineProps<{
@@ -157,17 +159,54 @@ function getPerkTypeName(type: 'SL' | 'AI' | 'LE'): string {
   }
 }
 
-function getDisplayEffects(effects: PerkEffect[] | undefined): string[] {
-  if (!effects || effects.length === 0) {
+function getPerkEffects(perk: PerkEntry | ResearchEntry): string[] {
+  try {
+    // Extract the item data from the perk/research entry
+    // Both PerkEntry and ResearchEntry have an optional item property
+    if (!perk || typeof perk !== 'object') {
+      return []
+    }
+
+    // Check if item data is available
+    const item = perk.item as Item | undefined
+    if (!item || typeof item !== 'object') {
+      // No item data available - this is normal for perks without effects
+      return []
+    }
+
+    // Use the perk-bonus-calculator to extract stat bonuses
+    const bonuses = parseItemForStatBonuses(item)
+
+    if (!bonuses || bonuses.length === 0) {
+      return []
+    }
+
+    // Format bonuses as "Skill: +X" strings
+    const effectStrings: string[] = []
+
+    // Group bonuses by skill name to avoid duplicates
+    const skillBonuses: Record<string, number> = {}
+    for (const bonus of bonuses) {
+      if (skillBonuses[bonus.skillName]) {
+        skillBonuses[bonus.skillName] += bonus.amount
+      } else {
+        skillBonuses[bonus.skillName] = bonus.amount
+      }
+    }
+
+    // Convert to formatted strings
+    for (const [skillName, amount] of Object.entries(skillBonuses)) {
+      if (amount !== 0) {
+        const sign = amount > 0 ? '+' : ''
+        effectStrings.push(`${skillName}: ${sign}${amount}`)
+      }
+    }
+
+    return effectStrings.length > 0 ? effectStrings : []
+  } catch (error) {
+    console.warn('Error parsing perk effects for perk:', perk?.name || 'unknown', error)
     return []
   }
-
-  // For now, return placeholder effect descriptions
-  // This will be replaced with actual effect parsing when database is connected
-  return [
-    'Effect details will be displayed here',
-    'once connected to the database'
-  ]
 }
 </script>
 
