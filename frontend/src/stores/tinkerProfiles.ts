@@ -921,6 +921,9 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   // Flag to prevent equipment watchers from firing during skill/ability updates
   let isUpdatingSkills = false;
 
+  // Flag to prevent recursive updates when setting profile from perk recalculation
+  let isUpdatingFromPerkChanges = false;
+
   /**
    * Execute the actual equipment bonus recalculation
    */
@@ -938,8 +941,9 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
       const updatedProfile = await updateProfileWithIPTracking(activeProfile.value);
 
-      // Set flag to prevent watchers from triggering
+      // Set flags to prevent watchers from triggering
       isUpdatingFromEquipmentBonus = true;
+      isUpdatingFromPerkChanges = true;
 
       // Update profile data
       activeProfile.value = updatedProfile;
@@ -948,12 +952,14 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       // Persist to storage
       await updateProfile(activeProfile.value.id, updatedProfile);
 
-      // Clear flag after update
+      // Clear flags after update
       isUpdatingFromEquipmentBonus = false;
+      isUpdatingFromPerkChanges = false;
 
     } catch (err) {
       console.error('Equipment change handling failed:', err);
       isUpdatingFromEquipmentBonus = false; // Ensure flag is cleared on error
+      isUpdatingFromPerkChanges = false; // Ensure flag is cleared on error
     } finally {
       equipmentUpdateState.value.isUpdating = false;
 
@@ -982,8 +988,8 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     const weaponsWatcher = watch(
       () => activeProfile.value?.Weapons,
       (newWeapons, oldWeapons) => {
-        // Skip if we're updating from equipment bonus recalculation or skills
-        if (isUpdatingFromEquipmentBonus || isUpdatingSkills) return;
+        // Skip if we're updating from equipment bonus recalculation, skills, or perks
+        if (isUpdatingFromEquipmentBonus || isUpdatingSkills || isUpdatingFromPerkChanges) return;
         // Only trigger if there are actual changes
         if (newWeapons !== oldWeapons) {
           handleEquipmentChange('Weapons');
@@ -995,8 +1001,8 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     const clothingWatcher = watch(
       () => activeProfile.value?.Clothing,
       (newClothing, oldClothing) => {
-        // Skip if we're updating from equipment bonus recalculation or skills
-        if (isUpdatingFromEquipmentBonus || isUpdatingSkills) return;
+        // Skip if we're updating from equipment bonus recalculation, skills, or perks
+        if (isUpdatingFromEquipmentBonus || isUpdatingSkills || isUpdatingFromPerkChanges) return;
         if (newClothing !== oldClothing) {
           handleEquipmentChange('Clothing');
         }
@@ -1007,8 +1013,8 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     const implantsWatcher = watch(
       () => activeProfile.value?.Implants,
       (newImplants, oldImplants) => {
-        // Skip if we're updating from equipment bonus recalculation or skills
-        if (isUpdatingFromEquipmentBonus || isUpdatingSkills) return;
+        // Skip if we're updating from equipment bonus recalculation, skills, or perks
+        if (isUpdatingFromEquipmentBonus || isUpdatingSkills || isUpdatingFromPerkChanges) return;
         if (newImplants !== oldImplants) {
           handleEquipmentChange('Implants');
         }
@@ -1016,8 +1022,20 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       { deep: true, flush: 'post' }
     );
 
+    const perksWatcher = watch(
+      () => activeProfile.value?.PerksAndResearch,
+      (newPerks, oldPerks) => {
+        // Skip if we're updating from equipment bonus recalculation, skills, or perks
+        if (isUpdatingFromEquipmentBonus || isUpdatingSkills || isUpdatingFromPerkChanges) return;
+        if (newPerks !== oldPerks) {
+          handleEquipmentChange('PerksAndResearch');
+        }
+      },
+      { deep: true, flush: 'post' }
+    );
+
     // Store the stop handles for cleanup
-    equipmentWatcherStopHandles = [weaponsWatcher, clothingWatcher, implantsWatcher];
+    equipmentWatcherStopHandles = [weaponsWatcher, clothingWatcher, implantsWatcher, perksWatcher];
   }
 
   /**

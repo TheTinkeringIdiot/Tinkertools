@@ -199,6 +199,7 @@ const baseValue = computed(() => props.isAbility ? minValue.value : 5); // Base 
 const trickleDownBonus = computed(() => props.skillData?.trickleDown || 0);
 const ipContribution = computed(() => props.skillData?.pointFromIp || 0);
 const equipmentBonus = computed(() => props.skillData?.equipmentBonus || 0);
+const perkBonus = computed(() => props.skillData?.perkBonus || 0);
 const hasEquipmentBonus = computed(() => equipmentBonus.value !== 0);
 
 // Equipment bonus visual indicators
@@ -240,7 +241,7 @@ const valueBreakdown = computed(() => {
 });
 
 const showBreakdown = computed(() => {
-  return !props.isAbility && (trickleDownBonus.value > 0 || ipContribution.value > 0 || equipmentBonus.value !== 0);
+  return !props.isAbility && (trickleDownBonus.value > 0 || ipContribution.value > 0 || equipmentBonus.value !== 0 || perkBonus.value !== 0);
 });
 
 // Simple tooltip content for PrimeVue v-tooltip directive
@@ -256,6 +257,9 @@ const simpleTooltipContent = computed(() => {
     if (equipBonus !== 0) {
       parts.push(`Equipment: ${equipBonus > 0 ? '+' : ''}${equipBonus}`);
     }
+    if (perkBonus.value !== 0) {
+      parts.push(`Perks: ${perkBonus.value > 0 ? '+' : ''}${perkBonus.value}`);
+    }
 
     const breakdown = parts.join('\n');
     return `${props.skillName} Breakdown:\n${breakdown}\nTotal: ${totalValue.value}`;
@@ -264,6 +268,9 @@ const simpleTooltipContent = computed(() => {
     if (trickleDownBonus.value > 0) parts.push(`Trickle-down: +${trickleDownBonus.value}`);
     if (equipmentBonus.value !== 0) {
       parts.push(`Equipment: ${equipmentBonus.value > 0 ? '+' : ''}${equipmentBonus.value}`);
+    }
+    if (perkBonus.value !== 0) {
+      parts.push(`Perks: ${perkBonus.value > 0 ? '+' : ''}${perkBonus.value}`);
     }
     if (ipContribution.value > 0) parts.push(`IP: +${ipContribution.value}`);
 

@@ -11,10 +11,11 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, func, text, Integer, or_, distinct
 import logging
 
-from app.models.item import Item, ItemSpellData
+from app.models.item import Item, ItemSpellData, ItemStats
 from app.models.perk import Perk
 from app.models.spell_data import SpellData, SpellDataSpells
-from app.models.spell import Spell
+from app.models.spell import Spell, SpellCriterion
+from app.models.action import Action, ActionCriteria
 from app.api.schemas.perk import (
     PerkResponse, PerkDetail, PerkSeries, PerkValidationResponse,
     PerkCalculationResponse, PerkRequirement, PerkEffect, PerkPointCost
@@ -135,7 +136,7 @@ class PerkService:
         # Execute query with proper loading of relationships
         results = query.options(
             joinedload(Item.perk),
-            joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
+            joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data).joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell).joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion)
         ).distinct().all()
 
         # Convert to response objects
@@ -204,7 +205,7 @@ class PerkService:
             .filter(Perk.perk_series == perk_name)\
             .options(
                 joinedload(Item.perk),
-                joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
+                joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data).joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell).joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion)
             )\
             .order_by(Perk.counter)
 
@@ -316,6 +317,10 @@ class PerkService:
                     .join(Perk, Item.id == Perk.item_id)\
                     .filter(Perk.perk_series == perk_name)\
                     .filter(Perk.counter == level)\
+                    .options(\
+                        joinedload(Item.perk),\
+                        joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data).joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell).joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion)\
+                    )\
                     .first()
 
                 if not perk_item:
@@ -347,28 +352,36 @@ class PerkService:
 
     async def get_perk_info_by_aoid(self, aoid: int) -> Optional[Dict[str, Any]]:
         """
-        Get basic perk info by its AOID (Anarchy Online ID).
+        Get complete perk item with full item details and perk metadata.
 
         Args:
             aoid: The AOID of the perk item
 
         Returns:
-            Dictionary with basic perk information or None if not found
+            Dictionary with complete perk item information or None if not found
         """
         logger.info(f"Looking up perk info by AOID: {aoid}")
 
-        # Query the perk item by AOID
+        # Query the perk item by AOID with all relationships loaded
+        from sqlalchemy.orm import selectinload
+
         perk_item = self.db.query(Item)\
             .join(Perk, Item.id == Perk.item_id)\
             .filter(Item.aoid == aoid)\
-            .options(joinedload(Item.perk))\
+            .options(
+                joinedload(Item.perk),
+                selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
+                selectinload(Item.item_spell_data).selectinload(ItemSpellData.spell_data).selectinload(SpellData.spell_data_spells).selectinload(SpellDataSpells.spell).selectinload(Spell.spell_criteria).selectinload(SpellCriterion.criterion),
+                selectinload(Item.actions).selectinload(Action.action_criteria).selectinload(ActionCriteria.criterion),
+                joinedload(Item.attack_defense)
+            )\
             .first()
 
         if not perk_item:
             logger.info(f"No perk found with AOID {aoid}")
             return None
 
-        # Extract basic perk information from perk table
+        # Extract perk metadata
         perk = perk_item.perk
         if not perk:
             logger.warning(f"Item {perk_item.id} has no perk relationship")
@@ -378,29 +391,116 @@ class PerkService:
         professions = self._profession_ids_to_names(perk.professions or [])
         breeds = self._breed_ids_to_names(perk.breeds or [])
 
-        # If arrays are empty or None, it means all professions/breeds are allowed
         if not perk.professions or len(perk.professions) == 0:
-            professions = []  # Empty list indicates "all allowed"
+            professions = []
         if not perk.breeds or len(perk.breeds) == 0:
-            breeds = []  # Empty list indicates "all allowed"
+            breeds = []
 
+        # Build the complete perk item response with all item details
         perk_info = {
+            # Item base information
             "id": perk_item.id,
             "aoid": perk_item.aoid,
-            "name": perk.name,
+            "name": perk_item.name,
+            "ql": perk_item.ql,
+            "item_class": perk_item.item_class,
+            "description": perk_item.description,
+            "is_nano": perk_item.is_nano,
+
+            # Item stats
+            "stats": [
+                {
+                    "stat": sv.stat_value.stat,
+                    "value": sv.stat_value.value,
+                    "stat_name": self._get_stat_name(sv.stat_value.stat) if hasattr(self, '_get_stat_name') else None
+                }
+                for sv in perk_item.item_stats
+            ] if perk_item.item_stats else [],
+
+            # Spell data (perk effects)
+            "spell_data": [
+                {
+                    "id": sd.spell_data.id,
+                    "event": sd.spell_data.event,
+                    "spells": [
+                        {
+                            "id": spell.id,
+                            "target": spell.target,
+                            "tick_count": spell.tick_count,
+                            "tick_interval": spell.tick_interval,
+                            "spell_id": spell.spell_id,
+                            "spell_format": spell.spell_format,
+                            "spell_params": spell.spell_params or []
+                        }
+                        for spell in sd.spell_data.spells
+                    ] if hasattr(sd.spell_data, 'spells') else []
+                }
+                for sd in perk_item.item_spell_data
+            ] if perk_item.item_spell_data else [],
+
+            # Attack/Defense stats
+            "attack_stats": [],
+            "defense_stats": [],
+
+            # Actions
+            "actions": [
+                {
+                    "id": action.id,
+                    "action": action.action,
+                    "criteria": [
+                        {
+                            "value1": ac.criterion.value1,
+                            "value2": ac.criterion.value2,
+                            "operator": ac.criterion.operator,
+                            "order_index": ac.order_index
+                        }
+                        for ac in sorted(action.action_criteria, key=lambda x: x.order_index)
+                    ] if action.action_criteria else []
+                }
+                for action in perk_item.actions
+            ] if perk_item.actions else [],
+
+            # Perk-specific metadata
+            "perk_name": perk.name,
+            "perk_counter": perk.counter,
+            "perk_type": perk.type,
+            "perk_series": perk.perk_series,
+            "perk_professions": professions,
+            "perk_breeds": breeds,
+            "perk_level_required": perk.level_required,
+            "perk_ai_level_required": perk.ai_level_required if perk.ai_level_required > 0 else None,
+
+            # Legacy fields for backwards compatibility
             "counter": perk.counter,
             "type": perk.type,
-            "description": perk_item.description,
-            "ql": perk_item.ql,
-            "perk_series": perk.perk_series,  # Add perk_series for grouping
-            "formatted_name": f"{perk.name} {perk.counter}",  # Add formatted name with counter
-            "professions": professions,  # Add profession names
-            "breeds": breeds,  # Add breed names
-            "level": perk.level_required,  # Add level requirement
-            "ai_title": perk.ai_level_required if perk.ai_level_required > 0 else None  # Add AI title requirement
+            "level": perk.level_required,
+            "ai_title": perk.ai_level_required if perk.ai_level_required > 0 else None,
+            "formatted_name": f"{perk.name} {perk.counter}"
         }
 
-        logger.info(f"Found perk: {perk.name} (type: {perk.type}, level: {perk.counter})")
+        # Add attack/defense stats if available
+        if perk_item.attack_defense:
+            atkdef = perk_item.attack_defense
+            if hasattr(atkdef, 'attack_defense_attack'):
+                perk_info["attack_stats"] = [
+                    {
+                        "stat": atk.stat_value.stat,
+                        "value": atk.stat_value.value,
+                        "stat_name": self._get_stat_name(atk.stat_value.stat) if hasattr(self, '_get_stat_name') else None
+                    }
+                    for atk in atkdef.attack_defense_attack
+                ]
+            if hasattr(atkdef, 'attack_defense_defense'):
+                perk_info["defense_stats"] = [
+                    {
+                        "stat": def_.stat_value.stat,
+                        "value": def_.stat_value.value,
+                        "stat_name": self._get_stat_name(def_.stat_value.stat) if hasattr(self, '_get_stat_name') else None
+                    }
+                    for def_ in atkdef.attack_defense_defense
+                ]
+
+        logger.info(f"Found complete perk item: {perk.name} (type: {perk.type}, level: {perk.counter})")
         return perk_info
 
     async def get_perk_by_aoid(self, aoid: int) -> Optional[PerkDetail]:
@@ -421,7 +521,7 @@ class PerkService:
             .filter(Item.aoid == aoid)\
             .options(
                 joinedload(Item.perk),
-                joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
+                joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data).joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell).joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion)
             )\
             .first()
 
@@ -649,10 +749,69 @@ class PerkService:
         return True  # If no point limits specified, assume affordable
 
     async def _get_spell_data_responses(self, item: Item) -> List[SpellDataResponse]:
-        """Convert item spell data to response format."""
-        # This would convert the item's spell_data to SpellDataResponse objects
-        # For now, return empty list
-        return []
+        """Convert item spell data to response format following the pattern from items endpoint."""
+        from app.api.schemas.spell import SpellWithCriteria
+        from app.api.schemas.criterion import CriterionResponse
+
+        spell_data_list = []
+
+        try:
+            # Extract spell data from item's item_spell_data relationship
+            if not hasattr(item, 'item_spell_data') or not item.item_spell_data:
+                logger.debug(f"Item {item.id} has no spell data")
+                return spell_data_list
+
+            for isd in item.item_spell_data:
+                if not isd.spell_data:
+                    logger.warning(f"ItemSpellData {isd} has no spell_data relationship")
+                    continue
+
+                spell_data = isd.spell_data
+
+                # Get spells for this spell_data with criteria
+                spells_with_criteria = []
+                if hasattr(spell_data, 'spell_data_spells') and spell_data.spell_data_spells:
+                    for sds in spell_data.spell_data_spells:
+                        if not sds.spell:
+                            logger.warning(f"SpellDataSpells {sds} has no spell relationship")
+                            continue
+
+                        spell = sds.spell
+
+                        # Get criteria for this spell - handle missing relationships gracefully
+                        criteria = []
+                        if hasattr(spell, 'spell_criteria') and spell.spell_criteria:
+                            for sc in spell.spell_criteria:
+                                if sc.criterion:
+                                    criteria.append(CriterionResponse(
+                                        id=sc.criterion.id,
+                                        value1=sc.criterion.value1,
+                                        value2=sc.criterion.value2,
+                                        operator=sc.criterion.operator
+                                    ))
+
+                        spells_with_criteria.append(SpellWithCriteria(
+                            id=spell.id,
+                            target=spell.target,
+                            tick_count=spell.tick_count,
+                            tick_interval=spell.tick_interval,
+                            spell_id=spell.spell_id,
+                            spell_format=spell.spell_format,
+                            spell_params=spell.spell_params or {},
+                            criteria=criteria
+                        ))
+
+                spell_data_list.append(SpellDataResponse(
+                    id=spell_data.id,
+                    event=spell_data.event,
+                    spells=spells_with_criteria
+                ))
+
+        except Exception as e:
+            logger.error(f"Error extracting spell data for item {item.id}: {e}")
+            # Return partial results instead of failing completely
+
+        return spell_data_list
 
     async def _extract_perk_effects(self, item: Item) -> List[PerkEffect]:
         """Extract stat effects from item spell data."""
