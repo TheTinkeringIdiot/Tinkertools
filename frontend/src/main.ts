@@ -4,6 +4,7 @@ import { createPinia } from 'pinia';
 import router from './router';
 import Tooltip from 'primevue/tooltip';
 import ConfirmationService from 'primevue/confirmationservice';
+import ToastService from 'primevue/toastservice';
 
 // Global PrimeVue component imports
 import Accordion from 'primevue/accordion';
@@ -45,6 +46,7 @@ const pinia = createPinia();
 
 app.use(PrimeVue);
 app.use(ConfirmationService);
+app.use(ToastService);
 app.use(pinia);
 app.use(router);
 

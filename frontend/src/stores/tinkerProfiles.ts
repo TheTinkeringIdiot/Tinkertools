@@ -737,6 +737,69 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   }
 
   /**
+   * Equip an item to the active profile
+   */
+  async function equipItem(item: any, slot: string): Promise<void> {
+    if (!activeProfile.value) {
+      throw new Error('No active profile selected');
+    }
+
+    // Determine equipment category based on item type or slot
+    let category: 'Weapons' | 'Clothing' | 'Implants';
+
+    // Check item class to determine category
+    // Based on common AO item classes:
+    // 1 = Weapon, 2 = Armor/Clothing, 3 = Implant
+    if (item.item_class === 1) {
+      category = 'Weapons';
+    } else if (item.item_class === 2) {
+      category = 'Clothing';
+    } else if (item.item_class === 3) {
+      category = 'Implants';
+    } else {
+      // Fallback: determine from slot name
+      if (slot.includes('Implant') || slot.includes('Eye') || slot.includes('Head') || slot.includes('Ear')) {
+        category = 'Implants';
+      } else if (slot.includes('Weapon') || slot.includes('HUD') || slot.includes('NCU') || slot.includes('Hand') || slot.includes('Deck')) {
+        category = 'Weapons';
+      } else {
+        category = 'Clothing';
+      }
+    }
+
+    // Update the equipment slot - this will trigger watchers for stat recalculation
+    const updatedProfile = { ...activeProfile.value };
+    updatedProfile[category][slot] = item;
+
+    // Update the profile (triggers save and recalculation)
+    await updateProfile(activeProfile.value.id, updatedProfile);
+
+    // Update local state
+    activeProfile.value = updatedProfile;
+    profiles.value.set(activeProfile.value.id, updatedProfile);
+  }
+
+  /**
+   * Unequip an item from the active profile
+   */
+  async function unequipItem(category: 'Weapons' | 'Clothing' | 'Implants', slot: string): Promise<void> {
+    if (!activeProfile.value) {
+      throw new Error('No active profile selected');
+    }
+
+    // Update the equipment slot to null
+    const updatedProfile = { ...activeProfile.value };
+    updatedProfile[category][slot] = null;
+
+    // Update the profile (triggers save and recalculation)
+    await updateProfile(activeProfile.value.id, updatedProfile);
+
+    // Update local state
+    activeProfile.value = updatedProfile;
+    profiles.value.set(activeProfile.value.id, updatedProfile);
+  }
+
+  /**
    * Modify a specific ability value with real-time trickle-down updates
    */
   async function modifyAbility(profileId: string, abilityName: string, newValue: number): Promise<{
@@ -1129,6 +1192,10 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     modifyAbility,
     recalculateProfileIP,
     updateCharacterMetadata,
+
+    // Equipment methods
+    equipItem,
+    unequipItem,
     
     // Direct access to manager (for advanced use cases)
     getManager: () => profileManager,

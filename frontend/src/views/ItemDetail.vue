@@ -22,6 +22,13 @@ Shows all item data with profile compatibility and comparison options
       <!-- Header Actions -->
       <div v-if="item" class="flex items-center gap-2">
         <Button
+          v-if="canEquip"
+          icon="pi pi-shield"
+          label="Equip"
+          severity="success"
+          @click="showEquipDialog"
+        />
+        <Button
           :icon="isFavorite ? 'pi pi-heart-fill' : 'pi pi-heart'"
           :label="isFavorite ? 'Favorited' : 'Favorite'"
           :severity="isFavorite ? 'danger' : 'secondary'"
@@ -302,6 +309,13 @@ Shows all item data with profile compatibility and comparison options
         <!-- Header Actions -->
         <div v-if="item" class="flex items-center gap-2">
           <Button
+            v-if="canEquip"
+            icon="pi pi-shield"
+            label="Equip"
+            severity="success"
+            @click="showEquipDialog"
+          />
+          <Button
             :icon="isFavorite ? 'pi pi-heart-fill' : 'pi pi-heart'"
             :label="isFavorite ? 'Favorited' : 'Favorite'"
             :severity="isFavorite ? 'danger' : 'secondary'"
@@ -563,6 +577,16 @@ Shows all item data with profile compatibility and comparison options
       </div>
     </template>
   </Dialog>
+
+  <!-- Equip Slot Selector Dialog -->
+  <EquipSlotSelector
+    v-model:visible="equipDialogVisible"
+    :item="displayedItem || item"
+    :profile="profile"
+    :valid-slots="validSlots"
+    @confirm="handleEquipItem"
+    @cancel="equipDialogVisible = false"
+  />
 </template>
 
 <script setup lang="ts">
@@ -584,11 +608,14 @@ import ActionRequirements from '@/components/ActionRequirements.vue'
 import RawStats from '@/components/items/RawStats.vue'
 import ItemSources from '@/components/items/ItemSources.vue'
 import ItemInterpolationBar from '@/components/items/ItemInterpolationBar.vue'
+import EquipSlotSelector from '@/components/items/EquipSlotSelector.vue'
+import { useToast } from 'primevue/usetoast'
 
 const route = useRoute()
 const router = useRouter()
 const itemsStore = useItemsStore()
 const profilesStore = useTinkerProfilesStore()
+const toast = useToast()
 
 // Props
 const props = defineProps<{
@@ -603,6 +630,8 @@ const error = ref<string | null>(null)
 const showAllStats = ref(false)
 const iconLoadError = ref(false)
 const advancedView = ref(false)
+const equipDialogVisible = ref(false)
+const validSlots = ref<string[]>([])
 
 // Interpolation state
 const interpolationInfo = ref<InterpolationInfo | null>(null)
@@ -679,6 +708,19 @@ const displayedItem = computed(() => {
   return interpolatedItem.value || item.value
 })
 
+// Check if item can be equipped (is equippable and profile meets requirements)
+const canEquip = computed(() => {
+  if (!profile.value || !displayedItem.value) return false
+
+  // Check if item is equippable (weapons, armor, implants)
+  const itemClass = displayedItem.value.item_class
+  if (itemClass !== 1 && itemClass !== 2 && itemClass !== 3) return false
+
+  // Check if requirements are met (you can add more sophisticated checks here)
+  // For now, just check if there's an active profile
+  return true
+})
+
 // Methods
 async function loadItem() {
   const itemAoid = props.aoid || route.params.aoid as string
@@ -748,6 +790,43 @@ function shareItem() {
   }
 }
 
+function showEquipDialog() {
+  if (!displayedItem.value) return
+
+  // Determine valid slots for this item based on its type and stats
+  // For now, we'll let the EquipSlotSelector component figure out the valid slots
+  validSlots.value = []
+
+  equipDialogVisible.value = true
+}
+
+async function handleEquipItem(slot: string) {
+  if (!displayedItem.value || !profile.value) return
+
+  try {
+    // Use the store's equipItem method
+    await profilesStore.equipItem(displayedItem.value, slot)
+
+    // Close the dialog
+    equipDialogVisible.value = false
+
+    // Show success message
+    toast.add({
+      severity: 'success',
+      summary: 'Item Equipped',
+      detail: `${displayedItem.value.name} has been equipped to ${slot}`,
+      life: 3000
+    })
+  } catch (error) {
+    console.error('Failed to equip item:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Equip Failed',
+      detail: 'Failed to equip the item. Please try again.',
+      life: 3000
+    })
+  }
+}
 
 function getCharacterStat(statId: number): number {
   if (!profile.value) return 0

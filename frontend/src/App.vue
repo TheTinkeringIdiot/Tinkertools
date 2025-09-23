@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import Button from 'primevue/button';
 import Menubar from 'primevue/menubar';
+import Toast from 'primevue/toast';
 import { useTheme } from './composables/useTheme';
 import AccessibilityAnnouncer from './components/shared/AccessibilityAnnouncer.vue';
 import ProfileDropdown from './components/profiles/ProfileDropdown.vue';
@@ -125,6 +126,9 @@ const menuItems = ref<MenuItem[]>([
     
     <!-- Accessibility Announcer for screen readers -->
     <AccessibilityAnnouncer />
+
+    <!-- Toast notifications -->
+    <Toast />
   </div>
 </template>
 
