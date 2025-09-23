@@ -109,7 +109,10 @@ Complete character management with skills, equipment, and IP tracking
         <!-- Right Column: Tabbed Management -->
         <div class="lg:col-span-2">
           <div class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg h-full">
-            <TabView class="h-full profile-tabs">
+            <TabView
+              v-model:activeIndex="activeTabIndex"
+              class="h-full profile-tabs"
+            >
               <!-- Equipment Tab -->
               <TabPanel class="h-full">
                 <template #header>
@@ -180,18 +183,6 @@ Complete character management with skills, equipment, and IP tracking
                       <h2 class="text-xl font-semibold text-surface-900 dark:text-surface-50">
                         Skills & Abilities
                       </h2>
-
-                      <div class="flex items-center gap-2">
-                        <Button
-                          icon="pi pi-refresh"
-                          severity="secondary"
-                          outlined
-                          size="small"
-                          @click="recalculateIP"
-                          :loading="recalculating"
-                          v-tooltip.bottom="'Recalculate IP & Caps'"
-                        />
-                      </div>
                     </div>
 
                     <!-- IP Summary -->
@@ -282,12 +273,12 @@ const props = defineProps<{
 // State
 const loading = ref(false);
 // Auto-save - no saving state needed
-const recalculating = ref(false);
 const error = ref<string | null>(null);
 const profileData = ref<TinkerProfile | null>(null);
 // Auto-save - no hasChanges tracking needed
 const showEditDialog = ref(false);
 // Auto-save - no pending changes tracking needed
+const activeTabIndex = ref(0); // Track the active tab index
 
 // Computed
 const isActiveProfile = computed(() => 
@@ -376,17 +367,6 @@ async function exportProfile() {
   }
 }
 
-async function recalculateIP() {
-  recalculating.value = true;
-  try {
-    await profilesStore.recalculateProfileIP(props.profileId);
-    await loadProfile(); // Reload to get updated data
-  } catch (err) {
-    console.error('Failed to recalculate IP:', err);
-  } finally {
-    recalculating.value = false;
-  }
-}
 
 async function handleSkillChange(category: string, skillName: string, newValue: number) {
   try {
@@ -400,7 +380,7 @@ async function handleSkillChange(category: string, skillName: string, newValue: 
 async function handleAbilityChange(abilityName: string, newValue: number) {
   try {
     const result = await profilesStore.modifyAbility(props.profileId, abilityName, newValue);
-    
+
     // Show feedback about trickle-down updates
     if (result.success && result.trickleDownChanges) {
       const changedSkills = Object.entries(result.trickleDownChanges).filter(
@@ -410,6 +390,10 @@ async function handleAbilityChange(abilityName: string, newValue: number) {
         showTrickleDownFeedback(changedSkills.length);
       }
     }
+
+    // Automatically recalculate IP and caps after ability changes
+    await profilesStore.recalculateProfileIP(props.profileId);
+    await loadProfile(); // Reload to get updated data
   } catch (err) {
     console.error('Failed to modify ability:', err);
     error.value = err instanceof Error ? err.message : 'Failed to modify ability';
