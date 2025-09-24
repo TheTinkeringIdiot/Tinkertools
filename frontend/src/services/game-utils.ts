@@ -1124,13 +1124,13 @@ export function getItemClass(item: any): number {
  */
 export function parseWeaponSlots(slotValue: number): string[] {
   const slots: string[] = [];
-  
+
   for (const [slotName, slotBit] of Object.entries(WEAPON_SLOT)) {
     if (slotName !== 'NONE' && slotName !== 'Bit0' && (slotValue & slotBit) === slotBit) {
       slots.push(slotName);
     }
   }
-  
+
   return slots;
 }
 

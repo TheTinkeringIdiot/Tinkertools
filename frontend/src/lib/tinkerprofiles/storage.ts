@@ -5,12 +5,13 @@
  * capabilities
  */
 
-import type { 
-  TinkerProfile, 
+import type {
+  TinkerProfile,
   ProfileStorageOptions,
   ProfileMetadata
 } from './types';
 import { STORAGE_KEYS, CURRENT_VERSION } from './constants';
+import { toRaw } from 'vue';
 
 export class ProfileStorage {
   private options: ProfileStorageOptions;
@@ -39,8 +40,9 @@ export class ProfileStorage {
    * Strip computed values from skills before saving
    */
   private stripComputedValues(profile: TinkerProfile): TinkerProfile {
-    // Create a deep clone to avoid modifying the original
-    const stripped = structuredClone(profile);
+    // Convert Vue proxy to raw object first, then create a deep clone
+    const rawProfile = toRaw(profile);
+    const stripped = structuredClone(rawProfile);
 
     // Strip computed values from skills
     if (stripped.Skills) {

@@ -374,16 +374,24 @@ export function calcAbilityIPAdjustableRange(level: number, breed: number, abili
   let adjustableRange: number;
   
   if (level < 201) {
-    // Pre-201: Use breed-specific ability caps
-    // The adjustable range is the difference between the pre-201 cap and the breed's base value
-    const pre201Cap = BREED_ABILITY_DATA.caps_pre201[breed]?.[abilityIndex] || 480;
+    // Pre-201: Calculate cap based on current title level, not always using level 200 cap
+    // Use the COST_TO_RATE table with the breed's cost factor to determine the cap for this TL
+    const costIndex = Math.min(Math.floor(costFactor * 10) - 10, COST_TO_RATE.length - 1);
     const breedBase = BREED_ABILITY_DATA.initial[breed]?.[abilityIndex] || 6;
 
-    // The adjustable range is simply the cap minus the base
-    // This is the maximum amount that can be increased through IP
-    adjustableRange = pre201Cap - breedBase;
+    if (costIndex < 0 || costIndex >= COST_TO_RATE.length) {
+      adjustableRange = 0;
+    } else {
+      
+      let cap: number;
 
-    console.log(`[DEBUG] calcAbilityIPAdjustableRange: Level ${level}, TL${tl}, ability ${abilityStatId}, breed ${breed}, pre201Cap(${pre201Cap}) - base(${breedBase}) = ${adjustableRange}`);
+      cap = Math.min(level * 3 + breedBase, BREED_ABILITY_DATA.caps_pre201[breed]?.[abilityIndex])  // Breed-specific pre-201 cap
+
+      // Adjustable range is the cap minus the base
+      adjustableRange = cap - breedBase;
+
+      console.log(`[DEBUG] calcAbilityIPAdjustableRange: Level ${level}, TL${tl}, ability ${abilityStatId}, breed ${breed}, costFactor ${costFactor}, cap(${cap}) - base(${breedBase}) = ${adjustableRange}`);
+    }
   } else {
     // Post-201: Use breed-specific post-201 progression
     const post201PerLevel = BREED_ABILITY_DATA.caps_post201_per_level[breed]?.[abilityIndex] || 15;
