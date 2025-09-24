@@ -594,7 +594,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useItemsStore } from '@/stores/items'
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
-import { getItemIconUrl, isWeapon, getDisplayItemFlags, getDisplayCanFlags, getProfessionId, getBreedId, getStatId } from '@/services/game-utils'
+import { getItemIconUrl, isWeapon, getDisplayItemFlags, getDisplayCanFlags, getProfessionId, getBreedId, getStatId, getItemSlotInfo } from '@/services/game-utils'
 import { mapProfileToStats, getProfileStat } from '@/utils/profile-stats-mapper'
 import type { Item, TinkerProfile, InterpolatedItem, InterpolationInfo } from '@/types/api'
 
@@ -794,8 +794,8 @@ function showEquipDialog() {
   if (!displayedItem.value) return
 
   // Determine valid slots for this item based on its type and stats
-  // For now, we'll let the EquipSlotSelector component figure out the valid slots
-  validSlots.value = []
+  const slotInfo = getItemSlotInfo(displayedItem.value)
+  validSlots.value = slotInfo.slots
 
   equipDialogVisible.value = true
 }

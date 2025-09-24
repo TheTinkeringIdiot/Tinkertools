@@ -168,41 +168,34 @@ const availableSlots = computed(() => {
     currentItem: any;
   }> = [];
 
-  // Determine which equipment category to check
-  let equipmentCategory: 'Weapons' | 'Clothing' | 'Implants';
-  let possibleSlots: string[] = [];
+  // If validSlots are provided (from stat 298), use them directly
+  if (props.validSlots && props.validSlots.length > 0) {
+    // Determine equipment category based on item class
+    let equipmentCategory: 'Weapons' | 'Clothing' | 'Implants';
 
-  if (props.item.item_class === 1) {
-    // Weapon
-    equipmentCategory = 'Weapons';
-    possibleSlots = props.validSlots.length > 0
-      ? props.validSlots
-      : ['HUD1', 'HUD2', 'HUD3', 'UTILS1', 'UTILS2', 'UTILS3',
-         'RightHand', 'LeftHand', 'Deck1', 'Deck2', 'Deck3', 'Deck4', 'Deck5', 'Deck6'];
-  } else if (props.item.item_class === 2) {
-    // Armor/Clothing
-    equipmentCategory = 'Clothing';
-    possibleSlots = props.validSlots.length > 0
-      ? props.validSlots
-      : ['Head', 'Back', 'Body', 'RightShoulder', 'LeftShoulder',
-         'RightArm', 'LeftArm', 'RightWrist', 'LeftWrist', 'RightHand', 'LeftHand',
-         'RightFinger', 'LeftFinger', 'Legs', 'RightFoot', 'LeftFoot', 'Neck', 'Belt'];
-  } else if (props.item.item_class === 3) {
-    // Implant
-    equipmentCategory = 'Implants';
-    possibleSlots = props.validSlots.length > 0
-      ? props.validSlots
-      : ['Head', 'Eye', 'Ear', 'RightArm', 'LeftArm', 'Chest', 'RightWrist', 'LeftWrist',
-         'Waist', 'RightHand', 'LeftHand', 'Leg', 'Feet'];
-  } else {
-    return [];
-  }
+    if (props.item.item_class === 1) {
+      equipmentCategory = 'Weapons';
+    } else if (props.item.item_class === 2) {
+      equipmentCategory = 'Clothing';
+    } else if (props.item.item_class === 3) {
+      equipmentCategory = 'Implants';
+    } else {
+      // Try to guess based on the slot names
+      const firstSlot = props.validSlots[0];
+      if (['HUD1', 'HUD2', 'HUD3', 'UTILS1', 'UTILS2', 'UTILS3', 'RightHand', 'LeftHand', 'Deck1', 'Deck2', 'Deck3', 'Deck4', 'Deck5', 'Deck6'].includes(firstSlot)) {
+        equipmentCategory = 'Weapons';
+      } else if (['Head', 'Eye', 'Ear', 'Chest', 'Waist', 'Leg', 'Feet'].includes(firstSlot)) {
+        equipmentCategory = 'Implants';
+      } else {
+        equipmentCategory = 'Clothing';
+      }
+    }
 
-  // Check each possible slot
-  const equipment = props.profile[equipmentCategory];
-  for (const slotName of possibleSlots) {
-    if (slotName in equipment) {
-      const currentItem = equipment[slotName];
+    const equipment = props.profile[equipmentCategory] || {};
+
+    // Process each valid slot
+    for (const slotName of props.validSlots) {
+      const currentItem = equipment[slotName] || null;
       slots.push({
         name: slotName,
         displayName: formatSlotName(slotName),
@@ -210,9 +203,13 @@ const availableSlots = computed(() => {
         currentItem: currentItem || { name: 'Empty', ql: 0 }
       });
     }
+
+    return slots;
   }
 
-  return slots;
+  // Fallback: If no validSlots provided, return empty array
+  // (The item should have stat 298 which provides valid slots)
+  return [];
 });
 
 // Get the selected slot object

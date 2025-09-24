@@ -6,7 +6,7 @@
  */
 
 import { defineStore } from 'pinia';
-import { ref, computed, readonly, watch } from 'vue';
+import { ref, computed, readonly, watch, toRaw } from 'vue';
 import {
   TinkerProfilesManager,
   type TinkerProfile,
@@ -767,9 +767,13 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       }
     }
 
+    // Convert reactive proxies to plain objects to avoid serialization issues
+    const plainProfile = toRaw(activeProfile.value);
+    const plainItem = toRaw(item);
+
     // Update the equipment slot - this will trigger watchers for stat recalculation
-    const updatedProfile = { ...activeProfile.value };
-    updatedProfile[category][slot] = item;
+    const updatedProfile = { ...plainProfile };
+    updatedProfile[category][slot] = plainItem;
 
     // Update the profile (triggers save and recalculation)
     await updateProfile(activeProfile.value.id, updatedProfile);
@@ -787,8 +791,11 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       throw new Error('No active profile selected');
     }
 
+    // Convert reactive proxy to plain object to avoid serialization issues
+    const plainProfile = toRaw(activeProfile.value);
+
     // Update the equipment slot to null
-    const updatedProfile = { ...activeProfile.value };
+    const updatedProfile = { ...plainProfile };
     updatedProfile[category][slot] = null;
 
     // Update the profile (triggers save and recalculation)
