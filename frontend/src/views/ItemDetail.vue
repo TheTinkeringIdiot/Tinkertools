@@ -114,25 +114,6 @@ Shows all item data with profile compatibility and comparison options
               <div class="space-y-4">
                 <!-- Item Slots Display or Icon -->
                 <ItemSlotsDisplay :item="item" />
-                
-                <!-- Compatibility Status -->
-                <div v-if="profile && showCompatibility" class="p-3 rounded-lg"
-                  :class="{
-                    'bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800': true
-                  }"
-                >
-                  <div class="flex items-center gap-2 mb-2">
-                    <i :class="{
-                      'pi pi-info-circle text-gray-600': true
-                    }"></i>
-                    <span class="text-sm font-medium">
-                      Compatible with your character
-                    </span>
-                  </div>
-                  <div class="text-xs text-surface-600 dark:text-surface-400">
-                    Profile: {{ profile.Character.Name }} (Level {{ profile.Character.Level }})
-                  </div>
-                </div>
               </div>
             </template>
           </Card>
@@ -392,25 +373,6 @@ Shows all item data with profile compatibility and comparison options
               <div class="space-y-4">
                 <!-- Item Slots Display or Icon -->
                 <ItemSlotsDisplay :item="item" />
-                
-                <!-- Compatibility Status -->
-                <div v-if="profile && showCompatibility" class="p-3 rounded-lg"
-                  :class="{
-                    'bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800': true
-                  }"
-                >
-                  <div class="flex items-center gap-2 mb-2">
-                    <i :class="{
-                      'pi pi-info-circle text-gray-600': true
-                    }"></i>
-                    <span class="text-sm font-medium">
-                      Compatible with your character
-                    </span>
-                  </div>
-                  <div class="text-xs text-surface-600 dark:text-surface-400">
-                    Profile: {{ profile.Character.Name }} (Level {{ profile.Character.Level }})
-                  </div>
-                </div>
               </div>
             </template>
           </Card>
