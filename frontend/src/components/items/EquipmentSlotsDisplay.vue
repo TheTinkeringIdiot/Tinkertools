@@ -4,50 +4,64 @@ Shows all equipped items in a slot grid layout for a specific equipment type
 -->
 <template>
   <div v-if="slotType" :class="['equipment-slots-display', slotType]">
-    <div 
-      v-for="(cell, index) in gridCells" 
-      :key="index"
-      :class="['equipment-slot-cell', { 
-        'has-item': cell.item, 
-        'empty-slot': !cell.item && cell.slotName,
-        'no-slot': !cell.slotName
-      }]"
-      :title="cell.slotName || ''"
-    >
-      <!-- Item icon if equipped -->
-      <img 
-        v-if="cell.item && cell.iconUrl" 
-        :src="cell.iconUrl"
-        :alt="`${cell.item.name} equipped in ${cell.slotName}`"
-        class="item-icon"
-        :title="`QL ${cell.item.ql} ${cell.item.name}`"
-        @error="onIconError"
-        @click="navigateToItem(cell.item)"
-      />
-      <!-- Fallback icon for equipped items without icon -->
-      <i 
-        v-else-if="cell.item && !cell.iconUrl"
-        class="pi pi-box item-fallback-icon"
-        :title="`QL ${cell.item.ql} ${cell.item.name}`"
-        @click="navigateToItem(cell.item)"
-      ></i>
-      <!-- Slot label for debugging (optional) -->
-      <span 
-        v-if="showLabels && cell.slotName" 
-        class="slot-label"
+    <TransitionGroup name="equipment-fade">
+      <div
+        v-for="(cell, index) in gridCells"
+        :key="`${index}-${cell.item?.aoid || 'empty'}`"
+        :class="['equipment-slot-cell', {
+          'has-item': cell.item,
+          'empty-slot': !cell.item && cell.slotName,
+          'no-slot': !cell.slotName,
+          'unequipping': unequippingSlots.has(cell.slotName || '')
+        }]"
+        :title="cell.slotName || ''"
       >
-        {{ cell.slotName }}
-      </span>
-    </div>
+        <!-- Item icon if equipped -->
+        <img
+          v-if="cell.item && cell.iconUrl"
+          :src="cell.iconUrl"
+          :alt="`${cell.item.name} equipped in ${cell.slotName}`"
+          class="item-icon"
+          :title="`QL ${cell.item.ql} ${cell.item.name}`"
+          @error="onIconError"
+          @click="navigateToItem(cell.item)"
+        />
+        <!-- Fallback icon for equipped items without icon -->
+        <i
+          v-else-if="cell.item && !cell.iconUrl"
+          class="pi pi-box item-fallback-icon"
+          :title="`QL ${cell.item.ql} ${cell.item.name}`"
+          @click="navigateToItem(cell.item)"
+        ></i>
+        <!-- Unequip button -->
+        <button
+          v-if="cell.item && allowUnequip"
+          class="unequip-button"
+          title="Unequip item"
+          @click.stop="handleUnequip(cell.slotName, cell.item)"
+        >
+          <i class="pi pi-times"></i>
+        </button>
+        <!-- Slot label for debugging (optional) -->
+        <span
+          v-if="showLabels && cell.slotName"
+          class="slot-label"
+        >
+          {{ cell.slotName }}
+        </span>
+      </div>
+    </TransitionGroup>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { 
-  getWeaponSlotPosition, 
-  getArmorSlotPosition, 
+import { useToast } from 'primevue/usetoast';
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
+import {
+  getWeaponSlotPosition,
+  getArmorSlotPosition,
   getImplantSlotPosition,
   getImplantSlotPositionFromBitflag,
   getItemIconUrl
@@ -59,14 +73,26 @@ interface Props {
   equipment: Record<string, Item | null>;
   slotType: 'weapon' | 'armor' | 'implant';
   showLabels?: boolean;
+  allowUnequip?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  showLabels: false
+  showLabels: false,
+  allowUnequip: true
 });
 
-// Router setup
+// Emits
+const emit = defineEmits<{
+  'equipment-changed': [];
+}>();
+
+// Router and stores setup
 const router = useRouter();
+const toast = useToast();
+const profilesStore = useTinkerProfilesStore();
+
+// State for tracking unequipping animations
+const unequippingSlots = ref(new Set<string>());
 
 // Computed properties
 const gridCells = computed(() => {
@@ -210,6 +236,65 @@ function navigateToItem(item: Item) {
     }
   });
 }
+
+async function handleUnequip(slotName: string | null, item: Item) {
+  if (!slotName) return;
+
+  // Determine the equipment category based on slot type
+  let category: 'Weapons' | 'Clothing' | 'Implants';
+  switch (props.slotType) {
+    case 'weapon':
+      category = 'Weapons';
+      break;
+    case 'armor':
+      category = 'Clothing';
+      break;
+    case 'implant':
+      category = 'Implants';
+      break;
+    default:
+      return;
+  }
+
+  // Start fade-out animation
+  unequippingSlots.value.add(slotName);
+
+  try {
+    // Wait for animation to start
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    // Unequip the item
+    await profilesStore.unequipItem(category, slotName);
+
+    // Show success toast
+    toast.add({
+      severity: 'success',
+      summary: 'Item Unequipped',
+      detail: `${item.name} unequipped`,
+      life: 3000
+    });
+
+    // Emit event to parent to reload profile
+    emit('equipment-changed');
+
+    // Keep tracking for animation completion
+    setTimeout(() => {
+      unequippingSlots.value.delete(slotName);
+    }, 250);
+  } catch (error) {
+    console.error('Failed to unequip item:', error);
+    // Remove from animation tracking on error
+    unequippingSlots.value.delete(slotName);
+
+    // Show error toast
+    toast.add({
+      severity: 'error',
+      summary: 'Unequip Failed',
+      detail: 'Failed to unequip item',
+      life: 3000
+    });
+  }
+}
 </script>
 
 <style scoped>
@@ -314,10 +399,10 @@ function navigateToItem(item: Item) {
   transform: translateX(-50%);
   font-size: 8px;
   color: white;
-  text-shadow: 
-    -1px -1px 0 #000, 
-    1px -1px 0 #000, 
-    -1px 1px 0 #000, 
+  text-shadow:
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
     1px 1px 0 #000;
   font-weight: bold;
   max-width: 100%;
@@ -327,6 +412,74 @@ function navigateToItem(item: Item) {
   background: rgba(0, 0, 0, 0.5);
   padding: 0 2px;
   border-radius: 2px;
+}
+
+/* Unequip button styling */
+.unequip-button {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(239, 68, 68, 0.8);
+  border: 1px solid rgba(239, 68, 68, 1);
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s ease;
+  padding: 0;
+  z-index: 10;
+}
+
+.unequip-button:hover {
+  background: rgba(239, 68, 68, 1);
+  transform: scale(1.1);
+}
+
+.unequip-button i {
+  font-size: 10px;
+  color: white;
+  font-weight: bold;
+}
+
+.equipment-slot-cell.has-item:hover .unequip-button {
+  opacity: 1;
+}
+
+/* Fade-out animation */
+.equipment-slot-cell.unequipping {
+  animation: fadeOutItem 0.3s ease-out forwards;
+}
+
+@keyframes fadeOutItem {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+/* Transition group animations */
+.equipment-fade-move,
+.equipment-fade-enter-active,
+.equipment-fade-leave-active {
+  transition: all 0.3s ease;
+}
+
+.equipment-fade-enter-from {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+.equipment-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.8);
 }
 
 /* Dark mode adjustments */

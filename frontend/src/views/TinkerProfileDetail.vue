@@ -135,6 +135,7 @@ Complete character management with skills, equipment, and IP tracking
                         :equipment="getEquippedWeapons(profileData.Weapons)"
                         :slot-type="'weapon'"
                         :show-labels="false"
+                        @equipment-changed="handleEquipmentChange"
                       />
                     </div>
 
@@ -148,6 +149,7 @@ Complete character management with skills, equipment, and IP tracking
                         :equipment="getEquippedArmor(profileData.Clothing)"
                         :slot-type="'armor'"
                         :show-labels="false"
+                        @equipment-changed="handleEquipmentChange"
                       />
                     </div>
 
@@ -161,6 +163,7 @@ Complete character management with skills, equipment, and IP tracking
                         :equipment="getEquippedImplants(profileData.Implants)"
                         :slot-type="'implant'"
                         :show-labels="false"
+                        @equipment-changed="handleEquipmentChange"
                       />
                     </div>
                   </div>
@@ -406,17 +409,17 @@ async function handleCharacterUpdate(changes: any) {
 
   try {
     const result = await profilesStore.updateCharacterMetadata(props.profileId, changes);
-    
+
     if (result.success) {
       // Reload profile to show updated data
       await loadProfile();
       showEditDialog.value = false;
-      
+
       // Show success message if there are warnings
       if (result.warnings.length > 0) {
         console.info('Character updated with warnings:', result.warnings);
       }
-      
+
       if (result.ipDelta !== undefined && result.ipDelta !== 0) {
         const change = result.ipDelta > 0 ? 'increased' : 'decreased';
         console.info(`IP usage ${change} by ${Math.abs(result.ipDelta)} points`);
@@ -429,6 +432,12 @@ async function handleCharacterUpdate(changes: any) {
     console.error('Error updating character:', err);
     error.value = err instanceof Error ? err.message : 'Failed to update character';
   }
+}
+
+// Handle equipment changes from unequip actions
+async function handleEquipmentChange() {
+  // Reload the profile to get updated equipment data
+  await loadProfile();
 }
 
 // Feedback functions
