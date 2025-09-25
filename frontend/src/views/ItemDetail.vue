@@ -29,6 +29,13 @@ Shows all item data with profile compatibility and comparison options
           @click="showEquipDialog"
         />
         <Button
+          v-if="item.is_nano && profilesStore.hasActiveProfile"
+          icon="pi pi-sparkles"
+          label="Cast Buff"
+          severity="primary"
+          @click="castBuff"
+        />
+        <Button
           :icon="isFavorite ? 'pi pi-heart-fill' : 'pi pi-heart'"
           :label="isFavorite ? 'Favorited' : 'Favorite'"
           :severity="isFavorite ? 'danger' : 'secondary'"
@@ -295,6 +302,13 @@ Shows all item data with profile compatibility and comparison options
             label="Equip"
             severity="success"
             @click="showEquipDialog"
+          />
+          <Button
+            v-if="item.is_nano && profilesStore.hasActiveProfile"
+            icon="pi pi-sparkles"
+            label="Cast Buff"
+            severity="primary"
+            @click="castBuff"
           />
           <Button
             :icon="isFavorite ? 'pi pi-heart-fill' : 'pi pi-heart'"
@@ -785,6 +799,29 @@ async function handleEquipItem(slot: string) {
       severity: 'error',
       summary: 'Equip Failed',
       detail: 'Failed to equip the item. Please try again.',
+      life: 3000
+    })
+  }
+}
+
+async function castBuff() {
+  if (!displayedItem.value) return
+
+  try {
+    // Cast to Item type to handle both interpolated and regular items
+    await profilesStore.castBuff(displayedItem.value as Item)
+    toast.add({
+      severity: 'success',
+      summary: 'Buff Cast',
+      detail: `${displayedItem.value.name} has been cast on your active profile`,
+      life: 3000
+    })
+  } catch (error) {
+    console.error('Failed to cast buff:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Cast Failed',
+      detail: error instanceof Error ? error.message : 'Failed to cast the buff',
       life: 3000
     })
   }

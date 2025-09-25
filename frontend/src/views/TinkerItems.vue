@@ -154,6 +154,7 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
             @item-click="onItemClick"
             @item-favorite="onItemFavorite"
             @item-compare="onItemCompare"
+            @item-cast-buff="onItemCastBuff"
             @page-change="onPageChange"
           />
         </div>
@@ -179,6 +180,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useItems } from '@/composables/useItems'
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
 import { useItemsStore } from '@/stores/items'
+import { useToast } from 'primevue/usetoast'
 import type { Item, ItemSearchQuery } from '@/types/api'
 
 
@@ -190,6 +192,7 @@ import ItemComparison from '@/components/items/ItemComparison.vue'
 const router = useRouter()
 const route = useRoute()
 const profilesStore = useTinkerProfilesStore()
+const toast = useToast()
 
 // State
 const searchQuery = ref('')
@@ -372,6 +375,26 @@ function removeFromComparison(itemId: number) {
 
 function clearComparison() {
   comparisonItems.value = []
+}
+
+async function onItemCastBuff(item: Item) {
+  try {
+    await profilesStore.castBuff(item)
+    toast.add({
+      severity: 'success',
+      summary: 'Buff Cast',
+      detail: `${item.name} has been cast on your active profile`,
+      life: 3000
+    })
+  } catch (error) {
+    console.error('Failed to cast buff:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Cast Failed',
+      detail: error instanceof Error ? error.message : 'Failed to cast the buff',
+      life: 3000
+    })
+  }
 }
 
 function onPageChange(page: number) {

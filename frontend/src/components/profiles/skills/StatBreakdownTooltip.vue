@@ -41,6 +41,26 @@ Shows base value, trickle-down, equipment bonuses, IP improvements, and total
         </span>
       </div>
 
+      <!-- Perk Bonuses Row (if any) -->
+      <div v-if="perkBonus !== 0" class="breakdown-row flex justify-between items-center">
+        <span class="text-xs" :class="perkBonus > 0 ? 'text-purple-600 dark:text-purple-400' : 'text-red-600 dark:text-red-400'">
+          Perks:
+        </span>
+        <span class="text-xs font-medium" :class="perkBonus > 0 ? 'text-purple-600 dark:text-purple-400' : 'text-red-600 dark:text-red-400'">
+          {{ perkBonus > 0 ? '+' : '' }}{{ formatValue(perkBonus) }}
+        </span>
+      </div>
+
+      <!-- Buff Bonuses Row (if any) -->
+      <div v-if="buffBonus !== 0" class="breakdown-row flex justify-between items-center">
+        <span class="text-xs" :class="buffBonus > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'">
+          Buffs:
+        </span>
+        <span class="text-xs font-medium" :class="buffBonus > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'">
+          {{ buffBonus > 0 ? '+' : '' }}{{ formatValue(buffBonus) }}
+        </span>
+      </div>
+
       <!-- IP Improvements Row (for non-misc skills) -->
       <div v-if="!isAbility && !isMiscSkill && ipContribution > 0" class="breakdown-row flex justify-between items-center">
         <span class="text-xs text-blue-600 dark:text-blue-400">
@@ -130,6 +150,10 @@ const baseValue = computed(() => {
 const trickleDownBonus = computed(() => props.skillData.trickleDown ?? 0);
 
 const equipmentBonus = computed(() => props.skillData.equipmentBonus ?? 0);
+
+const perkBonus = computed(() => props.skillData.perkBonus ?? 0);
+
+const buffBonus = computed(() => props.skillData.buffBonus ?? 0);
 
 const ipContribution = computed(() => props.skillData.pointFromIp ?? 0);
 
