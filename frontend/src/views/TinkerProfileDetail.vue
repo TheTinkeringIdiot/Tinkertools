@@ -167,6 +167,17 @@ Complete character management with skills, equipment, and IP tracking
                       />
                     </div>
                   </div>
+
+                  <!-- Buffs Section -->
+                  <div class="mt-6">
+                    <BuffTable
+                      :buffs="profileData.buffs || []"
+                      :currentNCU="profilesStore.currentNCU"
+                      :maxNCU="profilesStore.maxNCU"
+                      @remove-buff="handleRemoveBuff"
+                      @remove-all-buffs="handleRemoveAllBuffs"
+                    />
+                  </div>
                 </div>
               </TabPanel>
 
@@ -260,6 +271,7 @@ import EquipmentSlotsDisplay from '@/components/items/EquipmentSlotsDisplay.vue'
 import SkillsManager from '@/components/profiles/skills/SkillsManager.vue';
 import EditCharacterDialog from '@/components/profiles/EditCharacterDialog.vue';
 import PerkTabs from '@/components/profiles/perks/PerkTabs.vue';
+import BuffTable from '@/components/profiles/buffs/BuffTable.vue';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
 import type { Item } from '@/types/api';
 
@@ -438,6 +450,25 @@ async function handleCharacterUpdate(changes: any) {
 async function handleEquipmentChange() {
   // Reload the profile to get updated equipment data
   await loadProfile();
+}
+
+// Handle buff removal events
+async function handleRemoveBuff(buff: Item) {
+  try {
+    await profilesStore.removeBuff(buff.id);
+  } catch (err) {
+    console.error('Failed to remove buff:', err);
+    error.value = err instanceof Error ? err.message : 'Failed to remove buff';
+  }
+}
+
+async function handleRemoveAllBuffs() {
+  try {
+    await profilesStore.removeAllBuffs();
+  } catch (err) {
+    console.error('Failed to remove all buffs:', err);
+    error.value = err instanceof Error ? err.message : 'Failed to remove all buffs';
+  }
 }
 
 // Feedback functions

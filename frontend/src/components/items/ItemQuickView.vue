@@ -67,6 +67,14 @@ Shows essential item information in a compact format
     <!-- Actions -->
     <div class="flex justify-end gap-2 pt-4 border-t border-surface-200 dark:border-surface-700">
       <Button
+        v-if="item.is_nano && hasActiveProfile"
+        icon="pi pi-sparkles"
+        label="Cast Buff"
+        severity="primary"
+        size="small"
+        @click="$emit('cast-buff')"
+      />
+      <Button
         :icon="isFavorite ? 'pi pi-heart-fill' : 'pi pi-heart'"
         :label="isFavorite ? 'Favorited' : 'Favorite'"
         :severity="isFavorite ? 'danger' : 'secondary'"
@@ -93,6 +101,7 @@ Shows essential item information in a compact format
 import { computed, ref } from 'vue'
 import type { Item, TinkerProfile, ItemRequirement } from '@/types/api'
 import { getItemIconUrl } from '@/services/game-utils'
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
 
 const props = defineProps<{
   item: Item
@@ -106,12 +115,17 @@ defineEmits<{
   'view-full': []
   favorite: []
   compare: []
+  'cast-buff': []
 }>()
+
+// Store
+const profilesStore = useTinkerProfilesStore()
 
 // State
 const iconLoadError = ref(false)
 
 // Computed Properties
+const hasActiveProfile = computed(() => profilesStore.hasActiveProfile)
 const itemIconUrl = computed(() => {
   if (iconLoadError.value) return null
   return getItemIconUrl(props.item.stats || [])

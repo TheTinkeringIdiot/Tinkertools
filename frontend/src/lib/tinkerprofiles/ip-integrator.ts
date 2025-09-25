@@ -27,6 +27,7 @@ import { getBreedId, getProfessionId } from '../../services/game-utils';
 import { getSkillId, getSkillName } from './skill-mappings';
 import { calculateEquipmentBonuses } from '../../services/equipment-bonus-calculator';
 import { calculatePerkBonuses as calculatePerkBonusesService } from '../../services/perk-bonus-calculator';
+import { calculateNanoBonuses } from '../../services/nano-bonus-calculator';
 import type { AnyPerkEntry } from './perk-types';
 
 // ============================================================================
@@ -138,6 +139,29 @@ async function calculatePerkBonuses(profile: TinkerProfile): Promise<Record<stri
 }
 
 // ============================================================================
+// Buff Bonus Calculation
+// ============================================================================
+
+/**
+ * Calculate buff bonuses for skills and abilities from profile's active nano buffs
+ */
+function calculateBuffBonuses(profile: TinkerProfile): Record<string, number> {
+  if (!profile.buffs || !Array.isArray(profile.buffs) || profile.buffs.length === 0) {
+    return {};
+  }
+
+  try {
+    // Use the nano bonus calculator service to extract and aggregate stat bonuses
+    const buffBonuses = calculateNanoBonuses(profile.buffs);
+
+    return buffBonuses;
+  } catch (error) {
+    console.warn('Failed to calculate buff bonuses:', error);
+    return {};
+  }
+}
+
+// ============================================================================
 // IP Calculation and Updates
 // ============================================================================
 
@@ -205,7 +229,8 @@ export function calculateProfileIP(profile: TinkerProfile): IPTracker {
 export function updateProfileSkillInfo(
   profile: TinkerProfile,
   providedEquipmentBonuses?: Record<string, number>,
-  providedPerkBonuses?: Record<string, number>
+  providedPerkBonuses?: Record<string, number>,
+  providedBuffBonuses?: Record<string, number>
 ): void {
   const characterStats = profileToCharacterStats(profile);
 
@@ -214,6 +239,9 @@ export function updateProfileSkillInfo(
 
   // Use provided perk bonuses or calculate them
   const perkBonuses = providedPerkBonuses || {};
+
+  // Use provided buff bonuses or calculate them
+  const buffBonuses = providedBuffBonuses || calculateBuffBonuses(profile);
 
   // First, ensure pointFromIp is set for all abilities (needed for tests that set value directly)
   if (profile.Skills.Attributes) {
@@ -225,6 +253,7 @@ export function updateProfileSkillInfo(
         const breedInitValue = getBreedInitValue(characterStats.breed, abilityStatId);
         const equipmentBonus = equipmentBonuses[abilityName] || 0;
         const perkBonus = perkBonuses[abilityName] || 0;
+        const buffBonus = buffBonuses[abilityName] || 0;
 
         // Ensure pointFromIp is set (required field)
         if (ability.pointFromIp === undefined || ability.pointFromIp === null) {
@@ -244,14 +273,15 @@ export function updateProfileSkillInfo(
         ability.baseValue = cappedBaseValue;
         ability.equipmentBonus = equipmentBonus;
         ability.perkBonus = perkBonus; // Store perk bonus separately
+        ability.buffBonus = buffBonus; // Store buff bonus separately
         ability.trickleDown = 0; // Abilities don't have trickle-down
 
-        // Final value: capped base + equipment + perks (both can exceed natural cap)
-        // Apply perk effects after equipment bonuses but before final caps
-        ability.value = cappedBaseValue + equipmentBonus + perkBonus;
+        // Final value: capped base + equipment + perks + buffs (both can exceed natural cap)
+        // Apply buff effects after equipment and perk bonuses but before final caps
+        ability.value = cappedBaseValue + equipmentBonus + perkBonus + buffBonus;
 
-        // Display cap includes equipment and perk bonuses for UI
-        ability.cap = baseAbilityCap + equipmentBonus + perkBonus;
+        // Display cap includes equipment, perk, and buff bonuses for UI
+        ability.cap = baseAbilityCap + equipmentBonus + perkBonus + buffBonus;
       }
     });
   }
@@ -308,21 +338,23 @@ export function updateProfileSkillInfo(
           // Cap the base value at the skill's natural cap
           const cappedBaseValue = Math.min(baseValue, baseSkillCap);
 
-          // Get equipment and perk bonuses for this skill
+          // Get equipment, perk, and buff bonuses for this skill
           const equipmentBonus = equipmentBonuses[skillName] || 0;
           const perkBonus = perkBonuses[skillName] || 0;
+          const buffBonus = buffBonuses[skillName] || 0;
 
           // Store computed values
           skillData.baseValue = cappedBaseValue;
           skillData.equipmentBonus = equipmentBonus;
           skillData.perkBonus = perkBonus; // Store perk bonus separately
+          skillData.buffBonus = buffBonus; // Store buff bonus separately
 
-          // Final value: capped base + equipment + perks (both can exceed natural cap)
-          // Apply perk effects after equipment bonuses but before final caps
-          skillData.value = cappedBaseValue + equipmentBonus + perkBonus;
+          // Final value: capped base + equipment + perks + buffs (both can exceed natural cap)
+          // Apply buff effects after equipment and perk bonuses but before final caps
+          skillData.value = cappedBaseValue + equipmentBonus + perkBonus + buffBonus;
 
-          // Display cap includes equipment and perk bonuses for UI
-          skillData.cap = baseSkillCap + equipmentBonus + perkBonus;
+          // Display cap includes equipment, perk, and buff bonuses for UI
+          skillData.cap = baseSkillCap + equipmentBonus + perkBonus + buffBonus;
         }
       });
     }
@@ -378,10 +410,11 @@ export function updateProfileTrickleDown(profile: TinkerProfile): TinkerProfile 
           const baseValue = 5 + newTrickleDown + (skillData.pointFromIp || 0);
           skillData.baseValue = baseValue;
 
-          // Always include equipment and perk bonuses in final value
+          // Always include equipment, perk, and buff bonuses in final value
           const equipmentBonus = skillData.equipmentBonus || 0;
           const perkBonus = skillData.perkBonus || 0;
-          skillData.value = baseValue + equipmentBonus + perkBonus;
+          const buffBonus = skillData.buffBonus || 0;
+          skillData.value = baseValue + equipmentBonus + perkBonus + buffBonus;
         }
       });
     }
@@ -446,8 +479,16 @@ export async function recalculateProfileIP(profile: TinkerProfile): Promise<Tink
     console.warn('Failed to calculate perk bonuses during IP recalculation:', error);
   }
 
-  // Update skill information (trickle-down, caps) with perk bonuses
-  updateProfileSkillInfo(updatedProfile, undefined, perkBonuses);
+  // Calculate buff bonuses if buffs are present
+  let buffBonuses: Record<string, number> = {};
+  try {
+    buffBonuses = calculateBuffBonuses(updatedProfile);
+  } catch (error) {
+    console.warn('Failed to calculate buff bonuses during IP recalculation:', error);
+  }
+
+  // Update skill information (trickle-down, caps) with all bonuses
+  updateProfileSkillInfo(updatedProfile, undefined, perkBonuses, buffBonuses);
 
   // Recalculate IP tracker
   updatedProfile.IPTracker = calculateProfileIP(updatedProfile);

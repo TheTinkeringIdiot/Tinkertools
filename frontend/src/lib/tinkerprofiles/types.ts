@@ -18,11 +18,12 @@ export interface SkillWithIP {
   ipSpent: number;      // Total IP cost
 
   // Computed values (calculated at runtime, never stored)
-  value?: number;         // Total: base + trickle + IP + equipment + perks (capped)
-  baseValue?: number;     // Base + trickle + IP (no equipment/perks)
+  value?: number;         // Total: base + trickle + IP + equipment + perks + buffs (capped)
+  baseValue?: number;     // Base + trickle + IP (no equipment/perks/buffs)
   trickleDown?: number;   // Bonus from abilities
   equipmentBonus?: number; // Total bonus from all equipped items
   perkBonus?: number;     // Total bonus from all equipped perks
+  buffBonus?: number;     // Total bonus from all active nano buffs
   cap?: number;           // Effective skill cap (including equipment and perks for display)
 }
 
@@ -66,7 +67,7 @@ export interface TinkerProfile {
   version: string;
   created: string;
   updated: string;
-  
+
   // Character basic info
   Character: {
     Name: string;
@@ -83,7 +84,7 @@ export interface TinkerProfile {
 
   // IP tracking (new)
   IPTracker?: IPTracker;
-  
+
   // Complete skills structure with IP tracking (except Misc)
   Skills: {
     Attributes: {
@@ -106,14 +107,17 @@ export interface TinkerProfile {
     'Combat & Healing': Record<string, SkillWithIP>;
     Misc: Record<string, number>; // Misc doesn't use IP tracking
   };
-  
+
   // Equipment slots
   Weapons: Record<string, Item | null>;
   Clothing: Record<string, Item | null>;
   Implants: Record<string, ImplantWithClusters | null>;
-  
+
   // Perk system with structured tracking for SL/AI points and LE research
   PerksAndResearch: PerkSystem;
+
+  // Nano buff system - array of active nano programs providing stat bonuses
+  buffs?: Item[];
 }
 
 /** Simplified nano-compatible profile for TinkerNanos */

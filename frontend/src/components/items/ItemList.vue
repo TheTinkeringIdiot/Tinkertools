@@ -45,6 +45,7 @@ Shows items in grid or list view with pagination and compatibility indicators
           @click="$emit('item-click', item)"
           @favorite="$emit('item-favorite', item)"
           @compare="$emit('item-compare', item)"
+          @cast-buff="$emit('cast-buff', item)"
           @quick-view="showQuickView(item)"
         />
       </div>
@@ -133,7 +134,18 @@ Shows items in grid or list view with pagination and compatibility indicators
                       @click.stop="$emit('item-compare', item)"
                       v-tooltip.bottom="'Add to comparison'"
                     />
-                    
+
+                    <!-- Cast Buff Button (for nanos only) -->
+                    <Button
+                      v-if="item.is_nano && profilesStore.hasActiveProfile"
+                      icon="pi pi-sparkles"
+                      size="small"
+                      text
+                      severity="primary"
+                      @click.stop="$emit('cast-buff', item)"
+                      v-tooltip.bottom="'Cast nano buff to active profile'"
+                    />
+
                     <!-- Quick Actions Menu -->
                     <Button
                       icon="pi pi-ellipsis-v"
@@ -208,6 +220,7 @@ Shows items in grid or list view with pagination and compatibility indicators
 import { ref, computed, watch } from 'vue'
 import type { Item, TinkerProfile, PaginationInfo } from '@/types/api'
 import { getItemIconUrl as getItemIconUrlUtil } from '@/services/game-utils'
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
 
 // Components (to be created)
 import ItemCard from './ItemCard.vue'
@@ -228,9 +241,13 @@ const emit = defineEmits<{
   'item-click': [item: Item]
   'item-favorite': [item: Item]
   'item-compare': [item: Item]
+  'cast-buff': [item: Item]
   'page-change': [page: number]
   'view-mode-change': [mode: 'grid' | 'list']
 }>()
+
+// Store
+const profilesStore = useTinkerProfilesStore()
 
 // State
 const currentOffset = ref(props.pagination?.offset || 0)

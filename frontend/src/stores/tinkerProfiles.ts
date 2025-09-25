@@ -16,6 +16,9 @@ import {
   type ProfileValidationResult,
   type TinkerProfilesConfig
 } from '@/lib/tinkerprofiles';
+import { useToast } from 'primevue/usetoast';
+import { nanoCompatibility } from '@/utils/nano-compatibility';
+import type { Item } from '@/types/api';
 
 // Types that may not be exported yet
 type NanoCompatibleProfile = any; // TODO: Add proper type when available
@@ -994,6 +997,9 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   // Flag to prevent recursive updates when setting profile from perk recalculation
   let isUpdatingFromPerkChanges = false;
 
+  // Flag to prevent recursive updates when setting profile from buff recalculation
+  let isUpdatingFromBuffs = false;
+
   /**
    * Execute the actual equipment bonus recalculation
    */
@@ -1014,6 +1020,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       // Set flags to prevent watchers from triggering
       isUpdatingFromEquipmentBonus = true;
       isUpdatingFromPerkChanges = true;
+      isUpdatingFromBuffs = true;
 
       // Update profile data
       activeProfile.value = updatedProfile;
@@ -1025,11 +1032,13 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       // Clear flags after update
       isUpdatingFromEquipmentBonus = false;
       isUpdatingFromPerkChanges = false;
+      isUpdatingFromBuffs = false;
 
     } catch (err) {
       console.error('Equipment change handling failed:', err);
       isUpdatingFromEquipmentBonus = false; // Ensure flag is cleared on error
       isUpdatingFromPerkChanges = false; // Ensure flag is cleared on error
+      isUpdatingFromBuffs = false; // Ensure flag is cleared on error
     } finally {
       equipmentUpdateState.value.isUpdating = false;
 
@@ -1058,8 +1067,8 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     const weaponsWatcher = watch(
       () => activeProfile.value?.Weapons,
       (newWeapons, oldWeapons) => {
-        // Skip if we're updating from equipment bonus recalculation, skills, or perks
-        if (isUpdatingFromEquipmentBonus || isUpdatingSkills || isUpdatingFromPerkChanges) return;
+        // Skip if we're updating from equipment bonus recalculation, skills, perks, or buffs
+        if (isUpdatingFromEquipmentBonus || isUpdatingSkills || isUpdatingFromPerkChanges || isUpdatingFromBuffs) return;
         // Only trigger if there are actual changes
         if (newWeapons !== oldWeapons) {
           handleEquipmentChange('Weapons');
@@ -1071,8 +1080,8 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     const clothingWatcher = watch(
       () => activeProfile.value?.Clothing,
       (newClothing, oldClothing) => {
-        // Skip if we're updating from equipment bonus recalculation, skills, or perks
-        if (isUpdatingFromEquipmentBonus || isUpdatingSkills || isUpdatingFromPerkChanges) return;
+        // Skip if we're updating from equipment bonus recalculation, skills, perks, or buffs
+        if (isUpdatingFromEquipmentBonus || isUpdatingSkills || isUpdatingFromPerkChanges || isUpdatingFromBuffs) return;
         if (newClothing !== oldClothing) {
           handleEquipmentChange('Clothing');
         }
@@ -1083,8 +1092,8 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     const implantsWatcher = watch(
       () => activeProfile.value?.Implants,
       (newImplants, oldImplants) => {
-        // Skip if we're updating from equipment bonus recalculation, skills, or perks
-        if (isUpdatingFromEquipmentBonus || isUpdatingSkills || isUpdatingFromPerkChanges) return;
+        // Skip if we're updating from equipment bonus recalculation, skills, perks, or buffs
+        if (isUpdatingFromEquipmentBonus || isUpdatingSkills || isUpdatingFromPerkChanges || isUpdatingFromBuffs) return;
         if (newImplants !== oldImplants) {
           handleEquipmentChange('Implants');
         }
@@ -1095,8 +1104,8 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     const perksWatcher = watch(
       () => activeProfile.value?.PerksAndResearch,
       (newPerks, oldPerks) => {
-        // Skip if we're updating from equipment bonus recalculation, skills, or perks
-        if (isUpdatingFromEquipmentBonus || isUpdatingSkills || isUpdatingFromPerkChanges) return;
+        // Skip if we're updating from equipment bonus recalculation, skills, perks, or buffs
+        if (isUpdatingFromEquipmentBonus || isUpdatingSkills || isUpdatingFromPerkChanges || isUpdatingFromBuffs) return;
         if (newPerks !== oldPerks) {
           handleEquipmentChange('PerksAndResearch');
         }
@@ -1104,8 +1113,20 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       { deep: true, flush: 'post' }
     );
 
+    const buffsWatcher = watch(
+      () => activeProfile.value?.buffs,
+      (newBuffs, oldBuffs) => {
+        // Skip if we're updating from buff recalculation
+        if (isUpdatingFromBuffs) return;
+        if (newBuffs !== oldBuffs) {
+          handleEquipmentChange('Buffs');
+        }
+      },
+      { deep: true, flush: 'post' }
+    );
+
     // Store the stop handles for cleanup
-    equipmentWatcherStopHandles = [weaponsWatcher, clothingWatcher, implantsWatcher, perksWatcher];
+    equipmentWatcherStopHandles = [weaponsWatcher, clothingWatcher, implantsWatcher, perksWatcher, buffsWatcher];
   }
 
   /**
@@ -1140,6 +1161,297 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     },
     { immediate: true }
   );
+
+  // ============================================================================
+  // Buff Management and NCU Tracking
+  // ============================================================================
+
+  /**
+   * Get current NCU usage from active buffs
+   */
+  const currentNCU = computed(() => {
+    if (!activeProfile.value || !activeProfile.value.buffs) {
+      return 0;
+    }
+
+    return activeProfile.value.buffs.reduce((total, buff) => {
+      // NCU cost is stored in stat 54
+      const ncuStat = buff.stats?.find(stat => stat.stat === 54);
+      return total + (ncuStat?.value || 0);
+    }, 0);
+  });
+
+  /**
+   * Get maximum NCU capacity from Computer Literacy skill (stat 181)
+   */
+  const maxNCU = computed(() => {
+    if (!activeProfile.value) {
+      return 0;
+    }
+
+    // MaxNCU is the Computer Literacy skill in the Misc category
+    const computerLiteracy = activeProfile.value.Skills?.Misc?.['Computer Literacy'];
+    return computerLiteracy || 0;
+  });
+
+  /**
+   * Get available NCU space
+   */
+  const availableNCU = computed(() => {
+    return Math.max(0, maxNCU.value - currentNCU.value);
+  });
+
+  /**
+   * Check if a buff can be cast based on NCU requirements
+   */
+  function canCastBuff(item: Item): boolean {
+    if (!item.is_nano || !activeProfile.value) {
+      return false;
+    }
+
+    // Get NCU cost from stat 54
+    const ncuStat = item.stats?.find(stat => stat.stat === 54);
+    const ncuCost = ncuStat?.value || 0;
+
+    return ncuCost <= availableNCU.value;
+  }
+
+  /**
+   * Get buff conflicts based on NanoStrain (stat 75)
+   */
+  function getBuffConflicts(item: Item): Item[] {
+    if (!activeProfile.value?.buffs || !item.is_nano) {
+      return [];
+    }
+
+    // Get NanoStrain from stat 75
+    const newStrainStat = item.stats?.find(stat => stat.stat === 75);
+    if (!newStrainStat) {
+      return [];
+    }
+
+    const newStrain = newStrainStat.value;
+
+    return activeProfile.value.buffs.filter(buff => {
+      const buffStrainStat = buff.stats?.find(stat => stat.stat === 75);
+      return buffStrainStat && buffStrainStat.value === newStrain;
+    });
+  }
+
+  /**
+   * Cast a buff nano on the active profile
+   */
+  async function castBuff(item: Item): Promise<void> {
+    if (!activeProfile.value) {
+      throw new Error('No active profile selected');
+    }
+
+    if (!item.is_nano) {
+      throw new Error('Only nano items can be cast as buffs');
+    }
+
+    const toast = useToast();
+
+    try {
+      // Initialize buffs array if it doesn't exist
+      if (!activeProfile.value.buffs) {
+        activeProfile.value.buffs = [];
+      }
+
+      // Check NCU requirements
+      const ncuStat = item.stats?.find(stat => stat.stat === 54);
+      const ncuCost = ncuStat?.value || 0;
+
+      if (ncuCost > availableNCU.value) {
+        toast.add({
+          severity: 'error',
+          summary: 'Insufficient NCU',
+          detail: `Requires ${ncuCost} NCU, but only ${availableNCU.value} available`,
+          life: 3000
+        });
+        return;
+      }
+
+      // Check for NanoStrain conflicts
+      const conflicts = getBuffConflicts(item);
+
+      if (conflicts.length > 0) {
+        // Get StackingOrder values for comparison (stat 551)
+        const newStackingOrderStat = item.stats?.find(stat => stat.stat === 551);
+        const newStackingOrder = newStackingOrderStat?.value || 0;
+
+        for (const conflictBuff of conflicts) {
+          const conflictStackingOrderStat = conflictBuff.stats?.find(stat => stat.stat === 551);
+          const conflictStackingOrder = conflictStackingOrderStat?.value || 0;
+
+          // Higher StackingOrder replaces lower, equal StackingOrder means new replaces existing
+          if (newStackingOrder >= conflictStackingOrder) {
+            // Remove the conflicting buff
+            activeProfile.value.buffs = activeProfile.value.buffs.filter(buff => buff.id !== conflictBuff.id);
+          } else {
+            // New buff has lower priority, cannot cast
+            toast.add({
+              severity: 'error',
+              summary: 'Buff Conflict',
+              detail: `${conflictBuff.name} has higher stacking priority`,
+              life: 3000
+            });
+            return;
+          }
+        }
+      }
+
+      // Convert reactive proxy to plain object to avoid serialization issues
+      const plainItem = toRaw(item);
+
+      // Add the buff
+      activeProfile.value.buffs.push(plainItem);
+
+      // Set flag to prevent watcher loops
+      isUpdatingFromBuffs = true;
+
+      try {
+        // Trigger recalculation using the IP integrator
+        const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
+        const updatedProfile = await updateProfileWithIPTracking(activeProfile.value);
+
+        // Update the profile in storage and state
+        await updateProfile(activeProfile.value.id, updatedProfile);
+
+        // Update local state
+        activeProfile.value = updatedProfile;
+        profiles.value.set(activeProfile.value.id, updatedProfile);
+
+        toast.add({
+          severity: 'success',
+          summary: 'Buff Cast',
+          detail: `Successfully cast ${item.name}`,
+          life: 3000
+        });
+      } finally {
+        isUpdatingFromBuffs = false;
+      }
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to cast buff';
+      toast.add({
+        severity: 'error',
+        summary: 'Cast Failed',
+        detail: errorMessage,
+        life: 3000
+      });
+      throw err;
+    }
+  }
+
+  /**
+   * Remove a specific buff from the active profile
+   */
+  async function removeBuff(itemId: number): Promise<void> {
+    if (!activeProfile.value || !activeProfile.value.buffs) {
+      return;
+    }
+
+    const toast = useToast();
+
+    try {
+      const buffToRemove = activeProfile.value.buffs.find(buff => buff.id === itemId);
+      if (!buffToRemove) {
+        return;
+      }
+
+      // Remove the buff
+      activeProfile.value.buffs = activeProfile.value.buffs.filter(buff => buff.id !== itemId);
+
+      // Set flag to prevent watcher loops
+      isUpdatingFromBuffs = true;
+
+      try {
+        // Trigger recalculation using the IP integrator
+        const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
+        const updatedProfile = await updateProfileWithIPTracking(activeProfile.value);
+
+        // Update the profile in storage and state
+        await updateProfile(activeProfile.value.id, updatedProfile);
+
+        // Update local state
+        activeProfile.value = updatedProfile;
+        profiles.value.set(activeProfile.value.id, updatedProfile);
+
+        toast.add({
+          severity: 'success',
+          summary: 'Buff Removed',
+          detail: `Removed ${buffToRemove.name}`,
+          life: 3000
+        });
+      } finally {
+        isUpdatingFromBuffs = false;
+      }
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to remove buff';
+      toast.add({
+        severity: 'error',
+        summary: 'Remove Failed',
+        detail: errorMessage,
+        life: 3000
+      });
+      throw err;
+    }
+  }
+
+  /**
+   * Remove all buffs from the active profile
+   */
+  async function removeAllBuffs(): Promise<void> {
+    if (!activeProfile.value || !activeProfile.value.buffs || activeProfile.value.buffs.length === 0) {
+      return;
+    }
+
+    const toast = useToast();
+
+    try {
+      const buffCount = activeProfile.value.buffs.length;
+
+      // Clear all buffs
+      activeProfile.value.buffs = [];
+
+      // Set flag to prevent watcher loops
+      isUpdatingFromBuffs = true;
+
+      try {
+        // Trigger recalculation using the IP integrator
+        const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
+        const updatedProfile = await updateProfileWithIPTracking(activeProfile.value);
+
+        // Update the profile in storage and state
+        await updateProfile(activeProfile.value.id, updatedProfile);
+
+        // Update local state
+        activeProfile.value = updatedProfile;
+        profiles.value.set(activeProfile.value.id, updatedProfile);
+
+        toast.add({
+          severity: 'success',
+          summary: 'All Buffs Removed',
+          detail: `Removed ${buffCount} buff${buffCount === 1 ? '' : 's'}`,
+          life: 3000
+        });
+      } finally {
+        isUpdatingFromBuffs = false;
+      }
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to remove all buffs';
+      toast.add({
+        severity: 'error',
+        summary: 'Remove Failed',
+        detail: errorMessage,
+        life: 3000
+      });
+      throw err;
+    }
+  }
 
   // ============================================================================
   // Auto-initialization
@@ -1203,7 +1515,19 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     // Equipment methods
     equipItem,
     unequipItem,
-    
+
+    // Buff management methods
+    castBuff,
+    removeBuff,
+    removeAllBuffs,
+    canCastBuff,
+    getBuffConflicts,
+
+    // NCU tracking computed properties
+    currentNCU: readonly(currentNCU),
+    maxNCU: readonly(maxNCU),
+    availableNCU: readonly(availableNCU),
+
     // Direct access to manager (for advanced use cases)
     getManager: () => profileManager,
 

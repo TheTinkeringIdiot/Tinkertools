@@ -181,6 +181,17 @@ Shows item info with compatibility status and quick actions
             @click.stop="$emit('compare', item)"
             v-tooltip.bottom="'Add to comparison'"
           />
+
+          <!-- Cast Buff Button (for nanos only) -->
+          <Button
+            v-if="item.is_nano && profilesStore.hasActiveProfile"
+            icon="pi pi-sparkles"
+            size="small"
+            text
+            severity="primary"
+            @click.stop="$emit('cast-buff', item)"
+            v-tooltip.bottom="'Cast nano buff to active profile'"
+          />
         </div>
       </div>
     </template>
@@ -191,6 +202,7 @@ Shows item info with compatibility status and quick actions
 import { computed, ref } from 'vue'
 import type { Item, TinkerProfile, ItemRequirement } from '@/types/api'
 import { getItemIconUrl } from '@/services/game-utils'
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
 
 const props = defineProps<{
   item: Item
@@ -204,8 +216,12 @@ defineEmits<{
   click: [item: Item]
   favorite: [item: Item]
   compare: [item: Item]
+  'cast-buff': [item: Item]
   'quick-view': [item: Item]
 }>()
+
+// Store
+const profilesStore = useTinkerProfilesStore()
 
 // State
 const iconLoadError = ref(false)
