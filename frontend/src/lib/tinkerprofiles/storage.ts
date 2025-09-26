@@ -382,36 +382,91 @@ export class ProfileStorage {
   }
 
   /**
+   * Migrate Misc skills from numeric format to MiscSkill objects
+   */
+  private migrateMiscSkills(profile: TinkerProfile): TinkerProfile {
+    if (!profile.Skills?.Misc) {
+      return profile;
+    }
+
+    // Check if migration is needed by examining the first Misc skill
+    const miscSkills = profile.Skills.Misc;
+    const firstSkillName = Object.keys(miscSkills)[0];
+
+    if (!firstSkillName) {
+      return profile; // No Misc skills to migrate
+    }
+
+    const firstSkill = miscSkills[firstSkillName];
+
+    // If it's already a MiscSkill object, no migration needed
+    if (typeof firstSkill === 'object' && firstSkill !== null && 'baseValue' in firstSkill) {
+      return profile;
+    }
+
+    console.log(`[ProfileStorage] Migrating Misc skills for profile ${profile.Character.Name}`);
+
+    // Clone the profile to avoid mutating the original
+    const migrated = structuredClone(profile);
+    let skillsMigrated = 0;
+
+    // Convert each numeric Misc skill to MiscSkill object
+    for (const [skillName, skillValue] of Object.entries(miscSkills)) {
+      if (typeof skillValue === 'number') {
+        // Convert numeric value to MiscSkill object
+        (migrated.Skills.Misc as any)[skillName] = {
+          baseValue: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          value: skillValue // Preserve the original numeric value
+        };
+        skillsMigrated++;
+      }
+    }
+
+    if (skillsMigrated > 0) {
+      migrated.updated = new Date().toISOString();
+      console.log(`[ProfileStorage] Migrated ${skillsMigrated} Misc skills from numeric to MiscSkill objects for profile ${profile.Character.Name}`);
+    }
+
+    return migrated;
+  }
+
+  /**
    * Migrate perk system to structured format if needed
    */
   private async migratePerkSystem(profile: TinkerProfile): Promise<TinkerProfile> {
+    // First apply Misc skills migration
+    const miscMigrated = this.migrateMiscSkills(profile);
+
     // Check if perk system migration is needed
-    if (profile.PerksAndResearch &&
-        typeof profile.PerksAndResearch === 'object' &&
-        'perks' in profile.PerksAndResearch &&
-        'standardPerkPoints' in profile.PerksAndResearch &&
-        'aiPerkPoints' in profile.PerksAndResearch) {
-      return profile; // Already migrated
+    if (miscMigrated.PerksAndResearch &&
+        typeof miscMigrated.PerksAndResearch === 'object' &&
+        'perks' in miscMigrated.PerksAndResearch &&
+        'standardPerkPoints' in miscMigrated.PerksAndResearch &&
+        'aiPerkPoints' in miscMigrated.PerksAndResearch) {
+      return miscMigrated; // Already migrated
     }
 
-    console.log(`[ProfileStorage] Migrating perk system for profile ${profile.Character.Name}`);
+    console.log(`[ProfileStorage] Migrating perk system for profile ${miscMigrated.Character.Name}`);
 
     try {
       // Import transformer dynamically to avoid circular dependencies
       const { ProfileTransformer } = await import('./transformer');
       const transformer = new ProfileTransformer();
 
-      const migratedProfile = transformer.migrateProfilePerks(profile);
-      console.log(`[ProfileStorage] Successfully migrated perk system for profile ${profile.Character.Name}`);
+      const migratedProfile = transformer.migrateProfilePerks(miscMigrated);
+      console.log(`[ProfileStorage] Successfully migrated perk system for profile ${miscMigrated.Character.Name}`);
 
       return migratedProfile;
     } catch (error) {
-      console.error(`[ProfileStorage] Failed to migrate perk system for profile ${profile.Character.Name}:`, error);
+      console.error(`[ProfileStorage] Failed to migrate perk system for profile ${miscMigrated.Character.Name}:`, error);
 
       // Fallback: Create default perk system if migration fails
-      const fallbackProfile = structuredClone(profile);
-      const level = profile.Character.Level || 1;
-      const alienLevel = profile.Character.AlienLevel || 0;
+      const fallbackProfile = structuredClone(miscMigrated);
+      const level = miscMigrated.Character.Level || 1;
+      const alienLevel = miscMigrated.Character.AlienLevel || 0;
 
       // Calculate standard perk points
       const standardPerkPoints = level < 10 ? 0 :
@@ -437,7 +492,7 @@ export class ProfileStorage {
       };
 
       fallbackProfile.updated = new Date().toISOString();
-      console.log(`[ProfileStorage] Created fallback perk system for profile ${profile.Character.Name}`);
+      console.log(`[ProfileStorage] Created fallback perk system for profile ${miscMigrated.Character.Name}`);
 
       return fallbackProfile;
     }

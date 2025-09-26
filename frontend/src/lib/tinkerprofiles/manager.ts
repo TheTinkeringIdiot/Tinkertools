@@ -121,24 +121,62 @@ export class TinkerProfilesManager {
   // ============================================================================
   
   /**
+   * Convert numeric Misc skills to MiscSkill objects for compatibility
+   */
+  private migrateProfileMiscSkills(profile: TinkerProfile): TinkerProfile {
+    if (!profile.Skills?.Misc) {
+      return profile;
+    }
+
+    const miscSkills = profile.Skills.Misc;
+    let skillsMigrated = 0;
+
+    // Check if migration is needed by examining skills
+    for (const [skillName, skillValue] of Object.entries(miscSkills)) {
+      if (typeof skillValue === 'number') {
+        // Convert numeric value to MiscSkill object
+        (profile.Skills.Misc as any)[skillName] = {
+          baseValue: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          value: skillValue // Preserve the original numeric value
+        };
+        skillsMigrated++;
+      }
+    }
+
+    if (skillsMigrated > 0) {
+      profile.updated = new Date().toISOString();
+      console.log(`[TinkerProfilesManager] Migrated ${skillsMigrated} Misc skills from numeric to MiscSkill objects for profile ${profile.Character.Name}`);
+    }
+
+    return profile;
+  }
+
+  /**
    * Create a new profile
    */
   async createProfile(name: string, initialData?: Partial<TinkerProfile>): Promise<string> {
     try {
       // Extract breed from initialData to create profile with correct breed-specific values
       const breed = initialData?.Character?.Breed || 'Solitus';
-      const profile = createDefaultProfile(name, breed);
-      
+      let profile = createDefaultProfile(name, breed);
+
       if (initialData) {
         Object.assign(profile, initialData);
         profile.updated = new Date().toISOString();
       }
-      
+
+      // Misc skills should already be in correct format for new profiles (Task 1.2 completed)
+      // But apply migration as a safety net
+      profile = this.migrateProfileMiscSkills(profile);
+
       // Calculate caps and trickle-down for the new profile
       const { updateProfileWithIPTracking } = await import('./ip-integrator');
       const profileWithCaps = updateProfileWithIPTracking(profile);
       Object.assign(profile, profileWithCaps);
-      
+
       // Validate the profile
       if (this.config.validation.strictMode) {
         const validation = this.validator.validateProfile(profile);
@@ -146,22 +184,22 @@ export class TinkerProfilesManager {
           throw new Error(`Profile validation failed: ${validation.errors.join(', ')}`);
         }
       }
-      
+
       await this.storage.saveProfile(profile);
       this.invalidateCache();
-      
+
       if (this.config.events.enabled) {
         this.events.emit('profile:created', { profile });
       }
-      
+
       return profile.id;
-      
+
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to create profile';
       if (this.config.events.enabled) {
-        this.events.emit('storage:error', { 
-          error: new Error(errorMsg), 
-          operation: 'create' 
+        this.events.emit('storage:error', {
+          error: new Error(errorMsg),
+          operation: 'create'
         });
       }
       throw new Error(errorMsg);
@@ -177,42 +215,44 @@ export class TinkerProfilesManager {
       if (this.profilesCache.has(profileId) && !this.cacheInvalidated) {
         return this.profilesCache.get(profileId)!;
       }
-      
-      const profile = await this.storage.loadProfile(profileId);
-      
+
+      let profile = await this.storage.loadProfile(profileId);
+
       if (profile) {
+        // Apply Misc skills migration if needed (this happens in storage.loadProfile, but double-check)
+        profile = this.migrateProfileMiscSkills(profile);
+
         // Ensure IP tracking is initialized
-        let updatedProfile = profile;
         if (!profile.IPTracker) {
-          updatedProfile = await ipIntegrator.recalculateProfileIP(profile);
-          await this.storage.saveProfile(updatedProfile); // Save the updated profile
+          profile = await ipIntegrator.recalculateProfileIP(profile);
+          await this.storage.saveProfile(profile); // Save the updated profile
         }
-        
+
         // Validate and potentially auto-correct
-        const validation = this.validator.validateProfile(updatedProfile);
-        
+        const validation = this.validator.validateProfile(profile);
+
         if (!validation.valid && this.config.validation.strictMode) {
           throw new Error(`Profile validation failed: ${validation.errors.join(', ')}`);
         }
-        
+
         if (this.config.validation.autoCorrect && validation.warnings.length > 0) {
           // Apply auto-corrections here if needed
-          updatedProfile.updated = new Date().toISOString();
-          await this.storage.saveProfile(updatedProfile);
+          profile.updated = new Date().toISOString();
+          await this.storage.saveProfile(profile);
         }
-        
+
         // Update cache
-        this.profilesCache.set(profileId, updatedProfile);
-        return updatedProfile;
+        this.profilesCache.set(profileId, profile);
+        return profile;
       }
-      
+
       return null;
-      
+
     } catch (error) {
       if (this.config.events.enabled) {
-        this.events.emit('storage:error', { 
-          error: error instanceof Error ? error : new Error('Failed to load profile'), 
-          operation: 'load' 
+        this.events.emit('storage:error', {
+          error: error instanceof Error ? error : new Error('Failed to load profile'),
+          operation: 'load'
         });
       }
       return null;
@@ -228,9 +268,18 @@ export class TinkerProfilesManager {
       if (!existing) {
         throw new Error('Profile not found');
       }
-      
-      const updated = { ...existing, ...updates, updated: new Date().toISOString() };
-      
+
+      let updated = { ...existing, ...updates, updated: new Date().toISOString() };
+
+      // Check if equipment, perks, or buffs changed - if so, recalculate stats
+      const needsRecalc = updates.Weapons || updates.Clothing || updates.Implants ||
+                         updates.PerksAndResearch || updates.buffs;
+
+      if (needsRecalc) {
+        // Recalculate all stats including equipment bonuses, perk bonuses, etc
+        updated = await ipIntegrator.recalculateProfileIP(updated);
+      }
+
       // Validate the updated profile
       if (this.config.validation.strictMode) {
         const validation = this.validator.validateProfile(updated);
@@ -238,11 +287,11 @@ export class TinkerProfilesManager {
           throw new Error(`Profile validation failed: ${validation.errors.join(', ')}`);
         }
       }
-      
+
       await this.storage.saveProfile(updated);
       this.profilesCache.set(profileId, updated);
       this.invalidateMetadataCache();
-      
+
       if (this.config.events.enabled) {
         this.events.emit('profile:updated', { profile: updated, changes: updates });
       }

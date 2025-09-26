@@ -203,6 +203,7 @@ import { computed, ref } from 'vue'
 import type { Item, TinkerProfile, ItemRequirement } from '@/types/api'
 import { getItemIconUrl } from '@/services/game-utils'
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
+import { mapProfileToStats } from '@/utils/profile-stats-mapper'
 
 const props = defineProps<{
   item: Item
@@ -305,9 +306,11 @@ function getItemTypeLabel(itemClass: number): string {
 
 function canMeetRequirement(requirement: ItemRequirement): boolean {
   if (!props.profile) return false
-  
-  const characterStat = props.profile.stats?.[requirement.stat] || 0
-  return characterStat >= requirement.value
+
+  // Use the profile stats mapper to get all stats and skills correctly
+  const stats = mapProfileToStats(props.profile)
+  const characterValue = stats[requirement.stat] || 0
+  return characterValue >= requirement.value
 }
 
 function onIconError() {

@@ -1182,16 +1182,24 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   });
 
   /**
-   * Get maximum NCU capacity from Computer Literacy skill (stat 181)
+   * Get maximum NCU capacity from Max NCU skill (stat 181)
    */
   const maxNCU = computed(() => {
     if (!activeProfile.value) {
       return 0;
     }
 
-    // MaxNCU is the Computer Literacy skill in the Misc category
-    const computerLiteracy = activeProfile.value.Skills?.Misc?.['Computer Literacy'];
-    return computerLiteracy || 0;
+    // MaxNCU is the Max NCU skill in the Misc category (stat ID 181)
+    const maxNCUSkill = activeProfile.value.Skills?.Misc?.['Max NCU'];
+
+    // Handle both old numeric format and new MiscSkill object format
+    if (typeof maxNCUSkill === 'number') {
+      return maxNCUSkill;
+    } else if (maxNCUSkill && typeof maxNCUSkill === 'object' && 'value' in maxNCUSkill) {
+      return maxNCUSkill.value;
+    }
+
+    return 0;
   });
 
   /**

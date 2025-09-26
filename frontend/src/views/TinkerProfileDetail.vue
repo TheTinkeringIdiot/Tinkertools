@@ -114,7 +114,7 @@ Complete character management with skills, equipment, and IP tracking
               class="h-full profile-tabs"
             >
               <!-- Equipment Tab -->
-              <TabPanel class="h-full">
+              <TabPanel>
                 <template #header>
                   <div class="flex items-center gap-2">
                     <i class="pi pi-shield text-orange-500"></i>
@@ -122,7 +122,7 @@ Complete character management with skills, equipment, and IP tracking
                   </div>
                 </template>
 
-                <div class="p-6">
+                <div class="h-full p-6">
                   <h2 class="text-xl font-semibold text-surface-900 dark:text-surface-50 mb-4">Equipment</h2>
                   <div class="grid grid-cols-3 gap-4">
                     <!-- Weapons -->
@@ -182,7 +182,7 @@ Complete character management with skills, equipment, and IP tracking
               </TabPanel>
 
               <!-- Skills Tab -->
-              <TabPanel class="h-full">
+              <TabPanel>
                 <template #header>
                   <div class="flex items-center gap-2">
                     <i class="pi pi-cog text-blue-500"></i>
@@ -227,7 +227,7 @@ Complete character management with skills, equipment, and IP tracking
               </TabPanel>
 
               <!-- Perks Tab -->
-              <TabPanel class="h-full">
+              <TabPanel>
                 <template #header>
                   <div class="flex items-center gap-2">
                     <i class="pi pi-star text-primary-500"></i>

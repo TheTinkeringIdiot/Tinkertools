@@ -359,6 +359,31 @@ export function updateProfileSkillInfo(
       });
     }
   });
+
+  // Apply equipment, perk, and buff bonuses to Misc skills
+  if (profile.Skills.Misc && typeof profile.Skills.Misc === 'object') {
+    Object.entries(profile.Skills.Misc).forEach(([skillName, miscSkill]) => {
+      if (miscSkill && typeof miscSkill === 'object' && 'baseValue' in miscSkill) {
+        // Get bonuses for this Misc skill
+        const equipmentBonus = equipmentBonuses[skillName] || 0;
+        const perkBonus = perkBonuses[skillName] || 0;
+        const buffBonus = buffBonuses[skillName] || 0;
+
+        // Update individual bonus fields (never accumulate)
+        miscSkill.equipmentBonus = equipmentBonus;
+        miscSkill.perkBonus = perkBonus;
+        miscSkill.buffBonus = buffBonus;
+
+        // Calculate total value
+        miscSkill.value = miscSkill.baseValue + equipmentBonus + perkBonus + buffBonus;
+      }
+    });
+  }
+
+  // ACs are pure calculated values with no base (always start at 0)
+  // They should be calculated on-the-fly in the UI, not stored in the profile
+  // This prevents accumulation bugs from repeated bonus applications
+  // The actual AC calculation happens in the display components
 }
 
 /**

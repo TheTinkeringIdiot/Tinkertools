@@ -42,9 +42,10 @@ Provides a responsive grid layout for skills with stat breakdown tooltips
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, inject, provide } from 'vue';
 import SkillSlider from './SkillSlider.vue';
 import { getSkillStatId } from '@/utils/skill-registry';
+import type { TinkerProfile } from '@/lib/tinkerprofiles';
 
 // Props
 const props = defineProps<{
@@ -62,6 +63,13 @@ const emit = defineEmits<{
   'skill-changed': [category: string, skillName: string, newValue: number];
   'ability-changed': [abilityName: string, newValue: number];
 }>();
+
+// Inject the profile from parent and re-provide for children
+const profile = inject<TinkerProfile>('profile');
+if (profile) {
+  // Re-provide for child components (SkillSlider)
+  provide('profile', profile);
+}
 
 // Computed
 const skillCount = computed(() => {
