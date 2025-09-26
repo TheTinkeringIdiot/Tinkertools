@@ -112,7 +112,14 @@ Modal for importing profiles from various formats
       
       <!-- Format Detection -->
       <div v-if="detectedFormat" class="field">
-        <div class="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+        <div v-if="detectedFormat.includes('Unsupported')" class="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <i class="pi pi-times-circle text-red-600 dark:text-red-400"></i>
+          <div class="text-red-700 dark:text-red-300">
+            <strong>Detected format: {{ detectedFormat }}</strong>
+            <p class="text-sm mt-1">This format is no longer supported. Please recreate your profile or import from AOSetups.</p>
+          </div>
+        </div>
+        <div v-else class="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
           <i class="pi pi-info-circle text-blue-600 dark:text-blue-400"></i>
           <span class="text-blue-700 dark:text-blue-300">
             Detected format: <strong>{{ detectedFormat }}</strong>
@@ -292,7 +299,7 @@ Modal for importing profiles from various formats
         <Button
           :label="isBulkImport ? 'Import Profiles' : 'Import Profile'"
           icon="pi pi-upload"
-          :disabled="!hasData || importing"
+          :disabled="!hasData || importing || (detectedFormat && detectedFormat.includes('Unsupported'))"
           :loading="importing"
           @click="importProfile"
         />
@@ -412,36 +419,46 @@ function onFileClear() {
 function detectFormat(data: string): string {
   try {
     const parsed = JSON.parse(data);
-    
-    // Check for multi-profile bulk export format  
+
+    // Check for multi-profile bulk export format
     if (parsed.version === "1.0" && parsed.profileCount && parsed.profiles && Array.isArray(parsed.profiles)) {
       const profileCount = parsed.profileCount;
       const actualCount = parsed.profiles.length;
       return `TinkerProfiles Bulk Export (${actualCount} profile${actualCount !== 1 ? 's' : ''})`;
     }
-    
-    // Check for TinkerProfile format
-    if (parsed.Character && parsed.Skills && parsed.version) {
-      return 'TinkerProfile JSON';
+
+    // Check for v3.0.0 TinkerProfile format (DEPRECATED - NOT SUPPORTED)
+    if (parsed.Character && parsed.Skills && parsed.version === '3.0.0') {
+      return 'TinkerProfile v3.0.0 (Unsupported)';
     }
-    
+
+    // Check for v4.0.0 TinkerProfile format (SUPPORTED)
+    if (parsed.Character && parsed.skills && parsed.version === '4.0.0') {
+      return 'TinkerProfile v4.0.0';
+    }
+
+    // Check for TinkerProfile format (unknown version)
+    if (parsed.Character && (parsed.Skills || parsed.skills) && parsed.version) {
+      return `TinkerProfile ${parsed.version}`;
+    }
+
     // Check for legacy format
     if (parsed.character && parsed.skills) {
       return 'Legacy JSON';
     }
-    
+
     // Check for AO format
     if (parsed.CharacterName && parsed.Profession && parsed.Skills) {
       return 'Anarchy Online Export';
     }
-    
+
     // Check for nano-compatible profile
     if (parsed.name && parsed.profession && parsed.skills && parsed.stats) {
       return 'Nano-Compatible Profile';
     }
-    
+
     return 'Generic JSON';
-    
+
   } catch {
     return 'Unknown Format';
   }
@@ -549,6 +566,25 @@ async function importProfile() {
     } else {
       // Handle single profile import
       console.log(`[${importMethod.value === 'aosetups' ? 'AOSetups' : importMethod.value} Import] Processing profile data...`);
+
+      // Pre-validate for unsupported v3.0.0 format
+      if (importMethod.value !== 'aosetups') {
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.Character && parsed.Skills && parsed.version === '3.0.0') {
+            throw new Error(`TinkerProfile v3.0.0 format is no longer supported. Please recreate your profile or import from AOSetups instead.
+
+v4.0.0 introduces major architectural changes that are incompatible with v3.0.0.
+Visit the TinkerProfiles page to create a new profile or use the AOSetups import feature.`);
+          }
+        } catch (parseError) {
+          // If it's not JSON or our specific v3.0.0 error, continue with normal import flow
+          if (parseError instanceof Error && parseError.message.includes('v3.0.0 format is no longer supported')) {
+            throw parseError;
+          }
+        }
+      }
+
       const result = await profilesStore.importProfile(data);
       importResult.value = result;
       

@@ -56,19 +56,19 @@ Shows skills in a category with IP cost calculations and interactive value adjus
           <div v-else class="space-y-3">
             <!-- Skills/Abilities List -->
             <div
-              v-for="(skill, skillName) in skills"
-              :key="skillName"
+              v-for="(skill, skillId) in skills"
+              :key="skillId"
               class="skill-item"
             >
               <SkillSlider
-                :skill-name="skillName"
+                :skill-name="getSkillName(skillId)"
                 :skill-data="skill"
                 :is-ability="isAbilities"
                 :is-read-only="isReadOnly"
                 :category="title"
                 :breed="breed"
                 :profession="profession"
-                :skill-id="getSkillId(skillName)"
+                :skill-id="skillId"
                 @skill-changed="handleSkillChanged"
                 @ability-changed="handleAbilityChanged"
               />
@@ -91,14 +91,15 @@ import { ref, computed, inject, provide } from 'vue';
 import Badge from 'primevue/badge';
 import SkillSlider from './SkillSlider.vue';
 import SkillsGrid from './SkillsGrid.vue';
-import { getSkillStatId } from '@/utils/skill-registry';
+import { skillService } from '@/services/skill-service';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
+import type { SkillId, SkillData } from '@/types/skills';
 
 // Props
 const props = defineProps<{
   title: string;
   icon: string;
-  skills: Record<string, any>;
+  skills: Record<SkillId, SkillData>;
   isAbilities?: boolean;
   isReadOnly?: boolean;
   breed?: string;
@@ -132,13 +133,13 @@ const skillCount = computed(() => {
 const totalIPCost = computed(() => {
   if (props.isAbilities) {
     // For abilities, sum up ipSpent values
-    return Object.values(props.skills).reduce((total: number, skill: any) => {
+    return Object.values(props.skills).reduce((total: number, skill: SkillData) => {
       return total + (skill?.ipSpent || 0);
     }, 0);
   } else {
     // For skills, sum up ipSpent values (except Misc category which doesn't track IP)
     if (props.title === 'Misc') return 0;
-    return Object.values(props.skills).reduce((total: number, skill: any) => {
+    return Object.values(props.skills).reduce((total: number, skill: SkillData) => {
       return total + (skill?.ipSpent || 0);
     }, 0);
   }
@@ -149,8 +150,13 @@ function toggleExpanded() {
   isExpanded.value = !isExpanded.value;
 }
 
-function getSkillId(skillName: string): number | undefined {
-  return getSkillStatId(skillName) || undefined;
+function getSkillName(skillId: SkillId | number): string {
+  try {
+    return skillService.getName(skillId);
+  } catch (error) {
+    console.warn(`[SkillCategory] Failed to resolve skill name for ID ${skillId}:`, error);
+    return `Unknown Skill (${skillId})`;
+  }
 }
 
 function handleSkillChanged(category: string, skillName: string, newValue: number) {

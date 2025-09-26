@@ -37,45 +37,22 @@ export class ProfileStorage {
   // ============================================================================
   
   /**
-   * Strip computed values from skills before saving
+   * Prepare profile for v4.0.0 serialization
+   * v4.0.0 stores computed totals and uses flat skill ID structure
    */
-  private stripComputedValues(profile: TinkerProfile): TinkerProfile {
+  private prepareProfileForSerialization(profile: TinkerProfile): TinkerProfile {
     // Convert Vue proxy to raw object first, then create a deep clone
     const rawProfile = toRaw(profile);
-    const stripped = structuredClone(rawProfile);
+    const prepared = structuredClone(rawProfile);
 
-    // Strip computed values from skills
-    if (stripped.Skills) {
-      // Process all skill categories
-      Object.keys(stripped.Skills).forEach(category => {
-        const skillCategory = stripped.Skills[category as keyof typeof stripped.Skills];
-        if (skillCategory && typeof skillCategory === 'object') {
-          Object.values(skillCategory).forEach((skill: any) => {
-            if (skill && typeof skill === 'object') {
-              // Keep only stored values
-              const stored = {
-                pointFromIp: skill.pointFromIp || 0,
-                ipSpent: skill.ipSpent || 0
-              };
-              // Remove all computed values
-              delete skill.value;
-              delete skill.baseValue;
-              delete skill.trickleDown;
-              delete skill.equipmentBonus;
-              delete skill.cap;
-              // Set the stored values
-              skill.pointFromIp = stored.pointFromIp;
-              skill.ipSpent = stored.ipSpent;
-            }
-          });
-        }
-      });
-    }
+    // Set version to 4.0.0
+    prepared.version = '4.0.0';
 
-    // Update version to 3.0.0
-    stripped.version = '3.0.0';
+    // v4.0.0 stores computed totals - no stripping needed
+    // Skills should already be in flat ID-based format by this point
+    // Equipment, perks, and buffs structures remain unchanged
 
-    return stripped;
+    return prepared;
   }
 
   /**
@@ -83,8 +60,13 @@ export class ProfileStorage {
    */
   async saveProfile(profile: TinkerProfile): Promise<void> {
     try {
-      // Strip computed values before saving
-      const profileToSave = this.stripComputedValues(profile);
+      // Validate profile version
+      if (profile.version !== '4.0.0') {
+        throw new Error(`Invalid profile version: ${profile.version}. Only v4.0.0 profiles are supported.`);
+      }
+
+      // Prepare profile for v4.0.0 serialization (stores computed totals)
+      const profileToSave = this.prepareProfileForSerialization(profile);
 
       // Save the individual profile
       const profileKey = `${STORAGE_KEYS.PROFILE_PREFIX}${profile.id}`;
@@ -94,7 +76,7 @@ export class ProfileStorage {
       // Update the index
       await this.updateProfileIndex(profile.id, 'add');
 
-      console.log(`[ProfileStorage] Saved profile ${profile.id} to individual key (v3 minimal format)`);
+      console.log(`[ProfileStorage] Saved profile ${profile.id} to individual key (v4.0.0 format with computed totals)`);
 
     } catch (error) {
       throw new Error(`Failed to save profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -121,13 +103,25 @@ export class ProfileStorage {
         profile = JSON.parse(data);
       }
 
-      // Apply migrations including perk system migration
-      profile = await this.migrateProfile(profile);
+      // Validate profile version - only v4.0.0 supported
+      if (!profile.version || profile.version !== '4.0.0') {
+        throw new Error(`
+Profile version validation failed.
 
-      // For v3 profiles, we need to recalculate all computed values
-      // Import dynamically to avoid circular dependencies
-      const { updateProfileWithIPTracking } = await import('./ip-integrator');
-      profile = await updateProfileWithIPTracking(profile);
+Profile ID: ${profileId}
+Found version: ${profile.version || 'undefined'}
+Required version: 4.0.0
+
+This profile cannot be loaded as it uses an unsupported format.
+v4.0.0 uses ID-based skill storage for improved performance and reliability.
+
+Action required: This profile needs to be recreated or imported from AOSetups format.
+`);
+      }
+
+      // v4.0.0 profiles store computed totals - no recalculation needed during load
+      // Skills are in flat ID-based format, computed values are already present
+      // Profile is ready to use immediately
 
       return profile;
     } catch (error) {
@@ -263,239 +257,68 @@ export class ProfileStorage {
   // ============================================================================
   
   /**
-   * Migrate a profile to the current version
+   * Migration is disabled for v4.0.0 - breaking change requires recreation
    */
   private async migrateProfile(profile: TinkerProfile): Promise<TinkerProfile> {
-    if (profile.version === CURRENT_VERSION) {
-      // Even for current version profiles, check for BASE_SKILL and perk migrations
-      const skillMigrated = await this.migrateBaseSkillValues(profile);
-      return await this.migratePerkSystem(skillMigrated);
+    // v4.0.0 is a breaking change - no automatic migration from v3.0.0
+    // Users must recreate profiles or import from AOSetups format
+
+    if (profile.version !== '4.0.0') {
+      throw new Error(`
+Profile migration not supported.
+
+Profile version: ${profile.version || 'undefined'}
+Target version: 4.0.0
+
+v4.0.0 introduces ID-based skill storage which is not compatible with previous versions.
+Automatic migration is not provided due to the architectural changes required.
+
+Options:
+1. Recreate the profile manually
+2. Import from AOSetups format (if available)
+3. Use export data to rebuild the profile
+
+This ensures data integrity and optimal performance with the new skill system.
+`);
     }
 
-    // Clone the profile for migration
-    const migrated = structuredClone(profile);
-
-    // Version-specific migrations
-    if (!migrated.version || migrated.version < '2.0.0') {
-      // Migrate from v1.x to v2.0
-      migrated.version = CURRENT_VERSION;
-      migrated.updated = new Date().toISOString();
-
-      // Add any missing fields from current structure
-      if (!migrated.created) {
-        migrated.created = new Date().toISOString();
-      }
-    }
-
-    // Apply BASE_SKILL migration to all profiles
-    const skillMigrated = await this.migrateBaseSkillValues(migrated);
-
-    // Apply perk system migration
-    return await this.migratePerkSystem(skillMigrated);
+    return profile;
   }
 
   /**
-   * Migrate skills from value 1 to BASE_SKILL (5) for existing profiles
-   * Only updates skills that are currently at 1 to avoid overwriting user modifications
-   * Also adds cap field to all skills and calculates caps
+   * Base skill migration is disabled for v4.0.0
    */
   private async migrateBaseSkillValues(profile: TinkerProfile): Promise<TinkerProfile> {
-    const BASE_SKILL = 5;
-    
-    if (!profile.Skills) {
-      return profile;
+    // v4.0.0 uses ID-based skills - no migration from name-based skills
+    if (profile.version !== '4.0.0') {
+      throw new Error(`Base skill migration not supported for version ${profile.version}. Only v4.0.0 profiles are supported.`);
     }
-    
-    // Clone the profile to avoid mutating the original
-    const migrated = structuredClone(profile);
-    let skillsUpdated = 0;
-    let capsAdded = 0;
-    
-    // IP-based skill categories to update
-    const ipBasedCategories = [
-      'Body & Defense',
-      'Ranged Weapons', 
-      'Ranged Specials',
-      'Melee Weapons',
-      'Melee Specials', 
-      'Nanos & Casting',
-      'Exploring',
-      'Trade & Repair',
-      'Combat & Healing'
-    ];
-    
-    // Update IP-based skills
-    for (const categoryName of ipBasedCategories) {
-      const category = migrated.Skills[categoryName as keyof typeof migrated.Skills];
-      
-      if (category && typeof category === 'object') {
-        for (const [skillName, skill] of Object.entries(category)) {
-          if (skill && typeof skill === 'object' && 'value' in skill) {
-            const skillData = skill as any;
-            
-            // Only update skills that are currently at 1 and have not been modified by user
-            if (skillData.value === 1 && (!skillData.pointFromIp || skillData.pointFromIp === 0)) {
-              skillData.value = BASE_SKILL;
-              skillsUpdated++;
-            }
-            
-            // Add cap field if missing
-            if (skillData.cap === undefined) {
-              skillData.cap = undefined; // Will be calculated by updateProfileSkillInfo
-              capsAdded++;
-            }
-          }
-        }
-      }
-    }
-    
-    // Update abilities to have cap field if missing
-    if (migrated.Skills.Attributes) {
-      const abilityNames = ['Strength', 'Agility', 'Stamina', 'Intelligence', 'Sense', 'Psychic'];
-      abilityNames.forEach(abilityName => {
-        const ability = migrated.Skills.Attributes![abilityName as keyof typeof migrated.Skills.Attributes] as any;
-        if (ability && ability.cap === undefined) {
-          ability.cap = undefined; // Will be calculated by updateProfileSkillInfo
-          capsAdded++;
-        }
-      });
-    }
-    
-    // Recalculate caps using the IP integrator
-    if (capsAdded > 0) {
-      try {
-        // Import dynamically to avoid circular dependencies
-        const { updateProfileSkillInfo } = await import('./ip-integrator');
-        updateProfileSkillInfo(migrated);
-      } catch (error) {
-        console.warn('[ProfileStorage] Could not calculate caps during migration:', error);
-      }
-    }
-    
-    // If we updated any skills or added caps, mark the profile as updated
-    if (skillsUpdated > 0 || capsAdded > 0) {
-      migrated.updated = new Date().toISOString();
-      console.log(`[ProfileStorage] Migrated profile ${migrated.Character.Name}: ${skillsUpdated} skills from value 1 to BASE_SKILL (${BASE_SKILL}), ${capsAdded} caps added`);
-    }
-    
-    return migrated;
+
+    return profile;
   }
 
   /**
-   * Migrate Misc skills from numeric format to MiscSkill objects
+   * Misc skill migration is disabled for v4.0.0
    */
   private migrateMiscSkills(profile: TinkerProfile): TinkerProfile {
-    if (!profile.Skills?.Misc) {
-      return profile;
+    // v4.0.0 uses ID-based skills - no migration from name-based skills
+    if (profile.version !== '4.0.0') {
+      throw new Error(`Misc skill migration not supported for version ${profile.version}. Only v4.0.0 profiles are supported.`);
     }
 
-    // Check if migration is needed by examining the first Misc skill
-    const miscSkills = profile.Skills.Misc;
-    const firstSkillName = Object.keys(miscSkills)[0];
-
-    if (!firstSkillName) {
-      return profile; // No Misc skills to migrate
-    }
-
-    const firstSkill = miscSkills[firstSkillName];
-
-    // If it's already a MiscSkill object, no migration needed
-    if (typeof firstSkill === 'object' && firstSkill !== null && 'baseValue' in firstSkill) {
-      return profile;
-    }
-
-    console.log(`[ProfileStorage] Migrating Misc skills for profile ${profile.Character.Name}`);
-
-    // Clone the profile to avoid mutating the original
-    const migrated = structuredClone(profile);
-    let skillsMigrated = 0;
-
-    // Convert each numeric Misc skill to MiscSkill object
-    for (const [skillName, skillValue] of Object.entries(miscSkills)) {
-      if (typeof skillValue === 'number') {
-        // Convert numeric value to MiscSkill object
-        (migrated.Skills.Misc as any)[skillName] = {
-          baseValue: 0,
-          equipmentBonus: 0,
-          perkBonus: 0,
-          buffBonus: 0,
-          value: skillValue // Preserve the original numeric value
-        };
-        skillsMigrated++;
-      }
-    }
-
-    if (skillsMigrated > 0) {
-      migrated.updated = new Date().toISOString();
-      console.log(`[ProfileStorage] Migrated ${skillsMigrated} Misc skills from numeric to MiscSkill objects for profile ${profile.Character.Name}`);
-    }
-
-    return migrated;
+    return profile;
   }
 
   /**
-   * Migrate perk system to structured format if needed
+   * Perk system migration is disabled for v4.0.0
    */
   private async migratePerkSystem(profile: TinkerProfile): Promise<TinkerProfile> {
-    // First apply Misc skills migration
-    const miscMigrated = this.migrateMiscSkills(profile);
-
-    // Check if perk system migration is needed
-    if (miscMigrated.PerksAndResearch &&
-        typeof miscMigrated.PerksAndResearch === 'object' &&
-        'perks' in miscMigrated.PerksAndResearch &&
-        'standardPerkPoints' in miscMigrated.PerksAndResearch &&
-        'aiPerkPoints' in miscMigrated.PerksAndResearch) {
-      return miscMigrated; // Already migrated
+    // v4.0.0 profiles should already have the correct perk system structure
+    if (profile.version !== '4.0.0') {
+      throw new Error(`Perk system migration not supported for version ${profile.version}. Only v4.0.0 profiles are supported.`);
     }
 
-    console.log(`[ProfileStorage] Migrating perk system for profile ${miscMigrated.Character.Name}`);
-
-    try {
-      // Import transformer dynamically to avoid circular dependencies
-      const { ProfileTransformer } = await import('./transformer');
-      const transformer = new ProfileTransformer();
-
-      const migratedProfile = transformer.migrateProfilePerks(miscMigrated);
-      console.log(`[ProfileStorage] Successfully migrated perk system for profile ${miscMigrated.Character.Name}`);
-
-      return migratedProfile;
-    } catch (error) {
-      console.error(`[ProfileStorage] Failed to migrate perk system for profile ${miscMigrated.Character.Name}:`, error);
-
-      // Fallback: Create default perk system if migration fails
-      const fallbackProfile = structuredClone(miscMigrated);
-      const level = miscMigrated.Character.Level || 1;
-      const alienLevel = miscMigrated.Character.AlienLevel || 0;
-
-      // Calculate standard perk points
-      const standardPerkPoints = level < 10 ? 0 :
-        Math.min(Math.floor(level / 10), 20) + (level > 200 ? Math.min(level - 200, 20) : 0);
-
-      // Calculate AI perk points
-      const aiPerkPoints = Math.min(alienLevel, 30);
-
-      fallbackProfile.PerksAndResearch = {
-        perks: [],
-        standardPerkPoints: {
-          total: standardPerkPoints,
-          spent: 0,
-          available: standardPerkPoints
-        },
-        aiPerkPoints: {
-          total: aiPerkPoints,
-          spent: 0,
-          available: aiPerkPoints
-        },
-        research: [],
-        lastCalculated: new Date().toISOString()
-      };
-
-      fallbackProfile.updated = new Date().toISOString();
-      console.log(`[ProfileStorage] Created fallback perk system for profile ${miscMigrated.Character.Name}`);
-
-      return fallbackProfile;
-    }
+    return profile;
   }
 
   // ============================================================================
@@ -560,7 +383,7 @@ export class ProfileStorage {
   }
 
   /**
-   * Migrate from legacy storage format to individual profile keys
+   * Legacy storage migration is disabled for v4.0.0
    */
   private async migrateFromLegacyStorage(): Promise<void> {
     try {
@@ -570,39 +393,28 @@ export class ProfileStorage {
         return; // No legacy data to migrate
       }
 
-      console.log('[ProfileStorage] Migrating from legacy storage format...');
+      console.warn(`[ProfileStorage] Legacy profile data detected but migration is disabled in v4.0.0.`);
+      console.warn(`[ProfileStorage] v4.0.0 uses ID-based skill storage which is incompatible with previous versions.`);
+      console.warn(`[ProfileStorage] Legacy data will be left intact but cannot be automatically migrated.`);
+      console.warn(`[ProfileStorage] Users must recreate profiles or import from AOSetups format.`);
 
-      // Parse the legacy data
-      let legacyProfiles: Record<string, TinkerProfile>;
+      // Parse the legacy data to report how many profiles were found
       try {
-        legacyProfiles = JSON.parse(legacyData);
+        const legacyProfiles = JSON.parse(legacyData);
+        const profileCount = Object.keys(legacyProfiles || {}).length;
+        if (profileCount > 0) {
+          console.warn(`[ProfileStorage] Found ${profileCount} legacy profile(s) that require manual recreation.`);
+        }
       } catch (error) {
-        console.error('[ProfileStorage] Failed to parse legacy data:', error);
-        return;
+        console.warn('[ProfileStorage] Legacy data exists but cannot be parsed.');
       }
 
-      if (!legacyProfiles || Object.keys(legacyProfiles).length === 0) {
-        return;
-      }
+      // Do not remove legacy data - leave it for potential manual recovery
+      // Do not create index - start fresh with v4.0.0
 
-      // Migrate each profile to individual storage
-      const profileIds: string[] = [];
-      for (const [id, profile] of Object.entries(legacyProfiles)) {
-        const profileKey = `${STORAGE_KEYS.PROFILE_PREFIX}${id}`;
-        localStorage.setItem(profileKey, JSON.stringify(profile));
-        profileIds.push(id);
-      }
-
-      // Save the index
-      localStorage.setItem(STORAGE_KEYS.PROFILE_INDEX, JSON.stringify(profileIds));
-
-      // Remove the legacy data
-      localStorage.removeItem(STORAGE_KEYS.PROFILES);
-
-      console.log(`[ProfileStorage] Successfully migrated ${profileIds.length} profiles to individual storage`);
     } catch (error) {
-      console.error('[ProfileStorage] Migration failed:', error);
-      // Don't throw - allow the app to continue even if migration fails
+      console.error('[ProfileStorage] Legacy storage check failed:', error);
+      // Don't throw - allow the app to continue
     }
   }
 
@@ -615,7 +427,7 @@ export class ProfileStorage {
     console.warn('[ProfileStorage] saveAllProfiles is deprecated - profiles are now saved individually');
 
     // Save each profile individually
-    for (const [id, profile] of profiles.entries()) {
+    for (const [id, profile] of Array.from(profiles.entries())) {
       await this.saveProfile(profile);
     }
   }

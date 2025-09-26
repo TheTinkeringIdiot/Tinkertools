@@ -119,69 +119,72 @@ Shows base value, trickle-down, equipment bonuses, IP improvements, and total
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { SkillWithIP, MiscSkill } from '@/lib/tinkerprofiles/types';
+import { skillService } from '@/services/skill-service';
+import type { SkillId, SkillData } from '@/types/skills';
 
 // Props
 const props = defineProps<{
-  skillName: string;
-  skillData: SkillWithIP & {
-    equipmentBonus?: number;
-    baseValue?: number;
-  } | MiscSkill;
+  skillId: SkillId;
+  skillData: SkillData;
   isAbility?: boolean;
-  category?: string;
   breed?: string;
 }>();
+
+// Get skill name from skill service
+const skillName = computed(() => skillService.getName(props.skillId));
+
+// Get skill category from skill service
+const skillCategory = computed(() => skillService.getCategory(props.skillId));
 
 // Computed values for breakdown display
 const baseValue = computed(() => {
   if (props.isAbility) {
-    // For abilities, baseValue from backend includes breed base + IP improvements (no equipment)
-    // We want to show just the breed base here, so subtract pointFromIp
-    const fullBase = props.skillData.baseValue ?? props.skillData.value;
-    const improvements = (props.skillData as any).pointFromIp ?? 0;
-    return Math.max(0, fullBase - improvements);
+    // For abilities, we want to show just the breed base value
+    return props.skillData.base;
   } else if (isMiscSkill.value) {
     // For Misc skills, baseValue is always 0
-    return props.skillData.baseValue ?? 0;
+    return props.skillData.base;
   } else {
-    // For regular skills, base value is typically 5, or use provided baseValue
-    return props.skillData.baseValue ?? 5;
+    // For regular skills, use base value from skill data
+    return props.skillData.base;
   }
 });
 
 const trickleDownBonus = computed(() => {
   // Misc skills never have trickle-down bonuses
   if (isMiscSkill.value) return 0;
-  return (props.skillData as any).trickleDown ?? 0;
+  return props.skillData.trickle;
 });
 
-const equipmentBonus = computed(() => props.skillData.equipmentBonus ?? 0);
+const equipmentBonus = computed(() => props.skillData.equipmentBonus);
 
-const perkBonus = computed(() => props.skillData.perkBonus ?? 0);
+const perkBonus = computed(() => props.skillData.perkBonus);
 
-const buffBonus = computed(() => props.skillData.buffBonus ?? 0);
+const buffBonus = computed(() => props.skillData.buffBonus);
 
 const ipContribution = computed(() => {
   // Misc skills never have IP contributions
   if (isMiscSkill.value) return 0;
-  return (props.skillData as any).pointFromIp ?? 0;
+  return props.skillData.pointsFromIp;
 });
 
 const abilityImprovements = computed(() => {
   if (props.isAbility) {
-    // For abilities, use pointFromIp which tracks IP-based improvements
-    // This excludes equipment bonuses which are shown separately
-    return props.skillData.pointFromIp ?? 0;
+    // For abilities, use pointsFromIp which tracks IP-based improvements
+    return props.skillData.pointsFromIp;
   }
   return 0;
 });
 
-const totalValue = computed(() => props.skillData.value);
+const totalValue = computed(() => props.skillData.total);
 
-const skillCap = computed(() => props.skillData.cap);
+const skillCap = computed(() => {
+  // Skill cap is not available in the new SkillData interface
+  // This would need to be passed as a separate prop or computed elsewhere
+  return undefined;
+});
 
-const isMiscSkill = computed(() => props.category === 'Misc');
+const isMiscSkill = computed(() => skillCategory.value === 'Misc');
 
 // Utility functions
 const formatValue = (value: number): string => {

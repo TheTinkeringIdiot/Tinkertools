@@ -1,7 +1,9 @@
 /**
  * TinkerProfiles Library Types
- * 
+ *
  * Unified type definitions for profile management across all TinkerTools applications
+ *
+ * Version 4.0.0 - ID-based skill architecture
  */
 
 import type { Item } from '@/types/api';
@@ -11,32 +13,49 @@ import type { PerkSystem } from './perk-types';
 // Core Profile Types
 // ============================================================================
 
-/** Skill entry with IP tracking */
-export interface SkillWithIP {
-  // Stored values (persisted to localStorage)
-  pointFromIp: number;  // IP improvements made by player
-  ipSpent: number;      // Total IP cost
+/**
+ * Unified skill data structure for all skill types in v4.0.0
+ *
+ * Supports regular skills (with IP), Misc skills (bonus-only), and ACs (calculated)
+ * through unified interface with conditional zero values.
+ *
+ * @example
+ * // Regular skill (e.g., 1h Blunt - ID 102)
+ * { base: 5, trickle: 100, ipSpent: 5000, pointsFromIp: 250, equipmentBonus: 50, perkBonus: 25, buffBonus: 10, total: 440 }
+ *
+ * // Misc skill (e.g., MaxHealth - ID 27)
+ * { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 100, perkBonus: 50, buffBonus: 0, total: 150 }
+ *
+ * // AC skill (e.g., Chemical AC - ID 92)
+ * { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 75, perkBonus: 20, buffBonus: 5, total: 100 }
+ */
+export interface SkillData {
+  /** Breed-specific base value (5 for regular skills, 0 for Misc/ACs) */
+  base: number;
 
-  // Computed values (calculated at runtime, never stored)
-  value?: number;         // Total: base + trickle + IP + equipment + perks + buffs (capped)
-  baseValue?: number;     // Base + trickle + IP (no equipment/perks/buffs)
-  trickleDown?: number;   // Bonus from abilities
-  equipmentBonus?: number; // Total bonus from all equipped items
-  perkBonus?: number;     // Total bonus from all equipped perks
-  buffBonus?: number;     // Total bonus from all active nano buffs
-  cap?: number;           // Effective skill cap (including equipment and perks for display)
-}
+  /** Trickle-down bonus from attributes (separate from base for clarity) */
+  trickle: number;
 
-/** Misc skill entry with bonus tracking (no IP system) */
-export interface MiscSkill {
-  // Stored values (persisted to localStorage)
-  baseValue: number;      // Always 0 for Misc skills
+  /** IP invested in this skill (0 for Misc/ACs that don't use IP) */
+  ipSpent: number;
 
-  // Computed values (calculated at runtime, never stored)
-  equipmentBonus: number; // Total bonus from all equipped items
-  perkBonus: number;      // Total bonus from all equipped perks
-  buffBonus: number;      // Total bonus from all active nano buffs
-  value: number;          // Calculated total: baseValue + equipmentBonus + perkBonus + buffBonus
+  /** Skill points gained from IP investment (0 for Misc/ACs) */
+  pointsFromIp: number;
+
+  /** Pure equipment bonus (no base value included) */
+  equipmentBonus: number;
+
+  /** Pure perk bonus (no base value included) */
+  perkBonus: number;
+
+  /** Pure buff bonus (no base value included) */
+  buffBonus: number;
+
+  /**
+   * Total skill value: base + trickle + pointsFromIp + equipmentBonus + perkBonus + buffBonus
+   * Stored to prevent recalculation overhead and ensure consistency
+   */
+  total: number;
 }
 
 /** Comprehensive IP tracking information */
@@ -72,15 +91,34 @@ export interface ImplantWithClusters extends Item {
   };
 }
 
-/** Comprehensive profile structure following legacy TinkerProfiles format */
+/**
+ * TinkerProfile v4.0.0 structure with ID-based skill architecture
+ *
+ * Major changes from v3.0.0:
+ * - Skills stored in flat map using numeric skill IDs as keys
+ * - Unified SkillData interface for all skill types
+ * - Equipment, perks, and buffs structures unchanged for compatibility
+ *
+ * Skill ID structure:
+ * - 16-21: Attributes (Strength=16, Stamina=17, Agility=18, Sense=19, Intelligence=20, Psychic=21)
+ * - 90-97: ACs (Melee=90, Energy=91, Chemical=92, Radiation=93, Cold=94, Poison=95, Fire=96, Projectile=97)
+ * - 100-167: Regular skills (1h Blunt=102, 1h Edged=103, Break & Entry=165, etc.)
+ * - 200+: Misc skills (MaxHealth=27, MaxNano=28, etc.)
+ *
+ * @example
+ * // Access skills by ID instead of nested category/name structure
+ * profile.skills[102] // 1h Blunt skill data
+ * profile.skills[27]  // MaxHealth skill data
+ * profile.skills[92]  // Chemical AC skill data
+ */
 export interface TinkerProfile {
   // Profile metadata
   id: string;
-  version: string;
+  version: '4.0.0';  // Fixed version for v4.0.0 profiles
   created: string;
   updated: string;
 
-  // Character basic info
+  // Character basic info (unchanged)
   Character: {
     Name: string;
     Level: number;
@@ -94,41 +132,35 @@ export interface TinkerProfile {
     AlienLevel?: number; // 0-30, for AI perk points calculation
   };
 
-  // IP tracking (new)
+  // IP tracking (unchanged)
   IPTracker?: IPTracker;
 
-  // Complete skills structure with IP tracking (except Misc)
-  Skills: {
-    Attributes: {
-      Intelligence: SkillWithIP;
-      Psychic: SkillWithIP;
-      Sense: SkillWithIP;
-      Stamina: SkillWithIP;
-      Strength: SkillWithIP;
-      Agility: SkillWithIP;
-    };
-    'Body & Defense': Record<string, SkillWithIP>;
-    ACs: Record<string, number>;
-    'Ranged Weapons': Record<string, SkillWithIP>;
-    'Ranged Specials': Record<string, SkillWithIP>;
-    'Melee Weapons': Record<string, SkillWithIP>;
-    'Melee Specials': Record<string, SkillWithIP>;
-    'Nanos & Casting': Record<string, SkillWithIP>;
-    Exploring: Record<string, SkillWithIP>;
-    'Trade & Repair': Record<string, SkillWithIP>;
-    'Combat & Healing': Record<string, SkillWithIP>;
-    Misc: Record<string, MiscSkill>; // Misc uses bonus tracking instead of IP
+  /**
+   * Flat skill storage using numeric skill IDs as keys
+   *
+   * Replaces nested Skills[category][name] structure with direct ID access.
+   * All skill types (regular, Misc, ACs) use unified SkillData interface.
+   *
+   * @example
+   * skills: {
+   *   102: { base: 5, trickle: 100, ipSpent: 5000, pointsFromIp: 250, ... }, // 1h Blunt
+   *   27: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, ... },          // MaxHealth (Misc)
+   *   92: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, ... }           // Chemical AC
+   * }
+   */
+  skills: {
+    [skillId: number]: SkillData;
   };
 
-  // Equipment slots
+  // Equipment slots (unchanged)
   Weapons: Record<string, Item | null>;
   Clothing: Record<string, Item | null>;
   Implants: Record<string, ImplantWithClusters | null>;
 
-  // Perk system with structured tracking for SL/AI points and LE research
+  // Perk system (unchanged)
   PerksAndResearch: PerkSystem;
 
-  // Nano buff system - array of active nano programs providing stat bonuses
+  // Nano buff system (unchanged)
   buffs?: Item[];
 }
 

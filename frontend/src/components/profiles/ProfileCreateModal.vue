@@ -232,10 +232,11 @@ async function createProfile() {
   if (!validateForm()) {
     return;
   }
-  
+
   creating.value = true;
-  
+
   try {
+    // Create v4.0.0 profile with ID-based skill structure
     const profileData = {
       Character: {
         Name: formData.name.trim(),
@@ -247,17 +248,17 @@ async function createProfile() {
         AccountType: formData.accountType
       }
     };
-    
+
     const profileId = await profilesStore.createProfile(formData.name.trim(), profileData);
-    
+
     if (formData.setAsActive) {
       await profilesStore.setActiveProfile(profileId);
     }
-    
+
     emit('created', profileId);
     emit('update:visible', false);
     resetForm();
-    
+
   } catch (error) {
     console.error('Failed to create profile:', error);
     errors.value.general = 'Failed to create profile. Please try again.';

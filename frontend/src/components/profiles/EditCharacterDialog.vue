@@ -1,6 +1,9 @@
 <!--
-EditCharacterDialog - Modal dialog for editing character metadata
-Allows editing of name, level, profession, breed, faction, and account type
+EditCharacterDialog - Modal dialog for editing character metadata (v4.0.0)
+
+Allows editing of name, level, profession, breed, faction, and account type.
+When changes are saved, the parent component handles ID-based skill recalculation
+through the ip-integrator system for proper v4.0.0 profile updates.
 -->
 <template>
   <Dialog 
@@ -200,6 +203,12 @@ const emit = defineEmits<{
 }>();
 
 // Types
+/**
+ * Character changes interface for v4.0.0 profiles
+ *
+ * When emitted, the parent component will handle ID-based skill recalculation
+ * through the ip-integrator updateProfileWithIPTracking() function.
+ */
 interface CharacterChanges {
   name?: string;
   level?: number;

@@ -48,7 +48,7 @@ Interactive skill categories with expandable panels and sliders with IP calculat
         <SkillCategory
           :title="categoryName"
           :icon="getCategoryIcon(categoryName)"
-          :skills="skills"
+          :skills="getCategorySkills(categoryName)"
           :is-read-only="isReadOnlyCategory(categoryName)"
           :breed="breed"
           :profession="profession"
@@ -61,7 +61,7 @@ Interactive skill categories with expandable panels and sliders with IP calculat
         <SkillCategory
           :title="categoryName"
           :icon="getCategoryIcon(categoryName)"
-          :skills="skills"
+          :skills="getCategorySkills(categoryName)"
           :is-read-only="isReadOnlyCategory(categoryName)"
           :breed="breed"
           :profession="profession"
@@ -75,6 +75,8 @@ Interactive skill categories with expandable panels and sliders with IP calculat
 <script setup lang="ts">
 import { computed, ref, onMounted, provide } from 'vue';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
+import { useSkills } from '@/composables/useSkills';
+import { skillService } from '@/services/skill-service';
 import SkillCategory from './SkillCategory.vue';
 import Checkbox from 'primevue/checkbox';
 
@@ -91,6 +93,9 @@ const emit = defineEmits<{
 
 // Provide profile for AC calculation in child components
 provide('profile', props.profile);
+
+// Use skills composable for skill operations
+const { getSkillsByCategory } = useSkills();
 
 // State for Misc skills zero-value toggle
 const showZeroMiscSkills = ref(false);
@@ -111,7 +116,7 @@ function toggleZeroMiscSkills() {
 
 // Computed
 const coreAbilities = computed(() => {
-  return props.profile.Skills?.Attributes || {};
+  return getCategorySkills('Attributes');
 });
 
 const breed = computed(() => {
@@ -122,35 +127,45 @@ const profession = computed(() => {
   return props.profile.Character?.Profession || 'Adventurer';
 });
 
+// Helper function to get skills for a category as ID-based object
+function getCategorySkills(category: string): Record<string, any> {
+  try {
+    const skillTuples = getSkillsByCategory(category);
+    const skillsById: Record<string, any> = {};
+
+    for (const [skillId, skillData] of skillTuples) {
+      skillsById[skillId.toString()] = skillData;
+    }
+
+    return skillsById;
+  } catch (error) {
+    console.warn(`[SkillsManager] Failed to get skills for category "${category}":`, error);
+    return {};
+  }
+}
+
 // Filtered Misc skills based on toggle state
 const filteredMiscSkills = computed(() => {
-  const miscSkills = props.profile.Skills?.Misc;
-  if (!miscSkills) return {};
+  const miscSkillsById = getCategorySkills('Misc');
+  if (!miscSkillsById || Object.keys(miscSkillsById).length === 0) return {};
 
   if (showZeroMiscSkills.value) {
     // Show all Misc skills
-    return miscSkills;
+    return miscSkillsById;
   } else {
     // Filter out skills with value of 0
     const filtered: Record<string, any> = {};
-    Object.entries(miscSkills).forEach(([skillName, skillValue]) => {
-      // Handle MiscSkill objects which have multiple bonus properties
+    Object.entries(miscSkillsById).forEach(([skillId, skillData]) => {
+      // Handle SkillData objects which have multiple bonus properties
       let value = 0;
-      if (typeof skillValue === 'number') {
-        value = skillValue;
-      } else if (skillValue && typeof skillValue === 'object') {
-        // Calculate total from all bonus types
-        value = (skillValue.baseValue || 0) +
-                (skillValue.equipmentBonus || 0) +
-                (skillValue.perkBonus || 0) +
-                (skillValue.buffBonus || 0);
-        // Also check if there's a pre-calculated value property
-        if ('value' in skillValue && typeof skillValue.value === 'number') {
-          value = skillValue.value;
-        }
+      if (typeof skillData === 'number') {
+        value = skillData;
+      } else if (skillData && typeof skillData === 'object') {
+        // Use the total value from SkillData
+        value = skillData.total || 0;
       }
       if (value > 0) {
-        filtered[skillName] = skillValue;
+        filtered[skillId] = skillData;
       }
     });
     return filtered;
@@ -158,9 +173,6 @@ const filteredMiscSkills = computed(() => {
 });
 
 const skillCategories = computed(() => {
-  const skills = props.profile.Skills;
-  if (!skills) return {};
-
   // Define the order of skill categories, with ACs and Misc at the bottom
   const categoryOrder = [
     'Body & Defense',
@@ -180,28 +192,19 @@ const skillCategories = computed(() => {
   const orderedCategories: Record<string, any> = {};
 
   categoryOrder.forEach(categoryName => {
-    if (categoryName !== 'Attributes' && skills[categoryName as keyof typeof skills]) {
-      // Use filtered Misc skills for the Misc category
-      if (categoryName === 'Misc') {
-        orderedCategories[categoryName] = filteredMiscSkills.value;
-      } else if (categoryName === 'ACs') {
-        // Transform AC values (numbers) into MiscSkill objects for consistency
-        const transformedACs: Record<string, any> = {};
-        const acs = skills.ACs;
-        if (acs) {
-          Object.entries(acs).forEach(([acName, acValue]) => {
-            transformedACs[acName] = {
-              baseValue: acValue,
-              equipmentBonus: 0,
-              perkBonus: 0,
-              buffBonus: 0,
-              value: acValue
-            };
-          });
+    if (categoryName !== 'Attributes') {
+      try {
+        // Use filtered Misc skills for the Misc category
+        if (categoryName === 'Misc') {
+          orderedCategories[categoryName] = filteredMiscSkills.value;
+        } else {
+          const categorySkills = getCategorySkills(categoryName);
+          if (Object.keys(categorySkills).length > 0) {
+            orderedCategories[categoryName] = categorySkills;
+          }
         }
-        orderedCategories[categoryName] = transformedACs;
-      } else {
-        orderedCategories[categoryName] = skills[categoryName as keyof typeof skills];
+      } catch (error) {
+        console.warn(`[SkillsManager] Failed to get skills for category "${categoryName}":`, error);
       }
     }
   });
@@ -231,8 +234,17 @@ function handleAbilityChange(abilityName: string, newValue: number) {
   emit('ability-changed', abilityName, newValue);
 }
 
-function handleSkillChange(category: string, skillName: string, newValue: number) {
-  emit('skill-changed', category, skillName, newValue);
+function handleSkillChange(category: string, skillId: string, newValue: number) {
+  // Convert skill ID back to skill name for the emit event
+  // The parent component may still expect skill names until it's also updated
+  try {
+    const skillName = skillService.getName(parseInt(skillId, 10));
+    emit('skill-changed', category, skillName, newValue);
+  } catch (error) {
+    console.warn(`[SkillsManager] Failed to resolve skill name for ID ${skillId}:`, error);
+    // Fallback: emit with ID as string
+    emit('skill-changed', category, skillId, newValue);
+  }
 }
 
 function isReadOnlyCategory(categoryName: string): boolean {

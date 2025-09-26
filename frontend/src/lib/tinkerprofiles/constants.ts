@@ -289,7 +289,7 @@ export const STORAGE_KEYS = {
 // Version and Migration
 // ============================================================================
 
-export const CURRENT_VERSION = '2.0.0';
+export const CURRENT_VERSION = '4.0.0';
 export const SUPPORTED_VERSIONS = ['1.0.0', '1.1.0', '2.0.0'];
 
 // ============================================================================
@@ -368,7 +368,7 @@ export function createDefaultProfile(name: string = 'New Character', breed: stri
       MaxNano: initialNano
     },
     
-    Skills: structuredClone(getDefaultSkillsForBreed(breed)),
+    skills: structuredClone(getDefaultSkillsForBreed(breed)),
     
     Weapons: structuredClone(DEFAULT_WEAPONS),
     Clothing: structuredClone(DEFAULT_CLOTHING),

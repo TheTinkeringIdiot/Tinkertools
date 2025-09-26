@@ -14,19 +14,19 @@ Provides a responsive grid layout for skills with stat breakdown tooltips
       }"
     >
       <div
-        v-for="(skill, skillName) in skills"
-        :key="skillName"
+        v-for="(skill, skillId) in skills"
+        :key="skillId"
         class="skill-grid-item bg-surface-50 dark:bg-surface-800 rounded-lg p-3 transition-all duration-200 hover:bg-surface-100 dark:hover:bg-surface-700 hover:shadow-sm"
       >
         <SkillSlider
-          :skill-name="skillName"
+          :skill-name="getSkillName(skillId)"
           :skill-data="skill"
           :is-ability="isAbilities"
           :is-read-only="isReadOnly"
           :category="category"
           :breed="breed"
           :profession="profession"
-          :skill-id="getSkillId(skillName)"
+          :skill-id="Number(skillId)"
           @skill-changed="handleSkillChanged"
           @ability-changed="handleAbilityChanged"
         />
@@ -44,12 +44,13 @@ Provides a responsive grid layout for skills with stat breakdown tooltips
 <script setup lang="ts">
 import { computed, inject, provide } from 'vue';
 import SkillSlider from './SkillSlider.vue';
-import { getSkillStatId } from '@/utils/skill-registry';
+import { skillService } from '@/services/skill-service';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
+import type { SkillId, SkillData } from '@/types/skills';
 
 // Props
 const props = defineProps<{
-  skills: Record<string, any>;
+  skills: Record<SkillId, SkillData>;
   category: string;
   isAbilities?: boolean;
   isReadOnly?: boolean;
@@ -77,11 +78,13 @@ const skillCount = computed(() => {
 });
 
 // Methods
-function getSkillId(skillName: string): number {
+function getSkillName(skillId: SkillId | string): string {
   try {
-    return getSkillStatId(skillName) || 0;
-  } catch {
-    return 0;
+    const numericId = typeof skillId === 'string' ? parseInt(skillId, 10) : skillId;
+    return skillService.getName(numericId);
+  } catch (error) {
+    console.warn(`[SkillsGrid] Failed to resolve skill name for ID ${skillId}:`, error);
+    return `Unknown Skill (${skillId})`;
   }
 }
 

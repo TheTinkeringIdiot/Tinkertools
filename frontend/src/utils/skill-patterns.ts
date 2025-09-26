@@ -89,8 +89,8 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
     description: 'Melee Initiative'
   },
 
-  121: {
-    statId: 121,
+  120: {
+    statId: 120,
     patterns: [/^Phys(ic(al)?)?\.?\s*Init(iative)?$/i],
     category: 'Melee Weapons',
     description: 'Physical Initiative'
@@ -107,8 +107,8 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
     description: 'Sharp Objects'
   },
 
-  109: {
-    statId: 109,
+  111: {
+    statId: 111,
     patterns: [/^Bow$/i],
     category: 'Ranged Weapons',
     description: 'Bow'
@@ -121,43 +121,43 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
     description: 'Pistol'
   },
 
-  113: {
-    statId: 113,
+  116: {
+    statId: 116,
     patterns: [/^Assault\s*Rif(le)?$/i],
     category: 'Ranged Weapons',
     description: 'Assault Rifle'
   },
 
-  115: {
-    statId: 115,
+  114: {
+    statId: 114,
     patterns: [/^MG\s*\/?\s*SMG$/i],
     category: 'Ranged Weapons',
     description: 'MG/SMG'
   },
 
-  116: {
-    statId: 116,
+  115: {
+    statId: 115,
     patterns: [/^Shotgun$/i],
     category: 'Ranged Weapons',
     description: 'Shotgun'
   },
 
-  117: {
-    statId: 117,
+  113: {
+    statId: 113,
     patterns: [/^Rifle$/i],
     category: 'Ranged Weapons',
     description: 'Rifle'
   },
 
-  118: {
-    statId: 118,
+  109: {
+    statId: 109,
     patterns: [/^Grenade$/i],
     category: 'Ranged Weapons',
     description: 'Grenade'
   },
 
-  119: {
-    statId: 119,
+  110: {
+    statId: 110,
     patterns: [/^Heavy\s*Weapons?$/i],
     category: 'Ranged Weapons',
     description: 'Heavy Weapons'
@@ -170,15 +170,15 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
     description: 'Ranged Energy'
   },
 
-  229: {
-    statId: 229,
+  134: {
+    statId: 134,
     patterns: [/^Multi\s*Ranged$/i],
     category: 'Ranged Weapons',
     description: 'Multi Ranged'
   },
 
-  111: {
-    statId: 111,
+  119: {
+    statId: 119,
     patterns: [/^Ranged\.?\s*Init(iative)?$/i],
     category: 'Ranged Weapons',
     description: 'Ranged Initiative'
@@ -188,36 +188,36 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
   // Melee Specials
   // ============================================================================
 
-  142: {
-    statId: 142,
+  147: {
+    statId: 147,
     patterns: [/^Fast\s*Att(ac)?k$/i],
     category: 'Melee Specials',
     description: 'Fast Attack'
   },
 
-  144: {
-    statId: 144,
+  146: {
+    statId: 146,
     patterns: [/^Sneak\s*Att?(ac)?k$/i],
     category: 'Melee Specials',
     description: 'Sneak Attack'
   },
 
-  146: {
-    statId: 146,
+  143: {
+    statId: 143,
     patterns: [/^Riposte$/i],
     category: 'Melee Specials',
     description: 'Riposte'
   },
 
-  151: {
-    statId: 151,
+  142: {
+    statId: 142,
     patterns: [/^Brawl(ing)?$/i],
     category: 'Melee Specials',
     description: 'Brawling'
   },
 
-  154: {
-    statId: 154,
+  144: {
+    statId: 144,
     patterns: [/^Dimach$/i],
     category: 'Melee Specials',
     description: 'Dimach'
@@ -227,36 +227,36 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
   // Ranged Specials
   // ============================================================================
 
-  134: {
-    statId: 134,
+  150: {
+    statId: 150,
     patterns: [/^Fling\s*Shot$/i],
     category: 'Ranged Specials',
     description: 'Fling Shot'
   },
 
-  148: {
-    statId: 148,
+  151: {
+    statId: 151,
     patterns: [/^Aimed\s*Shot$/i],
     category: 'Ranged Specials',
     description: 'Aimed Shot'
   },
 
-  150: {
-    statId: 150,
+  121: {
+    statId: 121,
     patterns: [/^Bow\s*Spc\s*Att(ack)?$/i],
     category: 'Ranged Specials',
     description: 'Bow Special Attack'
   },
 
-  140: {
-    statId: 140,
+  148: {
+    statId: 148,
     patterns: [/^Burst$/i],
     category: 'Ranged Specials',
     description: 'Burst'
   },
 
-  147: {
-    statId: 147,
+  167: {
+    statId: 167,
     patterns: [/^Full\s*Auto$/i],
     category: 'Ranged Specials',
     description: 'Full Auto'
@@ -266,30 +266,30 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
   // Nanos & Casting
   // ============================================================================
 
-  122: {
-    statId: 122,
-    patterns: [/^NanoC\.?\s*Init(iative)?$/i],
+  149: {
+    statId: 149,
+    patterns: [/^Nano(C)?\.?\s*Init(iative)?$/i],
     category: 'Nanos & Casting',
     description: 'Nano Combat Initiative'
   },
 
-  123: {
-    statId: 123,
+  129: {
+    statId: 129,
     patterns: [/^Psych(o(logical)?)?\s*Modi(f(ications?)?)?$/i],
     category: 'Nanos & Casting',
     description: 'Psychological Modifications'
   },
 
-  124: {
-    statId: 124,
+  122: {
+    statId: 122,
     patterns: [/^Sensory\s*Impr(ovement)?$/i],
     category: 'Nanos & Casting',
     description: 'Sensory Improvement'
   },
 
-  125: {
-    statId: 125,
-    patterns: [/^Time\s*(&|and)?\s*Space$/i],
+  131: {
+    statId: 131,
+    patterns: [/^Time\s*(&|and)?\s*Space$/i, /^SpaceTime$/i],
     category: 'Nanos & Casting',
     description: 'Time & Space'
   },
@@ -301,15 +301,15 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
     description: 'Matter Creation'
   },
 
-  131: {
-    statId: 131,
+  128: {
+    statId: 128,
     patterns: [/^Bio(logical)?\s*Metamor(ph(osis)?)?$/i],
     category: 'Nanos & Casting',
     description: 'Biological Metamorphosis'
   },
 
-  132: {
-    statId: 132,
+  127: {
+    statId: 127,
     patterns: [/^Matt(er)?\.?\s*Metam(orph(osis)?)?$/i],
     category: 'Nanos & Casting',
     description: 'Matter Metamorphosis'
@@ -329,9 +329,9 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
     description: 'Electrical Engineering'
   },
 
-  135: {
-    statId: 135,
-    patterns: [/^Break\s*(&|and)?\s*Entry$/i],
+  165: {
+    statId: 165,
+    patterns: [/^Break(ing)?\s*(&|and)?\s*Entry$/i],
     category: 'Trade & Repair',
     description: 'Break & Entry'
   },
@@ -438,8 +438,8 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
     description: 'Evade Close Combat'
   },
 
-  164: {
-    statId: 164,
+  132: {
+    statId: 132,
     patterns: [/^Nano\s*Pool$/i],
     category: 'Body & Defense',
     description: 'Nano Pool'
@@ -470,8 +470,8 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
   // Exploring
   // ============================================================================
 
-  138: {
-    statId: 138,
+  137: {
+    statId: 137,
     patterns: [/^Adventur(ing|e)$/i],
     category: 'Exploring',
     description: 'Adventuring'
@@ -479,9 +479,9 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
 
   139: {
     statId: 139,
-    patterns: [/^Swim(ming)?$/i, /^Vehicle\s*Air$/i],
+    patterns: [/^Vehicle\s*Air$/i],
     category: 'Exploring',
-    description: 'Swimming/Vehicle Air'
+    description: 'Vehicle Air'
   },
 
   156: {
@@ -570,6 +570,31 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
     patterns: [/^Disease\s*AC$/i],
     category: 'ACs',
     description: 'Disease AC'
+  },
+
+  // ============================================================================
+  // Misc Skills
+  // ============================================================================
+
+  276: {
+    statId: 276,
+    patterns: [/^Add\s*All\s*Off(ense|\.)$/i],
+    category: 'Misc',
+    description: 'Add All Offense'
+  },
+
+  277: {
+    statId: 277,
+    patterns: [/^Add\s*All\s*Def(ense|\.)$/i],
+    category: 'Misc',
+    description: 'Add All Defense'
+  },
+
+  181: {
+    statId: 181,
+    patterns: [/^Max\s*NCU$/i],
+    category: 'Misc',
+    description: 'Max NCU'
   }
 
   // Note: Deflect doesn't exist as a skill - it might be Parry (145)

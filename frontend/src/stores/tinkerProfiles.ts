@@ -19,6 +19,8 @@ import {
 import { useToast } from 'primevue/usetoast';
 import { nanoCompatibility } from '@/utils/nano-compatibility';
 import type { Item } from '@/types/api';
+import { skillService } from '@/services/skill-service';
+import type { SkillId } from '@/types/skills';
 
 // Types that may not be exported yet
 type NanoCompatibleProfile = any; // TODO: Add proper type when available
@@ -300,24 +302,38 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     if (!profileManager) {
       throw new Error('Profile manager not initialized');
     }
-    
+
     loading.value = true;
     error.value = null;
-    
+
     try {
       await profileManager.setActiveProfile(profileId);
-      
+
       if (profileId) {
         const profile = await loadProfile(profileId);
         if (profile) {
+          // First set the profile
           activeProfile.value = profile;
           activeProfileId.value = profileId;
+
+          // Set up equipment watchers for future changes
+          setupEquipmentWatchers();
+
+          // Immediately recalculate equipment bonuses without debounce
+          // This ensures MaxNCU and other equipment bonuses are properly applied
+          const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
+          const updatedProfile = await updateProfileWithIPTracking(profile);
+
+          // Update the active profile with recalculated bonuses
+          activeProfile.value = updatedProfile;
+          profiles.value.set(updatedProfile.id, updatedProfile);
         }
       } else {
         activeProfile.value = null;
         activeProfileId.value = null;
+        cleanupEquipmentWatchers();
       }
-      
+
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to set active profile';
       throw err;
@@ -676,9 +692,9 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   }
 
   /**
-   * Modify a specific skill value
+   * Modify a specific skill value using skill ID
    */
-  async function modifySkill(profileId: string, category: string, skillName: string, newValue: number): Promise<void> {
+  async function modifySkill(profileId: string, skillId: SkillId | number, newValue: number): Promise<void> {
     if (!profileManager) {
       throw new Error('Profile manager not initialized');
     }
@@ -692,46 +708,21 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     isUpdatingSkills = true;
 
     try {
-      // Update the skill value
-      if (profile.Skills && profile.Skills[category as keyof typeof profile.Skills]) {
-        const skillCategory = profile.Skills[category as keyof typeof profile.Skills];
-        if (typeof skillCategory === 'object' && skillCategory !== null && skillName in skillCategory) {
-          if (category === 'Misc') {
-            // Misc skills don't use IP tracking
-            (skillCategory as any)[skillName] = newValue;
-          } else {
-            // Other skills use SkillWithIP structure
-            const skill = (skillCategory as any)[skillName];
-            if (skill && typeof skill === 'object') {
-              // In the new structure, we only update pointFromIp
-              // The value passed is the desired total value
-              const trickleDown = skill.trickleDown || 0;
-              const equipmentBonus = skill.equipmentBonus || 0;
-              const baseSkillValue = 5; // BASE_SKILL constant
+      // Use the IP integrator's modifySkill function which handles ID-based updates
+      const { modifySkill } = await import('@/lib/tinkerprofiles/ip-integrator');
+      const result = await modifySkill(profile, Number(skillId), newValue);
 
-              // Calculate how much IP is needed for this value
-              // newValue = baseSkillValue + trickleDown + pointFromIp + equipmentBonus
-              // Therefore: pointFromIp = newValue - equipmentBonus - trickleDown - baseSkillValue
-              const pointFromIp = Math.max(0, newValue - equipmentBonus - trickleDown - baseSkillValue);
+      if (result.success && result.updatedProfile) {
+        // Update the profile in storage and state
+        await updateProfile(profileId, result.updatedProfile);
 
-              // Only update the stored value
-              skill.pointFromIp = pointFromIp;
-            }
-          }
+        // Update active profile if this is the active one
+        if (activeProfileId.value === profileId) {
+          activeProfile.value = result.updatedProfile;
+          profiles.value.set(profileId, result.updatedProfile);
         }
-      }
-
-      // Recalculate all values after any skill change
-      const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
-      const updatedProfile = await updateProfileWithIPTracking(profile);
-
-      // Update the profile in storage and state
-      await updateProfile(profileId, updatedProfile);
-
-      // Update active profile if this is the active one
-      if (activeProfileId.value === profileId) {
-        activeProfile.value = updatedProfile;
-        profiles.value.set(profileId, updatedProfile);
+      } else {
+        throw new Error(result.error || 'Failed to modify skill');
       }
     } finally {
       // Always clear the flag
@@ -1189,14 +1180,12 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       return 0;
     }
 
-    // MaxNCU is the Max NCU skill in the Misc category (stat ID 181)
-    const maxNCUSkill = activeProfile.value.Skills?.Misc?.['Max NCU'];
+    // MaxNCU is skill ID 181 in the new ID-based structure
+    const maxNCUSkill = activeProfile.value.skills?.[181];
 
-    // Handle both old numeric format and new MiscSkill object format
-    if (typeof maxNCUSkill === 'number') {
-      return maxNCUSkill;
-    } else if (maxNCUSkill && typeof maxNCUSkill === 'object' && 'value' in maxNCUSkill) {
-      return maxNCUSkill.value;
+    if (maxNCUSkill) {
+      // Use the total value from the unified SkillData structure
+      return maxNCUSkill.total || 0;
     }
 
     return 0;

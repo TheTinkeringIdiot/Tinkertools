@@ -140,17 +140,18 @@ import type { SkillWithIP, MiscSkill } from '@/lib/tinkerprofiles/types';
 import { calculateSingleACValue } from '@/utils/ac-calculator';
 import { inject } from 'vue';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
+import { skillService } from '@/services/skill-service';
+import type { SkillId } from '@/types/skills';
 
 // Props
 const props = defineProps<{
-  skillName: string;
+  skillId: SkillId | number;
   skillData: SkillWithIP | MiscSkill | null;
   isAbility?: boolean;
   isReadOnly?: boolean;
   category: string;
   breed?: string;
   profession?: string;
-  skillId?: number;
 }>();
 
 // Inject the profile for AC calculation
@@ -158,9 +159,18 @@ const profile = inject<TinkerProfile>('profile');
 
 // Emits
 const emit = defineEmits<{
-  'skill-changed': [category: string, skillName: string, newValue: number];
-  'ability-changed': [abilityName: string, newValue: number];
+  'skill-changed': [category: string, skillId: SkillId | number, newValue: number];
+  'ability-changed': [skillId: SkillId | number, newValue: number];
 }>();
+
+// Computed properties for skill information
+const skillName = computed(() => {
+  try {
+    return skillService.getName(props.skillId);
+  } catch {
+    return `Unknown Skill (${props.skillId})`;
+  }
+});
 
 // Helper functions
 const getAbilityIndex = (abilityName: string): number => {
@@ -191,7 +201,7 @@ const isUserInteracting = ref(false);
 const minValue = computed(() => {
   if (props.isAbility && props.breed) {
     const breedId = getBreedId(props.breed) || 0;
-    const abilityIndex = getAbilityIndex(props.skillName);
+    const abilityIndex = getAbilityIndex(skillName.value);
     if (abilityIndex !== -1) {
       const abilityStatId = ABILITY_INDEX_TO_STAT_ID[abilityIndex];
       return getBreedInitValue(breedId, abilityStatId);
@@ -250,7 +260,7 @@ const equipmentBonusColorClass = computed(() => {
 const equipmentBonusTooltip = computed(() => {
   const bonusType = equipmentBonus.value > 0 ? 'bonus' : 'penalty';
   const bonusValue = Math.abs(equipmentBonus.value);
-  return `Equipment ${bonusType}: ${equipmentBonus.value > 0 ? '+' : '-'}${bonusValue} to ${props.skillName}`;
+  return `Equipment ${bonusType}: ${equipmentBonus.value > 0 ? '+' : '-'}${bonusValue} to ${skillName.value}`;
 });
 
 // Total displayed value (what the user sees)
@@ -261,7 +271,7 @@ const totalValue = computed(() => {
   } else if (props.category === 'ACs') {
     // For ACs: calculate value on-the-fly from bonuses
     if (profile) {
-      return calculateSingleACValue(profile, props.skillName);
+      return calculateSingleACValue(profile, skillName.value);
     }
     return 0;
   } else if (isMiscSkill.value) {
@@ -327,7 +337,7 @@ const simpleTooltipContent = computed(() => {
     }
 
     const breakdown = parts.join('\n');
-    return `${props.skillName} Breakdown:\n${breakdown}\nTotal: ${totalValue.value}`;
+    return `${skillName.value} Breakdown:\n${breakdown}\nTotal: ${totalValue.value}`;
   } else if (isMiscSkill.value) {
     // Tooltip for Misc skills (no trickle-down or IP)
     const parts = [`Base: ${baseValue.value}`];
@@ -342,7 +352,7 @@ const simpleTooltipContent = computed(() => {
     }
 
     const breakdown = parts.join('\n');
-    return `${props.skillName} Breakdown:\n${breakdown}\nTotal: ${totalValue.value}`;
+    return `${skillName.value} Breakdown:\n${breakdown}\nTotal: ${totalValue.value}`;
   } else {
     // Tooltip for regular skills
     const parts = [`Base: ${baseValue.value}`];
@@ -359,7 +369,7 @@ const simpleTooltipContent = computed(() => {
     if (ipContribution.value > 0) parts.push(`IP: +${ipContribution.value}`);
 
     const breakdown = parts.join('\n');
-    return `${props.skillName} Breakdown:\n${breakdown}\nTotal: ${totalValue.value}`;
+    return `${skillName.value} Breakdown:\n${breakdown}\nTotal: ${totalValue.value}`;
   }
 });
 
@@ -430,7 +440,7 @@ const costFactor = computed(() => {
   if (props.isAbility && props.breed) {
     // For abilities: use breed-based cost factors
     const breedId = getBreedId(props.breed);
-    const abilityIndex = getAbilityIndex(props.skillName);
+    const abilityIndex = getAbilityIndex(skillName.value);
     if (breedId !== null && abilityIndex !== -1) {
       return BREED_ABILITY_DATA.cost_factors[breedId]?.[abilityIndex] || null;
     }
@@ -442,8 +452,8 @@ const costFactor = computed(() => {
       'Nano-Technician': 12, 'Soldier': 1, 'Trader': 7, 'Shade': 11
     };
     const professionId = professionMap[props.profession];
-    if (professionId && props.skillId) {
-      return SKILL_COST_FACTORS[props.skillId]?.[professionId] || null;
+    if (professionId) {
+      return SKILL_COST_FACTORS[Number(props.skillId)]?.[professionId] || null;
     }
   }
   return null;
@@ -479,13 +489,13 @@ function onSliderChanged(newValue: number | null) {
   // Update input value to reflect the change
   if (props.isAbility) {
     inputValue.value = clampedValue;
-    emit('ability-changed', props.skillName, clampedValue);
+    emit('ability-changed', props.skillId, clampedValue);
   } else {
     // For skills, the slider value represents IP improvements only
     // The total skill value will be: base + trickle-down + IP improvements
     const totalSkillValue = baseValue.value + trickleDownBonus.value + clampedValue;
     inputValue.value = totalSkillValue;
-    emit('skill-changed', props.category, props.skillName, totalSkillValue);
+    emit('skill-changed', props.category, props.skillId, totalSkillValue);
   }
 
   // Reset interaction flag after a short delay
@@ -503,16 +513,16 @@ function onInputChanged(newValue: number | null) {
     const clampedValue = Math.max(minValue.value, Math.min(newValue, maxValue.value));
     sliderValue.value = clampedValue;
     inputValue.value = clampedValue;
-    emit('ability-changed', props.skillName, clampedValue);
+    emit('ability-changed', props.skillId, clampedValue);
   } else {
     // For skills: calculate the IP portion from total value
     const minTotal = baseValue.value + trickleDownBonus.value;
     const clampedTotal = Math.max(minTotal, Math.min(newValue, maxTotalValue.value));
     const ipPortion = Math.max(0, clampedTotal - baseValue.value - trickleDownBonus.value);
-    
+
     sliderValue.value = ipPortion;
     inputValue.value = clampedTotal;
-    emit('skill-changed', props.category, props.skillName, clampedTotal);
+    emit('skill-changed', props.category, props.skillId, clampedTotal);
   }
   
   // Reset interaction flag after a short delay
