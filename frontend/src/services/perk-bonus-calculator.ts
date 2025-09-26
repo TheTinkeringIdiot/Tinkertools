@@ -2,7 +2,7 @@
  * Perk Bonus Calculator Service
  *
  * Parses spell_data from perk items to find stat modification spells
- * (spell_id=53045, 53012, 53014, 53175) and aggregates bonuses by skill name.
+ * (spell_id=53045, 53012, 53014, 53175) and aggregates bonuses by skill ID.
  * Uses PERK_EVENTS = [1, 14] to handle Cast (1) and Wear (14) events since
  * perks may use different event types than equipment.
  *
@@ -21,7 +21,6 @@
  */
 
 import type { Item, SpellData, Spell } from '@/types/api'
-import { getSkillNameFromStatId } from '@/utils/skill-registry'
 
 // ============================================================================
 // Type Definitions
@@ -30,8 +29,6 @@ import { getSkillNameFromStatId } from '@/utils/skill-registry'
 export interface PerkStatBonus {
   /** STAT ID from game data */
   statId: number
-  /** Human-readable skill name */
-  skillName: string
   /** Bonus amount (can be negative) */
   amount: number
   /** Source perk item for debugging */
@@ -57,7 +54,7 @@ export interface PerkBonusError {
 
 export interface PerkCalculationResult {
   /** Successfully calculated bonuses */
-  bonuses: Record<string, number>
+  bonuses: Record<number, number>
   /** Non-fatal warnings */
   warnings: PerkBonusError[]
   /** Fatal errors */
@@ -156,7 +153,7 @@ class PerkSpellDataCache {
  * Memoization for aggregated perk bonuses calculation
  */
 class PerkBonusAggregationCache {
-  private cache = new Map<string, Record<string, number>>()
+  private cache = new Map<string, Record<number, number>>()
   private maxSize = 100
 
   private getCacheKey(bonuses: PerkStatBonus[]): string {
@@ -167,12 +164,12 @@ class PerkBonusAggregationCache {
       .join('|')
   }
 
-  get(bonuses: PerkStatBonus[]): Record<string, number> | null {
+  get(bonuses: PerkStatBonus[]): Record<number, number> | null {
     const key = this.getCacheKey(bonuses)
     return this.cache.get(key) || null
   }
 
-  set(bonuses: PerkStatBonus[], result: Record<string, number>): void {
+  set(bonuses: PerkStatBonus[], result: Record<number, number>): void {
     const key = this.getCacheKey(bonuses)
 
     if (this.cache.size >= this.maxSize) {
@@ -208,9 +205,9 @@ export class PerkBonusCalculator {
   /**
    * Calculate perk bonuses for all equipped perks
    * @param perks Array of perk items to analyze
-   * @returns Record mapping skill names to total bonus amounts
+   * @returns Record mapping skill IDs to total bonus amounts
    */
-  calculateBonuses(perks: Item[]): Record<string, number> {
+  calculateBonuses(perks: Item[]): Record<number, number> {
     try {
       const result = this.calculateBonusesWithErrorHandling(perks)
 
@@ -366,7 +363,7 @@ export class PerkBonusCalculator {
         }
       }
 
-      // Aggregate bonuses by skill name with error handling
+      // Aggregate bonuses by skill ID with error handling
       try {
         result.bonuses = this.aggregateBonusesOptimized(allBonuses)
       } catch (error) {
@@ -737,17 +734,9 @@ export class PerkBonusCalculator {
       return null
     }
 
-    // Convert stat ID to skill name
-    const skillName = getSkillNameFromStatId(statId)
-    if (!skillName) {
-      // Log unknown stat IDs for debugging but don't fail
-      console.warn(`Unknown stat ID ${statId} in perk ${perkName}`)
-      return null
-    }
-
+    // Return bonus with stat ID directly - no name conversion needed
     return {
       statId,
-      skillName,
       amount,
       perkName,
       perkAoid
@@ -940,37 +929,9 @@ export class PerkBonusCalculator {
         return result
       }
 
-      // Convert stat ID to skill name
-      let skillName: string | null
-      try {
-        skillName = getSkillNameFromStatId(statId)
-        if (!skillName) {
-          result.warnings.push({
-            type: 'warning',
-            message: 'Unknown stat ID in perk bonus',
-            details: `Stat ID ${statId} from spell ${spell.spell_id} in perk ${perkName || 'unknown'} does not map to a known skill`,
-            perkName,
-            perkAoid,
-            recoverable: true
-          })
-          return result
-        }
-      } catch (error) {
-        result.warnings.push({
-          type: 'warning',
-          message: 'Failed to convert stat ID to skill name',
-          details: `Error converting stat ID ${statId} to skill name for spell ${spell.spell_id} in perk ${perkName || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
-          perkName,
-          perkAoid,
-          recoverable: true
-        })
-        return result
-      }
-
-      // Successfully parsed
+      // Successfully parsed - use stat ID directly
       result.bonus = {
         statId,
-        skillName,
         amount,
         perkName,
         perkAoid
@@ -991,26 +952,27 @@ export class PerkBonusCalculator {
   }
 
   /**
-   * Aggregate stat bonuses by skill name
+   * Aggregate stat bonuses by skill ID
    * @param bonuses Array of individual perk stat bonuses
-   * @returns Record mapping skill names to total bonus amounts
+   * @returns Record mapping skill IDs to total bonus amounts
    */
-  aggregateBonuses(bonuses: PerkStatBonus[]): Record<string, number> {
-    const aggregated: Record<string, number> = {}
+  aggregateBonuses(bonuses: PerkStatBonus[]): Record<number, number> {
+    const aggregated: Record<number, number> = {}
 
     for (const bonus of bonuses) {
-      if (aggregated[bonus.skillName]) {
-        aggregated[bonus.skillName] += bonus.amount
+      if (aggregated[bonus.statId]) {
+        aggregated[bonus.statId] += bonus.amount
       } else {
-        aggregated[bonus.skillName] = bonus.amount
+        aggregated[bonus.statId] = bonus.amount
       }
     }
 
     // Filter out zero bonuses to keep the result clean
-    const filtered: Record<string, number> = {}
-    for (const [skillName, amount] of Object.entries(aggregated)) {
+    const filtered: Record<number, number> = {}
+    for (const [statId, amount] of Object.entries(aggregated)) {
+      const numericStatId = Number(statId)
       if (amount !== 0) {
-        filtered[skillName] = amount
+        filtered[numericStatId] = amount
       }
     }
 
@@ -1020,7 +982,7 @@ export class PerkBonusCalculator {
   /**
    * Optimized version of aggregateBonuses with memoization and error recovery
    */
-  private aggregateBonusesOptimized(bonuses: PerkStatBonus[]): Record<string, number> {
+  private aggregateBonusesOptimized(bonuses: PerkStatBonus[]): Record<number, number> {
     // Early return for empty bonuses
     if (bonuses.length === 0) {
       return {}
@@ -1073,8 +1035,8 @@ export class PerkBonusCalculator {
   /**
    * Safe aggregation method with individual error handling for each bonus
    */
-  private safeAggregateBonuses(bonuses: PerkStatBonus[]): Record<string, number> {
-    const aggregated: Record<string, number> = {}
+  private safeAggregateBonuses(bonuses: PerkStatBonus[]): Record<number, number> {
+    const aggregated: Record<number, number> = {}
 
     for (let i = 0; i < bonuses.length; i++) {
       try {
@@ -1086,8 +1048,8 @@ export class PerkBonusCalculator {
           continue
         }
 
-        if (typeof bonus.skillName !== 'string' || bonus.skillName.length === 0) {
-          console.warn(`Invalid skillName in bonus at index ${i}:`, bonus.skillName)
+        if (typeof bonus.statId !== 'number' || isNaN(bonus.statId)) {
+          console.warn(`Invalid statId in bonus at index ${i}:`, bonus.statId)
           continue
         }
 
@@ -1097,10 +1059,10 @@ export class PerkBonusCalculator {
         }
 
         // Safely aggregate
-        if (aggregated[bonus.skillName]) {
-          aggregated[bonus.skillName] += bonus.amount
+        if (aggregated[bonus.statId]) {
+          aggregated[bonus.statId] += bonus.amount
         } else {
-          aggregated[bonus.skillName] = bonus.amount
+          aggregated[bonus.statId] = bonus.amount
         }
 
       } catch (error) {
@@ -1110,10 +1072,11 @@ export class PerkBonusCalculator {
     }
 
     // Filter out zero bonuses to keep the result clean
-    const filtered: Record<string, number> = {}
-    for (const [skillName, amount] of Object.entries(aggregated)) {
+    const filtered: Record<number, number> = {}
+    for (const [statId, amount] of Object.entries(aggregated)) {
+      const numericStatId = Number(statId)
       if (amount !== 0) {
-        filtered[skillName] = amount
+        filtered[numericStatId] = amount
       }
     }
 
@@ -1167,9 +1130,9 @@ export const perkBonusCalculator = new PerkBonusCalculator()
 /**
  * Convenience function to calculate perk bonuses with performance monitoring and enhanced error recovery
  * @param perks Array of perk items to analyze
- * @returns Record mapping skill names to total perk bonuses
+ * @returns Record mapping skill IDs to total perk bonuses
  */
-export function calculatePerkBonuses(perks: Item[]): Record<string, number> {
+export function calculatePerkBonuses(perks: Item[]): Record<number, number> {
   try {
     // Enhanced input validation
     if (!perks) {
