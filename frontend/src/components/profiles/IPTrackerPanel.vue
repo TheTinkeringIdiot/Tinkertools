@@ -8,10 +8,9 @@ Shows IP allocation, usage, and breakdown with visual indicators
       <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50">
         Improvement Points
       </h3>
-      <Badge 
-        :value="`TL${titleLevel}`" 
-        severity="info" 
-        size="small"
+      <Badge
+        :value="`TL${titleLevel}`"
+        severity="info"
         v-tooltip.bottom="'Title Level'"
       />
     </div>
@@ -84,13 +83,13 @@ Shows IP allocation, usage, and breakdown with visual indicators
             Ability Breakdown
           </h5>
           <div class="space-y-2">
-            <div 
+            <div
               v-for="(ipSpent, abilityName) in ipTracker.breakdown.abilities"
               :key="abilityName"
               class="flex items-center justify-between text-sm"
             >
               <span class="text-surface-600 dark:text-surface-400">{{ abilityName }}</span>
-              <span class="font-medium text-surface-900 dark:text-surface-50">{{ formatNumber(ipSpent) }}</span>
+              <span class="font-medium text-surface-900 dark:text-surface-50">{{ formatNumber(ipSpent as number) }}</span>
             </div>
           </div>
         </div>
@@ -101,13 +100,30 @@ Shows IP allocation, usage, and breakdown with visual indicators
             Top Skill Categories
           </h5>
           <div class="space-y-2">
-            <div 
+            <div
               v-for="(ipSpent, categoryName) in topSkillCategories"
               :key="categoryName"
               class="flex items-center justify-between text-sm"
             >
               <span class="text-surface-600 dark:text-surface-400">{{ categoryName }}</span>
-              <span class="font-medium text-surface-900 dark:text-surface-50">{{ formatNumber(ipSpent) }}</span>
+              <span class="font-medium text-surface-900 dark:text-surface-50">{{ formatNumber(ipSpent as number) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Individual Skills Breakdown -->
+        <div v-if="topIndividualSkills.length > 0">
+          <h5 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+            Top Individual Skills
+          </h5>
+          <div class="space-y-2">
+            <div
+              v-for="skill in topIndividualSkills"
+              :key="skill.id"
+              class="flex items-center justify-between text-sm"
+            >
+              <span class="text-surface-600 dark:text-surface-400">{{ skill.name }}</span>
+              <span class="font-medium text-surface-900 dark:text-surface-50">{{ formatNumber(skill.ipSpent) }}</span>
             </div>
           </div>
         </div>
@@ -142,6 +158,7 @@ import Badge from 'primevue/badge';
 import Button from 'primevue/button';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
 import { calculateTitleLevel } from '@/services/game-utils';
+import { skillService } from '@/services/skill-service';
 
 // Props
 const props = defineProps<{
@@ -198,14 +215,42 @@ const remainingColor = computed(() => {
 
 const topSkillCategories = computed(() => {
   if (!ipTracker.value?.breakdown?.skillCategories) return {};
-  
+
   // Sort skill categories by IP spent and take top 5
   const sorted = Object.entries(ipTracker.value.breakdown.skillCategories)
     .filter(([_, ipSpent]) => ipSpent > 0)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 5);
-  
+
   return Object.fromEntries(sorted);
+});
+
+const topIndividualSkills = computed(() => {
+  if (!props.profile.skills) return [];
+
+  // Create array of skills with IP spent and their names via SkillService
+  const skillsWithIP: Array<{ id: number; name: string; ipSpent: number }> = [];
+
+  Object.entries(props.profile.skills).forEach(([skillIdStr, skillData]) => {
+    const skillId = parseInt(skillIdStr, 10);
+    if (skillData && skillData.ipSpent && skillData.ipSpent > 0) {
+      try {
+        const skillName = skillService.getName(skillId);
+        skillsWithIP.push({
+          id: skillId,
+          name: skillName,
+          ipSpent: skillData.ipSpent
+        });
+      } catch {
+        // Skip invalid skill IDs silently
+      }
+    }
+  });
+
+  // Sort by IP spent and take top 10
+  return skillsWithIP
+    .sort((a, b) => b.ipSpent - a.ipSpent)
+    .slice(0, 10);
 });
 
 // Methods

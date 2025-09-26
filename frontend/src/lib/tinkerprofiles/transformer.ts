@@ -19,12 +19,14 @@ import type { Item } from '@/types/api';
 import { createDefaultProfile, createDefaultNanoProfile } from './constants';
 import type { PerkSystem } from './perk-types';
 import { SKILL_CATEGORIES, getSkillId } from './skill-mappings';
-import { 
-  getClusterMapping, 
+import {
+  getClusterMapping,
   getSlotPosition,
-  AOSETUPS_SLOT_TO_BITFLAG 
+  AOSETUPS_SLOT_TO_BITFLAG
 } from './cluster-mappings';
 import { apiClient } from '@/services/api-client';
+import { skillService } from '@/services/skill-service';
+import type { SkillId } from '@/types/skills';
 
 export class ProfileTransformer {
   
@@ -238,18 +240,20 @@ export class ProfileTransformer {
   // ============================================================================
 
   private exportJSONFormat(profile: TinkerProfile): string {
-    // Enhanced JSON export with proper perk serialization
+    // Export profile in v4.0.0 format with numeric skill IDs
     const exportData = {
-      ...profile,
-      // Ensure perks are properly structured
+      version: "4.0.0",
+      id: profile.id,
+      created: profile.created,
+      updated: profile.updated,
+      Character: profile.Character,
+      IPTracker: profile.IPTracker,
+      skills: profile.skills, // Use numeric skill IDs as keys
+      Weapons: profile.Weapons,
+      Clothing: profile.Clothing,
+      Implants: profile.Implants,
       PerksAndResearch: this.serializePerkSystem(profile.PerksAndResearch),
-      // Add export metadata
-      exportMetadata: {
-        exportedAt: new Date().toISOString(),
-        exportFormat: 'tinkerprofiles-json',
-        version: profile.version,
-        includesPerks: true
-      }
+      buffs: profile.buffs
     };
 
     return JSON.stringify(exportData, null, 2);
@@ -388,9 +392,15 @@ export class ProfileTransformer {
   private async importFromAOSetups(data: string, result: ProfileImportResult): Promise<TinkerProfile> {
     const aosetups = JSON.parse(data);
     result.metadata.migrated = true;
-    
+
     const profile = createDefaultProfile();
-    
+
+    // Ensure profile is v4.0.0 format with ID-based skills
+    profile.version = '4.0.0';
+    if (!profile.skills) {
+      profile.skills = {};
+    }
+
     // Map character data
     if (aosetups.character) {
       profile.Character.Name = aosetups.character.name || aosetups.name || 'AOSetups Import';
@@ -400,21 +410,41 @@ export class ProfileTransformer {
       profile.Character.Faction = 'Neutral'; // Default, not in AOSetups
       profile.Character.Expansion = 'Lost Eden'; // Default
       profile.Character.AccountType = 'Paid'; // Default
-      
+
       // Calculate base health and nano based on breed and level
       const level = profile.Character.Level;
-      const healthPerLevel = profile.Character.Breed === 'Atrox' ? 10 : 
+      const healthPerLevel = profile.Character.Breed === 'Atrox' ? 10 :
                            profile.Character.Breed === 'Opifex' ? 6 : 8;
-      const nanoPerLevel = profile.Character.Breed === 'Atrox' ? 4 : 
+      const nanoPerLevel = profile.Character.Breed === 'Atrox' ? 4 :
                           profile.Character.Breed === 'Opifex' ? 6 : 5;
-      
+
       profile.Character.MaxHealth = level * healthPerLevel;
       profile.Character.MaxNano = level * nanoPerLevel;
-      
-      // Map skills with IP expenditure
+
+      // STEP 1: Normalize all skill names to IDs immediately after parsing
       if (aosetups.character.skills && Array.isArray(aosetups.character.skills)) {
+        const normalizedSkills: Array<{skillId: SkillId, ipExpenditure: number, pointsFromIp: number}> = [];
+
         for (const skill of aosetups.character.skills) {
-          this.mapAOSetupsSkill(skill, profile, result);
+          try {
+            // Normalize skill name to ID using SkillService
+            const skillId = skillService.resolveId(skill.name);
+            normalizedSkills.push({
+              skillId,
+              ipExpenditure: skill.ipExpenditure || 0,
+              pointsFromIp: skill.pointsFromIp || 0
+            });
+          } catch (error) {
+            // Halt import with descriptive error if any skill name unresolvable
+            const errorMessage = `Unable to resolve skill name: "${skill.name}" from AOSetups import. ${error instanceof Error ? error.message : 'Unknown error'}`;
+            result.errors.push(errorMessage);
+            throw new Error(errorMessage);
+          }
+        }
+
+        // STEP 2: Build profile with numeric skill IDs only
+        for (const normalizedSkill of normalizedSkills) {
+          this.mapNormalizedSkillToProfile(normalizedSkill, profile, result);
         }
       }
     }
@@ -488,22 +518,82 @@ export class ProfileTransformer {
     return this.migrateProfilePerks(profile);
   }
   
+  /**
+   * Map normalized skill (with numeric ID) to v4.0.0 profile structure
+   * Never references string skill names after normalization
+   */
+  private mapNormalizedSkillToProfile(
+    normalizedSkill: {skillId: SkillId, ipExpenditure: number, pointsFromIp: number},
+    profile: TinkerProfile,
+    result: ProfileImportResult
+  ): void {
+    const { skillId, ipExpenditure, pointsFromIp } = normalizedSkill;
+    const numericId = Number(skillId);
+
+    // Ensure skills map exists in v4.0.0 format
+    if (!profile.skills) {
+      profile.skills = {};
+    }
+
+    // Create or update skill data with ID-based structure
+    if (!profile.skills[numericId]) {
+      // Initialize with default skill data structure
+      profile.skills[numericId] = {
+        base: 5, // Default base value (will be adjusted for misc/AC skills)
+        trickle: 0,
+        ipSpent: 0,
+        pointsFromIp: 0,
+        equipmentBonus: 0,
+        perkBonus: 0,
+        buffBonus: 0,
+        total: 5
+      };
+
+      // Adjust base value for special skill types
+      const category = skillService.getCategory(skillId);
+      if (category === 'Misc' || category === 'ACs') {
+        profile.skills[numericId].base = 0;
+        profile.skills[numericId].total = 0;
+      }
+    }
+
+    // Apply AOSetups IP data
+    profile.skills[numericId].ipSpent = ipExpenditure;
+    profile.skills[numericId].pointsFromIp = pointsFromIp;
+
+    // Recalculate total (base + trickle + pointsFromIp + bonuses)
+    profile.skills[numericId].total =
+      profile.skills[numericId].base +
+      profile.skills[numericId].trickle +
+      profile.skills[numericId].pointsFromIp +
+      profile.skills[numericId].equipmentBonus +
+      profile.skills[numericId].perkBonus +
+      profile.skills[numericId].buffBonus;
+  }
+
+  /**
+   * Legacy method for backwards compatibility - now deprecated in v4.0.0
+   * @deprecated Use mapNormalizedSkillToProfile with SkillService.resolveId() instead
+   */
   private mapAOSetupsSkill(skill: any, profile: TinkerProfile, result: ProfileImportResult): void {
+    // This method is kept for backwards compatibility but should not be used in v4.0.0
+    result.warnings.push('Using deprecated skill mapping method - consider updating to v4.0.0 format');
+
     const skillName = skill.name;
     const ipExpenditure = skill.ipExpenditure || 0;
     const pointsFromIp = skill.pointsFromIp || 0;
-    
+
     // Check if this skill exists in SKILL_ID_MAP (now includes AOSetups variants)
     const skillId = getSkillId(skillName);
     if (!skillId) {
       result.warnings.push(`Unknown skill mapping: ${skillName}`);
       return;
     }
-    
+
     // Find which category and key this skill belongs to using SKILL_CATEGORIES
     let foundCategory: keyof typeof profile.Skills | null = null;
     let foundKey: string | null = null;
-    
+
     // Search through SKILL_CATEGORIES to find the skill
     for (const [category, skills] of Object.entries(SKILL_CATEGORIES)) {
       if (skills.includes(skillName)) {
@@ -512,7 +602,7 @@ export class ProfileTransformer {
         break;
       }
     }
-    
+
     if (foundCategory && foundKey && profile.Skills[foundCategory]) {
       const categorySkills = profile.Skills[foundCategory] as Record<string, any>;
       if (categorySkills[foundKey]) {

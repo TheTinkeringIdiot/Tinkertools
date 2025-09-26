@@ -1,6 +1,9 @@
 <!--
 TinkerProfiles - Profile management and listing page
 Shows all profiles in a card-based layout with management actions
+
+v4.0.0 Compatible: Uses ProfileMetadata which is unchanged in ID-based architecture.
+SkillService available for any future skill name displays.
 -->
 <template>
   <div class="tinker-profiles p-6 max-w-7xl mx-auto">
@@ -310,10 +313,11 @@ import ProfileCard from '@/components/profiles/ProfileCard.vue';
 import ProfileCreateModal from '@/components/profiles/ProfileCreateModal.vue';
 import ProfileImportModal from '@/components/profiles/ProfileImportModal.vue';
 import type { ProfileMetadata } from '@/lib/tinkerprofiles';
-import { 
+import {
   ANARCHY_PROFESSIONS,
   ANARCHY_BREEDS
 } from '@/lib/tinkerprofiles';
+import { skillService } from '@/services/skill-service';
 
 const router = useRouter();
 const profilesStore = useTinkerProfilesStore();

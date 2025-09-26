@@ -5,7 +5,7 @@
  * providing automatic IP tracking, validation, and recalculation
  */
 
-import type { TinkerProfile, IPTracker, SkillWithIP } from './types';
+import type { TinkerProfile, IPTracker, SkillData } from './types';
 import {
   calcIP,
   calcTitleLevel,
@@ -28,7 +28,14 @@ import { getSkillId, getSkillName } from './skill-mappings';
 import { calculateEquipmentBonuses } from '../../services/equipment-bonus-calculator';
 import { calculatePerkBonuses as calculatePerkBonusesService } from '../../services/perk-bonus-calculator';
 import { calculateNanoBonuses } from '../../services/nano-bonus-calculator';
+import { SKILL_PATTERNS } from '../../utils/skill-patterns';
+import { skillService } from '../../services/skill-service';
 import type { AnyPerkEntry } from './perk-types';
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
 
 // ============================================================================
 // Profile to CharacterStats Conversion
@@ -41,46 +48,30 @@ export function profileToCharacterStats(profile: TinkerProfile): CharacterStats 
   // Get breed and profession IDs
   const breed = getBreedId(profile.Character.Breed) || 0;
   const profession = getProfessionId(profile.Character.Profession) || 0;
-  
+
   // Extract abilities (improvements only for IP calculations)
+  // Attribute skill IDs: Strength=16, Agility=18, Stamina=17, Intelligence=20, Sense=19, Psychic=21
   const abilities = [
-    profile.Skills.Attributes.Strength.pointFromIp || 0,
-    profile.Skills.Attributes.Agility.pointFromIp || 0,
-    profile.Skills.Attributes.Stamina.pointFromIp || 0,
-    profile.Skills.Attributes.Intelligence.pointFromIp || 0,
-    profile.Skills.Attributes.Sense.pointFromIp || 0,
-    profile.Skills.Attributes.Psychic.pointFromIp || 0
+    profile.skills[16]?.pointsFromIp || 0, // Strength
+    profile.skills[18]?.pointsFromIp || 0, // Agility
+    profile.skills[17]?.pointsFromIp || 0, // Stamina
+    profile.skills[20]?.pointsFromIp || 0, // Intelligence
+    profile.skills[19]?.pointsFromIp || 0, // Sense
+    profile.skills[21]?.pointsFromIp || 0  // Psychic
   ];
-  
-  // Extract skills (improvements only) using STAT ID mapping
+
+  // Extract skills (improvements only) using skill IDs directly
   const skills: Record<string, number> = {};
-  
-  // Category names for skill extraction
-  const categories = [
-    'Body & Defense',
-    'Ranged Weapons', 
-    'Ranged Specials',
-    'Melee Weapons',
-    'Melee Specials',
-    'Nanos & Casting',
-    'Exploring',
-    'Trade & Repair',
-    'Combat & Healing'
-  ];
-  
-  // Fill in known skills from profile using proper STAT ID mapping
-  categories.forEach(categoryName => {
-    const category = profile.Skills[categoryName as keyof typeof profile.Skills];
-    if (category && typeof category === 'object') {
-      Object.entries(category).forEach(([skillName, skillData]: [string, any]) => {
-        const skillStatId = getSkillId(skillName);
-        if (skillStatId !== null && skillStatId >= 0 && skillData.pointFromIp !== undefined) {
-          skills[skillStatId.toString()] = skillData.pointFromIp;
-        }
-      });
+
+  // Iterate through all skills in the profile
+  for (const [skillIdStr, skillData] of Object.entries(profile.skills)) {
+    const skillId = Number(skillIdStr);
+    // Only include skills with IP spent (exclude attributes, Misc skills, ACs)
+    if (skillId >= 100 && skillId <= 167 && skillData.pointsFromIp !== undefined) {
+      skills[skillIdStr] = skillData.pointsFromIp;
     }
-  });
-  
+  }
+
   return {
     level: profile.Character.Level,
     breed,
@@ -97,7 +88,7 @@ export function profileToCharacterStats(profile: TinkerProfile): CharacterStats 
 /**
  * Calculate perk bonuses for skills and abilities from profile's perk system
  */
-async function calculatePerkBonuses(profile: TinkerProfile): Promise<Record<string, number>> {
+async function calculatePerkBonuses(profile: TinkerProfile): Promise<Record<number, number>> {
   if (!profile.PerksAndResearch) {
     return {};
   }
@@ -129,9 +120,18 @@ async function calculatePerkBonuses(profile: TinkerProfile): Promise<Record<stri
     }
 
     // Use the perk bonus calculator service to extract and aggregate stat bonuses
-    const perkBonuses = calculatePerkBonusesService(allPerkItems);
+    const perkBonusesBySkillId = calculatePerkBonusesService(allPerkItems);
 
-    return perkBonuses;
+    // Return skill ID bonuses directly (no name conversion needed)
+    const result: Record<number, number> = {};
+    for (const [skillIdStr, bonusAmount] of Object.entries(perkBonusesBySkillId)) {
+      const skillId = Number(skillIdStr);
+      if (!isNaN(skillId)) {
+        result[skillId] = bonusAmount;
+      }
+    }
+
+    return result;
   } catch (error) {
     console.warn('Failed to calculate perk bonuses:', error);
     return {};
@@ -145,7 +145,7 @@ async function calculatePerkBonuses(profile: TinkerProfile): Promise<Record<stri
 /**
  * Calculate buff bonuses for skills and abilities from profile's active nano buffs
  */
-function calculateBuffBonuses(profile: TinkerProfile): Record<string, number> {
+function calculateBuffBonuses(profile: TinkerProfile): Record<number, number> {
   if (!profile.buffs || !Array.isArray(profile.buffs) || profile.buffs.length === 0) {
     return {};
   }
@@ -154,7 +154,16 @@ function calculateBuffBonuses(profile: TinkerProfile): Record<string, number> {
     // Use the nano bonus calculator service to extract and aggregate stat bonuses
     const buffBonuses = calculateNanoBonuses(profile.buffs);
 
-    return buffBonuses;
+    // Convert to skill ID based structure if needed
+    const result: Record<number, number> = {};
+    for (const [key, value] of Object.entries(buffBonuses)) {
+      const skillId = Number(key);
+      if (!isNaN(skillId)) {
+        result[skillId] = value;
+      }
+    }
+
+    return result;
   } catch (error) {
     console.warn('Failed to calculate buff bonuses:', error);
     return {};
@@ -171,43 +180,36 @@ function calculateBuffBonuses(profile: TinkerProfile): Record<string, number> {
 export function calculateProfileIP(profile: TinkerProfile): IPTracker {
   const characterStats = profileToCharacterStats(profile);
   const ipAnalysis = calcIPAnalysis(characterStats);
-  
-  // Calculate breakdown by abilities using STAT IDs
+
+  // Calculate breakdown by abilities using skill IDs
   const abilityBreakdown: Record<string, number> = {};
-  ABILITY_NAMES.forEach((abilityName, index) => {
+  const abilityStatIds = [16, 17, 18, 19, 20, 21]; // Strength, Stamina, Agility, Sense, Intelligence, Psychic
+  const abilityNames = ['Strength', 'Stamina', 'Agility', 'Sense', 'Intelligence', 'Psychic'];
+
+  abilityStatIds.forEach((abilityStatId, index) => {
     const breed = getBreedId(profile.Character.Breed) || 0;
-    const ability = profile.Skills.Attributes[abilityName as keyof typeof profile.Skills.Attributes] as SkillWithIP;
-    const improvements = ability?.pointFromIp || 0;
-    const abilityStatId = ABILITY_INDEX_TO_STAT_ID[index];
+    const skillData = profile.skills[abilityStatId];
+    const improvements = skillData?.pointsFromIp || 0;
+    const abilityName = abilityNames[index];
     abilityBreakdown[abilityName] = calcTotalAbilityCost(improvements, breed, abilityStatId);
   });
-  
-  // Calculate breakdown by skill categories
+
+  // Calculate breakdown by skill categories using SkillService
   const skillCategoryBreakdown: Record<string, number> = {};
-  const categories = [
-    'Body & Defense',
-    'Ranged Weapons', 
-    'Ranged Specials',
-    'Melee Weapons',
-    'Melee Specials',
-    'Nanos & Casting',
-    'Exploring',
-    'Trade & Repair',
-    'Combat & Healing'
-  ];
-  
+  const categories = skillService.getAllCategories();
+
   categories.forEach(category => {
     skillCategoryBreakdown[category] = 0;
-    const skills = profile.Skills[category as keyof typeof profile.Skills];
-    if (skills && typeof skills === 'object') {
-      Object.values(skills).forEach((skill: any) => {
-        if (skill.ipSpent) {
-          skillCategoryBreakdown[category] += skill.ipSpent;
-        }
-      });
-    }
+    const skillIds = skillService.getSkillsByCategory(category);
+
+    skillIds.forEach(skillId => {
+      const skillData = profile.skills[skillId];
+      if (skillData && skillData.ipSpent) {
+        skillCategoryBreakdown[category] += skillData.ipSpent;
+      }
+    });
   });
-  
+
   return {
     totalAvailable: ipAnalysis.totalIP,
     totalUsed: ipAnalysis.usedIP,
@@ -228,14 +230,28 @@ export function calculateProfileIP(profile: TinkerProfile): IPTracker {
  */
 export function updateProfileSkillInfo(
   profile: TinkerProfile,
-  providedEquipmentBonuses?: Record<string, number>,
-  providedPerkBonuses?: Record<string, number>,
-  providedBuffBonuses?: Record<string, number>
+  providedEquipmentBonuses?: Record<number, number>,
+  providedPerkBonuses?: Record<number, number>,
+  providedBuffBonuses?: Record<number, number>
 ): void {
   const characterStats = profileToCharacterStats(profile);
 
-  // Use provided equipment bonuses or calculate them
-  const equipmentBonuses = providedEquipmentBonuses || calculateEquipmentBonuses(profile);
+  // Use provided equipment bonuses or calculate them (converted to skill ID format)
+  let equipmentBonuses: Record<number, number> = {};
+  if (providedEquipmentBonuses) {
+    equipmentBonuses = providedEquipmentBonuses;
+  } else {
+    const equipmentBonusesOld = calculateEquipmentBonuses(profile);
+    // Convert old string-based format to skill ID format
+    for (const [skillName, bonus] of Object.entries(equipmentBonusesOld)) {
+      try {
+        const skillId = skillService.resolveId(skillName);
+        equipmentBonuses[skillId] = bonus;
+      } catch (error) {
+        console.warn(`Failed to resolve skill name '${skillName}' to ID in equipment bonuses:`, error);
+      }
+    }
+  }
 
   // Use provided perk bonuses or calculate them
   const perkBonuses = providedPerkBonuses || {};
@@ -243,141 +259,124 @@ export function updateProfileSkillInfo(
   // Use provided buff bonuses or calculate them
   const buffBonuses = providedBuffBonuses || calculateBuffBonuses(profile);
 
-  // First, ensure pointFromIp is set for all abilities (needed for tests that set value directly)
-  if (profile.Skills.Attributes) {
-    const abilityNames = ['Strength', 'Agility', 'Stamina', 'Intelligence', 'Sense', 'Psychic'];
-    abilityNames.forEach((abilityName, index) => {
-      const ability = profile.Skills.Attributes![abilityName as keyof typeof profile.Skills.Attributes] as SkillWithIP;
-      if (ability) {
-        const abilityStatId = ABILITY_INDEX_TO_STAT_ID[index];
-        const breedInitValue = getBreedInitValue(characterStats.breed, abilityStatId);
-        const equipmentBonus = equipmentBonuses[abilityName] || 0;
-        const perkBonus = perkBonuses[abilityName] || 0;
-        const buffBonus = buffBonuses[abilityName] || 0;
+  // Update abilities (skill IDs 16-21)
+  const abilityStatIds = [16, 17, 18, 19, 20, 21]; // Strength, Stamina, Agility, Sense, Intelligence, Psychic
+  const abilityIndexToStatId = [16, 18, 17, 20, 19, 21]; // Maps ABILITY_INDEX_TO_STAT_ID order
 
-        // Ensure pointFromIp is set (required field)
-        if (ability.pointFromIp === undefined || ability.pointFromIp === null) {
-          ability.pointFromIp = 0; // Default to no IP spent
-        }
+  abilityStatIds.forEach((abilityStatId, index) => {
+    const skillData = profile.skills[abilityStatId];
+    if (skillData) {
+      const breedInitValue = getBreedInitValue(characterStats.breed, abilityStatId);
+      const equipmentBonus = equipmentBonuses[abilityStatId] || 0;
+      const perkBonus = perkBonuses[abilityStatId] || 0;
+      const buffBonus = buffBonuses[abilityStatId] || 0;
 
-        // Calculate base ability cap (without equipment/perks)
-        const baseAbilityCap = calcAbilityMaxValue(characterStats.level, characterStats.breed, characterStats.profession, abilityStatId);
-
-        // Calculate base value (breed init + IP improvements, no equipment/perks)
-        const baseValue = breedInitValue + ability.pointFromIp;
-
-        // Cap the base value at the ability's natural cap
-        const cappedBaseValue = Math.min(baseValue, baseAbilityCap);
-
-        // Store computed values
-        ability.baseValue = cappedBaseValue;
-        ability.equipmentBonus = equipmentBonus;
-        ability.perkBonus = perkBonus; // Store perk bonus separately
-        ability.buffBonus = buffBonus; // Store buff bonus separately
-        ability.trickleDown = 0; // Abilities don't have trickle-down
-
-        // Final value: capped base + equipment + perks + buffs (both can exceed natural cap)
-        // Apply buff effects after equipment and perk bonuses but before final caps
-        ability.value = cappedBaseValue + equipmentBonus + perkBonus + buffBonus;
-
-        // Display cap includes equipment, perk, and buff bonuses for UI
-        ability.cap = baseAbilityCap + equipmentBonus + perkBonus + buffBonus;
+      // Ensure pointsFromIp is set (required field)
+      if (skillData.pointsFromIp === undefined || skillData.pointsFromIp === null) {
+        skillData.pointsFromIp = 0; // Default to no IP spent
       }
-    });
-  }
 
-  // For trickle-down, use full ability values INCLUDING equipment and perk bonuses
-  const fullAbilityValues: number[] = [
-    profile.Skills.Attributes.Strength.value || 0,
-    profile.Skills.Attributes.Agility.value || 0,
-    profile.Skills.Attributes.Stamina.value || 0,
-    profile.Skills.Attributes.Intelligence.value || 0,
-    profile.Skills.Attributes.Sense.value || 0,
-    profile.Skills.Attributes.Psychic.value || 0
-  ];
-  const trickleDownResults = calcAllTrickleDown(fullAbilityValues);
-  
-  // Update skill caps and trickle-down
-  const categories = [
-    'Body & Defense',
-    'Ranged Weapons', 
-    'Ranged Specials',
-    'Melee Weapons',
-    'Melee Specials',
-    'Nanos & Casting',
-    'Exploring',
-    'Trade & Repair',
-    'Combat & Healing'
-  ];
-  
-  categories.forEach(categoryName => {
-    const category = profile.Skills[categoryName as keyof typeof profile.Skills];
-    if (category && typeof category === 'object') {
-      Object.entries(category).forEach(([skillName, skillData]: [string, any]) => {
-        const skillIndex = getSkillId(skillName);
-        if (skillIndex !== null && skillIndex >= 0) {
-          // Ensure pointFromIp is set (required field)
-          if (skillData.pointFromIp === undefined || skillData.pointFromIp === null) {
-            skillData.pointFromIp = 0; // Default to no IP spent
-          }
+      // Calculate base ability cap (without equipment/perks)
+      const baseAbilityCap = calcAbilityMaxValue(characterStats.level, characterStats.breed, characterStats.profession, abilityStatId);
 
-          // Update trickle-down bonus
-          skillData.trickleDown = trickleDownResults[skillIndex] || 0;
+      // Calculate base value (breed init + IP improvements, no equipment/perks)
+      const baseValue = breedInitValue + skillData.pointsFromIp;
 
-          // Calculate base skill cap (without equipment/perks)
-          const baseSkillCap = calcSkillCap(
-            characterStats.level,
-            characterStats.profession,
-            skillIndex,
-            fullAbilityValues
-          );
+      // Cap the base value at the ability's natural cap
+      const cappedBaseValue = Math.min(baseValue, baseAbilityCap);
 
-          // Calculate base value: base skill + trickle-down + IP improvements
-          const baseValue = 5 + skillData.trickleDown + skillData.pointFromIp;
+      // Store computed values in unified SkillData structure
+      skillData.base = breedInitValue;
+      skillData.trickle = 0; // Abilities don't have trickle-down
+      skillData.equipmentBonus = equipmentBonus;
+      skillData.perkBonus = perkBonus;
+      skillData.buffBonus = buffBonus;
 
-          // Cap the base value at the skill's natural cap
-          const cappedBaseValue = Math.min(baseValue, baseSkillCap);
-
-          // Get equipment, perk, and buff bonuses for this skill
-          const equipmentBonus = equipmentBonuses[skillName] || 0;
-          const perkBonus = perkBonuses[skillName] || 0;
-          const buffBonus = buffBonuses[skillName] || 0;
-
-          // Store computed values
-          skillData.baseValue = cappedBaseValue;
-          skillData.equipmentBonus = equipmentBonus;
-          skillData.perkBonus = perkBonus; // Store perk bonus separately
-          skillData.buffBonus = buffBonus; // Store buff bonus separately
-
-          // Final value: capped base + equipment + perks + buffs (both can exceed natural cap)
-          // Apply buff effects after equipment and perk bonuses but before final caps
-          skillData.value = cappedBaseValue + equipmentBonus + perkBonus + buffBonus;
-
-          // Display cap includes equipment, perk, and buff bonuses for UI
-          skillData.cap = baseSkillCap + equipmentBonus + perkBonus + buffBonus;
-        }
-      });
+      // Final total: base + pointsFromIp + equipment + perks + buffs
+      skillData.total = cappedBaseValue + equipmentBonus + perkBonus + buffBonus;
     }
   });
 
-  // Apply equipment, perk, and buff bonuses to Misc skills
-  if (profile.Skills.Misc && typeof profile.Skills.Misc === 'object') {
-    Object.entries(profile.Skills.Misc).forEach(([skillName, miscSkill]) => {
-      if (miscSkill && typeof miscSkill === 'object' && 'baseValue' in miscSkill) {
-        // Get bonuses for this Misc skill
-        const equipmentBonus = equipmentBonuses[skillName] || 0;
-        const perkBonus = perkBonuses[skillName] || 0;
-        const buffBonus = buffBonuses[skillName] || 0;
+  // For trickle-down, use full ability values INCLUDING equipment and perk bonuses
+  const fullAbilityValues: number[] = [
+    profile.skills[16]?.total || 0, // Strength
+    profile.skills[18]?.total || 0, // Agility
+    profile.skills[17]?.total || 0, // Stamina
+    profile.skills[20]?.total || 0, // Intelligence
+    profile.skills[19]?.total || 0, // Sense
+    profile.skills[21]?.total || 0  // Psychic
+  ];
+  const trickleDownResults = calcAllTrickleDown(fullAbilityValues);
+  
+  // Update regular skills (skill IDs 100-167) with trickle-down and bonuses
+  for (const [skillIdStr, skillData] of Object.entries(profile.skills)) {
+    const skillId = Number(skillIdStr);
 
-        // Update individual bonus fields (never accumulate)
-        miscSkill.equipmentBonus = equipmentBonus;
-        miscSkill.perkBonus = perkBonus;
-        miscSkill.buffBonus = buffBonus;
-
-        // Calculate total value
-        miscSkill.value = miscSkill.baseValue + equipmentBonus + perkBonus + buffBonus;
+    // Only process regular skills that have IP costs (100-167 range)
+    if (skillId >= 100 && skillId <= 167) {
+      // Ensure pointsFromIp is set (required field)
+      if (skillData.pointsFromIp === undefined || skillData.pointsFromIp === null) {
+        skillData.pointsFromIp = 0; // Default to no IP spent
       }
-    });
+
+      // Update trickle-down bonus
+      skillData.trickle = trickleDownResults[skillId] || 0;
+
+      // Calculate base skill cap (without equipment/perks)
+      const baseSkillCap = calcSkillCap(
+        characterStats.level,
+        characterStats.profession,
+        skillId,
+        fullAbilityValues
+      );
+
+      // Calculate base value: base skill + trickle-down + IP improvements
+      const baseValue = 5 + skillData.trickle + skillData.pointsFromIp;
+
+      // Cap the base value at the skill's natural cap
+      const cappedBaseValue = Math.min(baseValue, baseSkillCap);
+
+      // Get equipment, perk, and buff bonuses for this skill
+      const equipmentBonus = equipmentBonuses[skillId] || 0;
+      const perkBonus = perkBonuses[skillId] || 0;
+      const buffBonus = buffBonuses[skillId] || 0;
+
+      // Store computed values in unified SkillData structure
+      skillData.base = 5; // Regular skills have base of 5
+      skillData.equipmentBonus = equipmentBonus;
+      skillData.perkBonus = perkBonus;
+      skillData.buffBonus = buffBonus;
+
+      // Final total: base + trickle + pointsFromIp + equipment + perks + buffs
+      skillData.total = cappedBaseValue + equipmentBonus + perkBonus + buffBonus;
+    }
+  }
+
+  // Apply equipment, perk, and buff bonuses to Misc skills (skill IDs 200+)
+  for (const [skillIdStr, skillData] of Object.entries(profile.skills)) {
+    const skillId = Number(skillIdStr);
+
+    // Process Misc skills (skill IDs 200+ or other ranges that don't fall in abilities/regular skills)
+    if (skillId >= 200 || (skillId < 100 && skillId > 21)) {
+      // Get bonuses for this Misc skill
+      const equipmentBonus = equipmentBonuses[skillId] || 0;
+      const perkBonus = perkBonuses[skillId] || 0;
+      const buffBonus = buffBonuses[skillId] || 0;
+
+      // Misc skills have no base skill value, no trickle-down, no IP
+      skillData.base = 0;
+      skillData.trickle = 0;
+      skillData.ipSpent = 0;
+      skillData.pointsFromIp = 0;
+
+      // Update bonus fields
+      skillData.equipmentBonus = equipmentBonus;
+      skillData.perkBonus = perkBonus;
+      skillData.buffBonus = buffBonus;
+
+      // Calculate total value: only bonuses for Misc skills
+      skillData.total = equipmentBonus + perkBonus + buffBonus;
+    }
   }
 
   // ACs are pure calculated values with no base (always start at 0)
@@ -392,62 +391,45 @@ export function updateProfileSkillInfo(
 export function updateProfileTrickleDown(profile: TinkerProfile): TinkerProfile {
   // Create a deep copy to avoid mutations
   const updatedProfile = JSON.parse(JSON.stringify(profile)) as TinkerProfile;
-  
+
   // Extract current abilities from profile (full values, not just improvements)
   const abilities: number[] = [
-    updatedProfile.Skills.Attributes.Strength.value || 0,
-    updatedProfile.Skills.Attributes.Agility.value || 0,
-    updatedProfile.Skills.Attributes.Stamina.value || 0,
-    updatedProfile.Skills.Attributes.Intelligence.value || 0,
-    updatedProfile.Skills.Attributes.Sense.value || 0,
-    updatedProfile.Skills.Attributes.Psychic.value || 0
+    updatedProfile.skills[16]?.total || 0, // Strength
+    updatedProfile.skills[18]?.total || 0, // Agility
+    updatedProfile.skills[17]?.total || 0, // Stamina
+    updatedProfile.skills[20]?.total || 0, // Intelligence
+    updatedProfile.skills[19]?.total || 0, // Sense
+    updatedProfile.skills[21]?.total || 0  // Psychic
   ];
-  
+
   // Calculate new trickle-down values
   const trickleDownResults = calcAllTrickleDown(abilities);
-  
-  // Update trickle-down for all skill categories
-  const categories = [
-    'Body & Defense',
-    'Ranged Weapons', 
-    'Ranged Specials',
-    'Melee Weapons',
-    'Melee Specials',
-    'Nanos & Casting',
-    'Exploring',
-    'Trade & Repair',
-    'Combat & Healing'
-  ];
-  
-  categories.forEach(categoryName => {
-    const category = updatedProfile.Skills[categoryName as keyof typeof updatedProfile.Skills];
-    if (category && typeof category === 'object') {
-      Object.entries(category).forEach(([skillName, skillData]: [string, any]) => {
-        const skillIndex = getSkillId(skillName);
-        if (skillIndex !== null && skillIndex >= 0 && skillData) {
-          const newTrickleDown = trickleDownResults[skillIndex] || 0;
-          const oldTrickleDown = skillData.trickleDown || 0;
-          
-          // Update trickle-down bonus
-          skillData.trickleDown = newTrickleDown;
 
-          // Recalculate base value first
-          const baseValue = 5 + newTrickleDown + (skillData.pointFromIp || 0);
-          skillData.baseValue = baseValue;
+  // Update trickle-down for all regular skills (100-167)
+  for (const [skillIdStr, skillData] of Object.entries(updatedProfile.skills)) {
+    const skillId = Number(skillIdStr);
 
-          // Always include equipment, perk, and buff bonuses in final value
-          const equipmentBonus = skillData.equipmentBonus || 0;
-          const perkBonus = skillData.perkBonus || 0;
-          const buffBonus = skillData.buffBonus || 0;
-          skillData.value = baseValue + equipmentBonus + perkBonus + buffBonus;
-        }
-      });
+    // Only update regular skills that have trickle-down (100-167 range)
+    if (skillId >= 100 && skillId <= 167 && skillData) {
+      const newTrickleDown = trickleDownResults[skillId] || 0;
+
+      // Update trickle-down bonus
+      skillData.trickle = newTrickleDown;
+
+      // Recalculate base value: base + trickle + IP improvements
+      const baseValue = 5 + newTrickleDown + (skillData.pointsFromIp || 0);
+
+      // Always include equipment, perk, and buff bonuses in final value
+      const equipmentBonus = skillData.equipmentBonus || 0;
+      const perkBonus = skillData.perkBonus || 0;
+      const buffBonus = skillData.buffBonus || 0;
+      skillData.total = baseValue + equipmentBonus + perkBonus + buffBonus;
     }
-  });
-  
+  }
+
   // Update timestamp
   updatedProfile.updated = new Date().toISOString();
-  
+
   return updatedProfile;
 }
 
@@ -471,15 +453,39 @@ export function validateProfileIP(profile: TinkerProfile): {
   }
   
   // Check for skills near caps
-  Object.entries(profile.Skills).forEach(([categoryName, category]) => {
-    if (typeof category === 'object' && categoryName !== 'ACs' && categoryName !== 'Misc') {
-      Object.entries(category).forEach(([skillName, skillData]: [string, any]) => {
-        if (skillData.cap && skillData.value >= skillData.cap * 0.95) {
-          warnings.push(`${skillName} is near its effective cap (${skillData.value}/${skillData.cap})`);
+  for (const [skillIdStr, skillData] of Object.entries(profile.skills)) {
+    const skillId = Number(skillIdStr);
+
+    // Only check regular skills that have caps
+    if (skillId >= 100 && skillId <= 167) {
+      try {
+        const skillName = skillService.getName(skillId);
+        // Calculate theoretical cap (this would need to be calculated properly)
+        const characterStats = profileToCharacterStats(profile);
+        const abilities = [
+          profile.skills[16]?.total || 0, // Strength
+          profile.skills[18]?.total || 0, // Agility
+          profile.skills[17]?.total || 0, // Stamina
+          profile.skills[20]?.total || 0, // Intelligence
+          profile.skills[19]?.total || 0, // Sense
+          profile.skills[21]?.total || 0  // Psychic
+        ];
+
+        const baseSkillCap = calcSkillCap(
+          characterStats.level,
+          characterStats.profession,
+          skillId,
+          abilities
+        );
+
+        if (skillData.total >= baseSkillCap * 0.95) {
+          warnings.push(`${skillName} is near its natural cap (${skillData.total}/${baseSkillCap})`);
         }
-      });
+      } catch (error) {
+        // Skip invalid skill IDs
+      }
     }
-  });
+  }
   
   return {
     valid: validation.valid,
@@ -541,75 +547,106 @@ export async function recalculateProfileIP(profile: TinkerProfile): Promise<Tink
  */
 export async function modifySkill(
   profile: TinkerProfile,
-  category: string,
-  skillName: string,
+  skillId: number,
   newValue: number
 ): Promise<{
   success: boolean;
   error?: string;
   updatedProfile?: TinkerProfile;
 }> {
-  const skillData = (profile.Skills as any)[category]?.[skillName];
+  const skillData = profile.skills[skillId];
   if (!skillData) {
     return {
       success: false,
-      error: `Skill ${skillName} not found in category ${category}`
+      error: `Skill ID ${skillId} not found in profile`
     };
   }
-  
-  // Check if new value exceeds cap
-  if (skillData.cap && newValue > skillData.cap) {
+
+  // Get skill name for display purposes
+  let skillName: string;
+  try {
+    skillName = skillService.getName(skillId);
+  } catch (error) {
     return {
       success: false,
-      error: `Cannot raise ${skillName} to ${newValue}, exceeds cap of ${skillData.cap}`
+      error: `Invalid skill ID: ${skillId}`
     };
   }
-  
+
+  // For regular skills, check if new value exceeds natural cap (without bonuses)
+  if (skillId >= 100 && skillId <= 167) {
+    const characterStats = profileToCharacterStats(profile);
+    const abilities = [
+      profile.skills[16]?.total || 0, // Strength
+      profile.skills[18]?.total || 0, // Agility
+      profile.skills[17]?.total || 0, // Stamina
+      profile.skills[20]?.total || 0, // Intelligence
+      profile.skills[19]?.total || 0, // Sense
+      profile.skills[21]?.total || 0  // Psychic
+    ];
+
+    const baseSkillCap = calcSkillCap(
+      characterStats.level,
+      characterStats.profession,
+      skillId,
+      abilities
+    );
+
+    const trickleDown = skillData.trickle || 0;
+    const maxPossibleFromIP = baseSkillCap - 5 - trickleDown;
+
+    if (newValue > baseSkillCap) {
+      return {
+        success: false,
+        error: `Cannot raise ${skillName} to ${newValue}, exceeds natural cap of ${baseSkillCap}`
+      };
+    }
+  }
+
   // Calculate IP cost difference
-  const oldImprovements = skillData.pointFromIp;
-  const newImprovements = Math.max(0, newValue - (skillData.trickleDown || 0));
+  const oldImprovements = skillData.pointsFromIp || 0;
+  const trickleDown = skillData.trickle || 0;
+  const newImprovements = Math.max(0, newValue - 5 - trickleDown);
   const improvementDiff = newImprovements - oldImprovements;
-  
+
   if (improvementDiff === 0) {
     return { success: true, updatedProfile: profile };
   }
-  
-  // Calculate IP cost
-  const skillIndex = getSkillId(skillName);
-  const profession = getProfessionId(profile.Character.Profession) || 0;
+
+  // Calculate IP cost for regular skills
   let ipCost = 0;
-  
-  if (skillIndex !== null && skillIndex >= 0) {
+  if (skillId >= 100 && skillId <= 167) {
+    const profession = getProfessionId(profile.Character.Profession) || 0;
+
     if (improvementDiff > 0) {
       // Calculate cost to raise skill
       for (let i = oldImprovements; i < newImprovements; i++) {
-        ipCost += calcTotalSkillCost(1, profession, skillIndex);
+        ipCost += calcTotalSkillCost(1, profession, skillId);
       }
     } else {
       // Calculate IP refund for lowering skill
       for (let i = newImprovements; i < oldImprovements; i++) {
-        ipCost -= calcTotalSkillCost(1, profession, skillIndex);
+        ipCost -= calcTotalSkillCost(1, profession, skillId);
       }
     }
+
+    // Check IP availability
+    const currentIP = profile.IPTracker?.remaining || 0;
+    if (ipCost > currentIP) {
+      return {
+        success: false,
+        error: `Insufficient IP: need ${ipCost}, have ${currentIP}`
+      };
+    }
   }
-  
-  // Check IP availability
-  const currentIP = profile.IPTracker?.remaining || 0;
-  if (ipCost > currentIP) {
-    return {
-      success: false,
-      error: `Insufficient IP: need ${ipCost}, have ${currentIP}`
-    };
-  }
-  
+
   // Create updated profile
   const updatedProfile = JSON.parse(JSON.stringify(profile)) as TinkerProfile;
-  const updatedSkill = (updatedProfile.Skills as any)[category][skillName];
-  
-  updatedSkill.value = newValue;
-  updatedSkill.pointFromIp = newImprovements;
-  updatedSkill.ipSpent = updatedSkill.ipSpent + ipCost;
-  
+  const updatedSkill = updatedProfile.skills[skillId];
+
+  updatedSkill.pointsFromIp = newImprovements;
+  updatedSkill.ipSpent = (updatedSkill.ipSpent || 0) + ipCost;
+
   // Recalculate all IP information (includes perk bonuses)
   return {
     success: true,
@@ -622,48 +659,54 @@ export async function modifySkill(
  */
 export async function modifyAbility(
   profile: TinkerProfile,
-  abilityName: string,
+  abilityId: number,
   newValue: number
 ): Promise<{
   success: boolean;
   error?: string;
   updatedProfile?: TinkerProfile;
-  trickleDownChanges?: Record<string, { old: number; new: number }>;
+  trickleDownChanges?: Record<number, { old: number; new: number }>;
 }> {
-  const abilityData = (profile.Skills.Attributes as any)[abilityName];
+  const abilityData = profile.skills[abilityId];
   if (!abilityData) {
     return {
       success: false,
-      error: `Ability ${abilityName} not found`
+      error: `Ability ID ${abilityId} not found`
     };
   }
-  
-  const abilityIndex = ABILITY_NAMES.indexOf(abilityName);
-  const abilityStatId = ABILITY_INDEX_TO_STAT_ID[abilityIndex];
+
+  // Verify this is an ability (skill IDs 16-21)
+  if (abilityId < 16 || abilityId > 21) {
+    return {
+      success: false,
+      error: `Skill ID ${abilityId} is not an ability`
+    };
+  }
+
   const breed = getBreedId(profile.Character.Breed) || 0;
 
   // Calculate new improvement value
-  const breedBase = getBreedInitValue(breed, abilityStatId);
+  const breedBase = getBreedInitValue(breed, abilityId);
   const newImprovements = Math.max(0, newValue - breedBase);
-  const oldImprovements = abilityData.pointFromIp;
+  const oldImprovements = abilityData.pointsFromIp || 0;
   const improvementDiff = newImprovements - oldImprovements;
-  
+
   if (improvementDiff === 0) {
     return { success: true, updatedProfile: profile };
   }
-  
+
   // Calculate IP cost
   let ipCost = 0;
   if (improvementDiff > 0) {
     for (let i = oldImprovements; i < newImprovements; i++) {
-      ipCost += calcTotalAbilityCost(1, breed, abilityStatId);
+      ipCost += calcTotalAbilityCost(1, breed, abilityId);
     }
   } else {
     for (let i = newImprovements; i < oldImprovements; i++) {
-      ipCost -= calcTotalAbilityCost(1, breed, abilityStatId);
+      ipCost -= calcTotalAbilityCost(1, breed, abilityId);
     }
   }
-  
+
   // Check IP availability
   const currentIP = profile.IPTracker?.remaining || 0;
   if (ipCost > currentIP) {
@@ -672,49 +715,36 @@ export async function modifyAbility(
       error: `Insufficient IP: need ${ipCost}, have ${currentIP}`
     };
   }
-  
+
   // Capture old trickle-down values for change tracking
-  const oldTrickleDownChanges: Record<string, { old: number; new: number }> = {};
-  const categories = [
-    'Body & Defense', 'Ranged Weapons', 'Ranged Specials',
-    'Melee Weapons', 'Melee Specials', 'Nanos & Casting',
-    'Exploring', 'Trade & Repair', 'Combat & Healing'
-  ];
-  
-  categories.forEach(categoryName => {
-    const category = profile.Skills[categoryName as keyof typeof profile.Skills];
-    if (category && typeof category === 'object') {
-      Object.entries(category).forEach(([skillName, skillData]: [string, any]) => {
-        if (skillData && skillData.trickleDown !== undefined) {
-          oldTrickleDownChanges[skillName] = { old: skillData.trickleDown, new: 0 };
-        }
-      });
+  const oldTrickleDownChanges: Record<number, { old: number; new: number }> = {};
+
+  // Track trickle-down changes for regular skills (100-167)
+  for (const [skillIdStr, skillData] of Object.entries(profile.skills)) {
+    const skillId = Number(skillIdStr);
+    if (skillId >= 100 && skillId <= 167 && skillData.trickle !== undefined) {
+      oldTrickleDownChanges[skillId] = { old: skillData.trickle, new: 0 };
     }
-  });
-  
+  }
+
   // Create updated profile
   const updatedProfile = JSON.parse(JSON.stringify(profile)) as TinkerProfile;
-  const updatedAbility = (updatedProfile.Skills.Attributes as any)[abilityName];
-  
-  updatedAbility.value = newValue;
-  updatedAbility.pointFromIp = newImprovements;
-  updatedAbility.ipSpent = updatedAbility.ipSpent + ipCost;
-  
+  const updatedAbility = updatedProfile.skills[abilityId];
+
+  updatedAbility.pointsFromIp = newImprovements;
+  updatedAbility.ipSpent = (updatedAbility.ipSpent || 0) + ipCost;
+
   // Apply optimized trickle-down update
   const profileWithTrickleDown = updateProfileTrickleDown(updatedProfile);
-  
+
   // Capture new trickle-down values
-  categories.forEach(categoryName => {
-    const category = profileWithTrickleDown.Skills[categoryName as keyof typeof profileWithTrickleDown.Skills];
-    if (category && typeof category === 'object') {
-      Object.entries(category).forEach(([skillName, skillData]: [string, any]) => {
-        if (skillData && oldTrickleDownChanges[skillName] !== undefined) {
-          oldTrickleDownChanges[skillName].new = skillData.trickleDown || 0;
-        }
-      });
+  for (const [skillIdStr, skillData] of Object.entries(profileWithTrickleDown.skills)) {
+    const skillId = Number(skillIdStr);
+    if (oldTrickleDownChanges[skillId] !== undefined) {
+      oldTrickleDownChanges[skillId].new = skillData.trickle || 0;
     }
-  });
-  
+  }
+
   // Full IP recalculation (for IP tracker, includes perk bonuses)
   const finalProfile = await recalculateProfileIP(profileWithTrickleDown);
 

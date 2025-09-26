@@ -142,6 +142,8 @@ export const SKILL_REGISTRY: Record<string, number> = {
   'Ranged Energy': 133, // RangedEnergy in STAT enum
   'Add All Offense': 276, // AddAllOffense in STAT enum
   'Add All Defense': 277, // AddAllDefense in STAT enum
+  'Add All Off.': 276, // AddAllOffense (abbreviated format)
+  'Add All Def.': 277, // AddAllDefense (abbreviated format)
 
   // Damage Modifiers
   'Projectile Damage Modifier': 278, // ProjectileDamageModifier in STAT enum

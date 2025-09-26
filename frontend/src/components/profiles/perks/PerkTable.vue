@@ -117,6 +117,7 @@ import Button from 'primevue/button'
 import type { PerkEntry, ResearchEntry, PerkEffect } from '@/lib/tinkerprofiles/perk-types'
 import { parseItemForStatBonuses } from '@/services/perk-bonus-calculator'
 import type { Item } from '@/types/api'
+import { skillService } from '@/services/skill-service'
 
 // Props
 const props = defineProps<{
@@ -184,21 +185,30 @@ function getPerkEffects(perk: PerkEntry | ResearchEntry): string[] {
     // Format bonuses as "Skill: +X" strings
     const effectStrings: string[] = []
 
-    // Group bonuses by skill name to avoid duplicates
-    const skillBonuses: Record<string, number> = {}
+    // Group bonuses by skill ID and resolve names
+    const skillBonuses: Record<number, number> = {}
     for (const bonus of bonuses) {
-      if (skillBonuses[bonus.skillName]) {
-        skillBonuses[bonus.skillName] += bonus.amount
+      if (skillBonuses[bonus.statId]) {
+        skillBonuses[bonus.statId] += bonus.amount
       } else {
-        skillBonuses[bonus.skillName] = bonus.amount
+        skillBonuses[bonus.statId] = bonus.amount
       }
     }
 
-    // Convert to formatted strings
-    for (const [skillName, amount] of Object.entries(skillBonuses)) {
+    // Convert to formatted strings using SkillService
+    for (const [statIdStr, amount] of Object.entries(skillBonuses)) {
       if (amount !== 0) {
-        const sign = amount > 0 ? '+' : ''
-        effectStrings.push(`${skillName}: ${sign}${amount}`)
+        try {
+          const statId = parseInt(statIdStr, 10)
+          const skillName = skillService.getName(statId)
+          const sign = amount > 0 ? '+' : ''
+          effectStrings.push(`${skillName}: ${sign}${amount}`)
+        } catch (error) {
+          // If skill name resolution fails, use the stat ID
+          console.warn(`Failed to resolve skill name for stat ID ${statIdStr}:`, error)
+          const sign = amount > 0 ? '+' : ''
+          effectStrings.push(`Stat ${statIdStr}: ${sign}${amount}`)
+        }
       }
     }
 

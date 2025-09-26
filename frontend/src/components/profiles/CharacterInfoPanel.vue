@@ -90,31 +90,31 @@ Shows character stats, health, nano, and other core information
     </div>
     
     <!-- Attributes Overview -->
-    <div v-if="profile.Skills?.Attributes" class="mt-6">
+    <div v-if="attributes && attributes.length > 0" class="mt-6">
       <h4 class="text-md font-semibold text-surface-900 dark:text-surface-50 mb-3">
         Core Attributes
       </h4>
-      
+
       <div class="grid grid-cols-2 gap-3">
-        <div 
-          v-for="(ability, abilityName) in profile.Skills.Attributes"
-          :key="abilityName"
+        <div
+          v-for="attribute in attributes"
+          :key="attribute.id"
           class="flex items-center justify-between p-2 bg-surface-50 dark:bg-surface-800 rounded"
         >
           <span class="text-sm font-medium text-surface-700 dark:text-surface-300">
-            {{ getAbilityDisplayName(abilityName) }}
+            {{ attribute.shortName }}
           </span>
           <div class="flex items-center gap-2">
             <div class="text-right">
               <div class="text-sm font-bold text-surface-900 dark:text-surface-50">
-                {{ ability.value || 0 }}
+                {{ attribute.skill.value || 0 }}
               </div>
               <div class="text-xs text-surface-500 dark:text-surface-400">
-                Base: {{ breedBaseValues[abilityName as string as keyof typeof breedBaseValues] }}
+                Base: {{ attribute.breedBase }}
               </div>
             </div>
-            <span v-if="ability.trickleDown" class="text-xs text-green-600 dark:text-green-400">
-              (+{{ ability.trickleDown }})
+            <span v-if="attribute.skill.trickleDown" class="text-xs text-green-600 dark:text-green-400">
+              (+{{ attribute.skill.trickleDown }})
             </span>
           </div>
         </div>
@@ -151,6 +151,7 @@ import Badge from 'primevue/badge';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
 import { calculateTitleLevel, getBreedId } from '@/services/game-utils';
 import { getBreedInitValue } from '@/lib/tinkerprofiles/ip-calculator';
+import { skillService } from '@/services/skill-service';
 
 // Props
 const props = defineProps<{
@@ -221,32 +222,40 @@ const factionColor = computed(() => {
   return colorMap[props.profile.Character?.Faction || ''] || 'text-surface-400';
 });
 
-const breedBaseValues = computed(() => {
+const attributes = computed(() => {
+  // Attribute skill IDs: 16-21 (Strength, Agility, Stamina, Intelligence, Sense, Psychic)
+  const attributeIds = [16, 17, 18, 19, 20, 21];
   const breed = props.profile.Character?.Breed || 'Solitus';
   const breedId = getBreedId(breed) || 0;
-  
-  return {
-    'Strength': getBreedInitValue(breedId, 0),
-    'Agility': getBreedInitValue(breedId, 1),
-    'Stamina': getBreedInitValue(breedId, 2),
-    'Intelligence': getBreedInitValue(breedId, 3),
-    'Sense': getBreedInitValue(breedId, 4),
-    'Psychic': getBreedInitValue(breedId, 5)
-  };
+
+  // Breed init value indices match attribute order: STR=0, AGI=1, STA=2, INT=3, SEN=4, PSY=5
+  const breedInitIndices = [0, 1, 2, 3, 4, 5];
+
+  return attributeIds.map((skillId, index) => {
+    try {
+      const skill = props.profile.skills?.[skillId] || { value: 0, trickleDown: 0 };
+      const shortName = skillService.getShortName(skillId);
+      const breedBase = getBreedInitValue(breedId, breedInitIndices[index]);
+
+      return {
+        id: skillId,
+        shortName,
+        skill,
+        breedBase
+      };
+    } catch (error) {
+      console.warn(`Failed to get attribute info for skill ID ${skillId}:`, error);
+      return {
+        id: skillId,
+        shortName: 'UNK',
+        skill: { value: 0, trickleDown: 0 },
+        breedBase: 0
+      };
+    }
+  });
 });
 
 // Methods
-function getAbilityDisplayName(abilityName: string): string {
-  const nameMap: Record<string, string> = {
-    'Intelligence': 'INT',
-    'Psychic': 'PSY',
-    'Sense': 'SEN',
-    'Stamina': 'STA',
-    'Strength': 'STR',
-    'Agility': 'AGI'
-  };
-  return nameMap[abilityName] || abilityName;
-}
 
 function formatDateTime(dateString: string): string {
   try {

@@ -274,6 +274,8 @@ import PerkTabs from '@/components/profiles/perks/PerkTabs.vue';
 import BuffTable from '@/components/profiles/buffs/BuffTable.vue';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
 import type { Item } from '@/types/api';
+import { skillService } from '@/services/skill-service';
+import type { SkillId } from '@/types/skills';
 
 // Router
 const route = useRoute();
@@ -385,7 +387,12 @@ async function exportProfile() {
 
 async function handleSkillChange(category: string, skillName: string, newValue: number) {
   try {
-    await profilesStore.modifySkill(props.profileId, category, skillName, newValue);
+    // Convert skill name to ID using SkillService
+    const skillId = skillService.resolveId(skillName);
+    await profilesStore.modifySkill(props.profileId, skillId, newValue);
+
+    // Reload profile to get updated data
+    await loadProfile();
   } catch (err) {
     console.error('Failed to modify skill:', err);
     error.value = err instanceof Error ? err.message : 'Failed to modify skill';
@@ -394,21 +401,15 @@ async function handleSkillChange(category: string, skillName: string, newValue: 
 
 async function handleAbilityChange(abilityName: string, newValue: number) {
   try {
-    const result = await profilesStore.modifyAbility(props.profileId, abilityName, newValue);
+    // Convert ability name to ID using SkillService
+    const abilityId = skillService.resolveId(abilityName);
+    await profilesStore.modifySkill(props.profileId, abilityId, newValue);
 
-    // Show feedback about trickle-down updates
-    if (result.success && result.trickleDownChanges) {
-      const changedSkills = Object.entries(result.trickleDownChanges).filter(
-        ([_, change]) => Math.abs(change.new - change.old) > 0
-      );
-      if (changedSkills.length > 0) {
-        showTrickleDownFeedback(changedSkills.length);
-      }
-    }
+    // Reload profile to get updated data with trickle-down effects
+    await loadProfile();
 
-    // Automatically recalculate IP and caps after ability changes
-    await profilesStore.recalculateProfileIP(props.profileId);
-    await loadProfile(); // Reload to get updated data
+    // Show feedback about ability change
+    console.info(`✨ Ability ${abilityName} updated to ${newValue}`);
   } catch (err) {
     console.error('Failed to modify ability:', err);
     error.value = err instanceof Error ? err.message : 'Failed to modify ability';
