@@ -1,145 +1,195 @@
-# TinkerProfiles Skill System Improvements
+# TinkerProfiles Skill System - ID-Based Architecture (v4.0.0)
 
 ## Overview
 
-This feature represents a comprehensive enhancement to the TinkerProfiles skill calculation system, focusing on accurate IP integration, AC calculation improvements, and better Misc skill handling. The changes span 20+ files with significant improvements to skill value calculations, UI components, and bonus application mechanisms.
+This feature represents a major architectural refactoring of the TinkerProfiles skill system, migrating from name-based nested structures to a unified ID-based architecture. The refactoring introduces new service patterns, type safety improvements, and unified skill data structures while maintaining backward compatibility for calculations and IP integration.
 
-## Key Improvements
+## Key Architectural Changes
 
-### 1. Enhanced IP Integration for Misc Skills
-- **Problem**: Misc skills were not properly receiving equipment, perk, and buff bonuses
-- **Solution**: Enhanced `ip-integrator.ts` with dedicated Misc skill bonus application (lines 363-381)
-- **Impact**: Misc skills like "Max NCU", "Add All Off.", etc. now correctly display all bonuses
+### 1. ID-Based Skill Architecture
+- **Migration**: From `profile.Skills.Category.SkillName` to `profile.skills[skillId]`
+- **Benefits**: Type safety, consistent identification, better performance
+- **Impact**: Eliminates skill name matching issues and string-based lookups
 
-### 2. AC Calculation Overhaul
-- **Problem**: AC values were accumulating bonuses on each update, causing incorrect values
-- **Solution**:
-  - New dedicated `ac-calculator.ts` utility for on-the-fly calculations
-  - ACs now calculated from pure bonuses (no base value) to prevent accumulation bugs
-  - Enhanced `SkillSlider.vue` to handle AC-specific display logic (lines 261-267)
-- **Impact**: AC values are now accurate and don't drift over time
+### 2. Unified SkillData Structure
+- **Replaces**: Separate `SkillWithIP` and `MiscSkill` types
+- **Structure**: `{ base, trickle, ipSpent, pointsFromIp, equipmentBonus, perkBonus, buffBonus, total }`
+- **Impact**: Consistent data structure for all skill types (regular, Misc, ACs)
 
-### 3. Improved Skill Mapping and Storage
-- **Problem**: Inconsistent skill name matching and stats mapping
-- **Solution**:
-  - Enhanced `profile-stats-mapper.ts` with 235 lines of improvements
-  - New `skill-patterns.ts` utility with regex-based flexible skill matching
-  - Better handling of skill name variations and abbreviations
-- **Impact**: More reliable skill identification across different data sources
+### 3. New Service Layer
+- **SkillService**: Singleton service for ID↔name resolution and metadata operations
+- **useSkills Composable**: Reactive composition API for skill operations in Vue components
+- **Pattern Matching**: Enhanced regex-based skill name resolution via `skill-patterns.ts`
 
-### 4. UI Component Enhancements
-- **Problem**: Skill sliders lacked proper Misc skill support and bonus visualization
-- **Solution**:
-  - Enhanced `SkillSlider.vue` with 108 additional lines of improvements
-  - Better tooltip breakdowns showing all bonus sources
-  - Improved equipment bonus indicators with visual feedback
-  - Enhanced support for read-only Misc skills and ACs
-- **Impact**: Better user experience with clearer skill value breakdowns
+### 4. Enhanced Type Safety
+- **Branded Types**: `SkillId` type prevents accidental usage of regular numbers
+- **Error Classes**: `SkillNotFoundError`, `InvalidSkillIdError`, `InvalidCategoryError`
+- **Type Guards**: `isSkillId()` and `toSkillId()` for safe conversions
 
-### 5. Service Layer Improvements
-- **Problem**: Equipment, nano, and perk bonus calculators had edge cases and inconsistencies
-- **Solution**:
-  - Updated all three bonus calculator services with consistency improvements
-  - Better error handling and null-value protection
-  - Enhanced integration with the IP system
-- **Impact**: More reliable bonus calculations across all systems
+### 5. Component Refactoring
+- **SkillCategory.vue**: Now operates on ID-based skill objects instead of name-based
+- **SkillSlider.vue**: Enhanced to use `skillId` props instead of `skillName`
+- **SkillsManager.vue**: Integrates with `useSkills` composable for reactive skill access
 
-## Technical Implementation
+### 6. Improved IP Integration
+- **Unified Updates**: All skill types updated through single `updateProfileSkillInfo()` path
+- **Better Bonus Handling**: Equipment, perk, and buff bonuses applied consistently across skill types
+- **AC Calculations**: On-demand calculation prevents accumulation bugs
 
-### Data Flow
-1. **Profile Loading**: Skills loaded with base values and IP contributions
-2. **Bonus Calculation**: Equipment, perk, and buff bonuses calculated separately
-3. **Value Integration**: All bonuses applied via `updateProfileSkillInfo()` in ip-integrator
-4. **UI Display**: Skill components show breakdown of all value sources
-5. **AC Special Handling**: ACs calculated on-the-fly to prevent accumulation
+## Data Flow
 
-### Key Files Modified
+### v4.0.0 Architecture
+1. **Skill Resolution**: `SkillService` resolves names to IDs using three-tier matching (exact → case-insensitive → pattern)
+2. **Profile Storage**: Skills stored as `profile.skills[skillId]` with unified `SkillData` structure
+3. **Bonus Calculation**: Equipment, perk, and buff bonuses calculated by ID and applied uniformly
+4. **UI Access**: Components use `useSkills` composable for reactive skill data and operations
+5. **Type Safety**: Branded `SkillId` type prevents ID/string confusion throughout the system
 
-#### Core Logic (8 files)
-- `frontend/src/lib/tinkerprofiles/ip-integrator.ts` - Enhanced Misc skill bonus application
-- `frontend/src/lib/tinkerprofiles/storage.ts` - Improved skill data storage patterns
-- `frontend/src/lib/tinkerprofiles/manager.ts` - Better skill management coordination
-- `frontend/src/lib/tinkerprofiles/types.ts` - Enhanced type definitions
-- `frontend/src/utils/profile-stats-mapper.ts` - Major mapping improvements
-- `frontend/src/utils/skill-registry.ts` - Enhanced skill identification
-- `frontend/src/utils/ac-calculator.ts` - **New** dedicated AC calculation utility
-- `frontend/src/utils/skill-patterns.ts` - **New** flexible skill pattern matching
+### Migration Pattern
+```typescript
+// Old v3.x approach
+const skill = profile.Skills['Melee Weapons']['1h Blunt'];
+const value = skill.value;
 
-#### UI Components (7 files)
-- `frontend/src/components/profiles/skills/SkillSlider.vue` - Major UI enhancements
-- `frontend/src/components/profiles/skills/SkillsManager.vue` - Improved skill management
-- `frontend/src/components/profiles/skills/SkillCategory.vue` - Better category handling
-- `frontend/src/components/profiles/skills/SkillsGrid.vue` - Enhanced grid display
-- `frontend/src/components/profiles/skills/StatBreakdownTooltip.vue` - Better tooltips
-- `frontend/src/views/TinkerProfileDetail.vue` - Profile integration improvements
-- `frontend/src/components/items/ItemCard.vue` - Related item display fixes
+// New v4.0.0 approach
+const skillId = skillService.resolveId('1h Blunt'); // Returns 102
+const skill = profile.skills[skillId];
+const value = skill.total;
+```
 
-#### Service Layer (3 files)
-- `frontend/src/services/equipment-bonus-calculator.ts` - Consistency improvements
-- `frontend/src/services/nano-bonus-calculator.ts` - Enhanced buff handling
-- `frontend/src/services/perk-bonus-calculator.ts` - Better perk bonus extraction
+## Implementation
 
-#### Supporting Infrastructure (2+ files)
-- `frontend/src/stores/tinkerProfiles.ts` - Store integration improvements
-- `frontend/src/lib/tinkerprofiles/constants.ts` - Updated constants
-- `frontend/src/lib/tinkerprofiles/skill-mappings.ts` - Enhanced mappings
-- Plus test files and type definitions
+### Key Files Refactored
+
+#### New Service Layer Architecture
+- `frontend/src/services/skill-service.ts` - **NEW** Singleton service for skill ID operations
+- `frontend/src/composables/useSkills.ts` - **NEW** Reactive composition API for Vue components
+- `frontend/src/types/skills.ts` - **NEW** Type definitions for branded types and interfaces
+
+#### Core Logic Refactored (558+ line changes)
+- `frontend/src/lib/tinkerprofiles/ip-integrator.ts` - Major refactoring to ID-based skill operations
+- `frontend/src/lib/tinkerprofiles/types.ts` - Unified `SkillData` type replacing multiple skill interfaces
+- `frontend/src/utils/skill-patterns.ts` - Enhanced pattern matching with corrected skill ID mappings
+
+#### UI Components Refactored (178+ line changes)
+- `frontend/src/components/profiles/skills/SkillCategory.vue` - ID-based skill iteration and display
+- `frontend/src/components/profiles/skills/SkillSlider.vue` - `skillId` props instead of `skillName`
+- `frontend/src/components/profiles/skills/SkillsManager.vue` - Integration with `useSkills` composable
+- `frontend/src/components/profiles/skills/SkillsGrid.vue` - Grid display using ID-based access
+- `frontend/src/components/profiles/skills/StatBreakdownTooltip.vue` - Enhanced tooltips with service integration
+
+#### Supporting Infrastructure
+- All bonus calculators enhanced to work with skill ID resolution
+- Store integration updated for ID-based skill access patterns
+- Profile loading/saving maintains compatibility with new skill structure
 
 ## User-Facing Changes
 
-### Before
-- Misc skills showed only base values (equipment/perk bonuses ignored)
-- AC values would drift and accumulate incorrectly over time
-- Skill tooltips provided limited breakdown information
-- Some skills had inconsistent naming/mapping issues
+### Improved Reliability
+- **Consistent Skill Access**: Skills identified by stable IDs rather than string names
+- **Enhanced Pattern Matching**: Better recognition of skill name variations (e.g., "1h Blunt", "1hBlunt", "One-Handed Blunt")
+- **Type Safety**: Reduced runtime errors from invalid skill name references
+- **Better Performance**: O(1) skill lookups instead of string-based searches
 
-### After
-- **Complete Bonus Integration**: All skills (including Misc) show correct totals
-- **Accurate AC Values**: ACs calculated fresh each time, no accumulation bugs
-- **Detailed Tooltips**: Skill breakdowns show Base + Trickle-down + IP + Equipment + Perks + Buffs
-- **Visual Indicators**: Equipment bonuses highlighted with color-coded icons
-- **Better Consistency**: Improved skill identification and mapping across the system
+### Enhanced Developer Experience
+- **Composable API**: `useSkills()` provides reactive skill operations in Vue components
+- **Service Layer**: `SkillService` offers comprehensive skill metadata and resolution
+- **Type Safety**: Branded `SkillId` type prevents accidental integer/skill ID confusion
+- **Error Handling**: Descriptive error messages with suggestions for invalid skill names/IDs
+
+### Maintained Functionality
+- **Backward Compatibility**: Existing skill calculations and IP integration unchanged
+- **UI Consistency**: Same skill display and interaction patterns for users
+- **Profile Compatibility**: Existing profiles continue to work with new architecture
 
 ## Testing Considerations
 
 ### Critical Test Cases
-1. **Misc Skill Bonuses**: Verify "Max NCU", "Add All Off.", etc. include all bonuses
-2. **AC Accumulation**: Ensure AC values don't drift when equipment changes repeatedly
-3. **Skill Tooltips**: Check tooltip breakdowns show all contributing factors
-4. **Profile Loading**: Verify skills load correctly from stored profiles
-5. **Equipment Changes**: Confirm bonuses update immediately when equipment changes
+1. **Skill Resolution**: Verify `skillService.resolveId()` handles all skill name variations correctly
+2. **Component Integration**: Ensure all skill components work with ID-based props instead of names
+3. **Profile Migration**: Test backward compatibility with existing profile structures
+4. **Type Safety**: Verify branded `SkillId` types prevent runtime errors
+5. **Service Patterns**: Test `useSkills` composable provides correct reactive data
 
 ### Performance Impact
-- **Positive**: ACs now calculated on-demand (no storage overhead)
-- **Neutral**: Misc skill bonus calculation adds minimal overhead
-- **Optimized**: Better skill pattern matching reduces lookup times
+- **Improved**: O(1) skill lookups replace string-based searches
+- **Optimized**: Single service instance eliminates repeated pattern matching
+- **Efficient**: Composable API reduces duplicate reactive computations
 
-## Future Considerations
+## Usage Example
 
-### Planned Enhancements
-- **Skill Templates**: Pre-configured skill builds for different professions
-- **Bonus Optimization**: Suggestions for equipment combinations
-- **Advanced Tooltips**: Graphical bonus breakdown charts
+### Basic Skill Operations
+```typescript
+import { skillService } from '@/services/skill-service';
+import { useSkills } from '@/composables/useSkills';
 
-### Breaking Changes
-- AC values stored in profiles will be ignored (calculated fresh)
-- Misc skill bonus fields added to profile structure
-- Skill mapping patterns may affect custom skill name handling
+// Resolve skill names to IDs
+const oneHandBluntId = skillService.resolveId('1h Blunt'); // 102
+const maxNcuId = skillService.resolveId('Max NCU'); // 181
+
+// Get skill metadata
+const metadata = skillService.getMetadata(oneHandBluntId);
+// { id: 102, name: '1h Blunt', shortName: '1hB', category: 'Melee Weapons', sortOrder: 45 }
+
+// Use in Vue components
+const { getSkillsByCategory, getSkillValue } = useSkills();
+const meleeSkills = getSkillsByCategory('Melee Weapons');
+const oneHandBluntValue = getSkillValue(102);
+```
+
+### Component Integration
+```vue
+<!-- Before (v3.x) -->
+<SkillSlider
+  skill-name="1h Blunt"
+  :skill-data="profile.Skills['Melee Weapons']['1h Blunt']"
+/>
+
+<!-- After (v4.0.0) -->
+<SkillSlider
+  :skill-id="102"
+  :skill-data="profile.skills[102]"
+/>
+```
+
+## Breaking Changes
+
+### Architecture Migration
+- **Profile Structure**: Skills moved from nested categories to flat `skills[id]` object
+- **Component Props**: Skill components now expect `skillId` instead of `skillName`
+- **Type Definitions**: New branded `SkillId` type replaces generic numbers
+
+### Backward Compatibility
+- **Profile Loading**: Automatic migration handles old profile structures
+- **API Compatibility**: Existing bonus calculators work with ID-based resolution
+- **User Interface**: No visible changes to skill display or interaction patterns
 
 ## Dependencies
 
-### Internal
-- Requires IP calculation system (`ip-calculator.ts`)
-- Uses game data services for skill/stat mappings
-- Integrates with equipment, perk, and nano bonus systems
+### New Internal Dependencies
+- `frontend/src/services/skill-service.ts` - Core skill resolution and metadata service
+- `frontend/src/composables/useSkills.ts` - Vue composition API for reactive skill operations
+- `frontend/src/types/skills.ts` - Type definitions for skill system
 
-### External
-- PrimeVue components for UI enhancements
-- Vue 3 reactivity system for real-time updates
-- TypeScript for enhanced type safety
+### Existing System Integration
+- Maintains compatibility with IP calculation system (`ip-integrator.ts`)
+- Works with existing bonus calculators (equipment, perk, nano)
+- Integrates with TinkerProfiles store and profile management
+
+### External Dependencies
+- Vue 3 Composition API for reactive patterns
+- TypeScript for branded types and enhanced type safety
+- PrimeVue components for UI consistency
 
 ## Summary
 
-This comprehensive skill system improvement addresses three major pain points: Misc skill bonus integration, AC calculation accuracy, and skill identification consistency. The changes provide users with accurate skill values, detailed tooltips, and reliable calculations while maintaining the existing IP-based skill progression system.
+This v4.0.0 architectural refactoring modernizes the TinkerProfiles skill system with ID-based architecture, enhanced type safety, and service patterns. The migration from name-based nested structures to unified skill data provides better performance, reliability, and developer experience while maintaining full backward compatibility.
 
-The improvements are particularly important for high-level characters where equipment and perk bonuses represent significant portions of total skill values, and where AC values are critical for survivability calculations.
+Key benefits include:
+- **Type Safety**: Branded `SkillId` types prevent common runtime errors
+- **Performance**: O(1) skill lookups replace string-based searches
+- **Maintainability**: Service layer centralizes skill operations
+- **Reliability**: Enhanced pattern matching handles skill name variations
+- **Developer Experience**: Composable API integrates cleanly with Vue components
+
+The refactoring maintains all existing functionality while providing a foundation for future skill system enhancements and optimizations.
