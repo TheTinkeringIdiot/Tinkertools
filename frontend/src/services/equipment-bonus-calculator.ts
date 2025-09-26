@@ -15,7 +15,7 @@
 
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types'
 import type { Item, SpellData, Spell } from '@/types/api'
-import { getSkillNameFromStatId } from '@/utils/skill-registry'
+import { skillService } from './skill-service'
 
 // ============================================================================
 // Type Definitions
@@ -24,8 +24,6 @@ import { getSkillNameFromStatId } from '@/utils/skill-registry'
 export interface StatBonus {
   /** STAT ID from game data */
   statId: number
-  /** Human-readable skill name */
-  skillName: string
   /** Bonus amount (can be negative) */
   amount: number
   /** Source item for debugging */
@@ -49,7 +47,7 @@ export interface EquipmentBonusError {
 
 export interface CalculationResult {
   /** Successfully calculated bonuses */
-  bonuses: Record<string, number>
+  bonuses: Record<number, number>
   /** Non-fatal warnings */
   warnings: EquipmentBonusError[]
   /** Fatal errors */
@@ -148,7 +146,7 @@ class SpellDataCache {
  * Memoization for aggregated bonuses calculation
  */
 class BonusAggregationCache {
-  private cache = new Map<string, Record<string, number>>()
+  private cache = new Map<string, Record<number, number>>()
   private maxSize = 100
 
   private getCacheKey(bonuses: StatBonus[]): string {
@@ -159,12 +157,12 @@ class BonusAggregationCache {
       .join('|')
   }
 
-  get(bonuses: StatBonus[]): Record<string, number> | null {
+  get(bonuses: StatBonus[]): Record<number, number> | null {
     const key = this.getCacheKey(bonuses)
     return this.cache.get(key) || null
   }
 
-  set(bonuses: StatBonus[], result: Record<string, number>): void {
+  set(bonuses: StatBonus[], result: Record<number, number>): void {
     const key = this.getCacheKey(bonuses)
 
     if (this.cache.size >= this.maxSize) {
@@ -199,9 +197,9 @@ export class EquipmentBonusCalculator {
   /**
    * Calculate equipment bonuses for all equipped items in a profile
    * @param profile TinkerProfile containing equipped items
-   * @returns Record mapping skill names to total bonus amounts
+   * @returns Record mapping skill IDs to total bonus amounts
    */
-  calculateBonuses(profile: TinkerProfile): Record<string, number> {
+  calculateBonuses(profile: TinkerProfile): Record<number, number> {
     try {
       const result = this.calculateBonusesWithErrorHandling(profile)
 
@@ -258,7 +256,7 @@ export class EquipmentBonusCalculator {
       this.processEquipmentSlotsWithErrorHandling(profile.Clothing, 'Clothing', allBonuses, result)
       this.processEquipmentSlotsWithErrorHandling(profile.Implants, 'Implants', allBonuses, result)
 
-      // Aggregate bonuses by skill name with error handling
+      // Aggregate bonuses by skill ID with error handling
       try {
         result.bonuses = this.aggregateBonusesOptimized(allBonuses)
       } catch (error) {
@@ -603,9 +601,10 @@ export class EquipmentBonusCalculator {
       return null
     }
 
-    // Convert stat ID to skill name
-    const skillName = getSkillNameFromStatId(statId)
-    if (!skillName) {
+    // Validate that the stat ID is a known skill
+    try {
+      skillService.validateId(statId)
+    } catch {
       // Log unknown stat IDs for debugging but don't fail
       console.warn(`Unknown stat ID ${statId} in item ${itemName}`)
       return null
@@ -613,7 +612,6 @@ export class EquipmentBonusCalculator {
 
     return {
       statId,
-      skillName,
       amount,
       itemName
     }
@@ -805,11 +803,9 @@ export class EquipmentBonusCalculator {
         return result
       }
 
-      // Convert stat ID to skill name
-      let skillName: string | null
+      // Validate that the stat ID is a known skill
       try {
-        skillName = getSkillNameFromStatId(statId)
-        if (!skillName) {
+        if (!skillService.validateId(statId)) {
           result.warnings.push({
             type: 'warning',
             message: 'Unknown stat ID in equipment bonus',
@@ -823,8 +819,8 @@ export class EquipmentBonusCalculator {
       } catch (error) {
         result.warnings.push({
           type: 'warning',
-          message: 'Failed to convert stat ID to skill name',
-          details: `Error converting stat ID ${statId} to skill name for spell ${spell.spell_id} in item ${itemName || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
+          message: 'Failed to validate stat ID',
+          details: `Error validating stat ID ${statId} for spell ${spell.spell_id} in item ${itemName || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
           itemName,
           slotName,
           recoverable: true
@@ -835,7 +831,6 @@ export class EquipmentBonusCalculator {
       // Successfully parsed
       result.bonus = {
         statId,
-        skillName,
         amount,
         itemName
       }
@@ -857,26 +852,27 @@ export class EquipmentBonusCalculator {
   // Note: extractStatId and extractAmount methods were removed and inlined into parseSpellForStatBonus for performance
 
   /**
-   * Aggregate stat bonuses by skill name
+   * Aggregate stat bonuses by skill ID
    * @param bonuses Array of individual stat bonuses
-   * @returns Record mapping skill names to total bonus amounts
+   * @returns Record mapping skill IDs to total bonus amounts
    */
-  aggregateBonuses(bonuses: StatBonus[]): Record<string, number> {
-    const aggregated: Record<string, number> = {}
+  aggregateBonuses(bonuses: StatBonus[]): Record<number, number> {
+    const aggregated: Record<number, number> = {}
 
     for (const bonus of bonuses) {
-      if (aggregated[bonus.skillName]) {
-        aggregated[bonus.skillName] += bonus.amount
+      if (aggregated[bonus.statId]) {
+        aggregated[bonus.statId] += bonus.amount
       } else {
-        aggregated[bonus.skillName] = bonus.amount
+        aggregated[bonus.statId] = bonus.amount
       }
     }
 
     // Filter out zero bonuses to keep the result clean
-    const filtered: Record<string, number> = {}
-    for (const [skillName, amount] of Object.entries(aggregated)) {
+    const filtered: Record<number, number> = {}
+    for (const [statId, amount] of Object.entries(aggregated)) {
+      const numericStatId = parseInt(statId, 10)
       if (amount !== 0) {
-        filtered[skillName] = amount
+        filtered[numericStatId] = amount
       }
     }
 
@@ -886,7 +882,7 @@ export class EquipmentBonusCalculator {
   /**
    * Optimized version of aggregateBonuses with memoization
    */
-  private aggregateBonusesOptimized(bonuses: StatBonus[]): Record<string, number> {
+  private aggregateBonusesOptimized(bonuses: StatBonus[]): Record<number, number> {
     // Early return for empty bonuses
     if (bonuses.length === 0) {
       return {}
@@ -954,9 +950,9 @@ export const equipmentBonusCalculator = new EquipmentBonusCalculator()
 /**
  * Convenience function to calculate equipment bonuses for a profile with performance monitoring
  * @param profile TinkerProfile to analyze
- * @returns Record mapping skill names to total equipment bonuses
+ * @returns Record mapping skill IDs to total equipment bonuses
  */
-export function calculateEquipmentBonuses(profile: TinkerProfile): Record<string, number> {
+export function calculateEquipmentBonuses(profile: TinkerProfile): Record<number, number> {
   try {
     const startTime = performance.now()
     const result = equipmentBonusCalculator.calculateBonuses(profile)

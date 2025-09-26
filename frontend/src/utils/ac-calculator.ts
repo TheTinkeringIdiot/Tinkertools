@@ -9,6 +9,7 @@ import type { TinkerProfile } from '@/lib/tinkerprofiles';
 import { calculateEquipmentBonuses } from '@/services/equipment-bonus-calculator';
 import { calculatePerkBonuses } from '@/services/perk-bonus-calculator';
 import { calculateNanoBonuses } from '@/services/nano-bonus-calculator';
+import { skillService } from '@/services/skill-service';
 
 /**
  * Calculate all AC values for a profile
@@ -46,7 +47,20 @@ export function calculateACValues(profile: TinkerProfile): Record<string, number
       }
 
       if (allPerkItems.length > 0) {
-        perkBonuses = calculatePerkBonuses(allPerkItems);
+        const perkBonusesBySkillId = calculatePerkBonuses(allPerkItems);
+
+        // Convert skill IDs back to skill names for AC lookup
+        perkBonuses = {};
+        for (const [skillIdStr, bonusAmount] of Object.entries(perkBonusesBySkillId)) {
+          const skillId = Number(skillIdStr);
+          try {
+            const skillName = skillService.getName(skillId);
+            perkBonuses[skillName] = bonusAmount;
+          } catch (error) {
+            // Log unknown skill IDs but continue processing
+            console.warn(`Failed to convert skill ID ${skillId} to name in AC calculation:`, error);
+          }
+        }
       }
     } catch (error) {
       console.warn('Failed to calculate perk bonuses for ACs:', error);

@@ -18,7 +18,6 @@
  */
 
 import type { Item, SpellData, Spell } from '@/types/api'
-import { getSkillNameFromStatId } from '@/utils/skill-registry'
 
 // ============================================================================
 // Type Definitions
@@ -27,8 +26,6 @@ import { getSkillNameFromStatId } from '@/utils/skill-registry'
 export interface NanoStatBonus {
   /** STAT ID from game data */
   statId: number
-  /** Human-readable skill name */
-  skillName: string
   /** Bonus amount (can be negative) */
   amount: number
   /** Source nano item for debugging */
@@ -56,7 +53,7 @@ export interface NanoBonusError {
 
 export interface NanoCalculationResult {
   /** Successfully calculated bonuses */
-  bonuses: Record<string, number>
+  bonuses: Record<number, number>
   /** Non-fatal warnings */
   warnings: NanoBonusError[]
   /** Fatal errors */
@@ -156,7 +153,7 @@ class NanoSpellDataCache {
  * Memoization for aggregated nano bonuses calculation
  */
 class NanoBonusAggregationCache {
-  private cache = new Map<string, Record<string, number>>()
+  private cache = new Map<string, Record<number, number>>()
   private maxSize = 50 // Smaller since nano combinations are more limited
 
   private getCacheKey(bonuses: NanoStatBonus[]): string {
@@ -167,12 +164,12 @@ class NanoBonusAggregationCache {
       .join('|')
   }
 
-  get(bonuses: NanoStatBonus[]): Record<string, number> | null {
+  get(bonuses: NanoStatBonus[]): Record<number, number> | null {
     const key = this.getCacheKey(bonuses)
     return this.cache.get(key) || null
   }
 
-  set(bonuses: NanoStatBonus[], result: Record<string, number>): void {
+  set(bonuses: NanoStatBonus[], result: Record<number, number>): void {
     const key = this.getCacheKey(bonuses)
 
     if (this.cache.size >= this.maxSize) {
@@ -208,9 +205,9 @@ export class NanoBonusCalculator {
   /**
    * Calculate nano bonuses for all active buff nano items
    * @param nanos Array of nano items (buffs) to analyze
-   * @returns Record mapping skill names to total bonus amounts
+   * @returns Record mapping skill IDs to total bonus amounts
    */
-  calculateBonuses(nanos: Item[]): Record<string, number> {
+  calculateBonuses(nanos: Item[]): Record<number, number> {
     try {
       const result = this.calculateBonusesWithErrorHandling(nanos)
 
@@ -685,17 +682,10 @@ export class NanoBonusCalculator {
       return null
     }
 
-    // Convert stat ID to skill name
-    const skillName = getSkillNameFromStatId(statId)
-    if (!skillName) {
-      // Log unknown stat IDs for debugging but don't fail
-      console.warn(`Unknown stat ID ${statId} in nano ${nanoName}`)
-      return null
-    }
-
+    // No need to validate stat ID - preserve all nano bonuses for aggregation
+    // The caller can filter based on valid skill IDs if needed
     return {
       statId,
-      skillName,
       amount,
       nanoName,
       nanoAoid,
@@ -889,37 +879,10 @@ export class NanoBonusCalculator {
         return result
       }
 
-      // Convert stat ID to skill name
-      let skillName: string | null
-      try {
-        skillName = getSkillNameFromStatId(statId)
-        if (!skillName) {
-          result.warnings.push({
-            type: 'warning',
-            message: 'Unknown stat ID in nano bonus',
-            details: `Stat ID ${statId} from spell ${spell.spell_id} in nano ${nanoName || 'unknown'} does not map to a known skill`,
-            nanoName,
-            nanoAoid,
-            recoverable: true
-          })
-          return result
-        }
-      } catch (error) {
-        result.warnings.push({
-          type: 'warning',
-          message: 'Failed to convert stat ID to skill name',
-          details: `Error converting stat ID ${statId} to skill name for spell ${spell.spell_id} in nano ${nanoName || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
-          nanoName,
-          nanoAoid,
-          recoverable: true
-        })
-        return result
-      }
-
-      // Successfully parsed
+      // Successfully parsed - no need to validate stat ID
+      // The caller can filter based on valid skill IDs if needed
       result.bonus = {
         statId,
-        skillName,
         amount,
         nanoName,
         nanoAoid
@@ -940,26 +903,27 @@ export class NanoBonusCalculator {
   }
 
   /**
-   * Aggregate stat bonuses by skill name
+   * Aggregate stat bonuses by skill ID
    * @param bonuses Array of individual nano stat bonuses
-   * @returns Record mapping skill names to total bonus amounts
+   * @returns Record mapping skill IDs to total bonus amounts
    */
-  aggregateBonuses(bonuses: NanoStatBonus[]): Record<string, number> {
-    const aggregated: Record<string, number> = {}
+  aggregateBonuses(bonuses: NanoStatBonus[]): Record<number, number> {
+    const aggregated: Record<number, number> = {}
 
     for (const bonus of bonuses) {
-      if (aggregated[bonus.skillName]) {
-        aggregated[bonus.skillName] += bonus.amount
+      if (aggregated[bonus.statId]) {
+        aggregated[bonus.statId] += bonus.amount
       } else {
-        aggregated[bonus.skillName] = bonus.amount
+        aggregated[bonus.statId] = bonus.amount
       }
     }
 
     // Filter out zero bonuses to keep the result clean
-    const filtered: Record<string, number> = {}
-    for (const [skillName, amount] of Object.entries(aggregated)) {
+    const filtered: Record<number, number> = {}
+    for (const [statId, amount] of Object.entries(aggregated)) {
+      const numericStatId = parseInt(statId, 10)
       if (amount !== 0) {
-        filtered[skillName] = amount
+        filtered[numericStatId] = amount
       }
     }
 
@@ -969,7 +933,7 @@ export class NanoBonusCalculator {
   /**
    * Optimized version of aggregateBonuses with memoization
    */
-  private aggregateBonusesOptimized(bonuses: NanoStatBonus[]): Record<string, number> {
+  private aggregateBonusesOptimized(bonuses: NanoStatBonus[]): Record<number, number> {
     // Early return for empty bonuses
     if (bonuses.length === 0) {
       return {}
@@ -1037,9 +1001,9 @@ export const nanoBonusCalculator = new NanoBonusCalculator()
 /**
  * Convenience function to calculate nano bonuses with performance monitoring
  * @param nanos Array of nano items (buffs) to analyze
- * @returns Record mapping skill names to total nano bonuses
+ * @returns Record mapping skill IDs to total nano bonuses
  */
-export function calculateNanoBonuses(nanos: Item[]): Record<string, number> {
+export function calculateNanoBonuses(nanos: Item[]): Record<number, number> {
   try {
     const startTime = performance.now()
     const result = nanoBonusCalculator.calculateBonuses(nanos)
