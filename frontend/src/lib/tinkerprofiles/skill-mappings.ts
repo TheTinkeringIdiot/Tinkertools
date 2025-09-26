@@ -215,5 +215,6 @@ export const SKILL_CATEGORIES: Record<string, string[]> = {
   'Nanos & Casting': ['Matter Creation', 'NanoC Init', 'Psycho Modi', 'Sensory Improvement', 'Time & Space', 'Bio Metamor', 'Matt Metam'],
   'Exploring': ['Vehicle Air', 'Vehicle Ground', 'Vehicle Water', 'Adventuring', 'Run Speed'],
   'Trade & Repair': ['Chemistry', 'Computer Literacy', 'Elec Eng', 'Mech Eng', 'Nano Programming', 'Pharma Tech', 'Quantum FT', 'Tutoring', 'Weapon Smith', 'Break & Entry'],
-  'Combat & Healing': ['Concealment', 'Perception', 'Psychology', 'Treatment', 'First Aid', 'Trap Disarm.']
+  'Combat & Healing': ['Concealment', 'Perception', 'Psychology', 'Treatment', 'First Aid', 'Trap Disarm.'],
+  'Misc': ['% Add. Xp', '% Add. Nano Cost', 'Max NCU', 'Decreased Nano-Interrupt Modifier %', 'SkillLockModifier', 'HealDelta', 'Add All Def.', 'NanoDelta', 'RangeInc. NF', 'RangeInc. Weapon', 'CriticalIncrease', 'Free deck slot', 'Healing Efficiency', 'Add All Off.', 'Add. Proj. Dam.', 'Add. Melee Dam.', 'Add. Energy Dam.', 'Add. Chem. Dam.', 'Add. Rad. Dam.', 'Add. Cold Dam.', 'Add. Fire Dam.', 'Add. Poison Dam.', 'ShieldMeleeAC', 'ShieldProjectileAC', 'ShieldEnergyAC', 'ShieldFireAC', 'ShieldColdAC', 'ShieldChemicalAC', 'ShieldRadiationAC', 'ShieldPoisonAC', 'Direct Nano Damage Efficiency', 'Add. Nano Dam.', 'Scale']
 };

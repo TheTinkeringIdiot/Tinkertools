@@ -27,6 +27,18 @@ export interface SkillWithIP {
   cap?: number;           // Effective skill cap (including equipment and perks for display)
 }
 
+/** Misc skill entry with bonus tracking (no IP system) */
+export interface MiscSkill {
+  // Stored values (persisted to localStorage)
+  baseValue: number;      // Always 0 for Misc skills
+
+  // Computed values (calculated at runtime, never stored)
+  equipmentBonus: number; // Total bonus from all equipped items
+  perkBonus: number;      // Total bonus from all equipped perks
+  buffBonus: number;      // Total bonus from all active nano buffs
+  value: number;          // Calculated total: baseValue + equipmentBonus + perkBonus + buffBonus
+}
+
 /** Comprehensive IP tracking information */
 export interface IPTracker {
   totalAvailable: number;
@@ -105,7 +117,7 @@ export interface TinkerProfile {
     Exploring: Record<string, SkillWithIP>;
     'Trade & Repair': Record<string, SkillWithIP>;
     'Combat & Healing': Record<string, SkillWithIP>;
-    Misc: Record<string, number>; // Misc doesn't use IP tracking
+    Misc: Record<string, MiscSkill>; // Misc uses bonus tracking instead of IP
   };
 
   // Equipment slots

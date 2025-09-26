@@ -18,7 +18,7 @@
  */
 
 import type { Item, SpellData, Spell } from '@/types/api'
-import { getSkillName } from '@/lib/tinkerprofiles/skill-mappings'
+import { getSkillNameFromStatId } from '@/utils/skill-registry'
 
 // ============================================================================
 // Type Definitions
@@ -686,7 +686,7 @@ export class NanoBonusCalculator {
     }
 
     // Convert stat ID to skill name
-    const skillName = getSkillName(statId)
+    const skillName = getSkillNameFromStatId(statId)
     if (!skillName) {
       // Log unknown stat IDs for debugging but don't fail
       console.warn(`Unknown stat ID ${statId} in nano ${nanoName}`)
@@ -892,7 +892,7 @@ export class NanoBonusCalculator {
       // Convert stat ID to skill name
       let skillName: string | null
       try {
-        skillName = getSkillName(statId)
+        skillName = getSkillNameFromStatId(statId)
         if (!skillName) {
           result.warnings.push({
             type: 'warning',

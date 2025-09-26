@@ -270,3 +270,51 @@ When working with TinkerProfiles storage:
 6. **Leverage existing patterns** - follow established conventions
 
 The storage layer is now optimized for scale and performance. When in doubt, prefer individual profile operations over bulk operations.
+
+## Skill System Integration Patterns (September 2025)
+
+### Critical Skill Calculation Patterns
+
+#### AC Values - Pure Calculated Pattern
+```typescript
+// ACs are NEVER stored - always calculated fresh
+// This prevents accumulation bugs from repeated bonus applications
+const acValue = calculateSingleACValue(profile, 'Chemical AC');
+// Result: equipmentBonus + perkBonus + buffBonus (no base value)
+```
+
+#### Misc Skills - Bonus Integration Pattern
+```typescript
+// Misc skills get bonuses applied via ip-integrator updateProfileSkillInfo()
+const miscSkill = profile.Skills.Misc['Max NCU'];
+// Structure: { baseValue: X, equipmentBonus: Y, perkBonus: Z, buffBonus: W, value: total }
+```
+
+#### Regular Skills - Composite Value Pattern
+```typescript
+// Regular skills: base + trickle-down + IP + bonuses
+const skill = profile.Skills['Body & Defense']['Body Dev.'];
+// Components: 5 (base) + trickleDown + pointFromIp + equipmentBonus + perkBonus + buffBonus
+```
+
+### Skill Bonus Application Rules
+
+1. **Never Accumulate Bonuses**: Always recalculate from source data
+2. **Separate Bonus Storage**: Store equipmentBonus, perkBonus, buffBonus separately
+3. **Value Consistency**: Final `value` field is always sum of all components
+4. **AC Special Case**: ACs calculated on-demand, never stored in profile
+5. **Misc Skills**: Apply bonuses using ip-integrator, not direct manipulation
+
+### Pattern Matching for Skills
+```typescript
+// Use skill-patterns.ts for flexible skill name matching
+const skillValue = findSkillByPattern(skillCategory, statId);
+// Handles variations: "1h Blunt" vs "1h Blunt" vs "1hBlunt"
+```
+
+### Critical Files for Skill System
+
+- **`ip-integrator.ts`**: Central hub for all skill calculations and bonus applications
+- **`ac-calculator.ts`**: Pure calculation utility for AC values (no storage)
+- **`skill-patterns.ts`**: Flexible skill name matching via regex patterns
+- **`profile-stats-mapper.ts`**: Profile → stat ID mapping for requirements

@@ -87,11 +87,12 @@ Shows skills in a category with IP cost calculations and interactive value adjus
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, inject, provide } from 'vue';
 import Badge from 'primevue/badge';
 import SkillSlider from './SkillSlider.vue';
 import SkillsGrid from './SkillsGrid.vue';
 import { getSkillStatId } from '@/utils/skill-registry';
+import type { TinkerProfile } from '@/lib/tinkerprofiles';
 
 // Props
 const props = defineProps<{
@@ -111,6 +112,13 @@ const emit = defineEmits<{
   'skill-changed': [category: string, skillName: string, newValue: number];
   'ability-changed': [abilityName: string, newValue: number];
 }>();
+
+// Inject the profile from parent and re-provide for children
+const profile = inject<TinkerProfile>('profile');
+if (profile) {
+  // Re-provide for child components (SkillSlider)
+  provide('profile', profile);
+}
 
 // State
 // Core Abilities and Body & Defense should default to expanded, others collapsed

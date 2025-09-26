@@ -136,18 +136,25 @@ import Button from 'primevue/button';
 import { calcIP, getBreedInitValue, ABILITY_INDEX_TO_STAT_ID } from '@/lib/tinkerprofiles/ip-calculator';
 import { getBreedId } from '@/services/game-utils';
 import { SKILL_COST_FACTORS, BREED_ABILITY_DATA } from '@/services/game-data';
+import type { SkillWithIP, MiscSkill } from '@/lib/tinkerprofiles/types';
+import { calculateSingleACValue } from '@/utils/ac-calculator';
+import { inject } from 'vue';
+import type { TinkerProfile } from '@/lib/tinkerprofiles';
 
 // Props
 const props = defineProps<{
   skillName: string;
-  skillData: any;
+  skillData: SkillWithIP | MiscSkill | null;
   isAbility?: boolean;
   isReadOnly?: boolean;
   category: string;
   breed?: string;
   profession?: string;
-  skillId: number;
+  skillId?: number;
 }>();
+
+// Inject the profile for AC calculation
+const profile = inject<TinkerProfile>('profile');
 
 // Emits
 const emit = defineEmits<{
@@ -194,10 +201,37 @@ const minValue = computed(() => {
   return 0;
 });
 
+// Helper to check if skill is a Misc skill
+const isMiscSkill = computed(() => props.category === 'Misc');
+
 // Core skill value components
-const baseValue = computed(() => props.isAbility ? minValue.value : 5); // Base skill value
-const trickleDownBonus = computed(() => props.skillData?.trickleDown || 0);
-const ipContribution = computed(() => props.skillData?.pointFromIp || 0);
+const baseValue = computed(() => {
+  if (props.isAbility) {
+    return minValue.value;
+  } else if (isMiscSkill.value) {
+    // Misc skills use baseValue directly from the MiscSkill object
+    return (props.skillData as MiscSkill)?.baseValue || 0;
+  } else {
+    // Regular skills have a base value of 5
+    return 5;
+  }
+});
+
+const trickleDownBonus = computed(() => {
+  if (isMiscSkill.value || props.isAbility) {
+    // Misc skills and abilities don't have trickle-down bonuses
+    return 0;
+  }
+  return (props.skillData as SkillWithIP)?.trickleDown || 0;
+});
+
+const ipContribution = computed(() => {
+  if (isMiscSkill.value || props.isAbility) {
+    // Misc skills don't use IP system, abilities handle IP separately
+    return 0;
+  }
+  return (props.skillData as SkillWithIP)?.pointFromIp || 0;
+});
 const equipmentBonus = computed(() => props.skillData?.equipmentBonus || 0);
 const perkBonus = computed(() => props.skillData?.perkBonus || 0);
 const buffBonus = computed(() => props.skillData?.buffBonus || 0);
@@ -224,8 +258,22 @@ const totalValue = computed(() => {
   if (props.isAbility) {
     // For abilities: use the actual value from profile
     return sliderValue.value || 0;
+  } else if (props.category === 'ACs') {
+    // For ACs: calculate value on-the-fly from bonuses
+    if (profile) {
+      return calculateSingleACValue(profile, props.skillName);
+    }
+    return 0;
+  } else if (isMiscSkill.value) {
+    // For Misc skills: calculate total from all bonuses
+    // The value property should be set by ip-integrator, but calculate as fallback
+    if (props.skillData?.value !== undefined) {
+      return props.skillData.value;
+    }
+    // Fallback: calculate from individual bonuses
+    return baseValue.value + equipmentBonus.value + perkBonus.value + buffBonus.value;
   } else {
-    // For skills: use the total value from skill data directly
+    // For regular skills: use the total value from skill data directly
     return props.skillData?.value || 0;
   }
 });
@@ -236,13 +284,26 @@ const valueBreakdown = computed(() => {
     const breedBase = minValue.value;
     const improvements = Math.max(0, totalValue.value - breedBase);
     return `Breed Base: ${breedBase} + Improvements: ${improvements} = ${totalValue.value}`;
+  } else if (isMiscSkill.value) {
+    // Misc skills only show base + bonuses (no trickle-down or IP)
+    return `Base: ${baseValue.value} + Equipment: ${equipmentBonus.value} + Perks: ${perkBonus.value} + Buffs: ${buffBonus.value} = ${totalValue.value}`;
   } else {
     return `Base: ${baseValue.value} + Trickle-down: ${trickleDownBonus.value} + IP: ${ipContribution.value} = ${totalValue.value}`;
   }
 });
 
 const showBreakdown = computed(() => {
-  return !props.isAbility && (trickleDownBonus.value > 0 || ipContribution.value > 0 || equipmentBonus.value !== 0 || perkBonus.value !== 0 || buffBonus.value !== 0);
+  if (props.isAbility) {
+    return false;
+  }
+
+  if (isMiscSkill.value) {
+    // For Misc skills, show breakdown if any bonuses are present
+    return equipmentBonus.value !== 0 || perkBonus.value !== 0 || buffBonus.value !== 0;
+  }
+
+  // For regular skills, show breakdown if any components are present
+  return trickleDownBonus.value > 0 || ipContribution.value > 0 || equipmentBonus.value !== 0 || perkBonus.value !== 0 || buffBonus.value !== 0;
 });
 
 // Simple tooltip content for PrimeVue v-tooltip directive
@@ -267,7 +328,23 @@ const simpleTooltipContent = computed(() => {
 
     const breakdown = parts.join('\n');
     return `${props.skillName} Breakdown:\n${breakdown}\nTotal: ${totalValue.value}`;
+  } else if (isMiscSkill.value) {
+    // Tooltip for Misc skills (no trickle-down or IP)
+    const parts = [`Base: ${baseValue.value}`];
+    if (equipmentBonus.value !== 0) {
+      parts.push(`Equipment: ${equipmentBonus.value > 0 ? '+' : ''}${equipmentBonus.value}`);
+    }
+    if (perkBonus.value !== 0) {
+      parts.push(`Perks: ${perkBonus.value > 0 ? '+' : ''}${perkBonus.value}`);
+    }
+    if (buffBonus.value !== 0) {
+      parts.push(`Buffs: ${buffBonus.value > 0 ? '+' : ''}${buffBonus.value}`);
+    }
+
+    const breakdown = parts.join('\n');
+    return `${props.skillName} Breakdown:\n${breakdown}\nTotal: ${totalValue.value}`;
   } else {
+    // Tooltip for regular skills
     const parts = [`Base: ${baseValue.value}`];
     if (trickleDownBonus.value > 0) parts.push(`Trickle-down: +${trickleDownBonus.value}`);
     if (equipmentBonus.value !== 0) {
@@ -324,10 +401,10 @@ const maxValue = computed(() => {
 });
 
 const ipCost = computed(() => {
-  if (props.isAbility || props.category === 'Misc') {
-    return 0; // Misc doesn't track IP
+  if (props.isAbility || isMiscSkill.value) {
+    return 0; // Abilities and Misc don't track IP
   }
-  return props.skillData?.ipSpent || 0;
+  return (props.skillData as SkillWithIP)?.ipSpent || 0;
 });
 
 
@@ -456,7 +533,13 @@ function setToMax() {
 
 // Watchers
 // For abilities: watch the value field, for skills: watch the value field too (not pointFromIp)
-watch(() => props.skillData?.value, (newValue, oldValue) => {
+// For ACs: watch the skillData itself since it's a number
+watch(() => {
+  if (props.category === 'ACs') {
+    return props.skillData; // AC values are simple numbers
+  }
+  return props.skillData?.value; // Other skills have a value property
+}, (newValue, oldValue) => {
   if (newValue !== undefined) {
     // Always update on initial load (oldValue is undefined) or when not interacting
     const isInitialLoad = oldValue === undefined;
@@ -465,6 +548,9 @@ watch(() => props.skillData?.value, (newValue, oldValue) => {
         // For abilities: the value directly represents the ability score
         sliderValue.value = Math.max(newValue, minValue.value);
         inputValue.value = sliderValue.value;
+      } else if (props.category === 'ACs') {
+        // For ACs: the value is the total AC value with all bonuses
+        // ACs are read-only so we don't need to update sliders
       } else {
         // For skills: the value represents the total skill value, 
         // we need to calculate the IP portion for the slider

@@ -1,12 +1,13 @@
 /**
  * Profile Stats Mapper
- * 
+ *
  * Converts TinkerProfile structure to a flat stat ID → value map
  * for requirements checking against items and actions
  */
 
 import type { TinkerProfile } from '@/types/api'
 import { PROFESSION, BREED } from '@/services/game-data'
+import { findSkillByPattern } from './skill-patterns'
 
 /**
  * Maps a TinkerProfile to a flat record of stat ID → value
@@ -62,43 +63,43 @@ export function mapProfileToStats(profile: TinkerProfile): Record<number, number
   // ============================================================================
   // Combat Skills - Melee Weapons
   // ============================================================================
-  
-  // Map melee weapon skills from profile skill names to stat IDs
+
+  // Map melee weapon skills using pattern matching for flexibility
   const meleeSkills = profile.Skills['Melee Weapons'] || {}
-  stats[102] = meleeSkills['1h Blunt']?.value || 1  // 1hBlunt
-  stats[103] = meleeSkills['1h Edged']?.value || 1  // 1hEdged  
-  stats[105] = meleeSkills['2h Edged']?.value || 1  // 2hEdged
-  stats[107] = meleeSkills['2h Blunt']?.value || 1  // 2hBlunt
-  stats[106] = meleeSkills['Piercing']?.value || 1  // Piercing
-  stats[104] = meleeSkills['Melee Ener.']?.value || 1  // MeleeEnergy
-  stats[100] = meleeSkills['Martial Arts']?.value || 1  // MartialArts
-  stats[101] = meleeSkills['Mult. Melee']?.value || 1  // MultiMelee
+  stats[102] = findSkillByPattern(meleeSkills, 102) || 1  // 1hBlunt
+  stats[103] = findSkillByPattern(meleeSkills, 103) || 1  // 1hEdged
+  stats[105] = findSkillByPattern(meleeSkills, 105) || 1  // 2hEdged
+  stats[107] = findSkillByPattern(meleeSkills, 107) || 1  // 2hBlunt
+  stats[106] = findSkillByPattern(meleeSkills, 106) || 1  // Piercing
+  stats[104] = findSkillByPattern(meleeSkills, 104) || 1  // MeleeEnergy
+  stats[100] = findSkillByPattern(meleeSkills, 100) || 1  // MartialArts
+  stats[101] = findSkillByPattern(meleeSkills, 101) || 1  // MultiMelee
   
   // ============================================================================
   // Combat Skills - Ranged Weapons  
   // ============================================================================
   
   const rangedSkills = profile.Skills['Ranged Weapons'] || {}
-  stats[108] = rangedSkills['Sharp Obj']?.value || 1  // SharpObjects
-  stats[109] = rangedSkills['Bow']?.value || 1  // Bow
-  stats[112] = rangedSkills['Pistol']?.value || 1  // Pistol
-  stats[113] = rangedSkills['Assault Rif']?.value || 1  // AssaultRif
-  stats[115] = rangedSkills['MG / SMG']?.value || 1  // MG_SMG
-  stats[116] = rangedSkills['Shotgun']?.value || 1  // Shotgun
-  stats[117] = rangedSkills['Rifle']?.value || 1  // Rifle
-  stats[133] = rangedSkills['Ranged Ener']?.value || 1  // RangedEnergy
-  stats[118] = rangedSkills['Grenade']?.value || 1  // Grenade
-  stats[119] = rangedSkills['Heavy Weapons']?.value || 1  // HeavyWeapons
-  stats[229] = rangedSkills['Multi Ranged']?.value || 1  // MultiRanged
+  stats[108] = findSkillByPattern(rangedSkills, 108) || 1  // SharpObjects
+  stats[109] = findSkillByPattern(rangedSkills, 109) || 1  // Bow
+  stats[112] = findSkillByPattern(rangedSkills, 112) || 1  // Pistol
+  stats[113] = findSkillByPattern(rangedSkills, 113) || 1  // AssaultRif
+  stats[115] = findSkillByPattern(rangedSkills, 115) || 1  // MG_SMG
+  stats[116] = findSkillByPattern(rangedSkills, 116) || 1  // Shotgun
+  stats[117] = findSkillByPattern(rangedSkills, 117) || 1  // Rifle
+  stats[133] = findSkillByPattern(rangedSkills, 133) || 1  // RangedEnergy
+  stats[118] = findSkillByPattern(rangedSkills, 118) || 1  // Grenade
+  stats[119] = findSkillByPattern(rangedSkills, 119) || 1  // HeavyWeapons
+  stats[229] = findSkillByPattern(rangedSkills, 229) || 1  // MultiRanged
   
   // ============================================================================
   // Initiative Skills
   // ============================================================================
   
-  stats[111] = rangedSkills['Ranged. Init.']?.value || 1  // RangedInit
-  stats[120] = meleeSkills['Melee. Init.']?.value || 1  // MeleeInit
-  stats[121] = meleeSkills['Physic. Init']?.value || 1  // PhysicalInit
-  stats[122] = profile.Skills['Nanos & Casting']?.['NanoC. Init.']?.value || 1  // NanoCInit
+  stats[111] = findSkillByPattern(rangedSkills, 111) || 1  // RangedInit
+  stats[120] = findSkillByPattern(meleeSkills, 120) || 1  // MeleeInit
+  stats[121] = findSkillByPattern(meleeSkills, 121) || 1  // PhysicalInit
+  stats[122] = findSkillByPattern(profile.Skills['Nanos & Casting'] || {}, 122) || 1  // NanoCInit
   
   // ============================================================================
   // Special Attack Skills
@@ -106,98 +107,99 @@ export function mapProfileToStats(profile: TinkerProfile): Record<number, number
   
   const rangedSpecials = profile.Skills['Ranged Specials'] || {}
   const meleeSpecials = profile.Skills['Melee Specials'] || {}
-  
-  stats[134] = rangedSpecials['Fling Shot']?.value || 1  // FlingShot
-  stats[148] = rangedSpecials['Aimed Shot']?.value || 1  // AimedShot
-  stats[150] = rangedSpecials['Bow Spc Att']?.value || 1  // BowSpecialAttack
-  stats[140] = rangedSpecials['Burst']?.value || 1  // Burst
-  stats[167] = rangedSpecials['Full Auto']?.value || 1  // FullAuto
-  
-  stats[142] = meleeSpecials['Fast Attack']?.value || 1  // FastAttack
-  stats[144] = meleeSpecials['Sneak Atck']?.value || 1  // SneakAttack
-  stats[146] = meleeSpecials['Riposte']?.value || 1  // Riposte
-  stats[154] = meleeSpecials['Dimach']?.value || 1  // Dimach
-  stats[151] = meleeSpecials['Brawling']?.value || 1  // Brawling
+
+  stats[134] = findSkillByPattern(rangedSpecials, 134) || 1  // FlingShot
+  stats[148] = findSkillByPattern(rangedSpecials, 148) || 1  // AimedShot
+  stats[150] = findSkillByPattern(rangedSpecials, 150) || 1  // BowSpecialAttack
+  stats[140] = findSkillByPattern(rangedSpecials, 140) || 1  // Burst
+  stats[167] = findSkillByPattern(rangedSpecials, 167) || 1  // FullAuto
+
+  stats[142] = findSkillByPattern(meleeSpecials, 142) || 1  // FastAttack
+  stats[144] = findSkillByPattern(meleeSpecials, 144) || 1  // SneakAttack
+  stats[146] = findSkillByPattern(meleeSpecials, 146) || 1  // Riposte
+  stats[154] = findSkillByPattern(meleeSpecials, 154) || 1  // Dimach
+  stats[151] = findSkillByPattern(meleeSpecials, 151) || 1  // Brawling
   
   // ============================================================================
   // Nano & Casting Skills
   // ============================================================================
   
   const nanoSkills = profile.Skills['Nanos & Casting'] || {}
-  stats[130] = nanoSkills['Matter Crea']?.value || 1  // MaterialCreation
-  stats[131] = nanoSkills['Bio Metamor']?.value || 1  // BiologicalMetamorphosis  
-  stats[132] = nanoSkills['Matt. Metam']?.value || 1  // MatterMetamorphosis
-  stats[123] = nanoSkills['Psycho Modi']?.value || 1  // PsychologicalModifications
-  stats[124] = nanoSkills['Sensory Impr']?.value || 1  // SensoryImprovement
-  stats[125] = nanoSkills['Time&Space']?.value || 1  // TimeAndSpace
+  stats[130] = findSkillByPattern(nanoSkills, 130) || 1  // MaterialCreation
+  stats[131] = findSkillByPattern(nanoSkills, 131) || 1  // BiologicalMetamorphosis
+  stats[132] = findSkillByPattern(nanoSkills, 132) || 1  // MatterMetamorphosis
+  stats[123] = findSkillByPattern(nanoSkills, 123) || 1  // PsychologicalModifications
+  stats[124] = findSkillByPattern(nanoSkills, 124) || 1  // SensoryImprovement
+  stats[125] = findSkillByPattern(nanoSkills, 125) || 1  // TimeAndSpace
   
   // ============================================================================
   // Trade & Repair Skills
   // ============================================================================
   
   const tradeSkills = profile.Skills['Trade & Repair'] || {}
-  stats[125] = tradeSkills['Mech. Engi']?.value || 1  // MechanicalEngineering
-  stats[126] = tradeSkills['Elec. Engi']?.value || 1  // ElectricalEngineering
-  stats[157] = tradeSkills['Quantum FT']?.value || 1  // QuantumFT
-  stats[159] = tradeSkills['Weapon Smt']?.value || 1  // WeaponSmithing
-  stats[160] = tradeSkills['Pharma Tech']?.value || 1  // PharmaTech
-  stats[161] = tradeSkills['Comp. Liter']?.value || 1  // ComputerLiteracy
-  stats[162] = tradeSkills['Chemistry']?.value || 1  // Chemistry
-  stats[163] = tradeSkills['Nano Progra']?.value || 1  // NanoProgramming
-  stats[141] = tradeSkills['Tutoring']?.value || 1  // Tutoring
-  stats[135] = tradeSkills['Break&Entry']?.value || 1  // BreakAndEntry
+  stats[125] = findSkillByPattern(tradeSkills, 125) || 1  // MechanicalEngineering
+  stats[126] = findSkillByPattern(tradeSkills, 126) || 1  // ElectricalEngineering
+  stats[157] = findSkillByPattern(tradeSkills, 157) || 1  // QuantumFT
+  stats[159] = findSkillByPattern(tradeSkills, 159) || 1  // WeaponSmithing
+  stats[160] = findSkillByPattern(tradeSkills, 160) || 1  // PharmaTech
+  stats[161] = findSkillByPattern(tradeSkills, 161) || 1  // ComputerLiteracy
+  stats[162] = findSkillByPattern(tradeSkills, 162) || 1  // Chemistry
+  stats[163] = findSkillByPattern(tradeSkills, 163) || 1  // NanoProgramming
+  stats[141] = findSkillByPattern(tradeSkills, 141) || 1  // Tutoring
+  stats[135] = findSkillByPattern(tradeSkills, 135) || 1  // BreakAndEntry
   
   // ============================================================================
   // Combat & Healing Skills
   // ============================================================================
   
   const combatSkills = profile.Skills['Combat & Healing'] || {}
-  stats[123] = combatSkills['First Aid']?.value || 1  // FirstAid
-  stats[124] = combatSkills['Treatment']?.value || 1  // Treatment
-  stats[129] = combatSkills['Psychology']?.value || 1  // Psychology
-  stats[153] = combatSkills['Concealment']?.value || 1  // Concealment
-  stats[156] = combatSkills['Perception']?.value || 1  // Perception
-  stats[135] = combatSkills['Trap Disarm.']?.value || 1  // TrapDisarm
+  stats[123] = findSkillByPattern(combatSkills, 123) || 1  // FirstAid
+  stats[124] = findSkillByPattern(combatSkills, 124) || 1  // Treatment
+  stats[129] = findSkillByPattern(combatSkills, 129) || 1  // Psychology
+  stats[153] = findSkillByPattern(combatSkills, 153) || 1  // Concealment
+  stats[156] = findSkillByPattern(combatSkills, 156) || 1  // Perception
+  stats[135] = findSkillByPattern(combatSkills, 135) || 1  // TrapDisarm
   
   // ============================================================================
   // Body & Defense Skills
   // ============================================================================
   
   const bodySkills = profile.Skills['Body & Defense'] || {}
-  stats[152] = bodySkills['Body Dev.']?.value || 1  // BodyDevelopment
-  stats[164] = bodySkills['Nano Pool']?.value || 1  // NanoPool
-  stats[168] = bodySkills['Nano Resist']?.value || 1  // NanoResist
-  stats[155] = bodySkills['Dodge-Rng']?.value || 1  // DodgeRanged
-  stats[156] = bodySkills['Evade-ClsC']?.value || 1  // EvadeCloseC
-  stats[165] = bodySkills['Duck-Exp']?.value || 1  // DuckExp
-  stats[166] = bodySkills['Deflect']?.value || 1  // Deflect
+  stats[152] = findSkillByPattern(bodySkills, 152) || 1  // BodyDevelopment
+  stats[164] = findSkillByPattern(bodySkills, 164) || 1  // NanoPool
+  stats[168] = findSkillByPattern(bodySkills, 168) || 1  // NanoResist
+  stats[155] = findSkillByPattern(bodySkills, 155) || 1  // DodgeRanged
+  stats[156] = findSkillByPattern(bodySkills, 156) || 1  // EvadeCloseC
+  stats[165] = findSkillByPattern(bodySkills, 165) || 1  // DuckExp
+  stats[166] = findSkillByPattern(bodySkills, 166) || 1  // Deflect
   
   // ============================================================================
   // AC Skills
   // ============================================================================
-  
+
   const acSkills = profile.Skills.ACs || {}
-  stats[90] = acSkills['Imp/Proj AC'] || 1  // ProjectileAC
-  stats[91] = acSkills['Melee/ma AC'] || 1  // MeleeAC
-  stats[92] = acSkills['Energy AC'] || 1  // EnergyAC
-  stats[93] = acSkills['Chemical AC'] || 1  // ChemicalAC
-  stats[94] = acSkills['Radiation AC'] || 1  // RadiationAC
-  stats[95] = acSkills['Cold AC'] || 1  // ColdAC
-  stats[96] = acSkills['Poison AC'] || 1  // PoisonAC
-  stats[97] = acSkills['Fire AC'] || 1  // FireAC
-  stats[98] = acSkills['Disease AC'] || 1  // DiseaseAC
+  stats[90] = findSkillByPattern(acSkills, 90) || 1  // ProjectileAC
+  stats[91] = findSkillByPattern(acSkills, 91) || 1  // MeleeAC
+  stats[92] = findSkillByPattern(acSkills, 92) || 1  // EnergyAC
+  stats[93] = findSkillByPattern(acSkills, 93) || 1  // ChemicalAC
+  stats[94] = findSkillByPattern(acSkills, 94) || 1  // RadiationAC
+  stats[95] = findSkillByPattern(acSkills, 95) || 1  // ColdAC
+  stats[96] = findSkillByPattern(acSkills, 96) || 1  // PoisonAC
+  stats[97] = findSkillByPattern(acSkills, 97) || 1  // FireAC
+  stats[98] = findSkillByPattern(acSkills, 98) || 1  // DiseaseAC
   
   // ============================================================================
   // Exploring Skills
   // ============================================================================
   
   const exploringSkills = profile.Skills.Exploring || {}
-  stats[138] = exploringSkills['Adventuring']?.value || 1  // Adventuring
-  stats[139] = exploringSkills['Swimming']?.value || 1  // Swimming
-  stats[166] = exploringSkills['Run Speed']?.value || 1  // RunSpeed
-  stats[139] = exploringSkills['Vehicle Air']?.value || 1  // VehicleAir
-  stats[166] = exploringSkills['Vehicle Ground']?.value || 1  // VehicleGround
-  stats[167] = exploringSkills['Vehicle Water']?.value || 1  // VehicleWater
+  stats[138] = findSkillByPattern(exploringSkills, 138) || 1  // Adventuring
+  stats[139] = findSkillByPattern(exploringSkills, 139) || 1  // Swimming
+  stats[166] = findSkillByPattern(exploringSkills, 166) || 1  // RunSpeed
+  // Note: Vehicle skills might have overlapping stat IDs - needs verification
+  stats[139] = findSkillByPattern(exploringSkills, 139) || 1  // VehicleAir
+  stats[166] = findSkillByPattern(exploringSkills, 166) || 1  // VehicleGround
+  stats[167] = findSkillByPattern(exploringSkills, 167) || 1  // VehicleWater
   
   // ============================================================================
   // Misc Skills (these are raw numbers, not SkillWithIP)
@@ -206,12 +208,69 @@ export function mapProfileToStats(profile: TinkerProfile): Record<number, number
   const miscSkills = profile.Skills.Misc || {}
   // Just copy the values directly since Misc uses raw numbers
   Object.entries(miscSkills).forEach(([skillName, value]) => {
-    // Map misc skill names to stat IDs if needed
-    // For now, we'll handle the common ones
-    if (skillName === 'Max NCU' && typeof value === 'number') {
-      stats[181] = value  // MaxNCU
+    // Map misc skill names to stat IDs
+    if (typeof value === 'number') {
+      switch(skillName) {
+        case 'Max NCU':
+          stats[181] = value;  // MaxNCU
+          break;
+        case 'Add All Off.':
+          stats[276] = value;  // AddAllOffense
+          break;
+        case 'Add All Def.':
+          stats[277] = value;  // AddAllDefense
+          break;
+        case 'Add. Proj. Dam.':
+          stats[278] = value;  // ProjectileDamageModifier
+          break;
+        case 'Add. Melee Dam.':
+          stats[279] = value;  // MeleeDamageModifier
+          break;
+        case 'Add. Energy Dam.':
+          stats[280] = value;  // EnergyDamageModifier
+          break;
+        case 'Add. Chem. Dam.':
+          stats[281] = value;  // ChemicalDamageModifier
+          break;
+        case 'Add. Rad. Dam.':
+          stats[282] = value;  // RadiationDamageModifier
+          break;
+        case 'Add. Cold Dam.':
+          stats[311] = value;  // ColdDamageModifier
+          break;
+        case 'Add. Fire Dam.':
+          stats[316] = value;  // FireDamageModifier
+          break;
+        case 'Add. Poison Dam.':
+          stats[317] = value;  // PoisonDamageModifier
+          break;
+        case 'Add. Nano Dam.':
+          stats[315] = value;  // NanoDamageModifier
+          break;
+        case '% Add. Xp':
+          stats[319] = value;  // XPModifier
+          break;
+        case '% Add. Nano Cost':
+          stats[318] = value;  // NanoCost
+          break;
+        case 'HealDelta':
+          stats[343] = value;  // HealDelta
+          break;
+        case 'NanoDelta':
+          stats[364] = value;  // NanoDelta
+          break;
+        case 'RangeInc. NF':
+          stats[381] = value;  // NanoRange
+          break;
+        case 'RangeInc. Weapon':
+          stats[287] = value;  // AttackRange
+          break;
+        case 'CriticalIncrease':
+          stats[379] = value;  // CriticalIncrease
+          break;
+        // Add more mappings as needed
+      }
     }
-    // Add more misc mappings as needed
   })
   
   return stats

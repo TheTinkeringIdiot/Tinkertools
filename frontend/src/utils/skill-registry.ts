@@ -102,7 +102,56 @@ export const SKILL_REGISTRY: Record<string, number> = {
   'Psychology': 162,
   'Treatment': 124,
   'First Aid': 123, // FirstAid in STAT enum
-  'Trap Disarm.': 135 // TrapDisarm in STAT enum
+  'Trap Disarm.': 135, // TrapDisarm in STAT enum
+
+  // Regular ACs (Armor Class)
+  'Imp/Proj AC': 90, // ProjectileAC in STAT enum
+  'Melee/ma AC': 91, // MeleeAC in STAT enum
+  'Energy AC': 92, // EnergyAC in STAT enum
+  'Chemical AC': 93, // ChemicalAC in STAT enum
+  'Radiation AC': 94, // RadiationAC in STAT enum
+  'Cold AC': 95, // ColdAC in STAT enum
+  'Disease AC': 96, // PoisonAC in STAT enum
+  'Fire AC': 97, // FireAC in STAT enum
+
+  // Shield ACs
+  'Shield Projectile AC': 226, // ShieldProjectileAC in STAT enum
+  'Shield Melee AC': 227, // ShieldMeleeAC in STAT enum
+  'Shield Energy AC': 228, // ShieldEnergyAC in STAT enum
+  'Shield Chemical AC': 229, // ShieldChemicalAC in STAT enum
+  'Shield Radiation AC': 230, // ShieldRadiationAC in STAT enum
+  'Shield Cold AC': 231, // ShieldColdAC in STAT enum
+  'Shield Nano AC': 232, // ShieldNanoAC in STAT enum
+  'Shield Fire AC': 233, // ShieldFireAC in STAT enum
+  'Shield Poison AC': 234, // ShieldPoisonAC in STAT enum
+
+  // Reflect ACs
+  'Reflect Projectile AC': 205, // ReflectProjectileAC in STAT enum
+  'Reflect Melee AC': 206, // ReflectMeleeAC in STAT enum
+  'Reflect Energy AC': 207, // ReflectEnergyAC in STAT enum
+  'Reflect Chemical AC': 208, // ReflectChemicalAC in STAT enum
+  'Reflect Radiation AC': 216, // ReflectRadiationAC in STAT enum
+  'Reflect Cold AC': 217, // ReflectColdAC in STAT enum
+  'Reflect Nano AC': 218, // ReflectNanoAC in STAT enum
+  'Reflect Fire AC': 219, // ReflectFireAC in STAT enum
+  'Reflect Poison AC': 225, // ReflectPoisonAC in STAT enum
+
+  // Misc Stats
+  'Max Health': 1, // MaxHealth in STAT enum
+  'Max NCU': 181, // MaxNCU in STAT enum
+  'Ranged Energy': 133, // RangedEnergy in STAT enum
+  'Add All Offense': 276, // AddAllOffense in STAT enum
+  'Add All Defense': 277, // AddAllDefense in STAT enum
+
+  // Damage Modifiers
+  'Projectile Damage Modifier': 278, // ProjectileDamageModifier in STAT enum
+  'Melee Damage Modifier': 279, // MeleeDamageModifier in STAT enum
+  'Energy Damage Modifier': 280, // EnergyDamageModifier in STAT enum
+  'Chemical Damage Modifier': 281, // ChemicalDamageModifier in STAT enum
+  'Radiation Damage Modifier': 282, // RadiationDamageModifier in STAT enum
+  'Cold Damage Modifier': 311, // ColdDamageModifier in STAT enum
+  'Fire Damage Modifier': 316, // FireDamageModifier in STAT enum
+  'Poison Damage Modifier': 317 // PoisonDamageModifier in STAT enum
 };
 
 /**

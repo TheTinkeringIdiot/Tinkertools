@@ -119,7 +119,7 @@ Shows base value, trickle-down, equipment bonuses, IP improvements, and total
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { SkillWithIP } from '@/lib/tinkerprofiles/types';
+import type { SkillWithIP, MiscSkill } from '@/lib/tinkerprofiles/types';
 
 // Props
 const props = defineProps<{
@@ -127,7 +127,7 @@ const props = defineProps<{
   skillData: SkillWithIP & {
     equipmentBonus?: number;
     baseValue?: number;
-  };
+  } | MiscSkill;
   isAbility?: boolean;
   category?: string;
   breed?: string;
@@ -139,15 +139,22 @@ const baseValue = computed(() => {
     // For abilities, baseValue from backend includes breed base + IP improvements (no equipment)
     // We want to show just the breed base here, so subtract pointFromIp
     const fullBase = props.skillData.baseValue ?? props.skillData.value;
-    const improvements = props.skillData.pointFromIp ?? 0;
+    const improvements = (props.skillData as any).pointFromIp ?? 0;
     return Math.max(0, fullBase - improvements);
+  } else if (isMiscSkill.value) {
+    // For Misc skills, baseValue is always 0
+    return props.skillData.baseValue ?? 0;
   } else {
-    // For skills, base value is typically 5, or use provided baseValue
+    // For regular skills, base value is typically 5, or use provided baseValue
     return props.skillData.baseValue ?? 5;
   }
 });
 
-const trickleDownBonus = computed(() => props.skillData.trickleDown ?? 0);
+const trickleDownBonus = computed(() => {
+  // Misc skills never have trickle-down bonuses
+  if (isMiscSkill.value) return 0;
+  return (props.skillData as any).trickleDown ?? 0;
+});
 
 const equipmentBonus = computed(() => props.skillData.equipmentBonus ?? 0);
 
@@ -155,7 +162,11 @@ const perkBonus = computed(() => props.skillData.perkBonus ?? 0);
 
 const buffBonus = computed(() => props.skillData.buffBonus ?? 0);
 
-const ipContribution = computed(() => props.skillData.pointFromIp ?? 0);
+const ipContribution = computed(() => {
+  // Misc skills never have IP contributions
+  if (isMiscSkill.value) return 0;
+  return (props.skillData as any).pointFromIp ?? 0;
+});
 
 const abilityImprovements = computed(() => {
   if (props.isAbility) {
