@@ -46,7 +46,7 @@ npm run build
 # Setup virtual environment
 python -m venv backend/venv
 source backend/venv/bin/activate  # Linux/Mac
-backend\venv\Scripts\activate     # Windows
+DATABASE_URL is in .env.claude. The `source` command does not export it. 
 
 # Install dependencies
 pip install -r backend/requirements.txt
@@ -148,6 +148,7 @@ The database follows a legacy-compatible design with:
 3. **Client-Side User Data**: Privacy-first approach with no server-side user data
 4. **Legacy Data Compatibility**: Schema designed to match existing Django model structure
 5. **TypeScript Strict Mode**: Enforced for better type safety and maintainability
+6. **Skills are IDs**: All front end skills are stored and used as ID numbers for everything but display
 
 ## Working with the Codebase
 
