@@ -1240,23 +1240,38 @@ export function getWeaponSlotPosition(slotName: string): { row: number; col: num
     'Hud1': { row: 1, col: 1 },
     'Hud2': { row: 1, col: 2 },
     'Hud3': { row: 1, col: 3 },
+    'HUD1': { row: 1, col: 1 },
+    'HUD2': { row: 1, col: 2 },
+    'HUD3': { row: 1, col: 3 },
     'Utils1': { row: 2, col: 1 },
-    'Util1': { row: 2, col: 1 }, // Alternative name
+    'Util1': { row: 2, col: 1 },
+    'UTILS1': { row: 2, col: 1 },
     'Utils2': { row: 2, col: 2 },
-    'Util2': { row: 2, col: 2 }, // Alternative name
+    'Util2': { row: 2, col: 2 },
+    'UTILS2': { row: 2, col: 2 },
     'Utils3': { row: 2, col: 3 },
-    'Util3': { row: 2, col: 3 }, // Alternative name
+    'Util3': { row: 2, col: 3 },
+    'UTILS3': { row: 2, col: 3 },
     'LeftHand': { row: 3, col: 1 },
+    'LHand': { row: 3, col: 1 },
     'RightHand': { row: 3, col: 3 },
-    'Deck': { row: 4, col: 2 },
+    'RHand': { row: 3, col: 3 },
+    'Deck': { row: 3, col: 2 },
+    'Waist': { row: 3, col: 2 },
     'Deck1': { row: 4, col: 1 },
+    'NCU1': { row: 4, col: 1 },
     'Deck2': { row: 4, col: 2 },
+    'NCU2': { row: 4, col: 2 },
     'Deck3': { row: 4, col: 3 },
+    'NCU3': { row: 4, col: 3 },
     'Deck4': { row: 5, col: 1 },
+    'NCU4': { row: 5, col: 1 },
     'Deck5': { row: 5, col: 2 },
-    'Deck6': { row: 5, col: 3 }
+    'NCU5': { row: 5, col: 2 },
+    'Deck6': { row: 5, col: 3 },
+    'NCU6': { row: 5, col: 3 }
   };
-  
+
   return positions[slotName] || { row: 1, col: 1 };
 }
 
