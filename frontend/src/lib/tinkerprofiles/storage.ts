@@ -27,9 +27,6 @@ export class ProfileStorage {
 
     // Clean up legacy backup data on initialization
     this.cleanupLegacyBackups();
-
-    // Migrate from old storage format if needed
-    this.migrateFromLegacyStorage();
   }
   
   // ============================================================================
@@ -41,17 +38,17 @@ export class ProfileStorage {
    * v4.0.0 stores computed totals and uses flat skill ID structure
    */
   private prepareProfileForSerialization(profile: TinkerProfile): TinkerProfile {
+    // Validate version before serialization
+    if (profile.version !== '4.0.0') {
+      throw new Error(`Cannot serialize profile version ${profile.version}. Only v4.0.0 supported.`);
+    }
+
     // Convert Vue proxy to raw object first, then create a deep clone
     const rawProfile = toRaw(profile);
     const prepared = structuredClone(rawProfile);
 
-    // Set version to 4.0.0
-    prepared.version = '4.0.0';
-
-    // v4.0.0 stores computed totals - no stripping needed
-    // Skills should already be in flat ID-based format by this point
-    // Equipment, perks, and buffs structures remain unchanged
-
+    // Trust that profile is correct v4.0.0 format
+    // No defensive property deletion needed
     return prepared;
   }
 
@@ -103,25 +100,10 @@ export class ProfileStorage {
         profile = JSON.parse(data);
       }
 
-      // Validate profile version - only v4.0.0 supported
+      // Strict v4.0.0 validation
       if (!profile.version || profile.version !== '4.0.0') {
-        throw new Error(`
-Profile version validation failed.
-
-Profile ID: ${profileId}
-Found version: ${profile.version || 'undefined'}
-Required version: 4.0.0
-
-This profile cannot be loaded as it uses an unsupported format.
-v4.0.0 uses ID-based skill storage for improved performance and reliability.
-
-Action required: This profile needs to be recreated or imported from AOSetups format.
-`);
+        throw new Error(`Profile version ${profile.version || 'unknown'} not supported. Only v4.0.0 profiles can be loaded.`);
       }
-
-      // v4.0.0 profiles store computed totals - no recalculation needed during load
-      // Skills are in flat ID-based format, computed values are already present
-      // Profile is ready to use immediately
 
       return profile;
     } catch (error) {
@@ -252,74 +234,6 @@ Action required: This profile needs to be recreated or imported from AOSetups fo
   }
   
 
-  // ============================================================================
-  // Migration
-  // ============================================================================
-  
-  /**
-   * Migration is disabled for v4.0.0 - breaking change requires recreation
-   */
-  private async migrateProfile(profile: TinkerProfile): Promise<TinkerProfile> {
-    // v4.0.0 is a breaking change - no automatic migration from v3.0.0
-    // Users must recreate profiles or import from AOSetups format
-
-    if (profile.version !== '4.0.0') {
-      throw new Error(`
-Profile migration not supported.
-
-Profile version: ${profile.version || 'undefined'}
-Target version: 4.0.0
-
-v4.0.0 introduces ID-based skill storage which is not compatible with previous versions.
-Automatic migration is not provided due to the architectural changes required.
-
-Options:
-1. Recreate the profile manually
-2. Import from AOSetups format (if available)
-3. Use export data to rebuild the profile
-
-This ensures data integrity and optimal performance with the new skill system.
-`);
-    }
-
-    return profile;
-  }
-
-  /**
-   * Base skill migration is disabled for v4.0.0
-   */
-  private async migrateBaseSkillValues(profile: TinkerProfile): Promise<TinkerProfile> {
-    // v4.0.0 uses ID-based skills - no migration from name-based skills
-    if (profile.version !== '4.0.0') {
-      throw new Error(`Base skill migration not supported for version ${profile.version}. Only v4.0.0 profiles are supported.`);
-    }
-
-    return profile;
-  }
-
-  /**
-   * Misc skill migration is disabled for v4.0.0
-   */
-  private migrateMiscSkills(profile: TinkerProfile): TinkerProfile {
-    // v4.0.0 uses ID-based skills - no migration from name-based skills
-    if (profile.version !== '4.0.0') {
-      throw new Error(`Misc skill migration not supported for version ${profile.version}. Only v4.0.0 profiles are supported.`);
-    }
-
-    return profile;
-  }
-
-  /**
-   * Perk system migration is disabled for v4.0.0
-   */
-  private async migratePerkSystem(profile: TinkerProfile): Promise<TinkerProfile> {
-    // v4.0.0 profiles should already have the correct perk system structure
-    if (profile.version !== '4.0.0') {
-      throw new Error(`Perk system migration not supported for version ${profile.version}. Only v4.0.0 profiles are supported.`);
-    }
-
-    return profile;
-  }
 
   // ============================================================================
   // Compression (Future Enhancement)
@@ -382,41 +296,6 @@ This ensures data integrity and optimal performance with the new skill system.
     }
   }
 
-  /**
-   * Legacy storage migration is disabled for v4.0.0
-   */
-  private async migrateFromLegacyStorage(): Promise<void> {
-    try {
-      // Check if legacy data exists
-      const legacyData = localStorage.getItem(STORAGE_KEYS.PROFILES);
-      if (!legacyData || legacyData === 'null' || legacyData === '{}') {
-        return; // No legacy data to migrate
-      }
-
-      console.warn(`[ProfileStorage] Legacy profile data detected but migration is disabled in v4.0.0.`);
-      console.warn(`[ProfileStorage] v4.0.0 uses ID-based skill storage which is incompatible with previous versions.`);
-      console.warn(`[ProfileStorage] Legacy data will be left intact but cannot be automatically migrated.`);
-      console.warn(`[ProfileStorage] Users must recreate profiles or import from AOSetups format.`);
-
-      // Parse the legacy data to report how many profiles were found
-      try {
-        const legacyProfiles = JSON.parse(legacyData);
-        const profileCount = Object.keys(legacyProfiles || {}).length;
-        if (profileCount > 0) {
-          console.warn(`[ProfileStorage] Found ${profileCount} legacy profile(s) that require manual recreation.`);
-        }
-      } catch (error) {
-        console.warn('[ProfileStorage] Legacy data exists but cannot be parsed.');
-      }
-
-      // Do not remove legacy data - leave it for potential manual recovery
-      // Do not create index - start fresh with v4.0.0
-
-    } catch (error) {
-      console.error('[ProfileStorage] Legacy storage check failed:', error);
-      // Don't throw - allow the app to continue
-    }
-  }
 
   /**
    * Save all profiles to storage (DEPRECATED - kept for backward compatibility)

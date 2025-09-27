@@ -17,7 +17,7 @@ Shows owned perks with their effects and point usage in a tabbed interface
 
     <TabView class="h-full perk-tabs-container">
       <!-- SL Perks Tab -->
-      <TabPanel class="h-full">
+      <TabPanel>
         <template #header>
           <div class="flex items-center gap-2">
             <i class="pi pi-star text-primary-500" aria-hidden="true"></i>
@@ -44,7 +44,7 @@ Shows owned perks with their effects and point usage in a tabbed interface
       </TabPanel>
 
       <!-- AI Perks Tab -->
-      <TabPanel class="h-full">
+      <TabPanel>
         <template #header>
           <div class="flex items-center gap-2">
             <i class="pi pi-bolt text-cyan-500" aria-hidden="true"></i>
@@ -71,7 +71,7 @@ Shows owned perks with their effects and point usage in a tabbed interface
       </TabPanel>
 
       <!-- LE Research Tab -->
-      <TabPanel class="h-full">
+      <TabPanel>
         <template #header>
           <div class="flex items-center gap-2">
             <i class="pi pi-book text-purple-500" aria-hidden="true"></i>

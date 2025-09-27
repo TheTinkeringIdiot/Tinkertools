@@ -12,6 +12,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import type { Item } from '../../types/api'
 import { useTinkerProfilesStore } from '../tinkerProfiles'
+import { skillService } from '../../services/skill-service'
 
 // Mock the TinkerProfiles library
 vi.mock('@/lib/tinkerprofiles', () => ({
@@ -26,9 +27,16 @@ vi.mock('@/lib/tinkerprofiles', () => ({
         Breed: 'Solitus',
         Faction: 'Clan'
       },
-      Skills: {
-        Misc: {
-          'Computer Literacy': 1200 // MaxNCU
+      skills: {
+        [skillService.resolveId('Max NCU')]: {
+          value: 1200,
+          baseSkillValue: 1200,
+          total: 1200,
+          trickleDown: 0,
+          pointFromIp: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0
         }
       },
       buffs: []
@@ -56,23 +64,22 @@ vi.mock('@/lib/tinkerprofiles/ip-integrator', () => ({
     // Return profile with buffBonus calculated in skills
     const updatedProfile = {
       ...profile,
-      Skills: {
-        ...profile.Skills,
-        Body: {
-          ...profile.Skills?.Body,
-          'Assault Rifle': {
-            value: 100,
-            baseSkillValue: 5,
-            trickleDown: 0,
-            pointFromIp: 95,
-            equipmentBonus: 0,
-            perkBonus: 0,
-            buffBonus: profile.buffs?.reduce((total: number, buff: Item) => {
-              const arBonus = buff.spell_data?.find(sd => sd.event === 1)?.spells
-                ?.find(spell => spell.spell_params?.Stat === 17)?.spell_params?.Amount || 0
-              return total + arBonus
-            }, 0) || 0
-          }
+      skills: {
+        ...profile.skills,
+        // Mock Assault Rifle skill updates
+        [17]: { // Assault Rifle skill ID
+          value: 100,
+          baseSkillValue: 5,
+          total: 100,
+          trickleDown: 0,
+          pointFromIp: 95,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: profile.buffs?.reduce((total: number, buff: Item) => {
+            const arBonus = buff.spell_data?.find(sd => sd.event === 1)?.spells
+              ?.find(spell => spell.spell_params?.Stat === 17)?.spell_params?.Amount || 0
+            return total + arBonus
+          }, 0) || 0
         }
       }
     }
@@ -122,9 +129,16 @@ describe('TinkerProfiles Store - Buff Management', () => {
         Breed: 'Solitus',
         Faction: 'Clan'
       },
-      Skills: {
-        Misc: {
-          'Computer Literacy': 1200 // MaxNCU = 1200
+      skills: {
+        [skillService.resolveId('Max NCU')]: {
+          value: 1200,
+          baseSkillValue: 1200,
+          total: 1200,
+          trickleDown: 0,
+          pointFromIp: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0
         }
       },
       buffs: []
@@ -778,7 +792,9 @@ describe('TinkerProfiles Store - Buff Management', () => {
   describe('Integration Tests with NCU Validation', () => {
     it('should handle complex NCU scenarios with multiple operations', async () => {
       // Set up a profile with limited NCU
-      ;((store.activeProfile as any).Skills.Misc as any)['Computer Literacy'] = 200 // Only 200 MaxNCU
+      // Set limited NCU (Max NCU = 200) by updating the mock activeProfile directly
+      ;(store.activeProfile as any).skills[skillService.resolveId('Max NCU')].value = 200
+      ;(store.activeProfile as any).skills[skillService.resolveId('Max NCU')].total = 200
 
       const nano1 = createNanoItem('Nano 1', 1001, 100) // 100 NCU
       const nano2 = createNanoItem('Nano 2', 1002, 50)  // 50 NCU
@@ -828,7 +844,8 @@ describe('TinkerProfiles Store - Buff Management', () => {
       expect(store.availableNCU).toBe(100) // 1200 - 1100
 
       // Simulate equipment change reducing MaxNCU
-      ;((store.activeProfile as any).Skills.Misc as any)['Computer Literacy'] = 800 // Reduced MaxNCU
+      ;(store.activeProfile as any).skills[skillService.resolveId('Max NCU')].value = 800
+      ;(store.activeProfile as any).skills[skillService.resolveId('Max NCU')].total = 800
 
       expect(store.maxNCU).toBe(800)
       expect(store.availableNCU).toBe(0) // Math.max(0, 800 - 1100) = 0
@@ -850,7 +867,9 @@ describe('TinkerProfiles Store - Buff Management', () => {
     })
 
     it('should handle zero MaxNCU gracefully', async () => {
-      ;((store.activeProfile as any).Skills.Misc as any)['Computer Literacy'] = 0 // No NCU available
+      // Set zero NCU (Max NCU = 0)
+      ;(store.activeProfile as any).skills[skillService.resolveId('Max NCU')].value = 0
+      ;(store.activeProfile as any).skills[skillService.resolveId('Max NCU')].total = 0
 
       const nano = createNanoItem('Test Nano', 1001, 1) // Even 1 NCU should fail
 

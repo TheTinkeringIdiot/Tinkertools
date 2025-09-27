@@ -1,11 +1,13 @@
 /**
  * TinkerProfiles Transformer Tests
- * 
+ *
  * Tests for profile import/export with item fetching functionality
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ProfileTransformer } from '@/lib/tinkerprofiles/transformer';
+import { skillService } from '@/services/skill-service';
+import { createDefaultProfile } from '@/lib/tinkerprofiles/constants';
 import type { Item, InterpolationResponse } from '@/types/api';
 
 // Mock API client
@@ -316,9 +318,10 @@ describe('ProfileTransformer', () => {
     });
   });
 
-  describe('Legacy Format Support', () => {
-    it('should handle profiles that already have Body slot (legacy data)', async () => {
-      const legacyProfileData = JSON.stringify({
+  describe('Profile Version Support', () => {
+    it('should reject v3.0.0 profiles', async () => {
+      const v3ProfileData = JSON.stringify({
+        version: '3.0.0',
         Character: {
           Name: 'Legacy Character',
           Level: 50,
@@ -326,23 +329,106 @@ describe('ProfileTransformer', () => {
           Breed: 'Atrox',
           Faction: 'Clan'
         },
-        Clothing: {
-          'Body': mockItem, // Legacy profile with Body slot
-          'Head': { ...mockItem, name: 'Head Gear' }
+        Skills: {
+          Attributes: {
+            Strength: { value: 10, pointFromIp: 4 }
+          }
         },
+        Clothing: {},
         Weapons: {},
         Implants: {}
       });
 
-      const result = await transformer.importProfile(legacyProfileData);
+      const result = await transformer.importProfile(v3ProfileData);
+
+      expect(result.success).toBe(false);
+      expect(result.errors[0]).toContain('not supported');
+    });
+
+    it('should accept v4.0.0 profiles', async () => {
+      const v4Profile = createDefaultProfile('Test Character');
+      v4Profile.version = '4.0.0';
+      const v4ProfileData = JSON.stringify(v4Profile);
+
+      const result = await transformer.importProfile(v4ProfileData);
 
       expect(result.success).toBe(true);
-      
-      if (result.profile) {
-        // Should preserve existing Body slot for legacy compatibility
-        expect(result.profile.Clothing['Body']).toBeDefined();
-        expect(result.profile.Clothing['Head']).toBeDefined();
-      }
+      expect(result.profile?.version).toBe('4.0.0');
+      expect(result.profile?.skills).toBeDefined();
+      expect((result.profile as any).Skills).toBeUndefined();
+    });
+
+    it('should import AOSetups profiles to v4.0.0 format', async () => {
+      const aoSetupsData = {
+        name: 'AOSetups Character',
+        level: 60,
+        profession: 'Adventurer',
+        breed: 'Solitus',
+        faction: 'Neutral',
+        clothes: [],
+        weapons: [],
+        implants: []
+      };
+
+      const result = await transformer.importProfile(JSON.stringify(aoSetupsData));
+
+      expect(result.success).toBe(true);
+      expect(result.profile?.version).toBe('4.0.0');
+      expect(result.profile?.skills).toBeDefined();
+      expect((result.profile as any).Skills).toBeUndefined();
+    });
+
+    it('should ensure no Skills property exists in v4.0.0 profiles', async () => {
+      const v4Profile = createDefaultProfile('Test Character');
+      const exported = transformer.exportProfile(v4Profile, 'json');
+      const result = await transformer.importProfile(exported);
+
+      expect(result.success).toBe(true);
+      expect(result.profile?.version).toBe('4.0.0');
+      expect((result.profile as any).Skills).toBeUndefined();
+      expect(result.profile?.skills).toBeDefined();
+      expect(Object.keys(result.profile?.skills || {}).length).toBeGreaterThan(160);
+    });
+  });
+
+  describe('Profile Creation v4.0.0', () => {
+    it('should create profile with all skills initialized', () => {
+      const profile = createDefaultProfile('Test');
+
+      expect(profile.version).toBe('4.0.0');
+      expect(profile.skills).toBeDefined();
+      expect(Object.keys(profile.skills).length).toBeGreaterThan(160);
+    });
+
+    it('should initialize abilities with breed-specific bases', () => {
+      const profile = createDefaultProfile('Atrox Test', 'Atrox');
+
+      const strengthId = skillService.resolveId('Strength');
+      const strength = profile.skills[strengthId];
+      expect(strength.base).toBeGreaterThan(5); // Atrox should have higher base Strength
+    });
+
+    it('should initialize regular skills with base 5', () => {
+      const profile = createDefaultProfile('Test');
+      const oneHandBluntId = skillService.resolveId('1h Blunt');
+      const oneHandBlunt = profile.skills[oneHandBluntId];
+
+      expect(oneHandBlunt.base).toBe(5);
+      expect(oneHandBlunt.total).toBe(5);
+    });
+
+    it('should initialize Misc/AC skills with base 0', () => {
+      const profile = createDefaultProfile('Test');
+      const maxHealthId = skillService.resolveId('Max Health');
+      const chemicalACId = skillService.resolveId('Chemical AC');
+
+      expect(profile.skills[maxHealthId].base).toBe(0);
+      expect(profile.skills[chemicalACId].base).toBe(0);
+    });
+
+    it('should have no legacy Skills property', () => {
+      const profile = createDefaultProfile('Test');
+      expect((profile as any).Skills).toBeUndefined();
     });
   });
 

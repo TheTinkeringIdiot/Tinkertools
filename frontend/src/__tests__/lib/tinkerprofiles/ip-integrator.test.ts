@@ -13,6 +13,7 @@ import {
   updateProfileTrickleDown
 } from '@/lib/tinkerprofiles/ip-integrator';
 import { createDefaultProfile } from '@/lib/tinkerprofiles/constants';
+import { skillService } from '@/services/skill-service';
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 
 describe('IP Integrator - Bug Fixes and Data Flow', () => {
@@ -26,25 +27,26 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
 
   describe('profileToCharacterStats', () => {
     it('should extract improvement values for IP calculations', () => {
-      // Set some IP improvements
-      testProfile.Skills.Attributes.Strength.pointFromIp = 10;
-      testProfile.Skills.Attributes.Agility.pointFromIp = 5;
-      
+      // Set some IP improvements using v4.0.0 structure
+      const strengthId = skillService.resolveId('Strength'); // ID 16
+      const agilityId = skillService.resolveId('Agility'); // ID 17
+      testProfile.skills[strengthId].pointsFromIp = 10;
+      testProfile.skills[agilityId].pointsFromIp = 5;
+
       const stats = profileToCharacterStats(testProfile);
-      
+
       expect(stats.abilities[0]).toBe(10); // Strength improvements
       expect(stats.abilities[1]).toBe(5);  // Agility improvements
       expect(stats.abilities[2]).toBe(0);  // Stamina (no improvements)
     });
 
     it('should extract skill improvements correctly', () => {
-      // Set some skill improvements
-      if (testProfile.Skills['Body & Defense']['Body Dev.']) {
-        testProfile.Skills['Body & Defense']['Body Dev.'].pointFromIp = 15;
-      }
-      
+      // Set some skill improvements using v4.0.0 structure
+      const bodyDevId = skillService.resolveId('Body Dev.'); // ID 152
+      testProfile.skills[bodyDevId].pointsFromIp = 15;
+
       const stats = profileToCharacterStats(testProfile);
-      
+
       // Should find the skill improvement in the skills Record
       expect(Object.values(stats.skills).includes(15)).toBe(true);
     });
@@ -62,74 +64,86 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
 
   describe('updateProfileSkillInfo - Bug Fix Verification', () => {
     it('should pass full ability values to calcSkillCap (not just improvements)', () => {
-      // Set up profile with abilities at base values (6) and no improvements
-      testProfile.Skills.Attributes.Strength.value = 6;
-      testProfile.Skills.Attributes.Agility.value = 6;
-      testProfile.Skills.Attributes.Stamina.value = 6;
-      testProfile.Skills.Attributes.Intelligence.value = 6;
-      testProfile.Skills.Attributes.Sense.value = 6;
-      testProfile.Skills.Attributes.Psychic.value = 6;
-      
+      // Set up profile with abilities at base values (6) and no improvements using v4.0.0 structure
+      const strengthId = skillService.resolveId('Strength');
+      const agilityId = skillService.resolveId('Agility');
+      const staminaId = skillService.resolveId('Stamina');
+      const intelligenceId = skillService.resolveId('Intelligence');
+      const senseId = skillService.resolveId('Sense');
+      const psychicId = skillService.resolveId('Psychic');
+
+      testProfile.skills[strengthId].total = 6;
+      testProfile.skills[agilityId].total = 6;
+      testProfile.skills[staminaId].total = 6;
+      testProfile.skills[intelligenceId].total = 6;
+      testProfile.skills[senseId].total = 6;
+      testProfile.skills[psychicId].total = 6;
+
       // Clear any existing improvements
-      testProfile.Skills.Attributes.Strength.pointFromIp = 0;
-      testProfile.Skills.Attributes.Agility.pointFromIp = 0;
-      testProfile.Skills.Attributes.Stamina.pointFromIp = 0;
-      testProfile.Skills.Attributes.Intelligence.pointFromIp = 0;
-      testProfile.Skills.Attributes.Sense.pointFromIp = 0;
-      testProfile.Skills.Attributes.Psychic.pointFromIp = 0;
+      testProfile.skills[strengthId].pointsFromIp = 0;
+      testProfile.skills[agilityId].pointsFromIp = 0;
+      testProfile.skills[staminaId].pointsFromIp = 0;
+      testProfile.skills[intelligenceId].pointsFromIp = 0;
+      testProfile.skills[senseId].pointsFromIp = 0;
+      testProfile.skills[psychicId].pointsFromIp = 0;
 
       updateProfileSkillInfo(testProfile);
 
       // Body Dev should have cap of 13 (5 base + 1 trickle + 7 ability improvements)
       // This test verifies that full ability values (6,6,6,6,6,6) were used,
       // not improvement values (0,0,0,0,0,0) which would give a much lower cap
-      const bodyDev = testProfile.Skills['Body & Defense']['Body Dev.'];
-      if (bodyDev) {
-        expect(bodyDev.cap).toBe(13);
-      }
+      const bodyDevId = skillService.resolveId('Body Dev.');
+      const bodyDev = testProfile.skills[bodyDevId];
+      expect(bodyDev.cap).toBe(13);
     });
 
     it('should calculate correct skill caps with higher abilities', () => {
-      // Set significantly higher Stamina which affects Body Dev
-      testProfile.Skills.Attributes.Stamina.value = 50; // Body Dev only depends on Stamina
-      testProfile.Skills.Attributes.Stamina.pointFromIp = 44; // 50 - 6 (breed base) = 44 improvements
+      // Set significantly higher Stamina which affects Body Dev using v4.0.0 structure
+      const staminaId = skillService.resolveId('Stamina');
+      const strengthId = skillService.resolveId('Strength');
+      const agilityId = skillService.resolveId('Agility');
+      const intelligenceId = skillService.resolveId('Intelligence');
+      const senseId = skillService.resolveId('Sense');
+      const psychicId = skillService.resolveId('Psychic');
+
+      testProfile.skills[staminaId].total = 50; // Body Dev only depends on Stamina
+      testProfile.skills[staminaId].pointsFromIp = 44; // 50 - 6 (breed base) = 44 improvements
       // Keep others at base
-      testProfile.Skills.Attributes.Strength.value = 6;
-      testProfile.Skills.Attributes.Agility.value = 6;
-      testProfile.Skills.Attributes.Intelligence.value = 6;
-      testProfile.Skills.Attributes.Sense.value = 6;
-      testProfile.Skills.Attributes.Psychic.value = 6;
-      
+      testProfile.skills[strengthId].total = 6;
+      testProfile.skills[agilityId].total = 6;
+      testProfile.skills[intelligenceId].total = 6;
+      testProfile.skills[senseId].total = 6;
+      testProfile.skills[psychicId].total = 6;
+
       updateProfileSkillInfo(testProfile);
 
-      const bodyDev = testProfile.Skills['Body & Defense']['Body Dev.'];
-      if (bodyDev) {
-        // With significantly higher Stamina affecting Body Dev, cap should be much higher than 13
-        // Body Dev factors: [0.0, 0.0, 1.0, 0.0, 0.0, 0.0] (only Stamina)
-        // Weighted = 50*1.0 = 50
-        // Expected improvements: round(((50 - 5) * 2) + 5) = round(95) = 95
-        // Total cap = 5 + trickle + 95 should be much higher than 13
-        expect(bodyDev.cap).toBeGreaterThan(50);
-      }
+      const bodyDevId = skillService.resolveId('Body Dev.');
+      const bodyDev = testProfile.skills[bodyDevId];
+      // With significantly higher Stamina affecting Body Dev, cap should be much higher than 13
+      // Body Dev factors: [0.0, 0.0, 1.0, 0.0, 0.0, 0.0] (only Stamina)
+      // Weighted = 50*1.0 = 50
+      // Expected improvements: round(((50 - 5) * 2) + 5) = round(95) = 95
+      // Total cap = 5 + trickle + 95 should be much higher than 13
+      expect((bodyDev as any).cap).toBeGreaterThan(50);
     });
 
     it('should update both caps and trickle-down values', () => {
-      // Set some ability improvements
-      testProfile.Skills.Attributes.Agility.value = 15;
-      
+      // Set some ability improvements using v4.0.0 structure
+      const agilityId = skillService.resolveId('Agility');
+      testProfile.skills[agilityId].total = 15;
+
       updateProfileSkillInfo(testProfile);
 
       // Check that both caps and trickle-down were updated
-      const bodyDev = testProfile.Skills['Body & Defense']['Body Dev.'];
-      if (bodyDev) {
-        expect(bodyDev.cap).toBeDefined();
-        expect(bodyDev.trickleDown).toBeDefined();
-        expect(bodyDev.value).toBeDefined();
-        
-        // Value should be base + trickle + IP improvements
-        const expectedValue = 5 + (bodyDev.trickleDown || 0) + (bodyDev.pointFromIp || 0);
-        expect(bodyDev.value).toBe(expectedValue);
-      }
+      const bodyDevId = skillService.resolveId('Body Dev.');
+      const bodyDev = testProfile.skills[bodyDevId] as any; // Cast to any for dynamic properties
+      expect(bodyDev.cap).toBeDefined();
+      expect(bodyDev.trickle).toBeDefined();
+      expect(bodyDev.total).toBeDefined();
+
+      // Total should be base + trickle + IP improvements + equipment bonuses
+      const expectedTotal = (bodyDev.base || 0) + (bodyDev.trickle || 0) + (bodyDev.pointsFromIp || 0) + (bodyDev.equipmentBonus || 0);
+      expect(bodyDev.total).toBe(expectedTotal);
     });
 
     it('should handle all skill categories', () => {

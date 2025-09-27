@@ -4,10 +4,11 @@
  * Game data constants and default values for Anarchy Online profiles
  */
 
-import type { TinkerProfile, NanoCompatibleProfile } from './types';
+import type { TinkerProfile, NanoCompatibleProfile, SkillData } from './types';
 import type { PerkSystem } from './perk-types';
 import { getBreedInitValue, calcHP, calcNP } from './ip-calculator';
 import { getBreedId } from '../../services/game-utils';
+import { skillService } from '../../services/skill-service';
 
 // Import BASE_SKILL constant from ip-calculator
 const BASE_SKILL = 5; // Base skill value that all characters start with
@@ -64,22 +65,20 @@ export const ACCOUNT_TYPES = [
 // Default Skills Structure
 // ============================================================================
 
-/**
- * Get default skills structure for a specific breed
- */
-export function getDefaultSkillsForBreed(breed: string) {
-  const breedId = getBreedId(breed) || 0; // Default to Solitus if breed not found
-  
-  return {
-    Attributes: {
-      Strength: { value: getBreedInitValue(breedId, 0), ipSpent: 0, pointFromIp: 0, cap: undefined },
-      Agility: { value: getBreedInitValue(breedId, 1), ipSpent: 0, pointFromIp: 0, cap: undefined },
-      Stamina: { value: getBreedInitValue(breedId, 2), ipSpent: 0, pointFromIp: 0, cap: undefined },
-      Intelligence: { value: getBreedInitValue(breedId, 3), ipSpent: 0, pointFromIp: 0, cap: undefined },
-      Sense: { value: getBreedInitValue(breedId, 4), ipSpent: 0, pointFromIp: 0, cap: undefined },
-      Psychic: { value: getBreedInitValue(breedId, 5), ipSpent: 0, pointFromIp: 0, cap: undefined }
-    },
-    'Body & Defense': {
+
+// Keep the old DEFAULT_SKILLS for backward compatibility (uses Solitus breed)
+// Note: This is a legacy constant that may be removed in future versions
+// New code should use createDefaultSkillsV4() instead
+export const DEFAULT_SKILLS = {
+  Attributes: {
+    Strength: { value: 15, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    Agility: { value: 15, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    Stamina: { value: 15, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    Intelligence: { value: 15, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    Sense: { value: 15, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    Psychic: { value: 15, ipSpent: 0, pointFromIp: 0, cap: undefined }
+  },
+  'Body & Defense': {
     'Nano Pool': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Nano Resist': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Body Dev.': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
@@ -207,12 +206,8 @@ export function getDefaultSkillsForBreed(breed: string) {
     'Direct Nano Damage Efficiency': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
     'Add. Nano Dam.': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
     'Scale': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 }
-    }
-  };
-}
-
-// Keep the old DEFAULT_SKILLS for backward compatibility (uses Solitus breed)
-export const DEFAULT_SKILLS = getDefaultSkillsForBreed('Solitus');
+  }
+} as const;
 
 // ============================================================================
 // Default Equipment Slots
@@ -335,6 +330,47 @@ function getBreedIdFromBreedName(breed: string): number {
 }
 
 /**
+ * Create default v4.0.0 skills map for a breed
+ * Initializes all ~168 skills with appropriate base values
+ */
+export function createDefaultSkillsV4(breed: string): { [skillId: number]: SkillData } {
+  const skills: { [skillId: number]: SkillData } = {};
+
+  // Get all skill IDs from SkillService
+  const allSkillIds = skillService.getAllSkills();
+
+  // Get breed ID for breed-specific ability lookup
+  const breedId = getBreedId(breed) || 1; // Default to Solitus
+
+  for (const skillId of allSkillIds) {
+    const category = skillService.getCategory(Number(skillId));
+
+    let baseValue = 5; // Default for trainable skills
+
+    if (category === 'Abilities') {
+      // For abilities, use breed-specific values from ip-calculator
+      baseValue = getBreedInitValue(breedId, Number(skillId));
+    } else if (category === 'Misc' || category === 'ACs') {
+      // Misc and ACs start at 0
+      baseValue = 0;
+    }
+
+    skills[Number(skillId)] = {
+      base: baseValue,
+      trickle: 0,
+      ipSpent: 0,
+      pointsFromIp: 0,
+      equipmentBonus: 0,
+      perkBonus: 0,
+      buffBonus: 0,
+      total: baseValue
+    };
+  }
+
+  return skills;
+}
+
+/**
  * Create a default comprehensive TinkerProfile
  */
 export function createDefaultProfile(name: string = 'New Character', breed: string = 'Solitus'): TinkerProfile {
@@ -368,7 +404,7 @@ export function createDefaultProfile(name: string = 'New Character', breed: stri
       MaxNano: initialNano
     },
     
-    skills: structuredClone(getDefaultSkillsForBreed(breed)),
+    skills: createDefaultSkillsV4(breed),
     
     Weapons: structuredClone(DEFAULT_WEAPONS),
     Clothing: structuredClone(DEFAULT_CLOTHING),

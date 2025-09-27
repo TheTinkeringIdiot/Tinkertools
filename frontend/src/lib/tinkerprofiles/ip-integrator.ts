@@ -50,13 +50,13 @@ export function profileToCharacterStats(profile: TinkerProfile): CharacterStats 
   const profession = getProfessionId(profile.Character.Profession) || 0;
 
   // Extract abilities (improvements only for IP calculations)
-  // Attribute skill IDs: Strength=16, Agility=18, Stamina=17, Intelligence=20, Sense=19, Psychic=21
+  // Attribute skill IDs: Strength=16, Agility=17, Stamina=18, Intelligence=19, Sense=20, Psychic=21
   const abilities = [
     profile.skills[16]?.pointsFromIp || 0, // Strength
-    profile.skills[18]?.pointsFromIp || 0, // Agility
-    profile.skills[17]?.pointsFromIp || 0, // Stamina
-    profile.skills[20]?.pointsFromIp || 0, // Intelligence
-    profile.skills[19]?.pointsFromIp || 0, // Sense
+    profile.skills[17]?.pointsFromIp || 0, // Agility
+    profile.skills[18]?.pointsFromIp || 0, // Stamina
+    profile.skills[19]?.pointsFromIp || 0, // Intelligence
+    profile.skills[20]?.pointsFromIp || 0, // Sense
     profile.skills[21]?.pointsFromIp || 0  // Psychic
   ];
 
@@ -242,13 +242,13 @@ export function updateProfileSkillInfo(
     equipmentBonuses = providedEquipmentBonuses;
   } else {
     const equipmentBonusesOld = calculateEquipmentBonuses(profile);
-    // Convert old string-based format to skill ID format
-    for (const [skillName, bonus] of Object.entries(equipmentBonusesOld)) {
-      try {
-        const skillId = skillService.resolveId(skillName);
+    // Convert string keys to numeric skill IDs
+    for (const [skillIdStr, bonus] of Object.entries(equipmentBonusesOld)) {
+      const skillId = parseInt(skillIdStr, 10);
+      if (!isNaN(skillId)) {
         equipmentBonuses[skillId] = bonus;
-      } catch (error) {
-        console.warn(`Failed to resolve skill name '${skillName}' to ID in equipment bonuses:`, error);
+      } else {
+        console.warn(`Invalid skill ID in equipment bonuses: ${skillIdStr}`);
       }
     }
   }
@@ -291,6 +291,7 @@ export function updateProfileSkillInfo(
       skillData.equipmentBonus = equipmentBonus;
       skillData.perkBonus = perkBonus;
       skillData.buffBonus = buffBonus;
+      skillData.cap = baseAbilityCap;
 
       // Final total: base + pointsFromIp + equipment + perks + buffs
       skillData.total = cappedBaseValue + equipmentBonus + perkBonus + buffBonus;
@@ -300,10 +301,10 @@ export function updateProfileSkillInfo(
   // For trickle-down, use full ability values INCLUDING equipment and perk bonuses
   const fullAbilityValues: number[] = [
     profile.skills[16]?.total || 0, // Strength
-    profile.skills[18]?.total || 0, // Agility
-    profile.skills[17]?.total || 0, // Stamina
-    profile.skills[20]?.total || 0, // Intelligence
-    profile.skills[19]?.total || 0, // Sense
+    profile.skills[17]?.total || 0, // Agility
+    profile.skills[18]?.total || 0, // Stamina
+    profile.skills[19]?.total || 0, // Intelligence
+    profile.skills[20]?.total || 0, // Sense
     profile.skills[21]?.total || 0  // Psychic
   ];
   const trickleDownResults = calcAllTrickleDown(fullAbilityValues);
@@ -346,6 +347,7 @@ export function updateProfileSkillInfo(
       skillData.equipmentBonus = equipmentBonus;
       skillData.perkBonus = perkBonus;
       skillData.buffBonus = buffBonus;
+      skillData.cap = baseSkillCap;
 
       // Final total: base + trickle + pointsFromIp + equipment + perks + buffs
       skillData.total = cappedBaseValue + equipmentBonus + perkBonus + buffBonus;
@@ -395,10 +397,10 @@ export function updateProfileTrickleDown(profile: TinkerProfile): TinkerProfile 
   // Extract current abilities from profile (full values, not just improvements)
   const abilities: number[] = [
     updatedProfile.skills[16]?.total || 0, // Strength
-    updatedProfile.skills[18]?.total || 0, // Agility
-    updatedProfile.skills[17]?.total || 0, // Stamina
-    updatedProfile.skills[20]?.total || 0, // Intelligence
-    updatedProfile.skills[19]?.total || 0, // Sense
+    updatedProfile.skills[17]?.total || 0, // Agility
+    updatedProfile.skills[18]?.total || 0, // Stamina
+    updatedProfile.skills[19]?.total || 0, // Intelligence
+    updatedProfile.skills[20]?.total || 0, // Sense
     updatedProfile.skills[21]?.total || 0  // Psychic
   ];
 
@@ -464,10 +466,10 @@ export function validateProfileIP(profile: TinkerProfile): {
         const characterStats = profileToCharacterStats(profile);
         const abilities = [
           profile.skills[16]?.total || 0, // Strength
-          profile.skills[18]?.total || 0, // Agility
-          profile.skills[17]?.total || 0, // Stamina
-          profile.skills[20]?.total || 0, // Intelligence
-          profile.skills[19]?.total || 0, // Sense
+          profile.skills[17]?.total || 0, // Agility
+          profile.skills[18]?.total || 0, // Stamina
+          profile.skills[19]?.total || 0, // Intelligence
+          profile.skills[20]?.total || 0, // Sense
           profile.skills[21]?.total || 0  // Psychic
         ];
 
@@ -578,10 +580,10 @@ export async function modifySkill(
     const characterStats = profileToCharacterStats(profile);
     const abilities = [
       profile.skills[16]?.total || 0, // Strength
-      profile.skills[18]?.total || 0, // Agility
-      profile.skills[17]?.total || 0, // Stamina
-      profile.skills[20]?.total || 0, // Intelligence
-      profile.skills[19]?.total || 0, // Sense
+      profile.skills[17]?.total || 0, // Agility
+      profile.skills[18]?.total || 0, // Stamina
+      profile.skills[19]?.total || 0, // Intelligence
+      profile.skills[20]?.total || 0, // Sense
       profile.skills[21]?.total || 0  // Psychic
     ];
 

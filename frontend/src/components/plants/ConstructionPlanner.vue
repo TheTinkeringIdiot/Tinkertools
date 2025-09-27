@@ -270,6 +270,8 @@ Advanced implant construction analysis and step-by-step instructions
 <script setup lang="ts">
 import { ref, computed, watch, reactive } from 'vue';
 import { useConstructionPlanner } from '@/composables/useConstructionPlanner';
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
+import { skillService } from '@/services/skill-service';
 import Button from 'primevue/button';
 import Dropdown from 'primevue/dropdown';
 import InputNumber from 'primevue/inputnumber';
@@ -290,6 +292,13 @@ const props = withDefaults(defineProps<Props>(), {
   implants: () => ({}),
   currentBuild: () => ({})
 });
+
+// ============================================================================
+// TinkerProfiles Store Integration
+// ============================================================================
+
+const tinkerProfilesStore = useTinkerProfilesStore();
+const { activeProfile } = tinkerProfilesStore;
 
 // ============================================================================
 // Construction Planner Integration
@@ -325,7 +334,21 @@ const {
 const selectedSlotLocal = ref(selectedSlot.value);
 const autoAnalyze = ref(false);
 
-// Local skills for form binding
+// ============================================================================
+// Skill Values from Active Profile
+// ============================================================================
+
+// Computed property for skill values using ID-based access
+const skillValues = computed(() => ({
+  nanoProgramming: activeProfile.value?.skills[skillService.resolveId('Nano Programming')]?.total ?? 0,
+  breakAndEntry: activeProfile.value?.skills[skillService.resolveId('Break & Entry')]?.total ?? 0,
+  psychology: activeProfile.value?.skills[skillService.resolveId('Psychology')]?.total ?? 0,
+  quantumFT: activeProfile.value?.skills[skillService.resolveId('Quantum FT')]?.total ?? 0,
+  computerLiteracy: activeProfile.value?.skills[skillService.resolveId('Computer Literacy')]?.total ?? 0,
+  pharmaTech: activeProfile.value?.skills[skillService.resolveId('Pharma Tech')]?.total ?? 0
+}));
+
+// Local skills for form binding - these track the profile values but allow editing
 const localSkills = reactive<SkillSet>({
   'Nanoprogramming': 0,
   'Break & Entry': 0,
@@ -360,10 +383,21 @@ watch(selectedSlot, (newSlot) => {
   selectedSlotLocal.value = newSlot;
 });
 
-// Sync skills from service to local form
-watch(currentSkills, (newSkills) => {
-  Object.assign(localSkills, newSkills);
+// Sync skills from profile to local form
+watch(skillValues, (newSkillValues) => {
+  // Update localSkills from profile skill values (ID-based access)
+  localSkills.Nanoprogramming = newSkillValues.nanoProgramming;
+  localSkills['Break & Entry'] = newSkillValues.breakAndEntry;
+  localSkills.Psychology = newSkillValues.psychology;
+  localSkills['Quantum FT'] = newSkillValues.quantumFT;
+  localSkills['Computer Literacy'] = newSkillValues.computerLiteracy;
+  localSkills['Pharma Tech'] = newSkillValues.pharmaTech;
 }, { immediate: true, deep: true });
+
+// Sync local skills to construction planner service
+watch(localSkills, (newSkills) => {
+  setSkills(newSkills);
+}, { deep: true });
 </script>
 
 <style scoped>

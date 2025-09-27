@@ -2,8 +2,9 @@
  * Integration tests for AOSetups implant import
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ProfileTransformer } from '@/lib/tinkerprofiles/transformer';
+import { skillService } from '@/services/skill-service';
 
 // Mock the API client
 vi.mock('@/services/api-client', () => ({
@@ -276,9 +277,10 @@ describe('AOSetups Implant Import Integration', () => {
         expect(result.profile.Character.Profession).toBe('Doctor');
         expect(result.profile.Character.Breed).toBe('Atrox');
         
-        // Skills structure should be maintained
-        expect(result.profile.Skills).toBeDefined();
-        expect(result.profile.Skills.Attributes).toBeDefined();
+        // v4.0.0 skills structure should be used
+        expect(result.profile.skills).toBeDefined();
+        expect((result.profile as any).Skills).toBeUndefined();
+        expect(result.profile.version).toBe('4.0.0');
         
         // Implant should be enhanced with cluster data
         const eyeImplant = result.profile.Implants.Eye;

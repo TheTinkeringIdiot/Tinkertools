@@ -68,7 +68,7 @@ Shows skills in a category with IP cost calculations and interactive value adjus
                 :category="title"
                 :breed="breed"
                 :profession="profession"
-                :skill-id="skillId"
+                :skill-id="Number(skillId)"
                 @skill-changed="handleSkillChanged"
                 @ability-changed="handleAbilityChanged"
               />

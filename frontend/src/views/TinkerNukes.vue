@@ -79,29 +79,29 @@ Allows users to input skills and view usable offensive nanos in a sortable table
         
         <!-- Manual Skills Input -->
         <div v-if="useManualSkills" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div v-for="skill in nanoSkills" :key="skill.key" class="flex flex-col gap-1">
+          <div v-for="skill in nanoSkills" :key="skill.id" class="flex flex-col gap-1">
             <label class="text-xs font-medium text-surface-600 dark:text-surface-400">
               {{ skill.label }}
             </label>
             <InputNumber
-              v-model="manualSkills[skill.key]"
+              v-model="manualSkills[skill.id]"
               :min="1"
               :max="3000"
               :step="1"
               class="w-full"
-              :class="getSkillInputClass(skill.key)"
+              :class="getSkillInputClass(skill.id)"
             />
           </div>
         </div>
         
         <!-- Profile Skills Display -->
         <div v-else-if="activeProfile" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div v-for="skill in nanoSkills" :key="skill.key" class="flex flex-col gap-1">
+          <div v-for="skill in nanoSkills" :key="skill.id" class="flex flex-col gap-1">
             <label class="text-xs font-medium text-surface-600 dark:text-surface-400">
               {{ skill.label }}
             </label>
             <div class="p-2 bg-surface-200 dark:bg-surface-700 rounded text-center font-mono">
-              {{ getSkillValue(skill.key) || 1 }}
+              {{ getSkillValue(skill.id) || 1 }}
             </div>
           </div>
         </div>
@@ -258,6 +258,8 @@ import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Tag from 'primevue/tag';
 import type { NanoProgram } from '@/types/nano';
+import { skillService } from '@/services/skill-service';
+import type { SkillId } from '@/types/skills';
 
 // Stores
 const profileStore = useTinkerProfilesStore();
@@ -284,29 +286,55 @@ const selectedSchool = ref<string | null>(null);
 const searchQuery = ref('');
 const loading = ref(false);
 
-// Manual skills input
-const manualSkills = ref<Record<string, number>>({
-  matter_metamorphosis: 1,
-  biological_metamorphosis: 1,
-  psychological_modifications: 1,
-  matter_creation: 1,
-  time_and_space: 1,
-  sensory_improvement: 1,
-  nano_pool: 1,
-  computer_literacy: 1
-});
+// Manual skills input - using numeric skill IDs
+const manualSkills = ref<Record<number, number>>({});
 
-// Nano skills configuration
-const nanoSkills = [
-  { key: 'matter_metamorphosis', label: 'Matter Meta' },
-  { key: 'biological_metamorphosis', label: 'Bio Meta' },
-  { key: 'psychological_modifications', label: 'Psych Modi' },
-  { key: 'matter_creation', label: 'Matter Creat' },
-  { key: 'time_and_space', label: 'Time & Space' },
-  { key: 'sensory_improvement', label: 'Sensory Imp' },
-  { key: 'nano_pool', label: 'Nano Pool' },
-  { key: 'computer_literacy', label: 'Comp Lit' }
-];
+// Initialize manual skills with default values
+const initializeManualSkills = () => {
+  const skillDefaults = [
+    { name: 'Matter Metamorphosis', defaultValue: 1 },
+    { name: 'Biological Metamorphosis', defaultValue: 1 },
+    { name: 'Psychological Modifications', defaultValue: 1 },
+    { name: 'Matter Creation', defaultValue: 1 },
+    { name: 'Time and Space', defaultValue: 1 },
+    { name: 'Sensory Improvement', defaultValue: 1 },
+    { name: 'Nano Pool', defaultValue: 1 },
+    { name: 'Computer Literacy', defaultValue: 1 }
+  ];
+
+  skillDefaults.forEach(({ name, defaultValue }) => {
+    try {
+      const skillId = skillService.resolveId(name);
+      manualSkills.value[Number(skillId)] = defaultValue;
+    } catch (error) {
+      console.warn(`Failed to resolve skill: ${name}`, error);
+    }
+  });
+};
+
+// Nano skills configuration - using skill IDs
+const nanoSkills = computed(() => {
+  const skillNames = [
+    { name: 'Matter Metamorphosis', label: 'Matter Meta' },
+    { name: 'Biological Metamorphosis', label: 'Bio Meta' },
+    { name: 'Psychological Modifications', label: 'Psych Modi' },
+    { name: 'Matter Creation', label: 'Matter Creat' },
+    { name: 'Time and Space', label: 'Time & Space' },
+    { name: 'Sensory Improvement', label: 'Sensory Imp' },
+    { name: 'Nano Pool', label: 'Nano Pool' },
+    { name: 'Computer Literacy', label: 'Comp Lit' }
+  ];
+
+  return skillNames.map(({ name, label }) => {
+    try {
+      const skillId = skillService.resolveId(name);
+      return { id: Number(skillId), label, name };
+    } catch (error) {
+      console.warn(`Failed to resolve skill: ${name}`, error);
+      return null;
+    }
+  }).filter(Boolean) as Array<{ id: number; label: string; name: string }>;
+});
 
 // Computed properties
 const activeProfile = computed(() => {
@@ -328,21 +356,19 @@ const currentSkills = computed(() => {
   if (useManualSkills.value) {
     return manualSkills.value;
   }
-  
+
   if (activeProfile.value) {
-    const skills = (activeProfile.value as any).skills;
-    return {
-      matter_metamorphosis: skills['Matter Metamorphosis'] || 1,
-      biological_metamorphosis: skills['Biological Metamorphosis'] || 1,
-      psychological_modifications: skills['Psychological Modifications'] || 1,
-      matter_creation: skills['Matter Creation'] || 1,
-      time_and_space: skills['Time and Space'] || 1,
-      sensory_improvement: skills['Sensory Improvement'] || 1,
-      nano_pool: skills['Nano Pool'] || 1,
-      computer_literacy: skills['Computer Literacy'] || 1
-    };
+    const profileSkills = (activeProfile.value as any).skills;
+    const result: Record<number, number> = {};
+
+    // Convert profile skills from name-based to ID-based
+    nanoSkills.value.forEach(({ id, name }) => {
+      result[id] = profileSkills[id] || profileSkills[name] || 1;
+    });
+
+    return result;
   }
-  
+
   return {};
 });
 
@@ -407,12 +433,12 @@ function onProfileChange() {
   }
 }
 
-function getSkillValue(skillKey: string): number {
-  return (currentSkills.value as any)[skillKey] || 1;
+function getSkillValue(skillId: number): number {
+  return currentSkills.value[skillId] || 1;
 }
 
-function getSkillInputClass(skillKey: string): string {
-  const value = manualSkills.value[skillKey];
+function getSkillInputClass(skillId: number): string {
+  const value = manualSkills.value[skillId];
   if (value >= 1000) return 'skill-high';
   if (value >= 500) return 'skill-medium';
   return 'skill-low';
@@ -447,6 +473,9 @@ function getOffensiveEffects(nano: NanoProgram): string[] {
 onMounted(async () => {
   setLoading(true, 'Loading nano programs and profiles');
   try {
+    // Initialize manual skills with ID-based structure
+    initializeManualSkills();
+
     // Load nanos if not already loaded
     if (nanosStore.nanos.length === 0) {
       await nanosStore.fetchNanos();

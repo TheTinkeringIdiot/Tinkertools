@@ -26,7 +26,7 @@ export type {
 export {
   createDefaultProfile,
   createDefaultNanoProfile,
-  getDefaultSkillsForBreed,
+  createDefaultSkillsV4,
   ANARCHY_PROFESSIONS,
   ANARCHY_BREEDS,
   ANARCHY_FACTIONS,
