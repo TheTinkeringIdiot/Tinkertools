@@ -34,129 +34,7 @@ export class ProfileTransformer {
   // Profile Format Transformations
   // ============================================================================
   
-  /**
-   * Convert TinkerProfile to NanoCompatibleProfile
-   */
-  toNanoCompatible(profile: TinkerProfile): NanoCompatibleProfile {
-    const nanoProfile: NanoCompatibleProfile = {
-      id: profile.id,
-      name: profile.Character.Name,
-      profession: profile.Character.Profession,
-      level: profile.Character.Level,
-      skills: {},
-      stats: {},
-      activeNanos: [],
-      memoryCapacity: 500, // Default value
-      nanoPoints: 1000 // Default value
-    };
-    
-    // Map attributes to stats
-    if (profile.Skills.Attributes) {
-      nanoProfile.stats = {
-        'Strength': profile.Skills.Attributes.Strength?.value || 10,
-        'Stamina': profile.Skills.Attributes.Stamina?.value || 10,
-        'Agility': profile.Skills.Attributes.Agility?.value || 10,
-        'Sense': profile.Skills.Attributes.Sense?.value || 10,
-        'Intelligence': profile.Skills.Attributes.Intelligence?.value || 10,
-        'Psychic': profile.Skills.Attributes.Psychic?.value || 10
-      };
-    }
-    
-    // Map nano schools and relevant skills
-    if (profile.Skills['Nanos & Casting']) {
-      const nanoCasting = profile.Skills['Nanos & Casting'];
-      nanoProfile.skills['Biological Metamorphosis'] = nanoCasting['Bio Metamor']?.value || 1;
-      nanoProfile.skills['Matter Creation'] = nanoCasting['Matter Crea']?.value || 1;
-      nanoProfile.skills['Matter Metamorphosis'] = nanoCasting['Matt. Metam']?.value || 1;
-      nanoProfile.skills['Psychological Modifications'] = nanoCasting['Psycho Modi']?.value || 1;
-      nanoProfile.skills['Sensory Improvement'] = nanoCasting['Sensory Impr']?.value || 1;
-      nanoProfile.skills['Time and Space'] = nanoCasting['Time&Space']?.value || 1;
-    }
-    
-    // Map core skills
-    if (profile.Skills['Trade & Repair']) {
-      nanoProfile.skills['Nano Programming'] = profile.Skills['Trade & Repair']['Nano Progra']?.value || 1;
-      nanoProfile.skills['Computer Literacy'] = profile.Skills['Trade & Repair']['Comp. Liter']?.value || 1;
-      nanoProfile.skills['Tutoring'] = profile.Skills['Trade & Repair']['Tutoring']?.value || 1;
-    }
-    
-    if (profile.Skills['Combat & Healing']) {
-      nanoProfile.skills['First Aid'] = profile.Skills['Combat & Healing']['First Aid']?.value || 1;
-      nanoProfile.skills['Treatment'] = profile.Skills['Combat & Healing']['Treatment']?.value || 1;
-    }
-    
-    // Estimate memory capacity based on level and profession
-    nanoProfile.memoryCapacity = this.estimateMemoryCapacity(profile.Character.Level, profile.Character.Profession);
-    
-    // Estimate nano points based on level and intelligence
-    const intel = profile.Skills.Attributes?.Intelligence?.value || 10;
-    nanoProfile.nanoPoints = this.estimateNanoPoints(profile.Character.Level, intel);
-    
-    return nanoProfile;
-  }
   
-  /**
-   * Convert NanoCompatibleProfile to TinkerProfile
-   */
-  fromNanoCompatible(nanoProfile: NanoCompatibleProfile): TinkerProfile {
-    const profile = createDefaultProfile(nanoProfile.name);
-    
-    // Update basic character info
-    profile.Character.Name = nanoProfile.name;
-    profile.Character.Profession = nanoProfile.profession;
-    profile.Character.Level = nanoProfile.level;
-    
-    // Map stats to attributes
-    if (nanoProfile.stats) {
-      profile.Skills.Attributes.Strength.value = nanoProfile.stats.Strength || 10;
-      profile.Skills.Attributes.Stamina.value = nanoProfile.stats.Stamina || 10;
-      profile.Skills.Attributes.Agility.value = nanoProfile.stats.Agility || 10;
-      profile.Skills.Attributes.Sense.value = nanoProfile.stats.Sense || 10;
-      profile.Skills.Attributes.Intelligence.value = nanoProfile.stats.Intelligence || 10;
-      profile.Skills.Attributes.Psychic.value = nanoProfile.stats.Psychic || 10;
-    }
-    
-    // Map nano skills
-    if (nanoProfile.skills) {
-      if (nanoProfile.skills['Biological Metamorphosis']) {
-        profile.Skills['Nanos & Casting']['Bio Metamor'].value = nanoProfile.skills['Biological Metamorphosis'];
-      }
-      if (nanoProfile.skills['Matter Creation']) {
-        profile.Skills['Nanos & Casting']['Matter Crea'].value = nanoProfile.skills['Matter Creation'];
-      }
-      if (nanoProfile.skills['Matter Metamorphosis']) {
-        profile.Skills['Nanos & Casting']['Matt. Metam'].value = nanoProfile.skills['Matter Metamorphosis'];
-      }
-      if (nanoProfile.skills['Psychological Modifications']) {
-        profile.Skills['Nanos & Casting']['Psycho Modi'].value = nanoProfile.skills['Psychological Modifications'];
-      }
-      if (nanoProfile.skills['Sensory Improvement']) {
-        profile.Skills['Nanos & Casting']['Sensory Impr'].value = nanoProfile.skills['Sensory Improvement'];
-      }
-      if (nanoProfile.skills['Time and Space']) {
-        profile.Skills['Nanos & Casting']['Time&Space'].value = nanoProfile.skills['Time and Space'];
-      }
-      
-      // Map other skills
-      if (nanoProfile.skills['Nano Programming']) {
-        profile.Skills['Trade & Repair']['Nano Progra'].value = nanoProfile.skills['Nano Programming'];
-      }
-      if (nanoProfile.skills['Computer Literacy']) {
-        profile.Skills['Trade & Repair']['Comp. Liter'].value = nanoProfile.skills['Computer Literacy'];
-      }
-      if (nanoProfile.skills['Tutoring']) {
-        profile.Skills['Trade & Repair']['Tutoring'].value = nanoProfile.skills['Tutoring'];
-      }
-      if (nanoProfile.skills['First Aid']) {
-        profile.Skills['Combat & Healing']['First Aid'].value = nanoProfile.skills['First Aid'];
-      }
-      if (nanoProfile.skills['Treatment']) {
-        profile.Skills['Combat & Healing']['Treatment'].value = nanoProfile.skills['Treatment'];
-      }
-    }
-    
-    return profile;
-  }
   
   // ============================================================================
   // Export/Import Transformations
@@ -170,11 +48,6 @@ export class ProfileTransformer {
       case 'json':
         return this.exportJSONFormat(profile);
 
-      case 'legacy':
-        return this.exportLegacyFormat(profile);
-
-      case 'anarchy_online':
-        return this.exportAOFormat(profile);
 
       default:
         throw new Error(`Unsupported export format: ${format}`);
@@ -194,44 +67,48 @@ export class ProfileTransformer {
         migrated: false
       }
     };
-    
+
     try {
       // Try to detect format if not specified
       const detectedFormat = sourceFormat || this.detectFormat(data);
       result.metadata.source = detectedFormat;
       result.metadata.originalFormat = detectedFormat;
-      
+
+      // Reject unsupported formats immediately
+      if (detectedFormat === 'unsupported_legacy') {
+        result.errors.push('Profile format not supported. Only v4.0.0 profiles can be imported.');
+        return result;
+      }
+
       let profile: TinkerProfile;
-      
+
       switch (detectedFormat) {
         case 'json':
           profile = this.importFromJSON(data, result);
           break;
-          
-        case 'legacy':
-          profile = this.importFromLegacy(data, result);
-          break;
-          
-        case 'anarchy_online':
-          profile = this.importFromAO(data, result);
-          break;
-          
+
         case 'aosetups':
           profile = await this.importFromAOSetups(data, result);
           break;
-          
+
         default:
           result.errors.push('Unable to detect or unsupported format');
           return result;
       }
-      
+
+      // Verify imported profile version === '4.0.0' before returning success
+      if (profile.version !== '4.0.0') {
+        result.errors.push(`Invalid profile version: ${profile.version}. Only v4.0.0 supported.`);
+        return result;
+      }
+
       result.profile = profile;
       result.success = true;
-      
+
     } catch (error) {
       result.errors.push(error instanceof Error ? error.message : 'Import failed');
     }
-    
+
     return result;
   }
   
@@ -240,6 +117,11 @@ export class ProfileTransformer {
   // ============================================================================
 
   private exportJSONFormat(profile: TinkerProfile): string {
+    // Verify profile is v4.0.0
+    if (profile.version !== '4.0.0') {
+      throw new Error(`Cannot export profile version ${profile.version}. Only v4.0.0 supported.`);
+    }
+
     // Export profile in v4.0.0 format with numeric skill IDs
     const exportData = {
       version: "4.0.0",
@@ -259,54 +141,7 @@ export class ProfileTransformer {
     return JSON.stringify(exportData, null, 2);
   }
   
-  private exportLegacyFormat(profile: TinkerProfile): string {
-    // Export in the legacy TinkerProfiles format with converted perks
-    const legacy = {
-      character: {
-        name: profile.Character.Name,
-        level: profile.Character.Level,
-        profession: profile.Character.Profession,
-        breed: profile.Character.Breed,
-        faction: profile.Character.Faction
-      },
-      skills: profile.Skills,
-      equipment: {
-        weapons: profile.Weapons,
-        clothing: profile.Clothing,
-        implants: profile.Implants
-      },
-      // Convert structured perks back to legacy array format for compatibility
-      perksAndResearch: this.convertToLegacyPerks(profile.PerksAndResearch),
-      metadata: {
-        created: profile.created,
-        version: profile.version,
-        perkFormat: 'legacy-array'
-      }
-    };
-
-    return JSON.stringify(legacy, null, 2);
-  }
   
-  private exportAOFormat(profile: TinkerProfile): string {
-    // Export in a format similar to Anarchy Online's character export
-    const aoFormat = {
-      CharacterName: profile.Character.Name,
-      Level: profile.Character.Level,
-      Profession: profile.Character.Profession,
-      Breed: profile.Character.Breed,
-      Faction: profile.Character.Faction,
-      Skills: this.flattenSkills(profile.Skills),
-      Equipment: {
-        ...profile.Weapons,
-        ...profile.Clothing,
-        ...profile.Implants
-      },
-      // Add perk data in a simple format for AO compatibility
-      Perks: this.convertToAOPerks(profile.PerksAndResearch)
-    };
-
-    return JSON.stringify(aoFormat, null, 2);
-  }
   
   private importFromJSON(data: string, result: ProfileImportResult): TinkerProfile {
     const parsed = JSON.parse(data);
@@ -330,64 +165,7 @@ export class ProfileTransformer {
     return this.convertToTinkerProfile(parsed, result);
   }
   
-  private importFromLegacy(data: string, result: ProfileImportResult): TinkerProfile {
-    const legacy = JSON.parse(data);
-    result.metadata.migrated = true;
-
-    const profile = createDefaultProfile();
-
-    if (legacy.character) {
-      profile.Character.Name = legacy.character.name || 'Imported Character';
-      profile.Character.Level = legacy.character.level || 1;
-      profile.Character.Profession = legacy.character.profession || 'Adventurer';
-      profile.Character.Breed = legacy.character.breed || 'Solitus';
-      profile.Character.Faction = legacy.character.faction || 'Neutral';
-    }
-
-    if (legacy.skills) {
-      profile.Skills = { ...profile.Skills, ...legacy.skills };
-    }
-
-    if (legacy.equipment) {
-      if (legacy.equipment.weapons) profile.Weapons = legacy.equipment.weapons;
-      if (legacy.equipment.clothing) profile.Clothing = legacy.equipment.clothing;
-      if (legacy.equipment.implants) profile.Implants = legacy.equipment.implants;
-    }
-
-    // Import perk data from legacy format
-    profile.PerksAndResearch = this.importPerksFromData(legacy, result);
-
-    result.warnings.push('Profile migrated from legacy format');
-
-    // Ensure perk system is migrated with point calculation
-    return this.migrateProfilePerks(profile);
-  }
   
-  private importFromAO(data: string, result: ProfileImportResult): TinkerProfile {
-    const ao = JSON.parse(data);
-    result.metadata.migrated = true;
-
-    const profile = createDefaultProfile();
-
-    profile.Character.Name = ao.CharacterName || 'AO Import';
-    profile.Character.Level = ao.Level || 1;
-    profile.Character.Profession = ao.Profession || 'Adventurer';
-    profile.Character.Breed = ao.Breed || 'Solitus';
-    profile.Character.Faction = ao.Faction || 'Neutral';
-
-    if (ao.Skills) {
-      // Unflatten skills back to categorized structure
-      this.unflattenSkills(ao.Skills, profile.Skills);
-    }
-
-    // Import perk data from AO format
-    profile.PerksAndResearch = this.importPerksFromData(ao, result);
-
-    result.warnings.push('Profile imported from Anarchy Online format');
-
-    // Ensure perk system is migrated with point calculation
-    return this.migrateProfilePerks(profile);
-  }
   
   private async importFromAOSetups(data: string, result: ProfileImportResult): Promise<TinkerProfile> {
     const aosetups = JSON.parse(data);
@@ -571,50 +349,6 @@ export class ProfileTransformer {
       profile.skills[numericId].buffBonus;
   }
 
-  /**
-   * Legacy method for backwards compatibility - now deprecated in v4.0.0
-   * @deprecated Use mapNormalizedSkillToProfile with SkillService.resolveId() instead
-   */
-  private mapAOSetupsSkill(skill: any, profile: TinkerProfile, result: ProfileImportResult): void {
-    // This method is kept for backwards compatibility but should not be used in v4.0.0
-    result.warnings.push('Using deprecated skill mapping method - consider updating to v4.0.0 format');
-
-    const skillName = skill.name;
-    const ipExpenditure = skill.ipExpenditure || 0;
-    const pointsFromIp = skill.pointsFromIp || 0;
-
-    // Check if this skill exists in SKILL_ID_MAP (now includes AOSetups variants)
-    const skillId = getSkillId(skillName);
-    if (!skillId) {
-      result.warnings.push(`Unknown skill mapping: ${skillName}`);
-      return;
-    }
-
-    // Find which category and key this skill belongs to using SKILL_CATEGORIES
-    let foundCategory: keyof typeof profile.Skills | null = null;
-    let foundKey: string | null = null;
-
-    // Search through SKILL_CATEGORIES to find the skill
-    for (const [category, skills] of Object.entries(SKILL_CATEGORIES)) {
-      if (skills.includes(skillName)) {
-        foundCategory = category as keyof typeof profile.Skills;
-        foundKey = skillName;
-        break;
-      }
-    }
-
-    if (foundCategory && foundKey && profile.Skills[foundCategory]) {
-      const categorySkills = profile.Skills[foundCategory] as Record<string, any>;
-      if (categorySkills[foundKey]) {
-        categorySkills[foundKey].ipSpent = ipExpenditure;
-        categorySkills[foundKey].pointFromIp = pointsFromIp;
-        // Calculate total value (base + IP points)
-        categorySkills[foundKey].value = (categorySkills[foundKey].value || 0) + pointsFromIp;
-      }
-    } else {
-      result.warnings.push(`Skill '${skillName}' not found in profile categories`);
-    }
-  }
   
   private async mapAOSetupsEquipment(aosetups: any, profile: TinkerProfile, result: ProfileImportResult): Promise<void> {
     // First pass: collect all item requests
@@ -1056,29 +790,24 @@ export class ProfileTransformer {
   private detectFormat(data: string): string {
     try {
       const parsed = JSON.parse(data);
-      
-      // Check for TinkerProfile format
-      if (parsed.Character && parsed.Skills && parsed.version) {
+
+      // Check for v4.0.0 TinkerProfile format
+      if (parsed.Character && parsed.skills && parsed.version === '4.0.0') {
         return 'json';
       }
-      
+
       // Check for AOSetups format
       if (parsed.character && parsed.implants && parsed.weapons && parsed.clothes) {
         return 'aosetups';
       }
-      
-      // Check for legacy format
-      if (parsed.character && parsed.skills) {
-        return 'legacy';
+
+      // Check for unsupported legacy formats (v3.0.0 or Skills property with non-4.0.0 version)
+      if (parsed.Character && parsed.Skills && parsed.version !== '4.0.0') {
+        return 'unsupported_legacy';
       }
-      
-      // Check for AO format
-      if (parsed.CharacterName && parsed.Profession && parsed.Skills) {
-        return 'anarchy_online';
-      }
-      
-      return 'json'; // Default assumption
-      
+
+      return 'unknown';
+
     } catch {
       return 'unknown';
     }
@@ -1090,16 +819,16 @@ export class ProfileTransformer {
       data.id &&
       data.Character &&
       data.Character.Name &&
-      data.Skills &&
-      data.version
+      data.skills &&
+      data.version === '4.0.0'
     );
   }
   
   private convertToTinkerProfile(data: any, result: ProfileImportResult): TinkerProfile {
     const profile = createDefaultProfile();
 
-    // Check if this looks like an incomplete TinkerProfile
-    if (data.Character && data.Skills) {
+    // Check if this looks like an incomplete v4.0.0 TinkerProfile
+    if (data.Character && data.skills) {
       // Copy all Character data
       if (data.Character.Name) profile.Character.Name = data.Character.Name;
       if (data.Character.Level) profile.Character.Level = data.Character.Level;
@@ -1109,9 +838,9 @@ export class ProfileTransformer {
       if (data.Character.Expansion) profile.Character.Expansion = data.Character.Expansion;
       if (data.Character.AccountType) profile.Character.AccountType = data.Character.AccountType;
 
-      // Copy Skills if present
-      if (data.Skills) {
-        profile.Skills = { ...profile.Skills, ...data.Skills };
+      // Copy skills if present (v4.0.0 format with numeric IDs)
+      if (data.skills) {
+        profile.skills = { ...profile.skills, ...data.skills };
       }
 
       // Copy Equipment if present
@@ -1314,81 +1043,7 @@ export class ProfileTransformer {
     };
   }
 
-  /**
-   * Convert structured PerkSystem to legacy array format
-   */
-  private convertToLegacyPerks(perkSystem: any): any[] {
-    const legacyPerks: any[] = [];
 
-    if (!perkSystem || typeof perkSystem !== 'object') {
-      return legacyPerks;
-    }
-
-    // Add SL and AI perks
-    if (Array.isArray(perkSystem.perks)) {
-      for (const perk of perkSystem.perks) {
-        legacyPerks.push({
-          aoid: perk.aoid,
-          name: perk.name,
-          level: perk.level,
-          type: perk.type
-        });
-      }
-    }
-
-    // Add LE research
-    if (Array.isArray(perkSystem.research)) {
-      for (const research of perkSystem.research) {
-        legacyPerks.push({
-          aoid: research.aoid,
-          name: research.name,
-          level: research.level,
-          type: research.type
-        });
-      }
-    }
-
-    return legacyPerks;
-  }
-
-  /**
-   * Convert PerkSystem to AO-compatible format
-   */
-  private convertToAOPerks(perkSystem: any): any[] {
-    const aoPerks: any[] = [];
-
-    if (!perkSystem || typeof perkSystem !== 'object') {
-      return aoPerks;
-    }
-
-    // Convert SL and AI perks to simple format
-    if (Array.isArray(perkSystem.perks)) {
-      for (const perk of perkSystem.perks) {
-        aoPerks.push({
-          aoid: perk.aoid,
-          name: perk.name,
-          level: perk.level,
-          type: perk.type,
-          category: perk.type === 'AI' ? 'Alien' : 'Standard'
-        });
-      }
-    }
-
-    // Convert LE research
-    if (Array.isArray(perkSystem.research)) {
-      for (const research of perkSystem.research) {
-        aoPerks.push({
-          aoid: research.aoid,
-          name: research.name,
-          level: research.level,
-          type: research.type,
-          category: 'Research'
-        });
-      }
-    }
-
-    return aoPerks;
-  }
 
   /**
    * Import perks from various formats and normalize to PerkSystem
@@ -1498,45 +1153,5 @@ export class ProfileTransformer {
     return base + levelBonus + intelBonus;
   }
   
-  private flattenSkills(skills: TinkerProfile['Skills']): Record<string, number> {
-    const flattened: Record<string, number> = {};
-    
-    Object.entries(skills).forEach(([category, categorySkills]) => {
-      if (typeof categorySkills === 'object' && categorySkills !== null) {
-        Object.entries(categorySkills).forEach(([skill, value]) => {
-          if (typeof value === 'number') {
-            // Handle Misc category which uses raw numbers
-            flattened[`${category}.${skill}`] = value;
-          } else if (value && typeof value === 'object' && 'value' in value) {
-            // Handle other categories which use SkillWithIP structure
-            flattened[`${category}.${skill}`] = value.value;
-          }
-        });
-      }
-    });
-    
-    return flattened;
-  }
   
-  private unflattenSkills(flatSkills: Record<string, number>, targetSkills: TinkerProfile['Skills']): void {
-    Object.entries(flatSkills).forEach(([key, value]) => {
-      const parts = key.split('.');
-      if (parts.length === 2) {
-        const [category, skill] = parts;
-        if (targetSkills[category as keyof typeof targetSkills]) {
-          if (category === 'Misc') {
-            // Handle Misc category which uses raw numbers
-            const categorySkills = targetSkills[category as keyof typeof targetSkills] as Record<string, number>;
-            categorySkills[skill] = value;
-          } else {
-            // Handle other categories which use SkillWithIP structure
-            const categorySkills = targetSkills[category as keyof typeof targetSkills] as Record<string, any>;
-            if (categorySkills[skill] && typeof categorySkills[skill] === 'object' && 'value' in categorySkills[skill]) {
-              categorySkills[skill].value = value;
-            }
-          }
-        }
-      }
-    });
-  }
 }

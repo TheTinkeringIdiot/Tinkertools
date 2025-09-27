@@ -3,6 +3,7 @@ import type { TinkerProfile, Item } from '@/lib/tinkerprofiles/types';
 import { createDefaultProfile } from '@/lib/tinkerprofiles/constants';
 import { calculateEquipmentBonuses } from '@/services/equipment-bonus-calculator';
 import { updateProfileSkillInfo } from '@/lib/tinkerprofiles/ip-integrator';
+import { skillService } from '@/services/skill-service';
 
 describe('MaxNCU Equipment Bonus Application', () => {
   let profile: TinkerProfile;
@@ -45,9 +46,10 @@ describe('MaxNCU Equipment Bonus Application', () => {
     // Apply bonuses to profile
     updateProfileSkillInfo(profile, equipmentBonuses);
 
-    // Verify Max NCU in Misc skills was updated
-    expect(profile.Skills.Misc['Max NCU'].equipmentBonus).toBe(25);
-    expect(profile.Skills.Misc['Max NCU'].value).toBe(25); // 0 base + 25 equipment
+    // Verify Max NCU skill was updated
+    const maxNCUSkillId = skillService.resolveId('Max NCU');
+    expect(profile.skills[maxNCUSkillId].equipmentBonus).toBe(25);
+    expect(profile.skills[maxNCUSkillId].value).toBe(25); // 0 base + 25 equipment
   });
 
   it('should stack MaxNCU bonuses from multiple items', () => {
@@ -102,8 +104,9 @@ describe('MaxNCU Equipment Bonus Application', () => {
     updateProfileSkillInfo(profile, equipmentBonuses);
 
     // Verify total bonus applied
-    expect(profile.Skills.Misc['Max NCU'].equipmentBonus).toBe(50);
-    expect(profile.Skills.Misc['Max NCU'].value).toBe(50);
+    const maxNCUSkillId = skillService.resolveId('Max NCU');
+    expect(profile.skills[maxNCUSkillId].equipmentBonus).toBe(50);
+    expect(profile.skills[maxNCUSkillId].value).toBe(50);
   });
 
   it('should handle negative MaxNCU modifiers', () => {
@@ -134,8 +137,9 @@ describe('MaxNCU Equipment Bonus Application', () => {
 
     updateProfileSkillInfo(profile, equipmentBonuses);
 
-    expect(profile.Skills.Misc['Max NCU'].equipmentBonus).toBe(-15);
-    expect(profile.Skills.Misc['Max NCU'].value).toBe(-15); // Can go negative
+    const maxNCUSkillId = skillService.resolveId('Max NCU');
+    expect(profile.skills[maxNCUSkillId].equipmentBonus).toBe(-15);
+    expect(profile.skills[maxNCUSkillId].value).toBe(-15); // Can go negative
   });
 
   it('should combine MaxNCU with other misc skill bonuses', () => {
@@ -184,14 +188,18 @@ describe('MaxNCU Equipment Bonus Application', () => {
 
     updateProfileSkillInfo(profile, equipmentBonuses);
 
-    console.log('Misc skills after update:', profile.Skills.Misc);
+    console.log('Skills after update:', Object.keys(profile.skills));
 
-    // Verify all applied to Misc skills (using abbreviated names in profile)
-    expect(profile.Skills.Misc['Max NCU'].equipmentBonus).toBe(35);
-    expect(profile.Skills.Misc['Max NCU'].value).toBe(35);
-    expect(profile.Skills.Misc['Add All Off.'].equipmentBonus).toBe(10);
-    expect(profile.Skills.Misc['Add All Off.'].value).toBe(10);
-    expect(profile.Skills.Misc['Add All Def.'].equipmentBonus).toBe(15);
-    expect(profile.Skills.Misc['Add All Def.'].value).toBe(15);
+    // Verify all skill bonuses were applied
+    const maxNCUSkillId = skillService.resolveId('Max NCU');
+    const addAllOffSkillId = skillService.resolveId('Add All Offense');
+    const addAllDefSkillId = skillService.resolveId('Add All Defense');
+
+    expect(profile.skills[maxNCUSkillId].equipmentBonus).toBe(35);
+    expect(profile.skills[maxNCUSkillId].value).toBe(35);
+    expect(profile.skills[addAllOffSkillId].equipmentBonus).toBe(10);
+    expect(profile.skills[addAllOffSkillId].value).toBe(10);
+    expect(profile.skills[addAllDefSkillId].equipmentBonus).toBe(15);
+    expect(profile.skills[addAllDefSkillId].value).toBe(15);
   });
 });

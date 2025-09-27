@@ -112,11 +112,11 @@ Modal for importing profiles from various formats
       
       <!-- Format Detection -->
       <div v-if="detectedFormat" class="field">
-        <div v-if="detectedFormat.includes('Unsupported')" class="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+        <div v-if="detectedFormat && detectedFormat.includes('Unsupported')" class="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
           <i class="pi pi-times-circle text-red-600 dark:text-red-400"></i>
           <div class="text-red-700 dark:text-red-300">
-            <strong>Detected format: {{ detectedFormat }}</strong>
-            <p class="text-sm mt-1">This format is no longer supported. Please recreate your profile or import from AOSetups.</p>
+            <strong>{{ detectedFormat }}</strong>
+            <p class="text-sm mt-1">This profile format is not supported. Please create a new profile or import from AOSetups.</p>
           </div>
         </div>
         <div v-else class="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
@@ -427,19 +427,19 @@ function detectFormat(data: string): string {
       return `TinkerProfiles Bulk Export (${actualCount} profile${actualCount !== 1 ? 's' : ''})`;
     }
 
-    // Check for v3.0.0 TinkerProfile format (DEPRECATED - NOT SUPPORTED)
-    if (parsed.Character && parsed.Skills && parsed.version === '3.0.0') {
-      return 'TinkerProfile v3.0.0 (Unsupported)';
-    }
-
     // Check for v4.0.0 TinkerProfile format (SUPPORTED)
     if (parsed.Character && parsed.skills && parsed.version === '4.0.0') {
       return 'TinkerProfile v4.0.0';
     }
 
-    // Check for TinkerProfile format (unknown version)
-    if (parsed.Character && (parsed.Skills || parsed.skills) && parsed.version) {
-      return `TinkerProfile ${parsed.version}`;
+    // Check for v3.0.0 or other legacy TinkerProfile formats (UNSUPPORTED)
+    if (parsed.Character && (parsed.Skills || parsed.version !== '4.0.0')) {
+      return 'Unsupported Legacy Format';
+    }
+
+    // Check for AOSetups format
+    if (parsed.character && parsed.implants && parsed.weapons && parsed.clothes) {
+      return 'AOSetups';
     }
 
     // Check for legacy format
@@ -457,7 +457,7 @@ function detectFormat(data: string): string {
       return 'Nano-Compatible Profile';
     }
 
-    return 'Generic JSON';
+    return 'Unknown Format';
 
   } catch {
     return 'Unknown Format';

@@ -385,30 +385,37 @@ async function exportProfile() {
 }
 
 
-async function handleSkillChange(category: string, skillName: string, newValue: number) {
+async function handleSkillChange(category: string, skillId: string | number, newValue: number) {
   try {
-    // Convert skill name to ID using SkillService
-    const skillId = skillService.resolveId(skillName);
-    await profilesStore.modifySkill(props.profileId, skillId, newValue);
+    // Convert to number if it's a string ID
+    const numericSkillId = typeof skillId === 'string' ? Number(skillId) : skillId;
+    await profilesStore.modifySkill(props.profileId, numericSkillId, newValue);
 
-    // Reload profile to get updated data
-    await loadProfile();
+    // Update local profileData from store's updated activeProfile
+    const updatedProfile = profilesStore.activeProfile;
+    if (updatedProfile) {
+      profileData.value = updatedProfile;
+    }
   } catch (err) {
     console.error('Failed to modify skill:', err);
     error.value = err instanceof Error ? err.message : 'Failed to modify skill';
   }
 }
 
-async function handleAbilityChange(abilityName: string, newValue: number) {
+async function handleAbilityChange(abilityId: string | number, newValue: number) {
   try {
-    // Convert ability name to ID using SkillService
-    const abilityId = skillService.resolveId(abilityName);
-    await profilesStore.modifySkill(props.profileId, abilityId, newValue);
+    // Convert to number if it's a string ID
+    const numericAbilityId = typeof abilityId === 'string' ? Number(abilityId) : abilityId;
+    await profilesStore.modifySkill(props.profileId, numericAbilityId, newValue);
 
-    // Reload profile to get updated data with trickle-down effects
-    await loadProfile();
+    // Update local profileData from store's updated activeProfile
+    const updatedProfile = profilesStore.activeProfile;
+    if (updatedProfile) {
+      profileData.value = updatedProfile;
+    }
 
     // Show feedback about ability change
+    const abilityName = skillService.getName(numericAbilityId);
     console.info(`✨ Ability ${abilityName} updated to ${newValue}`);
   } catch (err) {
     console.error('Failed to modify ability:', err);

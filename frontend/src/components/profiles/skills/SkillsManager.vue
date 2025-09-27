@@ -87,7 +87,7 @@ const props = defineProps<{
 
 // Emits
 const emit = defineEmits<{
-  'skill-changed': [category: string, skillName: string, newValue: number];
+  'skill-changed': [category: string, skillId: number, newValue: number];
   'ability-changed': [abilityName: string, newValue: number];
 }>();
 
@@ -235,16 +235,9 @@ function handleAbilityChange(abilityName: string, newValue: number) {
 }
 
 function handleSkillChange(category: string, skillId: string, newValue: number) {
-  // Convert skill ID back to skill name for the emit event
-  // The parent component may still expect skill names until it's also updated
-  try {
-    const skillName = skillService.getName(parseInt(skillId, 10));
-    emit('skill-changed', category, skillName, newValue);
-  } catch (error) {
-    console.warn(`[SkillsManager] Failed to resolve skill name for ID ${skillId}:`, error);
-    // Fallback: emit with ID as string
-    emit('skill-changed', category, skillId, newValue);
-  }
+  // Emit the skill ID as a number for the parent component
+  const numericSkillId = parseInt(skillId, 10);
+  emit('skill-changed', category, numericSkillId, newValue);
 }
 
 function isReadOnlyCategory(categoryName: string): boolean {

@@ -92,24 +92,10 @@ export interface ImplantWithClusters extends Item {
 }
 
 /**
- * TinkerProfile v4.0.0 structure with ID-based skill architecture
+ * TinkerProfile v4.0.0 - ID-based skill architecture
  *
- * Major changes from v3.0.0:
- * - Skills stored in flat map using numeric skill IDs as keys
- * - Unified SkillData interface for all skill types
- * - Equipment, perks, and buffs structures unchanged for compatibility
- *
- * Skill ID structure:
- * - 16-21: Attributes (Strength=16, Stamina=17, Agility=18, Sense=19, Intelligence=20, Psychic=21)
- * - 90-97: ACs (Melee=90, Energy=91, Chemical=92, Radiation=93, Cold=94, Poison=95, Fire=96, Projectile=97)
- * - 100-167: Regular skills (1h Blunt=102, 1h Edged=103, Break & Entry=165, etc.)
- * - 200+: Misc skills (MaxHealth=27, MaxNano=28, etc.)
- *
- * @example
- * // Access skills by ID instead of nested category/name structure
- * profile.skills[102] // 1h Blunt skill data
- * profile.skills[27]  // MaxHealth skill data
- * profile.skills[92]  // Chemical AC skill data
+ * Skills stored as flat map: profile.skills[skillId]
+ * Use SkillService for name resolution and metadata
  */
 export interface TinkerProfile {
   // Profile metadata

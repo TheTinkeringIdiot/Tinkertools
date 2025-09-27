@@ -27,8 +27,8 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
         <!-- Current Value Display with Breakdown -->
         <div class="flex items-center gap-2">
           <span
-            class="text-sm text-surface-600 dark:text-surface-400 min-w-[4rem] text-right cursor-help skill-value-display"
-            v-tooltip.top="simpleTooltipContent"
+            v-if="!isReadOnly"
+            class="text-sm text-surface-600 dark:text-surface-400 min-w-[4rem] text-right skill-value-display"
           >
             {{ totalValue }} / {{ maxTotalValue }}
           </span>
@@ -67,13 +67,14 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
       />
       
       <!-- Input Number for precise entry with proper width -->
-      <div 
-        v-if="costFactorColor" 
+      <div
+        v-if="costFactorColor"
         class="input-gradient-wrapper flex-shrink-0"
-        :style="{ 
+        :style="{
           '--gradient-color-primary': costFactorColor.primary,
-          '--gradient-color-secondary': costFactorColor.secondary 
+          '--gradient-color-secondary': costFactorColor.secondary
         }"
+        v-tooltip.top="simpleTooltipContent"
       >
         <InputNumber
           v-model="inputValue"
@@ -93,6 +94,7 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
         :step="1"
         size="small"
         class="flex-shrink-0"
+        v-tooltip.top="simpleTooltipContent"
         @update:model-value="onInputChanged"
       />
       
@@ -111,7 +113,10 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
     <!-- Read-Only Display (for ACs and Misc) -->
     <div v-else class="flex items-center justify-center py-2">
       <div class="text-center">
-        <div class="text-lg font-bold text-surface-900 dark:text-surface-50 mb-1">
+        <div
+          class="text-lg font-bold text-surface-900 dark:text-surface-50 mb-1 cursor-help"
+          v-tooltip.top="simpleTooltipContent"
+        >
           {{ totalValue }}
         </div>
         <div class="text-xs text-surface-500 dark:text-surface-400">
@@ -218,6 +223,9 @@ const isMiscSkill = computed(() => props.category === 'Misc');
 const baseValue = computed(() => {
   if (props.isAbility) {
     return minValue.value;
+  } else if (props.category === 'ACs') {
+    // ACs have no base value, only bonuses
+    return 0;
   } else if (isMiscSkill.value) {
     // Misc skills use baseValue directly from the MiscSkill object
     return (props.skillData as MiscSkill)?.baseValue || 0;
@@ -228,19 +236,19 @@ const baseValue = computed(() => {
 });
 
 const trickleDownBonus = computed(() => {
-  if (isMiscSkill.value || props.isAbility) {
-    // Misc skills and abilities don't have trickle-down bonuses
+  if (isMiscSkill.value || props.isAbility || props.category === 'ACs') {
+    // Misc skills, abilities, and ACs don't have trickle-down bonuses
     return 0;
   }
-  return (props.skillData as SkillWithIP)?.trickleDown || 0;
+  return props.skillData?.trickle || 0;
 });
 
 const ipContribution = computed(() => {
-  if (isMiscSkill.value || props.isAbility) {
-    // Misc skills don't use IP system, abilities handle IP separately
+  if (isMiscSkill.value || props.isAbility || props.category === 'ACs') {
+    // Misc skills, ACs don't use IP system, abilities handle IP separately
     return 0;
   }
-  return (props.skillData as SkillWithIP)?.pointFromIp || 0;
+  return props.skillData?.pointsFromIp || 0;
 });
 const equipmentBonus = computed(() => props.skillData?.equipmentBonus || 0);
 const perkBonus = computed(() => props.skillData?.perkBonus || 0);
@@ -266,25 +274,30 @@ const equipmentBonusTooltip = computed(() => {
 // Total displayed value (what the user sees)
 const totalValue = computed(() => {
   if (props.isAbility) {
-    // For abilities: use the actual value from profile
-    return sliderValue.value || 0;
+    // For abilities: use the actual value from profile, or breed base if no IP invested
+    return sliderValue.value || minValue.value;
   } else if (props.category === 'ACs') {
-    // For ACs: calculate value on-the-fly from bonuses
-    if (profile) {
-      return calculateSingleACValue(profile, skillName.value);
+    // For ACs: use the total from skill data (already calculated and stored)
+    if (props.skillData?.total !== undefined) {
+      return props.skillData.total;
     }
-    return 0;
+    // Fallback: calculate from bonuses only
+    return equipmentBonus.value + perkBonus.value + buffBonus.value;
   } else if (isMiscSkill.value) {
     // For Misc skills: calculate total from all bonuses
     // The value property should be set by ip-integrator, but calculate as fallback
-    if (props.skillData?.value !== undefined) {
-      return props.skillData.value;
+    if (props.skillData?.total !== undefined) {
+      return props.skillData.total;
     }
     // Fallback: calculate from individual bonuses
     return baseValue.value + equipmentBonus.value + perkBonus.value + buffBonus.value;
   } else {
-    // For regular skills: use the total value from skill data directly
-    return props.skillData?.value || 0;
+    // For regular skills: use the total value from skill data, or calculate from components if not set
+    if (props.skillData?.total !== undefined) {
+      return props.skillData.total;
+    }
+    // Fallback: calculate from base + trickle-down + IP when value isn't set
+    return baseValue.value + trickleDownBonus.value + ipContribution.value;
   }
 });
 
@@ -337,6 +350,21 @@ const simpleTooltipContent = computed(() => {
     }
 
     const breakdown = parts.join('\n');
+    return `${skillName.value} Breakdown:\n${breakdown}\nTotal: ${totalValue.value}`;
+  } else if (props.category === 'ACs') {
+    // Tooltip for ACs (only bonuses, no base/trickle/IP)
+    const parts = [];
+    if (equipmentBonus.value !== 0) {
+      parts.push(`Equipment: ${equipmentBonus.value > 0 ? '+' : ''}${equipmentBonus.value}`);
+    }
+    if (perkBonus.value !== 0) {
+      parts.push(`Perks: ${perkBonus.value > 0 ? '+' : ''}${perkBonus.value}`);
+    }
+    if (buffBonus.value !== 0) {
+      parts.push(`Buffs: ${buffBonus.value > 0 ? '+' : ''}${buffBonus.value}`);
+    }
+
+    const breakdown = parts.length > 0 ? parts.join('\n') : 'No bonuses';
     return `${skillName.value} Breakdown:\n${breakdown}\nTotal: ${totalValue.value}`;
   } else if (isMiscSkill.value) {
     // Tooltip for Misc skills (no trickle-down or IP)
@@ -542,17 +570,18 @@ function setToMax() {
 }
 
 // Watchers
-// For abilities: watch the value field, for skills: watch the value field too (not pointFromIp)
+// For abilities: watch the total field, for skills: watch the total field too (not pointFromIp)
 // For ACs: watch the skillData itself since it's a number
 watch(() => {
   if (props.category === 'ACs') {
     return props.skillData; // AC values are simple numbers
   }
-  return props.skillData?.value; // Other skills have a value property
+  return props.skillData?.total; // Other skills have a total property
 }, (newValue, oldValue) => {
+  // Always update on initial load (oldValue is undefined) or when not interacting
+  const isInitialLoad = oldValue === undefined;
+
   if (newValue !== undefined) {
-    // Always update on initial load (oldValue is undefined) or when not interacting
-    const isInitialLoad = oldValue === undefined;
     if (isInitialLoad || !isUserInteracting.value) {
       if (props.isAbility) {
         // For abilities: the value directly represents the ability score
@@ -562,13 +591,24 @@ watch(() => {
         // For ACs: the value is the total AC value with all bonuses
         // ACs are read-only so we don't need to update sliders
       } else {
-        // For skills: the value represents the total skill value, 
+        // For skills: the value represents the total skill value,
         // we need to calculate the IP portion for the slider
         const totalSkillValue = newValue;
         const ipPortion = Math.max(0, totalSkillValue - baseValue.value - trickleDownBonus.value);
         sliderValue.value = Math.max(ipPortion, 0);
         inputValue.value = totalSkillValue;
       }
+    }
+  } else if (isInitialLoad) {
+    // Handle case where skillData.value is undefined (no IP invested yet)
+    if (props.isAbility) {
+      // For abilities: show breed base
+      sliderValue.value = minValue.value;
+      inputValue.value = minValue.value;
+    } else if (!props.isReadOnly && props.category !== 'ACs') {
+      // For skills: show base + trickle-down
+      sliderValue.value = 0; // No IP invested
+      inputValue.value = baseValue.value + trickleDownBonus.value;
     }
   }
 }, { immediate: true });

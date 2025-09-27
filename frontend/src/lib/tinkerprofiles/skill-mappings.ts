@@ -102,10 +102,33 @@ export const SKILL_ID_MAP: Record<string, number> = {
   'Cold AC': 95,
   'Energy AC': 92,
   'Fire AC': 97,
+  'Nano AC': 98,
   'Projectile AC': 90,
   'Melee AC': 91,
   'Radiation AC': 94,
   'Poison AC': 96,
+
+  // Reflect AC stats
+  'ReflectProjectileAC': 205,
+  'ReflectMeleeAC': 206,
+  'ReflectEnergyAC': 207,
+  'ReflectChemicalAC': 208,
+  'ReflectRadiationAC': 216,
+  'ReflectColdAC': 217,
+  'ReflectNanoAC': 218,
+  'ReflectFireAC': 219,
+  'ReflectPoisonAC': 225,
+
+  // Absorb AC stats
+  'AbsorbProjectileAC': 238,
+  'AbsorbMeleeAC': 239,
+  'AbsorbEnergyAC': 240,
+  'AbsorbChemicalAC': 241,
+  'AbsorbRadiationAC': 242,
+  'AbsorbColdAC': 243,
+  'AbsorbFireAC': 244,
+  'AbsorbPoisonAC': 245,
+  'AbsorbNanoAC': 246,
 
   // Special stats that appear in cluster data but aren't trainable skills
   'Max Health': 1,      // MaxHealth stat
@@ -145,6 +168,7 @@ export const SKILL_ID_MAP: Record<string, number> = {
   'RangeInc. NF': 381,       // NanoRange
   'RangeInc. Weapon': 287,   // AttackRange
   'CriticalIncrease': 379,   // CriticalIncrease
+  'BeltSlots': 45,           // BeltSlots
   'Free deck slot': 428,     // BeltSlots (used for deck slots)
   'Healing Efficiency': 535, // HealMultiplier
   'Direct Nano Damage Efficiency': 536, // NanoDamageMultiplier
@@ -157,6 +181,7 @@ export const SKILL_ID_MAP: Record<string, number> = {
   'ShieldChemicalAC': 229,   // ShieldChemicalAC
   'ShieldRadiationAC': 230,  // ShieldRadiationAC
   'ShieldColdAC': 231,       // ShieldColdAC
+  'ShieldNanoAC': 232,       // ShieldNanoAC
   'ShieldFireAC': 233,       // ShieldFireAC
   'ShieldPoisonAC': 234,     // ShieldPoisonAC
 
@@ -216,5 +241,11 @@ export const SKILL_CATEGORIES: Record<string, string[]> = {
   'Exploring': ['Vehicle Air', 'Vehicle Ground', 'Vehicle Water', 'Adventuring', 'Run Speed'],
   'Trade & Repair': ['Chemistry', 'Computer Literacy', 'Elec Eng', 'Mech Eng', 'Nano Programming', 'Pharma Tech', 'Quantum FT', 'Tutoring', 'Weapon Smith', 'Break & Entry'],
   'Combat & Healing': ['Concealment', 'Perception', 'Psychology', 'Treatment', 'First Aid', 'Trap Disarm.'],
-  'Misc': ['% Add. Xp', '% Add. Nano Cost', 'Max NCU', 'Decreased Nano-Interrupt Modifier %', 'SkillLockModifier', 'HealDelta', 'Add All Def.', 'NanoDelta', 'RangeInc. NF', 'RangeInc. Weapon', 'CriticalIncrease', 'Free deck slot', 'Healing Efficiency', 'Add All Off.', 'Add. Proj. Dam.', 'Add. Melee Dam.', 'Add. Energy Dam.', 'Add. Chem. Dam.', 'Add. Rad. Dam.', 'Add. Cold Dam.', 'Add. Fire Dam.', 'Add. Poison Dam.', 'ShieldMeleeAC', 'ShieldProjectileAC', 'ShieldEnergyAC', 'ShieldFireAC', 'ShieldColdAC', 'ShieldChemicalAC', 'ShieldRadiationAC', 'ShieldPoisonAC', 'Direct Nano Damage Efficiency', 'Add. Nano Dam.', 'Scale']
+  'ACs': [
+    'Projectile AC', 'Melee AC', 'Energy AC', 'Chemical AC', 'Radiation AC', 'Cold AC', 'Nano AC', 'Fire AC', 'Poison AC',
+    'ShieldProjectileAC', 'ShieldMeleeAC', 'ShieldEnergyAC', 'ShieldChemicalAC', 'ShieldRadiationAC', 'ShieldColdAC', 'ShieldNanoAC', 'ShieldFireAC', 'ShieldPoisonAC',
+    'ReflectProjectileAC', 'ReflectMeleeAC', 'ReflectEnergyAC', 'ReflectChemicalAC', 'ReflectRadiationAC', 'ReflectColdAC', 'ReflectNanoAC', 'ReflectFireAC', 'ReflectPoisonAC',
+    'AbsorbProjectileAC', 'AbsorbMeleeAC', 'AbsorbEnergyAC', 'AbsorbChemicalAC', 'AbsorbRadiationAC', 'AbsorbColdAC', 'AbsorbFireAC', 'AbsorbPoisonAC', 'AbsorbNanoAC'
+  ],
+  'Misc': ['% Add. Xp', '% Add. Nano Cost', 'Max NCU', 'Decreased Nano-Interrupt Modifier %', 'SkillLockModifier', 'HealDelta', 'Add All Def.', 'NanoDelta', 'RangeInc. NF', 'RangeInc. Weapon', 'CriticalIncrease', 'Free deck slot', 'Healing Efficiency', 'Add All Off.', 'Add. Proj. Dam.', 'Add. Melee Dam.', 'Add. Energy Dam.', 'Add. Chem. Dam.', 'Add. Rad. Dam.', 'Add. Cold Dam.', 'Add. Fire Dam.', 'Add. Poison Dam.', 'Direct Nano Damage Efficiency', 'Add. Nano Dam.', 'Scale']
 };
