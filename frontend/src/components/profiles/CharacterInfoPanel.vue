@@ -233,9 +233,15 @@ const attributes = computed(() => {
 
   return attributeIds.map((skillId, index) => {
     try {
-      const skill = props.profile.skills?.[skillId] || { value: 0, trickleDown: 0 };
+      const skillData = props.profile.skills?.[skillId];
       const shortName = skillService.getShortName(skillId);
       const breedBase = getBreedInitValue(breedId, breedInitIndices[index]);
+
+      // Build skill object compatible with display
+      const skill = {
+        value: skillData?.total || 0,
+        trickleDown: skillData?.trickle || 0
+      };
 
       return {
         id: skillId,
