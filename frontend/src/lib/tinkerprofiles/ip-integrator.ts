@@ -30,7 +30,77 @@ import { calculatePerkBonuses as calculatePerkBonusesService } from '../../servi
 import { calculateNanoBonuses } from '../../services/nano-bonus-calculator';
 import { SKILL_PATTERNS } from '../../utils/skill-patterns';
 import { skillService } from '../../services/skill-service';
+import { SKILL_COST_FACTORS } from '../../services/game-data';
 import type { AnyPerkEntry } from './perk-types';
+
+// ============================================================================
+// Skill Classification Constants
+// ============================================================================
+
+/**
+ * Attribute stat IDs (have breed base values, can be improved with IP)
+ */
+const ATTRIBUTE_IDS = new Set([16, 17, 18, 19, 20, 21]);
+
+/**
+ * Trainable skill IDs (have IP costs defined in game data)
+ * Derived from SKILL_COST_FACTORS to ensure accuracy
+ */
+const TRAINABLE_SKILL_IDS = new Set(
+  Object.keys(SKILL_COST_FACTORS).map(Number)
+);
+
+/**
+ * Bonus-only stat IDs (no base value, no IP cost, only receive bonuses)
+ * These stats need to be initialized if they have any bonuses from equipment/perks/buffs
+ */
+const BONUS_ONLY_STAT_IDS = new Set([
+  1,    // MaxHealth
+  221,  // MaxNano
+  45,   // BeltSlots
+  181,  // MaxNCU
+  276,  // AddAllOffense
+  277,  // AddAllDefense
+  278,  // ProjectileDamageModifier
+  279,  // MeleeDamageModifier
+  280,  // EnergyDamageModifier
+  281,  // ChemicalDamageModifier
+  282,  // RadiationDamageModifier
+  311,  // ColdDamageModifier
+  315,  // NanoDamageModifier
+  316,  // FireDamageModifier
+  317,  // PoisonDamageModifier
+  318,  // NanoCost
+  319,  // XPModifier
+  343,  // HealDelta
+  364,  // NanoDelta
+  379,  // CriticalIncrease
+  381,  // NanoRange
+  382,  // SkillLockModifier
+  383,  // NanoInterruptModifier
+  287,  // AttackRange
+  428,  // Free deck slot (alt BeltSlots)
+  535,  // HealMultiplier
+  536,  // NanoDamageMultiplier
+  360   // Scale
+]);
+
+/**
+ * Create an empty SkillData object for initializing missing skills
+ */
+function createEmptySkillData(): SkillData {
+  return {
+    base: 0,
+    trickle: 0,
+    pointsFromIp: 0,
+    equipmentBonus: 0,
+    perkBonus: 0,
+    buffBonus: 0,
+    ipSpent: 0,
+    cap: 0,
+    total: 0
+  };
+}
 
 // ============================================================================
 // Helper Functions
@@ -66,8 +136,8 @@ export function profileToCharacterStats(profile: TinkerProfile): CharacterStats 
   // Iterate through all skills in the profile
   for (const [skillIdStr, skillData] of Object.entries(profile.skills)) {
     const skillId = Number(skillIdStr);
-    // Only include skills with IP spent (exclude attributes, Misc skills, ACs)
-    if (skillId >= 100 && skillId <= 167 && skillData.pointsFromIp !== undefined) {
+    // Only include trainable skills with IP spent (exclude attributes, bonus-only stats, ACs)
+    if (TRAINABLE_SKILL_IDS.has(skillId) && skillData.pointsFromIp !== undefined) {
       skills[skillIdStr] = skillData.pointsFromIp;
     }
   }
@@ -259,6 +329,17 @@ export function updateProfileSkillInfo(
   // Use provided buff bonuses or calculate them
   const buffBonuses = providedBuffBonuses || calculateBuffBonuses(profile);
 
+  // Initialize any bonus-only stats that have bonuses but don't exist in profile yet
+  for (const statId of BONUS_ONLY_STAT_IDS) {
+    const hasBonus = (equipmentBonuses[statId] || 0) !== 0 ||
+                     (perkBonuses[statId] || 0) !== 0 ||
+                     (buffBonuses[statId] || 0) !== 0;
+
+    if (hasBonus && !profile.skills[statId]) {
+      profile.skills[statId] = createEmptySkillData();
+    }
+  }
+
   // Update abilities (skill IDs 16-21)
   const abilityStatIds = [16, 17, 18, 19, 20, 21]; // Strength, Stamina, Agility, Sense, Intelligence, Psychic
   const abilityIndexToStatId = [16, 18, 17, 20, 19, 21]; // Maps ABILITY_INDEX_TO_STAT_ID order
@@ -291,7 +372,7 @@ export function updateProfileSkillInfo(
       skillData.equipmentBonus = equipmentBonus;
       skillData.perkBonus = perkBonus;
       skillData.buffBonus = buffBonus;
-      skillData.cap = baseAbilityCap;
+      skillData.cap = baseAbilityCap + equipmentBonus + perkBonus + buffBonus;
 
       // Final total: base + pointsFromIp + equipment + perks + buffs
       skillData.total = cappedBaseValue + equipmentBonus + perkBonus + buffBonus;
@@ -309,12 +390,12 @@ export function updateProfileSkillInfo(
   ];
   const trickleDownResults = calcAllTrickleDown(fullAbilityValues);
   
-  // Update regular skills (skill IDs 100-167) with trickle-down and bonuses
+  // Update trainable skills with trickle-down and bonuses
   for (const [skillIdStr, skillData] of Object.entries(profile.skills)) {
     const skillId = Number(skillIdStr);
 
-    // Only process regular skills that have IP costs (100-167 range)
-    if (skillId >= 100 && skillId <= 167) {
+    // Only process trainable skills (have IP costs defined in game data)
+    if (TRAINABLE_SKILL_IDS.has(skillId)) {
       // Ensure pointsFromIp is set (required field)
       if (skillData.pointsFromIp === undefined || skillData.pointsFromIp === null) {
         skillData.pointsFromIp = 0; // Default to no IP spent
@@ -347,25 +428,25 @@ export function updateProfileSkillInfo(
       skillData.equipmentBonus = equipmentBonus;
       skillData.perkBonus = perkBonus;
       skillData.buffBonus = buffBonus;
-      skillData.cap = baseSkillCap;
+      skillData.cap = baseSkillCap + equipmentBonus + perkBonus + buffBonus;
 
       // Final total: base + trickle + pointsFromIp + equipment + perks + buffs
       skillData.total = cappedBaseValue + equipmentBonus + perkBonus + buffBonus;
     }
   }
 
-  // Apply equipment, perk, and buff bonuses to Misc skills (skill IDs 200+)
+  // Apply equipment, perk, and buff bonuses to bonus-only stats
   for (const [skillIdStr, skillData] of Object.entries(profile.skills)) {
     const skillId = Number(skillIdStr);
 
-    // Process Misc skills (skill IDs 200+ or other ranges that don't fall in abilities/regular skills)
-    if (skillId >= 200 || (skillId < 100 && skillId > 21)) {
-      // Get bonuses for this Misc skill
+    // Process bonus-only stats (no base value, no IP cost)
+    if (BONUS_ONLY_STAT_IDS.has(skillId)) {
+      // Get bonuses for this stat
       const equipmentBonus = equipmentBonuses[skillId] || 0;
       const perkBonus = perkBonuses[skillId] || 0;
       const buffBonus = buffBonuses[skillId] || 0;
 
-      // Misc skills have no base skill value, no trickle-down, no IP
+      // Bonus-only stats have no base skill value, no trickle-down, no IP
       skillData.base = 0;
       skillData.trickle = 0;
       skillData.ipSpent = 0;
@@ -376,7 +457,7 @@ export function updateProfileSkillInfo(
       skillData.perkBonus = perkBonus;
       skillData.buffBonus = buffBonus;
 
-      // Calculate total value: only bonuses for Misc skills
+      // Calculate total value: only bonuses for bonus-only stats
       skillData.total = equipmentBonus + perkBonus + buffBonus;
     }
   }
@@ -407,12 +488,12 @@ export function updateProfileTrickleDown(profile: TinkerProfile): TinkerProfile 
   // Calculate new trickle-down values
   const trickleDownResults = calcAllTrickleDown(abilities);
 
-  // Update trickle-down for all regular skills (100-167)
+  // Update trickle-down for all trainable skills
   for (const [skillIdStr, skillData] of Object.entries(updatedProfile.skills)) {
     const skillId = Number(skillIdStr);
 
-    // Only update regular skills that have trickle-down (100-167 range)
-    if (skillId >= 100 && skillId <= 167 && skillData) {
+    // Only update trainable skills that have trickle-down
+    if (TRAINABLE_SKILL_IDS.has(skillId) && skillData) {
       const newTrickleDown = trickleDownResults[skillId] || 0;
 
       // Update trickle-down bonus
@@ -458,8 +539,8 @@ export function validateProfileIP(profile: TinkerProfile): {
   for (const [skillIdStr, skillData] of Object.entries(profile.skills)) {
     const skillId = Number(skillIdStr);
 
-    // Only check regular skills that have caps
-    if (skillId >= 100 && skillId <= 167) {
+    // Only check trainable skills that have caps
+    if (TRAINABLE_SKILL_IDS.has(skillId)) {
       try {
         const skillName = skillService.getName(skillId);
         // Calculate theoretical cap (this would need to be calculated properly)
@@ -528,8 +609,10 @@ export async function recalculateProfileIP(profile: TinkerProfile): Promise<Tink
 
   // Recalculate health and nano since trickle-down effects might impact Body Dev and Nano Pool
   try {
+    console.log('[recalculateProfileIP] About to call recalculateHealthAndNano');
     const { recalculateHealthAndNano } = await import('@/services/profile-update-service');
     await recalculateHealthAndNano(updatedProfile);
+    console.log('[recalculateProfileIP] After recalculateHealthAndNano, MaxHealth:', updatedProfile.Character.MaxHealth, 'MaxNano:', updatedProfile.Character.MaxNano);
   } catch (error) {
     console.warn('Could not recalculate health/nano in IP tracker update:', error);
   }
@@ -575,8 +658,8 @@ export async function modifySkill(
     };
   }
 
-  // For regular skills, check if new value exceeds natural cap (without bonuses)
-  if (skillId >= 100 && skillId <= 167) {
+  // For trainable skills, check if new value exceeds natural cap (without bonuses)
+  if (TRAINABLE_SKILL_IDS.has(skillId)) {
     const characterStats = profileToCharacterStats(profile);
     const abilities = [
       profile.skills[16]?.total || 0, // Strength
@@ -615,9 +698,9 @@ export async function modifySkill(
     return { success: true, updatedProfile: profile };
   }
 
-  // Calculate IP cost for regular skills
+  // Calculate IP cost for trainable skills
   let ipCost = 0;
-  if (skillId >= 100 && skillId <= 167) {
+  if (TRAINABLE_SKILL_IDS.has(skillId)) {
     const profession = getProfessionId(profile.Character.Profession) || 0;
 
     if (improvementDiff > 0) {
@@ -721,10 +804,10 @@ export async function modifyAbility(
   // Capture old trickle-down values for change tracking
   const oldTrickleDownChanges: Record<number, { old: number; new: number }> = {};
 
-  // Track trickle-down changes for regular skills (100-167)
+  // Track trickle-down changes for trainable skills
   for (const [skillIdStr, skillData] of Object.entries(profile.skills)) {
     const skillId = Number(skillIdStr);
-    if (skillId >= 100 && skillId <= 167 && skillData.trickle !== undefined) {
+    if (TRAINABLE_SKILL_IDS.has(skillId) && skillData.trickle !== undefined) {
       oldTrickleDownChanges[skillId] = { old: skillData.trickle, new: 0 };
     }
   }

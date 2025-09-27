@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { updateProfileWithIPTracking } from '@/lib/tinkerprofiles/ip-integrator';
+import { updateProfileSkillInfo } from '@/lib/tinkerprofiles/ip-integrator';
 import { calculateEquipmentBonuses } from '@/services/equipment-bonus-calculator';
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 
@@ -12,49 +12,20 @@ describe('Misc Skills Equipment Bonuses', () => {
       Level: 200,
       Gender: 'Female'
     },
-    Skills: {
-      Attributes: {
-        Strength: { value: 100, pointFromIp: 0, trickleDown: 0, baseValue: 100, cap: 200, equipmentBonus: 0, perkBonus: 0, buffBonus: 0 },
-        Agility: { value: 100, pointFromIp: 0, trickleDown: 0, baseValue: 100, cap: 200, equipmentBonus: 0, perkBonus: 0, buffBonus: 0 },
-        Stamina: { value: 100, pointFromIp: 0, trickleDown: 0, baseValue: 100, cap: 200, equipmentBonus: 0, perkBonus: 0, buffBonus: 0 },
-        Intelligence: { value: 100, pointFromIp: 0, trickleDown: 0, baseValue: 100, cap: 200, equipmentBonus: 0, perkBonus: 0, buffBonus: 0 },
-        Sense: { value: 100, pointFromIp: 0, trickleDown: 0, baseValue: 100, cap: 200, equipmentBonus: 0, perkBonus: 0, buffBonus: 0 },
-        Psychic: { value: 100, pointFromIp: 0, trickleDown: 0, baseValue: 100, cap: 200, equipmentBonus: 0, perkBonus: 0, buffBonus: 0 }
-      },
-      Misc: {
-        'Max NCU': 0,
-        'Add All Off.': 0,
-        'Add All Def.': 0,
-        'Add. Proj. Dam.': 0,
-        'Add. Melee Dam.': 0,
-        'Add. Energy Dam.': 0,
-        'Add. Chem. Dam.': 0,
-        'Add. Rad. Dam.': 0,
-        'Add. Cold Dam.': 0,
-        'Add. Fire Dam.': 0,
-        'Add. Poison Dam.': 0,
-        'Add. Nano Dam.': 0,
-        'HealDelta': 0,
-        'NanoDelta': 0
-      },
-      ACs: {
-        'Projectile AC': 0,
-        'Melee AC': 0,
-        'Energy AC': 0,
-        'Chemical AC': 0,
-        'Radiation AC': 0,
-        'Cold AC': 0,
-        'Fire AC': 0,
-        'Poison AC': 0,
-        'Nano AC': 0
-      }
+    // v4 structure: skills with numeric IDs
+    skills: {
+      // Attributes (16-21)
+      16: { base: 100, trickle: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, ipSpent: 0, cap: 200, total: 100 }, // Strength
+      17: { base: 100, trickle: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, ipSpent: 0, cap: 200, total: 100 }, // Agility
+      18: { base: 100, trickle: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, ipSpent: 0, cap: 200, total: 100 }, // Stamina
+      19: { base: 100, trickle: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, ipSpent: 0, cap: 200, total: 100 }, // Intelligence
+      20: { base: 100, trickle: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, ipSpent: 0, cap: 200, total: 100 }, // Sense
+      21: { base: 100, trickle: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, ipSpent: 0, cap: 200, total: 100 }  // Psychic
     },
     Clothing: {},
     Weapons: {},
     HUD: {},
     Implants: {},
-    Perks: [],
-    Buffs: [],
     id: 'test-profile',
     lastUpdated: Date.now(),
     AOVersion: '18.8.0',
@@ -100,18 +71,18 @@ describe('Misc Skills Equipment Bonuses', () => {
     // Calculate equipment bonuses
     const bonuses = calculateEquipmentBonuses(profile);
 
-    // Verify bonuses are calculated
-    expect(bonuses['Max NCU']).toBe(50);
-    expect(bonuses['Add All Off.']).toBe(20);
-    expect(bonuses['Add All Def.']).toBe(15);
+    // Verify bonuses are calculated (bonuses use numeric stat IDs)
+    expect(bonuses[181]).toBe(50);  // Max NCU
+    expect(bonuses[276]).toBe(20);  // Add All Off.
+    expect(bonuses[277]).toBe(15);  // Add All Def.
 
     // Update profile with IP tracking (which applies equipment bonuses)
-    updateProfileWithIPTracking(profile);
+    updateProfileSkillInfo(profile);
 
-    // Verify Misc skills have equipment bonuses applied
-    expect(profile.Skills.Misc['Max NCU']).toBe(50);
-    expect(profile.Skills.Misc['Add All Off.']).toBe(20);
-    expect(profile.Skills.Misc['Add All Def.']).toBe(15);
+    // Verify bonus-only stats have equipment bonuses applied (use numeric stat IDs)
+    expect(profile.skills[181]?.total).toBe(50);   // Max NCU
+    expect(profile.skills[276]?.total).toBe(20);   // Add All Off.
+    expect(profile.skills[277]?.total).toBe(15);   // Add All Def.
   });
 
   it('should apply damage modifier equipment bonuses to Misc skills', () => {
@@ -152,18 +123,18 @@ describe('Misc Skills Equipment Bonuses', () => {
     // Calculate equipment bonuses
     const bonuses = calculateEquipmentBonuses(profile);
 
-    // Verify bonuses are calculated
-    expect(bonuses['Add. Proj. Dam.']).toBe(25);
-    expect(bonuses['Add. Melee Dam.']).toBe(30);
-    expect(bonuses['Add. Energy Dam.']).toBe(15);
+    // Verify bonuses are calculated (bonuses use numeric stat IDs)
+    expect(bonuses[278]).toBe(25);  // Add. Proj. Dam.
+    expect(bonuses[279]).toBe(30);  // Add. Melee Dam.
+    expect(bonuses[280]).toBe(15);  // Add. Energy Dam.
 
     // Update profile with IP tracking
-    updateProfileWithIPTracking(profile);
+    updateProfileSkillInfo(profile);
 
-    // Verify Misc skills have equipment bonuses applied
-    expect(profile.Skills.Misc['Add. Proj. Dam.']).toBe(25);
-    expect(profile.Skills.Misc['Add. Melee Dam.']).toBe(30);
-    expect(profile.Skills.Misc['Add. Energy Dam.']).toBe(15);
+    // Verify bonus-only stats have equipment bonuses applied (use numeric stat IDs)
+    expect(profile.skills[278]?.total).toBe(25);   // Add. Proj. Dam.
+    expect(profile.skills[279]?.total).toBe(30);   // Add. Melee Dam.
+    expect(profile.skills[280]?.total).toBe(15);   // Add. Energy Dam.
   });
 
   it('should stack multiple equipment bonuses for the same Misc skill', () => {
@@ -209,14 +180,14 @@ describe('Misc Skills Equipment Bonuses', () => {
     // Calculate equipment bonuses
     const bonuses = calculateEquipmentBonuses(profile);
 
-    // Verify bonuses stack
-    expect(bonuses['Max NCU']).toBe(55);  // 30 + 25
+    // Verify bonuses stack (bonuses use numeric stat IDs)
+    expect(bonuses[181]).toBe(55);  // Max NCU: 30 + 25
 
     // Update profile with IP tracking
-    updateProfileWithIPTracking(profile);
+    updateProfileSkillInfo(profile);
 
-    // Verify Misc skill has stacked bonuses applied
-    expect(profile.Skills.Misc['Max NCU']).toBe(55);
+    // Verify bonus-only stat has stacked bonuses applied (use numeric stat ID)
+    expect(profile.skills[181]?.total).toBe(55);   // Max NCU
   });
 
   it('should apply equipment, perk, and buff bonuses together for Misc skills', () => {
@@ -241,19 +212,21 @@ describe('Misc Skills Equipment Bonuses', () => {
 
     profile.Clothing.Chest = equipment;
 
-    // Add perk bonus (simulated by setting initial value)
-    profile.Skills.Misc['HealDelta'] = 10;  // Base value with perk
-
     // Calculate equipment bonuses
-    const bonuses = calculateEquipmentBonuses(profile);
+    const equipmentBonuses = calculateEquipmentBonuses(profile);
 
-    // Verify equipment bonus is calculated
-    expect(bonuses['HealDelta']).toBe(20);
+    // Verify equipment bonus is calculated (bonuses use numeric stat IDs)
+    expect(equipmentBonuses[343]).toBe(20);  // HealDelta
 
-    // Update profile with IP tracking
-    updateProfileWithIPTracking(profile);
+    // Simulate perk bonuses
+    const perkBonuses = { 343: 10 };  // HealDelta perk bonus
 
-    // Verify total value includes base + equipment bonus
-    expect(profile.Skills.Misc['HealDelta']).toBe(30);  // 10 base + 20 equipment
+    // Update profile with IP tracking, providing both equipment and perk bonuses
+    updateProfileSkillInfo(profile, equipmentBonuses, perkBonuses);
+
+    // Verify total value includes perk + equipment bonus (use numeric stat ID)
+    expect(profile.skills[343]?.total).toBe(30);  // 10 perk + 20 equipment
+    expect(profile.skills[343]?.equipmentBonus).toBe(20);
+    expect(profile.skills[343]?.perkBonus).toBe(10);
   });
 });

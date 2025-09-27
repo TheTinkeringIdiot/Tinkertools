@@ -209,11 +209,12 @@ const minValue = computed(() => {
     const abilityIndex = getAbilityIndex(skillName.value);
     if (abilityIndex !== -1) {
       const abilityStatId = ABILITY_INDEX_TO_STAT_ID[abilityIndex];
-      return getBreedInitValue(breedId, abilityStatId);
+      const breedBase = getBreedInitValue(breedId, abilityStatId);
+      return breedBase + equipmentBonus.value + perkBonus.value + buffBonus.value;
     }
   }
-  // For skills: slider minimum is 0 (no IP spent), regardless of trickle-down
-  return 0;
+  // For skills: slider minimum is base + trickle + bonuses (no IP spent)
+  return baseValue.value + trickleDownBonus.value + equipmentBonus.value + perkBonus.value + buffBonus.value;
 });
 
 // Helper to check if skill is a Misc skill

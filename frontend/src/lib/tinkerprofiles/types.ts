@@ -130,7 +130,8 @@ export interface TinkerProfile {
    * @example
    * skills: {
    *   102: { base: 5, trickle: 100, ipSpent: 5000, pointsFromIp: 250, ... }, // 1h Blunt
-   *   27: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, ... },          // MaxHealth (Misc)
+   *   1: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, ... },           // Max Health (bonus-only)
+   *   221: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, ... },         // Max Nano (bonus-only)
    *   92: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, ... }           // Chemical AC
    * }
    */

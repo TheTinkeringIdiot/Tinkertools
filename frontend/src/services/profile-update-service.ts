@@ -358,47 +358,43 @@ async function recalculateTrickleDown(profile: TinkerProfile): Promise<void> {
  * Recalculate health and nano based on current stats
  */
 export async function recalculateHealthAndNano(profile: TinkerProfile): Promise<void> {
-  if (!profile.Character || !profile.Skills?.Attributes) return;
+  if (!profile.Character || !profile.skills) return;
 
   const level = profile.Character.Level || 1;
   const breedId = getBreedId(profile.Character.Breed || 'Solitus') || 0;
   const professionId = getProfessionId(profile.Character.Profession || 'Adventurer') || 0;
 
-  // Get Body Dev and Nano Pool values
-  const bodyDev = profile.Skills['Body & Defense']?.['Body Dev.']?.value || 0;
-  const nanoPool = profile.Skills['Body & Defense']?.['Nano Pool']?.value || 0;
+  // Get Body Dev and Nano Pool values using ID-based skill system
+  const bodyDev = profile.skills[152]?.total || 0;  // Body Dev
+  const nanoPool = profile.skills[132]?.total || 0;  // Nano Pool
 
   // Get Stamina from attributes
-  const stamina = profile.Skills.Attributes?.['Stamina']?.value || 0;
+  const stamina = profile.skills[18]?.total || 0;  // Stamina
 
-  // Calculate equipment bonuses to get Max Health and Max Nano bonuses
-  // Import dynamically to avoid circular dependencies
-  let maxHealthBonus = 0;
-  let maxNanoBonus = 0;
+  console.log('[recalculateHealthAndNano] Skills:', { bodyDev, nanoPool, stamina, level, breedId, professionId });
 
-  try {
-    const { calculateEquipmentBonuses } = await import('./equipment-bonus-calculator');
-    const equipmentBonuses = calculateEquipmentBonuses(profile);
+  // Get aggregated bonuses from skills tracking (equipment + perk + buff)
+  // These are maintained by updateProfileSkillInfo in ip-integrator
+  const maxHealthBonus = profile.skills[1]?.total || 0;  // Max Health bonuses (stat ID 1)
+  const maxNanoBonus = profile.skills[221]?.total || 0;  // Max Nano bonuses (stat ID 221)
 
-    // Max Health has stat ID 1, Max Nano has stat ID 221
-    // These are mapped in skill-mappings.ts as 'Max Health' and 'Max Nano'
-    maxHealthBonus = equipmentBonuses['Max Health'] || 0;
-    maxNanoBonus = equipmentBonuses['Max Nano'] || 0;
-  } catch (error) {
-    console.warn('Could not calculate equipment bonuses for health/nano:', error);
-    // Continue with 0 bonuses if calculation fails
-  }
+  console.log('[recalculateHealthAndNano] Bonuses from skills:', { maxHealthBonus, maxNanoBonus });
 
   // Calculate health and nano using the accurate formula
-  // Note: calcHP already includes the maxHealthBonus in its calculation
+  // Note: calcHP includes the maxHealthBonus in its calculation
   const health = calcHP(bodyDev, level, breedId, professionId, stamina, maxHealthBonus);
 
   // For nano, we need to add the Max Nano bonus separately since calcNP doesn't include it
   const baseNano = calcNP(nanoPool, level, breedId, professionId);
   const nano = baseNano + maxNanoBonus;
 
+  console.log('[recalculateHealthAndNano] Calculated:', { health, nano, maxHealthBonus, maxNanoBonus });
+  console.log('[recalculateHealthAndNano] Setting profile.Character.MaxHealth =', health, 'MaxNano =', nano);
+
   profile.Character.MaxHealth = health;
   profile.Character.MaxNano = nano;
+
+  console.log('[recalculateHealthAndNano] After setting:', { MaxHealth: profile.Character.MaxHealth, MaxNano: profile.Character.MaxNano });
 }
 
 /**
