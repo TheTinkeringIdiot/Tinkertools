@@ -208,9 +208,9 @@ const gridCells = computed(() => {
 function getAllSlotsForType(slotType: string): string[] {
   switch (slotType) {
     case 'weapon':
-      return ['Right-Hand', 'Left-Hand', 'Right-Finger', 'Left-Finger', 'Chest', 'Legs', 'Feet', 'Hands', 'Arms', 'Head', 'Back', 'Shoulder', 'Wrist', 'Waist', 'Neck'];
-    case 'armor':  
-      return ['Head', 'Neck', 'Back', 'Right-Shoulder', 'Chest', 'Body', 'Left-Shoulder', 'Right-Arm', 'Hands', 'Left-Arm', 'Right-Wrist', 'Legs', 'Left-Wrist', 'Right-Finger', 'Feet', 'Left-Finger'];
+      return ['RHand', 'LHand', 'Waist', 'HUD1', 'HUD2', 'HUD3', 'UTILS1', 'UTILS2', 'UTILS3', 'NCU1', 'NCU2', 'NCU3', 'NCU4', 'NCU5', 'NCU6'];
+    case 'armor':
+      return ['Head', 'Neck', 'Back', 'RightShoulder', 'LeftShoulder', 'Body', 'Chest', 'RightArm', 'LeftArm', 'Hands', 'RightWrist', 'LeftWrist', 'Belt', 'Legs', 'RightFinger', 'LeftFinger', 'Feet'];
     case 'implant':
       // Return bitflag values as strings for implants
       return ['2', '4', '8', '16', '32', '64', '128', '256', '512', '1024', '2048', '4096', '8192'];
