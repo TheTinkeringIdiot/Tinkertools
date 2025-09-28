@@ -40,10 +40,8 @@ Shows items in grid or list view with pagination and compatibility indicators
           :item="item"
           :profile="compatibilityProfile"
           :show-compatibility="showCompatibility"
-          :is-favorite="isFavorite(item.id)"
           :is-comparing="isComparing(item.id)"
           @click="$emit('item-click', item)"
-          @favorite="$emit('item-favorite', item)"
           @compare="$emit('item-compare', item)"
           @cast-buff="$emit('cast-buff', item)"
           @quick-view="showQuickView(item)"
@@ -114,17 +112,7 @@ Shows items in grid or list view with pagination and compatibility indicators
                         v-tooltip.bottom="'Compatibility unknown'"
                       ></i>
                     </div>
-                    
-                    <!-- Favorite Button -->
-                    <Button
-                      :icon="isFavorite(item.id) ? 'pi pi-heart-fill' : 'pi pi-heart'"
-                      size="small"
-                      text
-                      :severity="isFavorite(item.id) ? 'danger' : 'secondary'"
-                      @click.stop="$emit('item-favorite', item)"
-                      v-tooltip.bottom="isFavorite(item.id) ? 'Remove from favorites' : 'Add to favorites'"
-                    />
-                    
+
                     <!-- Compare Button -->
                     <Button
                       icon="pi pi-clone"
@@ -209,7 +197,6 @@ Shows items in grid or list view with pagination and compatibility indicators
         :show-compatibility="showCompatibility"
         @close="showQuickViewDialog = false"
         @view-full="viewFullItem"
-        @favorite="$emit('item-favorite', selectedItem)"
         @compare="$emit('item-compare', selectedItem)"
       />
     </Dialog>
@@ -239,7 +226,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'item-click': [item: Item]
-  'item-favorite': [item: Item]
   'item-compare': [item: Item]
   'cast-buff': [item: Item]
   'page-change': [page: number]
@@ -282,15 +268,6 @@ const itemMenuItems = ref([
     }
   },
   { separator: true },
-  {
-    label: 'Add to Favorites',
-    icon: 'pi pi-heart',
-    command: () => {
-      if (selectedItem.value) {
-        emit('item-favorite', selectedItem.value)
-      }
-    }
-  },
   {
     label: 'Add to Comparison',
     icon: 'pi pi-clone',

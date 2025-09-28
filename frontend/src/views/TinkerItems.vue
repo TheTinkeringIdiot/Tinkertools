@@ -152,7 +152,6 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
             :loading="searchLoading"
             :pagination="pagination"
             @item-click="onItemClick"
-            @item-favorite="onItemFavorite"
             @item-compare="onItemCompare"
             @item-cast-buff="onItemCastBuff"
             @page-change="onPageChange"
@@ -225,10 +224,6 @@ const compatibilityProfile = computed(() =>
   showCompatibility.value && profilesStore.hasActiveProfile ? profilesStore.activeProfile as any : null
 )
 
-const favoriteCount = computed(() => 
-  // For now, return 0 since favorites might be handled differently with the new profile system
-  0
-)
 
 // Note: activeFilterCount and hasActiveFilters removed - now handled by AdvancedItemSearch
 
@@ -344,23 +339,8 @@ async function quickSearch(type: string) {
   await performAdvancedSearch(query)
 }
 
-function showFavorites() {
-  // Implementation for showing favorite items
-  searchQuery.value = ''
-  // TODO: Implement favorites filtering with new search system
-  const query: ItemSearchQuery = {
-    // Add favorites filter when implemented
-  }
-  performAdvancedSearch(query)
-}
-
 function onItemClick(item: Item) {
   router.push({ name: 'ItemDetail', params: { aoid: item.aoid!.toString() } })
-}
-
-function onItemFavorite(item: Item) {
-  // TODO: Implement favorites with new profile system
-  console.log('Favorite item:', item.id)
 }
 
 function onItemCompare(item: Item) {

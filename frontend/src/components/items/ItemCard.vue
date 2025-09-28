@@ -162,16 +162,6 @@ Shows item info with compatibility status and quick actions
         
         <!-- Actions -->
         <div class="flex items-center gap-1">
-          <!-- Favorite Button -->
-          <Button
-            :icon="isFavorite ? 'pi pi-heart-fill' : 'pi pi-heart'"
-            size="small"
-            text
-            :severity="isFavorite ? 'danger' : 'secondary'"
-            @click.stop="$emit('favorite', item)"
-            v-tooltip.bottom="isFavorite ? 'Remove from favorites' : 'Add to favorites'"
-          />
-          
           <!-- Compare Button -->
           <Button
             icon="pi pi-clone"
@@ -209,13 +199,11 @@ const props = defineProps<{
   item: Item
   profile?: TinkerProfile | null
   showCompatibility?: boolean
-  isFavorite?: boolean
   isComparing?: boolean
 }>()
 
 defineEmits<{
   click: [item: Item]
-  favorite: [item: Item]
   compare: [item: Item]
   'cast-buff': [item: Item]
   'quick-view': [item: Item]

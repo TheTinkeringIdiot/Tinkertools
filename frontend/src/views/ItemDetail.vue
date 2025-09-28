@@ -36,13 +36,6 @@ Shows all item data with profile compatibility and comparison options
           @click="castBuff"
         />
         <Button
-          :icon="isFavorite ? 'pi pi-heart-fill' : 'pi pi-heart'"
-          :label="isFavorite ? 'Favorited' : 'Favorite'"
-          :severity="isFavorite ? 'danger' : 'secondary'"
-          outlined
-                    @click="toggleFavorite"
-        />
-        <Button
           icon="pi pi-clone"
           label="Compare"
           severity="primary"
@@ -309,13 +302,6 @@ Shows all item data with profile compatibility and comparison options
             label="Cast Buff"
             severity="primary"
             @click="castBuff"
-          />
-          <Button
-            :icon="isFavorite ? 'pi pi-heart-fill' : 'pi pi-heart'"
-            :label="isFavorite ? 'Favorited' : 'Favorite'"
-            :severity="isFavorite ? 'danger' : 'secondary'"
-            outlined
-                        @click="toggleFavorite"
           />
           <Button
             icon="pi pi-clone"
@@ -642,10 +628,6 @@ const isModal = computed(() => {
 })
 
 
-const isFavorite = computed(() => 
-  // TODO: Add favorites to tinkerProfiles store
-  false
-)
 
 const hasSpecialEffects = computed(() => 
   item.value?.spell_data && item.value.spell_data.length > 0
@@ -739,10 +721,6 @@ function goBack() {
   }
 }
 
-function toggleFavorite() {
-  // TODO: Add favorites to tinkerProfiles store
-  console.log('Favorite toggle not yet implemented for tinkerProfiles store')
-}
 
 function addToComparison() {
   // Emit event or call parent method to add to comparison
@@ -751,9 +729,9 @@ function addToComparison() {
 
 function shareItem() {
   if (!item.value) return
-  
+
   const url = `${window.location.origin}/items/${item.value.aoid}`
-  
+
   if (navigator.share) {
     navigator.share({
       title: item.value.name,
@@ -762,7 +740,12 @@ function shareItem() {
     })
   } else {
     navigator.clipboard.writeText(url)
-    // Show success toast
+    toast.add({
+      severity: 'success',
+      summary: 'Link Copied',
+      detail: 'Item URL copied to clipboard',
+      life: 3000
+    })
   }
 }
 
