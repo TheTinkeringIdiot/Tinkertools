@@ -355,10 +355,10 @@ class DataImporter:
             for sv_data in item_data.get('StatValues', []):
                 stat = sv_data.get('Stat')
                 value = sv_data.get('RawValue')
-                
+
                 if stat == 76:  # Item class
                     item.item_class = value
-                elif stat == 54:  # Quality level
+                elif stat == 54 and not is_nano:  # Quality level - only for regular items
                     item.ql = value
             
             # Set defaults if not found

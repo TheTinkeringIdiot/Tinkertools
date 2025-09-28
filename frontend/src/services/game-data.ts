@@ -726,6 +726,7 @@ export const STAT = {
   1001: 'Type',
   1002: 'Instance',
   1003: 'NanoSubStrain',
+  1004: 'NCUCost',
   649: 'Unknown649',
   10207: 'Unknown10207'
 } as const;

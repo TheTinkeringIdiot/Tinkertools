@@ -275,7 +275,7 @@ class OptimizedImporter:
                     value = sv_data.get('RawValue')
                     if stat == 76:  # Item class
                         item.item_class = value
-                    elif stat == 54:  # Quality level
+                    elif stat == 54 and not is_nano:  # Quality level - only for regular items
                         item.ql = value
 
                 # Set defaults
@@ -343,11 +343,11 @@ class OptimizedImporter:
                 except ValueError:
                     pass
 
-            perk_name = f"{perk_data['name']} {perk_data['counter']}"
+            # perk_name = f"{perk_data['name']} {perk_data['counter']}"
 
             perk = Perk(
                 item_id=item.id,
-                name=perk_name,
+                name=perk_data['name'],
                 perk_series=perk_data["name"],
                 counter=perk_validator.validate_counter(perk_data["counter"]),
                 type=perk_validator.validate_perk_type(perk_data["type"]),

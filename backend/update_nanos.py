@@ -173,9 +173,9 @@ class NanoDataUpdater:
         """, nano_item_id)
         
         # Update QL (stat 54 AND items.ql column)
-        if current_stats.get(54) != nano_ql:
-            await self.update_item_stat(nano_item_id, 54, nano_ql)
-            self.stats['stat_updates'] += 1
+        # if current_stats.get(54) != nano_ql:
+        #     await self.update_item_stat(nano_item_id, 54, nano_ql)
+        #     self.stats['stat_updates'] += 1
         
         # Update items.ql column if different
         if current_item_ql != nano_ql:
