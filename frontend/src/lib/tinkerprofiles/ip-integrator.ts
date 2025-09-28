@@ -586,7 +586,7 @@ export async function recalculateProfileIP(profile: TinkerProfile): Promise<Tink
   const updatedProfile = JSON.parse(JSON.stringify(profile)) as TinkerProfile;
 
   // Calculate perk bonuses if perks are present
-  let perkBonuses: Record<string, number> = {};
+  let perkBonuses: Record<number, number> = {};
   try {
     perkBonuses = await calculatePerkBonuses(updatedProfile);
   } catch (error) {
@@ -594,7 +594,7 @@ export async function recalculateProfileIP(profile: TinkerProfile): Promise<Tink
   }
 
   // Calculate buff bonuses if buffs are present
-  let buffBonuses: Record<string, number> = {};
+  let buffBonuses: Record<number, number> = {};
   try {
     buffBonuses = calculateBuffBonuses(updatedProfile);
   } catch (error) {
@@ -609,10 +609,8 @@ export async function recalculateProfileIP(profile: TinkerProfile): Promise<Tink
 
   // Recalculate health and nano since trickle-down effects might impact Body Dev and Nano Pool
   try {
-    console.log('[recalculateProfileIP] About to call recalculateHealthAndNano');
     const { recalculateHealthAndNano } = await import('@/services/profile-update-service');
     await recalculateHealthAndNano(updatedProfile);
-    console.log('[recalculateProfileIP] After recalculateHealthAndNano, MaxHealth:', updatedProfile.Character.MaxHealth, 'MaxNano:', updatedProfile.Character.MaxNano);
   } catch (error) {
     console.warn('Could not recalculate health/nano in IP tracker update:', error);
   }

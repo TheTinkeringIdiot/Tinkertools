@@ -16,7 +16,6 @@ import {
   type ProfileValidationResult,
   type TinkerProfilesConfig
 } from '@/lib/tinkerprofiles';
-import { useToast } from 'primevue/usetoast';
 import { nanoCompatibility } from '@/utils/nano-compatibility';
 import type { Item } from '@/types/api';
 import { skillService } from '@/services/skill-service';
@@ -1247,97 +1246,64 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       throw new Error('Only nano items can be cast as buffs');
     }
 
-    const toast = useToast();
+    // Initialize buffs array if it doesn't exist
+    if (!activeProfile.value.buffs) {
+      activeProfile.value.buffs = [];
+    }
 
-    try {
-      // Initialize buffs array if it doesn't exist
-      if (!activeProfile.value.buffs) {
-        activeProfile.value.buffs = [];
-      }
+    // Check NCU requirements
+    const ncuStat = item.stats?.find(stat => stat.stat === 54);
+    const ncuCost = ncuStat?.value || 0;
 
-      // Check NCU requirements
-      const ncuStat = item.stats?.find(stat => stat.stat === 54);
-      const ncuCost = ncuStat?.value || 0;
+    if (ncuCost > availableNCU.value) {
+      throw new Error(`Requires ${ncuCost} NCU, but only ${availableNCU.value} available`);
+    }
 
-      if (ncuCost > availableNCU.value) {
-        toast.add({
-          severity: 'error',
-          summary: 'Insufficient NCU',
-          detail: `Requires ${ncuCost} NCU, but only ${availableNCU.value} available`,
-          life: 3000
-        });
-        return;
-      }
+    // Check for NanoStrain conflicts
+    const conflicts = getBuffConflicts(item);
 
-      // Check for NanoStrain conflicts
-      const conflicts = getBuffConflicts(item);
+    if (conflicts.length > 0) {
+      // Get StackingOrder values for comparison (stat 551)
+      const newStackingOrderStat = item.stats?.find(stat => stat.stat === 551);
+      const newStackingOrder = newStackingOrderStat?.value || 0;
 
-      if (conflicts.length > 0) {
-        // Get StackingOrder values for comparison (stat 551)
-        const newStackingOrderStat = item.stats?.find(stat => stat.stat === 551);
-        const newStackingOrder = newStackingOrderStat?.value || 0;
+      for (const conflictBuff of conflicts) {
+        const conflictStackingOrderStat = conflictBuff.stats?.find(stat => stat.stat === 551);
+        const conflictStackingOrder = conflictStackingOrderStat?.value || 0;
 
-        for (const conflictBuff of conflicts) {
-          const conflictStackingOrderStat = conflictBuff.stats?.find(stat => stat.stat === 551);
-          const conflictStackingOrder = conflictStackingOrderStat?.value || 0;
-
-          // Higher StackingOrder replaces lower, equal StackingOrder means new replaces existing
-          if (newStackingOrder >= conflictStackingOrder) {
-            // Remove the conflicting buff
-            activeProfile.value.buffs = activeProfile.value.buffs.filter(buff => buff.id !== conflictBuff.id);
-          } else {
-            // New buff has lower priority, cannot cast
-            toast.add({
-              severity: 'error',
-              summary: 'Buff Conflict',
-              detail: `${conflictBuff.name} has higher stacking priority`,
-              life: 3000
-            });
-            return;
-          }
+        // Higher StackingOrder replaces lower, equal StackingOrder means new replaces existing
+        if (newStackingOrder >= conflictStackingOrder) {
+          // Remove the conflicting buff
+          activeProfile.value.buffs = activeProfile.value.buffs.filter(buff => buff.id !== conflictBuff.id);
+        } else {
+          // New buff has lower priority, cannot cast
+          throw new Error(`${conflictBuff.name} has higher stacking priority`);
         }
       }
+    }
 
-      // Convert reactive proxy to plain object to avoid serialization issues
-      const plainItem = toRaw(item);
+    // Convert reactive proxy to plain object to avoid serialization issues
+    const plainItem = toRaw(item);
 
-      // Add the buff
-      activeProfile.value.buffs.push(plainItem);
+    // Add the buff
+    activeProfile.value.buffs.push(plainItem);
 
-      // Set flag to prevent watcher loops
-      isUpdatingFromBuffs = true;
+    // Set flag to prevent watcher loops
+    isUpdatingFromBuffs = true;
 
-      try {
-        // Trigger recalculation using the IP integrator
-        const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
-        const updatedProfile = await updateProfileWithIPTracking(activeProfile.value);
+    try {
+      // Trigger recalculation using the IP integrator
+      const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
+      const updatedProfile = await updateProfileWithIPTracking(activeProfile.value);
 
-        // Update the profile in storage and state
-        await updateProfile(activeProfile.value.id, updatedProfile);
+      // Update the profile in storage and state
+      await updateProfile(activeProfile.value.id, updatedProfile);
 
-        // Update local state
-        activeProfile.value = updatedProfile;
-        profiles.value.set(activeProfile.value.id, updatedProfile);
-
-        toast.add({
-          severity: 'success',
-          summary: 'Buff Cast',
-          detail: `Successfully cast ${item.name}`,
-          life: 3000
-        });
-      } finally {
-        isUpdatingFromBuffs = false;
-      }
-
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to cast buff';
-      toast.add({
-        severity: 'error',
-        summary: 'Cast Failed',
-        detail: errorMessage,
-        life: 3000
-      });
-      throw err;
+      // Update local state
+      activeProfile.value = updatedProfile;
+      profiles.value.set(activeProfile.value.id, updatedProfile);
+    } finally {
+      isUpdatingFromBuffs = false;
     }
   }
 
@@ -1349,51 +1315,30 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       return;
     }
 
-    const toast = useToast();
+    const buffToRemove = activeProfile.value.buffs.find(buff => buff.id === itemId);
+    if (!buffToRemove) {
+      return;
+    }
+
+    // Remove the buff
+    activeProfile.value.buffs = activeProfile.value.buffs.filter(buff => buff.id !== itemId);
+
+    // Set flag to prevent watcher loops
+    isUpdatingFromBuffs = true;
 
     try {
-      const buffToRemove = activeProfile.value.buffs.find(buff => buff.id === itemId);
-      if (!buffToRemove) {
-        return;
-      }
+      // Trigger recalculation using the IP integrator
+      const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
+      const updatedProfile = await updateProfileWithIPTracking(activeProfile.value);
 
-      // Remove the buff
-      activeProfile.value.buffs = activeProfile.value.buffs.filter(buff => buff.id !== itemId);
+      // Update the profile in storage and state
+      await updateProfile(activeProfile.value.id, updatedProfile);
 
-      // Set flag to prevent watcher loops
-      isUpdatingFromBuffs = true;
-
-      try {
-        // Trigger recalculation using the IP integrator
-        const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
-        const updatedProfile = await updateProfileWithIPTracking(activeProfile.value);
-
-        // Update the profile in storage and state
-        await updateProfile(activeProfile.value.id, updatedProfile);
-
-        // Update local state
-        activeProfile.value = updatedProfile;
-        profiles.value.set(activeProfile.value.id, updatedProfile);
-
-        toast.add({
-          severity: 'success',
-          summary: 'Buff Removed',
-          detail: `Removed ${buffToRemove.name}`,
-          life: 3000
-        });
-      } finally {
-        isUpdatingFromBuffs = false;
-      }
-
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to remove buff';
-      toast.add({
-        severity: 'error',
-        summary: 'Remove Failed',
-        detail: errorMessage,
-        life: 3000
-      });
-      throw err;
+      // Update local state
+      activeProfile.value = updatedProfile;
+      profiles.value.set(activeProfile.value.id, updatedProfile);
+    } finally {
+      isUpdatingFromBuffs = false;
     }
   }
 
@@ -1405,48 +1350,25 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       return;
     }
 
-    const toast = useToast();
+    // Clear all buffs
+    activeProfile.value.buffs = [];
+
+    // Set flag to prevent watcher loops
+    isUpdatingFromBuffs = true;
 
     try {
-      const buffCount = activeProfile.value.buffs.length;
+      // Trigger recalculation using the IP integrator
+      const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
+      const updatedProfile = await updateProfileWithIPTracking(activeProfile.value);
 
-      // Clear all buffs
-      activeProfile.value.buffs = [];
+      // Update the profile in storage and state
+      await updateProfile(activeProfile.value.id, updatedProfile);
 
-      // Set flag to prevent watcher loops
-      isUpdatingFromBuffs = true;
-
-      try {
-        // Trigger recalculation using the IP integrator
-        const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
-        const updatedProfile = await updateProfileWithIPTracking(activeProfile.value);
-
-        // Update the profile in storage and state
-        await updateProfile(activeProfile.value.id, updatedProfile);
-
-        // Update local state
-        activeProfile.value = updatedProfile;
-        profiles.value.set(activeProfile.value.id, updatedProfile);
-
-        toast.add({
-          severity: 'success',
-          summary: 'All Buffs Removed',
-          detail: `Removed ${buffCount} buff${buffCount === 1 ? '' : 's'}`,
-          life: 3000
-        });
-      } finally {
-        isUpdatingFromBuffs = false;
-      }
-
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to remove all buffs';
-      toast.add({
-        severity: 'error',
-        summary: 'Remove Failed',
-        detail: errorMessage,
-        life: 3000
-      });
-      throw err;
+      // Update local state
+      activeProfile.value = updatedProfile;
+      profiles.value.set(activeProfile.value.id, updatedProfile);
+    } finally {
+      isUpdatingFromBuffs = false;
     }
   }
 

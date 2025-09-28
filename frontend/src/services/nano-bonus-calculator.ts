@@ -77,13 +77,6 @@ export const STAT_BONUS_SPELL_IDS = [
   53175  // "Modify {Stat} by {Amount}" - ability stat modifier format
 ] as const
 
-/**
- * Nano events that provide stat bonuses
- * Nano programs use different event types than equipment
- * - 1: Cast (nano activation effect)
- * - 14: Wear (passive nano effect while uploaded)
- */
-export const NANO_EVENTS = [1, 14] as const
 
 // ============================================================================
 // Performance Caching
@@ -531,27 +524,6 @@ export class NanoBonusCalculator {
               nanoAoid: nano.aoid,
               recoverable: true
             })
-            continue
-          }
-
-          // Only process nano-related events (Cast=1, Wear=14)
-          if (!spellData.event) {
-            continue // Event missing - not necessarily an error
-          }
-
-          if (typeof spellData.event !== 'number' || !NANO_EVENTS.includes(spellData.event as any)) {
-            // Log suspicious event IDs for debugging but continue processing
-            if (typeof spellData.event === 'number' && spellData.event !== 2) {
-              // Only warn about unexpected numeric events (event 2 is equipment wield, expected to be ignored)
-              result.warnings.push({
-                type: 'warning',
-                message: 'Unexpected spell event type for nano',
-                details: `spell_data[${i}].event = ${spellData.event} is not a nano event for nano ${nano.name || 'unknown'}`,
-                nanoName: nano.name,
-                nanoAoid: nano.aoid,
-                recoverable: true
-              })
-            }
             continue
           }
 

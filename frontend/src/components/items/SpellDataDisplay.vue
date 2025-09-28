@@ -194,26 +194,19 @@ const spellDataSummary = computed(() => {
 })
 
 const characterStats = computed(() => {
-  if (!props.profile) return {}
-  
+  if (!props.profile?.skills) return {}
+
   // Convert TinkerProfile to character stats format expected by CriteriaDisplay
   const stats: Record<number, number> = {}
-  
-  // Map profile skills to stat IDs
-  Object.entries(props.profile.Skills).forEach(([category, skills]) => {
-    Object.entries(skills).forEach(([skillName, value]) => {
-      // This would need proper stat ID mapping - simplified for now
-      // In a real implementation, you'd map skill names to stat IDs
-      if (typeof value === 'number') {
-        // Use a hash or lookup table to convert skill names to stat IDs
-        const statId = getStatIdFromSkillName(skillName)
-        if (statId) {
-          stats[statId] = value
-        }
-      }
-    })
+
+  // Profile.skills is already a flat map of skillId -> SkillData
+  Object.entries(props.profile.skills).forEach(([skillId, skillData]) => {
+    const id = Number(skillId)
+    if (!isNaN(id) && skillData?.total !== undefined) {
+      stats[id] = skillData.total
+    }
   })
-  
+
   return stats
 })
 
