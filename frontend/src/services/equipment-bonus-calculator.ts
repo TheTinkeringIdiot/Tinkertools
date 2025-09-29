@@ -338,13 +338,8 @@ export class EquipmentBonusCalculator {
     bonuses: StatBonus[],
     result: CalculationResult
   ): void {
+    // Empty equipment slots are valid - only warn if structure is invalid
     if (!equipmentSlots) {
-      result.warnings.push({
-        type: 'warning',
-        message: `${categoryName} equipment data is missing`,
-        details: `Profile.${categoryName} is undefined or null`,
-        recoverable: true
-      })
       return
     }
 
