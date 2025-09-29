@@ -47,7 +47,7 @@ Shows essential nano information in a dense, scannable table format
             <!-- Cost & Usage Column (always show) -->
             <div class="stat-group">
               <div v-if="nanoStats.nanoCost" class="stat-pair">
-                <span class="stat-name">Cost</span>
+                <span class="stat-name">Nano Cost</span>
                 <span class="stat-val val-cost">{{ nanoStats.nanoCost }} NP</span>
               </div>
               <div v-if="nanoStats.castTime" class="stat-pair">
@@ -86,16 +86,20 @@ Shows essential nano information in a dense, scannable table format
             
             <!-- Properties Column -->
             <div class="stat-group">
+              <div v-if="nanoStats.ncuCost" class="stat-pair">
+                <span class="stat-name">NCU Cost</span>
+                <span class="stat-val val-ncu">{{ nanoStats.ncuCost }}</span>
+              </div>
               <div v-if="nanoStats.nanoSchool" class="stat-pair">
                 <span class="stat-name">School</span>
                 <span class="stat-val val-school">{{ NANOSCHOOL[nanoStats.nanoSchool] || `School ${nanoStats.nanoSchool}` }}</span>
               </div>
               <div v-if="nanoStats.nanoStrain" class="stat-pair">
                 <span class="stat-name">Strain</span>
-                <RouterLink 
-                  :to="{ 
-                    name: 'TinkerItems', 
-                    query: { strain: nanoStats.nanoStrain, is_nano: 'true' } 
+                <RouterLink
+                  :to="{
+                    name: 'TinkerItems',
+                    query: { strain: nanoStats.nanoStrain, is_nano: 'true' }
                   }"
                   class="stat-val val-strain clickable-link"
                 >
@@ -226,26 +230,27 @@ const isNanoItem = computed(() => {
 
 const nanoStats = computed(() => {
   if (!props.item.stats) return {}
-  
+
   const stats = props.item.stats
   return {
     // Core nano properties
     nanoCost: stats.find(s => s.stat === 407)?.value, // NanoPoints
+    ncuCost: stats.find(s => s.stat === 54)?.value, // NCU cost (Level stat)
     nanoDelta: stats.find(s => s.stat === 364)?.value, // NanoDelta
     nanoRange: stats.find(s => s.stat === 287)?.value, // AttackRange
     duration: stats.find(s => s.stat === 8)?.value, // Duration
     nanoSchool: stats.find(s => s.stat === 405)?.value, // NanoSchool
     nanoStrain: stats.find(s => s.stat === 75)?.value, // NanoStrain
-    
+
     // Timing
     castTime: stats.find(s => s.stat === 294)?.value, // AttackDelay
     rechargeTime: stats.find(s => s.stat === 210)?.value, // RechargeDelay
-    
+
     // Advanced properties
     areaOfEffect: stats.find(s => s.stat === 457)?.value, // AreaOfEffect
     stackingOrder: stats.find(s => s.stat === 30)?.value, // StackingOrder
     targetType: stats.find(s => s.stat === 37)?.value, // TargetType
-    
+
     // Extract flags from item flags if available
     flags: extractNanoFlags(props.item)
   }
@@ -527,6 +532,7 @@ function formatPercentageValue(value: number): string {
 
 /* Color coding */
 .nano-stats-component .val-cost { color: #8b5cf6; }
+.nano-stats-component .val-ncu { color: #6366f1; }
 .nano-stats-component .val-delta { color: #3b82f6; }
 .nano-stats-component .val-cast { color: #f59e0b; }
 .nano-stats-component .val-range { color: #10b981; }
