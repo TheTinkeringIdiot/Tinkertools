@@ -354,6 +354,11 @@ async function loadProfile() {
 async function setActiveProfile() {
   try {
     await profilesStore.setActiveProfile(props.profileId);
+    // Update profileData to reflect the newly active profile
+    const updatedProfile = profilesStore.activeProfile;
+    if (updatedProfile && updatedProfile.id === props.profileId) {
+      profileData.value = updatedProfile;
+    }
   } catch (err) {
     console.error('Failed to set active profile:', err);
   }

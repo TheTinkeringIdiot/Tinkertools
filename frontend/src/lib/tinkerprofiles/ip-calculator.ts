@@ -263,10 +263,9 @@ export function calcAbilityMaxValue(level: number, breed: number, profession: nu
   
   const baseValue = BREED_ABILITY_DATA.initial[breed][abilityIndex];
   const adjustableRange = calcAbilityIPAdjustableRange(level, breed, abilityStatId);
-  
+
   const maxValue = baseValue + adjustableRange;
-  console.log(`[DEBUG] calcAbilityMaxValue: ability ${abilityStatId}, breed base(${baseValue}) + adjustable(${adjustableRange}) = ${maxValue}`);
-  
+
   return maxValue;
 }
 
@@ -314,18 +313,6 @@ export function calcIPAdjustableRange(level: number, profession: number, skillId
 
       // Cap increases by inc_per_level for each level, but cannot exceed the TL max cap
       adjustableRange = Math.min(prevTLCap + (incPerLevel * levelsIntoTL), currentTLMaxCap);
-
-      // Debug for Body Dev
-      if (skillId === 152) {
-        console.log(`[DEBUG] TL${tl} cap calculation:
-          Level ${level}, TL start: ${tlStartLevel}
-          Previous TL cap: ${prevTLCap}
-          Inc per level: ${incPerLevel}
-          Levels into TL: ${levelsIntoTL} (levels ${tlStartLevel}-${level} inclusive)
-          Calculated: ${prevTLCap} + (${incPerLevel} * ${levelsIntoTL}) = ${prevTLCap + (incPerLevel * levelsIntoTL)}
-          Capped at TL${tl} max: ${currentTLMaxCap}
-          Final adjustable range: ${adjustableRange}`);
-      }
     }
   } else {
     // Post-201: TL6 cap plus post-201 progression
@@ -337,14 +324,6 @@ export function calcIPAdjustableRange(level: number, profession: number, skillId
     const post201Levels = level - 200;
     adjustableRange += post201Levels * rateData[8];
 
-  }
-
-  // Debug logging for Body Dev (skill ID 152)
-  if (skillId === 152) {
-    console.log(`[DEBUG] calcIPAdjustableRange for Body Dev (${skillId}):
-      Level: ${level}, TL: ${tl}, Profession: ${profession}
-      Cost factor: ${costFac}, Cost index: ${costIndex}
-      Adjustable range: ${adjustableRange}`);
   }
 
   return adjustableRange;
@@ -389,8 +368,6 @@ export function calcAbilityIPAdjustableRange(level: number, breed: number, abili
 
       // Adjustable range is the cap minus the base
       adjustableRange = cap - breedBase;
-
-      console.log(`[DEBUG] calcAbilityIPAdjustableRange: Level ${level}, TL${tl}, ability ${abilityStatId}, breed ${breed}, costFactor ${costFactor}, cap(${cap}) - base(${breedBase}) = ${adjustableRange}`);
     }
   } else {
     // Post-201: Use breed-specific post-201 progression
@@ -401,11 +378,10 @@ export function calcAbilityIPAdjustableRange(level: number, breed: number, abili
     const pre201Adjustable = pre201Cap - breedBase;
     const post201Levels = level - 200;
     const post201Adjustable = post201PerLevel * post201Levels;
-    
+
     adjustableRange = pre201Adjustable + post201Adjustable;
-    console.log(`[DEBUG] calcAbilityIPAdjustableRange: Level ${level}, post-201, ability ${abilityStatId}, pre201(${pre201Adjustable}) + post201(${post201Adjustable}) = ${adjustableRange}`);
   }
-  
+
   return Math.max(0, adjustableRange);
 }
 
@@ -416,10 +392,9 @@ export function calcSkillMaxValue(level: number, profession: number, skillId: nu
   const baseValue = BASE_SKILL; // All IP-based skills start at 5
   const trickleDown = calcTrickleDown(abilities, skillId);
   const adjustableRange = calcIPAdjustableRange(level, profession, skillId);
-  
+
   const maxValue = baseValue + trickleDown + adjustableRange;
-  console.log(`[DEBUG] calcSkillMaxValue: skill ${skillId}, base(${baseValue}) + trickle(${trickleDown}) + adjustable(${adjustableRange}) = ${maxValue}`);
-  
+
   return maxValue;
 }
 
@@ -555,15 +530,6 @@ export function calcAbilityCapImprovements(abilities: number[], skillId: number)
   // This returns the maximum number of improvements that can be made via IP
   const result = roundAO(((weightedAbility - 5) * 2) + 5);
 
-  // Debug logging for Body Dev
-  if (skillId === 152) {
-    console.log(`[DEBUG] calcAbilityCapImprovements for Body Dev (${skillId}):
-      Abilities: [${abilities.join(', ')}]
-      Trickle factors: [${trickleFactors.join(', ')}]
-      Weighted ability: ${weightedAbility}
-      Ability cap improvements: ${result}`);
-  }
-
   return result;
 }
 
@@ -584,18 +550,6 @@ export function calcSkillCap(level: number, profession: number, skillId: number,
   const maxImprovements = Math.min(levelBasedImprovements, abilityBasedImprovements);
 
   const totalCap = baseValue + trickleDown + maxImprovements;
-
-  // Debug logging for Body Dev (skill ID 152)
-  if (skillId === 152) {
-    console.log(`[DEBUG] calcSkillCap for Body Dev (${skillId}):
-      Level: ${level}, Profession: ${profession}
-      Base: ${baseValue}
-      Trickle-down: ${trickleDown}
-      Level-based improvements: ${levelBasedImprovements}
-      Ability-based improvements: ${abilityBasedImprovements}
-      Max improvements (min of both): ${maxImprovements}
-      Total cap: ${totalCap}`);
-  }
 
   return totalCap;
 }

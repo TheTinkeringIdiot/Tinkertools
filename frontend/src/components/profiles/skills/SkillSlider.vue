@@ -201,6 +201,8 @@ const previousTrickleDown = ref(0);
 
 // Flag to prevent watchers from interfering during user interaction
 const isUserInteracting = ref(false);
+// Flag to prevent emitting during programmatic updates (like profile loading)
+const isProgrammaticUpdate = ref(false);
 
 // Computed
 const minValue = computed(() => {
@@ -509,6 +511,12 @@ const costFactorColor = computed(() => {
 function onSliderChanged(newValue: number | null) {
   // This is called when the user releases the slider (slideend event)
   // We use the current sliderValue which has been updated during dragging
+
+  // Ignore programmatic updates from watchers (e.g., during profile loading)
+  if (isProgrammaticUpdate.value) {
+    return;
+  }
+
   const valueToUse = sliderValue.value;
 
   isUserInteracting.value = true;
@@ -535,9 +543,21 @@ function onSliderChanged(newValue: number | null) {
 
 function onInputChanged(newValue: number | null) {
   if (newValue === null || newValue === undefined) return;
-  
+
+  // Ignore programmatic updates from watchers (e.g., during profile loading)
+  if (isProgrammaticUpdate.value) {
+    return;
+  }
+
+  // Check if this looks like it came from the watcher setting inputValue equal to current total
+  // If inputValue is already at this value, it's likely a watcher update, not a user change
+  if (inputValue.value === newValue && !isUserInteracting.value) {
+    return;
+  }
+
+  // Mark as user interaction
   isUserInteracting.value = true;
-  
+
   if (props.isAbility) {
     const clampedValue = Math.max(minValue.value, Math.min(newValue, maxValue.value));
     sliderValue.value = clampedValue;
@@ -553,7 +573,7 @@ function onInputChanged(newValue: number | null) {
     inputValue.value = clampedTotal;
     emit('skill-changed', props.category, props.skillId, clampedTotal);
   }
-  
+
   // Reset interaction flag after a short delay
   setTimeout(() => {
     isUserInteracting.value = false;
@@ -570,6 +590,18 @@ function setToMax() {
   }
 }
 
+// Watch for profile prop changes to set programmatic update flag
+watch(() => props.profile, (newProfile, oldProfile) => {
+  // When profile changes (like when switching active profile), set the flag
+  if (newProfile && oldProfile && newProfile.id !== oldProfile.id) {
+    isProgrammaticUpdate.value = true;
+    // Keep flag set longer when profile switches
+    setTimeout(() => {
+      isProgrammaticUpdate.value = false;
+    }, 100);
+  }
+}, { immediate: false });
+
 // Watchers
 // For abilities: watch the total field, for skills: watch the total field too (not pointFromIp)
 // For ACs: watch the skillData itself since it's a number
@@ -584,6 +616,9 @@ watch(() => {
 
   if (newValue !== undefined) {
     if (isInitialLoad || !isUserInteracting.value) {
+      // Set flag to prevent onInputChanged from emitting during programmatic updates
+      isProgrammaticUpdate.value = true;
+
       if (props.isAbility) {
         // For abilities: the value directly represents the ability score
         sliderValue.value = Math.max(newValue, minValue.value);
@@ -599,9 +634,16 @@ watch(() => {
         sliderValue.value = Math.max(ipPortion, 0);
         inputValue.value = totalSkillValue;
       }
+
+      // Clear flag after a short delay to ensure InputNumber event has processed
+      setTimeout(() => {
+        isProgrammaticUpdate.value = false;
+      }, 10);
     }
   } else if (isInitialLoad) {
     // Handle case where skillData.value is undefined (no IP invested yet)
+    isProgrammaticUpdate.value = true;
+
     if (props.isAbility) {
       // For abilities: show breed base
       sliderValue.value = minValue.value;
@@ -611,12 +653,20 @@ watch(() => {
       sliderValue.value = 0; // No IP invested
       inputValue.value = baseValue.value + trickleDownBonus.value;
     }
+
+    // Clear flag after a short delay to ensure InputNumber event has processed
+    setTimeout(() => {
+      isProgrammaticUpdate.value = false;
+    }, 10);
   }
 }, { immediate: true });
 
 // Watch for slider value changes to update input field display (visual feedback only)
 watch(sliderValue, (newValue) => {
   if (newValue !== undefined) {
+    // Set flag during programmatic update from slider watcher
+    isProgrammaticUpdate.value = true;
+
     if (props.isAbility) {
       // For abilities, update the input display directly
       inputValue.value = newValue;
@@ -626,6 +676,11 @@ watch(sliderValue, (newValue) => {
       const totalSkillValue = baseValue.value + trickleDownBonus.value + newValue;
       inputValue.value = totalSkillValue;
     }
+
+    // Clear flag on next tick
+    setTimeout(() => {
+      isProgrammaticUpdate.value = false;
+    }, 0);
   }
 });
 
@@ -634,7 +689,11 @@ watch([baseValue, trickleDownBonus], (newValues, oldValues) => {
   if (!props.isAbility) {
     const isInitialLoad = oldValues === undefined || oldValues.some(v => v === undefined);
     if (isInitialLoad || !isUserInteracting.value) {
+      isProgrammaticUpdate.value = true;
       inputValue.value = totalValue.value;
+      setTimeout(() => {
+        isProgrammaticUpdate.value = false;
+      }, 0);
     }
   }
 }, { immediate: true });

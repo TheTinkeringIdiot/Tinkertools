@@ -371,14 +371,10 @@ export async function recalculateHealthAndNano(profile: TinkerProfile): Promise<
   // Get Stamina from attributes
   const stamina = profile.skills[18]?.total || 0;  // Stamina
 
-  console.log('[recalculateHealthAndNano] Skills:', { bodyDev, nanoPool, stamina, level, breedId, professionId });
-
   // Get aggregated bonuses from skills tracking (equipment + perk + buff)
   // These are maintained by updateProfileSkillInfo in ip-integrator
   const maxHealthBonus = profile.skills[1]?.total || 0;  // Max Health bonuses (stat ID 1)
   const maxNanoBonus = profile.skills[221]?.total || 0;  // Max Nano bonuses (stat ID 221)
-
-  console.log('[recalculateHealthAndNano] Bonuses from skills:', { maxHealthBonus, maxNanoBonus });
 
   // Calculate health and nano using the accurate formula
   // Note: calcHP includes the maxHealthBonus in its calculation
@@ -388,13 +384,8 @@ export async function recalculateHealthAndNano(profile: TinkerProfile): Promise<
   const baseNano = calcNP(nanoPool, level, breedId, professionId);
   const nano = baseNano + maxNanoBonus;
 
-  console.log('[recalculateHealthAndNano] Calculated:', { health, nano, maxHealthBonus, maxNanoBonus });
-  console.log('[recalculateHealthAndNano] Setting profile.Character.MaxHealth =', health, 'MaxNano =', nano);
-
   profile.Character.MaxHealth = health;
   profile.Character.MaxNano = nano;
-
-  console.log('[recalculateHealthAndNano] After setting:', { MaxHealth: profile.Character.MaxHealth, MaxNano: profile.Character.MaxNano });
 }
 
 /**
