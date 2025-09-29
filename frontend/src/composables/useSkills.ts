@@ -12,16 +12,19 @@
  * - Type-safe skill access with error handling
  */
 
-import { computed, readonly, type ComputedRef } from 'vue';
+import { computed, readonly, inject, type ComputedRef } from 'vue';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { skillService } from '@/services/skill-service';
 import type { SkillId, SkillData } from '@/types/skills';
+import type { TinkerProfile } from '@/lib/tinkerprofiles';
 
 export interface UseSkillsOptions {
   /** Category to filter skills by (optional) */
   category?: string;
   /** Whether to include skills with zero values (default: true) */
   includeZeroValues?: boolean;
+  /** Specific profile to use instead of active profile (optional) */
+  profile?: TinkerProfile | null;
 }
 
 export interface SkillTuple {
@@ -43,16 +46,20 @@ export interface SkillTuple {
 export function useSkills(options: UseSkillsOptions = {}) {
   const profilesStore = useTinkerProfilesStore();
 
+  // Try to inject profile from parent component (e.g., SkillsManager)
+  const injectedProfile = inject<TinkerProfile | null>('profile', null);
+
   // ============================================================================
   // Reactive Computed Properties
   // ============================================================================
 
   /**
-   * Get active profile's skills as reactive map
+   * Get profile's skills as reactive map
+   * Priority: options.profile > injected profile > active profile
    */
   const profileSkills = computed((): Record<string, SkillData> => {
-    const activeProfile = profilesStore.activeProfile;
-    return activeProfile?.skills || {};
+    const targetProfile = options.profile ?? injectedProfile ?? profilesStore.activeProfile;
+    return targetProfile?.skills || {};
   });
 
   /**

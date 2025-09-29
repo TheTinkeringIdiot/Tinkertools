@@ -94,8 +94,8 @@ const emit = defineEmits<{
 // Provide profile for AC calculation in child components
 provide('profile', props.profile);
 
-// Use skills composable for skill operations
-const { getSkillsByCategory } = useSkills();
+// Use skills composable for skill operations with the viewed profile
+const { getSkillsByCategory } = useSkills({ profile: props.profile });
 
 // State for Misc skills zero-value toggle
 const showZeroMiscSkills = ref(false);

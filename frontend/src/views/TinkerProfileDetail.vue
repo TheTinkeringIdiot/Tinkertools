@@ -396,8 +396,8 @@ async function handleSkillChange(category: string, skillId: string | number, new
     const numericSkillId = typeof skillId === 'string' ? Number(skillId) : skillId;
     await profilesStore.modifySkill(props.profileId, numericSkillId, newValue);
 
-    // Update local profileData from store's updated activeProfile
-    const updatedProfile = profilesStore.activeProfile;
+    // Update local profileData from the viewed profile (not activeProfile)
+    const updatedProfile = await profilesStore.loadProfile(props.profileId);
     if (updatedProfile) {
       profileData.value = updatedProfile;
     }
@@ -413,8 +413,8 @@ async function handleAbilityChange(abilityId: string | number, newValue: number)
     const numericAbilityId = typeof abilityId === 'string' ? Number(abilityId) : abilityId;
     await profilesStore.modifySkill(props.profileId, numericAbilityId, newValue);
 
-    // Update local profileData from store's updated activeProfile
-    const updatedProfile = profilesStore.activeProfile;
+    // Update local profileData from the viewed profile (not activeProfile)
+    const updatedProfile = await profilesStore.loadProfile(props.profileId);
     if (updatedProfile) {
       profileData.value = updatedProfile;
     }
