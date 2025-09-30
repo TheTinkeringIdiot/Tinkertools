@@ -664,32 +664,15 @@ export async function modifySkill(
     };
   }
 
-  // For trainable skills, check if new value exceeds natural cap (without bonuses)
+  // For trainable skills, check if new value exceeds displayed cap (includes bonuses)
   if (TRAINABLE_SKILL_IDS.has(skillId)) {
-    const characterStats = profileToCharacterStats(profile);
-    const abilities = [
-      profile.skills[16]?.total || 0, // Strength
-      profile.skills[17]?.total || 0, // Agility
-      profile.skills[18]?.total || 0, // Stamina
-      profile.skills[19]?.total || 0, // Intelligence
-      profile.skills[20]?.total || 0, // Sense
-      profile.skills[21]?.total || 0  // Psychic
-    ];
+    // Use the already-calculated cap which includes equipment/perk/buff bonuses
+    const displayedCap = skillData.cap || 0;
 
-    const baseSkillCap = calcSkillCap(
-      characterStats.level,
-      characterStats.profession,
-      skillId,
-      abilities
-    );
-
-    const trickleDown = skillData.trickle || 0;
-    const maxPossibleFromIP = baseSkillCap - 5 - trickleDown;
-
-    if (newValue > baseSkillCap) {
+    if (newValue > displayedCap) {
       return {
         success: false,
-        error: `Cannot raise ${skillName} to ${newValue}, exceeds natural cap of ${baseSkillCap}`
+        error: `Cannot raise ${skillName} to ${newValue}, exceeds cap of ${displayedCap}`
       };
     }
   }
