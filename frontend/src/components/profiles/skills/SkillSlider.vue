@@ -335,13 +335,18 @@ const showBreakdown = computed(() => {
 // Simple tooltip content for PrimeVue v-tooltip directive
 const simpleTooltipContent = computed(() => {
   if (props.isAbility) {
-    const breedBase = minValue.value;
-    const improvements = ipContribution.value; // Use ipContribution which tracks pointFromIp
+    // Calculate raw breed base without any bonuses
+    const breedId = getBreedId(props.breed || 'Solitus') || 0;
+    const abilityIndex = getAbilityIndex(skillName.value);
+    const abilityStatId = abilityIndex !== -1 ? ABILITY_INDEX_TO_STAT_ID[abilityIndex] : 0;
+    const breedBase = getBreedInitValue(breedId, abilityStatId);
+
+    const improvements = props.skillData?.pointsFromIp || 0; // Get IP points directly from skillData
     const equipBonus = equipmentBonus.value;
 
     // Build tooltip parts
     const parts = [`Breed Base: ${breedBase}`];
-    if (improvements > 0) parts.push(`Improvements: +${improvements}`);
+    if (improvements > 0) parts.push(`IP: +${improvements}`);
     if (equipBonus !== 0) {
       parts.push(`Equipment: ${equipBonus > 0 ? '+' : ''}${equipBonus}`);
     }
