@@ -817,7 +817,24 @@ export async function modifyAbility(
   updatedAbility.pointsFromIp = newImprovements;
   updatedAbility.ipSpent = (updatedAbility.ipSpent || 0) + ipCost;
 
-  // Apply optimized trickle-down update
+  // Recalculate ability total before trickle-down calculation
+  // This is critical: updateProfileTrickleDown reads ability.total values,
+  // so we must update the total to reflect the new pointsFromIp
+  const characterStats = profileToCharacterStats(updatedProfile);
+  const baseAbilityCap = calcAbilityMaxValue(characterStats.level, characterStats.breed, characterStats.profession, abilityId);
+  const baseValue = breedBase + newImprovements;
+  const cappedBaseValue = Math.min(baseValue, baseAbilityCap);
+
+  // Preserve existing bonuses when recalculating total
+  const equipmentBonus = updatedAbility.equipmentBonus || 0;
+  const perkBonus = updatedAbility.perkBonus || 0;
+  const buffBonus = updatedAbility.buffBonus || 0;
+  const updatedCap = baseAbilityCap + equipmentBonus + perkBonus + buffBonus;
+
+  updatedAbility.total = cappedBaseValue + equipmentBonus + perkBonus + buffBonus;
+  updatedAbility.cap = updatedCap;
+
+  // Apply optimized trickle-down update (now uses correct ability totals)
   const profileWithTrickleDown = updateProfileTrickleDown(updatedProfile);
 
   // Capture new trickle-down values

@@ -256,7 +256,7 @@ Complete character management with skills, equipment, and IP tracking
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import Button from 'primevue/button';
 import Badge from 'primevue/badge';
@@ -396,6 +396,10 @@ async function handleSkillChange(category: string, skillId: string | number, new
     const numericSkillId = typeof skillId === 'string' ? Number(skillId) : skillId;
     await profilesStore.modifySkill(props.profileId, numericSkillId, newValue);
 
+    // Force a complete reload to ensure reactivity triggers
+    profileData.value = null;
+    await nextTick();
+
     // Update local profileData from the viewed profile (not activeProfile)
     const updatedProfile = await profilesStore.loadProfile(props.profileId);
     if (updatedProfile) {
@@ -411,7 +415,14 @@ async function handleAbilityChange(abilityId: string | number, newValue: number)
   try {
     // Convert to number if it's a string ID
     const numericAbilityId = typeof abilityId === 'string' ? Number(abilityId) : abilityId;
-    await profilesStore.modifySkill(props.profileId, numericAbilityId, newValue);
+
+    // Call modifyAbility for abilities (skill IDs 16-21), not modifySkill
+    await profilesStore.modifyAbility(props.profileId, numericAbilityId, newValue);
+
+    // Force a complete reload to ensure reactivity triggers
+    // Use a temporary null assignment to break any reference caching
+    profileData.value = null;
+    await nextTick();
 
     // Update local profileData from the viewed profile (not activeProfile)
     const updatedProfile = await profilesStore.loadProfile(props.profileId);

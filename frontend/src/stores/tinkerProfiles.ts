@@ -802,7 +802,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   /**
    * Modify a specific ability value with real-time trickle-down updates
    */
-  async function modifyAbility(profileId: string, abilityName: string, newValue: number): Promise<{
+  async function modifyAbility(profileId: string, abilityId: number, newValue: number): Promise<{
     success: boolean;
     error?: string;
     trickleDownChanges?: Record<string, { old: number; new: number }>;
@@ -822,7 +822,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     try {
       // Use enhanced IP integrator for ability modification
       const { modifyAbility } = await import('@/lib/tinkerprofiles/ip-integrator');
-      const result = await modifyAbility(profile, abilityName, newValue);
+      const result = await modifyAbility(profile, abilityId, newValue);
 
       if (result.success && result.updatedProfile) {
         // Update the profile in storage and reactive state
