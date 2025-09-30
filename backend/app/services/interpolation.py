@@ -72,12 +72,11 @@ class InterpolationService:
             return None
 
         # Check if interpolation is needed
-        if (len(item_variants) == 1 or 
-            base_item.is_nano or 
-            'Control Point' in base_item.name or
-            item_variants[-1].ql == base_item.ql):
-            # No interpolation needed - return original item
-            return self._create_non_interpolated_item(base_item)
+        if (len(item_variants) == 1 or
+            base_item.is_nano or
+            'Control Point' in base_item.name):
+            # No interpolation needed - return original item with target QL
+            return self._create_non_interpolated_item(base_item, target_ql)
 
         # Find the appropriate low and high items for interpolation
         lo_item, hi_item = self._find_interpolation_bounds(item_variants, target_ql)
@@ -202,21 +201,29 @@ class InterpolationService:
         # Target QL is higher than highest variant
         return variants[-1], None
 
-    def _create_non_interpolated_item(self, item: Item) -> InterpolatedItem:
+    def _create_non_interpolated_item(self, item: Item, target_ql: int = None) -> InterpolatedItem:
         """
         Create an InterpolatedItem from a single item (no interpolation).
+        If target_ql is provided, the item's QL will be set to that value.
         """
         interpolated = InterpolatedItem.from_item(item, interpolating=False)
-        
+
+        # Update QL to target if specified
+        if target_ql is not None:
+            interpolated.ql = target_ql
+            interpolated.target_ql = target_ql
+            interpolated.low_ql = item.ql
+            interpolated.high_ql = item.ql
+
         # Load stats
         interpolated.stats = self._load_item_stats(item)
-        
+
         # Load spell data
         interpolated.spell_data = self._load_item_spell_data(item)
-        
+
         # Load actions
         interpolated.actions = self._load_item_actions(item)
-        
+
         return interpolated
 
     def _create_interpolated_item(self, lo_item: Item, hi_item: Optional[Item], target_ql: int) -> InterpolatedItem:
