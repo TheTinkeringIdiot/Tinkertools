@@ -59,6 +59,14 @@ const BONUS_ONLY_STAT_IDS = new Set([
   221,  // MaxNano
   45,   // BeltSlots
   181,  // MaxNCU
+  90,   // ProjectileAC
+  91,   // MeleeAC
+  92,   // EnergyAC
+  93,   // ChemicalAC
+  94,   // RadiationAC
+  95,   // ColdAC
+  96,   // PoisonAC
+  97,   // FireAC
   276,  // AddAllOffense
   277,  // AddAllDefense
   278,  // ProjectileDamageModifier
