@@ -216,8 +216,10 @@ Complete character management with skills, equipment, and IP tracking
                   </div>
 
                   <!-- Skills Content -->
-                  <div class="flex-1 p-6 overflow-y-auto">
+                  <div ref="skillsScrollContainer" class="flex-1 p-6 overflow-y-auto" style="scroll-behavior: auto;">
                     <SkillsManager
+                      v-if="profileData"
+                      :key="`skills-${profileData.id}`"
                       :profile="profileData"
                       @skill-changed="handleSkillChange"
                       @ability-changed="handleAbilityChange"
@@ -296,6 +298,7 @@ const profileData = ref<TinkerProfile | null>(null);
 const showEditDialog = ref(false);
 // Auto-save - no pending changes tracking needed
 const activeTabIndex = ref(0); // Track the active tab index
+const skillsScrollContainer = ref<HTMLElement | null>(null); // Reference to skills scroll container
 
 // Computed
 const isActiveProfile = computed(() => 
@@ -396,14 +399,12 @@ async function handleSkillChange(category: string, skillId: string | number, new
     const numericSkillId = typeof skillId === 'string' ? Number(skillId) : skillId;
     await profilesStore.modifySkill(props.profileId, numericSkillId, newValue);
 
-    // Force a complete reload to ensure reactivity triggers
-    profileData.value = null;
-    await nextTick();
-
     // Update local profileData from the viewed profile (not activeProfile)
+    // Direct assignment to maintain reactivity without unmounting component
     const updatedProfile = await profilesStore.loadProfile(props.profileId);
-    if (updatedProfile) {
-      profileData.value = updatedProfile;
+    if (updatedProfile && profileData.value) {
+      // Update in place to preserve component state and scroll position
+      Object.assign(profileData.value, updatedProfile);
     }
   } catch (err) {
     console.error('Failed to modify skill:', err);
@@ -419,15 +420,12 @@ async function handleAbilityChange(abilityId: string | number, newValue: number)
     // Call modifyAbility for abilities (skill IDs 16-21), not modifySkill
     await profilesStore.modifyAbility(props.profileId, numericAbilityId, newValue);
 
-    // Force a complete reload to ensure reactivity triggers
-    // Use a temporary null assignment to break any reference caching
-    profileData.value = null;
-    await nextTick();
-
     // Update local profileData from the viewed profile (not activeProfile)
+    // Direct assignment to maintain reactivity without unmounting component
     const updatedProfile = await profilesStore.loadProfile(props.profileId);
-    if (updatedProfile) {
-      profileData.value = updatedProfile;
+    if (updatedProfile && profileData.value) {
+      // Update in place to preserve component state and scroll position
+      Object.assign(profileData.value, updatedProfile);
     }
 
     // Show feedback about ability change
