@@ -318,3 +318,24 @@ const skillValue = findSkillByPattern(skillCategory, statId);
 - **`ac-calculator.ts`**: Pure calculation utility for AC values (no storage)
 - **`skill-patterns.ts`**: Flexible skill name matching via regex patterns
 - **`profile-stats-mapper.ts`**: Profile → stat ID mapping for requirements
+
+## Import Validation Boundary (September 2025)
+
+### Critical: Validate Before Import
+```typescript
+// ALWAYS validate imported profiles before saving
+const { validateProfile } = await import('./validation');
+const validation = validateProfile(importedProfile);
+if (!validation.valid) {
+  throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
+}
+```
+
+**Validation ensures:**
+- Profession/Breed IDs are numeric and in valid ranges (1-15, 0-7)
+- Skills structure is correct
+- Level is 1-220
+- Version is "4.0.0"
+
+**Location**: All imports run through validation in `transformer.ts` (JSON/AOSetups imports)
+**See**: `docs/features/profile-import-validation.doc.md` for full details

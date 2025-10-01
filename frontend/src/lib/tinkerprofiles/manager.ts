@@ -177,11 +177,23 @@ export class TinkerProfilesManager {
       const profileWithCaps = updateProfileWithIPTracking(profile);
       Object.assign(profile, profileWithCaps);
 
-      // Validate the profile
+      // Validate the profile including ID range checks
+      const { validateProfile } = await import('./validation');
+      const validation = validateProfile(profile);
+      if (!validation.valid) {
+        console.error('[ProfileManager] Profile validation failed:', validation.errors);
+        throw new Error(`Profile validation failed: ${validation.errors.join(', ')}`);
+      }
+
+      if (validation.warnings.length > 0) {
+        console.warn('[ProfileManager] Profile validation warnings:', validation.warnings);
+      }
+
+      // Legacy validator check if in strict mode
       if (this.config.validation.strictMode) {
-        const validation = this.validator.validateProfile(profile);
-        if (!validation.valid) {
-          throw new Error(`Profile validation failed: ${validation.errors.join(', ')}`);
+        const legacyValidation = this.validator.validateProfile(profile);
+        if (!legacyValidation.valid) {
+          throw new Error(`Profile validation failed: ${legacyValidation.errors.join(', ')}`);
         }
       }
 

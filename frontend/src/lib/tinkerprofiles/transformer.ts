@@ -27,6 +27,8 @@ import {
 import { apiClient } from '@/services/api-client';
 import { skillService } from '@/services/skill-service';
 import type { SkillId } from '@/types/skills';
+import { SKILL_COST_FACTORS } from '@/services/game-data';
+import { normalizeProfessionToId, normalizeBreedToId } from '@/services/game-utils';
 
 export class ProfileTransformer {
   
@@ -84,7 +86,7 @@ export class ProfileTransformer {
 
       switch (detectedFormat) {
         case 'json':
-          profile = this.importFromJSON(data, result);
+          profile = await this.importFromJSON(data, result);
           break;
 
         case 'aosetups':
@@ -143,7 +145,7 @@ export class ProfileTransformer {
   
   
   
-  private importFromJSON(data: string, result: ProfileImportResult): TinkerProfile {
+  private async importFromJSON(data: string, result: ProfileImportResult): Promise<TinkerProfile> {
     const parsed = JSON.parse(data);
 
     // Check if it's already a valid TinkerProfile
@@ -154,8 +156,28 @@ export class ProfileTransformer {
       importedProfile.created = new Date().toISOString();
       importedProfile.updated = new Date().toISOString();
 
+      // Normalize Character IDs (handles both legacy strings and numeric IDs)
+      importedProfile.Character.Profession = normalizeProfessionToId(
+        importedProfile.Character.Profession
+      );
+      importedProfile.Character.Breed = normalizeBreedToId(
+        importedProfile.Character.Breed
+      );
+
       // Import and normalize perk data
       importedProfile.PerksAndResearch = this.importPerksFromData(parsed, result);
+
+      // Validate the imported profile
+      const { validateProfile: validateProfileIds } = await import('./validation');
+      const validation = validateProfileIds(importedProfile);
+      if (!validation.valid) {
+        result.errors.push(...validation.errors);
+        throw new Error(`JSON import validation failed: ${validation.errors.join(', ')}`);
+      }
+
+      if (validation.warnings.length > 0) {
+        result.warnings.push(...validation.warnings);
+      }
 
       // Ensure perk system is properly migrated with point calculation
       return this.migrateProfilePerks(importedProfile);
@@ -172,29 +194,37 @@ export class ProfileTransformer {
     result.metadata.migrated = true;
 
     const profile = createDefaultProfile();
+    console.log(`[ProfileTransformer] Created default profile with ${Object.keys(profile.skills).length} skills`);
 
     // Ensure profile is v4.0.0 format with ID-based skills
     profile.version = '4.0.0';
-    if (!profile.skills) {
-      profile.skills = {};
-    }
+    // Keep all default skills - AOSetups will update the values for skills it includes
 
     // Map character data
     if (aosetups.character) {
       profile.Character.Name = aosetups.character.name || aosetups.name || 'AOSetups Import';
       profile.Character.Level = aosetups.character.level || 1;
-      profile.Character.Profession = aosetups.character.profession || 'Adventurer';
-      profile.Character.Breed = aosetups.character.breed || 'Solitus';
+
+      // Normalize profession and breed to numeric IDs
+      profile.Character.Profession = normalizeProfessionToId(
+        aosetups.character.profession || 'Adventurer'
+      );
+      profile.Character.Breed = normalizeBreedToId(
+        aosetups.character.breed || 'Solitus'
+      );
       profile.Character.Faction = 'Neutral'; // Default, not in AOSetups
       profile.Character.Expansion = 'Lost Eden'; // Default
       profile.Character.AccountType = 'Paid'; // Default
 
       // Calculate base health and nano based on breed and level
       const level = profile.Character.Level;
-      const healthPerLevel = profile.Character.Breed === 'Atrox' ? 10 :
-                           profile.Character.Breed === 'Opifex' ? 6 : 8;
-      const nanoPerLevel = profile.Character.Breed === 'Atrox' ? 4 :
-                          profile.Character.Breed === 'Opifex' ? 6 : 5;
+      // Breed IDs: 1=Solitus, 2=Opifex, 3=Nanomage, 4=Atrox
+      const healthPerLevel = profile.Character.Breed === 4 ? 10 :  // Atrox
+                           profile.Character.Breed === 2 ? 6 :     // Opifex
+                           8;                                      // Default (Solitus/Nanomage)
+      const nanoPerLevel = profile.Character.Breed === 4 ? 4 :     // Atrox
+                          profile.Character.Breed === 2 ? 6 :      // Opifex
+                          5;                                       // Default (Solitus/Nanomage)
 
       profile.Character.MaxHealth = level * healthPerLevel;
       profile.Character.MaxNano = level * nanoPerLevel;
@@ -224,6 +254,7 @@ export class ProfileTransformer {
         for (const normalizedSkill of normalizedSkills) {
           this.mapNormalizedSkillToProfile(normalizedSkill, profile, result);
         }
+        console.log(`[ProfileTransformer] After mapping AOSetups skills, profile has ${Object.keys(profile.skills).length} skills`);
       }
     }
     
@@ -292,6 +323,18 @@ export class ProfileTransformer {
     result.warnings.push('Profile imported from AOSetups format');
     result.warnings.push('Equipment items fetched from database with interpolated stats at target QLs');
 
+    // Validate the imported profile
+    const { validateProfile: validateProfileIds } = await import('./validation');
+    const validation = validateProfileIds(profile);
+    if (!validation.valid) {
+      result.errors.push(...validation.errors);
+      throw new Error(`AOSetups import validation failed: ${validation.errors.join(', ')}`);
+    }
+
+    if (validation.warnings.length > 0) {
+      result.warnings.push(...validation.warnings);
+    }
+
     // Ensure perk system is migrated
     return this.migrateProfilePerks(profile);
   }
@@ -311,6 +354,27 @@ export class ProfileTransformer {
     // Ensure skills map exists in v4.0.0 format
     if (!profile.skills) {
       profile.skills = {};
+    }
+
+    // Check if this is an ability (IDs 16-21: Strength, Agility, Stamina, Intelligence, Sense, Psychic)
+    const isAbility = numericId >= 16 && numericId <= 21;
+
+    // Handle abilities separately - they should already exist from createDefaultProfile()
+    if (isAbility) {
+      if (profile.skills[numericId]) {
+        // Just update the IP values for abilities
+        profile.skills[numericId].ipSpent = ipExpenditure;
+        profile.skills[numericId].pointsFromIp = pointsFromIp;
+        // Total will be recalculated by ipIntegrator.updateProfileSkillInfo later
+      }
+      return;
+    }
+
+    // Only update trainable skills from AOSetups data
+    // Other non-trainable skills (ACs, bonus-only stats) should keep their default values
+    if (!SKILL_COST_FACTORS[numericId]) {
+      console.log(`[ProfileTransformer] Skipping non-trainable skill ID ${numericId} (${skillService.getName(skillId)}) - keeping default values`);
+      return;
     }
 
     // Create or update skill data with ID-based structure
@@ -832,8 +896,12 @@ export class ProfileTransformer {
       // Copy all Character data
       if (data.Character.Name) profile.Character.Name = data.Character.Name;
       if (data.Character.Level) profile.Character.Level = data.Character.Level;
-      if (data.Character.Profession) profile.Character.Profession = data.Character.Profession;
-      if (data.Character.Breed) profile.Character.Breed = data.Character.Breed;
+      if (data.Character.Profession) {
+        profile.Character.Profession = normalizeProfessionToId(data.Character.Profession);
+      }
+      if (data.Character.Breed) {
+        profile.Character.Breed = normalizeBreedToId(data.Character.Breed);
+      }
       if (data.Character.Faction) profile.Character.Faction = data.Character.Faction;
       if (data.Character.Expansion) profile.Character.Expansion = data.Character.Expansion;
       if (data.Character.AccountType) profile.Character.AccountType = data.Character.AccountType;
@@ -853,7 +921,12 @@ export class ProfileTransformer {
       // Try to map common fields from other formats
       if (data.name) profile.Character.Name = data.name;
       if (data.level) profile.Character.Level = data.level;
-      if (data.profession) profile.Character.Profession = data.profession;
+      if (data.profession) {
+        profile.Character.Profession = normalizeProfessionToId(data.profession);
+      }
+      if (data.breed) {
+        profile.Character.Breed = normalizeBreedToId(data.breed);
+      }
 
       result.warnings.push('Profile converted from unrecognized format - some data may be lost');
     }
@@ -868,6 +941,38 @@ export class ProfileTransformer {
   // ============================================================================
   // Profile Migration
   // ============================================================================
+
+  /**
+   * Migrate legacy string-based Profession/Breed to numeric IDs
+   * Safe to call multiple times (idempotent)
+   * Automatically called when loading profiles
+   */
+  migrateProfileCharacterIds(profile: TinkerProfile): TinkerProfile {
+    let needsMigration = false;
+    const migrated = structuredClone(profile);
+
+    // Migrate Profession if it's a string
+    if (typeof migrated.Character.Profession !== 'number') {
+      const oldValue = migrated.Character.Profession;
+      migrated.Character.Profession = normalizeProfessionToId(oldValue as any);
+      console.log(`[Migration] Converted profession "${oldValue}" to ID ${migrated.Character.Profession}`);
+      needsMigration = true;
+    }
+
+    // Migrate Breed if it's a string
+    if (typeof migrated.Character.Breed !== 'number') {
+      const oldValue = migrated.Character.Breed;
+      migrated.Character.Breed = normalizeBreedToId(oldValue as any);
+      console.log(`[Migration] Converted breed "${oldValue}" to ID ${migrated.Character.Breed}`);
+      needsMigration = true;
+    }
+
+    if (needsMigration) {
+      migrated.updated = new Date().toISOString();
+    }
+
+    return migrated;
+  }
 
   /**
    * Migrate profile to include structured PerkSystem
