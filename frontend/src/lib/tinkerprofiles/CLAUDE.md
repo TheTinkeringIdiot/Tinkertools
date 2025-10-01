@@ -339,3 +339,191 @@ if (!validation.valid) {
 
 **Location**: All imports run through validation in `transformer.ts` (JSON/AOSetups imports)
 **See**: `docs/features/profile-import-validation.doc.md` for full details
+
+## Breed/Profession Normalization Pattern (September 2025)
+
+### Overview
+
+All Character.Breed and Character.Profession values are stored and used as **numeric IDs** throughout the TinkerProfiles system. This ensures consistency, enables efficient calculations, and provides robust fuzzy matching for imports.
+
+### Critical Rules
+
+1. **Storage**: Always store breed and profession as numeric IDs
+2. **Display**: Convert to human-readable names only in UI layer
+3. **Import**: Always normalize string values to IDs at import boundaries
+4. **Migration**: Legacy string-based profiles auto-migrate to IDs on load
+5. **Validation**: Verify numeric type and valid ID range
+
+### Normalization Functions
+
+**Location**: `/frontend/src/services/game-utils.ts`
+
+```typescript
+// Convert any breed value to numeric ID (1-7)
+normalizeBreedToId(value: string | number): number
+// Examples:
+normalizeBreedToId("Solitus") → 1
+normalizeBreedToId("solitus") → 1
+normalizeBreedToId(1) → 1
+normalizeBreedToId("invalid") → 1 (safe default)
+
+// Convert any profession value to numeric ID (1-15)
+normalizeProfessionToId(value: string | number): number
+// Examples:
+normalizeProfessionToId("Martial Artist") → 8
+normalizeProfessionToId("MartialArtist") → 8
+normalizeProfessionToId("martial artist") → 8
+normalizeProfessionToId(8) → 8
+normalizeProfessionToId("invalid") → 6 (Adventurer default)
+```
+
+### Key Features
+
+- **Idempotent**: Safe to call multiple times on same value
+- **Fuzzy Matching**: Handles spaces, hyphens, case variations
+- **Safe Defaults**: Invalid values → Adventurer (6) / Solitus (1)
+- **Type Flexible**: Accepts both strings and numbers
+
+### Usage Patterns
+
+#### Profile Creation
+```typescript
+// ALWAYS use numeric IDs when creating profiles
+const profile = createDefaultProfile("Character Name", "Solitus");
+// Result: profile.Character.Breed = 1 (numeric ID)
+// Result: profile.Character.Profession = 6 (numeric ID)
+```
+
+#### Import from External Format
+```typescript
+// ALWAYS normalize at import boundary
+const importedProfession = normalizeProfessionToId(
+  aosetups.character.profession || 'Adventurer'
+);
+const importedBreed = normalizeBreedToId(
+  aosetups.character.breed || 'Solitus'
+);
+
+profile.Character.Profession = importedProfession; // numeric ID
+profile.Character.Breed = importedBreed; // numeric ID
+```
+
+#### Display in UI
+```typescript
+// ONLY convert to names in display layer
+import { getProfessionName, getBreedName } from '@/services/game-utils';
+
+const displayName = getProfessionName(profile.Character.Profession);
+// Result: "Adventurer" (human-readable string)
+
+const displayBreed = getBreedName(profile.Character.Breed);
+// Result: "Solitus" (human-readable string)
+```
+
+#### IP Calculations
+```typescript
+// Use numeric IDs directly in calculations
+const abilityBase = getBreedInitValue(
+  profile.Character.Breed,  // numeric ID (1-7)
+  abilityId                  // numeric ID (16-21)
+);
+
+const skillCap = calcAbilityMaxValue(
+  level,
+  profile.Character.Breed,       // numeric ID
+  profile.Character.Profession,  // numeric ID
+  abilityId
+);
+```
+
+### Migration Support
+
+**Location**: `/frontend/src/lib/tinkerprofiles/transformer.ts`
+
+```typescript
+// Automatically migrates legacy string-based profiles
+migrateProfileCharacterIds(profile: TinkerProfile): TinkerProfile {
+  // Converts string values to numeric IDs
+  // Logs conversion for debugging
+  // Updates profile.updated timestamp
+  // Idempotent - safe to call multiple times
+}
+```
+
+**Automatic Migration Triggers**:
+- Profile load from storage
+- Profile import from JSON
+- Profile import from AOSetups
+
+### Validation
+
+**Location**: `/frontend/src/lib/tinkerprofiles/validation.ts`
+
+```typescript
+// Validate numeric type and range
+if (typeof profile.Character.Profession !== 'number' ||
+    profile.Character.Profession < 1 ||
+    profile.Character.Profession > 15) {
+  errors.push('Invalid profession ID');
+}
+
+if (typeof profile.Character.Breed !== 'number' ||
+    profile.Character.Breed < 0 ||
+    profile.Character.Breed > 7) {
+  errors.push('Invalid breed ID');
+}
+```
+
+### ID Mappings Reference
+
+```typescript
+// Profession IDs (1-15)
+1: Soldier, 2: MartialArtist, 3: Engineer, 4: Fixer
+5: Agent, 6: Adventurer, 7: Trader, 8: Bureaucrat
+9: Enforcer, 10: Doctor, 11: NanoTechnician, 12: MetaPhysicist
+13: Keeper, 14: Shade, 15: Monster (NPC)
+
+// Breed IDs (0-7)
+0: Unknown, 1: Solitus, 2: Opifex, 3: Nanomage, 4: Atrox
+5-7: Reserved/NPC breeds
+```
+
+### Critical Do's and Don'ts
+
+#### Do's ✅
+- Store breed/profession as numeric IDs in all profile data
+- Use normalization functions at import boundaries
+- Convert to names only in UI display layer
+- Validate numeric type and range in validation layer
+- Use numeric IDs directly in IP calculations
+
+#### Don'ts ❌
+- Don't store breed/profession as strings in profile structure
+- Don't skip normalization when importing external data
+- Don't use string values in IP calculation functions
+- Don't bypass migration when loading legacy profiles
+- Don't assume values are valid without type checking
+
+### Debugging Breed/Profession Issues
+
+```typescript
+// Check profile values in console
+console.log('Profession:', profile.Character.Profession, typeof profile.Character.Profession);
+console.log('Breed:', profile.Character.Breed, typeof profile.Character.Breed);
+
+// Should always show:
+// Profession: 6 'number'
+// Breed: 1 'number'
+
+// If you see strings, migration didn't run:
+// Profession: "Adventurer" 'string'  ← PROBLEM!
+```
+
+### Related Documentation
+
+See `/docs/features/breed-profession-normalization.doc.md` for complete feature documentation including:
+- Data flow diagrams
+- Import/export integration details
+- Migration scenarios
+- Edge case handling
+- Performance characteristics
