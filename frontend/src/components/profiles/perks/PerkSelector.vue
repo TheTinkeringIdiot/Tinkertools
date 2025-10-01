@@ -70,6 +70,7 @@ import type { PerkSeries, PerkType, AnyPerkEntry } from '@/lib/tinkerprofiles/pe
 import PerkCategory from './PerkCategory.vue';
 import Button from 'primevue/button';
 import ProgressSpinner from 'primevue/progressspinner';
+import { getProfessionName, getBreedName } from '@/services/game-utils';
 
 // Types
 interface PerkCategoryData {
@@ -97,13 +98,13 @@ const allPerkSeries = ref<PerkSeries[]>([]);
 
 // Computed
 const activeProfile = computed(() => {
-  return profilesStore.profiles.find(p => p.id === props.profileId);
+  return Array.from(profilesStore.profiles.values()).find(p => p.id === props.profileId);
 });
 
 const characterLevel = computed(() => activeProfile.value?.Character.Level || 1);
 const aiLevel = computed(() => activeProfile.value?.Character.AlienLevel || 0);
-const profession = computed(() => activeProfile.value?.Character.Profession || '');
-const breed = computed(() => activeProfile.value?.Character.Breed || '');
+const profession = computed(() => getProfessionName(activeProfile.value?.Character.Profession || 0));
+const breed = computed(() => getBreedName(activeProfile.value?.Character.Breed || 0));
 
 const ownedPerks = computed(() => {
   const perkSystem = activeProfile.value?.PerksAndResearch;
@@ -167,7 +168,7 @@ async function onPerkSelect(perkInfo: any, targetLevel: number) {
   const result = perkManager.addPerk(activeProfile.value, perkInfo, targetLevel);
 
   if (result.success && result.updatedProfile) {
-    await profilesStore.updateProfile(result.updatedProfile);
+    await profilesStore.updateProfile(props.profileId, result.updatedProfile);
 
     // Show success message
     console.log('Perk added successfully:', result.changeEvent);
@@ -183,7 +184,7 @@ async function onPerkRemove(perkName: string, targetLevel: number = 0) {
   const result = perkManager.removePerk(activeProfile.value, perkName, targetLevel);
 
   if (result.success && result.updatedProfile) {
-    await profilesStore.updateProfile(result.updatedProfile);
+    await profilesStore.updateProfile(props.profileId, result.updatedProfile);
 
     // Show success message
     console.log('Perk removed successfully:', result.changeEvent);

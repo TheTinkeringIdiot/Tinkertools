@@ -120,10 +120,10 @@ Modal for viewing and editing detailed profile information
                     class="w-full"
                   />
                   <p v-else class="text-surface-700 dark:text-surface-300">
-                    {{ profileData.Character.Profession }}
+                    {{ getProfessionName(profileData.Character.Profession) }}
                   </p>
                 </div>
-                
+
                 <div class="field">
                   <label class="font-medium text-surface-900 dark:text-surface-50">Breed</label>
                   <Dropdown
@@ -133,7 +133,7 @@ Modal for viewing and editing detailed profile information
                     class="w-full"
                   />
                   <p v-else class="text-surface-700 dark:text-surface-300">
-                    {{ profileData.Character.Breed }}
+                    {{ getBreedName(profileData.Character.Breed) }}
                   </p>
                 </div>
               </div>
@@ -370,6 +370,7 @@ import {
 } from '@/lib/tinkerprofiles';
 import { skillService } from '@/services/skill-service';
 import type { SkillId } from '@/types/skills';
+import { getProfessionName, getBreedName } from '@/services/game-utils';
 
 // Props & Emits
 const props = defineProps<{

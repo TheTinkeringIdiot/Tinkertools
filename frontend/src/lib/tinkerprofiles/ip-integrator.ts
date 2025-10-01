@@ -23,7 +23,6 @@ import {
   type IPCalculationResult
 } from './ip-calculator';
 
-import { getBreedId, getProfessionId } from '../../services/game-utils';
 import { getSkillId, getSkillName } from './skill-mappings';
 import { calculateEquipmentBonuses } from '../../services/equipment-bonus-calculator';
 import { calculatePerkBonuses as calculatePerkBonusesService } from '../../services/perk-bonus-calculator';
@@ -123,9 +122,9 @@ function createEmptySkillData(): SkillData {
  * Convert TinkerProfile to CharacterStats for IP calculations
  */
 export function profileToCharacterStats(profile: TinkerProfile): CharacterStats {
-  // Get breed and profession IDs
-  const breed = getBreedId(profile.Character.Breed) || 0;
-  const profession = getProfessionId(profile.Character.Profession) || 0;
+  // Direct access - no conversion needed since Character stores numeric IDs
+  const breed = profile.Character.Breed;
+  const profession = profile.Character.Profession;
 
   // Extract abilities (improvements only for IP calculations)
   // Attribute skill IDs: Strength=16, Agility=17, Stamina=18, Intelligence=19, Sense=20, Psychic=21
@@ -265,7 +264,7 @@ export function calculateProfileIP(profile: TinkerProfile): IPTracker {
   const abilityNames = ['Strength', 'Stamina', 'Agility', 'Sense', 'Intelligence', 'Psychic'];
 
   abilityStatIds.forEach((abilityStatId, index) => {
-    const breed = getBreedId(profile.Character.Breed) || 0;
+    const breed = profile.Character.Breed;
     const skillData = profile.skills[abilityStatId];
     const improvements = skillData?.pointsFromIp || 0;
     const abilityName = abilityNames[index];
@@ -690,7 +689,7 @@ export async function modifySkill(
   // Calculate IP cost for trainable skills
   let ipCost = 0;
   if (TRAINABLE_SKILL_IDS.has(skillId)) {
-    const profession = getProfessionId(profile.Character.Profession) || 0;
+    const profession = profile.Character.Profession;
 
     if (improvementDiff > 0) {
       // Calculate cost to raise skill
@@ -757,7 +756,7 @@ export async function modifyAbility(
     };
   }
 
-  const breed = getBreedId(profile.Character.Breed) || 0;
+  const breed = profile.Character.Breed;
 
   // Calculate new improvement value
   const breedBase = getBreedInitValue(breed, abilityId);

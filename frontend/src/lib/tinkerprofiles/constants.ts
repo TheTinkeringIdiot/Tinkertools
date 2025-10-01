@@ -7,7 +7,7 @@
 import type { TinkerProfile, NanoCompatibleProfile, SkillData } from './types';
 import type { PerkSystem } from './perk-types';
 import { getBreedInitValue, calcHP, calcNP } from './ip-calculator';
-import { getBreedId } from '../../services/game-utils';
+import { getBreedId, normalizeBreedToId, normalizeProfessionToId } from '../../services/game-utils';
 import { skillService } from '../../services/skill-service';
 
 // Import BASE_SKILL constant from ip-calculator
@@ -375,41 +375,41 @@ export function createDefaultSkillsV4(breed: string): { [skillId: number]: Skill
  */
 export function createDefaultProfile(name: string = 'New Character', breed: string = 'Solitus'): TinkerProfile {
   const now = new Date().toISOString();
-  
+
   // Calculate initial health and nano based on level 1 defaults
   const level = 1;
-  const breedId = getBreedIdFromBreedName(breed);
+  const breedId = normalizeBreedToId(breed); // Updated: use normalization
   const professionId = 6; // Adventurer
   const bodyDev = BASE_SKILL; // 5
   const nanoPool = BASE_SKILL; // 5
-  
+
   const initialHealth = calcHP(bodyDev, level, breedId, professionId);
   const initialNano = calcNP(nanoPool, level, breedId, professionId);
-  
+
   return {
     id: `profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     version: CURRENT_VERSION,
     created: now,
     updated: now,
-    
+
     Character: {
       Name: name,
       Level: 1,
-      Profession: 'Adventurer',
-      Breed: breed,
+      Profession: professionId as any,  // Store as numeric ID
+      Breed: breedId as any,            // Store as numeric ID
       Faction: 'Neutral',
       Expansion: 'Lost Eden',
       AccountType: 'Paid',
       MaxHealth: initialHealth,
       MaxNano: initialNano
     },
-    
+
     skills: createDefaultSkillsV4(breed),
-    
+
     Weapons: structuredClone(DEFAULT_WEAPONS),
     Clothing: structuredClone(DEFAULT_CLOTHING),
     Implants: structuredClone(DEFAULT_IMPLANTS),
-    
+
     PerksAndResearch: createDefaultPerkSystem(level, 0)
   };
 }
@@ -418,12 +418,12 @@ export function createDefaultProfile(name: string = 'New Character', breed: stri
  * Create a simplified nano-compatible profile
  */
 export function createDefaultNanoProfile(name: string = 'New Character', breed: string = 'Solitus'): NanoCompatibleProfile {
-  const breedId = getBreedId(breed) || 0;
-  
+  const breedId = getBreedId(breed) || 1;
+
   return {
     id: `nano_profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     name,
-    profession: 'Adventurer',
+    profession: 'Adventurer',  // NanoCompatibleProfile uses string types
     level: 1,
     skills: {
       // Nano Schools
@@ -433,7 +433,7 @@ export function createDefaultNanoProfile(name: string = 'New Character', breed: 
       'Psychological Modifications': BASE_SKILL,
       'Sensory Improvement': BASE_SKILL,
       'Time and Space': BASE_SKILL,
-      
+
       // Core Skills
       'Nano Programming': BASE_SKILL,
       'Computer Literacy': BASE_SKILL,

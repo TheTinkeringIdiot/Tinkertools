@@ -69,16 +69,18 @@ export function getRequirementName(id: number): RequirementName | undefined {
 
 /**
  * Get profession name from ID
+ * Safe fallback to "Unknown" for invalid IDs
  */
-export function getProfessionName(id: number): ProfessionName | undefined {
-  return PROFESSION[id as ProfessionId];
+export function getProfessionName(id: number): string {
+  return PROFESSION[id as ProfessionId] || 'Unknown';
 }
 
 /**
  * Get breed name from ID
+ * Safe fallback to "Unknown" for invalid IDs
  */
-export function getBreedName(id: number): BreedName | undefined {
-  return BREED[id as BreedId];
+export function getBreedName(id: number): string {
+  return BREED[id as BreedId] || 'Unknown';
 }
 
 /**
@@ -1659,7 +1661,7 @@ export function getRecommendedStatDistribution(
   level: number
 ): {
   primary: number[];    // Most important abilities
-  secondary: number[];  // Somewhat important abilities  
+  secondary: number[];  // Somewhat important abilities
   tertiary: number[];   // Less important abilities
 } {
   const breedSpec = getBreedSpecialization(breed);
@@ -1676,6 +1678,65 @@ export function getRecommendedStatDistribution(
   // Adjust based on profession needs
   // This would need more detailed profession analysis
   return recommendation;
+}
+
+// ============================================================================
+// Profession/Breed Normalization Functions (Phase 1 Migration Support)
+// ============================================================================
+
+/**
+ * Normalize profession string to ID with fuzzy matching
+ * Handles: "Martial Artist", "MartialArtist", "martial artist"
+ * Also accepts numeric IDs directly
+ */
+export function normalizeProfessionToId(value: string | number): number {
+  // Already numeric
+  if (typeof value === 'number') {
+    return value >= 1 && value <= 15 ? value : 6; // Default to Adventurer
+  }
+
+  // Exact match first
+  const exactMatch = getProfessionId(value);
+  if (exactMatch !== undefined) return exactMatch;
+
+  // Fuzzy match: remove spaces/hyphens, lowercase
+  const normalized = value.replace(/[\s-]/g, '').toLowerCase();
+  for (const [id, name] of Object.entries(PROFESSION)) {
+    if (name.replace(/[\s-]/g, '').toLowerCase() === normalized) {
+      return Number(id);
+    }
+  }
+
+  // Default to Adventurer
+  console.warn(`[normalizeProfessionToId] Unknown profession "${value}", defaulting to Adventurer`);
+  return 6; // Adventurer
+}
+
+/**
+ * Normalize breed string to ID with fuzzy matching
+ * Also accepts numeric IDs directly
+ */
+export function normalizeBreedToId(value: string | number): number {
+  // Already numeric
+  if (typeof value === 'number') {
+    return value >= 0 && value <= 7 ? value : 1; // Default to Solitus
+  }
+
+  // Exact match first
+  const exactMatch = getBreedId(value);
+  if (exactMatch !== undefined) return exactMatch;
+
+  // Fuzzy match
+  const normalized = value.toLowerCase();
+  for (const [id, name] of Object.entries(BREED)) {
+    if (name.toLowerCase() === normalized) {
+      return Number(id);
+    }
+  }
+
+  // Default to Solitus
+  console.warn(`[normalizeBreedToId] Unknown breed "${value}", defaulting to Solitus`);
+  return 1; // Solitus
 }
 
 // ============================================================================
@@ -1820,7 +1881,11 @@ export const gameUtils = {
   formatSkillValue,
   getProfessionSpecialization,
   getBreedSpecialization,
-  getRecommendedStatDistribution
+  getRecommendedStatDistribution,
+
+  // Normalization functions
+  normalizeProfessionToId,
+  normalizeBreedToId
 };
 
 // ============================================================================

@@ -102,8 +102,8 @@ const props = defineProps<{
   skills: Record<SkillId, SkillData>;
   isAbilities?: boolean;
   isReadOnly?: boolean;
-  breed?: string;
-  profession?: string;
+  breed?: number;
+  profession?: number;
   useGridLayout?: boolean;
   gridMode?: 'compact' | 'detailed' | 'list';
 }>();

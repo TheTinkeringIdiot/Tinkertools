@@ -260,6 +260,7 @@ import Tag from 'primevue/tag';
 import type { NanoProgram } from '@/types/nano';
 import { skillService } from '@/services/skill-service';
 import type { SkillId } from '@/types/skills';
+import { getProfessionName } from '@/services/game-utils';
 
 // Stores
 const profileStore = useTinkerProfilesStore();
@@ -345,7 +346,7 @@ const activeProfile = computed(() => {
 const profileOptions = computed(() => [
   { label: 'None', value: null },
   ...Array.from(profileStore.profiles.values())
-    .filter((profile: any) => profile?.Character.Profession === 'Nanotechnician')
+    .filter((profile: any) => getProfessionName(profile?.Character.Profession || 0) === 'Nanotechnician')
     .map((profile: any) => ({
       label: `${profile.Character.Name} (${profile.Character.Level})`,
       value: profile.Character.Name

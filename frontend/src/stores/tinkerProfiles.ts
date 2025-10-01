@@ -20,6 +20,7 @@ import { nanoCompatibility } from '@/utils/nano-compatibility';
 import type { Item } from '@/types/api';
 import { skillService } from '@/services/skill-service';
 import type { SkillId } from '@/types/skills';
+import { getProfessionName } from '@/services/game-utils';
 
 // Types that may not be exported yet
 type NanoCompatibleProfile = any; // TODO: Add proper type when available
@@ -76,9 +77,9 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   ]);
   
   const activeProfileName = computed(() => activeProfile.value?.Character.Name || '');
-  
-  const activeProfileProfession = computed(() => activeProfile.value?.Character.Profession || '');
-  
+
+  const activeProfileProfession = computed(() => getProfessionName(activeProfile.value?.Character.Profession || 0));
+
   const activeProfileLevel = computed(() => activeProfile.value?.Character.Level || 0);
   
   // ============================================================================

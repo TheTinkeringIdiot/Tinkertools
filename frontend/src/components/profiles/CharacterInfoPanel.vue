@@ -54,14 +54,14 @@ Shows character stats, health, nano, and other core information
       <div class="space-y-3">
         <div class="flex items-center justify-between py-2 border-b border-surface-200 dark:border-surface-700">
           <span class="text-sm font-medium text-surface-700 dark:text-surface-300">Profession</span>
-          <span class="text-sm text-surface-900 dark:text-surface-50">{{ profile.Character?.Profession || 'Unknown' }}</span>
+          <span class="text-sm text-surface-900 dark:text-surface-50">{{ getProfessionName(profile.Character?.Profession || 0) }}</span>
         </div>
-        
+
         <div class="flex items-center justify-between py-2 border-b border-surface-200 dark:border-surface-700">
           <span class="text-sm font-medium text-surface-700 dark:text-surface-300">Breed</span>
           <div class="flex items-center gap-2">
             <i class="pi pi-circle-fill text-xs" :class="breedColor"></i>
-            <span class="text-sm text-surface-900 dark:text-surface-50">{{ profile.Character?.Breed || 'Unknown' }}</span>
+            <span class="text-sm text-surface-900 dark:text-surface-50">{{ getBreedName(profile.Character?.Breed || 0) }}</span>
           </div>
         </div>
         
@@ -80,10 +80,9 @@ Shows character stats, health, nano, and other core information
         
         <div class="flex items-center justify-between py-2">
           <span class="text-sm font-medium text-surface-700 dark:text-surface-300">Account Type</span>
-          <Badge 
-            :value="profile.Character?.AccountType || 'Free'" 
+          <Badge
+            :value="profile.Character?.AccountType || 'Free'"
             :severity="profile.Character?.AccountType === 'Paid' ? 'success' : 'secondary'"
-            size="small"
           />
         </div>
       </div>
@@ -149,7 +148,7 @@ Shows character stats, health, nano, and other core information
 import { computed } from 'vue';
 import Badge from 'primevue/badge';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
-import { calculateTitleLevel, getBreedId } from '@/services/game-utils';
+import { calculateTitleLevel, getBreedId, getProfessionName, getBreedName } from '@/services/game-utils';
 import { getBreedInitValue } from '@/lib/tinkerprofiles/ip-calculator';
 import { skillService } from '@/services/skill-service';
 
@@ -204,13 +203,14 @@ const formattedNano = computed(() => {
 });
 
 const breedColor = computed(() => {
+  const breedName = getBreedName(props.profile.Character?.Breed || 0);
   const colorMap: Record<string, string> = {
     'Solitus': 'text-blue-500',
     'Opifex': 'text-green-500',
     'Nanomage': 'text-purple-500',
     'Atrox': 'text-red-500'
   };
-  return colorMap[props.profile.Character?.Breed || ''] || 'text-surface-400';
+  return colorMap[breedName] || 'text-surface-400';
 });
 
 const factionColor = computed(() => {
@@ -225,8 +225,7 @@ const factionColor = computed(() => {
 const attributes = computed(() => {
   // Attribute skill IDs: 16-21 (Strength, Agility, Stamina, Intelligence, Sense, Psychic)
   const attributeIds = [16, 17, 18, 19, 20, 21];
-  const breed = props.profile.Character?.Breed || 'Solitus';
-  const breedId = getBreedId(breed) || 0;
+  const breedId = props.profile.Character?.Breed || 0;
 
   // Breed init value indices match attribute order: STR=0, AGI=1, STA=2, INT=3, SEN=4, PSY=5
   const breedInitIndices = [0, 1, 2, 3, 4, 5];

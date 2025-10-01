@@ -12,6 +12,7 @@ import type {
 } from './types';
 import { STORAGE_KEYS, CURRENT_VERSION } from './constants';
 import { toRaw } from 'vue';
+import { getProfessionName, getBreedName } from '../../services/game-utils';
 
 export class ProfileStorage {
   private options: ProfileStorageOptions;
@@ -105,7 +106,30 @@ export class ProfileStorage {
         throw new Error(`Profile version ${profile.version || 'unknown'} not supported. Only v4.0.0 profiles can be loaded.`);
       }
 
-      return profile;
+      // Auto-migrate legacy string-based Character IDs
+      const { ProfileTransformer } = await import('./transformer');
+      const transformer = new ProfileTransformer();
+      const migrated = transformer.migrateProfileCharacterIds(profile);
+
+      // Validate after migration
+      const { validateCharacterIds } = await import('./validation');
+      const validation = validateCharacterIds(migrated);
+      if (!validation.valid) {
+        console.error(`[ProfileStorage] Loaded profile ${profileId} has invalid IDs:`, validation.errors);
+        // Still return the profile, but log errors for debugging
+      }
+
+      if (validation.warnings.length > 0) {
+        console.warn(`[ProfileStorage] Profile ${profileId} validation warnings:`, validation.warnings);
+      }
+
+      // Save back if migration occurred
+      if (migrated.updated !== profile.updated) {
+        await this.saveProfile(migrated);
+        console.log(`[ProfileStorage] Auto-migrated profile ${profileId} Character IDs`);
+      }
+
+      return migrated;
     } catch (error) {
       console.error('Failed to load profile:', error);
       return null;
@@ -173,9 +197,9 @@ export class ProfileStorage {
           metadata.push({
             id: profile.id,
             name: profile.Character.Name,
-            profession: profile.Character.Profession,
+            profession: getProfessionName(profile.Character.Profession),  // Convert ID to name
             level: profile.Character.Level,
-            breed: profile.Character.Breed,
+            breed: getBreedName(profile.Character.Breed),  // Convert ID to name
             faction: profile.Character.Faction,
             created: profile.created,
             updated: profile.updated,

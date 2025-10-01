@@ -139,7 +139,6 @@ import InputNumber from 'primevue/inputnumber';
 import Slider from 'primevue/slider';
 import Button from 'primevue/button';
 import { calcIP, getBreedInitValue, ABILITY_INDEX_TO_STAT_ID } from '@/lib/tinkerprofiles/ip-calculator';
-import { getBreedId } from '@/services/game-utils';
 import { SKILL_COST_FACTORS, BREED_ABILITY_DATA } from '@/services/game-data';
 import type { SkillWithIP, MiscSkill } from '@/lib/tinkerprofiles/types';
 import { calculateSingleACValue } from '@/utils/ac-calculator';
@@ -155,8 +154,8 @@ const props = defineProps<{
   isAbility?: boolean;
   isReadOnly?: boolean;
   category: string;
-  breed?: string;
-  profession?: string;
+  breed?: number;
+  profession?: number;
 }>();
 
 // Inject the profile for AC calculation
@@ -206,8 +205,8 @@ const isProgrammaticUpdate = ref(false);
 
 // Computed
 const minValue = computed(() => {
-  if (props.isAbility && props.breed) {
-    const breedId = getBreedId(props.breed) || 0;
+  if (props.isAbility && props.breed !== undefined) {
+    const breedId = props.breed;
     const abilityIndex = getAbilityIndex(skillName.value);
     if (abilityIndex !== -1) {
       const abilityStatId = ABILITY_INDEX_TO_STAT_ID[abilityIndex];
@@ -336,7 +335,7 @@ const showBreakdown = computed(() => {
 const simpleTooltipContent = computed(() => {
   if (props.isAbility) {
     // Calculate raw breed base without any bonuses
-    const breedId = getBreedId(props.breed || 'Solitus') || 0;
+    const breedId = props.breed ?? 1; // Default to Solitus
     const abilityIndex = getAbilityIndex(skillName.value);
     const abilityStatId = abilityIndex !== -1 ? ABILITY_INDEX_TO_STAT_ID[abilityIndex] : 0;
     const breedBase = getBreedInitValue(breedId, abilityStatId);
@@ -473,24 +472,17 @@ const capInfo = computed(() => {
 
 // Cost factor calculation
 const costFactor = computed(() => {
-  if (props.isAbility && props.breed) {
+  if (props.isAbility && props.breed !== undefined) {
     // For abilities: use breed-based cost factors
-    const breedId = getBreedId(props.breed);
+    const breedId = props.breed;
     const abilityIndex = getAbilityIndex(skillName.value);
-    if (breedId !== null && abilityIndex !== -1) {
+    if (abilityIndex !== -1) {
       return BREED_ABILITY_DATA.cost_factors[breedId]?.[abilityIndex] || null;
     }
-  } else if (!props.isAbility && props.profession) {
+  } else if (!props.isAbility && props.profession !== undefined) {
     // For skills: use profession-based cost factors with skillId
-    const professionMap: Record<string, number> = {
-      'Adventurer': 6, 'Agent': 5, 'Bureaucrat': 8, 'Doctor': 10, 'Enforcer': 9,
-      'Engineer': 3, 'Fixer': 4, 'Keeper': 14, 'Martial Artist': 2, 'Meta-Physicist': 15,
-      'Nano-Technician': 12, 'Soldier': 1, 'Trader': 7, 'Shade': 11
-    };
-    const professionId = professionMap[props.profession];
-    if (professionId) {
-      return SKILL_COST_FACTORS[Number(props.skillId)]?.[professionId] || null;
-    }
+    const professionId = props.profession;
+    return SKILL_COST_FACTORS[Number(props.skillId)]?.[professionId] || null;
   }
   return null;
 });

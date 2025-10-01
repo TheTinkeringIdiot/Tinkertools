@@ -282,13 +282,24 @@ export function calcIPAdjustableRange(level: number, profession: number, skillId
   
   const tl = calcTitleLevel(level);
   const costFac = skillCostFactors[profession];
+
+  if (costFac === undefined || isNaN(costFac)) {
+    console.warn(`[calcIPAdjustableRange] Invalid profession ${profession} or cost factor for skill ${skillId}`);
+    return 0;
+  }
+
   const costIndex = Math.min(Math.floor(costFac * 10) - 10, COST_TO_RATE.length - 1);
-  
+
   if (costIndex < 0 || costIndex >= COST_TO_RATE.length) {
     return 0;
   }
-  
+
   const rateData = COST_TO_RATE[costIndex];
+
+  if (!rateData) {
+    console.warn(`[calcIPAdjustableRange] Invalid rateData at costIndex ${costIndex} for skill ${skillId}`);
+    return 0;
+  }
   let adjustableRange: number;
   
   if (level < 201) {
@@ -348,10 +359,16 @@ export function calcAbilityIPAdjustableRange(level: number, breed: number, abili
   }
 
   const costFactor = breedCostFactors[abilityIndex];
+
+  if (costFactor === undefined || isNaN(costFactor)) {
+    console.warn(`[calcAbilityIPAdjustableRange] Invalid cost factor for breed ${breed}, ability ${abilityStatId}`);
+    return 3;
+  }
+
   const tl = calcTitleLevel(level);
-  
+
   let adjustableRange: number;
-  
+
   if (level < 201) {
     // Pre-201: Calculate cap based on current title level, not always using level 200 cap
     // Use the COST_TO_RATE table with the breed's cost factor to determine the cap for this TL
@@ -361,6 +378,12 @@ export function calcAbilityIPAdjustableRange(level: number, breed: number, abili
     if (costIndex < 0 || costIndex >= COST_TO_RATE.length) {
       adjustableRange = 0;
     } else {
+      const rateData = COST_TO_RATE[costIndex];
+
+      if (!rateData) {
+        console.warn(`[calcAbilityIPAdjustableRange] Invalid rateData at costIndex ${costIndex}`);
+        adjustableRange = 0;
+      } else {
       
       let cap: number;
 
@@ -368,6 +391,7 @@ export function calcAbilityIPAdjustableRange(level: number, breed: number, abili
 
       // Adjustable range is the cap minus the base
       adjustableRange = cap - breedBase;
+      }
     }
   } else {
     // Post-201: Use breed-specific post-201 progression

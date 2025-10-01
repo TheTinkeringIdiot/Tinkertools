@@ -108,8 +108,8 @@ export interface TinkerProfile {
   Character: {
     Name: string;
     Level: number;
-    Profession: string;
-    Breed: string;
+    Profession: number;  // Profession ID (1-15)
+    Breed: number;       // Breed ID (0-4 or 7)
     Faction: string;
     Expansion: string;
     AccountType: string;

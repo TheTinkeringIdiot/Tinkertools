@@ -35,8 +35,8 @@ Complete character management with skills, equipment, and IP tracking
                 <Badge v-if="isActiveProfile" value="Active" severity="success" />
               </div>
               <div class="flex items-center gap-4 text-surface-600 dark:text-surface-400">
-                <span>{{ profileData.Character.Profession }} Level {{ profileData.Character.Level }}</span>
-                <span>{{ profileData.Character.Breed }}</span>
+                <span>{{ displayProfession }} Level {{ profileData.Character.Level }}</span>
+                <span>{{ displayBreed }}</span>
                 <span>{{ profileData.Character.Faction }}</span>
               </div>
             </div>
@@ -278,6 +278,7 @@ import type { TinkerProfile } from '@/lib/tinkerprofiles';
 import type { Item } from '@/types/api';
 import { skillService } from '@/services/skill-service';
 import type { SkillId } from '@/types/skills';
+import { getProfessionName, getBreedName } from '@/services/game-utils';
 
 // Router
 const route = useRoute();
@@ -305,9 +306,13 @@ const isActiveProfile = computed(() =>
   profilesStore.activeProfileId === props.profileId
 );
 
+const displayProfession = computed(() => getProfessionName(profileData.value?.Character?.Profession || 0));
+const displayBreed = computed(() => getBreedName(profileData.value?.Character?.Breed || 0));
+
 const professionIcon = computed(() => {
   if (!profileData.value) return 'pi pi-user';
-  
+
+  const professionName = getProfessionName(profileData.value.Character.Profession);
   const iconMap: Record<string, string> = {
     'Adventurer': 'pi pi-compass',
     'Agent': 'pi pi-eye-slash',
@@ -324,7 +329,7 @@ const professionIcon = computed(() => {
     'Trader': 'pi pi-dollar',
     'Shade': 'pi pi-moon'
   };
-  return iconMap[profileData.value.Character.Profession] || 'pi pi-user';
+  return iconMap[professionName] || 'pi pi-user';
 });
 
 const remainingIPColor = computed(() => {

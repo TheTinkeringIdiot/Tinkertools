@@ -61,9 +61,9 @@ export async function updateCharacterMetadata(
     // Create a deep copy of the profile to work with
     const updatedProfile: TinkerProfile = JSON.parse(JSON.stringify(profile));
     
-    // Track original values for comparison
-    const originalBreed = getBreedId(profile.Character?.Breed || 'Solitus') || 0;
-    const originalProfession = getProfessionId(profile.Character?.Profession || 'Adventurer') || 0;
+    // Track original values for comparison (Character stores numeric IDs)
+    const originalBreed = profile.Character?.Breed || 0;
+    const originalProfession = profile.Character?.Profession || 0;
     const originalLevel = profile.Character?.Level || 1;
 
     // Apply basic changes
@@ -92,10 +92,12 @@ export async function updateCharacterMetadata(
     // Handle breed change (most impactful)
     let newBreed = originalBreed;
     if (changes.breed !== undefined) {
+      // Convert incoming breed string to ID
       const breedId = getBreedId(changes.breed);
       if (breedId !== null && breedId !== undefined && breedId !== originalBreed) {
         newBreed = breedId;
-        updatedProfile.Character.Breed = changes.breed;
+        // Store numeric ID in Character
+        updatedProfile.Character.Breed = breedId;
         
         // Recalculate abilities based on new breed
         const breedUpdateResult = await updateForBreedChange(
@@ -116,10 +118,12 @@ export async function updateCharacterMetadata(
     // Handle profession change
     let newProfession = originalProfession;
     if (changes.profession !== undefined) {
+      // Convert incoming profession string to ID
       const professionId = getProfessionId(changes.profession);
       if (professionId !== null && professionId !== undefined && professionId !== originalProfession) {
         newProfession = professionId;
-        updatedProfile.Character.Profession = changes.profession;
+        // Store numeric ID in Character
+        updatedProfile.Character.Profession = professionId;
         
         // Recalculate skills based on new profession
         const professionUpdateResult = await updateForProfessionChange(
@@ -361,8 +365,9 @@ export async function recalculateHealthAndNano(profile: TinkerProfile): Promise<
   if (!profile.Character || !profile.skills) return;
 
   const level = profile.Character.Level || 1;
-  const breedId = getBreedId(profile.Character.Breed || 'Solitus') || 0;
-  const professionId = getProfessionId(profile.Character.Profession || 'Adventurer') || 0;
+  // Direct access - Character stores numeric IDs
+  const breedId = profile.Character.Breed || 0;
+  const professionId = profile.Character.Profession || 0;
 
   // Get Body Dev and Nano Pool values using ID-based skill system
   const bodyDev = profile.skills[152]?.total || 0;  // Body Dev
@@ -486,8 +491,9 @@ function validateAbilityMinimums(profile: TinkerProfile): { errors: string[]; wa
   if (!profile.Character?.Breed || !profile.Skills?.Attributes) {
     return { errors, warnings };
   }
-  
-  const breedId = getBreedId(profile.Character.Breed) || 0;
+
+  // Direct access - Character stores numeric IDs
+  const breedId = profile.Character.Breed || 0;
   const abilityNames = ['Strength', 'Agility', 'Stamina', 'Intelligence', 'Sense', 'Psychic'];
   
   for (let i = 0; i < abilityNames.length; i++) {
@@ -497,7 +503,8 @@ function validateAbilityMinimums(profile: TinkerProfile): { errors: string[]; wa
     if (ability) {
       const minimumValue = getBreedInitValue(breedId, i);
       if (ability.value < minimumValue) {
-        errors.push(`${abilityName} (${ability.value}) is below minimum value for ${profile.Character.Breed} breed (${minimumValue})`);
+        const breedName = BREED_NAMES[breedId] || 'Unknown';
+        errors.push(`${abilityName} (${ability.value}) is below minimum value for ${breedName} breed (${minimumValue})`);
       }
     }
   }
