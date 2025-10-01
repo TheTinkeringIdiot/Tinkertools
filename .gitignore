@@ -31,6 +31,17 @@ __pycache__/
 .coverage
 htmlcov
 
+# Backend debug/test scripts and logs
+backend/*.log
+backend/*import*.py
+backend/*debug*.py
+backend/*test*.py
+backend/check_*.py
+backend/trace_*.py
+backend/benchmark_*.py
+backend/run_*.sh
+backend/.~lock.*
+
 # Database artifacts
 database/migrations/versions/*.py
 database/dumps/
