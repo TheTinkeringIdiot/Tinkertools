@@ -5,7 +5,7 @@ Nano programs API endpoints with rich spell data.
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload, selectinload
-from sqlalchemy import and_, or_, desc, asc
+from sqlalchemy import and_, or_, desc, asc, Integer
 import math
 import logging
 
@@ -497,6 +497,159 @@ def get_nanos_by_profession(
             sources=sources
         ))
     
+    return PaginatedResponse[ItemDetail](
+        items=detailed_items,
+        total=total,  # Now accurate count from DB filtering
+        page=page,
+        page_size=page_size,
+        pages=pages,
+        has_next=page < pages,
+        has_prev=page > 1
+    )
+
+
+@router.get("/offensive/{profession_id}", response_model=PaginatedResponse[ItemDetail])
+@cached_response("nanos_offensive", ttl=3600)  # Cache for 1 hour
+@performance_monitor
+def get_offensive_nanos_by_profession(
+    profession_id: int,
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(1000, ge=1, le=1000, description="Items per page"),
+    sort: str = Query("ql", description="Sort field: name, ql"),
+    sort_order: str = Query("desc", description="Sort order: asc, desc"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get offensive nano programs filtered by profession requirement.
+    OPTIMIZED endpoint specifically for TinkerNukes offensive nano filtering.
+
+    Filters for nanoprograms that:
+    - Belong to the specified profession (profession_id)
+    - Contain offensive spells (target=3, spell_id=53002)
+    - Deal health damage (spell_params.Stat=27)
+    - Have valid strain values (stat 75 > 0 AND stat 75 != 99999)
+    - Are not test items (name NOT LIKE 'TESTLIVEITEM%')
+
+    Performance optimizations:
+    - Database-level filtering for offensive spells
+    - selectinload instead of joinedload to avoid cartesian products
+    - Single query with proper pagination
+    - Moved test item and strain filtering to SQL
+    """
+    # Build optimized base query with database-level filtering
+    base_query = db.query(Item).filter(
+        and_(
+            Item.is_nano == True,
+            ~Item.name.startswith('TESTLIVEITEM'),  # Filter test items at DB level
+            # Filter by valid strain at DB level
+            Item.id.in_(
+                db.query(ItemStats.item_id)
+                .join(StatValue, ItemStats.stat_value_id == StatValue.id)
+                .filter(
+                    and_(
+                        StatValue.stat == 75,  # Strain stat
+                        StatValue.value > 0,
+                        StatValue.value != 99999
+                    )
+                )
+            ),
+            # Filter for offensive spells at DB level
+            Item.id.in_(
+                db.query(ItemSpellData.item_id)
+                .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)
+                .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)
+                .join(Spell, SpellDataSpells.spell_id == Spell.id)
+                .filter(
+                    and_(
+                        Spell.target == 3,  # Offensive target
+                        Spell.spell_id == 53002,  # Modify stat spell
+                        Spell.spell_params.op('->>')('Stat').cast(Integer) == 27  # Health damage
+                    )
+                )
+            )
+        )
+    )
+
+    # Filter by profession requirement using optimized subquery
+    if profession_id > 0:
+        profession_subquery = (
+            db.query(Action.item_id)
+            .join(ActionCriteria, Action.id == ActionCriteria.action_id)
+            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
+            .filter(
+                and_(
+                    Action.action == 3,  # USE action
+                    or_(
+                        and_(Criterion.value1 == 60, Criterion.value2 == profession_id),
+                        and_(Criterion.value1 == 368, Criterion.value2 == profession_id)
+                    )
+                )
+            )
+        )
+        base_query = base_query.filter(Item.id.in_(profession_subquery))
+
+    # Apply sorting with DISTINCT to prevent duplicates
+    if sort == "name":
+        base_query = base_query.order_by(desc(Item.name) if sort_order == "desc" else asc(Item.name))
+    elif sort == "ql":
+        base_query = base_query.order_by(desc(Item.ql) if sort_order == "desc" else asc(Item.ql))
+    else:
+        base_query = base_query.order_by(desc(Item.ql) if sort_order == "desc" else asc(Item.ql))
+
+    # Add DISTINCT to prevent duplicates from joins
+    base_query = base_query.distinct()
+
+    # Get total count efficiently
+    total = base_query.count()
+
+    # Apply pagination
+    pages = math.ceil(total / page_size) if total > 0 else 1
+    offset = (page - 1) * page_size
+
+    # Execute main query with selectinload for better performance
+    items = base_query.offset(offset).limit(page_size).options(
+        # Use selectinload instead of joinedload to avoid cartesian products
+        selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
+        selectinload(Item.item_spell_data).selectinload(ItemSpellData.spell_data)
+            .selectinload(SpellData.spell_data_spells).selectinload(SpellDataSpells.spell)
+            .selectinload(Spell.spell_criteria).selectinload(SpellCriterion.criterion),
+        selectinload(Item.actions).selectinload(Action.action_criteria)
+            .selectinload(ActionCriteria.criterion),
+    ).all()
+
+    # Convert to ItemDetail objects - now all filtering is done at DB level
+    detailed_items = []
+    for item in items:
+        # All filtering now done at database level, no need for Python filtering
+
+        # Build stats response
+        stats_response = [stat.stat_value for stat in item.item_stats] if item.item_stats else []
+
+        # Build spell data response
+        spell_data_list = [isd.spell_data for isd in item.item_spell_data] if item.item_spell_data else []
+
+        # Build actions response
+        actions = [action for action in item.actions] if item.actions else []
+
+        # Build minimal sources response (load separately if needed)
+        sources = []  # Disabled for performance - can be loaded separately if needed
+
+        detailed_items.append(ItemDetail(
+            id=item.id,
+            aoid=item.aoid,
+            name=item.name,
+            ql=item.ql,
+            item_class=item.item_class,
+            description=item.description,
+            is_nano=item.is_nano,
+            stats=stats_response,
+            spell_data=spell_data_list,
+            attack_stats=[],  # Nanos don't have attack stats
+            defense_stats=[], # Nanos don't have defense stats
+            actions=actions,
+            sources=sources
+        ))
+
     return PaginatedResponse[ItemDetail](
         items=detailed_items,
         total=total,  # Now accurate count from DB filtering

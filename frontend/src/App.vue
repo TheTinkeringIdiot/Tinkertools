@@ -38,6 +38,11 @@ const menuItems = ref<MenuItem[]>([
     command: () => router.push('/nanos')
   },
   {
+    label: 'TinkerNukes',
+    icon: 'pi pi-sparkles',
+    command: () => router.push('/tinkernukes')
+  },
+  {
     label: 'TinkerFite',
     icon: 'pi pi-shield',
     command: () => router.push('/fite')
@@ -46,11 +51,6 @@ const menuItems = ref<MenuItem[]>([
     label: 'TinkerPlants',
     icon: 'pi pi-cog',
     command: () => router.push('/plants')
-  },
-  {
-    label: 'TinkerNukes',
-    icon: 'pi pi-sparkles',
-    command: () => router.push('/nukes')
   },
   {
     label: 'TinkerPocket',

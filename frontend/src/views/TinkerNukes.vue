@@ -1,10 +1,14 @@
 <!--
 TinkerNukes - Nanotechnician Offensive Nano Specialization Tool
-Allows users to input skills and view usable offensive nanos in a sortable table
+
+Integrates NukeInputForm and NukeTable components with TinkerProfiles.
+Implements FR-10 profile state management with auto-population and filtering.
+
+Task 4.4: Complete view integration
 -->
 <template>
   <div class="tinker-nukes h-full flex flex-col">
-    <!-- Header with Profile Selection and Options -->
+    <!-- Header -->
     <div class="bg-surface-50 dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 p-4">
       <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div class="flex items-center gap-4">
@@ -12,503 +16,363 @@ Allows users to input skills and view usable offensive nanos in a sortable table
             <i class="pi pi-sparkles mr-2" aria-hidden="true"></i>
             TinkerNukes
           </h1>
-          <Badge 
-            :value="usableNanos.length" 
-            severity="success" 
-            v-if="usableNanos.length > 0"
-            :aria-label="`${usableNanos.length} usable offensive nanos found`"
+          <Badge
+            :value="filteredNanos.length"
+            severity="success"
+            v-if="filteredNanos.length > 0"
+            :aria-label="`${filteredNanos.length} usable offensive nanos found`"
           />
-          <Badge 
-            value="NT Only" 
-            severity="warning" 
+          <Badge
+            value="NT Only"
+            severity="warning"
             aria-label="This tool is specialized for Nanotechnician profession only"
           />
         </div>
-        
-        <!-- Profile & Display Options -->
-        <div class="flex flex-col sm:flex-row gap-3">
-          <!-- Profile Selection -->
-          <div class="flex items-center gap-2">
-            <label 
-              for="profile-select-nukes"
-              class="text-sm font-medium text-surface-700 dark:text-surface-300"
-            >
-              Profile:
-            </label>
-            <Dropdown 
-              id="profile-select-nukes"
-              v-model="selectedProfile"
-              :options="profileOptions"
-              option-label="label"
-              option-value="value"
-              placeholder="Select Profile"
-              class="w-40"
-              aria-describedby="profile-help-nukes"
-              @change="onProfileChange"
-            />
-            <span id="profile-help-nukes" class="sr-only">
-              Select a Nanotechnician profile to check nano casting requirements
-            </span>
-          </div>
-          
-          <!-- Manual Skills Toggle -->
-          <div class="flex items-center gap-2">
-            <InputSwitch 
-              v-model="useManualSkills"
-              input-id="manual-skills-toggle"
-              aria-describedby="manual-skills-help"
-            />
-            <label 
-              for="manual-skills-toggle"
-              class="text-sm text-surface-700 dark:text-surface-300"
-            >
-              Manual Skills
-            </label>
-            <span id="manual-skills-help" class="sr-only">
-              Toggle to manually input your character's nano skills instead of using a profile
-            </span>
-          </div>
-        </div>
       </div>
 
-      <!-- Skill Input Section -->
-      <div class="mt-4 p-4 bg-surface-100 dark:bg-surface-800 rounded-lg">
-        <h3 class="text-lg font-semibold mb-3 text-surface-900 dark:text-surface-50">
-          Nanotechnician Skills
-        </h3>
-        
-        <!-- Manual Skills Input -->
-        <div v-if="useManualSkills" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div v-for="skill in nanoSkills" :key="skill.id" class="flex flex-col gap-1">
-            <label class="text-xs font-medium text-surface-600 dark:text-surface-400">
-              {{ skill.label }}
-            </label>
+      <!-- Profile Selection Info (if active profile exists) -->
+      <div v-if="activeProfile" class="mt-3 flex items-center gap-2 text-sm text-surface-700 dark:text-surface-300">
+        <i class="pi pi-user"></i>
+        <span>
+          Active Profile: <strong>{{ activeProfile.Character.Name }}</strong>
+          ({{ getProfessionName(activeProfile.Character.Profession) }} {{ activeProfile.Character.Level }})
+        </span>
+      </div>
+    </div>
+
+    <!-- Input Form Section -->
+    <div class="p-4 border-b border-surface-200 dark:border-surface-700">
+      <NukeInputForm
+        :input-state="inputState"
+        :active-profile="activeProfile"
+        @update:input-state="onInputStateUpdate"
+      />
+    </div>
+
+    <!-- Filters Section -->
+    <div class="p-4 border-b border-surface-200 dark:border-surface-700">
+      <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+        <!-- Left side: Search and School filter -->
+        <div class="flex flex-col sm:flex-row gap-3 flex-1">
+          <!-- Search -->
+          <div class="flex items-center gap-2">
+            <i class="pi pi-search text-surface-400"></i>
+            <InputText
+              v-model="searchQuery"
+              placeholder="Search nanos..."
+              class="w-64"
+            />
+          </div>
+
+          <!-- School Filter -->
+          <Dropdown
+            v-model="selectedSchoolId"
+            :options="schoolFilterOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="All Schools"
+            showClear
+            class="w-48"
+          />
+
+          <!-- QL Range Filters -->
+          <div class="flex items-center gap-2">
+            <label class="text-sm text-surface-700 dark:text-surface-300">QL:</label>
             <InputNumber
-              v-model="manualSkills[skill.id]"
+              v-model="minQL"
               :min="1"
-              :max="3000"
-              :step="1"
-              class="w-full"
-              :class="getSkillInputClass(skill.id)"
+              :max="300"
+              placeholder="Min"
+              class="w-24"
+            />
+            <span class="text-surface-500">-</span>
+            <InputNumber
+              v-model="maxQL"
+              :min="1"
+              :max="300"
+              placeholder="Max"
+              class="w-24"
             />
           </div>
         </div>
-        
-        <!-- Profile Skills Display -->
-        <div v-else-if="activeProfile" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div v-for="skill in nanoSkills" :key="skill.id" class="flex flex-col gap-1">
-            <label class="text-xs font-medium text-surface-600 dark:text-surface-400">
-              {{ skill.label }}
-            </label>
-            <div class="p-2 bg-surface-200 dark:bg-surface-700 rounded text-center font-mono">
-              {{ getSkillValue(skill.id) || 1 }}
-            </div>
-          </div>
-        </div>
-        
-        <!-- No Profile Selected -->
-        <div v-else class="text-center py-6">
-          <i class="pi pi-user text-3xl text-surface-400 mb-2"></i>
-          <p class="text-surface-600 dark:text-surface-400">
-            Select a profile or enable manual skills to view usable nanos
-          </p>
+
+        <!-- Right side: Results count -->
+        <div class="text-sm text-surface-600 dark:text-surface-400">
+          {{ filteredNanos.length }} nano{{ filteredNanos.length !== 1 ? 's' : '' }} found
         </div>
       </div>
     </div>
 
     <!-- Nano Table -->
-    <div class="flex-1 p-4">
-      <!-- Table Controls -->
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-3">
-          <span class="text-sm text-surface-600 dark:text-surface-400">
-            {{ usableNanos.length }} usable offensive nanos
-          </span>
-          
-          <!-- School Filter -->
-          <Dropdown
-            v-model="selectedSchool"
-            :options="schoolOptions"
-            placeholder="All Schools"
-            showClear
-            class="w-48"
-          />
-        </div>
-
-        <!-- Search -->
-        <div class="flex items-center gap-2">
-          <i class="pi pi-search text-surface-400"></i>
-          <InputText
-            v-model="searchQuery"
-            placeholder="Search nanos..."
-            class="w-64"
-          />
-        </div>
-      </div>
-
-      <!-- Nano Table -->
-      <DataTable 
-        ref="tableRef"
-        :value="filteredNanos"
+    <div class="flex-1 p-4 overflow-auto">
+      <NukeTable
+        :nanos="filteredNanos"
+        :input-state="inputState"
+        :search-query="searchQuery"
         :loading="loading"
-        paginator
-        :rows="25"
-        :rowsPerPageOptions="[25, 50, 100]"
-        sortMode="multiple"
-        class="nano-table"
-        :globalFilter="searchQuery"
-        data-keyboard-nav-container
-        role="table"
-        :aria-label="`Table showing ${filteredNanos.length} offensive nano programs. Use arrow keys to navigate, Enter to select.`"
-      >
-        <!-- Name Column -->
-        <Column field="name" header="Nano" sortable class="min-w-48">
-          <template #body="{ data }">
-            <div class="flex items-center gap-2">
-              <i class="pi pi-sparkles text-primary-500"></i>
-              <span class="font-medium">{{ data.name }}</span>
-            </div>
-          </template>
-        </Column>
-
-        <!-- School Column -->
-        <Column field="school" header="School" sortable class="min-w-36">
-          <template #body="{ data }">
-            <Tag :value="data.school" severity="info" />
-          </template>
-        </Column>
-
-        <!-- Level Column -->
-        <Column field="level" header="Level" sortable class="w-24">
-          <template #body="{ data }">
-            <span class="font-mono">{{ data.level }}</span>
-          </template>
-        </Column>
-
-        <!-- Memory Usage Column -->
-        <Column field="memoryUsage" header="Memory" sortable class="w-24">
-          <template #body="{ data }">
-            <span class="font-mono text-xs">{{ data.memoryUsage || 'N/A' }}</span>
-          </template>
-        </Column>
-
-        <!-- Nano Points Column -->
-        <Column field="nanoPointCost" header="NP Cost" sortable class="w-24">
-          <template #body="{ data }">
-            <span class="font-mono text-xs">{{ data.nanoPointCost || 'N/A' }}</span>
-          </template>
-        </Column>
-
-        <!-- Usability Column -->
-        <Column header="Usability" class="w-32">
-          <template #body="{ data }">
-            <div class="flex items-center gap-2">
-              <i :class="getUsabilityIcon(data)" class="text-sm"></i>
-              <span class="text-xs font-medium" :class="getUsabilityColor(data)">
-                {{ getUsabilityText(data) }}
-              </span>
-            </div>
-          </template>
-        </Column>
-
-        <!-- Effects Column -->
-        <Column header="Effects" class="min-w-64">
-          <template #body="{ data }">
-            <div class="flex flex-wrap gap-1">
-              <Tag 
-                v-for="effect in getOffensiveEffects(data)" 
-                :key="effect" 
-                :value="effect" 
-                severity="danger"
-                class="text-xs"
-              />
-            </div>
-          </template>
-        </Column>
-
-        <!-- Empty State -->
-        <template #empty>
-          <div class="text-center py-12">
-            <i class="pi pi-search text-4xl text-surface-400 mb-4"></i>
-            <p class="text-lg text-surface-600 dark:text-surface-400">
-              No usable offensive nanos found
-            </p>
-            <p class="text-sm text-surface-500 dark:text-surface-500">
-              Adjust your skills or try different search criteria
-            </p>
-          </div>
-        </template>
-      </DataTable>
+        @nano-selected="onNanoSelected"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
-import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
-import { useNanosStore } from '@/stores/nanosStore';
-import { useAccessibility } from '@/composables/useAccessibility';
-import { useTableKeyboardNavigation } from '@/composables/useKeyboardNavigation';
-import Badge from 'primevue/badge';
-import Dropdown from 'primevue/dropdown';
-import InputSwitch from 'primevue/inputswitch';
-import InputNumber from 'primevue/inputnumber';
-import InputText from 'primevue/inputtext';
-import DataTable from 'primevue/datatable';
-import Column from 'primevue/column';
-import Tag from 'primevue/tag';
-import type { NanoProgram } from '@/types/nano';
-import { skillService } from '@/services/skill-service';
-import type { SkillId } from '@/types/skills';
-import { getProfessionName } from '@/services/game-utils';
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
+import { getProfessionName } from '@/services/game-utils'
+import Badge from 'primevue/badge'
+import Dropdown from 'primevue/dropdown'
+import InputText from 'primevue/inputtext'
+import InputNumber from 'primevue/inputnumber'
 
-// Stores
-const profileStore = useTinkerProfilesStore();
-const nanosStore = useNanosStore();
+// Import components from Task 4.1, 4.3
+import NukeInputForm from '@/components/nukes/NukeInputForm.vue'
+import NukeTable from '@/components/nukes/NukeTable.vue'
 
-// Accessibility
-const { announce, setLoading } = useAccessibility();
-const tableRef = ref<HTMLElement>();
+// Import types from Task 3.4
+import type { OffensiveNano, NukeInputState, CharacterStats, DamageModifiers, BuffPresets } from '@/types/offensive-nano'
 
-// Keyboard navigation for data table
-const { focusFirst } = useTableKeyboardNavigation(tableRef, {
-  onRowActivate: (rowIndex: number) => {
-    const nano = filteredNanos.value[rowIndex];
-    if (nano) {
-      announce(`Selected nano: ${nano.name}`, 'polite');
-    }
+// Import service from Task 4.1
+import { fetchOffensiveNanos, buildOffensiveNano } from '@/services/offensive-nano-service'
+
+// Import filtering utilities from Task 4.2
+import { filterBySkillRequirements, applyNanoFilters } from '@/utils/nuke-filtering'
+
+// ============================================================================
+// Store and Router
+// ============================================================================
+
+const profileStore = useTinkerProfilesStore()
+const router = useRouter()
+
+// ============================================================================
+// Reactive State
+// ============================================================================
+
+// Loading state
+const loading = ref(false)
+
+// Offensive nanos fetched from backend (profession ID 11 = Nanotechnician)
+const offensiveNanos = ref<OffensiveNano[]>([])
+
+// Manual input state (27 fields organized into 3 sections)
+const inputState = ref<NukeInputState>({
+  characterStats: {
+    breed: 1,
+    psychic: 6,
+    nanoInit: 1,
+    maxNano: 1,
+    nanoDelta: 1,
+    matterCreation: 1,
+    matterMeta: 1,
+    bioMeta: 1,
+    psychModi: 1,
+    sensoryImp: 1,
+    timeSpace: 1,
+  },
+  damageModifiers: {
+    projectile: 0,
+    melee: 0,
+    energy: 0,
+    chemical: 0,
+    radiation: 0,
+    cold: 0,
+    nano: 0,
+    fire: 0,
+    poison: 0,
+    directNanoDamageEfficiency: 0,
+    targetAC: 0,
+  },
+  buffPresets: {
+    crunchcom: 0,
+    humidity: 0,
+    notumSiphon: 0,
+    channeling: 0,
+    enhanceNanoDamage: 0,
+    ancientMatrix: 0,
+  },
+})
+
+// Search and filter state
+const searchQuery = ref('')
+const selectedSchoolId = ref<number | null>(null)
+const minQL = ref<number | undefined>(undefined)
+const maxQL = ref<number | undefined>(undefined)
+
+// ============================================================================
+// Computed Properties
+// ============================================================================
+
+/**
+ * Active profile from TinkerProfiles store
+ * Exposed as reactive ref for components
+ */
+const activeProfile = computed(() => profileStore.activeProfile)
+
+/**
+ * School filter options for dropdown
+ * Maps skill IDs to display names
+ */
+const schoolFilterOptions = computed(() => [
+  { label: 'Matter Creation', value: 130 },
+  { label: 'Matter Metamorphosis', value: 127 },
+  { label: 'Biological Metamorphosis', value: 128 },
+  { label: 'Psychological Modifications', value: 129 },
+  { label: 'Sensory Improvement', value: 126 },
+  { label: 'Time and Space', value: 131 },
+])
+
+/**
+ * Current character skills as ID-based record
+ * Extracted from inputState for filtering
+ */
+const currentSkills = computed((): Record<number, number> => {
+  const { characterStats } = inputState.value
+
+  return {
+    130: characterStats.matterCreation,
+    127: characterStats.matterMeta,
+    128: characterStats.bioMeta,
+    129: characterStats.psychModi,
+    126: characterStats.sensoryImp,
+    131: characterStats.timeSpace,
   }
-});
+})
 
-// Reactive state
-const selectedProfile = ref<string | null>(null);
-const useManualSkills = ref(false);
-const selectedSchool = ref<string | null>(null);
-const searchQuery = ref('');
-const loading = ref(false);
+/**
+ * Filtered nanos based on skill requirements and user filters
+ * Implements FR-2: Filter by skills, school, QL range, search query
+ */
+const filteredNanos = computed((): OffensiveNano[] => {
+  // Start with all offensive nanos
+  let filtered = offensiveNanos.value
 
-// Manual skills input - using numeric skill IDs
-const manualSkills = ref<Record<number, number>>({});
+  // Step 1: Filter by skill requirements (usable nanos only)
+  filtered = filterBySkillRequirements(filtered, currentSkills.value)
 
-// Initialize manual skills with default values
-const initializeManualSkills = () => {
-  const skillDefaults = [
-    { name: 'Matter Metamorphosis', defaultValue: 1 },
-    { name: 'Biological Metamorphosis', defaultValue: 1 },
-    { name: 'Psychological Modifications', defaultValue: 1 },
-    { name: 'Matter Creation', defaultValue: 1 },
-    { name: 'Time and Space', defaultValue: 1 },
-    { name: 'Sensory Improvement', defaultValue: 1 },
-    { name: 'Nano Pool', defaultValue: 1 },
-    { name: 'Computer Literacy', defaultValue: 1 }
-  ];
+  // Step 2: Apply additional filters (school, QL range, search)
+  filtered = applyNanoFilters(filtered, {
+    schoolId: selectedSchoolId.value,
+    minQL: minQL.value,
+    maxQL: maxQL.value,
+    searchQuery: searchQuery.value,
+  })
 
-  skillDefaults.forEach(({ name, defaultValue }) => {
-    try {
-      const skillId = skillService.resolveId(name);
-      manualSkills.value[Number(skillId)] = defaultValue;
-    } catch (error) {
-      console.warn(`Failed to resolve skill: ${name}`, error);
-    }
-  });
-};
+  return filtered
+})
 
-// Nano skills configuration - using skill IDs
-const nanoSkills = computed(() => {
-  const skillNames = [
-    { name: 'Matter Metamorphosis', label: 'Matter Meta' },
-    { name: 'Biological Metamorphosis', label: 'Bio Meta' },
-    { name: 'Psychological Modifications', label: 'Psych Modi' },
-    { name: 'Matter Creation', label: 'Matter Creat' },
-    { name: 'Time and Space', label: 'Time & Space' },
-    { name: 'Sensory Improvement', label: 'Sensory Imp' },
-    { name: 'Nano Pool', label: 'Nano Pool' },
-    { name: 'Computer Literacy', label: 'Comp Lit' }
-  ];
+// ============================================================================
+// Event Handlers
+// ============================================================================
 
-  return skillNames.map(({ name, label }) => {
-    try {
-      const skillId = skillService.resolveId(name);
-      return { id: Number(skillId), label, name };
-    } catch (error) {
-      console.warn(`Failed to resolve skill: ${name}`, error);
-      return null;
-    }
-  }).filter(Boolean) as Array<{ id: number; label: string; name: string }>;
-});
-
-// Computed properties
-const activeProfile = computed(() => {
-  if (!selectedProfile.value) return null;
-  return Array.from(profileStore.profiles.values()).find(p => p?.Character.Name === selectedProfile.value);
-});
-
-const profileOptions = computed(() => [
-  { label: 'None', value: null },
-  ...Array.from(profileStore.profiles.values())
-    .filter((profile: any) => getProfessionName(profile?.Character.Profession || 0) === 'Nanotechnician')
-    .map((profile: any) => ({
-      label: `${profile.Character.Name} (${profile.Character.Level})`,
-      value: profile.Character.Name
-    }))
-]);
-
-const currentSkills = computed(() => {
-  if (useManualSkills.value) {
-    return manualSkills.value;
-  }
-
-  if (activeProfile.value) {
-    const profileSkills = (activeProfile.value as any).skills;
-    const result: Record<number, number> = {};
-
-    // Convert profile skills from name-based to ID-based
-    nanoSkills.value.forEach(({ id, name }) => {
-      result[id] = profileSkills[id] || profileSkills[name] || 1;
-    });
-
-    return result;
-  }
-
-  return {};
-});
-
-// Get only offensive nanos (damage effects) for Nanotechnician
-const offensiveNanos = computed(() => {
-  return nanosStore.nanos.filter(nano => {
-    // Must be Nanotechnician profession
-    if (nano.profession && nano.profession !== 'Nanotechnician') {
-      return false;
-    }
-    
-    // Must have offensive effects
-    const hasOffensiveEffect = nano.effects?.some(effect => 
-      effect.type === 'damage' || 
-      effect.type === 'debuff' ||
-      (effect.type === 'utility' && effect.statId?.toString().includes('damage'))
-    );
-    
-    return hasOffensiveEffect;
-  });
-});
-
-const usableNanos = computed(() => {
-  const skills = currentSkills.value;
-  if (!skills || Object.keys(skills).length === 0) {
-    return [];
-  }
-
-  return offensiveNanos.value.filter(nano => {
-    if (!nano.castingRequirements) return true;
-    
-    return nano.castingRequirements.every(req => {
-      if (req.type === 'skill') {
-        const skillKey = req.requirement as string;
-        const skillValue = (skills as any)[skillKey] || 1;
-        return skillValue >= req.value;
-      }
-      return true; // Non-skill requirements are considered met for now
-    });
-  });
-});
-
-const schoolOptions = computed(() => {
-  const schools = [...new Set(offensiveNanos.value.map(nano => nano.school))];
-  return schools.map(school => ({ label: school, value: school }));
-});
-
-const filteredNanos = computed(() => {
-  let filtered = usableNanos.value;
-  
-  if (selectedSchool.value) {
-    filtered = filtered.filter(nano => nano.school === selectedSchool.value);
-  }
-  
-  return filtered;
-});
-
-// Methods
-function onProfileChange() {
-  if (selectedProfile.value) {
-    useManualSkills.value = false;
-  }
+/**
+ * Handle input state updates from NukeInputForm
+ * Updates local state and triggers table recalculation
+ */
+function onInputStateUpdate(newState: NukeInputState): void {
+  inputState.value = { ...newState }
 }
 
-function getSkillValue(skillId: number): number {
-  return currentSkills.value[skillId] || 1;
+/**
+ * Handle nano row click from NukeTable
+ * Navigate to /items/:id detail page
+ */
+function onNanoSelected(nanoId: number): void {
+  router.push(`/items/${nanoId}`)
 }
 
-function getSkillInputClass(skillId: number): string {
-  const value = manualSkills.value[skillId];
-  if (value >= 1000) return 'skill-high';
-  if (value >= 500) return 'skill-medium';
-  return 'skill-low';
+/**
+ * Clear the table (called on profile switch before re-filtering)
+ */
+function clearTable(): void {
+  // Clear filters to show empty table
+  searchQuery.value = ''
+  selectedSchoolId.value = null
+  minQL.value = undefined
+  maxQL.value = undefined
 }
 
-function getUsabilityIcon(nano: NanoProgram): string {
-  // For now, all displayed nanos are usable
-  return 'pi pi-check-circle text-green-500';
-}
+// ============================================================================
+// Lifecycle Hooks
+// ============================================================================
 
-function getUsabilityColor(nano: NanoProgram): string {
-  return 'text-green-600 dark:text-green-400';
-}
-
-function getUsabilityText(nano: NanoProgram): string {
-  return 'Usable';
-}
-
-function getOffensiveEffects(nano: NanoProgram): string[] {
-  if (!nano.effects) return [];
-  
-  return nano.effects
-    .filter(effect => effect.type === 'damage' || effect.type === 'debuff')
-    .map(effect => {
-      if (effect.type === 'damage') return 'Damage';
-      if (effect.type === 'debuff') return 'Debuff';
-      return effect.type;
-    });
-}
-
-// Lifecycle
+/**
+ * On mount: Fetch offensive nanos from backend
+ * Call GET /api/nanos/offensive/11 (profession ID 11 = Nanotechnician)
+ */
 onMounted(async () => {
-  setLoading(true, 'Loading nano programs and profiles');
-  try {
-    // Initialize manual skills with ID-based structure
-    initializeManualSkills();
+  loading.value = true
 
-    // Load nanos if not already loaded
-    if (nanosStore.nanos.length === 0) {
-      await nanosStore.fetchNanos();
-    }
-    await profileStore.loadProfiles();
-    announce(`Loaded ${offensiveNanos.value.length} offensive nano programs for Nanotechnicians`);
+  try {
+    // Fetch offensive nanos for Nanotechnician (profession ID 11)
+    const items = await fetchOffensiveNanos(11)
+
+    // Transform ItemDetail[] into OffensiveNano[]
+    offensiveNanos.value = items
+      .map(buildOffensiveNano)
+      .filter((nano): nano is OffensiveNano => nano !== null)
+
+    console.log(`[TinkerNukes] Loaded ${offensiveNanos.value.length} offensive nanos`)
   } catch (error) {
-    console.error('Failed to load data:', error);
-    announce('Failed to load data. Please refresh the page and try again.', 'assertive');
+    console.error('[TinkerNukes] Failed to fetch offensive nanos:', error)
   } finally {
-    setLoading(false);
+    loading.value = false
   }
-});
+})
+
+// ============================================================================
+// Watchers
+// ============================================================================
+
+/**
+ * Watch active profile changes
+ * FR-10: Handle profile switch
+ *
+ * On profile switch:
+ * 1. Clear the nanoprogram table (via clearTable)
+ * 2. If new profile is Nanotechnician: auto-populate fields (handled by NukeInputForm)
+ * 3. If new profile is not Nanotechnician: reset fields to defaults (handled by NukeInputForm)
+ * 4. Re-filter nanos based on new skill values (automatic via filteredNanos computed)
+ */
+watch(
+  () => profileStore.activeProfile,
+  (newProfile, oldProfile) => {
+    // Only react if profile actually changed
+    if (newProfile?.Character.Name === oldProfile?.Character.Name) {
+      return
+    }
+
+    // Clear table on profile switch
+    clearTable()
+
+    // Log profile change
+    if (newProfile) {
+      const profession = getProfessionName(newProfile.Character.Profession)
+      console.log(`[TinkerNukes] Profile switched to: ${newProfile.Character.Name} (${profession})`)
+
+      if (profession !== 'Nanotechnician') {
+        console.warn('[TinkerNukes] Active profile is not Nanotechnician, fields will reset to defaults')
+      }
+    } else {
+      console.log('[TinkerNukes] No active profile, fields will reset to defaults')
+    }
+
+    // Note: Auto-population and reset logic handled by NukeInputForm component
+    // filteredNanos will automatically re-filter based on new inputState values
+  },
+  { immediate: false }
+)
 </script>
 
 <style scoped>
-.nano-table :deep(.p-datatable-tbody tr td) {
-  padding: 0.75rem 0.5rem;
+.tinker-nukes {
+  background-color: var(--surface-0);
 }
 
-.skill-high :deep(.p-inputnumber-input) {
-  border-color: #10b981;
-  background-color: rgba(16, 185, 129, 0.1);
-}
-
-.skill-medium :deep(.p-inputnumber-input) {
-  border-color: #f59e0b;
-  background-color: rgba(245, 158, 11, 0.1);
-}
-
-.skill-low :deep(.p-inputnumber-input) {
-  border-color: #ef4444;
-  background-color: rgba(239, 68, 68, 0.1);
+/* Ensure table container scrolls properly */
+.overflow-auto {
+  overflow: auto;
+  max-height: 100%;
 }
 </style>

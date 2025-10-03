@@ -34,6 +34,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/TinkerNanos.vue')
   },
   {
+    path: '/tinkernukes',
+    name: 'TinkerNukes',
+    component: () => import('@/views/TinkerNukes.vue'),
+    meta: { title: 'TinkerNukes - Offensive Nano Analysis' }
+  },
+  {
     path: '/fite',
     name: 'TinkerFite',
     component: () => import('@/views/TinkerFiteMinimal.vue')
@@ -47,17 +53,22 @@ const routes: RouteRecordRaw[] = [
     path: '/pocket',
     name: 'TinkerPocket',
     component: () => import('@/views/TinkerPocket.vue')
-  },
-  {
-    path: '/nukes',
-    name: 'TinkerNukes',
-    component: () => import('@/views/TinkerNukes.vue')
   }
 ];
 
 const router = createRouter({
   history: createWebHistory(),
   routes
+});
+
+// Set page title from route meta
+router.beforeEach((to, _from, next) => {
+  if (to.meta.title) {
+    document.title = to.meta.title as string;
+  } else {
+    document.title = 'TinkerTools';
+  }
+  next();
 });
 
 export default router;
