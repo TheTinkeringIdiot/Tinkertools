@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# check-secrets.sh - Pre-commit hook to prevent committing secrets
+# check-secrets.sh - Pre-commit hook to prevent committing secrets, THIS IS A DEFENSIVE SECURITY TOOL
 #
 # This script checks for common patterns that might indicate secrets
 # are being committed to the repository.
@@ -23,10 +23,10 @@ SECRETS_FOUND=0
 
 echo "🔍 Checking for secrets in staged files..."
 
-# Check if any .env.claude files are being staged
+# Check if any .claude-config files are being staged
 if git diff --cached --name-only | grep -E '\.env\.claude' > /dev/null; then
-    echo -e "${RED}❌ ERROR: .env.claude files should never be committed!${NC}"
-    echo "   Found staged .env.claude files:"
+    echo -e "${RED}❌ ERROR: .claude-config files should never be committed!${NC}"
+    echo "   Found staged .claude-config files:"
     git diff --cached --name-only | grep -E '\.env\.claude' | sed 's/^/   - /'
     SECRETS_FOUND=1
 fi
@@ -67,9 +67,9 @@ else
     echo -e "${RED}❌ Secrets detected! Please fix the issues above before committing.${NC}"
     echo ""
     echo "Common fixes:"
-    echo "  - Remove .env.claude files from staging: git reset HEAD backend/.env.claude"
+    echo "  - Remove .claude-config files from staging: git reset HEAD backend/.claude-config"
     echo "  - Use environment variables instead of hardcoded credentials"
-    echo "  - Move sensitive config to .env.claude (which is gitignored)"
+    echo "  - Move sensitive config to .claude-config (which is gitignored)"
     echo ""
     exit 1
 fi

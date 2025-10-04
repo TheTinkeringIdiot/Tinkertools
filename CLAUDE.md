@@ -46,7 +46,7 @@ npm run build
 # Setup virtual environment
 python -m venv backend/venv
 source backend/venv/bin/activate  # Linux/Mac
-DATABASE_URL is in .env.claude. The `source` command does not export it. 
+DATABASE_URL is in .claude-config. The `source` command does not export it. 
 
 # Install dependencies
 pip install -r backend/requirements.txt
@@ -90,28 +90,24 @@ This section provides configuration information specifically for Claude Code (cl
 
 ### Environment Configuration
 
-Claude Code uses `backend/.env.claude` for sensitive configuration values. This file:
-- Contains actual database credentials and paths needed for development
-- Is excluded from git tracking via `.gitignore` 
-- Should NEVER be committed to the repository
+  Claude Code uses `backend/.claude-config` for local environment settings. This file:
+  - Contains database connection strings and development paths
+  - Is excluded from git tracking via `.gitignore`
+  - Should remain local to your machine
 
-**Usage for Claude Code:**
-- Always use the virtual environment at `backend/venv` for Python operations
-- Use the DATABASE_URL from `.env.claude` for database connections
-- Load environment from `.env.claude` when running backend commands
+  **Usage for Claude Code:**
+  - Always use the virtual environment at `backend/venv` for Python operations
+  - Use the DATABASE_URL from `.claude-config` for database connections
+  - Load environment from `.claude-config` when running backend commands
 
-**Security Notes:**
-- The `.env.claude` file contains real credentials and must never be committed
-- Multiple layers of protection are in place:
-  - `.gitignore` excludes all `.env.claude*` files
-  - Pre-commit checks can validate no secrets are being committed
-  - Clear documentation prevents accidental inclusion
+  **Note:** The `.claude-config` file is git-ignored and stays local.
+
 
 **Example backend startup command:**
 ```bash
-# Load environment from .env.claude and start backend
+# Load environment from .claude-config and start backend
 cd backend && source venv/bin/activate && \
-export $(cat .env.claude | xargs) && \
+export $(cat .claude-config | xargs) && \
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 

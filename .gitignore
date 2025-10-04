@@ -10,10 +10,11 @@ dist
 .env.*.local
 
 # Claude Code specific environment files (NEVER COMMIT)
-.env.claude
-.env.claude.*
-*.env.claude
+.env.local
+.env.local.*
+*.env.local
 .claude
+.claude-config
 
 # OS / IDE
 .DS_Store

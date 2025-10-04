@@ -23,26 +23,35 @@ export type Breed = 1 | 2 | 3 | 4
  *
  * Total reduction = floor(init/2) + floor(max(0, init-1200)/6)
  *
+ * Hard minimum (AttackDelayCap):
+ * - If stat 523 exists: use its value as minimum
+ * - If stat 523 not present: use 100cs as minimum
+ *
  * @param baseCastTime - Base cast time in centiseconds (from database)
  * @param nanoInit - Character's Nano Init skill value
+ * @param attackDelayCap - AttackDelayCap from stat 523, or undefined for default 100cs minimum
  * @returns Modified cast time in seconds with 2 decimal precision
  *
  * @example
- * // Nano with 300cs base cast time, 600 init
- * calculateCastTime(300, 600) // Returns 0.00 (300 - 300 = 0cs)
+ * // Nano with 300cs base cast time, 600 init, no cap stat
+ * calculateCastTime(300, 600) // Returns 1.00 (300 - 300 = 0cs, clamped to 100cs minimum)
  *
  * @example
- * // Nano with 1000cs base cast time, 1800 init
- * calculateCastTime(1000, 1800) // Returns 1.00 (1000 - 900 - 100 = 0cs, minimum 0)
+ * // Nano with 1000cs base cast time, 1800 init, 200cs cap
+ * calculateCastTime(1000, 1800, 200) // Returns 2.00 (1000 - 1000 = 0cs, clamped to 200cs)
  */
-export function calculateCastTime(baseCastTime: number, nanoInit: number): number {
+export function calculateCastTime(baseCastTime: number, nanoInit: number, attackDelayCap?: number): number {
   // Two-tier reduction calculation
   const firstTierReduction = Math.floor(nanoInit / 2)
   const secondTierReduction = Math.floor(Math.max(0, nanoInit - 1200) / 6)
   const totalReduction = firstTierReduction + secondTierReduction
 
-  // Apply reduction and prevent negative cast times
-  const modifiedCastTimeCs = Math.max(0, baseCastTime - totalReduction)
+  // Apply reduction
+  const reducedCastTimeCs = baseCastTime - totalReduction
+
+  // Apply hard minimum: stat 523 value or 100cs default
+  const minimumCastTimeCs = attackDelayCap ?? 100
+  const modifiedCastTimeCs = Math.max(minimumCastTimeCs, reducedCastTimeCs)
 
   // Convert centiseconds to seconds
   return centisecondsToSeconds(modifiedCastTimeCs)
@@ -55,22 +64,35 @@ export function calculateCastTime(baseCastTime: number, nanoInit: number): numbe
  * - Below 1200 init: 1:2 ratio (init/2 reduction)
  * - Above 1200 init: Additional 1:6 ratio ((init-1200)/6 reduction)
  *
+ * Hard minimum (RechargeDelayCap):
+ * - If stat 524 exists: use its value as minimum
+ * - If stat 524 not present: use 100cs as minimum
+ *
  * @param baseRecharge - Base recharge time in centiseconds (from database)
  * @param nanoInit - Character's Nano Init skill value
+ * @param rechargeDelayCap - RechargeDelayCap from stat 524, or undefined for default 100cs minimum
  * @returns Modified recharge time in seconds with 2 decimal precision
  *
  * @example
- * // Nano with 500cs base recharge, 1200 init
- * calculateRechargeTime(500, 1200) // Returns 0.00 (500 - 600 = 0cs, minimum 0)
+ * // Nano with 500cs base recharge, 1200 init, no cap stat
+ * calculateRechargeTime(500, 1200) // Returns 1.00 (500 - 600 = -100cs, clamped to 100cs minimum)
+ *
+ * @example
+ * // Nano with 800cs base recharge, 1800 init, 150cs cap
+ * calculateRechargeTime(800, 1800, 150) // Returns 1.50 (800 - 1000 = -200cs, clamped to 150cs)
  */
-export function calculateRechargeTime(baseRecharge: number, nanoInit: number): number {
+export function calculateRechargeTime(baseRecharge: number, nanoInit: number, rechargeDelayCap?: number): number {
   // Two-tier reduction calculation (same as cast time)
   const firstTierReduction = Math.floor(nanoInit / 2)
   const secondTierReduction = Math.floor(Math.max(0, nanoInit - 1200) / 6)
   const totalReduction = firstTierReduction + secondTierReduction
 
-  // Apply reduction and prevent negative recharge times
-  const modifiedRechargeCs = Math.max(0, baseRecharge - totalReduction)
+  // Apply reduction
+  const reducedRechargeCs = baseRecharge - totalReduction
+
+  // Apply hard minimum: stat 524 value or 100cs default
+  const minimumRechargeCs = rechargeDelayCap ?? 100
+  const modifiedRechargeCs = Math.max(minimumRechargeCs, reducedRechargeCs)
 
   // Convert centiseconds to seconds
   return centisecondsToSeconds(modifiedRechargeCs)

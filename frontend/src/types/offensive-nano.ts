@@ -41,6 +41,18 @@ export interface OffensiveNano extends NanoProgram {
 
   /** Interval between damage ticks in centiseconds. Only relevant if tickCount > 1 */
   tickInterval: number
+
+  /** Cast time in centiseconds from AttackDelay (stat 294) */
+  castTime: number
+
+  /** Recharge time in centiseconds from RechargeDelay (stat 210) */
+  rechargeTime: number
+
+  /** Attack delay cap in centiseconds from stat 523 (minimum cast time after init reduction) */
+  attackDelayCap?: number
+
+  /** Recharge delay cap in centiseconds from stat 524 (minimum recharge time after init reduction) */
+  rechargeDelayCap?: number
 }
 
 /**

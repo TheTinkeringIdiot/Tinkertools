@@ -214,15 +214,21 @@ const tableData = computed(() => {
     const costReductionPct = CRUNCHCOM_COST_REDUCTION[buffPresets.crunchcom] || 0
 
     // Calculate modified cast time (in seconds)
+    // nano.castTime is in centiseconds, convert to seconds for calculations
+    // Pass attackDelayCap (stat 523) to enforce minimum cast time
     const castTime = calculateCastTime(
-      nano.castingTime || 0,
-      characterStats.nanoInit
+      nano.castTime,
+      characterStats.nanoInit,
+      nano.attackDelayCap
     )
 
     // Calculate modified recharge time (in seconds)
+    // nano.rechargeTime is in centiseconds, convert to seconds for calculations
+    // Pass rechargeDelayCap (stat 524) to enforce minimum recharge time
     const rechargeTime = calculateRechargeTime(
-      nano.rechargeTime || 0,
-      characterStats.nanoInit
+      nano.rechargeTime,
+      characterStats.nanoInit,
+      nano.rechargeDelayCap
     )
 
     // Calculate modified nano cost (with breed cap)

@@ -236,6 +236,14 @@ export function buildOffensiveNano(item: ItemDetail): OffensiveNano | null {
   // Extract casting requirements
   const castingRequirements = extractCastingRequirements(allSpells)
 
+  // Extract cast time and recharge time from stats
+  const castTime = extractStatValue(item, 294) || 0
+  const rechargeTime = extractStatValue(item, 210) || 0
+
+  // Extract delay caps (minimum times after nano init reduction)
+  const attackDelayCap = extractStatValue(item, 523)
+  const rechargeDelayCap = extractStatValue(item, 524)
+
   // Build OffensiveNano object
   const offensiveNano: OffensiveNano = {
     // Base NanoProgram fields
@@ -254,7 +262,11 @@ export function buildOffensiveNano(item: ItemDetail): OffensiveNano | null {
     midDamage,
     damageType,
     tickCount,
-    tickInterval
+    tickInterval,
+    castTime,
+    rechargeTime,
+    attackDelayCap,
+    rechargeDelayCap
   }
 
   return offensiveNano
@@ -317,4 +329,22 @@ function extractLevel(requirements: CastingRequirement[]): number {
   }
 
   return 0
+}
+
+/**
+ * Extracts a specific stat value from item stats
+ * @param item - ItemDetail object
+ * @param statId - Stat ID to find (e.g., 294 for AttackDelay, 210 for RechargeDelay)
+ * @returns Stat value or undefined if not found
+ */
+function extractStatValue(item: ItemDetail, statId: number): number | undefined {
+  const stats = item.stats || []
+
+  for (const stat of stats) {
+    if (stat.stat === statId) {
+      return stat.value
+    }
+  }
+
+  return undefined
 }
