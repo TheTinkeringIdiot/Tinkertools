@@ -5,15 +5,17 @@
  * nano school compatibility checks, and spell effect formatting.
  */
 
-import { 
-  NANOSCHOOL, 
+import {
+  NANOSCHOOL,
   NANO_STRAIN,
-  PROFESSION,
+  PROFESSION
+} from '../services/game-data';
+import {
   getStatName,
   getProfessionName,
   getNanoSchoolName,
   getNanoStrainName
-} from '../services/game-data';
+} from '../services/game-utils';
 import { validateRequirements, type Character } from './stat-calculations';
 import { gameUtils } from '../services/game-utils';
 

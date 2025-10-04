@@ -16,17 +16,66 @@
 
 import type { OffensiveNano, UsabilityStatus } from '@/types/offensive-nano'
 import type { CastingRequirement } from '@/types/nano'
+import { validateNanoRequirements, type Nano } from './nano-compatibility'
+import type { Character } from './stat-calculations'
 
 // ============================================================================
-// Skill Requirement Filtering
+// Profile-Based Requirement Filtering
 // ============================================================================
 
 /**
- * Filter nanos by skill requirements
+ * Filter nanos by character profile requirements
+ *
+ * Uses validateNanoRequirements to check ALL requirements including:
+ * - Stat requirements
+ * - Skill requirements
+ * - Profession compatibility
+ * - Level requirements
+ *
+ * @param nanos - Array of offensive nanos to filter
+ * @param character - Character profile with stats, skills, profession, level
+ * @returns Filtered array of nanos where all requirements are met
+ *
+ * @example
+ * const character = { baseStats: {...}, profession: 11, level: 220, breed: 1 }
+ * const usableNanos = filterByCharacterProfile(allNanos, character)
+ */
+export function filterByCharacterProfile(
+  nanos: OffensiveNano[],
+  character: Character
+): OffensiveNano[] {
+  return nanos.filter((nano) => {
+    // Convert OffensiveNano to Nano interface for validateNanoRequirements
+    const nanoForValidation: Nano = {
+      id: nano.id,
+      name: nano.name,
+      school: nano.nanoSchoolId || 0,
+      ncuCost: nano.ncuCost || 0,
+      nanoPoints: nano.nanoPointCost || 0,
+      level: nano.qualityLevel,
+      requirements: nano.castingRequirements?.map(req => ({
+        stat: typeof req.requirement === 'number' ? req.requirement : parseInt(req.requirement as string, 10),
+        value: req.value,
+        operator: req.operator || '>='
+      })) || []
+    }
+
+    const validation = validateNanoRequirements(nanoForValidation, character)
+    return validation.canCast
+  })
+}
+
+// ============================================================================
+// Skill Requirement Filtering (Legacy - prefer filterByCharacterProfile)
+// ============================================================================
+
+/**
+ * Filter nanos by skill requirements only
  *
  * Returns only nanos where ALL skill requirements are met.
  * Uses ID-based skill lookup for O(1) access performance.
  *
+ * @deprecated Use filterByCharacterProfile for complete validation
  * @param nanos - Array of offensive nanos to filter
  * @param skills - Record mapping skill ID to current skill value
  * @returns Filtered array of nanos where all requirements are met

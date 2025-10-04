@@ -361,50 +361,54 @@ function getModifierStatFromDamageType(damageType: string): number {
   width: 100%;
 }
 
-.nuke-table :deep(.p-datatable-thead > tr > th) {
-  background-color: var(--surface-100);
-  color: var(--text-color);
-  font-weight: 600;
-  padding: 0.75rem 1rem;
-  border-bottom: 2px solid var(--surface-300);
-}
-
-.nuke-table :deep(.p-datatable-tbody > tr) {
-  transition: background-color 0.2s;
-}
-
-.nuke-table :deep(.p-datatable-tbody > tr:hover) {
-  background-color: var(--surface-50);
-  cursor: pointer;
-}
-
 .nuke-table :deep(.p-datatable-tbody > tr > td) {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--surface-200);
 }
 
-.nuke-table :deep(.p-paginator) {
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .nuke-table :deep(.p-datatable-tbody > tr > td) {
+    border-bottom-color: var(--surface-700);
+  }
+}
+</style>
+
+<style>
+/* Unscoped to override PrimeVue theme with higher specificity */
+.nuke-table .p-datatable-thead > tr > th {
+  background-color: #27272a !important; /* zinc-800 for good contrast */
+  color: #fafafa !important; /* zinc-50 for readability */
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+  border-bottom: 2px solid #3f3f46 !important; /* zinc-700 */
+}
+
+.nuke-table .p-datatable-tbody > tr {
+  transition: background-color 0.2s;
+}
+
+.nuke-table .p-datatable-tbody > tr:hover {
+  background-color: #1e3a8a !important; /* blue-900 for dark mode */
+  cursor: pointer;
+}
+
+.nuke-table .p-paginator {
   padding: 1rem;
   background-color: var(--surface-0);
   border-top: 1px solid var(--surface-200);
 }
 
+/* Light mode adjustments if needed */
+@media (prefers-color-scheme: light) {
+  .nuke-table .p-datatable-tbody > tr:hover {
+    background-color: #dbeafe !important; /* blue-100 for light mode */
+  }
+}
+
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
-  .nuke-table :deep(.p-datatable-thead > tr > th) {
-    background-color: var(--surface-800);
-    border-bottom-color: var(--surface-700);
-  }
-
-  .nuke-table :deep(.p-datatable-tbody > tr:hover) {
-    background-color: var(--surface-800);
-  }
-
-  .nuke-table :deep(.p-datatable-tbody > tr > td) {
-    border-bottom-color: var(--surface-700);
-  }
-
-  .nuke-table :deep(.p-paginator) {
+  .nuke-table .p-paginator {
     background-color: var(--surface-900);
     border-top-color: var(--surface-700);
   }

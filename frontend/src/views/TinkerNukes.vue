@@ -137,7 +137,8 @@ import type { OffensiveNano, NukeInputState, CharacterStats, DamageModifiers, Bu
 import { fetchOffensiveNanos, buildOffensiveNano } from '@/services/offensive-nano-service'
 
 // Import filtering utilities from Task 4.2
-import { filterBySkillRequirements, applyNanoFilters } from '@/utils/nuke-filtering'
+import { filterByCharacterProfile, applyNanoFilters } from '@/utils/nuke-filtering'
+import type { Character } from '@/utils/stat-calculations'
 
 // ============================================================================
 // Store and Router
@@ -224,32 +225,35 @@ const schoolFilterOptions = computed(() => [
 ])
 
 /**
- * Current character skills as ID-based record
- * Extracted from inputState for filtering
+ * Current character as Character type for profile-based filtering
+ * Extracted from activeProfile when available, otherwise uses manual inputState
  */
-const currentSkills = computed((): Record<number, number> => {
-  const { characterStats } = inputState.value
+const currentCharacter = computed((): Character | null => {
+  if (!activeProfile.value) {
+    return null
+  }
 
+  // Build Character from TinkerProfile
   return {
-    130: characterStats.matterCreation,
-    127: characterStats.matterMeta,
-    128: characterStats.bioMeta,
-    129: characterStats.psychModi,
-    126: characterStats.sensoryImp,
-    131: characterStats.timeSpace,
+    level: activeProfile.value.Character.Level,
+    profession: activeProfile.value.Character.Profession,
+    breed: activeProfile.value.Character.Breed,
+    baseStats: activeProfile.value.Skills || {}
   }
 })
 
 /**
- * Filtered nanos based on skill requirements and user filters
- * Implements FR-2: Filter by skills, school, QL range, search query
+ * Filtered nanos based on profile requirements and user filters
+ * Implements FR-2: Filter by all requirements (stats, skills, profession, level)
  */
 const filteredNanos = computed((): OffensiveNano[] => {
   // Start with all offensive nanos
   let filtered = offensiveNanos.value
 
-  // Step 1: Filter by skill requirements (usable nanos only)
-  filtered = filterBySkillRequirements(filtered, currentSkills.value)
+  // Step 1: Filter by character profile requirements (if profile exists)
+  if (currentCharacter.value) {
+    filtered = filterByCharacterProfile(filtered, currentCharacter.value)
+  }
 
   // Step 2: Apply additional filters (school, QL range, search)
   filtered = applyNanoFilters(filtered, {
