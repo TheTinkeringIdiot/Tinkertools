@@ -13,7 +13,8 @@
  * - FR-8: Buff lookup tables
  */
 
-import type { NanoProgram, CastingRequirement } from './nano'
+import type { NanoProgram } from './nano'
+import type { Item } from './api'
 
 // ============================================================================
 // Core Offensive Nano Types
@@ -24,6 +25,9 @@ import type { NanoProgram, CastingRequirement } from './nano'
  * Includes damage-specific fields for calculation and display
  */
 export interface OffensiveNano extends NanoProgram {
+  /** Full item object with actions and criteria for requirement validation */
+  item: Item
+
   /** Minimum damage value (after all modifiers, AC reduction, and tick count) */
   minDamage: number
 
@@ -180,18 +184,21 @@ export interface EfficiencyMetrics {
 }
 
 // ============================================================================
-// Manual Input State (27 Fields)
+// Manual Input State (28 Fields)
 // ============================================================================
 
 /**
  * Character statistics for offensive nano calculations
  * All fields are manually editable and can auto-populate from TinkerProfiles
  *
- * Total: 11 fields
+ * Total: 12 fields
  */
 export interface CharacterStats {
   /** Character breed (1=Solitus, 2=Opifex, 3=Nanomage, 4=Atrox) */
   breed: 1 | 2 | 3 | 4
+
+  /** Character level */
+  level: number
 
   /** Psychic ability (affects nano regen tick speed) */
   psychic: number
@@ -253,7 +260,7 @@ export interface BuffPresets {
 
 /**
  * Complete manual input state for TinkerNukes
- * Consolidates all 27 manual input fields organized by category
+ * Consolidates all 28 manual input fields organized by category
  *
  * Used for:
  * - Auto-population from active TinkerProfile
@@ -262,7 +269,7 @@ export interface BuffPresets {
  * - Profile switching and reset operations
  */
 export interface NukeInputState {
-  /** Character stats (11 fields) */
+  /** Character stats (12 fields) */
   characterStats: CharacterStats
 
   /** Damage modifiers (11 fields) */

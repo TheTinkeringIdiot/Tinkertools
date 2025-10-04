@@ -33,6 +33,7 @@ export interface CastingRequirement {
   type: 'skill' | 'stat' | 'nano' | 'item' | 'level';
   requirement: number | string;
   value: number;
+  operator?: string; // 'GreaterThan' | 'LessThan' | 'Equal' | etc.
   critical?: boolean; // Must be met vs recommended
 }
 

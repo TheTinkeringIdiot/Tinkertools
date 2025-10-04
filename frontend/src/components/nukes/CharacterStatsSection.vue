@@ -22,6 +22,22 @@
         />
       </div>
 
+      <!-- Level -->
+      <div class="flex flex-col">
+        <label for="level-input" class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
+          Level
+        </label>
+        <InputNumber
+          id="level-input"
+          v-model="localStats.level"
+          :min="1"
+          :max="220"
+          :step="1"
+          class="w-full"
+          @update:model-value="onFieldChange"
+        />
+      </div>
+
       <!-- Psychic (Ability) -->
       <div class="flex flex-col">
         <label for="psychic" class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
@@ -206,7 +222,10 @@ const emit = defineEmits<{
 }>()
 
 // Local state for two-way binding
-const localStats = ref<CharacterStats>({ ...props.characterStats })
+const localStats = ref<CharacterStats>({
+  ...props.characterStats,
+  level: props.characterStats.level ?? props.profile?.Character?.Level ?? 1
+})
 
 // Programmatic update flag to prevent watcher loops
 const isProgrammaticUpdate = ref(false)
@@ -221,12 +240,12 @@ const breedOptions = [
 
 // Skill ID mappings
 const SKILL_IDS = {
-  MATTER_CREATION: 130,
-  MATTER_META: 127,
-  BIO_META: 128,
-  PSYCH_MODI: 129,
-  SENSORY_IMP: 126,
-  TIME_SPACE: 131
+  SENSORY_IMP: 122,      // SensoryImprovement (FIXED)
+  MATTER_META: 127,      // MaterialMetamorphose
+  BIO_META: 128,         // BiologicalMetamorphose
+  PSYCH_MODI: 129,       // PsychologicalModification
+  MATTER_CREATION: 130,  // MaterialCreation
+  TIME_SPACE: 131        // SpaceTime
 } as const
 
 // Handle field changes - emit updates to parent
@@ -371,6 +390,18 @@ watch(() => props.profile?.skills[SKILL_IDS.TIME_SPACE]?.total, (newValue) => {
   if (newValue !== undefined && !isProgrammaticUpdate.value) {
     isProgrammaticUpdate.value = true
     localStats.value.timeSpace = newValue
+    setTimeout(() => {
+      isProgrammaticUpdate.value = false
+      emit('update:characterStats', { ...localStats.value })
+    }, 10)
+  }
+}, { immediate: true })
+
+// Watch Level
+watch(() => props.profile?.Character?.Level, (newValue) => {
+  if (newValue !== undefined && !isProgrammaticUpdate.value) {
+    isProgrammaticUpdate.value = true
+    localStats.value.level = newValue
     setTimeout(() => {
       isProgrammaticUpdate.value = false
       emit('update:characterStats', { ...localStats.value })

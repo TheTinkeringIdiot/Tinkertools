@@ -470,7 +470,7 @@ export function validateRequirements(
 ): { valid: boolean; failures: Array<{ stat: number; required: number; current: number }> } {
   const failures: Array<{ stat: number; required: number; current: number }> = [];
   const stats = character.baseStats || {};
-  
+
   for (const req of requirements) {
     const currentValue = stats[req.stat] || 0;
     const operator = req.operator || 'GreaterThan';

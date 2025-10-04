@@ -10,9 +10,9 @@
  * - FR-1: Offensive nano identification and filtering
  */
 
-import type { Item as ItemDetail, Spell, Criterion } from '@/types/api'
+import type { Item as ItemDetail, Spell } from '@/types/api'
 import type { OffensiveNano, DamageType } from '@/types/offensive-nano'
-import type { CastingRequirement, NanoSchool } from '@/types/nano'
+import type { NanoSchool } from '@/types/nano'
 
 // ============================================================================
 // API Configuration
@@ -37,27 +37,6 @@ const MODIFIER_STAT_TO_DAMAGE_TYPE: Record<number, DamageType> = {
   95: 'cold',        // → stat 311
   96: 'poison',      // → stat 317
   97: 'fire'         // → stat 316
-}
-
-// ============================================================================
-// Skill ID Mapping (from spell criteria)
-// ============================================================================
-
-/**
- * Maps criterion value1 to skill names for casting requirements
- * These are Anarchy Online skill IDs from spell_criteria
- */
-const SKILL_ID_TO_NAME: Record<number, string> = {
-  126: 'Matter Creation',
-  127: 'Matter Metamorphosis',
-  128: 'Biological Metamorphosis',
-  129: 'Psychological Modifications',
-  130: 'Sensory Improvement',
-  131: 'Time and Space',
-  157: 'Nano Programming',
-  // Additional common requirement IDs
-  152: 'Computer Literacy',
-  21: 'Psychic'
 }
 
 // ============================================================================
@@ -131,54 +110,51 @@ export function parseDamageType(spell: Spell): DamageType {
 }
 
 /**
- * Extracts casting requirements from spell criteria
- * Builds CastingRequirement objects with skill IDs and required values
+ * Extracts nano school from item's first action criteria
+ * Maps skill ID (126-131) to school name
  *
- * @param spells - Array of spells from spell_data
- * @returns Array of CastingRequirement objects with skill requirements
+ * @param item - ItemDetail object
+ * @returns NanoSchool identifier
  */
-export function extractCastingRequirements(spells: Spell[]): CastingRequirement[] {
-  const requirements: CastingRequirement[] = []
-  const seen = new Set<string>() // Deduplicate requirements
+function extractNanoSchool(item: ItemDetail): NanoSchool {
+  const SCHOOL_MAPPING: Record<number, NanoSchool> = {
+    122: 'Sensory Improvement',
+    127: 'Matter Metamorphosis',
+    128: 'Biological Metamorphosis',
+    129: 'Psychological Modifications',
+    130: 'Matter Creation',
+    131: 'Time and Space'
+  }
 
-  for (const spell of spells) {
-    const criteria = spell.criteria || []
-
+  // Check first action's criteria for school requirement
+  if (item.actions && item.actions.length > 0) {
+    const criteria = item.actions[0].criteria || []
     for (const criterion of criteria) {
-      const skillId = criterion.value1
-      const requiredValue = criterion.value2
-
-      // Check if this is a known skill requirement
-      if (SKILL_ID_TO_NAME[skillId]) {
-        const key = `skill_${skillId}`
-
-        if (!seen.has(key)) {
-          seen.add(key)
-          requirements.push({
-            type: 'skill',
-            requirement: skillId, // Store as skill ID for O(1) lookups
-            value: requiredValue,
-            critical: true
-          })
-        }
-      }
-      // Handle level requirements (value1 = 54)
-      else if (skillId === 54) {
-        const key = 'level'
-        if (!seen.has(key)) {
-          seen.add(key)
-          requirements.push({
-            type: 'level',
-            requirement: 'Level',
-            value: requiredValue,
-            critical: true
-          })
-        }
-      }
+      const school = SCHOOL_MAPPING[criterion.value1]
+      if (school) return school
     }
   }
 
-  return requirements
+  // Default to Matter Creation if no school requirement found
+  return 'Matter Creation'
+}
+
+/**
+ * Extracts level requirement from item's first action criteria
+ *
+ * @param item - ItemDetail object
+ * @returns Level requirement or 0
+ */
+function extractLevel(item: ItemDetail): number {
+  if (item.actions && item.actions.length > 0) {
+    const criteria = item.actions[0].criteria || []
+    for (const criterion of criteria) {
+      if (criterion.value1 === 54) { // 54 is Level stat
+        return criterion.value2
+      }
+    }
+  }
+  return 0
 }
 
 /**
@@ -237,15 +213,6 @@ export function buildOffensiveNano(item: ItemDetail): OffensiveNano | null {
   const tickCount = primarySpell.tick_count || 1
   const tickInterval = primarySpell.tick_interval || 0
 
-  // Extract all spells for casting requirements
-  const allSpells: Spell[] = []
-  for (const spellData of item.spell_data) {
-    allSpells.push(...(spellData.spells || []))
-  }
-
-  // Extract casting requirements
-  const castingRequirements = extractCastingRequirements(allSpells)
-
   // Extract cast time and recharge time from stats
   const castTime = extractStatValue(item, 294) || 0
   const rechargeTime = extractStatValue(item, 210) || 0
@@ -259,16 +226,19 @@ export function buildOffensiveNano(item: ItemDetail): OffensiveNano | null {
 
   // Build OffensiveNano object
   const offensiveNano: OffensiveNano = {
+    // Full item for action-criteria validation
+    item,
+
     // Base NanoProgram fields
     id: item.id,
     aoid: item.aoid,
     name: item.name,
-    school: extractNanoSchool(castingRequirements), // Determine from requirements
+    school: extractNanoSchool(item),
     strain: extractStrain(item),
     description: item.description || '',
-    level: extractLevel(castingRequirements),
+    level: extractLevel(item),
     qualityLevel: item.ql || 0,
-    castingRequirements,
+    castingRequirements: [], // Legacy field, use item.actions instead
 
     // Offensive-specific fields
     minDamage,
@@ -292,31 +262,6 @@ export function buildOffensiveNano(item: ItemDetail): OffensiveNano | null {
 // ============================================================================
 
 /**
- * Extracts nano school from casting requirements
- * Maps skill ID (126-131) to school name
- */
-function extractNanoSchool(requirements: CastingRequirement[]): NanoSchool {
-  const SCHOOL_MAPPING: Record<number, NanoSchool> = {
-    126: 'Matter Creation',
-    127: 'Matter Metamorphosis',
-    128: 'Biological Metamorphosis',
-    129: 'Psychological Modifications',
-    130: 'Sensory Improvement',
-    131: 'Time and Space'
-  }
-
-  for (const req of requirements) {
-    if (req.type === 'skill' && typeof req.requirement === 'number') {
-      const school = SCHOOL_MAPPING[req.requirement]
-      if (school) return school
-    }
-  }
-
-  // Default to Matter Creation if no school requirement found
-  return 'Matter Creation'
-}
-
-/**
  * Extracts strain from item stats (stat 75)
  * Returns strain value or empty string
  */
@@ -331,19 +276,6 @@ function extractStrain(item: ItemDetail): string {
   }
 
   return ''
-}
-
-/**
- * Extracts level requirement from casting requirements
- */
-function extractLevel(requirements: CastingRequirement[]): number {
-  for (const req of requirements) {
-    if (req.type === 'level') {
-      return req.value
-    }
-  }
-
-  return 0
 }
 
 /**

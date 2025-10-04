@@ -44,7 +44,7 @@ Task 4.4: Complete view integration
     <div class="p-4 border-b border-surface-200 dark:border-surface-700">
       <NukeInputForm
         :input-state="inputState"
-        :active-profile="activeProfile"
+        :active-profile="activeProfile as TinkerProfile | null"
         @update:input-state="onInputStateUpdate"
       />
     </div>
@@ -139,6 +139,8 @@ import { fetchOffensiveNanos, buildOffensiveNano } from '@/services/offensive-na
 // Import filtering utilities from Task 4.2
 import { filterByCharacterProfile, applyNanoFilters } from '@/utils/nuke-filtering'
 import type { Character } from '@/utils/stat-calculations'
+import { convertInputStateToCharacter } from '@/utils/input-to-character'
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types'
 
 // ============================================================================
 // Store and Router
@@ -157,10 +159,11 @@ const loading = ref(false)
 // Offensive nanos fetched from backend (profession ID 11 = Nanotechnician)
 const offensiveNanos = ref<OffensiveNano[]>([])
 
-// Manual input state (27 fields organized into 3 sections)
+// Manual input state (28 fields organized into 3 sections)
 const inputState = ref<NukeInputState>({
   characterStats: {
     breed: 1,
+    level: 1,
     psychic: 6,
     nanoInit: 1,
     maxNano: 1,
@@ -229,17 +232,10 @@ const schoolFilterOptions = computed(() => [
  * Extracted from activeProfile when available, otherwise uses manual inputState
  */
 const currentCharacter = computed((): Character | null => {
-  if (!activeProfile.value) {
-    return null
-  }
+  if (!activeProfile.value) return null
 
-  // Build Character from TinkerProfile
-  return {
-    level: activeProfile.value.Character.Level,
-    profession: activeProfile.value.Character.Profession,
-    breed: activeProfile.value.Character.Breed,
-    baseStats: activeProfile.value.Skills || {}
-  }
+  // Convert manual inputs to Character format for validation
+  return convertInputStateToCharacter(inputState.value, activeProfile.value as TinkerProfile)
 })
 
 /**

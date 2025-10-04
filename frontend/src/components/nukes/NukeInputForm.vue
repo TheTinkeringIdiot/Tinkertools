@@ -77,7 +77,7 @@ import { ENHANCE_NANO_DAMAGE, ANCIENT_MATRIX_DAMAGE } from '@/utils/nuke-regen-c
 // Props
 interface Props {
   inputState: NukeInputState
-  activeProfile?: TinkerProfile | null
+  activeProfile?: Readonly<TinkerProfile> | TinkerProfile | null
 }
 
 const props = defineProps<Props>()

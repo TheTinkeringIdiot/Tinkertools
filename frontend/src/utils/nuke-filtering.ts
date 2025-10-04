@@ -15,9 +15,8 @@
  */
 
 import type { OffensiveNano, UsabilityStatus } from '@/types/offensive-nano'
-import type { CastingRequirement } from '@/types/nano'
-import { validateNanoRequirements, type Nano } from './nano-compatibility'
 import type { Character } from './stat-calculations'
+import { checkActionRequirements, parseAction } from '@/services/action-criteria'
 
 // ============================================================================
 // Profile-Based Requirement Filtering
@@ -26,7 +25,7 @@ import type { Character } from './stat-calculations'
 /**
  * Filter nanos by character profile requirements
  *
- * Uses validateNanoRequirements to check ALL requirements including:
+ * Uses action-criteria infrastructure to check ALL requirements including:
  * - Stat requirements
  * - Skill requirements
  * - Profession compatibility
@@ -45,23 +44,17 @@ export function filterByCharacterProfile(
   character: Character
 ): OffensiveNano[] {
   return nanos.filter((nano) => {
-    // Convert OffensiveNano to Nano interface for validateNanoRequirements
-    const nanoForValidation: Nano = {
-      id: nano.id,
-      name: nano.name,
-      school: nano.nanoSchoolId || 0,
-      ncuCost: nano.ncuCost || 0,
-      nanoPoints: nano.nanoPointCost || 0,
-      level: nano.qualityLevel,
-      requirements: nano.castingRequirements?.map(req => ({
-        stat: typeof req.requirement === 'number' ? req.requirement : parseInt(req.requirement as string, 10),
-        value: req.value,
-        operator: req.operator || '>='
-      })) || []
+    // Check if nano has actions (should always have at least one)
+    if (!nano.item.actions || nano.item.actions.length === 0) {
+      console.warn(`[filterByCharacterProfile] Nano ${nano.id} has no actions`)
+      return true // No requirements means always usable
     }
 
-    const validation = validateNanoRequirements(nanoForValidation, character)
-    return validation.canCast
+    // Use first action (typically "Use" action for nanos)
+    const action = parseAction(nano.item.actions[0])
+    const result = checkActionRequirements(action, character.baseStats || {})
+
+    return result.canPerform
   })
 }
 
@@ -121,11 +114,11 @@ export function filterBySkillRequirements(
  * Filter nanos by nano school
  *
  * Nano schools are stored as skill IDs:
- * - Matter Creation = 126
+ * - Matter Creation = 130
  * - Matter Metamorphosis = 127
  * - Biological Metamorphosis = 128
  * - Psychological Modifications = 129
- * - Sensory Improvement = 130
+ * - Sensory Improvement = 122
  * - Time and Space = 131
  *
  * @param nanos - Array of offensive nanos to filter
@@ -133,7 +126,7 @@ export function filterBySkillRequirements(
  * @returns Filtered array of nanos matching the school
  *
  * @example
- * const matterCreationNanos = filterBySchool(allNanos, 126)
+ * const matterCreationNanos = filterBySchool(allNanos, 130)
  * const allNanos = filterBySchool(nanos, null)
  */
 export function filterBySchool(
@@ -146,21 +139,22 @@ export function filterBySchool(
   }
 
   return nanos.filter((nano) => {
-    // Check if nano has any skill requirement matching this school ID
-    if (!nano.castingRequirements || nano.castingRequirements.length === 0) {
+    // Check if nano has actions
+    if (!nano.item.actions || nano.item.actions.length === 0) {
       return false
     }
 
-    return nano.castingRequirements.some((requirement) => {
-      if (requirement.type !== 'skill') {
+    // Check first action's criteria for school requirement
+    const criteria = nano.item.actions[0].criteria || []
+
+    return criteria.some((criterion) => {
+      // School requirements are skill stat checks (value1 = skill ID)
+      // Skip logical operators (value1 = 0)
+      if (criterion.value1 === 0) {
         return false
       }
 
-      const skillId = typeof requirement.requirement === 'number'
-        ? requirement.requirement
-        : parseInt(requirement.requirement as string, 10)
-
-      return skillId === schoolId
+      return criterion.value1 === schoolId
     })
   })
 }
@@ -240,7 +234,7 @@ export function searchNanosByName(
  * @returns Usability status
  *
  * @example
- * const status = calculateUsabilityStatus(nano, { 126: 850, 127: 600 })
+ * const status = calculateUsabilityStatus(nano, { 130: 850, 127: 600 })
  * if (status === 'usable') {
  *   console.log('Nano is ready to cast!')
  * }
@@ -249,47 +243,31 @@ export function calculateUsabilityStatus(
   nano: OffensiveNano,
   skills: Record<number, number>
 ): UsabilityStatus {
-  // No requirements means always usable
-  if (!nano.castingRequirements || nano.castingRequirements.length === 0) {
+  // Check if nano has actions
+  if (!nano.item.actions || nano.item.actions.length === 0) {
+    return 'usable' // No requirements means always usable
+  }
+
+  // Use first action (typically "Use" action for nanos)
+  const action = parseAction(nano.item.actions[0])
+  const result = checkActionRequirements(action, skills)
+
+  // If all requirements met, status is 'usable'
+  if (result.canPerform) {
     return 'usable'
   }
 
-  // Calculate maximum skill gap across all skill requirements
+  // Calculate maximum gap from unmet requirements
   let maxGap = 0
-  let allRequirementsMet = true
-
-  for (const requirement of nano.castingRequirements) {
-    // Only check skill requirements
-    if (requirement.type !== 'skill') {
-      continue
-    }
-
-    // Get skill ID
-    const skillId = typeof requirement.requirement === 'number'
-      ? requirement.requirement
-      : parseInt(requirement.requirement as string, 10)
-
-    // Get current skill value
-    const currentSkillValue = skills[skillId] ?? 0
-
-    // Calculate gap (negative if requirement is met)
-    const gap = requirement.value - currentSkillValue
-
-    // Track maximum gap
+  for (const unmet of result.unmetRequirements) {
+    const gap = unmet.required - unmet.current
     if (gap > maxGap) {
       maxGap = gap
-    }
-
-    // Track if any requirement is not met
-    if (gap > 0) {
-      allRequirementsMet = false
     }
   }
 
   // Determine status based on maximum gap
-  if (allRequirementsMet) {
-    return 'usable'
-  } else if (maxGap <= 100) {
+  if (maxGap <= 100) {
     return 'close'
   } else {
     return 'far'

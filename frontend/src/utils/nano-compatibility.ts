@@ -148,7 +148,7 @@ export function validateNanoRequirements(
 ): NanoCompatibilityResult {
   const reasons: string[] = [];
   let canCast = true;
-  
+
   // Check stat requirements
   const reqValidation = validateRequirements(character, nano.requirements || []);
   if (!reqValidation.valid) {
