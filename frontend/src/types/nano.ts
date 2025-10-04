@@ -2,6 +2,7 @@
 
 export interface NanoProgram {
   id: number;
+  aoid?: number;
   name: string;
   icon?: string;
   school: NanoSchool;

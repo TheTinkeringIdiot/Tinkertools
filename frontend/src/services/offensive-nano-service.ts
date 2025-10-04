@@ -195,37 +195,47 @@ export function buildOffensiveNano(item: ItemDetail): OffensiveNano | null {
     return null
   }
 
-  // Find the offensive spell (target=3, spell_id=53002)
-  let offensiveSpell: Spell | null = null
+  // Find all offensive spells (target=3, spell_id=53002)
+  // Some nanos like Candycane have multiple spells that each deal damage
+  const offensiveSpells: Spell[] = []
 
   for (const spellData of item.spell_data) {
     const spells = spellData.spells || []
 
     for (const spell of spells) {
       if (spell.target === 3 && spell.spell_id === 53002) {
-        offensiveSpell = spell
-        break
+        offensiveSpells.push(spell)
       }
     }
-
-    if (offensiveSpell) break
   }
 
-  if (!offensiveSpell) {
+  if (offensiveSpells.length === 0) {
     console.warn(`[buildOffensiveNano] Item ${item.id} has no offensive spell`)
     return null
   }
 
-  // Parse damage values
-  const [minDamage, maxDamage] = parseSpellDamage(offensiveSpell)
+  // Sum damage values from all offensive spells
+  let totalMinDamage = 0
+  let totalMaxDamage = 0
+
+  for (const spell of offensiveSpells) {
+    const [min, max] = parseSpellDamage(spell)
+    totalMinDamage += min
+    totalMaxDamage += max
+  }
+
+  const minDamage = totalMinDamage
+  const maxDamage = totalMaxDamage
   const midDamage = Math.floor((minDamage + maxDamage) / 2)
 
-  // Parse damage type
-  const damageType = parseDamageType(offensiveSpell)
+  // Use first spell for damage type and tick mechanics
+  // (multi-spell nanos typically have same tick behavior across all spells)
+  const primarySpell = offensiveSpells[0]
+  const damageType = parseDamageType(primarySpell)
 
   // Parse tick mechanics (DoT detection: tickCount > 1)
-  const tickCount = offensiveSpell.tick_count || 1
-  const tickInterval = offensiveSpell.tick_interval || 0
+  const tickCount = primarySpell.tick_count || 1
+  const tickInterval = primarySpell.tick_interval || 0
 
   // Extract all spells for casting requirements
   const allSpells: Spell[] = []
@@ -244,10 +254,14 @@ export function buildOffensiveNano(item: ItemDetail): OffensiveNano | null {
   const attackDelayCap = extractStatValue(item, 523)
   const rechargeDelayCap = extractStatValue(item, 524)
 
+  // Extract nano point cost (stat 407)
+  const nanoPointCost = extractStatValue(item, 407) || 0
+
   // Build OffensiveNano object
   const offensiveNano: OffensiveNano = {
     // Base NanoProgram fields
     id: item.id,
+    aoid: item.aoid,
     name: item.name,
     school: extractNanoSchool(castingRequirements), // Determine from requirements
     strain: extractStrain(item),
@@ -266,7 +280,8 @@ export function buildOffensiveNano(item: ItemDetail): OffensiveNano | null {
     castTime,
     rechargeTime,
     attackDelayCap,
-    rechargeDelayCap
+    rechargeDelayCap,
+    nanoPointCost
   }
 
   return offensiveNano

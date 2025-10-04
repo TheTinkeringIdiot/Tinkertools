@@ -19,7 +19,7 @@
       <template #body="{ data }">
         <div class="flex items-center gap-2">
           <router-link
-            :to="`/items/${data.id}`"
+            :to="`/items/${data.aoid}`"
             class="font-medium text-primary-500 hover:text-primary-600 hover:underline"
             @click.stop
           >
@@ -300,6 +300,7 @@ const tableData = computed(() => {
     // Return formatted row data
     return {
       id: nano.id,
+      aoid: nano.aoid,
       name: nano.name,
       ql: nano.qualityLevel,
       castTime: castTime.toFixed(2),

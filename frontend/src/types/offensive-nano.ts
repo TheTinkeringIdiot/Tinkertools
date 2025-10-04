@@ -53,6 +53,9 @@ export interface OffensiveNano extends NanoProgram {
 
   /** Recharge delay cap in centiseconds from stat 524 (minimum recharge time after init reduction) */
   rechargeDelayCap?: number
+
+  /** Base nano point cost from stat 407 (NanoPoint) */
+  nanoPointCost: number
 }
 
 /**
