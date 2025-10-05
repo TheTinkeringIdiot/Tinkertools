@@ -116,6 +116,7 @@ export interface TinkerProfile {
     MaxHealth: number;
     MaxNano: number;
     AlienLevel?: number; // 0-30, for AI perk points calculation
+    Specialization?: number; // 0-30 for spec levels (bitflags: 0, 1, 2, 4, 8 map to display 0-4)
   };
 
   // IP tracking (unchanged)

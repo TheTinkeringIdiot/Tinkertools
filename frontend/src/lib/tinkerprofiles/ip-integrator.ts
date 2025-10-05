@@ -6,6 +6,7 @@
  */
 
 import type { TinkerProfile, IPTracker, SkillData } from './types';
+import { accountTypeToExpansionBitflag, specializationLevelToBitflag } from '@/utils/expansion-utils';
 import {
   calcIP,
   calcTitleLevel,
@@ -89,7 +90,13 @@ const BONUS_ONLY_STAT_IDS = new Set([
   428,  // Free deck slot (alt BeltSlots)
   535,  // HealMultiplier
   536,  // NanoDamageMultiplier
-  360   // Scale
+  360,  // Scale
+  355,  // WornItem
+  54,   // Level
+  60,   // Profession
+  368,  // VisualProfession
+  182,  // Specialization
+  389   // Expansion
 ]);
 
 /**
@@ -347,6 +354,24 @@ export function updateProfileSkillInfo(
     }
   }
 
+  // Special handling for character-derived stats that don't come from bonuses
+  // These stats are always present and derived from Character properties
+  if (!profile.skills[54]) {
+    profile.skills[54] = createEmptySkillData();   // Level
+  }
+  if (!profile.skills[60]) {
+    profile.skills[60] = createEmptySkillData();   // Profession
+  }
+  if (!profile.skills[368]) {
+    profile.skills[368] = createEmptySkillData();  // VisualProfession
+  }
+  if (!profile.skills[182]) {
+    profile.skills[182] = createEmptySkillData();  // Specialization
+  }
+  if (!profile.skills[389]) {
+    profile.skills[389] = createEmptySkillData();  // Expansion
+  }
+
   // Update abilities (skill IDs 16-21)
   const abilityStatIds = [16, 17, 18, 19, 20, 21]; // Strength, Stamina, Agility, Sense, Intelligence, Psychic
   const abilityIndexToStatId = [16, 18, 17, 20, 19, 21]; // Maps ABILITY_INDEX_TO_STAT_ID order
@@ -467,6 +492,75 @@ export function updateProfileSkillInfo(
       // Calculate total value: only bonuses for bonus-only stats
       skillData.total = equipmentBonus + perkBonus + buffBonus;
     }
+  }
+
+  // Update character-derived stats from Character properties
+  // These are special stats derived from character data, not from equipment/perks/buffs
+
+  // Level (stat 54) from Character.Level
+  if (profile.skills[54]) {
+    const levelValue = profile.Character.Level ?? 1;
+    profile.skills[54].base = 0;
+    profile.skills[54].trickle = 0;
+    profile.skills[54].ipSpent = 0;
+    profile.skills[54].pointsFromIp = 0;
+    profile.skills[54].equipmentBonus = 0;
+    profile.skills[54].perkBonus = 0;
+    profile.skills[54].buffBonus = 0;
+    profile.skills[54].total = levelValue;
+  }
+
+  // Profession (stat 60) from Character.Profession
+  if (profile.skills[60]) {
+    const professionValue = profile.Character.Profession ?? 6; // Default to Adventurer
+    profile.skills[60].base = 0;
+    profile.skills[60].trickle = 0;
+    profile.skills[60].ipSpent = 0;
+    profile.skills[60].pointsFromIp = 0;
+    profile.skills[60].equipmentBonus = 0;
+    profile.skills[60].perkBonus = 0;
+    profile.skills[60].buffBonus = 0;
+    profile.skills[60].total = professionValue;
+  }
+
+  // VisualProfession (stat 368) from Character.Profession
+  if (profile.skills[368]) {
+    const professionValue = profile.Character.Profession ?? 6; // Default to Adventurer
+    profile.skills[368].base = 0;
+    profile.skills[368].trickle = 0;
+    profile.skills[368].ipSpent = 0;
+    profile.skills[368].pointsFromIp = 0;
+    profile.skills[368].equipmentBonus = 0;
+    profile.skills[368].perkBonus = 0;
+    profile.skills[368].buffBonus = 0;
+    profile.skills[368].total = professionValue;
+  }
+
+  // Specialization (stat 182) from Character.Specialization
+  // Convert level to cumulative bitflag (spec 4 = 1|2|4|8 = 15)
+  if (profile.skills[182]) {
+    const specializationValue = specializationLevelToBitflag(profile.Character.Specialization ?? 0);
+    profile.skills[182].base = 0;
+    profile.skills[182].trickle = 0;
+    profile.skills[182].ipSpent = 0;
+    profile.skills[182].pointsFromIp = 0;
+    profile.skills[182].equipmentBonus = 0;
+    profile.skills[182].perkBonus = 0;
+    profile.skills[182].buffBonus = 0;
+    profile.skills[182].total = specializationValue;
+  }
+
+  // Expansion (stat 389) from Character.AccountType
+  if (profile.skills[389]) {
+    const expansionValue = accountTypeToExpansionBitflag(profile.Character.AccountType);
+    profile.skills[389].base = 0;
+    profile.skills[389].trickle = 0;
+    profile.skills[389].ipSpent = 0;
+    profile.skills[389].pointsFromIp = 0;
+    profile.skills[389].equipmentBonus = 0;
+    profile.skills[389].perkBonus = 0;
+    profile.skills[389].buffBonus = 0;
+    profile.skills[389].total = expansionValue;
   }
 
   // ACs are pure calculated values with no base (always start at 0)

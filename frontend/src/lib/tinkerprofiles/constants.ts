@@ -62,6 +62,12 @@ export const ACCOUNT_TYPES = [
 ] as const;
 
 // ============================================================================
+// Stat ID Constants
+// ============================================================================
+
+export const WORN_ITEM_STAT_ID = 355;
+
+// ============================================================================
 // Default Skills Structure
 // ============================================================================
 
@@ -401,7 +407,8 @@ export function createDefaultProfile(name: string = 'New Character', breed: stri
       Expansion: 'Lost Eden',
       AccountType: 'Paid',
       MaxHealth: initialHealth,
-      MaxNano: initialNano
+      MaxNano: initialNano,
+      Specialization: 0
     },
 
     skills: createDefaultSkillsV4(breed),

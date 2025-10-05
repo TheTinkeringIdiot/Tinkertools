@@ -133,6 +133,7 @@ export const SKILL_ID_MAP: Record<string, number> = {
   // Special stats that appear in cluster data but aren't trainable skills
   'Max Health': 1,      // MaxHealth stat
   'Max Nano': 221,      // MaxNanoEnergy stat
+  'WornItem': 355,      // WornItem equipment flags (bitwise OR of equipped item categories)
   
   // Exploring category
   'Concealment': 164,
@@ -172,6 +173,7 @@ export const SKILL_ID_MAP: Record<string, number> = {
   'Free deck slot': 428,     // BeltSlots (used for deck slots)
   'Healing Efficiency': 535, // HealMultiplier
   'Direct Nano Damage Efficiency': 536, // NanoDamageMultiplier
+  'Expansion': 389,          // Expansion (account type bitflag)
   'Scale': 360,              // Scale
 
   // Shield AC skills
@@ -247,5 +249,5 @@ export const SKILL_CATEGORIES: Record<string, string[]> = {
     'ReflectProjectileAC', 'ReflectMeleeAC', 'ReflectEnergyAC', 'ReflectChemicalAC', 'ReflectRadiationAC', 'ReflectColdAC', 'ReflectNanoAC', 'ReflectFireAC', 'ReflectPoisonAC',
     'AbsorbProjectileAC', 'AbsorbMeleeAC', 'AbsorbEnergyAC', 'AbsorbChemicalAC', 'AbsorbRadiationAC', 'AbsorbColdAC', 'AbsorbFireAC', 'AbsorbPoisonAC', 'AbsorbNanoAC'
   ],
-  'Misc': ['% Add. Xp', '% Add. Nano Cost', 'Max NCU', 'Decreased Nano-Interrupt Modifier %', 'SkillLockModifier', 'HealDelta', 'Add All Def.', 'NanoDelta', 'RangeInc. NF', 'RangeInc. Weapon', 'CriticalIncrease', 'Free deck slot', 'Healing Efficiency', 'Add All Off.', 'Add. Proj. Dam.', 'Add. Melee Dam.', 'Add. Energy Dam.', 'Add. Chem. Dam.', 'Add. Rad. Dam.', 'Add. Cold Dam.', 'Add. Fire Dam.', 'Add. Poison Dam.', 'Direct Nano Damage Efficiency', 'Add. Nano Dam.', 'Scale']
+  'Misc': ['% Add. Xp', '% Add. Nano Cost', 'Max NCU', 'Decreased Nano-Interrupt Modifier %', 'SkillLockModifier', 'HealDelta', 'Add All Def.', 'NanoDelta', 'RangeInc. NF', 'RangeInc. Weapon', 'CriticalIncrease', 'Free deck slot', 'Healing Efficiency', 'Add All Off.', 'Add. Proj. Dam.', 'Add. Melee Dam.', 'Add. Energy Dam.', 'Add. Chem. Dam.', 'Add. Rad. Dam.', 'Add. Cold Dam.', 'Add. Fire Dam.', 'Add. Poison Dam.', 'Direct Nano Damage Efficiency', 'Add. Nano Dam.', 'Expansion', 'Scale']
 };

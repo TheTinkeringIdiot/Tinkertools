@@ -122,7 +122,7 @@ through the ip-integrator system for proper v4.0.0 profile updates.
         <label for="accountType" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
           Account Type
         </label>
-        <Dropdown 
+        <Dropdown
           id="accountType"
           v-model="formData.accountType"
           :options="accountTypeOptions"
@@ -131,6 +131,25 @@ through the ip-integrator system for proper v4.0.0 profile updates.
           placeholder="Select account type"
           class="w-full"
         />
+      </div>
+
+      <!-- Specialization -->
+      <div class="field">
+        <label for="specialization" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+          Specialization
+        </label>
+        <Dropdown
+          id="specialization"
+          v-model="formData.Specialization"
+          :options="specializationOptions"
+          option-label="label"
+          option-value="value"
+          placeholder="Select specialization"
+          class="w-full"
+        />
+        <small class="text-surface-500 dark:text-surface-400">
+          Nanotechnician offensive nano specialization level
+        </small>
       </div>
 
       <!-- Warning Message -->
@@ -188,7 +207,8 @@ import InputText from 'primevue/inputtext';
 import InputNumber from 'primevue/inputnumber';
 import Dropdown from 'primevue/dropdown';
 import Button from 'primevue/button';
-import { PROFESSION_NAMES, BREED_NAMES } from '@/services/game-data';
+import { PROFESSION_NAMES, BREED_NAMES, SPECS } from '@/services/game-data';
+import { ACCOUNT_TYPES } from '@/lib/tinkerprofiles/constants';
 
 // Props
 const props = defineProps<{
@@ -216,6 +236,7 @@ interface CharacterChanges {
   breed?: string;
   faction?: string;
   accountType?: string;
+  Specialization?: number;
 }
 
 interface FormData {
@@ -225,6 +246,7 @@ interface FormData {
   breed: number;
   faction: string;
   accountType: string;
+  Specialization: number;
 }
 
 // State
@@ -236,7 +258,8 @@ const formData = ref<FormData>({
   profession: 0,
   breed: 0,
   faction: 'Neutral',
-  accountType: 'Free'
+  accountType: 'Froob',
+  Specialization: 0
 });
 
 const originalData = ref<FormData>({
@@ -245,7 +268,8 @@ const originalData = ref<FormData>({
   profession: 0,
   breed: 0,
   faction: 'Neutral',
-  accountType: 'Free'
+  accountType: 'Froob',
+  Specialization: 0
 });
 
 const errors = ref<Partial<FormData>>({});
@@ -267,16 +291,25 @@ const factionOptions = [
   { name: 'Neutral' }
 ];
 
-const accountTypeOptions = [
-  { name: 'Free', value: 'Free' },
-  { name: 'Paid', value: 'Paid' }
+const accountTypeOptions = ACCOUNT_TYPES.map(type => ({
+  name: type,
+  value: type
+}));
+
+const specializationOptions = [
+  { label: 'None (0)', value: 0 },
+  { label: 'Level 1', value: 1 },
+  { label: 'Level 2', value: 2 },
+  { label: 'Level 3', value: 4 },
+  { label: 'Level 4', value: 8 }
 ];
 
 // Computed
 const hasSignificantChanges = computed(() => {
   return formData.value.breed !== originalData.value.breed ||
          formData.value.profession !== originalData.value.profession ||
-         formData.value.level !== originalData.value.level;
+         formData.value.level !== originalData.value.level ||
+         formData.value.Specialization !== originalData.value.Specialization;
 });
 
 const isFormValid = computed(() => {
@@ -310,16 +343,15 @@ function initializeForm(): void {
   if (!props.profile?.Character) return;
 
   const character = props.profile.Character;
-  const profession = getProfessionId(character.Profession);
-  const breed = getBreedId(character.Breed);
 
   const data: FormData = {
     name: character.Name || '',
     level: character.Level || 1,
-    profession: profession !== null ? profession : 0,
-    breed: breed !== null ? breed : 0,
+    profession: character.Profession || 6, // Already a numeric ID
+    breed: character.Breed || 1, // Already a numeric ID
     faction: character.Faction || 'Neutral',
-    accountType: character.AccountType || 'Free'
+    accountType: character.AccountType || 'Froob',
+    Specialization: character.Specialization ?? 0
   };
 
   formData.value = { ...data };
@@ -347,20 +379,6 @@ function validateLevel(): void {
   } else {
     delete errors.value.level;
   }
-}
-
-function getProfessionId(professionName: string): number | null {
-  const index = PROFESSION_NAMES.findIndex(name => 
-    name.toLowerCase() === professionName.toLowerCase()
-  );
-  return index >= 0 ? index : null;
-}
-
-function getBreedId(breedName: string): number | null {
-  const index = BREED_NAMES.findIndex(name => 
-    name.toLowerCase() === breedName.toLowerCase()
-  );
-  return index >= 0 ? index : null;
 }
 
 function getBreedName(breedId: number): string {
@@ -402,6 +420,10 @@ async function onSave(): Promise<void> {
     
     if (formData.value.accountType !== originalData.value.accountType) {
       changes.accountType = formData.value.accountType;
+    }
+
+    if (formData.value.Specialization !== originalData.value.Specialization) {
+      changes.Specialization = formData.value.Specialization;
     }
 
     // Emit the save event with changes

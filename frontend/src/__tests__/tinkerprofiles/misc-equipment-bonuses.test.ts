@@ -7,8 +7,8 @@ describe('Misc Skills Equipment Bonuses', () => {
   const createTestProfile = (): TinkerProfile => ({
     Character: {
       Name: 'Test Character',
-      Profession: 'Agent',
-      Breed: 'Solitus',
+      Profession: 5,  // Agent (numeric ID)
+      Breed: 1,       // Solitus (numeric ID)
       Level: 200,
       Gender: 'Female'
     },
@@ -228,5 +228,146 @@ describe('Misc Skills Equipment Bonuses', () => {
     expect(profile.skills[343]?.total).toBe(30);  // 10 perk + 20 equipment
     expect(profile.skills[343]?.equipmentBonus).toBe(20);
     expect(profile.skills[343]?.perkBonus).toBe(10);
+  });
+
+  it('should apply single WornItem flag using bitwise OR', () => {
+    const profile = createTestProfile();
+
+    // Add item with BasicCyberDeck flag (BitNum=0, value=1)
+    const basicCyberdeck = {
+      aoid: 233255,
+      name: 'Basic Cyberdeck',
+      ql: 200,
+      spell_data: [{
+        event: 14,  // Wear event
+        spells: [{
+          spell_id: 53139,  // Set WornItem flag spell ID
+          spell_params: {
+            Stat: 355,  // WornItem stat ID
+            BitNum: 0   // BasicCyberDeck flag (1 << 0 = 1)
+          }
+        }]
+      }]
+    };
+
+    profile.Clothing.Chest = basicCyberdeck;
+
+    // Calculate equipment bonuses
+    const bonuses = calculateEquipmentBonuses(profile);
+
+    // Verify WornItem flag is set to 1 (BasicCyberDeck)
+    expect(bonuses[355]).toBe(1);  // 1 << 0 = 1
+
+    // Update profile with IP tracking
+    updateProfileSkillInfo(profile);
+
+    // Verify WornItem stat has the correct flag value
+    expect(profile.skills[355]?.total).toBe(1);  // BasicCyberDeck flag
+  });
+
+  it('should combine multiple different WornItem flags using bitwise OR', () => {
+    const profile = createTestProfile();
+
+    // Add item with BasicCyberDeck flag (BitNum=0, value=1)
+    const basicCyberdeck = {
+      aoid: 233255,
+      name: 'Basic Cyberdeck',
+      ql: 200,
+      spell_data: [{
+        event: 14,  // Wear event
+        spells: [{
+          spell_id: 53139,  // Set WornItem flag spell ID
+          spell_params: {
+            Stat: 355,  // WornItem stat ID
+            BitNum: 0   // BasicCyberDeck flag (1 << 0 = 1)
+          }
+        }]
+      }]
+    };
+
+    // Add item with NanoDeck flag (BitNum=6, value=64)
+    const nanoDeck = {
+      aoid: 300123,
+      name: 'Nano Deck',
+      ql: 200,
+      spell_data: [{
+        event: 14,  // Wear event
+        spells: [{
+          spell_id: 53139,  // Set WornItem flag spell ID
+          spell_params: {
+            Stat: 355,  // WornItem stat ID
+            BitNum: 6   // NanoDeck flag (1 << 6 = 64)
+          }
+        }]
+      }]
+    };
+
+    profile.Clothing.Chest = basicCyberdeck;
+    profile.HUD.HUD1 = nanoDeck;
+
+    // Calculate equipment bonuses
+    const bonuses = calculateEquipmentBonuses(profile);
+
+    // Verify flags are combined with bitwise OR: 1 | 64 = 65
+    expect(bonuses[355]).toBe(65);  // BasicCyberDeck (1) | NanoDeck (64)
+
+    // Update profile with IP tracking
+    updateProfileSkillInfo(profile);
+
+    // Verify WornItem stat has the combined flag value
+    expect(profile.skills[355]?.total).toBe(65);  // Combined flags
+  });
+
+  it('should be idempotent when equipping multiple items with same WornItem flag', () => {
+    const profile = createTestProfile();
+
+    // Add first item with BasicCyberDeck flag (BitNum=0, value=1)
+    const basicCyberdeck1 = {
+      aoid: 233255,
+      name: 'Basic Cyberdeck 1',
+      ql: 200,
+      spell_data: [{
+        event: 14,  // Wear event
+        spells: [{
+          spell_id: 53139,  // Set WornItem flag spell ID
+          spell_params: {
+            Stat: 355,  // WornItem stat ID
+            BitNum: 0   // BasicCyberDeck flag (1 << 0 = 1)
+          }
+        }]
+      }]
+    };
+
+    // Add second item with same BasicCyberDeck flag (BitNum=0, value=1)
+    const basicCyberdeck2 = {
+      aoid: 233256,
+      name: 'Basic Cyberdeck 2',
+      ql: 200,
+      spell_data: [{
+        event: 14,  // Wear event
+        spells: [{
+          spell_id: 53139,  // Set WornItem flag spell ID
+          spell_params: {
+            Stat: 355,  // WornItem stat ID
+            BitNum: 0   // BasicCyberDeck flag (1 << 0 = 1)
+          }
+        }]
+      }]
+    };
+
+    profile.Clothing.Chest = basicCyberdeck1;
+    profile.Clothing.Legs = basicCyberdeck2;
+
+    // Calculate equipment bonuses
+    const bonuses = calculateEquipmentBonuses(profile);
+
+    // Verify flag value is idempotent: 1 | 1 = 1 (not 2)
+    expect(bonuses[355]).toBe(1);  // Still 1, not 2
+
+    // Update profile with IP tracking
+    updateProfileSkillInfo(profile);
+
+    // Verify WornItem stat remains 1 (idempotent behavior)
+    expect(profile.skills[355]?.total).toBe(1);  // Same flag doesn't accumulate
   });
 });

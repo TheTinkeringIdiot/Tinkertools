@@ -81,8 +81,8 @@ Shows character stats, health, nano, and other core information
         <div class="flex items-center justify-between py-2">
           <span class="text-sm font-medium text-surface-700 dark:text-surface-300">Account Type</span>
           <Badge
-            :value="profile.Character?.AccountType || 'Free'"
-            :severity="profile.Character?.AccountType === 'Paid' ? 'success' : 'secondary'"
+            :value="profile.Character?.AccountType || 'Froob'"
+            severity="secondary"
           />
         </div>
       </div>

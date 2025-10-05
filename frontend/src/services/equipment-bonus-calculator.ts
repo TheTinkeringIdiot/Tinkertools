@@ -2,7 +2,7 @@
  * Equipment Bonus Calculator Service
  *
  * Parses spell_data from equipped items to find stat modification spells
- * (spell_id=53045, 53012, 53014, 53175) and aggregates bonuses by STAT ID
+ * (spell_id=53045, 53012, 53014, 53175, 53139) and aggregates bonuses by STAT ID
  * across all 45 equipment slots.
  *
  * Features comprehensive error handling:
@@ -68,7 +68,8 @@ export const STAT_BONUS_SPELL_IDS = [
   53045, // "Modify {Stat} by {Amount}" - primary stat bonus spell
   53012, // "Modify {Stat} by {Amount}" - alternative format
   53014, // "Modify {Stat} for {Duration}s by {Amount}" - timed bonus (some equipment uses this)
-  53175  // "Modify {Stat} by {Amount}" - additional stat modifier format
+  53175, // "Modify {Stat} by {Amount}" - additional stat modifier format
+  53139  // "Set flag {Stat} &{BitNum}" - WornItem flag setting spell
 ] as const
 
 /**
@@ -573,9 +574,8 @@ export class EquipmentBonusCalculator {
     // Extract parameters with hot path optimization
     const params = spell.spell_params
     const statValue = params.Stat ?? params.stat ?? params.StatID ?? params.statId
-    const amountValue = params.Amount ?? params.amount ?? params.Value ?? params.value
 
-    // Fast numeric conversion
+    // Fast numeric conversion for statId
     let statId: number | null = null
     let amount: number | null = null
 
@@ -586,11 +586,26 @@ export class EquipmentBonusCalculator {
       statId = isNaN(parsed) ? null : parsed
     }
 
-    if (typeof amountValue === 'number') {
-      amount = amountValue
-    } else if (typeof amountValue === 'string') {
-      const parsed = parseInt(amountValue, 10)
-      amount = isNaN(parsed) ? null : parsed
+    // Handle spell 53139 (WornItem flag) using BitNum parameter
+    if (spell.spell_id === 53139) {
+      const bitNumValue = params.BitNum ?? params.bitNum
+
+      if (typeof bitNumValue === 'number') {
+        amount = 1 << bitNumValue
+      } else if (typeof bitNumValue === 'string') {
+        const parsed = parseInt(bitNumValue, 10)
+        amount = isNaN(parsed) ? null : (1 << parsed)
+      }
+    } else {
+      // Handle other spells using Amount parameter
+      const amountValue = params.Amount ?? params.amount ?? params.Value ?? params.value
+
+      if (typeof amountValue === 'number') {
+        amount = amountValue
+      } else if (typeof amountValue === 'string') {
+        const parsed = parseInt(amountValue, 10)
+        amount = isNaN(parsed) ? null : parsed
+      }
     }
 
     if (statId === null || amount === null) {
@@ -684,7 +699,6 @@ export class EquipmentBonusCalculator {
       // Extract and validate parameters using the same logic as parseSpellForStatBonus
       const params = spell.spell_params
       const statValue = params.Stat ?? params.stat ?? params.StatID ?? params.statId
-      const amountValue = params.Amount ?? params.amount ?? params.Value ?? params.value
 
       let statId: number | null = null
       let amount: number | null = null
@@ -728,51 +742,77 @@ export class EquipmentBonusCalculator {
         }
       }
 
-      // Extract amount with error handling
-      if (typeof amountValue === 'number') {
-        if (Math.abs(amountValue) > 10000) {
-          result.warnings.push({
-            type: 'warning',
-            message: 'Large stat bonus amount detected',
-            details: `Stat bonus amount ${amountValue} is unusually large in item ${itemName || 'unknown'}`,
-            itemName,
-            slotName,
-            recoverable: true
-          })
-        }
-        amount = amountValue
-      } else if (typeof amountValue === 'string') {
-        const parsed = parseInt(amountValue, 10)
-        if (isNaN(parsed)) {
-          result.warnings.push({
-            type: 'warning',
-            message: 'Could not parse amount string',
-            details: `Unable to parse amount "${amountValue}" in item ${itemName || 'unknown'}`,
-            itemName,
-            slotName,
-            recoverable: true
-          })
-        } else {
-          if (Math.abs(parsed) > 10000) {
+      // Handle spell 53139 (WornItem flag) using BitNum parameter
+      if (spell.spell_id === 53139) {
+        const bitNumValue = params.BitNum ?? params.bitNum
+
+        if (typeof bitNumValue === 'number') {
+          amount = 1 << bitNumValue
+        } else if (typeof bitNumValue === 'string') {
+          const parsed = parseInt(bitNumValue, 10)
+          if (isNaN(parsed)) {
             result.warnings.push({
               type: 'warning',
-              message: 'Large parsed stat bonus amount',
-              details: `Parsed amount ${parsed} is unusually large in item ${itemName || 'unknown'}`,
+              message: 'Could not parse BitNum string',
+              details: `Unable to parse BitNum "${bitNumValue}" in item ${itemName || 'unknown'}`,
+              itemName,
+              slotName,
+              recoverable: true
+            })
+          } else {
+            amount = 1 << parsed
+          }
+        }
+      } else {
+        // Extract amount with error handling for other spell types
+        const amountValue = params.Amount ?? params.amount ?? params.Value ?? params.value
+
+        if (typeof amountValue === 'number') {
+          if (Math.abs(amountValue) > 10000) {
+            result.warnings.push({
+              type: 'warning',
+              message: 'Large stat bonus amount detected',
+              details: `Stat bonus amount ${amountValue} is unusually large in item ${itemName || 'unknown'}`,
               itemName,
               slotName,
               recoverable: true
             })
           }
-          amount = parsed
+          amount = amountValue
+        } else if (typeof amountValue === 'string') {
+          const parsed = parseInt(amountValue, 10)
+          if (isNaN(parsed)) {
+            result.warnings.push({
+              type: 'warning',
+              message: 'Could not parse amount string',
+              details: `Unable to parse amount "${amountValue}" in item ${itemName || 'unknown'}`,
+              itemName,
+              slotName,
+              recoverable: true
+            })
+          } else {
+            if (Math.abs(parsed) > 10000) {
+              result.warnings.push({
+                type: 'warning',
+                message: 'Large parsed stat bonus amount',
+                details: `Parsed amount ${parsed} is unusually large in item ${itemName || 'unknown'}`,
+                itemName,
+                slotName,
+                recoverable: true
+              })
+            }
+            amount = parsed
+          }
         }
       }
 
       if (statId === null || amount === null) {
         if (statId === null && amount === null) {
+          const missingParam = spell.spell_id === 53139 ? 'BitNum' : 'Amount'
           result.warnings.push({
             type: 'warning',
-            message: 'Spell parameters missing stat ID and amount',
-            details: `Spell ${spell.spell_id} in item ${itemName || 'unknown'} is missing both Stat and Amount parameters`,
+            message: 'Spell parameters missing stat ID and value',
+            details: `Spell ${spell.spell_id} in item ${itemName || 'unknown'} is missing both Stat and ${missingParam} parameters`,
             itemName,
             slotName,
             recoverable: true
@@ -787,10 +827,11 @@ export class EquipmentBonusCalculator {
             recoverable: true
           })
         } else {
+          const missingParam = spell.spell_id === 53139 ? 'BitNum' : 'Amount'
           result.warnings.push({
             type: 'warning',
-            message: 'Spell parameters missing amount',
-            details: `Spell ${spell.spell_id} in item ${itemName || 'unknown'} is missing Amount parameter`,
+            message: `Spell parameters missing ${missingParam.toLowerCase()}`,
+            details: `Spell ${spell.spell_id} in item ${itemName || 'unknown'} is missing ${missingParam} parameter`,
             itemName,
             slotName,
             recoverable: true
@@ -857,7 +898,12 @@ export class EquipmentBonusCalculator {
 
     for (const bonus of bonuses) {
       if (aggregated[bonus.statId]) {
-        aggregated[bonus.statId] += bonus.amount
+        // Stat 355 (WornItem) is a flag field - use bitwise OR instead of addition
+        if (bonus.statId === 355) {
+          aggregated[bonus.statId] |= bonus.amount
+        } else {
+          aggregated[bonus.statId] += bonus.amount
+        }
       } else {
         aggregated[bonus.statId] = bonus.amount
       }

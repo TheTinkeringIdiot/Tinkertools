@@ -27,6 +27,7 @@ export interface CharacterMetadataChanges {
   breed?: string;
   faction?: string;
   accountType?: string;
+  Specialization?: number;
 }
 
 export interface UpdateResult {
@@ -77,6 +78,10 @@ export async function updateCharacterMetadata(
     
     if (changes.accountType !== undefined) {
       updatedProfile.Character.AccountType = changes.accountType;
+    }
+
+    if (changes.Specialization !== undefined) {
+      updatedProfile.Character.Specialization = changes.Specialization;
     }
 
     // Handle level change
@@ -259,7 +264,7 @@ async function updateForProfessionChange(
   const warnings: string[] = [];
   const errors: string[] = [];
 
-  if (!profile.Skills) {
+  if (!profile.skills) {
     errors.push('Profile missing skills data');
     return { warnings, errors };
   }
@@ -528,7 +533,7 @@ export function validateCharacterBuild(profile: TinkerProfile): {
     errors.push('Profile missing character data');
   }
 
-  if (!profile.Skills) {
+  if (!profile.skills) {
     errors.push('Profile missing skills data');
   }
 
