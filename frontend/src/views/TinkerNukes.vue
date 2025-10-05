@@ -174,6 +174,7 @@ const inputState = ref<NukeInputState>({
     psychModi: 1,
     sensoryImp: 1,
     timeSpace: 1,
+    spec: 0,
   },
   damageModifiers: {
     projectile: 0,

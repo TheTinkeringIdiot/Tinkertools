@@ -191,6 +191,7 @@ function populateFromProfile(): void {
 
   localInputState.value.characterStats = {
     breed: (props.activeProfile.Character?.Breed || 1) as 1 | 2 | 3 | 4,
+    level: props.activeProfile.Character?.Level || 1,
     psychic: skills[21]?.total || 6,
     nanoInit: skills[149]?.total || 1,
     maxNano: props.activeProfile.Character?.MaxNano || 1,
@@ -201,6 +202,7 @@ function populateFromProfile(): void {
     psychModi: skills[129]?.total || 1,
     sensoryImp: skills[122]?.total || 1,
     timeSpace: skills[131]?.total || 1,
+    spec: props.activeProfile.Character?.Specialization ?? 0,
   }
 
   // Auto-populate damage modifiers from profile
@@ -254,6 +256,7 @@ function resetToDefaults(): void {
   localInputState.value = {
     characterStats: {
       breed: 1,
+      level: 1,
       psychic: 6,
       nanoInit: 1,
       maxNano: 1,
@@ -264,6 +267,7 @@ function resetToDefaults(): void {
       psychModi: 1,
       sensoryImp: 1,
       timeSpace: 1,
+      spec: 0,
     },
     damageModifiers: {
       projectile: 0,

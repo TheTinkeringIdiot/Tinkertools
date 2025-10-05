@@ -229,6 +229,9 @@ export interface CharacterStats {
 
   /** Time and Space skill (skill ID 131) */
   timeSpace: number
+
+  /** Specialization level (stat ID 182, bitflags: 0, 1, 2, 4, 8) */
+  spec: number
 }
 
 /**
