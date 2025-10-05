@@ -21,17 +21,32 @@ Shows nanos organized by strain in decreasing QL order
           </p>
         </div>
         
-        <!-- Sort Controls -->
-        <div v-if="selectedProfessionName && nanosByStrain.length > 0" class="flex items-center gap-2">
-          <label class="text-sm text-surface-600 dark:text-surface-400">Sort:</label>
-          <Dropdown
-            v-model="sortOrder"
-            :options="sortOptions"
-            option-label="label"
-            option-value="value"
-            class="w-32"
-            @change="onSortChange"
-          />
+        <!-- Sort Controls and Compatibility Toggle -->
+        <div v-if="selectedProfessionName && nanosByStrain.length > 0" class="flex items-center gap-4">
+          <!-- Compatibility Toggle -->
+          <div class="flex items-center gap-2">
+            <label class="text-sm text-surface-600 dark:text-surface-400">Show Unusable:</label>
+            <ToggleButton
+              v-model="showUnusableNanos"
+              onLabel="Yes"
+              offLabel="No"
+              class="w-20"
+              severity="secondary"
+            />
+          </div>
+
+          <!-- Sort Dropdown -->
+          <div class="flex items-center gap-2">
+            <label class="text-sm text-surface-600 dark:text-surface-400">Sort:</label>
+            <Dropdown
+              v-model="sortOrder"
+              :options="sortOptions"
+              option-label="label"
+              option-value="value"
+              class="w-32"
+              @change="onSortChange"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -137,6 +152,10 @@ Shows nanos organized by strain in decreasing QL order
                       v-for="nano in substrainGroup.nanos"
                       :key="nano.id"
                       class="border-b border-surface-200 dark:border-surface-700 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors cursor-pointer"
+                      :class="{
+                        'opacity-60': !canUseNano(nano) && showUnusableNanos,
+                        'bg-surface-100/30 dark:bg-surface-800/30': !canUseNano(nano) && showUnusableNanos
+                      }"
                       @click="onNanoSelect(nano)"
                     >
                       <!-- Icon -->
@@ -155,9 +174,13 @@ Shows nanos organized by strain in decreasing QL order
                       
                       <!-- Name -->
                       <td class="px-3 py-4">
-                        <div class="font-medium text-surface-900 dark:text-surface-50 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
+                        <RouterLink
+                          :to="{ name: 'ItemDetail', params: { aoid: nano.aoid?.toString() || nano.id.toString() } }"
+                          class="font-medium text-surface-900 dark:text-surface-50 hover:text-primary-600 dark:hover:text-primary-400 transition-colors hover:underline"
+                          @click.stop
+                        >
                           {{ nano.name }}
-                        </div>
+                        </RouterLink>
                       </td>
                       
                       <!-- QL -->
@@ -226,12 +249,18 @@ import { ref, computed, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import Badge from 'primevue/badge'
 import Dropdown from 'primevue/dropdown'
+import ToggleButton from 'primevue/togglebutton'
 import ProgressSpinner from 'primevue/progressspinner'
 import SimpleNanoCard from '@/components/nanos/SimpleNanoCard.vue'
 // import NanoDetail from '@/components/nanos/NanoDetail.vue'
 import { PROFESSION, NANO_STRAIN, NANO_SUBSTRAINS } from '@/services/game-data'
 import { getItemIconUrl, getNanoskillRequirements, getPrimarySource, getNanoSpecialization, getNanoExpansion, type NanoskillRequirements } from '@/services/game-utils'
 import type { Item } from '@/types/api'
+import { ProfileStorage } from '@/lib/tinkerprofiles/storage'
+import { mapProfileToStats } from '@/utils/profile-stats-mapper'
+import { checkActionRequirements, parseAction } from '@/services/action-criteria'
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types'
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
 
 interface SubstrainGroup {
   substrain: number
@@ -260,12 +289,18 @@ const props = withDefaults(defineProps<Props>(), {
 // Router
 const router = useRouter()
 
+// Profile store
+const profileStore = useTinkerProfilesStore()
+
 // State
 const nanos = ref<Item[]>([])
 const selectedNano = ref<Item | null>(null)
 const showNanoDetail = ref(false)
 const sortOrder = ref<'ql_desc' | 'ql_asc' | 'name_asc'>('ql_desc')
 const iconLoadErrors = ref<Set<number>>(new Set())
+const activeProfile = ref<TinkerProfile | null>(null)
+const characterStats = ref<Record<number, number> | null>(null)
+const showUnusableNanos = ref<boolean>(true)
 
 // Sort options
 const sortOptions = [
@@ -352,10 +387,15 @@ const nanosByStrain = computed((): StrainGroup[] => {
         }
       })
 
+      // Filter based on toggle state
+      const filteredNanos = showUnusableNanos.value
+        ? sortedNanos
+        : sortedNanos.filter(nano => canUseNano(nano))
+
       return {
         substrain,
         substrainName: NANO_SUBSTRAINS[substrain as keyof typeof NANO_SUBSTRAINS] || (substrain > 0 ? `Substrain ${substrain}` : 'General'),
-        nanos: sortedNanos
+        nanos: filteredNanos
       }
     })
 
@@ -446,11 +486,91 @@ function getFormattedSource(nano: Item): string | null {
   return getPrimarySource(nano)
 }
 
+// Profile loading and requirement checking
+async function loadActiveProfile() {
+  try {
+    const storage = new ProfileStorage()
+    const profile = await storage.loadActiveProfile()
+    activeProfile.value = profile
+
+    if (profile) {
+      characterStats.value = mapProfileToStats(profile)
+      console.log('Active profile loaded for nano compatibility:', profile.Character.Name)
+    } else {
+      characterStats.value = null
+      console.log('No active profile found')
+    }
+  } catch (error) {
+    console.error('Failed to load active profile:', error)
+    activeProfile.value = null
+    characterStats.value = null
+  }
+}
+
+function canUseNano(nano: Item): boolean {
+  if (!characterStats.value || !nano.actions || nano.actions.length === 0) {
+    return true // No profile or no requirements = show as usable
+  }
+
+  // Find USE action (action type 3)
+  const useAction = nano.actions.find(action => action.action === 3)
+  if (!useAction || !useAction.criteria || useAction.criteria.length === 0) {
+    return true // No USE action or no criteria = usable
+  }
+
+  // Check requirements
+  const parsedAction = parseAction(useAction)
+  const { canPerform } = checkActionRequirements(parsedAction, characterStats.value)
+  return canPerform
+}
+
+function loadShowUnusablePreference(): void {
+  try {
+    const saved = localStorage.getItem('tinkertools_nano_show_unusable')
+    if (saved !== null) {
+      showUnusableNanos.value = JSON.parse(saved)
+    }
+  } catch (error) {
+    console.warn('Failed to load show unusable preference:', error)
+  }
+}
+
+function saveShowUnusablePreference(): void {
+  try {
+    localStorage.setItem('tinkertools_nano_show_unusable', JSON.stringify(showUnusableNanos.value))
+  } catch (error) {
+    console.warn('Failed to save show unusable preference:', error)
+  }
+}
+
 // Watchers
 watch(
   () => props.selectedProfession,
   () => {
     loadNanos()
+    loadActiveProfile()
+    loadShowUnusablePreference()
+  },
+  { immediate: true }
+)
+
+watch(showUnusableNanos, () => {
+  saveShowUnusablePreference()
+})
+
+// Watch for active profile changes in the store
+watch(
+  () => profileStore.activeProfile,
+  (newProfile) => {
+    activeProfile.value = newProfile
+
+    if (newProfile) {
+      characterStats.value = mapProfileToStats(newProfile)
+      console.log('Active profile changed, updating nano compatibility:', newProfile.Character.Name)
+    } else {
+      characterStats.value = null
+      console.log('Active profile cleared')
+    }
   },
   { immediate: true }
 )
