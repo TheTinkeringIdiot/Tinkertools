@@ -301,8 +301,8 @@ watch(() => props.profile?.skills[149]?.total, (newValue) => {
   }
 }, { immediate: true })
 
-// Watch Max Nano (Skill ID 221)
-watch(() => props.profile?.skills[221]?.total, (newValue) => {
+// Watch Max Nano (Character.MaxNano)
+watch(() => props.profile?.Character?.MaxNano, (newValue) => {
   if (newValue !== undefined && !isProgrammaticUpdate.value) {
     isProgrammaticUpdate.value = true
     localStats.value.maxNano = newValue

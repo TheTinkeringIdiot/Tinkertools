@@ -223,7 +223,7 @@ const schoolFilterOptions = computed(() => [
   { label: 'Matter Metamorphosis', value: 127 },
   { label: 'Biological Metamorphosis', value: 128 },
   { label: 'Psychological Modifications', value: 129 },
-  { label: 'Sensory Improvement', value: 126 },
+  { label: 'Sensory Improvement', value: 122 },
   { label: 'Time and Space', value: 131 },
 ])
 

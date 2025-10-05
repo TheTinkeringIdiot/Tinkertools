@@ -193,13 +193,13 @@ function populateFromProfile(): void {
     breed: (props.activeProfile.Character?.Breed || 1) as 1 | 2 | 3 | 4,
     psychic: skills[21]?.total || 6,
     nanoInit: skills[149]?.total || 1,
-    maxNano: skills[221]?.total || 1,
+    maxNano: props.activeProfile.Character?.MaxNano || 1,
     nanoDelta: skills[364]?.total || 1,
     matterCreation: skills[130]?.total || 1,
     matterMeta: skills[127]?.total || 1,
     bioMeta: skills[128]?.total || 1,
     psychModi: skills[129]?.total || 1,
-    sensoryImp: skills[126]?.total || 1,
+    sensoryImp: skills[122]?.total || 1,
     timeSpace: skills[131]?.total || 1,
   }
 
