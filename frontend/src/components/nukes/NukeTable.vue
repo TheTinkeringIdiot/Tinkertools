@@ -328,8 +328,8 @@ const tableData = computed(() => {
  * Handle row click to navigate to nano detail page
  */
 function onRowClick(event: any) {
-  const nanoId = event.data.id
-  emit('nano-selected', nanoId)
+  const aoid = event.data.aoid
+  emit('nano-selected', aoid)
 }
 
 // ============================================================================
