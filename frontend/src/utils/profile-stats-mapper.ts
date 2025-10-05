@@ -8,6 +8,7 @@
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types'
 import { PROFESSION, BREED } from '@/services/game-data'
 import { skillService } from '@/services/skill-service'
+import { accountTypeToExpansionBitflag, specializationLevelToBitflag } from './expansion-utils'
 
 /**
  * Maps a TinkerProfile v4.0.0 to a flat record of stat ID → value
@@ -46,6 +47,12 @@ export function mapProfileToStats(profile: TinkerProfile): Record<number, number
   // MaxHealth and MaxNano (now in Character)
   stats[1] = profile.Character.MaxHealth || 1  // MaxHealth
   stats[214] = profile.Character.MaxNano || 1  // MaxNano
+
+  // Specialization (stat ID 182) - convert level to cumulative bitflag
+  stats[182] = specializationLevelToBitflag(profile.Character.Specialization ?? 0)
+
+  // Expansion (stat ID 389) - map account type to bitflag
+  stats[389] = accountTypeToExpansionBitflag(profile.Character.AccountType)
 
   // ============================================================================
   // Skills - Direct ID-based access (v4.0.0 structure)
@@ -88,6 +95,14 @@ export function mapProfileToStats(profile: TinkerProfile): Record<number, number
       stats[skillId] = 1
     }
   }
+
+  // ============================================================================
+  // Bonus-only stats (for requirements checking)
+  // ============================================================================
+
+  // WornItem (stat 355) - flag field for worn item requirements
+  // Use optional chaining since it may not exist if no bonuses are present
+  stats[355] = profile.skills[355]?.total ?? 0
 
   return stats
 }

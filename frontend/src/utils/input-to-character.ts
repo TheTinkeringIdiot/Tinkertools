@@ -59,9 +59,15 @@ export function convertInputStateToCharacter(
     130: characterStats.matterCreation ?? 0, // Material Creation
     131: characterStats.timeSpace ?? 0,      // Space Time
 
-    // Profession stats (both used for validation)
-    60: 11,   // Profession (Nanotechnician)
-    368: 11,  // VisualProfession (Nanotechnician)
+    // WornItem equipment flags (stat 355) - pulled from profile equipment bonuses
+    355: profile?.skills[355]?.total ?? 0,
+
+    // Character-derived stats - pulled from profile (derived from Character properties)
+    54: profile?.skills[54]?.total ?? characterStats.level ?? 1,    // Level
+    60: profile?.skills[60]?.total ?? 11,   // Profession (Nanotechnician)
+    368: profile?.skills[368]?.total ?? 11, // VisualProfession (Nanotechnician)
+    182: profile?.skills[182]?.total ?? 0,  // Specialization
+    389: profile?.skills[389]?.total ?? 0,  // Expansion
   }
 
   return {
