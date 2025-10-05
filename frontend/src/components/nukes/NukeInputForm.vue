@@ -29,7 +29,7 @@ Implements:
     </div>
 
     <!-- Form Sections in Accordion -->
-    <Accordion :multiple="true" :active-index="[0, 1, 2]">
+    <Accordion :multiple="true" :active-index="[]">
       <!-- Character Stats Section -->
       <AccordionTab header="Character Stats">
         <CharacterStatsSection
