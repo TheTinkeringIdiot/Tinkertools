@@ -12,13 +12,41 @@
  */
 export const CRUNCHCOM_COST_REDUCTION: Record<number, number> = {
   0: 0,
-  1: 8,
-  2: 12,
-  3: 16,
-  4: 20,
-  5: 24,
-  6: 26,
-  7: 28,
+  1: 4,   // CrunchCom Code Sieve
+  2: 8,   // Run-Time Recompiler
+  3: 12,  // CrunchCom Nano Compressor
+  4: 16,  // On-The-Fly Compression
+  5: 20,  // CrunchCom Nano Compressor Pro
+  6: 24,  // Jobe Nano Libraries
+  7: 28,  // Izgimmer's Obfuscated Recompiler
+}
+
+/**
+ * Crunchcom - AOID mapping for buff auto-population
+ * Maps dropdown level (1-7) to nano program AOID
+ */
+export const CRUNCHCOM_AOID_MAP: Record<number, number> = {
+  1: 95407,  // CrunchCom Code Sieve (4%)
+  2: 95416,  // Run-Time Recompiler (8%)
+  3: 95415,  // CrunchCom Nano Compressor (12%)
+  4: 95414,  // On-The-Fly Compression (16%)
+  5: 95412,  // CrunchCom Nano Compressor Pro (20%)
+  6: 95413,  // Jobe Nano Libraries (24%)
+  7: 95417,  // Izgimmer's Obfuscated Recompiler (28%)
+}
+
+/**
+ * Crunchcom - Nano names for display
+ * Maps dropdown level (1-7) to nano program name
+ */
+export const CRUNCHCOM_NAMES: Record<number, string> = {
+  1: 'CrunchCom Code Sieve',
+  2: 'Run-Time Recompiler',
+  3: 'CrunchCom Nano Compressor',
+  4: 'On-The-Fly Compression',
+  5: 'CrunchCom Nano Compressor Pro',
+  6: 'Jobe Nano Libraries',
+  7: 'Izgimmer\'s Obfuscated Recompiler',
 }
 
 /**
@@ -27,13 +55,41 @@ export const CRUNCHCOM_COST_REDUCTION: Record<number, number> = {
  */
 export const HUMIDITY_REGEN: Record<number, number> = {
   0: 0,
-  1: 1.5,
-  2: 3.33,
-  3: 5.17,
-  4: 7.0,
-  5: 10.5,
-  6: 13.09,
-  7: 15.67,
+  1: 1.5,   // Rudimentary Humidity Extractor
+  2: 3.33,  // Basic Humidity Extractor
+  3: 5.17,  // Humidity Extractor
+  4: 7.0,   // Efficient Humidity Extractor
+  5: 10.5,  // Superior Humidity Extractor
+  6: 13.09, // Boundless Humidity Extractor
+  7: 15.67, // Personal Notum Harvester
+}
+
+/**
+ * Humidity - AOID mapping for buff auto-population
+ * Maps dropdown level (1-7) to nano program AOID
+ */
+export const HUMIDITY_AOID_MAP: Record<number, number> = {
+  1: 90400,  // Rudimentary Humidity Extractor
+  2: 90405,  // Basic Humidity Extractor
+  3: 90404,  // Humidity Extractor
+  4: 90403,  // Efficient Humidity Extractor
+  5: 90402,  // Superior Humidity Extractor
+  6: 90401,  // Boundless Humidity Extractor
+  7: 90406,  // Personal Notum Harvester
+}
+
+/**
+ * Humidity - Nano names for display
+ * Maps dropdown level (1-7) to nano program name
+ */
+export const HUMIDITY_NAMES: Record<number, string> = {
+  1: 'Rudimentary Humidity Extractor',
+  2: 'Basic Humidity Extractor',
+  3: 'Humidity Extractor',
+  4: 'Efficient Humidity Extractor',
+  5: 'Superior Humidity Extractor',
+  6: 'Boundless Humidity Extractor',
+  7: 'Personal Notum Harvester',
 }
 
 /**

@@ -136,7 +136,11 @@ import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import type { BuffPresets } from '@/types/offensive-nano';
 import {
   CRUNCHCOM_COST_REDUCTION,
+  CRUNCHCOM_NAMES,
+  CRUNCHCOM_AOID_MAP,
   HUMIDITY_REGEN,
+  HUMIDITY_NAMES,
+  HUMIDITY_AOID_MAP,
   NOTUM_SIPHON_REGEN,
   CHANNELING_REGEN,
   ENHANCE_NANO_DAMAGE,
@@ -174,17 +178,25 @@ const isProgrammaticUpdate = ref(false);
 
 // Dropdown options generation
 const crunchcomOptions = ref<BuffOption[]>(
-  Object.entries(CRUNCHCOM_COST_REDUCTION).map(([level, value]) => ({
-    level: Number(level),
-    label: Number(level) === 0 ? 'None' : `Crunchcom ${level} (${value}% cost reduction)`,
-  }))
+  Object.entries(CRUNCHCOM_COST_REDUCTION).map(([level, value]) => {
+    const lvl = Number(level);
+    if (lvl === 0) {
+      return { level: lvl, label: 'None' };
+    }
+    const name = CRUNCHCOM_NAMES[lvl] || `Crunchcom ${lvl}`;
+    return { level: lvl, label: `${name} (${value}%)` };
+  })
 );
 
 const humidityOptions = ref<BuffOption[]>(
-  Object.entries(HUMIDITY_REGEN).map(([level, value]) => ({
-    level: Number(level),
-    label: Number(level) === 0 ? 'None' : `Humidity ${level} (${value}/s regen)`,
-  }))
+  Object.entries(HUMIDITY_REGEN).map(([level, value]) => {
+    const lvl = Number(level);
+    if (lvl === 0) {
+      return { level: lvl, label: 'None' };
+    }
+    const name = HUMIDITY_NAMES[lvl] || `Humidity ${lvl}`;
+    return { level: lvl, label: `${name} (${value}/s)` };
+  })
 );
 
 const notumSiphonOptions = ref<BuffOption[]>(
@@ -270,9 +282,31 @@ function populateFromProfile(): void {
     ancientMatrix: 0,
   };
 
-  // Match buffs by name patterns
+  // Match buffs - prefer AOID matching, fall back to name patterns
   for (const buff of props.profile.buffs) {
-    if (!buff?.name) continue;
+    if (!buff) continue;
+
+    // Try AOID matching first
+    if (buff.aoid) {
+      const crunchcomLevel = Object.entries(CRUNCHCOM_AOID_MAP).find(
+        ([_, aoid]) => aoid === buff.aoid
+      )?.[0];
+      if (crunchcomLevel) {
+        newLevels.crunchcom = Number(crunchcomLevel);
+        continue;
+      }
+
+      const humidityLevel = Object.entries(HUMIDITY_AOID_MAP).find(
+        ([_, aoid]) => aoid === buff.aoid
+      )?.[0];
+      if (humidityLevel) {
+        newLevels.humidity = Number(humidityLevel);
+        continue;
+      }
+    }
+
+    // Fall back to name pattern matching
+    if (!buff.name) continue;
 
     if (BUFF_NAME_PATTERNS.crunchcom.test(buff.name)) {
       newLevels.crunchcom = extractBuffLevel(buff.name);

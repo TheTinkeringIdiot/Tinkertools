@@ -53,13 +53,6 @@ export function filterByCharacterProfile(
     // Use first action (typically "Use" action for nanos)
     const action = parseAction(nano.item.actions[0])
     const result = checkActionRequirements(action, character.baseStats || {})
-
-    // Log filtered out items with unmet requirements
-    if (!result.canPerform) {
-      console.log(`[FILTERED OUT] ${nano.name} (ID: ${nano.id}, QL: ${nano.qualityLevel})`)
-      console.log('  Unmet requirements:', result.unmetRequirements)
-    }
-
     return result.canPerform
   })
 }

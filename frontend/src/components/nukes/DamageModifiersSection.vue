@@ -7,7 +7,6 @@
       <div class="flex flex-col">
         <label for="dnde" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
           Direct Nano Damage Efficiency
-          <span class="text-xs text-surface-500 dark:text-surface-400 ml-1">(stat 536)</span>
         </label>
         <InputNumber
           id="dnde"
@@ -28,7 +27,6 @@
       <div class="flex flex-col">
         <label for="projectile" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
           Projectile Damage Modifier
-          <span class="text-xs text-surface-500 dark:text-surface-400 ml-1">(stat 278)</span>
         </label>
         <InputNumber
           id="projectile"
@@ -44,7 +42,6 @@
       <div class="flex flex-col">
         <label for="melee" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
           Melee Damage Modifier
-          <span class="text-xs text-surface-500 dark:text-surface-400 ml-1">(stat 279)</span>
         </label>
         <InputNumber
           id="melee"
@@ -60,7 +57,6 @@
       <div class="flex flex-col">
         <label for="energy" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
           Energy Damage Modifier
-          <span class="text-xs text-surface-500 dark:text-surface-400 ml-1">(stat 280)</span>
         </label>
         <InputNumber
           id="energy"
@@ -76,7 +72,6 @@
       <div class="flex flex-col">
         <label for="chemical" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
           Chemical Damage Modifier
-          <span class="text-xs text-surface-500 dark:text-surface-400 ml-1">(stat 281)</span>
         </label>
         <InputNumber
           id="chemical"
@@ -92,7 +87,6 @@
       <div class="flex flex-col">
         <label for="radiation" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
           Radiation Damage Modifier
-          <span class="text-xs text-surface-500 dark:text-surface-400 ml-1">(stat 282)</span>
         </label>
         <InputNumber
           id="radiation"
@@ -108,7 +102,6 @@
       <div class="flex flex-col">
         <label for="cold" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
           Cold Damage Modifier
-          <span class="text-xs text-surface-500 dark:text-surface-400 ml-1">(stat 311)</span>
         </label>
         <InputNumber
           id="cold"
@@ -124,7 +117,6 @@
       <div class="flex flex-col">
         <label for="nano" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
           Nano Damage Modifier
-          <span class="text-xs text-surface-500 dark:text-surface-400 ml-1">(stat 315)</span>
         </label>
         <InputNumber
           id="nano"
@@ -140,7 +132,6 @@
       <div class="flex flex-col">
         <label for="fire" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
           Fire Damage Modifier
-          <span class="text-xs text-surface-500 dark:text-surface-400 ml-1">(stat 316)</span>
         </label>
         <InputNumber
           id="fire"
@@ -156,7 +147,6 @@
       <div class="flex flex-col">
         <label for="poison" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
           Poison Damage Modifier
-          <span class="text-xs text-surface-500 dark:text-surface-400 ml-1">(stat 317)</span>
         </label>
         <InputNumber
           id="poison"
