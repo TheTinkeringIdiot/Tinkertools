@@ -210,29 +210,37 @@ export interface InterpolationInfo {
   ql_range: number
 }
 
-export interface Symbiant {
+export interface SymbiantItem {
   id: number
   aoid: number
-  name?: string
-  slot?: string
-  ql?: number
-  family?: string
-  stat_bonuses?: StatBonus[]
+  name: string
+  ql: number
+  slot_id: number
+  family: 'Artillery' | 'Control' | 'Extermination' | 'Infantry' | 'Support'
 }
+
+export interface Mob {
+  id: number
+  name: string
+  level: number | null
+  playfield: string
+  location: string
+  mob_names: string[]
+  is_pocket_boss: boolean
+  metadata?: Record<string, any>
+}
+
+export interface MobWithDrops extends Mob {
+  dropped_items: SymbiantItem[]
+}
+
+// Legacy compatibility - will be deprecated
+export type PocketBoss = Mob
+export type Symbiant = SymbiantItem
 
 export interface StatBonus {
   stat: string
   bonus: number
-}
-
-export interface PocketBoss {
-  id: number
-  name: string
-  level: number
-  playfield?: string
-  location?: string
-  mobs?: string
-  dropped_symbiants?: Symbiant[]
 }
 
 // ============================================================================
@@ -351,19 +359,31 @@ export interface SpellSearchQuery {
 
 export interface SymbiantSearchQuery {
   search?: string
-  family?: string[]
+  family?: string
+  families?: string[]
+  slot_id?: number
+  min_ql?: number
+  max_ql?: number
   page?: number
   limit?: number
 }
 
-export interface PocketBossSearchQuery {
+export interface MobSearchQuery {
   search?: string
+  is_pocket_boss?: boolean
+  playfield?: string
   min_level?: number
   max_level?: number
-  playfield?: string
   page?: number
   limit?: number
 }
+
+export interface MobDropsQuery {
+  family?: string
+}
+
+// Legacy compatibility - will be deprecated
+export type PocketBossSearchQuery = MobSearchQuery
 
 // ============================================================================
 // Advanced Query Types

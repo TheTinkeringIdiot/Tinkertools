@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { apiClient } from '@/services/api-client';
-import type { PocketBoss, Symbiant } from '@/types/api';
+import type { Mob, SymbiantItem } from '@/types/api';
 
 export interface PocketBossFilters {
   search?: string;
@@ -14,7 +14,7 @@ export interface PocketBossFilters {
 
 export const usePocketBossStore = defineStore('pocketBoss', () => {
   // State
-  const pocketBosses = ref<PocketBoss[]>([]);
+  const pocketBosses = ref<Mob[]>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
   const filters = ref<PocketBossFilters>({});
@@ -33,18 +33,18 @@ export const usePocketBossStore = defineStore('pocketBoss', () => {
     }
 
     if (filters.value.minLevel !== undefined) {
-      result = result.filter(boss => boss.level >= filters.value.minLevel!);
+      result = result.filter(boss => boss.level !== null && boss.level >= filters.value.minLevel!);
     }
 
     if (filters.value.maxLevel !== undefined) {
-      result = result.filter(boss => boss.level <= filters.value.maxLevel!);
+      result = result.filter(boss => boss.level !== null && boss.level <= filters.value.maxLevel!);
     }
 
     if (filters.value.playfield) {
       result = result.filter(boss => boss.playfield === filters.value.playfield);
     }
 
-    return result.sort((a, b) => a.level - b.level);
+    return result.sort((a, b) => (a.level ?? 0) - (b.level ?? 0));
   });
 
   const playfields = computed(() => {
@@ -56,8 +56,8 @@ export const usePocketBossStore = defineStore('pocketBoss', () => {
 
   const levelRange = computed(() => {
     if (pocketBosses.value.length === 0) return { min: 1, max: 220 };
-    
-    const levels = pocketBosses.value.map(boss => boss.level);
+
+    const levels = pocketBosses.value.map(boss => boss.level).filter((l): l is number => l !== null);
     return {
       min: Math.min(...levels),
       max: Math.max(...levels)
@@ -73,7 +73,7 @@ export const usePocketBossStore = defineStore('pocketBoss', () => {
 
     try {
       const response = await apiClient.searchPocketBosses({ page: 1, limit: 1000 });
-      pocketBosses.value = response.items || [];
+      pocketBosses.value = response.data || [];
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to fetch pocket bosses';
       throw err;
@@ -90,17 +90,18 @@ export const usePocketBossStore = defineStore('pocketBoss', () => {
     filters.value = {};
   }
 
-  function getPocketBossById(id: number): PocketBoss | undefined {
+  function getPocketBossById(id: number): Mob | undefined {
     return pocketBosses.value.find(boss => boss.id === id);
   }
 
-  function getPocketBossesBySymbiant(symbiantId: number): PocketBoss[] {
-    return pocketBosses.value.filter(boss => 
-      boss.dropped_symbiants?.some(s => s.id === symbiantId)
-    );
+  function getPocketBossesBySymbiant(symbiantId: number): Mob[] {
+    // Note: This functionality will need to be implemented via the new API endpoint
+    // /symbiants/{symbiantId}/dropped-by instead of relying on embedded data
+    console.warn('getPocketBossesBySymbiant is deprecated - use apiClient.getSymbiantDroppedBy instead');
+    return [];
   }
 
-  function searchPocketBosses(query: string): PocketBoss[] {
+  function searchPocketBosses(query: string): Mob[] {
     if (!query.trim()) return pocketBosses.value;
 
     const searchTerm = query.toLowerCase();
@@ -108,7 +109,7 @@ export const usePocketBossStore = defineStore('pocketBoss', () => {
       boss.name.toLowerCase().includes(searchTerm) ||
       boss.playfield?.toLowerCase().includes(searchTerm) ||
       boss.location?.toLowerCase().includes(searchTerm) ||
-      boss.mobs?.toLowerCase().includes(searchTerm)
+      boss.mob_names?.some(mob => mob.toLowerCase().includes(searchTerm))
     );
   }
 

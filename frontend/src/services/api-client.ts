@@ -14,12 +14,14 @@ import type {
   PaginatedResponse,
   Item,
   Spell,
-  Symbiant,
-  PocketBoss,
+  SymbiantItem,
+  Mob,
+  MobWithDrops,
   ItemSearchQuery,
   SpellSearchQuery,
   SymbiantSearchQuery,
-  PocketBossSearchQuery,
+  MobSearchQuery,
+  MobDropsQuery,
   ItemFilterRequest,
   ItemCompatibilityRequest,
   ItemCompatibilityResult,
@@ -571,45 +573,72 @@ class TinkerToolsApiClient {
   // ============================================================================
   // Symbiants API
   // ============================================================================
-  
-  async searchSymbiants(query: SymbiantSearchQuery): Promise<PaginatedResponse<Symbiant>> {
+
+  async searchSymbiants(query: SymbiantSearchQuery): Promise<PaginatedResponse<SymbiantItem>> {
     const params = new URLSearchParams()
-    
+
     if (query.search) params.append('search', query.search)
-    if (query.family?.length) query.family.forEach(f => params.append('family', f))
+    if (query.family) {
+      params.append('family', query.family)
+    } else if (query.families?.length) {
+      query.families.forEach(f => params.append('families', f))
+    }
+    if (query.slot_id) params.append('slot_id', query.slot_id.toString())
+    if (query.min_ql) params.append('min_ql', query.min_ql.toString())
+    if (query.max_ql) params.append('max_ql', query.max_ql.toString())
     if (query.page) params.append('page', query.page.toString())
     if (query.limit) params.append('limit', query.limit.toString())
-    
-    return this.get<Symbiant[]>(`/symbiants?${params.toString()}`) as Promise<PaginatedResponse<Symbiant>>
+
+    return this.get<SymbiantItem[]>(`/symbiants?${params.toString()}`) as Promise<PaginatedResponse<SymbiantItem>>
   }
-  
-  async getSymbiant(id: number): Promise<ApiResponse<Symbiant>> {
-    return this.get<Symbiant>(`/symbiants/${id}`)
+
+  async getSymbiant(id: number): Promise<ApiResponse<SymbiantItem>> {
+    return this.get<SymbiantItem>(`/symbiants/${id}`)
+  }
+
+  async getSymbiantDroppedBy(symbiantId: number): Promise<ApiResponse<Mob[]>> {
+    return this.get<Mob[]>(`/symbiants/${symbiantId}/dropped-by`)
   }
   
   // ============================================================================
-  // Pocket Bosses API
+  // Mobs API (includes Pocket Bosses)
   // ============================================================================
-  
-  async searchPocketBosses(query: PocketBossSearchQuery): Promise<PaginatedResponse<PocketBoss>> {
+
+  async searchMobs(query: MobSearchQuery): Promise<PaginatedResponse<Mob>> {
     const params = new URLSearchParams()
-    
+
     if (query.search) params.append('search', query.search)
+    if (query.is_pocket_boss !== undefined) params.append('is_pocket_boss', query.is_pocket_boss.toString())
+    if (query.playfield) params.append('playfield', query.playfield)
     if (query.min_level) params.append('min_level', query.min_level.toString())
     if (query.max_level) params.append('max_level', query.max_level.toString())
-    if (query.playfield) params.append('playfield', query.playfield)
     if (query.page) params.append('page', query.page.toString())
     if (query.limit) params.append('limit', query.limit.toString())
-    
-    return this.get<PocketBoss[]>(`/pocket-bosses?${params.toString()}`) as Promise<PaginatedResponse<PocketBoss>>
+
+    return this.get<Mob[]>(`/mobs?${params.toString()}`) as Promise<PaginatedResponse<Mob>>
   }
-  
-  async getPocketBoss(id: number): Promise<ApiResponse<PocketBoss>> {
-    return this.get<PocketBoss>(`/pocket-bosses/${id}`)
+
+  async getMob(id: number): Promise<ApiResponse<Mob>> {
+    return this.get<Mob>(`/mobs/${id}`)
   }
-  
-  async getPocketBossDrops(id: number): Promise<ApiResponse<Symbiant[]>> {
-    return this.get<Symbiant[]>(`/pocket-bosses/${id}/drops`)
+
+  async getMobDrops(id: number, filters?: MobDropsQuery): Promise<ApiResponse<SymbiantItem[]>> {
+    const params = new URLSearchParams()
+    if (filters?.family) params.append('family', filters.family)
+    return this.get<SymbiantItem[]>(`/mobs/${id}/drops?${params.toString()}`)
+  }
+
+  // Legacy aliases for backward compatibility
+  async searchPocketBosses(query: MobSearchQuery): Promise<PaginatedResponse<Mob>> {
+    return this.searchMobs({ ...query, is_pocket_boss: true })
+  }
+
+  async getPocketBoss(id: number): Promise<ApiResponse<Mob>> {
+    return this.getMob(id)
+  }
+
+  async getPocketBossDrops(id: number): Promise<ApiResponse<SymbiantItem[]>> {
+    return this.getMobDrops(id)
   }
   
   // ============================================================================

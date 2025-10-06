@@ -4,58 +4,88 @@ Symbiants API endpoints.
 
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
+from sqlalchemy import and_
 import math
+import time
+import logging
 
 from app.core.database import get_db
-from app.models import Symbiant, PocketBossSymbiantDrops
-from app.api.schemas import (
-    SymbiantResponse,
-    SymbiantDetail,
-    PaginatedResponse
-)
+from app.models import SymbiantItem, Mob, Source, SourceType, ItemSource
+from app.api.schemas.symbiant import SymbiantResponse, SymbiantWithDropsResponse, MobDropInfo
+from app.api.schemas import PaginatedResponse
 from app.core.decorators import cached_response, performance_monitor
 
 router = APIRouter(prefix="/symbiants", tags=["symbiants"])
+
+# Set up logging for performance monitoring
+logger = logging.getLogger(__name__)
 
 
 @router.get("", response_model=PaginatedResponse[SymbiantResponse])
 @cached_response("symbiants")
 @performance_monitor
-def get_symbiants(
-    page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(50, ge=1, le=200, description="Items per page"),
-    family: Optional[str] = Query(None, description="Filter by symbiant family"),
-    slot: Optional[str] = Query(None, description="Filter by equipment slot"),
+def list_symbiants(
+    family: Optional[str] = Query(None, description="Filter by single family"),
+    families: Optional[List[str]] = Query(None, description="Filter by multiple families (for profession filtering)"),
+    slot_id: Optional[int] = Query(None, description="Filter by equipment slot ID"),
     min_ql: Optional[int] = Query(None, description="Minimum quality level"),
     max_ql: Optional[int] = Query(None, description="Maximum quality level"),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(50, ge=1, le=200, description="Items per page"),
     db: Session = Depends(get_db)
 ):
     """
-    Get paginated list of symbiants with optional filters.
+    List symbiants with filtering.
+
+    Filters:
+    - family: Filter by single symbiant family (Artillery, Control, etc.)
+    - families: Filter by multiple families (e.g., for profession-specific filtering)
+    - slot_id: Filter by equipment slot
+    - min_ql/max_ql: Filter by quality level range
+
+    Note: Use 'families' parameter for profession-based filtering where a profession
+    can use multiple symbiant families.
     """
-    query = db.query(Symbiant)
-    
-    # Apply filters
+    start_time = time.time()
+
+    query = db.query(SymbiantItem)
+
+    # Apply family filters (family takes precedence over families if both provided)
     if family:
-        query = query.filter(Symbiant.family == family)
-    if slot:
-        query = query.filter(Symbiant.slot == slot)
+        query = query.filter(SymbiantItem.family == family)
+    elif families and len(families) > 0:
+        query = query.filter(SymbiantItem.family.in_(families))
+
+    # Apply other filters
+    if slot_id is not None:
+        query = query.filter(SymbiantItem.slot_id == slot_id)
     if min_ql is not None:
-        query = query.filter(Symbiant.ql >= min_ql)
+        query = query.filter(SymbiantItem.ql >= min_ql)
     if max_ql is not None:
-        query = query.filter(Symbiant.ql <= max_ql)
-    
+        query = query.filter(SymbiantItem.ql <= max_ql)
+
+    # Order by family, QL, and name
+    query = query.order_by(
+        SymbiantItem.family.asc(),
+        SymbiantItem.ql.asc(),
+        SymbiantItem.name.asc()
+    )
+
     # Get total count
     total = query.count()
-    
+
     # Calculate pagination
     pages = math.ceil(total / page_size) if total > 0 else 1
     offset = (page - 1) * page_size
-    
+
     # Get symbiants for current page
     symbiants = query.offset(offset).limit(page_size).all()
-    
+
+    # Log performance metrics
+    query_time = time.time() - start_time
+    logger.info(f"Symbiant list query family='{family}' families={families} slot={slot_id} ql:{min_ql}-{max_ql} results={total} time={query_time:.3f}s")
+
     return PaginatedResponse[SymbiantResponse](
         items=symbiants,
         total=total,
@@ -67,58 +97,82 @@ def get_symbiants(
     )
 
 
-@router.get("/{symbiant_id}", response_model=SymbiantDetail)
+@router.get("/{symbiant_id}/dropped-by", response_model=List[MobDropInfo])
+@cached_response("symbiant_sources")
+@performance_monitor
+def get_symbiant_sources(
+    symbiant_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Get all pocket bosses that drop this symbiant.
+
+    Uses the sources system to query mobs via:
+    Mob -> Source -> ItemSource -> SymbiantItem
+
+    Only returns mobs where is_pocket_boss = TRUE.
+
+    Args:
+        symbiant_id: Database ID of the symbiant (from symbiant_items view)
+    """
+    start_time = time.time()
+
+    # Verify symbiant exists
+    symbiant = db.query(SymbiantItem).filter(SymbiantItem.id == symbiant_id).first()
+    if not symbiant:
+        raise HTTPException(status_code=404, detail="Symbiant not found")
+
+    # Get source_type_id for 'mob'
+    source_type = db.query(SourceType).filter(SourceType.name == 'mob').first()
+    if not source_type:
+        raise HTTPException(status_code=500, detail="Source type 'mob' not found in database")
+
+    # Query mobs via sources (only pocket bosses)
+    query = (
+        db.query(Mob)
+        .join(Source, Source.source_id == Mob.id)
+        .join(ItemSource, ItemSource.source_id == Source.id)
+        .filter(
+            and_(
+                ItemSource.item_id == symbiant_id,
+                Source.source_type_id == source_type.id,
+                Mob.is_pocket_boss == True
+            )
+        )
+    )
+
+    # Order by level and name
+    query = query.order_by(Mob.level.asc(), Mob.name.asc())
+
+    mobs = query.all()
+
+    # Log performance metrics
+    query_time = time.time() - start_time
+    logger.info(f"Symbiant sources query symbiant_id={symbiant_id} results={len(mobs)} time={query_time:.3f}s")
+
+    return [
+        MobDropInfo(
+            id=m.id,
+            name=m.name,
+            level=m.level,
+            location=m.location,
+            playfield=m.playfield,
+            is_pocket_boss=m.is_pocket_boss
+        )
+        for m in mobs
+    ]
+
+
+@router.get("/{symbiant_id}", response_model=SymbiantResponse)
 @cached_response("symbiants")
 @performance_monitor
 def get_symbiant(symbiant_id: int, db: Session = Depends(get_db)):
     """
-    Get detailed information about a specific symbiant including drop sources.
+    Get detailed information about a specific symbiant.
     """
-    symbiant = db.query(Symbiant).options(
-        joinedload(Symbiant.pocket_boss_drops).joinedload(PocketBossSymbiantDrops.pocket_boss)
-    ).filter(Symbiant.id == symbiant_id).first()
-    
+    symbiant = db.query(SymbiantItem).filter(SymbiantItem.id == symbiant_id).first()
+
     if not symbiant:
         raise HTTPException(status_code=404, detail="Symbiant not found")
-    
-    return SymbiantDetail(
-        id=symbiant.id,
-        aoid=symbiant.aoid,
-        name=symbiant.name,
-        ql=symbiant.ql,
-        family=symbiant.family,
-        symbiant_class=symbiant.symbiant_class,
-        slot=symbiant.slot,
-        stats=symbiant.stats,
-        description=symbiant.description,
-        dropped_by=symbiant.dropped_by
-    )
 
-
-@router.get("/{symbiant_id}/dropped-by", response_model=List[dict])
-@cached_response("symbiants")
-@performance_monitor
-def get_symbiant_drop_sources(symbiant_id: int, db: Session = Depends(get_db)):
-    """
-    Get list of pocket bosses that drop a specific symbiant.
-    """
-    symbiant = db.query(Symbiant).filter(Symbiant.id == symbiant_id).first()
-    
-    if not symbiant:
-        raise HTTPException(status_code=404, detail="Symbiant not found")
-    
-    # Get pocket bosses that drop this symbiant
-    bosses = db.query(PocketBossSymbiantDrops).options(
-        joinedload(PocketBossSymbiantDrops.pocket_boss)
-    ).filter(PocketBossSymbiantDrops.symbiant_id == symbiant_id).all()
-    
-    return [
-        {
-            "id": drop.pocket_boss.id,
-            "name": drop.pocket_boss.name,
-            "level": drop.pocket_boss.level,
-            "location": drop.pocket_boss.location,
-            "playfield": drop.pocket_boss.playfield
-        }
-        for drop in bosses
-    ]
+    return symbiant

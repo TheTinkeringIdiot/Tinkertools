@@ -46,7 +46,7 @@ npm run build
 # Setup virtual environment
 python -m venv backend/venv
 source backend/venv/bin/activate  # Linux/Mac
-DATABASE_URL is in .claude-config. The `source` command does not export it. 
+DATABASE_URL is in .env.local. The `source` command does not export it. 
 
 # Install dependencies
 pip install -r backend/requirements.txt
@@ -90,24 +90,24 @@ This section provides configuration information specifically for Claude Code (cl
 
 ### Environment Configuration
 
-  Claude Code uses `backend/.claude-config` for local environment settings. This file:
+  Claude Code uses `backend/.env.local` for local environment settings. This file:
   - Contains database connection strings and development paths
   - Is excluded from git tracking via `.gitignore`
   - Should remain local to your machine
 
   **Usage for Claude Code:**
   - Always use the virtual environment at `backend/venv` for Python operations
-  - Use the DATABASE_URL from `.claude-config` for database connections
-  - Load environment from `.claude-config` when running backend commands
+  - Use the DATABASE_URL from `.env.local` for database connections
+  - Load environment from `.env.local` when running backend commands
 
-  **Note:** The `.claude-config` file is git-ignored and stays local.
+  **Note:** The `.env.local` file is git-ignored and stays local.
 
 
 **Example backend startup command:**
 ```bash
-# Load environment from .claude-config and start backend
+# Load environment from .env.local and start backend
 cd backend && source venv/bin/activate && \
-export $(cat .claude-config | xargs) && \
+export $(cat .env.local | xargs) && \
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 

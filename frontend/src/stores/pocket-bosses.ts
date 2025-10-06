@@ -7,9 +7,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed, readonly } from 'vue'
 import type {
-  PocketBoss,
-  Symbiant,
-  PocketBossSearchQuery,
+  Mob,
+  SymbiantItem,
+  MobSearchQuery,
   PaginatedResponse,
   UserFriendlyError
 } from '../types/api'
@@ -19,12 +19,12 @@ export const usePocketBossesStore = defineStore('pocketBosses', () => {
   // ============================================================================
   // State
   // ============================================================================
-  
-  const pocketBosses = ref(new Map<number, PocketBoss>())
-  const bossDrops = ref(new Map<number, Symbiant[]>()) // boss_id -> symbiants
+
+  const pocketBosses = ref(new Map<number, Mob>())
+  const bossDrops = ref(new Map<number, SymbiantItem[]>()) // boss_id -> symbiants
   const searchResults = ref<{
-    query: PocketBossSearchQuery | null
-    results: PocketBoss[]
+    query: MobSearchQuery | null
+    results: Mob[]
     pagination: any
     timestamp: number
   } | null>(null)
@@ -40,17 +40,17 @@ export const usePocketBossesStore = defineStore('pocketBosses', () => {
   const allPocketBosses = computed(() => Array.from(pocketBosses.value.values()))
   
   const pocketBossesById = computed(() => (ids: number[]) =>
-    ids.map(id => pocketBosses.value.get(id)).filter(Boolean) as PocketBoss[]
+    ids.map(id => pocketBosses.value.get(id)).filter(Boolean) as Mob[]
   )
-  
+
   const pocketBossesByLevel = computed(() => (minLevel: number, maxLevel: number) =>
-    allPocketBosses.value.filter(boss => 
-      boss.level >= minLevel && boss.level <= maxLevel
-    ).sort((a, b) => a.level - b.level)
+    allPocketBosses.value.filter(boss =>
+      boss.level !== null && boss.level >= minLevel && boss.level <= maxLevel
+    ).sort((a, b) => (a.level ?? 0) - (b.level ?? 0))
   )
-  
+
   const pocketBossesByPlayfield = computed(() => (playfield: string) =>
-    allPocketBosses.value.filter(boss => 
+    allPocketBosses.value.filter(boss =>
       boss.playfield?.toLowerCase().includes(playfield.toLowerCase())
     )
   )
@@ -67,8 +67,9 @@ export const usePocketBossesStore = defineStore('pocketBosses', () => {
   
   const levelRanges = computed(() => {
     if (allPocketBosses.value.length === 0) return { min: 0, max: 0 }
-    
-    const levels = allPocketBosses.value.map(boss => boss.level)
+
+    const levels = allPocketBosses.value.map(boss => boss.level).filter((l): l is number => l !== null)
+    if (levels.length === 0) return { min: 0, max: 0 }
     return {
       min: Math.min(...levels),
       max: Math.max(...levels)
@@ -87,21 +88,22 @@ export const usePocketBossesStore = defineStore('pocketBosses', () => {
   
   // Group bosses by level ranges for easier browsing
   const pocketBossesByLevelRange = computed(() => {
-    const ranges = new Map<string, PocketBoss[]>()
-    
+    const ranges = new Map<string, Mob[]>()
+
     allPocketBosses.value.forEach(boss => {
+      if (boss.level === null) return
       const rangeKey = `${Math.floor(boss.level / 50) * 50}-${Math.floor(boss.level / 50) * 50 + 49}`
       if (!ranges.has(rangeKey)) {
         ranges.set(rangeKey, [])
       }
       ranges.get(rangeKey)!.push(boss)
     })
-    
+
     // Sort bosses within each range
     ranges.forEach(bosses => {
-      bosses.sort((a, b) => a.level - b.level)
+      bosses.sort((a, b) => (a.level ?? 0) - (b.level ?? 0))
     })
-    
+
     return ranges
   })
   
@@ -112,7 +114,7 @@ export const usePocketBossesStore = defineStore('pocketBosses', () => {
   /**
    * Search pocket bosses with query parameters
    */
-  async function searchPocketBosses(query: PocketBossSearchQuery, forceRefresh = false): Promise<PocketBoss[]> {
+  async function searchPocketBosses(query: MobSearchQuery, forceRefresh = false): Promise<Mob[]> {
     // Check if we already have this exact search cached
     if (
       !forceRefresh &&
@@ -122,12 +124,12 @@ export const usePocketBossesStore = defineStore('pocketBosses', () => {
     ) {
       return searchResults.value.results
     }
-    
+
     loading.value = true
     error.value = null
-    
+
     try {
-      const response: PaginatedResponse<PocketBoss> = await apiClient.searchPocketBosses(query)
+      const response: PaginatedResponse<Mob> = await apiClient.searchPocketBosses(query)
       
       if (response.success && response.data) {
         // Store individual pocket bosses in cache
@@ -159,18 +161,18 @@ export const usePocketBossesStore = defineStore('pocketBosses', () => {
   /**
    * Get a single pocket boss by ID
    */
-  async function getPocketBoss(id: number, forceRefresh = false): Promise<PocketBoss | null> {
+  async function getPocketBoss(id: number, forceRefresh = false): Promise<Mob | null> {
     // Check cache first
     if (!forceRefresh && pocketBosses.value.has(id)) {
       return pocketBosses.value.get(id) || null
     }
-    
+
     loading.value = true
     error.value = null
-    
+
     try {
       const response = await apiClient.getPocketBoss(id)
-      
+
       if (response.success && response.data) {
         pocketBosses.value.set(id, response.data)
         lastFetch.value = Date.now()
@@ -185,22 +187,22 @@ export const usePocketBossesStore = defineStore('pocketBosses', () => {
       loading.value = false
     }
   }
-  
+
   /**
    * Get drops for a specific pocket boss
    */
-  async function getPocketBossDrops(bossId: number, forceRefresh = false): Promise<Symbiant[]> {
+  async function getPocketBossDrops(bossId: number, forceRefresh = false): Promise<SymbiantItem[]> {
     // Check cache first
     if (!forceRefresh && bossDrops.value.has(bossId)) {
       return bossDrops.value.get(bossId) || []
     }
-    
+
     loading.value = true
     error.value = null
-    
+
     try {
       const response = await apiClient.getPocketBossDrops(bossId)
-      
+
       if (response.success && response.data) {
         bossDrops.value.set(bossId, response.data)
         lastFetch.value = Date.now()
@@ -219,22 +221,22 @@ export const usePocketBossesStore = defineStore('pocketBosses', () => {
   /**
    * Load all pocket bosses (relatively small dataset)
    */
-  async function loadAllPocketBosses(forceRefresh = false): Promise<PocketBoss[]> {
+  async function loadAllPocketBosses(forceRefresh = false): Promise<Mob[]> {
     if (!forceRefresh && pocketBosses.value.size > 50 && !isDataStale.value) {
       return allPocketBosses.value // We likely have most/all pocket bosses cached
     }
-    
+
     loading.value = true
     error.value = null
-    
+
     try {
       // Load in batches to get all pocket bosses
-      const allResults: PocketBoss[] = []
+      const allResults: Mob[] = []
       let page = 1
       let hasMore = true
-      
+
       while (hasMore) {
-        const response: PaginatedResponse<PocketBoss> = await apiClient.searchPocketBosses({
+        const response: PaginatedResponse<Mob> = await apiClient.searchPocketBosses({
           page,
           limit: 50
         })
@@ -265,42 +267,37 @@ export const usePocketBossesStore = defineStore('pocketBosses', () => {
   /**
    * Find pocket bosses that drop a specific symbiant
    */
-  function getBossesDropping(symbiantId: number): PocketBoss[] {
-    const droppingBosses: PocketBoss[] = []
-    
-    pocketBosses.value.forEach(boss => {
-      if (boss.drops && boss.drops.some(drop => drop.id === symbiantId)) {
-        droppingBosses.push(boss)
-      }
-    })
-    
-    return droppingBosses
+  function getBossesDropping(symbiantId: number): Mob[] {
+    // Note: This functionality should use the new API endpoint
+    // /symbiants/{symbiantId}/dropped-by instead
+    console.warn('getBossesDropping is deprecated - use apiClient.getSymbiantDroppedBy instead');
+    return []
   }
-  
+
   /**
    * Find pocket bosses by difficulty/level suitability
    */
-  function getBossesByDifficulty(difficulty: 'low' | 'medium' | 'high' | 'endgame'): PocketBoss[] {
+  function getBossesByDifficulty(difficulty: 'low' | 'medium' | 'high' | 'endgame'): Mob[] {
     const levelRanges = {
       low: [1, 100],
       medium: [100, 180],
       high: [180, 220],
       endgame: [220, 300]
     }
-    
+
     const [minLevel, maxLevel] = levelRanges[difficulty]
     return pocketBossesByLevel.value(minLevel, maxLevel)
   }
-  
+
   /**
    * Get comprehensive boss information including drops
    */
-  async function getBossWithDrops(bossId: number): Promise<PocketBoss & { dropDetails: Symbiant[] } | null> {
+  async function getBossWithDrops(bossId: number): Promise<Mob & { dropDetails: SymbiantItem[] } | null> {
     const boss = await getPocketBoss(bossId)
     if (!boss) return null
-    
+
     const drops = await getPocketBossDrops(bossId)
-    
+
     return {
       ...boss,
       dropDetails: drops

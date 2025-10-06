@@ -21,8 +21,8 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from app.models import (
     Item, StatValue, Criterion, Spell, SpellData, AttackDefense,
     AnimationMesh, Action, ActionCriteria, SpellCriterion,
-    ItemStats, Symbiant, AttackDefenseAttack, AttackDefenseDefense,
-    SpellDataSpells, ItemSpellData, Perk
+    ItemStats, AttackDefenseAttack, AttackDefenseDefense,
+    SpellDataSpells, ItemSpellData, Perk, Mob, Source, SourceType, ItemSource
 )
 from app.core import perk_validator
 from app.core.migration_runner import MigrationRunner
@@ -701,54 +701,180 @@ class DataImporter:
         
         return self.stats
     
-    def import_symbiants_from_csv(self, file_path: str, clear_existing: bool = False, full_reset: bool = False) -> int:
+    # DEPRECATED: This method is broken - CSV has no header row
+    # Kept for reference but should not be used
+    # def import_symbiants_from_csv(self, file_path: str, clear_existing: bool = False, full_reset: bool = False) -> int:
+    #     """
+    #     BROKEN: Import symbiants from CSV file.
+    #     This method incorrectly uses csv.DictReader on a CSV with no header row.
+    #     Use import_mobs_and_sources() instead.
+    #     """
+    #     pass
+
+    def import_mobs_and_sources(self, csv_path: str = 'database/symbiants.csv') -> Dict[str, int]:
         """
-        Import symbiants from CSV file.
+        Import pocket boss mobs and create source relationships from symbiants.csv
+
+        CSV Format (no header, semicolon-delimited):
+        QL;Slot;Family;BossName;Playfield;Location;Mobs;Level;...;ItemLink
 
         Args:
-            file_path: Path to CSV file to import
-            clear_existing: Clear existing symbiant data before import
-            full_reset: Drop all tables and recreate from migrations before import
+            csv_path: Path to symbiants.csv file
+
+        Returns:
+            Dict with counts of mobs, sources, and item_sources created
         """
-        logger.info(f"Starting symbiant import from {file_path} (full_reset={full_reset})")
+        logger.info("Starting mobs and sources import from symbiants.csv")
 
-        # Handle full reset if requested
-        if full_reset:
-            runner = MigrationRunner(db_url=self.db_url)
-            success = runner.reset_database()
-            if not success:
-                raise RuntimeError("Failed to reset database with migrations")
+        # Step 1: Parse CSV and deduplicate bosses
+        mobs_data = {}  # Key: (name, playfield) -> mob data
+        symbiant_drops = []  # List of {symbiant_aoid, boss_key} dicts
 
-        count = 0
+        with open(csv_path, 'r', encoding='utf-8') as f:
+            reader = csv.reader(f, delimiter=';')
+
+            for row_num, row in enumerate(reader, start=1):
+                if len(row) < 12:
+                    logger.warning(f"Skipping malformed row {row_num}: insufficient columns ({len(row)} < 12)")
+                    continue
+
+                # Parse columns (no header row!)
+                ql = row[0]
+                slot = row[1]
+                family = row[2]
+                boss_name = row[3].strip()
+                playfield = row[4].strip()
+                location = row[5].strip()
+                mobs = row[6].strip()  # Comma-separated mob names
+                level = row[7].strip()
+                # CSV has trailing semicolon, so item link is second-to-last field
+                item_link = row[-2].strip() if len(row) >= 11 else row[-1].strip()
+
+                # Extract AOID from item link
+                aoid = self._extract_aoid_from_link(item_link)
+                if not aoid:
+                    logger.warning(f"Could not extract AOID from link on row {row_num}: {item_link}")
+                    continue
+
+                # Build unique boss key
+                boss_key = (boss_name, playfield)
+
+                # Collect unique mobs (deduplicate)
+                if boss_key not in mobs_data:
+                    # Parse mob names into array
+                    mob_names = [m.strip() for m in mobs.split(',') if m.strip()]
+
+                    mobs_data[boss_key] = {
+                        'name': boss_name,
+                        'level': int(level) if level.isdigit() else None,
+                        'playfield': playfield,
+                        'location': location,
+                        'mob_names': mob_names,
+                        'is_pocket_boss': True
+                    }
+
+                # Track drop relationship
+                symbiant_drops.append({
+                    'symbiant_aoid': int(aoid),
+                    'boss_key': boss_key
+                })
+
+        logger.info(f"Parsed {len(mobs_data)} unique pocket bosses")
+        logger.info(f"Parsed {len(symbiant_drops)} symbiant drop relationships")
+
         with self.get_db_session() as db:
-            if clear_existing and not full_reset:
-                db.query(Symbiant).delete()
-                db.commit()
-            
-            with open(file_path, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                
-                symbiants = []
-                for row in reader:
-                    symbiant = Symbiant(
-                        aoid=int(row.get('aoid', 0)),
-                        family=row.get('family', '')
-                    )
-                    symbiants.append(symbiant)
-                    count += 1
-                    
-                    # Batch insert
-                    if len(symbiants) >= self.chunk_size:
-                        db.bulk_save_objects(symbiants)
-                        db.commit()
-                        symbiants = []
-                        logger.info(f"Imported {count} symbiants...")
-                
-                # Insert remaining
-                if symbiants:
-                    db.bulk_save_objects(symbiants)
-                    db.commit()
-        
-        logger.info(f"Symbiant import completed. Imported {count} symbiants.")
-        return count
+            # Step 2: Get source_type_id for 'mob'
+            source_type = db.query(SourceType).filter_by(name='mob').first()
+            if not source_type:
+                raise ValueError("Source type 'mob' not found - run migrations first")
+
+            # Step 3: Create Mob records
+            boss_key_to_id = {}  # Map boss_key to database ID
+
+            for boss_key, mob_data in mobs_data.items():
+                mob = Mob(**mob_data)
+                db.add(mob)
+                db.flush()  # Get ID
+                boss_key_to_id[boss_key] = mob.id
+
+            db.commit()
+            logger.info(f"Created {len(mobs_data)} mob records")
+
+            # Step 4: Create Source records (one per mob)
+            source_map = {}  # Map boss_key to source.id
+
+            for boss_key, mob_id in boss_key_to_id.items():
+                mob_name = mobs_data[boss_key]['name']
+
+                source = Source(
+                    source_type_id=source_type.id,
+                    source_id=mob_id,
+                    name=mob_name  # Denormalized for performance
+                )
+                db.add(source)
+                db.flush()
+                source_map[boss_key] = source.id
+
+            db.commit()
+            logger.info(f"Created {len(source_map)} source records")
+
+            # Step 5: Create ItemSource links (deduplicate first)
+            item_sources_created = 0
+            seen_pairs = set()  # Track (item_id, source_id) pairs to avoid duplicates
+
+            for drop in symbiant_drops:
+                symbiant_aoid = drop['symbiant_aoid']
+                boss_key = drop['boss_key']
+
+                # Find item by AOID
+                item = db.query(Item).filter_by(aoid=symbiant_aoid).first()
+                if not item:
+                    logger.warning(f"Item not found for AOID {symbiant_aoid}")
+                    continue
+
+                # Check for duplicate (item_id, source_id) pair
+                pair = (item.id, source_map[boss_key])
+                if pair in seen_pairs:
+                    logger.debug(f"Skipping duplicate item-source pair: item_id={item.id}, source_id={source_map[boss_key]}")
+                    continue
+
+                seen_pairs.add(pair)
+
+                # Create link
+                item_source = ItemSource(
+                    item_id=item.id,
+                    source_id=source_map[boss_key],
+                    drop_rate=None,  # Unknown
+                    min_ql=None,
+                    max_ql=None
+                )
+                db.add(item_source)
+                item_sources_created += 1
+
+            db.commit()
+            logger.info(f"Created {item_sources_created} item-source relationships")
+
+            # Step 6: Refresh materialized view
+            db.execute(text("REFRESH MATERIALIZED VIEW symbiant_items"))
+            db.commit()
+            logger.info("Refreshed symbiant_items materialized view")
+
+        return {
+            'mobs': len(mobs_data),
+            'sources': len(source_map),
+            'item_sources': item_sources_created
+        }
+
+    def _extract_aoid_from_link(self, link: str) -> Optional[int]:
+        """Extract AOID from item link format"""
+        # Example link format: <a href=http://aomainframe.info/showitem.asp?AOID=12345>Item Name</a>
+        # or just: 12345
+        import re
+        # Try to match AOID parameter in URL first
+        match = re.search(r'AOID=(\d+)', link, re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+        # Fallback: try to match any number (for simple formats)
+        match = re.search(r'(\d+)', link)
+        return int(match.group(1)) if match else None
 

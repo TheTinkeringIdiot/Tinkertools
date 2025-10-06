@@ -17,7 +17,17 @@ from .nano import (
     NanoTargeting
 )
 from .item import ItemResponse, ItemCreate, ItemDetail, ItemSearch, ItemRequirement
-from .symbiant import SymbiantResponse, SymbiantCreate, SymbiantDetail
+from .symbiant import (
+    SymbiantResponse,
+    SymbiantWithDropsResponse,
+    MobDropInfo,
+    # Deprecated but kept for backwards compatibility:
+    SymbiantCreate,
+    SymbiantDetail,
+    PocketBossInfo
+)
+from .mob import MobResponse, MobDetail, SymbiantDropInfo
+# Keep old pocket_boss imports for backwards compatibility
 from .pocket_boss import PocketBossResponse, PocketBossCreate, PocketBossDetail
 from .source import SourceTypeResponse, SourceResponse, ItemSourceResponse
 from .equipment_bonus import (
@@ -54,11 +64,17 @@ __all__ = [
     'ItemSearch',
     'ItemRequirement',
     'SymbiantResponse',
-    'SymbiantCreate',
-    'SymbiantDetail',
-    'PocketBossResponse',
-    'PocketBossCreate',
-    'PocketBossDetail',
+    'SymbiantWithDropsResponse',
+    'MobDropInfo',
+    'SymbiantCreate',  # Deprecated
+    'SymbiantDetail',  # Deprecated
+    'PocketBossInfo',  # Deprecated
+    'MobResponse',
+    'MobDetail',
+    'SymbiantDropInfo',
+    'PocketBossResponse',  # Deprecated
+    'PocketBossCreate',  # Deprecated
+    'PocketBossDetail',  # Deprecated
     'SourceTypeResponse',
     'SourceResponse',
     'ItemSourceResponse',

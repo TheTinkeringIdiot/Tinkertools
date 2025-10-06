@@ -78,8 +78,8 @@ def ensure_tables_exist():
 
 
 def import_symbiants(args):
-    """Import symbiants from CSV."""
-    logger.info(f"Starting symbiant import (optimized={args.optimized})...")
+    """Import mobs and sources from symbiants CSV."""
+    logger.info(f"Starting mobs and sources import from symbiants.csv...")
 
     # Ensure database tables exist (unless we're doing a full reset)
     if not args.clear and not ensure_tables_exist():
@@ -91,19 +91,20 @@ def import_symbiants(args):
         logger.error(f"File {file_path} not found")
         return False
 
-    # Note: Optimized importer doesn't have symbiant support yet, use regular for CSV
+    # Use regular importer (optimized doesn't have this method)
     importer = DataImporter(chunk_size=args.chunk_size)
     try:
-        # Use full_reset=True when --clear is specified
-        count = importer.import_symbiants_from_csv(
-            str(file_path),
-            clear_existing=False,  # Don't use old clear method
-            full_reset=args.clear  # Use new full reset with migrations
-        )
-        logger.info(f"Successfully imported {count} symbiants")
+        # Import mobs and sources from CSV
+        stats = importer.import_mobs_and_sources(str(file_path))
+        logger.info(f"Successfully imported mobs and sources:")
+        logger.info(f"  - Mobs: {stats['mobs']}")
+        logger.info(f"  - Sources: {stats['sources']}")
+        logger.info(f"  - Item-Source links: {stats['item_sources']}")
         return True
     except Exception as e:
-        logger.error(f"Symbiant import failed: {e}")
+        logger.error(f"Mobs and sources import failed: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return False
 
 
@@ -239,7 +240,7 @@ def import_all(args):
             logger.error(f"Failed to reset database: {e}")
             return False
 
-    # Import in order: symbiants (smallest), items, then nanos
+    # Import in order: items (contains symbiants), nanos, then mobs/sources
     success = True
 
     # Create a modified args object that doesn't trigger reset for individual imports
@@ -251,13 +252,7 @@ def import_all(args):
         clear=False  # Don't reset for individual imports since we did it above
     )
 
-    # Symbiants first (smallest file)
-    logger.info("=== Importing Symbiants ===")
-    if not import_symbiants(individual_args):
-        success = False
-        logger.error("Symbiant import failed, continuing with items...")
-
-    # Items (largest file)
+    # Items first (contains all symbiant items that mobs will reference)
     logger.info("=== Importing Items ===")
     if not import_items(individual_args):
         success = False
@@ -267,7 +262,13 @@ def import_all(args):
     logger.info("=== Importing Nanos ===")
     if not import_nanos(individual_args):
         success = False
-        logger.error("Nanos import failed")
+        logger.error("Nanos import failed, continuing with symbiants...")
+
+    # Symbiants/Mobs last (creates links to items that now exist)
+    logger.info("=== Importing Mobs and Sources ===")
+    if not import_symbiants(individual_args):
+        success = False
+        logger.error("Symbiant/Mobs import failed")
 
     if success:
         logger.info("All imports completed successfully!")

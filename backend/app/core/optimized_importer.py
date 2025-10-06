@@ -26,7 +26,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from app.models import (
     Item, StatValue, Criterion, Spell, SpellData, AttackDefense,
     AnimationMesh, Action, ActionCriteria, SpellCriterion,
-    ItemStats, Symbiant, AttackDefenseAttack, AttackDefenseDefense,
+    ItemStats, AttackDefenseAttack, AttackDefenseDefense,
     SpellDataSpells, ItemSpellData, Perk
 )
 from app.core import perk_validator

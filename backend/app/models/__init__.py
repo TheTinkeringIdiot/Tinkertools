@@ -12,8 +12,8 @@ from .shop_hash import ShopHash
 from .item import Item, ItemStats, ItemSpellData, ItemShopHash
 from .perk import Perk
 from .action import Action, ActionCriteria
-from .symbiant import Symbiant
-from .pocket_boss import PocketBoss, PocketBossSymbiantDrops
+from .mob import Mob
+from .symbiant_item import SymbiantItem
 from .source import SourceType, Source, ItemSource
 from .application_cache import ApplicationCache
 
@@ -36,9 +36,8 @@ __all__ = [
     'Perk',
     'Action',
     'ActionCriteria',
-    'Symbiant',
-    'PocketBoss',
-    'PocketBossSymbiantDrops',
+    'Mob',
+    'SymbiantItem',
     'SourceType',
     'Source',
     'ItemSource',
