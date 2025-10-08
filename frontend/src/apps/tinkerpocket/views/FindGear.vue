@@ -6,6 +6,7 @@ import { useSymbiantsStore } from '@/stores/symbiants'
 import { usePocketBossStore } from '@/stores/pocketBossStore'
 import { mapProfileToStats } from '@/utils/profile-stats-mapper'
 import { parseAction, checkActionRequirements } from '@/services/action-criteria'
+import { IMPLANT_SLOT } from '@/services/game-data'
 import type { SymbiantItem, Mob } from '@/types/api'
 
 // Props
@@ -66,19 +67,19 @@ let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 // Slot mapping constant (slot_id -> name)
 // Uses equipment slot bitflags from stat 298
 const SLOT_OPTIONS = [
-  { label: 'Eyes', value: 2 },
-  { label: 'Head', value: 4 },
-  { label: 'Ears', value: 8 },
-  { label: 'Right Arm', value: 16 },
-  { label: 'Chest', value: 32 },
-  { label: 'Left Arm', value: 64 },
-  { label: 'Right Wrist', value: 128 },
-  { label: 'Hands', value: 256 },
-  { label: 'Legs', value: 512 },
-  { label: 'Feet', value: 1024 },
-  { label: 'Left Wrist', value: 2048 },
-  { label: 'Thigh', value: 4096 },
-  { label: 'Shoulder', value: 8192 }
+  { label: 'Eyes', value: IMPLANT_SLOT.Eyes },
+  { label: 'Head', value: IMPLANT_SLOT.Head },
+  { label: 'Ears', value: IMPLANT_SLOT.Ears },
+  { label: 'Right Arm', value: IMPLANT_SLOT.RightArm },
+  { label: 'Chest', value: IMPLANT_SLOT.Chest },
+  { label: 'Left Arm', value: IMPLANT_SLOT.LeftArm },
+  { label: 'Right Wrist', value: IMPLANT_SLOT.RightWrist },
+  { label: 'Waist', value: IMPLANT_SLOT.Waist },
+  { label: 'Left Wrist', value: IMPLANT_SLOT.LeftWrist },
+  { label: 'Right Hand', value: IMPLANT_SLOT.RightHand },
+  { label: 'Legs', value: IMPLANT_SLOT.Legs },
+  { label: 'Left Hand', value: IMPLANT_SLOT.LeftHand },
+  { label: 'Feet', value: IMPLANT_SLOT.Feet }
 ]
 
 // Family options
