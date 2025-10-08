@@ -5,7 +5,7 @@ Mobs API endpoints.
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 import math
 import time
 import logging
@@ -69,12 +69,54 @@ def list_mobs(
     # Get mobs for current page
     mobs = query.offset(offset).limit(page_size).all()
 
+    # Get source_type_id for 'mob' to count symbiant drops
+    source_type = db.query(SourceType).filter(SourceType.name == 'mob').first()
+
+    # Build drop counts for all mobs on current page
+    symbiant_counts = {}
+    if source_type and mobs:
+        mob_ids = [mob.id for mob in mobs]
+
+        # Query to count symbiant drops per mob
+        drop_count_query = (
+            db.query(
+                Mob.id,
+                func.count(ItemSource.item_id).label('symbiant_count')
+            )
+            .outerjoin(Source, and_(
+                Source.source_id == Mob.id,
+                Source.source_type_id == source_type.id
+            ))
+            .outerjoin(ItemSource, ItemSource.source_id == Source.id)
+            .filter(Mob.id.in_(mob_ids))
+            .group_by(Mob.id)
+        )
+
+        # Build lookup dictionary
+        for mob_id, count in drop_count_query.all():
+            symbiant_counts[mob_id] = count
+
+    # Build response with symbiant_count
+    mob_responses = [
+        MobResponse(
+            id=mob.id,
+            name=mob.name,
+            level=mob.level,
+            playfield=mob.playfield,
+            location=mob.location,
+            mob_names=mob.mob_names,
+            is_pocket_boss=mob.is_pocket_boss,
+            symbiant_count=symbiant_counts.get(mob.id, 0)
+        )
+        for mob in mobs
+    ]
+
     # Log performance metrics
     query_time = time.time() - start_time
     logger.info(f"Mob list query is_pocket_boss={is_pocket_boss} playfield='{playfield}' level:{min_level}-{max_level} results={total} time={query_time:.3f}s")
 
     return PaginatedResponse[MobResponse](
-        items=mobs,
+        items=mob_responses,
         total=total,
         page=page,
         page_size=page_size,
@@ -165,4 +207,32 @@ def get_mob(mob_id: int, db: Session = Depends(get_db)):
     if not mob:
         raise HTTPException(status_code=404, detail="Mob not found")
 
-    return mob
+    # Get source_type_id for 'mob' to count symbiant drops
+    source_type = db.query(SourceType).filter(SourceType.name == 'mob').first()
+
+    # Count symbiant drops for this mob
+    symbiant_count = 0
+    if source_type:
+        symbiant_count = (
+            db.query(func.count(ItemSource.item_id))
+            .select_from(Source)
+            .outerjoin(ItemSource, ItemSource.source_id == Source.id)
+            .filter(
+                and_(
+                    Source.source_id == mob_id,
+                    Source.source_type_id == source_type.id
+                )
+            )
+            .scalar()
+        ) or 0
+
+    return MobResponse(
+        id=mob.id,
+        name=mob.name,
+        level=mob.level,
+        playfield=mob.playfield,
+        location=mob.location,
+        mob_names=mob.mob_names,
+        is_pocket_boss=mob.is_pocket_boss,
+        symbiant_count=symbiant_count
+    )

@@ -4,15 +4,17 @@ Symbiants API endpoints.
 
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_
 import math
 import time
 import logging
 
 from app.core.database import get_db
-from app.models import SymbiantItem, Mob, Source, SourceType, ItemSource
+from app.models import SymbiantItem, Mob, Source, SourceType, ItemSource, Item, Action, ActionCriteria
 from app.api.schemas.symbiant import SymbiantResponse, SymbiantWithDropsResponse, MobDropInfo
+from app.api.schemas.action import ActionResponse
+from app.api.schemas.criterion import CriterionResponse
 from app.api.schemas import PaginatedResponse
 from app.core.decorators import cached_response, performance_monitor
 
@@ -82,12 +84,60 @@ def list_symbiants(
     # Get symbiants for current page
     symbiants = query.offset(offset).limit(page_size).all()
 
+    # Get actions/criteria for each symbiant by joining with Item table
+    symbiant_ids = [s.id for s in symbiants]
+    items_query = (
+        db.query(Item)
+        .filter(Item.id.in_(symbiant_ids))
+        .options(
+            joinedload(Item.actions)
+            .joinedload(Action.action_criteria)
+            .joinedload(ActionCriteria.criterion)
+        )
+    )
+    items = {item.id: item for item in items_query.all()}
+
+    # Build response with actions
+    symbiant_responses = []
+    for symbiant in symbiants:
+        item = items.get(symbiant.id)
+        actions = []
+
+        if item and item.actions:
+            for action in item.actions:
+                criteria = [
+                    CriterionResponse(
+                        id=ac.criterion.id,
+                        value1=ac.criterion.value1,
+                        value2=ac.criterion.value2,
+                        operator=ac.criterion.operator
+                    )
+                    for ac in action.action_criteria
+                ]
+
+                actions.append(ActionResponse(
+                    id=action.id,
+                    action=action.action,
+                    item_id=action.item_id,
+                    criteria=criteria
+                ))
+
+        symbiant_responses.append(SymbiantResponse(
+            id=symbiant.id,
+            aoid=symbiant.aoid,
+            name=symbiant.name,
+            ql=symbiant.ql,
+            slot_id=symbiant.slot_id,
+            family=symbiant.family,
+            actions=actions
+        ))
+
     # Log performance metrics
     query_time = time.time() - start_time
     logger.info(f"Symbiant list query family='{family}' families={families} slot={slot_id} ql:{min_ql}-{max_ql} results={total} time={query_time:.3f}s")
 
     return PaginatedResponse[SymbiantResponse](
-        items=symbiants,
+        items=symbiant_responses,
         total=total,
         page=page,
         page_size=page_size,
@@ -175,4 +225,44 @@ def get_symbiant(symbiant_id: int, db: Session = Depends(get_db)):
     if not symbiant:
         raise HTTPException(status_code=404, detail="Symbiant not found")
 
-    return symbiant
+    # Get actions/criteria from Item table
+    item = (
+        db.query(Item)
+        .filter(Item.id == symbiant_id)
+        .options(
+            joinedload(Item.actions)
+            .joinedload(Action.action_criteria)
+            .joinedload(ActionCriteria.criterion)
+        )
+        .first()
+    )
+
+    actions = []
+    if item and item.actions:
+        for action in item.actions:
+            criteria = [
+                CriterionResponse(
+                    id=ac.criterion.id,
+                    value1=ac.criterion.value1,
+                    value2=ac.criterion.value2,
+                    operator=ac.criterion.operator
+                )
+                for ac in action.action_criteria
+            ]
+
+            actions.append(ActionResponse(
+                id=action.id,
+                action=action.action,
+                item_id=action.item_id,
+                criteria=criteria
+            ))
+
+    return SymbiantResponse(
+        id=symbiant.id,
+        aoid=symbiant.aoid,
+        name=symbiant.name,
+        ql=symbiant.ql,
+        slot_id=symbiant.slot_id,
+        family=symbiant.family,
+        actions=actions
+    )

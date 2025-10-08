@@ -24,14 +24,14 @@ export interface ApiResponse<T> {
   }
 }
 
-export interface PaginatedResponse<T> extends ApiResponse<T[]> {
-  pagination: {
-    page: number
-    limit: number
-    total: number
-    hasNext: boolean
-    hasPrev: boolean
-  }
+export interface PaginatedResponse<T> {
+  items: T[]
+  total: number
+  page: number
+  page_size: number
+  pages: number
+  has_next: boolean
+  has_prev: boolean
 }
 
 // ============================================================================
@@ -217,6 +217,7 @@ export interface SymbiantItem {
   ql: number
   slot_id: number
   family: 'Artillery' | 'Control' | 'Extermination' | 'Infantry' | 'Support'
+  actions: Action[]
 }
 
 export interface Mob {
@@ -228,6 +229,7 @@ export interface Mob {
   mob_names: string[]
   is_pocket_boss: boolean
   metadata?: Record<string, any>
+  symbiant_count?: number
 }
 
 export interface MobWithDrops extends Mob {

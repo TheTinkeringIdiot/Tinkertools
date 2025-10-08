@@ -15,6 +15,7 @@ class MobResponse(BaseModel):
     location: Optional[str] = Field(None, description="Location description")
     mob_names: Optional[List[str]] = Field(None, description="Array of mob names in the pocket")
     is_pocket_boss: bool = Field(description="Whether this is a pocket boss")
+    symbiant_count: Optional[int] = Field(None, description="Number of symbiants dropped by this mob")
 
     class Config:
         from_attributes = True

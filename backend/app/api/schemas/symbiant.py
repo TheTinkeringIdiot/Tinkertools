@@ -4,6 +4,8 @@ Pydantic schemas for Symbiant models.
 
 from typing import Optional, List
 from pydantic import BaseModel, Field
+from .action import ActionResponse
+from .criterion import CriterionResponse
 
 
 class SymbiantResponse(BaseModel):
@@ -14,6 +16,7 @@ class SymbiantResponse(BaseModel):
     ql: int = Field(description="Quality level")
     slot_id: int = Field(description="Equipment slot ID")
     family: Optional[str] = Field(None, description="Symbiant family (Artillery, Control, etc.)")
+    actions: List[ActionResponse] = Field(default_factory=list, description="Actions with criteria for requirements checking")
 
     class Config:
         from_attributes = True
