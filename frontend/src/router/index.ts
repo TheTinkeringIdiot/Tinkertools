@@ -53,6 +53,12 @@ const routes: RouteRecordRaw[] = [
     path: '/pocket',
     name: 'TinkerPocket',
     component: () => import('@/views/TinkerPocket.vue')
+  },
+  {
+    path: '/pocket/bosses/:id',
+    name: 'BossDetail',
+    component: () => import('@/views/BossDetail.vue'),
+    props: true
   }
 ];
 

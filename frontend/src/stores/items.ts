@@ -105,25 +105,31 @@ export const useItemsStore = defineStore('items', () => {
     
     try {
       const response: PaginatedResponse<Item> = await apiClient.searchItems(query)
-      
-      if (response.success && response.data) {
+
+      if (response.items) {
         // Store individual items in cache
-        response.data.forEach(item => {
+        response.items.forEach(item => {
           items.value.set(item.id, item)
         })
-        
+
         // Store search results
         searchResults.value = {
           query,
-          results: response.data,
-          pagination: response.pagination,
+          results: response.items,
+          pagination: {
+            page: response.page,
+            limit: response.page_size,
+            total: response.total,
+            hasNext: response.has_next,
+            hasPrev: response.has_prev
+          },
           timestamp: Date.now()
         }
-        
+
         lastFetch.value = Date.now()
-        return response.data
+        return response.items
       } else {
-        throw new Error(response.error?.message || 'Search failed')
+        throw new Error('Search failed')
       }
     } catch (err: any) {
       error.value = err
@@ -229,17 +235,17 @@ export const useItemsStore = defineStore('items', () => {
     
     try {
       const response: PaginatedResponse<Item> = await apiClient.filterItems(filter)
-      
-      if (response.success && response.data) {
+
+      if (response.items) {
         // Store individual items in cache
-        response.data.forEach(item => {
+        response.items.forEach(item => {
           items.value.set(item.id, item)
         })
-        
+
         lastFetch.value = Date.now()
-        return response.data
+        return response.items
       } else {
-        throw new Error(response.error?.message || 'Filter failed')
+        throw new Error('Filter failed')
       }
     } catch (err: any) {
       error.value = err

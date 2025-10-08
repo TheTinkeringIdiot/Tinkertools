@@ -86,25 +86,31 @@ export const useSpellsStore = defineStore('spells', () => {
     
     try {
       const response: PaginatedResponse<Spell> = await apiClient.searchSpells(query)
-      
-      if (response.success && response.data) {
+
+      if (response.items) {
         // Store individual spells in cache
-        response.data.forEach(spell => {
+        response.items.forEach(spell => {
           spells.value.set(spell.id, spell)
         })
-        
+
         // Store search results
         searchResults.value = {
           query,
-          results: response.data,
-          pagination: response.pagination,
+          results: response.items,
+          pagination: {
+            page: response.page,
+            limit: response.page_size,
+            total: response.total,
+            hasNext: response.has_next,
+            hasPrev: response.has_prev
+          },
           timestamp: Date.now()
         }
-        
+
         lastFetch.value = Date.now()
-        return response.data
+        return response.items
       } else {
-        throw new Error(response.error?.message || 'Search failed')
+        throw new Error('Search failed')
       }
     } catch (err: any) {
       error.value = err

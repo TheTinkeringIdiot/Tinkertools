@@ -73,7 +73,7 @@ export const usePocketBossStore = defineStore('pocketBoss', () => {
 
     try {
       const response = await apiClient.searchPocketBosses({ page: 1, limit: 1000 });
-      pocketBosses.value = response.data || [];
+      pocketBosses.value = response.items || [];
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to fetch pocket bosses';
       throw err;

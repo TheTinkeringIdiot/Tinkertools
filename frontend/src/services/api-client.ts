@@ -28,12 +28,12 @@ import type {
   BatchItemRequest,
   UserFriendlyError,
   ApiError,
-  ErrorCodes,
   InterpolatedItem,
   InterpolationRequest,
   InterpolationResponse,
   InterpolationInfo
 } from '../types/api'
+import { ErrorCodes } from '../types/api'
 
 // ============================================================================
 // Configuration
@@ -260,10 +260,30 @@ class TinkerToolsApiClient {
       throw this.handleError(error)
     }
   }
-  
+
+  async getPaginated<T>(url: string, config?: AxiosRequestConfig): Promise<PaginatedResponse<T>> {
+    try {
+      const response = await this.client.get<PaginatedResponse<T>>(url, config)
+      // Return the paginated response directly without wrapping
+      return response.data
+    } catch (error: any) {
+      throw this.handleError(error)
+    }
+  }
+
   async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     try {
       const response = await this.client.post<ApiResponse<T>>(url, data, config)
+      return response.data
+    } catch (error: any) {
+      throw this.handleError(error)
+    }
+  }
+
+  async postPaginated<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<PaginatedResponse<T>> {
+    try {
+      const response = await this.client.post<PaginatedResponse<T>>(url, data, config)
+      // Return the paginated response directly without wrapping
       return response.data
     } catch (error: any) {
       throw this.handleError(error)
@@ -335,24 +355,7 @@ class TinkerToolsApiClient {
         }
         if (query.strain !== undefined) params.append('strain', query.strain.toString())
         
-        const response = await this.client.get(`/items/search?${params.toString()}`)
-        const backendResponse = response.data
-        
-        // Transform backend response format to frontend expected format
-        const page = backendResponse.page || 1
-        const pageSize = backendResponse.page_size || 50
-        return {
-          success: true,
-          data: backendResponse.items || [],
-          pagination: {
-            page: page,
-            limit: pageSize,
-            offset: (page - 1) * pageSize,
-            total: backendResponse.total || 0,
-            hasNext: backendResponse.has_next || false,
-            hasPrev: backendResponse.has_prev || false
-          }
-        }
+        return this.getPaginated<Item>(`/items/search?${params.toString()}`)
       } else {
         // Use the regular /items endpoint for filtering without search
         if (query.item_class !== undefined) {
@@ -395,24 +398,7 @@ class TinkerToolsApiClient {
           params.append('strain', query.strain.toString())
         }
         
-        const response = await this.client.get(`/items?${params.toString()}`)
-        const backendResponse = response.data
-        
-        // Transform backend response format to frontend expected format
-        const page = backendResponse.page || 1
-        const pageSize = backendResponse.page_size || 50
-        return {
-          success: true,
-          data: backendResponse.items || [],
-          pagination: {
-            page: page,
-            limit: pageSize,
-            offset: (page - 1) * pageSize,
-            total: backendResponse.total || 0,
-            hasNext: backendResponse.has_next || false,
-            hasPrev: backendResponse.has_prev || false
-          }
-        }
+        return this.getPaginated<Item>(`/items?${params.toString()}`)
       }
     } catch (error: any) {
       throw this.handleError(error)
@@ -435,7 +421,7 @@ class TinkerToolsApiClient {
   }
   
   async filterItems(filter: ItemFilterRequest): Promise<PaginatedResponse<Item>> {
-    return this.post<Item[]>('/items/filter', filter) as Promise<PaginatedResponse<Item>>
+    return this.postPaginated<Item>('/items/filter', filter)
   }
   
   async checkItemCompatibility(request: ItemCompatibilityRequest): Promise<ApiResponse<ItemCompatibilityResult[]>> {
@@ -556,14 +542,14 @@ class TinkerToolsApiClient {
   
   async searchSpells(query: SpellSearchQuery): Promise<PaginatedResponse<Spell>> {
     const params = new URLSearchParams()
-    
+
     if (query.search) params.append('search', query.search)
     if (query.has_criteria !== undefined) params.append('has_criteria', query.has_criteria.toString())
     if (query.spell_id) params.append('spell_id', query.spell_id.toString())
     if (query.page) params.append('page', query.page.toString())
     if (query.limit) params.append('limit', query.limit.toString())
-    
-    return this.get<Spell[]>(`/spells?${params.toString()}`) as Promise<PaginatedResponse<Spell>>
+
+    return this.getPaginated<Spell>(`/spells?${params.toString()}`)
   }
   
   async getSpell(id: number): Promise<ApiResponse<Spell>> {
@@ -589,7 +575,7 @@ class TinkerToolsApiClient {
     if (query.page) params.append('page', query.page.toString())
     if (query.limit) params.append('limit', query.limit.toString())
 
-    return this.get<SymbiantItem[]>(`/symbiants?${params.toString()}`) as Promise<PaginatedResponse<SymbiantItem>>
+    return this.getPaginated<SymbiantItem>(`/symbiants?${params.toString()}`)
   }
 
   async getSymbiant(id: number): Promise<ApiResponse<SymbiantItem>> {
@@ -615,7 +601,7 @@ class TinkerToolsApiClient {
     if (query.page) params.append('page', query.page.toString())
     if (query.limit) params.append('limit', query.limit.toString())
 
-    return this.get<Mob[]>(`/mobs?${params.toString()}`) as Promise<PaginatedResponse<Mob>>
+    return this.getPaginated<Mob>(`/mobs?${params.toString()}`)
   }
 
   async getMob(id: number): Promise<ApiResponse<Mob>> {
@@ -649,8 +635,8 @@ class TinkerToolsApiClient {
     const searchParams = new URLSearchParams()
     if (params?.stat) searchParams.append('stat', params.stat.toString())
     if (params?.value) searchParams.append('value', params.value.toString())
-    
-    return this.get<any[]>(`/stat-values?${searchParams.toString()}`) as Promise<PaginatedResponse<any>>
+
+    return this.getPaginated<any>(`/stat-values?${searchParams.toString()}`)
   }
   
   // ============================================================================

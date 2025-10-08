@@ -130,25 +130,31 @@ export const usePocketBossesStore = defineStore('pocketBosses', () => {
 
     try {
       const response: PaginatedResponse<Mob> = await apiClient.searchPocketBosses(query)
-      
-      if (response.success && response.data) {
+
+      if (response.items) {
         // Store individual pocket bosses in cache
-        response.data.forEach(boss => {
+        response.items.forEach(boss => {
           pocketBosses.value.set(boss.id, boss)
         })
-        
+
         // Store search results
         searchResults.value = {
           query,
-          results: response.data,
-          pagination: response.pagination,
+          results: response.items,
+          pagination: {
+            page: response.page,
+            limit: response.page_size,
+            total: response.total,
+            hasNext: response.has_next,
+            hasPrev: response.has_prev
+          },
           timestamp: Date.now()
         }
-        
+
         lastFetch.value = Date.now()
-        return response.data
+        return response.items
       } else {
-        throw new Error(response.error?.message || 'Search failed')
+        throw new Error('Search failed')
       }
     } catch (err: any) {
       error.value = err
@@ -240,14 +246,14 @@ export const usePocketBossesStore = defineStore('pocketBosses', () => {
           page,
           limit: 50
         })
-        
-        if (response.success && response.data) {
-          response.data.forEach(boss => {
+
+        if (response.items) {
+          response.items.forEach(boss => {
             pocketBosses.value.set(boss.id, boss)
           })
-          
-          allResults.push(...response.data)
-          hasMore = response.pagination?.hasNext || false
+
+          allResults.push(...response.items)
+          hasMore = response.has_next || false
           page++
         } else {
           hasMore = false

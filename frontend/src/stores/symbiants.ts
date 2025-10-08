@@ -204,14 +204,15 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
           page,
           limit: 100
         })
-        
-        if (response.success && response.data) {
-          response.data.forEach(symbiant => {
+
+        if (response.items) {
+          const enrichedSymbiants = response.items.map(enrichSymbiant)
+          enrichedSymbiants.forEach(symbiant => {
             symbiants.value.set(symbiant.id, symbiant)
           })
-          
-          allResults.push(...response.data)
-          hasMore = response.pagination?.hasNext || false
+
+          allResults.push(...enrichedSymbiants)
+          hasMore = response.has_next || false
           page++
         } else {
           hasMore = false
