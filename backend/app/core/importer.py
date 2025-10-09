@@ -788,17 +788,28 @@ class DataImporter:
             if not source_type:
                 raise ValueError("Source type 'mob' not found - run migrations first")
 
-            # Step 3: Create Mob records
+            # Step 3: Create Mob records (or get existing)
+            # Pre-load all existing mobs to avoid repeated queries and ensure visibility
+            existing_mobs = {mob.name: mob.id for mob in db.query(Mob).all()}
             boss_key_to_id = {}  # Map boss_key to database ID
+            mobs_created = 0
 
             for boss_key, mob_data in mobs_data.items():
-                mob = Mob(**mob_data)
-                db.add(mob)
-                db.flush()  # Get ID
-                boss_key_to_id[boss_key] = mob.id
+                mob_name = mob_data['name']
+
+                # Check cache for existing mob (boss names are unique)
+                if mob_name in existing_mobs:
+                    boss_key_to_id[boss_key] = existing_mobs[mob_name]
+                else:
+                    mob = Mob(**mob_data)
+                    db.add(mob)
+                    db.flush()  # Get ID
+                    boss_key_to_id[boss_key] = mob.id
+                    existing_mobs[mob_name] = mob.id  # Add to cache
+                    mobs_created += 1
 
             db.commit()
-            logger.info(f"Created {len(mobs_data)} mob records")
+            logger.info(f"Created {mobs_created} new mob records, found {len(mobs_data) - mobs_created} existing")
 
             # Step 4: Create Source records (one per mob)
             source_map = {}  # Map boss_key to source.id
