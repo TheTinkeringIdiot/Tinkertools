@@ -7,6 +7,7 @@ import { usePocketBossStore } from '@/stores/pocketBossStore'
 import { mapProfileToStats } from '@/utils/profile-stats-mapper'
 import { parseAction, checkActionRequirements } from '@/services/action-criteria'
 import { IMPLANT_SLOT } from '@/services/game-data'
+import { getImplantSlotNameFromBitflag } from '@/services/game-utils'
 import type { SymbiantItem, Mob } from '@/types/api'
 
 // Props
@@ -283,11 +284,6 @@ function navigateToItem(aoid: number) {
   router.push(`/items/${aoid}`)
 }
 
-function getSlotName(slotId: number): string {
-  const slot = SLOT_OPTIONS.find(s => s.value === slotId)
-  return slot ? slot.label : `Slot ${slotId}`
-}
-
 // Boss Methods
 function updateBossFilters() {
   pocketBossStore.updateFilters({
@@ -479,7 +475,7 @@ watch(() => route.query, () => {
             <div class="text-sm text-surface-600 dark:text-surface-400 flex items-center gap-2 flex-wrap">
               <span>{{ symbiant.family }}</span>
               <span>•</span>
-              <span>{{ getSlotName(symbiant.slot_id) }}</span>
+              <span>{{ getImplantSlotNameFromBitflag(symbiant.slot_id) }}</span>
               <span>•</span>
               <span>QL {{ symbiant.ql }}</span>
             </div>

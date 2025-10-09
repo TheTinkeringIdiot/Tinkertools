@@ -167,6 +167,33 @@ export function getImplantSlotName(id: number): string | undefined {
   return IMPLANT_SLOT_POSITION[id as keyof typeof IMPLANT_SLOT_POSITION];
 }
 
+/**
+ * Get implant slot name from bitflag value
+ * Maps IMPLANT_SLOT bitflag values (from stat 298) to display names
+ * @param bitflag IMPLANT_SLOT bitflag value (e.g., 2=Eyes, 4=Head, 8=Ears)
+ * @returns Slot name or "Unknown Slot" for unrecognized values
+ */
+export function getImplantSlotNameFromBitflag(bitflag: number): string {
+  // Map bitflag values to slot names
+  const slotMap: Record<number, string> = {
+    2: 'Eyes',        // 1 << 1
+    4: 'Head',        // 1 << 2
+    8: 'Ears',        // 1 << 3
+    16: 'Right Arm',  // 1 << 4
+    32: 'Chest',      // 1 << 5
+    64: 'Left Arm',   // 1 << 6
+    128: 'Right Wrist', // 1 << 7
+    256: 'Waist',     // 1 << 8
+    512: 'Left Wrist', // 1 << 9
+    1024: 'Right Hand', // 1 << 10
+    2048: 'Legs',     // 1 << 11
+    4096: 'Left Hand', // 1 << 12
+    8192: 'Feet'      // 1 << 13
+  };
+
+  return slotMap[bitflag] || `Unknown Slot (${bitflag})`;
+}
+
 // ============================================================================
 // Name to ID Translation Functions
 // ============================================================================
@@ -1761,6 +1788,7 @@ export const gameUtils = {
   getWeaponSlotName,
   getArmorSlotName,
   getImplantSlotName,
+  getImplantSlotNameFromBitflag,
 
   // Name to ID translations
   getStatId,
