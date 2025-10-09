@@ -31,7 +31,7 @@ def list_mobs(
     min_level: Optional[int] = Query(None, description="Minimum mob level"),
     max_level: Optional[int] = Query(None, description="Maximum mob level"),
     page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(50, ge=1, le=200, description="Items per page"),
+    page_size: int = Query(50, ge=1, le=1000, description="Items per page"),
     db: Session = Depends(get_db)
 ):
     """

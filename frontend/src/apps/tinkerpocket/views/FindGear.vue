@@ -48,7 +48,7 @@ const bossSearchText = ref<string>('')
 const playfieldFilter = ref<string | null>(null)
 const minLevel = ref<number>(1)
 const maxLevel = ref<number>(220)
-const bossViewMode = ref<'grid' | 'list'>('grid')
+const bossViewMode = ref<'grid' | 'list'>('list')
 
 // Pagination State
 const currentPage = ref<number>(1)

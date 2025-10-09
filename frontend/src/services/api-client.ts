@@ -599,7 +599,7 @@ class TinkerToolsApiClient {
     if (query.min_level) params.append('min_level', query.min_level.toString())
     if (query.max_level) params.append('max_level', query.max_level.toString())
     if (query.page) params.append('page', query.page.toString())
-    if (query.limit) params.append('limit', query.limit.toString())
+    if (query.limit) params.append('page_size', query.limit.toString())
 
     return this.getPaginated<Mob>(`/mobs?${params.toString()}`)
   }
