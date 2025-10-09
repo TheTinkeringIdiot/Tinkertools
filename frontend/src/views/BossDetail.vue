@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { apiClient } from '@/services/api-client';
+import { getImplantSlotNameFromBitflag } from '@/services/game-utils';
 import { useToast } from 'primevue/usetoast';
 import Card from 'primevue/card';
 import DataTable from 'primevue/datatable';
@@ -26,28 +27,6 @@ const bossId = computed(() => parseInt(route.params.id as string));
 const sortedDrops = computed(() => {
   return [...drops.value].sort((a, b) => a.ql - b.ql);
 });
-
-// Slot name mapping (based on AO equipment slots)
-const slotNames: Record<number, string> = {
-  49: 'Head',
-  9: 'Eye',
-  34: 'Ear',
-  14: 'Chest',
-  13: 'Right Arm',
-  12: 'Left Arm',
-  19: 'Right Wrist',
-  18: 'Left Wrist',
-  16: 'Right Hand',
-  15: 'Left Hand',
-  56: 'Waist',
-  24: 'Legs',
-  57: 'Right Foot',
-  58: 'Left Foot'
-};
-
-function getSlotName(slotId: number): string {
-  return slotNames[slotId] || `Slot ${slotId}`;
-}
 
 function getSeverity(level: number | null): 'success' | 'info' | 'warning' | 'danger' {
   if (!level) return 'info';
@@ -193,28 +172,62 @@ onMounted(() => {
           <!-- Boss Info Card -->
           <Card>
             <template #content>
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <h3 class="text-sm font-medium text-surface-600 dark:text-surface-400 mb-2">Level</h3>
-                  <Tag
-                    v-if="boss.level !== null"
-                    :value="`Level ${boss.level}`"
-                    :severity="getSeverity(boss.level)"
-                    class="text-base"
-                  />
-                  <span v-else class="text-surface-500">Unknown</span>
-                </div>
-                <div>
-                  <h3 class="text-sm font-medium text-surface-600 dark:text-surface-400 mb-2">Playfield</h3>
-                  <p class="text-lg text-surface-900 dark:text-surface-50">
-                    {{ boss.playfield || 'Unknown' }}
-                  </p>
-                </div>
-                <div>
-                  <h3 class="text-sm font-medium text-surface-600 dark:text-surface-400 mb-2">Location</h3>
-                  <p class="text-lg text-surface-900 dark:text-surface-50">
-                    {{ boss.location || 'Unknown' }}
-                  </p>
+              <!-- Level Section (prominent, separate) -->
+              <div class="mb-6">
+                <h3 class="text-sm font-medium text-surface-600 dark:text-surface-400 mb-2">Boss Level</h3>
+                <Tag
+                  v-if="boss.level !== null"
+                  :value="`Level ${boss.level}`"
+                  :severity="getSeverity(boss.level)"
+                  class="text-lg px-4 py-2"
+                />
+                <span v-else class="text-surface-500">Unknown</span>
+              </div>
+
+              <!-- Where to Find Section (hierarchical) -->
+              <div class="space-y-3">
+                <h3 class="text-sm font-medium text-surface-600 dark:text-surface-400 mb-3">
+                  Where to Find This Pattern
+                </h3>
+
+                <!-- Playfield (root) -->
+                <div class="flex items-start gap-3">
+                  <i class="pi pi-map-marker text-xl text-primary-500 mt-0.5"></i>
+                  <div class="flex-1">
+                    <div class="text-lg font-semibold text-surface-900 dark:text-surface-50">
+                      {{ boss.playfield || 'Unknown Zone' }}
+                    </div>
+
+                    <!-- Location (child) - with visual connector -->
+                    <div v-if="boss.location" class="mt-3 ml-4 border-l-2 border-primary-200 dark:border-primary-800 pl-4">
+                      <div class="flex items-center gap-2 text-surface-700 dark:text-surface-300">
+                        <i class="pi pi-angle-right text-sm"></i>
+                        <span class="font-medium">{{ boss.location }}</span>
+                      </div>
+
+                      <!-- NPCs (grandchild) - deeper visual connector -->
+                      <div
+                        v-if="boss.mob_names && boss.mob_names.length > 0"
+                        class="mt-3 ml-4 border-l-2 border-primary-200 dark:border-primary-800 pl-4"
+                      >
+                        <div class="flex items-start gap-2 mb-2">
+                          <i class="pi pi-angle-right text-sm text-surface-500 mt-0.5"></i>
+                          <span class="text-sm font-medium text-surface-600 dark:text-surface-400">
+                            Pattern Dropped By:
+                          </span>
+                        </div>
+                        <div class="flex flex-wrap gap-2 ml-6">
+                          <Tag
+                            v-for="mob in boss.mob_names"
+                            :key="mob"
+                            :value="mob"
+                            severity="secondary"
+                            class="transition-all hover:scale-105"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </template>
@@ -254,7 +267,7 @@ onMounted(() => {
                   </Column>
                   <Column field="slot_id" header="Slot">
                     <template #body="{ data }">
-                      {{ getSlotName(data.slot_id) }}
+                      {{ getImplantSlotNameFromBitflag(data.slot_id) }}
                     </template>
                   </Column>
                   <Column field="ql" header="QL" sortable>
