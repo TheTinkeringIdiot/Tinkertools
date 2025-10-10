@@ -2,13 +2,12 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useSymbiantsStore } from '@/stores/symbiants';
-import AutoComplete from 'primevue/autocomplete';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Tag from 'primevue/tag';
 import Card from 'primevue/card';
 import Button from 'primevue/button';
-import type { Symbiant, Action, Criterion } from '@/types/api';
+import type { Symbiant } from '@/types/api';
 import { STAT } from '@/services/game-data';
 
 // Extended symbiant type with enriched properties
@@ -20,41 +19,24 @@ const symbiantStore = useSymbiantsStore();
 const route = useRoute();
 const router = useRouter();
 
-// Symbiant selection state
+// Symbiant selection state - now driven by store
 const selectedSymbiants = ref<(EnrichedSymbiant | null)[]>([null, null, null]);
-const searchQueries = ref<string[]>(['', '', '']);
-const filteredSuggestions = ref<EnrichedSymbiant[][]>([[], [], []]);
-
-// Available symbiants for autocomplete
-const allSymbiants = computed(() => symbiantStore.allSymbiants as EnrichedSymbiant[]);
-
-// Autocomplete search
-function searchSymbiants(event: any, index: number) {
-  const query = event.query.toLowerCase();
-  filteredSuggestions.value[index] = allSymbiants.value
-    .filter(s =>
-      s.name.toLowerCase().includes(query) ||
-      s.family?.toLowerCase().includes(query) ||
-      s.slot?.toLowerCase().includes(query)
-    )
-    .slice(0, 50); // Limit suggestions
-}
-
-// Format symbiant for display in dropdown
-function formatSymbiant(symbiant: EnrichedSymbiant | null): string {
-  if (!symbiant) return '';
-  return `${symbiant.name} (${symbiant.family}, QL${symbiant.ql})`;
-}
-
-// Handle symbiant selection
-function onSymbiantSelect(index: number) {
-  updateUrl();
-}
 
 // Clear a symbiant selection
 function clearSymbiant(index: number) {
+  const symbiant = selectedSymbiants.value[index];
   selectedSymbiants.value[index] = null;
-  searchQueries.value[index] = '';
+  // Sync to store
+  if (symbiant) {
+    symbiantStore.removeFromComparison(symbiant.id);
+  }
+  updateUrl();
+}
+
+// Clear all symbiant selections
+function clearAll() {
+  selectedSymbiants.value = [null, null, null];
+  symbiantStore.clearComparison();
   updateUrl();
 }
 
@@ -69,22 +51,27 @@ interface StatComparison {
 function extractStatsFromSymbiant(symbiant: EnrichedSymbiant | null): Map<number, { value: number; isRequirement: boolean }> {
   const stats = new Map<number, { value: number; isRequirement: boolean }>();
 
-  if (!symbiant || !symbiant.actions) return stats;
+  if (!symbiant) return stats;
 
-  symbiant.actions.forEach((action: Action) => {
-    if (!action.criteria) return;
+  // Extract bonuses from spell_data
+  if (symbiant.spell_data && Array.isArray(symbiant.spell_data)) {
+    symbiant.spell_data.forEach((spellData) => {
+      if (!spellData.spells || !Array.isArray(spellData.spells)) return;
 
-    action.criteria.forEach((criterion: Criterion) => {
-      // Operator 53 = requirement, 1 = modifier
-      const isRequirement = criterion.operator === 53;
-      const statId = criterion.value1;
-      const value = criterion.value2;
+      spellData.spells.forEach((spell) => {
+        // Filter for spell_id 53045 (Modify stat spell)
+        if (spell.spell_id === 53045) {
+          const statId = spell.spell_params?.Stat;
+          const amount = spell.spell_params?.Amount;
 
-      if (statId && value !== undefined) {
-        stats.set(statId, { value, isRequirement });
-      }
+          if (statId && amount !== undefined) {
+            // All symbiant bonuses are modifiers (not requirements)
+            stats.set(statId, { value: amount, isRequirement: false });
+          }
+        }
+      });
     });
-  });
+  }
 
   return stats;
 }
@@ -202,33 +189,49 @@ function updateUrl() {
   });
 }
 
-function loadFromUrl() {
+async function loadFromUrl() {
   const s1 = route.query.s1 ? parseInt(route.query.s1 as string) : null;
   const s2 = route.query.s2 ? parseInt(route.query.s2 as string) : null;
   const s3 = route.query.s3 ? parseInt(route.query.s3 as string) : null;
 
   const ids = [s1, s2, s3];
 
+  // Get all symbiants from store
+  const allSymbiants = symbiantStore.allSymbiants as EnrichedSymbiant[];
+
   ids.forEach((id, index) => {
     if (id) {
-      const symbiant = allSymbiants.value.find(s => s.id === id);
+      const symbiant = allSymbiants.find(s => s.id === id);
       if (symbiant) {
         selectedSymbiants.value[index] = symbiant;
-        searchQueries.value[index] = formatSymbiant(symbiant);
       }
     }
   });
+
+  // Sync loaded symbiants back to store
+  symbiantStore.clearComparison();
+  selectedSymbiants.value.forEach(s => s && symbiantStore.addToComparison(s));
+}
+
+function loadFromStore() {
+  // Load from store's comparison state
+  const storeSelection = symbiantStore.selectedForComparison;
+  selectedSymbiants.value = [...storeSelection] as (EnrichedSymbiant | null)[];
 }
 
 // Load symbiants on mount
 onMounted(async () => {
-  // Ensure symbiants are loaded
-  if (allSymbiants.value.length === 0) {
-    await symbiantStore.searchSymbiants({ page: 1, limit: 1000 });
-  }
+  // Ensure all symbiants are loaded (store handles caching)
+  await symbiantStore.loadAllSymbiants();
 
-  // Load from URL if available
-  loadFromUrl();
+  // Priority: URL params > Store state
+  if (route.query.s1 || route.query.s2 || route.query.s3) {
+    // Load from URL
+    await loadFromUrl();
+  } else {
+    // Load from store
+    loadFromStore();
+  }
 });
 
 // Watch for URL changes
@@ -237,6 +240,14 @@ watch(() => route.query, () => {
     loadFromUrl();
   }
 });
+
+// Watch for store changes (from other tabs/components)
+watch(() => symbiantStore.selectedForComparison, (newSelection) => {
+  // Only update if there are no URL params (to respect URL priority)
+  if (!route.query.s1 && !route.query.s2 && !route.query.s3) {
+    selectedSymbiants.value = [...newSelection] as (EnrichedSymbiant | null)[];
+  }
+}, { deep: true });
 </script>
 
 <template>
@@ -246,110 +257,101 @@ watch(() => route.query, () => {
       <template #content>
         <div class="flex flex-col gap-4">
           <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold">Select Symbiants to Compare</h3>
+            <h3 class="text-lg font-semibold">Selected Symbiants for Comparison</h3>
             <Button
               v-if="hasSelection"
               label="Clear All"
               icon="pi pi-times"
-              @click="selectedSymbiants = [null, null, null]; searchQueries = ['', '', '']; updateUrl()"
+              @click="clearAll()"
               outlined
               size="small"
             />
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <!-- Symbiant 1 -->
+            <!-- Symbiant Slot 1 -->
             <div class="flex flex-col gap-2">
               <label class="font-medium text-sm">Symbiant 1</label>
-              <div class="flex gap-2">
-                <AutoComplete
-                  v-model="searchQueries[0]"
-                  :suggestions="filteredSuggestions[0]"
-                  @complete="searchSymbiants($event, 0)"
-                  @item-select="selectedSymbiants[0] = $event.value; onSymbiantSelect(0)"
-                  :optionLabel="formatSymbiant"
-                  placeholder="Search symbiant..."
-                  class="flex-1"
-                  :dropdown="true"
-                />
-                <Button
-                  v-if="selectedSymbiants[0]"
-                  icon="pi pi-times"
-                  @click="clearSymbiant(0)"
-                  outlined
-                  severity="secondary"
-                />
-              </div>
-              <div v-if="selectedSymbiants[0]" class="p-3 bg-surface-50 dark:bg-surface-800 rounded">
-                <div class="font-semibold">{{ selectedSymbiants[0].name }}</div>
+              <div v-if="selectedSymbiants[0]" class="p-3 bg-surface-50 dark:bg-surface-800 rounded border border-surface-200 dark:border-surface-700">
+                <div class="flex items-start justify-between mb-2">
+                  <div class="font-semibold">{{ selectedSymbiants[0].name }}</div>
+                  <Button
+                    icon="pi pi-times"
+                    @click="clearSymbiant(0)"
+                    text
+                    rounded
+                    size="small"
+                    severity="secondary"
+                    class="-mt-1 -mr-1"
+                  />
+                </div>
                 <div class="text-sm text-surface-600 dark:text-surface-400">
                   {{ selectedSymbiants[0].slot }} • {{ selectedSymbiants[0].family }}
                 </div>
                 <Tag :value="`QL ${selectedSymbiants[0].ql}`" :severity="getQualitySeverity(selectedSymbiants[0].ql)" class="mt-2" />
               </div>
+              <div v-else class="p-6 bg-surface-50 dark:bg-surface-800 rounded border border-dashed border-surface-300 dark:border-surface-600 text-center">
+                <span class="text-surface-400 dark:text-surface-500 text-sm">Empty slot</span>
+              </div>
             </div>
 
-            <!-- Symbiant 2 -->
+            <!-- Symbiant Slot 2 -->
             <div class="flex flex-col gap-2">
               <label class="font-medium text-sm">Symbiant 2</label>
-              <div class="flex gap-2">
-                <AutoComplete
-                  v-model="searchQueries[1]"
-                  :suggestions="filteredSuggestions[1]"
-                  @complete="searchSymbiants($event, 1)"
-                  @item-select="selectedSymbiants[1] = $event.value; onSymbiantSelect(1)"
-                  :optionLabel="formatSymbiant"
-                  placeholder="Search symbiant..."
-                  class="flex-1"
-                  :dropdown="true"
-                />
-                <Button
-                  v-if="selectedSymbiants[1]"
-                  icon="pi pi-times"
-                  @click="clearSymbiant(1)"
-                  outlined
-                  severity="secondary"
-                />
-              </div>
-              <div v-if="selectedSymbiants[1]" class="p-3 bg-surface-50 dark:bg-surface-800 rounded">
-                <div class="font-semibold">{{ selectedSymbiants[1].name }}</div>
+              <div v-if="selectedSymbiants[1]" class="p-3 bg-surface-50 dark:bg-surface-800 rounded border border-surface-200 dark:border-surface-700">
+                <div class="flex items-start justify-between mb-2">
+                  <div class="font-semibold">{{ selectedSymbiants[1].name }}</div>
+                  <Button
+                    icon="pi pi-times"
+                    @click="clearSymbiant(1)"
+                    text
+                    rounded
+                    size="small"
+                    severity="secondary"
+                    class="-mt-1 -mr-1"
+                  />
+                </div>
                 <div class="text-sm text-surface-600 dark:text-surface-400">
                   {{ selectedSymbiants[1].slot }} • {{ selectedSymbiants[1].family }}
                 </div>
                 <Tag :value="`QL ${selectedSymbiants[1].ql}`" :severity="getQualitySeverity(selectedSymbiants[1].ql)" class="mt-2" />
               </div>
+              <div v-else class="p-6 bg-surface-50 dark:bg-surface-800 rounded border border-dashed border-surface-300 dark:border-surface-600 text-center">
+                <span class="text-surface-400 dark:text-surface-500 text-sm">Empty slot</span>
+              </div>
             </div>
 
-            <!-- Symbiant 3 -->
+            <!-- Symbiant Slot 3 -->
             <div class="flex flex-col gap-2">
               <label class="font-medium text-sm">Symbiant 3</label>
-              <div class="flex gap-2">
-                <AutoComplete
-                  v-model="searchQueries[2]"
-                  :suggestions="filteredSuggestions[2]"
-                  @complete="searchSymbiants($event, 2)"
-                  @item-select="selectedSymbiants[2] = $event.value; onSymbiantSelect(2)"
-                  :optionLabel="formatSymbiant"
-                  placeholder="Search symbiant..."
-                  class="flex-1"
-                  :dropdown="true"
-                />
-                <Button
-                  v-if="selectedSymbiants[2]"
-                  icon="pi pi-times"
-                  @click="clearSymbiant(2)"
-                  outlined
-                  severity="secondary"
-                />
-              </div>
-              <div v-if="selectedSymbiants[2]" class="p-3 bg-surface-50 dark:bg-surface-800 rounded">
-                <div class="font-semibold">{{ selectedSymbiants[2].name }}</div>
+              <div v-if="selectedSymbiants[2]" class="p-3 bg-surface-50 dark:bg-surface-800 rounded border border-surface-200 dark:border-surface-700">
+                <div class="flex items-start justify-between mb-2">
+                  <div class="font-semibold">{{ selectedSymbiants[2].name }}</div>
+                  <Button
+                    icon="pi pi-times"
+                    @click="clearSymbiant(2)"
+                    text
+                    rounded
+                    size="small"
+                    severity="secondary"
+                    class="-mt-1 -mr-1"
+                  />
+                </div>
                 <div class="text-sm text-surface-600 dark:text-surface-400">
                   {{ selectedSymbiants[2].slot }} • {{ selectedSymbiants[2].family }}
                 </div>
                 <Tag :value="`QL ${selectedSymbiants[2].ql}`" :severity="getQualitySeverity(selectedSymbiants[2].ql)" class="mt-2" />
               </div>
+              <div v-else class="p-6 bg-surface-50 dark:bg-surface-800 rounded border border-dashed border-surface-300 dark:border-surface-600 text-center">
+                <span class="text-surface-400 dark:text-surface-500 text-sm">Empty slot</span>
+              </div>
             </div>
+          </div>
+
+          <!-- Helper text -->
+          <div class="text-sm text-surface-500 dark:text-surface-400 text-center mt-2">
+            <i class="pi pi-info-circle mr-1"></i>
+            Select symbiants from the Browse tab to add them to comparison
           </div>
         </div>
       </template>
@@ -451,12 +453,5 @@ watch(() => route.query, () => {
 </template>
 
 <style scoped>
-/* Ensure AutoComplete dropdowns are full width */
-:deep(.p-autocomplete) {
-  width: 100%;
-}
-
-:deep(.p-autocomplete-input) {
-  width: 100%;
-}
+/* Component-specific styles can be added here if needed */
 </style>

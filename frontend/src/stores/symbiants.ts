@@ -19,7 +19,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
   // ============================================================================
   // State
   // ============================================================================
-  
+
   const symbiants = ref(new Map<number, Symbiant>())
   const searchResults = ref<{
     query: SymbiantSearchQuery | null
@@ -31,6 +31,9 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
   const error = ref<UserFriendlyError | null>(null)
   const lastFetch = ref(0)
   const cacheExpiry = 30 * 60 * 1000 // 30 minutes (symbiants change less frequently)
+
+  // Comparison selection state
+  const selectedForComparison = ref<(Symbiant | null)[]>([null, null, null])
   
   // ============================================================================
   // Getters
@@ -304,14 +307,64 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     totalSymbiants: symbiantsCount.value,
     uniqueFamilies: symbiantFamilies.value.length,
     familyBreakdown: Object.fromEntries(
-      Array.from(symbiantsByFamilyMap.value.entries()).map(([family, symbiants]) => 
+      Array.from(symbiantsByFamilyMap.value.entries()).map(([family, symbiants]) =>
         [family, symbiants.length]
       )
     ),
     lastUpdate: new Date(lastFetch.value).toLocaleString(),
     cacheHitRatio: symbiants.value.size > 0 ? 'Available' : 'No cache'
   }))
-  
+
+  /**
+   * Add symbiant to first available slot
+   * Returns true if added, false if all slots are full
+   */
+  function addToComparison(symbiant: Symbiant): boolean {
+    const firstEmptyIndex = selectedForComparison.value.findIndex(slot => slot === null)
+    if (firstEmptyIndex === -1) {
+      return false
+    }
+    selectedForComparison.value[firstEmptyIndex] = symbiant
+    return true
+  }
+
+  /**
+   * Remove symbiant by ID from comparison
+   */
+  function removeFromComparison(symbiantId: number): void {
+    const index = selectedForComparison.value.findIndex(
+      slot => slot !== null && slot.id === symbiantId
+    )
+    if (index !== -1) {
+      selectedForComparison.value[index] = null
+    }
+  }
+
+  /**
+   * Clear all comparison selections
+   */
+  function clearComparison(): void {
+    selectedForComparison.value = [null, null, null]
+  }
+
+  /**
+   * Check if symbiant is in comparison
+   * Returns slot index (0-2) or null if not found
+   */
+  function isInComparison(symbiantId: number): number | null {
+    const index = selectedForComparison.value.findIndex(
+      slot => slot !== null && slot.id === symbiantId
+    )
+    return index !== -1 ? index : null
+  }
+
+  /**
+   * Get count of selected symbiants
+   */
+  function getComparisonCount(): number {
+    return selectedForComparison.value.filter(slot => slot !== null).length
+  }
+
   // ============================================================================
   // Return
   // ============================================================================
@@ -322,7 +375,8 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     loading: readonly(loading),
     error: readonly(error),
     lastFetch: readonly(lastFetch),
-    
+    selectedForComparison: readonly(selectedForComparison),
+
     // Getters
     allSymbiants,
     symbiantsById,
@@ -335,7 +389,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     currentPagination,
     symbiantsByFamilyMap,
     getStats,
-    
+
     // Actions
     searchSymbiants,
     getSymbiant,
@@ -346,6 +400,12 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     clearSearch,
     clearError,
     clearCache,
-    preloadSymbiants
+    preloadSymbiants,
+    // Comparison actions
+    addToComparison,
+    removeFromComparison,
+    clearComparison,
+    isInComparison,
+    getComparisonCount
   }
 })

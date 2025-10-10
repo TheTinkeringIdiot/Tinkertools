@@ -218,6 +218,7 @@ export interface SymbiantItem {
   slot_id: number
   family: 'Artillery' | 'Control' | 'Extermination' | 'Infantry' | 'Support'
   actions: Action[]
+  spell_data?: SpellData[]
 }
 
 export interface Mob {

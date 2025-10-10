@@ -6,6 +6,7 @@ from typing import Optional, List
 from pydantic import BaseModel, Field
 from .action import ActionResponse
 from .criterion import CriterionResponse
+from .spell import SpellDataResponse
 
 
 class SymbiantResponse(BaseModel):
@@ -16,6 +17,7 @@ class SymbiantResponse(BaseModel):
     ql: int = Field(description="Quality level")
     slot_id: int = Field(description="Equipment slot ID")
     family: Optional[str] = Field(None, description="Symbiant family (Artillery, Control, etc.)")
+    spell_data: List[SpellDataResponse] = Field(default_factory=list, description="Item spell data (stat bonuses)")
     actions: List[ActionResponse] = Field(default_factory=list, description="Actions with criteria for requirements checking")
 
     class Config:

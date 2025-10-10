@@ -25,6 +25,8 @@ import Card from 'primevue/card'
 import Paginator from 'primevue/paginator'
 import Tag from 'primevue/tag'
 import DataView from 'primevue/dataview'
+import Badge from 'primevue/badge'
+import { useToast } from 'primevue/usetoast'
 
 // Router
 const router = useRouter()
@@ -34,6 +36,9 @@ const route = useRoute()
 const profileStore = useTinkerProfilesStore()
 const symbiantsStore = useSymbiantsStore()
 const pocketBossStore = usePocketBossStore()
+
+// Toast
+const toast = useToast()
 
 // Filter State (Symbiants)
 const familyFilter = ref<string | null>(null)
@@ -125,6 +130,10 @@ const displayedSymbiantCount = computed(() => {
 const filteredBosses = computed(() => pocketBossStore.filteredPocketBosses)
 const playfields = computed(() => pocketBossStore.playfields)
 const levelRange = computed(() => pocketBossStore.levelRange)
+
+// Comparison state
+const comparisonCount = computed(() => symbiantsStore.getComparisonCount())
+const hasComparisons = computed(() => comparisonCount.value > 0)
 
 // Methods
 function checkSymbiantRequirements(symbiant: SymbiantItem): boolean {
@@ -284,6 +293,26 @@ function navigateToItem(aoid: number) {
   router.push(`/items/${aoid}`)
 }
 
+function handleAddToComparison(symbiant: SymbiantItem) {
+  const added = symbiantsStore.addToComparison(symbiant)
+  if (!added) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Comparison Full',
+      detail: 'Comparison full (maximum 3 symbiants)',
+      life: 3000
+    })
+  }
+}
+
+function handleClearComparison() {
+  symbiantsStore.clearComparison()
+}
+
+function isSymbiantInComparison(symbiantId: number): boolean {
+  return symbiantsStore.isInComparison(symbiantId) !== null
+}
+
 // Boss Methods
 function updateBossFilters() {
   pocketBossStore.updateFilters({
@@ -432,13 +461,26 @@ watch(() => route.query, () => {
 
           <!-- Action Buttons -->
           <div class="mt-4 pt-4 border-t border-surface-200 dark:border-surface-700 flex justify-between items-center">
-            <Button
-              label="Clear Filters"
-              icon="pi pi-filter-slash"
-              outlined
-              size="small"
-              @click="clearFilters"
-            />
+            <div class="flex items-center gap-2">
+              <Button
+                label="Clear Filters"
+                icon="pi pi-filter-slash"
+                outlined
+                size="small"
+                @click="clearFilters"
+              />
+              <div v-if="hasComparisons" class="flex items-center gap-2">
+                <Badge :value="`${comparisonCount}/3 selected`" severity="info" />
+                <Button
+                  label="Clear Selection"
+                  icon="pi pi-times"
+                  outlined
+                  size="small"
+                  severity="secondary"
+                  @click="handleClearComparison"
+                />
+              </div>
+            </div>
             <span class="text-sm text-surface-600 dark:text-surface-400">
               <template v-if="profileToggle && activeProfile && displayedSymbiantCount < totalCount">
                 {{ displayedSymbiantCount }} of {{ totalCount }} symbiant{{ totalCount !== 1 ? 's' : '' }} match profile
@@ -480,6 +522,16 @@ watch(() => route.query, () => {
               <span>QL {{ symbiant.ql }}</span>
             </div>
           </div>
+
+          <!-- Compare Button -->
+          <Button
+            @click.stop="handleAddToComparison(symbiant)"
+            :icon="isSymbiantInComparison(symbiant.id) ? 'pi pi-check' : 'pi pi-clone'"
+            :severity="isSymbiantInComparison(symbiant.id) ? 'success' : 'secondary'"
+            size="small"
+            outlined
+            v-tooltip="isSymbiantInComparison(symbiant.id) ? 'In comparison' : 'Add to compare'"
+          />
         </div>
       </div>
 

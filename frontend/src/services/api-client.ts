@@ -573,7 +573,7 @@ class TinkerToolsApiClient {
     if (query.min_ql) params.append('min_ql', query.min_ql.toString())
     if (query.max_ql) params.append('max_ql', query.max_ql.toString())
     if (query.page) params.append('page', query.page.toString())
-    if (query.limit) params.append('limit', query.limit.toString())
+    if (query.limit) params.append('page_size', query.limit.toString())
 
     return this.getPaginated<SymbiantItem>(`/symbiants?${params.toString()}`)
   }

@@ -11,10 +11,14 @@ import time
 import logging
 
 from app.core.database import get_db
-from app.models import SymbiantItem, Mob, Source, SourceType, ItemSource, Item, Action, ActionCriteria
+from app.models import (
+    SymbiantItem, Mob, Source, SourceType, ItemSource, Item, Action, ActionCriteria,
+    ItemSpellData, SpellData, SpellDataSpells, Spell, SpellCriterion
+)
 from app.api.schemas.symbiant import SymbiantResponse, SymbiantWithDropsResponse, MobDropInfo
 from app.api.schemas.action import ActionResponse
 from app.api.schemas.criterion import CriterionResponse
+from app.api.schemas.spell import SpellDataResponse, SpellWithCriteria
 from app.api.schemas import PaginatedResponse
 from app.core.decorators import cached_response, performance_monitor
 
@@ -84,7 +88,7 @@ def list_symbiants(
     # Get symbiants for current page
     symbiants = query.offset(offset).limit(page_size).all()
 
-    # Get actions/criteria for each symbiant by joining with Item table
+    # Get actions/criteria and spell_data for each symbiant by joining with Item table
     symbiant_ids = [s.id for s in symbiants]
     items_query = (
         db.query(Item)
@@ -92,34 +96,80 @@ def list_symbiants(
         .options(
             joinedload(Item.actions)
             .joinedload(Action.action_criteria)
-            .joinedload(ActionCriteria.criterion)
+            .joinedload(ActionCriteria.criterion),
+            joinedload(Item.item_spell_data)
+            .joinedload(ItemSpellData.spell_data)
+            .joinedload(SpellData.spell_data_spells)
+            .joinedload(SpellDataSpells.spell)
+            .joinedload(Spell.spell_criteria)
+            .joinedload(SpellCriterion.criterion)
         )
     )
     items = {item.id: item for item in items_query.all()}
 
-    # Build response with actions
+    # Build response with actions and spell_data
     symbiant_responses = []
     for symbiant in symbiants:
         item = items.get(symbiant.id)
         actions = []
+        spell_data_list = []
 
-        if item and item.actions:
-            for action in item.actions:
-                criteria = [
-                    CriterionResponse(
-                        id=ac.criterion.id,
-                        value1=ac.criterion.value1,
-                        value2=ac.criterion.value2,
-                        operator=ac.criterion.operator
-                    )
-                    for ac in action.action_criteria
-                ]
+        if item:
+            # Build actions
+            if item.actions:
+                for action in item.actions:
+                    criteria = [
+                        CriterionResponse(
+                            id=ac.criterion.id,
+                            value1=ac.criterion.value1,
+                            value2=ac.criterion.value2,
+                            operator=ac.criterion.operator
+                        )
+                        for ac in action.action_criteria
+                    ]
 
-                actions.append(ActionResponse(
-                    id=action.id,
-                    action=action.action,
-                    item_id=action.item_id,
-                    criteria=criteria
+                    actions.append(ActionResponse(
+                        id=action.id,
+                        action=action.action,
+                        item_id=action.item_id,
+                        criteria=criteria
+                    ))
+
+            # Build spell_data
+            for isd in item.item_spell_data:
+                spell_data = isd.spell_data
+
+                # Get spells for this spell_data
+                spells_with_criteria = []
+                for sds in spell_data.spell_data_spells:
+                    spell = sds.spell
+
+                    # Get criteria for this spell
+                    criteria = [
+                        CriterionResponse(
+                            id=sc.criterion.id,
+                            value1=sc.criterion.value1,
+                            value2=sc.criterion.value2,
+                            operator=sc.criterion.operator
+                        )
+                        for sc in spell.spell_criteria
+                    ]
+
+                    spells_with_criteria.append(SpellWithCriteria(
+                        id=spell.id,
+                        target=spell.target,
+                        tick_count=spell.tick_count,
+                        tick_interval=spell.tick_interval,
+                        spell_id=spell.spell_id,
+                        spell_format=spell.spell_format,
+                        spell_params=spell.spell_params or {},
+                        criteria=criteria
+                    ))
+
+                spell_data_list.append(SpellDataResponse(
+                    id=spell_data.id,
+                    event=spell_data.event,
+                    spells=spells_with_criteria
                 ))
 
         symbiant_responses.append(SymbiantResponse(
@@ -129,6 +179,7 @@ def list_symbiants(
             ql=symbiant.ql,
             slot_id=symbiant.slot_id,
             family=symbiant.family,
+            spell_data=spell_data_list,
             actions=actions
         ))
 
@@ -225,36 +276,83 @@ def get_symbiant(symbiant_id: int, db: Session = Depends(get_db)):
     if not symbiant:
         raise HTTPException(status_code=404, detail="Symbiant not found")
 
-    # Get actions/criteria from Item table
+    # Get actions/criteria and spell_data from Item table
     item = (
         db.query(Item)
         .filter(Item.id == symbiant_id)
         .options(
             joinedload(Item.actions)
             .joinedload(Action.action_criteria)
-            .joinedload(ActionCriteria.criterion)
+            .joinedload(ActionCriteria.criterion),
+            joinedload(Item.item_spell_data)
+            .joinedload(ItemSpellData.spell_data)
+            .joinedload(SpellData.spell_data_spells)
+            .joinedload(SpellDataSpells.spell)
+            .joinedload(Spell.spell_criteria)
+            .joinedload(SpellCriterion.criterion)
         )
         .first()
     )
 
     actions = []
-    if item and item.actions:
-        for action in item.actions:
-            criteria = [
-                CriterionResponse(
-                    id=ac.criterion.id,
-                    value1=ac.criterion.value1,
-                    value2=ac.criterion.value2,
-                    operator=ac.criterion.operator
-                )
-                for ac in action.action_criteria
-            ]
+    spell_data_list = []
 
-            actions.append(ActionResponse(
-                id=action.id,
-                action=action.action,
-                item_id=action.item_id,
-                criteria=criteria
+    if item:
+        # Build actions
+        if item.actions:
+            for action in item.actions:
+                criteria = [
+                    CriterionResponse(
+                        id=ac.criterion.id,
+                        value1=ac.criterion.value1,
+                        value2=ac.criterion.value2,
+                        operator=ac.criterion.operator
+                    )
+                    for ac in action.action_criteria
+                ]
+
+                actions.append(ActionResponse(
+                    id=action.id,
+                    action=action.action,
+                    item_id=action.item_id,
+                    criteria=criteria
+                ))
+
+        # Build spell_data
+        for isd in item.item_spell_data:
+            spell_data = isd.spell_data
+
+            # Get spells for this spell_data
+            spells_with_criteria = []
+            for sds in spell_data.spell_data_spells:
+                spell = sds.spell
+
+                # Get criteria for this spell
+                criteria = [
+                    CriterionResponse(
+                        id=sc.criterion.id,
+                        value1=sc.criterion.value1,
+                        value2=sc.criterion.value2,
+                        operator=sc.criterion.operator
+                    )
+                    for sc in spell.spell_criteria
+                ]
+
+                spells_with_criteria.append(SpellWithCriteria(
+                    id=spell.id,
+                    target=spell.target,
+                    tick_count=spell.tick_count,
+                    tick_interval=spell.tick_interval,
+                    spell_id=spell.spell_id,
+                    spell_format=spell.spell_format,
+                    spell_params=spell.spell_params or {},
+                    criteria=criteria
+                ))
+
+            spell_data_list.append(SpellDataResponse(
+                id=spell_data.id,
+                event=spell_data.event,
+                spells=spells_with_criteria
             ))
 
     return SymbiantResponse(
@@ -264,5 +362,6 @@ def get_symbiant(symbiant_id: int, db: Session = Depends(get_db)):
         ql=symbiant.ql,
         slot_id=symbiant.slot_id,
         family=symbiant.family,
+        spell_data=spell_data_list,
         actions=actions
     )
