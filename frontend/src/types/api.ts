@@ -360,6 +360,7 @@ export interface SpellSearchQuery {
   limit?: number
 }
 
+// Pagination fields removed - all filtering now handled client-side
 export interface SymbiantSearchQuery {
   search?: string
   family?: string
@@ -369,8 +370,6 @@ export interface SymbiantSearchQuery {
   max_ql?: number
   min_level?: number
   max_level?: number
-  page?: number
-  limit?: number
 }
 
 export interface MobSearchQuery {

@@ -3,10 +3,9 @@ Symbiants API endpoints.
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, case
-import math
+from sqlalchemy import and_
 import time
 import logging
 
@@ -28,95 +27,30 @@ router = APIRouter(prefix="/symbiants", tags=["symbiants"])
 logger = logging.getLogger(__name__)
 
 
-@router.get("", response_model=PaginatedResponse[SymbiantResponse])
+@router.get("", response_model=List[SymbiantResponse])
 @cached_response("symbiants")
 @performance_monitor
 def list_symbiants(
-    family: Optional[str] = Query(None, description="Filter by single family"),
-    families: Optional[List[str]] = Query(None, description="Filter by multiple families (for profession filtering)"),
-    slot_id: Optional[int] = Query(None, description="Filter by equipment slot ID"),
-    min_ql: Optional[int] = Query(None, description="Minimum quality level"),
-    max_ql: Optional[int] = Query(None, description="Maximum quality level"),
-    min_level: Optional[int] = Query(None, description="Minimum level requirement"),
-    max_level: Optional[int] = Query(None, description="Maximum level requirement"),
-    page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(50, ge=1, le=2000, description="Items per page (up to 2000 for profile filtering)"),
     db: Session = Depends(get_db)
-):
+) -> List[SymbiantResponse]:
     """
-    List symbiants with filtering.
+    List all symbiants.
 
-    Filters:
-    - family: Filter by single symbiant family (Artillery, Control, etc.)
-    - families: Filter by multiple families (e.g., for profession-specific filtering)
-    - slot_id: Filter by equipment slot
-    - min_ql/max_ql: Filter by quality level range
-    - min_level/max_level: Filter by level requirement range
-
-    Note: Use 'families' parameter for profession-based filtering where a profession
-    can use multiple symbiant families.
+    Returns all symbiants in the database with default ordering.
+    Client-side filtering should be used for search, family, slot, QL, and level filtering.
     """
     start_time = time.time()
 
-    query = db.query(SymbiantItem)
-
-    # Apply family filters (family takes precedence over families if both provided)
-    if family:
-        query = query.filter(SymbiantItem.family == family)
-    elif families and len(families) > 0:
-        query = query.filter(SymbiantItem.family.in_(families))
-
-    # Apply other filters
-    if slot_id is not None:
-        query = query.filter(SymbiantItem.slot_id == slot_id)
-    if min_ql is not None:
-        query = query.filter(SymbiantItem.ql >= min_ql)
-    if max_ql is not None:
-        query = query.filter(SymbiantItem.ql <= max_ql)
-
-    # Apply level filtering via WEAR action (action=6) criteria where stat 54 = level
-    if min_level is not None or max_level is not None:
-        # Join through Item -> Action -> ActionCriteria -> Criterion
-        query = query.join(Item, SymbiantItem.id == Item.id)
-        query = query.join(Action, and_(
-            Action.item_id == Item.id,
-            Action.action == 6  # WEAR action
-        ))
-        query = query.join(ActionCriteria, ActionCriteria.action_id == Action.id)
-        query = query.join(Criterion, and_(
-            Criterion.id == ActionCriteria.criterion_id,
-            Criterion.value1 == 54  # Level stat ID
-        ))
-
-        # Create a computed level column that accounts for operator
-        # Operator 2 = GreaterThan, so value2=29 means level 30+
-        # Operator 0 = Equal, so value2 is used as-is
-        actual_level = case(
-            (Criterion.operator == 2, Criterion.value2 + 1),  # GreaterThan: add 1
-            else_=Criterion.value2  # Equal or other: use as-is
+    # Simple query - get all symbiants with default ordering
+    symbiants = (
+        db.query(SymbiantItem)
+        .order_by(
+            SymbiantItem.family.asc(),
+            SymbiantItem.ql.asc(),
+            SymbiantItem.name.asc()
         )
-
-        if min_level is not None:
-            query = query.filter(actual_level >= min_level)
-        if max_level is not None:
-            query = query.filter(actual_level <= max_level)
-
-    # Order by family, QL, and name
-    query = query.order_by(
-        SymbiantItem.family.asc(),
-        SymbiantItem.ql.asc(),
-        SymbiantItem.name.asc()
+        .all()
     )
-
-    # Get total count
-    total = query.count()
-
-    # Calculate pagination
-    pages = math.ceil(total / page_size) if total > 0 else 1
-    offset = (page - 1) * page_size
-
-    # Get symbiants for current page
-    symbiants = query.offset(offset).limit(page_size).all()
 
     # Get actions/criteria and spell_data for each symbiant by joining with Item table
     symbiant_ids = [s.id for s in symbiants]
@@ -215,17 +149,9 @@ def list_symbiants(
 
     # Log performance metrics
     query_time = time.time() - start_time
-    logger.info(f"Symbiant list query family='{family}' families={families} slot={slot_id} ql:{min_ql}-{max_ql} level:{min_level}-{max_level} results={total} time={query_time:.3f}s")
+    logger.info(f"Symbiant list query (all) results={len(symbiant_responses)} time={query_time:.3f}s")
 
-    return PaginatedResponse[SymbiantResponse](
-        items=symbiant_responses,
-        total=total,
-        page=page,
-        page_size=page_size,
-        pages=pages,
-        has_next=page < pages,
-        has_prev=page > 1
-    )
+    return symbiant_responses
 
 
 @router.get("/{symbiant_id}/dropped-by", response_model=List[MobDropInfo])

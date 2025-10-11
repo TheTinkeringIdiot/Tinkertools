@@ -8,8 +8,6 @@ import { defineStore } from 'pinia'
 import { ref, computed, readonly } from 'vue'
 import type {
   Symbiant,
-  SymbiantSearchQuery,
-  PaginatedResponse,
   UserFriendlyError
 } from '../types/api'
 import { apiClient } from '../services/api-client'
@@ -21,16 +19,10 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
   // ============================================================================
 
   const symbiants = ref(new Map<number, Symbiant>())
-  const searchResults = ref<{
-    query: SymbiantSearchQuery | null
-    results: Symbiant[]
-    pagination: any
-    timestamp: number
-  } | null>(null)
   const loading = ref(false)
   const error = ref<UserFriendlyError | null>(null)
   const lastFetch = ref(0)
-  const cacheExpiry = 30 * 60 * 1000 // 30 minutes (symbiants change less frequently)
+  const cacheExpiry = 30 * 24 * 60 * 60 * 1000 // 30 days in milliseconds
 
   // Comparison selection state
   const selectedForComparison = ref<(Symbiant | null)[]>([null, null, null])
@@ -65,10 +57,6 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     Date.now() - lastFetch.value > cacheExpiry
   )
   
-  const currentSearchQuery = computed(() => searchResults.value?.query)
-  const currentSearchResults = computed(() => searchResults.value?.results || [])
-  const currentPagination = computed(() => searchResults.value?.pagination)
-  
   // Family-based organization for easier browsing
   const symbiantsByFamilyMap = computed(() => {
     const familyMap = new Map<string, Symbiant[]>()
@@ -94,51 +82,36 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
   // ============================================================================
   
   /**
-   * Search symbiants with query parameters
+   * Load all symbiants with 30-day cache
    */
-  async function searchSymbiants(query: SymbiantSearchQuery, forceRefresh = false): Promise<Symbiant[]> {
-    // Check if we already have this exact search cached
-    if (
-      !forceRefresh &&
-      searchResults.value &&
-      JSON.stringify(searchResults.value.query) === JSON.stringify(query) &&
-      Date.now() - searchResults.value.timestamp < cacheExpiry
-    ) {
-      return searchResults.value.results
+  async function loadAllSymbiants(forceRefresh = false): Promise<Symbiant[]> {
+    // Check cache first
+    if (!forceRefresh && symbiants.value.size > 0 && !isDataStale.value) {
+      return allSymbiants.value
     }
-    
+
     loading.value = true
     error.value = null
-    
+
     try {
-      const response: PaginatedResponse<Symbiant> = await apiClient.searchSymbiants(query)
-      
-      if (response.items) {
-        // Enrich symbiants with display data and store in cache
-        const enrichedSymbiants = response.items.map(enrichSymbiant);
+      // Fetch ALL symbiants with no filters
+      const response = await apiClient.searchSymbiants({})
+
+      if (response && Array.isArray(response)) {
+        // Enrich symbiants with display data
+        const enrichedSymbiants = response.map(enrichSymbiant)
+
+        // Clear old data and store new data
+        symbiants.value.clear()
         enrichedSymbiants.forEach(symbiant => {
           symbiants.value.set(symbiant.id, symbiant)
         })
-        
-        // Store search results
-        searchResults.value = {
-          query,
-          results: enrichedSymbiants,
-          pagination: {
-            page: response.page,
-            limit: response.page_size,
-            total: response.total,
-            hasNext: response.has_next,
-            hasPrev: response.has_prev
-          },
-          timestamp: Date.now()
-        }
-        
+
         lastFetch.value = Date.now()
         return enrichedSymbiants
-      } else {
-        throw new Error('No symbiant data received')
       }
+
+      throw new Error('No symbiant data received')
     } catch (err: any) {
       error.value = err
       throw err
@@ -186,53 +159,6 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
   }
   
   /**
-   * Load all symbiants (they're a relatively small dataset)
-   */
-  async function loadAllSymbiants(forceRefresh = false): Promise<Symbiant[]> {
-    if (!forceRefresh && symbiants.value.size > 900 && !isDataStale.value) {
-      return allSymbiants.value // We likely have most/all symbiants cached
-    }
-    
-    loading.value = true
-    error.value = null
-    
-    try {
-      // Load in batches to get all symbiants
-      const allResults: Symbiant[] = []
-      let page = 1
-      let hasMore = true
-      
-      while (hasMore) {
-        const response: PaginatedResponse<Symbiant> = await apiClient.searchSymbiants({
-          page,
-          limit: 100
-        })
-
-        if (response.items) {
-          const enrichedSymbiants = response.items.map(enrichSymbiant)
-          enrichedSymbiants.forEach(symbiant => {
-            symbiants.value.set(symbiant.id, symbiant)
-          })
-
-          allResults.push(...enrichedSymbiants)
-          hasMore = response.has_next || false
-          page++
-        } else {
-          hasMore = false
-        }
-      }
-      
-      lastFetch.value = Date.now()
-      return allResults
-    } catch (err: any) {
-      error.value = err
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-  
-  /**
    * Get symbiants that would be useful for a character build
    */
   function getSymbiantsForBuild(targetStats: Array<{ stat: number; priority: 'high' | 'medium' | 'low' }>): Symbiant[] {
@@ -262,25 +188,17 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
   }
   
   /**
-   * Clear search results
-   */
-  function clearSearch(): void {
-    searchResults.value = null
-  }
-  
-  /**
    * Clear error state
    */
   function clearError(): void {
     error.value = null
   }
-  
+
   /**
    * Clear all cached data
    */
   function clearCache(): void {
     symbiants.value.clear()
-    searchResults.value = null
     lastFetch.value = 0
     error.value = null
   }
@@ -384,20 +302,15 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     symbiantFamilies,
     symbiantsCount,
     isDataStale,
-    currentSearchQuery,
-    currentSearchResults,
-    currentPagination,
     symbiantsByFamilyMap,
     getStats,
 
     // Actions
-    searchSymbiants,
+    loadAllSymbiants,
     getSymbiant,
     getSymbiantByAoid,
-    loadAllSymbiants,
     getSymbiantsForBuild,
     getSymbiantsByTier,
-    clearSearch,
     clearError,
     clearCache,
     preloadSymbiants,

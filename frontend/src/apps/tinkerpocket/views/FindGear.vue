@@ -22,7 +22,6 @@ import InputText from 'primevue/inputtext'
 import Slider from 'primevue/slider'
 import InputSwitch from 'primevue/inputswitch'
 import Card from 'primevue/card'
-import Paginator from 'primevue/paginator'
 import Tag from 'primevue/tag'
 import DataView from 'primevue/dataview'
 import Badge from 'primevue/badge'
@@ -59,16 +58,8 @@ const minLevel = ref<number>(1)
 const maxLevel = ref<number>(220)
 const bossViewMode = ref<'grid' | 'list'>('list')
 
-// Pagination State
-const currentPage = ref<number>(1)
-const pageSize = ref<number>(50)
-
 // Loading State
 const loading = ref<boolean>(false)
-
-// Data
-const symbiants = ref<SymbiantItem[]>([])
-const totalCount = ref<number>(0)
 
 // Debounce timer for search
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -110,45 +101,53 @@ const characterStats = computed(() => {
 })
 
 const filteredSymbiants = computed(() => {
-  console.log('🔍 Starting filteredSymbiants computation')
-  console.log('  profileToggle:', profileToggle.value)
-  console.log('  characterStats:', characterStats.value ? 'present' : 'null')
-  console.log('  symbiants.value.length:', symbiants.value.length)
+  let result = symbiantsStore.allSymbiants
 
-  if (!profileToggle.value || !characterStats.value) {
-    const result = symbiants.value.map(symbiant => ({
-      ...symbiant,
-      canUse: true
-    }))
-    console.log('  No filtering applied, returning all:', result.length)
-    return result
+  // 1. Family filter (most selective - apply first)
+  if (familyFilter.value) {
+    result = result.filter(s => s.family === familyFilter.value)
   }
 
-  // Apply character requirements filtering and hide unusable symbiants
-  let passCount = 0
-  let failCount = 0
+  // 2. Slot filter (very selective)
+  if (slotFilter.value) {
+    result = result.filter(s => s.slot_id === slotFilter.value)
+  }
 
-  const result = symbiants.value
-    .map(symbiant => {
-      const canUse = checkSymbiantRequirements(symbiant)
-      if (canUse) passCount++
-      else failCount++
+  // 3. QL range filter
+  if (minQL.value > 1 || maxQL.value < 300) {
+    result = result.filter(s => s.ql >= minQL.value && s.ql <= maxQL.value)
+  }
 
-      if (symbiant.family === 'Extermination' && canUse) {
-        console.log('  ✅ Extermination PASS:', symbiant.name)
+  // 4. Level range filter
+  if (symbiantMinLevel.value > 1 || symbiantMaxLevel.value < 220) {
+    result = result.filter(s => {
+      try {
+        const minLevel = getMinimumLevel(s)
+        return minLevel >= symbiantMinLevel.value && minLevel <= symbiantMaxLevel.value
+      } catch {
+        return true // Include if level extraction fails
       }
-      if (symbiant.family === 'Extermination' && !canUse) {
-        const result = checkActionRequirements(parseAction(symbiant.actions[0]), characterStats.value!)
-        console.log('  ❌ Extermination FAIL:', symbiant.name, 'QL:', symbiant.ql)
-        console.log('    Unmet:', result.unmetRequirements.map(r => `${r.statName}=${r.required}`).join(', '))
-      }
-
-      return { ...symbiant, canUse }
     })
-    .filter(symbiant => symbiant.canUse)
+  }
 
-  console.log('  Pass/Fail:', passCount, '/', failCount)
-  console.log('  Final result count:', result.length)
+  // 5. Text search (debounced)
+  if (searchText.value.trim()) {
+    const searchLower = searchText.value.toLowerCase()
+    result = result.filter(s => s.name.toLowerCase().includes(searchLower))
+  }
+
+  // 6. Profile filter (most expensive - apply last)
+  if (profileToggle.value && characterStats.value) {
+    result = result.filter(s => {
+      try {
+        const wearAction = s.actions?.find(a => a.action === 6)
+        if (!wearAction) return false
+        return checkActionRequirements(parseAction(wearAction), characterStats.value!).canPerform
+      } catch {
+        return false
+      }
+    })
+  }
 
   return result
 })
@@ -216,76 +215,13 @@ function checkSymbiantRequirements(symbiant: SymbiantItem): boolean {
 }
 
 async function fetchSymbiants() {
-  loading.value = true
-
-  try {
-    // When profile filtering is ON, fetch all symbiants to ensure we don't miss compatible ones on other pages
-    const effectivePageSize = profileToggle.value ? 2000 : pageSize.value
-    const effectivePage = profileToggle.value ? 1 : currentPage.value
-
-    const query: any = {
-      page: effectivePage,
-      limit: effectivePageSize
-    }
-
-    if (familyFilter.value) {
-      query.family = familyFilter.value
-    }
-
-    if (slotFilter.value) {
-      query.slot_id = slotFilter.value
-    }
-
-    if (minQL.value) {
-      query.min_ql = minQL.value
-    }
-
-    if (maxQL.value) {
-      query.max_ql = maxQL.value
-    }
-
-    if (searchText.value.trim()) {
-      query.search = searchText.value.trim()
-    }
-
-    if (symbiantMinLevel.value > 1) {
-      query.min_level = symbiantMinLevel.value
-    }
-
-    if (symbiantMaxLevel.value < 220) {
-      query.max_level = symbiantMaxLevel.value
-    }
-
-    const results = await symbiantsStore.searchSymbiants(query)
-    symbiants.value = results || []
-
-    // Debug: Log what we received from API
-    console.log('📦 Received from API:', {
-      total: symbiants.value.length,
-      families: [...new Set(symbiants.value.map(s => s.family))],
-      exterminationCount: symbiants.value.filter(s => s.family === 'Extermination').length
-    })
-
-    // Get total count from pagination if available
-    const pagination = symbiantsStore.currentPagination
-    if (pagination) {
-      totalCount.value = pagination.total
-    } else {
-      totalCount.value = symbiants.value.length
-    }
-  } catch (error) {
-    console.error('Failed to fetch symbiants:', error)
-    symbiants.value = []
-    totalCount.value = 0
-  } finally {
-    loading.value = false
-  }
+  await symbiantsStore.loadAllSymbiants()
+  // Computed property (filteredSymbiants) handles filtering
 }
 
 function updateFilters() {
-  currentPage.value = 1 // Reset to first page when filters change
+  // No page reset needed
   updateURL()
-  fetchSymbiants()
 }
 
 function onSearchInput() {
@@ -298,12 +234,6 @@ function onSearchInput() {
   }, 300)
 }
 
-function onPageChange(event: any) {
-  currentPage.value = event.page + 1 // PrimeVue uses 0-based pages
-  pageSize.value = event.rows
-  updateURL()
-  fetchSymbiants()
-}
 
 function clearFilters() {
   familyFilter.value = null
@@ -481,8 +411,11 @@ async function loadBosses() {
 // Lifecycle
 onMounted(async () => {
   readURLParams()
+
   if (props.view === 'symbiants') {
-    fetchSymbiants()
+    if (symbiantsStore.isDataStale || symbiantsStore.symbiantsCount === 0) {
+      await symbiantsStore.loadAllSymbiants()
+    }
   } else if (props.view === 'bosses') {
     await loadBosses()
   }
@@ -647,87 +580,87 @@ watch(() => activeProfile.value, (newProfile, oldProfile) => {
                 />
               </div>
             </div>
-            <span class="text-sm text-surface-600 dark:text-surface-400">
-              <template v-if="profileToggle && activeProfile && displayedSymbiantCount < totalCount">
-                {{ displayedSymbiantCount }} of {{ totalCount }} symbiant{{ totalCount !== 1 ? 's' : '' }} match profile
-              </template>
-              <template v-else>
-                {{ totalCount }} symbiant{{ totalCount !== 1 ? 's' : '' }} found
-              </template>
-            </span>
           </div>
         </template>
       </Card>
 
       <!-- Loading State -->
-      <div v-if="loading" class="text-center py-12">
-        <i class="pi pi-spinner pi-spin text-4xl text-primary-500 mb-4"></i>
+      <div v-if="symbiantsStore.loading" class="flex flex-col justify-center items-center py-12">
+        <i class="pi pi-spin pi-spinner text-4xl text-primary-500 mb-3"></i>
         <p class="text-lg text-surface-600 dark:text-surface-400">
-          {{ profileToggle ? 'Loading all symbiants for profile filtering...' : 'Loading symbiants...' }}
+          Loading symbiants...
         </p>
       </div>
 
-      <!-- Results List -->
-      <div v-else-if="filteredSymbiants.length > 0" class="space-y-2">
-        <div
-          v-for="symbiant in filteredSymbiants"
-          :key="symbiant.id"
-          @click="navigateToItem(symbiant.aoid)"
-          class="symbiant-card flex items-center gap-4 p-4 bg-surface-0 dark:bg-surface-800
-                 border border-surface-200 dark:border-surface-700 rounded-lg
-                 cursor-pointer transition-all duration-200"
-        >
-          <!-- Info -->
-          <div class="flex-1 min-w-0">
-            <div class="font-semibold text-surface-900 dark:text-surface-50">
-              {{ symbiant.name }}
-            </div>
-            <div class="text-sm text-surface-600 dark:text-surface-400 flex items-center gap-2 flex-wrap">
-              <span>{{ symbiant.family }}</span>
-              <span>•</span>
-              <span>{{ getImplantSlotNameFromBitflag(symbiant.slot_id) }}</span>
-              <span>•</span>
-              <span>QL {{ symbiant.ql }}</span>
-              <span>•</span>
-              <span>{{ formatMinimumLevel(symbiant) }}</span>
-            </div>
-          </div>
-
-          <!-- Compare Button -->
-          <Button
-            @click.stop="handleAddToComparison(symbiant)"
-            :icon="isSymbiantInComparison(symbiant.id) ? 'pi pi-check' : 'pi pi-clone'"
-            :severity="isSymbiantInComparison(symbiant.id) ? 'success' : 'secondary'"
-            size="small"
-            outlined
-            v-tooltip="isSymbiantInComparison(symbiant.id) ? 'In comparison' : 'Add to compare'"
-          />
-        </div>
-      </div>
-
-      <!-- Empty State -->
-      <div v-else class="text-center py-12">
-        <i class="pi pi-search text-4xl text-surface-400 mb-4"></i>
-        <p class="text-lg text-surface-600 dark:text-surface-400">No symbiants found</p>
-        <p class="text-sm text-surface-500 dark:text-surface-500">
-          Try adjusting your filters
+      <!-- Error State -->
+      <div v-else-if="symbiantsStore.error" class="flex flex-col justify-center items-center py-12">
+        <i class="pi pi-exclamation-circle text-4xl text-red-500 mb-3"></i>
+        <p class="text-lg text-red-600 dark:text-red-400 mb-4">
+          {{ symbiantsStore.error }}
         </p>
-      </div>
-
-      <!-- Pagination -->
-      <div v-if="!profileToggle && totalCount > pageSize" class="mt-6">
-        <Paginator
-          :rows="pageSize"
-          :totalRecords="totalCount"
-          :rowsPerPageOptions="[25, 50, 100]"
-          @page="onPageChange"
+        <Button
+          label="Retry"
+          icon="pi pi-refresh"
+          @click="symbiantsStore.loadAllSymbiants(true)"
         />
       </div>
 
-      <!-- Profile Filtering Message -->
-      <div v-else-if="profileToggle && !loading" class="mt-6 text-center text-sm text-surface-500 dark:text-surface-400">
-        <i class="pi pi-info-circle mr-1"></i>
-        Pagination disabled when filtering by profile (showing all matching results)
+      <!-- Results -->
+      <div v-else>
+        <!-- Result Count -->
+        <div class="mb-4 text-sm text-surface-600 dark:text-surface-400">
+          Showing {{ filteredSymbiants.length }} symbiant{{ filteredSymbiants.length !== 1 ? 's' : '' }}
+          <span v-if="symbiantsStore.symbiantsCount !== filteredSymbiants.length">
+            (filtered from {{ symbiantsStore.symbiantsCount }} total)
+          </span>
+        </div>
+
+        <!-- Results List -->
+        <div v-if="filteredSymbiants.length > 0" class="space-y-2">
+          <div
+            v-for="symbiant in filteredSymbiants"
+            :key="symbiant.id"
+            @click="navigateToItem(symbiant.aoid)"
+            class="symbiant-card flex items-center gap-4 p-4 bg-surface-0 dark:bg-surface-800
+                   border border-surface-200 dark:border-surface-700 rounded-lg
+                   cursor-pointer transition-all duration-200"
+          >
+            <!-- Info -->
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold text-surface-900 dark:text-surface-50">
+                {{ symbiant.name }}
+              </div>
+              <div class="text-sm text-surface-600 dark:text-surface-400 flex items-center gap-2 flex-wrap">
+                <span>{{ symbiant.family }}</span>
+                <span>•</span>
+                <span>{{ getImplantSlotNameFromBitflag(symbiant.slot_id) }}</span>
+                <span>•</span>
+                <span>QL {{ symbiant.ql }}</span>
+                <span>•</span>
+                <span>{{ formatMinimumLevel(symbiant) }}</span>
+              </div>
+            </div>
+
+            <!-- Compare Button -->
+            <Button
+              @click.stop="handleAddToComparison(symbiant)"
+              :icon="isSymbiantInComparison(symbiant.id) ? 'pi pi-check' : 'pi pi-clone'"
+              :severity="isSymbiantInComparison(symbiant.id) ? 'success' : 'secondary'"
+              size="small"
+              outlined
+              v-tooltip="isSymbiantInComparison(symbiant.id) ? 'In comparison' : 'Add to compare'"
+            />
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div v-else class="text-center py-12">
+          <i class="pi pi-search text-4xl text-surface-400 mb-4"></i>
+          <p class="text-lg text-surface-600 dark:text-surface-400">No symbiants found</p>
+          <p class="text-sm text-surface-500 dark:text-surface-500">
+            Try adjusting your filters
+          </p>
+        </div>
       </div>
     </div>
 
