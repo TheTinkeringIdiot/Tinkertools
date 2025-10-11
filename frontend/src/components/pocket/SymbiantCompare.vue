@@ -9,6 +9,7 @@ import Card from 'primevue/card';
 import Button from 'primevue/button';
 import type { Symbiant } from '@/types/api';
 import { STAT } from '@/services/game-data';
+import { getMinimumLevel } from '@/services/game-utils';
 
 // Extended symbiant type with enriched properties
 interface EnrichedSymbiant extends Symbiant {
@@ -140,6 +141,18 @@ function getQualitySeverity(ql: number): 'success' | 'info' | 'warning' | 'dange
   if (ql >= 150) return 'warning';
   if (ql >= 100) return 'info';
   return 'success';
+}
+
+// Format minimum level for display
+function formatMinimumLevel(symbiant: EnrichedSymbiant | null): string {
+  if (!symbiant) return '--';
+  try {
+    const level = getMinimumLevel(symbiant);
+    return `Lvl ${level}`;
+  } catch (error) {
+    console.error('Failed to extract level from symbiant:', symbiant.name, error);
+    return '--';
+  }
 }
 
 // Format stat value
@@ -288,7 +301,10 @@ watch(() => symbiantStore.selectedForComparison, (newSelection) => {
                 <div class="text-sm text-surface-600 dark:text-surface-400">
                   {{ selectedSymbiants[0].slot }} • {{ selectedSymbiants[0].family }}
                 </div>
-                <Tag :value="`QL ${selectedSymbiants[0].ql}`" :severity="getQualitySeverity(selectedSymbiants[0].ql)" class="mt-2" />
+                <div class="flex gap-2 mt-2">
+                  <Tag :value="`QL ${selectedSymbiants[0].ql}`" :severity="getQualitySeverity(selectedSymbiants[0].ql)" />
+                  <Tag :value="formatMinimumLevel(selectedSymbiants[0])" severity="info" />
+                </div>
               </div>
               <div v-else class="p-6 bg-surface-50 dark:bg-surface-800 rounded border border-dashed border-surface-300 dark:border-surface-600 text-center">
                 <span class="text-surface-400 dark:text-surface-500 text-sm">Empty slot</span>
@@ -314,7 +330,10 @@ watch(() => symbiantStore.selectedForComparison, (newSelection) => {
                 <div class="text-sm text-surface-600 dark:text-surface-400">
                   {{ selectedSymbiants[1].slot }} • {{ selectedSymbiants[1].family }}
                 </div>
-                <Tag :value="`QL ${selectedSymbiants[1].ql}`" :severity="getQualitySeverity(selectedSymbiants[1].ql)" class="mt-2" />
+                <div class="flex gap-2 mt-2">
+                  <Tag :value="`QL ${selectedSymbiants[1].ql}`" :severity="getQualitySeverity(selectedSymbiants[1].ql)" />
+                  <Tag :value="formatMinimumLevel(selectedSymbiants[1])" severity="info" />
+                </div>
               </div>
               <div v-else class="p-6 bg-surface-50 dark:bg-surface-800 rounded border border-dashed border-surface-300 dark:border-surface-600 text-center">
                 <span class="text-surface-400 dark:text-surface-500 text-sm">Empty slot</span>
@@ -340,7 +359,10 @@ watch(() => symbiantStore.selectedForComparison, (newSelection) => {
                 <div class="text-sm text-surface-600 dark:text-surface-400">
                   {{ selectedSymbiants[2].slot }} • {{ selectedSymbiants[2].family }}
                 </div>
-                <Tag :value="`QL ${selectedSymbiants[2].ql}`" :severity="getQualitySeverity(selectedSymbiants[2].ql)" class="mt-2" />
+                <div class="flex gap-2 mt-2">
+                  <Tag :value="`QL ${selectedSymbiants[2].ql}`" :severity="getQualitySeverity(selectedSymbiants[2].ql)" />
+                  <Tag :value="formatMinimumLevel(selectedSymbiants[2])" severity="info" />
+                </div>
               </div>
               <div v-else class="p-6 bg-surface-50 dark:bg-surface-800 rounded border border-dashed border-surface-300 dark:border-surface-600 text-center">
                 <span class="text-surface-400 dark:text-surface-500 text-sm">Empty slot</span>

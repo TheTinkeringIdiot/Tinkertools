@@ -4,15 +4,22 @@ Mobs API endpoints.
 
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, and_, func
 import math
 import time
 import logging
 
 from app.core.database import get_db
-from app.models import Mob, SymbiantItem, Source, SourceType, ItemSource
+from app.models import (
+    Mob, SymbiantItem, Source, SourceType, ItemSource, Item, Action, ActionCriteria,
+    ItemSpellData, SpellData, SpellDataSpells, Spell, SpellCriterion, Criterion
+)
 from app.api.schemas.mob import MobResponse, MobDetail, SymbiantDropInfo
+from app.api.schemas.symbiant import SymbiantResponse
+from app.api.schemas.action import ActionResponse
+from app.api.schemas.criterion import CriterionResponse
+from app.api.schemas.spell import SpellDataResponse, SpellWithCriteria
 from app.api.schemas import PaginatedResponse
 from app.core.decorators import cached_response, performance_monitor
 
@@ -126,7 +133,7 @@ def list_mobs(
     )
 
 
-@router.get("/{mob_id}/drops", response_model=List[SymbiantDropInfo])
+@router.get("/{mob_id}/drops", response_model=List[SymbiantResponse])
 @cached_response("mob_drops")
 @performance_monitor
 def get_mob_drops(
@@ -135,7 +142,7 @@ def get_mob_drops(
     db: Session = Depends(get_db)
 ):
     """
-    Get all symbiants dropped by this mob.
+    Get all symbiants dropped by this mob with actions for level extraction.
 
     Uses the sources system to query symbiants via:
     SymbiantItem -> ItemSource -> Source -> Mob
@@ -178,21 +185,106 @@ def get_mob_drops(
 
     symbiants = query.all()
 
+    # Get actions/criteria and spell_data for each symbiant by joining with Item table
+    symbiant_ids = [s.id for s in symbiants]
+    items_query = (
+        db.query(Item)
+        .filter(Item.id.in_(symbiant_ids))
+        .options(
+            joinedload(Item.actions)
+            .joinedload(Action.action_criteria)
+            .joinedload(ActionCriteria.criterion),
+            joinedload(Item.item_spell_data)
+            .joinedload(ItemSpellData.spell_data)
+            .joinedload(SpellData.spell_data_spells)
+            .joinedload(SpellDataSpells.spell)
+            .joinedload(Spell.spell_criteria)
+            .joinedload(SpellCriterion.criterion)
+        )
+    )
+    items = {item.id: item for item in items_query.all()}
+
+    # Build response with actions and spell_data
+    symbiant_responses = []
+    for symbiant in symbiants:
+        item = items.get(symbiant.id)
+        actions = []
+        spell_data_list = []
+
+        if item:
+            # Build actions
+            if item.actions:
+                for action in item.actions:
+                    criteria = [
+                        CriterionResponse(
+                            id=ac.criterion.id,
+                            value1=ac.criterion.value1,
+                            value2=ac.criterion.value2,
+                            operator=ac.criterion.operator
+                        )
+                        for ac in action.action_criteria
+                    ]
+
+                    actions.append(ActionResponse(
+                        id=action.id,
+                        action=action.action,
+                        item_id=action.item_id,
+                        criteria=criteria
+                    ))
+
+            # Build spell_data
+            for isd in item.item_spell_data:
+                spell_data = isd.spell_data
+
+                # Get spells for this spell_data
+                spells_with_criteria = []
+                for sds in spell_data.spell_data_spells:
+                    spell = sds.spell
+
+                    # Get criteria for this spell
+                    criteria = [
+                        CriterionResponse(
+                            id=sc.criterion.id,
+                            value1=sc.criterion.value1,
+                            value2=sc.criterion.value2,
+                            operator=sc.criterion.operator
+                        )
+                        for sc in spell.spell_criteria
+                    ]
+
+                    spells_with_criteria.append(SpellWithCriteria(
+                        id=spell.id,
+                        target=spell.target,
+                        tick_count=spell.tick_count,
+                        tick_interval=spell.tick_interval,
+                        spell_id=spell.spell_id,
+                        spell_format=spell.spell_format,
+                        spell_params=spell.spell_params or {},
+                        criteria=criteria
+                    ))
+
+                spell_data_list.append(SpellDataResponse(
+                    id=spell_data.id,
+                    event=spell_data.event,
+                    spells=spells_with_criteria
+                ))
+
+        symbiant_responses.append(SymbiantResponse(
+            id=symbiant.id,
+            aoid=symbiant.aoid,
+            name=symbiant.name,
+            ql=symbiant.ql,
+            slot_id=symbiant.slot_id,
+            family=symbiant.family,
+            spell_data=spell_data_list,
+            actions=actions
+        ))
+
     # Log performance metrics
     query_time = time.time() - start_time
     logger.info(f"Mob drops query mob_id={mob_id} family='{family}' results={len(symbiants)} time={query_time:.3f}s")
 
-    return [
-        SymbiantDropInfo(
-            id=s.id,
-            aoid=s.aoid,
-            name=s.name,
-            ql=s.ql,
-            slot_id=s.slot_id,
-            family=s.family
-        )
-        for s in symbiants
-    ]
+    return symbiant_responses
 
 
 @router.get("/{mob_id}", response_model=MobResponse)

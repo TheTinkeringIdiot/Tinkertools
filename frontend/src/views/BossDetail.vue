@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { apiClient } from '@/services/api-client';
-import { getImplantSlotNameFromBitflag } from '@/services/game-utils';
+import { getImplantSlotNameFromBitflag, getMinimumLevel } from '@/services/game-utils';
 import { useToast } from 'primevue/usetoast';
 import Card from 'primevue/card';
 import DataTable from 'primevue/datatable';
@@ -46,6 +46,16 @@ function formatLocation(): string {
 
 function navigateToItem(aoid: number) {
   router.push(`/items/${aoid}`);
+}
+
+function formatMinimumLevel(symbiant: SymbiantItem): string {
+  try {
+    const level = getMinimumLevel(symbiant);
+    return `${level}`;
+  } catch (error) {
+    console.error('Failed to extract level from symbiant:', symbiant.name, error);
+    return '--';
+  }
 }
 
 async function shareLink() {
@@ -273,6 +283,11 @@ onMounted(() => {
                   <Column field="ql" header="QL" sortable>
                     <template #body="{ data }">
                       <Tag :value="`QL ${data.ql}`" severity="info" />
+                    </template>
+                  </Column>
+                  <Column header="Level Req" sortable>
+                    <template #body="{ data }">
+                      <Tag :value="`Lvl ${formatMinimumLevel(data)}`" severity="info" />
                     </template>
                   </Column>
                 </DataTable>

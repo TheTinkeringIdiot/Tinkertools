@@ -7,7 +7,7 @@ import { usePocketBossStore } from '@/stores/pocketBossStore'
 import { mapProfileToStats } from '@/utils/profile-stats-mapper'
 import { parseAction, checkActionRequirements } from '@/services/action-criteria'
 import { IMPLANT_SLOT } from '@/services/game-data'
-import { getImplantSlotNameFromBitflag } from '@/services/game-utils'
+import { getImplantSlotNameFromBitflag, getMinimumLevel } from '@/services/game-utils'
 import type { SymbiantItem, Mob } from '@/types/api'
 
 // Props
@@ -46,6 +46,9 @@ const slotFilter = ref<number | null>(null)
 const minQL = ref<number>(1)
 const maxQL = ref<number>(300)
 const qlRange = ref<[number, number]>([1, 300]) // Local state for slider
+const symbiantMinLevel = ref<number>(1)
+const symbiantMaxLevel = ref<number>(220)
+const symbiantLevelRange = ref<[number, number]>([1, 220]) // Local state for slider
 const searchText = ref<string>('')
 const profileToggle = ref<boolean>(false)
 
@@ -245,6 +248,14 @@ async function fetchSymbiants() {
       query.search = searchText.value.trim()
     }
 
+    if (symbiantMinLevel.value > 1) {
+      query.min_level = symbiantMinLevel.value
+    }
+
+    if (symbiantMaxLevel.value < 220) {
+      query.max_level = symbiantMaxLevel.value
+    }
+
     const results = await symbiantsStore.searchSymbiants(query)
     symbiants.value = results || []
 
@@ -300,6 +311,9 @@ function clearFilters() {
   minQL.value = 1
   maxQL.value = 300
   qlRange.value = [1, 300]
+  symbiantMinLevel.value = 1
+  symbiantMaxLevel.value = 220
+  symbiantLevelRange.value = [1, 220]
   searchText.value = ''
   profileToggle.value = false
   updateFilters()
@@ -311,6 +325,12 @@ function applyQlFilter() {
   updateFilters()
 }
 
+function applyLevelFilter() {
+  symbiantMinLevel.value = symbiantLevelRange.value[0]
+  symbiantMaxLevel.value = symbiantLevelRange.value[1]
+  updateFilters()
+}
+
 function updateURL() {
   const query: any = {}
 
@@ -318,6 +338,8 @@ function updateURL() {
   if (slotFilter.value) query.slot = slotFilter.value.toString()
   if (minQL.value > 1) query.minql = minQL.value.toString()
   if (maxQL.value < 300) query.maxql = maxQL.value.toString()
+  if (symbiantMinLevel.value > 1) query.minlvl = symbiantMinLevel.value.toString()
+  if (symbiantMaxLevel.value < 220) query.maxlvl = symbiantMaxLevel.value.toString()
   if (searchText.value.trim()) query.search = searchText.value.trim()
   if (profileToggle.value) query.profile = 'true'
 
@@ -356,6 +378,22 @@ function readURLParams() {
 
   if (query.search && typeof query.search === 'string') {
     searchText.value = query.search
+  }
+
+  if (query.minlvl && typeof query.minlvl === 'string') {
+    const minLvl = parseInt(query.minlvl)
+    if (!isNaN(minLvl)) {
+      symbiantMinLevel.value = minLvl
+      symbiantLevelRange.value[0] = minLvl
+    }
+  }
+
+  if (query.maxlvl && typeof query.maxlvl === 'string') {
+    const maxLvl = parseInt(query.maxlvl)
+    if (!isNaN(maxLvl)) {
+      symbiantMaxLevel.value = maxLvl
+      symbiantLevelRange.value[1] = maxLvl
+    }
   }
 
   if (query.profile === 'true') {
@@ -423,6 +461,16 @@ function getSeverity(level: number): 'success' | 'info' | 'warning' | 'danger' {
   return 'danger'
 }
 
+function formatMinimumLevel(symbiant: SymbiantItem): string {
+  try {
+    const level = getMinimumLevel(symbiant)
+    return `Lvl ${level}+`
+  } catch (error) {
+    console.error('Failed to extract level from symbiant:', symbiant.name, error)
+    return 'Lvl ?'
+  }
+}
+
 async function loadBosses() {
   await pocketBossStore.fetchPocketBosses()
   // Set initial level range from store
@@ -446,6 +494,28 @@ watch(() => route.query, () => {
     readURLParams()
   }
 })
+
+// Watch for profile changes to auto-set max level
+watch(() => activeProfile.value, (newProfile, oldProfile) => {
+  if (props.view !== 'symbiants') return
+
+  // Only update if profile actually changed (not just a reference change)
+  const oldLevel = oldProfile?.Character.Level
+  const newLevel = newProfile?.Character.Level
+
+  if (newProfile && newLevel && oldLevel !== newLevel) {
+    // Auto-set max level to profile level
+    symbiantMaxLevel.value = newLevel
+    symbiantLevelRange.value[1] = newLevel
+    // Trigger update
+    applyLevelFilter()
+  } else if (!newProfile && oldProfile) {
+    // Profile was cleared, reset to max
+    symbiantMaxLevel.value = 220
+    symbiantLevelRange.value[1] = 220
+    applyLevelFilter()
+  }
+}, { immediate: false })
 </script>
 
 <template>
@@ -533,6 +603,28 @@ watch(() => route.query, () => {
             </div>
           </div>
 
+          <!-- Level Range Slider -->
+          <div class="mt-4">
+            <div class="flex items-center gap-3">
+              <label class="text-sm font-medium whitespace-nowrap">Level Range:</label>
+              <span class="text-sm text-surface-600 dark:text-surface-400 min-w-[2rem] text-center">{{ symbiantLevelRange[0] }}</span>
+              <Slider
+                v-model="symbiantLevelRange"
+                :range="true"
+                :min="1"
+                :max="220"
+                @slideend="applyLevelFilter"
+                class="flex-1"
+              />
+              <span class="text-sm text-surface-600 dark:text-surface-400 min-w-[2rem] text-center">{{ symbiantLevelRange[1] }}</span>
+              <i
+                v-if="activeProfile && symbiantMaxLevel === activeProfile.Character.Level"
+                class="pi pi-user text-primary-500"
+                v-tooltip="'Max level set from active profile'"
+              ></i>
+            </div>
+          </div>
+
           <!-- Action Buttons -->
           <div class="mt-4 pt-4 border-t border-surface-200 dark:border-surface-700 flex justify-between items-center">
             <div class="flex items-center gap-2">
@@ -596,6 +688,8 @@ watch(() => route.query, () => {
               <span>{{ getImplantSlotNameFromBitflag(symbiant.slot_id) }}</span>
               <span>•</span>
               <span>QL {{ symbiant.ql }}</span>
+              <span>•</span>
+              <span>{{ formatMinimumLevel(symbiant) }}</span>
             </div>
           </div>
 

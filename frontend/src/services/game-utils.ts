@@ -2027,3 +2027,39 @@ export function getNanoExpansion(item: Item): string | null {
   
   return expansionNames[expansionValue] || `Exp ${expansionValue}`;
 }
+
+// ============================================================================
+// Symbiant Functions
+// ============================================================================
+
+/**
+ * Extract minimum level requirement from symbiant WEAR action
+ * Symbiants always have a WEAR action (action = 6) with a level requirement (stat 54)
+ * @param symbiant The symbiant item to extract level from
+ * @returns The minimum level requirement (adjusted for operator)
+ * @throws Error if WEAR action or level requirement is missing
+ */
+export function getMinimumLevel(symbiant: { actions?: Action[] }): number {
+  const wearAction = symbiant.actions?.find(a => a.action === 6);
+  if (!wearAction) {
+    throw new Error(`Symbiant missing WEAR action (action=6)`);
+  }
+
+  const levelCriterion = wearAction.criteria.find(c => c.value1 === 54);
+  if (!levelCriterion) {
+    throw new Error(`Symbiant missing level requirement (stat=54) in WEAR action`);
+  }
+
+  // Operator 2 = GreaterThan, so value2=29 means "Level > 29" → display as 30
+  // Operator 0 = Equal, value2=30 means "Level = 30" → display as 30
+  // Operator 1 = LessThan (rare for requirements)
+  const { value2, operator } = levelCriterion;
+
+  if (operator === 2) {
+    // GreaterThan: Level > X means minimum is X+1
+    return value2 + 1;
+  }
+
+  // Equal or other operators: use value as-is
+  return value2;
+}

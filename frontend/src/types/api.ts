@@ -367,6 +367,8 @@ export interface SymbiantSearchQuery {
   slot_id?: number
   min_ql?: number
   max_ql?: number
+  min_level?: number
+  max_level?: number
   page?: number
   limit?: number
 }
