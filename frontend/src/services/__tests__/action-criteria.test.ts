@@ -87,6 +87,7 @@ vi.mock('../game-utils', () => ({
       19: 'Intelligence',
       20: 'Psychic',
       21: 'Sense',
+      30: 'Stat 30',
       54: 'Level',
       60: 'Profession',
       112: 'Pistol',
@@ -124,6 +125,9 @@ vi.mock('../game-utils', () => ({
       2: 'Neuter'
     }
     return genders[id]
+  },
+  getFlagNameFromValue: (stat: number, value: number) => {
+    return `flag ${value}`
   }
 }))
 
@@ -423,8 +427,7 @@ describe('action-criteria service', () => {
         action: 6, // Wield
         item_id: 123,
         criteria: [
-          { id: 1, value1: 112, value2: 356, operator: 2 },
-          { id: 2, value1: 0, value2: 0, operator: 4 }
+          { id: 1, value1: 112, value2: 356, operator: 2 }
         ]
       }
 
@@ -432,7 +435,7 @@ describe('action-criteria service', () => {
 
       expect(result.actionName).toBe('Wield')
       expect(result.hasRequirements).toBe(true)
-      expect(result.criteria).toHaveLength(2)
+      expect(result.criteria).toHaveLength(1)
       expect(result.expression).toBeDefined()
       expect(result.description).toContain('Wield:')
     })
@@ -531,7 +534,7 @@ describe('action-criteria service', () => {
       expect(result[0]).toEqual({
         stat: 30,
         statName: 'Stat 30',
-        mustHaveFlag: 32, // Last one wins in this implementation
+        mustHaveFlag: 64,
         mustLackFlag: 32
       })
     })
@@ -557,6 +560,9 @@ describe('action-criteria service', () => {
           isSeparator: false,
           isStatRequirement: true
         }
+      ],
+      rawCriteria: [
+        { id: 1, value1: 112, value2: 356, operator: 2 }
       ]
     }
 
@@ -602,7 +608,10 @@ describe('action-criteria service', () => {
           displayValue: 8,
           displaySymbol: '=',
           description: 'Profession = Bureaucrat'
-        }]
+        }],
+        rawCriteria: [
+          { id: 1, value1: 112, value2: 8, operator: 0 }
+        ]
       }
 
       // Test equal - match
@@ -612,6 +621,45 @@ describe('action-criteria service', () => {
       // Test equal - no match
       result = checkActionRequirements(equalAction, { 112: 5 })
       expect(result.canPerform).toBe(false)
+    })
+
+    it('should handle OR logic correctly (profession requirements)', () => {
+      // Typical OR pattern: (Prof = 1) OR (Prof = 2) OR (Prof = 3)
+      // RPN: Prof=1 Prof=2 OR Prof=3 OR
+      const action: Action = {
+        id: 1,
+        action: 6, // Wield
+        item_id: 123,
+        criteria: [
+          { id: 1, value1: 60, value2: 1, operator: 0 },  // Profession = 1 (Soldier)
+          { id: 2, value1: 60, value2: 2, operator: 0 },  // Profession = 2 (MartialArtist)
+          { id: 3, value1: 0, value2: 0, operator: 3 },   // OR
+          { id: 4, value1: 60, value2: 3, operator: 0 },  // Profession = 3 (Engineer)
+          { id: 5, value1: 0, value2: 0, operator: 3 }    // OR
+        ]
+      }
+
+      const parsedAction = parseAction(action)
+
+      // Character is Soldier (meets first option)
+      let result = checkActionRequirements(parsedAction, { 60: 1 })
+      expect(result.canPerform).toBe(true)
+      expect(result.unmetRequirements).toHaveLength(0)
+
+      // Character is MartialArtist (meets second option)
+      result = checkActionRequirements(parsedAction, { 60: 2 })
+      expect(result.canPerform).toBe(true)
+      expect(result.unmetRequirements).toHaveLength(0)
+
+      // Character is Engineer (meets third option)
+      result = checkActionRequirements(parsedAction, { 60: 3 })
+      expect(result.canPerform).toBe(true)
+      expect(result.unmetRequirements).toHaveLength(0)
+
+      // Character is Agent (doesn't meet any option)
+      result = checkActionRequirements(parsedAction, { 60: 5 })
+      expect(result.canPerform).toBe(false)
+      expect(result.unmetRequirements.length).toBeGreaterThan(0)
     })
   })
 

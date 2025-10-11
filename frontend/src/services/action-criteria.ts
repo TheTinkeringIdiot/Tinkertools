@@ -69,6 +69,7 @@ export interface ParsedAction {
   action: number
   actionName: string
   criteria: DisplayCriterion[]
+  rawCriteria: Criterion[]
   expression?: CriteriaExpression
   hasRequirements: boolean
   description: string
@@ -345,17 +346,18 @@ export function parseAction(action: Action): ParsedAction {
   const criteria = action.criteria.map(transformCriterionForDisplay)
   const expression = parseCriteriaExpression(action.criteria)
   const hasRequirements = criteria.some(c => c.isStatRequirement)
-  
-  const description = hasRequirements 
+
+  const description = hasRequirements
     ? `${actionName}: ${expression?.description || 'Has requirements'}`
     : `${actionName}: No requirements`
-  
+
   return {
     id: action.id,
     action: action.action || 0,
     actionName,
     criteria,
-    expression,
+    rawCriteria: action.criteria,
+    expression: expression || undefined,
     hasRequirements,
     description
   }
@@ -418,9 +420,9 @@ export function getCriteriaRequirements(criteria: Criterion[]): Array<{
  * Check if character meets action requirements
  */
 export function checkActionRequirements(
-  action: ParsedAction, 
+  action: ParsedAction,
   characterStats: Record<number, number>
-): { 
+): {
   canPerform: boolean
   unmetRequirements: Array<{
     stat: number
@@ -430,6 +432,37 @@ export function checkActionRequirements(
     operator: string
   }>
 } {
+  // Handle empty criteria
+  if (!action.rawCriteria || action.rawCriteria.length === 0) {
+    return { canPerform: true, unmetRequirements: [] }
+  }
+
+  // Build and evaluate criteria tree
+  const tree = buildCriteriaTree(action.rawCriteria, characterStats)
+
+  // Tree evaluation result tells us if requirements are met
+  const canPerform = tree ? tree.status === 'met' : true
+
+  // Collect unmet requirements from tree
+  const unmetRequirements = tree ? collectUnmetRequirements(tree, characterStats) : []
+
+  return { canPerform, unmetRequirements }
+}
+
+/**
+ * Collect unmet requirements from criteria tree
+ * Recursively traverses the tree and collects requirements with status 'unmet'
+ */
+function collectUnmetRequirements(
+  node: CriteriaTreeNode,
+  characterStats: Record<number, number>
+): Array<{
+  stat: number
+  statName: string
+  required: number
+  current: number
+  operator: string
+}> {
   const unmetRequirements: Array<{
     stat: number
     statName: string
@@ -437,51 +470,59 @@ export function checkActionRequirements(
     current: number
     operator: string
   }> = []
-  
-  for (const criterion of action.criteria) {
-    if (!criterion.isStatRequirement) continue
-    
+
+  // If this is an unmet requirement node, add it
+  if (node.type === 'requirement' && node.status === 'unmet' && node.criterion) {
+    const criterion = node.criterion
     const currentValue = characterStats[criterion.stat] || 0
-    let requirementMet = false
-    
-    switch (criterion.displaySymbol) {
-      case '=':
-        requirementMet = currentValue === criterion.displayValue
-        break
-      case '≤':
-        requirementMet = currentValue <= criterion.displayValue
-        break
-      case '≥':
-        requirementMet = currentValue >= criterion.displayValue
-        break
-      case '≠':
-        requirementMet = currentValue !== criterion.displayValue
-        break
-      case 'has':
-        requirementMet = (currentValue & criterion.displayValue) === criterion.displayValue
-        break
-      case 'lacks':
-        requirementMet = (currentValue & criterion.displayValue) === 0
-        break
-      default:
-        requirementMet = true // Unknown operator, assume met
-    }
-    
-    if (!requirementMet) {
-      unmetRequirements.push({
-        stat: criterion.stat,
-        statName: criterion.statName,
-        required: criterion.displayValue,
-        current: currentValue,
-        operator: criterion.displaySymbol
-      })
+
+    unmetRequirements.push({
+      stat: criterion.stat,
+      statName: criterion.statName,
+      required: criterion.displayValue,
+      current: currentValue,
+      operator: criterion.displaySymbol
+    })
+  }
+
+  // Handle operator nodes
+  if (node.type === 'operator' && node.children) {
+    if (node.operator === 'OR') {
+      // For OR nodes, only collect unmet requirements if the entire OR group is unmet
+      if (node.status === 'unmet') {
+        // All children are unmet, collect all of them to show what options are available
+        for (const child of node.children) {
+          unmetRequirements.push(...collectUnmetRequirements(child, characterStats))
+        }
+      }
+      // If OR node is met, don't collect any requirements from it
+    } else if (node.operator === 'AND') {
+      // For AND nodes, collect all unmet children
+      for (const child of node.children) {
+        if (child.status === 'unmet' || child.status === 'partial') {
+          unmetRequirements.push(...collectUnmetRequirements(child, characterStats))
+        }
+      }
+    } else if (node.operator === 'NOT') {
+      // For NOT nodes, if the node is unmet, it means the negated condition failed
+      if (node.status === 'unmet' && node.children.length > 0) {
+        // The child is met (which makes the NOT unmet)
+        // We could show this differently, but for now just collect it
+        unmetRequirements.push(...collectUnmetRequirements(node.children[0], characterStats))
+      }
     }
   }
-  
-  return {
-    canPerform: unmetRequirements.length === 0,
-    unmetRequirements
+
+  // Handle group nodes
+  if (node.type === 'group' && node.children) {
+    for (const child of node.children) {
+      if (child.status === 'unmet' || child.status === 'partial') {
+        unmetRequirements.push(...collectUnmetRequirements(child, characterStats))
+      }
+    }
   }
+
+  return unmetRequirements
 }
 
 /**
@@ -631,10 +672,40 @@ function buildTreeFromRPN(
  * Using logical properties: (A ∧ B) ∧ C = A ∧ B ∧ C
  */
 function consolidateNestedLogic(node: CriteriaTreeNode): CriteriaTreeNode {
+  // Special handling for OR nodes - even empty ones should count as 1 choice
+  if (node.type === 'operator' && node.operator === 'OR') {
+    const consolidatedChildren = node.children ? node.children.map(consolidateNestedLogic) : []
+
+    // Flatten nested OR operators into a single level
+    const flattenedChildren: CriteriaTreeNode[] = []
+
+    for (const child of consolidatedChildren) {
+      // If child is also an OR operation, flatten its children
+      if (child.type === 'operator' && child.operator === 'OR' && child.children) {
+        flattenedChildren.push(...child.children)
+      } else {
+        flattenedChildren.push(child)
+      }
+    }
+
+    // Check if any flattened child is met
+    const hasMetChild = flattenedChildren.some(c =>
+      c.status === 'met' || (c.status === 'partial' && c.metCount && c.metCount > 0)
+    )
+
+    return {
+      ...node,
+      children: flattenedChildren,  // Use flattened children
+      metCount: hasMetChild ? 1 : 0,
+      totalCount: 1,  // Always 1 - represents the choice itself
+      status: hasMetChild ? 'met' : 'unmet'
+    }
+  }
+
   if (!node.children || node.children.length === 0) {
     return node
   }
-  
+
   // Recursively consolidate children first
   const consolidatedChildren = node.children.map(consolidateNestedLogic)
   
@@ -663,18 +734,13 @@ function consolidateNestedLogic(node: CriteriaTreeNode): CriteriaTreeNode {
     }
   }
   
-  // For OR and NOT operations, just update children but don't flatten
-  if (node.type === 'operator' && (node.operator === 'OR' || node.operator === 'NOT')) {
+  // For NOT operations, just update children but don't flatten
+  if (node.type === 'operator' && node.operator === 'NOT') {
     const { metCount, totalCount } = calculateNodeStats(consolidatedChildren)
-    
-    let status: 'met' | 'unmet' | 'partial' | 'unknown'
-    if (node.operator === 'OR') {
-      status = metCount > 0 ? 'met' : 'unmet'
-    } else { // NOT
-      const childStatus = consolidatedChildren[0]?.status
-      status = childStatus === 'unmet' ? 'met' : (childStatus === 'met' ? 'unmet' : 'unknown')
-    }
-    
+    const childStatus = consolidatedChildren[0]?.status
+    const status: 'met' | 'unmet' | 'partial' | 'unknown' =
+      childStatus === 'unmet' ? 'met' : (childStatus === 'met' ? 'unmet' : 'unknown')
+
     return {
       ...node,
       children: consolidatedChildren,
@@ -737,8 +803,24 @@ function createOperatorNode(
     }
   }
   
-  const { metCount, totalCount } = calculateNodeStats(children)
-  
+  // Calculate stats based on operator type
+  let metCount: number
+  let totalCount: number
+
+  if (operator === 'OR') {
+    // OR represents a single choice among alternatives
+    const hasMetChild = children.some(c =>
+      c.status === 'met' || (c.status === 'partial' && c.metCount && c.metCount > 0)
+    )
+    metCount = hasMetChild ? 1 : 0
+    totalCount = 1
+  } else {
+    // AND and other operators sum their children
+    const stats = calculateNodeStats(children)
+    metCount = stats.metCount
+    totalCount = stats.totalCount
+  }
+
   let status: 'met' | 'unmet' | 'partial' | 'unknown'
   if (operator === 'AND') {
     status = metCount === totalCount ? 'met' : (metCount > 0 ? 'partial' : 'unmet')

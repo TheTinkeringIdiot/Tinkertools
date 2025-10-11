@@ -107,20 +107,47 @@ const characterStats = computed(() => {
 })
 
 const filteredSymbiants = computed(() => {
+  console.log('🔍 Starting filteredSymbiants computation')
+  console.log('  profileToggle:', profileToggle.value)
+  console.log('  characterStats:', characterStats.value ? 'present' : 'null')
+  console.log('  symbiants.value.length:', symbiants.value.length)
+
   if (!profileToggle.value || !characterStats.value) {
-    return symbiants.value.map(symbiant => ({
+    const result = symbiants.value.map(symbiant => ({
       ...symbiant,
       canUse: true
     }))
+    console.log('  No filtering applied, returning all:', result.length)
+    return result
   }
 
   // Apply character requirements filtering and hide unusable symbiants
-  return symbiants.value
+  let passCount = 0
+  let failCount = 0
+
+  const result = symbiants.value
     .map(symbiant => {
       const canUse = checkSymbiantRequirements(symbiant)
+      if (canUse) passCount++
+      else failCount++
+
+      if (symbiant.family === 'Extermination' && canUse) {
+        console.log('  ✅ Extermination PASS:', symbiant.name)
+      }
+      if (symbiant.family === 'Extermination' && !canUse) {
+        const result = checkActionRequirements(parseAction(symbiant.actions[0]), characterStats.value!)
+        console.log('  ❌ Extermination FAIL:', symbiant.name, 'QL:', symbiant.ql)
+        console.log('    Unmet:', result.unmetRequirements.map(r => `${r.statName}=${r.required}`).join(', '))
+      }
+
       return { ...symbiant, canUse }
     })
     .filter(symbiant => symbiant.canUse)
+
+  console.log('  Pass/Fail:', passCount, '/', failCount)
+  console.log('  Final result count:', result.length)
+
+  return result
 })
 
 const displayedSymbiantCount = computed(() => {
@@ -136,16 +163,52 @@ const comparisonCount = computed(() => symbiantsStore.getComparisonCount())
 const hasComparisons = computed(() => comparisonCount.value > 0)
 
 // Methods
+let debugCount = 0
 function checkSymbiantRequirements(symbiant: SymbiantItem): boolean {
-  if (!characterStats.value || !symbiant.actions || symbiant.actions.length === 0) {
-    return true // No requirements or no profile
+  const shouldLog = debugCount === 0
+
+  if (shouldLog) {
+    console.log('🔍 Checking symbiant:', symbiant.name, 'ID:', symbiant.id)
   }
 
-  // Check the first action (typically "Wear" for symbiants)
-  const action = symbiant.actions[0]
-  const parsedAction = parseAction(action)
-  const result = checkActionRequirements(parsedAction, characterStats.value)
+  if (!characterStats.value) {
+    if (shouldLog) console.log('❌ No character stats')
+    return true
+  }
 
+  if (shouldLog) {
+    console.log('📊 Character stats:', characterStats.value)
+    console.log('📊 Profession stat (60):', characterStats.value[60])
+  }
+
+  if (!symbiant.actions || symbiant.actions.length === 0) {
+    if (shouldLog) console.log('✅ No actions, returning true')
+    return true
+  }
+
+  const action = symbiant.actions[0]
+  if (shouldLog) {
+    console.log('📋 Action criteria count:', action.criteria?.length)
+  }
+
+  const parsedAction = parseAction(action)
+  if (shouldLog) {
+    console.log('🔨 Parsed action:', parsedAction)
+  }
+
+  const result = checkActionRequirements(parsedAction, characterStats.value)
+  if (shouldLog) {
+    console.log('✅ Can perform?', result.canPerform, 'Unmet:', result.unmetRequirements.length)
+
+    if (!result.canPerform && result.unmetRequirements.length > 0) {
+      console.log('❌ Unmet requirements:')
+      result.unmetRequirements.forEach(req => {
+        console.log(`  - Stat ${req.stat}: need ${req.required}, have ${req.current}`)
+      })
+    }
+  }
+
+  debugCount++
   return result.canPerform
 }
 
@@ -153,9 +216,13 @@ async function fetchSymbiants() {
   loading.value = true
 
   try {
+    // When profile filtering is ON, fetch all symbiants to ensure we don't miss compatible ones on other pages
+    const effectivePageSize = profileToggle.value ? 2000 : pageSize.value
+    const effectivePage = profileToggle.value ? 1 : currentPage.value
+
     const query: any = {
-      page: currentPage.value,
-      limit: pageSize.value
+      page: effectivePage,
+      limit: effectivePageSize
     }
 
     if (familyFilter.value) {
@@ -180,6 +247,13 @@ async function fetchSymbiants() {
 
     const results = await symbiantsStore.searchSymbiants(query)
     symbiants.value = results || []
+
+    // Debug: Log what we received from API
+    console.log('📦 Received from API:', {
+      total: symbiants.value.length,
+      families: [...new Set(symbiants.value.map(s => s.family))],
+      exterminationCount: symbiants.value.filter(s => s.family === 'Extermination').length
+    })
 
     // Get total count from pagination if available
     const pagination = symbiantsStore.currentPagination
@@ -433,7 +507,7 @@ watch(() => route.query, () => {
                 <InputSwitch
                   v-model="profileToggle"
                   :disabled="!activeProfile"
-                  @change="updateURL"
+                  @change="updateFilters"
                 />
                 <span class="text-sm text-surface-600 dark:text-surface-400">
                   {{ profileToggle ? 'On' : 'Off' }}
@@ -496,7 +570,9 @@ watch(() => route.query, () => {
       <!-- Loading State -->
       <div v-if="loading" class="text-center py-12">
         <i class="pi pi-spinner pi-spin text-4xl text-primary-500 mb-4"></i>
-        <p class="text-lg text-surface-600 dark:text-surface-400">Loading symbiants...</p>
+        <p class="text-lg text-surface-600 dark:text-surface-400">
+          {{ profileToggle ? 'Loading all symbiants for profile filtering...' : 'Loading symbiants...' }}
+        </p>
       </div>
 
       <!-- Results List -->
@@ -545,13 +621,19 @@ watch(() => route.query, () => {
       </div>
 
       <!-- Pagination -->
-      <div v-if="totalCount > pageSize" class="mt-6">
+      <div v-if="!profileToggle && totalCount > pageSize" class="mt-6">
         <Paginator
           :rows="pageSize"
           :totalRecords="totalCount"
           :rowsPerPageOptions="[25, 50, 100]"
           @page="onPageChange"
         />
+      </div>
+
+      <!-- Profile Filtering Message -->
+      <div v-else-if="profileToggle && !loading" class="mt-6 text-center text-sm text-surface-500 dark:text-surface-400">
+        <i class="pi pi-info-circle mr-1"></i>
+        Pagination disabled when filtering by profile (showing all matching results)
       </div>
     </div>
 

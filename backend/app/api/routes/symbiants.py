@@ -38,7 +38,7 @@ def list_symbiants(
     min_ql: Optional[int] = Query(None, description="Minimum quality level"),
     max_ql: Optional[int] = Query(None, description="Maximum quality level"),
     page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(50, ge=1, le=200, description="Items per page"),
+    page_size: int = Query(50, ge=1, le=2000, description="Items per page (up to 2000 for profile filtering)"),
     db: Session = Depends(get_db)
 ):
     """
