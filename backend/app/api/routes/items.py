@@ -4,7 +4,7 @@ Items API endpoints.
 
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, aliased
 from sqlalchemy import or_, and_, func, Integer, text
 import math
 import time
@@ -892,33 +892,33 @@ def get_items_with_stats(
     
     # Apply stat filters
     for i, (stat_id, op, value) in enumerate(requirements):
-        # Create alias for each stat join to avoid conflicts
-        stat_alias = f"sv_{i}"
-        item_stats_alias = f"ist_{i}"
-        
         if logic == "and" or len(requirements) == 1:
             # JOIN for AND logic - item must have ALL specified stats
+            # Use aliases to avoid "table name specified more than once" error
+            item_stats_alias = aliased(ItemStats)
+            stat_value_alias = aliased(StatValue)
+
             query = query.join(
-                ItemStats, 
-                Item.id == ItemStats.item_id
+                item_stats_alias,
+                Item.id == item_stats_alias.item_id
             ).join(
-                StatValue,
-                ItemStats.stat_value_id == StatValue.id
+                stat_value_alias,
+                item_stats_alias.stat_value_id == stat_value_alias.id
             ).filter(
-                StatValue.stat == stat_id
+                stat_value_alias.stat == stat_id
             )
-            
+
             # Apply condition
             if op == '>=':
-                query = query.filter(StatValue.value >= value)
+                query = query.filter(stat_value_alias.value >= value)
             elif op == '<=':
-                query = query.filter(StatValue.value <= value)
+                query = query.filter(stat_value_alias.value <= value)
             elif op == '>':
-                query = query.filter(StatValue.value > value)
+                query = query.filter(stat_value_alias.value > value)
             elif op == '<':
-                query = query.filter(StatValue.value < value)
+                query = query.filter(stat_value_alias.value < value)
             elif op == '=':
-                query = query.filter(StatValue.value == value)
+                query = query.filter(stat_value_alias.value == value)
         else:
             # OR logic is more complex - need subqueries
             if i == 0:
