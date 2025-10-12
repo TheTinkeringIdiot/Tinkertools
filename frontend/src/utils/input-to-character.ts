@@ -8,6 +8,7 @@
 import type { NukeInputState } from '@/types/offensive-nano'
 import type { Character } from './stat-calculations'
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types'
+import { mapProfileToStats } from './profile-stats-mapper'
 
 /**
  * Converts NukeInputState manual inputs to Character interface
@@ -43,6 +44,9 @@ export function convertInputStateToCharacter(
 ): Character {
   const { characterStats } = inputState
 
+  // Get profile stats if available (includes computed profession stats)
+  const profileStats = profile ? mapProfileToStats(profile) : {}
+
   // Build flat baseStats object using skill IDs
   const baseStats: Record<number, number> = {
     // Core abilities and nano stats
@@ -59,15 +63,13 @@ export function convertInputStateToCharacter(
     130: characterStats.matterCreation ?? 0, // Material Creation
     131: characterStats.timeSpace ?? 0,      // Space Time
 
-    // WornItem equipment flags (stat 355) - pulled from profile equipment bonuses
-    355: profile?.skills[355]?.total ?? 0,
-
-    // Character-derived stats - pulled from profile (derived from Character properties)
-    54: profile?.skills[54]?.total ?? characterStats.level ?? 1,    // Level
-    60: profile?.skills[60]?.total ?? 11,   // Profession (Nanotechnician)
-    368: profile?.skills[368]?.total ?? 11, // VisualProfession (Nanotechnician)
-    182: profile?.skills[182]?.total ?? 0,  // Specialization
-    389: profile?.skills[389]?.total ?? 0,  // Expansion
+    // Character-derived stats - use mapper output which includes profession stats
+    54: profileStats[54] ?? characterStats.level ?? 1,  // Level
+    60: profileStats[60] ?? 11,   // Profession (Nanotechnician default)
+    368: profileStats[368] ?? 11, // VisualProfession (Nanotechnician default)
+    182: profileStats[182] ?? 0,  // Specialization
+    355: profileStats[355] ?? 0,  // WornItem equipment flags
+    389: profileStats[389] ?? 0,  // Expansion
   }
 
   return {

@@ -39,6 +39,7 @@ export function mapProfileToStats(profile: TinkerProfile): Record<number, number
     for (const [id, name] of Object.entries(PROFESSION)) {
       if (name === profile.Character.Profession) {
         stats[60] = parseInt(id)
+        stats[368] = parseInt(id)  // VisualProfession (mirrors Profession)
         break
       }
     }
