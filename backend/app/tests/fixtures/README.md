@@ -4,13 +4,13 @@ This directory contains test fixtures for the perk identification functionality 
 
 ## Overview
 
-The perk identification system adds an `is_perk` boolean field to the Item model to properly identify perk items based on the authoritative `backend/database/perks.json` file, replacing the unreliable `item_class=99999` approach.
+The perk identification system uses a separate Perk model with a one-to-one relationship to the Item model. Items are identified as perks if they have an associated Perk record, not based on a boolean field. This design is based on the authoritative `backend/database/perks.json` file, replacing the unreliable `item_class=99999` approach.
 
 ## Fixture Files
 
 ### `perk_fixtures.py`
 
-Contains pytest fixtures for creating test items with the `is_perk` field properly set:
+Contains pytest fixtures for creating test items with associated Perk records:
 
 #### Perk Item Fixtures
 - `perk_accumulator_level_1` - AOID 210830 (Accumulator Level 1)
@@ -19,11 +19,15 @@ Contains pytest fixtures for creating test items with the `is_perk` field proper
 - `perk_acrobat_level_1` - AOID 211655 (Acrobat Level 1)
 - `perk_alien_tech_expertise_level_1` - AOID 247748 (Alien Technology Expertise Level 1)
 
+Each perk fixture creates both an Item record and an associated Perk record linked via the item_id foreign key.
+
 #### Non-Perk Item Fixtures
 - `non_perk_weapon` - AOID 100001 (Test Blaster weapon)
 - `non_perk_armor` - AOID 200001 (Test Armor)
 - `non_perk_implant` - AOID 300001 (Test Implant)
 - `nano_program` - AOID 400001 (Test Nano Program with `is_nano=True`)
+
+These fixtures create Item records without associated Perk records.
 
 #### Composite Fixtures
 - `mixed_item_list` - Returns a list containing both perk and non-perk items
@@ -34,20 +38,7 @@ Contains pytest fixtures for creating test items with the `is_perk` field proper
 
 ### `import_fixtures.py`
 
-Contains fixtures for testing the import system's perk identification logic:
-
-#### Data Fixtures
-- `sample_perks_data` - Sample perks.json structure with real perk data
-- `sample_perk_aoids` - Set of AOIDs extracted from sample perks data
-- `item_import_data_with_perks` - Sample item data for import testing
-
-#### File Fixtures
-- `temp_perks_json_file` - Temporary perks.json file for testing
-- `empty_perks_json_file` - Empty perks.json for error handling tests
-- `malformed_perks_json_file` - Invalid JSON for error handling tests
-
-#### Validation Fixtures
-- `expected_perk_identification` - Expected results for perk identification tests
+REMOVED: This file has been removed as it provided fixtures for testing an is_perk boolean field that does not exist. See the file for guidance on creating new import fixtures if needed.
 
 ## Real AOIDs Used
 
@@ -69,45 +60,70 @@ All perk fixtures use real AOIDs from the actual `backend/database/perks.json` f
 def test_perk_identification(perk_accumulator_level_1):
     """Test that a perk is properly identified."""
     assert perk_accumulator_level_1.aoid == 210830
-    assert perk_accumulator_level_1.is_perk is True
+    assert perk_accumulator_level_1.perk is not None  # Has associated Perk record
     assert perk_accumulator_level_1.is_nano is False
+    # Access Perk details
+    assert perk_accumulator_level_1.perk.name == "Accumulator"
+    assert perk_accumulator_level_1.perk.counter == 1
 ```
 
 ### Database Query Testing
 
 ```python
+from app.models.perk import Perk
+
 def test_query_perks_only(db_session, mixed_item_list):
-    """Test querying for perks using the is_perk field."""
-    perks = db_session.query(Item).filter(Item.is_perk == True).all()
+    """Test querying for perks using the Perk relationship."""
+    # Query for items that have associated Perk records
+    perks = db_session.query(Item).join(Perk, Item.id == Perk.item_id).all()
     assert len(perks) == 2  # From mixed_item_list fixture
+
+    # Verify all have perk relationships
+    for item in perks:
+        assert item.perk is not None
+```
+
+### Querying Non-Perks
+
+```python
+def test_query_non_perks(db_session, mixed_item_list):
+    """Test querying for non-perks by excluding items with Perk records."""
+    # Use left outer join and filter for NULL
+    non_perks = db_session.query(Item).outerjoin(
+        Perk, Item.id == Perk.item_id
+    ).filter(Perk.item_id.is_(None)).all()
+
+    assert len(non_perks) == 3
+    for item in non_perks:
+        assert item.perk is None
 ```
 
 ### Import System Testing
 
-```python
-def test_import_perk_identification(temp_perks_json_file, item_import_data_with_perks):
-    """Test that import system correctly identifies perks."""
-    # Use temp_perks_json_file and item_import_data_with_perks
-    # to test DataImporter.load_perk_aoids() functionality
-```
+Import testing should verify that:
+1. Item records are imported correctly
+2. Perk records are imported from perks.json
+3. Perk.item_id correctly references Item.id
+4. The relationship is properly established
 
 ## Key Design Decisions
 
 1. **Real AOIDs**: All fixtures use real AOIDs from perks.json to ensure realistic testing
-2. **Contrast Items**: Non-perk fixtures provide clear contrast for testing identification logic
-3. **Mixed Data**: Composite fixtures enable comprehensive integration testing
-4. **Error Cases**: Import fixtures include error scenarios (missing/malformed files)
-5. **Business Rules**: Fixtures enforce the rule that perks are never nano programs
+2. **Separate Perk Model**: Perks are a separate table with one-to-one relationship to Items
+3. **Relationship-Based**: Perk identification via `item.perk is not None`, not boolean field
+4. **Contrast Items**: Non-perk fixtures provide clear contrast for testing identification logic
+5. **Mixed Data**: Composite fixtures enable comprehensive integration testing
+6. **Business Rules**: Fixtures enforce the rule that perks are never nano programs
 
 ## Testing Strategy
 
 These fixtures support testing:
 
-1. **Model Validation**: Items are created with correct `is_perk` values
-2. **Database Queries**: Filtering and querying based on `is_perk` field
-3. **Import Logic**: Verification that import system sets `is_perk` correctly
-4. **Service Layer**: PerkService queries return only items with `is_perk=True`
-5. **API Responses**: Endpoints return proper `is_perk` field values
+1. **Model Validation**: Items with Perk records are properly linked
+2. **Database Queries**: Filtering and querying based on Perk relationship
+3. **Import Logic**: Verification that import system creates proper Perk records
+4. **Service Layer**: PerkService queries return items with Perk relationships
+5. **API Responses**: Endpoints return proper perk data from Perk model
 
 ## Integration with Existing Tests
 
@@ -125,4 +141,4 @@ Additional fixtures can be added for:
 - More perk types (AI, LE, SL variations)
 - Edge cases (special profession requirements)
 - Performance testing (large datasets)
-- Migration testing (old vs new identification methods)
+- Testing Perk model fields (professions, breeds arrays, etc.)

@@ -26,189 +26,153 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 
 def override_get_db():
-    """Override database dependency for testing."""
+    """Override database dependency for testing with transaction rollback."""
+    connection = engine.connect()
+    transaction = connection.begin()
+    session = TestingSessionLocal(bind=connection)
+
     try:
-        db = TestingSessionLocal()
-        yield db
+        yield session
     finally:
-        db.close()
+        session.close()
+        transaction.rollback()
+        connection.close()
 
 
 @pytest.fixture
 def db_session():
-    """Create a new database session for a test."""
-    db = TestingSessionLocal()
+    """Create a new database session for a test with transaction rollback."""
+    connection = engine.connect()
+    transaction = connection.begin()
+    session = TestingSessionLocal(bind=connection)
+
     try:
-        yield db
+        yield session
     finally:
-        db.close()
+        session.close()
+        transaction.rollback()
+        connection.close()
 
 
 @pytest.fixture
 def client(db_session):
-    """Create a test client with overridden database."""
-    app.dependency_overrides[get_db] = override_get_db
+    """Create a test client with overridden database using the same db_session.
+
+    This ensures that data created in db_session is visible to the API endpoints
+    called via the client, since they share the same database connection/transaction.
+    """
+    def override_get_db_with_session():
+        """Override that yields the same db_session fixture."""
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db_with_session
     with TestClient(app) as test_client:
         yield test_client
+
+    # Clean up properly - clear identity map to prevent state pollution
     app.dependency_overrides.clear()
+    db_session.expunge_all()  # Clear all objects from session identity map
 
 
 @pytest.fixture
 def sample_stat_value(db_session):
-    """Create a sample stat value for testing."""
+    """Query a real stat value from the database for testing.
+
+    Uses STAT_ID_COMMON_1 (Stat 1, Value: 5000) from the real database.
+    """
     from app.models import StatValue
-    
-    stat_value = StatValue(stat=16, value=500)  # Strength 500
-    db_session.add(stat_value)
-    db_session.commit()
-    db_session.refresh(stat_value)
+    from app.tests.db_test_constants import STAT_ID_COMMON_1
+
+    # Query real stat value instead of creating mock
+    stat_value = db_session.query(StatValue).filter(
+        StatValue.id == STAT_ID_COMMON_1
+    ).one()
+
     return stat_value
 
 
 @pytest.fixture
 def sample_item(db_session):
-    """Create a sample item for testing."""
-    from app.models import Item
-    
-    item = Item(
-        aoid=12345,
-        name="Test Weapon",
-        ql=200,
-        item_class=1,  # Use integer item_class
-        description="A test weapon for unit tests",
-        is_nano=False
-    )
-    db_session.add(item)
-    db_session.commit()
-    db_session.refresh(item)
+    """Query a real item from the database for testing.
+
+    Uses Cell Scanner (AOID: 24562, QL: 1, 6 stats) - a simple item
+    perfect for basic testing.
+    """
+    from app.models import Item, ItemStats
+    from sqlalchemy.orm import selectinload
+    from app.tests.db_test_constants import ITEM_CELL_SCANNER
+
+    # Query real item with stats loaded instead of creating mock
+    item = db_session.query(Item).options(
+        selectinload(Item.item_stats).selectinload(ItemStats.stat_value)
+    ).filter(Item.aoid == ITEM_CELL_SCANNER).one()
+
     return item
 
 
 @pytest.fixture
 def sample_symbiant(db_session):
-    """Create a sample symbiant for testing."""
-    from app.models import Symbiant
-    
-    symbiant = Symbiant(
-        aoid=54321,
-        name="Test Symbiant",
-        ql=200,
-        family="Artillery",
-        symbiant_class="Support",
-        slot="Head"
-    )
-    db_session.add(symbiant)
-    db_session.commit()
-    db_session.refresh(symbiant)
-    return symbiant
+    """Query a real symbiant item from the database for testing.
+
+    Uses "Breathing Ocular Symbiant" (AOID: 219132, QL: 100-150) - a real
+    symbiant with slot and level requirement data.
+
+    Note: Symbiants are stored as regular items with specific name patterns.
+    The symbiant_items materialized view filters items by name pattern and
+    extracts slot_id from stat 298.
+    """
+    from app.models import Item, ItemStats, Action
+    from sqlalchemy.orm import selectinload
+    from app.tests.db_test_constants import ITEM_MID_LOW_QL
+
+    # Query real symbiant item with all relationships loaded
+    item = db_session.query(Item).options(
+        selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
+        selectinload(Item.actions).selectinload(Action.action_criteria)
+    ).filter(Item.aoid == ITEM_MID_LOW_QL).one()
+
+    return item
 
 
 @pytest.fixture
 def sample_pocket_boss(db_session):
-    """Create a sample pocket boss for testing."""
-    from app.models import PocketBoss
-    
-    boss = PocketBoss(
-        name="Test Boss",
-        level=200,
-        location="Test Location",
-        playfield="Test Playfield",
-        encounter_info="Test encounter information"
-    )
-    db_session.add(boss)
-    db_session.commit()
-    db_session.refresh(boss)
+    """Query a real pocket boss from the database for testing.
+
+    Uses "Adobe Suzerain" (ID: 1171, Level: 125, Playfield: "Scheol Upper") -
+    a real pocket boss mob from the database.
+
+    Note: Pocket bosses are stored in the 'mobs' table with is_pocket_boss=True,
+    not in a separate 'pocket_bosses' table.
+    """
+    from app.models import Mob
+    from app.tests.db_test_constants import MOB_ID_ADOBE_SUZERAIN
+
+    # Query real pocket boss instead of creating mock
+    boss = db_session.query(Mob).filter(
+        Mob.id == MOB_ID_ADOBE_SUZERAIN
+    ).one()
+
     return boss
 
 
 @pytest.fixture
 def sample_item_with_all_fields(db_session):
-    """Create a comprehensive sample item with all related data for testing."""
+    """Query a comprehensive real item with all related data for testing.
+
+    Uses "Pistol Mastery" (AOID: 29246, QL: 24, 26 stats, 29 sources) -
+    a complex real item perfect for testing comprehensive relationships.
+    """
     from app.models import (
-        Item, ItemStats, StatValue, SpellData, ItemSpellData, Spell, 
-        SpellDataSpells, Action, ActionCriteria, Criterion, AttackDefense,
-        AttackDefenseAttack, AttackDefenseDefense
+        Item, ItemStats, ItemSource, Source, Action
     )
-    
-    # Create item
-    item = Item(
-        aoid=54321,
-        name="Enhanced Test Weapon",
-        ql=150,
-        item_class=1,
-        description="A comprehensive test weapon with all features",
-        is_nano=False
-    )
-    db_session.add(item)
-    db_session.flush()  # Get ID without committing
-    
-    # Create stat values
-    stat1 = StatValue(stat=16, value=50)  # Strength
-    stat2 = StatValue(stat=17, value=25)  # Intelligence
-    db_session.add_all([stat1, stat2])
-    db_session.flush()
-    
-    # Create item stats
-    item_stat1 = ItemStats(item_id=item.id, stat_value_id=stat1.id)
-    item_stat2 = ItemStats(item_id=item.id, stat_value_id=stat2.id)
-    db_session.add_all([item_stat1, item_stat2])
-    
-    # Create attack/defense data
-    attack_defense = AttackDefense()
-    db_session.add(attack_defense)
-    db_session.flush()
-    
-    # Set item's attack defense reference
-    item.atkdef_id = attack_defense.id
-    
-    # Create attack and defense stats
-    attack_stat = StatValue(stat=100, value=200)  # Attack rating
-    defense_stat = StatValue(stat=101, value=150)  # Defense rating
-    db_session.add_all([attack_stat, defense_stat])
-    db_session.flush()
-    
-    # Link attack/defense stats
-    attack_link = AttackDefenseAttack(attack_defense_id=attack_defense.id, stat_value_id=attack_stat.id)
-    defense_link = AttackDefenseDefense(attack_defense_id=attack_defense.id, stat_value_id=defense_stat.id)
-    db_session.add_all([attack_link, defense_link])
-    
-    # Create spell data
-    spell_data = SpellData(event=1)  # On equip
-    db_session.add(spell_data)
-    db_session.flush()
-    
-    # Create item spell data link
-    item_spell_data = ItemSpellData(item_id=item.id, spell_data_id=spell_data.id)
-    db_session.add(item_spell_data)
-    
-    # Create spell
-    spell = Spell(
-        target=1,
-        spell_id=98765,
-        spell_format="Increase {stat} by {value}",
-        spell_params={"stat": 96, "value": 15}
-    )
-    db_session.add(spell)
-    db_session.flush()
-    
-    # Create spell data spells link
-    spell_data_spell = SpellDataSpells(spell_data_id=spell_data.id, spell_id=spell.id)
-    db_session.add(spell_data_spell)
-    
-    # Create criteria for requirements
-    criterion = Criterion(value1=16, value2=100, operator=1)  # Strength >= 100
-    db_session.add(criterion)
-    db_session.flush()
-    
-    # Create action with criteria
-    action = Action(item_id=item.id, action=1)  # Equip action
-    db_session.add(action)
-    db_session.flush()
-    
-    # Create action criteria link
-    action_criteria = ActionCriteria(action_id=action.id, criterion_id=criterion.id)
-    db_session.add(action_criteria)
-    
-    db_session.commit()
-    db_session.refresh(item)
+    from sqlalchemy.orm import selectinload
+    from app.tests.db_test_constants import ITEM_PISTOL_MASTERY
+
+    # Query real item with all relationships loaded
+    item = db_session.query(Item).options(
+        selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
+        selectinload(Item.item_sources).selectinload(ItemSource.source).selectinload(Source.source_type),
+        selectinload(Item.actions).selectinload(Action.action_criteria)
+    ).filter(Item.aoid == ITEM_PISTOL_MASTERY).one()
+
     return item

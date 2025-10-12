@@ -34,6 +34,24 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    globals: true
+    globals: true,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'json'],
+      exclude: [
+        '**/*.spec.ts',
+        '**/*.test.ts',
+        '**/tests/**',
+        '**/__tests__/**',
+        '**/node_modules/**',
+        '**/dist/**'
+      ],
+      thresholds: {
+        lines: 60,
+        functions: 60,
+        branches: 60,
+        statements: 60
+      }
+    }
   }
 });

@@ -1,201 +1,237 @@
 """
 Test fixtures for perk identification functionality.
 
-This module provides test fixtures for items with `is_perk` field set to True/False,
-using real AOIDs from the perks.json file for testing perk identification logic.
+This module provides test fixtures that query real Perk and Item records from the database,
+replacing mock data with actual game data. Items are perks if they have a related Perk record.
 """
 
 import pytest
-from app.models import Item
+from sqlalchemy.orm import selectinload
+from app.models import Perk, Item, ItemStats
+from app.tests.db_test_constants import (
+    # SL Perks - Accumulator series
+    PERK_SL_ACCUMULATOR_1_ITEM_ID,
+    PERK_SL_ACCUMULATOR_2_ITEM_ID,
+    # AI Perks - Opportunist series
+    PERK_AI_OPPORTUNIST_1_ITEM_ID,
+    PERK_AI_OPPORTUNIST_2_ITEM_ID,
+    # LE Perks - Exploration series
+    PERK_LE_EXPLORATION_1_ITEM_ID,
+    PERK_LE_EXPLORATION_2_ITEM_ID,
+    PERK_LE_EXPLORATION_3_ITEM_ID,
+    # AI Perk - Alien Technology Expertise
+    PERK_AI_TECH_1_ITEM_ID,
+    # Items for testing non-perks
+    ITEM_CELL_SCANNER,
+    ITEM_AGENT,
+    ITEM_ADVENTURER,
+    ITEM_ENGINEER,
+)
+
+
+# =============================================================================
+# Perk Fixtures (8 total) - Real database perks
+# =============================================================================
+
+
+@pytest.fixture
+def perk_sl_acc1(db_session):
+    """Real Accumulator counter 1 perk (SL type, Level 10, AOID 210830)."""
+    return db_session.query(Perk).options(
+        selectinload(Perk.item)
+    ).filter(Perk.item_id == PERK_SL_ACCUMULATOR_1_ITEM_ID).one()
+
+
+@pytest.fixture
+def perk_sl_acc2(db_session):
+    """Real Accumulator counter 2 perk (SL type, Level 20, AOID 210831)."""
+    return db_session.query(Perk).options(
+        selectinload(Perk.item)
+    ).filter(Perk.item_id == PERK_SL_ACCUMULATOR_2_ITEM_ID).one()
+
+
+@pytest.fixture
+def perk_ai_opp1(db_session):
+    """Real Opportunist counter 1 perk (AI type, Level 15, AOID 252479)."""
+    return db_session.query(Perk).options(
+        selectinload(Perk.item)
+    ).filter(Perk.item_id == PERK_AI_OPPORTUNIST_1_ITEM_ID).one()
+
+
+@pytest.fixture
+def perk_ai_opp2(db_session):
+    """Real Opportunist counter 2 perk (AI type, Level 25, AOID 252480)."""
+    return db_session.query(Perk).options(
+        selectinload(Perk.item)
+    ).filter(Perk.item_id == PERK_AI_OPPORTUNIST_2_ITEM_ID).one()
+
+
+@pytest.fixture
+def perk_le_exp1(db_session):
+    """Real Exploration counter 1 perk (LE type, Level 1, AOID 260870)."""
+    return db_session.query(Perk).options(
+        selectinload(Perk.item)
+    ).filter(Perk.item_id == PERK_LE_EXPLORATION_1_ITEM_ID).one()
+
+
+@pytest.fixture
+def perk_le_exp2(db_session):
+    """Real Exploration counter 2 perk (LE type, Level 50, AOID 260871)."""
+    return db_session.query(Perk).options(
+        selectinload(Perk.item)
+    ).filter(Perk.item_id == PERK_LE_EXPLORATION_2_ITEM_ID).one()
+
+
+@pytest.fixture
+def perk_le_exp3(db_session):
+    """Real Exploration counter 3 perk (LE type, Level 75, AOID 260872)."""
+    return db_session.query(Perk).options(
+        selectinload(Perk.item)
+    ).filter(Perk.item_id == PERK_LE_EXPLORATION_3_ITEM_ID).one()
+
+
+@pytest.fixture
+def perk_le_exp4(db_session):
+    """Real Alien Technology Expertise counter 1 perk (AI type, Level 15, AOID 247748)."""
+    # Note: Using AI Tech as a substitute for LE exp4 since only 3 Exploration perks exist
+    return db_session.query(Perk).options(
+        selectinload(Perk.item)
+    ).filter(Perk.item_id == PERK_AI_TECH_1_ITEM_ID).one()
+
+
+# =============================================================================
+# Non-Perk Item Fixtures (4 total) - Real database items without perks
+# =============================================================================
+
+
+@pytest.fixture
+def item_no_perk(db_session):
+    """Real item without perk: Cell Scanner (AOID 24562, 6 stats, QL 1)."""
+    return db_session.query(Item).options(
+        selectinload(Item.item_stats).selectinload(ItemStats.stat_value)
+    ).filter(Item.aoid == ITEM_CELL_SCANNER).one()
+
+
+@pytest.fixture
+def item_with_other_data(db_session):
+    """Real item without perk: Agent profession item (AOID 46228, 7 stats, QL 1)."""
+    return db_session.query(Item).options(
+        selectinload(Item.item_stats).selectinload(ItemStats.stat_value)
+    ).filter(Item.aoid == ITEM_AGENT).one()
+
+
+@pytest.fixture
+def item_with_null_perk(db_session):
+    """Real item without perk: Adventurer profession item (AOID 46226, 7 stats, QL 1)."""
+    return db_session.query(Item).options(
+        selectinload(Item.item_stats).selectinload(ItemStats.stat_value)
+    ).filter(Item.aoid == ITEM_ADVENTURER).one()
+
+
+@pytest.fixture
+def item_different_category(db_session):
+    """Real item without perk: Engineer profession item (AOID 46229, 7 stats, QL 1)."""
+    return db_session.query(Item).options(
+        selectinload(Item.item_stats).selectinload(ItemStats.stat_value)
+    ).filter(Item.aoid == ITEM_ENGINEER).one()
+
+
+# =============================================================================
+# Legacy Fixtures (for backward compatibility with existing tests)
+# =============================================================================
 
 
 @pytest.fixture
 def perk_accumulator_level_1(db_session):
-    """Create Accumulator level 1 perk item (AOID 210830) for testing."""
-    item = Item(
-        aoid=210830,
-        name="Accumulator",
-        ql=10,
-        item_class=99999,  # Traditional perk item_class
-        description="Perk: Accumulator Level 1 - SL perk for Trader profession",
-        is_nano=False,
-        is_perk=True  # This should be set during import based on perks.json
-    )
-    db_session.add(item)
-    db_session.commit()
-    db_session.refresh(item)
-    return item
+    """Legacy fixture: Real Accumulator level 1 perk item (AOID 210830)."""
+    perk = db_session.query(Perk).options(
+        selectinload(Perk.item)
+    ).filter(Perk.item_id == PERK_SL_ACCUMULATOR_1_ITEM_ID).one()
+    return perk.item
 
 
 @pytest.fixture
 def perk_accumulator_level_5(db_session):
-    """Create Accumulator level 5 perk item (AOID 210834) for testing."""
-    item = Item(
-        aoid=210834,
-        name="Accumulator",
-        ql=90,
-        item_class=99999,
-        description="Perk: Accumulator Level 5 - SL perk for Trader profession",
-        is_nano=False,
-        is_perk=True
-    )
-    db_session.add(item)
-    db_session.commit()
-    db_session.refresh(item)
-    return item
+    """Legacy fixture: Real Accumulator level 5 perk item (AOID 210834)."""
+    # Note: Mapped to Accumulator 2 since that's what we have in constants
+    perk = db_session.query(Perk).options(
+        selectinload(Perk.item)
+    ).filter(Perk.item_id == PERK_SL_ACCUMULATOR_2_ITEM_ID).one()
+    return perk.item
 
 
 @pytest.fixture
 def perk_acquisition_level_1(db_session):
-    """Create Acquisition level 1 perk item (AOID 261355) for testing."""
-    item = Item(
-        aoid=261355,
-        name="Acquisition",
-        ql=1,
-        item_class=99999,
-        description="Perk: Acquisition Level 1 - LE perk for Fixer profession",
-        is_nano=False,
-        is_perk=True
-    )
-    db_session.add(item)
-    db_session.commit()
-    db_session.refresh(item)
-    return item
+    """Legacy fixture: Real Exploration level 1 perk item (LE type)."""
+    perk = db_session.query(Perk).options(
+        selectinload(Perk.item)
+    ).filter(Perk.item_id == PERK_LE_EXPLORATION_1_ITEM_ID).one()
+    return perk.item
 
 
 @pytest.fixture
 def perk_acrobat_level_1(db_session):
-    """Create Acrobat level 1 perk item (AOID 211655) for testing."""
-    item = Item(
-        aoid=211655,
-        name="Acrobat",
-        ql=30,
-        item_class=99999,
-        description="Perk: Acrobat Level 1 - SL perk for multiple professions",
-        is_nano=False,
-        is_perk=True
-    )
-    db_session.add(item)
-    db_session.commit()
-    db_session.refresh(item)
-    return item
+    """Legacy fixture: Real Opportunist level 1 perk item (AI type)."""
+    perk = db_session.query(Perk).options(
+        selectinload(Perk.item)
+    ).filter(Perk.item_id == PERK_AI_OPPORTUNIST_1_ITEM_ID).one()
+    return perk.item
 
 
 @pytest.fixture
 def perk_alien_tech_expertise_level_1(db_session):
-    """Create Alien Technology Expertise level 1 perk item (AOID 247748) for testing."""
-    item = Item(
-        aoid=247748,
-        name="Alien Technology Expertise",
-        ql=15,
-        item_class=99999,
-        description="Perk: Alien Technology Expertise Level 1 - AI perk",
-        is_nano=False,
-        is_perk=True
-    )
-    db_session.add(item)
-    db_session.commit()
-    db_session.refresh(item)
-    return item
+    """Legacy fixture: Real Alien Technology Expertise level 1 perk item (AOID 247748)."""
+    perk = db_session.query(Perk).options(
+        selectinload(Perk.item)
+    ).filter(Perk.item_id == PERK_AI_TECH_1_ITEM_ID).one()
+    return perk.item
 
 
 @pytest.fixture
 def non_perk_weapon(db_session):
-    """Create a regular weapon item that is NOT a perk for contrast testing."""
-    item = Item(
-        aoid=100001,  # Using a non-perk AOID
-        name="Test Blaster",
-        ql=150,
-        item_class=1,  # Weapon item class
-        description="A standard energy weapon for testing non-perk items",
-        is_nano=False,
-        is_perk=False  # This should be False for non-perk items
-    )
-    db_session.add(item)
-    db_session.commit()
-    db_session.refresh(item)
-    return item
+    """Legacy fixture: Real non-perk item (Cell Scanner)."""
+    return db_session.query(Item).options(
+        selectinload(Item.item_stats).selectinload(ItemStats.stat_value)
+    ).filter(Item.aoid == ITEM_CELL_SCANNER).one()
 
 
 @pytest.fixture
 def non_perk_armor(db_session):
-    """Create a regular armor item that is NOT a perk for contrast testing."""
-    item = Item(
-        aoid=200001,  # Using a non-perk AOID
-        name="Test Armor",
-        ql=200,
-        item_class=2,  # Armor item class
-        description="Standard protective armor for testing non-perk items",
-        is_nano=False,
-        is_perk=False
-    )
-    db_session.add(item)
-    db_session.commit()
-    db_session.refresh(item)
-    return item
+    """Legacy fixture: Real non-perk item (Agent profession)."""
+    return db_session.query(Item).options(
+        selectinload(Item.item_stats).selectinload(ItemStats.stat_value)
+    ).filter(Item.aoid == ITEM_AGENT).one()
 
 
 @pytest.fixture
 def non_perk_implant(db_session):
-    """Create a regular implant item that is NOT a perk for contrast testing."""
-    item = Item(
-        aoid=300001,  # Using a non-perk AOID
-        name="Test Implant",
-        ql=100,
-        item_class=3,  # Implant item class
-        description="Basic enhancement implant for testing non-perk items",
-        is_nano=False,
-        is_perk=False
-    )
-    db_session.add(item)
-    db_session.commit()
-    db_session.refresh(item)
-    return item
+    """Legacy fixture: Real non-perk item (Adventurer profession)."""
+    return db_session.query(Item).options(
+        selectinload(Item.item_stats).selectinload(ItemStats.stat_value)
+    ).filter(Item.aoid == ITEM_ADVENTURER).one()
 
 
 @pytest.fixture
 def nano_program(db_session):
-    """Create a nano program that is NOT a perk for contrast testing."""
-    item = Item(
-        aoid=400001,  # Using a non-perk AOID
-        name="Test Nano Program",
-        ql=75,
-        item_class=4,  # Nano program item class
-        description="Basic nano program for testing - not a perk, is a nano",
-        is_nano=True,  # This is a nano program
-        is_perk=False  # Nano programs are never perks
-    )
-    db_session.add(item)
-    db_session.commit()
-    db_session.refresh(item)
-    return item
+    """Legacy fixture: Real non-perk item (Engineer profession)."""
+    return db_session.query(Item).options(
+        selectinload(Item.item_stats).selectinload(ItemStats.stat_value)
+    ).filter(Item.aoid == ITEM_ENGINEER).one()
 
 
 @pytest.fixture
-def mixed_item_list(db_session, perk_accumulator_level_1, perk_acquisition_level_1,
-                   non_perk_weapon, non_perk_armor, nano_program):
-    """Create a mixed list of perk and non-perk items for comprehensive testing."""
+def mixed_item_list(
+    perk_accumulator_level_1,
+    perk_acquisition_level_1,
+    non_perk_weapon,
+    non_perk_armor,
+    nano_program,
+):
+    """Legacy fixture: Mixed list of perk and non-perk items."""
     return [
         perk_accumulator_level_1,
         perk_acquisition_level_1,
         non_perk_weapon,
         non_perk_armor,
-        nano_program
+        nano_program,
     ]
-
-
-# AOIDs used in fixtures for reference
-PERK_AOIDS_IN_FIXTURES = {
-    210830,  # Accumulator Level 1
-    210834,  # Accumulator Level 5
-    261355,  # Acquisition Level 1
-    211655,  # Acrobat Level 1
-    247748,  # Alien Technology Expertise Level 1
-}
-
-NON_PERK_AOIDS_IN_FIXTURES = {
-    100001,  # Test Blaster weapon
-    200001,  # Test Armor
-    300001,  # Test Implant
-    400001,  # Test Nano Program
-}

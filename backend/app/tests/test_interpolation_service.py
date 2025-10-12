@@ -458,8 +458,8 @@ class TestInterpolationService:
             mock_find.return_value = mock_variants
             
             result = service.get_interpolation_range(12345)
-            
-            assert result == (100, 199)  # max QL - 1 following legacy logic
+
+            assert result == (100, 200)  # max QL
 
     def test_get_interpolation_range_no_item(self, service, mock_db):
         """Test getting interpolation range for non-existent item."""
@@ -507,10 +507,10 @@ class TestInterpolationService:
         target_ql = 150
         
         interpolated.set_interpolation_metadata(lo_item, hi_item, target_ql)
-        
+
         assert interpolated.interpolating is True
         assert interpolated.low_ql == 100
-        assert interpolated.high_ql == 199  # hi_item.ql - 1
+        assert interpolated.high_ql == 200  # hi_item.ql
         assert interpolated.target_ql == 150
         assert interpolated.ql_delta == 50  # target_ql - lo_item.ql
         assert interpolated.ql_delta_full == 100  # hi_item.ql - lo_item.ql
@@ -619,13 +619,19 @@ class TestInterpolationRangesSimplified:
             mock_find.return_value = variants
             
             result = service.get_interpolation_ranges(231123)
-            
+
             assert result is not None
-            assert len(result) == 1  # One interpolatable range
+            assert len(result) == 2  # Two ranges: one interpolatable (1-19) and one single-ql (19)
+            # First range: interpolatable from QL 1 to 19
             assert result[0]["min_ql"] == 1
             assert result[0]["max_ql"] == 19
             assert result[0]["interpolatable"] is True
             assert result[0]["base_aoid"] == 231123
+            # Second range: non-interpolatable at QL 19
+            assert result[1]["min_ql"] == 19
+            assert result[1]["max_ql"] == 19
+            assert result[1]["interpolatable"] is False
+            assert result[1]["base_aoid"] == 231124
 
     def test_get_interpolation_ranges_single_variant(self, service, mock_db):
         """Test interpolation ranges with single variant (not interpolatable)."""
@@ -678,27 +684,33 @@ class TestInterpolationRangesSimplified:
             mock_find.return_value = variants
             
             result = service.get_interpolation_ranges(1001)
-            
+
             assert result is not None
-            assert len(result) == 3  # 1-50, 50-100, 100-200
-            
-            # Check first range: 1-50
+            assert len(result) == 4  # One range per variant: 1-50, 50-100, 100-200, 200
+
+            # Check first range: 1-50 (interpolatable)
             assert result[0]["min_ql"] == 1
             assert result[0]["max_ql"] == 50
             assert result[0]["interpolatable"] is True
             assert result[0]["base_aoid"] == 1001
-            
-            # Check second range: 50-100
+
+            # Check second range: 50-100 (interpolatable)
             assert result[1]["min_ql"] == 50
             assert result[1]["max_ql"] == 100
             assert result[1]["interpolatable"] is True
             assert result[1]["base_aoid"] == 1002
-            
-            # Check third range: 100-200
+
+            # Check third range: 100-200 (interpolatable)
             assert result[2]["min_ql"] == 100
             assert result[2]["max_ql"] == 200
             assert result[2]["interpolatable"] is True
             assert result[2]["base_aoid"] == 1003
+
+            # Check fourth range: 200 (non-interpolatable, highest QL)
+            assert result[3]["min_ql"] == 200
+            assert result[3]["max_ql"] == 200
+            assert result[3]["interpolatable"] is False
+            assert result[3]["base_aoid"] == 1004
 
     def test_get_interpolation_ranges_item_not_found(self, service, mock_db):
         """Test interpolation ranges when item is not found."""
