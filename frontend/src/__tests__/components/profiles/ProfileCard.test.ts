@@ -4,10 +4,10 @@
  * Tests for the ProfileCard component used in profile grid/list displays
  */
 
-// @ts-nocheck
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { mountWithContext, standardCleanup, BREED, PROFESSION, createTestProfile } from '@/__tests__/helpers'
+
 import ProfileCard from '../../../components/profiles/ProfileCard.vue'
 import type { ProfileMetadata } from '@/lib/tinkerprofiles'
 
@@ -50,8 +50,8 @@ const mockProfile: ProfileMetadata = {
   id: 'profile_123',
   name: 'TestCharacter',
   level: 200,
-  profession: 'Doctor',
-  breed: 'Atrox',
+  profession: PROFESSION.DOCTOR,
+  breed: BREED.ATROX,
   faction: 'Clan',
   created: '2024-01-01T00:00:00Z',
   updated: '2024-01-15T12:00:00Z'
@@ -61,8 +61,8 @@ const mockLowLevelProfile: ProfileMetadata = {
   id: 'profile_456',
   name: 'NewbieChar',
   level: 50,
-  profession: 'Soldier',
-  breed: 'Solitus',
+  profession: PROFESSION.SOLDIER,
+  breed: BREED.SOLITUS,
   faction: 'Omni',
   created: '2024-01-10T00:00:00Z',
   updated: '2024-01-10T00:00:00Z'
@@ -72,11 +72,12 @@ describe('ProfileCard', () => {
   let wrapper: any
 
   beforeEach(() => {
-    setActivePinia(createPinia())
+    
     vi.clearAllMocks()
   })
 
   afterEach(() => {
+    standardCleanup()
     if (wrapper) {
       wrapper.unmount()
     }
@@ -84,7 +85,7 @@ describe('ProfileCard', () => {
 
   describe('Component Rendering', () => {
     it('should mount without errors', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -95,7 +96,7 @@ describe('ProfileCard', () => {
     })
 
     it('should display character name', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -106,7 +107,7 @@ describe('ProfileCard', () => {
     })
 
     it('should display level badge', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -117,7 +118,7 @@ describe('ProfileCard', () => {
     })
 
     it('should display profession', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -128,7 +129,7 @@ describe('ProfileCard', () => {
     })
 
     it('should display breed and faction', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -142,7 +143,7 @@ describe('ProfileCard', () => {
 
   describe('Active Profile Indicator', () => {
     it('should show active badge when profile is active', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: true
@@ -153,7 +154,7 @@ describe('ProfileCard', () => {
     })
 
     it('should show active indicator bar when active', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: true
@@ -165,7 +166,7 @@ describe('ProfileCard', () => {
     })
 
     it('should not show active badge when profile is not active', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -178,7 +179,7 @@ describe('ProfileCard', () => {
 
   describe('Level Severity Display', () => {
     it('should show danger severity for level 200+', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -190,7 +191,7 @@ describe('ProfileCard', () => {
     })
 
     it('should show appropriate severity for lower levels', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockLowLevelProfile,
           isActive: false
@@ -204,7 +205,7 @@ describe('ProfileCard', () => {
 
   describe('User Interactions', () => {
     it('should emit view-details when View Details button is clicked', async () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -219,7 +220,7 @@ describe('ProfileCard', () => {
     })
 
     it('should emit set-active when set active button is clicked', async () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -234,7 +235,7 @@ describe('ProfileCard', () => {
     })
 
     it('should not show set-active button when profile is already active', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: true
@@ -246,7 +247,7 @@ describe('ProfileCard', () => {
     })
 
     it('should toggle actions menu when more actions button is clicked', async () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -264,7 +265,7 @@ describe('ProfileCard', () => {
 
   describe('Action Menu', () => {
     it('should have duplicate action in menu', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -280,7 +281,7 @@ describe('ProfileCard', () => {
     })
 
     it('should have export action in menu', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -296,7 +297,7 @@ describe('ProfileCard', () => {
     })
 
     it('should have delete action in menu', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -312,7 +313,7 @@ describe('ProfileCard', () => {
     })
 
     it('should emit duplicate event when duplicate action is triggered', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -330,7 +331,7 @@ describe('ProfileCard', () => {
     })
 
     it('should emit export event when export action is triggered', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -348,7 +349,7 @@ describe('ProfileCard', () => {
     })
 
     it('should emit delete event when delete action is triggered', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -368,7 +369,7 @@ describe('ProfileCard', () => {
 
   describe('Profession Icon Display', () => {
     it('should show correct icon for Doctor profession', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -380,7 +381,7 @@ describe('ProfileCard', () => {
     })
 
     it('should show correct icon for Soldier profession', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockLowLevelProfile,
           isActive: false
@@ -397,7 +398,7 @@ describe('ProfileCard', () => {
         profession: 'UnknownClass'
       }
 
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: unknownProfessionProfile,
           isActive: false
@@ -411,7 +412,7 @@ describe('ProfileCard', () => {
 
   describe('Date Formatting', () => {
     it('should display formatted created date', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -424,7 +425,7 @@ describe('ProfileCard', () => {
     })
 
     it('should display formatted updated date', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -439,7 +440,7 @@ describe('ProfileCard', () => {
 
   describe('Visual Styling', () => {
     it('should have profile-card class', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -451,7 +452,7 @@ describe('ProfileCard', () => {
     })
 
     it('should have breed color indicator', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -464,7 +465,7 @@ describe('ProfileCard', () => {
     })
 
     it('should have faction color indicator', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false
@@ -479,7 +480,7 @@ describe('ProfileCard', () => {
 
   describe('Accessibility', () => {
     it('should have tooltips on buttons', () => {
-      wrapper = mount(ProfileCard, {
+      wrapper = mountWithContext(ProfileCard, {
         props: {
           profile: mockProfile,
           isActive: false

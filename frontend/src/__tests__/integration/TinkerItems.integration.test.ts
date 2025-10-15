@@ -1,11 +1,14 @@
 /**
  * TinkerItems Full Integration Tests
- * 
+ *
+ * TRUE INTEGRATION TEST - Requires real backend
  * Tests the complete TinkerItems application with real API calls
  * to ensure proper integration between frontend and backend
+ *
+ * Strategy: Skip when backend not available (Option B)
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
@@ -18,11 +21,22 @@ import Checkbox from 'primevue/checkbox'
 import TinkerItems from '../../views/TinkerItems.vue'
 import { useItemsStore } from '../../stores/items'
 import type { ItemSearchQuery } from '../../types/api'
+import { isBackendAvailable, getBackendUrl } from '../helpers/backend-check'
 
 // Real backend URL for integration testing
-const BACKEND_URL = 'http://localhost:8000/api/v1'
+const BACKEND_URL = getBackendUrl() + '/api/v1'
 
-describe('TinkerItems Full Integration', () => {
+// Check backend availability before running tests
+let BACKEND_AVAILABLE = false
+
+beforeAll(async () => {
+  BACKEND_AVAILABLE = await isBackendAvailable()
+  if (!BACKEND_AVAILABLE) {
+    console.warn('Backend not available - skipping TinkerItems integration tests')
+  }
+})
+
+describe.skipIf(!BACKEND_AVAILABLE)('TinkerItems Full Integration', () => {
   let wrapper: any
   let itemsStore: any
 

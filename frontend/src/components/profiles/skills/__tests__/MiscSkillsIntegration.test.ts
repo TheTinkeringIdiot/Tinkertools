@@ -15,7 +15,9 @@ import { nextTick } from 'vue';
 import SkillSlider from '@/components/profiles/skills/SkillSlider.vue';
 import StatBreakdownTooltip from '@/components/profiles/skills/StatBreakdownTooltip.vue';
 import SkillsManager from '@/components/profiles/skills/SkillsManager.vue';
-import type { MiscSkill, TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { SkillId } from '@/types/skills';
+import { SKILL_ID, createTestProfile, PROFESSION, BREED } from '@/__tests__/helpers';
 
 // Mock PrimeVue components
 vi.mock('primevue/slider', () => ({
@@ -59,71 +61,65 @@ console.error = (...args: any[]) => {
   originalConsoleError(...args);
 };
 
+// Helper to cast numeric skill IDs to branded SkillId type
+const toSkillId = (id: number): SkillId => id as SkillId;
+
 describe('Misc Skills Integration Tests', () => {
 
-  // Helper function to create MiscSkill objects
-  const createMiscSkill = (overrides: Partial<MiscSkill> = {}): MiscSkill => ({
-    baseValue: 0,
-    equipmentBonus: 0,
-    perkBonus: 0,
-    buffBonus: 0,
-    value: 0,
-    ...overrides
-  });
+  // Test profile factory with Misc skills
+  const createMiscSkillsProfile = (): TinkerProfile => {
+    return createTestProfile({
+      profession: PROFESSION.ADVENTURER,
+      breed: BREED.SOLITUS,
+      level: 100,
+      skills: {
+        // Abilities
+        [SKILL_ID.INTELLIGENCE]: { base: 100, total: 100 },
+        [SKILL_ID.PSYCHIC]: { base: 100, total: 100 },
+        [SKILL_ID.SENSE]: { base: 100, total: 100 },
+        [SKILL_ID.STAMINA]: { base: 100, total: 100 },
+        [SKILL_ID.STRENGTH]: { base: 100, total: 100 },
+        [SKILL_ID.AGILITY]: { base: 100, total: 100 },
 
-  // Test profile with Misc skills
-  const createTestProfile = (): Partial<TinkerProfile> => ({
-    Character: {
-      Name: 'TestChar',
-      Profession: 'Adventurer',
-      Breed: 'Solitus',
-      Level: 100,
-      Faction: 'Omni',
-      Expansion: 'Shadowlands',
-      AccountType: 'Paid',
-      MaxHealth: 1000,
-      MaxNano: 500,
-    },
-    Skills: {
-      Attributes: {
-        Intelligence: { value: 100, pointFromIp: 0, trickleDown: 0, ipSpent: 0, cap: 200 },
-        Psychic: { value: 100, pointFromIp: 0, trickleDown: 0, ipSpent: 0, cap: 200 },
-        Sense: { value: 100, pointFromIp: 0, trickleDown: 0, ipSpent: 0, cap: 200 },
-        Stamina: { value: 100, pointFromIp: 0, trickleDown: 0, ipSpent: 0, cap: 200 },
-        Strength: { value: 100, pointFromIp: 0, trickleDown: 0, ipSpent: 0, cap: 200 },
-        Agility: { value: 100, pointFromIp: 0, trickleDown: 0, ipSpent: 0, cap: 200 },
-      },
-      'Body & Defense': {},
-      ACs: {},
-      'Ranged Weapons': {},
-      'Ranged Specials': {},
-      'Melee Weapons': {},
-      'Melee Specials': {},
-      'Nanos & Casting': {},
-      Exploring: {},
-      'Trade & Repair': {},
-      'Combat & Healing': {},
-      Misc: {
-        'Brawling': createMiscSkill({ value: 0 }),
-        'Concealment': createMiscSkill({
+        // Misc skills with bonuses
+        [SKILL_ID.BRAWLING]: {
+          base: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          total: 0
+        },
+        [SKILL_ID.CONCEALMENT]: {
+          base: 0,
           equipmentBonus: 50,
           perkBonus: 25,
           buffBonus: 10,
-          value: 85
-        }),
-        'Psychology': createMiscSkill({
+          total: 85
+        },
+        [SKILL_ID.PSYCHOLOGY]: {
+          base: 0,
           equipmentBonus: 30,
-          value: 30
-        }),
-        'Swim': createMiscSkill({ value: 0 }),
-        'Duck-Exp': createMiscSkill({
+          perkBonus: 0,
+          buffBonus: 0,
+          total: 30
+        },
+        [SKILL_ID.SWIMMING]: {
+          base: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          total: 0
+        },
+        [SKILL_ID.DUCK_EXP]: {
+          base: 0,
+          equipmentBonus: 0,
           perkBonus: 15,
           buffBonus: 5,
-          value: 20
-        }),
+          total: 20
+        },
       }
-    }
-  });
+    });
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -134,22 +130,26 @@ describe('Misc Skills Integration Tests', () => {
 
   describe('SkillSlider Display with MiscSkill Objects', () => {
     it('should correctly display MiscSkill objects', () => {
-      const miscSkill = createMiscSkill({
+      const skillData = {
+        base: 0,
+        trickle: 0,
+        ipSpent: 0,
+        pointsFromIp: 0,
         equipmentBonus: 50,
         perkBonus: 25,
-        value: 75
-      });
+        buffBonus: 0,
+        total: 75
+      };
 
       const wrapper = mount(SkillSlider, {
         props: {
-          skillId: 123,
-          skillId: 123,
+          skillId: toSkillId(SKILL_ID.CONCEALMENT),
           skillName: 'Concealment',
-          skillData: miscSkill,
+          skillData: skillData,
           isAbility: false,
           isReadOnly: true,
           category: 'Misc',
-          breed: 'Solitus'
+          breed: BREED.SOLITUS
         },
         global: {
           directives: {
@@ -164,22 +164,26 @@ describe('Misc Skills Integration Tests', () => {
     });
 
     it('should extract value field properly from MiscSkill objects', async () => {
-      const miscSkill = createMiscSkill({
+      const skillData = {
+        base: 0,
+        trickle: 0,
+        ipSpent: 0,
+        pointsFromIp: 0,
         equipmentBonus: 100,
         perkBonus: 50,
         buffBonus: 25,
-        value: 175
-      });
+        total: 175
+      };
 
       const wrapper = mount(SkillSlider, {
         props: {
-          skillId: 124,
-        skillName: 'Psychology',
-          skillData: miscSkill,
+          skillId: toSkillId(SKILL_ID.PSYCHOLOGY),
+          skillName: 'Psychology',
+          skillData: skillData,
           isAbility: false,
           isReadOnly: true,
           category: 'Misc',
-          breed: 'Solitus'
+          breed: BREED.SOLITUS
         },
         global: {
           directives: {
@@ -197,17 +201,26 @@ describe('Misc Skills Integration Tests', () => {
     });
 
     it('should maintain read-only behavior for Misc skills', () => {
-      const miscSkill = createMiscSkill({ value: 50 });
+      const skillData = {
+        base: 0,
+        trickle: 0,
+        ipSpent: 0,
+        pointsFromIp: 0,
+        equipmentBonus: 50,
+        perkBonus: 0,
+        buffBonus: 0,
+        total: 50
+      };
 
       const wrapper = mount(SkillSlider, {
         props: {
-          skillId: 125,
-        skillName: 'Brawling',
-          skillData: miscSkill,
+          skillId: toSkillId(SKILL_ID.BRAWLING),
+          skillName: 'Brawling',
+          skillData: skillData,
           isAbility: false,
           isReadOnly: true,
           category: 'Misc',
-          breed: 'Solitus'
+          breed: BREED.SOLITUS
         },
         global: {
           directives: {
@@ -223,20 +236,26 @@ describe('Misc Skills Integration Tests', () => {
     });
 
     it('should show equipment bonus indicator for Misc skills with bonuses', () => {
-      const miscSkill = createMiscSkill({
+      const skillData = {
+        base: 0,
+        trickle: 0,
+        ipSpent: 0,
+        pointsFromIp: 0,
         equipmentBonus: 75,
-        value: 75
-      });
+        perkBonus: 0,
+        buffBonus: 0,
+        total: 75
+      };
 
       const wrapper = mount(SkillSlider, {
         props: {
-          skillId: 123,
+          skillId: toSkillId(SKILL_ID.CONCEALMENT),
           skillName: 'Concealment',
-          skillData: miscSkill,
+          skillData: skillData,
           isAbility: false,
           isReadOnly: true,
           category: 'Misc',
-          breed: 'Solitus'
+          breed: BREED.SOLITUS
         },
         global: {
           directives: {
@@ -253,18 +272,22 @@ describe('Misc Skills Integration Tests', () => {
 
   describe('Tooltip Breakdowns for Misc Skills', () => {
     it('should show tooltip breakdowns for Misc skills', () => {
-      const miscSkill = createMiscSkill({
+      const skillData = {
+        base: 0,
+        trickle: 0,
+        ipSpent: 0,
+        pointsFromIp: 0,
         equipmentBonus: 50,
         perkBonus: 25,
         buffBonus: 10,
-        value: 85
-      });
+        total: 85
+      };
 
       const wrapper = mount(StatBreakdownTooltip, {
         props: {
-          skillId: 123,
+          skillId: toSkillId(SKILL_ID.CONCEALMENT),
           skillName: 'Concealment',
-          skillData: miscSkill,
+          skillData: skillData,
           isAbility: false,
           isMiscSkill: true,
           baseValue: 0,
@@ -293,16 +316,22 @@ describe('Misc Skills Integration Tests', () => {
     });
 
     it('should NOT show IP or trickle-down rows for Misc skills', () => {
-      const miscSkill = createMiscSkill({
+      const skillData = {
+        base: 0,
+        trickle: 0,
+        ipSpent: 0,
+        pointsFromIp: 0,
         equipmentBonus: 30,
-        value: 30
-      });
+        perkBonus: 0,
+        buffBonus: 0,
+        total: 30
+      };
 
       const wrapper = mount(StatBreakdownTooltip, {
         props: {
-          skillId: 124,
-        skillName: 'Psychology',
-          skillData: miscSkill,
+          skillId: toSkillId(SKILL_ID.PSYCHOLOGY),
+          skillName: 'Psychology',
+          skillData: skillData,
           isAbility: false,
           isMiscSkill: true,
           baseValue: 0,
@@ -331,18 +360,22 @@ describe('Misc Skills Integration Tests', () => {
     });
 
     it('should use correct color coding for bonuses', () => {
-      const miscSkill = createMiscSkill({
+      const skillData = {
+        base: 0,
+        trickle: 0,
+        ipSpent: 0,
+        pointsFromIp: 0,
         equipmentBonus: 40,
         perkBonus: 20,
         buffBonus: 5,
-        value: 65
-      });
+        total: 65
+      };
 
       const wrapper = mount(StatBreakdownTooltip, {
         props: {
-          skillId: 126,
-        skillName: 'Duck-Exp',
-          skillData: miscSkill,
+          skillId: toSkillId(SKILL_ID.DUCK_EXP),
+          skillName: 'Duck-Exp',
+          skillData: skillData,
           isAbility: false,
           isMiscSkill: true,
           baseValue: 0,
@@ -375,11 +408,11 @@ describe('Misc Skills Integration Tests', () => {
 
   describe('Zero-Value Toggle Functionality', () => {
     it('should show/hide zero-value Misc skills based on toggle', async () => {
-      const profile = createTestProfile();
+      const profile = createMiscSkillsProfile();
 
       const wrapper = mount(SkillsManager, {
         props: {
-          profile: profile as TinkerProfile
+          profile: profile
         },
         global: {
           directives: {
@@ -404,11 +437,11 @@ describe('Misc Skills Integration Tests', () => {
     });
 
     it('should toggle zero-value skills when button is clicked', async () => {
-      const profile = createTestProfile();
+      const profile = createMiscSkillsProfile();
 
       const wrapper = mount(SkillsManager, {
         props: {
-          profile: profile as TinkerProfile
+          profile: profile
         },
         global: {
           directives: {
@@ -438,11 +471,11 @@ describe('Misc Skills Integration Tests', () => {
     });
 
     it('should save toggle preference to localStorage', async () => {
-      const profile = createTestProfile();
+      const profile = createMiscSkillsProfile();
 
       const wrapper = mount(SkillsManager, {
         props: {
-          profile: profile as TinkerProfile
+          profile: profile
         },
         global: {
           directives: {
@@ -473,11 +506,11 @@ describe('Misc Skills Integration Tests', () => {
       // Set preference in localStorage before mounting
       localStorage.setItem('tinkertools_show_zero_misc_skills', 'true');
 
-      const profile = createTestProfile();
+      const profile = createMiscSkillsProfile();
 
       const wrapper = mount(SkillsManager, {
         props: {
-          profile: profile as TinkerProfile
+          profile: profile
         },
         global: {
           directives: {
@@ -495,20 +528,26 @@ describe('Misc Skills Integration Tests', () => {
 
   describe('Reactive Updates', () => {
     it('should update display when bonuses change', async () => {
-      const miscSkill = createMiscSkill({
+      const skillData = {
+        base: 0,
+        trickle: 0,
+        ipSpent: 0,
+        pointsFromIp: 0,
         equipmentBonus: 50,
-        value: 50
-      });
+        perkBonus: 0,
+        buffBonus: 0,
+        total: 50
+      };
 
       const wrapper = mount(SkillSlider, {
         props: {
-          skillId: 123,
+          skillId: toSkillId(SKILL_ID.CONCEALMENT),
           skillName: 'Concealment',
-          skillData: miscSkill,
+          skillData: skillData,
           isAbility: false,
           isReadOnly: true,
           category: 'Misc',
-          breed: 'Solitus'
+          breed: BREED.SOLITUS
         },
         global: {
           directives: {
@@ -520,11 +559,16 @@ describe('Misc Skills Integration Tests', () => {
       expect(wrapper.text()).toContain('50');
 
       // Update skill data
-      const updatedSkill = createMiscSkill({
+      const updatedSkill = {
+        base: 0,
+        trickle: 0,
+        ipSpent: 0,
+        pointsFromIp: 0,
         equipmentBonus: 75,
         perkBonus: 25,
-        value: 100
-      });
+        buffBonus: 0,
+        total: 100
+      };
 
       await wrapper.setProps({ skillData: updatedSkill });
       await nextTick();
@@ -534,15 +578,21 @@ describe('Misc Skills Integration Tests', () => {
     });
 
     it('should update tooltip when bonuses change', async () => {
-      const initialSkill = createMiscSkill({
+      const initialSkill = {
+        base: 0,
+        trickle: 0,
+        ipSpent: 0,
+        pointsFromIp: 0,
         equipmentBonus: 30,
-        value: 30
-      });
+        perkBonus: 0,
+        buffBonus: 0,
+        total: 30
+      };
 
       const wrapper = mount(StatBreakdownTooltip, {
         props: {
-          skillId: 124,
-        skillName: 'Psychology',
+          skillId: toSkillId(SKILL_ID.PSYCHOLOGY),
+          skillName: 'Psychology',
           skillData: initialSkill,
           isAbility: false,
           isMiscSkill: true,
@@ -566,9 +616,19 @@ describe('Misc Skills Integration Tests', () => {
       expect(wrapper.text()).not.toContain('Perks:');
 
       // Update with perk bonus
-      await wrapper.setProps({
+      const updatedSkill = {
+        base: 0,
+        trickle: 0,
+        ipSpent: 0,
+        pointsFromIp: 0,
+        equipmentBonus: 30,
         perkBonus: 20,
-        totalValue: 50
+        buffBonus: 0,
+        total: 50
+      };
+
+      await wrapper.setProps({
+        skillData: updatedSkill
       });
       await nextTick();
 
@@ -578,11 +638,11 @@ describe('Misc Skills Integration Tests', () => {
     });
 
     it('should update filtered display when toggle changes', async () => {
-      const profile = createTestProfile();
+      const profile = createMiscSkillsProfile();
 
       const wrapper = mount(SkillsManager, {
         props: {
-          profile: profile as TinkerProfile
+          profile: profile
         },
         global: {
           directives: {
@@ -611,22 +671,26 @@ describe('Misc Skills Integration Tests', () => {
 
   describe('No Console Errors', () => {
     it('should not generate type errors or warnings', async () => {
-      const miscSkill = createMiscSkill({
+      const skillData = {
+        base: 0,
+        trickle: 0,
+        ipSpent: 0,
+        pointsFromIp: 0,
         equipmentBonus: 50,
         perkBonus: 25,
         buffBonus: 10,
-        value: 85
-      });
+        total: 85
+      };
 
       const wrapper = mount(SkillSlider, {
         props: {
-          skillId: 123,
+          skillId: toSkillId(SKILL_ID.CONCEALMENT),
           skillName: 'Concealment',
-          skillData: miscSkill,
+          skillData: skillData,
           isAbility: false,
           isReadOnly: true,
           category: 'Misc',
-          breed: 'Solitus'
+          breed: BREED.SOLITUS
         },
         global: {
           directives: {
@@ -642,17 +706,26 @@ describe('Misc Skills Integration Tests', () => {
     });
 
     it('should mount and unmount components cleanly', async () => {
-      const miscSkill = createMiscSkill({ value: 50 });
+      const skillData = {
+        base: 0,
+        trickle: 0,
+        ipSpent: 0,
+        pointsFromIp: 0,
+        equipmentBonus: 0,
+        perkBonus: 0,
+        buffBonus: 0,
+        total: 50
+      };
 
       const wrapper = mount(SkillSlider, {
         props: {
-          skillId: 124,
-        skillName: 'Psychology',
-          skillData: miscSkill,
+          skillId: toSkillId(SKILL_ID.PSYCHOLOGY),
+          skillName: 'Psychology',
+          skillData: skillData,
           isAbility: false,
           isReadOnly: true,
           category: 'Misc',
-          breed: 'Solitus'
+          breed: BREED.SOLITUS
         },
         global: {
           directives: {
@@ -673,13 +746,13 @@ describe('Misc Skills Integration Tests', () => {
       // Test with undefined skill data
       const wrapper = mount(SkillSlider, {
         props: {
-          skillId: 127,
-        skillName: 'Test Skill',
+          skillId: toSkillId(SKILL_ID.MAX_NCU),
+          skillName: 'Test Skill',
           skillData: undefined,
           isAbility: false,
           isReadOnly: true,
           category: 'Misc',
-          breed: 'Solitus'
+          breed: BREED.SOLITUS
         },
         global: {
           directives: {
@@ -696,11 +769,11 @@ describe('Misc Skills Integration Tests', () => {
 
   describe('Integration Scenarios', () => {
     it('should work with complete profile integration', async () => {
-      const profile = createTestProfile();
+      const profile = createMiscSkillsProfile();
 
       const wrapper = mount(SkillsManager, {
         props: {
-          profile: profile as TinkerProfile
+          profile: profile
         },
         global: {
           directives: {
@@ -726,11 +799,11 @@ describe('Misc Skills Integration Tests', () => {
     });
 
     it('should handle dynamic profile updates', async () => {
-      const profile = createTestProfile();
+      const profile = createMiscSkillsProfile();
 
       const wrapper = mount(SkillsManager, {
         props: {
-          profile: profile as TinkerProfile
+          profile: profile
         },
         global: {
           directives: {
@@ -744,14 +817,17 @@ describe('Misc Skills Integration Tests', () => {
       // Update profile with new skill values
       const updatedProfile = {
         ...profile,
-        Skills: {
-          ...profile.Skills,
-          Misc: {
-            ...profile.Skills!.Misc,
-            'Brawling': createMiscSkill({
-              equipmentBonus: 100,
-              value: 100
-            })
+        skills: {
+          ...profile.skills,
+          [SKILL_ID.BRAWLING]: {
+            base: 0,
+            trickle: 0,
+            ipSpent: 0,
+            pointsFromIp: 0,
+            equipmentBonus: 100,
+            perkBonus: 0,
+            buffBonus: 0,
+            total: 100
           }
         }
       };

@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { nextTick } from 'vue';
 import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import TinkerNanos from '@/views/TinkerNanos.vue';
 import { useNanosStore } from '@/stores/nanosStore';
-import { useProfilesStore } from '@/stores/profilesStore';
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
+import { createTestProfile, PROFESSION, SKILL_ID } from '@/__tests__/helpers';
 
 // Mock router
 const mockRouter = {
@@ -324,9 +326,9 @@ describe('Nano Search Workflow', () => {
   beforeEach(async () => {
     pinia = createPinia();
     setActivePinia(pinia);
-    
+
     nanosStore = useNanosStore();
-    profilesStore = useProfilesStore();
+    profilesStore = useTinkerProfilesStore();
     
     // Mock comprehensive nano data for search testing
     nanosStore.nanos = [
@@ -550,20 +552,16 @@ describe('Nano Search Workflow', () => {
 
   it('searches with compatibility filtering when profile is active', async () => {
     // Set up a test profile
-    const testProfile = {
+    const testProfile = createTestProfile({
       id: 'test-profile',
       name: 'Test Character',
-      profession: 'Doctor',
+      profession: PROFESSION.DOCTOR,
       level: 80,
       skills: {
-        'Biological Metamorphosis': 300,
-        'Matter Creation': 200
-      },
-      stats: {},
-      activeNanos: [],
-      memoryCapacity: 500,
-      nanoPoints: 1000
-    };
+        [SKILL_ID.BIO_METAMOR]: { total: 300 },
+        [SKILL_ID.MATTER_CREATION]: { total: 200 }
+      }
+    });
     
     profilesStore.profiles = [testProfile];
     profilesStore.activeProfile = testProfile;

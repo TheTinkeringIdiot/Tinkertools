@@ -45,6 +45,11 @@ export function calculateDPS(
   tickCount: number = 1,
   tickInterval: number = 0
 ): number {
+  // Validate inputs - ensure all are valid numbers
+  if (!Number.isFinite(midDamage) || !Number.isFinite(castTime) || !Number.isFinite(rechargeTime)) {
+    return 0
+  }
+
   // Calculate base cycle time (cast + recharge)
   let cycleTime = castTime + rechargeTime
 
@@ -54,13 +59,19 @@ export function calculateDPS(
     cycleTime += tickDuration
   }
 
-  // Prevent division by zero
-  if (cycleTime === 0) {
+  // Prevent division by zero or invalid cycle time
+  if (cycleTime === 0 || !Number.isFinite(cycleTime)) {
     return 0
   }
 
   // Calculate DPS with 2 decimal precision
   const dps = midDamage / cycleTime
+
+  // Ensure result is valid
+  if (!Number.isFinite(dps)) {
+    return 0
+  }
+
   return Number(dps.toFixed(2))
 }
 
@@ -85,6 +96,11 @@ export function calculateDamagePerNano(
   midDamage: number,
   modifiedNanoCost: number
 ): number {
+  // Validate inputs
+  if (!Number.isFinite(midDamage) || !Number.isFinite(modifiedNanoCost)) {
+    return 0
+  }
+
   // Prevent division by zero
   if (modifiedNanoCost === 0) {
     return 0
@@ -92,6 +108,12 @@ export function calculateDamagePerNano(
 
   // Calculate ratio with 2 decimal precision
   const ratio = midDamage / modifiedNanoCost
+
+  // Ensure result is valid
+  if (!Number.isFinite(ratio)) {
+    return 0
+  }
+
   return Number(ratio.toFixed(2))
 }
 
@@ -120,16 +142,27 @@ export function calculateNanoPerSecond(
   castTime: number,
   rechargeTime: number
 ): number {
+  // Validate inputs
+  if (!Number.isFinite(modifiedNanoCost) || !Number.isFinite(castTime) || !Number.isFinite(rechargeTime)) {
+    return 0
+  }
+
   // Calculate cycle time (cast + recharge)
   const cycleTime = castTime + rechargeTime
 
-  // Prevent division by zero
-  if (cycleTime === 0) {
+  // Prevent division by zero or invalid cycle time
+  if (cycleTime === 0 || !Number.isFinite(cycleTime)) {
     return 0
   }
 
   // Calculate consumption rate with 2 decimal precision
   const nanoPerSecond = modifiedNanoCost / cycleTime
+
+  // Ensure result is valid
+  if (!Number.isFinite(nanoPerSecond)) {
+    return 0
+  }
+
   return Number(nanoPerSecond.toFixed(2))
 }
 

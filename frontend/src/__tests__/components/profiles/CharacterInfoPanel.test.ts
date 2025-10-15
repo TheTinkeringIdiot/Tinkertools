@@ -4,10 +4,10 @@
  * Tests for the character information display panel showing stats and metadata
  */
 
-// @ts-nocheck
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { mountWithContext, standardCleanup, BREED, PROFESSION, SKILL_ID } from '@/__tests__/helpers'
+
 import CharacterInfoPanel from '../../../components/profiles/CharacterInfoPanel.vue'
 import type { TinkerProfile } from '@/lib/tinkerprofiles'
 
@@ -131,11 +131,12 @@ describe('CharacterInfoPanel', () => {
   let wrapper: any
 
   beforeEach(() => {
-    setActivePinia(createPinia())
+    
     vi.clearAllMocks()
   })
 
   afterEach(() => {
+    standardCleanup()
     if (wrapper) {
       wrapper.unmount()
     }
@@ -143,7 +144,7 @@ describe('CharacterInfoPanel', () => {
 
   describe('Component Rendering', () => {
     it('should mount without errors', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -153,7 +154,7 @@ describe('CharacterInfoPanel', () => {
     })
 
     it('should display character information title', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -163,7 +164,7 @@ describe('CharacterInfoPanel', () => {
     })
 
     it('should display level information', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -174,7 +175,7 @@ describe('CharacterInfoPanel', () => {
     })
 
     it('should display title level', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -187,7 +188,7 @@ describe('CharacterInfoPanel', () => {
 
   describe('Title Level Display', () => {
     it('should show correct title level for level 200', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -197,7 +198,7 @@ describe('CharacterInfoPanel', () => {
     })
 
     it('should show correct title level description', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -207,7 +208,7 @@ describe('CharacterInfoPanel', () => {
     })
 
     it('should calculate title level for lower levels', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockLowLevelProfile
         }
@@ -220,7 +221,7 @@ describe('CharacterInfoPanel', () => {
 
   describe('Health and Nano Display', () => {
     it('should display health value', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -231,7 +232,7 @@ describe('CharacterInfoPanel', () => {
     })
 
     it('should display nano value', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -250,7 +251,7 @@ describe('CharacterInfoPanel', () => {
         }
       }
 
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: highHealthProfile
         }
@@ -268,7 +269,7 @@ describe('CharacterInfoPanel', () => {
         }
       }
 
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: lowHealthProfile
         }
@@ -286,7 +287,7 @@ describe('CharacterInfoPanel', () => {
         }
       }
 
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: noHealthProfile
         }
@@ -298,7 +299,7 @@ describe('CharacterInfoPanel', () => {
 
   describe('Character Details Display', () => {
     it('should display profession', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -309,7 +310,7 @@ describe('CharacterInfoPanel', () => {
     })
 
     it('should display breed', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -320,7 +321,7 @@ describe('CharacterInfoPanel', () => {
     })
 
     it('should display faction', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -331,7 +332,7 @@ describe('CharacterInfoPanel', () => {
     })
 
     it('should display expansion', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -342,7 +343,7 @@ describe('CharacterInfoPanel', () => {
     })
 
     it('should display account type', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -355,7 +356,7 @@ describe('CharacterInfoPanel', () => {
 
   describe('Breed Color Indicators', () => {
     it('should show red indicator for Atrox', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -374,7 +375,7 @@ describe('CharacterInfoPanel', () => {
         }
       }
 
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: solitusProfile
         }
@@ -387,7 +388,7 @@ describe('CharacterInfoPanel', () => {
 
   describe('Faction Color Indicators', () => {
     it('should show orange indicator for Clan', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -406,7 +407,7 @@ describe('CharacterInfoPanel', () => {
         }
       }
 
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: omniProfile
         }
@@ -419,7 +420,7 @@ describe('CharacterInfoPanel', () => {
 
   describe('Core Attributes Display', () => {
     it('should display all six attributes', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -435,7 +436,7 @@ describe('CharacterInfoPanel', () => {
     })
 
     it('should display attribute values', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -448,7 +449,7 @@ describe('CharacterInfoPanel', () => {
     })
 
     it('should display breed base values', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -458,7 +459,7 @@ describe('CharacterInfoPanel', () => {
     })
 
     it('should display trickle-down bonuses', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -475,7 +476,7 @@ describe('CharacterInfoPanel', () => {
         skills: {}
       }
 
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: noSkillsProfile
         }
@@ -488,18 +489,18 @@ describe('CharacterInfoPanel', () => {
 
   describe('Profile Metadata Display', () => {
     it('should display profile ID', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
       })
 
       expect(wrapper.text()).toContain('Profile ID')
-      expect(wrapper.text()).toContain('profile_1') // First 8 chars
+      expect(wrapper.text()).toContain('profile_') // First 8 chars of 'profile_123'
     })
 
     it('should display profile version', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -510,7 +511,7 @@ describe('CharacterInfoPanel', () => {
     })
 
     it('should display created date', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -522,7 +523,7 @@ describe('CharacterInfoPanel', () => {
     })
 
     it('should display updated date', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -536,7 +537,7 @@ describe('CharacterInfoPanel', () => {
 
   describe('Date Formatting', () => {
     it('should format dates correctly', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -554,7 +555,7 @@ describe('CharacterInfoPanel', () => {
         updated: 'invalid-date'
       }
 
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: invalidDateProfile
         }
@@ -566,7 +567,7 @@ describe('CharacterInfoPanel', () => {
 
   describe('Visual Styling', () => {
     it('should have character-info-panel class', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -577,7 +578,7 @@ describe('CharacterInfoPanel', () => {
     })
 
     it('should use proper background colors', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -591,7 +592,7 @@ describe('CharacterInfoPanel', () => {
     })
 
     it('should display badges with appropriate severity', () => {
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: mockProfile
         }
@@ -610,7 +611,7 @@ describe('CharacterInfoPanel', () => {
         Character: undefined
       }
 
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: noCharacterProfile
         }
@@ -630,7 +631,7 @@ describe('CharacterInfoPanel', () => {
         skills: {}
       }
 
-      wrapper = mount(CharacterInfoPanel, {
+      wrapper = mountWithContext(CharacterInfoPanel, {
         props: {
           profile: minimalProfile
         }

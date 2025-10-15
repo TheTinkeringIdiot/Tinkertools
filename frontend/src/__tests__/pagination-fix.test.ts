@@ -8,6 +8,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
+import { createPinia } from 'pinia'
 import axios from 'axios'
 import { apiClient } from '../services/api-client'
 import ItemList from '../components/items/ItemList.vue'
@@ -295,6 +296,9 @@ describe('Pagination Fix', () => {
           items: [mockItem],
           viewMode: 'grid',
           pagination
+        },
+        global: {
+          plugins: [createPinia()]
         }
       })
 
@@ -353,6 +357,9 @@ describe('Pagination Fix', () => {
           items: [mockItem],
           viewMode: 'grid',
           pagination
+        },
+        global: {
+          plugins: [createPinia()]
         }
       })
 
@@ -381,6 +388,9 @@ describe('Pagination Fix', () => {
           items: [mockItem],
           viewMode: 'grid',
           pagination
+        },
+        global: {
+          plugins: [createPinia()]
         }
       })
 
@@ -406,6 +416,9 @@ describe('Pagination Fix', () => {
             hasNext: true,
             hasPrev: false
           }
+        },
+        global: {
+          plugins: [createPinia()]
         }
       })
 
@@ -449,9 +462,13 @@ describe('Pagination Fix', () => {
           items: Array.from({ length: 24 }, (_, i) => ({ ...mockItem, id: i + 25 })),
           viewMode: 'grid',
           pagination
+        },
+        global: {
+          plugins: [createPinia()]
         }
       })
 
+      // Component displays: "Showing 25-48 of 100 items" format at line 155-156 in ItemList.vue
       const paginationInfo = wrapper.find('.text-sm')
       expect(paginationInfo.text()).toContain('Showing 25-48 of 100 items')
     })
@@ -485,6 +502,9 @@ describe('Pagination Fix', () => {
           items: result.data || [],
           viewMode: 'grid',
           pagination: result.pagination
+        },
+        global: {
+          plugins: [createPinia()]
         }
       })
 

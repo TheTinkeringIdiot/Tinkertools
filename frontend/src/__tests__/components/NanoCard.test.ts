@@ -1,50 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mountWithContext, standardCleanup, setupLocalStorageMock, createTestProfile, PROFESSION, SKILL_ID } from '@/__tests__/helpers';
 import { nextTick } from 'vue';
 import NanoCard from '@/components/nanos/NanoCard.vue';
 import type { NanoProgram, TinkerProfile, NanoCompatibilityInfo } from '@/types/nano';
-
-// Mock PrimeVue components
-vi.mock('primevue/avatar', () => ({
-  default: {
-    name: 'Avatar',
-    template: '<div class="avatar" :class="$attrs.class"><span>{{ label }}</span></div>',
-    props: ['label', 'size', 'shape']
-  }
-}));
-
-vi.mock('primevue/badge', () => ({
-  default: {
-    name: 'Badge',
-    template: '<span class="badge" :class="severity">{{ value }}</span>',
-    props: ['value', 'severity', 'size']
-  }
-}));
-
-vi.mock('primevue/button', () => ({
-  default: {
-    name: 'Button',
-    template: '<button @click="$emit(\'click\')" :class="[severity, { text }]"><i :class="icon"></i>{{ label }}</button>',
-    props: ['icon', 'label', 'severity', 'text', 'rounded', 'size'],
-    emits: ['click']
-  }
-}));
-
-vi.mock('primevue/card', () => ({
-  default: {
-    name: 'Card',
-    template: '<div class="card" :class="$attrs.class" @click="$emit(\'click\')"><div class="header"><slot name="header" /></div><div class="content"><slot name="content" /></div></div>',
-    emits: ['click']
-  }
-}));
-
-vi.mock('primevue/chip', () => ({
-  default: {
-    name: 'Chip',
-    template: '<span class="chip" :class="severity">{{ label }}</span>',
-    props: ['label', 'severity']
-  }
-}));
 
 describe('NanoCard', () => {
   let wrapper: any;
@@ -61,7 +19,7 @@ describe('NanoCard', () => {
       description: 'Heals target for a large amount of health over time.',
       level: 125,
       qualityLevel: 175,
-      profession: 'Doctor',
+      profession: PROFESSION.DOCTOR,
       nanoPointCost: 450,
       castingTime: 3,
       rechargeTime: 5,
@@ -69,8 +27,8 @@ describe('NanoCard', () => {
       sourceLocation: 'Omni-Tek Shop',
       acquisitionMethod: 'Purchase',
       castingRequirements: [
-        { type: 'skill', requirement: 'Biological Metamorphosis', value: 750, critical: true },
-        { type: 'skill', requirement: 'Nano Programming', value: 600, critical: true },
+        { type: 'skill', requirement: SKILL_ID.BIO_METAMOR, value: 750, critical: true },
+        { type: 'skill', requirement: SKILL_ID.NANO_PROGRAMMING, value: 600, critical: true },
         { type: 'level', requirement: 'level', value: 125, critical: true }
       ],
       effects: [
@@ -86,24 +44,17 @@ describe('NanoCard', () => {
       targeting: { type: 'team', range: 30 }
     };
 
-    mockProfile = {
-      id: 'test-profile',
-      name: 'Test Character',
-      profession: 'Doctor',
+    mockProfile = createTestProfile({
+      profession: PROFESSION.DOCTOR,
       level: 100,
       skills: {
-        'Biological Metamorphosis': 500,
-        'Matter Creation': 300,
-        'Nano Programming': 400
-      },
-      stats: {
-        'Intelligence': 400,
-        'Psychic': 300
-      },
-      activeNanos: [],
-      memoryCapacity: 500,
-      nanoPoints: 1000
-    };
+        [SKILL_ID.BIO_METAMOR]: { base: 0, trickle: 0, pointsFromIp: 500, equipmentBonus: 0, total: 500 },
+        [SKILL_ID.MATTER_CREATION]: { base: 0, trickle: 0, pointsFromIp: 300, equipmentBonus: 0, total: 300 },
+        [SKILL_ID.NANO_PROGRAMMING]: { base: 0, trickle: 0, pointsFromIp: 400, equipmentBonus: 0, total: 400 },
+        [SKILL_ID.INTELLIGENCE]: { base: 0, trickle: 0, pointsFromIp: 400, equipmentBonus: 0, total: 400 },
+        [SKILL_ID.PSYCHIC]: { base: 0, trickle: 0, pointsFromIp: 300, equipmentBonus: 0, total: 300 }
+      }
+    }) as any; // Cast as any since the type might differ from NanoProgram TinkerProfile
 
     mockCompatibilityInfo = {
       canCast: false,
@@ -120,15 +71,9 @@ describe('NanoCard', () => {
     };
 
     // Mock localStorage
-    const localStorageMock = {
-      getItem: vi.fn(() => '[]'),
-      setItem: vi.fn(),
-      removeItem: vi.fn(),
-      clear: vi.fn()
-    };
-    global.localStorage = localStorageMock as any;
+    setupLocalStorageMock();
 
-    wrapper = mount(NanoCard, {
+    wrapper = mountWithContext(NanoCard, {
       props: {
         nano: mockNano,
         compact: false,
@@ -137,6 +82,13 @@ describe('NanoCard', () => {
         compatibilityInfo: null
       }
     });
+  });
+
+  afterEach(() => {
+    if (wrapper) {
+      wrapper.unmount();
+    }
+    standardCleanup();
   });
 
   it('renders nano name correctly', () => {
@@ -169,7 +121,7 @@ describe('NanoCard', () => {
 
   it('displays nano properties in detailed view', () => {
     expect(wrapper.text()).toContain('Heal Delta'); // Strain
-    expect(wrapper.text()).toContain('Doctor'); // Profession
+    expect(wrapper.text()).toContain(PROFESSION.DOCTOR.toString()); // Profession ID
     expect(wrapper.text()).toContain('450'); // NP Cost
     expect(wrapper.text()).toContain('85mb'); // Memory
     expect(wrapper.text()).toContain('3s'); // Cast time

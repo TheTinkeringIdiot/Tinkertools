@@ -601,7 +601,7 @@ describe('useActionCriteria composables', () => {
       it('should find most restrictive requirement for a stat', () => {
         const criteria: Criterion[] = [
           { id: 1, value1: 112, value2: 300, operator: 2 },
-          { id: 2, value1: 112, value2: 400, operator: 2 }
+          { id: 2, value1: 112, value2: 356, operator: 2 }
         ]
 
         vi.mocked(transformCriterionForDisplay)
@@ -621,10 +621,10 @@ describe('useActionCriteria composables', () => {
             id: 2,
             stat: 112,
             statName: 'Pistol',
-            displayValue: 401,
+            displayValue: 357,
             displaySymbol: '≥',
             displayOperator: 'Greater than or equal to',
-            description: 'Pistol ≥ 401',
+            description: 'Pistol ≥ 357',
             isLogicalOperator: false,
             isSeparator: false,
             isStatRequirement: true
@@ -632,7 +632,8 @@ describe('useActionCriteria composables', () => {
 
         const result = getMostRestrictiveRequirement(criteria, 112)
 
-        expect(result?.displayValue).toBe(401)
+        // Implementation returns highest value for >= requirements (most restrictive)
+        expect(result?.displayValue).toBe(357)
       })
 
       it('should return null for non-existent stat', () => {

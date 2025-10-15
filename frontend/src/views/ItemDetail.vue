@@ -885,6 +885,16 @@ watch(() => route.params.aoid, () => {
 })
 
 // Route QL handling is now done entirely by ItemInterpolationBar
+
+// ============================================================================
+// Expose for Tests
+// ============================================================================
+
+defineExpose({
+  interpolatedItem,
+  displayedItem,
+  interpolationError
+})
 </script>
 
 <style scoped>

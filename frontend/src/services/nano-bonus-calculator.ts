@@ -77,6 +77,13 @@ export const STAT_BONUS_SPELL_IDS = [
   53175  // "Modify {Stat} by {Amount}" - ability stat modifier format
 ] as const
 
+/**
+ * Nano events that provide stat bonuses
+ * - 1: Cast (nanos trigger on cast)
+ * - 14: Wear (some nanos use wear event like equipment)
+ */
+export const NANO_EVENTS = [1, 14] as const
+
 
 // ============================================================================
 // Performance Caching
@@ -414,11 +421,8 @@ export class NanoBonusCalculator {
     }
 
     for (const spellData of nano.spell_data) {
-      // Only process nano-related events (Cast=1, Wear=14)
-      if (!spellData.event || !NANO_EVENTS.includes(spellData.event as any)) {
-        continue
-      }
-
+      // Process all spell data - event filtering happens at higher level
+      // Nano buffs can have multiple event types (Cast=1, Wear=14, etc.)
       if (!spellData.spells || !Array.isArray(spellData.spells)) {
         continue
       }

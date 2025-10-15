@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mountWithContext, standardCleanup } from '@/__tests__/helpers';
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue';
 
 describe('LoadingSpinner', () => {
   it('renders with default props', () => {
-    const wrapper = mount(LoadingSpinner);
+    const wrapper = mountWithContext(LoadingSpinner);
     
     expect(wrapper.exists()).toBe(true);
     expect(wrapper.attributes('role')).toBe('status');
@@ -13,7 +13,7 @@ describe('LoadingSpinner', () => {
   });
 
   it('renders with custom loading text', () => {
-    const wrapper = mount(LoadingSpinner, {
+    const wrapper = mountWithContext(LoadingSpinner, {
       props: {
         loadingText: 'Loading items...'
       }
@@ -24,7 +24,7 @@ describe('LoadingSpinner', () => {
   });
 
   it('shows text when showText is true', () => {
-    const wrapper = mount(LoadingSpinner, {
+    const wrapper = mountWithContext(LoadingSpinner, {
       props: {
         loadingText: 'Please wait...',
         showText: true
@@ -40,7 +40,7 @@ describe('LoadingSpinner', () => {
   });
 
   it('applies correct size classes for small spinner', () => {
-    const wrapper = mount(LoadingSpinner, {
+    const wrapper = mountWithContext(LoadingSpinner, {
       props: {
         size: 'small'
       }
@@ -55,7 +55,7 @@ describe('LoadingSpinner', () => {
   });
 
   it('applies correct size classes for large spinner', () => {
-    const wrapper = mount(LoadingSpinner, {
+    const wrapper = mountWithContext(LoadingSpinner, {
       props: {
         size: 'large'
       }
@@ -70,7 +70,7 @@ describe('LoadingSpinner', () => {
   });
 
   it('applies medium size classes by default', () => {
-    const wrapper = mount(LoadingSpinner);
+    const wrapper = mountWithContext(LoadingSpinner);
     
     const container = wrapper.find('[role="status"]');
     expect(container.classes()).toContain('p-4');
@@ -81,7 +81,7 @@ describe('LoadingSpinner', () => {
   });
 
   it('has proper spinner animation and styling', () => {
-    const wrapper = mount(LoadingSpinner);
+    const wrapper = mountWithContext(LoadingSpinner);
     
     const spinner = wrapper.find('.animate-spin');
     expect(spinner.exists()).toBe(true);
@@ -93,31 +93,31 @@ describe('LoadingSpinner', () => {
   });
 
   it('adjusts text size based on spinner size', () => {
-    const wrapperSmall = mount(LoadingSpinner, {
+    const wrapperSmall = mountWithContext(LoadingSpinner, {
       props: {
         size: 'small',
         showText: true,
         loadingText: 'Loading...'
       }
     });
-    
+
     const textSmall = wrapperSmall.find('.ml-2');
     expect(textSmall.classes()).toContain('text-sm');
-    
-    const wrapperMedium = mount(LoadingSpinner, {
+
+    const wrapperMedium = mountWithContext(LoadingSpinner, {
       props: {
         size: 'medium',
         showText: true,
         loadingText: 'Loading...'
       }
     });
-    
+
     const textMedium = wrapperMedium.find('.ml-2');
     expect(textMedium.classes()).toContain('text-base');
   });
 
   it('provides proper aria attributes for accessibility', () => {
-    const wrapper = mount(LoadingSpinner, {
+    const wrapper = mountWithContext(LoadingSpinner, {
       props: {
         loadingText: 'Loading user data...'
       }

@@ -1,20 +1,34 @@
 /**
  * Interpolation Range Transition Tests
- * 
+ *
+ * TRUE INTEGRATION TEST - Requires real backend
  * Tests multi-range item interpolation and navigation between
  * different base items using real backend data
+ *
+ * Strategy: Skip when backend not available (Option B)
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createWebHistory } from 'vue-router'
 import ItemDetail from '../../views/ItemDetail.vue'
 import { useItemsStore } from '../../stores/items'
 import { apiClient } from '../../services/api-client'
+import { isBackendAvailable, getBackendUrl } from '../helpers/backend-check'
 
 // Real backend URL for integration testing
-const BACKEND_URL = 'http://localhost:8000/api/v1'
+const BACKEND_URL = getBackendUrl() + '/api/v1'
+
+// Check backend availability before running tests
+let BACKEND_AVAILABLE = false
+
+beforeAll(async () => {
+  BACKEND_AVAILABLE = await isBackendAvailable()
+  if (!BACKEND_AVAILABLE) {
+    console.warn('Backend not available - skipping interpolation range tests')
+  }
+})
 
 // Known multi-range items for testing
 const TEST_ITEMS = {
@@ -27,20 +41,20 @@ const TEST_ITEMS = {
   }
 }
 
-describe('Interpolation Range Transitions', () => {
+describe.skipIf(!BACKEND_AVAILABLE)('Interpolation Range Transitions', () => {
   let router: any
   let store: any
 
   beforeEach(() => {
     setActivePinia(createPinia())
     store = useItemsStore()
-    
+
     router = createRouter({
       history: createWebHistory(),
       routes: [
-        { 
-          path: '/items/:aoid', 
-          name: 'ItemDetail', 
+        {
+          path: '/items/:aoid',
+          name: 'ItemDetail',
           component: ItemDetail,
           props: true
         }

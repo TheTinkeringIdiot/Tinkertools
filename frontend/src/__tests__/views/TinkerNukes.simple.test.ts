@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { nextTick } from 'vue';
 import { mount } from '@vue/test-utils';
 import { createPinia } from 'pinia';
 import { createRouter, createWebHistory } from 'vue-router';
-import PrimeVue from 'primevue/config';
 import TinkerNukes from '@/views/TinkerNukes.vue';
 
 // Mock PrimeVue components
@@ -42,10 +42,9 @@ describe('TinkerNukes Simple Tests', () => {
     });
 
     const pinia = createPinia();
-
     wrapper = mount(TinkerNukes, {
       global: {
-        plugins: [PrimeVue, pinia, router],
+        plugins: [pinia, router],
         stubs: {
           RouterLink: true,
           RouterView: true
@@ -68,63 +67,66 @@ describe('TinkerNukes Simple Tests', () => {
     expect(wrapper.text()).toContain('NT Only');
   });
 
-  it('shows nanotechnician skills section', () => {
-    expect(wrapper.text()).toContain('Nanotechnician Skills');
+  it('shows character stats section', () => {
+    expect(wrapper.text()).toContain('Character Stats');
   });
 
-  it('has manual skills toggle', () => {
-    expect(wrapper.text()).toContain('Manual Skills');
+  it('shows damage modifiers section', () => {
+    expect(wrapper.text()).toContain('Damage Modifiers');
+  });
+
+  it('shows buff presets section', () => {
+    expect(wrapper.text()).toContain('Buff Presets');
   });
 
   it('initializes with correct default state', () => {
     const component = wrapper.vm;
-    expect(component.selectedProfile).toBeNull();
-    expect(component.useManualSkills).toBe(false);
+    expect(component.activeProfile).toBeNull();
     expect(component.searchQuery).toBe('');
-    expect(component.selectedSchool).toBeNull();
+    expect(component.selectedSchoolId).toBeNull();
   });
 
-  it('has proper manual skills defaults', () => {
+  it('has proper input state defaults', () => {
     const component = wrapper.vm;
-    const skills = component.manualSkills;
-    
-    expect(skills.matter_creation).toBe(1);
-    expect(skills.biological_metamorphosis).toBe(1);
-    expect(skills.nano_pool).toBe(1);
-    expect(skills.computer_literacy).toBe(1);
-    
-    // Verify all 8 skills are present
-    const skillKeys = Object.keys(skills);
-    expect(skillKeys.length).toBe(8);
+    const state = component.inputState;
+
+    expect(state.characterStats.matterCreation).toBe(1);
+    expect(state.characterStats.bioMeta).toBe(1);
+    expect(state.characterStats.level).toBe(1);
+    expect(state.characterStats.psychic).toBe(6);
+
+    // Verify character stats structure
+    expect(state.characterStats).toHaveProperty('breed');
+    expect(state.characterStats).toHaveProperty('nanoInit');
+    expect(state.characterStats).toHaveProperty('maxNano');
   });
 
-  it('provides correct nano skills configuration', () => {
+  it('provides correct school filter options', () => {
     const component = wrapper.vm;
-    const skills = component.nanoSkills;
-    
-    expect(skills.length).toBe(8);
-    
-    const skillKeys = skills.map((s: any) => s.key);
-    expect(skillKeys).toContain('matter_metamorphosis');
-    expect(skillKeys).toContain('biological_metamorphosis');
-    expect(skillKeys).toContain('psychological_modifications');
-    expect(skillKeys).toContain('matter_creation');
-    expect(skillKeys).toContain('time_and_space');
-    expect(skillKeys).toContain('sensory_improvement');
-    expect(skillKeys).toContain('nano_pool');
-    expect(skillKeys).toContain('computer_literacy');
+    const options = component.schoolFilterOptions;
+
+    expect(options.length).toBe(6);
+
+    const labels = options.map((o: any) => o.label);
+    expect(labels).toContain('Matter Creation');
+    expect(labels).toContain('Biological Metamorphosis');
+    expect(labels).toContain('Psychological Modifications');
+    expect(labels).toContain('Matter Metamorphosis');
+    expect(labels).toContain('Time and Space');
+    expect(labels).toContain('Sensory Improvement');
   });
 
-  it('has proper skill labels', () => {
+  it('has proper current skills mapping', () => {
     const component = wrapper.vm;
-    const skills = component.nanoSkills;
-    
-    const labels = skills.map((s: any) => s.label);
-    expect(labels).toContain('Matter Meta');
-    expect(labels).toContain('Bio Meta');
-    expect(labels).toContain('Matter Creat');
-    expect(labels).toContain('Nano Pool');
-    expect(labels).toContain('Comp Lit');
+    const skills = component.currentSkills;
+
+    // currentSkills is a computed that maps skill IDs
+    expect(skills[130]).toBe(1); // Matter Creation
+    expect(skills[128]).toBe(1); // Bio Meta
+    expect(skills[127]).toBe(1); // Matter Meta
+    expect(skills[129]).toBe(1); // Psych Modi
+    expect(skills[122]).toBe(1); // Sensory Imp
+    expect(skills[131]).toBe(1); // Time Space
   });
 
   it('renders data table component', () => {
@@ -132,67 +134,30 @@ describe('TinkerNukes Simple Tests', () => {
   });
 
   it('shows offensive nano count message', () => {
-    expect(wrapper.text()).toContain('usable offensive nanos');
+    expect(wrapper.text()).toContain('found');
   });
 
-  it('has skill input class calculation', () => {
+  it('displays filtered nanos count', () => {
     const component = wrapper.vm;
-    
-    // Test skill level classifications
-    component.manualSkills.matter_creation = 100;
-    expect(component.getSkillInputClass('matter_creation')).toBe('skill-low');
-    
-    component.manualSkills.matter_creation = 600;
-    expect(component.getSkillInputClass('matter_creation')).toBe('skill-medium');
-    
-    component.manualSkills.matter_creation = 1200;
-    expect(component.getSkillInputClass('matter_creation')).toBe('skill-high');
+    const count = component.filteredNanos.length;
+
+    // Check that the count is displayed in the text
+    expect(wrapper.text()).toContain(`${count} nano`);
   });
 
-  it('provides usability helper functions', () => {
+  it('has loading state', () => {
     const component = wrapper.vm;
-    const mockNano = { id: 1, name: 'Test Nano' };
-    
-    expect(typeof component.getUsabilityIcon(mockNano)).toBe('string');
-    expect(typeof component.getUsabilityText(mockNano)).toBe('string');
-    expect(typeof component.getUsabilityColor(mockNano)).toBe('string');
-    expect(component.getUsabilityText(mockNano)).toBe('Usable');
+    expect(typeof component.loading).toBe('boolean');
+    expect(component.loading).toBe(false);
   });
 
-  it('handles offensive effects extraction', () => {
+  it('has offensive nanos array', () => {
     const component = wrapper.vm;
-    
-    const nanoWithEffects = {
-      effects: [
-        { type: 'damage', value: 100 },
-        { type: 'heal', value: 50 },
-        { type: 'debuff', value: 25 }
-      ]
-    };
-    
-    const effects = component.getOffensiveEffects(nanoWithEffects);
-    expect(Array.isArray(effects)).toBe(true);
-    expect(effects).toContain('Damage');
-    expect(effects).toContain('Debuff');
+    expect(Array.isArray(component.offensiveNanos)).toBe(true);
   });
 
-  it('handles empty effects gracefully', () => {
+  it('has filtered nanos computed property', () => {
     const component = wrapper.vm;
-    const nanoWithoutEffects = { id: 1, name: 'Test' };
-    
-    const effects = component.getOffensiveEffects(nanoWithoutEffects);
-    expect(Array.isArray(effects)).toBe(true);
-    expect(effects.length).toBe(0);
-  });
-
-  it('handles profile changes correctly', () => {
-    const component = wrapper.vm;
-    
-    // Test profile change method
-    component.selectedProfile = 'TestProfile';
-    component.onProfileChange();
-    
-    // Should disable manual skills when profile is selected
-    expect(component.useManualSkills).toBe(false);
+    expect(Array.isArray(component.filteredNanos)).toBe(true);
   });
 });

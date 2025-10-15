@@ -321,6 +321,20 @@ onMounted(() => {
   loadCollectionData();
   loadCollectionGoals();
 });
+
+// Expose methods for tests
+defineExpose({
+  getCollectionItem,
+  toggleCollection,
+  getDropSources,
+  getSlotIcon,
+  getQualitySeverity,
+  clearFilters,
+  createCollectionGoal,
+  getGoalProgress,
+  exportCollectionData,
+  importCollectionData
+})
 </script>
 
 <template>

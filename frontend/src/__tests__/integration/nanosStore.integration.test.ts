@@ -1,3 +1,13 @@
+/**
+ * NanosStore Unit Tests
+ *
+ * UNIT TEST - Uses mocks, not real backend
+ * Strategy: Already uses mocks correctly
+ *
+ * Note: This file is named "integration" but actually uses mocks.
+ * It tests store logic in isolation, not real API integration.
+ */
+
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import { useNanosStore } from '@/stores/nanosStore';
@@ -12,7 +22,21 @@ global.localStorage = {
   key: vi.fn()
 } as any;
 
-describe('NanosStore Integration Tests', () => {
+// Mock global fetch for unit tests
+global.fetch = vi.fn().mockResolvedValue({
+  ok: true,
+  status: 200,
+  json: async () => ({
+    items: [],
+    total: 0,
+    page: 1,
+    page_size: 50,
+    pages: 0
+  }),
+  text: async () => '{"items": [], "total": 0}'
+} as any);
+
+describe('NanosStore Unit Tests', () => {
   let store: ReturnType<typeof useNanosStore>;
 
   beforeEach(() => {

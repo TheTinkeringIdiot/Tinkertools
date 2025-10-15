@@ -1,12 +1,27 @@
+/**
+ * TinkerNukes Component Unit Tests
+ *
+ * UNIT TEST - Component behavior tests with mocks
+ * Strategy: Tests component logic in isolation
+ *
+ * Tests TinkerNukes view functionality with mocked stores and backend.
+ * Focuses on component behavior, filtering, and state management.
+ *
+ * Note: This file is named "integration" but uses mocks to test
+ * component behavior in isolation, not real backend integration.
+ */
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { nextTick } from 'vue';
 import { mount, VueWrapper } from '@vue/test-utils';
 import { createPinia } from 'pinia';
 import { createRouter, createWebHistory } from 'vue-router';
 import PrimeVue from 'primevue/config';
 import TinkerNukes from '@/views/TinkerNukes.vue';
 import { useNanosStore } from '@/stores/nanosStore';
-import { useProfilesStore } from '@/stores/profilesStore';
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import type { NanoProgram } from '@/types/nano';
+import { PROFESSION } from '@/__tests__/helpers';
 
 // Mock PrimeVue components
 vi.mock('primevue/badge', () => ({ 
@@ -76,7 +91,7 @@ vi.mock('primevue/column', () => ({
   }
 }));
 
-describe('TinkerNukes Integration Tests', () => {
+describe('TinkerNukes Component Unit Tests', () => {
   let wrapper: VueWrapper;
   let router: any;
   let pinia: any;
@@ -108,7 +123,7 @@ describe('TinkerNukes Integration Tests', () => {
 
     // Get store instances
     nanosStore = useNanosStore();
-    profilesStore = useProfilesStore();
+    profilesStore = useTinkerProfilesStore();
 
     await wrapper.vm.$nextTick();
   });
@@ -129,20 +144,31 @@ describe('TinkerNukes Integration Tests', () => {
       expect(wrapper.text()).toContain('NT Only');
     });
 
-    it('shows nanotechnician skills section', () => {
-      expect(wrapper.text()).toContain('Nanotechnician Skills');
+    it('shows form sections', () => {
+      expect(wrapper.text()).toContain('Character Stats');
+      expect(wrapper.text()).toContain('Damage Modifiers');
+      expect(wrapper.text()).toContain('Buff Presets');
     });
 
-    it('has all required skill inputs', () => {
+    it('has all required input state fields', () => {
       const component = wrapper.vm as any;
-      const skillLabels = component.nanoSkills.map((s: any) => s.label);
-      
-      expect(skillLabels).toContain('Matter Meta');
-      expect(skillLabels).toContain('Bio Meta'); 
-      expect(skillLabels).toContain('Matter Creat');
-      expect(skillLabels).toContain('Nano Pool');
-      expect(skillLabels).toContain('Comp Lit');
-      expect(skillLabels.length).toBe(8);
+      const state = component.inputState;
+
+      // Character stats
+      expect(state.characterStats).toHaveProperty('matterCreation');
+      expect(state.characterStats).toHaveProperty('bioMeta');
+      expect(state.characterStats).toHaveProperty('matterMeta');
+      expect(state.characterStats).toHaveProperty('psychModi');
+      expect(state.characterStats).toHaveProperty('sensoryImp');
+      expect(state.characterStats).toHaveProperty('timeSpace');
+
+      // Damage modifiers
+      expect(state.damageModifiers).toHaveProperty('projectile');
+      expect(state.damageModifiers).toHaveProperty('nano');
+
+      // Buff presets
+      expect(state.buffPresets).toHaveProperty('crunchcom');
+      expect(state.buffPresets).toHaveProperty('enhanceNanoDamage');
     });
   });
 
@@ -188,7 +214,7 @@ describe('TinkerNukes Integration Tests', () => {
       // Should only include nanos that are either unspecified profession or NT
       offensiveNanos.forEach((nano: NanoProgram) => {
         if (nano.profession) {
-          expect(nano.profession).toBe('Nanotechnician');
+          expect(nano.profession).toBe(PROFESSION.NANOTECHNICIAN);
         }
       });
       
@@ -198,117 +224,95 @@ describe('TinkerNukes Integration Tests', () => {
     }, 10000);
   });
 
-  describe('Skill Management', () => {
-    it('starts with manual skills disabled', () => {
+  describe('Input State Management', () => {
+    it('initializes input state with defaults', () => {
       const component = wrapper.vm as any;
-      expect(component.useManualSkills).toBe(false);
+      const state = component.inputState;
+
+      expect(state.characterStats.breed).toBe(1);
+      expect(state.characterStats.level).toBe(1);
+      expect(state.characterStats.psychic).toBe(6);
+      expect(state.characterStats.matterCreation).toBe(1);
     });
 
-    it('toggles manual skills mode', async () => {
-      const toggle = wrapper.find('[data-testid="inputswitch"]');
-      expect(toggle.exists()).toBe(true);
-      
+    it('allows updating character stats', async () => {
       const component = wrapper.vm as any;
-      component.useManualSkills = true;
+
+      // Update input state directly
+      component.inputState.characterStats.level = 200;
+      component.inputState.characterStats.matterCreation = 1000;
+
       await wrapper.vm.$nextTick();
-      
-      expect(component.useManualSkills).toBe(true);
+
+      expect(component.inputState.characterStats.level).toBe(200);
+      expect(component.inputState.characterStats.matterCreation).toBe(1000);
     });
 
-    it('initializes manual skills with proper defaults', () => {
-      const component = wrapper.vm as any;
-      const skills = component.manualSkills;
-      
-      expect(skills.matter_creation).toBe(1);
-      expect(skills.biological_metamorphosis).toBe(1);
-      expect(skills.nano_pool).toBe(1);
-      expect(skills.computer_literacy).toBe(1);
-      
-      // All skills should be initialized
-      Object.values(skills).forEach(value => {
-        expect(typeof value).toBe('number');
-        expect(value).toBeGreaterThan(0);
-      });
-    });
-
-    it('calculates skill-based usability correctly', async () => {
+    it('calculates skill-based filtering correctly', async () => {
       await new Promise(resolve => setTimeout(resolve, 200));
-      
+
       const component = wrapper.vm as any;
-      
+
       // Test with low skills
-      component.useManualSkills = true;
-      component.manualSkills = {
-        matter_creation: 50,
-        biological_metamorphosis: 50,
-        psychological_modifications: 50,
-        matter_metamorphosis: 50,
-        time_and_space: 50,
-        sensory_improvement: 50,
-        nano_pool: 50,
-        computer_literacy: 50
-      };
-      
+      component.inputState.characterStats.matterCreation = 50;
+      component.inputState.characterStats.bioMeta = 50;
+      component.inputState.characterStats.level = 10;
+
       await wrapper.vm.$nextTick();
-      const lowSkillUsable = component.usableNanos.length;
-      
+      const lowSkillFiltered = component.filteredNanos.length;
+
       // Test with high skills
-      component.manualSkills = {
-        matter_creation: 1000,
-        biological_metamorphosis: 1000,
-        psychological_modifications: 1000,
-        matter_metamorphosis: 1000,
-        time_and_space: 1000,
-        sensory_improvement: 1000,
-        nano_pool: 1000,
-        computer_literacy: 1000
-      };
-      
+      component.inputState.characterStats.matterCreation = 1000;
+      component.inputState.characterStats.bioMeta = 1000;
+      component.inputState.characterStats.level = 220;
+
       await wrapper.vm.$nextTick();
-      const highSkillUsable = component.usableNanos.length;
-      
+      const highSkillFiltered = component.filteredNanos.length;
+
       // Higher skills should allow more nanos (or at least same amount)
-      expect(highSkillUsable).toBeGreaterThanOrEqual(lowSkillUsable);
+      expect(highSkillFiltered).toBeGreaterThanOrEqual(lowSkillFiltered);
     }, 10000);
   });
 
   describe('Profile Integration', () => {
-    it('filters profile dropdown to only show Nanotechnicians', async () => {
+    it('displays active profile information', async () => {
       await new Promise(resolve => setTimeout(resolve, 200));
-      
+
       const component = wrapper.vm as any;
-      const profileOptions = component.profileOptions;
-      
-      // Should have at least the 'None' option
-      expect(profileOptions.length).toBeGreaterThanOrEqual(1);
-      expect(profileOptions[0].label).toBe('None');
-      
-      // Any additional profiles should be Nanotechnicians only
-      if (profileOptions.length > 1) {
-        profileOptions.slice(1).forEach((option: any) => {
-          expect(option.label).toContain('('); // Should contain level in parentheses
-        });
+
+      // Initially no active profile
+      expect(component.activeProfile).toBeNull();
+
+      // If there are NT profiles available in store
+      if (profilesStore.profiles.some((p: any) => p.Character?.Profession === 11)) {
+        const ntProfile = profilesStore.profiles.find((p: any) => p.Character?.Profession === 11);
+        profilesStore.activeProfile = ntProfile;
+
+        await wrapper.vm.$nextTick();
+
+        expect(component.activeProfile).toBeTruthy();
+        expect(wrapper.text()).toContain('Active Profile:');
       }
     }, 10000);
 
-    it('extracts skills from selected profile', async () => {
+    it('extracts skills from active profile', async () => {
       await new Promise(resolve => setTimeout(resolve, 200));
-      
+
       const component = wrapper.vm as any;
-      
+
       // If there are NT profiles available, test skill extraction
-      if (profilesStore.profiles.some((p: any) => p.profession === 'Nanotechnician')) {
-        const ntProfile = profilesStore.profiles.find((p: any) => p.profession === 'Nanotechnician');
-        component.selectedProfile = ntProfile.name;
-        
+      if (profilesStore.profiles.some((p: any) => p.Character?.Profession === 11)) {
+        const ntProfile = profilesStore.profiles.find((p: any) => p.Character?.Profession === 11);
+        profilesStore.activeProfile = ntProfile;
+
         await wrapper.vm.$nextTick();
-        
+
         const skills = component.currentSkills;
         expect(typeof skills).toBe('object');
-        
-        // Should have extracted skill values (or defaults)
-        expect(typeof skills.matter_creation).toBe('number');
-        expect(skills.matter_creation).toBeGreaterThan(0);
+
+        // Should have extracted skill values by ID (or defaults)
+        expect(typeof skills[130]).toBe('number'); // Matter Creation
+        expect(skills[130]).toBeGreaterThan(0);
       }
     }, 10000);
   });
@@ -319,128 +323,121 @@ describe('TinkerNukes Integration Tests', () => {
       expect(table.exists()).toBe(true);
     });
 
-    it('shows usable nano count', async () => {
+    it('shows filtered nano count', async () => {
       await new Promise(resolve => setTimeout(resolve, 200));
-      
+
       const component = wrapper.vm as any;
-      const usableCount = component.usableNanos.length;
-      
-      expect(wrapper.text()).toContain(`${usableCount} usable offensive nanos`);
+      const filteredCount = component.filteredNanos.length;
+
+      expect(wrapper.text()).toContain(`${filteredCount} nano`);
+      expect(wrapper.text()).toContain('found');
     }, 10000);
 
     it('provides school filtering options', async () => {
       await new Promise(resolve => setTimeout(resolve, 200));
-      
+
       const component = wrapper.vm as any;
-      const schoolOptions = component.schoolOptions;
-      
+      const schoolOptions = component.schoolFilterOptions;
+
       expect(Array.isArray(schoolOptions)).toBe(true);
-      
-      // If there are nanos, there should be school options
-      if (component.offensiveNanos.length > 0) {
-        expect(schoolOptions.length).toBeGreaterThan(0);
-        schoolOptions.forEach((option: any) => {
-          expect(option).toHaveProperty('label');
-          expect(option).toHaveProperty('value');
-        });
-      }
+      expect(schoolOptions.length).toBe(6);
+
+      schoolOptions.forEach((option: any) => {
+        expect(option).toHaveProperty('label');
+        expect(option).toHaveProperty('value');
+      });
     }, 10000);
 
     it('filters by selected school', async () => {
       await new Promise(resolve => setTimeout(resolve, 200));
-      
+
       const component = wrapper.vm as any;
-      
-      if (component.schoolOptions.length > 0) {
-        const firstSchool = component.schoolOptions[0].value;
-        component.selectedSchool = firstSchool;
-        
+
+      if (component.schoolFilterOptions.length > 0) {
+        const firstSchool = component.schoolFilterOptions[0].value;
+        component.selectedSchoolId = firstSchool;
+
         await wrapper.vm.$nextTick();
-        
+
         const filtered = component.filteredNanos;
-        filtered.forEach((nano: NanoProgram) => {
-          expect(nano.school).toBe(firstSchool);
-        });
+        // If we have filtered results, verify they match the school
+        if (filtered.length > 0) {
+          filtered.forEach((nano: any) => {
+            // Check if nano.schoolId matches (skill ID based)
+            expect([firstSchool, null, undefined]).toContain(nano.schoolId);
+          });
+        }
       }
     }, 10000);
   });
 
-  describe('Utility Functions', () => {
-    it('provides correct usability indicators', () => {
+  describe('Search and Filter Features', () => {
+    it('has search query field', () => {
       const component = wrapper.vm as any;
-      const mockNano = { id: 1, name: 'Test', effects: [{ type: 'damage' }] };
-      
-      const icon = component.getUsabilityIcon(mockNano);
-      const text = component.getUsabilityText(mockNano);
-      const color = component.getUsabilityColor(mockNano);
-      
-      expect(icon).toContain('pi-check-circle');
-      expect(text).toBe('Usable');
-      expect(color).toContain('green');
+      expect(typeof component.searchQuery).toBe('string');
+      expect(component.searchQuery).toBe('');
     });
 
-    it('extracts offensive effects correctly', () => {
+    it('has QL range filters', () => {
       const component = wrapper.vm as any;
-      
-      const damageNano = {
-        effects: [
-          { type: 'damage', value: 100 },
-          { type: 'heal', value: 50 },
-          { type: 'debuff', value: 25 }
-        ]
-      };
-      
-      const effects = component.getOffensiveEffects(damageNano);
-      expect(effects).toContain('Damage');
-      expect(effects).toContain('Debuff');
-      expect(effects).not.toContain('Heal');
+      expect(component.minQL).toBeUndefined();
+      expect(component.maxQL).toBeUndefined();
     });
 
-    it('provides skill level CSS classes', () => {
+    it('allows setting QL range', async () => {
       const component = wrapper.vm as any;
-      
-      component.manualSkills.matter_creation = 100;
-      expect(component.getSkillInputClass('matter_creation')).toBe('skill-low');
-      
-      component.manualSkills.matter_creation = 600;
-      expect(component.getSkillInputClass('matter_creation')).toBe('skill-medium');
-      
-      component.manualSkills.matter_creation = 1200;
-      expect(component.getSkillInputClass('matter_creation')).toBe('skill-high');
+
+      component.minQL = 100;
+      component.maxQL = 200;
+
+      await wrapper.vm.$nextTick();
+
+      expect(component.minQL).toBe(100);
+      expect(component.maxQL).toBe(200);
+    });
+
+    it('allows setting search query', async () => {
+      const component = wrapper.vm as any;
+
+      component.searchQuery = 'damage';
+
+      await wrapper.vm.$nextTick();
+
+      expect(component.searchQuery).toBe('damage');
     });
   });
 
   describe('Error Handling', () => {
     it('handles empty nano data gracefully', async () => {
       const component = wrapper.vm as any;
-      
-      // Simulate empty nano data
-      nanosStore.nanos = [];
+
+      // Simulate empty offensive nanos
+      component.offensiveNanos = [];
       await wrapper.vm.$nextTick();
-      
+
       expect(component.offensiveNanos.length).toBe(0);
-      expect(component.usableNanos.length).toBe(0);
-      expect(component.schoolOptions.length).toBe(0);
+      expect(component.filteredNanos.length).toBe(0);
     });
 
     it('handles missing profile skills gracefully', () => {
       const component = wrapper.vm as any;
-      
+
       // Test with profile without skills
       const badProfile = {
-        id: 'test-profile',
-        name: 'Test',
-        profession: 'Nanotechnician',
-        level: 100,
-        skills: {}, // Missing nano skills
-        stats: {}
+        Character: {
+          Name: 'Test',
+          Profession: 11, // Nanotechnician
+          Level: 100,
+          Breed: 1,
+          MaxNano: 1000
+        },
+        skills: {} // Missing nano skills
       };
-      
-      profilesStore.profiles = [badProfile];
-      component.selectedProfile = 'Test';
-      
+
+      profilesStore.activeProfile = badProfile;
+
       const skills = component.currentSkills;
-      expect(skills.matter_creation).toBe(1); // Should default to 1
+      expect(skills[130]).toBe(1); // Matter Creation should default to 1
     });
   });
 });

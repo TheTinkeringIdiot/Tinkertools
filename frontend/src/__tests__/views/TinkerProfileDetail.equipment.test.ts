@@ -1,15 +1,17 @@
 /**
  * TinkerProfileDetail Equipment Section Tests
- * 
+ *
  * Tests specifically for the equipment display functionality in the profile detail view
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { nextTick } from 'vue';
 import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import TinkerProfileDetail from '@/views/TinkerProfileDetail.vue';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import type { Item, TinkerProfile } from '@/types/api';
+import { BREED, PROFESSION } from '@/__tests__/helpers';
 
 // Mock Vue Router
 const mockRoute = {
@@ -70,8 +72,8 @@ describe('TinkerProfileDetail Equipment Section', () => {
     Character: {
       Name: 'Test Character',
       Level: 60,
-      Profession: 'Adventurer',
-      Breed: 'Solitus',
+      Profession: PROFESSION.ADVENTURER,
+      Breed: BREED.SOLITUS,
       Faction: 'Neutral',
       Expansion: 'Lost Eden',
       AccountType: 'Paid',
@@ -80,12 +82,12 @@ describe('TinkerProfileDetail Equipment Section', () => {
     },
     Skills: {
       Attributes: {
-        Intelligence: { value: 100, ipSpent: 0, pointFromIp: 0 },
-        Psychic: { value: 100, ipSpent: 0, pointFromIp: 0 },
-        Sense: { value: 100, ipSpent: 0, pointFromIp: 0 },
-        Stamina: { value: 100, ipSpent: 0, pointFromIp: 0 },
-        Strength: { value: 100, ipSpent: 0, pointFromIp: 0 },
-        Agility: { value: 100, ipSpent: 0, pointFromIp: 0 }
+        Intelligence: { value: 100, ipSpent: 0, pointsFromIp: 0 },
+        Psychic: { value: 100, ipSpent: 0, pointsFromIp: 0 },
+        Sense: { value: 100, ipSpent: 0, pointsFromIp: 0 },
+        Stamina: { value: 100, ipSpent: 0, pointsFromIp: 0 },
+        Strength: { value: 100, ipSpent: 0, pointsFromIp: 0 },
+        Agility: { value: 100, ipSpent: 0, pointsFromIp: 0 }
       },
       'Body & Defense': {},
       ACs: {},
@@ -146,8 +148,9 @@ describe('TinkerProfileDetail Equipment Section', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Should render equipment section
-      const equipmentSection = wrapper.find('h2:contains("Equipment")');
-      expect(equipmentSection.exists()).toBe(true);
+      const headings = wrapper.findAll('h2')
+      const equipmentSection = headings.find(h => h.text().includes('Equipment'))
+      expect(equipmentSection).toBeTruthy();
 
       // Should render all three equipment grids
       const equipmentSlots = wrapper.findAll('.mock-equipment-slots');

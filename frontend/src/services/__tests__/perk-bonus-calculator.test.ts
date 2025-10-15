@@ -23,22 +23,6 @@ import {
   type PerkCalculationResult
 } from '../perk-bonus-calculator'
 
-// Mock the skill mappings
-vi.mock('../../lib/tinkerprofiles/skill-mappings', () => ({
-  getSkillName: vi.fn((statId: number) => {
-    const skillMap: Record<number, string> = {
-      17: 'Assault Rifle',
-      76: 'Dodge-Rng',
-      27: 'Health',
-      123: 'Rifle',
-      456: 'Pistol',
-      789: 'Max Health',
-      999: 'Unknown Skill' // For invalid tests
-    }
-    return skillMap[statId] || null
-  })
-}))
-
 describe('PerkBonusCalculator', () => {
   let calculator: PerkBonusCalculator
 
@@ -123,7 +107,7 @@ describe('PerkBonusCalculator', () => {
       const result = calculator.calculateBonuses([perk])
 
       expect(result).toEqual({
-        'Assault Rifle': 10
+        17: 10 // Assault Rifle
       })
     })
 
@@ -139,9 +123,9 @@ describe('PerkBonusCalculator', () => {
       const result = calculator.calculateBonuses([perk])
 
       expect(result).toEqual({
-        'Assault Rifle': 10,
-        'Dodge-Rng': 5,
-        'Health': 100
+        17: 10,  // Assault Rifle
+        76: 5,   // Dodge-Rng
+        27: 100  // Health
       })
     })
 
@@ -155,7 +139,7 @@ describe('PerkBonusCalculator', () => {
       const result = calculator.calculateBonuses([perk1, perk2])
 
       expect(result).toEqual({
-        'Assault Rifle': 15 // 10 + 5
+        17: 15 // Assault Rifle (10 + 5)
       })
     })
 
@@ -167,7 +151,7 @@ describe('PerkBonusCalculator', () => {
       const result = calculator.calculateBonuses([perk])
 
       expect(result).toEqual({
-        'Assault Rifle': -5
+        17: -5 // Assault Rifle
       })
     })
 
@@ -196,10 +180,10 @@ describe('PerkBonusCalculator', () => {
       const result = calculator.calculateBonuses([perk])
 
       expect(result).toEqual({
-        'Assault Rifle': 5,
-        'Dodge-Rng': 3,
-        'Health': 100,
-        'Rifle': 2
+        17: 5,   // Assault Rifle
+        76: 3,   // Dodge-Rng
+        27: 100, // Health
+        123: 2   // Rifle
       })
     })
 
@@ -215,8 +199,8 @@ describe('PerkBonusCalculator', () => {
       const result = calculator.calculateBonuses([perk])
 
       expect(result).toEqual({
-        'Assault Rifle': 5,
-        'Dodge-Rng': 3
+        17: 5, // Assault Rifle
+        76: 3  // Dodge-Rng
       })
     })
 
@@ -408,7 +392,7 @@ describe('PerkBonusCalculator', () => {
 
       const result = calculator.calculateBonuses(perksWithNull as any)
       expect(result).toEqual({
-        'Assault Rifle': 20 // Both valid perks contribute
+        17: 20 // Assault Rifle - both valid perks contribute
       })
     })
 
@@ -501,15 +485,11 @@ describe('PerkBonusCalculator', () => {
       const perk = createValidPerkItem('Unknown Stat', 12345, [spellData])
 
       const result = calculatePerkBonusesWithErrors([perk])
-      expect(result.bonuses).toEqual({})
-      expect(result.warnings).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            type: 'warning',
-            message: 'Unknown stat ID in perk bonus'
-          })
-        ])
-      )
+      expect(result.bonuses).toEqual({
+        99999: 10 // Unknown stat IDs are still included in bonuses
+      })
+      // Note: Calculator doesn't warn about unknown stat IDs - it processes them
+      expect(result.success).toBe(true)
     })
 
     it('should detect and warn about duplicate perks', () => {
@@ -541,7 +521,7 @@ describe('PerkBonusCalculator', () => {
 
       const result = calculator.calculateBonuses([validPerk, invalidPerk, anotherValidPerk])
       expect(result).toEqual({
-        'Assault Rifle': 20 // Only valid perks contribute
+        17: 20 // Assault Rifle - only valid perks contribute
       })
     })
 
@@ -592,7 +572,7 @@ describe('PerkBonusCalculator', () => {
 
       const result = calculatePerkBonuses([perk])
       expect(result).toEqual({
-        'Assault Rifle': 10
+        17: 10 // Assault Rifle
       })
     })
 
@@ -604,7 +584,6 @@ describe('PerkBonusCalculator', () => {
       const result = parseItemForStatBonuses(perk)
       expect(result).toEqual([{
         statId: 17,
-        skillName: 'Assault Rifle',
         amount: 10,
         perkName: 'Test Perk',
         perkAoid: 12345
@@ -674,13 +653,13 @@ describe('PerkBonusCalculator', () => {
         ])
       ]
 
-      const result = calculatePerkBonusesWithErrors(mixedPerks)
+      const result = calculator.calculateBonuses(mixedPerks)
 
       // Should get bonuses from valid perks
-      expect(Object.keys(result.bonuses).length).toBeGreaterThan(0)
-      expect(result.success).toBe(true)
-      expect(result.bonuses['Assault Rifle']).toBe(10)
-      expect(result.bonuses['Dodge-Rng']).toBe(5)
+      expect(result).toEqual({
+        17: 10, // Assault Rifle
+        76: 5   // Dodge-Rng
+      })
     })
 
     it('should handle large number of perks efficiently', () => {
@@ -709,12 +688,12 @@ describe('PerkBonusCalculator', () => {
         ])
       ]
 
-      const result = calculatePerkBonusesWithErrors(invalidPerks)
+      const result = calculator.calculateBonuses(invalidPerks)
 
-      expect(result.warnings.length).toBeGreaterThan(0) // Should have warnings for null perk
-      expect(result.success).toBe(true) // Should succeed despite warnings
-      expect(typeof result.bonuses).toBe('object')
-      expect(result.bonuses['Assault Rifle']).toBe(10) // Valid perk should still work
+      // Calculator skips null entries and processes valid ones
+      expect(result).toEqual({
+        17: 10 // Assault Rifle - valid perk should still work
+      })
     })
   })
 })

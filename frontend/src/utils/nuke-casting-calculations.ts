@@ -25,16 +25,16 @@ export type Breed = 1 | 2 | 3 | 4
  *
  * Hard minimum (AttackDelayCap):
  * - If stat 523 exists: use its value as minimum
- * - If stat 523 not present: use 100cs as minimum
+ * - If stat 523 not present: can reduce to 0 (no minimum)
  *
  * @param baseCastTime - Base cast time in centiseconds (from database)
  * @param nanoInit - Character's Nano Init skill value
- * @param attackDelayCap - AttackDelayCap from stat 523, or undefined for default 100cs minimum
+ * @param attackDelayCap - AttackDelayCap from stat 523, or undefined to allow 0
  * @returns Modified cast time in seconds with 2 decimal precision
  *
  * @example
  * // Nano with 300cs base cast time, 600 init, no cap stat
- * calculateCastTime(300, 600) // Returns 1.00 (300 - 300 = 0cs, clamped to 100cs minimum)
+ * calculateCastTime(300, 600) // Returns 0.00 (300 - 300 = 0cs)
  *
  * @example
  * // Nano with 1000cs base cast time, 1800 init, 200cs cap
@@ -49,9 +49,15 @@ export function calculateCastTime(baseCastTime: number, nanoInit: number, attack
   // Apply reduction
   const reducedCastTimeCs = baseCastTime - totalReduction
 
-  // Apply hard minimum: stat 523 value or 100cs default
-  const minimumCastTimeCs = attackDelayCap ?? 100
-  const modifiedCastTimeCs = Math.max(minimumCastTimeCs, reducedCastTimeCs)
+  // Apply hard minimum if attackDelayCap is provided, otherwise allow 0
+  let modifiedCastTimeCs: number
+  if (attackDelayCap !== undefined) {
+    // If stat 523 exists, use it as minimum
+    modifiedCastTimeCs = Math.max(attackDelayCap, reducedCastTimeCs)
+  } else {
+    // No cap stat: allow reduction to 0 but not below
+    modifiedCastTimeCs = Math.max(0, reducedCastTimeCs)
+  }
 
   // Convert centiseconds to seconds
   return centisecondsToSeconds(modifiedCastTimeCs)
@@ -66,16 +72,16 @@ export function calculateCastTime(baseCastTime: number, nanoInit: number, attack
  *
  * Hard minimum (RechargeDelayCap):
  * - If stat 524 exists: use its value as minimum
- * - If stat 524 not present: use 100cs as minimum
+ * - If stat 524 not present: can reduce to 0 (no minimum)
  *
  * @param baseRecharge - Base recharge time in centiseconds (from database)
  * @param nanoInit - Character's Nano Init skill value
- * @param rechargeDelayCap - RechargeDelayCap from stat 524, or undefined for default 100cs minimum
+ * @param rechargeDelayCap - RechargeDelayCap from stat 524, or undefined to allow 0
  * @returns Modified recharge time in seconds with 2 decimal precision
  *
  * @example
  * // Nano with 500cs base recharge, 1200 init, no cap stat
- * calculateRechargeTime(500, 1200) // Returns 1.00 (500 - 600 = -100cs, clamped to 100cs minimum)
+ * calculateRechargeTime(500, 1200) // Returns 0.00 (500 - 600 = -100cs, clamped to 0)
  *
  * @example
  * // Nano with 800cs base recharge, 1800 init, 150cs cap
@@ -90,9 +96,15 @@ export function calculateRechargeTime(baseRecharge: number, nanoInit: number, re
   // Apply reduction
   const reducedRechargeCs = baseRecharge - totalReduction
 
-  // Apply hard minimum: stat 524 value or 100cs default
-  const minimumRechargeCs = rechargeDelayCap ?? 100
-  const modifiedRechargeCs = Math.max(minimumRechargeCs, reducedRechargeCs)
+  // Apply hard minimum if rechargeDelayCap is provided, otherwise allow 0
+  let modifiedRechargeCs: number
+  if (rechargeDelayCap !== undefined) {
+    // If stat 524 exists, use it as minimum
+    modifiedRechargeCs = Math.max(rechargeDelayCap, reducedRechargeCs)
+  } else {
+    // No cap stat: allow reduction to 0 but not below
+    modifiedRechargeCs = Math.max(0, reducedRechargeCs)
+  }
 
   // Convert centiseconds to seconds
   return centisecondsToSeconds(modifiedRechargeCs)

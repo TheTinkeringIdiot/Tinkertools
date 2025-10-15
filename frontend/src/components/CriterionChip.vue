@@ -6,9 +6,9 @@
     <!-- Stat Requirement -->
     <div v-if="criterion.isStatRequirement" class="stat-requirement">
       <span class="stat-name">{{ criterion.statName }}</span>
-      <span class="operator">{{ criterion.displaySymbol }}</span>
+      <span class="operator">{{ ' ' + criterion.displaySymbol + ' ' }}</span>
       <span class="value">{{ formattedValue }}</span>
-      
+
       <!-- Character Status -->
       <span v-if="characterStats && showStatus" class="status" :class="statusClasses">
         ({{ currentValue }})
@@ -260,7 +260,6 @@ const statusClasses = computed(() => {
 }
 
 .stat-requirement-chip .operator {
-  margin: 0 4px;
   font-family: 'Courier New', monospace;
   font-weight: 600;
   font-size: 11px;

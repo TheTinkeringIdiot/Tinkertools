@@ -12,6 +12,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { nextTick } from 'vue';
 import { mount, VueWrapper } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import NukeTable from '@/components/nukes/NukeTable.vue'
@@ -130,6 +131,7 @@ const createDefaultInputState = (): NukeInputState => ({
 const createMockNanos = (): OffensiveNano[] => [
   {
     id: 1001,
+    aoid: 1001,
     name: 'Viral Bomb',
     school: 'Bio Meta' as any,
     strain: '1',
@@ -143,12 +145,15 @@ const createMockNanos = (): OffensiveNano[] => [
     damageType: 'poison',
     tickCount: 1,
     tickInterval: 0,
-    castingTime: 300,
+    castTime: 300,
     rechargeTime: 2000,
-    nanoPointCost: 500
+    nanoPointCost: 500,
+    attackDelayCap: 100,
+    rechargeDelayCap: 100
   },
   {
     id: 1002,
+    aoid: 1002,
     name: 'Corrosive Cloud',
     school: 'Bio Meta' as any,
     strain: '2',
@@ -162,12 +167,15 @@ const createMockNanos = (): OffensiveNano[] => [
     damageType: 'chemical',
     tickCount: 5,
     tickInterval: 100,
-    castingTime: 400,
+    castTime: 400,
     rechargeTime: 1500,
-    nanoPointCost: 450
+    nanoPointCost: 450,
+    attackDelayCap: 100,
+    rechargeDelayCap: 100
   },
   {
     id: 1003,
+    aoid: 1003,
     name: 'Energy Blast',
     school: 'Matter Creation' as any,
     strain: '1',
@@ -181,9 +189,11 @@ const createMockNanos = (): OffensiveNano[] => [
     damageType: 'energy',
     tickCount: 1,
     tickInterval: 0,
-    castingTime: 500,
+    castTime: 500,
     rechargeTime: 3000,
-    nanoPointCost: 800
+    nanoPointCost: 800,
+    attackDelayCap: 100,
+    rechargeDelayCap: 100
   }
 ]
 
@@ -1042,6 +1052,7 @@ describe('NukeTable', () => {
     it('should handle nanos with missing optional fields gracefully', async () => {
       const incompleteNano = {
         id: 9999,
+        aoid: 9999,
         name: 'Incomplete Nano',
         school: 'Matter Creation' as any,
         strain: '',
@@ -1054,7 +1065,12 @@ describe('NukeTable', () => {
         midDamage: 0,
         damageType: 'energy' as any,
         tickCount: 1,
-        tickInterval: 0
+        tickInterval: 0,
+        castTime: 300,
+        rechargeTime: 2000,
+        nanoPointCost: 500,
+        attackDelayCap: 100,
+        rechargeDelayCap: 100
       }
 
       wrapper = mount(NukeTable, {
@@ -1080,6 +1096,7 @@ describe('NukeTable', () => {
       const hugeDamageNano = {
         ...createMockNanos()[0],
         id: 8888,
+        aoid: 8888,
         minDamage: 999999,
         maxDamage: 9999999,
         midDamage: 5000000
@@ -1106,10 +1123,11 @@ describe('NukeTable', () => {
       const zeroValuesNano = {
         ...createMockNanos()[0],
         id: 7777,
+        aoid: 7777,
         minDamage: 0,
         maxDamage: 0,
         midDamage: 0,
-        castingTime: 0,
+        castTime: 0,
         rechargeTime: 0,
         nanoPointCost: 0
       }

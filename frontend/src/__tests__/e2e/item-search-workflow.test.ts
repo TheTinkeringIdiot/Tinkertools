@@ -1,16 +1,21 @@
 /**
  * E2E Tests for Item Search Workflow
- * 
+ *
  * Tests critical user workflows for searching and browsing items
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
-import { nextTick } from 'vue'
-import { createRouter, createWebHistory } from 'vue-router'
+import {
+  mountWithContext,
+  flushPromises,
+  wait,
+  standardCleanup,
+  createTestProfile,
+  PROFESSION,
+  BREED
+} from '@/__tests__/helpers'
 import TinkerItems from '../../views/TinkerItems.vue'
-import type { Item, TinkerProfile } from '../../types/api'
+import type { Item } from '../../types/api'
 
 // Mock the API client
 vi.mock('../../services/api-client', () => ({
@@ -76,46 +81,23 @@ const mockItems: Item[] = [
   }
 ]
 
-const mockProfile: TinkerProfile = {
-  id: 'test-profile',
+const mockProfile = createTestProfile({
   name: 'Test Character',
-  level: 200,
-  profession: 'Engineer',
-  stats: {
-    16: 350, // Strength
-    19: 450  // Intelligence
+  Character: {
+    Level: 200,
+    Profession: PROFESSION.ENGINEER
   }
-}
+})
 
 describe('Item Search Workflow E2E', () => {
   let wrapper: any
-  let router: any
-  let pinia: any
 
   beforeEach(async () => {
-    pinia = createPinia()
-    setActivePinia(pinia)
-
-    router = createRouter({
-      history: createWebHistory(),
-      routes: [
-        { path: '/', component: { template: '<div>Home</div>' } },
-        { path: '/items', component: TinkerItems }
-      ]
-    })
-
-    await router.push('/items')
-
     // Mock successful API responses
     const mockSearchItems = vi.fn().mockResolvedValue(mockItems)
-    
-    wrapper = mount(TinkerItems, {
+
+    wrapper = mountWithContext(TinkerItems, {
       global: {
-        plugins: [pinia, router],
-        mocks: {
-          $route: router.currentRoute.value,
-          $router: router
-        },
         stubs: {
           'router-link': true,
           'router-view': true
@@ -123,13 +105,14 @@ describe('Item Search Workflow E2E', () => {
       }
     })
 
-    await nextTick()
+    await flushPromises()
   })
 
   afterEach(() => {
     if (wrapper) {
       wrapper.unmount()
     }
+    standardCleanup()
   })
 
   describe('Basic Item Search', () => {
@@ -142,7 +125,8 @@ describe('Item Search Workflow E2E', () => {
       await searchInput.trigger('keydown.enter')
 
       // Should trigger search
-      await nextTick()
+      await flushPromises()
+      await wait(100)
 
       // Verify search was performed
       expect(wrapper.text()).toContain('armor')
@@ -165,7 +149,7 @@ describe('Item Search Workflow E2E', () => {
 
       if (listButton) {
         await listButton.trigger('click')
-        await nextTick()
+        await flushPromises()
 
         // Should switch to list view
         const listView = wrapper.find('.space-y-2')
@@ -184,29 +168,32 @@ describe('Item Search Workflow E2E', () => {
         preferences: { favoriteItems: [] }
       }
 
-      wrapper = mount(TinkerItems, {
+      wrapper = mountWithContext(TinkerItems, {
         global: {
-          plugins: [pinia, router],
           provide: {
             profileStore
+          },
+          stubs: {
+            'router-link': true,
+            'router-view': true
           }
         }
       })
 
-      await nextTick()
+      await flushPromises()
 
       // Should show profile selection
       const profileDropdown = wrapper.find('select')
       if (profileDropdown.exists()) {
         await profileDropdown.setValue(mockProfile.id)
-        await nextTick()
+        await flushPromises()
       }
 
       // Should show compatibility toggle
       const compatibilityToggle = wrapper.find('input[type="checkbox"]')
       if (compatibilityToggle.exists()) {
         await compatibilityToggle.setChecked(true)
-        await nextTick()
+        await flushPromises()
 
         // Should display compatibility indicators
         expect(wrapper.vm).toBeTruthy()
@@ -217,14 +204,14 @@ describe('Item Search Workflow E2E', () => {
       // Set up with profile and compatibility enabled
       wrapper.vm.selectedProfile = mockProfile
       wrapper.vm.showCompatibility = true
-      await nextTick()
+      await flushPromises()
 
       // Perform search
       const searchInput = wrapper.find('input[type="text"]')
       if (searchInput.exists()) {
         await searchInput.setValue('armor')
         await searchInput.trigger('keydown.enter')
-        await nextTick()
+        await flushPromises()
       }
 
       // Should show compatibility status
@@ -241,7 +228,7 @@ describe('Item Search Workflow E2E', () => {
         const armorFilter = wrapper.find('input[value="6"]') // Armor class
         if (armorFilter.exists()) {
           await armorFilter.setChecked(true)
-          await nextTick()
+          await flushPromises()
         }
       }
 
@@ -254,7 +241,7 @@ describe('Item Search Workflow E2E', () => {
       if (qlInputs.length >= 2) {
         await qlInputs[0].setValue('100') // Min QL
         await qlInputs[1].setValue('250') // Max QL
-        await nextTick()
+        await flushPromises()
       }
 
       expect(wrapper.exists()).toBe(true)
@@ -265,7 +252,7 @@ describe('Item Search Workflow E2E', () => {
       const nanoFilter = wrapper.find('input[id*="nano"]')
       if (nanoFilter.exists()) {
         await nanoFilter.setChecked(true)
-        await nextTick()
+        await flushPromises()
       }
 
       expect(wrapper.exists()).toBe(true)
@@ -276,13 +263,13 @@ describe('Item Search Workflow E2E', () => {
     it('should allow user to view item details', async () => {
       // Mock items in results
       wrapper.vm.searchResults = mockItems
-      await nextTick()
+      await flushPromises()
 
       // Click on an item
       const itemCard = wrapper.find('.item-card')
       if (itemCard.exists()) {
         await itemCard.trigger('click')
-        await nextTick()
+        await flushPromises()
 
         // Should open item detail view
         expect(wrapper.emitted('item-click')).toBeTruthy()
@@ -292,13 +279,13 @@ describe('Item Search Workflow E2E', () => {
     it('should allow user to add items to favorites', async () => {
       // Mock items in results
       wrapper.vm.searchResults = mockItems
-      await nextTick()
+      await flushPromises()
 
       // Find and click favorite button
       const favoriteButton = wrapper.find('button[class*="pi-heart"]')
       if (favoriteButton.exists()) {
         await favoriteButton.trigger('click')
-        await nextTick()
+        await flushPromises()
 
         expect(wrapper.emitted('item-favorite')).toBeTruthy()
       }
@@ -307,13 +294,13 @@ describe('Item Search Workflow E2E', () => {
     it('should allow user to compare items', async () => {
       // Mock items in results
       wrapper.vm.searchResults = mockItems
-      await nextTick()
+      await flushPromises()
 
       // Find and click compare button
       const compareButton = wrapper.find('button[class*="pi-clone"]')
       if (compareButton.exists()) {
         await compareButton.trigger('click')
-        await nextTick()
+        await flushPromises()
 
         expect(wrapper.emitted('item-compare')).toBeTruthy()
       }
@@ -339,7 +326,7 @@ describe('Item Search Workflow E2E', () => {
       if (searchInput.exists()) {
         await searchInput.setValue('new search')
         await searchInput.trigger('keydown.enter')
-        await nextTick()
+        await flushPromises()
 
         // Should save to localStorage
         expect(localStorage.setItem).toHaveBeenCalledWith(
@@ -353,7 +340,7 @@ describe('Item Search Workflow E2E', () => {
       const searchInput = wrapper.find('input[type="text"]')
       if (searchInput.exists()) {
         await searchInput.trigger('focus')
-        await nextTick()
+        await flushPromises()
 
         // Should show recent searches
         const suggestions = wrapper.find('.suggestions')
@@ -366,13 +353,14 @@ describe('Item Search Workflow E2E', () => {
     it('should allow user to navigate through pages', async () => {
       // Mock pagination data
       wrapper.vm.pagination = { page: 1, limit: 25, total: 100 }
-      await nextTick()
+      await flushPromises()
 
       // Find next page button
-      const nextButton = wrapper.find('button:contains("Next")')
-      if (nextButton.exists()) {
+      const buttons = wrapper.findAll('button')
+      const nextButton = buttons.find(btn => btn.text().includes('Next'))
+      if (nextButton) {
         await nextButton.trigger('click')
-        await nextTick()
+        await flushPromises()
 
         expect(wrapper.emitted('page-change')).toBeTruthy()
       }
@@ -383,7 +371,7 @@ describe('Item Search Workflow E2E', () => {
       const pageSizeSelect = wrapper.find('select[class*="rows"]')
       if (pageSizeSelect.exists()) {
         await pageSizeSelect.setValue('50')
-        await nextTick()
+        await flushPromises()
 
         expect(wrapper.emitted('page-size-change')).toBeTruthy()
       }
@@ -400,7 +388,7 @@ describe('Item Search Workflow E2E', () => {
       })
 
       window.dispatchEvent(new Event('resize'))
-      await nextTick()
+      await flushPromises()
 
       // Should show mobile-optimized layout
       const mobileControls = wrapper.find('.md\\:hidden')
@@ -416,7 +404,7 @@ describe('Item Search Workflow E2E', () => {
       })
 
       window.dispatchEvent(new Event('resize'))
-      await nextTick()
+      await flushPromises()
 
       // Should maintain core functionality
       const searchInput = wrapper.find('input[type="text"]')
@@ -434,7 +422,7 @@ describe('Item Search Workflow E2E', () => {
       if (searchInput.exists()) {
         await searchInput.setValue('error test')
         await searchInput.trigger('keydown.enter')
-        await nextTick()
+        await flushPromises()
       }
 
       // Should show error message
@@ -445,7 +433,7 @@ describe('Item Search Workflow E2E', () => {
       // Mock empty results
       wrapper.vm.searchResults = []
       wrapper.vm.searchPerformed = true
-      await nextTick()
+      await flushPromises()
 
       // Should show empty state
       expect(wrapper.text()).toContain('No items found') || expect(wrapper.exists()).toBe(true)
@@ -462,7 +450,7 @@ describe('Item Search Workflow E2E', () => {
       }))
 
       wrapper.vm.searchResults = largeDataset.slice(0, 25) // Paginated
-      await nextTick()
+      await flushPromises()
 
       // Should render without performance issues
       expect(wrapper.exists()).toBe(true)
@@ -484,7 +472,7 @@ describe('Item Search Workflow E2E', () => {
 
         // Advance timers
         vi.advanceTimersByTime(500)
-        await nextTick()
+        await flushPromises()
 
         // Now should have triggered search
         expect(wrapper.exists()).toBe(true)

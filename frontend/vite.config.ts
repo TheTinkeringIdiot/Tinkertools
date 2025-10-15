@@ -35,6 +35,12 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    testTimeout: 10000,  // Default 10s for all tests
+    hookTimeout: 10000,
+    env: {
+      // Backend availability check for integration tests
+      VITE_BACKEND_URL: process.env.BACKEND_URL || 'http://localhost:8000'
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'json'],

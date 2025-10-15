@@ -5,6 +5,7 @@ import { DEFAULT_SKILLS } from '@/lib/tinkerprofiles/constants';
 import { SKILL_CATEGORIES } from '@/lib/tinkerprofiles/skill-mappings';
 import type { TinkerProfile, MiscSkill } from '@/lib/tinkerprofiles/types';
 import type { Item } from '@/types/api';
+import { BREED, PROFESSION } from '@/__tests__/helpers';
 
 describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
   let testProfile: TinkerProfile;
@@ -14,8 +15,8 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
     testProfile = {
       Character: {
         Name: 'Test Character',
-        Profession: 'Agent',
-        Breed: 'Solitus',
+        Profession: PROFESSION.AGENT,
+        Breed: BREED.SOLITUS,
         Level: 200,
         Gender: 'Female',
         Faction: 'Clan',
@@ -26,12 +27,12 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
       },
       Skills: {
         Attributes: {
-          Strength: { value: 100, pointFromIp: 0, ipSpent: 0, trickleDown: 0, baseValue: 100, cap: 200, equipmentBonus: 0, perkBonus: 0, buffBonus: 0 },
-          Agility: { value: 100, pointFromIp: 0, ipSpent: 0, trickleDown: 0, baseValue: 100, cap: 200, equipmentBonus: 0, perkBonus: 0, buffBonus: 0 },
-          Stamina: { value: 100, pointFromIp: 0, ipSpent: 0, trickleDown: 0, baseValue: 100, cap: 200, equipmentBonus: 0, perkBonus: 0, buffBonus: 0 },
-          Intelligence: { value: 100, pointFromIp: 0, ipSpent: 0, trickleDown: 0, baseValue: 100, cap: 200, equipmentBonus: 0, perkBonus: 0, buffBonus: 0 },
-          Sense: { value: 100, pointFromIp: 0, ipSpent: 0, trickleDown: 0, baseValue: 100, cap: 200, equipmentBonus: 0, perkBonus: 0, buffBonus: 0 },
-          Psychic: { value: 100, pointFromIp: 0, ipSpent: 0, trickleDown: 0, baseValue: 100, cap: 200, equipmentBonus: 0, perkBonus: 0, buffBonus: 0 }
+          Strength: { value: 100, pointsFromIp: 0, ipSpent: 0, trickleDown: 0, baseValue: 100, cap: 200, equipmentBonus: 0, perkBonus: 0, buffBonus: 0 },
+          Agility: { value: 100, pointsFromIp: 0, ipSpent: 0, trickleDown: 0, baseValue: 100, cap: 200, equipmentBonus: 0, perkBonus: 0, buffBonus: 0 },
+          Stamina: { value: 100, pointsFromIp: 0, ipSpent: 0, trickleDown: 0, baseValue: 100, cap: 200, equipmentBonus: 0, perkBonus: 0, buffBonus: 0 },
+          Intelligence: { value: 100, pointsFromIp: 0, ipSpent: 0, trickleDown: 0, baseValue: 100, cap: 200, equipmentBonus: 0, perkBonus: 0, buffBonus: 0 },
+          Sense: { value: 100, pointsFromIp: 0, ipSpent: 0, trickleDown: 0, baseValue: 100, cap: 200, equipmentBonus: 0, perkBonus: 0, buffBonus: 0 },
+          Psychic: { value: 100, pointsFromIp: 0, ipSpent: 0, trickleDown: 0, baseValue: 100, cap: 200, equipmentBonus: 0, perkBonus: 0, buffBonus: 0 }
         },
         'Body & Defense': {},
         'Ranged Weapons': {},

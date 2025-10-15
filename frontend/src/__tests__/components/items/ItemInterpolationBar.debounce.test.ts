@@ -7,6 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION } from '@/__tests__/helpers'
 import { nextTick } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import ItemInterpolationBar from '../../../components/items/ItemInterpolationBar.vue'
@@ -105,6 +106,7 @@ describe('ItemInterpolationBar - Debounce Functionality', () => {
   })
 
   afterEach(() => {
+    standardCleanup()
     if (wrapper) {
       wrapper.unmount()
     }

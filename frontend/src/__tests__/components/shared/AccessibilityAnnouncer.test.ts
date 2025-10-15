@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { nextTick } from 'vue';
+import { mountWithContext, standardCleanup } from '@/__tests__/helpers';
 import AccessibilityAnnouncer from '@/components/shared/AccessibilityAnnouncer.vue';
 
 describe('AccessibilityAnnouncer', () => {
@@ -9,7 +10,7 @@ describe('AccessibilityAnnouncer', () => {
   let announceStatus: Event;
 
   beforeEach(() => {
-    wrapper = mount(AccessibilityAnnouncer);
+    wrapper = mountWithContext(AccessibilityAnnouncer);
     
     // Create custom events for testing
     announcePolite = new CustomEvent('announce-polite', { 
@@ -26,6 +27,7 @@ describe('AccessibilityAnnouncer', () => {
   });
 
   afterEach(() => {
+    standardCleanup()
     wrapper.unmount();
   });
 

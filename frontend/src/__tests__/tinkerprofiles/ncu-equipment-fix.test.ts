@@ -40,16 +40,16 @@ describe('MaxNCU Equipment Bonus Application', () => {
     // Calculate equipment bonuses
     const equipmentBonuses = calculateEquipmentBonuses(profile);
 
-    // Verify the bonus was calculated correctly
-    expect(equipmentBonuses['Max NCU']).toBe(25);
+    // Verify the bonus was calculated correctly (bonuses use numeric stat IDs)
+    expect(equipmentBonuses[181]).toBe(25); // Max NCU stat ID is 181
 
     // Apply bonuses to profile
     updateProfileSkillInfo(profile, equipmentBonuses);
 
     // Verify Max NCU skill was updated
     const maxNCUSkillId = skillService.resolveId('Max NCU');
-    expect(profile.skills[maxNCUSkillId].equipmentBonus).toBe(25);
-    expect(profile.skills[maxNCUSkillId].value).toBe(25); // 0 base + 25 equipment
+    expect(profile.skills[maxNCUSkillId]?.equipmentBonus).toBe(25);
+    expect(profile.skills[maxNCUSkillId]?.total).toBe(25); // 0 base + 25 equipment
   });
 
   it('should stack MaxNCU bonuses from multiple items', () => {
@@ -99,14 +99,14 @@ describe('MaxNCU Equipment Bonus Application', () => {
 
     // Calculate and apply bonuses
     const equipmentBonuses = calculateEquipmentBonuses(profile);
-    expect(equipmentBonuses['Max NCU']).toBe(50); // 20 + 30
+    expect(equipmentBonuses[181]).toBe(50); // Max NCU: 20 + 30
 
     updateProfileSkillInfo(profile, equipmentBonuses);
 
     // Verify total bonus applied
     const maxNCUSkillId = skillService.resolveId('Max NCU');
-    expect(profile.skills[maxNCUSkillId].equipmentBonus).toBe(50);
-    expect(profile.skills[maxNCUSkillId].value).toBe(50);
+    expect(profile.skills[maxNCUSkillId]?.equipmentBonus).toBe(50);
+    expect(profile.skills[maxNCUSkillId]?.total).toBe(50);
   });
 
   it('should handle negative MaxNCU modifiers', () => {
@@ -133,13 +133,13 @@ describe('MaxNCU Equipment Bonus Application', () => {
     profile.Clothing.Chest = debuffItem;
 
     const equipmentBonuses = calculateEquipmentBonuses(profile);
-    expect(equipmentBonuses['Max NCU']).toBe(-15);
+    expect(equipmentBonuses[181]).toBe(-15); // Max NCU with negative modifier
 
     updateProfileSkillInfo(profile, equipmentBonuses);
 
     const maxNCUSkillId = skillService.resolveId('Max NCU');
-    expect(profile.skills[maxNCUSkillId].equipmentBonus).toBe(-15);
-    expect(profile.skills[maxNCUSkillId].value).toBe(-15); // Can go negative
+    expect(profile.skills[maxNCUSkillId]?.equipmentBonus).toBe(-15);
+    expect(profile.skills[maxNCUSkillId]?.total).toBe(-15); // Can go negative
   });
 
   it('should combine MaxNCU with other misc skill bonuses', () => {
@@ -181,10 +181,10 @@ describe('MaxNCU Equipment Bonus Application', () => {
 
     const equipmentBonuses = calculateEquipmentBonuses(profile);
 
-    // Verify all bonuses calculated (using the skill names returned by getSkillNameFromStatId)
-    expect(equipmentBonuses['Max NCU']).toBe(35);
-    expect(equipmentBonuses['Add All Offense']).toBe(10);
-    expect(equipmentBonuses['Add All Defense']).toBe(15);
+    // Verify all bonuses calculated (bonuses use numeric stat IDs)
+    expect(equipmentBonuses[181]).toBe(35); // Max NCU
+    expect(equipmentBonuses[276]).toBe(10); // Add All Offense
+    expect(equipmentBonuses[277]).toBe(15); // Add All Defense
 
     updateProfileSkillInfo(profile, equipmentBonuses);
 
@@ -195,11 +195,11 @@ describe('MaxNCU Equipment Bonus Application', () => {
     const addAllOffSkillId = skillService.resolveId('Add All Offense');
     const addAllDefSkillId = skillService.resolveId('Add All Defense');
 
-    expect(profile.skills[maxNCUSkillId].equipmentBonus).toBe(35);
-    expect(profile.skills[maxNCUSkillId].value).toBe(35);
-    expect(profile.skills[addAllOffSkillId].equipmentBonus).toBe(10);
-    expect(profile.skills[addAllOffSkillId].value).toBe(10);
-    expect(profile.skills[addAllDefSkillId].equipmentBonus).toBe(15);
-    expect(profile.skills[addAllDefSkillId].value).toBe(15);
+    expect(profile.skills[maxNCUSkillId]?.equipmentBonus).toBe(35);
+    expect(profile.skills[maxNCUSkillId]?.total).toBe(35);
+    expect(profile.skills[addAllOffSkillId]?.equipmentBonus).toBe(10);
+    expect(profile.skills[addAllOffSkillId]?.total).toBe(10);
+    expect(profile.skills[addAllDefSkillId]?.equipmentBonus).toBe(15);
+    expect(profile.skills[addAllDefSkillId]?.total).toBe(15);
   });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { nextTick } from 'vue';
+import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION, BREED } from '@/__tests__/helpers';
 import SymbiantList from '@/components/plants/SymbiantList.vue';
 import type { PlantSymbiant } from '@/types/plants';
 import { apiClient } from '@/services/api-client';
@@ -95,7 +96,7 @@ describe('SymbiantList', () => {
   });
 
   beforeEach(() => {
-    wrapper = mount(SymbiantList, {
+    wrapper = mountWithContext(SymbiantList, {
       props: {
         symbiants: realSymbiants,
         loading: false,
@@ -105,6 +106,7 @@ describe('SymbiantList', () => {
   });
 
   afterEach(() => {
+    standardCleanup()
     wrapper?.unmount();
   });
 

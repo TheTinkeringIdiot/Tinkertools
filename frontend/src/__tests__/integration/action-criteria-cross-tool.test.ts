@@ -22,6 +22,9 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
+import { createApp } from 'vue'
+import PrimeVue from 'primevue/config'
+import ToastService from 'primevue/toastservice'
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
 import { parseAction, checkActionRequirements } from '@/services/action-criteria'
 import { mapProfileToStats } from '@/utils/profile-stats-mapper'
@@ -29,6 +32,7 @@ import { filterByCharacterProfile } from '@/utils/nuke-filtering'
 import type { Action, SymbiantItem } from '@/types/api'
 import type { OffensiveNano } from '@/types/offensive-nano'
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types'
+import { BREED, PROFESSION } from '@/__tests__/helpers'
 
 // Mock localStorage for profile persistence
 global.localStorage = {
@@ -51,7 +55,15 @@ describe('TinkerPocket: Symbiant Requirements with OR Logic', () => {
   let profileStore: ReturnType<typeof useTinkerProfilesStore>
 
   beforeEach(() => {
-    setActivePinia(createPinia())
+    // Setup PrimeVue with ToastService BEFORE initializing Pinia/stores
+    const app = createApp({})
+    app.use(PrimeVue)
+    app.use(ToastService)
+
+    const pinia = createPinia()
+    app.use(pinia)
+    setActivePinia(pinia)
+
     profileStore = useTinkerProfilesStore()
     vi.clearAllMocks()
   })
@@ -176,7 +188,15 @@ describe('TinkerNukes: Nano Requirements with OR Logic', () => {
   let profileStore: ReturnType<typeof useTinkerProfilesStore>
 
   beforeEach(() => {
-    setActivePinia(createPinia())
+    // Setup PrimeVue with ToastService BEFORE initializing Pinia/stores
+    const app = createApp({})
+    app.use(PrimeVue)
+    app.use(ToastService)
+
+    const pinia = createPinia()
+    app.use(pinia)
+    setActivePinia(pinia)
+
     profileStore = useTinkerProfilesStore()
     vi.clearAllMocks()
   })
@@ -317,7 +337,15 @@ describe('Cross-Tool: Shared Profile State', () => {
   let profileStore: ReturnType<typeof useTinkerProfilesStore>
 
   beforeEach(() => {
-    setActivePinia(createPinia())
+    // Setup PrimeVue with ToastService BEFORE initializing Pinia/stores
+    const app = createApp({})
+    app.use(PrimeVue)
+    app.use(ToastService)
+
+    const pinia = createPinia()
+    app.use(pinia)
+    setActivePinia(pinia)
+
     profileStore = useTinkerProfilesStore()
     vi.clearAllMocks()
   })
@@ -327,9 +355,9 @@ describe('Cross-Tool: Shared Profile State', () => {
     const mockProfile: Partial<TinkerProfile> = {
       Character: {
         Name: 'TestChar',
-        Profession: 'NanoTechnician',
+        Profession: PROFESSION.NANO_TECHNICIAN,
         Level: 200,
-        Breed: 'Opifex',
+        Breed: BREED.OPIFEX,
         Gender: 'Male',
         MaxHealth: 5000,
         MaxNano: 8000,
@@ -390,9 +418,9 @@ describe('Cross-Tool: Shared Profile State', () => {
     const profile: Partial<TinkerProfile> = {
       Character: {
         Name: 'MultiToolChar',
-        Profession: 'Soldier',
+        Profession: PROFESSION.SOLDIER,
         Level: 150,
-        Breed: 'Solitus',
+        Breed: BREED.SOLITUS,
         Gender: 'Male',
         MaxHealth: 4000,
         MaxNano: 3000,

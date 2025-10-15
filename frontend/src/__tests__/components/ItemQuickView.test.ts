@@ -4,10 +4,10 @@
  * Tests for the ItemQuickView component functionality
  */
 
-// @ts-nocheck
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION } from '@/__tests__/helpers'
+
 import ItemQuickView from '../../components/items/ItemQuickView.vue'
 import type { Item, TinkerProfile } from '../../types/api'
 
@@ -100,29 +100,28 @@ const mockNanoItem: Item = {
   animation_mesh: null
 }
 
-const mockProfile: TinkerProfile = {
-  id: 'test-profile',
-  name: 'Elite Soldier',
+const mockProfile: TinkerProfile = createTestProfile({
+  profession: PROFESSION.SOLDIER,
   level: 200,
-  profession: 'Soldier',
-  stats: {
-    16: 380, // Strength - meets requirement
-    17: 250, // Agility - doesn't meet requirement
-    19: 200, // Intelligence
-    133: 480, // Ranged Energy - meets requirement
-    161: 300  // Computer Literacy
+  skills: {
+    [SKILL_ID.STRENGTH]: { base: 6, pointsFromIp: 374, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, trickle: 0, ipSpent: 0, total: 380 },
+    [SKILL_ID.AGILITY]: { base: 6, pointsFromIp: 244, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, trickle: 0, ipSpent: 0, total: 250 },
+    [SKILL_ID.INTELLIGENCE]: { base: 6, pointsFromIp: 194, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, trickle: 0, ipSpent: 0, total: 200 },
+    133: { base: 5, pointsFromIp: 475, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, trickle: 0, ipSpent: 0, total: 480 }, // Ranged Energy
+    161: { base: 5, pointsFromIp: 295, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, trickle: 0, ipSpent: 0, total: 300 } // Computer Literacy
   }
-}
+})
 
 describe('ItemQuickView', () => {
   let wrapper: any
 
   beforeEach(() => {
-    setActivePinia(createPinia())
+    
     vi.clearAllMocks()
   })
 
   afterEach(() => {
+    standardCleanup()
     if (wrapper) {
       wrapper.unmount()
     }
@@ -130,7 +129,7 @@ describe('ItemQuickView', () => {
 
   describe('Component Mounting', () => {
     it('should mount without errors', () => {
-      wrapper = mount(ItemQuickView, {
+      wrapper = mountWithContext(ItemQuickView, {
         props: {
           item: mockItem
         }
@@ -140,7 +139,7 @@ describe('ItemQuickView', () => {
     })
 
     it('should display item basic information', () => {
-      wrapper = mount(ItemQuickView, {
+      wrapper = mountWithContext(ItemQuickView, {
         props: {
           item: mockItem
         }
@@ -152,21 +151,22 @@ describe('ItemQuickView', () => {
     })
 
     it('should show nano-specific information for nano items', () => {
-      wrapper = mount(ItemQuickView, {
+      wrapper = mountWithContext(ItemQuickView, {
         props: {
           item: mockNanoItem
         }
       })
-      
-      const nanoBadge = wrapper.find('.p-badge:contains("Nano")')
-      expect(nanoBadge.exists()).toBe(true)
+
+      const badges = wrapper.findAll('.p-badge')
+      const nanoBadge = badges.find(badge => badge.text().includes('Nano'))
+      expect(nanoBadge).toBeTruthy()
       expect(wrapper.text()).toContain('Superior First Aid')
     })
   })
 
   describe('Item Statistics Display', () => {
     beforeEach(() => {
-      wrapper = mount(ItemQuickView, {
+      wrapper = mountWithContext(ItemQuickView, {
         props: {
           item: mockItem
         }
@@ -189,7 +189,7 @@ describe('ItemQuickView', () => {
     })
 
     it('should handle items with no stats', () => {
-      wrapper = mount(ItemQuickView, {
+      wrapper = mountWithContext(ItemQuickView, {
         props: {
           item: { ...mockItem, stats: [] }
         }
@@ -202,7 +202,7 @@ describe('ItemQuickView', () => {
   describe('Requirements Display', () => {
     describe('without profile', () => {
       beforeEach(() => {
-        wrapper = mount(ItemQuickView, {
+        wrapper = mountWithContext(ItemQuickView, {
           props: {
             item: mockItem
           }
@@ -225,7 +225,7 @@ describe('ItemQuickView', () => {
 
     describe('with profile', () => {
       beforeEach(() => {
-        wrapper = mount(ItemQuickView, {
+        wrapper = mountWithContext(ItemQuickView, {
           props: {
             item: mockItem,
             profile: mockProfile,
@@ -257,7 +257,7 @@ describe('ItemQuickView', () => {
 
   describe('Special Effects and Actions', () => {
     beforeEach(() => {
-      wrapper = mount(ItemQuickView, {
+      wrapper = mountWithContext(ItemQuickView, {
         props: {
           item: mockItem
         }
@@ -277,7 +277,7 @@ describe('ItemQuickView', () => {
     })
 
     it('should handle items with no special effects', () => {
-      wrapper = mount(ItemQuickView, {
+      wrapper = mountWithContext(ItemQuickView, {
         props: {
           item: { ...mockItem, spell_data: [] }
         }
@@ -289,7 +289,7 @@ describe('ItemQuickView', () => {
 
   describe('Attack Information', () => {
     beforeEach(() => {
-      wrapper = mount(ItemQuickView, {
+      wrapper = mountWithContext(ItemQuickView, {
         props: {
           item: mockItem
         }
@@ -307,7 +307,7 @@ describe('ItemQuickView', () => {
     })
 
     it('should not show attack info for non-weapons', () => {
-      wrapper = mount(ItemQuickView, {
+      wrapper = mountWithContext(ItemQuickView, {
         props: {
           item: mockNanoItem
         }
@@ -319,7 +319,7 @@ describe('ItemQuickView', () => {
 
   describe('User Actions', () => {
     beforeEach(() => {
-      wrapper = mount(ItemQuickView, {
+      wrapper = mountWithContext(ItemQuickView, {
         props: {
           item: mockItem
         }
@@ -335,9 +335,10 @@ describe('ItemQuickView', () => {
     })
 
     it('should emit view-full event when view details button is clicked', async () => {
-      const viewFullButton = wrapper.find('button:contains("View Full Details")')
-      
-      if (viewFullButton.exists()) {
+      const buttons = wrapper.findAll('button')
+      const viewFullButton = buttons.find(btn => btn.text().includes('View Full Details'))
+
+      if (viewFullButton) {
         await viewFullButton.trigger('click')
         expect(wrapper.emitted('view-full')).toBeTruthy()
       }
@@ -364,7 +365,7 @@ describe('ItemQuickView', () => {
 
   describe('Visual Layout and Organization', () => {
     beforeEach(() => {
-      wrapper = mount(ItemQuickView, {
+      wrapper = mountWithContext(ItemQuickView, {
         props: {
           item: mockItem
         }
@@ -391,7 +392,7 @@ describe('ItemQuickView', () => {
 
   describe('Responsive Design', () => {
     it('should be optimized for modal display', () => {
-      wrapper = mount(ItemQuickView, {
+      wrapper = mountWithContext(ItemQuickView, {
         props: {
           item: mockItem
         }
@@ -411,7 +412,7 @@ describe('ItemQuickView', () => {
         description: 'A very long description that goes on and on with lots of details about the item and its many features and capabilities that should wrap properly and not overflow the container boundaries.'
       }
       
-      wrapper = mount(ItemQuickView, {
+      wrapper = mountWithContext(ItemQuickView, {
         props: {
           item: longNameItem
         }
@@ -439,7 +440,7 @@ describe('ItemQuickView', () => {
         animation_mesh: null
       }
       
-      wrapper = mount(ItemQuickView, {
+      wrapper = mountWithContext(ItemQuickView, {
         props: {
           item: minimalItem
         }
@@ -450,7 +451,7 @@ describe('ItemQuickView', () => {
     })
 
     it('should handle missing or null profile gracefully', () => {
-      wrapper = mount(ItemQuickView, {
+      wrapper = mountWithContext(ItemQuickView, {
         props: {
           item: mockItem,
           profile: null,
@@ -463,7 +464,7 @@ describe('ItemQuickView', () => {
     })
 
     it('should handle items with no requirements', () => {
-      wrapper = mount(ItemQuickView, {
+      wrapper = mountWithContext(ItemQuickView, {
         props: {
           item: { ...mockItem, requirements: [] }
         }
@@ -485,7 +486,7 @@ describe('ItemQuickView', () => {
         }))
       }
       
-      wrapper = mount(ItemQuickView, {
+      wrapper = mountWithContext(ItemQuickView, {
         props: {
           item: complexItem
         }
@@ -495,7 +496,7 @@ describe('ItemQuickView', () => {
     })
 
     it('should not re-render unnecessarily on prop changes', async () => {
-      wrapper = mount(ItemQuickView, {
+      wrapper = mountWithContext(ItemQuickView, {
         props: {
           item: mockItem,
           showCompatibility: false
@@ -512,7 +513,7 @@ describe('ItemQuickView', () => {
 
   describe('Accessibility', () => {
     beforeEach(() => {
-      wrapper = mount(ItemQuickView, {
+      wrapper = mountWithContext(ItemQuickView, {
         props: {
           item: mockItem
         }

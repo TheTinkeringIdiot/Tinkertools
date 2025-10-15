@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION, BREED } from '@/__tests__/helpers';
 import SymbiantFilters from '@/components/plants/SymbiantFilters.vue';
 import type { SymbiantFilters as SymbiantFiltersType } from '@/types/plants';
 
@@ -84,7 +84,7 @@ describe('SymbiantFilters', () => {
   };
 
   beforeEach(() => {
-    wrapper = mount(SymbiantFilters, {
+    wrapper = mountWithContext(SymbiantFilters, {
       props: {
         modelValue: defaultFilters,
         availableFamilies: ['Seeker', 'Hacker', 'Soldier', 'Medic']
@@ -93,6 +93,7 @@ describe('SymbiantFilters', () => {
   });
 
   afterEach(() => {
+    standardCleanup()
     wrapper?.unmount();
   });
 

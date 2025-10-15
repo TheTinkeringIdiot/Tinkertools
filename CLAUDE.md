@@ -163,10 +163,77 @@ The database follows a legacy-compatible design with:
 - **Error Handling**: Proper HTTP status codes and error messages
 
 ### Testing Strategy
-- Unit tests: Minimum 80% coverage
-- Integration tests: All API endpoints
-- E2E tests: Critical user workflows
-- Performance tests: Query optimization validation
+
+**Frontend Testing** (Vitest + Vue Test Utils):
+The frontend test suite was refactored in September 2025 to use true integration tests with **real Pinia stores + mocked backend only**. This approach catches real bugs while maintaining test speed.
+
+**Test Architecture**:
+- ✅ Use **real** Pinia stores (actual state management logic)
+- ✅ Use **real** Vue components (actual rendering + reactivity)
+- ✅ Mock **only** external boundaries (API, localStorage, router)
+- ❌ Never mock store internals or Vue reactivity
+
+**Test Types**:
+1. **Integration Tests** (91/107 passing - 85%):
+   - Real Pinia stores with mocked API client
+   - Test infrastructure: `src/__tests__/helpers/integration-test-utils.ts`
+   - Test fixtures: `profile-fixtures.ts`, `item-fixtures.ts`, `nano-fixtures.ts`
+   - Suites: buff-management, equipment-interaction, item-search, nano-compatibility, profile-management
+
+2. **Backend Integration Tests**:
+   - Require real backend running
+   - Use `describe.skipIf(!BACKEND_AVAILABLE)` pattern
+   - Backend availability check: `helpers/backend-check.ts`
+
+3. **E2E Tests** (Playwright - pending):
+   - Critical user workflows
+   - Full system integration
+
+**Key Test Patterns**:
+```typescript
+// Integration test setup (required pattern)
+beforeEach(async () => {
+  // CRITICAL: Setup PrimeVue + ToastService first
+  const app = createApp({});
+  app.use(PrimeVue);
+  app.use(ToastService);
+
+  context = await setupIntegrationTest();
+  app.use(context.pinia);
+
+  store = useTinkerProfilesStore();
+});
+```
+
+**Critical Requirements**:
+- PrimeVue + ToastService setup in all integration tests
+- Mock API client BEFORE store imports: `vi.mock('@/services/api-client')`
+- Use individual profile localStorage keys: `tinkertools_profile_{id}`
+- Use test fixtures for realistic game data
+
+**Test Results** (September 2025):
+- Buff Management: 19/19 (100%) ✅
+- Item Search: 22/22 (100%) ✅
+- Equipment Interaction: 23/23 (100%) ✅
+- Nano Compatibility: 16/21 (76%) ⚠️
+- Profile Management: 11/22 (50%) ⚠️
+- **Overall: 91/107 (85%)**
+
+**Infrastructure Fixes Applied**:
+- MaxNCU calculation: base (1200 + level*6) + bonuses
+- Equipment bonus extraction from `item.stats` and `spell_data`
+- Skill auto-creation in `modifySkill()` for missing skills
+- localStorage key migration from legacy to individual profile keys
+
+**Backend Testing** (pytest):
+- Unit tests for API endpoints
+- Database integration tests
+- Query performance validation
+
+**Documentation**:
+- Detailed strategy: `frontend/src/__tests__/TESTING_STRATEGY.md`
+- Refactoring results: `frontend/TEST_REFACTORING_RESULTS.md`
+- Test examples in `src/__tests__/integration/`
 
 ## Resources
 

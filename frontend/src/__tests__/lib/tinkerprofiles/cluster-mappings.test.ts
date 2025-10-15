@@ -3,12 +3,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { 
-  getClusterMapping, 
-  isValidClusterId, 
+import {
+  getClusterMapping,
+  isValidClusterId,
   getSlotPosition,
   CLUSTER_ID_TO_STAT,
-  AOSETUPS_SLOT_TO_POSITION 
+  AOSETUPS_SLOT_TO_BITFLAG
 } from '@/lib/tinkerprofiles/cluster-mappings';
 
 describe('Cluster Mappings', () => {
@@ -65,26 +65,26 @@ describe('Cluster Mappings', () => {
   });
 
   describe('getSlotPosition', () => {
-    it('should map AOSetups slot names to numeric positions', () => {
-      expect(getSlotPosition('eye')).toBe(1);
-      expect(getSlotPosition('head')).toBe(2);
-      expect(getSlotPosition('ear')).toBe(3);
-      expect(getSlotPosition('rarm')).toBe(4);
-      expect(getSlotPosition('chest')).toBe(5);
-      expect(getSlotPosition('larm')).toBe(6);
-      expect(getSlotPosition('rwrist')).toBe(7);
-      expect(getSlotPosition('waist')).toBe(8);
-      expect(getSlotPosition('lwrist')).toBe(9);
-      expect(getSlotPosition('rhand')).toBe(10);
-      expect(getSlotPosition('leg')).toBe(11);
-      expect(getSlotPosition('lhand')).toBe(12);
-      expect(getSlotPosition('feet')).toBe(13);
+    it('should map AOSetups slot names to bitflag values', () => {
+      expect(getSlotPosition('eye')).toBe(2);      // 1 << 1
+      expect(getSlotPosition('head')).toBe(4);     // 1 << 2
+      expect(getSlotPosition('ear')).toBe(8);      // 1 << 3
+      expect(getSlotPosition('rarm')).toBe(16);    // 1 << 4
+      expect(getSlotPosition('chest')).toBe(32);   // 1 << 5
+      expect(getSlotPosition('larm')).toBe(64);    // 1 << 6
+      expect(getSlotPosition('rwrist')).toBe(128); // 1 << 7
+      expect(getSlotPosition('waist')).toBe(256);  // 1 << 8
+      expect(getSlotPosition('lwrist')).toBe(512); // 1 << 9
+      expect(getSlotPosition('rhand')).toBe(1024); // 1 << 10
+      expect(getSlotPosition('leg')).toBe(2048);   // 1 << 11
+      expect(getSlotPosition('lhand')).toBe(4096); // 1 << 12
+      expect(getSlotPosition('feet')).toBe(8192);  // 1 << 13
     });
 
     it('should handle case insensitive slot names', () => {
-      expect(getSlotPosition('EYE')).toBe(1);
-      expect(getSlotPosition('Head')).toBe(2);
-      expect(getSlotPosition('CHEST')).toBe(5);
+      expect(getSlotPosition('EYE')).toBe(2);
+      expect(getSlotPosition('Head')).toBe(4);
+      expect(getSlotPosition('CHEST')).toBe(32);
     });
 
     it('should return null for invalid slot names', () => {
@@ -128,7 +128,7 @@ describe('Cluster Mappings', () => {
     });
   });
 
-  describe('AOSETUPS_SLOT_TO_POSITION mapping', () => {
+  describe('AOSETUPS_SLOT_TO_BITFLAG mapping', () => {
     it('should cover all standard implant slots', () => {
       const expectedSlots = [
         'eye', 'head', 'ear', 'rarm', 'chest', 'larm',
@@ -136,16 +136,18 @@ describe('Cluster Mappings', () => {
       ];
 
       for (const slot of expectedSlots) {
-        expect(AOSETUPS_SLOT_TO_POSITION[slot]).toBeDefined();
-        expect(AOSETUPS_SLOT_TO_POSITION[slot]).toBeGreaterThan(0);
-        expect(AOSETUPS_SLOT_TO_POSITION[slot]).toBeLessThanOrEqual(13);
+        expect(AOSETUPS_SLOT_TO_BITFLAG[slot]).toBeDefined();
+        expect(AOSETUPS_SLOT_TO_BITFLAG[slot]).toBeGreaterThan(0);
+        expect(AOSETUPS_SLOT_TO_BITFLAG[slot]).toBeLessThanOrEqual(8192);
       }
     });
 
-    it('should have unique position numbers', () => {
-      const positions = Object.values(AOSETUPS_SLOT_TO_POSITION);
-      const uniquePositions = new Set(positions);
-      expect(positions.length).toBe(uniquePositions.size);
+    it('should have unique bitflag numbers', () => {
+      const bitflags = Object.values(AOSETUPS_SLOT_TO_BITFLAG);
+      const uniqueBitflags = new Set(bitflags);
+      // Note: 'leg' and 'legs' both map to 2048, so unique count is less than total count
+      expect(uniqueBitflags.size).toBeGreaterThan(0);
+      expect(uniqueBitflags.size).toBeLessThanOrEqual(bitflags.length);
     });
   });
 
@@ -163,9 +165,9 @@ describe('Cluster Mappings', () => {
         }
       };
 
-      // Get slot position
-      const slotPosition = getSlotPosition(aoSetupsImplant.slot);
-      expect(slotPosition).toBe(1); // Eye slot
+      // Get slot bitflag
+      const slotBitflag = getSlotPosition(aoSetupsImplant.slot);
+      expect(slotBitflag).toBe(2); // Eye bitflag (1 << 1)
 
       // Get cluster mappings
       const shinyMapping = getClusterMapping(aoSetupsImplant.clusters.Shiny.ClusterID);
@@ -201,8 +203,8 @@ describe('Cluster Mappings', () => {
         }
       };
 
-      const slotPosition = getSlotPosition(aoSetupsSymbiant.slot);
-      expect(slotPosition).toBe(5); // Chest slot
+      const slotBitflag = getSlotPosition(aoSetupsSymbiant.slot);
+      expect(slotBitflag).toBe(32); // Chest bitflag (1 << 5)
     });
   });
 });

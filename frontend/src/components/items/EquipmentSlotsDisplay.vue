@@ -226,13 +226,15 @@ function onIconError() {
 
 function navigateToItem(item: Item) {
   // Navigate to ItemDetail page for the specific item at the equipped QL
+  if (!item.aoid) return;
+
   router.push({
     name: 'ItemDetail',
     params: {
       aoid: item.aoid.toString()
     },
     query: {
-      ql: item.ql.toString()
+      ql: item.ql?.toString() || '1'
     }
   });
 }

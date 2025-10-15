@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { recalculateHealthAndNano } from '@/services/profile-update-service';
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import { BREED, PROFESSION } from '@/__tests__/helpers';
 
 describe('Equipment Health and Nano Bonuses', () => {
   it('should apply Max Health equipment bonuses to Character.MaxHealth', async () => {
@@ -13,8 +14,8 @@ describe('Equipment Health and Nano Bonuses', () => {
       Character: {
         Name: 'Test',
         Level: 100,
-        Breed: 'Solitus',
-        Profession: 'Soldier',
+        Breed: BREED.SOLITUS,
+        Profession: PROFESSION.SOLDIER,
         AccountType: 'Free',
         Faction: 'Neutral',
         MaxHealth: 0,
@@ -22,16 +23,16 @@ describe('Equipment Health and Nano Bonuses', () => {
       },
       Skills: {
         Attributes: {
-          Strength: { value: 100, ipSpent: 0, pointFromIp: 0 },
-          Agility: { value: 100, ipSpent: 0, pointFromIp: 0 },
-          Stamina: { value: 200, ipSpent: 0, pointFromIp: 0 }, // Higher stamina for health calc
-          Intelligence: { value: 100, ipSpent: 0, pointFromIp: 0 },
-          Sense: { value: 100, ipSpent: 0, pointFromIp: 0 },
-          Psychic: { value: 100, ipSpent: 0, pointFromIp: 0 }
+          Strength: { value: 100, ipSpent: 0, pointsFromIp: 0 },
+          Agility: { value: 100, ipSpent: 0, pointsFromIp: 0 },
+          Stamina: { value: 200, ipSpent: 0, pointsFromIp: 0 }, // Higher stamina for health calc
+          Intelligence: { value: 100, ipSpent: 0, pointsFromIp: 0 },
+          Sense: { value: 100, ipSpent: 0, pointsFromIp: 0 },
+          Psychic: { value: 100, ipSpent: 0, pointsFromIp: 0 }
         },
         'Body & Defense': {
-          'Body Dev.': { value: 500, ipSpent: 0, pointFromIp: 0 }, // Body Dev affects health
-          'Nano Pool': { value: 300, ipSpent: 0, pointFromIp: 0 } // Nano Pool affects nano
+          'Body Dev.': { value: 500, ipSpent: 0, pointsFromIp: 0 }, // Body Dev affects health
+          'Nano Pool': { value: 300, ipSpent: 0, pointsFromIp: 0 } // Nano Pool affects nano
         }
       },
       Clothing: {
@@ -90,8 +91,8 @@ describe('Equipment Health and Nano Bonuses', () => {
       Character: {
         Name: 'Test',
         Level: 100,
-        Breed: 'Solitus',
-        Profession: 'Nano-Technician',
+        Breed: BREED.SOLITUS,
+        Profession: PROFESSION.NANO_TECHNICIAN,
         AccountType: 'Free',
         Faction: 'Neutral',
         MaxHealth: 0,
@@ -99,16 +100,16 @@ describe('Equipment Health and Nano Bonuses', () => {
       },
       Skills: {
         Attributes: {
-          Strength: { value: 100, ipSpent: 0, pointFromIp: 0 },
-          Agility: { value: 100, ipSpent: 0, pointFromIp: 0 },
-          Stamina: { value: 100, ipSpent: 0, pointFromIp: 0 },
-          Intelligence: { value: 200, ipSpent: 0, pointFromIp: 0 }, // Higher int for nano calc
-          Sense: { value: 100, ipSpent: 0, pointFromIp: 0 },
-          Psychic: { value: 200, ipSpent: 0, pointFromIp: 0 } // Higher psychic for nano calc
+          Strength: { value: 100, ipSpent: 0, pointsFromIp: 0 },
+          Agility: { value: 100, ipSpent: 0, pointsFromIp: 0 },
+          Stamina: { value: 100, ipSpent: 0, pointsFromIp: 0 },
+          Intelligence: { value: 200, ipSpent: 0, pointsFromIp: 0 }, // Higher int for nano calc
+          Sense: { value: 100, ipSpent: 0, pointsFromIp: 0 },
+          Psychic: { value: 200, ipSpent: 0, pointsFromIp: 0 } // Higher psychic for nano calc
         },
         'Body & Defense': {
-          'Body Dev.': { value: 300, ipSpent: 0, pointFromIp: 0 },
-          'Nano Pool': { value: 500, ipSpent: 0, pointFromIp: 0 } // Higher Nano Pool
+          'Body Dev.': { value: 300, ipSpent: 0, pointsFromIp: 0 },
+          'Nano Pool': { value: 500, ipSpent: 0, pointsFromIp: 0 } // Higher Nano Pool
         }
       },
       Clothing: {
@@ -167,8 +168,8 @@ describe('Equipment Health and Nano Bonuses', () => {
       Character: {
         Name: 'Test',
         Level: 150,
-        Breed: 'Atrox',
-        Profession: 'Enforcer',
+        Breed: BREED.ATROX,
+        Profession: PROFESSION.ENFORCER,
         AccountType: 'Paid',
         Faction: 'Clan',
         MaxHealth: 0,
@@ -176,16 +177,16 @@ describe('Equipment Health and Nano Bonuses', () => {
       },
       Skills: {
         Attributes: {
-          Strength: { value: 250, ipSpent: 0, pointFromIp: 0 },
-          Agility: { value: 150, ipSpent: 0, pointFromIp: 0 },
-          Stamina: { value: 300, ipSpent: 0, pointFromIp: 0 },
-          Intelligence: { value: 100, ipSpent: 0, pointFromIp: 0 },
-          Sense: { value: 100, ipSpent: 0, pointFromIp: 0 },
-          Psychic: { value: 100, ipSpent: 0, pointFromIp: 0 }
+          Strength: { value: 250, ipSpent: 0, pointsFromIp: 0 },
+          Agility: { value: 150, ipSpent: 0, pointsFromIp: 0 },
+          Stamina: { value: 300, ipSpent: 0, pointsFromIp: 0 },
+          Intelligence: { value: 100, ipSpent: 0, pointsFromIp: 0 },
+          Sense: { value: 100, ipSpent: 0, pointsFromIp: 0 },
+          Psychic: { value: 100, ipSpent: 0, pointsFromIp: 0 }
         },
         'Body & Defense': {
-          'Body Dev.': { value: 700, ipSpent: 0, pointFromIp: 0 },
-          'Nano Pool': { value: 400, ipSpent: 0, pointFromIp: 0 }
+          'Body Dev.': { value: 700, ipSpent: 0, pointsFromIp: 0 },
+          'Nano Pool': { value: 400, ipSpent: 0, pointsFromIp: 0 }
         }
       },
       Clothing: {

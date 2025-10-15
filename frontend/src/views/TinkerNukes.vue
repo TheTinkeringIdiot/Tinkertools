@@ -364,6 +364,33 @@ watch(
   },
   { immediate: false }
 )
+
+// ============================================================================
+// Expose for Tests
+// ============================================================================
+
+defineExpose({
+  loading,
+  offensiveNanos,
+  activeProfile,
+  inputState,
+  searchQuery,
+  selectedSchoolId,
+  minQL,
+  maxQL,
+  filteredNanos,
+  currentSkills: computed(() => {
+    const skills: Record<number, number> = {}
+    skills[130] = inputState.value.characterStats.matterCreation
+    skills[127] = inputState.value.characterStats.matterMeta
+    skills[128] = inputState.value.characterStats.bioMeta
+    skills[129] = inputState.value.characterStats.psychModi
+    skills[122] = inputState.value.characterStats.sensoryImp
+    skills[131] = inputState.value.characterStats.timeSpace
+    return skills
+  }),
+  schoolFilterOptions
+})
 </script>
 
 <style scoped>

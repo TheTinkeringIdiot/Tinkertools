@@ -1,24 +1,30 @@
 /**
  * Pagination Integration Tests
- * 
+ *
+ * TRUE INTEGRATION TEST - Requires real backend
  * Tests pagination functionality using the real backend
  * Verifies that the offset calculation fix works correctly end-to-end
+ *
+ * Strategy: Skip when backend not available (Option B)
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { apiClient } from '../services/api-client'
 import type { ItemSearchQuery } from '../types/api'
+import { isBackendAvailable } from './helpers/backend-check'
+
+// Check backend availability before running tests
+let BACKEND_AVAILABLE = false
+
+beforeAll(async () => {
+  BACKEND_AVAILABLE = await isBackendAvailable()
+  if (!BACKEND_AVAILABLE) {
+    console.warn('Backend not available - skipping pagination integration tests')
+  }
+})
 
 // Real integration tests using the backend
-describe('Pagination Integration Tests', () => {
-  beforeAll(async () => {
-    // Verify backend is available
-    try {
-      await apiClient.healthCheck()
-    } catch (error) {
-      console.warn('Backend not available for integration tests')
-    }
-  })
+describe.skipIf(!BACKEND_AVAILABLE)('Pagination Integration Tests', () => {
 
   describe('API Client Pagination Response', () => {
     it('should return pagination with correct offset for page 1', async () => {

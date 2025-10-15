@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION } from '@/__tests__/helpers'
 import NanoStatistics from '@/components/items/NanoStatistics.vue'
 import type { Item } from '@/types/api'
 
@@ -41,7 +41,7 @@ describe('NanoStatistics', () => {
         defense_stats: []
       }
 
-      const wrapper = mount(NanoStatistics, {
+      const wrapper = mountWithContext(NanoStatistics, {
         props: {
           item: mockNanoWithTicks
         },
@@ -85,7 +85,7 @@ describe('NanoStatistics', () => {
         defense_stats: []
       }
 
-      const wrapper = mount(NanoStatistics, {
+      const wrapper = mountWithContext(NanoStatistics, {
         props: {
           item: mockNanoWithoutTicks
         },
@@ -125,7 +125,7 @@ describe('NanoStatistics', () => {
         defense_stats: []
       }
 
-      const wrapper = mount(NanoStatistics, {
+      const wrapper = mountWithContext(NanoStatistics, {
         props: {
           item: mockNanoWithZeroInterval
         },
@@ -165,7 +165,7 @@ describe('NanoStatistics', () => {
         defense_stats: []
       }
 
-      const wrapper = mount(NanoStatistics, {
+      const wrapper = mountWithContext(NanoStatistics, {
         props: {
           item: mockNanoWithDecimalTicks
         },
@@ -197,7 +197,7 @@ describe('NanoStatistics', () => {
         actions: []
       }
 
-      const wrapper = mount(NanoStatistics, {
+      const wrapper = mountWithContext(NanoStatistics, {
         props: {
           item: mockNanoWithStrain
         },
@@ -231,7 +231,7 @@ describe('NanoStatistics', () => {
         actions: []
       }
 
-      const wrapper = mount(NanoStatistics, {
+      const wrapper = mountWithContext(NanoStatistics, {
         props: {
           item: mockNanoWithoutStrain
         },

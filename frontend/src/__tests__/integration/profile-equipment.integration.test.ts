@@ -1,13 +1,17 @@
 /**
  * Profile Equipment Integration Tests
- * 
+ *
  * Integration tests for profile import workflow with item fetching and equipment display
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { nextTick, createApp } from 'vue';
 import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
+import PrimeVue from 'primevue/config';
+import ToastService from 'primevue/toastservice';
 import type { Item } from '@/types/api';
+import { BREED, PROFESSION } from '@/__tests__/helpers';
 
 // Mock the API client module with factory function
 
@@ -156,7 +160,15 @@ describe('Profile Equipment Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorageMock.clear();
+
+    // CRITICAL: Setup PrimeVue + ToastService FIRST
+    const app = createApp({});
+    app.use(PrimeVue);
+    app.use(ToastService);
+
+    // Then setup Pinia
     pinia = createPinia();
+    app.use(pinia);
     setActivePinia(pinia);
   });
 
@@ -311,6 +323,7 @@ describe('Profile Equipment Integration', () => {
       const store = useTinkerProfilesStore();
 
       // Create a profile with legacy Body slot (simulate old profile)
+      // Note: This manually constructs a legacy v1.0.0 profile structure for testing backward compatibility
       const legacyProfile = {
         id: 'legacy-profile',
         version: '1.0.0',
@@ -319,8 +332,8 @@ describe('Profile Equipment Integration', () => {
         Character: {
           Name: 'Legacy Character',
           Level: 50,
-          Profession: 'Soldier',
-          Breed: 'Atrox',
+          Profession: PROFESSION.SOLDIER,
+          Breed: BREED.ATROX,
           Faction: 'Clan',
           Expansion: 'Shadow Lands',
           AccountType: 'Paid',
@@ -329,12 +342,12 @@ describe('Profile Equipment Integration', () => {
         },
         Skills: {
           Attributes: {
-            Intelligence: { value: 6, ipSpent: 0, pointFromIp: 0 },
-            Psychic: { value: 6, ipSpent: 0, pointFromIp: 0 },
-            Sense: { value: 6, ipSpent: 0, pointFromIp: 0 },
-            Stamina: { value: 6, ipSpent: 0, pointFromIp: 0 },
-            Strength: { value: 6, ipSpent: 0, pointFromIp: 0 },
-            Agility: { value: 6, ipSpent: 0, pointFromIp: 0 }
+            Intelligence: { value: 6, ipSpent: 0, pointsFromIp: 0 },
+            Psychic: { value: 6, ipSpent: 0, pointsFromIp: 0 },
+            Sense: { value: 6, ipSpent: 0, pointsFromIp: 0 },
+            Stamina: { value: 6, ipSpent: 0, pointsFromIp: 0 },
+            Strength: { value: 6, ipSpent: 0, pointsFromIp: 0 },
+            Agility: { value: 6, ipSpent: 0, pointsFromIp: 0 }
           },
           'Body & Defense': {},
           ACs: {},

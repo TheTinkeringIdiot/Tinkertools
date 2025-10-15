@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { nextTick } from 'vue';
 import { mount, VueWrapper } from '@vue/test-utils';
 import { createPinia } from 'pinia';
 import PrimeVue from 'primevue/config';
@@ -103,7 +104,7 @@ describe('PocketBossDatabase', () => {
   beforeEach(() => {
     const pinia = createPinia();
     
-    wrapper = mount(PocketBossDatabase, {
+    wrapper = mountWithContext(PocketBossDatabase, {
       global: {
         plugins: [pinia, PrimeVue]
       }

@@ -283,6 +283,24 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     return selectedForComparison.value.filter(slot => slot !== null).length
   }
 
+  /**
+   * Search symbiants with pagination parameters
+   * Wrapper around loadAllSymbiants for API compatibility
+   */
+  async function searchSymbiants(params?: { page?: number; limit?: number }): Promise<Symbiant[]> {
+    // Load all symbiants and cache them
+    const allSymbs = await loadAllSymbiants();
+
+    // If pagination params provided, slice the results
+    if (params?.page && params?.limit) {
+      const start = (params.page - 1) * params.limit;
+      const end = start + params.limit;
+      return allSymbs.slice(start, end);
+    }
+
+    return allSymbs;
+  }
+
   // ============================================================================
   // Return
   // ============================================================================
@@ -307,6 +325,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
 
     // Actions
     loadAllSymbiants,
+    searchSymbiants,
     getSymbiant,
     getSymbiantByAoid,
     getSymbiantsForBuild,

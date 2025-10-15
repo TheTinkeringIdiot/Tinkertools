@@ -2,6 +2,27 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // We will import inside tests (dynamic) for migration scenarios.
 // Utilities to manipulate environment before (re)loading the composable module.
+
+// Stateful localStorage mock that persists across module initialization
+let localStorageMock: Record<string, string> = {};
+
+function mockLocalStorage() {
+  global.localStorage = {
+    getItem: vi.fn((key: string) => localStorageMock[key] || null),
+    setItem: vi.fn((key: string, value: string) => {
+      localStorageMock[key] = value;
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete localStorageMock[key];
+    }),
+    clear: vi.fn(() => {
+      localStorageMock = {};
+    }),
+    length: 0,
+    key: vi.fn()
+  } as any;
+}
+
 function mockMatchMedia(dark: boolean) {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
@@ -35,11 +56,13 @@ function getThemeClassState() {
 
 describe('useTheme composable', () => {
   beforeEach(() => {
+    // Clear and setup localStorage mock
+    localStorageMock = {};
+    mockLocalStorage();
+
     // Clear modules so that top-level initialization re-runs per test when needed
     vi.resetModules();
-    // Clear storage by removing specific keys instead of clearing all
-    localStorage.removeItem('tinkertools-theme-mode');
-    localStorage.removeItem('tinkertools-dark-mode');
+
     // Default system preference: light
     mockMatchMedia(false);
     resetDocumentRoot();
@@ -67,7 +90,10 @@ describe('useTheme composable', () => {
   });
 
   it('uses stored unified theme preference over system', async () => {
-    localStorage.setItem('tinkertools-theme-mode', 'dark');
+    // Set value in mock BEFORE resetting modules
+    localStorageMock['tinkertools-theme-mode'] = 'dark';
+    mockLocalStorage(); // Re-apply mock
+    vi.resetModules(); // Reset modules to re-initialize
     mockMatchMedia(false);
     const { isDark, currentTheme } = await import('@/composables/useTheme');
     expect(isDark.value).toBe(true);
@@ -75,7 +101,10 @@ describe('useTheme composable', () => {
   });
 
   it('migrates legacy key tinkertools-dark-mode to unified key', async () => {
-    localStorage.setItem('tinkertools-dark-mode', 'dark');
+    // Set legacy value in mock BEFORE resetting modules
+    localStorageMock['tinkertools-dark-mode'] = 'dark';
+    mockLocalStorage(); // Re-apply mock
+    vi.resetModules(); // Reset modules to re-initialize
     const { isDark } = await import('@/composables/useTheme');
     expect(isDark.value).toBe(true);
     expect(localStorage.getItem('tinkertools-theme-mode')).toBe('dark');

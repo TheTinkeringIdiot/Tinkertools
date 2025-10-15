@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION } from '@/__tests__/helpers';
 import { nextTick } from 'vue';
 import NanoList from '@/components/nanos/NanoList.vue';
 import type { NanoProgram, TinkerProfile } from '@/types/nano';
@@ -72,13 +72,13 @@ describe('NanoList', () => {
         description: 'Heals target for a large amount.',
         level: 125,
         qualityLevel: 175,
-        profession: 'Doctor',
+        profession: PROFESSION.DOCTOR,
         nanoPointCost: 450,
         castingTime: 3,
         rechargeTime: 5,
         memoryUsage: 85,
         castingRequirements: [
-          { type: 'skill', requirement: 'Biological Metamorphosis', value: 750, critical: true }
+          { type: 'skill', requirement: SKILL_ID.BIO_METAMOR, value: 750, critical: true }
         ],
         effects: [{
           type: 'heal',
@@ -101,7 +101,7 @@ describe('NanoList', () => {
         rechargeTime: 8,
         memoryUsage: 75,
         castingRequirements: [
-          { type: 'skill', requirement: 'Matter Creation', value: 650, critical: true }
+          { type: 'skill', requirement: SKILL_ID.MATTER_CREATION, value: 650, critical: true }
         ],
         effects: [{
           type: 'protection',
@@ -119,13 +119,13 @@ describe('NanoList', () => {
         description: 'Summons a pet.',
         level: 75,
         qualityLevel: 125,
-        profession: 'Meta-Physicist',
+        profession: PROFESSION.META_PHYSICIST,
         nanoPointCost: 500,
         castingTime: 6,
         rechargeTime: 2,
         memoryUsage: 120,
         castingRequirements: [
-          { type: 'skill', requirement: 'Matter Creation', value: 500, critical: true }
+          { type: 'skill', requirement: SKILL_ID.MATTER_CREATION, value: 500, critical: true }
         ],
         effects: [{
           type: 'summon',
@@ -137,24 +137,17 @@ describe('NanoList', () => {
       }
     ];
 
-    mockProfile = {
-      id: 'test-profile',
-      name: 'Test Character',
-      profession: 'Doctor',
+    mockProfile = createTestProfile({
+      profession: PROFESSION.DOCTOR,
       level: 100,
       skills: {
-        'Biological Metamorphosis': 500,
-        'Matter Creation': 300,
-        'Nano Programming': 400
-      },
-      stats: {
-        'Intelligence': 400,
-        'Psychic': 300
-      },
-      activeNanos: [],
-      memoryCapacity: 500,
-      nanoPoints: 1000
-    };
+        [SKILL_ID.BIO_METAMOR]: { base: 5, pointsFromIp: 495, equipmentBonus: 0, total: 500 },
+        [SKILL_ID.MATTER_CREATION]: { base: 5, pointsFromIp: 295, equipmentBonus: 0, total: 300 },
+        [SKILL_ID.NANO_PROGRAMMING]: { base: 5, pointsFromIp: 395, equipmentBonus: 0, total: 400 },
+        [SKILL_ID.INTELLIGENCE]: { base: 6, pointsFromIp: 394, equipmentBonus: 0, total: 400 },
+        [SKILL_ID.PSYCHIC]: { base: 6, pointsFromIp: 294, equipmentBonus: 0, total: 300 }
+      }
+    });
 
     // Mock localStorage
     const localStorageMock = {
@@ -165,7 +158,7 @@ describe('NanoList', () => {
     };
     global.localStorage = localStorageMock as any;
 
-    wrapper = mount(NanoList, {
+    wrapper = mountWithContext(NanoList, {
       props: {
         nanos: mockNanos,
         loading: false,

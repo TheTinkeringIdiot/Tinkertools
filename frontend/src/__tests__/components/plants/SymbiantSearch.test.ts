@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { nextTick } from 'vue';
 import { mount } from '@vue/test-utils';
+import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION, BREED } from '@/__tests__/helpers';
 import SymbiantSearch from '@/components/plants/SymbiantSearch.vue';
 
 // Mock PrimeVue components with simpler templates to avoid syntax issues
@@ -47,7 +49,7 @@ describe('SymbiantSearch', () => {
   let wrapper: any;
 
   beforeEach(() => {
-    wrapper = mount(SymbiantSearch, {
+    wrapper = mountWithContext(SymbiantSearch, {
       props: {
         modelValue: '',
         showQuickFilters: true
@@ -56,6 +58,7 @@ describe('SymbiantSearch', () => {
   });
 
   afterEach(() => {
+    standardCleanup()
     wrapper?.unmount();
   });
 

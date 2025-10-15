@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { nextTick } from 'vue';
 import { mount, VueWrapper } from '@vue/test-utils';
+import { mountWithContext, standardCleanup } from '@/__tests__/helpers';
 import { createTestingPinia } from '@pinia/testing';
 import PrimeVue from 'primevue/config';
 import CollectionTracker from '@/components/pocket/CollectionTracker.vue';
@@ -124,7 +126,7 @@ describe('CollectionTracker', () => {
       writable: true
     });
 
-    wrapper = mount(CollectionTracker, {
+    wrapper = mountWithContext(CollectionTracker, {
       global: {
         plugins: [
           createTestingPinia({
@@ -155,6 +157,7 @@ describe('CollectionTracker', () => {
   });
 
   afterEach(() => {
+    standardCleanup()
     vi.clearAllMocks();
   });
 

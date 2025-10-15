@@ -73,6 +73,15 @@ function formatLocation(boss: PocketBoss): string {
   if (boss.location) parts.push(boss.location);
   return parts.join(' - ') || 'Unknown Location';
 }
+
+// Expose methods for tests
+defineExpose({
+  formatLocation,
+  getSeverity,
+  showDetails,
+  updateLevelRange,
+  updatePlayfield
+})
 </script>
 
 <template>

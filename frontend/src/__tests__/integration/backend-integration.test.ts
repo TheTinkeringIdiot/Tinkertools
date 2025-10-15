@@ -1,6 +1,16 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+/**
+ * Backend Integration Tests
+ *
+ * TRUE INTEGRATION TEST - Requires real backend
+ * Tests backend integration with nano store
+ *
+ * Strategy: Skip when backend not available (Option B)
+ */
+
+import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import { useNanosStore } from '@/stores/nanosStore';
+import { isBackendAvailable } from '../helpers/backend-check';
 
 // Simple localStorage mock
 global.localStorage = {
@@ -12,7 +22,17 @@ global.localStorage = {
   key: vi.fn()
 } as any;
 
-describe('Backend Integration Tests', () => {
+// Check backend availability before running tests
+let BACKEND_AVAILABLE = false;
+
+beforeAll(async () => {
+  BACKEND_AVAILABLE = await isBackendAvailable();
+  if (!BACKEND_AVAILABLE) {
+    console.warn('Backend not available - skipping backend integration tests');
+  }
+});
+
+describe.skipIf(!BACKEND_AVAILABLE)('Backend Integration Tests', () => {
   let store: ReturnType<typeof useNanosStore>;
 
   beforeEach(() => {

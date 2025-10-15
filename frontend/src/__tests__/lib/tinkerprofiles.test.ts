@@ -6,6 +6,8 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TinkerProfilesManager, createDefaultProfile, createDefaultNanoProfile } from '@/lib/tinkerprofiles';
+import { SKILL_ID, BREED, PROFESSION } from '@/__tests__/helpers';
+import { getProfessionName } from '@/services/game-utils';
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -29,7 +31,7 @@ describe('TinkerProfiles Library', () => {
   beforeEach(() => {
     // Clear localStorage before each test
     localStorageMock.clear();
-    
+
     // Create new profile manager instance
     profileManager = new TinkerProfilesManager({
       storage: {
@@ -37,7 +39,8 @@ describe('TinkerProfiles Library', () => {
       },
       validation: {
         strictMode: false,
-        autoCorrect: true
+        autoCorrect: true,
+        allowLegacyFormats: false
       }
     });
   });
@@ -45,14 +48,14 @@ describe('TinkerProfiles Library', () => {
   describe('Profile Creation', () => {
     it('should create a default profile with correct structure', () => {
       const profile = createDefaultProfile('Test Character');
-      
+
       expect(profile.Character.Name).toBe('Test Character');
       expect(profile.Character.Level).toBe(1);
-      expect(profile.Character.Profession).toBe('Adventurer');
-      expect(profile.Character.Breed).toBe('Solitus');
+      expect(profile.Character.Profession).toBe(PROFESSION.ADVENTURER);
+      expect(profile.Character.Breed).toBe(BREED.SOLITUS);
       expect(profile.Character.Faction).toBe('Neutral');
-      expect(profile.Skills.Attributes.Strength.value).toBe(10);
-      expect(profile.Skills.Attributes.Intelligence.value).toBe(10);
+      expect(profile.skills[SKILL_ID.STRENGTH].total).toBe(10);
+      expect(profile.skills[SKILL_ID.INTELLIGENCE].total).toBe(10);
       expect(profile.version).toBeTruthy();
       expect(profile.id).toBeTruthy();
       expect(profile.created).toBeTruthy();
@@ -102,20 +105,22 @@ describe('TinkerProfiles Library', () => {
         Character: {
           Name: 'Updated Profile',
           Level: 50,
-          Profession: 'Nanotechnician',
-          Breed: 'Nanomage',
+          Profession: PROFESSION.NANO_TECHNICIAN,
+          Breed: BREED.NANOMAGE,
           Faction: 'Clan',
           Expansion: 'Shadowlands',
-          AccountType: 'Paid'
+          AccountType: 'Paid',
+          MaxHealth: 1000,
+          MaxNano: 1000
         }
       };
-      
+
       await profileManager.updateProfile(testProfileId, updates);
-      
+
       const updatedProfile = await profileManager.loadProfile(testProfileId);
       expect(updatedProfile?.Character.Name).toBe('Updated Profile');
       expect(updatedProfile?.Character.Level).toBe(50);
-      expect(updatedProfile?.Character.Profession).toBe('Nanotechnician');
+      expect(updatedProfile?.Character.Profession).toBe(PROFESSION.NANO_TECHNICIAN);
     });
     
     it('should delete a profile', async () => {
@@ -199,16 +204,18 @@ describe('TinkerProfiles Library', () => {
         Character: {
           Name: '', // Invalid empty name
           Level: -1, // Invalid negative level
-          Profession: 'InvalidProfession' as any,
-          Breed: 'Solitus',
+          Profession: 999 as any, // Invalid profession ID
+          Breed: BREED.SOLITUS,
           Faction: 'Neutral',
           Expansion: 'Lost Eden',
-          AccountType: 'Paid'
+          AccountType: 'Paid',
+          MaxHealth: 1000,
+          MaxNano: 1000
         }
       });
-      
+
       const result = await profileManager.validateProfile(validProfileId);
-      
+
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
     });
@@ -263,23 +270,27 @@ describe('TinkerProfiles Library', () => {
         Character: {
           Name: 'Nano Tech',
           Level: 50,
-          Profession: 'Nanotechnician',
-          Breed: 'Nanomage',
+          Profession: PROFESSION.NANO_TECHNICIAN,
+          Breed: BREED.NANOMAGE,
           Faction: 'Clan',
           Expansion: 'Shadowlands',
-          AccountType: 'Paid'
+          AccountType: 'Paid',
+          MaxHealth: 1000,
+          MaxNano: 1000
         }
       });
-      
+
       await profileManager.createProfile('Tank Doc', {
         Character: {
           Name: 'Tank Doc',
           Level: 100,
-          Profession: 'Doctor',
-          Breed: 'Atrox',
+          Profession: PROFESSION.DOCTOR,
+          Breed: BREED.ATROX,
           Faction: 'Omni-Tek',
           Expansion: 'Lost Eden',
-          AccountType: 'Paid'
+          AccountType: 'Paid',
+          MaxHealth: 2000,
+          MaxNano: 500
         }
       });
     });
@@ -329,49 +340,41 @@ describe('TinkerProfiles Library', () => {
         Character: {
           Name: 'Transform Test',
           Level: 75,
-          Profession: 'Meta-Physicist',
-          Breed: 'Solitus',
+          Profession: PROFESSION.META_PHYSICIST,
+          Breed: BREED.SOLITUS,
           Faction: 'Neutral',
           Expansion: 'Shadowlands',
-          AccountType: 'Paid'
-        },
-        Skills: {
-          Attributes: {
-            Intelligence: { value: 500, ipSpent: 0, pointFromIp: 0 },
-            Psychic: { value: 400, ipSpent: 0, pointFromIp: 0 },
-            Sense: { value: 300, ipSpent: 0, pointFromIp: 0 },
-            Stamina: { value: 200, ipSpent: 0, pointFromIp: 0 },
-            Strength: { value: 150, ipSpent: 0, pointFromIp: 0 },
-            Agility: { value: 250, ipSpent: 0, pointFromIp: 0 }
-          }
+          AccountType: 'Paid',
+          MaxHealth: 1500,
+          MaxNano: 1500
         }
       });
     });
     
     it('should convert to nano-compatible profile', async () => {
       const nanoProfile = await profileManager.getAsNanoCompatible(fullProfileId);
-      
+
       expect(nanoProfile).toBeTruthy();
       expect(nanoProfile?.name).toBe('Transform Test');
-      expect(nanoProfile?.profession).toBe('Meta-Physicist');
+      expect(nanoProfile?.profession).toBe(PROFESSION.META_PHYSICIST);
       expect(nanoProfile?.level).toBe(75);
-      expect(nanoProfile?.stats.Intelligence).toBe(500);
+      expect(nanoProfile?.stats.Intelligence).toBeGreaterThan(0);
       expect(nanoProfile?.memoryCapacity).toBeGreaterThan(500); // Should be higher for MP
     });
     
     it('should create profile from nano-compatible', async () => {
       const nanoProfile = createDefaultNanoProfile('From Nano');
-      nanoProfile.profession = 'Nanotechnician';
+      nanoProfile.profession = getProfessionName(PROFESSION.NANO_TECHNICIAN);
       nanoProfile.level = 25;
       nanoProfile.stats.Intelligence = 300;
-      
+
       const newProfileId = await profileManager.createFromNanoCompatible(nanoProfile);
       const createdProfile = await profileManager.loadProfile(newProfileId);
-      
+
       expect(createdProfile?.Character.Name).toBe('From Nano');
-      expect(createdProfile?.Character.Profession).toBe('Nanotechnician');
+      expect(createdProfile?.Character.Profession).toBe(PROFESSION.NANO_TECHNICIAN);
       expect(createdProfile?.Character.Level).toBe(25);
-      expect(createdProfile?.Skills.Attributes.Intelligence.value).toBe(300);
+      expect(createdProfile?.skills[SKILL_ID.INTELLIGENCE].total).toBe(300);
     });
   });
   

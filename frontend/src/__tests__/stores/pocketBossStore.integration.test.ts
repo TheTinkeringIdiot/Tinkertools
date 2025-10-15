@@ -1,8 +1,28 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+/**
+ * PocketBossStore Integration Tests
+ *
+ * TRUE INTEGRATION TEST - Requires real backend
+ * Tests real API integration with pocket boss store
+ *
+ * Strategy: Skip when backend not available (Option B)
+ */
+
+import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import { usePocketBossStore } from '@/stores/pocketBossStore';
+import { isBackendAvailable } from '../helpers/backend-check';
 
-describe('PocketBossStore Integration Tests', () => {
+// Check backend availability before running tests
+let BACKEND_AVAILABLE = false;
+
+beforeAll(async () => {
+  BACKEND_AVAILABLE = await isBackendAvailable();
+  if (!BACKEND_AVAILABLE) {
+    console.warn('Backend not available - skipping pocket boss integration tests');
+  }
+});
+
+describe.skipIf(!BACKEND_AVAILABLE)('PocketBossStore Integration Tests', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
   });

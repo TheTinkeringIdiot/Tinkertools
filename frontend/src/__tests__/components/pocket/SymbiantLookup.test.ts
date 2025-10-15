@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { nextTick } from 'vue';
 import { mount, VueWrapper } from '@vue/test-utils';
 import { createTestingPinia } from '@pinia/testing';
 import PrimeVue from 'primevue/config';
@@ -94,7 +95,7 @@ describe('SymbiantLookup', () => {
   ];
 
   beforeEach(() => {
-    wrapper = mount(SymbiantLookup, {
+    wrapper = mountWithContext(SymbiantLookup, {
       global: {
         plugins: [
           createTestingPinia({

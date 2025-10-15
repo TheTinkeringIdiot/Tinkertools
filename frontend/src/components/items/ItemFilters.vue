@@ -672,6 +672,18 @@ onMounted(() => {
 watch(() => props.filters, (newFilters) => {
   tempFilters.value = { ...newFilters }
 }, { deep: true })
+
+// Expose methods for tests
+defineExpose({
+  updateFilters: (filters: Partial<ItemFilters>) => {
+    tempFilters.value = { ...tempFilters.value, ...filters }
+    applyFilters()
+  },
+  savePreset: (name: string) => {
+    presetName.value = name
+    savePreset()
+  }
+})
 </script>
 
 <style scoped>

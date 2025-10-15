@@ -200,7 +200,14 @@ export function calcAbilityCost(currentValue: number, breed: number, abilityStat
     console.warn(`[calcAbilityCost] Unknown ability STAT ID ${abilityStatId}`);
     return currentValue * 2; // Conservative fallback
   }
-  
+
+  // Validate breed exists in data structure
+  const breedCostFactors = BREED_ABILITY_DATA.cost_factors[breed];
+  if (!breedCostFactors) {
+    console.warn(`[calcAbilityCost] Unknown breed ${breed}, using Solitus default`);
+    breed = 1; // Default to Solitus
+  }
+
   return currentValue * BREED_ABILITY_DATA.cost_factors[breed][abilityIndex];
 }
 
@@ -214,7 +221,14 @@ export function calcTotalAbilityCost(improvements: number, breed: number, abilit
     console.warn(`[calcTotalAbilityCost] Unknown ability STAT ID ${abilityStatId}`);
     return improvements * 10; // Conservative fallback
   }
-  
+
+  // Validate breed exists in data structure
+  const breedData = BREED_ABILITY_DATA.initial[breed];
+  if (!breedData) {
+    console.warn(`[calcTotalAbilityCost] Unknown breed ${breed}, using Solitus default`);
+    breed = 1; // Default to Solitus
+  }
+
   let totalIP = 0;
   if (improvements > 0) {
     for (let i = 0; i < improvements; i++) {
@@ -260,7 +274,14 @@ export function calcAbilityMaxValue(level: number, breed: number, profession: nu
     console.warn(`[calcAbilityMaxValue] Unknown ability STAT ID ${abilityStatId}`);
     return 10; // Conservative fallback
   }
-  
+
+  // Validate breed exists in data structure
+  const breedData = BREED_ABILITY_DATA.initial[breed];
+  if (!breedData) {
+    console.warn(`[calcAbilityMaxValue] Unknown breed ${breed}, using Solitus default`);
+    breed = 1; // Default to Solitus
+  }
+
   const baseValue = BREED_ABILITY_DATA.initial[breed][abilityIndex];
   const adjustableRange = calcAbilityIPAdjustableRange(level, breed, abilityStatId);
 
@@ -463,6 +484,12 @@ export function calcHP(bodyDev: number, level: number, breed: number, profession
     return 0;
   }
 
+  // Validate breed exists in data structure
+  if (!BREED_ABILITY_DATA.base_hp[breed]) {
+    console.warn(`[calcHP] Unknown breed ${breed}, using Solitus default`);
+    breed = 1; // Default to Solitus
+  }
+
   const breedBaseHP = BREED_ABILITY_DATA.base_hp[breed] || 0;
   const breedBodyFactor = BREED_ABILITY_DATA.body_factor[breed] || 1;
 
@@ -501,6 +528,12 @@ export function calcNP(nanoPool: number, level: number, breed: number, professio
   if (!professionNPPerLevel) {
     console.warn(`Unknown profession ID: ${profession}`);
     return 0;
+  }
+
+  // Validate breed exists in data structure
+  if (!BREED_ABILITY_DATA.base_np[breed]) {
+    console.warn(`[calcNP] Unknown breed ${breed}, using Solitus default`);
+    breed = 1; // Default to Solitus
   }
 
   const breedBaseNP = BREED_ABILITY_DATA.base_np[breed] || 0;

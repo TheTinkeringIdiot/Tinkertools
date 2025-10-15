@@ -389,6 +389,27 @@ export class EquipmentBonusCalculator {
   parseItemSpells(item: Item): StatBonus[] {
     const bonuses: StatBonus[] = []
 
+    // First, extract direct stat bonuses from item.stats array
+    if (item.stats && Array.isArray(item.stats)) {
+      for (const stat of item.stats) {
+        if (stat.stat && stat.value) {
+          try {
+            // Validate that the stat ID is a known skill
+            skillService.validateId(stat.stat)
+            bonuses.push({
+              statId: stat.stat,
+              amount: stat.value,
+              itemName: item.name
+            })
+          } catch {
+            // Skip unknown stat IDs
+            console.warn(`Unknown stat ID ${stat.stat} in item ${item.name}`)
+          }
+        }
+      }
+    }
+
+    // Then, extract bonuses from spell data
     if (!item.spell_data || !Array.isArray(item.spell_data)) {
       return bonuses
     }
@@ -460,6 +481,33 @@ export class EquipmentBonusCalculator {
           recoverable: true
         })
         return result
+      }
+
+      // First, extract direct stat bonuses from item.stats array
+      if (item.stats && Array.isArray(item.stats)) {
+        for (const stat of item.stats) {
+          if (stat.stat && stat.value) {
+            try {
+              // Validate that the stat ID is a known skill
+              skillService.validateId(stat.stat)
+              result.bonuses.push({
+                statId: stat.stat,
+                amount: stat.value,
+                itemName: item.name
+              })
+            } catch {
+              // Log warning for unknown stat IDs but continue processing
+              result.warnings.push({
+                type: 'warning',
+                message: 'Unknown stat ID in item stats',
+                details: `Stat ID ${stat.stat} in item ${item.name || 'unknown'} does not map to a known skill`,
+                itemName: item.name,
+                slotName,
+                recoverable: true
+              })
+            }
+          }
+        }
       }
 
       // Check for spell_data

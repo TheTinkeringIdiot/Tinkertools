@@ -4,10 +4,10 @@
  * Tests for the ItemFilters component functionality
  */
 
-// @ts-nocheck
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION } from '@/__tests__/helpers'
+
 import { nextTick } from 'vue'
 import ItemFilters from '../../components/items/ItemFilters.vue'
 import type { TinkerProfile, ItemFilters as IItemFilters } from '../../types/api'
@@ -72,17 +72,15 @@ vi.mock('primevue/button', () => ({
   }
 }))
 
-const mockProfile: TinkerProfile = {
-  id: 'test-profile',
-  name: 'Test Character',
+const mockProfile: TinkerProfile = createTestProfile({
+  profession: PROFESSION.ENGINEER,
   level: 200,
-  profession: 'Engineer',
-  stats: {
-    16: 500, // Strength
-    17: 400, // Agility
-    19: 600  // Intelligence
+  skills: {
+    [SKILL_ID.STRENGTH]: { base: 6, pointsFromIp: 494, equipmentBonus: 0, total: 500 },
+    [SKILL_ID.AGILITY]: { base: 6, pointsFromIp: 394, equipmentBonus: 0, total: 400 },
+    [SKILL_ID.INTELLIGENCE]: { base: 6, pointsFromIp: 594, equipmentBonus: 0, total: 600 }
   }
-}
+})
 
 const mockFilters: IItemFilters = {
   item_class: [1, 2],
@@ -98,7 +96,7 @@ describe('ItemFilters', () => {
   let wrapper: any
 
   beforeEach(() => {
-    setActivePinia(createPinia())
+    
     vi.clearAllMocks()
     
     // Reset localStorage
@@ -114,6 +112,7 @@ describe('ItemFilters', () => {
   })
 
   afterEach(() => {
+    standardCleanup()
     if (wrapper) {
       wrapper.unmount()
     }
@@ -121,7 +120,7 @@ describe('ItemFilters', () => {
 
   describe('Component Mounting', () => {
     it('should mount without errors', () => {
-      wrapper = mount(ItemFilters, {
+      wrapper = mountWithContext(ItemFilters, {
         props: {
           filters: {},
           loading: false
@@ -132,7 +131,7 @@ describe('ItemFilters', () => {
     })
 
     it('should display accordion sections', () => {
-      wrapper = mount(ItemFilters, {
+      wrapper = mountWithContext(ItemFilters, {
         props: {
           filters: {},
           loading: false
@@ -144,7 +143,7 @@ describe('ItemFilters', () => {
     })
 
     it('should show profile-aware options when profile is provided', () => {
-      wrapper = mount(ItemFilters, {
+      wrapper = mountWithContext(ItemFilters, {
         props: {
           filters: {},
           loading: false,
@@ -159,7 +158,7 @@ describe('ItemFilters', () => {
 
   describe('Item Type Filters', () => {
     beforeEach(() => {
-      wrapper = mount(ItemFilters, {
+      wrapper = mountWithContext(ItemFilters, {
         props: {
           filters: {},
           loading: false
@@ -194,7 +193,7 @@ describe('ItemFilters', () => {
 
   describe('Quality Level Filters', () => {
     beforeEach(() => {
-      wrapper = mount(ItemFilters, {
+      wrapper = mountWithContext(ItemFilters, {
         props: {
           filters: mockFilters,
           loading: false
@@ -224,7 +223,7 @@ describe('ItemFilters', () => {
 
   describe('Stat Requirement Filters', () => {
     beforeEach(() => {
-      wrapper = mount(ItemFilters, {
+      wrapper = mountWithContext(ItemFilters, {
         props: {
           filters: {},
           loading: false,
@@ -247,7 +246,7 @@ describe('ItemFilters', () => {
     })
 
     it('should not show stat filters when no profile', () => {
-      wrapper = mount(ItemFilters, {
+      wrapper = mountWithContext(ItemFilters, {
         props: {
           filters: {},
           loading: false,
@@ -262,7 +261,7 @@ describe('ItemFilters', () => {
 
   describe('Filter Presets', () => {
     beforeEach(() => {
-      wrapper = mount(ItemFilters, {
+      wrapper = mountWithContext(ItemFilters, {
         props: {
           filters: {},
           loading: false
@@ -276,8 +275,9 @@ describe('ItemFilters', () => {
     })
 
     it('should emit preset selection', async () => {
-      const presetButton = wrapper.find('button:contains("Weapons")')
-      if (presetButton.exists()) {
+      const buttons = wrapper.findAll('button')
+      const presetButton = buttons.find(btn => btn.text().includes('Weapons'))
+      if (presetButton) {
         await presetButton.trigger('click')
         expect(wrapper.emitted('preset-apply')).toBeTruthy()
       }
@@ -288,9 +288,10 @@ describe('ItemFilters', () => {
       await wrapper.setProps({
         filters: { item_class: [1, 2], min_ql: 200 }
       })
-      
-      const saveButton = wrapper.find('button:contains("Save")')
-      if (saveButton.exists()) {
+
+      const buttons = wrapper.findAll('button')
+      const saveButton = buttons.find(btn => btn.text().includes('Save'))
+      if (saveButton) {
         await saveButton.trigger('click')
         // Should show save dialog or emit save event
       }
@@ -299,7 +300,7 @@ describe('ItemFilters', () => {
 
   describe('Clear and Reset', () => {
     beforeEach(() => {
-      wrapper = mount(ItemFilters, {
+      wrapper = mountWithContext(ItemFilters, {
         props: {
           filters: mockFilters,
           loading: false
@@ -308,9 +309,10 @@ describe('ItemFilters', () => {
     })
 
     it('should emit clear filters event', async () => {
-      const clearButton = wrapper.find('button:contains("Clear")')
-      
-      if (clearButton.exists()) {
+      const buttons = wrapper.findAll('button')
+      const clearButton = buttons.find(btn => btn.text().includes('Clear'))
+
+      if (clearButton) {
         await clearButton.trigger('click')
         expect(wrapper.emitted('filters-clear')).toBeTruthy()
       }
@@ -327,48 +329,64 @@ describe('ItemFilters', () => {
 
   describe('LocalStorage Integration', () => {
     it('should save filter presets to localStorage', async () => {
-      wrapper = mount(ItemFilters, {
+      wrapper = mountWithContext(ItemFilters, {
         props: {
-          filters: { item_class: [1], min_ql: 150 },
+          filters: { itemClasses: [1], minQL: 150 },
           loading: false
         }
       })
-      
-      // Simulate saving a preset
+
+      // Wait for component to mount
+      await nextTick()
+
+      // Simulate saving a preset using the exposed method
       const presetName = 'My Custom Preset'
-      await wrapper.vm.savePreset(presetName)
-      
-      expect(localStorage.setItem).toHaveBeenCalledWith(
-        'tinkerItems.filterPresets',
-        expect.stringContaining(presetName)
-      )
+      wrapper.vm.savePreset(presetName)
+
+      // Wait for save operation
+      await vi.waitFor(() => {
+        expect(localStorage.setItem).toHaveBeenCalledWith(
+          'tinkerItems.filterPresets',
+          expect.stringContaining(presetName)
+        )
+      })
     })
 
-    it('should load filter presets from localStorage', () => {
-      const mockPresets = {
-        'Custom Preset': { item_class: [1, 2], min_ql: 200 }
-      }
-      
+    it('should load filter presets from localStorage', async () => {
+      const mockPresets = [{
+        name: 'Custom Preset',
+        filters: { itemClasses: [1, 2], minQL: 200 }
+      }]
+
       const mockGetItem = vi.fn((key) => {
         if (key === 'tinkerItems.filterPresets') {
           return JSON.stringify(mockPresets)
         }
         return null
       })
-      
+
       Object.defineProperty(window, 'localStorage', {
-        value: { ...window.localStorage, getItem: mockGetItem },
+        value: {
+          ...window.localStorage,
+          getItem: mockGetItem,
+          setItem: vi.fn(),
+          removeItem: vi.fn(),
+          clear: vi.fn()
+        },
         writable: true
       })
-      
-      wrapper = mount(ItemFilters, {
+
+      wrapper = mountWithContext(ItemFilters, {
         props: {
           filters: {},
           loading: false
         }
       })
-      
-      expect(mockGetItem).toHaveBeenCalledWith('tinkerItems.filterPresets')
+
+      // Wait for mount lifecycle
+      await vi.waitFor(() => {
+        expect(mockGetItem).toHaveBeenCalledWith('tinkerItems.filterPresets')
+      })
     })
   })
 
@@ -381,7 +399,7 @@ describe('ItemFilters', () => {
         )
       }
       
-      wrapper = mount(ItemFilters, {
+      wrapper = mountWithContext(ItemFilters, {
         props: {
           filters: largeFilters,
           loading: false
@@ -392,7 +410,7 @@ describe('ItemFilters', () => {
     })
 
     it('should show loading state', () => {
-      wrapper = mount(ItemFilters, {
+      wrapper = mountWithContext(ItemFilters, {
         props: {
           filters: {},
           loading: true
@@ -409,7 +427,7 @@ describe('ItemFilters', () => {
 
   describe('Accessibility', () => {
     beforeEach(() => {
-      wrapper = mount(ItemFilters, {
+      wrapper = mountWithContext(ItemFilters, {
         props: {
           filters: {},
           loading: false
@@ -438,7 +456,7 @@ describe('ItemFilters', () => {
 
   describe('Error Handling', () => {
     it('should handle invalid filter values gracefully', async () => {
-      wrapper = mount(ItemFilters, {
+      wrapper = mountWithContext(ItemFilters, {
         props: {
           filters: { min_ql: 'invalid' as any },
           loading: false
@@ -450,18 +468,22 @@ describe('ItemFilters', () => {
     })
 
     it('should validate filter ranges', async () => {
-      wrapper = mount(ItemFilters, {
+      wrapper = mountWithContext(ItemFilters, {
         props: {
           filters: {},
           loading: false
         }
       })
-      
-      // Set min_ql higher than max_ql
-      await wrapper.vm.updateFilters({ min_ql: 300, max_ql: 200 })
-      
-      // Should emit corrected values or show validation error
-      expect(wrapper.emitted('filters-change')).toBeTruthy()
+
+      await nextTick()
+
+      // Set min_ql higher than max_ql using exposed method
+      wrapper.vm.updateFilters({ minQL: 300, maxQL: 200 })
+
+      // Wait for filter change to be emitted
+      await vi.waitFor(() => {
+        expect(wrapper.emitted('filter-change')).toBeTruthy()
+      })
     })
   })
 })

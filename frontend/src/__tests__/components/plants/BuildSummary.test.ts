@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION, BREED } from '@/__tests__/helpers';
 import BuildSummary from '@/components/plants/BuildSummary.vue';
 import type { CharacterBuild, CharacterStats, PlantSymbiant } from '@/types/plants';
 import { apiClient } from '@/services/api-client';
@@ -83,7 +83,7 @@ describe('BuildSummary', () => {
       intelligence: 425
     };
 
-    wrapper = mount(BuildSummary, {
+    wrapper = mountWithContext(BuildSummary, {
       props: {
         currentBuild: testBuild,
         statBonuses: mockStatBonuses,
@@ -93,6 +93,7 @@ describe('BuildSummary', () => {
   });
 
   afterEach(() => {
+    standardCleanup()
     wrapper?.unmount();
   });
 

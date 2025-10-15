@@ -21,6 +21,7 @@ import type { Item } from '@/types/api';
 import { skillService } from '@/services/skill-service';
 import type { SkillId } from '@/types/skills';
 import { getProfessionName } from '@/services/game-utils';
+import { useToast } from 'primevue/usetoast';
 
 // Types that may not be exported yet
 type NanoCompatibleProfile = any; // TODO: Add proper type when available
@@ -48,10 +49,13 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   // ============================================================================
   // State
   // ============================================================================
-  
+
   // Profile manager instance
   let profileManager: TinkerProfilesManager;
-  
+
+  // Toast service for user notifications
+  const toast = useToast();
+
   // Reactive state
   const profiles = ref<Map<string, TinkerProfile>>(new Map());
   const profileMetadata = ref<ProfileMetadata[]>([]);
@@ -81,7 +85,12 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   const activeProfileProfession = computed(() => getProfessionName(activeProfile.value?.Character.Profession || 0));
 
   const activeProfileLevel = computed(() => activeProfile.value?.Character.Level || 0);
-  
+
+  /**
+   * Get the ID of the currently active profile
+   */
+  const computedActiveProfileId = computed(() => activeProfileId.value);
+
   // ============================================================================
   // Initialization
   // ============================================================================
@@ -765,16 +774,20 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     const plainProfile = toRaw(activeProfile.value);
     const plainItem = toRaw(item);
 
-    // Update the equipment slot - this will trigger watchers for stat recalculation
+    // Update the equipment slot - create deep copy to avoid mutating original
     const updatedProfile = { ...plainProfile };
-    updatedProfile[category][slot] = plainItem;
+    // Deep copy the equipment category to ensure we don't mutate shared objects
+    updatedProfile[category] = { ...plainProfile[category], [slot]: plainItem };
 
     // Update the profile (triggers save and recalculation)
     await updateProfile(activeProfile.value.id, updatedProfile);
 
-    // Update local state
-    activeProfile.value = updatedProfile;
-    profiles.value.set(activeProfile.value.id, updatedProfile);
+    // Reload the profile to get the recalculated version from storage
+    const reloadedProfile = await loadProfile(activeProfile.value.id);
+    if (reloadedProfile) {
+      activeProfile.value = reloadedProfile;
+      profiles.value.set(activeProfile.value.id, reloadedProfile);
+    }
   }
 
   /**
@@ -788,16 +801,20 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     // Convert reactive proxy to plain object to avoid serialization issues
     const plainProfile = toRaw(activeProfile.value);
 
-    // Update the equipment slot to null
+    // Update the equipment slot to null - create deep copy to avoid mutating original
     const updatedProfile = { ...plainProfile };
-    updatedProfile[category][slot] = null;
+    // Deep copy the equipment category to ensure we don't mutate shared objects
+    updatedProfile[category] = { ...plainProfile[category], [slot]: null };
 
     // Update the profile (triggers save and recalculation)
     await updateProfile(activeProfile.value.id, updatedProfile);
 
-    // Update local state
-    activeProfile.value = updatedProfile;
-    profiles.value.set(activeProfile.value.id, updatedProfile);
+    // Reload the profile to get the recalculated version from storage
+    const reloadedProfile = await loadProfile(activeProfile.value.id);
+    if (reloadedProfile) {
+      activeProfile.value = reloadedProfile;
+      profiles.value.set(activeProfile.value.id, reloadedProfile);
+    }
   }
 
   /**
@@ -972,10 +989,13 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     }
 
     // Use requestAnimationFrame for UI batching, then setTimeout for debouncing
+    // Disable debounce in test environment for faster, more reliable tests
+    const DEBOUNCE_MS = import.meta.env.VITEST ? 0 : 100;
+
     requestAnimationFrame(() => {
       equipmentDebounceTimer = setTimeout(async () => {
         await executeEquipmentUpdate();
-      }, 100); // 100ms debounce as specified in requirements
+      }, DEBOUNCE_MS); // 100ms debounce in production, 0ms in tests
     });
   }
 
@@ -1257,7 +1277,14 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     const ncuCost = ncuStat?.value || 0;
 
     if (ncuCost > availableNCU.value) {
-      throw new Error(`Requires ${ncuCost} NCU, but only ${availableNCU.value} available`);
+      const errorMsg = `Requires ${ncuCost} NCU, but only ${availableNCU.value} available`;
+      toast.add({
+        severity: 'error',
+        summary: 'Insufficient NCU',
+        detail: errorMsg,
+        life: 3000
+      });
+      return;
     }
 
     // Check for NanoStrain conflicts
@@ -1278,7 +1305,13 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
           activeProfile.value.buffs = activeProfile.value.buffs.filter(buff => buff.id !== conflictBuff.id);
         } else {
           // New buff has lower priority, cannot cast
-          throw new Error(`${conflictBuff.name} has higher stacking priority`);
+          toast.add({
+            severity: 'error',
+            summary: 'Buff Conflict',
+            detail: `${conflictBuff.name} has higher stacking priority`,
+            life: 3000
+          });
+          return;
         }
       }
     }
@@ -1303,6 +1336,14 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       // Update local state
       activeProfile.value = updatedProfile;
       profiles.value.set(activeProfile.value.id, updatedProfile);
+
+      // Show success toast
+      toast.add({
+        severity: 'success',
+        summary: 'Buff Cast',
+        detail: `Successfully cast ${item.name}`,
+        life: 3000
+      });
     } finally {
       isUpdatingFromBuffs = false;
     }
@@ -1338,6 +1379,14 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       // Update local state
       activeProfile.value = updatedProfile;
       profiles.value.set(activeProfile.value.id, updatedProfile);
+
+      // Show success toast
+      toast.add({
+        severity: 'success',
+        summary: 'Buff Removed',
+        detail: `Removed ${buffToRemove.name}`,
+        life: 3000
+      });
     } finally {
       isUpdatingFromBuffs = false;
     }
@@ -1350,6 +1399,8 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     if (!activeProfile.value || !activeProfile.value.buffs || activeProfile.value.buffs.length === 0) {
       return;
     }
+
+    const buffCount = activeProfile.value.buffs.length;
 
     // Clear all buffs
     activeProfile.value.buffs = [];
@@ -1368,6 +1419,14 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       // Update local state
       activeProfile.value = updatedProfile;
       profiles.value.set(activeProfile.value.id, updatedProfile);
+
+      // Show success toast
+      toast.add({
+        severity: 'success',
+        summary: 'All Buffs Removed',
+        detail: `Removed ${buffCount} ${buffCount === 1 ? 'buff' : 'buffs'}`,
+        life: 3000
+      });
     } finally {
       isUpdatingFromBuffs = false;
     }
@@ -1383,16 +1442,16 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   // ============================================================================
   // Return Store Interface
   // ============================================================================
-  
+
   return {
     // State (readonly)
     profiles: readonly(profiles),
     profileMetadata: readonly(profileMetadata),
-    activeProfileId: readonly(activeProfileId),
+    activeProfileId: computedActiveProfileId,
     activeProfile: readonly(activeProfile),
     loading: readonly(loading),
     error: readonly(error),
-    
+
     // Computed properties
     hasProfiles,
     hasActiveProfile,

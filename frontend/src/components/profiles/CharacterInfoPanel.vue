@@ -7,7 +7,13 @@ Shows character stats, health, nano, and other core information
     <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4">
       Character Information
     </h3>
-    
+
+    <!-- Character Name -->
+    <div class="mb-4 p-3 bg-surface-50 dark:bg-surface-800 rounded-lg">
+      <div class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Name</div>
+      <div class="text-lg font-bold text-surface-900 dark:text-surface-50">{{ profile.Character?.Name || 'Unknown' }}</div>
+    </div>
+
     <!-- Basic Info Grid -->
     <div class="grid grid-cols-1 gap-4 mb-6">
       <!-- Level & Title Level -->
@@ -182,7 +188,7 @@ const titleLevelDescription = computed(() => {
 
 const formattedHealth = computed(() => {
   const health = props.profile.Character?.MaxHealth;
-  if (!health || health === undefined) return '0';
+  if (health === null || health === undefined) return '0';
   if (health >= 1000000) {
     return `${(health / 1000000).toFixed(1)}M`;
   } else if (health >= 1000) {
@@ -193,7 +199,7 @@ const formattedHealth = computed(() => {
 
 const formattedNano = computed(() => {
   const nano = props.profile.Character?.MaxNano;
-  if (!nano || nano === undefined) return '0';
+  if (nano === null || nano === undefined) return '0';
   if (nano >= 1000000) {
     return `${(nano / 1000000).toFixed(1)}M`;
   } else if (nano >= 1000) {

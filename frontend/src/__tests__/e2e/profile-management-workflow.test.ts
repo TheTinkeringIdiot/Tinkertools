@@ -1,16 +1,21 @@
 /**
  * E2E Tests for Profile Management Workflow
- * 
+ *
  * Tests critical user workflows for creating, managing, and using profiles
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
-import { nextTick } from 'vue'
-import { createRouter, createWebHistory } from 'vue-router'
+import {
+  mountWithContext,
+  flushPromises,
+  wait,
+  standardCleanup,
+  createTestProfile,
+  PROFESSION,
+  BREED,
+  SKILL_ID
+} from '@/__tests__/helpers'
 import TinkerItems from '../../views/TinkerItems.vue'
-import type { TinkerProfile } from '../../types/api'
 
 // Mock localStorage for profile persistence
 const mockLocalStorage = (() => {
@@ -35,77 +40,50 @@ Object.defineProperty(window, 'localStorage', {
   writable: true
 })
 
-const mockProfiles: TinkerProfile[] = [
-  {
+const mockProfiles = [
+  createTestProfile({
     id: 'engineer-200',
     name: 'Engineer Main',
-    level: 200,
-    profession: 'Engineer',
-    stats: {
-      16: 400, // Strength
-      17: 350, // Agility  
-      18: 500, // Stamina
-      19: 600, // Intelligence
-      20: 300, // Sense
-      21: 250  // Psychic
+    Character: {
+      Level: 200,
+      Profession: PROFESSION.ENGINEER
     }
-  },
-  {
+  }),
+  createTestProfile({
     id: 'soldier-180',
     name: 'Soldier Alt',
-    level: 180,
-    profession: 'Soldier',
-    stats: {
-      16: 500, // Strength
-      17: 400, // Agility
-      18: 550, // Stamina
-      19: 200, // Intelligence
-      20: 350, // Sense
-      21: 150  // Psychic
+    Character: {
+      Level: 180,
+      Profession: PROFESSION.SOLDIER
     }
-  }
+  })
 ]
 
 describe('Profile Management Workflow E2E', () => {
   let wrapper: any
-  let router: any
-  let pinia: any
 
   beforeEach(async () => {
-    pinia = createPinia()
-    setActivePinia(pinia)
-
-    router = createRouter({
-      history: createWebHistory(),
-      routes: [
-        { path: '/', component: { template: '<div>Home</div>' } },
-        { path: '/items', component: TinkerItems }
-      ]
-    })
-
-    await router.push('/items')
-
     // Reset localStorage
     mockLocalStorage.clear()
     vi.clearAllMocks()
 
-    wrapper = mount(TinkerItems, {
+    wrapper = mountWithContext(TinkerItems, {
       global: {
-        plugins: [pinia, router],
-        mocks: {
-          $route: router.currentRoute.value,
-          $router: router
+        stubs: {
+          'router-link': true,
+          'router-view': true
         }
       }
     })
 
-    await nextTick()
+    await flushPromises()
   })
 
   afterEach(() => {
     if (wrapper) {
       wrapper.unmount()
     }
+    standardCleanup()
   })
 
   describe('Profile Selection and Switching', () => {
@@ -120,7 +98,7 @@ describe('Profile Management Workflow E2E', () => {
       if (profileDropdown.exists()) {
         // Select first profile
         await profileDropdown.setValue('engineer-200')
-        await nextTick()
+        await flushPromises()
 
         expect(profileDropdown.element.value).toBe('engineer-200')
       }
@@ -131,18 +109,18 @@ describe('Profile Management Workflow E2E', () => {
       const profileDropdown = wrapper.find('select')
       if (profileDropdown.exists()) {
         await profileDropdown.setValue('engineer-200')
-        await nextTick()
+        await flushPromises()
 
         // Enable compatibility
         const compatibilityToggle = wrapper.find('input[type="checkbox"]')
         if (compatibilityToggle.exists()) {
           await compatibilityToggle.setChecked(true)
-          await nextTick()
+          await flushPromises()
         }
 
         // Switch to different profile
         await profileDropdown.setValue('soldier-180')
-        await nextTick()
+        await flushPromises()
 
         // Compatibility should update based on new profile stats
         expect(wrapper.vm.selectedProfile).toBe('soldier-180') || expect(wrapper.exists()).toBe(true)
@@ -154,7 +132,7 @@ describe('Profile Management Workflow E2E', () => {
       const profileDropdown = wrapper.find('select')
       if (profileDropdown.exists()) {
         await profileDropdown.setValue('engineer-200')
-        await nextTick()
+        await flushPromises()
 
         // Should save to localStorage
         expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
@@ -168,10 +146,11 @@ describe('Profile Management Workflow E2E', () => {
   describe('Profile Creation Workflow', () => {
     it('should allow user to create a new profile', async () => {
       // Find create profile button
-      const createButton = wrapper.find('button:contains("Create")')
-      if (createButton.exists()) {
+      const buttons = wrapper.findAll('button')
+      const createButton = buttons.find(btn => btn.text().includes('Create'))
+      if (createButton) {
         await createButton.trigger('click')
-        await nextTick()
+        await flushPromises()
 
         // Should open profile creation dialog
         const dialog = wrapper.find('.profile-dialog')
@@ -190,28 +169,25 @@ describe('Profile Management Workflow E2E', () => {
 
       // Attempt to create profile with invalid data
       wrapper.vm.createProfile(newProfile)
-      await nextTick()
+      await flushPromises()
 
       // Should show validation errors
       expect(wrapper.text()).toContain('Name is required') || expect(wrapper.exists()).toBe(true)
     })
 
     it('should save new profile to localStorage', async () => {
-      const newProfile: TinkerProfile = {
+      const newProfile = createTestProfile({
         id: 'doctor-150',
         name: 'Doctor Build',
-        level: 150,
-        profession: 'Doctor',
-        stats: {
-          19: 500, // Intelligence
-          20: 400, // Sense
-          21: 300  // Psychic
+        Character: {
+          Level: 150,
+          Profession: PROFESSION.DOCTOR
         }
-      }
+      })
 
       // Create profile
       wrapper.vm.saveProfile(newProfile)
-      await nextTick()
+      await flushPromises()
 
       // Should save to localStorage
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
@@ -231,13 +207,14 @@ describe('Profile Management Workflow E2E', () => {
       const profileDropdown = wrapper.find('select')
       if (profileDropdown.exists()) {
         await profileDropdown.setValue('engineer-200')
-        await nextTick()
+        await flushPromises()
 
         // Find edit button
-        const editButton = wrapper.find('button:contains("Edit")')
-        if (editButton.exists()) {
+        const buttons = wrapper.findAll('button')
+        const editButton = buttons.find(btn => btn.text().includes('Edit'))
+        if (editButton) {
           await editButton.trigger('click')
-          await nextTick()
+          await flushPromises()
 
           // Should open edit dialog with current profile data
           const dialog = wrapper.find('.profile-dialog')
@@ -249,15 +226,18 @@ describe('Profile Management Workflow E2E', () => {
     it('should update profile stats and save changes', async () => {
       const updatedProfile = {
         ...mockProfiles[0],
-        stats: {
-          ...mockProfiles[0].stats,
-          16: 450 // Updated strength
+        skills: {
+          ...mockProfiles[0].skills,
+          [SKILL_ID.STRENGTH]: {
+            ...mockProfiles[0].skills[SKILL_ID.STRENGTH],
+            total: 450
+          }
         }
       }
 
       // Update profile
       wrapper.vm.updateProfile(updatedProfile)
-      await nextTick()
+      await flushPromises()
 
       // Should save changes to localStorage
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
@@ -269,8 +249,12 @@ describe('Profile Management Workflow E2E', () => {
     it('should validate stat changes are realistic', async () => {
       const invalidProfile = {
         ...mockProfiles[0],
-        stats: {
-          16: 9999 // Unrealistic strength value
+        skills: {
+          ...mockProfiles[0].skills,
+          [SKILL_ID.STRENGTH]: {
+            ...mockProfiles[0].skills[SKILL_ID.STRENGTH],
+            total: 9999 // Unrealistic strength value
+          }
         }
       }
 
@@ -292,13 +276,14 @@ describe('Profile Management Workflow E2E', () => {
       const profileDropdown = wrapper.find('select')
       if (profileDropdown.exists()) {
         await profileDropdown.setValue('soldier-180')
-        await nextTick()
+        await flushPromises()
 
         // Find delete button
-        const deleteButton = wrapper.find('button:contains("Delete")')
-        if (deleteButton.exists()) {
+        const buttons = wrapper.findAll('button')
+        const deleteButton = buttons.find(btn => btn.text().includes('Delete'))
+        if (deleteButton) {
           await deleteButton.trigger('click')
-          await nextTick()
+          await flushPromises()
 
           // Should show confirmation dialog
           const confirmDialog = wrapper.find('.confirm-dialog')
@@ -312,7 +297,7 @@ describe('Profile Management Workflow E2E', () => {
       window.confirm = vi.fn(() => false) // User cancels
 
       wrapper.vm.deleteProfile('soldier-180')
-      await nextTick()
+      await flushPromises()
 
       // Profile should not be deleted
       expect(window.confirm).toHaveBeenCalled()
@@ -324,7 +309,7 @@ describe('Profile Management Workflow E2E', () => {
       window.confirm = vi.fn(() => true) // User confirms
 
       wrapper.vm.deleteProfile('soldier-180')
-      await nextTick()
+      await flushPromises()
 
       // Should update localStorage without deleted profile
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
@@ -339,10 +324,11 @@ describe('Profile Management Workflow E2E', () => {
       mockLocalStorage.setItem('tinkertools_profiles', JSON.stringify(mockProfiles))
 
       // Find export button
-      const exportButton = wrapper.find('button:contains("Export")')
-      if (exportButton.exists()) {
+      const buttons = wrapper.findAll('button')
+      const exportButton = buttons.find(btn => btn.text().includes('Export'))
+      if (exportButton) {
         await exportButton.trigger('click')
-        await nextTick()
+        await flushPromises()
 
         // Should trigger download or show export data
         expect(wrapper.vm.exportProfiles).toBeDefined() || expect(wrapper.exists()).toBe(true)
@@ -369,7 +355,7 @@ describe('Profile Management Workflow E2E', () => {
         })
 
         await fileInput.trigger('change')
-        await nextTick()
+        await flushPromises()
 
         // Should process and save imported profiles
         expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
@@ -402,21 +388,21 @@ describe('Profile Management Workflow E2E', () => {
       const testItem = {
         id: 1,
         name: 'High-Int Item',
-        requirements: [{ stat: 19, value: 500 }] // Intelligence 500
+        requirements: [{ stat: SKILL_ID.INTELLIGENCE, value: 500 }] // Intelligence 500
       }
 
       // Test with Engineer (has high Int)
       const profileDropdown = wrapper.find('select')
       if (profileDropdown.exists()) {
         await profileDropdown.setValue('engineer-200')
-        await nextTick()
+        await flushPromises()
 
         const engineerCompatible = wrapper.vm.canUseItem(testItem, mockProfiles[0])
         expect(engineerCompatible).toBe(true)
 
         // Test with Soldier (has low Int)
         await profileDropdown.setValue('soldier-180')
-        await nextTick()
+        await flushPromises()
 
         const soldierCompatible = wrapper.vm.canUseItem(testItem, mockProfiles[1])
         expect(soldierCompatible).toBe(false)
@@ -428,13 +414,13 @@ describe('Profile Management Workflow E2E', () => {
       const compatibilityToggle = wrapper.find('input[type="checkbox"]')
       if (compatibilityToggle.exists()) {
         await compatibilityToggle.setChecked(true)
-        await nextTick()
+        await flushPromises()
 
         // Change profile
         const profileDropdown = wrapper.find('select')
         if (profileDropdown.exists()) {
           await profileDropdown.setValue('engineer-200')
-          await nextTick()
+          await flushPromises()
 
           // Should trigger re-filtering of items
           expect(wrapper.emitted('profile-change')).toBeTruthy() || expect(wrapper.exists()).toBe(true)
@@ -448,14 +434,14 @@ describe('Profile Management Workflow E2E', () => {
       if (searchInput.exists()) {
         await searchInput.setValue('armor')
         await searchInput.trigger('keydown.enter')
-        await nextTick()
+        await flushPromises()
       }
 
       // Toggle compatibility
       const compatibilityToggle = wrapper.find('input[type="checkbox"]')
       if (compatibilityToggle.exists()) {
         await compatibilityToggle.setChecked(true)
-        await nextTick()
+        await flushPromises()
 
         // Search term should be preserved
         expect(searchInput.element.value).toBe('armor')
@@ -474,7 +460,7 @@ describe('Profile Management Workflow E2E', () => {
 
       // Attempt to save profile
       wrapper.vm.saveProfile(newProfile)
-      await nextTick()
+      await flushPromises()
 
       // Should handle error gracefully
       expect(wrapper.text()).toContain('Storage limit exceeded') || expect(wrapper.exists()).toBe(true)
@@ -486,7 +472,7 @@ describe('Profile Management Workflow E2E', () => {
 
       // Load profiles
       wrapper.vm.loadProfiles()
-      await nextTick()
+      await flushPromises()
 
       // Should handle gracefully and reset to empty state
       expect(wrapper.vm.profiles).toEqual([]) || expect(wrapper.exists()).toBe(true)
@@ -501,10 +487,11 @@ describe('Profile Management Workflow E2E', () => {
 
     it('should allow comparing stats between profiles', async () => {
       // Select comparison mode
-      const compareButton = wrapper.find('button:contains("Compare")')
-      if (compareButton.exists()) {
+      const buttons = wrapper.findAll('button')
+      const compareButton = buttons.find(btn => btn.text().includes('Compare'))
+      if (compareButton) {
         await compareButton.trigger('click')
-        await nextTick()
+        await flushPromises()
 
         // Should show profile comparison view
         const comparisonView = wrapper.find('.profile-comparison')
@@ -518,16 +505,16 @@ describe('Profile Management Workflow E2E', () => {
       // Should identify stat differences
       expect(comparison.differences.length).toBeGreaterThan(0)
       expect(comparison.differences).toContainEqual({
-        stat: 19, // Intelligence
-        profile1: 600,
-        profile2: 200,
-        difference: 400
+        stat: SKILL_ID.INTELLIGENCE, // Intelligence
+        profile1: mockProfiles[0].skills[SKILL_ID.INTELLIGENCE].total,
+        profile2: mockProfiles[1].skills[SKILL_ID.INTELLIGENCE].total,
+        difference: Math.abs(mockProfiles[0].skills[SKILL_ID.INTELLIGENCE].total - mockProfiles[1].skills[SKILL_ID.INTELLIGENCE].total)
       })
     })
 
     it('should show item compatibility differences between profiles', async () => {
       const testItem = {
-        requirements: [{ stat: 19, value: 400 }] // Intelligence requirement
+        requirements: [{ stat: SKILL_ID.INTELLIGENCE, value: 400 }] // Intelligence requirement
       }
 
       // Compare compatibility

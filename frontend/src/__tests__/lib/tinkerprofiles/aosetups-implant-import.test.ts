@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ProfileTransformer } from '@/lib/tinkerprofiles/transformer';
 import { skillService } from '@/services/skill-service';
+import { PROFESSION, BREED } from '@/__tests__/helpers';
 
 // Mock the API client
 vi.mock('@/services/api-client', () => ({
@@ -82,13 +83,12 @@ describe('AOSetups Implant Import Integration', () => {
         // Check character data
         expect(result.profile.Character.Name).toBe('TestCharacter');
         expect(result.profile.Character.Level).toBe(200);
-        expect(result.profile.Character.Profession).toBe('Agent');
-        expect(result.profile.Character.Breed).toBe('Solitus');
+        expect(result.profile.Character.Profession).toBe(PROFESSION.AGENT); // Numeric ID
+        expect(result.profile.Character.Breed).toBe(BREED.SOLITUS); // Numeric ID
 
-        // Check eye implant with clusters
-        const eyeImplant = result.profile.Implants.Eye;
+        // Check eye implant with clusters (stored with bitflag key '2')
+        const eyeImplant = result.profile.Implants['2'];
         expect(eyeImplant).toBeDefined();
-        expect(eyeImplant?.slot).toBe(1); // Eye slot position
         expect(eyeImplant?.type).toBe('implant');
         expect(eyeImplant?.ql).toBe(100);
         
@@ -107,10 +107,9 @@ describe('AOSetups Implant Import Integration', () => {
           skillName: 'Intelligence'
         });
 
-        // Check head implant with partial clusters
-        const headImplant = result.profile.Implants.Head;
+        // Check head implant with partial clusters (stored with bitflag key '4')
+        const headImplant = result.profile.Implants['4'];
         expect(headImplant).toBeDefined();
-        expect(headImplant?.slot).toBe(2); // Head slot position
         expect(headImplant?.type).toBe('implant');
         expect(headImplant?.ql).toBe(150);
         
@@ -124,10 +123,9 @@ describe('AOSetups Implant Import Integration', () => {
         });
         expect(headImplant?.clusters?.Faded).toBeUndefined(); // Not provided
 
-        // Check symbiant (no clusters but has item data)
-        const chestImplant = result.profile.Implants.Chest;
+        // Check symbiant (no clusters but has item data) (stored with bitflag key '32')
+        const chestImplant = result.profile.Implants['32'];
         expect(chestImplant).toBeDefined();
-        expect(chestImplant?.slot).toBe(5); // Chest slot position
         expect(chestImplant?.type).toBe('symbiant');
         expect(chestImplant?.aoid).toBe(123456);
         expect(chestImplant?.clusters).toBeUndefined(); // Symbiants don't have cluster data
@@ -169,9 +167,9 @@ describe('AOSetups Implant Import Integration', () => {
       expect(result.profile).toBeDefined();
 
       if (result.profile) {
-        const eyeImplant = result.profile.Implants.Eye;
+        const eyeImplant = result.profile.Implants['2'];
         expect(eyeImplant).toBeDefined();
-        
+
         // Should only have the valid cluster
         expect(eyeImplant?.clusters?.Bright).toEqual({
           stat: 112,
@@ -225,9 +223,9 @@ describe('AOSetups Implant Import Integration', () => {
       if (result.profile) {
         // Invalid slot should be skipped
         expect(Object.values(result.profile.Implants).filter(Boolean).length).toBe(1);
-        
-        // Valid slot should be processed
-        const eyeImplant = result.profile.Implants.Eye;
+
+        // Valid slot should be processed (bitflag key '2' for eye)
+        const eyeImplant = result.profile.Implants['2'];
         expect(eyeImplant).toBeDefined();
         expect(eyeImplant?.clusters?.Bright).toBeDefined();
       }
@@ -274,19 +272,19 @@ describe('AOSetups Implant Import Integration', () => {
       if (result.profile) {
         // Character data should be preserved
         expect(result.profile.Character.Name).toBe('TestCharacter');
-        expect(result.profile.Character.Profession).toBe('Doctor');
-        expect(result.profile.Character.Breed).toBe('Atrox');
-        
+        expect(result.profile.Character.Profession).toBe(PROFESSION.DOCTOR); // Numeric ID
+        expect(result.profile.Character.Breed).toBe(BREED.ATROX); // Numeric ID
+
         // v4.0.0 skills structure should be used
         expect(result.profile.skills).toBeDefined();
         expect((result.profile as any).Skills).toBeUndefined();
         expect(result.profile.version).toBe('4.0.0');
-        
-        // Implant should be enhanced with cluster data
-        const eyeImplant = result.profile.Implants.Eye;
+
+        // Implant should be enhanced with cluster data (bitflag key '2' for eye)
+        const eyeImplant = result.profile.Implants['2'];
         expect(eyeImplant).toBeDefined();
         expect(eyeImplant?.clusters?.Shiny).toBeDefined();
-        
+
         // Other equipment slots should still exist (even if empty)
         expect(result.profile.Weapons).toBeDefined();
         expect(result.profile.Clothing).toBeDefined();

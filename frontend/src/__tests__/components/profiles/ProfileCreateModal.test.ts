@@ -4,10 +4,10 @@
  * Tests for the modal dialog used to create new character profiles
  */
 
-// @ts-nocheck
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { mountWithContext, standardCleanup, BREED, PROFESSION, SKILL_ID } from '@/__tests__/helpers'
+
 import { nextTick } from 'vue'
 import ProfileCreateModal from '../../../components/profiles/ProfileCreateModal.vue'
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
@@ -72,8 +72,15 @@ describe('ProfileCreateModal', () => {
   let store: any
 
   beforeEach(() => {
-    setActivePinia(createPinia())
+    // Clear localStorage before each test to prevent breed/profession string errors
+    localStorage.clear()
+
     store = useTinkerProfilesStore()
+
+    // Mock initialization methods to prevent loading invalid data from localStorage
+    store.loadProfiles = vi.fn().mockResolvedValue(undefined)
+    store.refreshMetadata = vi.fn().mockResolvedValue(undefined)
+
     vi.clearAllMocks()
 
     // Mock store methods
@@ -82,6 +89,7 @@ describe('ProfileCreateModal', () => {
   })
 
   afterEach(() => {
+    standardCleanup()
     if (wrapper) {
       wrapper.unmount()
     }
@@ -89,7 +97,7 @@ describe('ProfileCreateModal', () => {
 
   describe('Component Rendering', () => {
     it('should mount without errors', () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -99,7 +107,7 @@ describe('ProfileCreateModal', () => {
     })
 
     it('should show dialog when visible is true', () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -110,7 +118,7 @@ describe('ProfileCreateModal', () => {
     })
 
     it('should hide dialog when visible is false', () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: false
         }
@@ -121,7 +129,7 @@ describe('ProfileCreateModal', () => {
     })
 
     it('should display form fields', () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -137,7 +145,7 @@ describe('ProfileCreateModal', () => {
 
   describe('Form Validation', () => {
     it('should require character name', async () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -151,7 +159,7 @@ describe('ProfileCreateModal', () => {
     })
 
     it('should validate character name format', async () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -169,7 +177,7 @@ describe('ProfileCreateModal', () => {
     })
 
     it('should accept valid character name', async () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -187,7 +195,7 @@ describe('ProfileCreateModal', () => {
     })
 
     it('should validate character name length', async () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -206,7 +214,7 @@ describe('ProfileCreateModal', () => {
     })
 
     it('should disable submit button when form is invalid', async () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -219,7 +227,7 @@ describe('ProfileCreateModal', () => {
     })
 
     it('should enable submit button when form is valid', async () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -236,7 +244,7 @@ describe('ProfileCreateModal', () => {
 
   describe('Form Submission', () => {
     it('should call createProfile on valid submission', async () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -254,7 +262,7 @@ describe('ProfileCreateModal', () => {
     })
 
     it('should create profile with correct data', async () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -284,7 +292,7 @@ describe('ProfileCreateModal', () => {
     })
 
     it('should set as active profile when checkbox is checked', async () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -305,7 +313,7 @@ describe('ProfileCreateModal', () => {
     })
 
     it('should not set as active when checkbox is unchecked', async () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -328,7 +336,7 @@ describe('ProfileCreateModal', () => {
     })
 
     it('should emit created event on successful creation', async () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -340,14 +348,17 @@ describe('ProfileCreateModal', () => {
 
       const form = wrapper.find('form')
       await form.trigger('submit.prevent')
-      await nextTick()
 
-      expect(wrapper.emitted('created')).toBeTruthy()
+      // Wait for async profile creation to complete
+      await vi.waitFor(() => {
+        expect(wrapper.emitted('created')).toBeTruthy()
+      })
+
       expect(wrapper.emitted('created')[0]).toEqual(['new_profile_id'])
     })
 
     it('should emit update:visible false on successful creation', async () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -359,18 +370,24 @@ describe('ProfileCreateModal', () => {
 
       const form = wrapper.find('form')
       await form.trigger('submit.prevent')
-      await nextTick()
 
-      expect(wrapper.emitted('update:visible')).toBeTruthy()
+      // Wait for async profile creation to complete
+      await vi.waitFor(() => {
+        expect(wrapper.emitted('update:visible')).toBeTruthy()
+      })
+
       expect(wrapper.emitted('update:visible')[0]).toEqual([false])
     })
 
     it('should show loading state during creation', async () => {
+      let resolveCreate: (value: string) => void
       store.createProfile = vi.fn().mockImplementation(() =>
-        new Promise(resolve => setTimeout(() => resolve('new_id'), 100))
+        new Promise(resolve => {
+          resolveCreate = resolve
+        })
       )
 
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -381,18 +398,20 @@ describe('ProfileCreateModal', () => {
       await nextTick()
 
       const form = wrapper.find('form')
-      form.trigger('submit.prevent')
-      await nextTick()
+      await form.trigger('submit.prevent')
 
-      const submitButton = wrapper.find('button[type="submit"]')
-      expect(submitButton.props('loading')).toBe(true)
+      // Wait for loading state to be set
+      await vi.waitFor(() => {
+        const submitButton = wrapper.find('button[type="submit"]')
+        expect(submitButton.props('loading')).toBe(true)
+      })
     })
 
     it('should handle creation errors gracefully', async () => {
       store.createProfile = vi.fn().mockRejectedValue(new Error('Failed to create'))
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -414,7 +433,7 @@ describe('ProfileCreateModal', () => {
 
   describe('Form Fields', () => {
     it('should have all profession options', () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -429,7 +448,7 @@ describe('ProfileCreateModal', () => {
     })
 
     it('should have all breed options', () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -444,7 +463,7 @@ describe('ProfileCreateModal', () => {
     })
 
     it('should have all faction options', () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -460,7 +479,7 @@ describe('ProfileCreateModal', () => {
     })
 
     it('should have level input with proper constraints', () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -472,7 +491,7 @@ describe('ProfileCreateModal', () => {
     })
 
     it('should have default values for form fields', () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -490,7 +509,7 @@ describe('ProfileCreateModal', () => {
 
   describe('Cancel Action', () => {
     it('should emit update:visible false when cancel is clicked', async () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -505,7 +524,7 @@ describe('ProfileCreateModal', () => {
     })
 
     it('should reset form when cancel is clicked', async () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -525,7 +544,7 @@ describe('ProfileCreateModal', () => {
 
   describe('Form Reset', () => {
     it('should reset form after successful creation', async () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -544,7 +563,7 @@ describe('ProfileCreateModal', () => {
     })
 
     it('should clear validation errors on form reset', async () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -570,7 +589,7 @@ describe('ProfileCreateModal', () => {
 
   describe('Accessibility', () => {
     it('should have proper labels for form fields', () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -584,7 +603,7 @@ describe('ProfileCreateModal', () => {
     })
 
     it('should have autofocus on character name input', () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }
@@ -595,7 +614,7 @@ describe('ProfileCreateModal', () => {
     })
 
     it('should mark required fields', () => {
-      wrapper = mount(ProfileCreateModal, {
+      wrapper = mountWithContext(ProfileCreateModal, {
         props: {
           visible: true
         }

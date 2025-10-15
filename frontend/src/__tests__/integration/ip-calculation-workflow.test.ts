@@ -1,11 +1,16 @@
 /**
  * IP Calculation Workflow Integration Tests
- * 
+ *
  * End-to-end tests that verify the complete workflow from profile creation
  * to IP calculations, skill caps, and UI display.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+  standardCleanup,
+  BREED,
+  SKILL_ID
+} from '@/__tests__/helpers';
 import { createDefaultProfile } from '@/lib/tinkerprofiles/constants';
 import {
   updateProfileSkillInfo,
@@ -27,7 +32,11 @@ describe('IP Calculation Workflow Integration', () => {
   beforeEach(() => {
     profile = createDefaultProfile('Test Character', 'Solitus');
     profile.Character.Level = 50;
-    profile.Character.Profession = 'Adventurer';
+    profile.Character.Profession = 6; // Adventurer
+  });
+
+  afterEach(() => {
+    standardCleanup();
   });
 
   describe('Profile Creation v4.0.0', () => {
@@ -325,7 +334,7 @@ describe('IP Calculation Workflow Integration', () => {
 
     it('should handle high-level character with optimized abilities', () => {
       profile.Character.Level = 150;
-      profile.Character.Profession = 'Doctor';
+      profile.Character.Profession = 10; // Doctor
       
       // Optimized for nano casting
       setAllAbilities(profile, 20); // Base level

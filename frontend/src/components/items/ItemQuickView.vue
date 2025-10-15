@@ -146,7 +146,8 @@ const keyStats = computed(() => {
 // Methods
 function canMeetRequirement(requirement: ItemRequirement): boolean {
   if (!props.profile) return false
-  const characterStat = props.profile.stats?.[requirement.stat] || 0
+  const skillData = props.profile.skills?.[requirement.stat]
+  const characterStat = skillData?.total || 0
   return characterStat >= requirement.value
 }
 

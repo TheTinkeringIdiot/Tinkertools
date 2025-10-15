@@ -198,8 +198,9 @@ export function interpolateSpellText(format: string, params: Record<string, any>
         // For NanoID/ItemID, we'll return a placeholder that will be replaced with a link in the component
         return `[LINK:${value}]`
       } else if (paramName.toLowerCase().includes('chance')) {
-        // For Chance, return the value without adding % (template already includes it)
-        return value
+        // For Chance, add % symbol after the value
+        // The value is stored as the final percentage (0.25 means 0.25%, not 25%)
+        return `${value}%`
       } else if (paramName.toLowerCase().includes('stat') && typeof value === 'number') {
         // For Stat, display as stat name
         const statName = getStatName(value)

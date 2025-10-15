@@ -1,8 +1,15 @@
 /**
- * AdvancedItemSearch Integration Tests
- * 
- * Tests the AdvancedItemSearch component with real API calls to ensure
- * it properly integrates with the backend search functionality
+ * AdvancedItemSearch Component Unit Tests
+ *
+ * UNIT TEST - Component behavior tests, no real API calls
+ * Strategy: Tests component logic in isolation
+ *
+ * Tests the AdvancedItemSearch component query building and validation
+ * without making real backend calls. Component emits search queries
+ * which are validated for correct structure.
+ *
+ * Note: This file is named "integration" but tests component behavior
+ * in isolation, not real backend integration.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
@@ -19,10 +26,7 @@ import AdvancedItemSearch from '../../components/items/AdvancedItemSearch.vue'
 import { useItemsStore } from '../../stores/items'
 import type { ItemSearchQuery } from '../../types/api'
 
-// Integration tests run against real backend
-const BACKEND_URL = 'http://localhost:8000'
-
-describe('AdvancedItemSearch Integration', () => {
+describe('AdvancedItemSearch Component Unit Tests', () => {
   let wrapper: any
   let itemsStore: any
 

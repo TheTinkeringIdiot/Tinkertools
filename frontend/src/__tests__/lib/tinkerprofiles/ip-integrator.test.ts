@@ -15,6 +15,7 @@ import {
 import { createDefaultProfile } from '@/lib/tinkerprofiles/constants';
 import { skillService } from '@/services/skill-service';
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import { SKILL_ID, PROFESSION } from '@/__tests__/helpers';
 
 describe('IP Integrator - Bug Fixes and Data Flow', () => {
   let testProfile: TinkerProfile;
@@ -22,7 +23,7 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
   beforeEach(() => {
     testProfile = createDefaultProfile('Test Character', 'Solitus');
     testProfile.Character.Level = 50;
-    testProfile.Character.Profession = 'Adventurer';
+    testProfile.Character.Profession = PROFESSION.ADVENTURER; // Use numeric ID
   });
 
   describe('profileToCharacterStats', () => {
@@ -149,26 +150,23 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
     it('should handle all skill categories', () => {
       updateProfileSkillInfo(testProfile);
 
-      // Check that skills in different categories were processed
-      const categories = [
-        'Body & Defense',
-        'Ranged Weapons',
-        'Melee Weapons',
-        'Nanos & Casting',
-        'Exploring',
-        'Trade & Repair',
-        'Combat & Healing'
+      // Check that skills in different categories were processed using v4.0.0 structure
+      // Sample a few skills from different categories to verify processing
+      const testSkillIds = [
+        SKILL_ID.BODY_DEV,        // Body & Defense
+        SKILL_ID.ASSAULT_RIF,      // Ranged Weapons
+        SKILL_ID['1H_EDGED'],      // Melee Weapons
+        SKILL_ID.MATTER_CREATION,  // Nanos & Casting
+        SKILL_ID.CONCEALMENT,      // Exploring
+        SKILL_ID.COMPUTER_LITERACY,// Trade & Repair
+        SKILL_ID.FIRST_AID         // Combat & Healing
       ];
 
-      categories.forEach(categoryName => {
-        const category = testProfile.Skills[categoryName as keyof typeof testProfile.Skills];
-        if (category && typeof category === 'object') {
-          Object.values(category).forEach((skill: any) => {
-            if (skill && typeof skill === 'object' && 'cap' in skill) {
-              expect(skill.cap).toBeDefined();
-              expect(typeof skill.cap).toBe('number');
-            }
-          });
+      testSkillIds.forEach(skillId => {
+        const skill = testProfile.skills[skillId];
+        if (skill && typeof skill === 'object' && 'cap' in skill) {
+          expect(skill.cap).toBeDefined();
+          expect(typeof skill.cap).toBe('number');
         }
       });
     });
@@ -176,9 +174,9 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
 
   describe('calculateProfileIP', () => {
     it('should use improvement values for IP cost calculations', () => {
-      // Set some improvements
-      testProfile.Skills.Attributes.Strength.pointFromIp = 10;
-      testProfile.Skills['Body & Defense']['Body Dev.'].pointFromIp = 5;
+      // Set some improvements using v4.0.0 structure
+      testProfile.skills[SKILL_ID.STRENGTH].pointsFromIp = 10;
+      testProfile.skills[SKILL_ID.BODY_DEV].pointsFromIp = 5;
 
       const ipTracker = calculateProfileIP(testProfile);
 
@@ -190,11 +188,11 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
     it('should not double-count IP for cap calculations', () => {
       // This test ensures that IP calculations use improvements
       // while cap calculations use full values
-      testProfile.Skills.Attributes.Strength.value = 16; // 10 improvements on top of 6 base
-      testProfile.Skills.Attributes.Strength.pointFromIp = 10;
+      testProfile.skills[SKILL_ID.STRENGTH].total = 16; // 10 improvements on top of 6 base
+      testProfile.skills[SKILL_ID.STRENGTH].pointsFromIp = 10;
 
       const ipTracker = calculateProfileIP(testProfile);
-      
+
       // IP should only count the improvements (10), not the full value (16)
       expect(ipTracker.abilityIP).toBeGreaterThan(0);
       expect(ipTracker.totalUsed).toBeGreaterThan(0);
@@ -204,41 +202,41 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
   describe('updateProfileTrickleDown', () => {
     it('should use full ability values for trickle-down calculations', () => {
       // Set Stamina to a high value (Body Dev only gets trickle-down from Stamina)
-      testProfile.Skills.Attributes.Stamina.value = 40;
-      testProfile.Skills.Attributes.Intelligence.value = 30;
-      testProfile.Skills.Attributes.Sense.value = 20;
+      testProfile.skills[SKILL_ID.STAMINA].total = 40;
+      testProfile.skills[SKILL_ID.INTELLIGENCE].total = 30;
+      testProfile.skills[SKILL_ID.SENSE].total = 20;
 
       const updatedProfile = updateProfileTrickleDown(testProfile);
 
       // Check that trickle-down was calculated using full ability values
-      const bodyDev = updatedProfile.Skills['Body & Defense']['Body Dev.'];
+      const bodyDev = updatedProfile.skills[SKILL_ID.BODY_DEV];
       if (bodyDev) {
         // Body Dev factors: [0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
         // Trickle-down = floor((40*1.0) / 4) = floor(10) = 10
-        expect(bodyDev.trickleDown).toBeGreaterThan(5); // Should be significantly more than base case (1)
+        expect(bodyDev.trickle).toBeGreaterThan(5); // Should be significantly more than base case (1)
       }
     });
 
     it('should not mutate the original profile', () => {
-      const originalAgility = testProfile.Skills.Attributes.Agility.value;
-      
+      const originalAgility = testProfile.skills[SKILL_ID.AGILITY].total;
+
       const updatedProfile = updateProfileTrickleDown(testProfile);
-      
+
       // Original should be unchanged
-      expect(testProfile.Skills.Attributes.Agility.value).toBe(originalAgility);
-      
+      expect(testProfile.skills[SKILL_ID.AGILITY].total).toBe(originalAgility);
+
       // But returned profile should be a copy
       expect(updatedProfile).not.toBe(testProfile);
     });
 
     it('should update timestamp', async () => {
       const originalTimestamp = testProfile.updated;
-      
+
       // Wait a small amount to ensure timestamp difference
       await new Promise(resolve => setTimeout(resolve, 1));
-      
+
       const updatedProfile = updateProfileTrickleDown(testProfile);
-      
+
       expect(updatedProfile.updated).not.toBe(originalTimestamp);
       expect(new Date(updatedProfile.updated).getTime()).toBeGreaterThan(new Date(originalTimestamp).getTime());
     });
@@ -246,29 +244,32 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
 
   describe('Data Flow Integration', () => {
     it('should maintain consistency between IP calculations and skill caps', () => {
-      // Set some abilities and improvements
-      testProfile.Skills.Attributes.Agility.value = 20;
-      testProfile.Skills.Attributes.Agility.pointFromIp = 14; // 6 base + 14 improvements = 20
-      testProfile.Skills['Body & Defense']['Body Dev.'].pointFromIp = 5;
+      // Set some abilities and improvements using v4.0.0 structure
+      testProfile.skills[SKILL_ID.AGILITY].total = 20;
+      testProfile.skills[SKILL_ID.AGILITY].pointsFromIp = 14; // 6 base + 14 improvements = 20
+      testProfile.skills[SKILL_ID.BODY_DEV].pointsFromIp = 5;
 
       updateProfileSkillInfo(testProfile);
       const ipTracker = calculateProfileIP(testProfile);
 
       // Verify consistency
       expect(ipTracker.totalUsed).toBeGreaterThan(0);
-      
-      const bodyDev = testProfile.Skills['Body & Defense']['Body Dev.'];
+
+      const bodyDev = testProfile.skills[SKILL_ID.BODY_DEV];
       if (bodyDev) {
-        expect(bodyDev.cap).toBeGreaterThan(bodyDev.value);
-        expect(bodyDev.value).toBe(5 + (bodyDev.trickleDown || 0) + (bodyDev.pointFromIp || 0) + (bodyDev.equipmentBonus || 0));
+        expect(bodyDev.cap).toBeGreaterThan(bodyDev.total);
+        expect(bodyDev.total).toBe(bodyDev.base + (bodyDev.trickle || 0) + (bodyDev.pointsFromIp || 0) + (bodyDev.equipmentBonus || 0));
       }
     });
 
     it('should handle edge case of new profile with no improvements', () => {
-      // Ensure all improvements are 0
-      Object.values(testProfile.Skills.Attributes).forEach((attr: any) => {
-        attr.pointFromIp = 0;
-      });
+      // Ensure all improvements are 0 using v4.0.0 structure
+      testProfile.skills[SKILL_ID.STRENGTH].pointsFromIp = 0;
+      testProfile.skills[SKILL_ID.AGILITY].pointsFromIp = 0;
+      testProfile.skills[SKILL_ID.STAMINA].pointsFromIp = 0;
+      testProfile.skills[SKILL_ID.INTELLIGENCE].pointsFromIp = 0;
+      testProfile.skills[SKILL_ID.SENSE].pointsFromIp = 0;
+      testProfile.skills[SKILL_ID.PSYCHIC].pointsFromIp = 0;
 
       updateProfileSkillInfo(testProfile);
       const ipTracker = calculateProfileIP(testProfile);
@@ -276,11 +277,11 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
       // Should not crash and should give sensible results
       expect(ipTracker.totalUsed).toBe(0);
       expect(ipTracker.remaining).toBeGreaterThan(0);
-      
-      const bodyDev = testProfile.Skills['Body & Defense']['Body Dev.'];
+
+      const bodyDev = testProfile.skills[SKILL_ID.BODY_DEV];
       if (bodyDev) {
         expect(bodyDev.cap).toBe(13); // The famous Body Dev cap issue should be fixed
-        expect(bodyDev.value).toBe(5 + (bodyDev.trickleDown || 0)); // Base + trickle only
+        expect(bodyDev.total).toBe(bodyDev.base + (bodyDev.trickle || 0)); // Base + trickle only
       }
     });
   });
@@ -314,11 +315,11 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
 
       updateProfileSkillInfo(testProfile);
 
-      // Check that Strength has equipment bonus applied
-      const strength = testProfile.Skills.Attributes.Strength;
+      // Check that Strength has equipment bonus applied using v4.0.0 structure
+      const strength = testProfile.skills[SKILL_ID.STRENGTH];
       expect(strength.equipmentBonus).toBe(10);
-      expect(strength.baseValue).toBeDefined();
-      expect(strength.value).toBe((strength.baseValue || 0) + 10);
+      expect(strength.base).toBeDefined();
+      expect(strength.total).toBe(strength.base + 10);
     });
 
     it('should include equipment bonuses in trickle-down calculations', () => {
@@ -347,21 +348,21 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
         } as any
       };
 
-      // Set base Stamina to 30
-      testProfile.Skills.Attributes.Stamina.value = 30;
-      testProfile.Skills.Attributes.Stamina.pointFromIp = 24; // 6 base + 24 improvements
+      // Set base Stamina to 30 using v4.0.0 structure
+      testProfile.skills[SKILL_ID.STAMINA].total = 30;
+      testProfile.skills[SKILL_ID.STAMINA].pointsFromIp = 24; // 6 base + 24 improvements
 
       updateProfileSkillInfo(testProfile);
 
       // Stamina should be 30 base + 20 equipment = 50
-      expect(testProfile.Skills.Attributes.Stamina.value).toBe(50);
-      expect(testProfile.Skills.Attributes.Stamina.equipmentBonus).toBe(20);
+      expect(testProfile.skills[SKILL_ID.STAMINA].total).toBe(50);
+      expect(testProfile.skills[SKILL_ID.STAMINA].equipmentBonus).toBe(20);
 
       // Body Dev should get trickle-down from the total Stamina (50)
       // Body Dev factors: [0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
       // Trickle-down = floor((50*1.0) / 4) = floor(12.5) = 12
-      const bodyDev = testProfile.Skills['Body & Defense']['Body Dev.'];
-      expect(bodyDev.trickleDown).toBe(12);
+      const bodyDev = testProfile.skills[SKILL_ID.BODY_DEV];
+      expect(bodyDev.trickle).toBe(12);
     });
 
     it('should track base value separately from total value for abilities', () => {
@@ -403,17 +404,17 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
 
       updateProfileSkillInfo(testProfile);
 
-      // Check Intelligence
-      const intelligence = testProfile.Skills.Attributes.Intelligence;
+      // Check Intelligence using v4.0.0 structure
+      const intelligence = testProfile.skills[SKILL_ID.INTELLIGENCE];
       expect(intelligence.equipmentBonus).toBe(15);
-      expect(intelligence.baseValue).toBeDefined();
-      expect(intelligence.value).toBe((intelligence.baseValue || 0) + 15);
+      expect(intelligence.base).toBeDefined();
+      expect(intelligence.total).toBe(intelligence.base + 15);
 
-      // Check Psychic
-      const psychic = testProfile.Skills.Attributes.Psychic;
+      // Check Psychic using v4.0.0 structure
+      const psychic = testProfile.skills[SKILL_ID.PSYCHIC];
       expect(psychic.equipmentBonus).toBe(8);
-      expect(psychic.baseValue).toBeDefined();
-      expect(psychic.value).toBe((psychic.baseValue || 0) + 8);
+      expect(psychic.base).toBeDefined();
+      expect(psychic.total).toBe(psychic.base + 8);
     });
 
     it('should handle profiles with no equipment gracefully', () => {
@@ -424,32 +425,33 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
 
       updateProfileSkillInfo(testProfile);
 
-      // All abilities should have zero equipment bonus
-      const abilityNames = ['Strength', 'Agility', 'Stamina', 'Intelligence', 'Sense', 'Psychic'];
-      abilityNames.forEach(abilityName => {
-        const ability = testProfile.Skills.Attributes[abilityName as keyof typeof testProfile.Skills.Attributes];
+      // All abilities should have zero equipment bonus using v4.0.0 structure
+      const abilityIds = [SKILL_ID.STRENGTH, SKILL_ID.AGILITY, SKILL_ID.STAMINA, SKILL_ID.INTELLIGENCE, SKILL_ID.SENSE, SKILL_ID.PSYCHIC];
+      abilityIds.forEach(abilityId => {
+        const ability = testProfile.skills[abilityId];
         expect(ability.equipmentBonus).toBe(0);
-        expect(ability.baseValue).toBeDefined();
-        expect(ability.value).toBe(ability.baseValue);
+        expect(ability.base).toBeDefined();
+        expect(ability.total).toBe(ability.base);
       });
     });
   });
 });
 
-// Test utilities
+// Test utilities (Note: These are duplicates of helpers - should import from @/__tests__/helpers instead)
+// Keeping for backwards compatibility with this test file only
 function createTestProfile(overrides: Partial<TinkerProfile> = {}): TinkerProfile {
   const profile = createDefaultProfile('Test', 'Solitus');
   return { ...profile, ...overrides };
 }
 
 function setProfileAbilities(profile: TinkerProfile, abilities: number[]): void {
-  const abilityNames = ['Strength', 'Agility', 'Stamina', 'Intelligence', 'Sense', 'Psychic'];
-  abilityNames.forEach((name, index) => {
+  const abilityIds = [SKILL_ID.STRENGTH, SKILL_ID.AGILITY, SKILL_ID.STAMINA, SKILL_ID.INTELLIGENCE, SKILL_ID.SENSE, SKILL_ID.PSYCHIC];
+  abilityIds.forEach((skillId, index) => {
     if (abilities[index] !== undefined) {
-      const attr = profile.Skills.Attributes[name as keyof typeof profile.Skills.Attributes] as any;
-      if (attr) {
-        attr.value = abilities[index];
-        attr.pointFromIp = Math.max(0, abilities[index] - 6); // Assuming 6 is breed base
+      const skill = profile.skills[skillId];
+      if (skill) {
+        skill.total = abilities[index];
+        skill.pointsFromIp = Math.max(0, abilities[index] - 6); // Assuming 6 is breed base
       }
     }
   });

@@ -1,12 +1,12 @@
 /**
  * Unit tests for ActionRequirements component
- * 
+ *
  * Tests the main component for displaying item actions and their requirements
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ref } from 'vue'
+import { mountWithContext, standardCleanup } from '@/__tests__/helpers'
 import ActionRequirements from '../ActionRequirements.vue'
 import type { Action } from '../../types/api'
 import type { CharacterStats } from '../../composables/useActionCriteria'
@@ -14,30 +14,6 @@ import type { CharacterStats } from '../../composables/useActionCriteria'
 // Mock the useItemActions composable
 vi.mock('../../composables/useActionCriteria', () => ({
   useItemActions: vi.fn()
-}))
-
-// Mock PrimeVue components
-vi.mock('primevue/accordion', () => ({
-  default: {
-    name: 'Accordion',
-    template: '<div class="p-accordion"><slot /></div>'
-  }
-}))
-
-vi.mock('primevue/accordiontab', () => ({
-  default: {
-    name: 'AccordionTab',
-    props: ['header'],
-    template: '<div class="p-accordiontab"><div class="p-accordiontab-header">{{ header }}</div><div class="p-accordiontab-content"><slot /></div></div>'
-  }
-}))
-
-vi.mock('primevue/tag', () => ({
-  default: {
-    name: 'Tag',
-    props: ['value', 'severity'],
-    template: '<span class="p-tag" :class="`p-tag-${severity}`">{{ value }}</span>'
-  }
 }))
 
 // Mock CriteriaDisplay component
@@ -162,26 +138,30 @@ describe('ActionRequirements', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(useItemActions).mockReturnValue(mockUseItemActions)
-    
+
     mockUseItemActions.getRequirementColor.mockImplementation((canPerform: boolean | null) => {
       if (canPerform === null) return 'gray'
       return canPerform ? 'green' : 'red'
     })
-    
+
     mockUseItemActions.getRequirementSeverity.mockImplementation((canPerform: boolean | null) => {
       if (canPerform === null) return 'secondary'
       return canPerform ? 'success' : 'danger'
     })
-    
+
     mockUseItemActions.formatShortfall.mockImplementation((required: number, current: number) => {
       const shortfall = required - current
       return shortfall > 0 ? `(need ${shortfall} more)` : ''
     })
   })
 
+  afterEach(() => {
+    standardCleanup()
+  })
+
   describe('component rendering', () => {
     it('should render without errors', () => {
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: mockActions
         }
@@ -191,7 +171,7 @@ describe('ActionRequirements', () => {
     })
 
     it('should render primary action when expanded=true', () => {
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: mockActions,
           expanded: true
@@ -203,7 +183,7 @@ describe('ActionRequirements', () => {
     })
 
     it('should render accordion for multiple actions when expanded=false', () => {
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: mockActions,
           expanded: false
@@ -215,7 +195,7 @@ describe('ActionRequirements', () => {
     })
 
     it('should render simple actions when showSimpleActions=true', () => {
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: mockActions,
           showSimpleActions: true
@@ -226,7 +206,7 @@ describe('ActionRequirements', () => {
     })
 
     it('should not render simple actions when showSimpleActions=false', () => {
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: mockActions,
           showSimpleActions: false
@@ -244,7 +224,7 @@ describe('ActionRequirements', () => {
     }
 
     it('should pass character stats to criteria display', () => {
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: mockActions,
           characterStats,
@@ -257,7 +237,7 @@ describe('ActionRequirements', () => {
     })
 
     it('should display requirement status tags', () => {
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: mockActions,
           characterStats,
@@ -278,7 +258,7 @@ describe('ActionRequirements', () => {
     })
 
     it('should show requirement met indicator', () => {
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: mockActions,
           characterStats,
@@ -290,7 +270,7 @@ describe('ActionRequirements', () => {
     })
 
     it('should show requirement not met indicator', () => {
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: mockActions,
           characterStats,
@@ -304,7 +284,7 @@ describe('ActionRequirements', () => {
 
   describe('props validation', () => {
     it('should handle empty actions array', () => {
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: []
         }
@@ -315,7 +295,7 @@ describe('ActionRequirements', () => {
     })
 
     it('should handle null character stats', () => {
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: mockActions,
           characterStats: null
@@ -332,7 +312,7 @@ describe('ActionRequirements', () => {
     })
 
     it('should use default mode for criteria display', () => {
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: mockActions,
           expanded: true
@@ -344,7 +324,7 @@ describe('ActionRequirements', () => {
     })
 
     it('should pass custom mode to criteria display', () => {
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: mockActions,
           expanded: true,
@@ -359,7 +339,7 @@ describe('ActionRequirements', () => {
 
   describe('action priority', () => {
     it('should display primary action first when expanded', () => {
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: mockActions,
           expanded: true
@@ -381,7 +361,7 @@ describe('ActionRequirements', () => {
       
       mockUseItemActions.primaryAction.value = mockParsedActions[1] // Attack action
       
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: actionsWithoutWield,
           expanded: true
@@ -396,7 +376,7 @@ describe('ActionRequirements', () => {
     it('should show unmet requirement details', () => {
       const characterStats: CharacterStats = { 54: 100 } // Level too low
       
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: mockActions,
           characterStats,
@@ -409,7 +389,7 @@ describe('ActionRequirements', () => {
     })
 
     it('should handle no character data gracefully', () => {
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: mockActions,
           characterStats: undefined
@@ -426,7 +406,7 @@ describe('ActionRequirements', () => {
 
   describe('interaction behavior', () => {
     it('should toggle accordion sections', async () => {
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: mockActions,
           expanded: false
@@ -442,7 +422,7 @@ describe('ActionRequirements', () => {
     })
 
     it('should display action summaries in accordion headers', () => {
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: mockActions,
           characterStats: { 112: 400, 54: 100 },
@@ -485,7 +465,7 @@ describe('ActionRequirements', () => {
       mockUseItemActions.actionsWithRequirements.value = []
       mockUseItemActions.simpleActions.value = mockUseItemActions.parsedActions.value
 
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: actionsNoCriteria,
           showSimpleActions: true
@@ -518,7 +498,7 @@ describe('ActionRequirements', () => {
         expression: null
       }]
 
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: malformedActions
         }
@@ -574,7 +554,7 @@ describe('ActionRequirements', () => {
         expression: null
       }]
 
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: baseActions,
           characterStats: { 112: 280 } // Below base requirement
@@ -650,7 +630,7 @@ describe('ActionRequirements', () => {
         expression: null
       }]
 
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: baseActions,
           characterStats
@@ -733,7 +713,7 @@ describe('ActionRequirements', () => {
         expression: null
       }]
 
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: baseSpellActions,
           characterStats: { 200: 160 } // Character meets base but not interpolated
@@ -769,7 +749,7 @@ describe('ActionRequirements', () => {
     })
 
     it('should maintain component reactivity during interpolation updates', async () => {
-      const wrapper = mount(ActionRequirements, {
+      const wrapper = mountWithContext(ActionRequirements, {
         props: {
           actions: [],
           characterStats: {}

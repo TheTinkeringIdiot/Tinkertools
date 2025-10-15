@@ -13,12 +13,19 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { mount, VueWrapper, flushPromises } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
-import { createRouter, createMemoryHistory } from 'vue-router'
+import { nextTick } from 'vue';
+import { VueWrapper, flushPromises } from '@vue/test-utils'
+import PrimeVue from 'primevue/config'
 import TinkerNukes from '@/views/TinkerNukes.vue'
+import { setActivePinia } from 'pinia'
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types'
+import {
+  mountWithContext,
+  standardCleanup,
+  createTestProfile,
+  PROFESSION
+} from '@/__tests__/helpers'
 
 // Mock the offensive nano service
 vi.mock('@/services/offensive-nano-service', () => ({
@@ -94,55 +101,35 @@ vi.mock('@/components/nukes/NukeTable.vue', () => ({
 // Test Fixtures
 // ============================================================================
 
-const createNanotechProfile = (name = 'TestNano'): TinkerProfile => ({
-  Character: {
-    Name: name,
-    Profession: 11, // Nanotechnician
-    Breed: 3,
-    Level: 220,
-    Gender: 'Female',
-    Faction: 'Clan',
-    Organization: 'Test Org'
-  },
-  skills: {
-    21: { total: 800 },
-    149: { total: 1200 },
-    221: { total: 5000 },
-    126: { total: 2500 },
-    127: { total: 2500 },
-    128: { total: 2500 },
-    129: { total: 2500 },
-    130: { total: 2500 },
-    131: { total: 2500 }
-  },
-  abilities: {},
-  items: {},
-  symbiants: {},
-  perks: [],
-  buffs: [],
-  version: '4.0.0'
-} as any)
+const createNanotechProfile = (name = 'TestNano'): TinkerProfile =>
+  createTestProfile({
+    name,
+    profession: PROFESSION.NANO_TECHNICIAN,
+    breed: 3,
+    level: 220,
+    skills: {
+      21: { total: 800 },
+      149: { total: 1200 },
+      221: { total: 5000 },
+      126: { total: 2500 },
+      127: { total: 2500 },
+      128: { total: 2500 },
+      129: { total: 2500 },
+      130: { total: 2500 },
+      131: { total: 2500 }
+    }
+  })
 
-const createNonNanotechProfile = (name = 'TestDoc'): TinkerProfile => ({
-  Character: {
-    Name: name,
-    Profession: 6, // Doctor
-    Breed: 1,
-    Level: 220,
-    Gender: 'Male',
-    Faction: 'Omni',
-    Organization: 'Test Org'
-  },
-  skills: {
-    21: { total: 500 }
-  },
-  abilities: {},
-  items: {},
-  symbiants: {},
-  perks: [],
-  buffs: [],
-  version: '4.0.0'
-} as any)
+const createNonNanotechProfile = (name = 'TestDoc'): TinkerProfile =>
+  createTestProfile({
+    name,
+    profession: PROFESSION.DOCTOR,
+    breed: 1,
+    level: 220,
+    skills: {
+      21: { total: 500 }
+    }
+  })
 
 // ============================================================================
 // Test Suite
@@ -150,34 +137,9 @@ const createNonNanotechProfile = (name = 'TestDoc'): TinkerProfile => ({
 
 describe('TinkerNukes View', () => {
   let wrapper: VueWrapper<any>
-  let router: any
-  let pinia: any
-  let profileStore: any
-
-  beforeEach(() => {
-    pinia = createPinia()
-    setActivePinia(pinia)
-    profileStore = useTinkerProfilesStore()
-
-    router = createRouter({
-      history: createMemoryHistory(),
-      routes: [
-        { path: '/', name: 'home', component: { template: '<div>Home</div>' } },
-        {
-          path: '/tinker-nukes',
-          name: 'tinker-nukes',
-          component: TinkerNukes
-        },
-        {
-          path: '/items/:id',
-          name: 'item-detail',
-          component: { template: '<div>Item Detail</div>' }
-        }
-      ]
-    })
-  })
 
   afterEach(() => {
+    standardCleanup()
     wrapper?.unmount()
   })
 
@@ -187,9 +149,9 @@ describe('TinkerNukes View', () => {
 
   describe('Component Structure', () => {
     it('should render the view with header, form, filters, and table', async () => {
-      wrapper = mount(TinkerNukes, {
+      wrapper = mountWithContext(TinkerNukes, {
         global: {
-          plugins: [pinia, router]
+          plugins: [PrimeVue]
         }
       })
 
@@ -201,11 +163,7 @@ describe('TinkerNukes View', () => {
     })
 
     it('should display NT Only badge in header', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -213,11 +171,7 @@ describe('TinkerNukes View', () => {
     })
 
     it('should show nano count badge when nanos are loaded', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -229,11 +183,7 @@ describe('TinkerNukes View', () => {
     })
 
     it('should have accessible heading structure', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -251,11 +201,7 @@ describe('TinkerNukes View', () => {
     it('should fetch offensive nanos on mount', async () => {
       const { fetchOffensiveNanos } = await import('@/services/offensive-nano-service')
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -263,11 +209,7 @@ describe('TinkerNukes View', () => {
     })
 
     it('should display loading state while fetching nanos', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       // Check loading state before promise resolves
       expect(wrapper.vm.loading).toBe(true)
@@ -279,11 +221,7 @@ describe('TinkerNukes View', () => {
     })
 
     it('should store fetched nanos in component state', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -297,11 +235,7 @@ describe('TinkerNukes View', () => {
 
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -319,28 +253,34 @@ describe('TinkerNukes View', () => {
   describe('Profile Integration', () => {
     it('should access active profile from TinkerProfiles store', async () => {
       const profile = createNanotechProfile()
-      profileStore.activeProfile = profile
-
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
+
+      // Access store from wrapper's Pinia instance
+      const pinia = wrapper.vm.$pinia
+      setActivePinia(pinia)
+      const profileStore = useTinkerProfilesStore()
+      profileStore.initialize()
+      profileStore.activeProfile = profile
+
+      await wrapper.vm.$nextTick()
 
       expect(wrapper.vm.activeProfile).toBe(profile)
     })
 
     it('should display active profile info in header', async () => {
       const profile = createNanotechProfile('TestNanoChar')
-      profileStore.activeProfile = profile
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      await flushPromises()
+
+      // Access store from wrapper\'s Pinia instance
+      const pinia = wrapper.vm.$pinia
+      setActivePinia(pinia)
+      const profileStore = useTinkerProfilesStore()
+      profileStore.initialize()
+      profileStore.activeProfile = profile
 
       await flushPromises()
 
@@ -349,13 +289,16 @@ describe('TinkerNukes View', () => {
     })
 
     it('should not crash when no active profile', async () => {
-      profileStore.activeProfile = null
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      await flushPromises()
+
+      // Access store from wrapper\'s Pinia instance
+      const pinia = wrapper.vm.$pinia
+      setActivePinia(pinia)
+      const profileStore = useTinkerProfilesStore()
+      profileStore.initialize()
+      profileStore.activeProfile = null
 
       await flushPromises()
 
@@ -370,13 +313,16 @@ describe('TinkerNukes View', () => {
   describe('Profile Switching', () => {
     it('should clear table filters when profile switches', async () => {
       const profile1 = createNanotechProfile('Profile1')
-      profileStore.activeProfile = profile1
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      await flushPromises()
+
+      // Access store from wrapper\'s Pinia instance
+      const pinia = wrapper.vm.$pinia
+      setActivePinia(pinia)
+      const profileStore = useTinkerProfilesStore()
+      profileStore.initialize()
+      profileStore.activeProfile = profile1
 
       await flushPromises()
 
@@ -403,13 +349,16 @@ describe('TinkerNukes View', () => {
 
     it('should update input form when profile switches', async () => {
       const profile1 = createNanotechProfile('Profile1')
-      profileStore.activeProfile = profile1
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      await flushPromises()
+
+      // Access store from wrapper\'s Pinia instance
+      const pinia = wrapper.vm.$pinia
+      setActivePinia(pinia)
+      const profileStore = useTinkerProfilesStore()
+      profileStore.initialize()
+      profileStore.activeProfile = profile1
 
       await flushPromises()
 
@@ -429,13 +378,16 @@ describe('TinkerNukes View', () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
 
       const profile1 = createNanotechProfile('Profile1')
-      profileStore.activeProfile = profile1
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      await flushPromises()
+
+      // Access store from wrapper\'s Pinia instance
+      const pinia = wrapper.vm.$pinia
+      setActivePinia(pinia)
+      const profileStore = useTinkerProfilesStore()
+      profileStore.initialize()
+      profileStore.activeProfile = profile1
 
       await flushPromises()
 
@@ -461,13 +413,16 @@ describe('TinkerNukes View', () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
       const docProfile = createNonNanotechProfile()
-      profileStore.activeProfile = docProfile
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      await flushPromises()
+
+      // Access store from wrapper\'s Pinia instance
+      const pinia = wrapper.vm.$pinia
+      setActivePinia(pinia)
+      const profileStore = useTinkerProfilesStore()
+      profileStore.initialize()
+      profileStore.activeProfile = docProfile
 
       await flushPromises()
 
@@ -483,13 +438,16 @@ describe('TinkerNukes View', () => {
 
     it('should still display nanos but form shows defaults', async () => {
       const docProfile = createNonNanotechProfile()
-      profileStore.activeProfile = docProfile
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      await flushPromises()
+
+      // Access store from wrapper\'s Pinia instance
+      const pinia = wrapper.vm.$pinia
+      setActivePinia(pinia)
+      const profileStore = useTinkerProfilesStore()
+      profileStore.initialize()
+      profileStore.activeProfile = docProfile
 
       await flushPromises()
 
@@ -504,13 +462,16 @@ describe('TinkerNukes View', () => {
 
     it('should show profession name in header even for non-NT', async () => {
       const docProfile = createNonNanotechProfile('TestDoctor')
-      profileStore.activeProfile = docProfile
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      await flushPromises()
+
+      // Access store from wrapper\'s Pinia instance
+      const pinia = wrapper.vm.$pinia
+      setActivePinia(pinia)
+      const profileStore = useTinkerProfilesStore()
+      profileStore.initialize()
+      profileStore.activeProfile = docProfile
 
       await flushPromises()
 
@@ -525,13 +486,16 @@ describe('TinkerNukes View', () => {
 
   describe('Manual Skills Mode', () => {
     it('should work without active profile', async () => {
-      profileStore.activeProfile = null
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      await flushPromises()
+
+      // Access store from wrapper\'s Pinia instance
+      const pinia = wrapper.vm.$pinia
+      setActivePinia(pinia)
+      const profileStore = useTinkerProfilesStore()
+      profileStore.initialize()
+      profileStore.activeProfile = null
 
       await flushPromises()
 
@@ -544,13 +508,16 @@ describe('TinkerNukes View', () => {
     })
 
     it('should allow manual input state updates without profile', async () => {
-      profileStore.activeProfile = null
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      await flushPromises()
+
+      // Access store from wrapper\'s Pinia instance
+      const pinia = wrapper.vm.$pinia
+      setActivePinia(pinia)
+      const profileStore = useTinkerProfilesStore()
+      profileStore.initialize()
+      profileStore.activeProfile = null
 
       await flushPromises()
 
@@ -572,13 +539,16 @@ describe('TinkerNukes View', () => {
     })
 
     it('should filter nanos based on manual skill values', async () => {
-      profileStore.activeProfile = null
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      await flushPromises()
+
+      // Access store from wrapper\'s Pinia instance
+      const pinia = wrapper.vm.$pinia
+      setActivePinia(pinia)
+      const profileStore = useTinkerProfilesStore()
+      profileStore.initialize()
+      profileStore.activeProfile = null
 
       await flushPromises()
 
@@ -592,13 +562,16 @@ describe('TinkerNukes View', () => {
     })
 
     it('should calculate table metrics using manual values', async () => {
-      profileStore.activeProfile = null
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      await flushPromises()
+
+      // Access store from wrapper\'s Pinia instance
+      const pinia = wrapper.vm.$pinia
+      setActivePinia(pinia)
+      const profileStore = useTinkerProfilesStore()
+      profileStore.initialize()
+      profileStore.activeProfile = null
 
       await flushPromises()
 
@@ -615,11 +588,7 @@ describe('TinkerNukes View', () => {
 
   describe('Search and Filtering', () => {
     it('should filter nanos by search query', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -635,11 +604,7 @@ describe('TinkerNukes View', () => {
     })
 
     it('should filter by nano school dropdown', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -652,11 +617,7 @@ describe('TinkerNukes View', () => {
     })
 
     it('should filter by QL range', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -671,11 +632,7 @@ describe('TinkerNukes View', () => {
     })
 
     it('should update table when filters change', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -692,11 +649,7 @@ describe('TinkerNukes View', () => {
     })
 
     it('should show results count after filtering', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -705,11 +658,7 @@ describe('TinkerNukes View', () => {
     })
 
     it('should clear school filter when clear button clicked', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -731,13 +680,16 @@ describe('TinkerNukes View', () => {
   describe('Skill-Based Filtering', () => {
     it('should filter nanos by character skill requirements', async () => {
       const profile = createNanotechProfile()
-      profileStore.activeProfile = profile
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      await flushPromises()
+
+      // Access store from wrapper\'s Pinia instance
+      const pinia = wrapper.vm.$pinia
+      setActivePinia(pinia)
+      const profileStore = useTinkerProfilesStore()
+      profileStore.initialize()
+      profileStore.activeProfile = profile
 
       await flushPromises()
 
@@ -747,13 +699,16 @@ describe('TinkerNukes View', () => {
     })
 
     it('should use manual skills when no profile', async () => {
-      profileStore.activeProfile = null
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      await flushPromises()
+
+      // Access store from wrapper\'s Pinia instance
+      const pinia = wrapper.vm.$pinia
+      setActivePinia(pinia)
+      const profileStore = useTinkerProfilesStore()
+      profileStore.initialize()
+      profileStore.activeProfile = null
 
       await flushPromises()
 
@@ -763,13 +718,16 @@ describe('TinkerNukes View', () => {
     })
 
     it('should update filtered nanos when skills change', async () => {
-      profileStore.activeProfile = null
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      await flushPromises()
+
+      // Access store from wrapper\'s Pinia instance
+      const pinia = wrapper.vm.$pinia
+      setActivePinia(pinia)
+      const profileStore = useTinkerProfilesStore()
+      profileStore.initialize()
+      profileStore.activeProfile = null
 
       await flushPromises()
 
@@ -790,14 +748,11 @@ describe('TinkerNukes View', () => {
 
   describe('Navigation', () => {
     it('should navigate to nano detail page on nano selection', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
+      const router = wrapper.vm.$router
       const pushSpy = vi.spyOn(router, 'push')
 
       // Simulate nano selection from table
@@ -808,14 +763,11 @@ describe('TinkerNukes View', () => {
     })
 
     it('should handle navigation with different nano IDs', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
+      const router = wrapper.vm.$router
       const pushSpy = vi.spyOn(router, 'push')
 
       const tableComponent = wrapper.findComponent({ name: 'NukeTable' })
@@ -834,11 +786,7 @@ describe('TinkerNukes View', () => {
 
   describe('Input State Management', () => {
     it('should initialize with default input state', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -848,11 +796,7 @@ describe('TinkerNukes View', () => {
     })
 
     it('should update input state from form emissions', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -873,11 +817,7 @@ describe('TinkerNukes View', () => {
     })
 
     it('should pass input state to table for calculations', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -893,11 +833,7 @@ describe('TinkerNukes View', () => {
 
   describe('School Filter Options', () => {
     it('should provide all 6 nano schools in dropdown', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -911,11 +847,7 @@ describe('TinkerNukes View', () => {
     })
 
     it('should map school IDs correctly', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -932,11 +864,7 @@ describe('TinkerNukes View', () => {
 
   describe('Accessibility', () => {
     it('should have proper heading hierarchy', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -945,11 +873,7 @@ describe('TinkerNukes View', () => {
     })
 
     it('should provide ARIA labels for badges', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -959,11 +883,7 @@ describe('TinkerNukes View', () => {
     })
 
     it('should announce nano count for screen readers', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -972,11 +892,7 @@ describe('TinkerNukes View', () => {
     })
 
     it('should have semantic HTML structure', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -987,12 +903,7 @@ describe('TinkerNukes View', () => {
     })
 
     it('should support keyboard navigation in filters', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        },
-        attachTo: document.body
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] }, attachTo: document.body})
 
       await flushPromises()
 
@@ -1014,11 +925,7 @@ describe('TinkerNukes View', () => {
       const { fetchOffensiveNanos } = await import('@/services/offensive-nano-service')
       vi.mocked(fetchOffensiveNanos).mockResolvedValueOnce([])
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -1027,11 +934,7 @@ describe('TinkerNukes View', () => {
     })
 
     it('should handle rapid filter changes', async () => {
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -1052,13 +955,16 @@ describe('TinkerNukes View', () => {
         skills: { 21: { total: 100 } }
       } as any
 
-      profileStore.activeProfile = incompleteProfile
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      await flushPromises()
+
+      // Access store from wrapper\'s Pinia instance
+      const pinia = wrapper.vm.$pinia
+      setActivePinia(pinia)
+      const profileStore = useTinkerProfilesStore()
+      profileStore.initialize()
+      profileStore.activeProfile = incompleteProfile
 
       await flushPromises()
 
@@ -1069,13 +975,16 @@ describe('TinkerNukes View', () => {
     it('should handle undefined breed gracefully', async () => {
       const profile = createNanotechProfile()
       profile.Character.Breed = undefined as any
-      profileStore.activeProfile = profile
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      await flushPromises()
+
+      // Access store from wrapper\'s Pinia instance
+      const pinia = wrapper.vm.$pinia
+      setActivePinia(pinia)
+      const profileStore = useTinkerProfilesStore()
+      profileStore.initialize()
+      profileStore.activeProfile = profile
 
       await flushPromises()
 
@@ -1091,11 +1000,7 @@ describe('TinkerNukes View', () => {
     it('should log nano load count on successful fetch', async () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -1115,11 +1020,7 @@ describe('TinkerNukes View', () => {
 
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
       await flushPromises()
 
@@ -1134,13 +1035,16 @@ describe('TinkerNukes View', () => {
     it('should log when no active profile', async () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
 
-      profileStore.activeProfile = null
+      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } })
 
-      wrapper = mount(TinkerNukes, {
-        global: {
-          plugins: [pinia, router]
-        }
-      })
+      await flushPromises()
+
+      // Access store from wrapper\'s Pinia instance
+      const pinia = wrapper.vm.$pinia
+      setActivePinia(pinia)
+      const profileStore = useTinkerProfilesStore()
+      profileStore.initialize()
+      profileStore.activeProfile = null
 
       await flushPromises()
 

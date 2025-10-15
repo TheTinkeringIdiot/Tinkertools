@@ -8,12 +8,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useItems } from '../../composables/useItems'
 import { useItemsStore } from '../../stores/items'
-import { useProfileStore } from '../../stores/profile'
+import { useProfileStore } from '../../stores/tinkerProfiles'
 import type { Item } from '../../types/api'
 
 // Mock stores
 vi.mock('../../stores/items')
-vi.mock('../../stores/profile')
+vi.mock('../../stores/tinkerProfiles')
 
 const mockItem: Item = {
   id: 1,

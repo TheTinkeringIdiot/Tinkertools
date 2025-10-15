@@ -4,10 +4,10 @@
  * Tests for the global profile selector dropdown used in navigation
  */
 
-// @ts-nocheck
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { mountWithContext, standardCleanup, BREED, PROFESSION, SKILL_ID } from '@/__tests__/helpers'
+
 import { nextTick } from 'vue'
 import ProfileDropdown from '../../../components/profiles/ProfileDropdown.vue'
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
@@ -53,7 +53,7 @@ describe('ProfileDropdown', () => {
   let store: any
 
   beforeEach(() => {
-    setActivePinia(createPinia())
+    
     store = useTinkerProfilesStore()
     vi.clearAllMocks()
 
@@ -63,8 +63,8 @@ describe('ProfileDropdown', () => {
         id: 'profile_1',
         name: 'TestChar1',
         level: 200,
-        profession: 'Doctor',
-        breed: 'Atrox',
+        profession: PROFESSION.DOCTOR,
+        breed: BREED.ATROX,
         faction: 'Clan',
         created: '2024-01-01T00:00:00Z',
         updated: '2024-01-01T00:00:00Z'
@@ -73,8 +73,8 @@ describe('ProfileDropdown', () => {
         id: 'profile_2',
         name: 'TestChar2',
         level: 150,
-        profession: 'Soldier',
-        breed: 'Solitus',
+        profession: PROFESSION.SOLDIER,
+        breed: BREED.SOLITUS,
         faction: 'Omni',
         created: '2024-01-01T00:00:00Z',
         updated: '2024-01-01T00:00:00Z'
@@ -85,6 +85,7 @@ describe('ProfileDropdown', () => {
   })
 
   afterEach(() => {
+    standardCleanup()
     if (wrapper) {
       wrapper.unmount()
     }
@@ -92,14 +93,14 @@ describe('ProfileDropdown', () => {
 
   describe('Component Rendering', () => {
     it('should mount without errors', async () => {
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       expect(wrapper.exists()).toBe(true)
     })
 
     it('should display placeholder when no profile is selected', async () => {
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       expect(wrapper.text()).toContain('No Profile Selected')
@@ -108,7 +109,7 @@ describe('ProfileDropdown', () => {
     it('should load profiles on mount', async () => {
       const loadProfilesSpy = vi.spyOn(store, 'loadProfiles').mockResolvedValue(undefined)
 
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       expect(loadProfilesSpy).toHaveBeenCalled()
@@ -122,7 +123,7 @@ describe('ProfileDropdown', () => {
         { label: 'TestChar2 (Soldier 150)', value: 'profile_2' }
       ]
 
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       const dropdown = wrapper.findComponent({ name: 'Dropdown' })
@@ -134,7 +135,7 @@ describe('ProfileDropdown', () => {
         { label: 'TestChar1 (Doctor 200)', value: 'profile_1' }
       ]
 
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       // Open dropdown
@@ -150,7 +151,7 @@ describe('ProfileDropdown', () => {
         { label: 'TestChar1 (Doctor 200)', value: 'profile_1' }
       ]
 
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       // Open dropdown
@@ -170,7 +171,7 @@ describe('ProfileDropdown', () => {
       store.activeProfileLevel = 200
       store.hasActiveProfile = true
 
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       expect(wrapper.text()).toContain('TestChar1')
@@ -181,7 +182,7 @@ describe('ProfileDropdown', () => {
       store.activeProfileId = 'profile_1'
       store.hasActiveProfile = true
 
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       const dropdown = wrapper.find('.p-dropdown')
@@ -191,7 +192,7 @@ describe('ProfileDropdown', () => {
     it('should not apply active styling when no profile is active', async () => {
       store.hasActiveProfile = false
 
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       const dropdown = wrapper.find('.p-dropdown')
@@ -207,7 +208,7 @@ describe('ProfileDropdown', () => {
         { label: 'TestChar1 (Doctor 200)', value: 'profile_1' }
       ]
 
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       // Simulate dropdown change
@@ -225,7 +226,7 @@ describe('ProfileDropdown', () => {
         { label: 'TestChar1 (Doctor 200)', value: 'profile_1' }
       ]
 
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       const dropdown = wrapper.findComponent({ name: 'Dropdown' })
@@ -245,7 +246,7 @@ describe('ProfileDropdown', () => {
         { label: 'TestChar1 (Doctor 200)', value: 'profile_1' }
       ]
 
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       const dropdown = wrapper.findComponent({ name: 'Dropdown' })
@@ -268,7 +269,7 @@ describe('ProfileDropdown', () => {
         { label: 'TestChar2 (Soldier 150)', value: 'profile_2' }
       ]
 
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       const dropdown = wrapper.findComponent({ name: 'Dropdown' })
@@ -284,7 +285,7 @@ describe('ProfileDropdown', () => {
     it('should show loading placeholder when loading', async () => {
       store.loading = true
 
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       const dropdown = wrapper.findComponent({ name: 'Dropdown' })
@@ -294,7 +295,7 @@ describe('ProfileDropdown', () => {
     it('should show select placeholder when not loading', async () => {
       store.loading = false
 
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       const dropdown = wrapper.findComponent({ name: 'Dropdown' })
@@ -304,7 +305,7 @@ describe('ProfileDropdown', () => {
     it('should pass loading prop to dropdown', async () => {
       store.loading = true
 
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       const dropdown = wrapper.findComponent({ name: 'Dropdown' })
@@ -319,7 +320,7 @@ describe('ProfileDropdown', () => {
       store.activeProfileProfession = 'Doctor'
       store.activeProfileLevel = 200
 
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       // Custom value slot should render
@@ -331,7 +332,7 @@ describe('ProfileDropdown', () => {
         { label: 'TestChar1 (Doctor 200)', value: 'profile_1' }
       ]
 
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       // Open dropdown
@@ -350,7 +351,7 @@ describe('ProfileDropdown', () => {
         { label: 'TestChar1 (Doctor 200)', value: 'profile_1' }
       ]
 
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       // Open dropdown
@@ -365,7 +366,7 @@ describe('ProfileDropdown', () => {
 
   describe('Store Synchronization', () => {
     it('should sync with store active profile ID', async () => {
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       // Change store active profile
@@ -377,7 +378,7 @@ describe('ProfileDropdown', () => {
     })
 
     it('should watch store activeProfileId changes', async () => {
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       const dropdown = wrapper.findComponent({ name: 'Dropdown' })
@@ -393,7 +394,7 @@ describe('ProfileDropdown', () => {
     })
 
     it('should update when store profile options change', async () => {
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       // Initially empty
@@ -413,7 +414,7 @@ describe('ProfileDropdown', () => {
 
   describe('Accessibility', () => {
     it('should have appropriate ARIA labels', async () => {
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       const dropdown = wrapper.find('.p-dropdown')
@@ -421,7 +422,7 @@ describe('ProfileDropdown', () => {
     })
 
     it('should be keyboard navigable', async () => {
-      wrapper = mount(ProfileDropdown)
+      wrapper = mountWithContext(ProfileDropdown)
       await nextTick()
 
       const dropdown = wrapper.findComponent({ name: 'Dropdown' })

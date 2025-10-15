@@ -1,15 +1,25 @@
 /**
- * Plants Store Integration Tests
- * Tests integration between TinkerPlants and related stores
+ * Plants Store Unit Tests
+ *
+ * UNIT TEST - Uses mocks, not real backend
+ * Strategy: Already uses mocked API client correctly
+ *
+ * Tests integration between TinkerPlants and related stores using mocks
+ *
+ * Note: This file is named "integration" but actually uses mocks.
+ * It tests store logic in isolation, not real API integration.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
+import { createApp } from 'vue';
+import PrimeVue from 'primevue/config';
+import ToastService from 'primevue/toastservice';
 import { useSymbiantsStore } from '@/stores/symbiants';
-import { useProfilesStore } from '@/stores/profilesStore';
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import type { PlantSymbiant, CharacterBuild, CharacterStats } from '@/types/plants';
 
-// Mock API client
+// Mock API client for unit testing
 vi.mock('@/services/api-client', () => ({
   apiClient: {
     searchSymbiants: vi.fn(() => Promise.resolve({
@@ -49,53 +59,67 @@ vi.mock('@/services/api-client', () => ({
 }));
 
 // Mock localStorage
+const localStorageData: Record<string, string> = {
+  'tinkerplants_builds': JSON.stringify([
+    {
+      id: 'build1',
+      name: 'Test Build',
+      symbiants: {
+        head: {
+          id: 1,
+          aoid: 101,
+          name: 'Test Head Symbiant'
+        }
+      },
+      totalStats: { strength: 450 },
+      createdAt: '2024-01-01T00:00:00.000Z'
+    }
+  ])
+};
+
 global.localStorage = {
   getItem: vi.fn((key: string) => {
-    if (key === 'tinkerplants_builds') {
-      return JSON.stringify([
-        {
-          id: 'build1',
-          name: 'Test Build',
-          symbiants: {
-            head: {
-              id: 1,
-              aoid: 101,
-              name: 'Test Head Symbiant'
-            }
-          },
-          totalStats: { strength: 450 },
-          createdAt: '2024-01-01T00:00:00.000Z'
-        }
-      ]);
-    }
-    if (key === 'tinkertools_profiles') {
-      return JSON.stringify([
-        {
-          id: 'profile1',
-          name: 'Test Character',
-          profession: 'Soldier',
-          level: 150,
-          stats: { strength: 400, agility: 300 }
-        }
-      ]);
-    }
-    return null;
+    return localStorageData[key] || null;
   }),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
+  setItem: vi.fn((key: string, value: string) => {
+    localStorageData[key] = value;
+  }),
+  removeItem: vi.fn((key: string) => {
+    delete localStorageData[key];
+  }),
+  clear: vi.fn(() => {
+    Object.keys(localStorageData).forEach(key => delete localStorageData[key]);
+  }),
   length: 0,
   key: vi.fn()
 } as any;
 
-describe('Plants Store Integration', () => {
+describe('Plants Store Unit Tests', () => {
   let symbiantsStore: any;
   let profilesStore: any;
 
-  beforeEach(() => {
-    setActivePinia(createPinia());
+  beforeEach(async () => {
+    // Setup PrimeVue with ToastService for stores
+    const app = createApp({});
+    app.use(PrimeVue);
+    app.use(ToastService);
+
+    // Reset localStorage data for each test
+    Object.keys(localStorageData).forEach(key => {
+      if (key.startsWith('tinkertools_profile')) {
+        delete localStorageData[key];
+      }
+    });
+
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    app.use(pinia);
+
     symbiantsStore = useSymbiantsStore();
-    profilesStore = useProfilesStore();
+    profilesStore = useTinkerProfilesStore();
+
+    // Initialize profile manager
+    await profilesStore.loadProfiles();
   });
 
   describe('Symbiants Store Integration', () => {
@@ -161,53 +185,61 @@ describe('Plants Store Integration', () => {
   });
 
   describe('Profiles Store Integration', () => {
-    it('loads character profiles for plants use', async () => {
-      await profilesStore.loadProfiles();
-      
-      expect(profilesStore.profiles.length).toBeGreaterThanOrEqual(0);
+    it('loads character profiles for plants use', () => {
+      // Profile manager is initialized in beforeEach
+      expect(profilesStore.profileMetadata.length).toBeGreaterThanOrEqual(0);
     });
 
     it('manages active profile selection', async () => {
-      await profilesStore.loadProfiles();
-      
-      if (profilesStore.profiles.length > 0) {
-        const testProfile = profilesStore.profiles[0];
-        profilesStore.setActiveProfile(testProfile.id);
-        
-        expect(profilesStore.activeProfile).toEqual(testProfile);
-      }
+      // Create a test profile with proper structure
+      const profileId = await profilesStore.createProfile('Test Doctor', {
+        Character: {
+          Profession: 10, // Doctor
+          Breed: 1, // Solitus
+          Level: 100
+        }
+      });
+
+      // Set the profile as active (async operation)
+      await profilesStore.setActiveProfile(profileId);
+
+      expect(profilesStore.activeProfile).toBeTruthy();
+      expect(profilesStore.activeProfileId).toBe(profileId);
     });
 
     it('clears active profile', async () => {
-      await profilesStore.loadProfiles();
-      
-      // Test basic profile store functionality - use existing profile if available
-      const testProfileId = profilesStore.profiles.length > 0 ? profilesStore.profiles[0].id : 'profile1';
-      
-      if (profilesStore.setActiveProfile && typeof profilesStore.setActiveProfile === 'function') {
-        profilesStore.setActiveProfile(testProfileId);
-        
-        // Profile might not be set if it doesn't exist - that's OK for this test
-        if (profilesStore.clearActiveProfile && typeof profilesStore.clearActiveProfile === 'function') {
-          profilesStore.clearActiveProfile();
-          expect(profilesStore.activeProfile === null || profilesStore.activeProfile === undefined).toBe(true);
-        } else {
-          expect(true).toBe(true); // clearActiveProfile method not available
+      // Create a test profile
+      const profileId = await profilesStore.createProfile('Test Character', {
+        Character: {
+          Profession: 6, // Adventurer
+          Breed: 1, // Solitus
+          Level: 50
         }
-      } else {
-        expect(true).toBe(true); // setActiveProfile method not available  
-      }
+      });
+
+      // Set it as active (async operation)
+      await profilesStore.setActiveProfile(profileId);
+      expect(profilesStore.activeProfile).toBeTruthy();
+
+      // Clear active profile (async operation)
+      await profilesStore.clearActiveProfile();
+      expect(profilesStore.activeProfile).toBeNull();
     });
 
     it('provides profile statistics for character building', async () => {
-      await profilesStore.loadProfiles();
-      
-      if (profilesStore.profiles.length > 0) {
-        const profile = profilesStore.profiles[0];
-        expect(profile.stats).toBeDefined();
-        expect(typeof profile.level).toBe('number');
-        expect(typeof profile.profession).toBe('string');
-      }
+      // Create a test profile with proper structure
+      const profileId = await profilesStore.createProfile('Test Soldier', {
+        Character: {
+          Profession: 1, // Soldier
+          Breed: 1, // Solitus
+          Level: 150
+        }
+      });
+
+      const profile = await profilesStore.loadProfile(profileId);
+      expect(profile).toBeTruthy();
+      expect(profile!.Character.Level).toBe(150);
+      expect(typeof profile!.Character.Profession).toBe('number');
     });
   });
 
@@ -277,26 +309,22 @@ describe('Plants Store Integration', () => {
 
   describe('Character Stat Calculations', () => {
     it('calculates base character stats from profile', async () => {
-      await profilesStore.loadProfiles();
-      
-      // Create a test profile with proper stats structure
-      const testProfile = {
-        id: 'test',
-        name: 'Test Character',
-        profession: 'Soldier',
-        level: 150,
-        stats: {
-          strength: 400,
-          agility: 300
-        },
-        skills: {}
-      };
-      
-      const baseStats = testProfile.stats;
-      expect(typeof baseStats.strength).toBe('number');
-      expect(typeof baseStats.agility).toBe('number');
-      expect(baseStats.strength).toBeGreaterThan(0);
-      expect(baseStats.agility).toBeGreaterThan(0);
+      // Create a proper TinkerProfile with correct structure
+      const profileId = await profilesStore.createProfile('Test Soldier', {
+        Character: {
+          Profession: 1, // Soldier
+          Breed: 1, // Solitus
+          Level: 150
+        }
+      });
+
+      const profile = await profilesStore.loadProfile(profileId);
+      expect(profile).toBeTruthy();
+
+      // Check that skills are properly initialized with numeric IDs
+      expect(profile!.skills).toBeDefined();
+      expect(typeof profile!.skills[16]).toBe('object'); // Strength ability ID
+      expect(profile!.skills[16].total).toBeGreaterThan(0);
     });
 
     it('calculates symbiant stat bonuses', () => {

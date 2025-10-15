@@ -394,7 +394,7 @@ onMounted(() => {
   // Check for itemId and ql query parameters (from equipment navigation)
   const itemIdParam = route.query.itemId
   const qlParam = route.query.ql
-  
+
   if (itemIdParam && qlParam) {
     // Create a search query for the specific item and QL
     const itemQuery: ItemSearchQuery = {
@@ -402,16 +402,16 @@ onMounted(() => {
       min_ql: parseInt(qlParam as string),
       max_ql: parseInt(qlParam as string)
     }
-    
+
     // Trigger the advanced search
     performAdvancedSearch(itemQuery)
     return
   }
-  
+
   // Check for strain query parameter and trigger search if present
   const strainParam = route.query.strain
   const isNanoParam = route.query.is_nano
-  
+
   if (strainParam) {
     // Create a search query for the specified strain
     const strainQuery: ItemSearchQuery = {
@@ -419,12 +419,12 @@ onMounted(() => {
       is_nano: isNanoParam === 'true' // Filter to nanos if specified
       // Don't include 'search' parameter to use basic /items endpoint
     }
-    
+
     // Trigger the advanced search
     performAdvancedSearch(strainQuery)
     return
   }
-  
+
   // Check if we have cached search results and restore them
   const itemsStore = useItemsStore()
   if (itemsStore.currentSearchResults.length > 0 && itemsStore.currentSearchQuery) {
@@ -435,6 +435,15 @@ onMounted(() => {
     // Note: Filter restoration would need to be handled by AdvancedItemSearch component
     // when implementing state persistence
   }
+})
+
+// Expose for tests
+defineExpose({
+  currentOffset: computed(() => {
+    const page = pagination.value?.page || 1
+    const limit = pagination.value?.limit || 24
+    return (page - 1) * limit
+  })
 })
 </script>
 

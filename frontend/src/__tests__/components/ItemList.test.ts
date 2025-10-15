@@ -4,10 +4,8 @@
  * Tests for the ItemList component functionality
  */
 
-// @ts-nocheck
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION } from '@/__tests__/helpers'
 import { nextTick } from 'vue'
 import ItemList from '../../components/items/ItemList.vue'
 import type { Item, TinkerProfile, PaginationInfo } from '../../types/api'
@@ -122,16 +120,14 @@ const mockItem: Item = {
   animation_mesh: null
 }
 
-const mockProfile: TinkerProfile = {
-  id: 'test-profile',
-  name: 'Test Character',
+const mockProfile: TinkerProfile = createTestProfile({
   level: 200,
-  profession: 'Engineer',
-  stats: {
-    16: 350, // Can meet strength req
-    17: 150  // Cannot meet agility req
+  profession: PROFESSION.ENGINEER,
+  skills: {
+    [SKILL_ID.STRENGTH]: { base: 0, trickle: 0, pointsFromIp: 350, equipmentBonus: 0, total: 350 },
+    [SKILL_ID.AGILITY]: { base: 0, trickle: 0, pointsFromIp: 150, equipmentBonus: 0, total: 150 }
   }
-}
+})
 
 const mockPagination: PaginationInfo = {
   page: 1,
@@ -144,7 +140,6 @@ describe('ItemList', () => {
   let wrapper: any
 
   beforeEach(() => {
-    setActivePinia(createPinia())
     vi.clearAllMocks()
   })
 
@@ -152,41 +147,42 @@ describe('ItemList', () => {
     if (wrapper) {
       wrapper.unmount()
     }
+    standardCleanup()
   })
 
   describe('Component Mounting', () => {
     it('should mount without errors', () => {
-      wrapper = mount(ItemList, {
+      wrapper = mountWithContext(ItemList, {
         props: {
           items: [mockItem],
           viewMode: 'grid'
         }
       })
-      
+
       expect(wrapper.exists()).toBe(true)
     })
 
     it('should render items in grid view', () => {
-      wrapper = mount(ItemList, {
+      wrapper = mountWithContext(ItemList, {
         props: {
           items: [mockItem],
           viewMode: 'grid'
         }
       })
-      
+
       const itemCards = wrapper.findAllComponents({ name: 'ItemCard' })
       expect(itemCards).toHaveLength(1)
       expect(wrapper.find('.grid').exists()).toBe(true)
     })
 
     it('should render items in list view', async () => {
-      wrapper = mount(ItemList, {
+      wrapper = mountWithContext(ItemList, {
         props: {
           items: [mockItem],
           viewMode: 'list'
         }
       })
-      
+
       const listItems = wrapper.findAll('.space-y-2 > div')
       expect(listItems.length).toBeGreaterThan(0)
     })
@@ -194,7 +190,7 @@ describe('ItemList', () => {
 
   describe('View Mode Switching', () => {
     beforeEach(() => {
-      wrapper = mount(ItemList, {
+      wrapper = mountWithContext(ItemList, {
         props: {
           items: [mockItem],
           viewMode: 'grid'
@@ -226,7 +222,7 @@ describe('ItemList', () => {
 
   describe('Item Display', () => {
     beforeEach(() => {
-      wrapper = mount(ItemList, {
+      wrapper = mountWithContext(ItemList, {
         props: {
           items: [mockItem],
           viewMode: 'grid',
@@ -274,7 +270,7 @@ describe('ItemList', () => {
 
   describe('Compatibility Display', () => {
     beforeEach(() => {
-      wrapper = mount(ItemList, {
+      wrapper = mountWithContext(ItemList, {
         props: {
           items: [mockItem],
           viewMode: 'list',
@@ -309,7 +305,7 @@ describe('ItemList', () => {
 
   describe('Pagination', () => {
     beforeEach(() => {
-      wrapper = mount(ItemList, {
+      wrapper = mountWithContext(ItemList, {
         props: {
           items: [mockItem],
           viewMode: 'grid',
@@ -319,6 +315,7 @@ describe('ItemList', () => {
     })
 
     it('should display pagination information', () => {
+      // Component displays format: "Showing 1-1 of 100 items" (ItemList.vue line 155-156)
       const paginationInfo = wrapper.find('.text-sm')
       expect(paginationInfo.text()).toContain('Showing 1-1 of 100 items')
     })
@@ -341,7 +338,7 @@ describe('ItemList', () => {
 
   describe('Quick View Dialog', () => {
     beforeEach(() => {
-      wrapper = mount(ItemList, {
+      wrapper = mountWithContext(ItemList, {
         props: {
           items: [mockItem],
           viewMode: 'grid'
@@ -402,7 +399,7 @@ describe('ItemList', () => {
 
   describe('Context Menu', () => {
     beforeEach(() => {
-      wrapper = mount(ItemList, {
+      wrapper = mountWithContext(ItemList, {
         props: {
           items: [mockItem],
           viewMode: 'list'
@@ -435,7 +432,7 @@ describe('ItemList', () => {
 
   describe('Empty State', () => {
     it('should show empty state when no items', () => {
-      wrapper = mount(ItemList, {
+      wrapper = mountWithContext(ItemList, {
         props: {
           items: [],
           viewMode: 'grid'
@@ -447,7 +444,7 @@ describe('ItemList', () => {
     })
 
     it('should show helpful message in empty state', () => {
-      wrapper = mount(ItemList, {
+      wrapper = mountWithContext(ItemList, {
         props: {
           items: [],
           viewMode: 'grid'
@@ -460,7 +457,7 @@ describe('ItemList', () => {
 
   describe('Responsiveness', () => {
     beforeEach(() => {
-      wrapper = mount(ItemList, {
+      wrapper = mountWithContext(ItemList, {
         props: {
           items: [mockItem, { ...mockItem, id: 2 }, { ...mockItem, id: 3 }],
           viewMode: 'grid'
@@ -489,8 +486,8 @@ describe('ItemList', () => {
         id: i + 1,
         name: `Item ${i + 1}`
       }))
-      
-      wrapper = mount(ItemList, {
+
+      wrapper = mountWithContext(ItemList, {
         props: {
           items: manyItems,
           viewMode: 'grid'
@@ -503,7 +500,7 @@ describe('ItemList', () => {
     })
 
     it('should not re-render unnecessarily on prop changes', async () => {
-      wrapper = mount(ItemList, {
+      wrapper = mountWithContext(ItemList, {
         props: {
           items: [mockItem],
           viewMode: 'grid'

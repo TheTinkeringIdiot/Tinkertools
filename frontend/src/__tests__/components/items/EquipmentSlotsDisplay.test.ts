@@ -4,19 +4,29 @@
  * Tests for the EquipmentSlotsDisplay component functionality
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mountWithContext, standardCleanup } from '@/__tests__/helpers';
 import EquipmentSlotsDisplay from '@/components/items/EquipmentSlotsDisplay.vue';
 import type { Item } from '@/types/api';
 
-// Mock router 
+// Mock router
 const mockRouter = {
   push: vi.fn()
+};
+
+// Mock toast
+const mockToast = {
+  add: vi.fn()
 };
 
 // Mock vue-router
 vi.mock('vue-router', () => ({
   useRouter: () => mockRouter
+}));
+
+// Mock PrimeVue useToast
+vi.mock('primevue/usetoast', () => ({
+  useToast: () => mockToast
 }));
 
 // Mock the game-utils functions
@@ -108,57 +118,63 @@ describe('EquipmentSlotsDisplay', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRouter.push.mockClear();
+    mockToast.add.mockClear();
+  });
+
+  afterEach(() => {
+    standardCleanup();
   });
 
   describe('Component Rendering', () => {
     it('should render with correct grid structure for armor', () => {
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment: {},
           slotType: 'armor'
         }
       });
 
-      expect(wrapper.find('.equipment-slots-display.armor')).toBeTruthy();
+      expect(wrapper.find('.equipment-slots-display.armor').exists()).toBe(true);
       expect(wrapper.findAll('.equipment-slot-cell')).toHaveLength(15); // 5x3 grid
     });
 
     it('should render with correct grid structure for weapons', () => {
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment: {},
           slotType: 'weapon'
         }
       });
 
-      expect(wrapper.find('.equipment-slots-display.weapon')).toBeTruthy();
+      expect(wrapper.find('.equipment-slots-display.weapon').exists()).toBe(true);
       expect(wrapper.findAll('.equipment-slot-cell')).toHaveLength(15); // 5x3 grid
     });
 
     it('should render with correct grid structure for implants', () => {
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment: {},
           slotType: 'implant'
         }
       });
 
-      expect(wrapper.find('.equipment-slots-display.implant')).toBeTruthy();
+      expect(wrapper.find('.equipment-slots-display.implant').exists()).toBe(true);
       expect(wrapper.findAll('.equipment-slot-cell')).toHaveLength(15); // 5x3 grid
     });
 
     it('should show background images for different slot types', () => {
-      const armorWrapper = mount(EquipmentSlotsDisplay, {
+      const armorWrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: { equipment: {}, slotType: 'armor' }
       });
       expect(armorWrapper.find('.equipment-slots-display').classes()).toContain('armor');
 
-      const weaponWrapper = mount(EquipmentSlotsDisplay, {
+      const weaponWrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: { equipment: {}, slotType: 'weapon' }
       });
       expect(weaponWrapper.find('.equipment-slots-display').classes()).toContain('weapon');
 
-      const implantWrapper = mount(EquipmentSlotsDisplay, {
+      const implantWrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: { equipment: {}, slotType: 'implant' }
       });
       expect(implantWrapper.find('.equipment-slots-display').classes()).toContain('implant');
@@ -171,7 +187,7 @@ describe('EquipmentSlotsDisplay', () => {
         'Head': mockItem
       };
 
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment,
           slotType: 'armor'
@@ -196,14 +212,14 @@ describe('EquipmentSlotsDisplay', () => {
         'Chest': { ...mockItem, name: 'Chest Item' }
       };
 
-      const bodyWrapper = mount(EquipmentSlotsDisplay, {
+      const bodyWrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment: equipmentWithBody,
           slotType: 'armor'
         }
       });
 
-      const chestWrapper = mount(EquipmentSlotsDisplay, {
+      const chestWrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment: equipmentWithChest,
           slotType: 'armor'
@@ -225,7 +241,7 @@ describe('EquipmentSlotsDisplay', () => {
         'Legs': { ...mockItem, id: 3, name: 'Leg Armor' }
       };
 
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment,
           slotType: 'armor'
@@ -252,15 +268,15 @@ describe('EquipmentSlotsDisplay', () => {
         'Head': itemWithoutIcon
       };
 
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment,
           slotType: 'armor'
         }
       });
 
-      expect(wrapper.find('.item-icon')).toBeTruthy();
-      expect(wrapper.find('.item-fallback-icon')).toBeTruthy();
+      expect(wrapper.find('.item-icon').exists()).toBe(false);
+      expect(wrapper.find('.item-fallback-icon').exists()).toBe(true);
       expect(wrapper.find('.item-fallback-icon').classes()).toContain('pi-box');
     });
 
@@ -269,7 +285,7 @@ describe('EquipmentSlotsDisplay', () => {
         'Head': mockItem
       };
 
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment,
           slotType: 'armor'
@@ -290,7 +306,7 @@ describe('EquipmentSlotsDisplay', () => {
 
   describe('Props Handling', () => {
     it('should handle empty equipment object', () => {
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment: {},
           slotType: 'armor'
@@ -308,7 +324,7 @@ describe('EquipmentSlotsDisplay', () => {
         'Legs': mockItem
       };
 
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment,
           slotType: 'armor'
@@ -324,7 +340,7 @@ describe('EquipmentSlotsDisplay', () => {
         'Head': mockItem
       };
 
-      const wrapperWithLabels = mount(EquipmentSlotsDisplay, {
+      const wrapperWithLabels = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment,
           slotType: 'armor',
@@ -332,7 +348,7 @@ describe('EquipmentSlotsDisplay', () => {
         }
       });
 
-      const wrapperWithoutLabels = mount(EquipmentSlotsDisplay, {
+      const wrapperWithoutLabels = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment,
           slotType: 'armor',
@@ -353,7 +369,7 @@ describe('EquipmentSlotsDisplay', () => {
         'Head': mockItem
       };
 
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment,
           slotType: 'armor'
@@ -371,7 +387,7 @@ describe('EquipmentSlotsDisplay', () => {
     });
 
     it('should return empty array for invalid slot type', () => {
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment: {},
           slotType: 'invalid' as any
@@ -379,7 +395,7 @@ describe('EquipmentSlotsDisplay', () => {
       });
 
       // Should render empty grid or handle gracefully
-      expect(wrapper.find('.equipment-slots-display')).toBeTruthy();
+      expect(wrapper.find('.equipment-slots-display').exists()).toBe(false);
     });
   });
 
@@ -391,7 +407,7 @@ describe('EquipmentSlotsDisplay', () => {
         '2048': { ...mockItem, id: 3, name: 'Leg Implant' }   // Legs implant (bitflag 2048)
       };
 
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment: implantEquipment,
           slotType: 'implant'
@@ -425,7 +441,7 @@ describe('EquipmentSlotsDisplay', () => {
         '8192': { ...mockItem, name: 'Feet Implant' }       // Feet
       };
 
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment: fullImplantSet,
           slotType: 'implant'
@@ -450,7 +466,7 @@ describe('EquipmentSlotsDisplay', () => {
         '8192': { ...mockItem, name: 'Feet Implant' }    // Should be at row 5, col 2
       };
 
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment: implantEquipment,
           slotType: 'implant'
@@ -472,7 +488,7 @@ describe('EquipmentSlotsDisplay', () => {
         '32': { ...mockItem, id: 2, name: 'Valid Chest Implant' }  // Valid bitflag
       };
 
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment: implantEquipment,
           slotType: 'implant'
@@ -494,7 +510,7 @@ describe('EquipmentSlotsDisplay', () => {
         'Chest': { ...mockItem, id: 2, name: 'Chest Armor' }
       };
 
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment: armorEquipment,
           slotType: 'armor'
@@ -521,7 +537,7 @@ describe('EquipmentSlotsDisplay', () => {
         'invalidString': null  // Invalid string key with null value (should be ignored)
       };
 
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment: mixedImplantEquipment,
           slotType: 'implant'
@@ -560,14 +576,18 @@ describe('EquipmentSlotsDisplay', () => {
           id: 1,
           stat: 79,
           value: 999
-        }]
+        }],
+        spell_data: [],
+        actions: [],
+        attack_stats: [],
+        defense_stats: []
       };
 
       const armorEquipment = {
         'Head': testItem
       };
 
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment: armorEquipment,
           slotType: 'armor'
@@ -601,14 +621,18 @@ describe('EquipmentSlotsDisplay', () => {
         item_class: 3,
         description: 'Test item',
         is_nano: false,
-        stats: [] // No icon stat
+        stats: [], // No icon stat
+        spell_data: [],
+        actions: [],
+        attack_stats: [],
+        defense_stats: []
       };
 
       const implantEquipment = {
         '32': testItem // Chest implant bitflag
       };
 
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment: implantEquipment,
           slotType: 'implant'
@@ -646,14 +670,18 @@ describe('EquipmentSlotsDisplay', () => {
           id: 2,
           stat: 79,
           value: 888
-        }]
+        }],
+        spell_data: [],
+        actions: [],
+        attack_stats: [],
+        defense_stats: []
       };
 
       const weaponEquipment = {
         'Right-Hand': testItem
       };
 
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment: weaponEquipment,
           slotType: 'weapon'
@@ -676,14 +704,18 @@ describe('EquipmentSlotsDisplay', () => {
         item_class: 2,
         description: 'No icon available',
         is_nano: false,
-        stats: [] // No icon
+        stats: [], // No icon
+        spell_data: [],
+        actions: [],
+        attack_stats: [],
+        defense_stats: []
       };
 
       const armorEquipment = {
         'Chest': testItem
       };
 
-      const wrapper = mount(EquipmentSlotsDisplay, {
+      const wrapper = mountWithContext(EquipmentSlotsDisplay, {
         props: {
           equipment: armorEquipment,
           slotType: 'armor'

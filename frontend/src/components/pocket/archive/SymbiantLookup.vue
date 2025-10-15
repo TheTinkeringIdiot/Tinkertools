@@ -125,6 +125,15 @@ function getSlotIcon(slot: string): string {
   };
   return iconMap[slot] || 'pi-circle';
 }
+
+// Expose methods for tests
+defineExpose({
+  clearAllFilters,
+  showDetails,
+  getDropSources,
+  getQualitySeverity,
+  getSlotIcon
+})
 </script>
 
 <template>

@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mountWithContext, standardCleanup, BREED, PROFESSION, SKILL_ID } from '@/__tests__/helpers';
 import { nextTick } from 'vue';
 import SkillSlider from '@/components/profiles/skills/SkillSlider.vue';
 
@@ -51,18 +51,22 @@ vi.mock('@/services/game-utils', () => ({
 
 describe('SkillSlider Component', () => {
   const defaultProps = {
-    skillName: 'Body Dev.',
+    skillId: 152, // Body Dev
     skillData: {
-      value: 6,
-      pointFromIp: 0,
-      trickleDown: 1,
+      base: 5,
+      trickle: 1,
       ipSpent: 0,
+      pointsFromIp: 0,
+      equipmentBonus: 0,
+      perkBonus: 0,
+      buffBonus: 0,
+      total: 6,
       cap: 13
     },
     isAbility: false,
     isReadOnly: false,
     category: 'Body & Defense',
-    breed: 'Solitus'
+    breed: BREED.SOLITUS
   };
 
   beforeEach(() => {
@@ -71,7 +75,7 @@ describe('SkillSlider Component', () => {
 
   describe('Display Behavior', () => {
     it('should display current value and total cap correctly', () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: defaultProps
       });
 
@@ -80,7 +84,7 @@ describe('SkillSlider Component', () => {
     });
 
     it('should show input field with total skill value', async () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: defaultProps
       });
 
@@ -91,7 +95,7 @@ describe('SkillSlider Component', () => {
     });
 
     it('should display trickle-down bonus when present', () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: defaultProps
       });
 
@@ -101,11 +105,12 @@ describe('SkillSlider Component', () => {
     it('should show IP cost for non-ability skills', () => {
       const skillDataWithIP = {
         ...defaultProps.skillData,
-        pointFromIp: 5,
-        ipSpent: 120
+        pointsFromIp: 5,
+        ipSpent: 120,
+        total: 11 // base (5) + trickle (1) + pointsFromIp (5) = 11
       };
 
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: {
           ...defaultProps,
           skillData: skillDataWithIP
@@ -116,7 +121,7 @@ describe('SkillSlider Component', () => {
     });
 
     it('should display value breakdown in tooltip', () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: defaultProps
       });
 
@@ -131,7 +136,7 @@ describe('SkillSlider Component', () => {
 
   describe('Slider Interaction', () => {
     it('should update input field when slider changes', async () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: defaultProps
       });
 
@@ -144,12 +149,12 @@ describe('SkillSlider Component', () => {
       await slider.setValue(4);
       await nextTick();
 
-      // Input field should show total value: 5 base + 1 trickle + 4 IP = 10
+      // Input field should show total value: 5 base + 1 trickle + 4 pointsFromIp = 10
       expect(inputField.element.value).toBe('10');
     });
 
     it('should emit skill-changed event with total value', async () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: defaultProps
       });
 
@@ -158,11 +163,11 @@ describe('SkillSlider Component', () => {
 
       expect(wrapper.emitted('skill-changed')).toBeTruthy();
       const emittedEvent = wrapper.emitted('skill-changed')?.[0];
-      expect(emittedEvent).toEqual(['Body & Defense', 'Body Dev.', 10]); // Total skill value
+      expect(emittedEvent).toEqual(['Body & Defense', 152, 10]); // Total skill value
     });
 
     it('should respect slider minimum and maximum values', async () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: defaultProps
       });
 
@@ -175,7 +180,7 @@ describe('SkillSlider Component', () => {
 
   describe('Input Field Interaction', () => {
     it('should update slider when input field changes', async () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: defaultProps
       });
 
@@ -193,7 +198,7 @@ describe('SkillSlider Component', () => {
     });
 
     it('should emit skill-changed event when input changes', async () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: defaultProps
       });
 
@@ -202,11 +207,11 @@ describe('SkillSlider Component', () => {
 
       expect(wrapper.emitted('skill-changed')).toBeTruthy();
       const emittedEvent = wrapper.emitted('skill-changed')?.[0];
-      expect(emittedEvent).toEqual(['Body & Defense', 'Body Dev.', 10]);
+      expect(emittedEvent).toEqual(['Body & Defense', 152, 10]);
     });
 
     it('should respect input field minimum and maximum values', async () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: defaultProps
       });
 
@@ -217,7 +222,7 @@ describe('SkillSlider Component', () => {
     });
 
     it('should clamp values to valid range', async () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: defaultProps
       });
 
@@ -234,7 +239,7 @@ describe('SkillSlider Component', () => {
 
   describe('Max Button Behavior', () => {
     it('should set skill to maximum cap when clicked', async () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: defaultProps
       });
 
@@ -249,11 +254,12 @@ describe('SkillSlider Component', () => {
     it('should be disabled when already at maximum', async () => {
       const maxedSkillData = {
         ...defaultProps.skillData,
-        value: 13,
-        pointFromIp: 7 // At maximum IP improvements
+        pointsFromIp: 7, // At maximum IP improvements
+        total: 13, // base (5) + trickle (1) + pointsFromIp (7) = 13
+        cap: 13
       };
 
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: {
           ...defaultProps,
           skillData: maxedSkillData
@@ -267,7 +273,7 @@ describe('SkillSlider Component', () => {
     });
 
     it('should emit event when max button is used', async () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: defaultProps
       });
 
@@ -276,26 +282,30 @@ describe('SkillSlider Component', () => {
 
       expect(wrapper.emitted('skill-changed')).toBeTruthy();
       const emittedEvent = wrapper.emitted('skill-changed')?.[0];
-      expect(emittedEvent).toEqual(['Body & Defense', 'Body Dev.', 13]);
+      expect(emittedEvent).toEqual(['Body & Defense', 152, 13]);
     });
   });
 
   describe('Ability Skills', () => {
     const abilityProps = {
-      skillName: 'Strength',
+      skillId: 16, // Strength
       skillData: {
-        value: 10,
-        pointFromIp: 4,
+        base: 6,
+        pointsFromIp: 4,
+        equipmentBonus: 0,
+        perkBonus: 0,
+        buffBonus: 0,
+        total: 10, // base (6) + pointsFromIp (4) = 10
         cap: 50
       },
       isAbility: true,
       isReadOnly: false,
       category: 'Attributes',
-      breed: 'Solitus'
+      breed: BREED.SOLITUS
     };
 
     it('should handle ability skills differently', async () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: abilityProps
       });
 
@@ -310,7 +320,7 @@ describe('SkillSlider Component', () => {
     });
 
     it('should emit ability-changed for ability skills', async () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: abilityProps
       });
 
@@ -319,7 +329,7 @@ describe('SkillSlider Component', () => {
 
       expect(wrapper.emitted('ability-changed')).toBeTruthy();
       const emittedEvent = wrapper.emitted('ability-changed')?.[0];
-      expect(emittedEvent).toEqual(['Strength', 12]);
+      expect(emittedEvent).toEqual([16, 12]);
     });
   });
 
@@ -331,7 +341,7 @@ describe('SkillSlider Component', () => {
     };
 
     it('should not show interactive controls for read-only skills', () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: readOnlyProps
       });
 
@@ -341,10 +351,11 @@ describe('SkillSlider Component', () => {
     });
 
     it('should show read-only display', () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: readOnlyProps
       });
 
+      // Total value should be displayed (base 5 + trickle 1 = 6)
       expect(wrapper.text()).toContain('6'); // Current value
       expect(wrapper.text()).toContain('Read-Only');
     });
@@ -353,7 +364,7 @@ describe('SkillSlider Component', () => {
   describe('Progress Bar', () => {
     it('should show correct progress percentage', () => {
       // Skill at 6 out of 13 maximum = ~46%
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: defaultProps
       });
 
@@ -365,10 +376,12 @@ describe('SkillSlider Component', () => {
     it('should use appropriate color based on percentage', () => {
       const highValueData = {
         ...defaultProps.skillData,
-        value: 12 // 12/13 = ~92%
+        pointsFromIp: 6,
+        total: 12, // base (5) + trickle (1) + pointsFromIp (6) = 12
+        cap: 13
       };
 
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: {
           ...defaultProps,
           skillData: highValueData
@@ -383,7 +396,7 @@ describe('SkillSlider Component', () => {
 
   describe('Cap Information', () => {
     it('should show remaining points to cap', () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: defaultProps
       });
 
@@ -393,11 +406,12 @@ describe('SkillSlider Component', () => {
     it('should show "At skill cap" when maxed', () => {
       const maxedData = {
         ...defaultProps.skillData,
-        value: 13,
-        pointFromIp: 7 // Max IP improvements to reach cap
+        pointsFromIp: 7, // Max IP improvements to reach cap
+        total: 13, // base (5) + trickle (1) + pointsFromIp (7) = 13
+        cap: 13
       };
 
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: {
           ...defaultProps,
           skillData: maxedData
@@ -412,7 +426,7 @@ describe('SkillSlider Component', () => {
 
   describe('User Interaction Flag', () => {
     it('should not flicker during slider interaction', async () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: defaultProps
       });
 
@@ -433,7 +447,7 @@ describe('SkillSlider Component', () => {
     });
 
     it('should maintain consistency during rapid changes', async () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: defaultProps
       });
 
@@ -454,7 +468,7 @@ describe('SkillSlider Component', () => {
 
   describe('Props Reactivity', () => {
     it('should update when skillData changes', async () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: defaultProps
       });
 
@@ -462,9 +476,9 @@ describe('SkillSlider Component', () => {
       await wrapper.setProps({
         skillData: {
           ...defaultProps.skillData,
-          value: 10,
-          pointFromIp: 4,
-          trickleDown: 1
+          pointsFromIp: 4,
+          trickle: 1,
+          total: 10 // base (5) + trickle (1) + pointsFromIp (4) = 10
         }
       });
 
@@ -476,7 +490,7 @@ describe('SkillSlider Component', () => {
     });
 
     it('should update when cap changes', async () => {
-      const wrapper = mount(SkillSlider, {
+      const wrapper = mountWithContext(SkillSlider, {
         props: defaultProps
       });
 

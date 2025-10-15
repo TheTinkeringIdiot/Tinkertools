@@ -1,26 +1,17 @@
 /**
  * Unit tests for CriterionChip component
- * 
+ *
  * Tests the component for displaying individual criterion requirements as chips
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mountWithContext, standardCleanup } from '@/__tests__/helpers'
 import CriterionChip from '../CriterionChip.vue'
 import type { DisplayCriterion, CharacterStats } from '../../composables/useActionCriteria'
 
 // Mock the isRequirementMet utility function
 vi.mock('../../composables/useActionCriteria', () => ({
   isRequirementMet: vi.fn()
-}))
-
-// Mock PrimeVue components
-vi.mock('primevue/tag', () => ({
-  default: {
-    name: 'Tag',
-    props: ['value', 'severity', 'class', 'icon'],
-    template: '<span class="p-tag" :class="`p-tag-${severity} ${$attrs.class}`"><i v-if="icon" :class="icon"></i> {{ value }}</span>'
-  }
 }))
 
 import { isRequirementMet } from '../../composables/useActionCriteria'
@@ -48,9 +39,13 @@ describe('CriterionChip', () => {
     vi.mocked(isRequirementMet).mockReturnValue(true)
   })
 
+  afterEach(() => {
+    standardCleanup()
+  })
+
   describe('component rendering', () => {
     it('should render without errors', () => {
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion
         }
@@ -60,7 +55,7 @@ describe('CriterionChip', () => {
     })
 
     it('should display criterion description', () => {
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion
         }
@@ -70,7 +65,7 @@ describe('CriterionChip', () => {
     })
 
     it('should render as PrimeVue Tag component', () => {
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion
         }
@@ -86,7 +81,7 @@ describe('CriterionChip', () => {
     it('should show success status when requirement is met', () => {
       vi.mocked(isRequirementMet).mockReturnValue(true)
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion,
           characterStats
@@ -101,7 +96,7 @@ describe('CriterionChip', () => {
     it('should show danger status when requirement is not met', () => {
       vi.mocked(isRequirementMet).mockReturnValue(false)
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion,
           characterStats: { 112: 300 } // Too low
@@ -116,7 +111,7 @@ describe('CriterionChip', () => {
     it('should show secondary status when requirement cannot be evaluated', () => {
       vi.mocked(isRequirementMet).mockReturnValue(null)
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion,
           characterStats
@@ -129,7 +124,7 @@ describe('CriterionChip', () => {
     })
 
     it('should show secondary status when no character stats provided', () => {
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion
         }
@@ -150,7 +145,7 @@ describe('CriterionChip', () => {
         description: 'Profession = Bureaucrat'
       }
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: equalCriterion,
           characterStats: { 112: 8 }
@@ -168,7 +163,7 @@ describe('CriterionChip', () => {
         description: 'Level ≤ 199'
       }
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: lessThanCriterion,
           characterStats: { 112: 150 }
@@ -185,7 +180,7 @@ describe('CriterionChip', () => {
         description: 'Profession ≠ Agent'
       }
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: notEqualCriterion
         }
@@ -201,7 +196,7 @@ describe('CriterionChip', () => {
         description: 'Can flags has flag 64'
       }
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: bitFlagCriterion
         }
@@ -217,7 +212,7 @@ describe('CriterionChip', () => {
         description: 'Can flags lacks flag 32'
       }
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: bitNotSetCriterion
         }
@@ -236,7 +231,7 @@ describe('CriterionChip', () => {
         description: 'Level ≥ 151'
       }
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: levelCriterion,
           characterStats: { 54: 200 }
@@ -256,7 +251,7 @@ describe('CriterionChip', () => {
         description: 'Profession = Bureaucrat'
       }
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: professionCriterion,
           characterStats: { 60: 8 }
@@ -276,7 +271,7 @@ describe('CriterionChip', () => {
         description: 'Breed = Opifex'
       }
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: breedCriterion,
           characterStats: { 4: 1 }
@@ -296,7 +291,7 @@ describe('CriterionChip', () => {
         description: 'Gender = Female'
       }
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: genderCriterion,
           characterStats: { 59: 1 }
@@ -308,38 +303,41 @@ describe('CriterionChip', () => {
   })
 
   describe('requirement evaluation', () => {
-    it('should call isRequirementMet with correct parameters', () => {
-      mount(CriterionChip, {
+    it('should evaluate requirement correctly with character stats', () => {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion,
           characterStats
         }
       })
 
-      expect(isRequirementMet).toHaveBeenCalledWith(mockCriterion, characterStats)
+      // Component should show met status since characterStats[112] = 400 >= 357
+      expect(wrapper.vm.requirementMet).toBe(true)
     })
 
-    it('should not call isRequirementMet when no character stats provided', () => {
-      mount(CriterionChip, {
+    it('should not evaluate requirement when no character stats provided', () => {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion
         }
       })
 
-      expect(isRequirementMet).not.toHaveBeenCalled()
+      // Should show secondary status when no stats
+      expect(wrapper.vm.requirementMet).toBeNull()
     })
 
     it('should handle character stats with missing required stat', () => {
       const statsWithoutRequiredStat = { 54: 200 } // Has Level but not Pistol
 
-      mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion,
           characterStats: statsWithoutRequiredStat
         }
       })
 
-      expect(isRequirementMet).toHaveBeenCalledWith(mockCriterion, statsWithoutRequiredStat)
+      // Should evaluate as false since the required stat is missing (defaults to 0)
+      expect(wrapper.vm.requirementMet).toBe(false)
     })
   })
 
@@ -347,7 +345,7 @@ describe('CriterionChip', () => {
     it('should display check icon for met requirements', () => {
       vi.mocked(isRequirementMet).mockReturnValue(true)
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion,
           characterStats
@@ -361,7 +359,7 @@ describe('CriterionChip', () => {
     it('should display times icon for unmet requirements', () => {
       vi.mocked(isRequirementMet).mockReturnValue(false)
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion,
           characterStats: { 112: 300 }
@@ -375,7 +373,7 @@ describe('CriterionChip', () => {
     it('should display question icon for unknown status', () => {
       vi.mocked(isRequirementMet).mockReturnValue(null)
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion,
           characterStats
@@ -389,7 +387,7 @@ describe('CriterionChip', () => {
     it('should apply success severity class', () => {
       vi.mocked(isRequirementMet).mockReturnValue(true)
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion,
           characterStats
@@ -404,7 +402,7 @@ describe('CriterionChip', () => {
     it('should apply danger severity class', () => {
       vi.mocked(isRequirementMet).mockReturnValue(false)
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion,
           characterStats: { 112: 300 }
@@ -417,7 +415,7 @@ describe('CriterionChip', () => {
     })
 
     it('should apply secondary severity class', () => {
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion
         }
@@ -444,7 +442,7 @@ describe('CriterionChip', () => {
     }
 
     it('should display logical operators without status indicators', () => {
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: logicalCriterion,
           characterStats
@@ -458,14 +456,15 @@ describe('CriterionChip', () => {
     })
 
     it('should not evaluate logical operators', () => {
-      mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: logicalCriterion,
           characterStats
         }
       })
 
-      expect(isRequirementMet).not.toHaveBeenCalled()
+      // Logical operators should not have requirement evaluation
+      expect(wrapper.vm.requirementMet).toBeNull()
     })
   })
 
@@ -477,7 +476,7 @@ describe('CriterionChip', () => {
         description: 'Pistol Op999 357'
       }
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: unknownOperatorCriterion
         }
@@ -493,7 +492,7 @@ describe('CriterionChip', () => {
         description: ''
       }
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: emptyCriterion
         }
@@ -508,7 +507,7 @@ describe('CriterionChip', () => {
         description: 'This is a very long description that might overflow the chip container and needs to be handled gracefully'
       }
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: longDescriptionCriterion
         }
@@ -521,7 +520,7 @@ describe('CriterionChip', () => {
     it('should handle malformed character stats', () => {
       const malformedStats = { 'invalid': 'data' } as any
 
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion,
           characterStats: malformedStats
@@ -529,13 +528,14 @@ describe('CriterionChip', () => {
       })
 
       expect(wrapper.exists()).toBe(true)
-      expect(isRequirementMet).toHaveBeenCalledWith(mockCriterion, malformedStats)
+      // Should handle malformed stats gracefully
+      expect(wrapper.vm.currentValue).toBe(0)
     })
   })
 
   describe('accessibility', () => {
     it('should have appropriate ARIA attributes', () => {
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion,
           characterStats
@@ -548,7 +548,7 @@ describe('CriterionChip', () => {
     })
 
     it('should be focusable for keyboard navigation', () => {
-      const wrapper = mount(CriterionChip, {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion,
           characterStats
@@ -562,26 +562,27 @@ describe('CriterionChip', () => {
   })
 
   describe('performance considerations', () => {
-    it('should not re-evaluate requirements unnecessarily', () => {
-      const wrapper = mount(CriterionChip, {
+    it('should not re-evaluate requirements unnecessarily', async () => {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion,
           characterStats
         }
       })
 
-      // Initial evaluation
-      expect(isRequirementMet).toHaveBeenCalledTimes(1)
+      // Get initial evaluation result
+      const initialResult = wrapper.vm.requirementMet
+      expect(initialResult).toBe(true)
 
-      // Re-render with same props should not trigger additional evaluations
-      wrapper.setProps({ criterion: mockCriterion, characterStats })
-      
-      // Vue's reactivity should prevent unnecessary re-computations
-      expect(isRequirementMet).toHaveBeenCalledTimes(1)
+      // Re-render with same props should not change result
+      await wrapper.setProps({ criterion: mockCriterion, characterStats })
+
+      // Vue's reactivity should maintain the same result
+      expect(wrapper.vm.requirementMet).toBe(initialResult)
     })
 
-    it('should handle frequent prop updates efficiently', () => {
-      const wrapper = mount(CriterionChip, {
+    it('should handle frequent prop updates efficiently', async () => {
+      const wrapper = mountWithContext(CriterionChip, {
         props: {
           criterion: mockCriterion,
           characterStats
@@ -589,9 +590,14 @@ describe('CriterionChip', () => {
       })
 
       // Update character stats multiple times
-      wrapper.setProps({ characterStats: { 112: 350 } })
-      wrapper.setProps({ characterStats: { 112: 400 } })
-      wrapper.setProps({ characterStats: { 112: 450 } })
+      await wrapper.setProps({ characterStats: { 112: 350 } })
+      expect(wrapper.vm.requirementMet).toBe(false)
+
+      await wrapper.setProps({ characterStats: { 112: 400 } })
+      expect(wrapper.vm.requirementMet).toBe(true)
+
+      await wrapper.setProps({ characterStats: { 112: 450 } })
+      expect(wrapper.vm.requirementMet).toBe(true)
 
       // Should remain responsive
       expect(wrapper.exists()).toBe(true)

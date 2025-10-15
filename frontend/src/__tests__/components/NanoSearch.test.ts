@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION } from '@/__tests__/helpers';
 import { nextTick } from 'vue';
 import NanoSearch from '@/components/nanos/NanoSearch.vue';
 
@@ -59,7 +59,7 @@ describe('NanoSearch', () => {
   let wrapper: any;
 
   beforeEach(() => {
-    wrapper = mount(NanoSearch, {
+    wrapper = mountWithContext(NanoSearch, {
       props: {
         modelValue: '',
         totalResults: 0
@@ -166,7 +166,7 @@ describe('NanoSearch', () => {
     localStorageMock.getItem.mockReturnValue('["recent1", "recent2"]');
 
     // Remount to trigger localStorage loading
-    wrapper = mount(NanoSearch, {
+    wrapper = mountWithContext(NanoSearch, {
       props: {
         modelValue: '',
         totalResults: 0

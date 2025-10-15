@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { nextTick } from 'vue';
 import { mount } from '@vue/test-utils';
-import { createApp } from 'vue';
+import { createPinia } from 'pinia';
 import PrimeVue from 'primevue/config';
 
 // Import TinkerPlants component
@@ -22,11 +23,10 @@ describe('TinkerPlants - Simple Tests', () => {
   });
 
   const createWrapper = () => {
+    const pinia = createPinia();
     return mount(TinkerPlants, {
       global: {
-        plugins: [
-          [PrimeVue, {}]
-        ]
+        plugins: [pinia, [PrimeVue, {}]]
       }
     });
   };

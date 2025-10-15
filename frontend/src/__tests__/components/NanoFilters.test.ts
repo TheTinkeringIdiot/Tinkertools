@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION } from '@/__tests__/helpers';
 import { nextTick } from 'vue';
 import NanoFilters from '@/components/nanos/NanoFilters.vue';
 import type { NanoFilters as NanoFiltersType, TinkerProfile } from '@/types/nano';
@@ -83,26 +83,19 @@ describe('NanoFilters', () => {
       sortDescending: false
     };
 
-    mockProfile = {
-      id: 'test-profile',
-      name: 'Test Character',
-      profession: 'Doctor',
+    mockProfile = createTestProfile({
+      profession: PROFESSION.DOCTOR,
       level: 100,
       skills: {
-        'Biological Metamorphosis': 500,
-        'Matter Creation': 300,
-        'Nano Programming': 400
-      },
-      stats: {
-        'Intelligence': 400,
-        'Psychic': 300
-      },
-      activeNanos: [],
-      memoryCapacity: 500,
-      nanoPoints: 1000
-    };
+        [SKILL_ID.BIO_METAMOR]: { base: 5, pointsFromIp: 495, equipmentBonus: 0, total: 500 },
+        [SKILL_ID.MATTER_CREATION]: { base: 5, pointsFromIp: 295, equipmentBonus: 0, total: 300 },
+        [SKILL_ID.NANO_PROGRAMMING]: { base: 5, pointsFromIp: 395, equipmentBonus: 0, total: 400 },
+        [SKILL_ID.INTELLIGENCE]: { base: 6, pointsFromIp: 394, equipmentBonus: 0, total: 400 },
+        [SKILL_ID.PSYCHIC]: { base: 6, pointsFromIp: 294, equipmentBonus: 0, total: 300 }
+      }
+    });
 
-    wrapper = mount(NanoFilters, {
+    wrapper = mountWithContext(NanoFilters, {
       props: {
         modelValue: defaultFilters,
         showCompatibility: false,

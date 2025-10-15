@@ -281,7 +281,28 @@ export class TinkerProfilesManager {
         throw new Error('Profile not found');
       }
 
-      let updated = { ...existing, ...updates, updated: new Date().toISOString() };
+      // Deep merge equipment updates to preserve other slots
+      let updated = { ...existing };
+
+      // Handle equipment updates specially to preserve other slots
+      if (updates.Weapons) {
+        updated.Weapons = { ...existing.Weapons, ...updates.Weapons };
+      }
+      if (updates.Clothing) {
+        updated.Clothing = { ...existing.Clothing, ...updates.Clothing };
+      }
+      if (updates.Implants) {
+        updated.Implants = { ...existing.Implants, ...updates.Implants };
+      }
+
+      // Apply other updates
+      Object.keys(updates).forEach(key => {
+        if (key !== 'Weapons' && key !== 'Clothing' && key !== 'Implants') {
+          (updated as any)[key] = (updates as any)[key];
+        }
+      });
+
+      updated.updated = new Date().toISOString();
 
       // Check if equipment, perks, or buffs changed - if so, recalculate stats
       const needsRecalc = updates.Weapons || updates.Clothing || updates.Implants ||
@@ -307,13 +328,13 @@ export class TinkerProfilesManager {
       if (this.config.events.enabled) {
         this.events.emit('profile:updated', { profile: updated, changes: updates });
       }
-      
+
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to update profile';
       if (this.config.events.enabled) {
-        this.events.emit('storage:error', { 
-          error: new Error(errorMsg), 
-          operation: 'update' 
+        this.events.emit('storage:error', {
+          error: new Error(errorMsg),
+          operation: 'update'
         });
       }
       throw new Error(errorMsg);

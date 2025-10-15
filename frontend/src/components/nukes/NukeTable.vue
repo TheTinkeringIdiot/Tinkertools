@@ -354,6 +354,16 @@ function getModifierStatFromDamageType(damageType: string): number {
 
   return damageTypeMap[damageType] || 96 // Default to poison if unknown
 }
+
+// ============================================================================
+// Expose for Tests
+// ============================================================================
+
+defineExpose({
+  defaultSortField,
+  defaultSortOrder,
+  tableData
+})
 </script>
 
 <style scoped>

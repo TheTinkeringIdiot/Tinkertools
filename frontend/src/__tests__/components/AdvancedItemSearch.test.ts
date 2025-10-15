@@ -6,7 +6,8 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION } from '@/__tests__/helpers'
+
 import { nextTick } from 'vue'
 import PrimeVue from 'primevue/config'
 import Button from 'primevue/button'
@@ -21,10 +22,11 @@ describe('AdvancedItemSearch', () => {
   let wrapper: any
 
   beforeEach(() => {
-    setActivePinia(createPinia())
+    
   })
 
   afterEach(() => {
+    standardCleanup()
     if (wrapper) {
       wrapper.unmount()
     }

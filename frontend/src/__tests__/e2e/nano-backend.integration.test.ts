@@ -1,10 +1,22 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+/**
+ * TinkerNanos Backend Integration Tests
+ *
+ * TRUE INTEGRATION TEST - Requires real backend
+ * Tests TinkerNanos view with real backend integration
+ *
+ * Strategy: Skip when backend not available (Option B)
+ */
+
+import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
+import { nextTick } from 'vue';
 import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { createRouter, createWebHistory } from 'vue-router';
 import TinkerNanos from '@/views/TinkerNanos.vue';
 import { useNanosStore } from '@/stores/nanosStore';
-import { useProfilesStore } from '@/stores/profilesStore';
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
+import { BREED, PROFESSION } from '@/__tests__/helpers';
+import { isBackendAvailable } from '../helpers/backend-check';
 
 // Mock localStorage
 global.localStorage = {
@@ -119,14 +131,24 @@ vi.mock('primevue/progressspinner', () => ({
 
 vi.mock('primevue/togglebutton', () => ({
   default: {
-    name: 'ToggleButton', 
+    name: 'ToggleButton',
     template: '<button @click="$emit(\'update:modelValue\', !modelValue)">{{ modelValue ? "List" : "Schools" }}</button>',
     props: ['modelValue', 'onLabel', 'offLabel'],
     emits: ['update:modelValue']
   }
 }));
 
-describe('TinkerNanos Backend Integration', () => {
+// Check backend availability before running tests
+let BACKEND_AVAILABLE = false;
+
+beforeAll(async () => {
+  BACKEND_AVAILABLE = await isBackendAvailable();
+  if (!BACKEND_AVAILABLE) {
+    console.warn('Backend not available - skipping TinkerNanos backend integration tests');
+  }
+});
+
+describe.skipIf(!BACKEND_AVAILABLE)('TinkerNanos Backend Integration', () => {
   let pinia: any;
 
   beforeEach(async () => {
@@ -150,7 +172,7 @@ describe('TinkerNanos Backend Integration', () => {
 
   it('initializes stores and fetches nano data from backend', async () => {
     const nanosStore = useNanosStore();
-    const profilesStore = useProfilesStore();
+    const profilesStore = useTinkerProfilesStore();
 
     const wrapper = mount(TinkerNanos, {
       global: {
@@ -201,7 +223,7 @@ describe('TinkerNanos Backend Integration', () => {
   }, 10000);
 
   it('handles profile selection', async () => {
-    const profilesStore = useProfilesStore();
+    const profilesStore = useTinkerProfilesStore();
 
     const wrapper = mount(TinkerNanos, {
       global: {
@@ -210,10 +232,12 @@ describe('TinkerNanos Backend Integration', () => {
     });
 
     // Create a test profile
-    const profile = await profilesStore.createProfile({
-      name: 'Test Profile',
-      profession: 'Doctor',
-      level: 100
+    const profile = await profilesStore.createProfile('Test Profile', {
+      Character: {
+        Profession: PROFESSION.DOCTOR, // 10
+        Breed: BREED.SOLITUS, // 1
+        Level: 100
+      }
     });
 
     await wrapper.vm.$nextTick();

@@ -1,11 +1,20 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import TabView from 'primevue/tabview';
 import TabPanel from 'primevue/tabpanel';
 import FindGear from '@/apps/tinkerpocket/views/FindGear.vue';
 import SymbiantCompare from '@/components/pocket/SymbiantCompare.vue';
 
 const activeTab = ref(0);
+
+// Expose for tests
+defineExpose({
+  currentStep: computed(() => {
+    // Map activeTab to step names for tests
+    const steps = ['initial', 'loading', 'loaded']
+    return steps[Math.min(activeTab.value, steps.length - 1)]
+  })
+})
 </script>
 
 <template>

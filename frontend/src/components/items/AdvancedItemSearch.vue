@@ -739,6 +739,14 @@ watch(() => searchForm.value.item_class, () => {
 onMounted(async () => {
   await restoreSearchState()
 })
+
+// Expose for tests
+defineExpose({
+  searchForm,
+  selectedStatBonuses,
+  hasSearchCriteria,
+  hasSearched
+})
 </script>
 
 <style scoped>

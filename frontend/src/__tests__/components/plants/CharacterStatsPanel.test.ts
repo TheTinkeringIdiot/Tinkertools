@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { nextTick } from 'vue';
+import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION, BREED } from '@/__tests__/helpers';
 import CharacterStatsPanel from '@/components/plants/CharacterStatsPanel.vue';
 import type { CharacterProfile, CharacterStats } from '@/types/plants';
 
@@ -46,7 +47,7 @@ describe('CharacterStatsPanel', () => {
   });
 
   beforeEach(() => {
-    wrapper = mount(CharacterStatsPanel, {
+    wrapper = mountWithContext(CharacterStatsPanel, {
       props: {
         profile: null,
         editable: true,
@@ -56,6 +57,7 @@ describe('CharacterStatsPanel', () => {
   });
 
   afterEach(() => {
+    standardCleanup()
     wrapper?.unmount();
   });
 

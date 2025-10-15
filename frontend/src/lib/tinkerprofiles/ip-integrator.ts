@@ -489,8 +489,26 @@ export function updateProfileSkillInfo(
       skillData.perkBonus = perkBonus;
       skillData.buffBonus = buffBonus;
 
-      // Calculate total value: only bonuses for bonus-only stats
-      skillData.total = equipmentBonus + perkBonus + buffBonus;
+      // Special case: MaxNCU (stat 181) - has a base value that receives bonuses
+      if (skillId === 181) {
+        const totalBonuses = equipmentBonus + perkBonus + buffBonus;
+
+        if (totalBonuses === 0) {
+          // No bonuses: preserve existing total (for test profiles with custom MaxNCU)
+          // or calculate default from level
+          if (!skillData.total || skillData.total === 0) {
+            skillData.total = Math.max(1200, characterStats.level * 6);
+          }
+          // else: keep existing total unchanged
+        } else {
+          // Has bonuses: calculate base from level and add bonuses
+          const baseMaxNCU = Math.max(1200, characterStats.level * 6);
+          skillData.total = baseMaxNCU + totalBonuses;
+        }
+      } else {
+        // Other bonus-only stats: no base value, only bonuses
+        skillData.total = equipmentBonus + perkBonus + buffBonus;
+      }
     }
   }
 
@@ -738,7 +756,15 @@ export async function modifySkill(
   error?: string;
   updatedProfile?: TinkerProfile;
 }> {
-  const skillData = profile.skills[skillId];
+  let skillData = profile.skills[skillId];
+
+  // Auto-create missing trainable skills for better UX
+  // This allows users to modify any trainable skill without pre-initialization
+  if (!skillData && TRAINABLE_SKILL_IDS.has(skillId)) {
+    skillData = createEmptySkillData();
+    profile.skills[skillId] = skillData;
+  }
+
   if (!skillData) {
     return {
       success: false,

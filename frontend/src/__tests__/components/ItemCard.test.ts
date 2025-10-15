@@ -1,56 +1,13 @@
 /**
  * ItemCard Component Tests
- * 
+ *
  * Tests for the ItemCard component functionality
  */
 
-// @ts-nocheck
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID } from '@/__tests__/helpers'
 import ItemCard from '../../components/items/ItemCard.vue'
 import type { Item, TinkerProfile } from '../../types/api'
-
-// Mock PrimeVue components
-vi.mock('primevue/card', () => ({
-  default: {
-    name: 'Card',
-    template: `
-      <div class="p-card" v-bind="$attrs" @click="$emit('click')">
-        <div class="p-card-header"><slot name="header" /></div>
-        <div class="p-card-title"><slot name="title" /></div>
-        <div class="p-card-content"><slot name="content" /></div>
-        <div class="p-card-footer"><slot name="footer" /></div>
-      </div>
-    `,
-    emits: ['click']
-  }
-}))
-
-vi.mock('primevue/badge', () => ({
-  default: {
-    name: 'Badge',
-    template: '<span class="p-badge" :class="severity">{{ value }}</span>',
-    props: ['value', 'severity', 'size']
-  }
-}))
-
-vi.mock('primevue/button', () => ({
-  default: {
-    name: 'Button',
-    template: '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
-    props: ['icon', 'size', 'rounded', 'severity', 'text'],
-    emits: ['click']
-  }
-}))
-
-vi.mock('primevue/tag', () => ({
-  default: {
-    name: 'Tag',
-    template: '<span class="p-tag" :class="severity">{{ value }}</span>',
-    props: ['value', 'severity', 'size']
-  }
-}))
 
 const mockItem: Item = {
   id: 1,
@@ -91,23 +48,20 @@ const mockNanoItem: Item = {
   attack_defense: null
 }
 
-const mockProfile: TinkerProfile = {
-  id: 'test-profile',
-  name: 'Test Character',
+const mockProfile: TinkerProfile = createTestProfile({
   level: 200,
-  profession: 'Soldier',
-  stats: {
-    16: 350, // Strength - meets requirement
-    17: 200, // Agility - doesn't meet requirement
-    133: 450 // Ranged Energy - meets requirement
+  profession: 1, // Soldier
+  skills: {
+    [SKILL_ID.STRENGTH]: { base: 0, trickle: 0, pointsFromIp: 350, equipmentBonus: 0, total: 350 },
+    [SKILL_ID.AGILITY]: { base: 0, trickle: 0, pointsFromIp: 200, equipmentBonus: 0, total: 200 },
+    133: { base: 0, trickle: 0, pointsFromIp: 450, equipmentBonus: 0, total: 450 } // Ranged Energy
   }
-}
+})
 
 describe('ItemCard', () => {
   let wrapper: any
 
   beforeEach(() => {
-    setActivePinia(createPinia())
     vi.clearAllMocks()
   })
 
@@ -115,11 +69,12 @@ describe('ItemCard', () => {
     if (wrapper) {
       wrapper.unmount()
     }
+    standardCleanup()
   })
 
   describe('Component Mounting', () => {
     it('should mount without errors', () => {
-      wrapper = mount(ItemCard, {
+      wrapper = mountWithContext(ItemCard, {
         props: {
           item: mockItem
         }
@@ -129,7 +84,7 @@ describe('ItemCard', () => {
     })
 
     it('should display item basic information', () => {
-      wrapper = mount(ItemCard, {
+      wrapper = mountWithContext(ItemCard, {
         props: {
           item: mockItem
         }
@@ -141,20 +96,21 @@ describe('ItemCard', () => {
     })
 
     it('should show nano badge for nano items', () => {
-      wrapper = mount(ItemCard, {
+      wrapper = mountWithContext(ItemCard, {
         props: {
           item: mockNanoItem
         }
       })
-      
-      const nanoBadge = wrapper.find('.p-badge:contains("Nano")')
-      expect(nanoBadge.exists()).toBe(true)
+
+      const nanoBadges = wrapper.findAll('.p-badge')
+      const nanoBadge = nanoBadges.find(badge => badge.text().includes('Nano'))
+      expect(nanoBadge).toBeTruthy()
     })
   })
 
   describe('Item Stats Display', () => {
     beforeEach(() => {
-      wrapper = mount(ItemCard, {
+      wrapper = mountWithContext(ItemCard, {
         props: {
           item: mockItem
         }
@@ -185,7 +141,7 @@ describe('ItemCard', () => {
         ]
       }
       
-      wrapper = mount(ItemCard, {
+      wrapper = mountWithContext(ItemCard, {
         props: {
           item: itemWithZeroStat
         }
@@ -201,7 +157,7 @@ describe('ItemCard', () => {
   describe('Compatibility Features', () => {
     describe('without profile', () => {
       beforeEach(() => {
-        wrapper = mount(ItemCard, {
+        wrapper = mountWithContext(ItemCard, {
           props: {
             item: mockItem,
             showCompatibility: true
@@ -221,7 +177,7 @@ describe('ItemCard', () => {
 
     describe('with profile', () => {
       beforeEach(() => {
-        wrapper = mount(ItemCard, {
+        wrapper = mountWithContext(ItemCard, {
           props: {
             item: mockItem,
             profile: mockProfile,
@@ -273,7 +229,7 @@ describe('ItemCard', () => {
           ]
         }
         
-        wrapper = mount(ItemCard, {
+        wrapper = mountWithContext(ItemCard, {
           props: {
             item: itemWithManyReqs,
             profile: mockProfile,
@@ -295,7 +251,7 @@ describe('ItemCard', () => {
           ]
         }
         
-        wrapper = mount(ItemCard, {
+        wrapper = mountWithContext(ItemCard, {
           props: {
             item: compatibleItem,
             profile: mockProfile,
@@ -311,7 +267,7 @@ describe('ItemCard', () => {
 
   describe('Item Properties and Tags', () => {
     it('should show weapon property for items with attack data', () => {
-      wrapper = mount(ItemCard, {
+      wrapper = mountWithContext(ItemCard, {
         props: {
           item: mockItem
         }
@@ -324,7 +280,7 @@ describe('ItemCard', () => {
     })
 
     it('should show special effects property for items with spell data', () => {
-      wrapper = mount(ItemCard, {
+      wrapper = mountWithContext(ItemCard, {
         props: {
           item: mockItem
         }
@@ -336,20 +292,21 @@ describe('ItemCard', () => {
     })
 
     it('should mark high QL items as rare', () => {
-      wrapper = mount(ItemCard, {
+      wrapper = mountWithContext(ItemCard, {
         props: {
           item: mockItem // QL 250 should be considered rare
         }
       })
-      
-      const rareBadge = wrapper.find('.p-badge:contains("Rare")')
-      expect(rareBadge.exists()).toBe(true)
+
+      const badges = wrapper.findAll('.p-badge')
+      const rareBadge = badges.find(badge => badge.text().includes('Rare'))
+      expect(rareBadge).toBeTruthy()
     })
   })
 
   describe('User Interactions', () => {
     beforeEach(() => {
-      wrapper = mount(ItemCard, {
+      wrapper = mountWithContext(ItemCard, {
         props: {
           item: mockItem,
           isFavorite: false,
@@ -406,7 +363,7 @@ describe('ItemCard', () => {
 
   describe('Visual States', () => {
     it('should show different favorite button states', async () => {
-      wrapper = mount(ItemCard, {
+      wrapper = mountWithContext(ItemCard, {
         props: {
           item: mockItem,
           isFavorite: true
@@ -419,7 +376,7 @@ describe('ItemCard', () => {
     })
 
     it('should show different comparison button states', () => {
-      wrapper = mount(ItemCard, {
+      wrapper = mountWithContext(ItemCard, {
         props: {
           item: mockItem,
           isComparing: true
@@ -431,7 +388,7 @@ describe('ItemCard', () => {
     })
 
     it('should apply comparison visual styling', () => {
-      wrapper = mount(ItemCard, {
+      wrapper = mountWithContext(ItemCard, {
         props: {
           item: mockItem,
           isComparing: true
@@ -444,7 +401,7 @@ describe('ItemCard', () => {
     })
 
     it('should apply compatibility visual styling', () => {
-      wrapper = mount(ItemCard, {
+      wrapper = mountWithContext(ItemCard, {
         props: {
           item: {
             ...mockItem,
@@ -463,7 +420,7 @@ describe('ItemCard', () => {
 
   describe('Item Type and Category', () => {
     it('should display correct item type label', () => {
-      wrapper = mount(ItemCard, {
+      wrapper = mountWithContext(ItemCard, {
         props: {
           item: mockItem // item_class: 5 should be "Ranged"
         }
@@ -473,7 +430,7 @@ describe('ItemCard', () => {
     })
 
     it('should handle unknown item classes gracefully', () => {
-      wrapper = mount(ItemCard, {
+      wrapper = mountWithContext(ItemCard, {
         props: {
           item: {
             ...mockItem,
@@ -488,7 +445,7 @@ describe('ItemCard', () => {
 
   describe('Responsive Design', () => {
     it('should have responsive card layout', () => {
-      wrapper = mount(ItemCard, {
+      wrapper = mountWithContext(ItemCard, {
         props: {
           item: mockItem
         }
@@ -500,7 +457,7 @@ describe('ItemCard', () => {
     })
 
     it('should show/hide quick actions on hover', () => {
-      wrapper = mount(ItemCard, {
+      wrapper = mountWithContext(ItemCard, {
         props: {
           item: mockItem
         }
@@ -513,7 +470,7 @@ describe('ItemCard', () => {
 
   describe('Accessibility', () => {
     beforeEach(() => {
-      wrapper = mount(ItemCard, {
+      wrapper = mountWithContext(ItemCard, {
         props: {
           item: mockItem
         }
@@ -553,7 +510,7 @@ describe('ItemCard', () => {
         animation_mesh: null
       }
       
-      wrapper = mount(ItemCard, {
+      wrapper = mountWithContext(ItemCard, {
         props: {
           item: minimalItem
         }
@@ -569,7 +526,7 @@ describe('ItemCard', () => {
         stats: []
       }
       
-      wrapper = mount(ItemCard, {
+      wrapper = mountWithContext(ItemCard, {
         props: {
           item: itemWithoutStats
         }

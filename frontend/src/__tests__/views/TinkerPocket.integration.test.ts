@@ -1,4 +1,14 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+/**
+ * TinkerPocket Integration Tests
+ *
+ * TRUE INTEGRATION TEST - Requires real backend
+ * Tests full TinkerPocket view with real API calls
+ *
+ * Strategy: Skip when backend not available (Option B)
+ */
+
+import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
+import { nextTick } from 'vue';
 import { mount, VueWrapper } from '@vue/test-utils';
 import { createPinia } from 'pinia';
 import { createRouter, createWebHistory } from 'vue-router';
@@ -6,8 +16,19 @@ import PrimeVue from 'primevue/config';
 import TinkerPocket from '@/views/TinkerPocket.vue';
 import { usePocketBossStore } from '@/stores/pocketBossStore';
 import { useSymbiantsStore } from '@/stores/symbiants';
+import { isBackendAvailable } from '../helpers/backend-check';
 
-describe('TinkerPocket Integration Tests', () => {
+// Check backend availability before running tests
+let BACKEND_AVAILABLE = false;
+
+beforeAll(async () => {
+  BACKEND_AVAILABLE = await isBackendAvailable();
+  if (!BACKEND_AVAILABLE) {
+    console.warn('Backend not available - skipping TinkerPocket integration tests');
+  }
+});
+
+describe.skipIf(!BACKEND_AVAILABLE)('TinkerPocket Integration Tests', () => {
   let wrapper: VueWrapper;
   let router: any;
   let pinia: any;

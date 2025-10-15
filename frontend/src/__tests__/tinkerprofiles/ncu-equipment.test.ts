@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TinkerProfilesManager } from '@/lib/tinkerprofiles';
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import { BREED, PROFESSION } from '@/__tests__/helpers';
 
 describe('NCU Equipment Bonuses', () => {
   let manager: TinkerProfilesManager;
@@ -22,32 +23,38 @@ describe('NCU Equipment Bonuses', () => {
     profileId = await manager.createProfile('NCU Test', {
       Character: {
         Name: 'NCU Test',
-        Profession: 'Nanotechnician',
-        Breed: 'Opifex',
+        Profession: PROFESSION.NANO_TECHNICIAN,
+        Breed: BREED.OPIFEX,
         Level: 200,
         Gender: 'Male'
       }
     } as Partial<TinkerProfile>);
   });
 
-  it('should update MaxNCU (Computer Literacy) when equipping NCU items', async () => {
+  it('should update MaxNCU when equipping NCU items', async () => {
     // Load the profile
     let profile = await manager.loadProfile(profileId);
     expect(profile).toBeDefined();
 
-    // Get initial Computer Literacy value
-    const initialComputerLiteracy = profile?.Skills?.Misc?.['Computer Literacy'] || 0;
-    console.log('Initial Computer Literacy:', initialComputerLiteracy);
+    // Get initial Max NCU value (stat ID 181)
+    const initialMaxNCU = profile?.skills?.[181]?.total || 0;
+    console.log('Initial Max NCU:', initialMaxNCU);
 
-    // Simulate equipping an NCU item (e.g., NCU Memory with +20 Computer Literacy)
-    // Item aoid 303992 or similar
+    // Simulate equipping an NCU item with +20 Max NCU (stat ID 181)
     const ncuItem = {
       aoid: 303992,
       name: 'NCU Memory Test',
       ql: 200,
-      stats: {
-        'Computer Literacy': 20  // Adds +20 to Computer Literacy
-      }
+      spell_data: [{
+        event: 14,  // Wear event
+        spells: [{
+          spell_id: 53045,  // Modify Stat spell ID
+          spell_params: {
+            Stat: 181,  // Max NCU stat ID
+            Amount: 20  // +20 Max NCU
+          }
+        }]
+      }]
     };
 
     // Equip the item in a slot (e.g., Chest slot for testing)
@@ -62,17 +69,17 @@ describe('NCU Equipment Bonuses', () => {
     profile = await manager.loadProfile(profileId);
     expect(profile).toBeDefined();
 
-    // Check that Computer Literacy has increased
-    const updatedComputerLiteracy = profile?.Skills?.Misc?.['Computer Literacy'] || 0;
-    console.log('Updated Computer Literacy:', updatedComputerLiteracy);
+    // Check that Max NCU has increased
+    const updatedMaxNCU = profile?.skills?.[181]?.total || 0;
+    console.log('Updated Max NCU:', updatedMaxNCU);
 
-    // The Computer Literacy should have increased by the equipment bonus
-    expect(updatedComputerLiteracy).toBeGreaterThan(initialComputerLiteracy);
+    // The Max NCU should have increased by the equipment bonus
+    expect(updatedMaxNCU).toBeGreaterThan(initialMaxNCU);
 
     // Verify the equipment bonus was applied (should be at least 20 more)
     // Note: The exact increase depends on how the equipment bonus calculator works
     // but it should definitely be higher than before
-    expect(updatedComputerLiteracy).toBeGreaterThanOrEqual(initialComputerLiteracy + 20);
+    expect(updatedMaxNCU).toBeGreaterThanOrEqual(initialMaxNCU + 20);
   });
 
   it('should update MaxNCU when equipping multiple NCU items', async () => {
@@ -80,8 +87,8 @@ describe('NCU Equipment Bonuses', () => {
     let profile = await manager.loadProfile(profileId);
     expect(profile).toBeDefined();
 
-    // Get initial Computer Literacy value
-    const initialComputerLiteracy = profile?.Skills?.Misc?.['Computer Literacy'] || 0;
+    // Get initial Max NCU value (stat ID 181)
+    const initialMaxNCU = profile?.skills?.[181]?.total || 0;
 
     // Simulate equipping multiple NCU items
     const ncuItems = {
@@ -89,19 +96,46 @@ describe('NCU Equipment Bonuses', () => {
         aoid: 303992,
         name: 'NCU Memory 1',
         ql: 200,
-        stats: { 'Computer Literacy': 20 }
+        spell_data: [{
+          event: 14,
+          spells: [{
+            spell_id: 53045,
+            spell_params: {
+              Stat: 181,
+              Amount: 20
+            }
+          }]
+        }]
       },
       Legs: {
         aoid: 303993,
         name: 'NCU Memory 2',
         ql: 200,
-        stats: { 'Computer Literacy': 25 }
+        spell_data: [{
+          event: 14,
+          spells: [{
+            spell_id: 53045,
+            spell_params: {
+              Stat: 181,
+              Amount: 25
+            }
+          }]
+        }]
       },
       Head: {
         aoid: 303994,
         name: 'NCU Memory 3',
         ql: 200,
-        stats: { 'Computer Literacy': 30 }
+        spell_data: [{
+          event: 14,
+          spells: [{
+            spell_id: 53045,
+            spell_params: {
+              Stat: 181,
+              Amount: 30
+            }
+          }]
+        }]
       }
     };
 
@@ -117,13 +151,13 @@ describe('NCU Equipment Bonuses', () => {
     profile = await manager.loadProfile(profileId);
     expect(profile).toBeDefined();
 
-    // Check that Computer Literacy has increased significantly
-    const updatedComputerLiteracy = profile?.Skills?.Misc?.['Computer Literacy'] || 0;
-    console.log('Initial Computer Literacy:', initialComputerLiteracy);
-    console.log('Updated Computer Literacy with 3 items:', updatedComputerLiteracy);
+    // Check that Max NCU has increased significantly
+    const updatedMaxNCU = profile?.skills?.[181]?.total || 0;
+    console.log('Initial Max NCU:', initialMaxNCU);
+    console.log('Updated Max NCU with 3 items:', updatedMaxNCU);
 
     // Should have increased by at least the sum of all bonuses (75)
-    expect(updatedComputerLiteracy).toBeGreaterThanOrEqual(initialComputerLiteracy + 75);
+    expect(updatedMaxNCU).toBeGreaterThanOrEqual(initialMaxNCU + 75);
   });
 
   it('should decrease MaxNCU when unequipping NCU items', async () => {
@@ -133,7 +167,16 @@ describe('NCU Equipment Bonuses', () => {
       aoid: 303992,
       name: 'NCU Memory',
       ql: 200,
-      stats: { 'Computer Literacy': 50 }
+      spell_data: [{
+        event: 14,
+        spells: [{
+          spell_id: 53045,
+          spell_params: {
+            Stat: 181,
+            Amount: 50
+          }
+        }]
+      }]
     };
 
     await manager.updateProfile(profileId, {
@@ -145,7 +188,7 @@ describe('NCU Equipment Bonuses', () => {
 
     // Get the value with equipment
     profile = await manager.loadProfile(profileId);
-    const withEquipmentNCU = profile?.Skills?.Misc?.['Computer Literacy'] || 0;
+    const withEquipmentNCU = profile?.skills?.[181]?.total || 0;
 
     // Now unequip the item
     await manager.updateProfile(profileId, {
@@ -157,12 +200,12 @@ describe('NCU Equipment Bonuses', () => {
 
     // Get the value without equipment
     profile = await manager.loadProfile(profileId);
-    const withoutEquipmentNCU = profile?.Skills?.Misc?.['Computer Literacy'] || 0;
+    const withoutEquipmentNCU = profile?.skills?.[181]?.total || 0;
 
-    console.log('Computer Literacy with equipment:', withEquipmentNCU);
-    console.log('Computer Literacy without equipment:', withoutEquipmentNCU);
+    console.log('Max NCU with equipment:', withEquipmentNCU);
+    console.log('Max NCU without equipment:', withoutEquipmentNCU);
 
-    // Computer Literacy should have decreased
+    // Max NCU should have decreased
     expect(withoutEquipmentNCU).toBeLessThan(withEquipmentNCU);
   });
 });

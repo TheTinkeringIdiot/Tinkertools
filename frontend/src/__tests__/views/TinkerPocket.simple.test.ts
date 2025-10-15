@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { nextTick } from 'vue';
 import { mount } from '@vue/test-utils';
 import { createPinia } from 'pinia';
 import { createRouter, createWebHistory } from 'vue-router';
@@ -252,7 +253,7 @@ describe('TinkerPocket Integration Workflow', () => {
       methods: {
         async simulateLoad() {
           this.currentStep = 'loading';
-          
+
           try {
             // Simulate API calls
             await new Promise(resolve => setTimeout(resolve, 10));
@@ -269,14 +270,17 @@ describe('TinkerPocket Integration Workflow', () => {
     });
 
     expect(wrapper.vm.currentStep).toBe('initial');
-    
-    await wrapper.find('button').trigger('click');
+
+    await wrapper.find('button').trigger('click', {
+      stopPropagation: () => {},
+      preventDefault: () => {}
+    });
     expect(wrapper.vm.currentStep).toBe('loading');
-    
+
     // Wait for async operation
     await wrapper.vm.$nextTick();
     await new Promise(resolve => setTimeout(resolve, 20));
-    
+
     expect(wrapper.vm.currentStep).toBe('loaded');
   });
 });
