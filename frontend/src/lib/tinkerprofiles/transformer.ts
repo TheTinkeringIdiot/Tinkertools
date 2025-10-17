@@ -646,14 +646,23 @@ export class ProfileTransformer {
           result.warnings.push(`No valid clusters found for implant in slot ${placement.slot}`);
           return null;
         }
-        
+
         // Call backend API to lookup the exact implant
-        const lookupItem = await apiClient.lookupImplant(
+        const lookupResponse = await apiClient.lookupImplant(
           slotPosition,
           placement.targetQl || 100,
           clusters
         );
-        
+
+        // Check if lookup was successful
+        if (!lookupResponse.success || !lookupResponse.data) {
+          const errorMsg = lookupResponse.error?.message || 'Implant lookup failed';
+          result.warnings.push(`Failed to lookup implant for slot ${placement.slot}: ${errorMsg}`);
+          return this.createPlaceholderImplant(placement, result, slotPosition);
+        }
+
+        const lookupItem = lookupResponse.data;
+
         // Create enhanced implant with the real data
         const enhancedImplant: ImplantWithClusters = {
           ...lookupItem,

@@ -31,7 +31,8 @@ import type {
   InterpolatedItem,
   InterpolationRequest,
   InterpolationResponse,
-  InterpolationInfo
+  InterpolationInfo,
+  ImplantLookupResponse
 } from '../types/api'
 import { ErrorCodes } from '../types/api'
 
@@ -431,37 +432,54 @@ class TinkerToolsApiClient {
   // ============================================================================
   // Implant API
   // ============================================================================
-  
-  async lookupImplant(slot: number, ql: number, clusters: Record<string, number>): Promise<Item> {
+
+  async lookupImplant(slot: number, ql: number, clusters: Record<string, number>): Promise<ImplantLookupResponse> {
     try {
-      const request = { slot, ql, clusters };
-      const response = await this.client.post('/implants/lookup', request);
-      
-      if (response.data.success && response.data.item) {
-        return response.data.item;
-      } else {
-        throw new Error(response.data.message || 'Implant lookup failed');
+      const request = { slot, ql, clusters }
+      const response = await this.client.post<ImplantLookupResponse>('/implants/lookup', request)
+
+      // Backend returns ImplantLookupResponse with item in 'item' field
+      return response.data
+    } catch (error: any) {
+      throw this.handleError(error)
+    }
+  }
+
+  async getAvailableImplants(slot: number, ql: number = 1): Promise<ApiResponse<Item[]>> {
+    try {
+      const response = await this.client.get<Item[]>(`/implants/slots/${slot}/available?ql=${ql}`)
+
+      // Check if response is already wrapped in ApiResponse format
+      if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+        return response.data as ApiResponse<Item[]>
+      }
+
+      // Wrap raw response in ApiResponse format
+      return {
+        success: true,
+        data: Array.isArray(response.data) ? response.data : []
       }
     } catch (error: any) {
-      throw this.handleError(error);
+      throw this.handleError(error)
     }
   }
 
-  async getAvailableImplants(slot: number, ql: number = 1): Promise<Item[]> {
+  async validateClusters(clusters: Record<string, number>): Promise<ApiResponse<{ valid: boolean; message: string }>> {
     try {
-      const response = await this.client.get(`/implants/slots/${slot}/available?ql=${ql}`);
-      return response.data || [];
-    } catch (error: any) {
-      throw this.handleError(error);
-    }
-  }
+      const response = await this.client.post<{ valid: boolean; message: string }>('/implants/validate-clusters', clusters)
 
-  async validateClusters(clusters: Record<string, number>): Promise<{ valid: boolean; message: string }> {
-    try {
-      const response = await this.client.post('/implants/validate-clusters', clusters);
-      return response.data;
+      // Check if response is already wrapped in ApiResponse format
+      if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+        return response.data as ApiResponse<{ valid: boolean; message: string }>
+      }
+
+      // Wrap raw response in ApiResponse format
+      return {
+        success: true,
+        data: response.data
+      }
     } catch (error: any) {
-      throw this.handleError(error);
+      throw this.handleError(error)
     }
   }
 

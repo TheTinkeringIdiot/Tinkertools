@@ -298,7 +298,6 @@ const props = withDefaults(defineProps<Props>(), {
 // ============================================================================
 
 const tinkerProfilesStore = useTinkerProfilesStore();
-const { activeProfile } = tinkerProfilesStore;
 
 // ============================================================================
 // Construction Planner Integration
@@ -340,12 +339,12 @@ const autoAnalyze = ref(false);
 
 // Computed property for skill values using ID-based access
 const skillValues = computed(() => ({
-  nanoProgramming: activeProfile.value?.skills[skillService.resolveId('Nano Programming')]?.total ?? 0,
-  breakAndEntry: activeProfile.value?.skills[skillService.resolveId('Break & Entry')]?.total ?? 0,
-  psychology: activeProfile.value?.skills[skillService.resolveId('Psychology')]?.total ?? 0,
-  quantumFT: activeProfile.value?.skills[skillService.resolveId('Quantum FT')]?.total ?? 0,
-  computerLiteracy: activeProfile.value?.skills[skillService.resolveId('Computer Literacy')]?.total ?? 0,
-  pharmaTech: activeProfile.value?.skills[skillService.resolveId('Pharma Tech')]?.total ?? 0
+  nanoProgramming: tinkerProfilesStore.activeProfile?.skills[skillService.resolveId('Nano Programming')]?.total ?? 0,
+  breakAndEntry: tinkerProfilesStore.activeProfile?.skills[skillService.resolveId('Break & Entry')]?.total ?? 0,
+  psychology: tinkerProfilesStore.activeProfile?.skills[skillService.resolveId('Psychology')]?.total ?? 0,
+  quantumFT: tinkerProfilesStore.activeProfile?.skills[skillService.resolveId('Quantum FT')]?.total ?? 0,
+  computerLiteracy: tinkerProfilesStore.activeProfile?.skills[skillService.resolveId('Computer Literacy')]?.total ?? 0,
+  pharmaTech: tinkerProfilesStore.activeProfile?.skills[skillService.resolveId('Pharma Tech')]?.total ?? 0
 }));
 
 // Local skills for form binding - these track the profile values but allow editing

@@ -50,19 +50,22 @@ vi.mock('@/services/api-client', () => {
     }),
     lookupPerkByAoid: vi.fn().mockResolvedValue(null),
     lookupImplant: vi.fn().mockResolvedValue({
-      id: 1,
-      aoid: 123456,
-      name: 'Mock Implant',
-      ql: 100,
-      description: 'A test implant',
-      item_class: 3,
-      is_nano: false,
-      stats: [],
-      spell_data: [],
-      actions: [],
-      attack_stats: [],
-      defense_stats: [],
-      sources: []
+      success: true,
+      data: {
+        id: 1,
+        aoid: 123456,
+        name: 'Mock Implant',
+        ql: 100,
+        description: 'A test implant',
+        item_class: 3,
+        is_nano: false,
+        stats: [],
+        spell_data: [],
+        actions: [],
+        attack_stats: [],
+        defense_stats: [],
+        sources: []
+      }
     })
   };
   return {

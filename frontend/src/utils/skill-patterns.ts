@@ -35,7 +35,7 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
 
   103: {
     statId: 103,
-    patterns: [/^1h\s*Edged?$/i],
+    patterns: [/^1h\s*Edged?(\sWeapon)?$/i],
     category: 'Melee Weapons',
     description: '1h Edged'
   },
@@ -303,7 +303,7 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
 
   128: {
     statId: 128,
-    patterns: [/^Bio(logical)?\s*Metamor(ph(osis)?)?$/i],
+    patterns: [/^Bio(logical)?(\s)?.*Metamor(ph(osis)?)?$/i],
     category: 'Nanos & Casting',
     description: 'Biological Metamorphosis'
   },
@@ -319,8 +319,12 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
   // Trade & Repair
   // ============================================================================
 
-  // Note: Mechanical Engineering is 125 but conflicts with Time & Space
-  // These need to be handled by category context
+  125: {
+    statId: 125,
+    patterns: [/^Mech(anical)?\.?\s*Eng(i(neering)?)?$/i],
+    category: 'Trade & Repair',
+    description: 'Mechanical Engineering'
+  },
 
   126: {
     statId: 126,
@@ -389,9 +393,26 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
   // Combat & Healing
   // ============================================================================
 
-  // Note: First Aid is 123 but conflicts with Psychological Modifications
-  // Note: Treatment is 124 but conflicts with Sensory Improvement
-  // These need to be handled by category context
+  123: {
+    statId: 123,
+    patterns: [/^First\s*Aid$/i],
+    category: 'Combat & Healing',
+    description: 'First Aid'
+  },
+
+  124: {
+    statId: 124,
+    patterns: [/^Treatment$/i],
+    category: 'Combat & Healing',
+    description: 'Treatment'
+  },
+
+  135: {
+    statId: 135,
+    patterns: [/^Trap\s*Disarm$/i],
+    category: 'Combat & Healing',
+    description: 'Trap Disarm'
+  },
 
   162: {
     statId: 162,
@@ -484,6 +505,13 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
     description: 'Vehicle Air'
   },
 
+  140: {
+    statId: 140,
+    patterns: [/^Map\s*Nav.*$/i],
+    category: 'Exploring',
+    description: 'Map Navigation'
+  },
+
   156: {
     statId: 156,
     patterns: [/^Run\s*Speed$/i],
@@ -493,14 +521,14 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
 
   166: {
     statId: 166,
-    patterns: [/^Vehicle\s*Ground$/i],
+    patterns: [/^Vehicle\s*Gr(ou)?nd$/i],
     category: 'Exploring',
     description: 'Vehicle Ground'
   },
 
   117: {
     statId: 117,
-    patterns: [/^Vehicle\s*Water$/i],
+    patterns: [/^Vehicle\s*(Water|Hydr(o)?)$/i],
     category: 'Exploring',
     description: 'Vehicle Water'
   },
@@ -572,13 +600,279 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
     description: 'Disease AC'
   },
 
+  205: {
+    statId: 205,
+    patterns: [/^Reflect\s*Projectile\s*AC$/i],
+    category: 'ACs',
+    description: 'Reflect Projectile AC'
+  },
+
+  206: {
+    statId: 206,
+    patterns: [/^Reflect\s*Melee\s*AC$/i],
+    category: 'ACs',
+    description: 'Reflect Melee AC'
+  },
+
+  207: {
+    statId: 207,
+    patterns: [/^Reflect\s*Energy\s*AC$/i],
+    category: 'ACs',
+    description: 'Reflect Energy AC'
+  },
+
+  208: {
+    statId: 208,
+    patterns: [/^Reflect\s*Chemical\s*AC$/i],
+    category: 'ACs',
+    description: 'Reflect Chemical AC'
+  },
+
+  216: {
+    statId: 216,
+    patterns: [/^Reflect\s*Radiation\s*AC$/i],
+    category: 'ACs',
+    description: 'Reflect Radiation AC'
+  },
+
+  217: {
+    statId: 217,
+    patterns: [/^Reflect\s*Cold\s*AC$/i],
+    category: 'ACs',
+    description: 'Reflect Cold AC'
+  },
+
+  218: {
+    statId: 218,
+    patterns: [/^Reflect\s*Nano\s*AC$/i],
+    category: 'ACs',
+    description: 'Reflect Nano AC'
+  },
+
+  219: {
+    statId: 219,
+    patterns: [/^Reflect\s*Fire\s*AC$/i],
+    category: 'ACs',
+    description: 'Reflect Fire AC'
+  },
+
+  225: {
+    statId: 225,
+    patterns: [/^Reflect\s*Poison\s*AC$/i],
+    category: 'ACs',
+    description: 'Reflect Poison AC'
+  },
+
+  226: {
+    statId: 226,
+    patterns: [/^Shield\s*Projectile\s*AC$/i],
+    category: 'ACs',
+    description: 'Shield Projectile AC'
+  },
+
+  227: {
+    statId: 227,
+    patterns: [/^Shield\s*Melee\s*AC$/i],
+    category: 'ACs',
+    description: 'Shield Melee AC'
+  },
+
+  228: {
+    statId: 228,
+    patterns: [/^Shield\s*Energy\s*AC$/i],
+    category: 'ACs',
+    description: 'Shield Energy AC'
+  },
+
+  229: {
+    statId: 229,
+    patterns: [/^Shield\s*Chemical\s*AC$/i],
+    category: 'ACs',
+    description: 'Shield Chemical AC'
+  },
+
+  230: {
+    statId: 230,
+    patterns: [/^Shield\s*Radiation\s*AC$/i],
+    category: 'ACs',
+    description: 'Shield Radiation AC'
+  },
+
+  231: {
+    statId: 231,
+    patterns: [/^Shield\s*Cold\s*AC$/i],
+    category: 'ACs',
+    description: 'Shield Cold AC'
+  },
+
+  232: {
+    statId: 232,
+    patterns: [/^Shield\s*Nano\s*AC$/i],
+    category: 'ACs',
+    description: 'Shield Nano AC'
+  },
+
+  233: {
+    statId: 233,
+    patterns: [/^Shield\s*Fire\s*AC$/i],
+    category: 'ACs',
+    description: 'Shield Fire AC'
+  },
+
+  234: {
+    statId: 234,
+    patterns: [/^Shield\s*Poison\s*AC$/i],
+    category: 'ACs',
+    description: 'Shield Poison AC'
+  },
+
+  238: {
+    statId: 238,
+    patterns: [/^Absorb\s*Projectile\s*AC$/i],
+    category: 'ACs',
+    description: 'Absorb Projectile AC'
+  },
+
+  239: {
+    statId: 239,
+    patterns: [/^Absorb\s*Melee\s*AC$/i],
+    category: 'ACs',
+    description: 'Absorb Melee AC'
+  },
+
+  240: {
+    statId: 240,
+    patterns: [/^Absorb\s*Energy\s*AC$/i],
+    category: 'ACs',
+    description: 'Absorb Energy AC'
+  },
+
+  241: {
+    statId: 241,
+    patterns: [/^Absorb\s*Chemical\s*AC$/i],
+    category: 'ACs',
+    description: 'Absorb Chemical AC'
+  },
+
+  242: {
+    statId: 242,
+    patterns: [/^Absorb\s*Radiation\s*AC$/i],
+    category: 'ACs',
+    description: 'Absorb Radiation AC'
+  },
+
+  243: {
+    statId: 243,
+    patterns: [/^Absorb\s*Cold\s*AC$/i],
+    category: 'ACs',
+    description: 'Absorb Cold AC'
+  },
+
+  244: {
+    statId: 244,
+    patterns: [/^Absorb\s*Fire\s*AC$/i],
+    category: 'ACs',
+    description: 'Absorb Fire AC'
+  },
+
+  245: {
+    statId: 245,
+    patterns: [/^Absorb\s*Poison\s*AC$/i],
+    category: 'ACs',
+    description: 'Absorb Poison AC'
+  },
+
+  246: {
+    statId: 246,
+    patterns: [/^Absorb\s*Nano\s*AC$/i],
+    category: 'ACs',
+    description: 'Absorb Nano AC'
+  },
+
+  // ============================================================================
+  // Add Damage
+  // ============================================================================
+
+  // 278: 'ProjectileDamageModifier',
+  // 279: 'MeleeDamageModifier',
+  // 280: 'EnergyDamageModifier',
+  // 281: 'ChemicalDamageModifier',
+  // 282: 'RadiationDamageModifier',
+  // 311: 'ColdDamageModifier',
+  // 315: 'NanoDamageModifier',
+  // 316: 'FireDamageModifier',
+  // 317: 'PoisonDamageModifier',
+
+  278: {
+    statId: 278,
+    patterns: [/^Projectile\s*Damage\s*Modifier$/i, /Add.?\s*Proj.?\s*Dam(age|.)/],
+    category: 'Damage',
+    description: 'Projectile Damage Modifier'
+  },
+
+  279: {
+    statId: 279,
+    patterns: [/^Melee\s*Damage\s*Modifier$/i, /Add.?\s*Melee\s*Dam(age|.)/],
+    category: 'Damage',
+    description: 'Melee Damage Modifier'
+  },
+
+  280: {
+    statId: 280,
+    patterns: [/^Energy\s*Damage\s*Modifier$/i, /Add.?\s*Energy\s*Dam(age|.)/],
+    category: 'Damage',
+    description: 'Energy Damage Modifier'
+  },
+
+  281: {
+    statId: 281,
+    patterns: [/^Chemical\s*Damage\s*Modifier$/i, /Add.?\s*Chem.?\s*Dam(age|.)/],
+    category: 'Damage',
+    description: 'Chemical Damage Modifier'
+  },
+
+  282: {
+    statId: 282,
+    patterns: [/^Radiation\s*Damage\s*Modifier$/i, /Add.?\s*Rad.?\s*Dam(age|.)/],
+    category: 'Damage',
+    description: 'Radiation Damage Modifier'
+  },
+
+  311: {
+    statId: 311,
+    patterns: [/^Cold\s*Damage\s*Modifier$/i, /Add.?\s*Cold\s*Dam(age|.)/],
+    category: 'Damage',
+    description: 'Cold Damage Modifier'
+  },
+
+  315: {
+    statId: 315,
+    patterns: [/^Nano\s*Damage\s*Modifier$/i, /Add.?\s*Nano\s*Dam(age|.)/],
+    category: 'Damage',
+    description: 'Nano Damage Modifier'
+  },
+
+  316: {
+    statId: 316,
+    patterns: [/^Fire\s*Damage\s*Modifier$/i, /Add.?\s*Fire\s*Dam(age|.)/],
+    category: 'Damage',
+    description: 'Fire Damage Modifier'
+  },
+
+  317: {
+    statId: 317,
+    patterns: [/^Poison\s*Damage\s*Modifier$/i, /Add.?\s*Poison\s*Dam(age|.)/],
+    category: 'Damage',
+    description: 'Poison Damage Modifier'
+  },
+
   // ============================================================================
   // Misc Skills
   // ============================================================================
 
   276: {
     statId: 276,
-    patterns: [/^Add\s*All\s*Off(ense|\.)$/i],
+    patterns: [/^Add\s*All\s*Off(ense|\.)?$/i],
     category: 'Misc',
     description: 'Add All Offense'
   },
@@ -595,13 +889,66 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
     patterns: [/^Max\s*NCU$/i],
     category: 'Misc',
     description: 'Max NCU'
-  }
+  },
 
-  // Note: Deflect doesn't exist as a skill - it might be Parry (145)
-}
+  236: {
+    statId: 236,
+    patterns: [/^InsurancePercentage$/i],
+    category: 'ACs',
+    description: 'Insurance Percentage'
+  },
 
-/**
- * Find a skill value from a profile category by matching against known patterns
+  318: {
+    statId: 318,
+    patterns: [/^NanoCost$/i, /Nano\s*Point\s*Cost\s*Modifier/i],
+    category: 'Misc',
+    description: 'Nano Cost'
+  },
+
+  343: {
+    statId: 343,
+    patterns: [/^Heal\s*Delta$/i],
+    category: 'Misc',
+    description: 'Heal Delta'
+  },
+
+  364: {
+    statId: 364,
+    patterns: [/^Nano\s*Delta$/i],
+    category: 'Misc',
+    description: 'Nano Delta'
+  },
+
+  341: {
+    statId: 341,
+    patterns: [/^XP\s*Bonus$/i, /^Add.\s*XP$/i],
+    category: 'Misc',
+    description: 'XP Bonus'
+  },
+
+  382: {
+    statId: 382,
+    patterns: [/^SkillLock$/i, /Skill\s*Time\s*Lock\s*Modifier/i],
+    category: 'Misc',
+    description: 'Skill Lock'
+  },
+
+  383: {
+    statId: 383,
+    patterns: [/^NanoInterrupt$/i, /Nano\s*Formula\s*Interrupt\s*Modifier/i],
+    category: 'Misc',
+    description: 'Nano Interrupt'
+  },
+
+  0: {
+    statId: 0,
+    patterns: [/^Empty$/i],
+    category: 'Misc',
+    description: 'None'
+  },
+};
+
+ /* Find a skill value from a profile category by matching against known patterns
  * @param skillCategory Object containing skills from a profile category
  * @param statId The stat ID we're looking for
  * @returns The skill value if found, or null

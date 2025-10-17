@@ -187,7 +187,10 @@ describe('Profile Equipment Integration', () => {
         .mockResolvedValueOnce({ data: { ...mockItem, id: 5, name: 'Brain Symbiant' } });
       
       // Setup implant lookup API response
-      mockedApiClient.lookupImplant.mockResolvedValue(mockImplantItem);
+      mockedApiClient.lookupImplant.mockResolvedValue({
+        success: true,
+        data: mockImplantItem
+      });
 
       const store = useTinkerProfilesStore();
       
@@ -435,8 +438,8 @@ describe('Profile Equipment Integration', () => {
       };
 
       mockedApiClient.lookupImplant
-        .mockResolvedValueOnce(chestImplant)
-        .mockResolvedValueOnce(earImplant);
+        .mockResolvedValueOnce({ success: true, data: chestImplant })
+        .mockResolvedValueOnce({ success: true, data: earImplant });
 
       const store = useTinkerProfilesStore();
       const result = await store.importProfile(testImplantData, 'aosetups');

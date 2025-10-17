@@ -205,7 +205,18 @@ export const SKILL_ID_MAP: Record<string, number> = {
   'Sensory Impr': 122,       // AOSetups variant of 'Sensory Improvement'
   'Sneak Atck': 146,         // AOSetups variant of 'Sneak Attack'
   'Time&Space': 131,         // AOSetups variant of 'Time & Space'
-  'Weapon Smt': 158          // AOSetups variant of 'Weapon Smith'
+  'Weapon Smt': 158,         // AOSetups variant of 'Weapon Smith'
+
+  // Database cluster name variations (full forms from implant descriptions)
+  'Sensory Improvement and Modification': 122,  // Full form of 'Sensory Improvement'
+  'Ranged Weapons Initiative': 119,             // Full form of 'Ranged Init'
+  'Biological Metamorphoses': 128,              // Alternate spelling of 'Bio Metamor'
+  'Physical Prowess and Martial Arts Initiative': 120, // Full form of 'Physical Init'
+  'Matter Metamorphoses': 127,                  // Alternate spelling of 'Matt Metam'
+  'life': 1,                                     // Lowercase 'life' = Max Health
+  'Breaking and Entering': 165,                 // Full form of 'Break & Entry'
+  'Multiple Ranged Weapons': 134,               // Full form of 'Multi Ranged'
+  'Evade Close Combat and Martial Art Attacks': 155 // Full form of 'Evade-ClsC'
 };
 
 /**

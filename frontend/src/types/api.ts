@@ -576,3 +576,83 @@ export interface SearchResponse<T> extends PaginatedResponse<T> {
   }
   suggestions?: string[]
 }
+
+// ============================================================================
+// TinkerPlants Types
+// ============================================================================
+
+/** Implant selection configuration for a single slot */
+export interface ImplantSelection {
+  /** Shiny cluster stat ID (e.g., 112 for Pistol, 131 for Time & Space) or null if empty */
+  shiny: number | null
+  /** Bright cluster stat ID or null if empty */
+  bright: number | null
+  /** Faded cluster stat ID or null if empty */
+  faded: number | null
+  /** Quality level (1-300) */
+  ql: number
+  /** Slot bitflag string key (e.g., "2" for Eyes, "4" for Head) */
+  slotBitflag: string
+  /** Full item data from API (null if not yet loaded) */
+  item: Item | null
+}
+
+/** Request format for implant lookup API */
+export interface ImplantLookupRequest {
+  /** Slot position number or bitflag */
+  slot: number
+  /** Quality level (1-300) */
+  ql: number
+  /** Cluster configuration as stat ID → cluster name mapping */
+  clusters: Record<string, number>
+}
+
+/** Response format for implant lookup API */
+export interface ImplantLookupResponse {
+  /** Whether the lookup was successful */
+  success: boolean
+  /** The found implant item data (null if not found) */
+  item: Item | null
+  /** Success or error message */
+  message?: string
+  /** Whether the item was interpolated to target QL */
+  interpolated: boolean
+  /** Base QL of the database item used */
+  base_ql?: number
+}
+
+/** Requirement check result for a single stat */
+export interface ImplantRequirement {
+  /** Stat ID (e.g., 134 for Treatment) */
+  stat: number
+  /** Human-readable stat name */
+  statName: string
+  /** Required value for this stat */
+  required: number
+  /** Current profile value for this stat */
+  current: number
+  /** Whether requirement is met */
+  met: boolean
+}
+
+/** Treatment requirement information */
+export interface TreatmentInfo {
+  /** Treatment value required by implant configuration */
+  required: number
+  /** Current Treatment value from profile */
+  current: number
+  /** Delta between required and current (positive = need more) */
+  delta: number
+  /** Whether profile treatment meets requirement */
+  sufficient: boolean
+}
+
+/** Validation result for implant configuration */
+export interface ImplantValidationResult {
+  /** Whether configuration is valid */
+  valid: boolean
+  /** Blocking errors (invalid clusters, QoL out of range, etc.) */
+  errors: string[]
+  /** Non-blocking warnings (suboptimal choices, etc.) */
+  warnings: string[]
+}
