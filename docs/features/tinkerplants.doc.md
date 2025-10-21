@@ -60,21 +60,25 @@ The system automatically:
 
 ### Treatment Calculation
 1. **Requirement scan** → Iterate all configured implants' action criteria
-2. **Treatment extraction** → Find highest Treatment (stat 134) requirement across items
-3. **Profile comparison** → Compare to profile.skills[134].total
+2. **Treatment extraction** → Find highest Treatment (stat 124) requirement across items
+3. **Profile comparison** → Compare to profile.skills[124].total
 4. **Delta calculation** → treatmentInfo = { required, current, delta, sufficient }
-5. **Display** → TreatmentDisplay.vue shows prominent status with color-coded tags
+5. **Display** → TreatmentDisplay.vue shows prominent status with color-coded tags (now in Bonuses tab)
 
 ## Implementation
 
 ### Key Files
 
 #### Frontend Components
-- **`frontend/src/views/TinkerPlants.vue`** - Main view with 13-slot grid, dual tabs (Build/Construction)
+- **`frontend/src/views/TinkerPlants.vue`** - Main view with 13-slot grid, three tabs (Build/Bonuses/Construction)
+  - Build tab: ClusterLookup + ImplantGrid (configuration only)
+  - Bonuses tab: TreatmentDisplay + BonusDisplay + RequirementsDisplay (results only)
+  - Construction tab: ConstructionPlanner (build order planning)
+  - Calculate button validation: Ensures all configured implants complete lookups before calculation
 - **`frontend/src/components/plants/ClusterLookup.vue`** - AutoComplete cluster search with slot highlighting
 - **`frontend/src/components/plants/AttributePreference.vue`** - Attribute filter selection (future implant variant filtering)
-- **`frontend/src/components/plants/BonusDisplay.vue`** - Aggregate and per-implant bonus display with responsive layout
-- **`frontend/src/components/plants/RequirementsDisplay.vue`** - Two-column requirements (Equipment vs Build)
+- **`frontend/src/components/plants/BonusDisplay.vue`** - Aggregate and per-implant bonus display with responsive layout, graceful fallback for unknown stat IDs
+- **`frontend/src/components/plants/RequirementsDisplay.vue`** - Two-column requirements (Equipment vs Build), now imports ImplantRequirement type from @/types/api
 - **`frontend/src/components/plants/TreatmentDisplay.vue`** - Prominent Treatment status display with color-coded tags
 - **`frontend/src/components/plants/ConstructionPlanner.vue`** - Construction tab for build order planning (existing)
 
@@ -84,6 +88,8 @@ The system automatically:
   - Actions: loadFromProfile, saveToProfile, revertToProfile, updateSlot, lookupImplantForSlot, calculateBonuses, calculateRequirements
   - Cache: In-memory Map with 5-minute TTL for implant lookups
   - Debouncing: 100ms delay on manual changes to avoid rapid-fire API calls
+  - Bug fix: Treatment stat ID corrected from 134 to 124
+  - Type safety: Proper type casting for ImplantWithClusters → Item conversion
 
 #### Frontend Utilities
 - **`frontend/src/utils/cluster-utilities.ts`** - Comprehensive cluster operations
@@ -97,6 +103,9 @@ The system automatically:
 #### Integration Points
 - **`frontend/src/services/api-client.ts`** - lookupImplant() method (POST /api/implants/lookup)
 - **`frontend/src/services/equipment-bonus-calculator.ts`** - parseItemSpells() for bonus extraction
+  - Critical fix: Now extracts bonuses ONLY from spell_data (item.stats does NOT contain implant bonuses)
+  - Removed incorrect double-extraction that was causing duplicate/incorrect bonuses
+  - Improved stat ID validation to skip non-trainable stats like Mass (stat 2)
 - **`frontend/src/services/action-criteria.ts`** - getCriteriaRequirements() for requirement parsing
 - **`frontend/src/services/skill-service.ts`** - resolveId() for cluster name → stat ID conversion
 - **`frontend/src/services/game-data.ts`** - IMP_SKILLS, IMP_SLOTS, NP_MODS, JOBE_SKILL, CLUSTER_MIN_QL
@@ -151,6 +160,57 @@ profile.Implants = {
   // ... etc for all 13 slots
 }
 ```
+
+### Recent Improvements (October 2025)
+
+#### Three-Tab UI Reorganization
+**Problem**: Build tab was cluttered with both configuration controls and calculation results, making it difficult to focus on either task.
+
+**Solution**: Split functionality across three focused tabs:
+- Build tab: Pure configuration (ClusterLookup + ImplantGrid)
+- Bonuses tab: Pure results (TreatmentDisplay + BonusDisplay + RequirementsDisplay)
+- Construction tab: Build planning (ConstructionPlanner)
+
+**Benefits**:
+- Clearer user mental model (configure → view results → plan build)
+- Reduced visual clutter in each tab
+- Better mobile experience (less scrolling within tabs)
+- Easier to find specific information
+
+#### Calculate Button Validation
+**Problem**: Users could click Calculate while implant lookups were still in progress, leading to incomplete bonus calculations.
+
+**Solution**: Added validation that counts configured slots vs slots with fetched items, blocking Calculate if any lookups are pending.
+
+**Implementation**: Shows informative toast message: "Some implants are still loading. Please wait for all lookups to complete."
+
+#### Equipment Bonus Extraction Fix
+**Problem**: equipmentBonusCalculator was extracting bonuses from both item.stats AND spell_data, causing duplicate/incorrect bonuses. Implant bonuses are ONLY in spell_data.
+
+**Solution**: Removed item.stats extraction entirely from parseItemSpells() and parseEquipmentItem(). Now only processes spell_data for bonuses.
+
+**Impact**: Accurate bonus calculations for all equipment types, especially implants.
+
+#### Treatment Stat ID Correction
+**Problem**: Code was using stat ID 134 for Treatment skill, which is incorrect.
+
+**Solution**: Corrected to stat ID 124 (the actual Treatment skill ID) in all Treatment-related calculations.
+
+**Files affected**: tinkerPlants.ts (treatment calculations and requirement checks)
+
+#### Type Safety Improvements
+**Problem**: Type casting issues when converting ImplantWithClusters to Item in loadFromProfile().
+
+**Solution**: Added explicit type casting chain (ImplantWithClusters → unknown → Item) with comments explaining safety.
+
+**Problem**: RequirementsDisplay was importing ImplantRequirement type from store instead of centralized types.
+
+**Solution**: Changed import to @/types/api for better type organization and reusability.
+
+#### Error Handling Improvements
+**Problem**: BonusDisplay would crash if encountering unknown stat IDs.
+
+**Solution**: Added try/catch around skillService.getName() with graceful fallback to "Stat {ID}" format. Logs warning to console for debugging.
 
 ### Key Technical Decisions
 
@@ -273,11 +333,25 @@ JOBE_SKILL = {
 
 ### UI/UX Features
 
-#### Grid Layout
+#### Three-Tab Interface
+**Build Tab** (Configuration-focused):
 - 13-row grid (one per slot) with 5 columns: Slot | Shiny | Bright | Faded | QL
+- ClusterLookup search component at top for finding clusters across slots
+- Calculate button with validation (ensures all configured implants complete lookups)
 - Responsive: Maintains structure on mobile (horizontal scroll if needed)
 - Visual feedback: Per-slot loading spinners during API calls
 - Keyboard accessible: Full tab navigation and screen reader support
+
+**Bonuses Tab** (Results-focused):
+- TreatmentDisplay showing Treatment requirements and deltas (moved from Build tab)
+- BonusDisplay with aggregate totals and per-implant breakdowns (moved from Build tab)
+- RequirementsDisplay with Equipment and Build requirements (moved from Build tab)
+- Empty state: Informative message prompting users to configure implants in Build tab
+- Clean separation: Results only, no configuration controls
+
+**Construction Tab** (Planning-focused):
+- ConstructionPlanner for build order optimization
+- Tracks NP and Jobe combining skill requirements
 
 #### Cluster Highlighting
 - ClusterLookup search highlights matching slots with colored borders
@@ -290,12 +364,15 @@ JOBE_SKILL = {
 - Status colors: Green (sufficient) vs Red (insufficient)
 - Real-time delta: Shows exact +/- treatment needed
 - Responsive layout: Switches to vertical stack on mobile
+- Location: Bonuses tab (previously in Build tab)
 
 #### Bonus Display
 - Dual view: Aggregate totals (grid cards) + per-implant breakdown (table)
 - Responsive: Grid cards → mobile-friendly cards on small screens
 - Sorting: Bonuses sorted by value descending for quick scanning
+- Graceful error handling: Falls back to "Stat {ID}" for unknown stat IDs
 - Empty state: Informative message when no implants configured
+- Location: Bonuses tab (previously in Build tab)
 
 #### Save/Revert System
 - Visual indicators: Badge with "*" on Save button when hasChanges = true
