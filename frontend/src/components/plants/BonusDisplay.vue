@@ -185,9 +185,19 @@ function formatBonuses(bonuses: Record<number, number>): BonusEntry[] {
   return Object.entries(bonuses)
     .map(([statIdStr, value]) => {
       const statId = parseInt(statIdStr, 10);
+      let statName: string;
+
+      try {
+        statName = skillService.getName(statId);
+      } catch (error) {
+        // Graceful fallback for unknown stat IDs
+        console.warn(`Unable to get name for stat ID ${statId}:`, error);
+        statName = `Stat ${statId}`;
+      }
+
       return {
         statId,
-        statName: skillService.getName(statId),
+        statName,
         value
       };
     })

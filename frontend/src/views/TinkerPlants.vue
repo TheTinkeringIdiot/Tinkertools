@@ -116,15 +116,6 @@ Grid-based implant selection following the legacy TinkerPlants format
                   @fill-all-requested="handleFillAll"
                 />
 
-                <!-- Treatment Display Component -->
-                <TreatmentDisplay
-                  v-if="showResults"
-                  :treatment-required="tinkerPlantsStore.treatmentInfo.required"
-                  :profile-treatment="tinkerPlantsStore.treatmentInfo.current"
-                  :delta="tinkerPlantsStore.treatmentInfo.delta"
-                  :sufficient="tinkerPlantsStore.treatmentInfo.sufficient"
-                />
-
                 <!-- Implant Grid -->
                 <div class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg overflow-hidden">
           <!-- Grid Header -->
@@ -136,7 +127,7 @@ Grid-based implant selection following the legacy TinkerPlants format
               Shiny
             </div>
             <div class="p-3 font-semibold text-surface-900 dark:text-surface-50 text-center border-r border-surface-200 dark:border-surface-700">
-              Bright  
+              Bright
             </div>
             <div class="p-3 font-semibold text-surface-900 dark:text-surface-50 text-center border-r border-surface-200 dark:border-surface-700">
               Faded
@@ -145,7 +136,7 @@ Grid-based implant selection following the legacy TinkerPlants format
               QL
             </div>
           </div>
-          
+
           <!-- Grid Rows -->
           <div
             v-for="(slot, index) in implantSlots"
@@ -233,9 +224,25 @@ Grid-based implant selection following the legacy TinkerPlants format
             </div>
           </div>
                 </div>
+              </div>
+            </div>
+          </TabPanel>
+
+          <!-- Bonuses Tab -->
+          <TabPanel header="Bonuses" class="h-full">
+            <div class="p-4">
+              <div class="max-w-6xl mx-auto space-y-6">
+                <!-- Treatment Display Component -->
+                <TreatmentDisplay
+                  v-if="showResults"
+                  :treatment-required="tinkerPlantsStore.treatmentInfo.required"
+                  :profile-treatment="tinkerPlantsStore.treatmentInfo.current"
+                  :delta="tinkerPlantsStore.treatmentInfo.delta"
+                  :sufficient="tinkerPlantsStore.treatmentInfo.sufficient"
+                />
 
                 <!-- Results Section -->
-                <div v-if="showResults" class="mt-6 space-y-6">
+                <div v-if="showResults" class="space-y-6">
                   <!-- Skeleton loaders while calculating -->
                   <template v-if="loading">
                     <div class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
@@ -262,9 +269,17 @@ Grid-based implant selection following the legacy TinkerPlants format
 
                     <!-- Requirements Display Component -->
                     <RequirementsDisplay
-                      :requirements="tinkerPlantsStore.calculatedRequirements"
+                      :requirements="requirementsForDisplay"
                     />
                   </template>
+                </div>
+
+                <!-- Empty state when no results -->
+                <div v-else class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-8">
+                  <div class="text-center text-surface-500 dark:text-surface-400">
+                    <i class="pi pi-info-circle text-4xl mb-4" aria-hidden="true"></i>
+                    <p class="text-lg">Configure implants in the Build tab and click Calculate to see bonuses and requirements.</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -274,7 +289,7 @@ Grid-based implant selection following the legacy TinkerPlants format
           <TabPanel header="Construction" class="h-full">
             <div class="p-4">
               <div class="max-w-6xl mx-auto">
-                <ConstructionPlanner 
+                <ConstructionPlanner
                   :implants="implantSelections"
                   :current-build="calculatedBonuses"
                 />
@@ -425,6 +440,14 @@ const calculatedBonuses = computed(() => {
 const constructionRequirements = computed(() => {
   // Get requirements from store calculation
   return tinkerPlantsStore.calculatedRequirements || [];
+});
+
+/**
+ * Computed requirements that converts readonly array to mutable for component props
+ */
+const requirementsForDisplay = computed(() => {
+  // Convert readonly array to mutable array for RequirementsDisplay component
+  return [...tinkerPlantsStore.calculatedRequirements];
 });
 
 /**
@@ -585,6 +608,23 @@ const clearAllImplants = () => {
 
 const calculateBuild = () => {
   if (!hasAnyImplants.value) return;
+
+  // Validate that all configured implants have completed their lookups
+  const config = tinkerPlantsStore.currentConfiguration as Record<string, any>;
+  const configuredSlots = Object.entries(config).filter(([_, selection]) => {
+    const hasNonEmptyClusters =
+      selection.shiny !== null ||
+      selection.bright !== null ||
+      selection.faded !== null;
+    return hasNonEmptyClusters;
+  });
+
+  const slotsWithItems = configuredSlots.filter(([_, selection]) => !!selection.item);
+
+  if (configuredSlots.length > slotsWithItems.length) {
+    announce('Some implants are still loading. Please wait for all lookups to complete.', 'assertive');
+    return;
+  }
 
   setLoading(true, 'Calculating implant build...');
 

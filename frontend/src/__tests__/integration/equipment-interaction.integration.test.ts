@@ -17,7 +17,9 @@ import {
   createArmorItem,
   createImplantItem,
   createStatValue,
-  createItemWithRequirements
+  createItemWithRequirements,
+  createSpellData,
+  createSpell
 } from '../helpers/item-fixtures';
 import { SKILL_ID } from '../helpers/skill-fixtures';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
@@ -88,10 +90,15 @@ describe('Equipment Interaction Integration', () => {
         name: 'Combat Rifle',
         aoid: 100001,
         ql: 200,
-        stats: [
-          createStatValue(SKILL_ID.ASSAULT_RIF, 50),
-          createStatValue(SKILL_ID.RANGED_INIT, 25),
-          createStatValue(SKILL_ID.ADD_PROJ_DAM, 100)
+        spell_data: [
+          createSpellData({
+            event: 2, // Wield event for weapons
+            spells: [
+              createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.ASSAULT_RIF, Amount: 50 } }),
+              createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.RANGED_INIT, Amount: 25 } }),
+              createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.ADD_PROJ_DAM, Amount: 100 } })
+            ]
+          })
         ]
       });
 
@@ -125,9 +132,14 @@ describe('Equipment Interaction Integration', () => {
         name: 'Combat Armor',
         aoid: 100002,
         ql: 180,
-        stats: [
-          createStatValue(SKILL_ID.PROJECTILE_AC, 500),
-          createStatValue(SKILL_ID.MELEE_AC, 400)
+        spell_data: [
+          createSpellData({
+            event: 14, // Wear event for armor
+            spells: [
+              createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.PROJECTILE_AC, Amount: 500 } }),
+              createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.MELEE_AC, Amount: 400 } })
+            ]
+          })
         ]
       });
 
@@ -151,21 +163,36 @@ describe('Equipment Interaction Integration', () => {
         name: 'Assault Rifle',
         aoid: 100003,
         ql: 200,
-        stats: [createStatValue(SKILL_ID.ASSAULT_RIF, 30)]
+        spell_data: [
+          createSpellData({
+            event: 2,
+            spells: [createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.ASSAULT_RIF, Amount: 30 } })]
+          })
+        ]
       });
 
       const armor = createArmorItem({
         name: 'Tactical Armor',
         aoid: 100004,
         ql: 180,
-        stats: [createStatValue(SKILL_ID.ASSAULT_RIF, 20)]
+        spell_data: [
+          createSpellData({
+            event: 14,
+            spells: [createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.ASSAULT_RIF, Amount: 20 } })]
+          })
+        ]
       });
 
       const implant = createImplantItem({
         name: 'Combat Implant',
         aoid: 100005,
         ql: 150,
-        stats: [createStatValue(SKILL_ID.ASSAULT_RIF, 15)]
+        spell_data: [
+          createSpellData({
+            event: 14,
+            spells: [createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.ASSAULT_RIF, Amount: 15 } })]
+          })
+        ]
       });
 
       // Get initial stat
@@ -195,20 +222,14 @@ describe('Equipment Interaction Integration', () => {
         name: 'Buffed Armor',
         aoid: 100006,
         ql: 200,
-        stats: [createStatValue(SKILL_ID.STAMINA, 10)],
         spell_data: [
-          {
-            id: 1,
+          createSpellData({
             event: 14, // Wear event
             spells: [
-              {
-                id: 1,
-                spell_id: 53045, // Modify Skill
-                spell_params: { stat: SKILL_ID.STRENGTH, amount: 25 },
-                criteria: []
-              }
+              createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.STAMINA, Amount: 10 } }),
+              createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.STRENGTH, Amount: 25 } })
             ]
-          }
+          })
         ]
       });
 
@@ -235,9 +256,14 @@ describe('Equipment Interaction Integration', () => {
         name: 'Test Weapon',
         aoid: 100007,
         ql: 200,
-        stats: [
-          createStatValue(SKILL_ID.ASSAULT_RIF, 50),
-          createStatValue(SKILL_ID.RANGED_INIT, 25)
+        spell_data: [
+          createSpellData({
+            event: 2,
+            spells: [
+              createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.ASSAULT_RIF, Amount: 50 } }),
+              createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.RANGED_INIT, Amount: 25 } })
+            ]
+          })
         ]
       });
 
@@ -420,7 +446,12 @@ describe('Equipment Interaction Integration', () => {
           name: 'Low Req Armor',
           aoid: 100020,
           ql: 50,
-          stats: [createStatValue(SKILL_ID.STAMINA, 5)]
+          spell_data: [
+            createSpellData({
+              event: 14,
+              spells: [createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.STAMINA, Amount: 5 } })]
+            })
+          ]
         }
       );
 
@@ -440,7 +471,12 @@ describe('Equipment Interaction Integration', () => {
           name: 'High Req Weapon',
           aoid: 100021,
           ql: 300,
-          stats: [createStatValue(SKILL_ID.ADD_PROJ_DAM, 500)]
+          spell_data: [
+            createSpellData({
+              event: 2,
+              spells: [createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.ADD_PROJ_DAM, Amount: 500 } })]
+            })
+          ]
         }
       );
 
@@ -484,7 +520,12 @@ describe('Equipment Interaction Integration', () => {
         name: 'Strength Armor',
         aoid: 100023,
         ql: 200,
-        stats: [createStatValue(SKILL_ID.STRENGTH, 50)]
+        spell_data: [
+          createSpellData({
+            event: 14,
+            spells: [createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.STRENGTH, Amount: 50 } })]
+          })
+        ]
       });
 
       const initialStrength = store.activeProfile?.skills?.[SKILL_ID.STRENGTH]?.total || 0;
@@ -502,19 +543,34 @@ describe('Equipment Interaction Integration', () => {
       const item1 = createArmorItem({
         name: 'Stamina Armor',
         aoid: 100024,
-        stats: [createStatValue(SKILL_ID.STAMINA, 30)]
+        spell_data: [
+          createSpellData({
+            event: 14,
+            spells: [createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.STAMINA, Amount: 30 } })]
+          })
+        ]
       });
 
       const item2 = createImplantItem({
         name: 'Stamina Implant',
         aoid: 100025,
-        stats: [createStatValue(SKILL_ID.STAMINA, 20)]
+        spell_data: [
+          createSpellData({
+            event: 14,
+            spells: [createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.STAMINA, Amount: 20 } })]
+          })
+        ]
       });
 
       const item3 = createWeaponItem({
         name: 'Stamina Weapon',
         aoid: 100026,
-        stats: [createStatValue(SKILL_ID.STAMINA, 15)]
+        spell_data: [
+          createSpellData({
+            event: 2,
+            spells: [createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.STAMINA, Amount: 15 } })]
+          })
+        ]
       });
 
       const initialStamina = store.activeProfile?.skills?.[SKILL_ID.STAMINA]?.total || 0;
@@ -538,7 +594,12 @@ describe('Equipment Interaction Integration', () => {
         name: 'Agility Armor',
         aoid: 100027,
         ql: 180,
-        stats: [createStatValue(SKILL_ID.AGILITY, 40)]
+        spell_data: [
+          createSpellData({
+            event: 14,
+            spells: [createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.AGILITY, Amount: 40 } })]
+          })
+        ]
       });
 
       const initialAgility = store.activeProfile?.skills?.[SKILL_ID.AGILITY]?.total || 0;
@@ -565,9 +626,14 @@ describe('Equipment Interaction Integration', () => {
         name: 'Debuff Armor',
         aoid: 100028,
         ql: 100,
-        stats: [
-          createStatValue(SKILL_ID.PROJECTILE_AC, 500), // Good bonus
-          createStatValue(SKILL_ID.RUN_SPEED, -10) // Debuff
+        spell_data: [
+          createSpellData({
+            event: 14,
+            spells: [
+              createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.PROJECTILE_AC, Amount: 500 } }),
+              createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.RUN_SPEED, Amount: -10 } })
+            ]
+          })
         ]
       });
 
@@ -592,7 +658,12 @@ describe('Equipment Interaction Integration', () => {
         name: 'NCU Device',
         aoid: 100029,
         ql: 200,
-        stats: [createStatValue(SKILL_ID.MAX_NCU, 30)]
+        spell_data: [
+          createSpellData({
+            event: 2,
+            spells: [createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.MAX_NCU, Amount: 30 } })]
+          })
+        ]
       });
 
       const initialMaxNCU = store.maxNCU || 0;
@@ -677,13 +748,23 @@ describe('Equipment Interaction Integration', () => {
       const lowBonusItem = createArmorItem({
         name: 'Low Bonus',
         aoid: 100042,
-        stats: [createStatValue(SKILL_ID.STAMINA, 10)]
+        spell_data: [
+          createSpellData({
+            event: 14,
+            spells: [createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.STAMINA, Amount: 10 } })]
+          })
+        ]
       });
 
       const highBonusItem = createArmorItem({
         name: 'High Bonus',
         aoid: 100043,
-        stats: [createStatValue(SKILL_ID.STAMINA, 50)]
+        spell_data: [
+          createSpellData({
+            event: 14,
+            spells: [createSpell({ spell_id: 53045, spell_params: { Stat: SKILL_ID.STAMINA, Amount: 50 } })]
+          })
+        ]
       });
 
       const initialStamina = store.activeProfile?.skills?.[SKILL_ID.STAMINA]?.total || 0;

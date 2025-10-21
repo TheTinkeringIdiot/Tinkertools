@@ -92,7 +92,7 @@ Shows equipment requirements (from database) and build requirements (calculated)
 <script setup lang="ts">
 import { computed } from 'vue'
 import Panel from 'primevue/panel'
-import type { ImplantRequirement } from '@/stores/tinkerPlants'
+import type { ImplantRequirement } from '@/types/api'
 
 interface Props {
   requirements: ImplantRequirement[]

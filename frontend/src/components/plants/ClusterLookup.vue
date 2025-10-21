@@ -25,13 +25,6 @@ Part of TinkerPlants Revamp - Task 3.4
       <div class="space-y-4">
         <!-- Search Input with AutoComplete -->
         <div class="flex flex-col gap-2">
-          <label
-            for="cluster-search"
-            class="text-sm font-medium text-surface-700 dark:text-surface-300"
-          >
-            Search for Cluster
-          </label>
-
           <AutoComplete
             v-model="searchQuery"
             :suggestions="filteredClusters"

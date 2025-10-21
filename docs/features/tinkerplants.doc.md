@@ -4,7 +4,24 @@
 TinkerPlants is a comprehensive implant planning tool that enables users to design, optimize, and manage implant configurations for their Anarchy Online characters. The system integrates with TinkerProfiles to provide real-time requirement checking, treatment calculations, and bonus aggregation across a character's complete implant setup.
 
 ## User Perspective
-Users can configure implants across 13 body slots (Eye, Head, Ear, Right Arm, Chest, Left Arm, Right Wrist, Waist, Left Wrist, Right Hand, Leg, Left Hand, Feet) by selecting cluster combinations (Shiny/Bright/Faded) and quality levels. The system automatically:
+Users can configure implants across 13 body slots (Eye, Head, Ear, Right Arm, Chest, Left Arm, Right Wrist, Waist, Left Wrist, Right Hand, Leg, Left Hand, Feet) by selecting cluster combinations (Shiny/Bright/Faded) and quality levels. The interface is organized into three dedicated tabs:
+
+**Build Tab** (Configuration):
+- Configure clusters and QLs across the 13-slot implant grid
+- Search for specific clusters using ClusterLookup component
+- Real-time validation ensures all implants complete their lookups before calculation
+
+**Bonuses Tab** (Results):
+- View Treatment requirements with color-coded status indicators
+- Review aggregate stat bonuses across all equipped implants
+- Inspect per-implant bonus breakdowns
+- Check equipment and build requirements against active profile
+
+**Construction Tab** (Planning):
+- Plan optimal build order for implant construction
+- Track Nano Programming and Jobe combining skill requirements
+
+The system automatically:
 - Looks up matching implants from the database based on cluster selections
 - Calculates total stat bonuses across all equipped implants
 - Validates equipment requirements (Treatment, Attributes) against the active profile

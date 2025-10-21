@@ -301,13 +301,16 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
           const clusters = parseImplantClusters(implantData)
           console.log(`[TinkerPlants] Slot ${slotBitflag} parsed clusters:`, clusters)
           if (clusters) {
+            // ImplantWithClusters extends Item, so cast to unknown first then to Item
+            // This is safe because we're only using the Item properties
+            const item = implantData as unknown as Item
             loadedConfiguration[slotBitflag] = {
               shiny: clusters.shiny,
               bright: clusters.bright,
               faded: clusters.faded,
-              ql: implantData.ql || 200,
+              ql: (implantData as any).ql || 200,
               slotBitflag,
-              item: implantData
+              item: item
             }
           } else {
             console.log(`[TinkerPlants] Slot ${slotBitflag}: parser returned null`)
@@ -368,11 +371,10 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
         }
       }
 
-      // Update profile.Implants
-      profile.Implants = implantsToSave
-
-      // Persist profile to storage
-      await profilesStore.updateProfile(profile.id, profile)
+      // Persist profile to storage using updateProfile with partial update
+      await profilesStore.updateProfile(profile.id, {
+        Implants: implantsToSave
+      })
 
       // Update profileConfiguration to match currentConfiguration (no longer "dirty")
       profileConfiguration.value = JSON.parse(JSON.stringify(currentConfiguration.value))
@@ -718,8 +720,8 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
             const requiredValue = req.exactValue || req.minValue || 0
             const currentValue = profile.skills?.[statId]?.total || 0
 
-            // Track max Treatment requirement (stat 134)
-            if (statId === 134 && requiredValue > maxTreatmentRequired) {
+            // Track max Treatment requirement (stat 124)
+            if (statId === 124 && requiredValue > maxTreatmentRequired) {
               maxTreatmentRequired = requiredValue
             }
 
@@ -739,7 +741,7 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
     }
 
     // Calculate Treatment info
-    const profileTreatment = profile.skills?.[134]?.total || 0
+    const profileTreatment = profile.skills?.[124]?.total || 0
     const delta = maxTreatmentRequired - profileTreatment
 
     treatmentInfo.value = {
