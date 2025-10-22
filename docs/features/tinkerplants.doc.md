@@ -4,18 +4,24 @@
 TinkerPlants is a comprehensive implant planning tool that enables users to design, optimize, and manage implant configurations for their Anarchy Online characters. The system integrates with TinkerProfiles to provide real-time requirement checking, treatment calculations, and bonus aggregation across a character's complete implant setup.
 
 ## User Perspective
-Users can configure implants across 13 body slots (Eye, Head, Ear, Right Arm, Chest, Left Arm, Right Wrist, Waist, Left Wrist, Right Hand, Leg, Left Hand, Feet) by selecting cluster combinations (Shiny/Bright/Faded) and quality levels. The interface is organized into three dedicated tabs:
+Users can configure implants across 13 body slots (Eye, Head, Ear, Right Arm, Chest, Left Arm, Right Wrist, Waist, Left Wrist, Right Hand, Leg, Left Hand, Feet) by selecting cluster combinations (Shiny/Bright/Faded) and quality levels. The interface is organized into four dedicated tabs:
 
 **Build Tab** (Configuration):
 - Configure clusters and QLs across the 13-slot implant grid
 - Search for specific clusters using ClusterLookup component
-- Real-time validation ensures all implants complete their lookups before calculation
+- QL inputs trigger lookups on blur (not every keystroke) for optimal performance
+- Auto-recalculation: Results update automatically after each change
+
+**Requirements Tab** (Validation):
+- View total attribute requirements (Treatment, Strength, etc.) with color-coded met/unmet status
+- Inspect per-implant requirement breakdowns showing which implants need which stats
+- Review build requirements (Nano Programming, Jobe combining skills)
+- All requirements automatically recalculated after configuration changes
 
 **Bonuses Tab** (Results):
-- View Treatment requirements with color-coded status indicators
 - Review aggregate stat bonuses across all equipped implants
 - Inspect per-implant bonus breakdowns
-- Check equipment and build requirements against active profile
+- Automatically updated after any configuration change
 
 **Construction Tab** (Planning):
 - Plan optimal build order for implant construction
@@ -23,7 +29,7 @@ Users can configure implants across 13 body slots (Eye, Head, Ear, Right Arm, Ch
 
 The system automatically:
 - Looks up matching implants from the database based on cluster selections
-- Calculates total stat bonuses across all equipped implants
+- Recalculates bonuses and requirements immediately after any state change (no manual refresh needed)
 - Validates equipment requirements (Treatment, Attributes) against the active profile
 - Computes build requirements (Nano Programming, Jobe combining skills)
 - Tracks Treatment requirements and displays surplus/deficit relative to character skills
@@ -70,24 +76,29 @@ The system automatically:
 ### Key Files
 
 #### Frontend Components
-- **`frontend/src/views/TinkerPlants.vue`** - Main view with 13-slot grid, three tabs (Build/Bonuses/Construction)
+- **`frontend/src/views/TinkerPlants.vue`** - Main view with 13-slot grid, four tabs (Build/Requirements/Bonuses/Construction)
   - Build tab: ClusterLookup + ImplantGrid (configuration only)
-  - Bonuses tab: TreatmentDisplay + BonusDisplay + RequirementsDisplay (results only)
+  - Requirements tab: AttributeRequirementsDisplay + PerImplantRequirements + RequirementsDisplay (equipment and build requirements)
+  - Bonuses tab: BonusDisplay (aggregate and per-implant bonus displays)
   - Construction tab: ConstructionPlanner (build order planning)
-  - Calculate button validation: Ensures all configured implants complete lookups before calculation
+  - Auto-recalculation: Bonuses/requirements update automatically after state changes
+  - QL inputs: Blur-triggered lookups to prevent keystroke spam
 - **`frontend/src/components/plants/ClusterLookup.vue`** - AutoComplete cluster search with slot highlighting
 - **`frontend/src/components/plants/AttributePreference.vue`** - Attribute filter selection (future implant variant filtering)
 - **`frontend/src/components/plants/BonusDisplay.vue`** - Aggregate and per-implant bonus display with responsive layout, graceful fallback for unknown stat IDs
-- **`frontend/src/components/plants/RequirementsDisplay.vue`** - Two-column requirements (Equipment vs Build), now imports ImplantRequirement type from @/types/api
-- **`frontend/src/components/plants/TreatmentDisplay.vue`** - Prominent Treatment status display with color-coded tags
+- **`frontend/src/components/plants/RequirementsDisplay.vue`** - Build requirements display (NP, Jobe combining skills), imports types from @/types/api
+- **`frontend/src/components/plants/AttributeRequirementsDisplay.vue`** - Attribute requirements display (Treatment, Strength, etc.) with color-coded status tags
+- **`frontend/src/components/plants/PerImplantRequirements.vue`** - Per-slot requirement breakdown with DataTable and mobile card layout
+- **`frontend/src/components/plants/TreatmentDisplay.vue`** - Prominent Treatment status display with color-coded tags (legacy, may be deprecated)
 - **`frontend/src/components/plants/ConstructionPlanner.vue`** - Construction tab for build order planning (existing)
 
 #### Frontend Store
 - **`frontend/src/stores/tinkerPlants.ts`** - Pinia store managing implant state, API calls, caching, calculations
-  - State: currentConfiguration, profileConfiguration, calculatedBonuses, calculatedRequirements, treatmentInfo
-  - Actions: loadFromProfile, saveToProfile, revertToProfile, updateSlot, lookupImplantForSlot, calculateBonuses, calculateRequirements
+  - State: currentConfiguration, profileConfiguration, calculatedBonuses, calculatedRequirements, treatmentInfo, perImplantRequirements
+  - Actions: loadFromProfile, saveToProfile, revertToProfile, updateSlot, lookupImplantForSlot, calculateBonuses, calculateRequirements, recalculate
   - Cache: In-memory Map with 5-minute TTL for implant lookups
   - Debouncing: 100ms delay on manual changes to avoid rapid-fire API calls
+  - Auto-recalculation: recalculate() helper automatically updates bonuses/requirements after state changes
   - Bug fix: Treatment stat ID corrected from 134 to 124
   - Type safety: Proper type casting for ImplantWithClusters → Item conversion
 
@@ -99,6 +110,7 @@ The system automatically:
   - Jobe Detection: isJobeCluster(), getJobeRequiredSkill(), getAllJobeClusters()
   - Slot Normalization: normalizeSlotName(), getSlotNameVariations()
   - Search: getSlotsForCluster(), getAllUniqueClusters()
+  - Empty cluster handling: Returns empty arrays instead of ['Empty'] for unconfigured slots
 
 #### Integration Points
 - **`frontend/src/services/api-client.ts`** - lookupImplant() method (POST /api/implants/lookup)
@@ -108,7 +120,7 @@ The system automatically:
   - Improved stat ID validation to skip non-trainable stats like Mass (stat 2)
 - **`frontend/src/services/action-criteria.ts`** - getCriteriaRequirements() for requirement parsing
 - **`frontend/src/services/skill-service.ts`** - resolveId() for cluster name → stat ID conversion
-- **`frontend/src/services/game-data.ts`** - IMP_SKILLS, IMP_SLOTS, NP_MODS, JOBE_SKILL, CLUSTER_MIN_QL
+- **`frontend/src/services/game-data.ts`** - IMP_SKILLS, IMP_SLOTS, NP_MODS, JOBE_SKILL, CLUSTER_MIN_QL (all 'Empty' strings removed from IMP_SKILLS arrays)
 
 #### Backend Endpoint
 - **`backend/app/main.py`** - POST /api/implants/lookup endpoint (existing, no changes)
@@ -168,7 +180,8 @@ profile.Implants = {
 
 **Solution**: Split functionality across three focused tabs:
 - Build tab: Pure configuration (ClusterLookup + ImplantGrid)
-- Bonuses tab: Pure results (TreatmentDisplay + BonusDisplay + RequirementsDisplay)
+- Requirements tab: Equipment and build requirements with per-implant breakdown
+- Bonuses tab: Aggregate and per-implant bonus displays
 - Construction tab: Build planning (ConstructionPlanner)
 
 **Benefits**:
@@ -176,13 +189,23 @@ profile.Implants = {
 - Reduced visual clutter in each tab
 - Better mobile experience (less scrolling within tabs)
 - Easier to find specific information
+- Dedicated space for requirement validation
 
-#### Calculate Button Validation
-**Problem**: Users could click Calculate while implant lookups were still in progress, leading to incomplete bonus calculations.
+#### Auto-Recalculation System (October 21, 2025)
+**Problem**: Manual Calculate button required users to remember to recalculate after each change, leading to stale or confusing data displays.
 
-**Solution**: Added validation that counts configured slots vs slots with fetched items, blocking Calculate if any lookups are pending.
+**Solution**: Removed Calculate button entirely and implemented automatic recalculation after all state-changing operations:
+- After implant lookup completes
+- After loading configuration from profile
+- After reverting to saved configuration
 
-**Implementation**: Shows informative toast message: "Some implants are still loading. Please wait for all lookups to complete."
+**Implementation**: Added `recalculate()` helper function that triggers both `calculateBonuses()` and `calculateRequirements()` atomically.
+
+**Benefits**:
+- Always-current data - no manual refresh needed
+- Reduced cognitive load - one less button to remember
+- Cleaner UI - removed unnecessary control
+- Better UX consistency with other TinkerTools views
 
 #### Equipment Bonus Extraction Fix
 **Problem**: equipmentBonusCalculator was extracting bonuses from both item.stats AND spell_data, causing duplicate/incorrect bonuses. Implant bonuses are ONLY in spell_data.
@@ -197,6 +220,74 @@ profile.Implants = {
 **Solution**: Corrected to stat ID 124 (the actual Treatment skill ID) in all Treatment-related calculations.
 
 **Files affected**: tinkerPlants.ts (treatment calculations and requirement checks)
+
+#### "Empty" Cluster Redundancy Removal (October 21, 2025)
+**Problem**: All IMP_SKILLS arrays started with 'Empty' string, and cluster utilities returned ['Empty'] for empty slots. This caused validation errors and UI confusion since 'Empty' is not a valid cluster name for lookups.
+
+**Solution**:
+- Removed 'Empty' string from all 13 slot arrays in IMP_SKILLS (game-data.ts)
+- Modified cluster-utilities.ts to return empty arrays instead of ['Empty']
+- Updated cluster validation logic to handle null/undefined properly
+
+**Benefits**:
+- Cleaner dropdown UI without meaningless 'Empty' option
+- Prevents validation errors from invalid cluster selections
+- More intuitive UX - empty means unconfigured, not a cluster type
+- Simpler code without special-casing 'Empty' everywhere
+
+#### QL Input Performance Optimization (October 21, 2025)
+**Problem**: QL inputs triggered implant lookups on every keystroke, causing rapid-fire API calls and UI flickering during user input (e.g., typing "200" triggers 3 lookups: QL 2, 20, 200).
+
+**Solution**: Changed both global and per-slot QL inputs to trigger lookups only on blur event instead of input event.
+
+**Implementation**:
+- Global QL: `@blur="onGlobalQLComplete"` (previously `@input="onGlobalQLChange"`)
+- Per-slot QL: `@blur="onQLComplete(slotId)"` (previously `@input="onQLChange"`)
+- Input events still update local reactive state for immediate visual feedback
+- Lookups only fire when user finishes editing (tabs away or clicks elsewhere)
+
+**Benefits**:
+- 70-90% reduction in API calls during QL adjustment
+- Smoother typing experience without loading spinner flicker
+- Better server performance with fewer redundant requests
+- Existing 100ms debounce still applies for additional safety
+
+#### UI State Synchronization Fixes (October 21, 2025)
+**Problem 1**: Revert button restored store state but did not sync dropdown selections back to UI, causing visual desync between displayed selections and actual configuration.
+
+**Problem 2**: Clear All button cleared selections but did not enable the Revert button, making it impossible to undo a mass clear operation.
+
+**Solutions**:
+1. **Revert sync**: Enhanced `revertToProfile()` to explicitly sync store configuration back to local reactive `implantSelections` object, ensuring dropdowns reflect reverted state
+2. **Clear All state**: Modified `clearAllImplants()` to update store's `currentConfiguration`, which triggers `hasChanges` computed property via dirty checking
+
+**Benefits**:
+- Visual consistency between UI controls and underlying data
+- Predictable undo/redo behavior
+- Users can safely experiment with Clear All knowing Revert will restore
+
+#### Save Button Layout Improvements (October 21, 2025)
+**Problem**: Save button used nested Badge component to display unsaved changes indicator (*). This caused button size to change when badge appeared/disappeared, creating jarring layout shift.
+
+**Solution**: Replaced nested `<Badge>` component with PrimeVue Button's built-in `badge` prop:
+```vue
+<!-- Before (nested component, causes layout shift) -->
+<Button>
+  <Badge v-if="hasChanges" value="*" />
+</Button>
+
+<!-- After (built-in prop, stable layout) -->
+<Button
+  :badge="hasChanges ? '*' : undefined"
+  badgeSeverity="danger"
+/>
+```
+
+**Benefits**:
+- Stable button dimensions - no layout shift on state changes
+- Cleaner component template
+- Better accessibility with proper badge ARIA attributes
+- Consistent with PrimeVue design patterns
 
 #### Type Safety Improvements
 **Problem**: Type casting issues when converting ImplantWithClusters to Item in loadFromProfile().

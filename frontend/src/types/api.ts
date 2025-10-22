@@ -647,6 +647,32 @@ export interface TreatmentInfo {
   sufficient: boolean
 }
 
+/** Attribute requirement information for display in Requirements tab */
+export interface AttributeRequirementInfo {
+  /** Stat ID (e.g., 124 for Treatment) */
+  stat: number
+  /** Human-readable stat name */
+  statName: string
+  /** Maximum required value for this stat */
+  required: number
+  /** Current profile value for this stat */
+  current: number
+  /** Difference (positive = need more, negative = surplus) */
+  delta: number
+  /** Whether current meets requirement */
+  sufficient: boolean
+}
+
+/** Per-implant requirements grouped by slot */
+export interface PerImplantRequirement {
+  /** Slot bitflag (e.g., "2" for Eyes) */
+  slot: string
+  /** Display name (e.g., "Eyes") */
+  slotName: string
+  /** Requirements for this implant */
+  requirements: ImplantRequirement[]
+}
+
 /** Validation result for implant configuration */
 export interface ImplantValidationResult {
   /** Whether configuration is valid */

@@ -84,18 +84,17 @@ export function getAvailableClusters(
 
   if (!slotSkills) {
     console.warn(`Unknown slot name: ${slotName}`);
-    return ['Empty'];
+    return [];
   }
 
   const clusters = slotSkills[clusterType];
 
   if (!clusters) {
     console.warn(`Unknown cluster type: ${clusterType} for slot ${slotName}`);
-    return ['Empty'];
+    return [];
   }
 
-  // IMP_SKILLS already includes 'Empty' as first element, but ensure it's present
-  return clusters.includes('Empty') ? [...clusters] : ['Empty', ...clusters];
+  return [...clusters];
 }
 
 /**

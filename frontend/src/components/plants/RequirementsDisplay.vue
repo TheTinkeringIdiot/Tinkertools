@@ -1,91 +1,55 @@
 <!--
-RequirementsDisplay - Display implant requirements
-Shows equipment requirements (from database) and build requirements (calculated)
+RequirementsDisplay - Display build requirements ONLY
+Shows ONLY build requirements (Nanoprogramming, Break & Entry, Jobe skills)
+Equipment requirements (Treatment, attributes) are handled by AttributeRequirementsDisplay
+
+NOTE: Consider renaming to BuildRequirementsDisplay in the future for clarity
 -->
 <template>
   <div class="requirements-display">
     <h3 class="font-medium text-surface-900 dark:text-surface-100 mb-3">
       <i class="pi pi-exclamation-triangle mr-2"></i>
-      Requirements
+      Build Requirements
     </h3>
 
     <!-- No requirements message -->
     <div
-      v-if="equipmentRequirements.length === 0 && buildRequirements.length === 0"
+      v-if="buildRequirements.length === 0"
       class="text-center py-4 text-surface-500 dark:text-surface-400"
     >
       <i class="pi pi-info-circle text-xl mb-1 block"></i>
-      <p class="text-sm">Configure implants to see requirements</p>
+      <p class="text-sm">Configure implants to see build requirements</p>
     </div>
 
-    <!-- Two-column layout -->
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <!-- Column 1: Equipment Requirements -->
-      <Panel header="Equipment Requirements" :toggleable="false">
-        <div v-if="equipmentRequirements.length === 0" class="text-sm text-surface-500 dark:text-surface-400">
-          No equipment requirements
-        </div>
-        <div v-else class="space-y-2">
-          <div
-            v-for="req in equipmentRequirements"
-            :key="req.stat"
-            class="flex justify-between items-center text-sm"
-          >
-            <span class="font-medium text-surface-700 dark:text-surface-300">
-              {{ req.statName }}:
+    <!-- Build Requirements Panel -->
+    <Panel v-else header="Build Requirements" :toggleable="false">
+      <div class="space-y-2">
+        <div
+          v-for="req in buildRequirements"
+          :key="req.stat"
+          class="flex justify-between items-center text-sm"
+        >
+          <span class="font-medium text-surface-700 dark:text-surface-300">
+            {{ req.statName }}:
+          </span>
+          <div class="flex flex-col items-end">
+            <span class="font-medium">{{ req.required }}</span>
+            <span
+              v-if="req.met"
+              class="text-xs text-green-600 dark:text-green-400"
+            >
+              ✓ Met
             </span>
-            <div class="flex flex-col items-end">
-              <span class="font-medium">{{ req.required }}</span>
-              <span
-                v-if="req.met"
-                class="text-xs text-green-600 dark:text-green-400"
-              >
-                ✓ Met
-              </span>
-              <span
-                v-else
-                class="text-xs text-red-600 dark:text-red-400"
-              >
-                Need +{{ req.required - req.current }}
-              </span>
-            </div>
+            <span
+              v-else
+              class="text-xs text-red-600 dark:text-red-400"
+            >
+              Need +{{ req.required - req.current }}
+            </span>
           </div>
         </div>
-      </Panel>
-
-      <!-- Column 2: Build Requirements -->
-      <Panel header="Build Requirements" :toggleable="false">
-        <div v-if="buildRequirements.length === 0" class="text-sm text-surface-500 dark:text-surface-400">
-          No build requirements
-        </div>
-        <div v-else class="space-y-2">
-          <div
-            v-for="req in buildRequirements"
-            :key="req.stat"
-            class="flex justify-between items-center text-sm"
-          >
-            <span class="font-medium text-surface-700 dark:text-surface-300">
-              {{ req.statName }}:
-            </span>
-            <div class="flex flex-col items-end">
-              <span class="font-medium">{{ req.required }}</span>
-              <span
-                v-if="req.met"
-                class="text-xs text-green-600 dark:text-green-400"
-              >
-                ✓ Met
-              </span>
-              <span
-                v-else
-                class="text-xs text-red-600 dark:text-red-400"
-              >
-                Need +{{ req.required - req.current }}
-              </span>
-            </div>
-          </div>
-        </div>
-      </Panel>
-    </div>
+      </div>
+    </Panel>
   </div>
 </template>
 
@@ -105,8 +69,9 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 // Stat IDs for categorization
+// Equipment stats to filter OUT (these are handled by AttributeRequirementsDisplay)
 const EQUIPMENT_STAT_IDS = new Set([
-  134, // Treatment
+  124, // Treatment (FIXED: was incorrectly 134 which is MultiRanged)
   16,  // Strength
   17,  // Agility
   18,  // Stamina
@@ -130,14 +95,15 @@ const BUILD_STAT_IDS = new Set([
   130, // Time and Space
 ])
 
-// Computed: Equipment Requirements (Treatment, Attributes, Title Level)
+// Computed: Equipment Requirements (FILTERED OUT - handled by AttributeRequirementsDisplay)
+// This is kept for backward compatibility but will be empty
 const equipmentRequirements = computed(() => {
   return props.requirements
     .filter(req => EQUIPMENT_STAT_IDS.has(req.stat))
     .sort((a, b) => {
       // Sort Treatment first, then attributes, then Title Level
-      if (a.stat === 134) return -1
-      if (b.stat === 134) return 1
+      if (a.stat === 124) return -1 // FIXED: was 134 (MultiRanged), now 124 (Treatment)
+      if (b.stat === 124) return 1
       if (a.stat === 64) return 1
       if (b.stat === 64) return -1
       return a.statName.localeCompare(b.statName)

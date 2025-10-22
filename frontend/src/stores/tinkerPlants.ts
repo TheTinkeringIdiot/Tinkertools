@@ -11,7 +11,9 @@ import type {
   Item,
   ImplantSelection,
   ImplantRequirement,
-  TreatmentInfo
+  TreatmentInfo,
+  AttributeRequirementInfo,
+  PerImplantRequirement
 } from '../types/api'
 import { apiClient } from '../services/api-client'
 import { useTinkerProfilesStore } from './tinkerProfiles'
@@ -19,6 +21,17 @@ import { equipmentBonusCalculator } from '../services/equipment-bonus-calculator
 import { getCriteriaRequirements } from '../services/action-criteria'
 import { useToast } from 'primevue/usetoast'
 import { skillService } from '../services/skill-service'
+
+// Attribute stats that need special display
+const ATTRIBUTE_STAT_IDS = new Set([
+  124, // Treatment
+  16,  // Strength
+  17,  // Agility
+  18,  // Stamina
+  19,  // Intelligence
+  20,  // Sense
+  21,  // Psychic
+])
 
 // Cache entry for implant lookups
 interface CacheEntry {
@@ -202,6 +215,40 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
    */
   const attributePreference = ref<string>('Strength')
 
+  /**
+   * Per-implant requirements (not deduplicated)
+   * Tracks requirements for each individual implant slot
+   * Key: slot bitflag (e.g., "2" for Eyes)
+   * Value: array of requirements for that specific implant
+   */
+  const perImplantRequirements = ref<Record<string, ImplantRequirement[]>>({})
+
+  // ============================================================================
+  // Helper Functions
+  // ============================================================================
+
+  /**
+   * Map implant slot bitflag to display name
+   */
+  function getSlotDisplayName(slotBitflag: string): string {
+    const slotMap: Record<string, string> = {
+      '2': 'Eyes',
+      '4': 'Head',
+      '8': 'Ears',
+      '16': 'Right Arm',
+      '32': 'Chest',
+      '64': 'Left Arm',
+      '128': 'Right Wrist',
+      '256': 'Waist',
+      '512': 'Left Wrist',
+      '1024': 'Right Hand',
+      '2048': 'Legs',
+      '4096': 'Left Hand',
+      '8192': 'Feet'
+    }
+    return slotMap[slotBitflag] || `Slot ${slotBitflag}`
+  }
+
   // ============================================================================
   // Getters
   // ============================================================================
@@ -253,6 +300,64 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
     }
 
     return false
+  })
+
+  /**
+   * Attribute requirements for current configuration
+   * Returns only attribute stats (Treatment, Strength, Agility, etc.)
+   * Sorted with Treatment first, then alphabetically
+   */
+  const attributeRequirements = computed((): AttributeRequirementInfo[] => {
+    const requirements: AttributeRequirementInfo[] = []
+
+    for (const req of calculatedRequirements.value) {
+      // Only include attribute stats (not build skills)
+      if (ATTRIBUTE_STAT_IDS.has(req.stat)) {
+        requirements.push({
+          stat: req.stat,
+          statName: req.statName,
+          required: req.required,
+          current: req.current,
+          delta: req.required - req.current,
+          sufficient: req.met
+        })
+      }
+    }
+
+    // Sort: Treatment first, then alphabetically
+    requirements.sort((a, b) => {
+      if (a.stat === 124) return -1  // Treatment first
+      if (b.stat === 124) return 1
+      return a.statName.localeCompare(b.statName)
+    })
+
+    return requirements
+  })
+
+  /**
+   * Per-implant requirements formatted for display
+   * Returns array of requirements grouped by implant slot
+   */
+  const perImplantRequirementsList = computed((): PerImplantRequirement[] => {
+    const result: PerImplantRequirement[] = []
+
+    // Standard slot order (by bitflag value)
+    const slotOrder = ['2', '4', '8', '16', '32', '64', '128', '256', '512', '1024', '2048', '4096', '8192']
+
+    for (const slotBitflag of slotOrder) {
+      const requirements = perImplantRequirements.value[slotBitflag]
+      if (!requirements || requirements.length === 0) {
+        continue // Skip empty slots
+      }
+
+      result.push({
+        slot: slotBitflag,
+        slotName: getSlotDisplayName(slotBitflag),
+        requirements
+      })
+    }
+
+    return result
   })
 
   // ============================================================================
@@ -324,6 +429,9 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
       profileConfiguration.value = JSON.parse(JSON.stringify(loadedConfiguration))
 
       console.log('[TinkerPlants] Loaded configuration from profile:', Object.keys(loadedConfiguration).length, 'slots')
+
+      // Auto-recalculate bonuses and requirements
+      recalculate()
     } catch (err: any) {
       error.value = err instanceof Error ? err.message : 'Failed to load configuration'
       toast.add({
@@ -408,6 +516,9 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
   function revertToProfile(): void {
     currentConfiguration.value = JSON.parse(JSON.stringify(profileConfiguration.value))
     console.log('[TinkerPlants] Reverted to profile configuration')
+
+    // Auto-recalculate bonuses and requirements after revert
+    recalculate()
   }
 
   /**
@@ -587,6 +698,9 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
       selection.item = null
     } finally {
       slotLoading.value[slotBitflag] = false
+
+      // Auto-recalculate bonuses and requirements after slot update
+      recalculate()
     }
   }
 
@@ -678,8 +792,12 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
       return
     }
 
-    const requirements: ImplantRequirement[] = []
+    // Use Map to track max requirement per stat (deduplication)
+    const maxRequirements = new Map<number, ImplantRequirement>()
     let maxTreatmentRequired = 0
+
+    // Track per-slot requirements (not deduplicated)
+    const slotRequirements: Record<string, ImplantRequirement[]> = {}
 
     // Iterate all slots in current configuration
     for (const [slotBitflag, selection] of Object.entries(currentConfiguration.value)) {
@@ -696,6 +814,11 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
 
       if (!hasNonEmptyClusters) {
         continue
+      }
+
+      // Initialize slot requirements array
+      if (!slotRequirements[slotBitflag]) {
+        slotRequirements[slotBitflag] = []
       }
 
       try {
@@ -725,13 +848,22 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
               maxTreatmentRequired = requiredValue
             }
 
-            requirements.push({
+            const implantReq: ImplantRequirement = {
               stat: statId,
               statName: req.statName,
               required: requiredValue,
               current: currentValue,
               met: currentValue >= requiredValue
-            })
+            }
+
+            // Add to this slot's requirement list
+            slotRequirements[slotBitflag].push(implantReq)
+
+            // Deduplicate: only keep max requirement per stat for global list
+            const existing = maxRequirements.get(statId)
+            if (!existing || requiredValue > existing.required) {
+              maxRequirements.set(statId, implantReq)
+            }
           }
         }
       } catch (err) {
@@ -751,8 +883,14 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
       sufficient: profileTreatment >= maxTreatmentRequired
     }
 
-    calculatedRequirements.value = requirements
-    console.log('[TinkerPlants] Calculated requirements:', requirements.length, 'total')
+    // Convert Map to array
+    calculatedRequirements.value = Array.from(maxRequirements.values())
+
+    // Update per-implant requirements
+    perImplantRequirements.value = slotRequirements
+
+    console.log('[TinkerPlants] Calculated requirements:', calculatedRequirements.value.length, 'unique stats')
+    console.log('[TinkerPlants] Per-implant requirements:', Object.keys(slotRequirements).length, 'slots')
     console.log('[TinkerPlants] Treatment required:', maxTreatmentRequired, 'current:', profileTreatment)
   }
 
@@ -784,6 +922,16 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
   }
 
   /**
+   * Recalculate bonuses and requirements
+   * Convenience method that triggers both calculateBonuses() and calculateRequirements()
+   * Called automatically after configuration changes
+   */
+  function recalculate(): void {
+    calculateBonuses()
+    calculateRequirements()
+  }
+
+  /**
    * Reset store state
    * Clears all configuration, bonuses, requirements, and cache
    */
@@ -792,6 +940,7 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
     profileConfiguration.value = {}
     calculatedBonuses.value = {}
     calculatedRequirements.value = []
+    perImplantRequirements.value = {}
     treatmentInfo.value = {
       required: 0,
       current: 0,
@@ -825,6 +974,8 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
     treatmentRequired,
     unmetRequirements,
     hasChanges,
+    attributeRequirements,
+    perImplantRequirementsList,
 
     // Actions
     loadFromProfile,
@@ -835,6 +986,7 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
     lookupImplantForSlotDebounced,
     calculateBonuses,
     calculateRequirements,
+    recalculate,
     clearError,
     clearCache,
     reset,

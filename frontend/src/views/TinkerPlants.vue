@@ -36,6 +36,7 @@ Grid-based implant selection following the legacy TinkerPlants format
               class="header-ql-input"
               aria-describedby="ql-help"
               @input="onGlobalQLChange"
+              @blur="onGlobalQLComplete"
             />
             <span id="ql-help" class="sr-only">
               Quality Level for implants, from 1 to 300
@@ -54,16 +55,6 @@ Grid-based implant selection following the legacy TinkerPlants format
             severity="secondary"
             outlined
             aria-label="Clear all selected implants"
-          />
-          
-          <!-- Calculate Button -->
-          <Button
-            @click="calculateBuild"
-            label="Calculate"
-            icon="pi pi-calculator"
-            size="small"
-            :disabled="!hasAnyImplants"
-            aria-label="Calculate implant construction requirements"
           />
 
           <!-- Revert Button -->
@@ -85,17 +76,12 @@ Grid-based implant selection following the legacy TinkerPlants format
             icon="pi pi-save"
             size="small"
             severity="success"
+            outlined
             :disabled="!tinkerPlantsStore.hasChanges"
+            :badge="tinkerPlantsStore.hasChanges ? '*' : undefined"
+            badgeSeverity="danger"
             aria-label="Save implant configuration to profile"
-          >
-            <Badge
-              v-if="tinkerPlantsStore.hasChanges"
-              value="*"
-              severity="danger"
-              class="ml-2"
-              aria-label="Unsaved changes"
-            />
-          </Button>
+          />
         </div>
       </div>
     </div>
@@ -219,10 +205,54 @@ Grid-based implant selection following the legacy TinkerPlants format
                 class="w-full ql-input"
                 :disabled="isSlotLoading(slot.id)"
                 :aria-label="`Quality Level for ${slot.name} implant`"
-                @input="onQLChange(slot.id, $event.value as number)"
+                @blur="onQLComplete(slot.id)"
               />
             </div>
           </div>
+                </div>
+              </div>
+            </div>
+          </TabPanel>
+
+          <!-- Requirements Tab -->
+          <TabPanel header="Requirements" class="h-full">
+            <div class="p-4">
+              <div class="max-w-6xl mx-auto space-y-6">
+                <!-- Total Requirements Section -->
+                <div v-if="showResults" class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-6">
+                  <h3 class="text-xl font-bold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2">
+                    <i class="pi pi-check-circle text-primary-500" aria-hidden="true"></i>
+                    Total Requirements
+                  </h3>
+                  <AttributeRequirementsDisplay
+                    :requirements="tinkerPlantsStore.attributeRequirements"
+                  />
+                </div>
+
+                <!-- Per-Implant Requirements Section -->
+                <div v-if="showResults" class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-6">
+                  <h3 class="text-xl font-bold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2">
+                    <i class="pi pi-list text-primary-500" aria-hidden="true"></i>
+                    Per-Implant Requirements
+                  </h3>
+                  <PerImplantRequirements
+                    :per-implant-requirements="tinkerPlantsStore.perImplantRequirementsList"
+                  />
+                </div>
+
+                <!-- Build Requirements Section -->
+                <div v-if="showResults">
+                  <RequirementsDisplay
+                    :requirements="requirementsForDisplay"
+                  />
+                </div>
+
+                <!-- Empty state when no results -->
+                <div v-else class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-8">
+                  <div class="text-center text-surface-500 dark:text-surface-400">
+                    <i class="pi pi-info-circle text-4xl mb-4" aria-hidden="true"></i>
+                    <p class="text-lg">Configure implants in the Build tab to see requirements.</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -232,15 +262,6 @@ Grid-based implant selection following the legacy TinkerPlants format
           <TabPanel header="Bonuses" class="h-full">
             <div class="p-4">
               <div class="max-w-6xl mx-auto space-y-6">
-                <!-- Treatment Display Component -->
-                <TreatmentDisplay
-                  v-if="showResults"
-                  :treatment-required="tinkerPlantsStore.treatmentInfo.required"
-                  :profile-treatment="tinkerPlantsStore.treatmentInfo.current"
-                  :delta="tinkerPlantsStore.treatmentInfo.delta"
-                  :sufficient="tinkerPlantsStore.treatmentInfo.sufficient"
-                />
-
                 <!-- Results Section -->
                 <div v-if="showResults" class="space-y-6">
                   <!-- Skeleton loaders while calculating -->
@@ -251,12 +272,6 @@ Grid-based implant selection following the legacy TinkerPlants format
                       <Skeleton class="mb-2" height="1.5rem" width="60%" />
                       <Skeleton height="1.5rem" width="70%" />
                     </div>
-                    <div class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
-                      <Skeleton class="mb-2" height="2rem" />
-                      <Skeleton class="mb-2" height="1.5rem" width="90%" />
-                      <Skeleton class="mb-2" height="1.5rem" width="75%" />
-                      <Skeleton height="1.5rem" width="85%" />
-                    </div>
                   </template>
 
                   <!-- Actual results when not loading -->
@@ -266,11 +281,6 @@ Grid-based implant selection following the legacy TinkerPlants format
                       :bonuses="tinkerPlantsStore.calculatedBonuses"
                       :per-implant-bonuses="perImplantBonuses"
                     />
-
-                    <!-- Requirements Display Component -->
-                    <RequirementsDisplay
-                      :requirements="requirementsForDisplay"
-                    />
                   </template>
                 </div>
 
@@ -278,7 +288,7 @@ Grid-based implant selection following the legacy TinkerPlants format
                 <div v-else class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-8">
                   <div class="text-center text-surface-500 dark:text-surface-400">
                     <i class="pi pi-info-circle text-4xl mb-4" aria-hidden="true"></i>
-                    <p class="text-lg">Configure implants in the Build tab and click Calculate to see bonuses and requirements.</p>
+                    <p class="text-lg">Configure implants in the Build tab to see bonuses.</p>
                   </div>
                 </div>
               </div>
@@ -331,9 +341,10 @@ import Skeleton from 'primevue/skeleton';
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue';
 import ConstructionPlanner from '@/components/plants/ConstructionPlanner.vue';
 import ClusterLookup from '@/components/plants/ClusterLookup.vue';
-import TreatmentDisplay from '@/components/plants/TreatmentDisplay.vue';
+import AttributeRequirementsDisplay from '@/components/plants/AttributeRequirementsDisplay.vue';
 import BonusDisplay from '@/components/plants/BonusDisplay.vue';
 import RequirementsDisplay from '@/components/plants/RequirementsDisplay.vue';
+import PerImplantRequirements from '@/components/plants/PerImplantRequirements.vue';
 import AttributePreference from '@/components/plants/AttributePreference.vue';
 
 // Accessibility
@@ -344,7 +355,6 @@ const tinkerPlantsStore = useTinkerPlantsStore();
 
 // State
 const qualityLevel = ref(200);
-const showResults = ref(false);
 const selectedClusterInfo = ref<{ clusterName: string; matchingSlots: Array<{ slot: string; types: string[] }> } | null>(null);
 
 // Computed loading from store
@@ -427,10 +437,13 @@ const getSkillOptions = (slotName: string, clusterType: 'shiny' | 'bright' | 'fa
 
 // Computed properties
 const hasAnyImplants = computed(() => {
-  return Object.values(implantSelections).some(selection => 
+  return Object.values(implantSelections).some(selection =>
     selection.shiny || selection.bright || selection.faded
   );
 });
+
+// Show results automatically when there are configured implants
+const showResults = computed(() => hasAnyImplants.value);
 
 const calculatedBonuses = computed(() => {
   // Get bonuses from store calculation
@@ -531,6 +544,12 @@ const isSlotHighlighted = (slotName: string, columnType: string): boolean => {
 
 // Event handlers
 const onImplantChange = (slotId: string, type: string, value: number | null) => {
+  // Validate value is null or number (reject strings like "Empty")
+  if (value !== null && typeof value !== 'number') {
+    console.error(`Invalid cluster value: ${value} (type: ${typeof value}). Must be null or number.`);
+    return;
+  }
+
   // Get the bitflag for this slot
   const mapping = slotMapping[slotId as keyof typeof slotMapping];
   if (!mapping) {
@@ -555,7 +574,10 @@ const onImplantChange = (slotId: string, type: string, value: number | null) => 
   announce(`${type} cluster ${skillName || 'cleared'} for ${implantSlots.value.find(s => s.id === slotId)?.name} slot`);
 };
 
-const onQLChange = (slotId: string, value: number | null) => {
+const onQLComplete = (slotId: string) => {
+  // Triggered when user finishes entering QL (on blur)
+  const value = implantSelections[slotId].ql;
+
   if (value !== null) {
     // Get the bitflag for this slot
     const mapping = slotMapping[slotId as keyof typeof slotMapping];
@@ -584,65 +606,71 @@ const onGlobalQLChange = (event: any) => {
   if (newQL !== null && newQL !== undefined) {
     // Ensure the value is within valid bounds before applying to all fields
     const clampedQL = Math.max(1, Math.min(300, newQL));
-    
-    // Update all slot QL values with the clamped value
+
+    // Update all slot QL values in local state (immediate UI update)
     Object.keys(implantSelections).forEach(slotId => {
       implantSelections[slotId].ql = clampedQL;
     });
-    announce(`All Quality Levels set to ${clampedQL}`);
   }
+};
+
+const onGlobalQLComplete = () => {
+  // Triggered when user finishes entering QL (on blur)
+  // Update store and trigger lookups for configured slots
+  const clampedQL = Math.max(1, Math.min(300, qualityLevel.value));
+
+  Object.keys(implantSelections).forEach(slotId => {
+    // Check if this slot has any configured clusters
+    const selection = implantSelections[slotId];
+    const hasConfiguredClusters = selection.shiny !== null || selection.bright !== null || selection.faded !== null;
+
+    if (hasConfiguredClusters) {
+      // Get the bitflag for this slot
+      const mapping = slotMapping[slotId as keyof typeof slotMapping];
+      if (mapping) {
+        const slotBitflag = mapping.bitflag;
+
+        // Update store with new QL
+        tinkerPlantsStore.updateSlot(slotBitflag, {
+          ql: clampedQL,
+          slotBitflag
+        });
+
+        // Trigger debounced lookup to fetch implant at new QL
+        tinkerPlantsStore.lookupImplantForSlotDebounced(slotBitflag);
+      }
+    }
+  });
+
+  announce(`All Quality Levels set to ${clampedQL}`);
 };
 
 const clearAllImplants = () => {
   Object.keys(implantSelections).forEach(slotId => {
+    // Get the bitflag for this slot
+    const mapping = slotMapping[slotId as keyof typeof slotMapping];
+    if (!mapping) return;
+
+    const slotBitflag = mapping.bitflag;
+
+    // Update local state
     implantSelections[slotId] = {
       shiny: null,
       bright: null,
       faded: null,
       ql: qualityLevel.value
     };
+
+    // Update store state to trigger change detection and enable Revert button
+    tinkerPlantsStore.updateSlot(slotBitflag, {
+      shiny: null,
+      bright: null,
+      faded: null,
+      ql: qualityLevel.value,
+      slotBitflag
+    });
   });
-  showResults.value = false;
   announce('All implants cleared');
-};
-
-const calculateBuild = () => {
-  if (!hasAnyImplants.value) return;
-
-  // Validate that all configured implants have completed their lookups
-  const config = tinkerPlantsStore.currentConfiguration as Record<string, any>;
-  const configuredSlots = Object.entries(config).filter(([_, selection]) => {
-    const hasNonEmptyClusters =
-      selection.shiny !== null ||
-      selection.bright !== null ||
-      selection.faded !== null;
-    return hasNonEmptyClusters;
-  });
-
-  const slotsWithItems = configuredSlots.filter(([_, selection]) => !!selection.item);
-
-  if (configuredSlots.length > slotsWithItems.length) {
-    announce('Some implants are still loading. Please wait for all lookups to complete.', 'assertive');
-    return;
-  }
-
-  setLoading(true, 'Calculating implant build...');
-
-  try {
-    // Call store methods to calculate bonuses and requirements
-    tinkerPlantsStore.calculateBonuses();
-    tinkerPlantsStore.calculateRequirements();
-
-    showResults.value = true;
-
-    const bonusCount = Object.keys(calculatedBonuses.value).length;
-    announce(`Build calculated. Total stat bonuses: ${bonusCount} different stats affected`);
-  } catch (error) {
-    console.error('Failed to calculate build:', error);
-    announce('Failed to calculate build', 'assertive');
-  } finally {
-    setLoading(false);
-  }
 };
 
 /**
@@ -659,10 +687,34 @@ const handleSave = async () => {
 };
 
 /**
+ * Sync local implantSelections from store's currentConfiguration
+ * Called after operations that modify the store (load, revert, etc.)
+ */
+const syncImplantSelectionsFromStore = () => {
+  const config = tinkerPlantsStore.currentConfiguration as Record<string, any>;
+  for (const [slotBitflag, selection] of Object.entries(config)) {
+    // Find the slot name for this bitflag
+    const slotEntry = Object.entries(slotMapping).find(
+      ([_, mapping]) => mapping.bitflag === slotBitflag
+    );
+    if (slotEntry) {
+      const slotName = slotEntry[0];
+      implantSelections[slotName] = {
+        shiny: selection.shiny,
+        bright: selection.bright,
+        faded: selection.faded,
+        ql: selection.ql
+      };
+    }
+  }
+};
+
+/**
  * Handle Revert button click - discards changes and reverts to profile state
  */
 const handleRevert = () => {
   tinkerPlantsStore.revertToProfile();
+  syncImplantSelectionsFromStore();
   announce('Changes reverted to last saved state');
 };
 
@@ -759,22 +811,7 @@ onMounted(async () => {
     await tinkerPlantsStore.loadFromProfile();
 
     // Sync implantSelections from store's currentConfiguration
-    const config = tinkerPlantsStore.currentConfiguration as Record<string, any>;
-    for (const [slotBitflag, selection] of Object.entries(config)) {
-      // Find the slot name for this bitflag
-      const slotEntry = Object.entries(slotMapping).find(
-        ([_, mapping]) => mapping.bitflag === slotBitflag
-      );
-      if (slotEntry) {
-        const slotName = slotEntry[0];
-        implantSelections[slotName] = {
-          shiny: selection.shiny,
-          bright: selection.bright,
-          faded: selection.faded,
-          ql: selection.ql
-        };
-      }
-    }
+    syncImplantSelectionsFromStore();
 
     announce('Implant planner loaded successfully');
   } catch (error) {

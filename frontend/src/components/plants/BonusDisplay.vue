@@ -201,7 +201,7 @@ function formatBonuses(bonuses: Record<number, number>): BonusEntry[] {
         value
       };
     })
-    .sort((a, b) => b.value - a.value); // Sort by value descending
+    .sort((a, b) => a.statName.localeCompare(b.statName)); // Sort alphabetically by stat name
 }
 
 // ============================================================================
