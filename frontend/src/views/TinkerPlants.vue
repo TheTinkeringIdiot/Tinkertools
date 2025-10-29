@@ -21,42 +21,6 @@ Grid-based implant selection following the legacy TinkerPlants format
         
         <!-- Controls -->
         <div class="flex flex-col sm:flex-row gap-3">
-          <!-- Quality Level Control -->
-          <div class="flex items-center gap-2">
-            <label for="ql-input" class="text-sm font-medium text-surface-700 dark:text-surface-300 whitespace-nowrap">
-              Set QL To:
-            </label>
-            <InputNumber 
-              id="ql-input"
-              v-model="qualityLevel"
-              :min="1"
-              :max="300"
-              :step="1"
-              :use-grouping="false"
-              class="header-ql-input"
-              aria-describedby="ql-help"
-              @input="onGlobalQLChange"
-              @blur="onGlobalQLComplete"
-            />
-            <span id="ql-help" class="sr-only">
-              Quality Level for implants, from 1 to 300
-            </span>
-          </div>
-          
-          <!-- Attribute Preference Control -->
-          <AttributePreference />
-          
-          <!-- Clear All Button -->
-          <Button
-            @click="clearAllImplants"
-            label="Clear All"
-            icon="pi pi-trash"
-            size="small"
-            severity="secondary"
-            outlined
-            aria-label="Clear all selected implants"
-          />
-
           <!-- Revert Button -->
           <Button
             @click="handleRevert"
@@ -95,6 +59,42 @@ Grid-based implant selection following the legacy TinkerPlants format
           <TabPanel header="Build" class="h-full">
             <div class="p-4">
               <div class="max-w-6xl mx-auto space-y-6">
+                <!-- Build Controls Toolbar -->
+                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-surface-50 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
+                  <!-- Quality Level Control -->
+                  <div class="flex items-center gap-2">
+                    <label for="ql-input" class="text-sm font-medium text-surface-700 dark:text-surface-300 whitespace-nowrap">
+                      Set QL To:
+                    </label>
+                    <InputNumber
+                      id="ql-input"
+                      v-model="qualityLevel"
+                      :min="1"
+                      :max="300"
+                      :step="1"
+                      :use-grouping="false"
+                      class="build-ql-input"
+                      aria-describedby="ql-help"
+                      @input="onGlobalQLChange"
+                      @blur="onGlobalQLComplete"
+                    />
+                    <span id="ql-help" class="sr-only">
+                      Quality Level for implants, from 1 to 300
+                    </span>
+                  </div>
+
+                  <!-- Clear All Button -->
+                  <Button
+                    @click="clearAllImplants"
+                    label="Clear All"
+                    icon="pi pi-trash"
+                    size="small"
+                    severity="secondary"
+                    outlined
+                    aria-label="Clear all selected implants"
+                  />
+                </div>
+
                 <!-- Cluster Lookup Component -->
                 <ClusterLookup
                   @cluster-selected="handleClusterSelected"
@@ -131,16 +131,22 @@ Grid-based implant selection following the legacy TinkerPlants format
             :class="{ 'opacity-75': isSlotLoading(slot.id) }"
           >
             <!-- Slot Name -->
-            <div class="p-3 border-r border-surface-200 dark:border-surface-700 flex items-center gap-2">
+            <div class="p-3 border-r border-surface-200 dark:border-surface-700 flex items-center justify-between gap-2">
               <span class="font-medium text-surface-900 dark:text-surface-50">
                 {{ slot.name }}
               </span>
-              <!-- Per-slot loading indicator -->
-              <i
-                v-if="isSlotLoading(slot.id)"
-                class="pi pi-spin pi-spinner text-primary text-sm"
-                :aria-label="`Loading implant for ${slot.name}`"
-              ></i>
+              <div class="flex items-center gap-2">
+                <span v-if="getPrimaryAttributeAbbr(slot.id)"
+                      class="text-xs text-surface-600 dark:text-surface-400">
+                  {{ getPrimaryAttributeAbbr(slot.id) }}
+                </span>
+                <!-- Per-slot loading indicator -->
+                <i
+                  v-if="isSlotLoading(slot.id)"
+                  class="pi pi-spin pi-spinner text-primary text-sm"
+                  :aria-label="`Loading implant for ${slot.name}`"
+                ></i>
+              </div>
             </div>
 
             <!-- Shiny Dropdown -->
@@ -240,13 +246,6 @@ Grid-based implant selection following the legacy TinkerPlants format
                   />
                 </div>
 
-                <!-- Build Requirements Section -->
-                <div v-if="showResults">
-                  <RequirementsDisplay
-                    :requirements="requirementsForDisplay"
-                  />
-                </div>
-
                 <!-- Empty state when no results -->
                 <div v-else class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-8">
                   <div class="text-center text-surface-500 dark:text-surface-400">
@@ -299,12 +298,14 @@ Grid-based implant selection following the legacy TinkerPlants format
           <TabPanel header="Construction" class="h-full">
             <div class="p-4">
               <div class="max-w-6xl mx-auto">
-                <ConstructionPlanner
-                  :implants="implantSelections"
-                  :current-build="calculatedBonuses"
-                />
+                <ConstructionPlanner />
               </div>
             </div>
+          </TabPanel>
+
+          <!-- Shopping List Tab -->
+          <TabPanel header="Shopping List" class="h-full">
+            <ShoppingList />
           </TabPanel>
         </TabView>
       </div>
@@ -328,6 +329,7 @@ Grid-based implant selection following the legacy TinkerPlants format
 import { ref, computed, onMounted, reactive, watch } from 'vue';
 import { useAccessibility } from '@/composables/useAccessibility';
 import { useTinkerPlantsStore } from '@/stores/tinkerPlants';
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { equipmentBonusCalculator } from '@/services/equipment-bonus-calculator';
 import { IMP_SKILLS, IMPLANT_SLOT } from '@/services/game-data';
 import { skillService } from '@/services/skill-service';
@@ -343,15 +345,28 @@ import ConstructionPlanner from '@/components/plants/ConstructionPlanner.vue';
 import ClusterLookup from '@/components/plants/ClusterLookup.vue';
 import AttributeRequirementsDisplay from '@/components/plants/AttributeRequirementsDisplay.vue';
 import BonusDisplay from '@/components/plants/BonusDisplay.vue';
-import RequirementsDisplay from '@/components/plants/RequirementsDisplay.vue';
 import PerImplantRequirements from '@/components/plants/PerImplantRequirements.vue';
-import AttributePreference from '@/components/plants/AttributePreference.vue';
+import ShoppingList from '@/components/plants/ShoppingList.vue';
+
+// Stat abbreviation helper
+const getStatAbbreviation = (statId: number): string => {
+  const abbreviations: Record<number, string> = {
+    17: 'Agi',  // Agility
+    18: 'Sta',  // Stamina
+    19: 'Int',  // Intelligence
+    20: 'Sen',  // Sense
+    21: 'Psy',  // Psychic
+    22: 'Str'   // Strength
+  }
+  return abbreviations[statId] || ''
+}
 
 // Accessibility
 const { announce, setLoading } = useAccessibility();
 
-// Store
+// Stores
 const tinkerPlantsStore = useTinkerPlantsStore();
+const tinkerProfilesStore = useTinkerProfilesStore();
 
 // State
 const qualityLevel = ref(200);
@@ -448,19 +463,6 @@ const showResults = computed(() => hasAnyImplants.value);
 const calculatedBonuses = computed(() => {
   // Get bonuses from store calculation
   return tinkerPlantsStore.calculatedBonuses || {};
-});
-
-const constructionRequirements = computed(() => {
-  // Get requirements from store calculation
-  return tinkerPlantsStore.calculatedRequirements || [];
-});
-
-/**
- * Computed requirements that converts readonly array to mutable for component props
- */
-const requirementsForDisplay = computed(() => {
-  // Convert readonly array to mutable array for RequirementsDisplay component
-  return [...tinkerPlantsStore.calculatedRequirements];
 });
 
 /**
@@ -795,6 +797,34 @@ const handleFillAll = async (clusterName: string) => {
   announce(`Filled ${populatedCount} cluster slot(s) with ${clusterName}`);
 };
 
+/**
+ * Get the primary attribute abbreviation for a slot
+ * Returns the 3-letter abbreviation of the highest-value attribute requirement
+ * (excluding Treatment stat 124)
+ */
+const getPrimaryAttributeAbbr = (slotId: string): string => {
+  const bitflag = slotMapping[slotId as keyof typeof slotMapping]?.bitflag
+  if (!bitflag) return ''
+
+  const slotReqs = tinkerPlantsStore.perImplantRequirementsList
+    .find(item => item.slot === bitflag)?.requirements
+
+  if (!slotReqs || slotReqs.length === 0) return ''
+
+  // Filter to attribute stats only (exclude Treatment 124)
+  const attributeStats = [17, 18, 19, 20, 21, 22]
+  const attributeReqs = slotReqs.filter(req => attributeStats.includes(req.stat))
+
+  if (attributeReqs.length === 0) return ''
+
+  // Find highest value
+  const primaryReq = attributeReqs.reduce((highest, current) =>
+    current.required > highest.required ? current : highest
+  )
+
+  return getStatAbbreviation(primaryReq.stat)
+}
+
 // Watch for store errors and announce them
 watch(() => tinkerPlantsStore.error, (error) => {
   if (error) {
@@ -821,6 +851,28 @@ onMounted(async () => {
     setLoading(false);
   }
 });
+
+// Watch for active profile changes and reload implant data
+watch(
+  () => tinkerProfilesStore.activeProfile,
+  async (newProfile, oldProfile) => {
+    // Only reload if profile actually changed (not just a reference update)
+    if (newProfile?.id !== oldProfile?.id) {
+      setLoading(true, 'Loading implant configuration...');
+
+      try {
+        await tinkerPlantsStore.loadFromProfile();
+        syncImplantSelectionsFromStore();
+        announce('Implant configuration loaded for ' + (newProfile?.Character.Name || 'profile'));
+      } catch (error) {
+        console.error('Failed to reload implant data:', error);
+        announce('Failed to reload implant data', 'assertive');
+      } finally {
+        setLoading(false);
+      }
+    }
+  }
+);
 </script>
 
 <style scoped>
@@ -845,16 +897,16 @@ onMounted(async () => {
   width: 100% !important;
 }
 
-/* Header QL input styling - compact width and consistent appearance */
-.header-ql-input {
+/* Build QL input styling - compact width and consistent appearance */
+.build-ql-input {
   width: 80px;
 }
 
-.header-ql-input :deep(.p-inputnumber) {
+.build-ql-input :deep(.p-inputnumber) {
   width: 80px;
 }
 
-.header-ql-input :deep(.p-inputnumber-input) {
+.build-ql-input :deep(.p-inputnumber-input) {
   text-align: center !important;
   width: 80px !important;
   padding-left: 0.5rem !important;

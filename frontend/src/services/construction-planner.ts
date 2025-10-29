@@ -6,13 +6,16 @@
  */
 
 import { reactive, computed, ref } from 'vue';
-import { 
+import {
   generateConstructionPlan,
+  rkClusterNP,
+  jobeClusterSkill,
   type SkillSet,
   type ConstructionPlan,
   type ConstructionStep
 } from '../utils/construction-analysis';
 import { IMP_SLOTS, type ImpSlotName } from '../services/game-data';
+import { isJobeCluster } from '../utils/cluster-utilities';
 
 // ============================================================================
 // Service State
@@ -176,50 +179,91 @@ function getConstructionFeasibility(
   if (!hasValidSkills.value) {
     return { feasible: false, reason: 'Skill information required' };
   }
-  
-  // Quick feasibility check based on basic requirements
+
   const npSkill = state.skills['Nanoprogramming'] || 0;
   const beSkill = state.skills['Break & Entry'] || 0;
-  
-  // Basic NP requirement (rough estimate)
-  const estimatedNPReq = Math.max(
-    targetQL * 1.0, // Minimum reasonable requirement
-    targetQL * 2.5  // Maximum for complex builds
-  );
-  
-  if (npSkill < estimatedNPReq * 0.5) {
-    return { 
-      feasible: false, 
-      reason: `Nanoprogramming skill may be too low (need ~${Math.round(estimatedNPReq * 0.5)}+)` 
+
+  // Calculate ACTUAL NP requirements for each cluster
+  const requirements = [];
+
+  if (shinySkill && shinySkill !== 'Empty') {
+    const req = rkClusterNP(shinySkill, 'Shiny', targetQL);
+    if (req > 0) requirements.push({ cluster: shinySkill, slot: 'Shiny', npReq: req });
+  }
+
+  if (brightSkill && brightSkill !== 'Empty') {
+    const req = rkClusterNP(brightSkill, 'Bright', targetQL);
+    if (req > 0) requirements.push({ cluster: brightSkill, slot: 'Bright', npReq: req });
+  }
+
+  if (fadedSkill && fadedSkill !== 'Empty') {
+    const req = rkClusterNP(fadedSkill, 'Faded', targetQL);
+    if (req > 0) requirements.push({ cluster: fadedSkill, slot: 'Faded', npReq: req });
+  }
+
+  // Find max NP requirement
+  const maxNPReq = Math.max(...requirements.map(r => r.npReq), 0);
+
+  if (maxNPReq > 0 && npSkill < maxNPReq) {
+    return {
+      feasible: false,
+      reason: `Nanoprogramming too low (need ${maxNPReq}, have ${npSkill})`
     };
   }
-  
-  // QL bumping B&E requirement
-  if (targetQL > 50 && beSkill < targetQL * 2) {
-    return { 
-      feasible: false, 
-      reason: `Break & Entry skill too low for QL bumping (need ~${targetQL * 2}+)` 
+
+  // B&E requirement for cleaning (if needed for QL bumping)
+  const beReq = Math.round(targetQL * 4.75);
+  if (targetQL > 50 && beSkill < beReq) {
+    return {
+      feasible: false,
+      reason: `Break & Entry too low for QL bumping (need ${beReq}, have ${beSkill})`
     };
   }
-  
+
   return { feasible: true };
 }
 
 /**
  * Get skill recommendations for a target QL
  */
-function getSkillRecommendations(targetQL: number): { skill: string; recommended: number; current: number }[] {
+function getSkillRecommendations(
+  targetQL: number,
+  shinySkill?: string,
+  brightSkill?: string,
+  fadedSkill?: string
+): { skill: string; recommended: number; current: number }[] {
   const recommendations = [];
-  
-  // Nanoprogramming recommendations
-  const npRecommended = Math.round(targetQL * 2.5);
+
+  // Calculate actual NP requirements based on clusters
+  const npRequirements = [];
+
+  if (shinySkill && shinySkill !== 'Empty') {
+    const req = rkClusterNP(shinySkill, 'Shiny', targetQL);
+    if (req > 0) npRequirements.push(req);
+  }
+
+  if (brightSkill && brightSkill !== 'Empty') {
+    const req = rkClusterNP(brightSkill, 'Bright', targetQL);
+    if (req > 0) npRequirements.push(req);
+  }
+
+  if (fadedSkill && fadedSkill !== 'Empty') {
+    const req = rkClusterNP(fadedSkill, 'Faded', targetQL);
+    if (req > 0) npRequirements.push(req);
+  }
+
+  // Recommend max NP requirement (or fallback to estimate if no clusters)
+  const npRecommended = npRequirements.length > 0
+    ? Math.max(...npRequirements)
+    : Math.round(targetQL * 2.5); // Fallback for empty build
+
   recommendations.push({
     skill: 'Nanoprogramming',
     recommended: npRecommended,
     current: state.skills['Nanoprogramming'] || 0
   });
-  
-  // Break & Entry for QL bumping
+
+  // Break & Entry for QL bumping (game mechanic constant)
   if (targetQL > 50) {
     const beRecommended = Math.round(targetQL * 4.75);
     recommendations.push({
@@ -228,7 +272,7 @@ function getSkillRecommendations(targetQL: number): { skill: string; recommended
       current: state.skills['Break & Entry'] || 0
     });
   }
-  
+
   return recommendations;
 }
 

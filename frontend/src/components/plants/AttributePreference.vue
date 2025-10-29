@@ -36,8 +36,9 @@ import Dropdown from 'primevue/dropdown';
 const tinkerPlantsStore = useTinkerPlantsStore();
 const tinkerProfilesStore = useTinkerProfilesStore();
 
-// Attribute options (Agility, Intelligence, Psychic, Sense, Stamina, Strength)
+// Attribute options (None first, then Agility, Intelligence, Psychic, Sense, Stamina, Strength)
 const attributeOptions = [
+  { label: 'None', value: null },
   { label: 'Agility', value: 'Agility' },
   { label: 'Intelligence', value: 'Intelligence' },
   { label: 'Psychic', value: 'Psychic' },
@@ -51,40 +52,11 @@ const selectedAttribute = ref<string | null>(null);
 
 /**
  * Determine default attribute based on profile's top attributes
- * Defaults to profile's highest two attributes (ties broken alphabetically)
+ * Defaults to null (None) for no preference
  */
-const determineDefaultAttribute = (): string => {
-  const profile = tinkerProfilesStore.activeProfile;
-  if (!profile) {
-    return 'Strength'; // Safe default
-  }
-
-  // Attribute skill IDs from game-data.ts
-  const attributeIds = {
-    Agility: 17,
-    Intelligence: 19,
-    Psychic: 21,
-    Sense: 20,
-    Stamina: 18,
-    Strength: 16
-  };
-
-  // Get attribute values from profile
-  const attributeValues = Object.entries(attributeIds).map(([name, id]) => ({
-    name,
-    value: profile.skills?.[id]?.total || 0
-  }));
-
-  // Sort by value (descending), then by name (alphabetically)
-  attributeValues.sort((a, b) => {
-    if (b.value !== a.value) {
-      return b.value - a.value;
-    }
-    return a.name.localeCompare(b.name);
-  });
-
-  // Return the highest attribute
-  return attributeValues[0]?.name || 'Strength';
+const determineDefaultAttribute = (): string | null => {
+  // Default to "None" (no attribute preference)
+  return null;
 };
 
 /**
@@ -92,14 +64,18 @@ const determineDefaultAttribute = (): string => {
  */
 const handleAttributeChange = (event: any) => {
   const newAttribute = event.value;
-  if (newAttribute) {
-    // Update store
-    tinkerPlantsStore.setAttributePreference(newAttribute);
 
-    // Persist to localStorage (per profile)
-    const profileId = tinkerProfilesStore.activeProfileId;
-    if (profileId) {
-      const storageKey = `tinkertools_plants_attribute_${profileId}`;
+  // Update store (allow null for "None")
+  tinkerPlantsStore.setAttributePreference(newAttribute);
+
+  // Persist to localStorage (per profile)
+  const profileId = tinkerProfilesStore.activeProfileId;
+  if (profileId) {
+    const storageKey = `tinkertools_plants_attribute_${profileId}`;
+    if (newAttribute === null) {
+      // Clear stored preference when "None" is selected
+      localStorage.removeItem(storageKey);
+    } else {
       localStorage.setItem(storageKey, newAttribute);
     }
   }
@@ -118,15 +94,15 @@ const loadAttributePreference = () => {
       selectedAttribute.value = stored;
       tinkerPlantsStore.setAttributePreference(stored);
     } else {
-      // Use default based on profile
+      // Use default (None)
       const defaultAttr = determineDefaultAttribute();
       selectedAttribute.value = defaultAttr;
       tinkerPlantsStore.setAttributePreference(defaultAttr);
     }
   } else {
-    // No profile, use Strength as safe default
-    selectedAttribute.value = 'Strength';
-    tinkerPlantsStore.setAttributePreference('Strength');
+    // No profile, use None as default
+    selectedAttribute.value = null;
+    tinkerPlantsStore.setAttributePreference(null);
   }
 };
 

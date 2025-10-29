@@ -104,18 +104,6 @@ Advanced implant construction analysis and step-by-step instructions
           />
         </div>
       </div>
-      
-      <!-- Skill Status -->
-      <div class="mt-4 flex items-center gap-2">
-        <div v-if="hasValidSkills" class="flex items-center gap-2 text-green-600 dark:text-green-400">
-          <i class="pi pi-check-circle"></i>
-          <span class="text-sm">Ready for construction analysis</span>
-        </div>
-        <div v-else class="flex items-center gap-2 text-orange-600 dark:text-orange-400">
-          <i class="pi pi-exclamation-triangle"></i>
-          <span class="text-sm">Enter Nanoprogramming and Break & Entry skills to continue</span>
-        </div>
-      </div>
     </div>
 
     <!-- Implant Selection Section -->
@@ -200,27 +188,6 @@ Advanced implant construction analysis and step-by-step instructions
       </div>
     </div>
 
-    <!-- Analysis Controls -->
-    <div class="flex justify-between items-center">
-      <Button
-        @click="analyzeSelectedImplant"
-        :disabled="!canAnalyze"
-        :loading="isAnalyzing"
-        label="Analyze Construction"
-        icon="pi pi-play"
-        class="flex-1 max-w-xs"
-      />
-      
-      <Button
-        @click="clearAnalysis"
-        :disabled="!currentPlan"
-        label="Clear"
-        icon="pi pi-trash"
-        severity="secondary"
-        outlined
-      />
-    </div>
-
     <!-- Construction Analysis Results -->
     <ConstructionSteps
       v-if="currentPlan"
@@ -240,11 +207,11 @@ Advanced implant construction analysis and step-by-step instructions
       </div>
     </div>
 
-    <!-- Skill Recommendations -->
+    <!-- Skill Requirements -->
     <div v-if="skillRecommendations.length > 0" class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
       <h4 class="font-medium text-blue-900 dark:text-blue-100 mb-3 flex items-center gap-2">
         <i class="pi pi-lightbulb text-blue-600 dark:text-blue-400"></i>
-        Skill Recommendations
+        Skill Requirements
       </h4>
       <div class="space-y-2">
         <div 
@@ -271,7 +238,9 @@ Advanced implant construction analysis and step-by-step instructions
 import { ref, computed, watch, reactive } from 'vue';
 import { useConstructionPlanner } from '@/composables/useConstructionPlanner';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
+import { useTinkerPlantsStore } from '@/stores/tinkerPlants';
 import { skillService } from '@/services/skill-service';
+import { IMPLANT_SLOT } from '@/services/game-data';
 import Button from 'primevue/button';
 import Dropdown from 'primevue/dropdown';
 import InputNumber from 'primevue/inputnumber';
@@ -280,30 +249,59 @@ import ConstructionSteps from './ConstructionSteps.vue';
 import type { SkillSet } from '@/utils/construction-analysis';
 
 // ============================================================================
-// Props
-// ============================================================================
-
-interface Props {
-  implants?: Record<string, any>;
-  currentBuild?: Record<string, any>;
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  implants: () => ({}),
-  currentBuild: () => ({})
-});
-
-// ============================================================================
-// TinkerProfiles Store Integration
+// Store Integration
 // ============================================================================
 
 const tinkerProfilesStore = useTinkerProfilesStore();
+const tinkerPlantsStore = useTinkerPlantsStore();
+
+// ============================================================================
+// Slot Name to Bitflag Mapping
+// ============================================================================
+
+// Mapping from construction planner slot names (IMP_SLOTS format) to bitflags
+const slotNameToBitflag: Record<string, string> = {
+  'Eye': String(IMPLANT_SLOT.Eyes),
+  'Head': String(IMPLANT_SLOT.Head),
+  'Ear': String(IMPLANT_SLOT.Ears),
+  'Right-Arm': String(IMPLANT_SLOT.RightArm),
+  'Chest': String(IMPLANT_SLOT.Chest),
+  'Left-Arm': String(IMPLANT_SLOT.LeftArm),
+  'Right-Wrist': String(IMPLANT_SLOT.RightWrist),
+  'Waist': String(IMPLANT_SLOT.Waist),
+  'Left-Wrist': String(IMPLANT_SLOT.LeftWrist),
+  'Right-Hand': String(IMPLANT_SLOT.RightHand),
+  'Leg': String(IMPLANT_SLOT.Legs),
+  'Left-Hand': String(IMPLANT_SLOT.LeftHand),
+  'Feet': String(IMPLANT_SLOT.Feet)
+};
 
 // ============================================================================
 // Construction Planner Integration
 // ============================================================================
 
-const implantData = computed(() => props.implants);
+// Read implant data from TinkerPlants store's currentConfiguration
+// Transform from bitflag keys + stat IDs to slot name keys + stat names
+const implantData = computed(() => {
+  const config = tinkerPlantsStore.currentConfiguration;
+  const transformed: Record<string, any> = {};
+
+  // Transform from bitflag keys to slot name keys
+  for (const [slotName, bitflag] of Object.entries(slotNameToBitflag)) {
+    const selection = config[bitflag];
+    if (selection) {
+      // Convert stat IDs to stat names for the construction planner
+      transformed[slotName] = {
+        shiny: selection.shiny ? skillService.getName(selection.shiny) : null,
+        bright: selection.bright ? skillService.getName(selection.bright) : null,
+        faded: selection.faded ? skillService.getName(selection.faded) : null,
+        ql: selection.ql
+      };
+    }
+  }
+
+  return transformed;
+});
 
 const {
   currentSkills,
@@ -321,9 +319,7 @@ const {
   skillRecommendations,
   setSkills,
   selectSlotForAnalysis,
-  analyzeSelectedImplant,
-  setAutoAnalysis,
-  clearAnalysis
+  setAutoAnalysis
 } = useConstructionPlanner(implantData);
 
 // ============================================================================
@@ -354,8 +350,7 @@ const localSkills = reactive<SkillSet>({
   'Psychology': 0,
   'Quantum FT': 0,
   'Computer Literacy': 0,
-  'Pharma Tech': 0,
-  'Weaponsmithing': 0
+  'Pharma Tech': 0
 });
 
 // ============================================================================
@@ -396,7 +391,7 @@ watch(skillValues, (newSkillValues) => {
 // Sync local skills to construction planner service
 watch(localSkills, (newSkills) => {
   setSkills(newSkills);
-}, { deep: true });
+}, { immediate: true, deep: true });
 </script>
 
 <style scoped>

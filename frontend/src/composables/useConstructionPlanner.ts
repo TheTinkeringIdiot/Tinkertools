@@ -9,6 +9,7 @@ import { computed, watch, ref } from 'vue';
 import { constructionPlannerService } from '../services/construction-planner';
 import type { ImpSlotName } from '../services/game-data';
 import type { SkillSet, ConstructionPlan } from '../utils/construction-analysis';
+import { skillService } from '../services/skill-service';
 
 // ============================================================================
 // Composable Interface
@@ -96,11 +97,16 @@ export function useConstructionPlanner(implantData?: Ref<ImplantsData>) {
     if (!config || !selectedSlot.value) {
       return { feasible: false, reason: 'No implant configuration selected' };
     }
-    
+
+    // Convert stat IDs to cluster names for getConstructionFeasibility
+    const shinyName = config.shiny ? (typeof config.shiny === 'number' ? skillService.getName(config.shiny) : config.shiny) : 'Empty';
+    const brightName = config.bright ? (typeof config.bright === 'number' ? skillService.getName(config.bright) : config.bright) : 'Empty';
+    const fadedName = config.faded ? (typeof config.faded === 'number' ? skillService.getName(config.faded) : config.faded) : 'Empty';
+
     return getConstructionFeasibility(
-      config.shiny || 'Empty',
-      config.bright || 'Empty', 
-      config.faded || 'Empty',
+      shinyName,
+      brightName,
+      fadedName,
       config.ql
     );
   });
@@ -111,8 +117,13 @@ export function useConstructionPlanner(implantData?: Ref<ImplantsData>) {
   const skillRecommendations = computed(() => {
     const config = selectedImplantConfig.value;
     if (!config) return [];
-    
-    return getSkillRecommendations(config.ql);
+
+    // Convert stat IDs to names (same pattern as analyzeSelectedImplant)
+    const shinyName = config.shiny ? (typeof config.shiny === 'number' ? skillService.getName(config.shiny) : config.shiny) : 'Empty';
+    const brightName = config.bright ? (typeof config.bright === 'number' ? skillService.getName(config.bright) : config.bright) : 'Empty';
+    const fadedName = config.faded ? (typeof config.faded === 'number' ? skillService.getName(config.faded) : config.faded) : 'Empty';
+
+    return getSkillRecommendations(config.ql, shinyName, brightName, fadedName);
   });
   
   /**
@@ -137,16 +148,21 @@ export function useConstructionPlanner(implantData?: Ref<ImplantsData>) {
   async function analyzeSelectedImplant(): Promise<ConstructionPlan | null> {
     const config = selectedImplantConfig.value;
     const slot = selectedSlot.value;
-    
+
     if (!config || !slot) {
       return null;
     }
-    
+
+    // Convert stat IDs to cluster names for analyzeConstruction
+    const shinyName = config.shiny ? (typeof config.shiny === 'number' ? skillService.getName(config.shiny) : config.shiny) : 'Empty';
+    const brightName = config.bright ? (typeof config.bright === 'number' ? skillService.getName(config.bright) : config.bright) : 'Empty';
+    const fadedName = config.faded ? (typeof config.faded === 'number' ? skillService.getName(config.faded) : config.faded) : 'Empty';
+
     return await analyzeConstruction(
       slot,
-      config.shiny || 'Empty',
-      config.bright || 'Empty',
-      config.faded || 'Empty',
+      shinyName,
+      brightName,
+      fadedName,
       config.ql
     );
   }
@@ -197,11 +213,16 @@ export function useConstructionPlanner(implantData?: Ref<ImplantsData>) {
     slot: ImpSlotName,
     config: ImplantConfig
   ): Promise<ConstructionPlan | null> {
+    // Convert stat IDs to cluster names for analyzeConstruction
+    const shinyName = config.shiny ? (typeof config.shiny === 'number' ? skillService.getName(config.shiny) : config.shiny) : 'Empty';
+    const brightName = config.bright ? (typeof config.bright === 'number' ? skillService.getName(config.bright) : config.bright) : 'Empty';
+    const fadedName = config.faded ? (typeof config.faded === 'number' ? skillService.getName(config.faded) : config.faded) : 'Empty';
+
     return await analyzeConstruction(
       slot,
-      config.shiny || 'Empty',
-      config.bright || 'Empty',
-      config.faded || 'Empty',
+      shinyName,
+      brightName,
+      fadedName,
       config.ql
     );
   }

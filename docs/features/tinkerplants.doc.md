@@ -4,13 +4,14 @@
 TinkerPlants is a comprehensive implant planning tool that enables users to design, optimize, and manage implant configurations for their Anarchy Online characters. The system integrates with TinkerProfiles to provide real-time requirement checking, treatment calculations, and bonus aggregation across a character's complete implant setup.
 
 ## User Perspective
-Users can configure implants across 13 body slots (Eye, Head, Ear, Right Arm, Chest, Left Arm, Right Wrist, Waist, Left Wrist, Right Hand, Leg, Left Hand, Feet) by selecting cluster combinations (Shiny/Bright/Faded) and quality levels. The interface is organized into four dedicated tabs:
+Users can configure implants across 13 body slots (Eye, Head, Ear, Right Arm, Chest, Left Arm, Right Wrist, Waist, Left Wrist, Right Hand, Leg, Left Hand, Feet) by selecting cluster combinations (Shiny/Bright/Faded) and quality levels. The interface is organized into five dedicated tabs:
 
 **Build Tab** (Configuration):
 - Configure clusters and QLs across the 13-slot implant grid
-- Search for specific clusters using ClusterLookup component
+- Inline ClusterLookup search component for finding clusters across slots
 - QL inputs trigger lookups on blur (not every keystroke) for optimal performance
 - Auto-recalculation: Results update automatically after each change
+- Attribute preference selection (defaults to "None" for no filtering)
 
 **Requirements Tab** (Validation):
 - View total attribute requirements (Treatment, Strength, etc.) with color-coded met/unmet status
@@ -24,8 +25,18 @@ Users can configure implants across 13 body slots (Eye, Head, Ear, Right Arm, Ch
 - Automatically updated after any configuration change
 
 **Construction Tab** (Planning):
-- Plan optimal build order for implant construction
-- Track Nano Programming and Jobe combining skill requirements
+- Automatic construction analysis as implants are configured
+- Real-time NP and Jobe skill requirements display
+- Construction steps guide with order-independent instructions
+- Skill feasibility checking (green = ready, red = insufficient skills)
+- Integrated with store configuration (reads directly from currentConfiguration)
+
+**Shopping Tab** (Organization):
+- Generate shopping lists organized by vendor/cluster type
+- Four sections: Empty Implants, Shiny Clusters, Bright Clusters, Faded Clusters
+- Checkboxes to track purchases across multiple vendors
+- Progress badges showing items checked/total
+- Automatically updates when configuration changes
 
 The system automatically:
 - Looks up matching implants from the database based on cluster selections
@@ -76,21 +87,22 @@ The system automatically:
 ### Key Files
 
 #### Frontend Components
-- **`frontend/src/views/TinkerPlants.vue`** - Main view with 13-slot grid, four tabs (Build/Requirements/Bonuses/Construction)
-  - Build tab: ClusterLookup + ImplantGrid (configuration only)
-  - Requirements tab: AttributeRequirementsDisplay + PerImplantRequirements + RequirementsDisplay (equipment and build requirements)
+- **`frontend/src/views/TinkerPlants.vue`** - Main view with 13-slot grid, five tabs (Build/Requirements/Bonuses/Construction/Shopping)
+  - Build tab: Inline ClusterLookup + AttributePreference + ImplantGrid (configuration only)
+  - Requirements tab: AttributeRequirementsDisplay + PerImplantRequirements (equipment and build requirements)
   - Bonuses tab: BonusDisplay (aggregate and per-implant bonus displays)
-  - Construction tab: ConstructionPlanner (build order planning)
+  - Construction tab: ConstructionPlanner (auto-analyzing build order planning)
+  - Shopping tab: ShoppingList (vendor-organized purchase tracking)
   - Auto-recalculation: Bonuses/requirements update automatically after state changes
   - QL inputs: Blur-triggered lookups to prevent keystroke spam
-- **`frontend/src/components/plants/ClusterLookup.vue`** - AutoComplete cluster search with slot highlighting
-- **`frontend/src/components/plants/AttributePreference.vue`** - Attribute filter selection (future implant variant filtering)
+- **`frontend/src/components/plants/ClusterLookup.vue`** - Inline AutoComplete cluster search with label (no Card wrapper)
+- **`frontend/src/components/plants/AttributePreference.vue`** - Attribute preference selection (defaults to "None" instead of profile's top attribute)
+- **`frontend/src/components/plants/ShoppingList.vue`** - Shopping list organized by vendor type (Empty Implants, Shiny/Bright/Faded Clusters) with checkbox tracking
 - **`frontend/src/components/plants/BonusDisplay.vue`** - Aggregate and per-implant bonus display with responsive layout, graceful fallback for unknown stat IDs
-- **`frontend/src/components/plants/RequirementsDisplay.vue`** - Build requirements display (NP, Jobe combining skills), imports types from @/types/api
 - **`frontend/src/components/plants/AttributeRequirementsDisplay.vue`** - Attribute requirements display (Treatment, Strength, etc.) with color-coded status tags
 - **`frontend/src/components/plants/PerImplantRequirements.vue`** - Per-slot requirement breakdown with DataTable and mobile card layout
 - **`frontend/src/components/plants/TreatmentDisplay.vue`** - Prominent Treatment status display with color-coded tags (legacy, may be deprecated)
-- **`frontend/src/components/plants/ConstructionPlanner.vue`** - Construction tab for build order planning (existing)
+- **`frontend/src/components/plants/ConstructionPlanner.vue`** - Automatic construction analysis integrated with TinkerPlants store, real-time NP/Jobe requirements
 
 #### Frontend Store
 - **`frontend/src/stores/tinkerPlants.ts`** - Pinia store managing implant state, API calls, caching, calculations
@@ -175,21 +187,115 @@ profile.Implants = {
 
 ### Recent Improvements (October 2025)
 
-#### Three-Tab UI Reorganization
-**Problem**: Build tab was cluttered with both configuration controls and calculation results, making it difficult to focus on either task.
+#### Shopping List Feature (October 28, 2025)
+**Problem**: Users needed an organized way to track which implants and clusters to purchase across multiple in-game vendors.
 
-**Solution**: Split functionality across three focused tabs:
-- Build tab: Pure configuration (ClusterLookup + ImplantGrid)
-- Requirements tab: Equipment and build requirements with per-implant breakdown
-- Bonuses tab: Aggregate and per-implant bonus displays
-- Construction tab: Build planning (ConstructionPlanner)
+**Solution**: Added new Shopping tab with vendor-organized shopping lists:
+- Four sections: Empty Implants, Shiny Clusters, Bright Clusters, Faded Clusters
+- Checkbox tracking for each item with strikethrough on completion
+- Progress badges showing checked/total items per section
+- Auto-updates when configuration changes
+- Sorted alphabetically to match in-game vendor presentation
+
+**Data Flow**:
+1. Reads currentConfiguration from TinkerPlants store
+2. Extracts configured slots and clusters
+3. Converts stat IDs to cluster names via skillService
+4. Groups by vendor type (Empty/Shiny/Bright/Faded)
+5. Maintains local checked state (not persisted)
 
 **Benefits**:
-- Clearer user mental model (configure → view results → plan build)
+- Reduces in-game confusion about what to buy
+- Separates shopping trips by vendor (efficient vendor navigation)
+- Visual progress tracking prevents duplicate purchases
+- No need for external note-taking or spreadsheets
+
+**Files**:
+- `frontend/src/components/plants/ShoppingList.vue` - New component
+- `frontend/src/views/TinkerPlants.vue` - Added Shopping tab
+
+#### Construction Planner Auto-Analysis (October 28, 2025)
+**Problem**: Manual "Analyze Construction" button required extra clicks and was easy to forget, leading to stale or missing construction guidance.
+
+**Solution**: Removed manual analysis button and integrated construction planner directly with TinkerPlants store:
+- Reads implant configuration from `tinkerPlantsStore.currentConfiguration`
+- Auto-analyzes as implants are configured (reactive updates)
+- Real-time NP and Jobe skill requirement calculations
+- Uses actual cluster NP formulas instead of estimates
+- Skill feasibility checking with color-coded status
+
+**Implementation**:
+- ConstructionPlanner now reads from TinkerPlants store bitflag keys
+- Converts bitflag keys to construction planner slot names
+- Converts stat IDs to cluster names for analysis
+- Skills sync from profile to construction planner composable
+- Requirements calculated using rkClusterNP() and jobeClusterSkill()
+
+**Benefits**:
+- Always-current construction guidance
+- More accurate NP requirements (formula-based, not estimates)
+- Better skill requirement display (exact values, not ranges)
+- Cleaner UI without manual button
+- Seamless integration with Build tab workflow
+
+**Files**:
+- `frontend/src/components/plants/ConstructionPlanner.vue` - Integrated with store
+- `frontend/src/composables/useConstructionPlanner.ts` - Added stat ID to name conversion
+- `frontend/src/services/construction-planner.ts` - Improved NP calculation accuracy
+
+#### Attribute Preference Default Change (October 28, 2025)
+**Problem**: Attribute preference defaulted to profile's top attribute, which could lead to unintended filtering or confusion when backend filtering is implemented.
+
+**Solution**: Changed default attribute preference from auto-detected top attribute to "None" (null):
+- Added "None" option as first dropdown choice
+- Default selection is now null (no preference)
+- Removed complex profile attribute analysis logic
+- Clear localStorage key when "None" selected
+
+**Benefits**:
+- Clearer user intent (explicit choice vs automatic assumption)
+- Simpler code without profile attribute ranking
+- Prevents future issues when backend attribute filtering is added
+- More predictable behavior for new users
+
+**Files**:
+- `frontend/src/components/plants/AttributePreference.vue` - Changed default logic
+- `frontend/src/stores/tinkerPlants.ts` - Updated attributePreference type to allow null
+
+#### Cluster Lookup UI Simplification (October 28, 2025)
+**Problem**: ClusterLookup component used bulky Card wrapper with title header, taking excessive vertical space in Build tab.
+
+**Solution**: Converted to inline layout with label:
+- Replaced Card component with simple div + border styling
+- Inline label "Cluster Lookup:" instead of Card title
+- Horizontal flexbox layout (label + input + clear button)
+- Consistent styling with surrounding controls
+
+**Benefits**:
+- Reduced vertical space consumption (~40px saved)
+- Better visual integration with Build tab controls
+- Cleaner, more compact appearance
+- Improved mobile layout efficiency
+
+**Files**:
+- `frontend/src/components/plants/ClusterLookup.vue` - Removed Card wrapper
+
+#### Five-Tab UI Organization
+**Problem**: Build tab was cluttered with both configuration controls and calculation results, making it difficult to focus on either task.
+
+**Solution**: Split functionality across five focused tabs:
+- Build tab: Pure configuration (ClusterLookup + AttributePreference + ImplantGrid)
+- Requirements tab: Equipment and build requirements with per-implant breakdown
+- Bonuses tab: Aggregate and per-implant bonus displays
+- Construction tab: Auto-analyzing build order planning
+- Shopping tab: Vendor-organized purchase tracking
+
+**Benefits**:
+- Clearer user mental model (configure → validate → review → plan → shop)
 - Reduced visual clutter in each tab
 - Better mobile experience (less scrolling within tabs)
 - Easier to find specific information
-- Dedicated space for requirement validation
+- Dedicated space for each workflow phase
 
 #### Auto-Recalculation System (October 21, 2025)
 **Problem**: Manual Calculate button required users to remember to recalculate after each change, leading to stale or confusing data displays.

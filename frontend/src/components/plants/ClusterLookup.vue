@@ -4,59 +4,54 @@ Provides AutoComplete search to find clusters and highlight matching implant slo
 Part of TinkerPlants Revamp - Task 3.4
 -->
 <template>
-  <Card class="cluster-lookup">
-    <template #title>
-      <div class="flex items-center justify-between">
-        <span class="text-lg">Cluster Lookup</span>
-        <Button
-          v-if="selectedCluster"
-          icon="pi pi-times"
-          text
-          rounded
-          size="small"
-          @click="resetSelection"
-          v-tooltip.bottom="'Clear Selection'"
-          aria-label="Clear cluster selection"
-        />
-      </div>
-    </template>
+  <div class="cluster-lookup bg-surface-50 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
+    <div class="flex items-center gap-3">
+      <!-- Title Label -->
+      <label for="cluster-search" class="text-sm font-medium text-surface-700 dark:text-surface-300 whitespace-nowrap">
+        Cluster Lookup:
+      </label>
 
-    <template #content>
-      <div class="space-y-4">
-        <!-- Search Input with AutoComplete -->
-        <div class="flex flex-col gap-2">
-          <AutoComplete
-            v-model="searchQuery"
-            :suggestions="filteredClusters"
-            @complete="onSearch"
-            @item-select="onClusterSelect"
-            placeholder="Type cluster name (e.g., Rifle, Strength, Max NCU)..."
-            input-id="cluster-search"
-            class="w-full"
-            :min-length="1"
-            complete-on-focus
-            dropdown
-            force-selection
-          >
-            <template #option="{ option }">
-              <div class="flex items-center gap-2">
-                <i class="pi pi-box text-surface-500"></i>
-                <span>{{ option }}</span>
-              </div>
-            </template>
-          </AutoComplete>
+      <!-- Search Input with AutoComplete -->
+      <AutoComplete
+        v-model="searchQuery"
+        :suggestions="filteredClusters"
+        @complete="onSearch"
+        @item-select="onClusterSelect"
+        placeholder="Type cluster name (e.g., Rifle, Strength, Max NCU)..."
+        input-id="cluster-search"
+        class="flex-1"
+        :min-length="1"
+        complete-on-focus
+        dropdown
+        force-selection
+      >
+        <template #option="{ option }">
+          <div class="flex items-center gap-2">
+            <i class="pi pi-box text-surface-500"></i>
+            <span>{{ option }}</span>
+          </div>
+        </template>
+      </AutoComplete>
 
-        </div>
-      </div>
-    </template>
-  </Card>
+      <!-- Clear Button -->
+      <Button
+        v-if="selectedCluster"
+        icon="pi pi-times"
+        text
+        rounded
+        size="small"
+        @click="resetSelection"
+        v-tooltip.bottom="'Clear Selection'"
+        aria-label="Clear cluster selection"
+      />
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import AutoComplete from 'primevue/autocomplete';
 import Button from 'primevue/button';
-import Card from 'primevue/card';
 import { getAllUniqueClusters, getSlotsForCluster } from '@/utils/cluster-utilities';
 import type { ClusterType, ImpSlotName } from '@/services/game-data';
 
@@ -189,10 +184,5 @@ defineExpose({
 
 .cluster-lookup :deep(.p-autocomplete-input) {
   width: 100%;
-}
-
-/* Card title spacing */
-.cluster-lookup :deep(.p-card-title) {
-  margin-bottom: 0;
 }
 </style>

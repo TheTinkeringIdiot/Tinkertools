@@ -211,9 +211,9 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
 
   /**
    * Attribute preference for filtering implant variants
-   * Defaults to profile's top attribute
+   * Defaults to null (no preference)
    */
-  const attributePreference = ref<string>('Strength')
+  const attributePreference = ref<string | null>(null)
 
   /**
    * Per-implant requirements (not deduplicated)
@@ -897,9 +897,9 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
   /**
    * Set attribute preference for implant filtering
    *
-   * @param attribute - Attribute name (Agility, Intelligence, Psychic, Sense, Stamina, Strength)
+   * @param attribute - Attribute name (Agility, Intelligence, Psychic, Sense, Stamina, Strength) or null for no preference
    */
-  function setAttributePreference(attribute: string): void {
+  function setAttributePreference(attribute: string | null): void {
     attributePreference.value = attribute
     // Note: Client-side filtering not yet implemented in lookupImplantForSlot()
     // Backend may not support attribute filtering yet
