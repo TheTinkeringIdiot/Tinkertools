@@ -1,6 +1,6 @@
 /**
  * TinkerProfiles Pinia Store
- * 
+ *
  * Vue 3 Pinia store wrapper for the TinkerProfiles library,
  * providing reactive state management for profile operations
  */
@@ -14,7 +14,7 @@ import {
   type ProfileExportFormat,
   type ProfileImportResult,
   type ProfileValidationResult,
-  type TinkerProfilesConfig
+  type TinkerProfilesConfig,
 } from '@/lib/tinkerprofiles';
 import { nanoCompatibility } from '@/utils/nano-compatibility';
 import type { Item } from '@/types/api';
@@ -63,26 +63,28 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   const activeProfile = ref<TinkerProfile | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
-  
+
   // ============================================================================
   // Computed Properties
   // ============================================================================
-  
+
   const hasProfiles = computed(() => profileMetadata.value.length > 0);
-  
+
   const hasActiveProfile = computed(() => activeProfile.value !== null);
-  
+
   const profileOptions = computed(() => [
     { label: 'No Profile', value: null },
-    ...profileMetadata.value.map(profile => ({
+    ...profileMetadata.value.map((profile) => ({
       label: `${profile.name} (${profile.profession} ${profile.level})`,
-      value: profile.id
-    }))
+      value: profile.id,
+    })),
   ]);
-  
+
   const activeProfileName = computed(() => activeProfile.value?.Character.Name || '');
 
-  const activeProfileProfession = computed(() => getProfessionName(activeProfile.value?.Character.Profession || 0));
+  const activeProfileProfession = computed(() =>
+    getProfessionName(activeProfile.value?.Character.Profession || 0)
+  );
 
   const activeProfileLevel = computed(() => activeProfile.value?.Character.Level || 0);
 
@@ -94,7 +96,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   // ============================================================================
   // Initialization
   // ============================================================================
-  
+
   /**
    * Initialize the profile manager with configuration
    */
@@ -104,34 +106,34 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
         autoBackup: false,
         compression: false,
         migration: true,
-        analytics: false
+        analytics: false,
       },
       validation: {
         strictMode: false,
         autoCorrect: true,
-        allowLegacyFormats: true
+        allowLegacyFormats: true,
       },
       events: {
         enabled: true,
-        throttle: 100
+        throttle: 100,
       },
-      ...config
+      ...config,
     });
-    
+
     // Set up event listeners
     setupEventListeners();
   }
-  
+
   /**
    * Set up event listeners for profile manager events
    */
   function setupEventListeners() {
     if (!profileManager) return;
-    
+
     profileManager.on('profile:created', async ({ profile }) => {
       await refreshMetadata();
     });
-    
+
     profileManager.on('profile:updated', async ({ profile }) => {
       profiles.value.set(profile.id, profile);
       if (activeProfileId.value === profile.id) {
@@ -139,7 +141,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       }
       await refreshMetadata();
     });
-    
+
     profileManager.on('profile:deleted', async ({ profileId }) => {
       profiles.value.delete(profileId);
       if (activeProfileId.value === profileId) {
@@ -148,26 +150,26 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       }
       await refreshMetadata();
     });
-    
+
     profileManager.on('profile:activated', ({ profile }) => {
       activeProfile.value = profile;
       activeProfileId.value = profile.id;
     });
-    
+
     profileManager.on('storage:error', ({ error: storageError, operation }) => {
       error.value = `Storage error during ${operation}: ${storageError.message}`;
       console.error('TinkerProfiles storage error:', storageError);
     });
-    
+
     profileManager.on('validation:failed', ({ profileId, errors }) => {
       error.value = `Profile validation failed for ${profileId}: ${errors.join(', ')}`;
     });
   }
-  
+
   // ============================================================================
   // Profile Management Actions
   // ============================================================================
-  
+
   /**
    * Load all profile data
    */
@@ -175,26 +177,25 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     if (!profileManager) {
       initialize();
     }
-    
+
     loading.value = true;
     error.value = null;
-    
+
     try {
       // Load metadata
       await refreshMetadata();
-      
+
       // Load active profile
       const active = await profileManager.getActiveProfile();
       if (active) {
         // Ensure caps and trickle-down are calculated for display
         const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
         const activeWithCaps = await updateProfileWithIPTracking(active);
-        
+
         activeProfile.value = activeWithCaps;
         activeProfileId.value = activeWithCaps.id;
         profiles.value.set(activeWithCaps.id, activeWithCaps);
       }
-      
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load profiles';
       console.error('Failed to load profiles:', err);
@@ -202,23 +203,25 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       loading.value = false;
     }
   }
-  
+
   /**
    * Create a new profile
    */
-  async function createProfile(name: string, initialData?: Partial<TinkerProfile>): Promise<string> {
+  async function createProfile(
+    name: string,
+    initialData?: Partial<TinkerProfile>
+  ): Promise<string> {
     if (!profileManager) {
       throw new Error('Profile manager not initialized');
     }
-    
+
     loading.value = true;
     error.value = null;
-    
+
     try {
       const profileId = await profileManager.createProfile(name, initialData);
       await refreshMetadata();
       return profileId;
-      
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to create profile';
       throw err;
@@ -226,7 +229,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       loading.value = false;
     }
   }
-  
+
   /**
    * Update a profile
    */
@@ -234,13 +237,12 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     if (!profileManager) {
       throw new Error('Profile manager not initialized');
     }
-    
+
     loading.value = true;
     error.value = null;
-    
+
     try {
       await profileManager.updateProfile(profileId, updates);
-      
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to update profile';
       throw err;
@@ -248,7 +250,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       loading.value = false;
     }
   }
-  
+
   /**
    * Delete a profile
    */
@@ -256,13 +258,12 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     if (!profileManager) {
       throw new Error('Profile manager not initialized');
     }
-    
+
     loading.value = true;
     error.value = null;
-    
+
     try {
       await profileManager.deleteProfile(profileId);
-      
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to delete profile';
       throw err;
@@ -270,7 +271,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       loading.value = false;
     }
   }
-  
+
   /**
    * Load a specific profile by ID
    */
@@ -293,17 +294,16 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
         return profileWithCaps;
       }
       return profile;
-      
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load profile';
       return null;
     }
   }
-  
+
   // ============================================================================
   // Active Profile Management
   // ============================================================================
-  
+
   /**
    * Set the active profile
    */
@@ -330,7 +330,9 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
           // Immediately recalculate equipment bonuses without debounce
           // This ensures MaxNCU and other equipment bonuses are properly applied
-          const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
+          const { updateProfileWithIPTracking } = await import(
+            '@/lib/tinkerprofiles/ip-integrator'
+          );
           const updatedProfile = await updateProfileWithIPTracking(profile);
 
           // Update the active profile with recalculated bonuses
@@ -342,7 +344,6 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
         activeProfileId.value = null;
         cleanupEquipmentWatchers();
       }
-
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to set active profile';
       throw err;
@@ -350,18 +351,18 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       loading.value = false;
     }
   }
-  
+
   /**
    * Clear the active profile
    */
   async function clearActiveProfile(): Promise<void> {
     await setActiveProfile(null);
   }
-  
+
   // ============================================================================
   // Profile Transformations
   // ============================================================================
-  
+
   /**
    * Get profile as nano-compatible format
    */
@@ -369,10 +370,10 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     if (!profileManager) {
       throw new Error('Profile manager not initialized');
     }
-    
+
     return await profileManager.getAsNanoCompatible(profileId);
   }
-  
+
   /**
    * Create profile from nano-compatible format
    */
@@ -380,25 +381,28 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     if (!profileManager) {
       throw new Error('Profile manager not initialized');
     }
-    
+
     return await profileManager.createFromNanoCompatible(nanoProfile);
   }
-  
+
   // ============================================================================
   // Import/Export Operations
   // ============================================================================
-  
+
   /**
    * Export a profile
    */
-  async function exportProfile(profileId: string, format: ProfileExportFormat = 'json'): Promise<string> {
+  async function exportProfile(
+    profileId: string,
+    format: ProfileExportFormat = 'json'
+  ): Promise<string> {
     if (!profileManager) {
       throw new Error('Profile manager not initialized');
     }
-    
+
     return await profileManager.exportProfile(profileId, format);
   }
-  
+
   /**
    * Export all profiles as a single JSON file
    */
@@ -406,13 +410,13 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     if (!profileManager) {
       throw new Error('Profile manager not initialized');
     }
-    
+
     loading.value = true;
     error.value = null;
-    
+
     try {
       const allProfiles: TinkerProfile[] = [];
-      
+
       // Load all profiles
       for (const metadata of profileMetadata.value) {
         const profile = await loadProfile(metadata.id);
@@ -420,17 +424,16 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
           allProfiles.push(profile);
         }
       }
-      
+
       // Create export object
       const exportData = {
-        version: "1.0",
+        version: '1.0',
         exportDate: new Date().toISOString(),
         profileCount: allProfiles.length,
-        profiles: allProfiles
+        profiles: allProfiles,
       };
-      
+
       return JSON.stringify(exportData, null, 2);
-      
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to export all profiles';
       throw err;
@@ -438,7 +441,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       loading.value = false;
     }
   }
-  
+
   /**
    * Import a profile
    */
@@ -446,19 +449,18 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     if (!profileManager) {
       throw new Error('Profile manager not initialized');
     }
-    
+
     loading.value = true;
     error.value = null;
-    
+
     try {
       const result = await profileManager.importProfile(data, sourceFormat);
-      
+
       if (!result.success) {
         error.value = `Import failed: ${result.errors.join(', ')}`;
       }
-      
+
       return result;
-      
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to import profile';
       throw err;
@@ -466,21 +468,24 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       loading.value = false;
     }
   }
-  
+
   /**
    * Import multiple profiles from export all format
    */
-  async function importAllProfiles(data: string, options: { 
-    skipDuplicates?: boolean; 
-    overwriteExisting?: boolean; 
-  } = {}): Promise<BulkImportResult> {
+  async function importAllProfiles(
+    data: string,
+    options: {
+      skipDuplicates?: boolean;
+      overwriteExisting?: boolean;
+    } = {}
+  ): Promise<BulkImportResult> {
     if (!profileManager) {
       throw new Error('Profile manager not initialized');
     }
-    
+
     loading.value = true;
     error.value = null;
-    
+
     try {
       // Parse the bulk export data
       let exportData: any;
@@ -489,15 +494,15 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       } catch (parseError) {
         throw new Error('Invalid JSON format');
       }
-      
+
       // Validate bulk export structure
       if (!exportData.version || !exportData.profiles || !Array.isArray(exportData.profiles)) {
         throw new Error('Invalid bulk export format');
       }
-      
+
       const profiles = exportData.profiles as TinkerProfile[];
-      const existingProfiles = profileMetadata.value.map(p => p.name.toLowerCase());
-      
+      const existingProfiles = profileMetadata.value.map((p) => p.name.toLowerCase());
+
       const result: BulkImportResult = {
         totalProfiles: profiles.length,
         successCount: 0,
@@ -507,10 +512,10 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
         metadata: {
           source: 'TinkerProfiles Bulk Export',
           exportVersion: exportData.version,
-          exportDate: exportData.exportDate
-        }
+          exportDate: exportData.exportDate,
+        },
       };
-      
+
       // Process each profile
       for (const profile of profiles) {
         const profileResult = {
@@ -519,13 +524,13 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
           success: false,
           skipped: false,
           error: undefined as string | undefined,
-          warnings: [] as string[]
+          warnings: [] as string[],
         };
-        
+
         try {
           // Check for duplicates
           const isDuplicate = existingProfiles.includes(profileResult.profileName.toLowerCase());
-          
+
           if (isDuplicate) {
             if (options.skipDuplicates) {
               profileResult.skipped = true;
@@ -545,34 +550,33 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
               profileResult.warnings?.push('Profile renamed to avoid duplicate');
             }
           }
-          
+
           // Import the individual profile
           const profileJson = JSON.stringify(profile);
           const importResult = await importProfile(profileJson);
-          
+
           if (importResult.success && importResult.profile) {
             profileResult.success = true;
             profileResult.profileId = importResult.profile.id;
             profileResult.warnings?.push(...(importResult.warnings || []));
             result.successCount++;
-            
+
             // Add to existing profiles list to prevent duplicates within this batch
             existingProfiles.push(profileResult.profileName.toLowerCase());
           } else {
             profileResult.error = importResult.errors.join(', ');
             result.failureCount++;
           }
-          
         } catch (profileError) {
-          profileResult.error = profileError instanceof Error ? profileError.message : 'Unknown error';
+          profileResult.error =
+            profileError instanceof Error ? profileError.message : 'Unknown error';
           result.failureCount++;
         }
-        
+
         result.results.push(profileResult);
       }
-      
+
       return result;
-      
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to import profiles';
       throw err;
@@ -580,11 +584,11 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       loading.value = false;
     }
   }
-  
+
   // ============================================================================
   // Validation Operations
   // ============================================================================
-  
+
   /**
    * Validate a profile
    */
@@ -592,14 +596,14 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     if (!profileManager) {
       throw new Error('Profile manager not initialized');
     }
-    
+
     return await profileManager.validateProfile(profileId);
   }
-  
+
   // ============================================================================
   // Search and Filtering
   // ============================================================================
-  
+
   /**
    * Search profiles with filters
    */
@@ -607,20 +611,20 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     if (!profileManager) {
       throw new Error('Profile manager not initialized');
     }
-    
+
     return await profileManager.searchProfiles(filters, sort);
   }
-  
+
   // ============================================================================
   // Utility Methods
   // ============================================================================
-  
+
   /**
    * Refresh profile metadata
    */
   async function refreshMetadata(): Promise<void> {
     if (!profileManager) return;
-    
+
     try {
       const metadata = await profileManager.getProfileMetadata(true);
       profileMetadata.value = metadata;
@@ -628,14 +632,14 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       console.error('Failed to refresh profile metadata:', err);
     }
   }
-  
+
   /**
    * Clear error state
    */
   function clearError(): void {
     error.value = null;
   }
-  
+
   /**
    * Get storage statistics
    */
@@ -645,7 +649,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     }
     return profileManager.getStorageStats();
   }
-  
+
   /**
    * Clear all profile data (dangerous!)
    */
@@ -653,19 +657,18 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     if (!profileManager) {
       throw new Error('Profile manager not initialized');
     }
-    
+
     loading.value = true;
-    
+
     try {
       await profileManager.clearAllData();
-      
+
       // Reset state
       profiles.value.clear();
       profileMetadata.value = [];
       activeProfile.value = null;
       activeProfileId.value = null;
       error.value = null;
-      
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to clear data';
       throw err;
@@ -673,18 +676,18 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       loading.value = false;
     }
   }
-  
+
   // ============================================================================
   // Backward Compatibility Helpers
   // ============================================================================
-  
+
   /**
    * Get profile by ID (backward compatibility)
    */
   function getProfileById(profileId: string): TinkerProfile | undefined {
     return profiles.value.get(profileId);
   }
-  
+
   /**
    * Duplicate a profile (backward compatibility)
    */
@@ -693,17 +696,21 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     if (!original) {
       throw new Error('Profile not found');
     }
-    
+
     const duplicated = structuredClone(original);
     duplicated.Character.Name = newName || `${original.Character.Name} (Copy)`;
-    
+
     return await createProfile(duplicated.Character.Name, duplicated);
   }
 
   /**
    * Modify a specific skill value using skill ID
    */
-  async function modifySkill(profileId: string, skillId: SkillId | number, newValue: number): Promise<void> {
+  async function modifySkill(
+    profileId: string,
+    skillId: SkillId | number,
+    newValue: number
+  ): Promise<void> {
     if (!profileManager) {
       throw new Error('Profile manager not initialized');
     }
@@ -761,9 +768,20 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       category = 'Implants';
     } else {
       // Fallback: determine from slot name
-      if (slot.includes('Implant') || slot.includes('Eye') || slot.includes('Head') || slot.includes('Ear')) {
+      if (
+        slot.includes('Implant') ||
+        slot.includes('Eye') ||
+        slot.includes('Head') ||
+        slot.includes('Ear')
+      ) {
         category = 'Implants';
-      } else if (slot.includes('Weapon') || slot.includes('HUD') || slot.includes('NCU') || slot.includes('Hand') || slot.includes('Deck')) {
+      } else if (
+        slot.includes('Weapon') ||
+        slot.includes('HUD') ||
+        slot.includes('NCU') ||
+        slot.includes('Hand') ||
+        slot.includes('Deck')
+      ) {
         category = 'Weapons';
       } else {
         category = 'Clothing';
@@ -793,7 +811,10 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   /**
    * Unequip an item from the active profile
    */
-  async function unequipItem(category: 'Weapons' | 'Clothing' | 'Implants', slot: string): Promise<void> {
+  async function unequipItem(
+    category: 'Weapons' | 'Clothing' | 'Implants',
+    slot: string
+  ): Promise<void> {
     if (!activeProfile.value) {
       throw new Error('No active profile selected');
     }
@@ -820,7 +841,11 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   /**
    * Modify a specific ability value with real-time trickle-down updates
    */
-  async function modifyAbility(profileId: string, abilityId: number, newValue: number): Promise<{
+  async function modifyAbility(
+    profileId: string,
+    abilityId: number,
+    newValue: number
+  ): Promise<{
     success: boolean;
     error?: string;
     trickleDownChanges?: Record<string, { old: number; new: number }>;
@@ -854,12 +879,12 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
         return {
           success: true,
-          trickleDownChanges: result.trickleDownChanges
+          trickleDownChanges: result.trickleDownChanges,
         };
       } else {
         return {
           success: false,
-          error: result.error
+          error: result.error,
         };
       }
     } finally {
@@ -884,21 +909,24 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     // Use the IP integrator to recalculate IP tracking
     const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
     const updatedProfile = await updateProfileWithIPTracking(profile);
-    
+
     await updateProfile(profileId, updatedProfile);
   }
 
   /**
    * Update character metadata with proper recalculation of dependent values
    */
-  async function updateCharacterMetadata(profileId: string, changes: {
-    name?: string;
-    level?: number;
-    profession?: string;
-    breed?: string;
-    faction?: string;
-    accountType?: string;
-  }): Promise<{
+  async function updateCharacterMetadata(
+    profileId: string,
+    changes: {
+      name?: string;
+      level?: number;
+      profession?: string;
+      breed?: string;
+      faction?: string;
+      accountType?: string;
+    }
+  ): Promise<{
     success: boolean;
     warnings: string[];
     errors: string[];
@@ -924,7 +952,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       if (result.success && result.updatedProfile) {
         // Update the profile in storage
         await updateProfile(profileId, result.updatedProfile);
-        
+
         // Refresh active profile if this is the active one
         if (activeProfileId.value === profileId) {
           activeProfile.value = result.updatedProfile;
@@ -934,20 +962,20 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       }
 
       return result;
-
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update character metadata';
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to update character metadata';
       error.value = errorMessage;
       return {
         success: false,
         warnings: [],
-        errors: [errorMessage]
+        errors: [errorMessage],
       };
     } finally {
       loading.value = false;
     }
   }
-  
+
   // ============================================================================
   // Equipment Change Detection
   // ============================================================================
@@ -960,7 +988,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     isUpdating: false,
     pendingUpdate: false,
     lastUpdateTime: 0,
-    batchedChanges: [] as string[] // Track which equipment slots changed
+    batchedChanges: [] as string[], // Track which equipment slots changed
   });
 
   /**
@@ -1044,7 +1072,6 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       isUpdatingFromEquipmentBonus = false;
       isUpdatingFromPerkChanges = false;
       isUpdatingFromBuffs = false;
-
     } catch (err) {
       console.error('Equipment change handling failed:', err);
       isUpdatingFromEquipmentBonus = false; // Ensure flag is cleared on error
@@ -1079,7 +1106,13 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       () => activeProfile.value?.Weapons,
       (newWeapons, oldWeapons) => {
         // Skip if we're updating from equipment bonus recalculation, skills, perks, or buffs
-        if (isUpdatingFromEquipmentBonus || isUpdatingSkills || isUpdatingFromPerkChanges || isUpdatingFromBuffs) return;
+        if (
+          isUpdatingFromEquipmentBonus ||
+          isUpdatingSkills ||
+          isUpdatingFromPerkChanges ||
+          isUpdatingFromBuffs
+        )
+          return;
         // Only trigger if there are actual changes
         if (newWeapons !== oldWeapons) {
           handleEquipmentChange('Weapons');
@@ -1092,7 +1125,13 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       () => activeProfile.value?.Clothing,
       (newClothing, oldClothing) => {
         // Skip if we're updating from equipment bonus recalculation, skills, perks, or buffs
-        if (isUpdatingFromEquipmentBonus || isUpdatingSkills || isUpdatingFromPerkChanges || isUpdatingFromBuffs) return;
+        if (
+          isUpdatingFromEquipmentBonus ||
+          isUpdatingSkills ||
+          isUpdatingFromPerkChanges ||
+          isUpdatingFromBuffs
+        )
+          return;
         if (newClothing !== oldClothing) {
           handleEquipmentChange('Clothing');
         }
@@ -1104,7 +1143,13 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       () => activeProfile.value?.Implants,
       (newImplants, oldImplants) => {
         // Skip if we're updating from equipment bonus recalculation, skills, perks, or buffs
-        if (isUpdatingFromEquipmentBonus || isUpdatingSkills || isUpdatingFromPerkChanges || isUpdatingFromBuffs) return;
+        if (
+          isUpdatingFromEquipmentBonus ||
+          isUpdatingSkills ||
+          isUpdatingFromPerkChanges ||
+          isUpdatingFromBuffs
+        )
+          return;
         if (newImplants !== oldImplants) {
           handleEquipmentChange('Implants');
         }
@@ -1116,7 +1161,13 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       () => activeProfile.value?.PerksAndResearch,
       (newPerks, oldPerks) => {
         // Skip if we're updating from equipment bonus recalculation, skills, perks, or buffs
-        if (isUpdatingFromEquipmentBonus || isUpdatingSkills || isUpdatingFromPerkChanges || isUpdatingFromBuffs) return;
+        if (
+          isUpdatingFromEquipmentBonus ||
+          isUpdatingSkills ||
+          isUpdatingFromPerkChanges ||
+          isUpdatingFromBuffs
+        )
+          return;
         if (newPerks !== oldPerks) {
           handleEquipmentChange('PerksAndResearch');
         }
@@ -1137,14 +1188,20 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     );
 
     // Store the stop handles for cleanup
-    equipmentWatcherStopHandles = [weaponsWatcher, clothingWatcher, implantsWatcher, perksWatcher, buffsWatcher];
+    equipmentWatcherStopHandles = [
+      weaponsWatcher,
+      clothingWatcher,
+      implantsWatcher,
+      perksWatcher,
+      buffsWatcher,
+    ];
   }
 
   /**
    * Clean up equipment watchers to prevent memory leaks
    */
   function cleanupEquipmentWatchers(): void {
-    equipmentWatcherStopHandles.forEach(stopWatcher => stopWatcher());
+    equipmentWatcherStopHandles.forEach((stopWatcher) => stopWatcher());
     equipmentWatcherStopHandles = [];
   }
 
@@ -1187,7 +1244,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
     return activeProfile.value.buffs.reduce((total, buff) => {
       // NCU cost is stored in stat 54
-      const ncuStat = buff.stats?.find(stat => stat.stat === 54);
+      const ncuStat = buff.stats?.find((stat) => stat.stat === 54);
       return total + (ncuStat?.value || 0);
     }, 0);
   });
@@ -1227,7 +1284,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     }
 
     // Get NCU cost from stat 54
-    const ncuStat = item.stats?.find(stat => stat.stat === 54);
+    const ncuStat = item.stats?.find((stat) => stat.stat === 54);
     const ncuCost = ncuStat?.value || 0;
 
     return ncuCost <= availableNCU.value;
@@ -1242,15 +1299,15 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     }
 
     // Get NanoStrain from stat 75
-    const newStrainStat = item.stats?.find(stat => stat.stat === 75);
+    const newStrainStat = item.stats?.find((stat) => stat.stat === 75);
     if (!newStrainStat) {
       return [];
     }
 
     const newStrain = newStrainStat.value;
 
-    return activeProfile.value.buffs.filter(buff => {
-      const buffStrainStat = buff.stats?.find(stat => stat.stat === 75);
+    return activeProfile.value.buffs.filter((buff) => {
+      const buffStrainStat = buff.stats?.find((stat) => stat.stat === 75);
       return buffStrainStat && buffStrainStat.value === newStrain;
     });
   }
@@ -1273,7 +1330,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     }
 
     // Check NCU requirements
-    const ncuStat = item.stats?.find(stat => stat.stat === 54);
+    const ncuStat = item.stats?.find((stat) => stat.stat === 54);
     const ncuCost = ncuStat?.value || 0;
 
     if (ncuCost > availableNCU.value) {
@@ -1282,7 +1339,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
         severity: 'error',
         summary: 'Insufficient NCU',
         detail: errorMsg,
-        life: 3000
+        life: 3000,
       });
       return;
     }
@@ -1292,24 +1349,26 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
     if (conflicts.length > 0) {
       // Get StackingOrder values for comparison (stat 551)
-      const newStackingOrderStat = item.stats?.find(stat => stat.stat === 551);
+      const newStackingOrderStat = item.stats?.find((stat) => stat.stat === 551);
       const newStackingOrder = newStackingOrderStat?.value || 0;
 
       for (const conflictBuff of conflicts) {
-        const conflictStackingOrderStat = conflictBuff.stats?.find(stat => stat.stat === 551);
+        const conflictStackingOrderStat = conflictBuff.stats?.find((stat) => stat.stat === 551);
         const conflictStackingOrder = conflictStackingOrderStat?.value || 0;
 
         // Higher StackingOrder replaces lower, equal StackingOrder means new replaces existing
         if (newStackingOrder >= conflictStackingOrder) {
           // Remove the conflicting buff
-          activeProfile.value.buffs = activeProfile.value.buffs.filter(buff => buff.id !== conflictBuff.id);
+          activeProfile.value.buffs = activeProfile.value.buffs.filter(
+            (buff) => buff.id !== conflictBuff.id
+          );
         } else {
           // New buff has lower priority, cannot cast
           toast.add({
             severity: 'error',
             summary: 'Buff Conflict',
             detail: `${conflictBuff.name} has higher stacking priority`,
-            life: 3000
+            life: 3000,
           });
           return;
         }
@@ -1342,7 +1401,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
         severity: 'success',
         summary: 'Buff Cast',
         detail: `Successfully cast ${item.name}`,
-        life: 3000
+        life: 3000,
       });
     } finally {
       isUpdatingFromBuffs = false;
@@ -1357,13 +1416,13 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       return;
     }
 
-    const buffToRemove = activeProfile.value.buffs.find(buff => buff.id === itemId);
+    const buffToRemove = activeProfile.value.buffs.find((buff) => buff.id === itemId);
     if (!buffToRemove) {
       return;
     }
 
     // Remove the buff
-    activeProfile.value.buffs = activeProfile.value.buffs.filter(buff => buff.id !== itemId);
+    activeProfile.value.buffs = activeProfile.value.buffs.filter((buff) => buff.id !== itemId);
 
     // Set flag to prevent watcher loops
     isUpdatingFromBuffs = true;
@@ -1385,7 +1444,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
         severity: 'success',
         summary: 'Buff Removed',
         detail: `Removed ${buffToRemove.name}`,
-        life: 3000
+        life: 3000,
       });
     } finally {
       isUpdatingFromBuffs = false;
@@ -1396,7 +1455,11 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
    * Remove all buffs from the active profile
    */
   async function removeAllBuffs(): Promise<void> {
-    if (!activeProfile.value || !activeProfile.value.buffs || activeProfile.value.buffs.length === 0) {
+    if (
+      !activeProfile.value ||
+      !activeProfile.value.buffs ||
+      activeProfile.value.buffs.length === 0
+    ) {
       return;
     }
 
@@ -1425,7 +1488,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
         severity: 'success',
         summary: 'All Buffs Removed',
         detail: `Removed ${buffCount} ${buffCount === 1 ? 'buff' : 'buffs'}`,
-        life: 3000
+        life: 3000,
       });
     } finally {
       isUpdatingFromBuffs = false;
@@ -1438,7 +1501,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
   // Initialize the store automatically
   initialize();
-  
+
   // ============================================================================
   // Return Store Interface
   // ============================================================================
@@ -1459,7 +1522,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     activeProfileName,
     activeProfileProfession,
     activeProfileLevel,
-    
+
     // Actions
     loadProfiles,
     createProfile,
@@ -1480,11 +1543,11 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     clearError,
     getStorageStats,
     clearAllData,
-    
+
     // Backward compatibility
     getProfileById,
     duplicateProfile,
-    
+
     // Profile modification methods
     modifySkill,
     modifyAbility,
@@ -1514,7 +1577,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     getEquipmentUpdateStats: () => ({
       isUpdating: equipmentUpdateState.value.isUpdating,
       lastUpdateTime: equipmentUpdateState.value.lastUpdateTime,
-      hasPendingUpdate: equipmentUpdateState.value.pendingUpdate
-    })
+      hasPendingUpdate: equipmentUpdateState.value.pendingUpdate,
+    }),
   };
 });

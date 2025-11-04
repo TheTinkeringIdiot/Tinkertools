@@ -20,7 +20,8 @@ $equipment-bonus-glow-medium: rgba(59, 130, 246, 0.2);
 }
 
 @mixin equipment-bonus-gradient($opacity: 0.1) {
-  background: linear-gradient(135deg,
+  background: linear-gradient(
+    135deg,
     rgba(59, 130, 246, $opacity) 0%,
     transparent 25%,
     transparent 75%,

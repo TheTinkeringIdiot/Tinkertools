@@ -1,14 +1,20 @@
 /**
  * ItemList Component Tests
- * 
+ *
  * Tests for the ItemList component functionality
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION } from '@/__tests__/helpers'
-import { nextTick } from 'vue'
-import ItemList from '../../components/items/ItemList.vue'
-import type { Item, TinkerProfile, PaginationInfo } from '../../types/api'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  mountWithContext,
+  standardCleanup,
+  createTestProfile,
+  SKILL_ID,
+  PROFESSION,
+} from '@/__tests__/helpers';
+import { nextTick } from 'vue';
+import ItemList from '../../components/items/ItemList.vue';
+import type { Item, TinkerProfile, PaginationInfo } from '../../types/api';
 
 // Mock child components
 vi.mock('../../components/items/ItemCard.vue', () => ({
@@ -23,9 +29,9 @@ vi.mock('../../components/items/ItemCard.vue', () => ({
       </div>
     `,
     props: ['item', 'profile', 'showCompatibility', 'isFavorite', 'isComparing'],
-    emits: ['click', 'favorite', 'compare', 'quick-view']
-  }
-}))
+    emits: ['click', 'favorite', 'compare', 'quick-view'],
+  },
+}));
 
 vi.mock('../../components/items/ItemQuickView.vue', () => ({
   default: {
@@ -40,43 +46,51 @@ vi.mock('../../components/items/ItemQuickView.vue', () => ({
       </div>
     `,
     props: ['item', 'profile', 'showCompatibility'],
-    emits: ['close', 'view-full', 'favorite', 'compare']
-  }
-}))
+    emits: ['close', 'view-full', 'favorite', 'compare'],
+  },
+}));
 
 // Mock PrimeVue components
 vi.mock('primevue/button', () => ({
   default: {
     name: 'Button',
     template: '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
-    emits: ['click']
-  }
-}))
+    emits: ['click'],
+  },
+}));
 
 vi.mock('primevue/badge', () => ({
   default: {
     name: 'Badge',
     template: '<span class="p-badge">{{ value }}</span>',
-    props: ['value', 'severity', 'size']
-  }
-}))
+    props: ['value', 'severity', 'size'],
+  },
+}));
 
 vi.mock('primevue/tag', () => ({
   default: {
     name: 'Tag',
     template: '<span class="p-tag">{{ value }}</span>',
-    props: ['value', 'severity', 'size']
-  }
-}))
+    props: ['value', 'severity', 'size'],
+  },
+}));
 
 vi.mock('primevue/paginator', () => ({
   default: {
     name: 'Paginator',
-    template: '<div class="p-paginator"><button @click="$emit(\'page\', { first: 0, rows: 25 })">Page 1</button></div>',
-    props: ['first', 'rows', 'totalRecords', 'rowsPerPageOptions', 'template', 'currentPageReportTemplate'],
-    emits: ['page']
-  }
-}))
+    template:
+      '<div class="p-paginator"><button @click="$emit(\'page\', { first: 0, rows: 25 })">Page 1</button></div>',
+    props: [
+      'first',
+      'rows',
+      'totalRecords',
+      'rowsPerPageOptions',
+      'template',
+      'currentPageReportTemplate',
+    ],
+    emits: ['page'],
+  },
+}));
 
 vi.mock('primevue/contextmenu', () => ({
   default: {
@@ -84,19 +98,19 @@ vi.mock('primevue/contextmenu', () => ({
     template: '<div class="p-context-menu" ref="menu"></div>',
     props: ['model'],
     methods: {
-      show: vi.fn()
-    }
-  }
-}))
+      show: vi.fn(),
+    },
+  },
+}));
 
 vi.mock('primevue/dialog', () => ({
   default: {
     name: 'Dialog',
     template: '<div v-if="visible" class="p-dialog"><slot /></div>',
     props: ['visible', 'modal', 'header', 'style'],
-    emits: ['update:visible']
-  }
-}))
+    emits: ['update:visible'],
+  },
+}));
 
 const mockItem: Item = {
   id: 1,
@@ -108,117 +122,117 @@ const mockItem: Item = {
   is_nano: false,
   stats: [
     { stat: 16, value: 50 }, // Strength +50
-    { stat: 17, value: 25 }  // Agility +25
+    { stat: 17, value: 25 }, // Agility +25
   ],
   requirements: [
     { stat: 16, value: 300 }, // Strength 300
-    { stat: 17, value: 200 }  // Agility 200
+    { stat: 17, value: 200 }, // Agility 200
   ],
   spell_data: [],
   actions: [],
   attack_defense: null,
-  animation_mesh: null
-}
+  animation_mesh: null,
+};
 
 const mockProfile: TinkerProfile = createTestProfile({
   level: 200,
   profession: PROFESSION.ENGINEER,
   skills: {
     [SKILL_ID.STRENGTH]: { base: 0, trickle: 0, pointsFromIp: 350, equipmentBonus: 0, total: 350 },
-    [SKILL_ID.AGILITY]: { base: 0, trickle: 0, pointsFromIp: 150, equipmentBonus: 0, total: 150 }
-  }
-})
+    [SKILL_ID.AGILITY]: { base: 0, trickle: 0, pointsFromIp: 150, equipmentBonus: 0, total: 150 },
+  },
+});
 
 const mockPagination: PaginationInfo = {
   page: 1,
   limit: 25,
   total: 100,
-  offset: 0
-}
+  offset: 0,
+};
 
 describe('ItemList', () => {
-  let wrapper: any
+  let wrapper: any;
 
   beforeEach(() => {
-    vi.clearAllMocks()
-  })
+    vi.clearAllMocks();
+  });
 
   afterEach(() => {
     if (wrapper) {
-      wrapper.unmount()
+      wrapper.unmount();
     }
-    standardCleanup()
-  })
+    standardCleanup();
+  });
 
   describe('Component Mounting', () => {
     it('should mount without errors', () => {
       wrapper = mountWithContext(ItemList, {
         props: {
           items: [mockItem],
-          viewMode: 'grid'
-        }
-      })
+          viewMode: 'grid',
+        },
+      });
 
-      expect(wrapper.exists()).toBe(true)
-    })
+      expect(wrapper.exists()).toBe(true);
+    });
 
     it('should render items in grid view', () => {
       wrapper = mountWithContext(ItemList, {
         props: {
           items: [mockItem],
-          viewMode: 'grid'
-        }
-      })
+          viewMode: 'grid',
+        },
+      });
 
-      const itemCards = wrapper.findAllComponents({ name: 'ItemCard' })
-      expect(itemCards).toHaveLength(1)
-      expect(wrapper.find('.grid').exists()).toBe(true)
-    })
+      const itemCards = wrapper.findAllComponents({ name: 'ItemCard' });
+      expect(itemCards).toHaveLength(1);
+      expect(wrapper.find('.grid').exists()).toBe(true);
+    });
 
     it('should render items in list view', async () => {
       wrapper = mountWithContext(ItemList, {
         props: {
           items: [mockItem],
-          viewMode: 'list'
-        }
-      })
+          viewMode: 'list',
+        },
+      });
 
-      const listItems = wrapper.findAll('.space-y-2 > div')
-      expect(listItems.length).toBeGreaterThan(0)
-    })
-  })
+      const listItems = wrapper.findAll('.space-y-2 > div');
+      expect(listItems.length).toBeGreaterThan(0);
+    });
+  });
 
   describe('View Mode Switching', () => {
     beforeEach(() => {
       wrapper = mountWithContext(ItemList, {
         props: {
           items: [mockItem],
-          viewMode: 'grid'
-        }
-      })
-    })
+          viewMode: 'grid',
+        },
+      });
+    });
 
     it('should show view mode controls on mobile', () => {
-      const mobileControls = wrapper.find('.md\\:hidden')
-      expect(mobileControls.exists()).toBe(true)
-    })
+      const mobileControls = wrapper.find('.md\\:hidden');
+      expect(mobileControls.exists()).toBe(true);
+    });
 
     it('should emit view mode change when buttons are clicked', async () => {
-      const listViewButton = wrapper.find('button').findAll('button')[1] // Second button should be list view
-      
+      const listViewButton = wrapper.find('button').findAll('button')[1]; // Second button should be list view
+
       if (listViewButton) {
-        await listViewButton.trigger('click')
-        expect(wrapper.emitted('view-mode-change')).toBeTruthy()
-        expect(wrapper.emitted('view-mode-change')[0]).toEqual(['list'])
+        await listViewButton.trigger('click');
+        expect(wrapper.emitted('view-mode-change')).toBeTruthy();
+        expect(wrapper.emitted('view-mode-change')[0]).toEqual(['list']);
       }
-    })
+    });
 
     it('should highlight active view mode button', () => {
       // Grid view should be active
-      const gridButton = wrapper.find('button').findAll('button')[0]
-      expect(gridButton.attributes('severity')).toBe('primary')
-    })
-  })
+      const gridButton = wrapper.find('button').findAll('button')[0];
+      expect(gridButton.attributes('severity')).toBe('primary');
+    });
+  });
 
   describe('Item Display', () => {
     beforeEach(() => {
@@ -227,46 +241,46 @@ describe('ItemList', () => {
           items: [mockItem],
           viewMode: 'grid',
           favoriteItems: [1],
-          comparisonItems: [1]
-        }
-      })
-    })
+          comparisonItems: [1],
+        },
+      });
+    });
 
     it('should pass correct props to ItemCard components', () => {
-      const itemCard = wrapper.findComponent({ name: 'ItemCard' })
-      
-      expect(itemCard.props('item')).toEqual(mockItem)
-      expect(itemCard.props('isFavorite')).toBe(true)
-      expect(itemCard.props('isComparing')).toBe(true)
-    })
+      const itemCard = wrapper.findComponent({ name: 'ItemCard' });
+
+      expect(itemCard.props('item')).toEqual(mockItem);
+      expect(itemCard.props('isFavorite')).toBe(true);
+      expect(itemCard.props('isComparing')).toBe(true);
+    });
 
     it('should handle item click events', async () => {
-      const itemCard = wrapper.findComponent({ name: 'ItemCard' })
-      
-      await itemCard.trigger('click')
-      
-      expect(wrapper.emitted('item-click')).toBeTruthy()
-      expect(wrapper.emitted('item-click')[0]).toEqual([mockItem])
-    })
+      const itemCard = wrapper.findComponent({ name: 'ItemCard' });
+
+      await itemCard.trigger('click');
+
+      expect(wrapper.emitted('item-click')).toBeTruthy();
+      expect(wrapper.emitted('item-click')[0]).toEqual([mockItem]);
+    });
 
     it('should handle favorite toggle events', async () => {
-      const itemCard = wrapper.findComponent({ name: 'ItemCard' })
-      
-      await itemCard.vm.$emit('favorite', mockItem)
-      
-      expect(wrapper.emitted('item-favorite')).toBeTruthy()
-      expect(wrapper.emitted('item-favorite')[0]).toEqual([mockItem])
-    })
+      const itemCard = wrapper.findComponent({ name: 'ItemCard' });
+
+      await itemCard.vm.$emit('favorite', mockItem);
+
+      expect(wrapper.emitted('item-favorite')).toBeTruthy();
+      expect(wrapper.emitted('item-favorite')[0]).toEqual([mockItem]);
+    });
 
     it('should handle comparison events', async () => {
-      const itemCard = wrapper.findComponent({ name: 'ItemCard' })
-      
-      await itemCard.vm.$emit('compare', mockItem)
-      
-      expect(wrapper.emitted('item-compare')).toBeTruthy()
-      expect(wrapper.emitted('item-compare')[0]).toEqual([mockItem])
-    })
-  })
+      const itemCard = wrapper.findComponent({ name: 'ItemCard' });
+
+      await itemCard.vm.$emit('compare', mockItem);
+
+      expect(wrapper.emitted('item-compare')).toBeTruthy();
+      expect(wrapper.emitted('item-compare')[0]).toEqual([mockItem]);
+    });
+  });
 
   describe('Compatibility Display', () => {
     beforeEach(() => {
@@ -275,33 +289,37 @@ describe('ItemList', () => {
           items: [mockItem],
           viewMode: 'list',
           compatibilityProfile: mockProfile,
-          showCompatibility: true
-        }
-      })
-    })
+          showCompatibility: true,
+        },
+      });
+    });
 
     it('should show compatibility indicators in list view', () => {
-      const compatibilityIcons = wrapper.findAll('.pi-check-circle, .pi-times-circle, .pi-question-circle')
-      expect(compatibilityIcons.length).toBeGreaterThan(0)
-    })
+      const compatibilityIcons = wrapper.findAll(
+        '.pi-check-circle, .pi-times-circle, .pi-question-circle'
+      );
+      expect(compatibilityIcons.length).toBeGreaterThan(0);
+    });
 
     it('should display requirement tags with correct colors', () => {
-      const requirementTags = wrapper.findAllComponents({ name: 'Tag' })
-      
+      const requirementTags = wrapper.findAllComponents({ name: 'Tag' });
+
       // Should have tags for requirements
-      const dangerTags = requirementTags.filter(tag => tag.props('severity') === 'danger')
-      const successTags = requirementTags.filter(tag => tag.props('severity') === 'success')
-      
-      expect(dangerTags.length + successTags.length).toBeGreaterThan(0)
-    })
+      const dangerTags = requirementTags.filter((tag) => tag.props('severity') === 'danger');
+      const successTags = requirementTags.filter((tag) => tag.props('severity') === 'success');
+
+      expect(dangerTags.length + successTags.length).toBeGreaterThan(0);
+    });
 
     it('should not show compatibility when disabled', async () => {
-      await wrapper.setProps({ showCompatibility: false })
-      
-      const compatibilityIcons = wrapper.findAll('.pi-check-circle, .pi-times-circle, .pi-question-circle')
-      expect(compatibilityIcons).toHaveLength(0)
-    })
-  })
+      await wrapper.setProps({ showCompatibility: false });
+
+      const compatibilityIcons = wrapper.findAll(
+        '.pi-check-circle, .pi-times-circle, .pi-question-circle'
+      );
+      expect(compatibilityIcons).toHaveLength(0);
+    });
+  });
 
   describe('Pagination', () => {
     beforeEach(() => {
@@ -309,212 +327,212 @@ describe('ItemList', () => {
         props: {
           items: [mockItem],
           viewMode: 'grid',
-          pagination: mockPagination
-        }
-      })
-    })
+          pagination: mockPagination,
+        },
+      });
+    });
 
     it('should display pagination information', () => {
       // Component displays format: "Showing 1-1 of 100 items" (ItemList.vue line 155-156)
-      const paginationInfo = wrapper.find('.text-sm')
-      expect(paginationInfo.text()).toContain('Showing 1-1 of 100 items')
-    })
+      const paginationInfo = wrapper.find('.text-sm');
+      expect(paginationInfo.text()).toContain('Showing 1-1 of 100 items');
+    });
 
     it('should render paginator component', () => {
-      const paginator = wrapper.findComponent({ name: 'Paginator' })
-      expect(paginator.exists()).toBe(true)
-      expect(paginator.props('totalRecords')).toBe(100)
-    })
+      const paginator = wrapper.findComponent({ name: 'Paginator' });
+      expect(paginator.exists()).toBe(true);
+      expect(paginator.props('totalRecords')).toBe(100);
+    });
 
     it('should emit page change events', async () => {
-      const paginator = wrapper.findComponent({ name: 'Paginator' })
-      
-      await paginator.vm.$emit('page', { first: 25, rows: 25 })
-      
-      expect(wrapper.emitted('page-change')).toBeTruthy()
-      expect(wrapper.emitted('page-change')[0]).toEqual([2]) // Page 2
-    })
-  })
+      const paginator = wrapper.findComponent({ name: 'Paginator' });
+
+      await paginator.vm.$emit('page', { first: 25, rows: 25 });
+
+      expect(wrapper.emitted('page-change')).toBeTruthy();
+      expect(wrapper.emitted('page-change')[0]).toEqual([2]); // Page 2
+    });
+  });
 
   describe('Quick View Dialog', () => {
     beforeEach(() => {
       wrapper = mountWithContext(ItemList, {
         props: {
           items: [mockItem],
-          viewMode: 'grid'
-        }
-      })
-    })
+          viewMode: 'grid',
+        },
+      });
+    });
 
     it('should open quick view dialog when item card emits quick-view', async () => {
-      const itemCard = wrapper.findComponent({ name: 'ItemCard' })
-      
-      await itemCard.vm.$emit('quick-view', mockItem)
-      await nextTick()
-      
-      const dialog = wrapper.findComponent({ name: 'Dialog' })
-      expect(dialog.exists()).toBe(true)
-      expect(dialog.props('visible')).toBe(true)
-    })
+      const itemCard = wrapper.findComponent({ name: 'ItemCard' });
+
+      await itemCard.vm.$emit('quick-view', mockItem);
+      await nextTick();
+
+      const dialog = wrapper.findComponent({ name: 'Dialog' });
+      expect(dialog.exists()).toBe(true);
+      expect(dialog.props('visible')).toBe(true);
+    });
 
     it('should render ItemQuickView in dialog', async () => {
-      const itemCard = wrapper.findComponent({ name: 'ItemCard' })
-      await itemCard.vm.$emit('quick-view', mockItem)
-      await nextTick()
-      
-      const quickView = wrapper.findComponent({ name: 'ItemQuickView' })
-      expect(quickView.exists()).toBe(true)
-      expect(quickView.props('item')).toEqual(mockItem)
-    })
+      const itemCard = wrapper.findComponent({ name: 'ItemCard' });
+      await itemCard.vm.$emit('quick-view', mockItem);
+      await nextTick();
+
+      const quickView = wrapper.findComponent({ name: 'ItemQuickView' });
+      expect(quickView.exists()).toBe(true);
+      expect(quickView.props('item')).toEqual(mockItem);
+    });
 
     it('should close dialog when quick view emits close', async () => {
       // Open dialog first
-      const itemCard = wrapper.findComponent({ name: 'ItemCard' })
-      await itemCard.vm.$emit('quick-view', mockItem)
-      await nextTick()
-      
+      const itemCard = wrapper.findComponent({ name: 'ItemCard' });
+      await itemCard.vm.$emit('quick-view', mockItem);
+      await nextTick();
+
       // Close dialog
-      const quickView = wrapper.findComponent({ name: 'ItemQuickView' })
-      await quickView.vm.$emit('close')
-      await nextTick()
-      
-      const dialog = wrapper.findComponent({ name: 'Dialog' })
-      expect(dialog.props('visible')).toBe(false)
-    })
+      const quickView = wrapper.findComponent({ name: 'ItemQuickView' });
+      await quickView.vm.$emit('close');
+      await nextTick();
+
+      const dialog = wrapper.findComponent({ name: 'Dialog' });
+      expect(dialog.props('visible')).toBe(false);
+    });
 
     it('should handle view-full event from quick view', async () => {
       // Open dialog
-      const itemCard = wrapper.findComponent({ name: 'ItemCard' })
-      await itemCard.vm.$emit('quick-view', mockItem)
-      await nextTick()
-      
+      const itemCard = wrapper.findComponent({ name: 'ItemCard' });
+      await itemCard.vm.$emit('quick-view', mockItem);
+      await nextTick();
+
       // Trigger view full
-      const quickView = wrapper.findComponent({ name: 'ItemQuickView' })
-      await quickView.vm.$emit('view-full')
-      
-      expect(wrapper.emitted('item-click')).toBeTruthy()
-      expect(wrapper.emitted('item-click')[0]).toEqual([mockItem])
-    })
-  })
+      const quickView = wrapper.findComponent({ name: 'ItemQuickView' });
+      await quickView.vm.$emit('view-full');
+
+      expect(wrapper.emitted('item-click')).toBeTruthy();
+      expect(wrapper.emitted('item-click')[0]).toEqual([mockItem]);
+    });
+  });
 
   describe('Context Menu', () => {
     beforeEach(() => {
       wrapper = mountWithContext(ItemList, {
         props: {
           items: [mockItem],
-          viewMode: 'list'
-        }
-      })
-    })
+          viewMode: 'list',
+        },
+      });
+    });
 
     it('should show context menu on item action button click', async () => {
-      const menuButton = wrapper.find('button[class*="pi-ellipsis-v"]')
-      
+      const menuButton = wrapper.find('button[class*="pi-ellipsis-v"]');
+
       if (menuButton.exists()) {
-        const mockEvent = { target: menuButton.element }
-        await wrapper.vm.showItemMenu(mockEvent, mockItem)
-        
-        const contextMenu = wrapper.findComponent({ name: 'ContextMenu' })
-        expect(contextMenu.exists()).toBe(true)
+        const mockEvent = { target: menuButton.element };
+        await wrapper.vm.showItemMenu(mockEvent, mockItem);
+
+        const contextMenu = wrapper.findComponent({ name: 'ContextMenu' });
+        expect(contextMenu.exists()).toBe(true);
       }
-    })
+    });
 
     it('should have context menu items', () => {
-      const contextMenu = wrapper.findComponent({ name: 'ContextMenu' })
-      
+      const contextMenu = wrapper.findComponent({ name: 'ContextMenu' });
+
       if (contextMenu.exists()) {
-        const menuModel = contextMenu.props('model')
-        expect(menuModel).toBeDefined()
-        expect(menuModel.length).toBeGreaterThan(0)
+        const menuModel = contextMenu.props('model');
+        expect(menuModel).toBeDefined();
+        expect(menuModel.length).toBeGreaterThan(0);
       }
-    })
-  })
+    });
+  });
 
   describe('Empty State', () => {
     it('should show empty state when no items', () => {
       wrapper = mountWithContext(ItemList, {
         props: {
           items: [],
-          viewMode: 'grid'
-        }
-      })
-      
-      expect(wrapper.text()).toContain('No items found')
-      expect(wrapper.find('.pi-inbox').exists()).toBe(true)
-    })
+          viewMode: 'grid',
+        },
+      });
+
+      expect(wrapper.text()).toContain('No items found');
+      expect(wrapper.find('.pi-inbox').exists()).toBe(true);
+    });
 
     it('should show helpful message in empty state', () => {
       wrapper = mountWithContext(ItemList, {
         props: {
           items: [],
-          viewMode: 'grid'
-        }
-      })
-      
-      expect(wrapper.text()).toContain('Try adjusting your search terms or filters')
-    })
-  })
+          viewMode: 'grid',
+        },
+      });
+
+      expect(wrapper.text()).toContain('Try adjusting your search terms or filters');
+    });
+  });
 
   describe('Responsiveness', () => {
     beforeEach(() => {
       wrapper = mountWithContext(ItemList, {
         props: {
           items: [mockItem, { ...mockItem, id: 2 }, { ...mockItem, id: 3 }],
-          viewMode: 'grid'
-        }
-      })
-    })
+          viewMode: 'grid',
+        },
+      });
+    });
 
     it('should use responsive grid classes', () => {
-      const grid = wrapper.find('.grid')
-      expect(grid.classes()).toContain('grid-cols-1')
-      expect(grid.classes()).toContain('sm:grid-cols-2')
-      expect(grid.classes()).toContain('lg:grid-cols-3')
-      expect(grid.classes()).toContain('xl:grid-cols-4')
-    })
+      const grid = wrapper.find('.grid');
+      expect(grid.classes()).toContain('grid-cols-1');
+      expect(grid.classes()).toContain('sm:grid-cols-2');
+      expect(grid.classes()).toContain('lg:grid-cols-3');
+      expect(grid.classes()).toContain('xl:grid-cols-4');
+    });
 
     it('should hide view mode controls on desktop', () => {
-      const desktopHidden = wrapper.find('.md\\:hidden')
-      expect(desktopHidden.exists()).toBe(true)
-    })
-  })
+      const desktopHidden = wrapper.find('.md\\:hidden');
+      expect(desktopHidden.exists()).toBe(true);
+    });
+  });
 
   describe('Performance', () => {
     it('should handle large item lists efficiently', () => {
       const manyItems = Array.from({ length: 100 }, (_, i) => ({
         ...mockItem,
         id: i + 1,
-        name: `Item ${i + 1}`
-      }))
+        name: `Item ${i + 1}`,
+      }));
 
       wrapper = mountWithContext(ItemList, {
         props: {
           items: manyItems,
-          viewMode: 'grid'
-        }
-      })
-      
-      expect(wrapper.exists()).toBe(true)
-      const itemCards = wrapper.findAllComponents({ name: 'ItemCard' })
-      expect(itemCards).toHaveLength(100)
-    })
+          viewMode: 'grid',
+        },
+      });
+
+      expect(wrapper.exists()).toBe(true);
+      const itemCards = wrapper.findAllComponents({ name: 'ItemCard' });
+      expect(itemCards).toHaveLength(100);
+    });
 
     it('should not re-render unnecessarily on prop changes', async () => {
       wrapper = mountWithContext(ItemList, {
         props: {
           items: [mockItem],
-          viewMode: 'grid'
-        }
-      })
-      
-      const initialRenderCount = wrapper.vm.$.renderCount || 1
-      
+          viewMode: 'grid',
+        },
+      });
+
+      const initialRenderCount = wrapper.vm.$.renderCount || 1;
+
       // Change non-item props
-      await wrapper.setProps({ loading: true })
-      await wrapper.setProps({ loading: false })
-      
+      await wrapper.setProps({ loading: true });
+      await wrapper.setProps({ loading: false });
+
       // Should not re-render items unnecessarily
-      expect(wrapper.exists()).toBe(true)
-    })
-  })
-})
+      expect(wrapper.exists()).toBe(true);
+    });
+  });
+});

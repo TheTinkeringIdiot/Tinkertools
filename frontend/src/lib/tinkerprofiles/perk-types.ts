@@ -13,20 +13,20 @@
 
 /** Individual perk entry for SL/AI perks that cost points */
 export interface PerkEntry {
-  aoid: number;         // Perk item ID (for the specific level)
-  name: string;         // Perk name
-  level: number;        // Current owned level (1-10)
-  type: 'SL' | 'AI';    // Point type used
-  item?: any;           // Complete item details (optional for backwards compatibility)
+  aoid: number; // Perk item ID (for the specific level)
+  name: string; // Perk name
+  level: number; // Current owned level (1-10)
+  type: 'SL' | 'AI'; // Point type used
+  item?: any; // Complete item details (optional for backwards compatibility)
 }
 
 /** Research entry for LE perks that are free but requirement-based */
 export interface ResearchEntry {
-  aoid: number;         // Research item ID
-  name: string;         // Research name
-  level: number;        // Current level
-  type: 'LE';           // Always LE for research
-  item?: any;           // Complete item details (optional for backwards compatibility)
+  aoid: number; // Research item ID
+  name: string; // Research name
+  level: number; // Current level
+  type: 'LE'; // Always LE for research
+  item?: any; // Complete item details (optional for backwards compatibility)
 }
 
 // ============================================================================
@@ -35,16 +35,16 @@ export interface ResearchEntry {
 
 /** Standard perk points tracking (SL perks) */
 export interface StandardPerkPoints {
-  total: number;        // Total points based on character level
-  spent: number;        // Points used on SL perks
-  available: number;    // Remaining SL points
+  total: number; // Total points based on character level
+  spent: number; // Points used on SL perks
+  available: number; // Remaining SL points
 }
 
 /** AI perk points tracking (AI perks) */
 export interface AIPerkPoints {
-  total: number;        // Total points based on AI level
-  spent: number;        // Points used on AI perks
-  available: number;    // Remaining AI points
+  total: number; // Total points based on AI level
+  spent: number; // Points used on AI perks
+  available: number; // Remaining AI points
 }
 
 // ============================================================================
@@ -53,11 +53,11 @@ export interface AIPerkPoints {
 
 /** Complete perk system with separate tracking for all three types */
 export interface PerkSystem {
-  perks: PerkEntry[];                    // SL and AI perks that cost points
+  perks: PerkEntry[]; // SL and AI perks that cost points
   standardPerkPoints: StandardPerkPoints; // SL perk points tracking
-  aiPerkPoints: AIPerkPoints;            // AI perk points tracking
-  research: ResearchEntry[];             // LE research perks (free)
-  lastCalculated: string;                // Timestamp of last calculation
+  aiPerkPoints: AIPerkPoints; // AI perk points tracking
+  research: ResearchEntry[]; // LE research perks (free)
+  lastCalculated: string; // Timestamp of last calculation
 }
 
 // ============================================================================
@@ -73,17 +73,17 @@ export interface PerkValidationResult {
 
 /** Perk requirements from database */
 export interface PerkRequirement {
-  level?: number;        // Character level requirement
-  alienLevel?: number;   // AI level requirement (for AI perks)
+  level?: number; // Character level requirement
+  alienLevel?: number; // AI level requirement (for AI perks)
   professions?: string[]; // Allowed professions
-  breeds?: string[];     // Allowed breeds
-  expansion?: string;    // Required expansion
+  breeds?: string[]; // Allowed breeds
+  expansion?: string; // Required expansion
 }
 
 /** Perk effect from spell data */
 export interface PerkEffect {
-  stat: number;          // Stat ID
-  value: number;         // Modification value
+  stat: number; // Stat ID
+  value: number; // Modification value
   type: 'add' | 'multiply' | 'set'; // Effect type
 }
 
@@ -103,9 +103,9 @@ export type PerkType = 'SL' | 'AI' | 'LE';
 export interface PerkInfo {
   aoid: number;
   name: string;
-  level: number;         // Perk level (1-10)
+  level: number; // Perk level (1-10)
   type: PerkType;
-  cost: number;          // Point cost (0 for LE)
+  cost: number; // Point cost (0 for LE)
   requirements: PerkRequirement;
   effects: PerkEffect[];
 }
@@ -114,7 +114,7 @@ export interface PerkInfo {
 export interface PerkSeries {
   name: string;
   type: PerkType;
-  levels: PerkInfo[];    // Array of all levels (1-10)
+  levels: PerkInfo[]; // Array of all levels (1-10)
   requirements: PerkRequirement; // Base requirements
 }
 
@@ -135,7 +135,7 @@ export interface PerkCharacterData {
 export interface PerkPointCalculation {
   standardPoints: {
     total: number;
-    formula: string;     // Description of how calculated
+    formula: string; // Description of how calculated
   };
   aiPoints: {
     total: number;

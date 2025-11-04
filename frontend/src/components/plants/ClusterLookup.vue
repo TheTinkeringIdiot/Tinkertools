@@ -4,10 +4,15 @@ Provides AutoComplete search to find clusters and highlight matching implant slo
 Part of TinkerPlants Revamp - Task 3.4
 -->
 <template>
-  <div class="cluster-lookup bg-surface-50 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
+  <div
+    class="cluster-lookup bg-surface-50 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-4"
+  >
     <div class="flex items-center gap-3">
       <!-- Title Label -->
-      <label for="cluster-search" class="text-sm font-medium text-surface-700 dark:text-surface-300 whitespace-nowrap">
+      <label
+        for="cluster-search"
+        class="text-sm font-medium text-surface-700 dark:text-surface-300 whitespace-nowrap"
+      >
         Cluster Lookup:
       </label>
 
@@ -73,7 +78,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  disabled: false
+  disabled: false,
 });
 
 interface Emits {
@@ -122,7 +127,7 @@ function onSearch(event: { query: string }) {
   }
 
   // Filter clusters that contain the query string
-  filteredClusters.value = allClusters.value.filter(cluster =>
+  filteredClusters.value = allClusters.value.filter((cluster) =>
     cluster.toLowerCase().includes(query)
   );
 }
@@ -160,11 +165,14 @@ function resetSelection() {
 // ============================================================================
 
 // Watch for external cluster changes (if needed for integration)
-watch(() => selectedCluster.value, (newCluster) => {
-  if (newCluster) {
-    emit('clusterSelected', newCluster, matchingSlots.value);
+watch(
+  () => selectedCluster.value,
+  (newCluster) => {
+    if (newCluster) {
+      emit('clusterSelected', newCluster, matchingSlots.value);
+    }
   }
-});
+);
 
 // ============================================================================
 // Expose public methods for parent component
@@ -173,7 +181,7 @@ watch(() => selectedCluster.value, (newCluster) => {
 defineExpose({
   resetSelection,
   selectedCluster: computed(() => selectedCluster.value),
-  matchingSlots
+  matchingSlots,
 });
 </script>
 

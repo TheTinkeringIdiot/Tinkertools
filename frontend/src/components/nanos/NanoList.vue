@@ -5,14 +5,14 @@ Displays nano programs in a scrollable list with compatibility indicators
 <template>
   <div class="nano-list h-full flex flex-col">
     <!-- List Header -->
-    <div class="flex items-center justify-between p-4 border-b border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-900">
+    <div
+      class="flex items-center justify-between p-4 border-b border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-900"
+    >
       <div class="flex items-center gap-4">
-        <h3 class="text-lg font-medium text-surface-900 dark:text-surface-100">
-          Nano Programs
-        </h3>
+        <h3 class="text-lg font-medium text-surface-900 dark:text-surface-100">Nano Programs</h3>
         <Badge :value="totalNanos" severity="info" />
       </div>
-      
+
       <div class="flex items-center gap-2">
         <!-- View Density Toggle -->
         <ToggleButton
@@ -23,7 +23,7 @@ Displays nano programs in a scrollable list with compatibility indicators
           off-icon="pi pi-list"
           size="small"
         />
-        
+
         <!-- Items per page -->
         <Dropdown
           v-model="itemsPerPage"
@@ -75,8 +75,8 @@ Displays nano programs in a scrollable list with compatibility indicators
     </div>
 
     <!-- Pagination -->
-    <div 
-      v-if="totalPages > 1" 
+    <div
+      v-if="totalPages > 1"
       class="p-4 border-t border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-900"
     >
       <Paginator
@@ -104,16 +104,19 @@ import NanoCard from './NanoCard.vue';
 import type { NanoProgram, TinkerProfile, NanoCompatibilityInfo } from '@/types/nano';
 
 // Props
-const props = withDefaults(defineProps<{
-  nanos: NanoProgram[];
-  loading?: boolean;
-  showCompatibility?: boolean;
-  activeProfile?: TinkerProfile | null;
-}>(), {
-  loading: false,
-  showCompatibility: false,
-  activeProfile: null
-});
+const props = withDefaults(
+  defineProps<{
+    nanos: NanoProgram[];
+    loading?: boolean;
+    showCompatibility?: boolean;
+    activeProfile?: TinkerProfile | null;
+  }>(),
+  {
+    loading: false,
+    showCompatibility: false,
+    activeProfile: null,
+  }
+);
 
 // Emits
 const emit = defineEmits<{
@@ -149,12 +152,12 @@ const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null =
 
   const profile = props.activeProfile;
   const requirements = nano.castingRequirements || [];
-  
+
   let canCast = true;
   let skillDeficits: { skill: string; current: number; required: number; deficit: number }[] = [];
   let statDeficits: { stat: string; current: number; required: number; deficit: number }[] = [];
   let levelDeficit = 0;
-  
+
   // Check each requirement
   for (const req of requirements) {
     switch (req.type) {
@@ -167,11 +170,11 @@ const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null =
             skill,
             current: currentSkill,
             required: req.value,
-            deficit: req.value - currentSkill
+            deficit: req.value - currentSkill,
           });
         }
         break;
-        
+
       case 'stat':
         const stat = req.requirement as string;
         const currentStat = profile.stats[stat] || 0;
@@ -181,11 +184,11 @@ const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null =
             stat,
             current: currentStat,
             required: req.value,
-            deficit: req.value - currentStat
+            deficit: req.value - currentStat,
           });
         }
         break;
-        
+
       case 'level':
         if (profile.level < req.value) {
           canCast = false;
@@ -197,13 +200,15 @@ const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null =
 
   // Calculate compatibility score (0-100)
   const totalRequirements = requirements.length;
-  const metRequirements = totalRequirements - skillDeficits.length - statDeficits.length - (levelDeficit > 0 ? 1 : 0);
-  const compatibilityScore = totalRequirements > 0 ? Math.round((metRequirements / totalRequirements) * 100) : 100;
+  const metRequirements =
+    totalRequirements - skillDeficits.length - statDeficits.length - (levelDeficit > 0 ? 1 : 0);
+  const compatibilityScore =
+    totalRequirements > 0 ? Math.round((metRequirements / totalRequirements) * 100) : 100;
 
   // Calculate skill gap (average deficit across all skill requirements)
-  const allSkillReqs = requirements.filter(req => req.type === 'skill');
+  const allSkillReqs = requirements.filter((req) => req.type === 'skill');
   let averageSkillGap = 0;
-  
+
   if (allSkillReqs.length > 0) {
     const totalGap = skillDeficits.reduce((sum, deficit) => sum + deficit.deficit, 0);
     averageSkillGap = Math.round(totalGap / allSkillReqs.length);
@@ -217,7 +222,7 @@ const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null =
     statDeficits,
     levelDeficit,
     memoryUsage: nano.memoryUsage || 0,
-    nanoPointCost: nano.nanoPointCost || 0
+    nanoPointCost: nano.nanoPointCost || 0,
   };
 };
 
@@ -233,7 +238,7 @@ const handlePageChange = (event: any) => {
   currentPage.value = Math.floor(event.first / itemsPerPage.value);
   first.value = event.first;
   emit('page-change', currentPage.value + 1);
-  
+
   // Scroll to top of list
   const listElement = document.querySelector('.nano-list .overflow-auto');
   if (listElement) {
@@ -265,7 +270,7 @@ const savePreferences = () => {
   try {
     const preferences = {
       compactView: compactView.value,
-      itemsPerPage: itemsPerPage.value
+      itemsPerPage: itemsPerPage.value,
     };
     localStorage.setItem('tinkertools_nano_list_preferences', JSON.stringify(preferences));
   } catch (error) {
@@ -279,10 +284,14 @@ watch([compactView, itemsPerPage], () => {
 });
 
 // Reset pagination when nanos change
-watch(() => props.nanos, () => {
-  currentPage.value = 0;
-  first.value = 0;
-}, { flush: 'post' });
+watch(
+  () => props.nanos,
+  () => {
+    currentPage.value = 0;
+    first.value = 0;
+  },
+  { flush: 'post' }
+);
 
 // Lifecycle
 onMounted(() => {

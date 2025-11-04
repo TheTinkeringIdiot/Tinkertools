@@ -22,7 +22,7 @@ import {
   SkillNotFoundError,
   InvalidSkillIdError,
   InvalidCategoryError,
-  toSkillId
+  toSkillId,
 } from '../types/skills';
 
 /**
@@ -144,7 +144,7 @@ export class SkillService {
       'Run Speed': 'RS',
       'Vehicle Air': 'VA',
       'Vehicle Ground': 'VG',
-      'Vehicle Water': 'VW'
+      'Vehicle Water': 'VW',
     };
 
     if (specialCases[skillName]) {
@@ -152,12 +152,12 @@ export class SkillService {
     }
 
     // Generate from first letters of words
-    const words = skillName.split(/[\s\-\.&]+/).filter(word => word.length > 0);
+    const words = skillName.split(/[\s\-\.&]+/).filter((word) => word.length > 0);
     if (words.length === 1) {
       return words[0].substring(0, 3).toUpperCase();
     }
 
-    return words.map(word => word.charAt(0).toUpperCase()).join('');
+    return words.map((word) => word.charAt(0).toUpperCase()).join('');
   }
 
   /**
@@ -169,9 +169,10 @@ export class SkillService {
     if (inputType === 'name') {
       // Suggest similar names using Levenshtein distance
       const suggestions = this.findSimilarSkillNames(input, 3);
-      const suggestionsText = suggestions.length > 0
-        ? `\n\nDid you mean one of these?\n${suggestions.map(s => `  - ${s}`).join('\n')}`
-        : '';
+      const suggestionsText =
+        suggestions.length > 0
+          ? `\n\nDid you mean one of these?\n${suggestions.map((s) => `  - ${s}`).join('\n')}`
+          : '';
 
       return `${baseMessage}
 
@@ -212,7 +213,7 @@ Total skills: ${this.skillIdToName.size}`;
     return suggestions
       .sort((a, b) => a.distance - b.distance)
       .slice(0, maxSuggestions)
-      .map(s => s.name);
+      .map((s) => s.name);
   }
 
   /**
@@ -270,11 +271,7 @@ Total skills: ${this.skillIdToName.size}`;
     }
 
     // Step 4: Not found - throw descriptive error
-    throw new SkillNotFoundError(
-      name,
-      'name',
-      this.generateDetailedError(name, 'name')
-    );
+    throw new SkillNotFoundError(name, 'name', this.generateDetailedError(name, 'name'));
   }
 
   /**
@@ -368,7 +365,7 @@ Total skills: ${this.skillIdToName.size}`;
     return skillIds
       .slice() // Copy array to avoid mutations
       .sort((a, b) => this.getSortOrder(a) - this.getSortOrder(b))
-      .map(id => toSkillId(id));
+      .map((id) => toSkillId(id));
   }
 
   /**
@@ -379,7 +376,7 @@ Total skills: ${this.skillIdToName.size}`;
   public getAllSkills(): SkillId[] {
     return Array.from(this.skillIdToName.keys())
       .sort((a, b) => this.getSortOrder(a) - this.getSortOrder(b))
-      .map(id => toSkillId(id));
+      .map((id) => toSkillId(id));
   }
 
   /**
@@ -421,7 +418,7 @@ Total skills: ${this.skillIdToName.size}`;
       name: this.getName(skillId),
       shortName: this.getShortName(skillId),
       category: this.getCategory(skillId),
-      sortOrder: this.getSortOrder(skillId)
+      sortOrder: this.getSortOrder(skillId),
     };
   }
 
@@ -443,7 +440,7 @@ Total skills: ${this.skillIdToName.size}`;
       return {
         skillId: toSkillId(exactId),
         resolvedName: name,
-        matchType: 'exact'
+        matchType: 'exact',
       };
     }
 
@@ -455,7 +452,7 @@ Total skills: ${this.skillIdToName.size}`;
         return {
           skillId: toSkillId(skillId),
           resolvedName: skillName,
-          matchType: 'case-insensitive'
+          matchType: 'case-insensitive',
         };
       }
     }
@@ -469,18 +466,14 @@ Total skills: ${this.skillIdToName.size}`;
           return {
             skillId: toSkillId(skillId),
             resolvedName,
-            matchType: 'pattern'
+            matchType: 'pattern',
           };
         }
       }
     }
 
     // Not found
-    throw new SkillNotFoundError(
-      name,
-      'name',
-      this.generateDetailedError(name, 'name')
-    );
+    throw new SkillNotFoundError(name, 'name', this.generateDetailedError(name, 'name'));
   }
 
   /**
@@ -496,7 +489,7 @@ Total skills: ${this.skillIdToName.size}`;
     return {
       name: category,
       skillIds,
-      sortOrder: 0 // Could be enhanced to support category ordering
+      sortOrder: 0, // Could be enhanced to support category ordering
     };
   }
 
@@ -523,7 +516,7 @@ Total skills: ${this.skillIdToName.size}`;
       totalSkills: this.skillIdToName.size,
       totalCategories: this.categoryToSkillIds.size,
       totalPatterns: this.skillPatterns.size,
-      skillsByCategory
+      skillsByCategory,
     };
   }
 }

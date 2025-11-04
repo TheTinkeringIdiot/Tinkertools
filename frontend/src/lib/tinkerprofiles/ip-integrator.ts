@@ -1,12 +1,15 @@
 /**
  * IP Integration for TinkerProfiles
- * 
+ *
  * Integrates IP calculation system with TinkerProfile management,
  * providing automatic IP tracking, validation, and recalculation
  */
 
 import type { TinkerProfile, IPTracker, SkillData } from './types';
-import { accountTypeToExpansionBitflag, specializationLevelToBitflag } from '@/utils/expansion-utils';
+import {
+  accountTypeToExpansionBitflag,
+  specializationLevelToBitflag,
+} from '@/utils/expansion-utils';
 import {
   calcIP,
   calcTitleLevel,
@@ -21,7 +24,7 @@ import {
   ABILITY_NAMES,
   ABILITY_INDEX_TO_STAT_ID,
   type CharacterStats,
-  type IPCalculationResult
+  type IPCalculationResult,
 } from './ip-calculator';
 
 import { getSkillId, getSkillName } from './skill-mappings';
@@ -46,57 +49,55 @@ const ATTRIBUTE_IDS = new Set([16, 17, 18, 19, 20, 21]);
  * Trainable skill IDs (have IP costs defined in game data)
  * Derived from SKILL_COST_FACTORS to ensure accuracy
  */
-const TRAINABLE_SKILL_IDS = new Set(
-  Object.keys(SKILL_COST_FACTORS).map(Number)
-);
+const TRAINABLE_SKILL_IDS = new Set(Object.keys(SKILL_COST_FACTORS).map(Number));
 
 /**
  * Bonus-only stat IDs (no base value, no IP cost, only receive bonuses)
  * These stats need to be initialized if they have any bonuses from equipment/perks/buffs
  */
 const BONUS_ONLY_STAT_IDS = new Set([
-  1,    // MaxHealth
-  221,  // MaxNano
-  45,   // BeltSlots
-  181,  // MaxNCU
-  90,   // ProjectileAC
-  91,   // MeleeAC
-  92,   // EnergyAC
-  93,   // ChemicalAC
-  94,   // RadiationAC
-  95,   // ColdAC
-  96,   // PoisonAC
-  97,   // FireAC
-  276,  // AddAllOffense
-  277,  // AddAllDefense
-  278,  // ProjectileDamageModifier
-  279,  // MeleeDamageModifier
-  280,  // EnergyDamageModifier
-  281,  // ChemicalDamageModifier
-  282,  // RadiationDamageModifier
-  311,  // ColdDamageModifier
-  315,  // NanoDamageModifier
-  316,  // FireDamageModifier
-  317,  // PoisonDamageModifier
-  318,  // NanoCost
-  319,  // XPModifier
-  343,  // HealDelta
-  364,  // NanoDelta
-  379,  // CriticalIncrease
-  381,  // NanoRange
-  382,  // SkillLockModifier
-  383,  // NanoInterruptModifier
-  287,  // AttackRange
-  428,  // Free deck slot (alt BeltSlots)
-  535,  // HealMultiplier
-  536,  // NanoDamageMultiplier
-  360,  // Scale
-  355,  // WornItem
-  54,   // Level
-  60,   // Profession
-  368,  // VisualProfession
-  182,  // Specialization
-  389   // Expansion
+  1, // MaxHealth
+  221, // MaxNano
+  45, // BeltSlots
+  181, // MaxNCU
+  90, // ProjectileAC
+  91, // MeleeAC
+  92, // EnergyAC
+  93, // ChemicalAC
+  94, // RadiationAC
+  95, // ColdAC
+  96, // PoisonAC
+  97, // FireAC
+  276, // AddAllOffense
+  277, // AddAllDefense
+  278, // ProjectileDamageModifier
+  279, // MeleeDamageModifier
+  280, // EnergyDamageModifier
+  281, // ChemicalDamageModifier
+  282, // RadiationDamageModifier
+  311, // ColdDamageModifier
+  315, // NanoDamageModifier
+  316, // FireDamageModifier
+  317, // PoisonDamageModifier
+  318, // NanoCost
+  319, // XPModifier
+  343, // HealDelta
+  364, // NanoDelta
+  379, // CriticalIncrease
+  381, // NanoRange
+  382, // SkillLockModifier
+  383, // NanoInterruptModifier
+  287, // AttackRange
+  428, // Free deck slot (alt BeltSlots)
+  535, // HealMultiplier
+  536, // NanoDamageMultiplier
+  360, // Scale
+  355, // WornItem
+  54, // Level
+  60, // Profession
+  368, // VisualProfession
+  182, // Specialization
+  389, // Expansion
 ]);
 
 /**
@@ -112,14 +113,13 @@ function createEmptySkillData(): SkillData {
     buffBonus: 0,
     ipSpent: 0,
     cap: 0,
-    total: 0
+    total: 0,
   };
 }
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
 
 // ============================================================================
 // Profile to CharacterStats Conversion
@@ -141,7 +141,7 @@ export function profileToCharacterStats(profile: TinkerProfile): CharacterStats 
     profile.skills[18]?.pointsFromIp || 0, // Stamina
     profile.skills[19]?.pointsFromIp || 0, // Intelligence
     profile.skills[20]?.pointsFromIp || 0, // Sense
-    profile.skills[21]?.pointsFromIp || 0  // Psychic
+    profile.skills[21]?.pointsFromIp || 0, // Psychic
   ];
 
   // Extract skills (improvements only) using skill IDs directly
@@ -161,7 +161,7 @@ export function profileToCharacterStats(profile: TinkerProfile): CharacterStats 
     breed,
     profession,
     abilities,
-    skills
+    skills,
   };
 }
 
@@ -183,7 +183,7 @@ async function calculatePerkBonuses(profile: TinkerProfile): Promise<Record<numb
 
     // Add SL/AI perks that have item data
     if (profile.PerksAndResearch.perks && Array.isArray(profile.PerksAndResearch.perks)) {
-      profile.PerksAndResearch.perks.forEach(perkEntry => {
+      profile.PerksAndResearch.perks.forEach((perkEntry) => {
         if (perkEntry && perkEntry.item) {
           allPerkItems.push(perkEntry.item);
         }
@@ -192,7 +192,7 @@ async function calculatePerkBonuses(profile: TinkerProfile): Promise<Record<numb
 
     // Add LE research that have item data
     if (profile.PerksAndResearch.research && Array.isArray(profile.PerksAndResearch.research)) {
-      profile.PerksAndResearch.research.forEach(researchEntry => {
+      profile.PerksAndResearch.research.forEach((researchEntry) => {
         if (researchEntry && researchEntry.item) {
           allPerkItems.push(researchEntry.item);
         }
@@ -282,11 +282,11 @@ export function calculateProfileIP(profile: TinkerProfile): IPTracker {
   const skillCategoryBreakdown: Record<string, number> = {};
   const categories = skillService.getAllCategories();
 
-  categories.forEach(category => {
+  categories.forEach((category) => {
     skillCategoryBreakdown[category] = 0;
     const skillIds = skillService.getSkillsByCategory(category);
 
-    skillIds.forEach(skillId => {
+    skillIds.forEach((skillId) => {
       const skillData = profile.skills[skillId];
       if (skillData && skillData.ipSpent) {
         skillCategoryBreakdown[category] += skillData.ipSpent;
@@ -304,8 +304,8 @@ export function calculateProfileIP(profile: TinkerProfile): IPTracker {
     lastCalculated: new Date().toISOString(),
     breakdown: {
       abilities: abilityBreakdown,
-      skillCategories: skillCategoryBreakdown
-    }
+      skillCategories: skillCategoryBreakdown,
+    },
   };
 }
 
@@ -345,9 +345,10 @@ export function updateProfileSkillInfo(
 
   // Initialize any bonus-only stats that have bonuses but don't exist in profile yet
   for (const statId of BONUS_ONLY_STAT_IDS) {
-    const hasBonus = (equipmentBonuses[statId] || 0) !== 0 ||
-                     (perkBonuses[statId] || 0) !== 0 ||
-                     (buffBonuses[statId] || 0) !== 0;
+    const hasBonus =
+      (equipmentBonuses[statId] || 0) !== 0 ||
+      (perkBonuses[statId] || 0) !== 0 ||
+      (buffBonuses[statId] || 0) !== 0;
 
     if (hasBonus && !profile.skills[statId]) {
       profile.skills[statId] = createEmptySkillData();
@@ -357,19 +358,19 @@ export function updateProfileSkillInfo(
   // Special handling for character-derived stats that don't come from bonuses
   // These stats are always present and derived from Character properties
   if (!profile.skills[54]) {
-    profile.skills[54] = createEmptySkillData();   // Level
+    profile.skills[54] = createEmptySkillData(); // Level
   }
   if (!profile.skills[60]) {
-    profile.skills[60] = createEmptySkillData();   // Profession
+    profile.skills[60] = createEmptySkillData(); // Profession
   }
   if (!profile.skills[368]) {
-    profile.skills[368] = createEmptySkillData();  // VisualProfession
+    profile.skills[368] = createEmptySkillData(); // VisualProfession
   }
   if (!profile.skills[182]) {
-    profile.skills[182] = createEmptySkillData();  // Specialization
+    profile.skills[182] = createEmptySkillData(); // Specialization
   }
   if (!profile.skills[389]) {
-    profile.skills[389] = createEmptySkillData();  // Expansion
+    profile.skills[389] = createEmptySkillData(); // Expansion
   }
 
   // Update abilities (skill IDs 16-21)
@@ -390,7 +391,12 @@ export function updateProfileSkillInfo(
       }
 
       // Calculate base ability cap (without equipment/perks)
-      const baseAbilityCap = calcAbilityMaxValue(characterStats.level, characterStats.breed, characterStats.profession, abilityStatId);
+      const baseAbilityCap = calcAbilityMaxValue(
+        characterStats.level,
+        characterStats.breed,
+        characterStats.profession,
+        abilityStatId
+      );
 
       // Calculate base value (breed init + IP improvements, no equipment/perks)
       const baseValue = breedInitValue + skillData.pointsFromIp;
@@ -418,10 +424,10 @@ export function updateProfileSkillInfo(
     profile.skills[18]?.total || 0, // Stamina
     profile.skills[19]?.total || 0, // Intelligence
     profile.skills[20]?.total || 0, // Sense
-    profile.skills[21]?.total || 0  // Psychic
+    profile.skills[21]?.total || 0, // Psychic
   ];
   const trickleDownResults = calcAllTrickleDown(fullAbilityValues);
-  
+
   // Update trainable skills with trickle-down and bonuses
   for (const [skillIdStr, skillData] of Object.entries(profile.skills)) {
     const skillId = Number(skillIdStr);
@@ -601,7 +607,7 @@ export function updateProfileTrickleDown(profile: TinkerProfile): TinkerProfile 
     updatedProfile.skills[18]?.total || 0, // Stamina
     updatedProfile.skills[19]?.total || 0, // Intelligence
     updatedProfile.skills[20]?.total || 0, // Sense
-    updatedProfile.skills[21]?.total || 0  // Psychic
+    updatedProfile.skills[21]?.total || 0, // Psychic
   ];
 
   // Calculate new trickle-down values
@@ -646,14 +652,14 @@ export function validateProfileIP(profile: TinkerProfile): {
 } {
   const characterStats = profileToCharacterStats(profile);
   const validation = validateCharacterBuild(characterStats);
-  
+
   const warnings: string[] = [];
-  
+
   // Add warnings for inefficient IP usage
   if (validation.ipAnalysis.efficiency < 80) {
     warnings.push(`Low IP efficiency: ${validation.ipAnalysis.efficiency}% of available IP used`);
   }
-  
+
   // Check for skills near caps
   for (const [skillIdStr, skillData] of Object.entries(profile.skills)) {
     const skillId = Number(skillIdStr);
@@ -670,7 +676,7 @@ export function validateProfileIP(profile: TinkerProfile): {
           profile.skills[18]?.total || 0, // Stamina
           profile.skills[19]?.total || 0, // Intelligence
           profile.skills[20]?.total || 0, // Sense
-          profile.skills[21]?.total || 0  // Psychic
+          profile.skills[21]?.total || 0, // Psychic
         ];
 
         const baseSkillCap = calcSkillCap(
@@ -681,19 +687,21 @@ export function validateProfileIP(profile: TinkerProfile): {
         );
 
         if (skillData.total >= baseSkillCap * 0.95) {
-          warnings.push(`${skillName} is near its natural cap (${skillData.total}/${baseSkillCap})`);
+          warnings.push(
+            `${skillName} is near its natural cap (${skillData.total}/${baseSkillCap})`
+          );
         }
       } catch (error) {
         // Skip invalid skill IDs
       }
     }
   }
-  
+
   return {
     valid: validation.valid,
     errors: validation.errors,
     warnings,
-    ipAnalysis: validation.ipAnalysis
+    ipAnalysis: validation.ipAnalysis,
   };
 }
 
@@ -768,7 +776,7 @@ export async function modifySkill(
   if (!skillData) {
     return {
       success: false,
-      error: `Skill ID ${skillId} not found in profile`
+      error: `Skill ID ${skillId} not found in profile`,
     };
   }
 
@@ -779,7 +787,7 @@ export async function modifySkill(
   } catch (error) {
     return {
       success: false,
-      error: `Invalid skill ID: ${skillId}`
+      error: `Invalid skill ID: ${skillId}`,
     };
   }
 
@@ -791,7 +799,7 @@ export async function modifySkill(
     if (newValue > displayedCap) {
       return {
         success: false,
-        error: `Cannot raise ${skillName} to ${newValue}, exceeds cap of ${displayedCap}`
+        error: `Cannot raise ${skillName} to ${newValue}, exceeds cap of ${displayedCap}`,
       };
     }
   }
@@ -828,7 +836,7 @@ export async function modifySkill(
     if (ipCost > currentIP) {
       return {
         success: false,
-        error: `Insufficient IP: need ${ipCost}, have ${currentIP}`
+        error: `Insufficient IP: need ${ipCost}, have ${currentIP}`,
       };
     }
   }
@@ -843,7 +851,7 @@ export async function modifySkill(
   // Recalculate all IP information (includes perk bonuses)
   return {
     success: true,
-    updatedProfile: await recalculateProfileIP(updatedProfile)
+    updatedProfile: await recalculateProfileIP(updatedProfile),
   };
 }
 
@@ -864,7 +872,7 @@ export async function modifyAbility(
   if (!abilityData) {
     return {
       success: false,
-      error: `Ability ID ${abilityId} not found`
+      error: `Ability ID ${abilityId} not found`,
     };
   }
 
@@ -872,7 +880,7 @@ export async function modifyAbility(
   if (abilityId < 16 || abilityId > 21) {
     return {
       success: false,
-      error: `Skill ID ${abilityId} is not an ability`
+      error: `Skill ID ${abilityId} is not an ability`,
     };
   }
 
@@ -905,7 +913,7 @@ export async function modifyAbility(
   if (ipCost > currentIP) {
     return {
       success: false,
-      error: `Insufficient IP: need ${ipCost}, have ${currentIP}`
+      error: `Insufficient IP: need ${ipCost}, have ${currentIP}`,
     };
   }
 
@@ -931,7 +939,12 @@ export async function modifyAbility(
   // This is critical: updateProfileTrickleDown reads ability.total values,
   // so we must update the total to reflect the new pointsFromIp
   const characterStats = profileToCharacterStats(updatedProfile);
-  const baseAbilityCap = calcAbilityMaxValue(characterStats.level, characterStats.breed, characterStats.profession, abilityId);
+  const baseAbilityCap = calcAbilityMaxValue(
+    characterStats.level,
+    characterStats.breed,
+    characterStats.profession,
+    abilityId
+  );
   const baseValue = breedBase + newImprovements;
   const cappedBaseValue = Math.min(baseValue, baseAbilityCap);
 
@@ -961,7 +974,7 @@ export async function modifyAbility(
   return {
     success: true,
     updatedProfile: finalProfile,
-    trickleDownChanges: oldTrickleDownChanges
+    trickleDownChanges: oldTrickleDownChanges,
   };
 }
 
@@ -969,7 +982,9 @@ export async function modifyAbility(
  * Recalculate profile with updated perk bonuses
  * Use this when perks change to ensure all skill/ability values are updated
  */
-export async function recalculateProfileWithPerkChanges(profile: TinkerProfile): Promise<TinkerProfile> {
+export async function recalculateProfileWithPerkChanges(
+  profile: TinkerProfile
+): Promise<TinkerProfile> {
   return recalculateProfileIP(profile);
 }
 
@@ -997,5 +1012,5 @@ export const ipIntegrator = {
   updateProfileWithIPTracking,
   recalculateProfileWithPerkChanges,
   modifySkill,
-  modifyAbility
+  modifyAbility,
 };

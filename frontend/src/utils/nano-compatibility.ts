@@ -1,20 +1,16 @@
 /**
  * TinkerTools Nano Compatibility Utility
- * 
+ *
  * Functions for nano requirement validation, NCU cost calculations,
  * nano school compatibility checks, and spell effect formatting.
  */
 
-import {
-  NANOSCHOOL,
-  NANO_STRAIN,
-  PROFESSION
-} from '../services/game-data';
+import { NANOSCHOOL, NANO_STRAIN, PROFESSION } from '../services/game-data';
 import {
   getStatName,
   getProfessionName,
   getNanoSchoolName,
-  getNanoStrainName
+  getNanoStrainName,
 } from '../services/game-utils';
 import { validateRequirements, type Character } from './stat-calculations';
 import { gameUtils } from '../services/game-utils';
@@ -114,24 +110,24 @@ export function findRemovableNanos(
 ): Nano[] {
   const availableNCU = calculateAvailableNCU(totalNCU, runningNanos);
   const neededNCU = targetNano.ncuCost - availableNCU;
-  
+
   if (neededNCU <= 0) return [];
-  
+
   // Sort running nanos by NCU cost (remove expensive ones first)
   const sortedNanos = [...runningNanos].sort((a, b) => b.ncuCost - a.ncuCost);
-  
+
   const removable: Nano[] = [];
   let freedNCU = 0;
-  
+
   for (const nano of sortedNanos) {
     removable.push(nano);
     freedNCU += nano.ncuCost;
-    
+
     if (freedNCU >= neededNCU) {
       break;
     }
   }
-  
+
   return removable;
 }
 
@@ -153,12 +149,12 @@ export function validateNanoRequirements(
   const reqValidation = validateRequirements(character, nano.requirements || []);
   if (!reqValidation.valid) {
     canCast = false;
-    reqValidation.failures.forEach(failure => {
+    reqValidation.failures.forEach((failure) => {
       const statName = getStatName(failure.stat) || `Stat ${failure.stat}`;
       reasons.push(`${statName}: ${failure.current}/${failure.required}`);
     });
   }
-  
+
   // Check profession compatibility
   if (nano.school && !canProfessionUseNanoSchool(character.profession, nano.school)) {
     const professionName = getProfessionName(character.profession) || 'Unknown';
@@ -166,19 +162,19 @@ export function validateNanoRequirements(
     reasons.push(`${professionName} cannot use ${schoolName} nanos effectively`);
     canCast = false;
   }
-  
+
   // Check level requirements (if nano has level restriction)
   if (nano.level && character.level < nano.level) {
     reasons.push(`Level ${character.level}/${nano.level}`);
     canCast = false;
   }
-  
+
   return {
     canCast,
     reasons,
     requiredStats: reqValidation.failures,
     ncuRequired: nano.ncuCost,
-    ncuAvailable: 0 // This should be calculated by caller
+    ncuAvailable: 0, // This should be calculated by caller
   };
 }
 
@@ -195,25 +191,25 @@ export function canProfessionUseNanoSchool(professionId: number, schoolId: numbe
 export function getNanoSchoolEffectiveness(professionId: number, schoolId: number): number {
   const profession = getProfessionName(professionId);
   const school = getNanoSchoolName(schoolId);
-  
+
   if (!profession || !school) return 0;
 
   // Effectiveness ratings (0-100)
   const effectiveness: Record<string, Record<string, number>> = {
-    'Doctor': { 'Medical': 100, 'Protection': 80, 'Combat': 40, 'Psi': 60, 'Space': 30 },
-    'NanoTechnician': { 'Combat': 100, 'Psi': 90, 'Medical': 50, 'Protection': 60, 'Space': 70 },
-    'MetaPhysicist': { 'Psi': 100, 'Space': 100, 'Combat': 70, 'Medical': 40, 'Protection': 50 },
-    'Bureaucrat': { 'Psi': 90, 'Protection': 80, 'Medical': 60, 'Combat': 40, 'Space': 50 },
-    'Agent': { 'Psi': 80, 'Combat': 85, 'Medical': 50, 'Protection': 60, 'Space': 40 },
-    'Adventurer': { 'Medical': 80, 'Protection': 75, 'Combat': 60, 'Psi': 50, 'Space': 40 },
-    'Trader': { 'Medical': 75, 'Protection': 70, 'Psi': 60, 'Combat': 40, 'Space': 30 },
-    'Engineer': { 'Protection': 80, 'Combat': 70, 'Medical': 60, 'Psi': 50, 'Space': 40 },
-    'Fixer': { 'Medical': 70, 'Combat': 75, 'Protection': 60, 'Psi': 50, 'Space': 30 },
-    'Soldier': { 'Combat': 85, 'Protection': 80, 'Medical': 60, 'Psi': 40, 'Space': 30 },
-    'Enforcer': { 'Combat': 90, 'Protection': 85, 'Medical': 50, 'Psi': 40, 'Space': 30 },
-    'MartialArtist': { 'Medical': 75, 'Combat': 80, 'Protection': 60, 'Psi': 50, 'Space': 30 },
-    'Keeper': { 'Medical': 90, 'Protection': 90, 'Psi': 80, 'Combat': 60, 'Space': 50 },
-    'Shade': { 'Combat': 90, 'Psi': 85, 'Medical': 50, 'Protection': 60, 'Space': 40 }
+    Doctor: { Medical: 100, Protection: 80, Combat: 40, Psi: 60, Space: 30 },
+    NanoTechnician: { Combat: 100, Psi: 90, Medical: 50, Protection: 60, Space: 70 },
+    MetaPhysicist: { Psi: 100, Space: 100, Combat: 70, Medical: 40, Protection: 50 },
+    Bureaucrat: { Psi: 90, Protection: 80, Medical: 60, Combat: 40, Space: 50 },
+    Agent: { Psi: 80, Combat: 85, Medical: 50, Protection: 60, Space: 40 },
+    Adventurer: { Medical: 80, Protection: 75, Combat: 60, Psi: 50, Space: 40 },
+    Trader: { Medical: 75, Protection: 70, Psi: 60, Combat: 40, Space: 30 },
+    Engineer: { Protection: 80, Combat: 70, Medical: 60, Psi: 50, Space: 40 },
+    Fixer: { Medical: 70, Combat: 75, Protection: 60, Psi: 50, Space: 30 },
+    Soldier: { Combat: 85, Protection: 80, Medical: 60, Psi: 40, Space: 30 },
+    Enforcer: { Combat: 90, Protection: 85, Medical: 50, Psi: 40, Space: 30 },
+    MartialArtist: { Medical: 75, Combat: 80, Protection: 60, Psi: 50, Space: 30 },
+    Keeper: { Medical: 90, Protection: 90, Psi: 80, Combat: 60, Space: 50 },
+    Shade: { Combat: 90, Psi: 85, Medical: 50, Protection: 60, Space: 40 },
   };
 
   return effectiveness[profession]?.[school] || 0;
@@ -226,12 +222,9 @@ export function getNanoSchoolEffectiveness(professionId: number, schoolId: numbe
 /**
  * Check for stacking conflicts between nanos
  */
-export function checkStackingConflicts(
-  newNano: Nano,
-  runningNanos: Nano[]
-): StackingConflict[] {
+export function checkStackingConflicts(newNano: Nano, runningNanos: Nano[]): StackingConflict[] {
   const conflicts: StackingConflict[] = [];
-  
+
   for (const existingNano of runningNanos) {
     // Check strain conflicts
     if (newNano.strain && existingNano.strain === newNano.strain) {
@@ -239,20 +232,20 @@ export function checkStackingConflicts(
         existingNano,
         newNano,
         conflictType: 'strain',
-        description: `Both nanos use strain ${getNanoStrainName(newNano.strain) || newNano.strain}`
+        description: `Both nanos use strain ${getNanoStrainName(newNano.strain) || newNano.strain}`,
       });
     }
-    
+
     // Check stacking line conflicts
     if (newNano.stackingLine && existingNano.stackingLine === newNano.stackingLine) {
       conflicts.push({
         existingNano,
         newNano,
         conflictType: 'stackingLine',
-        description: `Both nanos are on the same stacking line ${newNano.stackingLine}`
+        description: `Both nanos are on the same stacking line ${newNano.stackingLine}`,
       });
     }
-    
+
     // Check for overlapping effects (simplified)
     if (newNano.effects && existingNano.effects) {
       const overlapEffects = findOverlappingEffects(newNano.effects, existingNano.effects);
@@ -261,12 +254,12 @@ export function checkStackingConflicts(
           existingNano,
           newNano,
           conflictType: 'effect',
-          description: `Conflicting effects: ${overlapEffects.join(', ')}`
+          description: `Conflicting effects: ${overlapEffects.join(', ')}`,
         });
       }
     }
   }
-  
+
   return conflicts;
 }
 
@@ -275,7 +268,7 @@ export function checkStackingConflicts(
  */
 export function findOverlappingEffects(effects1: NanoEffect[], effects2: NanoEffect[]): string[] {
   const overlaps: string[] = [];
-  
+
   for (const effect1 of effects1) {
     for (const effect2 of effects2) {
       // Check if both effects modify the same stat
@@ -285,7 +278,7 @@ export function findOverlappingEffects(effects1: NanoEffect[], effects2: NanoEff
       }
     }
   }
-  
+
   return [...new Set(overlaps)]; // Remove duplicates
 }
 
@@ -297,31 +290,31 @@ export function resolveStackingConflicts(
   strategy: 'replace' | 'cancel' | 'ask' = 'replace'
 ): Array<{ action: 'remove' | 'block'; nano: Nano; reason: string }> {
   const actions: Array<{ action: 'remove' | 'block'; nano: Nano; reason: string }> = [];
-  
+
   for (const conflict of conflicts) {
     switch (strategy) {
       case 'replace':
         actions.push({
           action: 'remove',
           nano: conflict.existingNano,
-          reason: `Replaced by ${conflict.newNano.name}`
+          reason: `Replaced by ${conflict.newNano.name}`,
         });
         break;
-        
+
       case 'cancel':
         actions.push({
           action: 'block',
           nano: conflict.newNano,
-          reason: `Conflicts with ${conflict.existingNano.name}`
+          reason: `Conflicts with ${conflict.existingNano.name}`,
         });
         break;
-        
+
       case 'ask':
         // Return the conflict for user decision
         break;
     }
   }
-  
+
   return actions;
 }
 
@@ -338,7 +331,7 @@ export function calculateNanoCost(
   modifiers: Array<{ type: string; value: number }> = []
 ): number {
   let cost = nano.nanoPoints || 0;
-  
+
   // Apply cost modifiers
   for (const modifier of modifiers) {
     switch (modifier.type) {
@@ -353,7 +346,7 @@ export function calculateNanoCost(
         break;
     }
   }
-  
+
   // Nano cost cannot be negative
   return Math.max(0, cost);
 }
@@ -367,7 +360,7 @@ export function calculateNanoInitTime(
   modifiers: Array<{ type: string; value: number }> = []
 ): number {
   let initTime = nano.attackTime || 1000; // Default 1 second
-  
+
   // Apply speed modifiers
   for (const modifier of modifiers) {
     switch (modifier.type) {
@@ -382,7 +375,7 @@ export function calculateNanoInitTime(
         break;
     }
   }
-  
+
   return Math.max(100, initTime); // Minimum 0.1 second
 }
 
@@ -394,7 +387,7 @@ export function calculateNanoInitTime(
  * Format nano effects for display
  */
 export function formatNanoEffects(effects: NanoEffect[]): string[] {
-  return effects.map(effect => formatSingleEffect(effect));
+  return effects.map((effect) => formatSingleEffect(effect));
 }
 
 /**
@@ -404,10 +397,10 @@ export function formatSingleEffect(effect: NanoEffect): string {
   const statName = effect.stat ? getStatName(effect.stat) || `Stat ${effect.stat}` : 'Unknown';
   const amount = effect.amount || 0;
   const duration = effect.duration || 0;
-  
+
   // Basic effect formatting
   let description = '';
-  
+
   switch (effect.type) {
     case 1: // Modify stat
       description = `${amount > 0 ? '+' : ''}${amount} ${statName}`;
@@ -415,7 +408,7 @@ export function formatSingleEffect(effect: NanoEffect): string {
         description += ` for ${duration}s`;
       }
       break;
-      
+
     case 2: // Heal/Damage
       if (amount > 0) {
         description = `Heal ${amount} ${statName}`;
@@ -423,7 +416,7 @@ export function formatSingleEffect(effect: NanoEffect): string {
         description = `Damage ${Math.abs(amount)} ${statName}`;
       }
       break;
-      
+
     case 3: // Damage over time
       description = `${Math.abs(amount)} ${statName} damage`;
       if (effect.hits) {
@@ -433,7 +426,7 @@ export function formatSingleEffect(effect: NanoEffect): string {
         description += ` over ${duration}s`;
       }
       break;
-      
+
     case 4: // Heal over time
       description = `${amount} ${statName} healing`;
       if (effect.hits) {
@@ -443,11 +436,11 @@ export function formatSingleEffect(effect: NanoEffect): string {
         description += ` over ${duration}s`;
       }
       break;
-      
+
     default:
       description = effect.description || `Unknown effect type ${effect.type}`;
   }
-  
+
   return description;
 }
 
@@ -457,12 +450,12 @@ export function formatSingleEffect(effect: NanoEffect): string {
 export function getNanoSchoolColor(schoolId: number): string {
   const colors = {
     1: '#ff4444', // Combat - Red
-    2: '#44ff44', // Medical - Green  
+    2: '#44ff44', // Medical - Green
     3: '#4444ff', // Protection - Blue
     4: '#ff44ff', // Psi - Purple
-    5: '#ffff44'  // Space - Yellow
+    5: '#ffff44', // Space - Yellow
   };
-  
+
   return colors[schoolId as keyof typeof colors] || '#888888';
 }
 
@@ -473,10 +466,10 @@ export function getNanoDifficulty(nano: Nano): 'Easy' | 'Medium' | 'Hard' | 'Exp
   if (!nano.requirements || nano.requirements.length === 0) {
     return 'Easy';
   }
-  
+
   // Calculate difficulty based on highest requirement
-  const maxRequirement = Math.max(...nano.requirements.map(req => req.value));
-  
+  const maxRequirement = Math.max(...nano.requirements.map((req) => req.value));
+
   if (maxRequirement < 100) return 'Easy';
   if (maxRequirement < 300) return 'Medium';
   if (maxRequirement < 600) return 'Hard';
@@ -493,24 +486,24 @@ export const nanoCompatibility = {
   calculateAvailableNCU,
   hasEnoughNCU,
   findRemovableNanos,
-  
+
   // Requirements
   validateNanoRequirements,
   canProfessionUseNanoSchool,
   getNanoSchoolEffectiveness,
-  
+
   // Stacking
   checkStackingConflicts,
   findOverlappingEffects,
   resolveStackingConflicts,
-  
+
   // Calculations
   calculateNanoCost,
   calculateNanoInitTime,
-  
+
   // Formatting
   formatNanoEffects,
   formatSingleEffect,
   getNanoSchoolColor,
-  getNanoDifficulty
+  getNanoDifficulty,
 };

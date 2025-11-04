@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION } from '@/__tests__/helpers';
+import {
+  mountWithContext,
+  standardCleanup,
+  createTestProfile,
+  SKILL_ID,
+  PROFESSION,
+} from '@/__tests__/helpers';
 import { nextTick } from 'vue';
 import NanoList from '@/components/nanos/NanoList.vue';
 import type { NanoProgram, TinkerProfile } from '@/types/nano';
@@ -8,10 +14,11 @@ import type { NanoProgram, TinkerProfile } from '@/types/nano';
 vi.mock('@/components/nanos/NanoCard.vue', () => ({
   default: {
     name: 'NanoCard',
-    template: '<div class="nano-card" @click="$emit(\'select\', nano)" data-testid="nano-card"><span>{{ nano.name }}</span></div>',
+    template:
+      '<div class="nano-card" @click="$emit(\'select\', nano)" data-testid="nano-card"><span>{{ nano.name }}</span></div>',
     props: ['nano', 'compact', 'showCompatibility', 'activeProfile', 'compatibilityInfo'],
-    emits: ['select', 'favorite']
-  }
+    emits: ['select', 'favorite'],
+  },
 }));
 
 // Mock PrimeVue components
@@ -19,42 +26,52 @@ vi.mock('primevue/badge', () => ({
   default: {
     name: 'Badge',
     template: '<span class="badge">{{ value }}</span>',
-    props: ['value', 'severity']
-  }
+    props: ['value', 'severity'],
+  },
 }));
 
 vi.mock('primevue/dropdown', () => ({
   default: {
     name: 'Dropdown',
-    template: '<select v-model="modelValue" @change="$emit(\'update:modelValue\', $event.target.value); $emit(\'change\')"><option v-for="option in options" :key="option" :value="option">{{ option }}</option></select>',
+    template:
+      '<select v-model="modelValue" @change="$emit(\'update:modelValue\', $event.target.value); $emit(\'change\')"><option v-for="option in options" :key="option" :value="option">{{ option }}</option></select>',
     props: ['modelValue', 'options'],
-    emits: ['update:modelValue', 'change']
-  }
+    emits: ['update:modelValue', 'change'],
+  },
 }));
 
 vi.mock('primevue/paginator', () => ({
   default: {
     name: 'Paginator',
-    template: '<div class="paginator"><button @click="$emit(\'page\', { first: 0 })">First</button><button @click="$emit(\'page\', { first: first + rows })">Next</button></div>',
-    props: ['first', 'rows', 'totalRecords', 'rowsPerPageOptions', 'template', 'currentPageReportTemplate'],
-    emits: ['page', 'update:first']
-  }
+    template:
+      '<div class="paginator"><button @click="$emit(\'page\', { first: 0 })">First</button><button @click="$emit(\'page\', { first: first + rows })">Next</button></div>',
+    props: [
+      'first',
+      'rows',
+      'totalRecords',
+      'rowsPerPageOptions',
+      'template',
+      'currentPageReportTemplate',
+    ],
+    emits: ['page', 'update:first'],
+  },
 }));
 
 vi.mock('primevue/progressspinner', () => ({
   default: {
     name: 'ProgressSpinner',
-    template: '<div class="spinner">Loading...</div>'
-  }
+    template: '<div class="spinner">Loading...</div>',
+  },
 }));
 
 vi.mock('primevue/togglebutton', () => ({
   default: {
     name: 'ToggleButton',
-    template: '<button @click="$emit(\'update:modelValue\', !modelValue)" :class="{ active: modelValue }">{{ modelValue ? onLabel : offLabel }}</button>',
+    template:
+      '<button @click="$emit(\'update:modelValue\', !modelValue)" :class="{ active: modelValue }">{{ modelValue ? onLabel : offLabel }}</button>',
     props: ['modelValue', 'onLabel', 'offLabel', 'onIcon', 'offIcon', 'size'],
-    emits: ['update:modelValue']
-  }
+    emits: ['update:modelValue'],
+  },
 }));
 
 describe('NanoList', () => {
@@ -78,15 +95,17 @@ describe('NanoList', () => {
         rechargeTime: 5,
         memoryUsage: 85,
         castingRequirements: [
-          { type: 'skill', requirement: SKILL_ID.BIO_METAMOR, value: 750, critical: true }
+          { type: 'skill', requirement: SKILL_ID.BIO_METAMOR, value: 750, critical: true },
         ],
-        effects: [{
-          type: 'heal',
-          value: 1250,
-          modifier: 'add',
-          stackable: false,
-          conditions: []
-        }]
+        effects: [
+          {
+            type: 'heal',
+            value: 1250,
+            modifier: 'add',
+            stackable: false,
+            conditions: [],
+          },
+        ],
       },
       {
         id: 2,
@@ -101,15 +120,17 @@ describe('NanoList', () => {
         rechargeTime: 8,
         memoryUsage: 75,
         castingRequirements: [
-          { type: 'skill', requirement: SKILL_ID.MATTER_CREATION, value: 650, critical: true }
+          { type: 'skill', requirement: SKILL_ID.MATTER_CREATION, value: 650, critical: true },
         ],
-        effects: [{
-          type: 'protection',
-          value: 200,
-          modifier: 'add',
-          stackable: false,
-          conditions: []
-        }]
+        effects: [
+          {
+            type: 'protection',
+            value: 200,
+            modifier: 'add',
+            stackable: false,
+            conditions: [],
+          },
+        ],
       },
       {
         id: 3,
@@ -125,16 +146,18 @@ describe('NanoList', () => {
         rechargeTime: 2,
         memoryUsage: 120,
         castingRequirements: [
-          { type: 'skill', requirement: SKILL_ID.MATTER_CREATION, value: 500, critical: true }
+          { type: 'skill', requirement: SKILL_ID.MATTER_CREATION, value: 500, critical: true },
         ],
-        effects: [{
-          type: 'summon',
-          value: 1,
-          modifier: 'set',
-          stackable: false,
-          conditions: []
-        }]
-      }
+        effects: [
+          {
+            type: 'summon',
+            value: 1,
+            modifier: 'set',
+            stackable: false,
+            conditions: [],
+          },
+        ],
+      },
     ];
 
     mockProfile = createTestProfile({
@@ -145,8 +168,8 @@ describe('NanoList', () => {
         [SKILL_ID.MATTER_CREATION]: { base: 5, pointsFromIp: 295, equipmentBonus: 0, total: 300 },
         [SKILL_ID.NANO_PROGRAMMING]: { base: 5, pointsFromIp: 395, equipmentBonus: 0, total: 400 },
         [SKILL_ID.INTELLIGENCE]: { base: 6, pointsFromIp: 394, equipmentBonus: 0, total: 400 },
-        [SKILL_ID.PSYCHIC]: { base: 6, pointsFromIp: 294, equipmentBonus: 0, total: 300 }
-      }
+        [SKILL_ID.PSYCHIC]: { base: 6, pointsFromIp: 294, equipmentBonus: 0, total: 300 },
+      },
     });
 
     // Mock localStorage
@@ -154,7 +177,7 @@ describe('NanoList', () => {
       getItem: vi.fn(() => '{"compactView": false, "itemsPerPage": 25}'),
       setItem: vi.fn(),
       removeItem: vi.fn(),
-      clear: vi.fn()
+      clear: vi.fn(),
     };
     global.localStorage = localStorageMock as any;
 
@@ -163,8 +186,8 @@ describe('NanoList', () => {
         nanos: mockNanos,
         loading: false,
         showCompatibility: false,
-        activeProfile: null
-      }
+        activeProfile: null,
+      },
     });
   });
 
@@ -210,7 +233,7 @@ describe('NanoList', () => {
   it('emits nano-select event when nano card is clicked', async () => {
     const firstCard = wrapper.find('[data-testid="nano-card"]');
     await firstCard.trigger('click');
-    
+
     expect(wrapper.emitted('nano-select')).toBeTruthy();
     expect(wrapper.emitted('nano-select')[0][0]).toEqual(mockNanos[0]);
   });
@@ -218,7 +241,7 @@ describe('NanoList', () => {
   it('toggles compact view when toggle button clicked', async () => {
     const toggleButton = wrapper.find('button');
     await toggleButton.trigger('click');
-    
+
     // Should emit update and save preferences
     expect(localStorage.setItem).toHaveBeenCalled();
   });
@@ -227,16 +250,16 @@ describe('NanoList', () => {
     const dropdown = wrapper.find('select');
     await dropdown.setValue('50');
     await dropdown.trigger('change');
-    
+
     expect(localStorage.setItem).toHaveBeenCalled();
   });
 
   it('calculates compatibility info when profile is active', async () => {
     await wrapper.setProps({
       showCompatibility: true,
-      activeProfile: mockProfile
+      activeProfile: mockProfile,
     });
-    
+
     // Should pass compatibility info to nano cards
     const nanoCards = wrapper.findAllComponents({ name: 'NanoCard' });
     expect(nanoCards.length).toBe(3);
@@ -247,11 +270,11 @@ describe('NanoList', () => {
     const manyNanos = Array.from({ length: 50 }, (_, i) => ({
       ...mockNanos[0],
       id: i + 1,
-      name: `Nano ${i + 1}`
+      name: `Nano ${i + 1}`,
     }));
-    
+
     await wrapper.setProps({ nanos: manyNanos });
-    
+
     const paginator = wrapper.find('.paginator');
     expect(paginator.exists()).toBe(true);
   });
@@ -260,15 +283,15 @@ describe('NanoList', () => {
     const manyNanos = Array.from({ length: 50 }, (_, i) => ({
       ...mockNanos[0],
       id: i + 1,
-      name: `Nano ${i + 1}`
+      name: `Nano ${i + 1}`,
     }));
-    
+
     await wrapper.setProps({ nanos: manyNanos });
-    
+
     const paginator = wrapper.find('.paginator');
     const nextButton = paginator.find('button:last-child');
     await nextButton.trigger('click');
-    
+
     expect(wrapper.emitted('page-change')).toBeTruthy();
   });
 
@@ -279,7 +302,7 @@ describe('NanoList', () => {
   it('saves preferences to localStorage when changed', async () => {
     const toggleButton = wrapper.find('button');
     await toggleButton.trigger('click');
-    
+
     expect(localStorage.setItem).toHaveBeenCalledWith(
       'tinkertools_nano_list_preferences',
       expect.stringContaining('compactView')
@@ -289,19 +312,19 @@ describe('NanoList', () => {
   it('filters nanos correctly based on compatibility', async () => {
     await wrapper.setProps({
       showCompatibility: true,
-      activeProfile: mockProfile
+      activeProfile: mockProfile,
     });
-    
+
     // Should calculate compatibility for each nano
     // Nano 1 (Superior Heal) requires BM 750, profile has 500 - should not be castable
-    // Nano 2 (Matter Armor) requires MC 650, profile has 300 - should not be castable  
+    // Nano 2 (Matter Armor) requires MC 650, profile has 300 - should not be castable
     // Nano 3 (Summon Pet) requires MC 500, profile has 300 - should not be castable
-    
+
     const nanoCards = wrapper.findAllComponents({ name: 'NanoCard' });
     expect(nanoCards.length).toBe(3);
-    
+
     // Each card should receive compatibility info
-    nanoCards.forEach(card => {
+    nanoCards.forEach((card) => {
       expect(card.props('showCompatibility')).toBe(true);
       expect(card.props('activeProfile')).toEqual(mockProfile);
     });
@@ -310,7 +333,7 @@ describe('NanoList', () => {
   it('handles favorite events from nano cards', async () => {
     const firstCard = wrapper.findComponent({ name: 'NanoCard' });
     await firstCard.vm.$emit('favorite', 1, true);
-    
+
     expect(wrapper.emitted('favorite')).toBeTruthy();
     expect(wrapper.emitted('favorite')[0]).toEqual([1, true]);
   });
@@ -320,19 +343,19 @@ describe('NanoList', () => {
     const manyNanos = Array.from({ length: 50 }, (_, i) => ({
       ...mockNanos[0],
       id: i + 1,
-      name: `Nano ${i + 1}`
+      name: `Nano ${i + 1}`,
     }));
-    
+
     await wrapper.setProps({ nanos: manyNanos });
-    
+
     // Go to page 2
     const paginator = wrapper.find('.paginator');
     const nextButton = paginator.find('button:last-child');
     await nextButton.trigger('click');
-    
+
     // Change nanos (simulating new search)
     await wrapper.setProps({ nanos: mockNanos });
-    
+
     // Should reset to first page
     const nanoCards = wrapper.findAll('[data-testid="nano-card"]');
     expect(nanoCards.length).toBeLessThanOrEqual(25); // Default page size
@@ -342,21 +365,21 @@ describe('NanoList', () => {
     const scrollToSpy = vi.fn();
     const mockElement = { scrollTo: scrollToSpy };
     vi.spyOn(document, 'querySelector').mockReturnValue(mockElement as any);
-    
+
     const manyNanos = Array.from({ length: 50 }, (_, i) => ({
       ...mockNanos[0],
       id: i + 1,
-      name: `Nano ${i + 1}`
+      name: `Nano ${i + 1}`,
     }));
-    
+
     await wrapper.setProps({ nanos: manyNanos });
-    
+
     const paginator = wrapper.find('.paginator');
     const nextButton = paginator.find('button:last-child');
     await nextButton.trigger('click');
-    
+
     await nextTick();
-    
+
     expect(scrollToSpy).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
   });
 });

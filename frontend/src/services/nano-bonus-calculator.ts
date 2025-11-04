@@ -17,7 +17,7 @@
  * - LRU caching optimized for nano items
  */
 
-import type { Item, SpellData, Spell } from '@/types/api'
+import type { Item, SpellData, Spell } from '@/types/api';
 
 // ============================================================================
 // Type Definitions
@@ -25,41 +25,41 @@ import type { Item, SpellData, Spell } from '@/types/api'
 
 export interface NanoStatBonus {
   /** STAT ID from game data */
-  statId: number
+  statId: number;
   /** Bonus amount (can be negative) */
-  amount: number
+  amount: number;
   /** Source nano item for debugging */
-  nanoName?: string
+  nanoName?: string;
   /** Nano AOID for identification */
-  nanoAoid?: number
+  nanoAoid?: number;
   /** Nano quality level */
-  nanoQl?: number
+  nanoQl?: number;
 }
 
 export interface NanoBonusError {
   /** Type of error for user display */
-  type: 'warning' | 'error'
+  type: 'warning' | 'error';
   /** User-friendly error message */
-  message: string
+  message: string;
   /** Technical details for debugging */
-  details: string
+  details: string;
   /** Source nano that caused the error */
-  nanoName?: string
+  nanoName?: string;
   /** Nano AOID for identification */
-  nanoAoid?: number
+  nanoAoid?: number;
   /** Whether calculation can continue */
-  recoverable: boolean
+  recoverable: boolean;
 }
 
 export interface NanoCalculationResult {
   /** Successfully calculated bonuses */
-  bonuses: Record<number, number>
+  bonuses: Record<number, number>;
   /** Non-fatal warnings */
-  warnings: NanoBonusError[]
+  warnings: NanoBonusError[];
   /** Fatal errors */
-  errors: NanoBonusError[]
+  errors: NanoBonusError[];
   /** Whether calculation completed successfully */
-  success: boolean
+  success: boolean;
 }
 
 // ============================================================================
@@ -74,16 +74,15 @@ export const STAT_BONUS_SPELL_IDS = [
   53045, // "Modify {Stat} by {Amount}" - primary stat bonus spell for skills
   53012, // "Modify {Stat} by {Amount}" - alternative skill format
   53014, // "Modify {Stat} for {Duration}s by {Amount}" - timed skill bonus
-  53175  // "Modify {Stat} by {Amount}" - ability stat modifier format
-] as const
+  53175, // "Modify {Stat} by {Amount}" - ability stat modifier format
+] as const;
 
 /**
  * Nano events that provide stat bonuses
  * - 1: Cast (nanos trigger on cast)
  * - 14: Wear (some nanos use wear event like equipment)
  */
-export const NANO_EVENTS = [1, 14] as const
-
+export const NANO_EVENTS = [1, 14] as const;
 
 // ============================================================================
 // Performance Caching
@@ -95,57 +94,57 @@ export const NANO_EVENTS = [1, 14] as const
  * Value: NanoStatBonus[] array
  */
 class NanoSpellDataCache {
-  private cache = new Map<string, NanoStatBonus[]>()
-  private maxSize = 200 // Smaller cache than equipment since nanos are less varied
-  private hitCount = 0
-  private missCount = 0
+  private cache = new Map<string, NanoStatBonus[]>();
+  private maxSize = 200; // Smaller cache than equipment since nanos are less varied
+  private hitCount = 0;
+  private missCount = 0;
 
   private getCacheKey(nano: Item): string {
     // Use AOID and QL for nano programs - both are important for nano identification
-    return nano.aoid && nano.ql ? `${nano.aoid}-${nano.ql}` : nano.name || 'unknown'
+    return nano.aoid && nano.ql ? `${nano.aoid}-${nano.ql}` : nano.name || 'unknown';
   }
 
   get(nano: Item): NanoStatBonus[] | null {
-    const key = this.getCacheKey(nano)
-    const cached = this.cache.get(key)
+    const key = this.getCacheKey(nano);
+    const cached = this.cache.get(key);
 
     if (cached) {
-      this.hitCount++
-      return cached
+      this.hitCount++;
+      return cached;
     } else {
-      this.missCount++
-      return null
+      this.missCount++;
+      return null;
     }
   }
 
   set(nano: Item, bonuses: NanoStatBonus[]): void {
-    const key = this.getCacheKey(nano)
+    const key = this.getCacheKey(nano);
 
     // If cache is full, remove oldest entry (simple LRU)
     if (this.cache.size >= this.maxSize) {
-      const firstKey = this.cache.keys().next().value
+      const firstKey = this.cache.keys().next().value;
       if (firstKey) {
-        this.cache.delete(firstKey)
+        this.cache.delete(firstKey);
       }
     }
 
-    this.cache.set(key, bonuses)
+    this.cache.set(key, bonuses);
   }
 
   clear(): void {
-    this.cache.clear()
-    this.hitCount = 0
-    this.missCount = 0
+    this.cache.clear();
+    this.hitCount = 0;
+    this.missCount = 0;
   }
 
   getStats(): { size: number; hitRate: number; hitCount: number; missCount: number } {
-    const total = this.hitCount + this.missCount
+    const total = this.hitCount + this.missCount;
     return {
       size: this.cache.size,
       hitRate: total > 0 ? (this.hitCount / total) * 100 : 0,
       hitCount: this.hitCount,
-      missCount: this.missCount
-    }
+      missCount: this.missCount,
+    };
   }
 }
 
@@ -153,37 +152,37 @@ class NanoSpellDataCache {
  * Memoization for aggregated nano bonuses calculation
  */
 class NanoBonusAggregationCache {
-  private cache = new Map<string, Record<number, number>>()
-  private maxSize = 50 // Smaller since nano combinations are more limited
+  private cache = new Map<string, Record<number, number>>();
+  private maxSize = 50; // Smaller since nano combinations are more limited
 
   private getCacheKey(bonuses: NanoStatBonus[]): string {
     // Create a deterministic key from the bonuses array
     return bonuses
-      .map(b => `${b.statId}:${b.amount}`)
+      .map((b) => `${b.statId}:${b.amount}`)
       .sort()
-      .join('|')
+      .join('|');
   }
 
   get(bonuses: NanoStatBonus[]): Record<number, number> | null {
-    const key = this.getCacheKey(bonuses)
-    return this.cache.get(key) || null
+    const key = this.getCacheKey(bonuses);
+    return this.cache.get(key) || null;
   }
 
   set(bonuses: NanoStatBonus[], result: Record<number, number>): void {
-    const key = this.getCacheKey(bonuses)
+    const key = this.getCacheKey(bonuses);
 
     if (this.cache.size >= this.maxSize) {
-      const firstKey = this.cache.keys().next().value
+      const firstKey = this.cache.keys().next().value;
       if (firstKey) {
-        this.cache.delete(firstKey)
+        this.cache.delete(firstKey);
       }
     }
 
-    this.cache.set(key, result)
+    this.cache.set(key, result);
   }
 
   clear(): void {
-    this.cache.clear()
+    this.cache.clear();
   }
 }
 
@@ -192,15 +191,15 @@ class NanoBonusAggregationCache {
 // ============================================================================
 
 export class NanoBonusCalculator {
-  private spellCache = new NanoSpellDataCache()
-  private bonusCache = new NanoBonusAggregationCache()
+  private spellCache = new NanoSpellDataCache();
+  private bonusCache = new NanoBonusAggregationCache();
 
   // Performance tracking - nano calculations must be under 50ms per requirement
   private performanceMetrics = {
     lastCalculationTime: 0,
     averageCalculationTime: 0,
-    calculationCount: 0
-  }
+    calculationCount: 0,
+  };
 
   /**
    * Calculate nano bonuses for all active buff nano items
@@ -209,24 +208,23 @@ export class NanoBonusCalculator {
    */
   calculateBonuses(nanos: Item[]): Record<number, number> {
     try {
-      const result = this.calculateBonusesWithErrorHandling(nanos)
+      const result = this.calculateBonusesWithErrorHandling(nanos);
 
       // Log any warnings or errors for debugging
       if (result.warnings.length > 0) {
-        console.warn('Nano bonus calculation warnings:', result.warnings)
+        console.warn('Nano bonus calculation warnings:', result.warnings);
       }
 
       if (result.errors.length > 0) {
-        console.error('Nano bonus calculation errors:', result.errors)
+        console.error('Nano bonus calculation errors:', result.errors);
         // For backward compatibility, still return bonuses even with errors
       }
 
-      return result.bonuses
-
+      return result.bonuses;
     } catch (error) {
-      console.error('Critical error in nano bonus calculation:', error)
+      console.error('Critical error in nano bonus calculation:', error);
       // Fallback to empty bonuses to ensure system continues working
-      return {}
+      return {};
     }
   }
 
@@ -236,13 +234,13 @@ export class NanoBonusCalculator {
    * @returns NanoCalculationResult with bonuses, warnings, and errors
    */
   calculateBonusesWithErrorHandling(nanos: Item[]): NanoCalculationResult {
-    const startTime = performance.now()
+    const startTime = performance.now();
     const result: NanoCalculationResult = {
       bonuses: {},
       warnings: [],
       errors: [],
-      success: true
-    }
+      success: true,
+    };
 
     try {
       // Validate nanos array
@@ -251,10 +249,10 @@ export class NanoBonusCalculator {
           type: 'error',
           message: 'Nano buffs data is missing',
           details: 'Nano buffs array is null or undefined',
-          recoverable: false
-        })
-        result.success = false
-        return result
+          recoverable: false,
+        });
+        result.success = false;
+        return result;
       }
 
       if (!Array.isArray(nanos)) {
@@ -262,14 +260,14 @@ export class NanoBonusCalculator {
           type: 'error',
           message: 'Invalid nano buffs data format',
           details: 'Nano buffs data is not an array',
-          recoverable: false
-        })
-        result.success = false
-        return result
+          recoverable: false,
+        });
+        result.success = false;
+        return result;
       }
 
-      const allBonuses: NanoStatBonus[] = []
-      const processedNanos = new Set<string>() // Track processed nanos to prevent duplicates
+      const allBonuses: NanoStatBonus[] = [];
+      const processedNanos = new Set<string>(); // Track processed nanos to prevent duplicates
 
       // Enhanced bounds checking for nanos array
       if (nanos.length > 100) {
@@ -277,22 +275,22 @@ export class NanoBonusCalculator {
           type: 'warning',
           message: 'Unusually large number of nano buffs',
           details: `Processing ${nanos.length} nano buffs, which exceeds typical NCU capacity`,
-          recoverable: true
-        })
+          recoverable: true,
+        });
       }
 
       // Process each nano with individual error handling
       for (let i = 0; i < nanos.length; i++) {
-        const nano = nanos[i]
+        const nano = nanos[i];
 
         if (!nano) {
           result.warnings.push({
             type: 'warning',
             message: 'Null nano in buffs array',
             details: `Nano at index ${i} is null or undefined`,
-            recoverable: true
-          })
-          continue
+            recoverable: true,
+          });
+          continue;
         }
 
         // Enhanced validation for nano structure
@@ -301,9 +299,9 @@ export class NanoBonusCalculator {
             type: 'warning',
             message: 'Invalid nano data type in array',
             details: `Nano at index ${i} is not an object (type: ${typeof nano})`,
-            recoverable: true
-          })
-          continue
+            recoverable: true,
+          });
+          continue;
         }
 
         // Validate that this is actually a nano program
@@ -314,13 +312,13 @@ export class NanoBonusCalculator {
             details: `Item ${nano.name || 'unknown'} at index ${i} is not a nano program (is_nano=${nano.is_nano})`,
             nanoName: nano.name,
             nanoAoid: nano.aoid,
-            recoverable: true
-          })
-          continue
+            recoverable: true,
+          });
+          continue;
         }
 
         // Prevent processing the same nano multiple times
-        const nanoId = nano.aoid && nano.ql ? `${nano.aoid}-${nano.ql}` : (nano.name || `index_${i}`)
+        const nanoId = nano.aoid && nano.ql ? `${nano.aoid}-${nano.ql}` : nano.name || `index_${i}`;
         if (processedNanos.has(nanoId)) {
           result.warnings.push({
             type: 'warning',
@@ -328,18 +326,18 @@ export class NanoBonusCalculator {
             details: `Nano ${nano.name || 'unknown'} (${nanoId}) appears multiple times in the buffs array`,
             nanoName: nano.name,
             nanoAoid: nano.aoid,
-            recoverable: true
-          })
-          continue
+            recoverable: true,
+          });
+          continue;
         }
-        processedNanos.add(nanoId)
+        processedNanos.add(nanoId);
 
         try {
-          const nanoBonuses = this.parseNanoSpellsWithErrorHandling(nano)
+          const nanoBonuses = this.parseNanoSpellsWithErrorHandling(nano);
 
           if (nanoBonuses.bonuses.length > 0) {
             // Validate bonuses before adding them
-            const validBonuses = nanoBonuses.bonuses.filter(bonus => {
+            const validBonuses = nanoBonuses.bonuses.filter((bonus) => {
               if (!bonus || typeof bonus !== 'object') {
                 result.warnings.push({
                   type: 'warning',
@@ -347,22 +345,21 @@ export class NanoBonusCalculator {
                   details: `Nano ${nano.name || 'unknown'} returned invalid bonus data`,
                   nanoName: nano.name,
                   nanoAoid: nano.aoid,
-                  recoverable: true
-                })
-                return false
+                  recoverable: true,
+                });
+                return false;
               }
-              return true
-            })
+              return true;
+            });
 
             if (validBonuses.length > 0) {
-              allBonuses.push(...validBonuses)
+              allBonuses.push(...validBonuses);
             }
           }
 
           // Collect warnings and errors from nano parsing
-          result.warnings.push(...nanoBonuses.warnings)
-          result.errors.push(...nanoBonuses.errors)
-
+          result.warnings.push(...nanoBonuses.warnings);
+          result.errors.push(...nanoBonuses.errors);
         } catch (error) {
           result.warnings.push({
             type: 'warning',
@@ -370,42 +367,41 @@ export class NanoBonusCalculator {
             details: `Error parsing nano ${nano.name || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
             nanoName: nano.name,
             nanoAoid: nano.aoid,
-            recoverable: true
-          })
+            recoverable: true,
+          });
           // Continue processing other nanos
         }
       }
 
       // Aggregate bonuses by skill name with error handling
       try {
-        result.bonuses = this.aggregateBonusesOptimized(allBonuses)
+        result.bonuses = this.aggregateBonusesOptimized(allBonuses);
       } catch (error) {
         result.errors.push({
           type: 'error',
           message: 'Failed to aggregate nano bonuses',
           details: `Aggregation error: ${error instanceof Error ? error.message : String(error)}`,
-          recoverable: false
-        })
-        result.success = false
-        result.bonuses = {} // Fallback to empty bonuses
+          recoverable: false,
+        });
+        result.success = false;
+        result.bonuses = {}; // Fallback to empty bonuses
       }
-
     } catch (error) {
       result.errors.push({
         type: 'error',
         message: 'Unexpected error during nano bonus calculation',
         details: `Critical error: ${error instanceof Error ? error.message : String(error)}`,
-        recoverable: false
-      })
-      result.success = false
-      result.bonuses = {} // Ensure we always return something
+        recoverable: false,
+      });
+      result.success = false;
+      result.bonuses = {}; // Ensure we always return something
     } finally {
       // Track performance metrics
-      const endTime = performance.now()
-      this.updatePerformanceMetrics(endTime - startTime)
+      const endTime = performance.now();
+      this.updatePerformanceMetrics(endTime - startTime);
     }
 
-    return result
+    return result;
   }
 
   /**
@@ -414,28 +410,28 @@ export class NanoBonusCalculator {
    * @returns Array of stat bonuses found in the nano
    */
   parseNanoSpells(nano: Item): NanoStatBonus[] {
-    const bonuses: NanoStatBonus[] = []
+    const bonuses: NanoStatBonus[] = [];
 
     if (!nano.spell_data || !Array.isArray(nano.spell_data)) {
-      return bonuses
+      return bonuses;
     }
 
     for (const spellData of nano.spell_data) {
       // Process all spell data - event filtering happens at higher level
       // Nano buffs can have multiple event types (Cast=1, Wear=14, etc.)
       if (!spellData.spells || !Array.isArray(spellData.spells)) {
-        continue
+        continue;
       }
 
       for (const spell of spellData.spells) {
-        const bonus = this.parseSpellForStatBonus(spell, nano.name, nano.aoid, nano.ql)
+        const bonus = this.parseSpellForStatBonus(spell, nano.name, nano.aoid, nano.ql);
         if (bonus) {
-          bonuses.push(bonus)
+          bonuses.push(bonus);
         }
       }
     }
 
-    return bonuses
+    return bonuses;
   }
 
   /**
@@ -443,18 +439,18 @@ export class NanoBonusCalculator {
    */
   private parseNanoSpellsOptimized(nano: Item): NanoStatBonus[] {
     // Check cache first
-    const cached = this.spellCache.get(nano)
+    const cached = this.spellCache.get(nano);
     if (cached) {
-      return cached
+      return cached;
     }
 
     // Parse as usual if not cached
-    const bonuses = this.parseNanoSpells(nano)
+    const bonuses = this.parseNanoSpells(nano);
 
     // Cache the result for future use
-    this.spellCache.set(nano, bonuses)
+    this.spellCache.set(nano, bonuses);
 
-    return bonuses
+    return bonuses;
   }
 
   /**
@@ -462,14 +458,16 @@ export class NanoBonusCalculator {
    * @param nano Nano item with spell_data to parse
    * @returns Object with bonuses array and error/warning arrays
    */
-  parseNanoSpellsWithErrorHandling(
-    nano: Item
-  ): { bonuses: NanoStatBonus[]; warnings: NanoBonusError[]; errors: NanoBonusError[] } {
+  parseNanoSpellsWithErrorHandling(nano: Item): {
+    bonuses: NanoStatBonus[];
+    warnings: NanoBonusError[];
+    errors: NanoBonusError[];
+  } {
     const result = {
       bonuses: [] as NanoStatBonus[],
       warnings: [] as NanoBonusError[],
-      errors: [] as NanoBonusError[]
-    }
+      errors: [] as NanoBonusError[],
+    };
 
     try {
       // Validate nano structure
@@ -478,9 +476,9 @@ export class NanoBonusCalculator {
           type: 'error',
           message: 'Nano data is missing',
           details: 'Nano is null or undefined',
-          recoverable: true
-        })
-        return result
+          recoverable: true,
+        });
+        return result;
       }
 
       // Enhanced validation of nano data structure
@@ -491,15 +489,15 @@ export class NanoBonusCalculator {
           details: `Nano is not an object: ${typeof nano}`,
           nanoName: (nano as any)?.name,
           nanoAoid: (nano as any)?.aoid,
-          recoverable: true
-        })
-        return result
+          recoverable: true,
+        });
+        return result;
       }
 
       // Check for spell_data
       if (!nano.spell_data) {
         // This is normal for nanos without spell effects, not an error
-        return result
+        return result;
       }
 
       if (!Array.isArray(nano.spell_data)) {
@@ -509,14 +507,14 @@ export class NanoBonusCalculator {
           details: `spell_data is not an array for nano ${nano.name || 'unknown'} (type: ${typeof nano.spell_data})`,
           nanoName: nano.name,
           nanoAoid: nano.aoid,
-          recoverable: true
-        })
-        return result
+          recoverable: true,
+        });
+        return result;
       }
 
       // Process each spell data entry
       for (let i = 0; i < nano.spell_data.length; i++) {
-        const spellData = nano.spell_data[i]
+        const spellData = nano.spell_data[i];
 
         try {
           if (!spellData || typeof spellData !== 'object') {
@@ -526,9 +524,9 @@ export class NanoBonusCalculator {
               details: `spell_data[${i}] is ${spellData === null ? 'null' : typeof spellData} for nano ${nano.name || 'unknown'}`,
               nanoName: nano.name,
               nanoAoid: nano.aoid,
-              recoverable: true
-            })
-            continue
+              recoverable: true,
+            });
+            continue;
           }
 
           if (!spellData.spells || !Array.isArray(spellData.spells)) {
@@ -538,14 +536,14 @@ export class NanoBonusCalculator {
               details: `spell_data[${i}].spells is ${spellData.spells === null ? 'null' : typeof spellData.spells} for nano ${nano.name || 'unknown'}`,
               nanoName: nano.name,
               nanoAoid: nano.aoid,
-              recoverable: true
-            })
-            continue
+              recoverable: true,
+            });
+            continue;
           }
 
           // Process each spell in the spell data
           for (let j = 0; j < spellData.spells.length; j++) {
-            const spell = spellData.spells[j]
+            const spell = spellData.spells[j];
 
             try {
               if (!spell || typeof spell !== 'object') {
@@ -555,20 +553,23 @@ export class NanoBonusCalculator {
                   details: `spell_data[${i}].spells[${j}] is ${spell === null ? 'null' : typeof spell} for nano ${nano.name || 'unknown'}`,
                   nanoName: nano.name,
                   nanoAoid: nano.aoid,
-                  recoverable: true
-                })
-                continue
+                  recoverable: true,
+                });
+                continue;
               }
 
-              const bonus = this.parseSpellForStatBonusWithErrorHandling(spell, nano.name, nano.aoid)
+              const bonus = this.parseSpellForStatBonusWithErrorHandling(
+                spell,
+                nano.name,
+                nano.aoid
+              );
 
               if (bonus.bonus) {
-                result.bonuses.push(bonus.bonus)
+                result.bonuses.push(bonus.bonus);
               }
 
-              result.warnings.push(...bonus.warnings)
-              result.errors.push(...bonus.errors)
-
+              result.warnings.push(...bonus.warnings);
+              result.errors.push(...bonus.errors);
             } catch (error) {
               result.warnings.push({
                 type: 'warning',
@@ -576,8 +577,8 @@ export class NanoBonusCalculator {
                 details: `Error parsing spell ${j} in spell_data[${i}] for nano ${nano.name || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
                 nanoName: nano.name,
                 nanoAoid: nano.aoid,
-                recoverable: true
-              })
+                recoverable: true,
+              });
               // Continue processing other spells
             }
           }
@@ -588,8 +589,8 @@ export class NanoBonusCalculator {
             details: `Error processing spell_data[${i}] for nano ${nano.name || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
             nanoName: nano.name,
             nanoAoid: nano.aoid,
-            recoverable: true
-          })
+            recoverable: true,
+          });
           // Continue processing other spell data entries
         }
       }
@@ -600,11 +601,11 @@ export class NanoBonusCalculator {
         details: `Unexpected error parsing nano ${nano.name || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
         nanoName: nano.name,
         nanoAoid: nano.aoid,
-        recoverable: false
-      })
+        recoverable: false,
+      });
     }
 
-    return result
+    return result;
   }
 
   /**
@@ -623,39 +624,39 @@ export class NanoBonusCalculator {
   ): NanoStatBonus | null {
     // Fast path: check spell_id first (most common rejection case)
     if (!spell.spell_id || !STAT_BONUS_SPELL_IDS.includes(spell.spell_id as any)) {
-      return null
+      return null;
     }
 
     // Fast path: check spell_params existence and type
     if (!spell.spell_params || typeof spell.spell_params !== 'object') {
-      return null
+      return null;
     }
 
     // Extract parameters with hot path optimization
-    const params = spell.spell_params
-    const statValue = params.Stat ?? params.stat ?? params.StatID ?? params.statId
-    const amountValue = params.Amount ?? params.amount ?? params.Value ?? params.value
+    const params = spell.spell_params;
+    const statValue = params.Stat ?? params.stat ?? params.StatID ?? params.statId;
+    const amountValue = params.Amount ?? params.amount ?? params.Value ?? params.value;
 
     // Fast numeric conversion
-    let statId: number | null = null
-    let amount: number | null = null
+    let statId: number | null = null;
+    let amount: number | null = null;
 
     if (typeof statValue === 'number') {
-      statId = statValue
+      statId = statValue;
     } else if (typeof statValue === 'string') {
-      const parsed = parseInt(statValue, 10)
-      statId = isNaN(parsed) ? null : parsed
+      const parsed = parseInt(statValue, 10);
+      statId = isNaN(parsed) ? null : parsed;
     }
 
     if (typeof amountValue === 'number') {
-      amount = amountValue
+      amount = amountValue;
     } else if (typeof amountValue === 'string') {
-      const parsed = parseInt(amountValue, 10)
-      amount = isNaN(parsed) ? null : parsed
+      const parsed = parseInt(amountValue, 10);
+      amount = isNaN(parsed) ? null : parsed;
     }
 
     if (statId === null || amount === null) {
-      return null
+      return null;
     }
 
     // No need to validate stat ID - preserve all nano bonuses for aggregation
@@ -665,8 +666,8 @@ export class NanoBonusCalculator {
       amount,
       nanoName,
       nanoAoid,
-      nanoQl
-    }
+      nanoQl,
+    };
   }
 
   /**
@@ -684,8 +685,8 @@ export class NanoBonusCalculator {
     const result = {
       bonus: null as NanoStatBonus | null,
       warnings: [] as NanoBonusError[],
-      errors: [] as NanoBonusError[]
-    }
+      errors: [] as NanoBonusError[],
+    };
 
     try {
       // Validate spell structure
@@ -696,20 +697,20 @@ export class NanoBonusCalculator {
           details: 'Spell is null or undefined',
           nanoName,
           nanoAoid,
-          recoverable: true
-        })
-        return result
+          recoverable: true,
+        });
+        return result;
       }
 
       // Check if this spell modifies stats
       if (!spell.spell_id) {
         // Not an error - many spells don't have IDs or aren't stat modifiers
-        return result
+        return result;
       }
 
       if (!STAT_BONUS_SPELL_IDS.includes(spell.spell_id as any)) {
         // Not an error - this spell doesn't modify stats
-        return result
+        return result;
       }
 
       // Validate spell parameters
@@ -720,9 +721,9 @@ export class NanoBonusCalculator {
           details: `Spell ${spell.spell_id} has no parameters in nano ${nanoName || 'unknown'}`,
           nanoName,
           nanoAoid,
-          recoverable: true
-        })
-        return result
+          recoverable: true,
+        });
+        return result;
       }
 
       if (typeof spell.spell_params !== 'object') {
@@ -732,18 +733,18 @@ export class NanoBonusCalculator {
           details: `Spell ${spell.spell_id} parameters are not an object in nano ${nanoName || 'unknown'}`,
           nanoName,
           nanoAoid,
-          recoverable: true
-        })
-        return result
+          recoverable: true,
+        });
+        return result;
       }
 
       // Extract and validate parameters using the same logic as parseSpellForStatBonus
-      const params = spell.spell_params
-      const statValue = params.Stat ?? params.stat ?? params.StatID ?? params.statId
-      const amountValue = params.Amount ?? params.amount ?? params.Value ?? params.value
+      const params = spell.spell_params;
+      const statValue = params.Stat ?? params.stat ?? params.StatID ?? params.statId;
+      const amountValue = params.Amount ?? params.amount ?? params.Value ?? params.value;
 
-      let statId: number | null = null
-      let amount: number | null = null
+      let statId: number | null = null;
+      let amount: number | null = null;
 
       // Extract stat ID with error handling
       if (typeof statValue === 'number') {
@@ -754,12 +755,12 @@ export class NanoBonusCalculator {
             details: `Stat ID ${statValue} is outside expected range (0-1000) in nano ${nanoName || 'unknown'}`,
             nanoName,
             nanoAoid,
-            recoverable: true
-          })
+            recoverable: true,
+          });
         }
-        statId = statValue
+        statId = statValue;
       } else if (typeof statValue === 'string') {
-        const parsed = parseInt(statValue, 10)
+        const parsed = parseInt(statValue, 10);
         if (isNaN(parsed)) {
           result.warnings.push({
             type: 'warning',
@@ -767,8 +768,8 @@ export class NanoBonusCalculator {
             details: `Unable to parse stat ID "${statValue}" in nano ${nanoName || 'unknown'}`,
             nanoName,
             nanoAoid,
-            recoverable: true
-          })
+            recoverable: true,
+          });
         } else {
           if (parsed < 0 || parsed > 1000) {
             result.warnings.push({
@@ -777,10 +778,10 @@ export class NanoBonusCalculator {
               details: `Parsed stat ID ${parsed} is outside expected range (0-1000) in nano ${nanoName || 'unknown'}`,
               nanoName,
               nanoAoid,
-              recoverable: true
-            })
+              recoverable: true,
+            });
           }
-          statId = parsed
+          statId = parsed;
         }
       }
 
@@ -793,12 +794,12 @@ export class NanoBonusCalculator {
             details: `Stat bonus amount ${amountValue} is unusually large in nano ${nanoName || 'unknown'}`,
             nanoName,
             nanoAoid,
-            recoverable: true
-          })
+            recoverable: true,
+          });
         }
-        amount = amountValue
+        amount = amountValue;
       } else if (typeof amountValue === 'string') {
-        const parsed = parseInt(amountValue, 10)
+        const parsed = parseInt(amountValue, 10);
         if (isNaN(parsed)) {
           result.warnings.push({
             type: 'warning',
@@ -806,8 +807,8 @@ export class NanoBonusCalculator {
             details: `Unable to parse amount "${amountValue}" in nano ${nanoName || 'unknown'}`,
             nanoName,
             nanoAoid,
-            recoverable: true
-          })
+            recoverable: true,
+          });
         } else {
           if (Math.abs(parsed) > 10000) {
             result.warnings.push({
@@ -816,10 +817,10 @@ export class NanoBonusCalculator {
               details: `Parsed amount ${parsed} is unusually large in nano ${nanoName || 'unknown'}`,
               nanoName,
               nanoAoid,
-              recoverable: true
-            })
+              recoverable: true,
+            });
           }
-          amount = parsed
+          amount = parsed;
         }
       }
 
@@ -831,8 +832,8 @@ export class NanoBonusCalculator {
             details: `Spell ${spell.spell_id} in nano ${nanoName || 'unknown'} is missing both Stat and Amount parameters`,
             nanoName,
             nanoAoid,
-            recoverable: true
-          })
+            recoverable: true,
+          });
         } else if (statId === null) {
           result.warnings.push({
             type: 'warning',
@@ -840,8 +841,8 @@ export class NanoBonusCalculator {
             details: `Spell ${spell.spell_id} in nano ${nanoName || 'unknown'} is missing Stat parameter`,
             nanoName,
             nanoAoid,
-            recoverable: true
-          })
+            recoverable: true,
+          });
         } else {
           result.warnings.push({
             type: 'warning',
@@ -849,10 +850,10 @@ export class NanoBonusCalculator {
             details: `Spell ${spell.spell_id} in nano ${nanoName || 'unknown'} is missing Amount parameter`,
             nanoName,
             nanoAoid,
-            recoverable: true
-          })
+            recoverable: true,
+          });
         }
-        return result
+        return result;
       }
 
       // Successfully parsed - no need to validate stat ID
@@ -861,9 +862,8 @@ export class NanoBonusCalculator {
         statId,
         amount,
         nanoName,
-        nanoAoid
-      }
-
+        nanoAoid,
+      };
     } catch (error) {
       result.errors.push({
         type: 'error',
@@ -871,11 +871,11 @@ export class NanoBonusCalculator {
         details: `Unexpected error parsing spell in nano ${nanoName || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
         nanoName,
         nanoAoid,
-        recoverable: false
-      })
+        recoverable: false,
+      });
     }
 
-    return result
+    return result;
   }
 
   /**
@@ -884,26 +884,26 @@ export class NanoBonusCalculator {
    * @returns Record mapping skill IDs to total bonus amounts
    */
   aggregateBonuses(bonuses: NanoStatBonus[]): Record<number, number> {
-    const aggregated: Record<number, number> = {}
+    const aggregated: Record<number, number> = {};
 
     for (const bonus of bonuses) {
       if (aggregated[bonus.statId]) {
-        aggregated[bonus.statId] += bonus.amount
+        aggregated[bonus.statId] += bonus.amount;
       } else {
-        aggregated[bonus.statId] = bonus.amount
+        aggregated[bonus.statId] = bonus.amount;
       }
     }
 
     // Filter out zero bonuses to keep the result clean
-    const filtered: Record<number, number> = {}
+    const filtered: Record<number, number> = {};
     for (const [statId, amount] of Object.entries(aggregated)) {
-      const numericStatId = parseInt(statId, 10)
+      const numericStatId = parseInt(statId, 10);
       if (amount !== 0) {
-        filtered[numericStatId] = amount
+        filtered[numericStatId] = amount;
       }
     }
 
-    return filtered
+    return filtered;
   }
 
   /**
@@ -912,58 +912,58 @@ export class NanoBonusCalculator {
   private aggregateBonusesOptimized(bonuses: NanoStatBonus[]): Record<number, number> {
     // Early return for empty bonuses
     if (bonuses.length === 0) {
-      return {}
+      return {};
     }
 
     // Check memoization cache
-    const cached = this.bonusCache.get(bonuses)
+    const cached = this.bonusCache.get(bonuses);
     if (cached) {
-      return cached
+      return cached;
     }
 
     // Calculate as usual
-    const result = this.aggregateBonuses(bonuses)
+    const result = this.aggregateBonuses(bonuses);
 
     // Cache the result
-    this.bonusCache.set(bonuses, result)
+    this.bonusCache.set(bonuses, result);
 
-    return result
+    return result;
   }
 
   /**
    * Update performance metrics for monitoring
    */
   private updatePerformanceMetrics(calculationTime: number): void {
-    this.performanceMetrics.lastCalculationTime = calculationTime
-    this.performanceMetrics.calculationCount++
+    this.performanceMetrics.lastCalculationTime = calculationTime;
+    this.performanceMetrics.calculationCount++;
 
     // Calculate running average
-    const { averageCalculationTime, calculationCount } = this.performanceMetrics
+    const { averageCalculationTime, calculationCount } = this.performanceMetrics;
     this.performanceMetrics.averageCalculationTime =
-      ((averageCalculationTime * (calculationCount - 1)) + calculationTime) / calculationCount
+      (averageCalculationTime * (calculationCount - 1) + calculationTime) / calculationCount;
   }
 
   /**
    * Get performance statistics for debugging
    */
   getPerformanceStats(): {
-    lastCalculationTime: number
-    averageCalculationTime: number
-    calculationCount: number
-    cacheStats: ReturnType<NanoSpellDataCache['getStats']>
+    lastCalculationTime: number;
+    averageCalculationTime: number;
+    calculationCount: number;
+    cacheStats: ReturnType<NanoSpellDataCache['getStats']>;
   } {
     return {
       ...this.performanceMetrics,
-      cacheStats: this.spellCache.getStats()
-    }
+      cacheStats: this.spellCache.getStats(),
+    };
   }
 
   /**
    * Clear all caches (useful for memory management)
    */
   clearCaches(): void {
-    this.spellCache.clear()
-    this.bonusCache.clear()
+    this.spellCache.clear();
+    this.bonusCache.clear();
   }
 }
 
@@ -972,7 +972,7 @@ export class NanoBonusCalculator {
 // ============================================================================
 
 /** Singleton instance for easy access */
-export const nanoBonusCalculator = new NanoBonusCalculator()
+export const nanoBonusCalculator = new NanoBonusCalculator();
 
 /**
  * Convenience function to calculate nano bonuses with performance monitoring
@@ -981,24 +981,26 @@ export const nanoBonusCalculator = new NanoBonusCalculator()
  */
 export function calculateNanoBonuses(nanos: Item[]): Record<number, number> {
   try {
-    const startTime = performance.now()
-    const result = nanoBonusCalculator.calculateBonuses(nanos)
-    const endTime = performance.now()
+    const startTime = performance.now();
+    const result = nanoBonusCalculator.calculateBonuses(nanos);
+    const endTime = performance.now();
 
     // Warn if calculation takes longer than 50ms (nano performance requirement)
-    const calculationTime = endTime - startTime
+    const calculationTime = endTime - startTime;
     if (calculationTime > 50) {
-      console.warn(`Nano bonus calculation exceeded 50ms threshold: ${calculationTime.toFixed(2)}ms`)
+      console.warn(
+        `Nano bonus calculation exceeded 50ms threshold: ${calculationTime.toFixed(2)}ms`
+      );
 
       // Log performance stats for debugging
-      const stats = nanoBonusCalculator.getPerformanceStats()
-      console.warn('Nano performance stats:', stats)
+      const stats = nanoBonusCalculator.getPerformanceStats();
+      console.warn('Nano performance stats:', stats);
     }
 
-    return result
+    return result;
   } catch (error) {
-    console.error('Error in calculateNanoBonuses convenience function:', error)
-    return {}
+    console.error('Error in calculateNanoBonuses convenience function:', error);
+    return {};
   }
 }
 
@@ -1009,19 +1011,21 @@ export function calculateNanoBonuses(nanos: Item[]): Record<number, number> {
  */
 export function calculateNanoBonusesWithErrors(nanos: Item[]): NanoCalculationResult {
   try {
-    return nanoBonusCalculator.calculateBonusesWithErrorHandling(nanos)
+    return nanoBonusCalculator.calculateBonusesWithErrorHandling(nanos);
   } catch (error) {
     return {
       bonuses: {},
       warnings: [],
-      errors: [{
-        type: 'error',
-        message: 'Critical error in nano bonus calculation',
-        details: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
-        recoverable: false
-      }],
-      success: false
-    }
+      errors: [
+        {
+          type: 'error',
+          message: 'Critical error in nano bonus calculation',
+          details: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
+          recoverable: false,
+        },
+      ],
+      success: false,
+    };
   }
 }
 
@@ -1032,10 +1036,10 @@ export function calculateNanoBonusesWithErrors(nanos: Item[]): NanoCalculationRe
  */
 export function parseNanoForStatBonuses(nano: Item): NanoStatBonus[] {
   try {
-    return nanoBonusCalculator.parseNanoSpells(nano)
+    return nanoBonusCalculator.parseNanoSpells(nano);
   } catch (error) {
-    console.error('Error in parseNanoForStatBonuses convenience function:', error)
-    return []
+    console.error('Error in parseNanoForStatBonuses convenience function:', error);
+    return [];
   }
 }
 
@@ -1044,23 +1048,27 @@ export function parseNanoForStatBonuses(nano: Item): NanoStatBonus[] {
  * @param nano Nano item to analyze
  * @returns Object with bonuses array and error/warning arrays
  */
-export function parseNanoForStatBonusesWithErrors(
-  nano: Item
-): { bonuses: NanoStatBonus[]; warnings: NanoBonusError[]; errors: NanoBonusError[] } {
+export function parseNanoForStatBonusesWithErrors(nano: Item): {
+  bonuses: NanoStatBonus[];
+  warnings: NanoBonusError[];
+  errors: NanoBonusError[];
+} {
   try {
-    return nanoBonusCalculator.parseNanoSpellsWithErrorHandling(nano)
+    return nanoBonusCalculator.parseNanoSpellsWithErrorHandling(nano);
   } catch (error) {
     return {
       bonuses: [],
       warnings: [],
-      errors: [{
-        type: 'error',
-        message: 'Critical error parsing nano spells',
-        details: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
-        nanoName: nano?.name,
-        nanoAoid: nano?.aoid,
-        recoverable: false
-      }]
-    }
+      errors: [
+        {
+          type: 'error',
+          message: 'Critical error parsing nano spells',
+          details: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
+          nanoName: nano?.name,
+          nanoAoid: nano?.aoid,
+          recoverable: false,
+        },
+      ],
+    };
   }
 }

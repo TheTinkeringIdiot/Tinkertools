@@ -185,12 +185,7 @@ export function createSpellData(options: Partial<SpellData> = {}): SpellData {
  * Create an Action object
  */
 export function createAction(options: Partial<Action> = {}): Action {
-  const {
-    id = Math.floor(Math.random() * 1000000),
-    action,
-    item_id = 0,
-    criteria = [],
-  } = options;
+  const { id = Math.floor(Math.random() * 1000000), action, item_id = 0, criteria = [] } = options;
 
   return {
     id,
@@ -300,11 +295,7 @@ export function createBuffItem(options: Partial<ItemCreationOptions> = {}): Item
 /**
  * Create a perk item with multiple spell effects
  */
-export function createPerkItem(
-  name: string,
-  aoid: number,
-  bonuses: Array<[number, number]>
-): Item {
+export function createPerkItem(name: string, aoid: number, bonuses: Array<[number, number]>): Item {
   const spells = bonuses.map(([statId, amount]) =>
     createSpell({
       spell_id: 53045, // Modify Skill
@@ -331,8 +322,8 @@ export function createItemWithRequirements(
   requirements: Array<[number, number]>,
   options: Partial<ItemCreationOptions> = {}
 ): Item {
-  const criteria = requirements.map(([statId, value]) =>
-    createCriterion(statId, value, 0) // operator 0 = ">="
+  const criteria = requirements.map(
+    ([statId, value]) => createCriterion(statId, value, 0) // operator 0 = ">="
   );
 
   const action = createAction({
@@ -475,10 +466,7 @@ export function createNanoItemSet(): Item[] {
   return [
     createImplantItem({
       name: 'Nano Implant',
-      stats: [
-        createStatValue(SKILL_ID.INTELLIGENCE, 25),
-        createStatValue(SKILL_ID.NANO_POOL, 100),
-      ],
+      stats: [createStatValue(SKILL_ID.INTELLIGENCE, 25), createStatValue(SKILL_ID.NANO_POOL, 100)],
     }),
     createNanoItem({
       name: 'Nano Enhancement',

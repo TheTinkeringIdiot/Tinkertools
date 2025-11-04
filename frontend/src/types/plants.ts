@@ -1,6 +1,6 @@
 /**
  * TinkerPlants - Type Definitions
- * 
+ *
  * Types for character building, stat calculations, and implant/symbiant planning
  */
 

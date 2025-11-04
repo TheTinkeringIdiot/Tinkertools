@@ -29,7 +29,7 @@ const searchQuery = ref(filters.value.search || '');
 const selectedPlayfield = ref(filters.value.playfield || null);
 const levelFilter = ref([
   filters.value.minLevel || levelRange.value.min,
-  filters.value.maxLevel || levelRange.value.max
+  filters.value.maxLevel || levelRange.value.max,
 ]);
 
 // Methods
@@ -44,7 +44,7 @@ function updatePlayfield() {
 function updateLevelRange() {
   pocketBossStore.updateFilters({
     minLevel: levelFilter.value[0],
-    maxLevel: levelFilter.value[1]
+    maxLevel: levelFilter.value[1],
   });
 }
 
@@ -80,8 +80,8 @@ defineExpose({
   getSeverity,
   showDetails,
   updateLevelRange,
-  updatePlayfield
-})
+  updatePlayfield,
+});
 </script>
 
 <template>
@@ -132,7 +132,9 @@ defineExpose({
         </div>
 
         <!-- Action Buttons -->
-        <div class="flex items-center justify-between mt-4 pt-4 border-t border-surface-200 dark:border-surface-700">
+        <div
+          class="flex items-center justify-between mt-4 pt-4 border-t border-surface-200 dark:border-surface-700"
+        >
           <div class="flex items-center gap-2">
             <Button
               @click="clearAllFilters"
@@ -145,7 +147,7 @@ defineExpose({
               {{ bosses.length }} boss{{ bosses.length !== 1 ? 'es' : '' }} found
             </span>
           </div>
-          
+
           <div class="flex items-center gap-2">
             <Button
               @click="viewMode = 'grid'"
@@ -202,10 +204,7 @@ defineExpose({
                       {{ formatLocation(boss) }}
                     </p>
                   </div>
-                  <Tag
-                    :value="`Level ${boss.level}`"
-                    :severity="getSeverity(boss.level)"
-                  />
+                  <Tag :value="`Level ${boss.level}`" :severity="getSeverity(boss.level)" />
                 </div>
 
                 <!-- Mobs -->
@@ -217,7 +216,9 @@ defineExpose({
                 <!-- Symbiant Count -->
                 <div class="flex items-center justify-between text-sm">
                   <span class="text-surface-600 dark:text-surface-400">
-                    {{ boss.dropped_symbiants?.length || 0 }} symbiant{{ (boss.dropped_symbiants?.length || 0) !== 1 ? 's' : '' }}
+                    {{ boss.dropped_symbiants?.length || 0 }} symbiant{{
+                      (boss.dropped_symbiants?.length || 0) !== 1 ? 's' : ''
+                    }}
                   </span>
                   <i class="pi pi-arrow-right text-primary-500"></i>
                 </div>
@@ -239,7 +240,9 @@ defineExpose({
               <div class="flex items-center justify-between py-2">
                 <div class="flex items-center gap-4 flex-1">
                   <div class="min-w-0 flex-1">
-                    <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 truncate">
+                    <h3
+                      class="text-lg font-semibold text-surface-900 dark:text-surface-50 truncate"
+                    >
                       {{ boss.name }}
                     </h3>
                     <p class="text-sm text-surface-600 dark:text-surface-400 truncate">
@@ -247,12 +250,9 @@ defineExpose({
                       <span v-if="boss.mobs" class="ml-2">• {{ boss.mobs }}</span>
                     </p>
                   </div>
-                  
+
                   <div class="flex items-center gap-4">
-                    <Tag
-                      :value="`Level ${boss.level}`"
-                      :severity="getSeverity(boss.level)"
-                    />
+                    <Tag :value="`Level ${boss.level}`" :severity="getSeverity(boss.level)" />
                     <span class="text-sm text-surface-600 dark:text-surface-400">
                       {{ boss.dropped_symbiants?.length || 0 }} symbiants
                     </span>

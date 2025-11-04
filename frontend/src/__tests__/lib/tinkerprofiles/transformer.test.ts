@@ -28,8 +28,8 @@ vi.mock('@/services/api-client', () => {
         spell_data: [],
         actions: [],
         attack_stats: [],
-        defense_stats: []
-      }
+        defense_stats: [],
+      },
     }),
     getItem: vi.fn().mockResolvedValue({
       success: true,
@@ -45,8 +45,8 @@ vi.mock('@/services/api-client', () => {
         spell_data: [],
         actions: [],
         attack_stats: [],
-        defense_stats: []
-      }
+        defense_stats: [],
+      },
     }),
     lookupPerkByAoid: vi.fn().mockResolvedValue(null),
     lookupImplant: vi.fn().mockResolvedValue({
@@ -64,13 +64,13 @@ vi.mock('@/services/api-client', () => {
         actions: [],
         attack_stats: [],
         defense_stats: [],
-        sources: []
-      }
-    })
+        sources: [],
+      },
+    }),
   };
   return {
     default: mockInstance,
-    apiClient: mockInstance
+    apiClient: mockInstance,
   };
 });
 
@@ -82,24 +82,24 @@ describe('ProfileTransformer', () => {
   const mockItem: Item = {
     id: 1,
     aoid: 246660,
-    name: 'Combined Commando\'s Jacket',
+    name: "Combined Commando's Jacket",
     ql: 300,
     description: 'A tactical jacket',
     item_class: 2,
     is_nano: false,
     stats: [
       { id: 1, stat: 79, value: 123456 }, // Icon stat
-      { id: 2, stat: 12, value: 100 }
+      { id: 2, stat: 12, value: 100 },
     ],
     spell_data: [],
     actions: [],
     attack_stats: [],
-    defense_stats: []
+    defense_stats: [],
   };
 
   const mockInterpolationResponse: InterpolationResponse = {
     success: true,
-    item: mockItem
+    item: mockItem,
   };
 
   beforeEach(() => {
@@ -114,35 +114,35 @@ describe('ProfileTransformer', () => {
         level: 60,
         profession: 'Adventurer',
         breed: 'Solitus',
-        faction: 'Neutral'
+        faction: 'Neutral',
       },
       clothes: [
         {
           slot: 'BODY',
           highid: 246660,
-          selectedQl: 300
+          selectedQl: 300,
         },
         {
           slot: 'HEAD',
           highid: 246661,
-          selectedQl: 280
-        }
+          selectedQl: 280,
+        },
       ],
       weapons: [
         {
           highid: 123456,
-          selectedQl: 200
-        }
+          selectedQl: 200,
+        },
       ],
       implants: [
         {
           slot: 'head',
           symbiant: {
             highid: 789123,
-            selectedQl: 150
-          }
-        }
-      ]
+            selectedQl: 150,
+          },
+        },
+      ],
     };
 
     it('should import AOSetups data and fetch items from API', async () => {
@@ -150,7 +150,10 @@ describe('ProfileTransformer', () => {
         .mockResolvedValueOnce({ success: true, item: { ...mockItem, id: 1 } })
         .mockResolvedValueOnce({ success: true, item: { ...mockItem, id: 2, name: 'Head Item' } })
         .mockResolvedValueOnce({ success: true, item: { ...mockItem, id: 3, name: 'Weapon Item' } })
-        .mockResolvedValueOnce({ success: true, item: { ...mockItem, id: 4, name: 'Implant Item' } });
+        .mockResolvedValueOnce({
+          success: true,
+          item: { ...mockItem, id: 4, name: 'Implant Item' },
+        });
 
       const result = await transformer.importProfile(JSON.stringify(mockAOSetupsData));
 
@@ -173,7 +176,7 @@ describe('ProfileTransformer', () => {
 
         // Check that BODY slot is mapped to Chest in the profile
         expect(result.profile.Clothing['Chest']).toBeDefined();
-        expect(result.profile.Clothing['Chest']?.name).toContain('Combined Commando\'s Jacket');
+        expect(result.profile.Clothing['Chest']?.name).toContain("Combined Commando's Jacket");
 
         // Check that HEAD slot is mapped correctly
         expect(result.profile.Clothing['Head']).toBeDefined();
@@ -203,9 +206,9 @@ describe('ProfileTransformer', () => {
           {
             slot: 'BODY',
             highid: 246660,
-            selectedQl: 300
-          }
-        ]
+            selectedQl: 300,
+          },
+        ],
       };
 
       mockApiClient.interpolateItem.mockResolvedValueOnce({ success: true, item: mockItem });
@@ -237,7 +240,7 @@ describe('ProfileTransformer', () => {
 
         // Should have successful item
         expect(result.profile.Clothing['Head']).toBeDefined();
-        expect(result.profile.Clothing['Head']?.name).toContain('Combined Commando\'s Jacket');
+        expect(result.profile.Clothing['Head']?.name).toContain("Combined Commando's Jacket");
       }
     });
 
@@ -256,7 +259,7 @@ describe('ProfileTransformer', () => {
         expect(result.profile.Clothing['Chest']?.name).toContain('fetch failed');
 
         // Should have successful item
-        expect(result.profile.Clothing['Head']?.name).toContain('Combined Commando\'s Jacket');
+        expect(result.profile.Clothing['Head']?.name).toContain("Combined Commando's Jacket");
       }
     });
   });
@@ -269,15 +272,15 @@ describe('ProfileTransformer', () => {
           level: 60,
           profession: 'Adventurer',
           breed: 'Solitus',
-          faction: 'Neutral'
+          faction: 'Neutral',
         },
         clothes: [
           { slot: 'BODY', highid: 1, selectedQl: 100 },
           { slot: 'HEAD', highid: 2, selectedQl: 200 },
-          { slot: 'LEGS', highid: 3, selectedQl: 300 }
+          { slot: 'LEGS', highid: 3, selectedQl: 300 },
         ],
         weapons: [],
-        implants: []
+        implants: [],
       };
 
       mockApiClient.interpolateItem
@@ -298,15 +301,15 @@ describe('ProfileTransformer', () => {
           level: 60,
           profession: 'Adventurer',
           breed: 'Solitus',
-          faction: 'Neutral'
+          faction: 'Neutral',
         },
         clothes: [
           { slot: 'BODY', highid: 1, selectedQl: 100 },
           { slot: 'HEAD', highid: 2, selectedQl: 200 },
-          { slot: 'LEGS', highid: 3, selectedQl: 300 }
+          { slot: 'LEGS', highid: 3, selectedQl: 300 },
         ],
         weapons: [],
-        implants: []
+        implants: [],
       };
 
       mockApiClient.interpolateItem
@@ -330,7 +333,7 @@ describe('ProfileTransformer', () => {
           level: 60,
           profession: 'Adventurer',
           breed: 'Solitus',
-          faction: 'Neutral'
+          faction: 'Neutral',
         },
         clothes: [
           { slot: 'HEAD', highid: 1, selectedQl: 100 },
@@ -342,21 +345,24 @@ describe('ProfileTransformer', () => {
           { slot: 'ARM_L', highid: 7, selectedQl: 100 },
           { slot: 'WRIST_R', highid: 8, selectedQl: 100 },
           { slot: 'WRIST_L', highid: 9, selectedQl: 100 },
-          { slot: 'NECK', highid: 10, selectedQl: 100 }
+          { slot: 'NECK', highid: 10, selectedQl: 100 },
         ],
         weapons: [],
-        implants: []
+        implants: [],
       };
 
-      mockApiClient.interpolateItem.mockImplementation(async () => ({ success: true, item: mockItem }));
+      mockApiClient.interpolateItem.mockImplementation(async () => ({
+        success: true,
+        item: mockItem,
+      }));
 
       const result = await transformer.importProfile(JSON.stringify(aoSetupsWithAllSlots));
 
       expect(result.success).toBe(true);
-      
+
       if (result.profile) {
         const clothing = result.profile.Clothing;
-        
+
         expect(clothing['Head']).toBeDefined(); // HEAD -> Head
         expect(clothing['Chest']).toBeDefined(); // BODY -> Chest (not Body!)
         expect(clothing['Legs']).toBeDefined(); // LEGS -> Legs
@@ -367,7 +373,7 @@ describe('ProfileTransformer', () => {
         expect(clothing['RightWrist']).toBeDefined(); // WRIST_R -> RightWrist
         expect(clothing['LeftWrist']).toBeDefined(); // WRIST_L -> LeftWrist
         expect(clothing['Neck']).toBeDefined(); // NECK -> Neck
-        
+
         // Body should not exist (should be mapped to Chest)
         expect(clothing['Body']).toBeUndefined();
       }
@@ -380,18 +386,21 @@ describe('ProfileTransformer', () => {
           level: 60,
           profession: 'Adventurer',
           breed: 'Solitus',
-          faction: 'Neutral'
+          faction: 'Neutral',
         },
         implants: [
           { slot: 'head', symbiant: { highid: 1, selectedQl: 100 } },
           { slot: 'chest', symbiant: { highid: 2, selectedQl: 100 } },
-          { slot: 'leg', symbiant: { highid: 3, selectedQl: 100 } }
+          { slot: 'leg', symbiant: { highid: 3, selectedQl: 100 } },
         ],
         clothes: [],
-        weapons: []
+        weapons: [],
       };
 
-      mockApiClient.interpolateItem.mockImplementation(async () => ({ success: true, item: mockItem }));
+      mockApiClient.interpolateItem.mockImplementation(async () => ({
+        success: true,
+        item: mockItem,
+      }));
 
       const result = await transformer.importProfile(JSON.stringify(aoSetupsWithImplants));
 
@@ -399,8 +408,8 @@ describe('ProfileTransformer', () => {
 
       if (result.profile) {
         // v4.0.0 uses bitflag keys, not string slot names
-        expect(result.profile.Implants['4']).toBeDefined();    // head → bitflag 4
-        expect(result.profile.Implants['32']).toBeDefined();   // chest → bitflag 32
+        expect(result.profile.Implants['4']).toBeDefined(); // head → bitflag 4
+        expect(result.profile.Implants['32']).toBeDefined(); // chest → bitflag 32
         expect(result.profile.Implants['2048']).toBeDefined(); // leg → bitflag 2048
       }
     });
@@ -415,16 +424,16 @@ describe('ProfileTransformer', () => {
           Level: 50,
           Profession: 'Soldier',
           Breed: 'Atrox',
-          Faction: 'Clan'
+          Faction: 'Clan',
         },
         Skills: {
           Attributes: {
-            Strength: { value: 10, pointFromIp: 4 }
-          }
+            Strength: { value: 10, pointFromIp: 4 },
+          },
         },
         Clothing: {},
         Weapons: {},
-        Implants: {}
+        Implants: {},
       });
 
       const result = await transformer.importProfile(v3ProfileData);
@@ -453,11 +462,11 @@ describe('ProfileTransformer', () => {
           level: 60,
           profession: 'Adventurer',
           breed: 'Solitus',
-          faction: 'Neutral'
+          faction: 'Neutral',
         },
         clothes: [],
         weapons: [],
-        implants: []
+        implants: [],
       };
 
       const result = await transformer.importProfile(JSON.stringify(aoSetupsData));
@@ -529,19 +538,19 @@ describe('ProfileTransformer', () => {
   describe('Error Handling', () => {
     it('should handle malformed JSON gracefully', async () => {
       const result = await transformer.importProfile('invalid json');
-      
+
       expect(result.success).toBe(false);
       expect(result.errors).toContain('Unable to detect or unsupported format');
     });
 
     it('should handle missing required fields', async () => {
       const incompleteData = JSON.stringify({
-        name: 'Test'
+        name: 'Test',
         // Missing other required fields
       });
 
       const result = await transformer.importProfile(incompleteData);
-      
+
       // Should attempt to handle gracefully
       expect(result).toBeDefined();
     });
@@ -550,18 +559,20 @@ describe('ProfileTransformer', () => {
       // Mock API client to be unavailable
       vi.mocked(mockApiClient.interpolateItem).mockRejectedValue(new Error('Network error'));
 
-      const result = await transformer.importProfile(JSON.stringify({
-        character: {
-          name: 'Test',
-          level: 60,
-          profession: 'Adventurer',
-          breed: 'Solitus',
-          faction: 'Neutral'
-        },
-        clothes: [{ slot: 'BODY', highid: 1, selectedQl: 100 }],
-        weapons: [],
-        implants: []
-      }));
+      const result = await transformer.importProfile(
+        JSON.stringify({
+          character: {
+            name: 'Test',
+            level: 60,
+            profession: 'Adventurer',
+            breed: 'Solitus',
+            faction: 'Neutral',
+          },
+          clothes: [{ slot: 'BODY', highid: 1, selectedQl: 100 }],
+          weapons: [],
+          implants: [],
+        })
+      );
 
       expect(result.success).toBe(true);
       expect(result.warnings.length).toBeGreaterThan(0);
@@ -582,57 +593,63 @@ describe('ProfileTransformer', () => {
           level: 60,
           profession: 'Adventurer',
           breed: 'Solitus',
-          faction: 'Neutral'
+          faction: 'Neutral',
         },
         implants: [
           {
-            slot: 'eye',      // Should map to bitflag 2
+            slot: 'eye', // Should map to bitflag 2
             symbiant: {
               highid: 111111,
-              selectedQl: 100
-            }
+              selectedQl: 100,
+            },
           },
           {
-            slot: 'head',     // Should map to bitflag 4
+            slot: 'head', // Should map to bitflag 4
             symbiant: {
               highid: 222222,
-              selectedQl: 150
-            }
+              selectedQl: 150,
+            },
           },
           {
-            slot: 'legs',     // Should map to bitflag 2048 (plural form)
+            slot: 'legs', // Should map to bitflag 2048 (plural form)
             symbiant: {
               highid: 333333,
-              selectedQl: 200
-            }
-          }
+              selectedQl: 200,
+            },
+          },
         ],
         clothes: [],
-        weapons: []
+        weapons: [],
       };
 
       // Mock API responses for each implant
       mockApiClient.interpolateItem
         .mockResolvedValueOnce({ success: true, item: { ...mockItem, id: 1, name: 'Eye Implant' } })
-        .mockResolvedValueOnce({ success: true, item: { ...mockItem, id: 2, name: 'Head Implant' } })
-        .mockResolvedValueOnce({ success: true, item: { ...mockItem, id: 3, name: 'Leg Implant' } });
+        .mockResolvedValueOnce({
+          success: true,
+          item: { ...mockItem, id: 2, name: 'Head Implant' },
+        })
+        .mockResolvedValueOnce({
+          success: true,
+          item: { ...mockItem, id: 3, name: 'Leg Implant' },
+        });
 
       const result = await transformer.importProfile(JSON.stringify(aoSetupsWithImplants));
 
       expect(result.success).toBe(true);
       expect(result.profile).toBeDefined();
-      
+
       if (result.profile) {
         // Check that implants are stored with bitflag keys, not string names
-        expect(result.profile.Implants['2']).toBeDefined();    // Eye implant
-        expect(result.profile.Implants['4']).toBeDefined();    // Head implant
+        expect(result.profile.Implants['2']).toBeDefined(); // Eye implant
+        expect(result.profile.Implants['4']).toBeDefined(); // Head implant
         expect(result.profile.Implants['2048']).toBeDefined(); // Legs implant
-        
+
         // Verify content
         expect(result.profile.Implants['2']?.name).toBe('Eye Implant');
         expect(result.profile.Implants['4']?.name).toBe('Head Implant');
         expect(result.profile.Implants['2048']?.name).toBe('Leg Implant');
-        
+
         // Ensure old string keys are NOT used
         expect(result.profile.Implants['Eyes']).toBeUndefined();
         expect(result.profile.Implants['Head']).toBeUndefined();
@@ -647,25 +664,25 @@ describe('ProfileTransformer', () => {
           level: 60,
           profession: 'Adventurer',
           breed: 'Solitus',
-          faction: 'Neutral'
+          faction: 'Neutral',
         },
         implants: [
-          { slot: 'eye', symbiant: { highid: 111, selectedQl: 100 } },       // → '2'
-          { slot: 'head', symbiant: { highid: 222, selectedQl: 100 } },      // → '4'
-          { slot: 'ear', symbiant: { highid: 333, selectedQl: 100 } },       // → '8'
-          { slot: 'rarm', symbiant: { highid: 444, selectedQl: 100 } },      // → '16'
-          { slot: 'chest', symbiant: { highid: 555, selectedQl: 100 } },     // → '32'
-          { slot: 'larm', symbiant: { highid: 666, selectedQl: 100 } },      // → '64'
-          { slot: 'rwrist', symbiant: { highid: 777, selectedQl: 100 } },    // → '128'
-          { slot: 'waist', symbiant: { highid: 888, selectedQl: 100 } },     // → '256'
-          { slot: 'lwrist', symbiant: { highid: 999, selectedQl: 100 } },    // → '512'
-          { slot: 'rhand', symbiant: { highid: 1111, selectedQl: 100 } },    // → '1024'
-          { slot: 'legs', symbiant: { highid: 2222, selectedQl: 100 } },     // → '2048'
-          { slot: 'lhand', symbiant: { highid: 3333, selectedQl: 100 } },    // → '4096'
-          { slot: 'feet', symbiant: { highid: 4444, selectedQl: 100 } }      // → '8192'
+          { slot: 'eye', symbiant: { highid: 111, selectedQl: 100 } }, // → '2'
+          { slot: 'head', symbiant: { highid: 222, selectedQl: 100 } }, // → '4'
+          { slot: 'ear', symbiant: { highid: 333, selectedQl: 100 } }, // → '8'
+          { slot: 'rarm', symbiant: { highid: 444, selectedQl: 100 } }, // → '16'
+          { slot: 'chest', symbiant: { highid: 555, selectedQl: 100 } }, // → '32'
+          { slot: 'larm', symbiant: { highid: 666, selectedQl: 100 } }, // → '64'
+          { slot: 'rwrist', symbiant: { highid: 777, selectedQl: 100 } }, // → '128'
+          { slot: 'waist', symbiant: { highid: 888, selectedQl: 100 } }, // → '256'
+          { slot: 'lwrist', symbiant: { highid: 999, selectedQl: 100 } }, // → '512'
+          { slot: 'rhand', symbiant: { highid: 1111, selectedQl: 100 } }, // → '1024'
+          { slot: 'legs', symbiant: { highid: 2222, selectedQl: 100 } }, // → '2048'
+          { slot: 'lhand', symbiant: { highid: 3333, selectedQl: 100 } }, // → '4096'
+          { slot: 'feet', symbiant: { highid: 4444, selectedQl: 100 } }, // → '8192'
         ],
         clothes: [],
-        weapons: []
+        weapons: [],
       };
 
       // Mock all API responses
@@ -673,7 +690,7 @@ describe('ProfileTransformer', () => {
       for (let i = 0; i < expectedCalls; i++) {
         mockApiClient.interpolateItem.mockResolvedValueOnce({
           success: true,
-          item: { ...mockItem, id: i + 1, name: `Implant ${i + 1}` }
+          item: { ...mockItem, id: i + 1, name: `Implant ${i + 1}` },
         });
       }
 
@@ -681,18 +698,36 @@ describe('ProfileTransformer', () => {
 
       expect(result.success).toBe(true);
       expect(result.profile).toBeDefined();
-      
+
       if (result.profile) {
         // Check all expected bitflag keys are present
-        const expectedBitflags = ['2', '4', '8', '16', '32', '64', '128', '256', '512', '1024', '2048', '4096', '8192'];
-        
-        expectedBitflags.forEach(bitflag => {
+        const expectedBitflags = [
+          '2',
+          '4',
+          '8',
+          '16',
+          '32',
+          '64',
+          '128',
+          '256',
+          '512',
+          '1024',
+          '2048',
+          '4096',
+          '8192',
+        ];
+
+        expectedBitflags.forEach((bitflag) => {
           expect(result.profile!.Implants[bitflag]).toBeDefined();
           expect(result.profile!.Implants[bitflag]?.name).toMatch(/Implant \d+/);
         });
 
         // Ensure exactly 13 implants are stored
-        expect(Object.keys(result.profile.Implants).filter(key => result.profile!.Implants[key] !== null)).toHaveLength(13);
+        expect(
+          Object.keys(result.profile.Implants).filter(
+            (key) => result.profile!.Implants[key] !== null
+          )
+        ).toHaveLength(13);
       }
 
       // Verify all API calls were made
@@ -706,45 +741,51 @@ describe('ProfileTransformer', () => {
           level: 60,
           profession: 'Adventurer',
           breed: 'Solitus',
-          faction: 'Neutral'
+          faction: 'Neutral',
         },
         implants: [
           {
-            slot: 'leg',      // Should map to bitflag 2048
+            slot: 'leg', // Should map to bitflag 2048
             symbiant: {
               highid: 111111,
-              selectedQl: 100
-            }
+              selectedQl: 100,
+            },
           },
           {
-            slot: 'legs',     // Should also map to bitflag 2048 (overwrite the first one)
+            slot: 'legs', // Should also map to bitflag 2048 (overwrite the first one)
             symbiant: {
               highid: 222222,
-              selectedQl: 150
-            }
-          }
+              selectedQl: 150,
+            },
+          },
         ],
         clothes: [],
-        weapons: []
+        weapons: [],
       };
 
       mockApiClient.interpolateItem
-        .mockResolvedValueOnce({ success: true, item: { ...mockItem, id: 1, name: 'First Leg Implant' } })
-        .mockResolvedValueOnce({ success: true, item: { ...mockItem, id: 2, name: 'Second Leg Implant' } });
+        .mockResolvedValueOnce({
+          success: true,
+          item: { ...mockItem, id: 1, name: 'First Leg Implant' },
+        })
+        .mockResolvedValueOnce({
+          success: true,
+          item: { ...mockItem, id: 2, name: 'Second Leg Implant' },
+        });
 
       const result = await transformer.importProfile(JSON.stringify(duplicateLegTest));
 
       expect(result.success).toBe(true);
       expect(result.profile).toBeDefined();
-      
+
       if (result.profile) {
         // Should have one leg implant (the last one wins)
         expect(result.profile.Implants['2048']).toBeDefined();
         expect(result.profile.Implants['2048']?.name).toBe('Second Leg Implant');
-        
+
         // Should not have duplicates
-        const legImplants = Object.keys(result.profile.Implants).filter(key => 
-          key === '2048' && result.profile!.Implants[key] !== null
+        const legImplants = Object.keys(result.profile.Implants).filter(
+          (key) => key === '2048' && result.profile!.Implants[key] !== null
         );
         expect(legImplants).toHaveLength(1);
       }
@@ -757,46 +798,66 @@ describe('ProfileTransformer', () => {
           level: 60,
           profession: 'Adventurer',
           breed: 'Solitus',
-          faction: 'Neutral'
+          faction: 'Neutral',
         },
         implants: [
           {
-            slot: 'invalidslot',  // Invalid slot name
+            slot: 'invalidslot', // Invalid slot name
             symbiant: {
               highid: 111111,
-              selectedQl: 100
-            }
+              selectedQl: 100,
+            },
           },
           {
-            slot: 'chest',        // Valid slot
+            slot: 'chest', // Valid slot
             symbiant: {
               highid: 222222,
-              selectedQl: 150
-            }
-          }
+              selectedQl: 150,
+            },
+          },
         ],
         clothes: [],
-        weapons: []
+        weapons: [],
       };
 
       mockApiClient.interpolateItem
-        .mockResolvedValueOnce({ success: true, item: { ...mockItem, id: 1, name: 'Invalid Implant' } })
-        .mockResolvedValueOnce({ success: true, item: { ...mockItem, id: 2, name: 'Valid Chest Implant' } });
+        .mockResolvedValueOnce({
+          success: true,
+          item: { ...mockItem, id: 1, name: 'Invalid Implant' },
+        })
+        .mockResolvedValueOnce({
+          success: true,
+          item: { ...mockItem, id: 2, name: 'Valid Chest Implant' },
+        });
 
       const result = await transformer.importProfile(JSON.stringify(invalidSlotTest));
 
       expect(result.success).toBe(true);
       expect(result.profile).toBeDefined();
-      
+
       if (result.profile) {
         // Valid implant should be stored
-        expect(result.profile.Implants['32']).toBeDefined();  // Chest implant
+        expect(result.profile.Implants['32']).toBeDefined(); // Chest implant
         expect(result.profile.Implants['32']?.name).toBe('Valid Chest Implant');
-        
+
         // Invalid slot should not create a bitflag entry
-        const allBitflags = ['2', '4', '8', '16', '32', '64', '128', '256', '512', '1024', '2048', '4096', '8192'];
-        const invalidBitflags = Object.keys(result.profile.Implants).filter(key => 
-          !allBitflags.includes(key) && result.profile!.Implants[key] !== null
+        const allBitflags = [
+          '2',
+          '4',
+          '8',
+          '16',
+          '32',
+          '64',
+          '128',
+          '256',
+          '512',
+          '1024',
+          '2048',
+          '4096',
+          '8192',
+        ];
+        const invalidBitflags = Object.keys(result.profile.Implants).filter(
+          (key) => !allBitflags.includes(key) && result.profile!.Implants[key] !== null
         );
         expect(invalidBitflags).toHaveLength(0);
       }
@@ -809,40 +870,40 @@ describe('ProfileTransformer', () => {
           level: 60,
           profession: 'Adventurer',
           breed: 'Solitus',
-          faction: 'Neutral'
+          faction: 'Neutral',
         },
         implants: [
           {
             slot: 'chest',
             symbiant: {
               highid: 111111,
-              selectedQl: 100
+              selectedQl: 100,
             },
             clusters: {
-              'Shiny': { ClusterID: 16 },     // Strength
-              'Bright': { ClusterID: 112 },   // Pistol
-              'Faded': { ClusterID: 19 }      // Intelligence
-            }
-          }
+              Shiny: { ClusterID: 16 }, // Strength
+              Bright: { ClusterID: 112 }, // Pistol
+              Faded: { ClusterID: 19 }, // Intelligence
+            },
+          },
         ],
         clothes: [],
-        weapons: []
+        weapons: [],
       };
 
       mockApiClient.interpolateItem.mockResolvedValueOnce({
         success: true,
-        item: { ...mockItem, id: 1, name: 'Chest Implant with Clusters' }
+        item: { ...mockItem, id: 1, name: 'Chest Implant with Clusters' },
       });
 
       const result = await transformer.importProfile(JSON.stringify(implantWithClusters));
 
       expect(result.success).toBe(true);
       expect(result.profile).toBeDefined();
-      
+
       if (result.profile) {
-        const chestImplant = result.profile.Implants['32'];  // Chest bitflag
+        const chestImplant = result.profile.Implants['32']; // Chest bitflag
         expect(chestImplant).toBeDefined();
-        
+
         // Check that cluster data is preserved
         if ('clusters' in chestImplant!) {
           expect(chestImplant.clusters).toBeDefined();

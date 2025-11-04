@@ -6,29 +6,50 @@ import { createRouter, createWebHistory } from 'vue-router';
 import TinkerNukes from '@/views/TinkerNukes.vue';
 
 // Mock PrimeVue components
-vi.mock('primevue/badge', () => ({ 
-  default: { template: '<span class="mock-badge">{{ value }}<slot></slot></span>', props: ['value', 'severity'] }
+vi.mock('primevue/badge', () => ({
+  default: {
+    template: '<span class="mock-badge">{{ value }}<slot></slot></span>',
+    props: ['value', 'severity'],
+  },
 }));
-vi.mock('primevue/dropdown', () => ({ 
-  default: { template: '<div class="mock-dropdown"><slot></slot></div>', props: ['modelValue', 'options', 'placeholder'] }
+vi.mock('primevue/dropdown', () => ({
+  default: {
+    template: '<div class="mock-dropdown"><slot></slot></div>',
+    props: ['modelValue', 'options', 'placeholder'],
+  },
 }));
-vi.mock('primevue/inputswitch', () => ({ 
-  default: { template: '<div class="mock-inputswitch"><slot></slot></div>', props: ['modelValue', 'inputId'] }
+vi.mock('primevue/inputswitch', () => ({
+  default: {
+    template: '<div class="mock-inputswitch"><slot></slot></div>',
+    props: ['modelValue', 'inputId'],
+  },
 }));
-vi.mock('primevue/inputnumber', () => ({ 
-  default: { template: '<input class="mock-inputnumber" type="number" />', props: ['modelValue', 'min', 'max'] }
+vi.mock('primevue/inputnumber', () => ({
+  default: {
+    template: '<input class="mock-inputnumber" type="number" />',
+    props: ['modelValue', 'min', 'max'],
+  },
 }));
-vi.mock('primevue/inputtext', () => ({ 
-  default: { template: '<input class="mock-inputtext" type="text" />', props: ['modelValue', 'placeholder'] }
+vi.mock('primevue/inputtext', () => ({
+  default: {
+    template: '<input class="mock-inputtext" type="text" />',
+    props: ['modelValue', 'placeholder'],
+  },
 }));
-vi.mock('primevue/datatable', () => ({ 
-  default: { template: '<div class="mock-datatable"><slot></slot><slot name="empty"></slot></div>', props: ['value', 'loading'] }
+vi.mock('primevue/datatable', () => ({
+  default: {
+    template: '<div class="mock-datatable"><slot></slot><slot name="empty"></slot></div>',
+    props: ['value', 'loading'],
+  },
 }));
-vi.mock('primevue/column', () => ({ 
-  default: { template: '<div class="mock-column"><slot></slot></div>', props: ['field', 'header'] }
+vi.mock('primevue/column', () => ({
+  default: { template: '<div class="mock-column"><slot></slot></div>', props: ['field', 'header'] },
 }));
-vi.mock('primevue/tag', () => ({ 
-  default: { template: '<span class="mock-tag"><slot></slot></span>', props: ['value', 'severity'] }
+vi.mock('primevue/tag', () => ({
+  default: {
+    template: '<span class="mock-tag"><slot></slot></span>',
+    props: ['value', 'severity'],
+  },
 }));
 
 describe('TinkerNukes Simple Tests', () => {
@@ -38,7 +59,7 @@ describe('TinkerNukes Simple Tests', () => {
   beforeEach(async () => {
     router = createRouter({
       history: createWebHistory(),
-      routes: [{ path: '/nukes', name: 'TinkerNukes', component: TinkerNukes }]
+      routes: [{ path: '/nukes', name: 'TinkerNukes', component: TinkerNukes }],
     });
 
     const pinia = createPinia();
@@ -47,9 +68,9 @@ describe('TinkerNukes Simple Tests', () => {
         plugins: [pinia, router],
         stubs: {
           RouterLink: true,
-          RouterView: true
-        }
-      }
+          RouterView: true,
+        },
+      },
     });
 
     await wrapper.vm.$nextTick();

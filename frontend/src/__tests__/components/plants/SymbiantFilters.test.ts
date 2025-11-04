@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION, BREED } from '@/__tests__/helpers';
+import {
+  mountWithContext,
+  standardCleanup,
+  createTestProfile,
+  SKILL_ID,
+  PROFESSION,
+  BREED,
+} from '@/__tests__/helpers';
 import SymbiantFilters from '@/components/plants/SymbiantFilters.vue';
 import type { SymbiantFilters as SymbiantFiltersType } from '@/types/plants';
 
@@ -8,46 +15,49 @@ vi.mock('primevue/accordion', () => ({
   default: {
     name: 'Accordion',
     template: '<div class="accordion"><slot /></div>',
-    props: ['activeIndex', 'multiple']
-  }
+    props: ['activeIndex', 'multiple'],
+  },
 }));
 
 vi.mock('primevue/accordiontab', () => ({
   default: {
     name: 'AccordionTab',
-    template: '<div class="accordion-tab"><template v-if="$slots.header"><div class="header"><slot name="header" /></div></template><div class="content"><slot /></div></div>',
-    props: ['header']
-  }
+    template:
+      '<div class="accordion-tab"><template v-if="$slots.header"><div class="header"><slot name="header" /></div></template><div class="content"><slot /></div></div>',
+    props: ['header'],
+  },
 }));
 
 vi.mock('primevue/badge', () => ({
   default: {
     name: 'Badge',
     template: '<span class="badge" :class="severity">{{ value }}</span>',
-    props: ['value', 'severity', 'size']
-  }
+    props: ['value', 'severity', 'size'],
+  },
 }));
 
 vi.mock('primevue/button', () => ({
   default: {
     name: 'Button',
-    template: '<button @click="$emit(\'click\')" :class="[severity, { text }]">{{ label }}</button>',
+    template:
+      '<button @click="$emit(\'click\')" :class="[severity, { text }]">{{ label }}</button>',
     props: ['label', 'severity', 'size', 'text'],
-    emits: ['click']
-  }
+    emits: ['click'],
+  },
 }));
 
 vi.mock('primevue/checkbox', () => ({
   default: {
     name: 'Checkbox',
-    template: '<input type="checkbox" :checked="modelValue?.includes?.(value) || modelValue === value" @change="handleChange" :id="inputId" />',
+    template:
+      '<input type="checkbox" :checked="modelValue?.includes?.(value) || modelValue === value" @change="handleChange" :id="inputId" />',
     props: ['modelValue', 'value', 'inputId'],
     emits: ['update:modelValue'],
     methods: {
       handleChange(event: Event) {
         const target = event.target as HTMLInputElement;
         const checked = target.checked;
-        
+
         if (Array.isArray(this.modelValue)) {
           const newValue = [...this.modelValue];
           if (checked) {
@@ -60,18 +70,19 @@ vi.mock('primevue/checkbox', () => ({
         } else {
           this.$emit('update:modelValue', checked ? this.value : null);
         }
-      }
-    }
-  }
+      },
+    },
+  },
 }));
 
 vi.mock('primevue/slider', () => ({
   default: {
     name: 'Slider',
-    template: '<input type="range" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" @change="$emit(\'change\')" :min="min" :max="max" :step="step" />',
+    template:
+      '<input type="range" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" @change="$emit(\'change\')" :min="min" :max="max" :step="step" />',
     props: ['modelValue', 'min', 'max', 'step', 'range'],
-    emits: ['update:modelValue', 'change']
-  }
+    emits: ['update:modelValue', 'change'],
+  },
 }));
 
 describe('SymbiantFilters', () => {
@@ -80,20 +91,20 @@ describe('SymbiantFilters', () => {
     families: [],
     slots: [],
     qualityLevels: [],
-    statBonuses: []
+    statBonuses: [],
   };
 
   beforeEach(() => {
     wrapper = mountWithContext(SymbiantFilters, {
       props: {
         modelValue: defaultFilters,
-        availableFamilies: ['Seeker', 'Hacker', 'Soldier', 'Medic']
-      }
+        availableFamilies: ['Seeker', 'Hacker', 'Soldier', 'Medic'],
+      },
     });
   });
 
   afterEach(() => {
-    standardCleanup()
+    standardCleanup();
     wrapper?.unmount();
   });
 
@@ -137,10 +148,10 @@ describe('SymbiantFilters', () => {
   });
 
   it('selects all families when "All" button is clicked', async () => {
-    const allButton = wrapper.findAll('button').find((button: any) => 
-      button.text().includes('All')
-    );
-    
+    const allButton = wrapper
+      .findAll('button')
+      .find((button: any) => button.text().includes('All'));
+
     if (allButton) {
       await allButton.trigger('click');
       expect(wrapper.emitted('update:modelValue')).toBeTruthy();
@@ -148,10 +159,10 @@ describe('SymbiantFilters', () => {
   });
 
   it('clears all families when "None" button is clicked', async () => {
-    const noneButton = wrapper.findAll('button').find((button: any) => 
-      button.text().includes('None')
-    );
-    
+    const noneButton = wrapper
+      .findAll('button')
+      .find((button: any) => button.text().includes('None'));
+
     if (noneButton) {
       await noneButton.trigger('click');
       expect(wrapper.emitted('update:modelValue')).toBeTruthy();
@@ -167,10 +178,11 @@ describe('SymbiantFilters', () => {
   });
 
   it('resets all filters when reset button is clicked', async () => {
-    const resetButton = wrapper.find('button').findAll('button').find((button: any) => 
-      button.text().includes('Reset All Filters')
-    );
-    
+    const resetButton = wrapper
+      .find('button')
+      .findAll('button')
+      .find((button: any) => button.text().includes('Reset All Filters'));
+
     if (resetButton) {
       await resetButton.trigger('click');
       expect(wrapper.emitted('update:modelValue')).toBeTruthy();
@@ -195,8 +207,8 @@ describe('SymbiantFilters', () => {
         families: ['Seeker'],
         slots: ['head', 'chest'],
         qualityLevels: [100, 200],
-        statBonuses: ['strength']
-      }
+        statBonuses: ['strength'],
+      },
     });
 
     const badges = wrapper.findAll('.badge');
@@ -208,25 +220,25 @@ describe('SymbiantFilters', () => {
       families: ['Seeker'],
       slots: ['head'],
       qualityLevels: [100],
-      statBonuses: ['strength']
+      statBonuses: ['strength'],
     };
 
     await wrapper.setProps({ modelValue: newFilters });
-    
+
     // Verify internal state is updated
     expect(wrapper.vm.selectedFamilies).toEqual(['Seeker']);
     expect(wrapper.vm.selectedSlots).toEqual(['head']);
   });
 
   it('handles minimum stat bonus filter', async () => {
-    const minBonusSlider = wrapper.findAll('input[type="range"]').find((input: any) => 
-      input.element.min === '0' && input.element.max === '100'
-    );
-    
+    const minBonusSlider = wrapper
+      .findAll('input[type="range"]')
+      .find((input: any) => input.element.min === '0' && input.element.max === '100');
+
     if (minBonusSlider) {
       await minBonusSlider.setValue(25);
       await minBonusSlider.trigger('change');
-      
+
       expect(wrapper.emitted('update:modelValue')).toBeTruthy();
     }
   });

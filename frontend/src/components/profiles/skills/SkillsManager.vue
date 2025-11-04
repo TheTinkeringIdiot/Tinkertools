@@ -15,17 +15,21 @@ Interactive skill categories with expandable panels and sliders with IP calculat
       @ability-changed="handleAbilityChange"
       @skill-changed="handleSkillChange"
     />
-    
+
     <!-- Non-Misc Skill Categories -->
     <template v-for="(skills, categoryName) in skillCategories" :key="categoryName">
       <!-- Special handling for Misc category with toggle -->
       <template v-if="categoryName === 'Misc'">
         <!-- Misc Category Toggle -->
-        <div class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-3 mb-2">
+        <div
+          class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-3 mb-2"
+        >
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
               <i class="pi pi-ellipsis-h text-primary-500"></i>
-              <span class="text-sm font-medium text-surface-700 dark:text-surface-300">Misc Skills Options</span>
+              <span class="text-sm font-medium text-surface-700 dark:text-surface-300"
+                >Misc Skills Options</span
+              >
             </div>
             <div class="flex items-center gap-2">
               <Checkbox
@@ -111,7 +115,10 @@ onMounted(() => {
 // Save toggle preference to localStorage when changed
 function toggleZeroMiscSkills() {
   // The v-model already updates showZeroMiscSkills.value, so we just save it
-  localStorage.setItem('tinkertools_show_zero_misc_skills', JSON.stringify(showZeroMiscSkills.value));
+  localStorage.setItem(
+    'tinkertools_show_zero_misc_skills',
+    JSON.stringify(showZeroMiscSkills.value)
+  );
 }
 
 // Computed
@@ -184,14 +191,14 @@ const skillCategories = computed(() => {
     'Exploring',
     'Trade & Repair',
     'Combat & Healing',
-    'ACs',  // Non-modifiable, moved to bottom
-    'Misc'  // Non-modifiable, at the end
+    'ACs', // Non-modifiable, moved to bottom
+    'Misc', // Non-modifiable, at the end
   ];
 
   // Create ordered categories object
   const orderedCategories: Record<string, any> = {};
 
-  categoryOrder.forEach(categoryName => {
+  categoryOrder.forEach((categoryName) => {
     if (categoryName !== 'Attributes') {
       try {
         // Use filtered Misc skills for the Misc category
@@ -216,16 +223,16 @@ const skillCategories = computed(() => {
 function getCategoryIcon(categoryName: string): string {
   const iconMap: Record<string, string> = {
     'Body & Defense': 'pi pi-shield',
-    'ACs': 'pi pi-chart-line',
+    ACs: 'pi pi-chart-line',
     'Ranged Weapons': 'pi pi-crosshairs',
     'Ranged Specials': 'pi pi-star',
     'Melee Weapons': 'pi pi-sword',
     'Melee Specials': 'pi pi-flash',
     'Nanos & Casting': 'pi pi-sparkles',
-    'Exploring': 'pi pi-compass',
+    Exploring: 'pi pi-compass',
     'Trade & Repair': 'pi pi-wrench',
     'Combat & Healing': 'pi pi-heart',
-    'Misc': 'pi pi-ellipsis-h'
+    Misc: 'pi pi-ellipsis-h',
   };
   return iconMap[categoryName] || 'pi pi-cog';
 }

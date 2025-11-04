@@ -18,13 +18,13 @@ global.localStorage = {
   removeItem: vi.fn(),
   clear: vi.fn(),
   length: 0,
-  key: vi.fn()
+  key: vi.fn(),
 } as any;
 
 // Mock stores with real backend integration
 vi.mock('@/stores/symbiants', () => {
   let realSymbiants: PlantSymbiant[] = [];
-  
+
   return {
     useSymbiantsStore: () => ({
       allSymbiants: ref(realSymbiants),
@@ -35,17 +35,17 @@ vi.mock('@/stores/symbiants', () => {
       preloadSymbiants: vi.fn(async () => {
         const response = await apiClient.searchSymbiants({ limit: 10 });
         if (response.success) {
-          realSymbiants = response.data.map(symbiant => ({
+          realSymbiants = response.data.map((symbiant) => ({
             ...symbiant,
             name: symbiant.name || `Symbiant ${symbiant.id}`,
             slot: symbiant.slot || 'unknown',
             qualityLevel: symbiant.qualityLevel || 100,
-            statBonuses: symbiant.statBonuses || []
+            statBonuses: symbiant.statBonuses || [],
           })) as PlantSymbiant[];
         }
         return realSymbiants;
-      })
-    })
+      }),
+    }),
   };
 });
 
@@ -55,8 +55,8 @@ vi.mock('@/stores/profilesStore', () => ({
     activeProfile: ref(null),
     setActiveProfile: vi.fn(),
     clearActiveProfile: vi.fn(),
-    loadProfiles: vi.fn()
-  })
+    loadProfiles: vi.fn(),
+  }),
 }));
 
 // Mock all components as simple divs to focus on integration logic
@@ -64,8 +64,8 @@ vi.mock('@/components/plants/CharacterStatsPanel.vue', () => ({
   default: {
     name: 'CharacterStatsPanel',
     template: '<div class="character-stats-panel">CharacterStatsPanel</div>',
-    emits: ['stats-changed']
-  }
+    emits: ['stats-changed'],
+  },
 }));
 
 vi.mock('@/components/plants/StatTargets.vue', () => ({
@@ -73,8 +73,8 @@ vi.mock('@/components/plants/StatTargets.vue', () => ({
     name: 'StatTargets',
     template: '<div class="stat-targets">StatTargets</div>',
     props: ['modelValue'],
-    emits: ['update:modelValue']
-  }
+    emits: ['update:modelValue'],
+  },
 }));
 
 vi.mock('@/components/plants/BuildSummary.vue', () => ({
@@ -82,8 +82,8 @@ vi.mock('@/components/plants/BuildSummary.vue', () => ({
     name: 'BuildSummary',
     template: '<div class="build-summary">BuildSummary</div>',
     props: ['currentBuild', 'statBonuses', 'totalStats'],
-    emits: ['symbiant-removed']
-  }
+    emits: ['symbiant-removed'],
+  },
 }));
 
 vi.mock('@/components/plants/CharacterBuilder.vue', () => ({
@@ -91,17 +91,20 @@ vi.mock('@/components/plants/CharacterBuilder.vue', () => ({
     name: 'CharacterBuilder',
     template: '<div class="character-builder">CharacterBuilder</div>',
     props: ['profile', 'statTargets', 'availableSymbiants', 'currentBuild'],
-    emits: ['build-changed', 'symbiant-selected']
-  }
+    emits: ['build-changed', 'symbiant-selected'],
+  },
 }));
 
 vi.mock('@/components/plants/SymbiantSearch.vue', () => ({
   default: {
     name: 'SymbiantSearch',
-    template: '<div class="symbiant-search"><input v-model="query" @input="$emit(\'search\', query)" /></div>',
-    data() { return { query: '' } },
-    emits: ['search']
-  }
+    template:
+      '<div class="symbiant-search"><input v-model="query" @input="$emit(\'search\', query)" /></div>',
+    data() {
+      return { query: '' };
+    },
+    emits: ['search'],
+  },
 }));
 
 vi.mock('@/components/plants/SymbiantFilters.vue', () => ({
@@ -109,8 +112,8 @@ vi.mock('@/components/plants/SymbiantFilters.vue', () => ({
     name: 'SymbiantFilters',
     template: '<div class="symbiant-filters">SymbiantFilters</div>',
     props: ['modelValue', 'availableFamilies'],
-    emits: ['update:modelValue', 'filter-change']
-  }
+    emits: ['update:modelValue', 'filter-change'],
+  },
 }));
 
 vi.mock('@/components/plants/SymbiantFamilyView.vue', () => ({
@@ -118,8 +121,8 @@ vi.mock('@/components/plants/SymbiantFamilyView.vue', () => ({
     name: 'SymbiantFamilyView',
     template: '<div class="symbiant-family-view">SymbiantFamilyView</div>',
     props: ['symbiants', 'families', 'buildMode'],
-    emits: ['symbiant-select', 'add-to-build']
-  }
+    emits: ['symbiant-select', 'add-to-build'],
+  },
 }));
 
 vi.mock('@/components/plants/SymbiantList.vue', () => ({
@@ -127,8 +130,8 @@ vi.mock('@/components/plants/SymbiantList.vue', () => ({
     name: 'SymbiantList',
     template: '<div class="symbiant-list">SymbiantList</div>',
     props: ['symbiants', 'loading', 'buildMode'],
-    emits: ['symbiant-select', 'add-to-build', 'page-change']
-  }
+    emits: ['symbiant-select', 'add-to-build', 'page-change'],
+  },
 }));
 
 vi.mock('@/components/plants/SymbiantDetail.vue', () => ({
@@ -136,8 +139,8 @@ vi.mock('@/components/plants/SymbiantDetail.vue', () => ({
     name: 'SymbiantDetail',
     template: '<div class="symbiant-detail" v-if="visible">SymbiantDetail</div>',
     props: ['visible', 'symbiant', 'showBuildOptions', 'currentBuild'],
-    emits: ['update:visible', 'add-to-build', 'close']
-  }
+    emits: ['update:visible', 'add-to-build', 'close'],
+  },
 }));
 
 vi.mock('@/components/plants/BuildComparison.vue', () => ({
@@ -145,8 +148,8 @@ vi.mock('@/components/plants/BuildComparison.vue', () => ({
     name: 'BuildComparison',
     template: '<div class="build-comparison">BuildComparison</div>',
     props: ['builds', 'currentBuild'],
-    emits: ['load-build', 'delete-build']
-  }
+    emits: ['load-build', 'delete-build'],
+  },
 }));
 
 vi.mock('@/components/plants/SavedBuilds.vue', () => ({
@@ -154,8 +157,8 @@ vi.mock('@/components/plants/SavedBuilds.vue', () => ({
     name: 'SavedBuilds',
     template: '<div class="saved-builds">SavedBuilds</div>',
     props: ['builds'],
-    emits: ['load-build', 'delete-build', 'duplicate-build']
-  }
+    emits: ['load-build', 'delete-build', 'duplicate-build'],
+  },
 }));
 
 // Mock PrimeVue components used in main view
@@ -163,8 +166,8 @@ vi.mock('primevue/badge', () => ({
   default: {
     name: 'Badge',
     template: '<span class="badge">{{ value }}</span>',
-    props: ['value', 'severity']
-  }
+    props: ['value', 'severity'],
+  },
 }));
 
 vi.mock('primevue/button', () => ({
@@ -172,47 +175,50 @@ vi.mock('primevue/button', () => ({
     name: 'Button',
     template: '<button @click="$emit(\'click\')">{{ label }}</button>',
     props: ['label', 'icon', 'severity', 'size', 'disabled'],
-    emits: ['click']
-  }
+    emits: ['click'],
+  },
 }));
 
 vi.mock('primevue/dialog', () => ({
   default: {
     name: 'Dialog',
-    template: '<div v-if="visible" class="dialog"><div class="dialog-header">{{ header }}</div><slot /></div>',
+    template:
+      '<div v-if="visible" class="dialog"><div class="dialog-header">{{ header }}</div><slot /></div>',
     props: ['visible', 'header', 'modal', 'style', 'maximizable'],
-    emits: ['update:visible']
-  }
+    emits: ['update:visible'],
+  },
 }));
 
 vi.mock('primevue/dropdown', () => ({
   default: {
     name: 'Dropdown',
-    template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value); $emit(\'change\')"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select>',
+    template:
+      '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value); $emit(\'change\')"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select>',
     props: ['modelValue', 'options', 'optionLabel', 'optionValue', 'placeholder'],
-    emits: ['update:modelValue', 'change']
-  }
+    emits: ['update:modelValue', 'change'],
+  },
 }));
 
 vi.mock('primevue/progressspinner', () => ({
   default: {
     name: 'ProgressSpinner',
-    template: '<div class="progress-spinner">Loading...</div>'
-  }
+    template: '<div class="progress-spinner">Loading...</div>',
+  },
 }));
 
 vi.mock('primevue/togglebutton', () => ({
   default: {
     name: 'ToggleButton',
-    template: '<button @click="toggle" :class="{ active: modelValue }">{{ modelValue ? onLabel : offLabel }}</button>',
+    template:
+      '<button @click="toggle" :class="{ active: modelValue }">{{ modelValue ? onLabel : offLabel }}</button>',
     props: ['modelValue', 'onLabel', 'offLabel', 'onIcon', 'offIcon'],
     emits: ['update:modelValue'],
     methods: {
       toggle() {
         this.$emit('update:modelValue', !this.modelValue);
-      }
-    }
-  }
+      },
+    },
+  },
 }));
 
 describe('TinkerPlants E2E Workflows', () => {
@@ -224,12 +230,12 @@ describe('TinkerPlants E2E Workflows', () => {
     // Fetch real symbiants for E2E testing
     const response = await apiClient.searchSymbiants({ limit: 5 });
     if (response.success) {
-      realSymbiants = response.data.map(symbiant => ({
+      realSymbiants = response.data.map((symbiant) => ({
         ...symbiant,
         name: symbiant.name || `Symbiant ${symbiant.id}`,
         slot: symbiant.slot || 'unknown',
         qualityLevel: symbiant.qualityLevel || 100,
-        statBonuses: symbiant.statBonuses || []
+        statBonuses: symbiant.statBonuses || [],
       })) as PlantSymbiant[];
     }
   }, 10000);
@@ -237,11 +243,11 @@ describe('TinkerPlants E2E Workflows', () => {
   beforeEach(() => {
     pinia = createPinia();
     setActivePinia(pinia);
-    
+
     wrapper = mount(TinkerPlants, {
       global: {
-        plugins: [pinia]
-      }
+        plugins: [pinia],
+      },
     });
   });
 
@@ -264,9 +270,11 @@ describe('TinkerPlants E2E Workflows', () => {
     });
 
     it('shows build mode and view mode toggles', () => {
-      const toggleButtons = wrapper.findAll('button').filter((btn: any) => 
-        btn.text().includes('Build Mode') || btn.text().includes('Family View')
-      );
+      const toggleButtons = wrapper
+        .findAll('button')
+        .filter(
+          (btn: any) => btn.text().includes('Build Mode') || btn.text().includes('Family View')
+        );
       expect(toggleButtons.length).toBeGreaterThan(0);
     });
 
@@ -282,10 +290,12 @@ describe('TinkerPlants E2E Workflows', () => {
       expect(wrapper.find('.character-stats-panel').exists()).toBe(true);
 
       // Switch to browse mode
-      const buildModeToggle = wrapper.findAll('button').find((btn: any) => 
-        btn.text().includes('Build Mode') || btn.text().includes('Browse Mode')
-      );
-      
+      const buildModeToggle = wrapper
+        .findAll('button')
+        .find(
+          (btn: any) => btn.text().includes('Build Mode') || btn.text().includes('Browse Mode')
+        );
+
       if (buildModeToggle) {
         await buildModeToggle.trigger('click');
         expect(wrapper.vm.buildMode).toBe(false);
@@ -295,10 +305,10 @@ describe('TinkerPlants E2E Workflows', () => {
 
     it('switches between family and list views', async () => {
       // Check for view mode toggle buttons
-      const viewModeToggle = wrapper.findAll('button').find((btn: any) => 
-        btn.text().includes('Family View') || btn.text().includes('List View')
-      );
-      
+      const viewModeToggle = wrapper
+        .findAll('button')
+        .find((btn: any) => btn.text().includes('Family View') || btn.text().includes('List View'));
+
       if (viewModeToggle) {
         await viewModeToggle.trigger('click');
         // View mode changed, verify button exists and is clickable
@@ -314,11 +324,11 @@ describe('TinkerPlants E2E Workflows', () => {
     it('allows setting stat targets', async () => {
       // Should be in build mode by default
       expect(wrapper.vm.statTargets || []).toEqual([]);
-      
+
       // Simulate adding a stat target
       if (wrapper.vm.handleStatsChange) {
         await wrapper.vm.handleStatsChange({ strength: 500, agility: 400 });
-        
+
         expect(wrapper.vm.characterStats?.strength || 0).toBe(500);
         expect(wrapper.vm.characterStats?.agility || 0).toBe(400);
       }
@@ -329,23 +339,21 @@ describe('TinkerPlants E2E Workflows', () => {
         id: 1,
         aoid: 101,
         name: 'Test Head',
-        statBonuses: [
-          { statId: 'strength', statName: 'Strength', value: 50, type: 'bonus' }
-        ]
+        statBonuses: [{ statId: 'strength', statName: 'Strength', value: 50, type: 'bonus' }],
       };
-      
+
       const testBuild: CharacterBuild = {
         id: 'test',
         name: 'Test',
         symbiants: {
-          head: testSymbiant
+          head: testSymbiant,
         },
-        totalStats: {}
+        totalStats: {},
       };
 
       wrapper.vm.currentBuild = testBuild;
       const bonuses = wrapper.vm.buildStatBonuses;
-      
+
       if (testSymbiant.statBonuses && testSymbiant.statBonuses.length > 0) {
         const expectedBonus = testSymbiant.statBonuses[0].value;
         const bonusKey = testSymbiant.statBonuses[0].statId;
@@ -355,29 +363,27 @@ describe('TinkerPlants E2E Workflows', () => {
 
     it('calculates total character stats including bonuses', () => {
       wrapper.vm.characterStats = { strength: 400, agility: 300 };
-      
-      const testSymbiant = realSymbiants.find(s => s.statBonuses && s.statBonuses.length > 0) || {
+
+      const testSymbiant = realSymbiants.find((s) => s.statBonuses && s.statBonuses.length > 0) || {
         id: 1,
         aoid: 101,
         name: 'Test Head',
-        statBonuses: [
-          { statId: 'strength', statName: 'Strength', value: 50, type: 'bonus' }
-        ]
+        statBonuses: [{ statId: 'strength', statName: 'Strength', value: 50, type: 'bonus' }],
       };
-      
+
       wrapper.vm.currentBuild = {
         id: 'test',
         name: 'Test',
         symbiants: {
-          head: testSymbiant
+          head: testSymbiant,
         },
-        totalStats: {}
+        totalStats: {},
       };
 
       const totalStats = wrapper.vm.totalCharacterStats;
-      
+
       if (testSymbiant.statBonuses && testSymbiant.statBonuses.length > 0) {
-        const bonus = testSymbiant.statBonuses.find(b => b.statId === 'strength');
+        const bonus = testSymbiant.statBonuses.find((b) => b.statId === 'strength');
         if (bonus) {
           expect(totalStats?.strength || 0).toBe(400 + bonus.value);
         }
@@ -389,21 +395,21 @@ describe('TinkerPlants E2E Workflows', () => {
       const testSymbiant = realSymbiants[0] || {
         id: 1,
         aoid: 101,
-        name: 'Test Head'
+        name: 'Test Head',
       };
-      
+
       wrapper.vm.currentBuild = {
         id: '',
         name: '',
         symbiants: {
-          head: testSymbiant
+          head: testSymbiant,
         },
-        totalStats: {}
+        totalStats: {},
       };
 
       if (wrapper.vm.saveBuild) {
         await wrapper.vm.saveBuild();
-        
+
         expect(localStorage.setItem).toHaveBeenCalledWith(
           'tinkerplants_builds',
           expect.stringContaining(testSymbiant.name)
@@ -420,14 +426,16 @@ describe('TinkerPlants E2E Workflows', () => {
   describe('Search and Filtering Workflow', () => {
     it('filters symbiants by search query', async () => {
       // Check if search functionality exists
-      const searchInput = wrapper.find('input[placeholder*="search"], input[placeholder*="Search"]');
-      
+      const searchInput = wrapper.find(
+        'input[placeholder*="search"], input[placeholder*="Search"]'
+      );
+
       if (searchInput.exists() && realSymbiants.length > 0) {
         // Apply search filter using real symbiant name
         const testName = realSymbiants[0].name.toLowerCase().substring(0, 3);
         await searchInput.setValue(testName);
         await searchInput.trigger('input');
-        
+
         // Verify search input was updated
         expect(searchInput.element.value).toContain(testName);
       } else {
@@ -440,13 +448,13 @@ describe('TinkerPlants E2E Workflows', () => {
       // Check for family filter controls
       const filterButtons = wrapper.findAll('button').filter((btn: any) => {
         const text = btn.text().toLowerCase();
-        return realSymbiants.some(s => s.family && text.includes(s.family.toLowerCase()));
+        return realSymbiants.some((s) => s.family && text.includes(s.family.toLowerCase()));
       });
-      
+
       if (filterButtons.length > 0 && realSymbiants.length > 0) {
         // Click on a family filter button
         await filterButtons[0].trigger('click');
-        
+
         // Verify the button was clicked
         expect(filterButtons[0].exists()).toBe(true);
       } else {
@@ -461,11 +469,11 @@ describe('TinkerPlants E2E Workflows', () => {
         const text = btn.text().toLowerCase();
         return text.includes('clear') || text.includes('reset') || text.includes('all');
       });
-      
+
       if (clearButtons.length > 0) {
         // Click the clear/reset button
         await clearButtons[0].trigger('click');
-        
+
         // Verify the button exists and was clicked
         expect(clearButtons[0].exists()).toBe(true);
       } else {
@@ -479,7 +487,7 @@ describe('TinkerPlants E2E Workflows', () => {
     it('updates character stats when profile changes', async () => {
       // Look for profile selection dropdown or controls
       const profileDropdown = wrapper.find('select, [role="listbox"], .p-dropdown');
-      
+
       if (profileDropdown.exists()) {
         // Profile selection exists, verify it's interactive
         expect(profileDropdown.exists()).toBe(true);
@@ -495,7 +503,7 @@ describe('TinkerPlants E2E Workflows', () => {
         const text = btn.text().toLowerCase();
         return text.includes('clear') && text.includes('profile');
       });
-      
+
       if (clearProfileButton) {
         await clearProfileButton.trigger('click');
         expect(clearProfileButton.exists()).toBe(true);
@@ -511,12 +519,12 @@ describe('TinkerPlants E2E Workflows', () => {
       const testSymbiant = realSymbiants[0] || {
         id: 1,
         aoid: 101,
-        name: 'Test Symbiant'
+        name: 'Test Symbiant',
       };
 
       if (wrapper.vm.handleSymbiantSelect) {
         await wrapper.vm.handleSymbiantSelect(testSymbiant);
-        
+
         expect(wrapper.vm.selectedSymbiant).toEqual(testSymbiant);
         expect(wrapper.vm.showSymbiantDetail).toBe(true);
       }
@@ -524,13 +532,13 @@ describe('TinkerPlants E2E Workflows', () => {
 
     it('closes symbiant detail dialog', async () => {
       const testSymbiant = realSymbiants[0] || { id: 1, aoid: 101, name: 'Test' };
-      
+
       wrapper.vm.showSymbiantDetail = true;
       wrapper.vm.selectedSymbiant = testSymbiant;
-      
+
       if (wrapper.vm.handleSymbiantDetailClose) {
         await wrapper.vm.handleSymbiantDetailClose();
-        
+
         expect(wrapper.vm.selectedSymbiant).toBeNull();
         expect(wrapper.vm.showSymbiantDetail).toBe(false);
       }
@@ -541,15 +549,15 @@ describe('TinkerPlants E2E Workflows', () => {
         id: 1,
         aoid: 101,
         name: 'Test Symbiant',
-        slot: 'head'
+        slot: 'head',
       };
-      
+
       // Ensure symbiant has a slot for testing
       testSymbiant.slot = testSymbiant.slot || 'head';
 
       if (wrapper.vm.handleAddToBuild) {
         await wrapper.vm.handleAddToBuild(testSymbiant);
-        
+
         expect(wrapper.vm.currentBuild?.symbiants?.[testSymbiant.slot]).toEqual(testSymbiant);
       }
     });
@@ -559,19 +567,19 @@ describe('TinkerPlants E2E Workflows', () => {
     it('determines if build is valid for saving', () => {
       // Empty build should not be valid
       expect(wrapper.vm.hasValidBuild || false).toBe(false);
-      
+
       const testSymbiant = realSymbiants[0] || { id: 1, aoid: 101, name: 'Test' };
-      
+
       // Build with symbiants should be valid
       wrapper.vm.currentBuild = {
         id: 'test',
         name: 'Test',
         symbiants: {
-          head: testSymbiant
+          head: testSymbiant,
         },
-        totalStats: {}
+        totalStats: {},
       };
-      
+
       expect(wrapper.vm.hasValidBuild || false).toBe(true);
     });
 
@@ -581,11 +589,11 @@ describe('TinkerPlants E2E Workflows', () => {
         const text = btn.text().toLowerCase();
         return text.includes('save');
       });
-      
+
       if (saveButton) {
         // Save button exists - test that it handles validation
         await saveButton.trigger('click');
-        
+
         // Verify button exists and is clickable
         expect(saveButton.exists()).toBe(true);
       } else {

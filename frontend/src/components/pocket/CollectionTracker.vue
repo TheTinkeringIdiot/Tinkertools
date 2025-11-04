@@ -39,7 +39,7 @@ try {
 } catch {
   // Fallback for test environments or when ConfirmationService is not provided
   confirm = {
-    require: () => Promise.resolve(true)
+    require: () => Promise.resolve(true),
   };
 }
 
@@ -55,7 +55,7 @@ const showNewGoalForm = ref(false);
 
 // Computed properties
 const availableSlots = computed(() => {
-  const slots = new Set(Array.from(symbiantStore.symbiants.values()).map(s => s.slot));
+  const slots = new Set(Array.from(symbiantStore.symbiants.values()).map((s) => s.slot));
   return Array.from(slots).sort();
 });
 
@@ -64,22 +64,23 @@ const filteredSymbiants = computed(() => {
 
   // Apply slot filter
   if (selectedSlot.value) {
-    result = result.filter(s => s.slot === selectedSlot.value);
+    result = result.filter((s) => s.slot === selectedSlot.value);
   }
 
   // Apply search filter
   if (searchQuery.value.trim()) {
     const search = searchQuery.value.toLowerCase();
-    result = result.filter(s =>
-      s.name.toLowerCase().includes(search) ||
-      s.slot.toLowerCase().includes(search) ||
-      s.family?.toLowerCase().includes(search)
+    result = result.filter(
+      (s) =>
+        s.name.toLowerCase().includes(search) ||
+        s.slot.toLowerCase().includes(search) ||
+        s.family?.toLowerCase().includes(search)
     );
   }
 
   // Apply collection filter
   if (showOnlyUncollected.value) {
-    result = result.filter(s => !getCollectionItem(s.id).collected);
+    result = result.filter((s) => !getCollectionItem(s.id).collected);
   }
 
   return result.sort((a, b) => {
@@ -92,11 +93,11 @@ const filteredSymbiants = computed(() => {
 
 const collectionStats = computed(() => {
   const total = symbiantStore.symbiants.size;
-  const collected = Object.values(collectionData.value).filter(item => item.collected).length;
+  const collected = Object.values(collectionData.value).filter((item) => item.collected).length;
   const percentage = total > 0 ? Math.round((collected / total) * 100) : 0;
 
   const bySlot: Record<string, { total: number; collected: number; percentage: number }> = {};
-  
+
   for (const symbiant of symbiantStore.symbiants.values()) {
     if (!bySlot[symbiant.slot]) {
       bySlot[symbiant.slot] = { total: 0, collected: 0, percentage: 0 };
@@ -109,7 +110,7 @@ const collectionStats = computed(() => {
   }
 
   // Calculate percentages
-  Object.keys(bySlot).forEach(slot => {
+  Object.keys(bySlot).forEach((slot) => {
     const stats = bySlot[slot];
     stats.percentage = stats.total > 0 ? Math.round((stats.collected / stats.total) * 100) : 0;
   });
@@ -121,19 +122,20 @@ const collectionStats = computed(() => {
     remaining: total - collected,
     bySlot: Object.entries(bySlot)
       .map(([slot, stats]) => ({ slot, ...stats }))
-      .sort((a, b) => a.slot.localeCompare(b.slot))
+      .sort((a, b) => a.slot.localeCompare(b.slot)),
   };
 });
 
 // Methods
 function getCollectionItem(symbiantId: number): CollectionItem | undefined {
   if (!collectionData.value[symbiantId]) {
-    const symbiant = symbiantStore.symbiants.get(symbiantId) || 
-                     Array.from(symbiantStore.symbiants.values()).find(s => s.id === symbiantId);
+    const symbiant =
+      symbiantStore.symbiants.get(symbiantId) ||
+      Array.from(symbiantStore.symbiants.values()).find((s) => s.id === symbiantId);
     if (symbiant) {
       collectionData.value[symbiantId] = {
         symbiant,
-        collected: false
+        collected: false,
       };
     }
   }
@@ -154,16 +156,16 @@ function getDropSources(symbiant: Symbiant): PocketBoss[] {
 
 function getSlotIcon(slot: string): string {
   const iconMap: Record<string, string> = {
-    'Head': 'pi-user',
-    'Eye': 'pi-eye',
-    'Ear': 'pi-volume-up',
-    'Chest': 'pi-shield',
-    'Arm': 'pi-stop',
-    'Wrist': 'pi-circle',
-    'Hand': 'pi-hand-paper',
-    'Waist': 'pi-minus',
-    'Leg': 'pi-sort-down',
-    'Feet': 'pi-step-forward'
+    Head: 'pi-user',
+    Eye: 'pi-eye',
+    Ear: 'pi-volume-up',
+    Chest: 'pi-shield',
+    Arm: 'pi-stop',
+    Wrist: 'pi-circle',
+    Hand: 'pi-hand-paper',
+    Waist: 'pi-minus',
+    Leg: 'pi-sort-down',
+    Feet: 'pi-step-forward',
   };
   return iconMap[slot] || 'pi-circle';
 }
@@ -188,8 +190,8 @@ function createCollectionGoal() {
     id: Date.now().toString(),
     name: newGoalName.value,
     description: newGoalDescription.value,
-    targetSymbiants: filteredSymbiants.value.map(s => s.id),
-    createdAt: new Date()
+    targetSymbiants: filteredSymbiants.value.map((s) => s.id),
+    createdAt: new Date(),
   };
 
   collectionGoals.value.push(goal);
@@ -207,21 +209,19 @@ function deleteCollectionGoal(goalId: string) {
     icon: 'pi pi-trash',
     acceptClass: 'p-button-danger',
     accept: () => {
-      collectionGoals.value = collectionGoals.value.filter(g => g.id !== goalId);
+      collectionGoals.value = collectionGoals.value.filter((g) => g.id !== goalId);
       saveCollectionGoals();
-    }
+    },
   });
 }
 
 function getGoalProgress(goal: CollectionGoal) {
   const total = goal.targetSymbiants.length;
-  const collected = goal.targetSymbiants.filter(id => 
-    getCollectionItem(id).collected
-  ).length;
+  const collected = goal.targetSymbiants.filter((id) => getCollectionItem(id).collected).length;
   return {
     total,
     collected,
-    percentage: total > 0 ? Math.round((collected / total) * 100) : 0
+    percentage: total > 0 ? Math.round((collected / total) * 100) : 0,
   };
 }
 
@@ -230,7 +230,7 @@ function exportCollectionData() {
     collection: collectionData.value,
     goals: collectionGoals.value,
     exportDate: new Date().toISOString(),
-    stats: collectionStats.value
+    stats: collectionStats.value,
   };
 
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -265,7 +265,7 @@ function importCollectionData(event: Event) {
     }
   };
   reader.readAsText(file);
-  
+
   // Reset file input
   (event.target as HTMLInputElement).value = '';
 }
@@ -281,7 +281,7 @@ function resetCollection() {
       collectionGoals.value = [];
       saveCollectionData();
       saveCollectionGoals();
-    }
+    },
   });
 }
 
@@ -333,8 +333,8 @@ defineExpose({
   createCollectionGoal,
   getGoalProgress,
   exportCollectionData,
-  importCollectionData
-})
+  importCollectionData,
+});
 </script>
 
 <template>
@@ -352,7 +352,9 @@ defineExpose({
               </span>
             </div>
             <ProgressBar :value="collectionStats.percentage" class="mb-2"></ProgressBar>
-            <div class="flex items-center justify-between text-sm text-surface-600 dark:text-surface-400">
+            <div
+              class="flex items-center justify-between text-sm text-surface-600 dark:text-surface-400"
+            >
               <span>{{ collectionStats.collected }} of {{ collectionStats.total }} collected</span>
               <span>{{ collectionStats.remaining }} remaining</span>
             </div>
@@ -383,7 +385,9 @@ defineExpose({
           </div>
 
           <!-- Action Buttons -->
-          <div class="flex flex-wrap items-center gap-3 pt-4 border-t border-surface-200 dark:border-surface-700">
+          <div
+            class="flex flex-wrap items-center gap-3 pt-4 border-t border-surface-200 dark:border-surface-700"
+          >
             <Button
               @click="exportCollectionData"
               icon="pi pi-download"
@@ -399,12 +403,7 @@ defineExpose({
                 size="small"
                 as="span"
               />
-              <input
-                type="file"
-                accept=".json"
-                @change="importCollectionData"
-                class="hidden"
-              />
+              <input type="file" accept=".json" @change="importCollectionData" class="hidden" />
             </label>
             <Button
               @click="resetCollection"
@@ -457,7 +456,8 @@ defineExpose({
                   </div>
                 </div>
                 <div class="text-sm text-surface-600 dark:text-surface-400">
-                  This goal will include {{ filteredSymbiants.length }} symbiants based on current filters.
+                  This goal will include {{ filteredSymbiants.length }} symbiants based on current
+                  filters.
                 </div>
                 <div class="flex items-center gap-2">
                   <Button
@@ -503,7 +503,10 @@ defineExpose({
               </div>
               <div class="space-y-2">
                 <div class="flex items-center justify-between text-sm">
-                  <span>Progress: {{ getGoalProgress(goal).collected }} / {{ getGoalProgress(goal).total }}</span>
+                  <span
+                    >Progress: {{ getGoalProgress(goal).collected }} /
+                    {{ getGoalProgress(goal).total }}</span
+                  >
                   <span class="font-semibold">{{ getGoalProgress(goal).percentage }}%</span>
                 </div>
                 <ProgressBar :value="getGoalProgress(goal).percentage"></ProgressBar>
@@ -541,11 +544,7 @@ defineExpose({
           </div>
           <div class="flex items-end">
             <div class="flex items-center">
-              <Checkbox
-                v-model="showOnlyUncollected"
-                inputId="uncollected"
-                binary
-              />
+              <Checkbox v-model="showOnlyUncollected" inputId="uncollected" binary />
               <label for="uncollected" class="ml-2">Show only uncollected</label>
             </div>
           </div>
@@ -615,10 +614,7 @@ defineExpose({
 
           <Column field="ql" header="Quality" sortable class="min-w-[80px]">
             <template #body="{ data }">
-              <Tag
-                :value="`QL ${data.ql}`"
-                :severity="getQualitySeverity(data.ql)"
-              />
+              <Tag :value="`QL ${data.ql}`" :severity="getQualitySeverity(data.ql)" />
             </template>
           </Column>
 

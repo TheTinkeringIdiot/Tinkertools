@@ -12,13 +12,13 @@ vi.mock('@/services/api-client', () => ({
   apiClient: {
     interpolateItem: vi.fn().mockResolvedValue({
       success: false,
-      error: 'Mocked response for testing'
+      error: 'Mocked response for testing',
     }),
     getItem: vi.fn().mockResolvedValue({
       success: false,
-      error: 'Mocked response for testing'
-    })
-  }
+      error: 'Mocked response for testing',
+    }),
+  },
 }));
 
 describe('AOSetups Implant Import Integration', () => {
@@ -36,49 +36,49 @@ describe('AOSetups Implant Import Integration', () => {
           name: 'TestCharacter',
           level: 200,
           profession: 'Agent',
-          breed: 'Solitus'
+          breed: 'Solitus',
         },
         implants: [
           {
-            "_id": "68c2ca20b3f11d03a38e4f99",
-            "slot": "eye",
-            "type": "implant", 
-            "ql": 100,
-            "clusters": {
-              "Shiny": { "ClusterID": 77 },    // Strength
-              "Bright": { "ClusterID": 60 },   // Pistol
-              "Faded": { "ClusterID": 37 }     // Intelligence
-            }
+            _id: '68c2ca20b3f11d03a38e4f99',
+            slot: 'eye',
+            type: 'implant',
+            ql: 100,
+            clusters: {
+              Shiny: { ClusterID: 77 }, // Strength
+              Bright: { ClusterID: 60 }, // Pistol
+              Faded: { ClusterID: 37 }, // Intelligence
+            },
           },
           {
-            "_id": "68c2ca20b3f11d03a38e4f9a",
-            "slot": "head",
-            "type": "implant",
-            "ql": 150, 
-            "clusters": {
-              "Shiny": { "ClusterID": 7 },     // Agility
-              "Bright": { "ClusterID": 68 }    // Rifle
-            }
+            _id: '68c2ca20b3f11d03a38e4f9a',
+            slot: 'head',
+            type: 'implant',
+            ql: 150,
+            clusters: {
+              Shiny: { ClusterID: 7 }, // Agility
+              Bright: { ClusterID: 68 }, // Rifle
+            },
           },
           {
-            "_id": "symbiant123",
-            "slot": "chest",
-            "symbiant": {
-              "highid": 123456,
-              "selectedQl": 200
-            }
-          }
+            _id: 'symbiant123',
+            slot: 'chest',
+            symbiant: {
+              highid: 123456,
+              selectedQl: 200,
+            },
+          },
         ],
         weapons: [],
         clothes: [],
-        perks: []
+        perks: [],
       });
 
       const result = await transformer.importProfile(aoSetupsData);
 
       expect(result.success).toBe(true);
       expect(result.profile).toBeDefined();
-      
+
       if (result.profile) {
         // Check character data
         expect(result.profile.Character.Name).toBe('TestCharacter');
@@ -91,20 +91,20 @@ describe('AOSetups Implant Import Integration', () => {
         expect(eyeImplant).toBeDefined();
         expect(eyeImplant?.type).toBe('implant');
         expect(eyeImplant?.ql).toBe(100);
-        
+
         // Check clusters
         expect(eyeImplant?.clusters).toBeDefined();
         expect(eyeImplant?.clusters?.Shiny).toEqual({
-          stat: 16,              // Strength STAT ID
-          skillName: 'Strength'
+          stat: 16, // Strength STAT ID
+          skillName: 'Strength',
         });
         expect(eyeImplant?.clusters?.Bright).toEqual({
-          stat: 112,             // Pistol STAT ID
-          skillName: 'Pistol'
+          stat: 112, // Pistol STAT ID
+          skillName: 'Pistol',
         });
         expect(eyeImplant?.clusters?.Faded).toEqual({
-          stat: 19,              // Intelligence STAT ID
-          skillName: 'Intelligence'
+          stat: 19, // Intelligence STAT ID
+          skillName: 'Intelligence',
         });
 
         // Check head implant with partial clusters (stored with bitflag key '4')
@@ -112,14 +112,14 @@ describe('AOSetups Implant Import Integration', () => {
         expect(headImplant).toBeDefined();
         expect(headImplant?.type).toBe('implant');
         expect(headImplant?.ql).toBe(150);
-        
+
         expect(headImplant?.clusters?.Shiny).toEqual({
-          stat: 17,              // Agility STAT ID
-          skillName: 'Agility'
+          stat: 17, // Agility STAT ID
+          skillName: 'Agility',
         });
         expect(headImplant?.clusters?.Bright).toEqual({
-          stat: 113,             // Rifle STAT ID
-          skillName: 'Rifle'
+          stat: 113, // Rifle STAT ID
+          skillName: 'Rifle',
         });
         expect(headImplant?.clusters?.Faded).toBeUndefined(); // Not provided
 
@@ -133,7 +133,7 @@ describe('AOSetups Implant Import Integration', () => {
 
       // Check warnings - should have import notifications
       expect(result.warnings).toContain('Profile imported from AOSetups format');
-      expect(result.warnings.some(w => w.includes('clusters to slot'))).toBe(true);
+      expect(result.warnings.some((w) => w.includes('clusters to slot'))).toBe(true);
     });
 
     it('should handle invalid cluster IDs gracefully', async () => {
@@ -142,23 +142,23 @@ describe('AOSetups Implant Import Integration', () => {
           name: 'TestCharacter',
           level: 100,
           profession: 'Adventurer',
-          breed: 'Solitus'
+          breed: 'Solitus',
         },
         implants: [
           {
-            "slot": "eye",
-            "type": "implant",
-            "ql": 50,
-            "clusters": {
-              "Shiny": { "ClusterID": 999 },   // Invalid ID
-              "Bright": { "ClusterID": 60 },   // Valid ID (Pistol)
-              "Faded": { "ClusterID": 0 }      // Invalid ID (empty)
-            }
-          }
+            slot: 'eye',
+            type: 'implant',
+            ql: 50,
+            clusters: {
+              Shiny: { ClusterID: 999 }, // Invalid ID
+              Bright: { ClusterID: 60 }, // Valid ID (Pistol)
+              Faded: { ClusterID: 0 }, // Invalid ID (empty)
+            },
+          },
         ],
         weapons: [],
         clothes: [],
-        perks: []
+        perks: [],
       });
 
       const result = await transformer.importProfile(aoSetupsData);
@@ -173,14 +173,14 @@ describe('AOSetups Implant Import Integration', () => {
         // Should only have the valid cluster
         expect(eyeImplant?.clusters?.Bright).toEqual({
           stat: 112,
-          skillName: 'Pistol'
+          skillName: 'Pistol',
         });
         expect(eyeImplant?.clusters?.Shiny).toBeUndefined();
         expect(eyeImplant?.clusters?.Faded).toBeUndefined();
       }
 
       // Check warnings for invalid cluster IDs
-      expect(result.warnings.some(w => w.includes('Unknown ClusterID: 999'))).toBe(true);
+      expect(result.warnings.some((w) => w.includes('Unknown ClusterID: 999'))).toBe(true);
       // Note: ClusterID 0 is filtered out in the cluster processing, not in the mapping lookup
     });
 
@@ -189,30 +189,30 @@ describe('AOSetups Implant Import Integration', () => {
         character: {
           name: 'TestCharacter',
           level: 100,
-          profession: 'Adventurer', 
-          breed: 'Solitus'
+          profession: 'Adventurer',
+          breed: 'Solitus',
         },
         implants: [
           {
-            "slot": "invalid_slot",
-            "type": "implant",
-            "ql": 50,
-            "clusters": {
-              "Shiny": { "ClusterID": 77 }
-            }
+            slot: 'invalid_slot',
+            type: 'implant',
+            ql: 50,
+            clusters: {
+              Shiny: { ClusterID: 77 },
+            },
           },
           {
-            "slot": "eye", // Valid slot
-            "type": "implant",
-            "ql": 75,
-            "clusters": {
-              "Bright": { "ClusterID": 60 }
-            }
-          }
+            slot: 'eye', // Valid slot
+            type: 'implant',
+            ql: 75,
+            clusters: {
+              Bright: { ClusterID: 60 },
+            },
+          },
         ],
         weapons: [],
         clothes: [],
-        perks: []
+        perks: [],
       });
 
       const result = await transformer.importProfile(aoSetupsData);
@@ -231,7 +231,9 @@ describe('AOSetups Implant Import Integration', () => {
       }
 
       // Check warning for invalid slot
-      expect(result.warnings.some(w => w.includes('Unknown implant slot: invalid_slot'))).toBe(true);
+      expect(result.warnings.some((w) => w.includes('Unknown implant slot: invalid_slot'))).toBe(
+        true
+      );
     });
 
     it('should preserve existing TinkerProfile structure for non-implant data', async () => {
@@ -245,23 +247,23 @@ describe('AOSetups Implant Import Integration', () => {
             {
               name: 'First Aid',
               ipExpenditure: 50,
-              pointsFromIp: 25
-            }
-          ]
+              pointsFromIp: 25,
+            },
+          ],
         },
         implants: [
           {
-            "slot": "eye",
-            "type": "implant",
-            "ql": 100,
-            "clusters": {
-              "Shiny": { "ClusterID": 77 } // Strength
-            }
-          }
+            slot: 'eye',
+            type: 'implant',
+            ql: 100,
+            clusters: {
+              Shiny: { ClusterID: 77 }, // Strength
+            },
+          },
         ],
         weapons: [],
         clothes: [],
-        perks: []
+        perks: [],
       });
 
       const result = await transformer.importProfile(aoSetupsData);

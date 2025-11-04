@@ -12,28 +12,28 @@
  */
 export const CRUNCHCOM_COST_REDUCTION: Record<number, number> = {
   0: 0,
-  1: 4,   // CrunchCom Code Sieve
-  2: 8,   // Run-Time Recompiler
-  3: 12,  // CrunchCom Nano Compressor
-  4: 16,  // On-The-Fly Compression
-  5: 20,  // CrunchCom Nano Compressor Pro
-  6: 24,  // Jobe Nano Libraries
-  7: 28,  // Izgimmer's Obfuscated Recompiler
-}
+  1: 4, // CrunchCom Code Sieve
+  2: 8, // Run-Time Recompiler
+  3: 12, // CrunchCom Nano Compressor
+  4: 16, // On-The-Fly Compression
+  5: 20, // CrunchCom Nano Compressor Pro
+  6: 24, // Jobe Nano Libraries
+  7: 28, // Izgimmer's Obfuscated Recompiler
+};
 
 /**
  * Crunchcom - AOID mapping for buff auto-population
  * Maps dropdown level (1-7) to nano program AOID
  */
 export const CRUNCHCOM_AOID_MAP: Record<number, number> = {
-  1: 95407,  // CrunchCom Code Sieve (4%)
-  2: 95416,  // Run-Time Recompiler (8%)
-  3: 95415,  // CrunchCom Nano Compressor (12%)
-  4: 95414,  // On-The-Fly Compression (16%)
-  5: 95412,  // CrunchCom Nano Compressor Pro (20%)
-  6: 95413,  // Jobe Nano Libraries (24%)
-  7: 95417,  // Izgimmer's Obfuscated Recompiler (28%)
-}
+  1: 95407, // CrunchCom Code Sieve (4%)
+  2: 95416, // Run-Time Recompiler (8%)
+  3: 95415, // CrunchCom Nano Compressor (12%)
+  4: 95414, // On-The-Fly Compression (16%)
+  5: 95412, // CrunchCom Nano Compressor Pro (20%)
+  6: 95413, // Jobe Nano Libraries (24%)
+  7: 95417, // Izgimmer's Obfuscated Recompiler (28%)
+};
 
 /**
  * Crunchcom - Nano names for display
@@ -46,8 +46,8 @@ export const CRUNCHCOM_NAMES: Record<number, string> = {
   4: 'On-The-Fly Compression',
   5: 'CrunchCom Nano Compressor Pro',
   6: 'Jobe Nano Libraries',
-  7: 'Izgimmer\'s Obfuscated Recompiler',
-}
+  7: "Izgimmer's Obfuscated Recompiler",
+};
 
 /**
  * Humidity Extractor - Nano Regen per Second
@@ -55,28 +55,28 @@ export const CRUNCHCOM_NAMES: Record<number, string> = {
  */
 export const HUMIDITY_REGEN: Record<number, number> = {
   0: 0,
-  1: 1.5,   // Rudimentary Humidity Extractor
-  2: 3.33,  // Basic Humidity Extractor
-  3: 5.17,  // Humidity Extractor
-  4: 7.0,   // Efficient Humidity Extractor
-  5: 10.5,  // Superior Humidity Extractor
+  1: 1.5, // Rudimentary Humidity Extractor
+  2: 3.33, // Basic Humidity Extractor
+  3: 5.17, // Humidity Extractor
+  4: 7.0, // Efficient Humidity Extractor
+  5: 10.5, // Superior Humidity Extractor
   6: 13.09, // Boundless Humidity Extractor
   7: 15.67, // Personal Notum Harvester
-}
+};
 
 /**
  * Humidity - AOID mapping for buff auto-population
  * Maps dropdown level (1-7) to nano program AOID
  */
 export const HUMIDITY_AOID_MAP: Record<number, number> = {
-  1: 90400,  // Rudimentary Humidity Extractor
-  2: 90405,  // Basic Humidity Extractor
-  3: 90404,  // Humidity Extractor
-  4: 90403,  // Efficient Humidity Extractor
-  5: 90402,  // Superior Humidity Extractor
-  6: 90401,  // Boundless Humidity Extractor
-  7: 90406,  // Personal Notum Harvester
-}
+  1: 90400, // Rudimentary Humidity Extractor
+  2: 90405, // Basic Humidity Extractor
+  3: 90404, // Humidity Extractor
+  4: 90403, // Efficient Humidity Extractor
+  5: 90402, // Superior Humidity Extractor
+  6: 90401, // Boundless Humidity Extractor
+  7: 90406, // Personal Notum Harvester
+};
 
 /**
  * Humidity - Nano names for display
@@ -90,7 +90,7 @@ export const HUMIDITY_NAMES: Record<number, string> = {
   5: 'Superior Humidity Extractor',
   6: 'Boundless Humidity Extractor',
   7: 'Personal Notum Harvester',
-}
+};
 
 /**
  * Notum Siphon - Nano Regen per Second
@@ -108,7 +108,7 @@ export const NOTUM_SIPHON_REGEN: Record<number, number> = {
   8: 66.67,
   9: 75.0,
   10: 83.34,
-}
+};
 
 /**
  * Channeling of Notum - Nano Regen per Second
@@ -120,7 +120,7 @@ export const CHANNELING_REGEN: Record<number, number> = {
   2: 10.3,
   3: 12.875,
   4: 15.45,
-}
+};
 
 /**
  * Enhance Nano Damage - Direct Nano Damage Efficiency Percentage
@@ -134,7 +134,7 @@ export const ENHANCE_NANO_DAMAGE: Record<number, number> = {
   4: 12,
   5: 15,
   6: 18,
-}
+};
 
 /**
  * Ancient Matrix - Direct Nano Damage Efficiency Percentage
@@ -152,15 +152,15 @@ export const ANCIENT_MATRIX_DAMAGE: Record<number, number> = {
   8: 2.67,
   9: 2.83,
   10: 3,
-}
+};
 
 /**
  * Nano regeneration buffs interface for parameter passing
  */
 export interface NanoRegenBuffs {
-  humidity: number
-  notumSiphon: number
-  channeling: number
+  humidity: number;
+  notumSiphon: number;
+  channeling: number;
 }
 
 /**
@@ -171,7 +171,7 @@ export interface NanoRegenBuffs {
  * @returns Tick speed in seconds
  */
 export function calculateTickSpeed(psychic: number): number {
-  return 28 - Math.floor((psychic - 1) / 60) * 2
+  return 28 - Math.floor((psychic - 1) / 60) * 2;
 }
 
 /**
@@ -189,15 +189,15 @@ export function calculateTickSpeed(psychic: number): number {
  * @returns Base nano delta per tick
  */
 export function calculateBaseDelta(breed: number, nanoDelta: number): number {
-  let breedBase = 3 // Default to Solitus/Opifex
+  let breedBase = 3; // Default to Solitus/Opifex
 
   if (breed === 3) {
-    breedBase = 4 // Nanomage
+    breedBase = 4; // Nanomage
   } else if (breed === 4) {
-    breedBase = 2 // Atrox
+    breedBase = 2; // Atrox
   }
 
-  return breedBase + nanoDelta
+  return breedBase + nanoDelta;
 }
 
 /**
@@ -220,14 +220,14 @@ export function calculateNanoRegen(
   const buffRegen =
     HUMIDITY_REGEN[buffs.humidity] +
     NOTUM_SIPHON_REGEN[buffs.notumSiphon] +
-    CHANNELING_REGEN[buffs.channeling]
+    CHANNELING_REGEN[buffs.channeling];
 
   // Calculate base delta contribution
-  const baseDelta = calculateBaseDelta(breed, nanoDelta)
-  const tickSpeed = calculateTickSpeed(psychic)
-  const deltaRegen = baseDelta / tickSpeed
+  const baseDelta = calculateBaseDelta(breed, nanoDelta);
+  const tickSpeed = calculateTickSpeed(psychic);
+  const deltaRegen = baseDelta / tickSpeed;
 
-  return buffRegen + deltaRegen
+  return buffRegen + deltaRegen;
 }
 
 /**
@@ -245,10 +245,10 @@ export function calculateSustainTime(
   regenPerSecond: number
 ): number {
   if (regenPerSecond >= nanoPerSecond) {
-    return Infinity
+    return Infinity;
   }
 
-  return maxNano / (nanoPerSecond - regenPerSecond)
+  return maxNano / (nanoPerSecond - regenPerSecond);
 }
 
 /**
@@ -266,8 +266,8 @@ export function calculateCastsToEmpty(
   sustainable: boolean
 ): number {
   if (sustainable) {
-    return Infinity
+    return Infinity;
   }
 
-  return Math.floor(maxNano / nanoCost)
+  return Math.floor(maxNano / nanoCost);
 }

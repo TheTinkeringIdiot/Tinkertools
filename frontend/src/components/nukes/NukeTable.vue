@@ -117,9 +117,7 @@
     <template #empty>
       <div class="text-center py-12">
         <i class="pi pi-search text-4xl text-surface-400 mb-4"></i>
-        <p class="text-lg text-surface-600 dark:text-surface-400">
-          No offensive nanos found
-        </p>
+        <p class="text-lg text-surface-600 dark:text-surface-400">No offensive nanos found</p>
         <p class="text-sm text-surface-500 dark:text-surface-500">
           Adjust your search criteria or input values
         </p>
@@ -129,11 +127,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { type OffensiveNano } from '@/types/offensive-nano'
-import type { NukeInputState } from '@/types/offensive-nano'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
+import { computed } from 'vue';
+import { type OffensiveNano } from '@/types/offensive-nano';
+import type { NukeInputState } from '@/types/offensive-nano';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
 
 // Import calculation utilities from Phase 2
 import {
@@ -141,19 +139,19 @@ import {
   calculateRechargeTime,
   calculateNanoCost,
   type Breed,
-} from '@/utils/nuke-casting-calculations'
+} from '@/utils/nuke-casting-calculations';
 
 import {
   calculateNanoDamage,
   type DamageModifiers as DamageModifiersCalc,
   type SpellDamage,
-} from '@/utils/nuke-damage-calculations'
+} from '@/utils/nuke-damage-calculations';
 
 import {
   calculateAllEfficiencyMetrics,
   formatSustainTime,
   formatCastsToEmpty,
-} from '@/utils/nuke-efficiency-calculations'
+} from '@/utils/nuke-efficiency-calculations';
 
 import {
   calculateNanoRegen,
@@ -161,7 +159,7 @@ import {
   ENHANCE_NANO_DAMAGE,
   ANCIENT_MATRIX_DAMAGE,
   type NanoRegenBuffs,
-} from '@/utils/nuke-regen-calculations'
+} from '@/utils/nuke-regen-calculations';
 
 // ============================================================================
 // Component Props
@@ -169,34 +167,34 @@ import {
 
 interface Props {
   /** Array of offensive nanoprograms from backend */
-  nanos: OffensiveNano[]
+  nanos: OffensiveNano[];
   /** Current input state with all manual fields and buffs */
-  inputState: NukeInputState
+  inputState: NukeInputState;
   /** Search query for global filtering */
-  searchQuery?: string
+  searchQuery?: string;
   /** Loading state */
-  loading?: boolean
+  loading?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   searchQuery: '',
   loading: false,
-})
+});
 
 // ============================================================================
 // Component Emits
 // ============================================================================
 
 const emit = defineEmits<{
-  'nano-selected': [nanoId: number]
-}>()
+  'nano-selected': [nanoId: number];
+}>();
 
 // ============================================================================
 // Table Configuration
 // ============================================================================
 
-const defaultSortField = 'ql'
-const defaultSortOrder = -1 // Descending
+const defaultSortField = 'ql';
+const defaultSortOrder = -1; // Descending
 
 // ============================================================================
 // Computed Table Data
@@ -208,19 +206,15 @@ const defaultSortOrder = -1 // Descending
 const tableData = computed(() => {
   return props.nanos.map((nano) => {
     // Extract input state values
-    const { characterStats, damageModifiers, buffPresets } = props.inputState
+    const { characterStats, damageModifiers, buffPresets } = props.inputState;
 
     // Calculate nano cost reduction from Crunchcom buff
-    const costReductionPct = CRUNCHCOM_COST_REDUCTION[buffPresets.crunchcom] || 0
+    const costReductionPct = CRUNCHCOM_COST_REDUCTION[buffPresets.crunchcom] || 0;
 
     // Calculate modified cast time (in seconds)
     // nano.castTime is in centiseconds, convert to seconds for calculations
     // Pass attackDelayCap (stat 523) to enforce minimum cast time
-    const castTime = calculateCastTime(
-      nano.castTime,
-      characterStats.nanoInit,
-      nano.attackDelayCap
-    )
+    const castTime = calculateCastTime(nano.castTime, characterStats.nanoInit, nano.attackDelayCap);
 
     // Calculate modified recharge time (in seconds)
     // nano.rechargeTime is in centiseconds, convert to seconds for calculations
@@ -229,14 +223,14 @@ const tableData = computed(() => {
       nano.rechargeTime,
       characterStats.nanoInit,
       nano.rechargeDelayCap
-    )
+    );
 
     // Calculate modified nano cost (with breed cap)
     const nanoCost = calculateNanoCost(
       nano.nanoPointCost || 0,
       costReductionPct,
       characterStats.breed as Breed
-    )
+    );
 
     // Build damage modifiers object for calculation
     const damageModifiersForCalc: DamageModifiersCalc = {
@@ -250,7 +244,7 @@ const tableData = computed(() => {
       fireDamage: damageModifiers.fire,
       poisonDamage: damageModifiers.poison,
       directNanoDamageEfficiency: damageModifiers.directNanoDamageEfficiency,
-    }
+    };
 
     // Build spell damage objects from nano effects
     // NOTE: This is a simplified version - actual implementation should extract
@@ -262,28 +256,24 @@ const tableData = computed(() => {
         modifierStat: getModifierStatFromDamageType(nano.damageType),
         tickCount: nano.tickCount || 1,
       },
-    ]
+    ];
 
     // Calculate damage (min, mid, max) with all modifiers
-    const damage = calculateNanoDamage(
-      spells,
-      damageModifiersForCalc,
-      damageModifiers.targetAC
-    )
+    const damage = calculateNanoDamage(spells, damageModifiersForCalc, damageModifiers.targetAC);
 
     // Calculate nano regeneration per second
     const regenBuffs: NanoRegenBuffs = {
       humidity: buffPresets.humidity,
       notumSiphon: buffPresets.notumSiphon,
       channeling: buffPresets.channeling,
-    }
+    };
 
     const regenPerSecond = calculateNanoRegen(
       characterStats.psychic,
       characterStats.breed,
       characterStats.nanoDelta,
       regenBuffs
-    )
+    );
 
     // Calculate all efficiency metrics (DPS, damage/nano, sustain, etc.)
     const efficiencyMetrics = calculateAllEfficiencyMetrics(
@@ -295,7 +285,7 @@ const tableData = computed(() => {
       regenPerSecond,
       nano.tickCount || 1,
       nano.tickInterval || 0
-    )
+    );
 
     // Return formatted row data
     return {
@@ -316,9 +306,9 @@ const tableData = computed(() => {
       sustainTimeFormatted: formatSustainTime(efficiencyMetrics.sustainTime),
       castsToEmpty: efficiencyMetrics.castsToEmpty,
       castsToEmptyFormatted: formatCastsToEmpty(efficiencyMetrics.castsToEmpty),
-    }
-  })
-})
+    };
+  });
+});
 
 // ============================================================================
 // Event Handlers
@@ -328,8 +318,8 @@ const tableData = computed(() => {
  * Handle row click to navigate to nano detail page
  */
 function onRowClick(event: any) {
-  const aoid = event.data.aoid
-  emit('nano-selected', aoid)
+  const aoid = event.data.aoid;
+  emit('nano-selected', aoid);
 }
 
 // ============================================================================
@@ -350,9 +340,9 @@ function getModifierStatFromDamageType(damageType: string): number {
     cold: 95,
     poison: 96,
     fire: 97,
-  }
+  };
 
-  return damageTypeMap[damageType] || 96 // Default to poison if unknown
+  return damageTypeMap[damageType] || 96; // Default to poison if unknown
 }
 
 // ============================================================================
@@ -362,8 +352,8 @@ function getModifierStatFromDamageType(damageType: string): number {
 defineExpose({
   defaultSortField,
   defaultSortOrder,
-  tableData
-})
+  tableData,
+});
 </script>
 
 <style scoped>

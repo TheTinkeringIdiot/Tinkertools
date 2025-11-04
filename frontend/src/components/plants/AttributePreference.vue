@@ -5,7 +5,10 @@ Allows users to select a preferred attribute for implant filtering
 <template>
   <div class="attribute-preference">
     <div class="flex items-center gap-2">
-      <label for="attribute-select" class="text-sm font-medium text-surface-700 dark:text-surface-300 whitespace-nowrap">
+      <label
+        for="attribute-select"
+        class="text-sm font-medium text-surface-700 dark:text-surface-300 whitespace-nowrap"
+      >
         Attribute Preference:
       </label>
       <Dropdown
@@ -44,7 +47,7 @@ const attributeOptions = [
   { label: 'Psychic', value: 'Psychic' },
   { label: 'Sense', value: 'Sense' },
   { label: 'Stamina', value: 'Stamina' },
-  { label: 'Strength', value: 'Strength' }
+  { label: 'Strength', value: 'Strength' },
 ];
 
 // Local state for dropdown
@@ -90,7 +93,7 @@ const loadAttributePreference = () => {
     const storageKey = `tinkertools_plants_attribute_${profileId}`;
     const stored = localStorage.getItem(storageKey);
 
-    if (stored && attributeOptions.some(opt => opt.value === stored)) {
+    if (stored && attributeOptions.some((opt) => opt.value === stored)) {
       selectedAttribute.value = stored;
       tinkerPlantsStore.setAttributePreference(stored);
     } else {
@@ -107,9 +110,12 @@ const loadAttributePreference = () => {
 };
 
 // Watch for active profile changes
-watch(() => tinkerProfilesStore.activeProfileId, () => {
-  loadAttributePreference();
-});
+watch(
+  () => tinkerProfilesStore.activeProfileId,
+  () => {
+    loadAttributePreference();
+  }
+);
 
 // Initialize on mount
 onMounted(() => {

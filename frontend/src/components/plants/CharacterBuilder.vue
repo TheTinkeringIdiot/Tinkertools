@@ -14,14 +14,25 @@ Visual character representation with symbiant slots
           Level {{ profile.level }} {{ profile.profession }}
         </div>
       </div>
-      
+
       <!-- Character Silhouette with Slots -->
-      <div class="relative bg-surface-0 dark:bg-surface-950 rounded-lg p-8 border border-surface-200 dark:border-surface-700">
+      <div
+        class="relative bg-surface-0 dark:bg-surface-950 rounded-lg p-8 border border-surface-200 dark:border-surface-700"
+      >
         <!-- Character Silhouette -->
         <div class="flex justify-center">
-          <svg width="300" height="400" viewBox="0 0 300 400" class="text-surface-300 dark:text-surface-700">
+          <svg
+            width="300"
+            height="400"
+            viewBox="0 0 300 400"
+            class="text-surface-300 dark:text-surface-700"
+          >
             <!-- Simple character outline -->
-            <path d="M150 50 C170 50 180 70 180 90 C180 110 170 130 150 130 C130 130 120 110 120 90 C120 70 130 50 150 50 Z" fill="currentColor" opacity="0.3" />
+            <path
+              d="M150 50 C170 50 180 70 180 90 C180 110 170 130 150 130 C130 130 120 110 120 90 C120 70 130 50 150 50 Z"
+              fill="currentColor"
+              opacity="0.3"
+            />
             <rect x="130" y="130" width="40" height="80" fill="currentColor" opacity="0.3" />
             <rect x="120" y="140" width="15" height="60" fill="currentColor" opacity="0.3" />
             <rect x="165" y="140" width="15" height="60" fill="currentColor" opacity="0.3" />
@@ -30,7 +41,7 @@ Visual character representation with symbiant slots
             <rect x="140" y="350" width="20" height="15" fill="currentColor" opacity="0.3" />
           </svg>
         </div>
-        
+
         <!-- Symbiant Slots -->
         <div class="absolute inset-0">
           <!-- Head -->
@@ -42,7 +53,7 @@ Visual character representation with symbiant slots
             @symbiant-selected="onSymbiantSlotClick"
             @symbiant-removed="onSymbiantRemoved"
           />
-          
+
           <!-- Eye -->
           <SymbiantSlot
             slot-id="eye"
@@ -52,7 +63,7 @@ Visual character representation with symbiant slots
             @symbiant-selected="onSymbiantSlotClick"
             @symbiant-removed="onSymbiantRemoved"
           />
-          
+
           <!-- Ear -->
           <SymbiantSlot
             slot-id="ear"
@@ -62,7 +73,7 @@ Visual character representation with symbiant slots
             @symbiant-selected="onSymbiantSlotClick"
             @symbiant-removed="onSymbiantRemoved"
           />
-          
+
           <!-- Chest -->
           <SymbiantSlot
             slot-id="chest"
@@ -72,7 +83,7 @@ Visual character representation with symbiant slots
             @symbiant-selected="onSymbiantSlotClick"
             @symbiant-removed="onSymbiantRemoved"
           />
-          
+
           <!-- Right Arm -->
           <SymbiantSlot
             slot-id="rarm"
@@ -82,7 +93,7 @@ Visual character representation with symbiant slots
             @symbiant-selected="onSymbiantSlotClick"
             @symbiant-removed="onSymbiantRemoved"
           />
-          
+
           <!-- Left Arm -->
           <SymbiantSlot
             slot-id="larm"
@@ -92,7 +103,7 @@ Visual character representation with symbiant slots
             @symbiant-selected="onSymbiantSlotClick"
             @symbiant-removed="onSymbiantRemoved"
           />
-          
+
           <!-- Waist -->
           <SymbiantSlot
             slot-id="waist"
@@ -102,7 +113,7 @@ Visual character representation with symbiant slots
             @symbiant-selected="onSymbiantSlotClick"
             @symbiant-removed="onSymbiantRemoved"
           />
-          
+
           <!-- Right Wrist -->
           <SymbiantSlot
             slot-id="rwrist"
@@ -112,7 +123,7 @@ Visual character representation with symbiant slots
             @symbiant-selected="onSymbiantSlotClick"
             @symbiant-removed="onSymbiantRemoved"
           />
-          
+
           <!-- Left Wrist -->
           <SymbiantSlot
             slot-id="lwrist"
@@ -122,7 +133,7 @@ Visual character representation with symbiant slots
             @symbiant-selected="onSymbiantSlotClick"
             @symbiant-removed="onSymbiantRemoved"
           />
-          
+
           <!-- Legs -->
           <SymbiantSlot
             slot-id="legs"
@@ -132,7 +143,7 @@ Visual character representation with symbiant slots
             @symbiant-selected="onSymbiantSlotClick"
             @symbiant-removed="onSymbiantRemoved"
           />
-          
+
           <!-- Right Finger -->
           <SymbiantSlot
             slot-id="rfinger"
@@ -142,7 +153,7 @@ Visual character representation with symbiant slots
             @symbiant-selected="onSymbiantSlotClick"
             @symbiant-removed="onSymbiantRemoved"
           />
-          
+
           <!-- Left Finger -->
           <SymbiantSlot
             slot-id="lfinger"
@@ -152,7 +163,7 @@ Visual character representation with symbiant slots
             @symbiant-selected="onSymbiantSlotClick"
             @symbiant-removed="onSymbiantRemoved"
           />
-          
+
           <!-- Feet -->
           <SymbiantSlot
             slot-id="feet"
@@ -164,7 +175,7 @@ Visual character representation with symbiant slots
           />
         </div>
       </div>
-      
+
       <!-- Build Actions -->
       <div class="mt-6 flex justify-center gap-4">
         <Button
@@ -174,12 +185,7 @@ Visual character representation with symbiant slots
           severity="primary"
           :disabled="statTargets.length === 0"
         />
-        <Button
-          @click="clearAllSlots"
-          label="Clear All"
-          icon="pi pi-trash"
-          severity="secondary"
-        />
+        <Button @click="clearAllSlots" label="Clear All" icon="pi pi-trash" severity="secondary" />
         <Button
           @click="analyzeBuild"
           label="Analyze Build"
@@ -233,7 +239,7 @@ const optimizeBuild = () => {
 const clearAllSlots = () => {
   const clearedBuild: CharacterBuild = {
     ...props.currentBuild,
-    symbiants: {}
+    symbiants: {},
   };
   emit('build-changed', clearedBuild);
 };

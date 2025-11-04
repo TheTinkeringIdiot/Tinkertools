@@ -10,15 +10,15 @@
  * - FR-1: Offensive nano identification and filtering
  */
 
-import type { Item as ItemDetail, Spell } from '@/types/api'
-import type { OffensiveNano, DamageType } from '@/types/offensive-nano'
-import type { NanoSchool } from '@/types/nano'
+import type { Item as ItemDetail, Spell } from '@/types/api';
+import type { OffensiveNano, DamageType } from '@/types/offensive-nano';
+import type { NanoSchool } from '@/types/nano';
 
 // ============================================================================
 // API Configuration
 // ============================================================================
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
 // ============================================================================
 // Damage Type Mapping
@@ -29,15 +29,15 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000
  * Used to identify which damage modifier stat applies to the nano
  */
 const MODIFIER_STAT_TO_DAMAGE_TYPE: Record<number, DamageType> = {
-  90: 'projectile',  // → stat 278
-  91: 'melee',       // → stat 279
-  92: 'energy',      // → stat 280
-  93: 'chemical',    // → stat 281
-  94: 'radiation',   // → stat 282
-  95: 'cold',        // → stat 311
-  96: 'poison',      // → stat 317
-  97: 'fire'         // → stat 316
-}
+  90: 'projectile', // → stat 278
+  91: 'melee', // → stat 279
+  92: 'energy', // → stat 280
+  93: 'chemical', // → stat 281
+  94: 'radiation', // → stat 282
+  95: 'cold', // → stat 311
+  96: 'poison', // → stat 317
+  97: 'fire', // → stat 316
+};
 
 // ============================================================================
 // API Functions
@@ -52,24 +52,26 @@ const MODIFIER_STAT_TO_DAMAGE_TYPE: Record<number, DamageType> = {
  */
 export async function fetchOffensiveNanos(professionId: number): Promise<ItemDetail[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/nanos/offensive/${professionId}?page=1&page_size=1000`)
+    const response = await fetch(
+      `${API_BASE_URL}/nanos/offensive/${professionId}?page=1&page_size=1000`
+    );
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch offensive nanos: ${response.statusText}`)
+      throw new Error(`Failed to fetch offensive nanos: ${response.statusText}`);
     }
 
-    const data = await response.json()
+    const data = await response.json();
 
     // Backend returns PaginatedResponse with items array
     if (data && Array.isArray(data.items)) {
-      return data.items as ItemDetail[]
+      return data.items as ItemDetail[];
     }
 
-    console.warn('[fetchOffensiveNanos] Unexpected response format:', data)
-    return []
+    console.warn('[fetchOffensiveNanos] Unexpected response format:', data);
+    return [];
   } catch (error) {
-    console.error('[fetchOffensiveNanos] Error fetching offensive nanos:', error)
-    throw error
+    console.error('[fetchOffensiveNanos] Error fetching offensive nanos:', error);
+    throw error;
   }
 }
 
@@ -85,14 +87,14 @@ export async function fetchOffensiveNanos(professionId: number): Promise<ItemDet
  * @returns Tuple of [minDamage, maxDamage] as positive integers
  */
 export function parseSpellDamage(spell: Spell): [number, number] {
-  const params = spell.spell_params || {}
+  const params = spell.spell_params || {};
 
   // Extract damage values (stored as negative in database)
-  const minValue = params.MinValue || params.minValue || 0
-  const maxValue = params.MaxValue || params.maxValue || 0
+  const minValue = params.MinValue || params.minValue || 0;
+  const maxValue = params.MaxValue || params.maxValue || 0;
 
   // Return absolute values
-  return [Math.abs(minValue), Math.abs(maxValue)]
+  return [Math.abs(minValue), Math.abs(maxValue)];
 }
 
 /**
@@ -103,10 +105,10 @@ export function parseSpellDamage(spell: Spell): [number, number] {
  * @returns Damage type string ('projectile', 'melee', etc.) or 'energy' as default
  */
 export function parseDamageType(spell: Spell): DamageType {
-  const params = spell.spell_params || {}
-  const modifierStat = params.ModifierStat || params.modifierStat || 92 // Default to energy
+  const params = spell.spell_params || {};
+  const modifierStat = params.ModifierStat || params.modifierStat || 92; // Default to energy
 
-  return MODIFIER_STAT_TO_DAMAGE_TYPE[modifierStat] || 'energy'
+  return MODIFIER_STAT_TO_DAMAGE_TYPE[modifierStat] || 'energy';
 }
 
 /**
@@ -123,20 +125,20 @@ function extractNanoSchool(item: ItemDetail): NanoSchool {
     128: 'Biological Metamorphosis',
     129: 'Psychological Modifications',
     130: 'Matter Creation',
-    131: 'Time and Space'
-  }
+    131: 'Time and Space',
+  };
 
   // Check first action's criteria for school requirement
   if (item.actions && item.actions.length > 0) {
-    const criteria = item.actions[0].criteria || []
+    const criteria = item.actions[0].criteria || [];
     for (const criterion of criteria) {
-      const school = SCHOOL_MAPPING[criterion.value1]
-      if (school) return school
+      const school = SCHOOL_MAPPING[criterion.value1];
+      if (school) return school;
     }
   }
 
   // Default to Matter Creation if no school requirement found
-  return 'Matter Creation'
+  return 'Matter Creation';
 }
 
 /**
@@ -147,14 +149,15 @@ function extractNanoSchool(item: ItemDetail): NanoSchool {
  */
 function extractLevel(item: ItemDetail): number {
   if (item.actions && item.actions.length > 0) {
-    const criteria = item.actions[0].criteria || []
+    const criteria = item.actions[0].criteria || [];
     for (const criterion of criteria) {
-      if (criterion.value1 === 54) { // 54 is Level stat
-        return criterion.value2
+      if (criterion.value1 === 54) {
+        // 54 is Level stat
+        return criterion.value2;
       }
     }
   }
-  return 0
+  return 0;
 }
 
 /**
@@ -167,62 +170,62 @@ function extractLevel(item: ItemDetail): number {
 export function buildOffensiveNano(item: ItemDetail): OffensiveNano | null {
   // Validate item has spell data
   if (!item.spell_data || item.spell_data.length === 0) {
-    console.warn(`[buildOffensiveNano] Item ${item.id} has no spell_data`)
-    return null
+    console.warn(`[buildOffensiveNano] Item ${item.id} has no spell_data`);
+    return null;
   }
 
   // Find all offensive spells (target=3, spell_id=53002)
   // Some nanos like Candycane have multiple spells that each deal damage
-  const offensiveSpells: Spell[] = []
+  const offensiveSpells: Spell[] = [];
 
   for (const spellData of item.spell_data) {
-    const spells = spellData.spells || []
+    const spells = spellData.spells || [];
 
     for (const spell of spells) {
       if (spell.target === 3 && spell.spell_id === 53002) {
-        offensiveSpells.push(spell)
+        offensiveSpells.push(spell);
       }
     }
   }
 
   if (offensiveSpells.length === 0) {
-    console.warn(`[buildOffensiveNano] Item ${item.id} has no offensive spell`)
-    return null
+    console.warn(`[buildOffensiveNano] Item ${item.id} has no offensive spell`);
+    return null;
   }
 
   // Sum damage values from all offensive spells
-  let totalMinDamage = 0
-  let totalMaxDamage = 0
+  let totalMinDamage = 0;
+  let totalMaxDamage = 0;
 
   for (const spell of offensiveSpells) {
-    const [min, max] = parseSpellDamage(spell)
-    totalMinDamage += min
-    totalMaxDamage += max
+    const [min, max] = parseSpellDamage(spell);
+    totalMinDamage += min;
+    totalMaxDamage += max;
   }
 
-  const minDamage = totalMinDamage
-  const maxDamage = totalMaxDamage
-  const midDamage = Math.floor((minDamage + maxDamage) / 2)
+  const minDamage = totalMinDamage;
+  const maxDamage = totalMaxDamage;
+  const midDamage = Math.floor((minDamage + maxDamage) / 2);
 
   // Use first spell for damage type and tick mechanics
   // (multi-spell nanos typically have same tick behavior across all spells)
-  const primarySpell = offensiveSpells[0]
-  const damageType = parseDamageType(primarySpell)
+  const primarySpell = offensiveSpells[0];
+  const damageType = parseDamageType(primarySpell);
 
   // Parse tick mechanics (DoT detection: tickCount > 1)
-  const tickCount = primarySpell.tick_count || 1
-  const tickInterval = primarySpell.tick_interval || 0
+  const tickCount = primarySpell.tick_count || 1;
+  const tickInterval = primarySpell.tick_interval || 0;
 
   // Extract cast time and recharge time from stats
-  const castTime = extractStatValue(item, 294) || 0
-  const rechargeTime = extractStatValue(item, 210) || 0
+  const castTime = extractStatValue(item, 294) || 0;
+  const rechargeTime = extractStatValue(item, 210) || 0;
 
   // Extract delay caps (minimum times after nano init reduction)
-  const attackDelayCap = extractStatValue(item, 523)
-  const rechargeDelayCap = extractStatValue(item, 524)
+  const attackDelayCap = extractStatValue(item, 523);
+  const rechargeDelayCap = extractStatValue(item, 524);
 
   // Extract nano point cost (stat 407)
-  const nanoPointCost = extractStatValue(item, 407) || 0
+  const nanoPointCost = extractStatValue(item, 407) || 0;
 
   // Build OffensiveNano object
   const offensiveNano: OffensiveNano = {
@@ -251,10 +254,10 @@ export function buildOffensiveNano(item: ItemDetail): OffensiveNano | null {
     rechargeTime,
     attackDelayCap,
     rechargeDelayCap,
-    nanoPointCost
-  }
+    nanoPointCost,
+  };
 
-  return offensiveNano
+  return offensiveNano;
 }
 
 // ============================================================================
@@ -266,16 +269,16 @@ export function buildOffensiveNano(item: ItemDetail): OffensiveNano | null {
  * Returns strain value or empty string
  */
 function extractStrain(item: ItemDetail): string {
-  const stats = item.stats || []
+  const stats = item.stats || [];
 
   for (const stat of stats) {
     if (stat.stat === 75) {
       // Strain value stored in stat.value
-      return String(stat.value)
+      return String(stat.value);
     }
   }
 
-  return ''
+  return '';
 }
 
 /**
@@ -285,13 +288,13 @@ function extractStrain(item: ItemDetail): string {
  * @returns Stat value or undefined if not found
  */
 function extractStatValue(item: ItemDetail, statId: number): number | undefined {
-  const stats = item.stats || []
+  const stats = item.stats || [];
 
   for (const stat of stats) {
     if (stat.stat === statId) {
-      return stat.value
+      return stat.value;
     }
   }
 
-  return undefined
+  return undefined;
 }

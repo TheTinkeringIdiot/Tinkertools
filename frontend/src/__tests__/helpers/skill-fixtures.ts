@@ -205,36 +205,36 @@ export const AC_STAT_ID = {
 // ============================================================================
 
 export const MISC_SKILL_ID = {
-  MAX_HEALTH: 1,              // MaxHealth stat
-  MAX_NANO: 221,              // MaxNanoEnergy stat
-  MAX_NCU: 181,               // MaxNCU
-  ADD_ALL_OFF: 276,           // AddAllOffense
-  ADD_ALL_DEF: 277,           // AddAllDefense
-  ADD_PROJ_DAM: 278,          // ProjectileDamageModifier
-  ADD_MELEE_DAM: 279,         // MeleeDamageModifier
-  ADD_ENERGY_DAM: 280,        // EnergyDamageModifier
-  ADD_CHEM_DAM: 281,          // ChemicalDamageModifier
-  ADD_RAD_DAM: 282,           // RadiationDamageModifier
-  ADD_COLD_DAM: 311,          // ColdDamageModifier
-  ADD_FIRE_DAM: 316,          // FireDamageModifier
-  ADD_POISON_DAM: 317,        // PoisonDamageModifier
-  ADD_NANO_DAM: 315,          // NanoDamageModifier
-  PERCENT_ADD_XP: 319,        // XPModifier
+  MAX_HEALTH: 1, // MaxHealth stat
+  MAX_NANO: 221, // MaxNanoEnergy stat
+  MAX_NCU: 181, // MaxNCU
+  ADD_ALL_OFF: 276, // AddAllOffense
+  ADD_ALL_DEF: 277, // AddAllDefense
+  ADD_PROJ_DAM: 278, // ProjectileDamageModifier
+  ADD_MELEE_DAM: 279, // MeleeDamageModifier
+  ADD_ENERGY_DAM: 280, // EnergyDamageModifier
+  ADD_CHEM_DAM: 281, // ChemicalDamageModifier
+  ADD_RAD_DAM: 282, // RadiationDamageModifier
+  ADD_COLD_DAM: 311, // ColdDamageModifier
+  ADD_FIRE_DAM: 316, // FireDamageModifier
+  ADD_POISON_DAM: 317, // PoisonDamageModifier
+  ADD_NANO_DAM: 315, // NanoDamageModifier
+  PERCENT_ADD_XP: 319, // XPModifier
   PERCENT_ADD_NANO_COST: 318, // NanoCost modifier
-  NANO_INTERRUPT_MOD: 383,    // NanoInterruptModifier
-  SKILL_LOCK_MOD: 382,        // SkillLockModifier
-  HEAL_DELTA: 343,            // HealDelta
-  NANO_DELTA: 364,            // NanoDelta
-  RANGE_INC_NF: 381,          // NanoRange
-  RANGE_INC_WEAPON: 287,      // AttackRange
-  CRITICAL_INCREASE: 379,     // CriticalIncrease
-  BELT_SLOTS: 45,             // BeltSlots
-  FREE_DECK_SLOT: 428,        // Deck slots
-  HEALING_EFFICIENCY: 535,    // HealMultiplier
-  NANO_DAM_EFFICIENCY: 536,   // NanoDamageMultiplier
-  EXPANSION: 389,             // Expansion bitflag
-  SCALE: 360,                 // Scale
-  WORN_ITEM: 355,             // WornItem equipment flags
+  NANO_INTERRUPT_MOD: 383, // NanoInterruptModifier
+  SKILL_LOCK_MOD: 382, // SkillLockModifier
+  HEAL_DELTA: 343, // HealDelta
+  NANO_DELTA: 364, // NanoDelta
+  RANGE_INC_NF: 381, // NanoRange
+  RANGE_INC_WEAPON: 287, // AttackRange
+  CRITICAL_INCREASE: 379, // CriticalIncrease
+  BELT_SLOTS: 45, // BeltSlots
+  FREE_DECK_SLOT: 428, // Deck slots
+  HEALING_EFFICIENCY: 535, // HealMultiplier
+  NANO_DAM_EFFICIENCY: 536, // NanoDamageMultiplier
+  EXPANSION: 389, // Expansion bitflag
+  SCALE: 360, // Scale
+  WORN_ITEM: 355, // WornItem equipment flags
 } as const;
 
 // ============================================================================
@@ -270,9 +270,7 @@ export const SKILL_ID = {
  * ]);
  * // Result: { 116: 10, 154: 5 }
  */
-export function createSkillBonuses(
-  entries: Array<[number, number]>
-): Record<number, number> {
+export function createSkillBonuses(entries: Array<[number, number]>): Record<number, number> {
   return Object.fromEntries(entries);
 }
 

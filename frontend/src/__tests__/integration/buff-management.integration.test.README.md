@@ -9,24 +9,28 @@ Comprehensive integration tests for buff management functionality covering NCU t
 ### Test Scenarios Implemented
 
 1. **Casting Buffs**
+
    - ✅ Single buff casting and NCU tracking
    - ✅ Multiple buff accumulation
    - ✅ NCU overflow prevention
    - ✅ `canCastBuff` validation
 
 2. **NanoStrain Conflicts**
+
    - ✅ Higher priority buff replacement
    - ✅ Lower priority buff rejection
    - ✅ Multiple buffs with different strains
    - ✅ Conflict detection
 
 3. **Buff Removal**
+
    - ✅ Single buff removal
    - ✅ Remove all buffs
    - ✅ Graceful handling of non-existent buffs
    - ✅ Empty buff list handling
 
 4. **Profile Switching**
+
    - ✅ Buff isolation between profiles
    - ✅ No buff leakage
    - ✅ Per-profile NCU calculations
@@ -44,11 +48,13 @@ Comprehensive integration tests for buff management functionality covering NCU t
 The tests currently have an issue with MaxNCU calculation. The IP integrator recalculates skill values (including MaxNCU, skill ID 181) based on the profile's level, abilities, and other factors.
 
 **Current Behavior:**
+
 - Test profiles are created with a specified MaxNCU value
 - The IP integrator runs during `setActiveProfile()` and recalculates MaxNCU to 0
 - This causes tests that depend on a specific MaxNCU value to fail
 
 **Workaround Options:**
+
 1. Set up complete ability/skill structures that result in desired MaxNCU after IP calculation
 2. Mock the IP integrator during tests (not recommended for integration tests)
 3. Test with dynamically calculated MaxNCU values (current approach)
@@ -85,6 +91,7 @@ Tests use the following buff items:
 ### Profile Setup
 
 Test profiles are created with:
+
 - Level 200 Adventurer (Solitus)
 - MaxNCU calculated by IP integrator
 - Empty buff list initially
@@ -95,6 +102,7 @@ Test profiles are created with:
 ### Real Integration Testing
 
 These tests use:
+
 - ✅ Real Pinia store (`useTinkerProfilesStore`)
 - ✅ Real TinkerProfilesManager
 - ✅ Real IP calculation (updateProfileWithIPTracking)

@@ -1,6 +1,6 @@
 /**
  * IP Integrator Tests
- * 
+ *
  * Tests for the IP integration system, focusing on bug fixes and proper
  * data flow between profile management and IP calculations.
  */
@@ -10,7 +10,7 @@ import {
   profileToCharacterStats,
   updateProfileSkillInfo,
   calculateProfileIP,
-  updateProfileTrickleDown
+  updateProfileTrickleDown,
 } from '@/lib/tinkerprofiles/ip-integrator';
 import { createDefaultProfile } from '@/lib/tinkerprofiles/constants';
 import { skillService } from '@/services/skill-service';
@@ -37,8 +37,8 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
       const stats = profileToCharacterStats(testProfile);
 
       expect(stats.abilities[0]).toBe(10); // Strength improvements
-      expect(stats.abilities[1]).toBe(5);  // Agility improvements
-      expect(stats.abilities[2]).toBe(0);  // Stamina (no improvements)
+      expect(stats.abilities[1]).toBe(5); // Agility improvements
+      expect(stats.abilities[2]).toBe(0); // Stamina (no improvements)
     });
 
     it('should extract skill improvements correctly', () => {
@@ -54,7 +54,7 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
 
     it('should handle missing skill data gracefully', () => {
       const stats = profileToCharacterStats(testProfile);
-      
+
       expect(stats.level).toBe(50);
       expect(stats.breed).toBeGreaterThanOrEqual(0);
       expect(stats.profession).toBeGreaterThanOrEqual(0);
@@ -143,7 +143,11 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
       expect(bodyDev.total).toBeDefined();
 
       // Total should be base + trickle + IP improvements + equipment bonuses
-      const expectedTotal = (bodyDev.base || 0) + (bodyDev.trickle || 0) + (bodyDev.pointsFromIp || 0) + (bodyDev.equipmentBonus || 0);
+      const expectedTotal =
+        (bodyDev.base || 0) +
+        (bodyDev.trickle || 0) +
+        (bodyDev.pointsFromIp || 0) +
+        (bodyDev.equipmentBonus || 0);
       expect(bodyDev.total).toBe(expectedTotal);
     });
 
@@ -153,16 +157,16 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
       // Check that skills in different categories were processed using v4.0.0 structure
       // Sample a few skills from different categories to verify processing
       const testSkillIds = [
-        SKILL_ID.BODY_DEV,        // Body & Defense
-        SKILL_ID.ASSAULT_RIF,      // Ranged Weapons
-        SKILL_ID['1H_EDGED'],      // Melee Weapons
-        SKILL_ID.MATTER_CREATION,  // Nanos & Casting
-        SKILL_ID.CONCEALMENT,      // Exploring
-        SKILL_ID.COMPUTER_LITERACY,// Trade & Repair
-        SKILL_ID.FIRST_AID         // Combat & Healing
+        SKILL_ID.BODY_DEV, // Body & Defense
+        SKILL_ID.ASSAULT_RIF, // Ranged Weapons
+        SKILL_ID['1H_EDGED'], // Melee Weapons
+        SKILL_ID.MATTER_CREATION, // Nanos & Casting
+        SKILL_ID.CONCEALMENT, // Exploring
+        SKILL_ID.COMPUTER_LITERACY, // Trade & Repair
+        SKILL_ID.FIRST_AID, // Combat & Healing
       ];
 
-      testSkillIds.forEach(skillId => {
+      testSkillIds.forEach((skillId) => {
         const skill = testProfile.skills[skillId];
         if (skill && typeof skill === 'object' && 'cap' in skill) {
           expect(skill.cap).toBeDefined();
@@ -233,12 +237,14 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
       const originalTimestamp = testProfile.updated;
 
       // Wait a small amount to ensure timestamp difference
-      await new Promise(resolve => setTimeout(resolve, 1));
+      await new Promise((resolve) => setTimeout(resolve, 1));
 
       const updatedProfile = updateProfileTrickleDown(testProfile);
 
       expect(updatedProfile.updated).not.toBe(originalTimestamp);
-      expect(new Date(updatedProfile.updated).getTime()).toBeGreaterThan(new Date(originalTimestamp).getTime());
+      expect(new Date(updatedProfile.updated).getTime()).toBeGreaterThan(
+        new Date(originalTimestamp).getTime()
+      );
     });
   });
 
@@ -258,7 +264,12 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
       const bodyDev = testProfile.skills[SKILL_ID.BODY_DEV];
       if (bodyDev) {
         expect(bodyDev.cap).toBeGreaterThan(bodyDev.total);
-        expect(bodyDev.total).toBe(bodyDev.base + (bodyDev.trickle || 0) + (bodyDev.pointsFromIp || 0) + (bodyDev.equipmentBonus || 0));
+        expect(bodyDev.total).toBe(
+          bodyDev.base +
+            (bodyDev.trickle || 0) +
+            (bodyDev.pointsFromIp || 0) +
+            (bodyDev.equipmentBonus || 0)
+        );
       }
     });
 
@@ -304,13 +315,13 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
                   nano_school: 0,
                   spell_params: {
                     Stat: 16,
-                    Amount: 10
-                  }
-                }
-              ]
-            }
-          ]
-        } as any
+                    Amount: 10,
+                  },
+                },
+              ],
+            },
+          ],
+        } as any,
       };
 
       updateProfileSkillInfo(testProfile);
@@ -325,7 +336,7 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
     it('should include equipment bonuses in trickle-down calculations', () => {
       // Setup: Give Stamina a +20 equipment bonus
       testProfile.Clothing = {
-        'Body': {
+        Body: {
           id: 2,
           aoid: 54321,
           name: 'Test Armor',
@@ -339,13 +350,13 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
                   nano_school: 0,
                   spell_params: {
                     Stat: 18,
-                    Amount: 20
-                  }
-                }
-              ]
-            }
-          ]
-        } as any
+                    Amount: 20,
+                  },
+                },
+              ],
+            },
+          ],
+        } as any,
       };
 
       // Set base Stamina to 30 using v4.0.0 structure
@@ -368,7 +379,7 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
     it('should track base value separately from total value for abilities', () => {
       // Setup equipment with multiple ability bonuses
       testProfile.Implants = {
-        'Head': {
+        Head: {
           id: 3,
           aoid: 11111,
           name: 'Test Implant',
@@ -384,8 +395,8 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
                   nano_school: 0,
                   spell_params: {
                     Stat: 19,
-                    Amount: 15
-                  }
+                    Amount: 15,
+                  },
                 },
                 {
                   spell_id: 53045,
@@ -393,13 +404,13 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
                   nano_school: 0,
                   spell_params: {
                     Stat: 21,
-                    Amount: 8
-                  }
-                }
-              ]
-            }
-          ]
-        } as any
+                    Amount: 8,
+                  },
+                },
+              ],
+            },
+          ],
+        } as any,
       };
 
       updateProfileSkillInfo(testProfile);
@@ -426,8 +437,15 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
       updateProfileSkillInfo(testProfile);
 
       // All abilities should have zero equipment bonus using v4.0.0 structure
-      const abilityIds = [SKILL_ID.STRENGTH, SKILL_ID.AGILITY, SKILL_ID.STAMINA, SKILL_ID.INTELLIGENCE, SKILL_ID.SENSE, SKILL_ID.PSYCHIC];
-      abilityIds.forEach(abilityId => {
+      const abilityIds = [
+        SKILL_ID.STRENGTH,
+        SKILL_ID.AGILITY,
+        SKILL_ID.STAMINA,
+        SKILL_ID.INTELLIGENCE,
+        SKILL_ID.SENSE,
+        SKILL_ID.PSYCHIC,
+      ];
+      abilityIds.forEach((abilityId) => {
         const ability = testProfile.skills[abilityId];
         expect(ability.equipmentBonus).toBe(0);
         expect(ability.base).toBeDefined();
@@ -445,7 +463,14 @@ function createTestProfile(overrides: Partial<TinkerProfile> = {}): TinkerProfil
 }
 
 function setProfileAbilities(profile: TinkerProfile, abilities: number[]): void {
-  const abilityIds = [SKILL_ID.STRENGTH, SKILL_ID.AGILITY, SKILL_ID.STAMINA, SKILL_ID.INTELLIGENCE, SKILL_ID.SENSE, SKILL_ID.PSYCHIC];
+  const abilityIds = [
+    SKILL_ID.STRENGTH,
+    SKILL_ID.AGILITY,
+    SKILL_ID.STAMINA,
+    SKILL_ID.INTELLIGENCE,
+    SKILL_ID.SENSE,
+    SKILL_ID.PSYCHIC,
+  ];
   abilityIds.forEach((skillId, index) => {
     if (abilities[index] !== undefined) {
       const skill = profile.skills[skillId];

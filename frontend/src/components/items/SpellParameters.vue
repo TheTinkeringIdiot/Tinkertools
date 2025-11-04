@@ -17,7 +17,7 @@ Handles links, percentages, and other parameter types with pill-style badges
           <span class="parameter-text">{{ param.displayValue }}</span>
         </span>
       </router-link>
-      
+
       <span
         v-for="param in nonLinkParameters"
         :key="param.key"
@@ -35,40 +35,40 @@ Handles links, percentages, and other parameter types with pill-style badges
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { FormattedParameter } from '@/services/spell-data-utils'
+import { computed } from 'vue';
+import type { FormattedParameter } from '@/services/spell-data-utils';
 
 // ============================================================================
 // Props
 // ============================================================================
 
 interface Props {
-  parameters: FormattedParameter[]
-  maxVisible?: number
-  showIcons?: boolean
+  parameters: FormattedParameter[];
+  maxVisible?: number;
+  showIcons?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   parameters: () => [],
   maxVisible: 6,
-  showIcons: true
-})
+  showIcons: true,
+});
 
 // ============================================================================
 // Computed Properties
 // ============================================================================
 
 const visibleParameters = computed(() => {
-  return props.parameters.slice(0, props.maxVisible)
-})
+  return props.parameters.slice(0, props.maxVisible);
+});
 
 const linkParameters = computed(() => {
-  return visibleParameters.value.filter(param => param.type === 'link')
-})
+  return visibleParameters.value.filter((param) => param.type === 'link');
+});
 
 const nonLinkParameters = computed(() => {
-  return visibleParameters.value.filter(param => param.type !== 'link')
-})
+  return visibleParameters.value.filter((param) => param.type !== 'link');
+});
 
 // ============================================================================
 // Methods
@@ -79,21 +79,21 @@ function getParameterClass(type: string): string {
     percentage: 'percentage-badge',
     stat: 'stat-badge',
     number: 'number-badge',
-    text: 'text-badge'
-  }
-  return classMap[type] || 'text-badge'
+    text: 'text-badge',
+  };
+  return classMap[type] || 'text-badge';
 }
 
 function getParameterIcon(type: string): string {
-  if (!props.showIcons) return ''
-  
+  if (!props.showIcons) return '';
+
   const iconMap: Record<string, string> = {
     percentage: '%',
     stat: '📊',
     number: '#',
-    text: '💬'
-  }
-  return iconMap[type] || ''
+    text: '💬',
+  };
+  return iconMap[type] || '';
 }
 </script>
 
@@ -186,7 +186,7 @@ function getParameterIcon(type: string): string {
     font-size: 9px;
     padding: 1px 4px;
   }
-  
+
   .parameter-icon {
     font-size: 7px;
   }

@@ -1,22 +1,20 @@
 <template>
   <div class="interpolation-control">
     <!-- Header with item info -->
-    <div class="mb-4 p-4 bg-surface-0 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700">
+    <div
+      class="mb-4 p-4 bg-surface-0 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700"
+    >
       <div class="flex items-center justify-between mb-2">
         <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-100">
           Quality Level Interpolation
         </h3>
         <div class="flex items-center gap-2">
-          <Badge 
-            v-if="interpolationStatus === 'interpolated'" 
-            value="Interpolated" 
+          <Badge
+            v-if="interpolationStatus === 'interpolated'"
+            value="Interpolated"
             severity="success"
           />
-          <Badge 
-            v-else-if="interpolationStatus === 'original'" 
-            value="Original" 
-            severity="info"
-          />
+          <Badge v-else-if="interpolationStatus === 'original'" value="Original" severity="info" />
           <Button
             v-if="showClearButton && interpolatedItem"
             icon="pi pi-refresh"
@@ -27,15 +25,15 @@
           />
         </div>
       </div>
-      
+
       <div class="text-sm text-surface-600 dark:text-surface-400">
         <span v-if="interpolationInfo">
-          Available range: QL {{ qualityRange?.min }} - {{ qualityRange?.max }}
-          ({{ qualityRange?.range }} levels)
+          Available range: QL {{ qualityRange?.min }} - {{ qualityRange?.max }} ({{
+            qualityRange?.range
+          }}
+          levels)
         </span>
-        <span v-else-if="!isInterpolatable">
-          This item cannot be interpolated
-        </span>
+        <span v-else-if="!isInterpolatable"> This item cannot be interpolated </span>
       </div>
     </div>
 
@@ -48,12 +46,7 @@
     </div>
 
     <!-- Error state -->
-    <Message 
-      v-else-if="error" 
-      severity="error" 
-      class="mb-4"
-      :closable="false"
-    >
+    <Message v-else-if="error" severity="error" class="mb-4" :closable="false">
       <div class="flex items-center justify-between w-full">
         <span>{{ error.message }}</span>
         <Button
@@ -67,8 +60,8 @@
     </Message>
 
     <!-- No interpolation available -->
-    <Message 
-      v-else-if="!isInterpolatable && interpolationInfo" 
+    <Message
+      v-else-if="!isInterpolatable && interpolationInfo"
       severity="info"
       class="mb-4"
       :closable="false"
@@ -114,9 +107,7 @@
 
       <!-- Quick select buttons -->
       <div v-if="suggestedLevels.length > 0" class="space-y-2">
-        <div class="text-sm font-medium text-surface-700 dark:text-surface-300">
-          Quick Select:
-        </div>
+        <div class="text-sm font-medium text-surface-700 dark:text-surface-300">Quick Select:</div>
         <div class="flex flex-wrap gap-2">
           <Button
             v-for="level in suggestedLevels"
@@ -131,22 +122,25 @@
       </div>
 
       <!-- Current interpolation info -->
-      <div 
+      <div
         v-if="interpolatedItem?.interpolating"
         class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800"
       >
         <div class="flex items-center gap-2 text-sm text-blue-800 dark:text-blue-200">
           <i class="pi pi-info-circle"></i>
           <span>
-            Interpolated from QL {{ interpolatedItem.low_ql }} to QL {{ interpolatedItem.high_ql }}
-            ({{ interpolatedItem.ql_delta }}/{{ interpolatedItem.ql_delta_full }} steps)
+            Interpolated from QL {{ interpolatedItem.low_ql }} to QL
+            {{ interpolatedItem.high_ql }} ({{ interpolatedItem.ql_delta }}/{{
+              interpolatedItem.ql_delta_full
+            }}
+            steps)
           </span>
         </div>
       </div>
     </div>
 
     <!-- Debug info (development only) -->
-    <div 
+    <div
       v-if="showDebugInfo && interpolatedItem"
       class="mt-4 p-3 bg-surface-100 dark:bg-surface-800 rounded text-xs"
     >
@@ -159,17 +153,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import { useInterpolation } from '../../composables/useInterpolation'
-import type { Item, InterpolatedItem, InterpolationInfo } from '../../types/api'
+import { ref, computed, watch, onMounted } from 'vue';
+import { useInterpolation } from '../../composables/useInterpolation';
+import type { Item, InterpolatedItem, InterpolationInfo } from '../../types/api';
 
 // PrimeVue components
-import Button from 'primevue/button'
-import Slider from 'primevue/slider'
-import InputNumber from 'primevue/inputnumber'
-import ProgressSpinner from 'primevue/progressspinner'
-import Message from 'primevue/message'
-import Badge from 'primevue/badge'
+import Button from 'primevue/button';
+import Slider from 'primevue/slider';
+import InputNumber from 'primevue/inputnumber';
+import ProgressSpinner from 'primevue/progressspinner';
+import Message from 'primevue/message';
+import Badge from 'primevue/badge';
 
 // ============================================================================
 // Props & Emits
@@ -177,24 +171,24 @@ import Badge from 'primevue/badge'
 
 interface Props {
   /** Item AOID or Item object */
-  item?: number | Item | null
+  item?: number | Item | null;
   /** Initial target quality level */
-  initialQl?: number
+  initialQl?: number;
   /** Show clear/reset button */
-  showClearButton?: boolean
+  showClearButton?: boolean;
   /** Show debug information (development) */
-  showDebugInfo?: boolean
+  showDebugInfo?: boolean;
   /** Auto-load interpolation info */
-  autoLoad?: boolean
+  autoLoad?: boolean;
   /** Debounce delay for QL changes */
-  debounceMs?: number
+  debounceMs?: number;
 }
 
 interface Emits {
-  (e: 'interpolated', item: InterpolatedItem | null): void
-  (e: 'qualityChanged', ql: number): void
-  (e: 'error', error: string): void
-  (e: 'loaded', info: InterpolationInfo | null): void
+  (e: 'interpolated', item: InterpolatedItem | null): void;
+  (e: 'qualityChanged', ql: number): void;
+  (e: 'error', error: string): void;
+  (e: 'loaded', info: InterpolationInfo | null): void;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -203,20 +197,20 @@ const props = withDefaults(defineProps<Props>(), {
   showClearButton: true,
   showDebugInfo: false,
   autoLoad: true,
-  debounceMs: 300
-})
+  debounceMs: 300,
+});
 
-const emit = defineEmits<Emits>()
+const emit = defineEmits<Emits>();
 
 // ============================================================================
 // Interpolation State
 // ============================================================================
 
 const itemAoid = computed(() => {
-  if (typeof props.item === 'number') return props.item
-  if (props.item && typeof props.item === 'object') return props.item.aoid || null
-  return null
-})
+  if (typeof props.item === 'number') return props.item;
+  if (props.item && typeof props.item === 'object') return props.item.aoid || null;
+  return null;
+});
 
 const {
   interpolatedItem,
@@ -233,29 +227,29 @@ const {
   setItemFromObject,
   resetToOriginal,
   getSuggestedQualityLevels,
-  retry
+  retry,
 } = useInterpolation(ref(itemAoid.value), {
   autoLoad: props.autoLoad,
-  debounceMs: props.debounceMs
-})
+  debounceMs: props.debounceMs,
+});
 
 // ============================================================================
 // Local State
 // ============================================================================
 
-const localTargetQl = ref<number | null>(props.initialQl || null)
+const localTargetQl = ref<number | null>(props.initialQl || null);
 
 // ============================================================================
 // Computed Properties
 // ============================================================================
 
 const suggestedLevels = computed(() => {
-  return getSuggestedQualityLevels()
-})
+  return getSuggestedQualityLevels();
+});
 
 const debugInfo = computed(() => {
-  if (!interpolatedItem.value) return null
-  
+  if (!interpolatedItem.value) return null;
+
   return {
     interpolating: interpolatedItem.value.interpolating,
     target_ql: interpolatedItem.value.target_ql,
@@ -265,9 +259,9 @@ const debugInfo = computed(() => {
     ql_delta_full: interpolatedItem.value.ql_delta_full,
     stats_count: interpolatedItem.value.stats?.length || 0,
     spell_data_count: interpolatedItem.value.spell_data?.length || 0,
-    actions_count: interpolatedItem.value.actions?.length || 0
-  }
-})
+    actions_count: interpolatedItem.value.actions?.length || 0,
+  };
+});
 
 // ============================================================================
 // Methods
@@ -275,49 +269,49 @@ const debugInfo = computed(() => {
 
 async function onQualityLevelChange(): Promise<void> {
   if (!localTargetQl.value || !itemAoid.value || !isTargetQlValid.value) {
-    return
+    return;
   }
 
   try {
-    const result = await interpolateToQl(localTargetQl.value)
-    emit('interpolated', result)
-    emit('qualityChanged', localTargetQl.value)
+    const result = await interpolateToQl(localTargetQl.value);
+    emit('interpolated', result);
+    emit('qualityChanged', localTargetQl.value);
   } catch (err: any) {
-    emit('error', err.message || 'Failed to interpolate item')
+    emit('error', err.message || 'Failed to interpolate item');
   }
 }
 
 function setQualityLevel(ql: number): void {
-  localTargetQl.value = ql
-  onQualityLevelChange()
+  localTargetQl.value = ql;
+  onQualityLevelChange();
 }
 
 async function handleItemChange(): Promise<void> {
-  if (!props.item) return
+  if (!props.item) return;
 
   try {
     if (typeof props.item === 'number') {
-      await setItem(props.item)
+      await setItem(props.item);
     } else {
-      await setItemFromObject(props.item)
+      await setItemFromObject(props.item);
     }
-    
-    emit('loaded', interpolationInfo.value)
+
+    emit('loaded', interpolationInfo.value);
 
     // Set initial QL if specified and item is interpolatable
     if (props.initialQl && isInterpolatable.value && qualityRange.value) {
       const clampedQl = Math.max(
         qualityRange.value.min,
         Math.min(qualityRange.value.max, props.initialQl)
-      )
-      localTargetQl.value = clampedQl
-      await onQualityLevelChange()
+      );
+      localTargetQl.value = clampedQl;
+      await onQualityLevelChange();
     } else if (qualityRange.value) {
       // Default to minimum QL
-      localTargetQl.value = qualityRange.value.min
+      localTargetQl.value = qualityRange.value.min;
     }
   } catch (err: any) {
-    emit('error', err.message || 'Failed to load item')
+    emit('error', err.message || 'Failed to load item');
   }
 }
 
@@ -325,17 +319,17 @@ async function handleItemChange(): Promise<void> {
 // Watchers
 // ============================================================================
 
-watch(() => props.item, handleItemChange, { immediate: false })
+watch(() => props.item, handleItemChange, { immediate: false });
 
 watch(error, (newError) => {
   if (newError) {
-    emit('error', newError.message)
+    emit('error', newError.message);
   }
-})
+});
 
 watch(interpolatedItem, (newItem) => {
-  emit('interpolated', newItem)
-})
+  emit('interpolated', newItem);
+});
 
 // ============================================================================
 // Lifecycle
@@ -343,9 +337,9 @@ watch(interpolatedItem, (newItem) => {
 
 onMounted(() => {
   if (props.item) {
-    handleItemChange()
+    handleItemChange();
   }
-})
+});
 
 // ============================================================================
 // Expose public methods
@@ -355,8 +349,8 @@ defineExpose({
   setQualityLevel,
   resetToOriginal,
   retry,
-  loadInterpolationInfo
-})
+  loadInterpolationInfo,
+});
 </script>
 
 <style scoped>

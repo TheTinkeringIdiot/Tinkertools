@@ -14,11 +14,11 @@ import { BREED, PROFESSION } from '@/__tests__/helpers';
 
 // Mock PrimeVue Toast
 const mockToast = {
-  add: vi.fn()
+  add: vi.fn(),
 };
 
 vi.mock('primevue/usetoast', () => ({
-  useToast: () => mockToast
+  useToast: () => mockToast,
 }));
 
 describe('Buff Management Integration', () => {
@@ -38,13 +38,13 @@ describe('Buff Management Integration', () => {
     stats: [
       { id: 1, stat: 54, value: 30 }, // NCU cost (stat 54)
       { id: 2, stat: 75, value: 1000 }, // NanoStrain (stat 75)
-      { id: 3, stat: 551, value: 100 } // StackingOrder (stat 551)
+      { id: 3, stat: 551, value: 100 }, // StackingOrder (stat 551)
     ],
     spell_data: [],
     actions: [],
     attack_stats: [],
     defense_stats: [],
-    ...overrides
+    ...overrides,
   });
 
   const buffLowNCU = createBuffItem({
@@ -53,8 +53,8 @@ describe('Buff Management Integration', () => {
     stats: [
       { id: 1, stat: 54, value: 25 }, // Low NCU cost
       { id: 2, stat: 75, value: 1000 }, // Strain A
-      { id: 3, stat: 551, value: 100 } // Priority 100
-    ]
+      { id: 3, stat: 551, value: 100 }, // Priority 100
+    ],
   });
 
   const buffMediumNCU = createBuffItem({
@@ -63,8 +63,8 @@ describe('Buff Management Integration', () => {
     stats: [
       { id: 1, stat: 54, value: 30 }, // Medium NCU cost
       { id: 2, stat: 75, value: 2000 }, // Strain B (different)
-      { id: 3, stat: 551, value: 120 } // Priority 120
-    ]
+      { id: 3, stat: 551, value: 120 }, // Priority 120
+    ],
   });
 
   const buffHighNCU = createBuffItem({
@@ -73,8 +73,8 @@ describe('Buff Management Integration', () => {
     stats: [
       { id: 1, stat: 54, value: 1100 }, // High NCU cost - won't fit
       { id: 2, stat: 75, value: 3000 }, // Strain C
-      { id: 3, stat: 551, value: 150 }
-    ]
+      { id: 3, stat: 551, value: 150 },
+    ],
   });
 
   const buffSameStrainHighPriority = createBuffItem({
@@ -83,8 +83,8 @@ describe('Buff Management Integration', () => {
     stats: [
       { id: 1, stat: 54, value: 35 },
       { id: 2, stat: 75, value: 1000 }, // Same strain as buffLowNCU
-      { id: 3, stat: 551, value: 200 } // Higher priority than buffLowNCU
-    ]
+      { id: 3, stat: 551, value: 200 }, // Higher priority than buffLowNCU
+    ],
   });
 
   const buffSameStrainLowPriority = createBuffItem({
@@ -93,8 +93,8 @@ describe('Buff Management Integration', () => {
     stats: [
       { id: 1, stat: 54, value: 20 },
       { id: 2, stat: 75, value: 1000 }, // Same strain as buffLowNCU
-      { id: 3, stat: 551, value: 50 } // Lower priority than buffLowNCU
-    ]
+      { id: 3, stat: 551, value: 50 }, // Lower priority than buffLowNCU
+    ],
   });
 
   beforeEach(async () => {
@@ -119,7 +119,7 @@ describe('Buff Management Integration', () => {
         Expansion: 'Shadow Lands',
         AccountType: 'Paid',
         MaxHealth: 2000,
-        MaxNano: 1000
+        MaxNano: 1000,
       },
       Skills: {},
       skills: {
@@ -133,13 +133,13 @@ describe('Buff Management Integration', () => {
           buffBonus: 0,
           ipSpent: 0,
           cap: 2000,
-          total: 1200
-        }
+          total: 1200,
+        },
       },
       Clothing: {},
       Weapons: {},
       Implants: {},
-      buffs: [] // Start with no buffs
+      buffs: [], // Start with no buffs
     };
 
     // Create profile using the store's createProfile method (omit PerksAndResearch - will be created automatically)
@@ -147,7 +147,6 @@ describe('Buff Management Integration', () => {
 
     // Set as active profile (this triggers IP recalculation)
     await store.setActiveProfile(profileId);
-
   });
 
   describe('Casting Buffs', () => {
@@ -186,7 +185,7 @@ describe('Buff Management Integration', () => {
       expect(mockToast.add).toHaveBeenCalledWith(
         expect.objectContaining({
           severity: 'success',
-          summary: 'Buff Cast'
+          summary: 'Buff Cast',
         })
       );
     });
@@ -246,7 +245,7 @@ describe('Buff Management Integration', () => {
       expect(mockToast.add).toHaveBeenCalledWith(
         expect.objectContaining({
           severity: 'error',
-          summary: 'Insufficient NCU'
+          summary: 'Insufficient NCU',
         })
       );
     });
@@ -317,7 +316,7 @@ describe('Buff Management Integration', () => {
       expect(mockToast.add).toHaveBeenCalledWith(
         expect.objectContaining({
           severity: 'error',
-          summary: 'Buff Conflict'
+          summary: 'Buff Conflict',
         })
       );
     });
@@ -336,8 +335,8 @@ describe('Buff Management Integration', () => {
         stats: [
           { id: 1, stat: 54, value: 40 },
           { id: 2, stat: 75, value: 3000 }, // Unique strain
-          { id: 3, stat: 551, value: 100 }
-        ]
+          { id: 3, stat: 551, value: 100 },
+        ],
       });
 
       await store.castBuff(buffDifferentStrain);
@@ -394,7 +393,7 @@ describe('Buff Management Integration', () => {
       expect(mockToast.add).toHaveBeenCalledWith(
         expect.objectContaining({
           severity: 'success',
-          summary: 'Buff Removed'
+          summary: 'Buff Removed',
         })
       );
     });
@@ -424,7 +423,7 @@ describe('Buff Management Integration', () => {
       expect(mockToast.add).toHaveBeenCalledWith(
         expect.objectContaining({
           severity: 'success',
-          summary: 'All Buffs Removed'
+          summary: 'All Buffs Removed',
         })
       );
     });
@@ -469,7 +468,7 @@ describe('Buff Management Integration', () => {
           Expansion: 'Shadow Lands',
           AccountType: 'Paid',
           MaxHealth: 1500,
-          MaxNano: 800
+          MaxNano: 800,
         },
         Skills: {},
         skills: {
@@ -482,13 +481,13 @@ describe('Buff Management Integration', () => {
             buffBonus: 0,
             ipSpent: 0,
             cap: 2000,
-            total: 1000
-          }
+            total: 1000,
+          },
         },
         Clothing: {},
         Weapons: {},
         Implants: {},
-        buffs: []
+        buffs: [],
       };
 
       const profileId2 = await store.createProfile('Second Character', profile2Data);
@@ -550,7 +549,7 @@ describe('Buff Management Integration', () => {
           Expansion: 'Shadow Lands',
           AccountType: 'Paid',
           MaxHealth: 1000,
-          MaxNano: 500
+          MaxNano: 500,
         },
         Skills: {},
         skills: {
@@ -563,13 +562,13 @@ describe('Buff Management Integration', () => {
             buffBonus: 0,
             ipSpent: 0,
             cap: 2000,
-            total: 800
-          }
+            total: 800,
+          },
         },
         Clothing: {},
         Weapons: {},
         Implants: {},
-        buffs: []
+        buffs: [],
       };
 
       const profileId2 = await store.createProfile('Isolated Profile', profile2Data);
@@ -591,7 +590,7 @@ describe('Buff Management Integration', () => {
       await nextTick();
 
       const profile1BuffCount = store.activeProfile?.buffs?.length || 0;
-      const profile1BuffIds = store.activeProfile?.buffs?.map(b => b.id) || [];
+      const profile1BuffIds = store.activeProfile?.buffs?.map((b) => b.id) || [];
 
       // Switch to second profile
       await store.setActiveProfile(profileId2);
@@ -601,7 +600,7 @@ describe('Buff Management Integration', () => {
       expect(store.activeProfile?.buffs?.length).toBe(0);
 
       // Verify no buff IDs from profile 1 leaked
-      const profile2BuffIds = store.activeProfile?.buffs?.map(b => b.id) || [];
+      const profile2BuffIds = store.activeProfile?.buffs?.map((b) => b.id) || [];
       for (const id of profile1BuffIds) {
         expect(profile2BuffIds).not.toContain(id);
       }
@@ -619,7 +618,7 @@ describe('Buff Management Integration', () => {
           Expansion: 'Shadow Lands',
           AccountType: 'Paid',
           MaxHealth: 800,
-          MaxNano: 300
+          MaxNano: 300,
         },
         Skills: {},
         skills: {
@@ -632,13 +631,13 @@ describe('Buff Management Integration', () => {
             buffBonus: 0,
             ipSpent: 0,
             cap: 2000,
-            total: 500
-          }
+            total: 500,
+          },
         },
         Clothing: {},
         Weapons: {},
         Implants: {},
-        buffs: []
+        buffs: [],
       };
 
       const profileId2 = await store.createProfile('Low NCU Character', profile2Data);
@@ -688,8 +687,8 @@ describe('Buff Management Integration', () => {
         name: 'Broken Buff',
         stats: [
           { id: 2, stat: 75, value: 5000 }, // Has strain but no NCU stat
-          { id: 3, stat: 551, value: 100 }
-        ]
+          { id: 3, stat: 551, value: 100 },
+        ],
       });
 
       await store.castBuff(buffNoNCU);
@@ -705,8 +704,8 @@ describe('Buff Management Integration', () => {
         id: 2002,
         name: 'Strainless Buff',
         stats: [
-          { id: 1, stat: 54, value: 30 } // Has NCU but no strain
-        ]
+          { id: 1, stat: 54, value: 30 }, // Has NCU but no strain
+        ],
       });
 
       await store.castBuff(buffNoStrain);
@@ -724,8 +723,8 @@ describe('Buff Management Integration', () => {
         stats: [
           { id: 1, stat: 54, value: 30 },
           { id: 2, stat: 75, value: 1000 }, // Same strain as buffLowNCU
-          { id: 3, stat: 551, value: 100 } // EQUAL priority to buffLowNCU
-        ]
+          { id: 3, stat: 551, value: 100 }, // EQUAL priority to buffLowNCU
+        ],
       });
 
       // Cast first buff

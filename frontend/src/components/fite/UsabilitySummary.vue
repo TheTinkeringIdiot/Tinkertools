@@ -6,7 +6,9 @@
         <div class="text-sm text-surface-600 dark:text-surface-400">Usable</div>
       </div>
       <div>
-        <span class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{{ partialCount }}</span>
+        <span class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{{
+          partialCount
+        }}</span>
         <div class="text-sm text-surface-600 dark:text-surface-400">Close (1-2 missing)</div>
       </div>
       <div>
@@ -22,45 +24,45 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { Weapon, CharacterSkills } from '@/types/weapon'
-import { useFiteStore } from '@/stores/fiteStore'
+import { computed } from 'vue';
+import type { Weapon, CharacterSkills } from '@/types/weapon';
+import { useFiteStore } from '@/stores/fiteStore';
 
 interface Props {
-  weapons: Weapon[]
-  characterSkills: CharacterSkills
+  weapons: Weapon[];
+  characterSkills: CharacterSkills;
 }
 
-const props = defineProps<Props>()
-const fiteStore = useFiteStore()
+const props = defineProps<Props>();
+const fiteStore = useFiteStore();
 
 // Computed
 const usabilityStats = computed(() => {
-  let usable = 0
-  let partial = 0
-  let unusable = 0
+  let usable = 0;
+  let partial = 0;
+  let unusable = 0;
 
-  props.weapons.forEach(weapon => {
-    const usability = fiteStore.checkWeaponUsability(weapon, props.characterSkills)
-    
+  props.weapons.forEach((weapon) => {
+    const usability = fiteStore.checkWeaponUsability(weapon, props.characterSkills);
+
     if (usability.canUse) {
-      usable++
+      usable++;
     } else if (usability.missingRequirements.length <= 2) {
-      partial++
+      partial++;
     } else {
-      unusable++
+      unusable++;
     }
-  })
+  });
 
-  return { usable, partial, unusable }
-})
+  return { usable, partial, unusable };
+});
 
-const usableCount = computed(() => usabilityStats.value.usable)
-const partialCount = computed(() => usabilityStats.value.partial)
-const unusableCount = computed(() => usabilityStats.value.unusable)
+const usableCount = computed(() => usabilityStats.value.usable);
+const partialCount = computed(() => usabilityStats.value.partial);
+const unusableCount = computed(() => usabilityStats.value.unusable);
 
 const usabilityPercentage = computed(() => {
-  if (props.weapons.length === 0) return 0
-  return Math.round((usableCount.value / props.weapons.length) * 100)
-})
+  if (props.weapons.length === 0) return 0;
+  return Math.round((usableCount.value / props.weapons.length) * 100);
+});
 </script>

@@ -4,7 +4,7 @@ import {
   getSymbiantSlot,
   getSymbiantQL,
   getSymbiantFamily,
-  enrichSymbiant
+  enrichSymbiant,
 } from '@/utils/symbiantHelpers';
 import type { Symbiant } from '@/types/api';
 
@@ -50,7 +50,18 @@ describe('symbiantHelpers', () => {
     });
 
     it('generates valid slot types', () => {
-      const validSlots = ['Head', 'Eye', 'Ear', 'Chest', 'Arm', 'Wrist', 'Hand', 'Waist', 'Leg', 'Feet'];
+      const validSlots = [
+        'Head',
+        'Eye',
+        'Ear',
+        'Chest',
+        'Arm',
+        'Wrist',
+        'Hand',
+        'Waist',
+        'Leg',
+        'Feet',
+      ];
       const symbiant: Symbiant = { id: 5, aoid: 100 };
       const slot = getSymbiantSlot(symbiant);
       expect(validSlots).toContain(slot);
@@ -105,7 +116,7 @@ describe('symbiantHelpers', () => {
         name: 'Existing Name',
         slot: 'Existing Slot',
         ql: 150,
-        family: 'Existing Family'
+        family: 'Existing Family',
       };
 
       const enriched = enrichSymbiant(symbiant);

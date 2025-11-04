@@ -5,7 +5,7 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner.vue';
 describe('LoadingSpinner', () => {
   it('renders with default props', () => {
     const wrapper = mountWithContext(LoadingSpinner);
-    
+
     expect(wrapper.exists()).toBe(true);
     expect(wrapper.attributes('role')).toBe('status');
     expect(wrapper.attributes('aria-label')).toBe('Loading: Loading...');
@@ -15,10 +15,10 @@ describe('LoadingSpinner', () => {
   it('renders with custom loading text', () => {
     const wrapper = mountWithContext(LoadingSpinner, {
       props: {
-        loadingText: 'Loading items...'
-      }
+        loadingText: 'Loading items...',
+      },
     });
-    
+
     expect(wrapper.attributes('aria-label')).toBe('Loading: Loading items...');
     expect(wrapper.find('.sr-only').text()).toBe('Loading items...');
   });
@@ -27,14 +27,14 @@ describe('LoadingSpinner', () => {
     const wrapper = mountWithContext(LoadingSpinner, {
       props: {
         loadingText: 'Please wait...',
-        showText: true
-      }
+        showText: true,
+      },
     });
-    
+
     const textElement = wrapper.find('.ml-2');
     expect(textElement.exists()).toBe(true);
     expect(textElement.text()).toBe('Please wait...');
-    
+
     // Should not have sr-only text when visible text is shown
     expect(wrapper.find('.sr-only').exists()).toBe(false);
   });
@@ -42,13 +42,13 @@ describe('LoadingSpinner', () => {
   it('applies correct size classes for small spinner', () => {
     const wrapper = mountWithContext(LoadingSpinner, {
       props: {
-        size: 'small'
-      }
+        size: 'small',
+      },
     });
-    
+
     const container = wrapper.find('[role="status"]');
     expect(container.classes()).toContain('p-2');
-    
+
     const spinner = wrapper.find('.animate-spin');
     expect(spinner.classes()).toContain('w-4');
     expect(spinner.classes()).toContain('h-4');
@@ -57,13 +57,13 @@ describe('LoadingSpinner', () => {
   it('applies correct size classes for large spinner', () => {
     const wrapper = mountWithContext(LoadingSpinner, {
       props: {
-        size: 'large'
-      }
+        size: 'large',
+      },
     });
-    
+
     const container = wrapper.find('[role="status"]');
     expect(container.classes()).toContain('p-8');
-    
+
     const spinner = wrapper.find('.animate-spin');
     expect(spinner.classes()).toContain('w-8');
     expect(spinner.classes()).toContain('h-8');
@@ -71,10 +71,10 @@ describe('LoadingSpinner', () => {
 
   it('applies medium size classes by default', () => {
     const wrapper = mountWithContext(LoadingSpinner);
-    
+
     const container = wrapper.find('[role="status"]');
     expect(container.classes()).toContain('p-4');
-    
+
     const spinner = wrapper.find('.animate-spin');
     expect(spinner.classes()).toContain('w-6');
     expect(spinner.classes()).toContain('h-6');
@@ -82,7 +82,7 @@ describe('LoadingSpinner', () => {
 
   it('has proper spinner animation and styling', () => {
     const wrapper = mountWithContext(LoadingSpinner);
-    
+
     const spinner = wrapper.find('.animate-spin');
     expect(spinner.exists()).toBe(true);
     expect(spinner.classes()).toContain('border-2');
@@ -97,8 +97,8 @@ describe('LoadingSpinner', () => {
       props: {
         size: 'small',
         showText: true,
-        loadingText: 'Loading...'
-      }
+        loadingText: 'Loading...',
+      },
     });
 
     const textSmall = wrapperSmall.find('.ml-2');
@@ -108,8 +108,8 @@ describe('LoadingSpinner', () => {
       props: {
         size: 'medium',
         showText: true,
-        loadingText: 'Loading...'
-      }
+        loadingText: 'Loading...',
+      },
     });
 
     const textMedium = wrapperMedium.find('.ml-2');
@@ -119,10 +119,10 @@ describe('LoadingSpinner', () => {
   it('provides proper aria attributes for accessibility', () => {
     const wrapper = mountWithContext(LoadingSpinner, {
       props: {
-        loadingText: 'Loading user data...'
-      }
+        loadingText: 'Loading user data...',
+      },
     });
-    
+
     const container = wrapper.find('[role="status"]');
     expect(container.attributes('role')).toBe('status');
     expect(container.attributes('aria-label')).toBe('Loading: Loading user data...');

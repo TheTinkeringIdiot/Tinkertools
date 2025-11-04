@@ -1,9 +1,9 @@
 /**
  * TinkerTools Nanotechnician Specialization Utility
- * 
+ *
  * Functions for Nanotechnician offensive nano specialization calculations,
  * damage bonus computations, and character initialization.
- * 
+ *
  * Converted from TinkerNukes utils.py
  */
 
@@ -21,7 +21,7 @@ import {
   type BreedId,
   type DeckId,
   type SpecId,
-  type DamageTypeId
+  type DamageTypeId,
 } from '../services/game-data';
 
 // ============================================================================
@@ -89,7 +89,7 @@ export function initialNukes(): NukesConfiguration {
     cost_pct: 0,
     body_dev: 1,
     psychic: 1,
-    nano_delta: 0
+    nano_delta: 0,
   };
 }
 
@@ -160,7 +160,7 @@ export function calculateTotalDamageBonus(config: NukesConfiguration): DamageBon
 
   return {
     total,
-    breakdown
+    breakdown,
   };
 }
 
@@ -168,11 +168,11 @@ export function calculateTotalDamageBonus(config: NukesConfiguration): DamageBon
  * Calculate damage bonus for a specific nano type
  */
 export function calculateSpecificDamageBonus(
-  config: NukesConfiguration, 
+  config: NukesConfiguration,
   damageType: DamageTypeId
 ): number {
   const totalBonus = calculateTotalDamageBonus(config);
-  
+
   // For specific damage types, apply the total bonus
   // In the original implementation, all damage types benefit equally
   return totalBonus.total;
@@ -248,10 +248,10 @@ export function validateNukesConfig(config: NukesConfiguration): {
     { name: 'Notum Siphon', value: config.NS, max: 10 },
     { name: 'Channeling of Notum', value: config.CoN, max: 4 },
     { name: 'Enhance Nano Damage', value: config.END, max: 6 },
-    { name: 'Ancient Matrix', value: config.AM, max: 10 }
+    { name: 'Ancient Matrix', value: config.AM, max: 10 },
   ];
 
-  enhancements.forEach(enhancement => {
+  enhancements.forEach((enhancement) => {
     if (enhancement.value < 0 || enhancement.value > enhancement.max) {
       errors.push(`${enhancement.name} must be between 0 and ${enhancement.max}`);
     }
@@ -269,7 +269,7 @@ export function validateNukesConfig(config: NukesConfiguration): {
   return {
     valid: errors.length === 0,
     errors,
-    warnings
+    warnings,
   };
 }
 
@@ -299,17 +299,17 @@ export function calculateNanoInitiative(config: NukesConfiguration): number {
 export const nanotechnicianSpecialization = {
   // Initialization
   initialNukes,
-  
+
   // Calculations
   calculateTotalDamageBonus,
   calculateSpecificDamageBonus,
   calculateNanoPool,
   calculateNanoInitiative,
-  
+
   // Utilities
   getBreedName,
   getDeckName,
   getSpecLevel,
   getDamageTypeName,
-  validateNukesConfig
+  validateNukesConfig,
 };

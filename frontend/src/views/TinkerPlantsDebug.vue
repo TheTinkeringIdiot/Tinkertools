@@ -4,9 +4,13 @@ TinkerPlants Debug - Test version to identify CSS issues
 <template>
   <div class="tinker-plants" class="h-screen flex flex-col bg-surface-50 dark:bg-surface-900">
     <!-- Header -->
-    <div class="bg-surface-0 dark:bg-surface-950 border-b border-surface-200 dark:border-surface-700 p-4">
-      <h1 style="margin: 0; font-size: 1.5rem; font-weight: bold; text-surface-900 dark:text-surface-50;">
-        <i class="pi pi-cog" style="margin-right: 8px;"></i>
+    <div
+      class="bg-surface-0 dark:bg-surface-950 border-b border-surface-200 dark:border-surface-700 p-4"
+    >
+      <h1
+        style="margin: 0; font-size: 1.5rem; font-weight: bold; text-surface-900 dark:text-surface-50;"
+      >
+        <i class="pi pi-cog" style="margin-right: 8px"></i>
         TinkerPlants Debug
       </h1>
       <p style="margin: 4px 0 0; text-surface-600 dark:text-surface-400; font-size: 0.9rem;">
@@ -15,46 +19,54 @@ TinkerPlants Debug - Test version to identify CSS issues
     </div>
 
     <!-- Main Layout -->
-    <div style="flex: 1; display: flex; min-height: 0;">
+    <div style="flex: 1; display: flex; min-height: 0">
       <!-- Left Sidebar -->
-      <div style="width: 320px; bg-surface-0 dark:bg-surface-950; border-r border-surface-200 dark:border-surface-700; padding: 16px;">
-        <h3 style="margin: 0 0 16px; font-size: 1.1rem; font-weight: 600; text-surface-900 dark:text-surface-50;">
-          <i class="pi pi-user" style="margin-right: 8px;"></i>
+      <div
+        style="width: 320px; bg-surface-0 dark:bg-surface-950; border-r border-surface-200 dark:border-surface-700; padding: 16px;"
+      >
+        <h3
+          style="margin: 0 0 16px; font-size: 1.1rem; font-weight: 600; text-surface-900 dark:text-surface-50;"
+        >
+          <i class="pi pi-user" style="margin-right: 8px"></i>
           Character Panel
         </h3>
-        
+
         <!-- Profile Selection -->
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 8px; font-weight: 500; text-surface-700 dark:text-surface-300;">
+        <div style="margin-bottom: 16px">
+          <label
+            style="display: block; margin-bottom: 8px; font-weight: 500; text-surface-700 dark:text-surface-300;"
+          >
             Profile:
           </label>
-          <Dropdown 
+          <Dropdown
             v-model="selectedProfile"
             :options="profileOptions"
             option-label="label"
             option-value="value"
             placeholder="Select Profile"
-            style="width: 100%;"
+            style="width: 100%"
           />
         </div>
 
         <!-- Mode Toggle -->
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 8px; font-weight: 500; text-surface-700 dark:text-surface-300;">
+        <div style="margin-bottom: 16px">
+          <label
+            style="display: block; margin-bottom: 8px; font-weight: 500; text-surface-700 dark:text-surface-300;"
+          >
             Mode:
           </label>
-          <ToggleButton 
+          <ToggleButton
             v-model="buildMode"
             on-label="Build Mode"
             off-label="Browse Mode"
             on-icon="pi pi-wrench"
             off-icon="pi pi-search"
-            style="width: 100%;"
+            style="width: 100%"
           />
         </div>
 
         <!-- Test Component Load -->
-        <div style="margin-bottom: 16px;">
+        <div style="margin-bottom: 16px">
           <h4 style="margin: 0 0 8px; font-weight: 500; text-surface-700 dark:text-surface-300;">
             Component Status:
           </h4>
@@ -68,47 +80,55 @@ TinkerPlants Debug - Test version to identify CSS issues
 
         <!-- Stats Display -->
         <div>
-          <h4 style="margin: 0 0 8px; font-weight: 500; text-surface-700 dark:text-surface-300;">Stats:</h4>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <h4 style="margin: 0 0 8px; font-weight: 500; text-surface-700 dark:text-surface-300;">
+            Stats:
+          </h4>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
             <div class="h-screen flex flex-col bg-surface-50 dark:bg-surface-900">
               <span style="text-surface-600 dark:text-surface-400;">STR:</span>
-              <span style="font-weight: 600; margin-left: 4px;">{{ stats.strength }}</span>
+              <span style="font-weight: 600; margin-left: 4px">{{ stats.strength }}</span>
             </div>
             <div class="h-screen flex flex-col bg-surface-50 dark:bg-surface-900">
               <span style="text-surface-600 dark:text-surface-400;">AGI:</span>
-              <span style="font-weight: 600; margin-left: 4px;">{{ stats.agility }}</span>
+              <span style="font-weight: 600; margin-left: 4px">{{ stats.agility }}</span>
             </div>
             <div class="h-screen flex flex-col bg-surface-50 dark:bg-surface-900">
               <span style="text-surface-600 dark:text-surface-400;">INT:</span>
-              <span style="font-weight: 600; margin-left: 4px;">{{ stats.intelligence }}</span>
+              <span style="font-weight: 600; margin-left: 4px">{{ stats.intelligence }}</span>
             </div>
             <div class="h-screen flex flex-col bg-surface-50 dark:bg-surface-900">
               <span style="text-surface-600 dark:text-surface-400;">STA:</span>
-              <span style="font-weight: 600; margin-left: 4px;">{{ stats.stamina }}</span>
+              <span style="font-weight: 600; margin-left: 4px">{{ stats.stamina }}</span>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Main Content -->
-      <div style="flex: 1; display: flex; flex-direction: column; bg-surface-0 dark:bg-surface-950;">
+      <div
+        style="flex: 1; display: flex; flex-direction: column; bg-surface-0 dark:bg-surface-950;"
+      >
         <!-- Content Header -->
         <div style="padding: 16px; border-b border-surface-200 dark:border-surface-700;">
-          <h2 style="margin: 0; font-size: 1.2rem; font-weight: 600; text-surface-900 dark:text-surface-50;">
+          <h2
+            style="margin: 0; font-size: 1.2rem; font-weight: 600; text-surface-900 dark:text-surface-50;"
+          >
             {{ buildMode ? 'Character Builder' : 'Symbiant Browser' }}
           </h2>
         </div>
 
         <!-- Content Area -->
-        <div style="flex: 1; padding: 16px; overflow-y: auto;">
+        <div style="flex: 1; padding: 16px; overflow-y: auto">
           <!-- Test actual component loading -->
-          <div style="margin-bottom: 16px;">
-            <h3 style="margin: 0 0 12px; font-weight: 600; text-surface-900 dark:text-surface-50;">Component Test:</h3>
-            
+          <div style="margin-bottom: 16px">
+            <h3 style="margin: 0 0 12px; font-weight: 600; text-surface-900 dark:text-surface-50;">
+              Component Test:
+            </h3>
+
             <!-- Try to load CharacterStatsPanel -->
             <div v-if="buildMode">
               <div class="h-screen flex flex-col bg-surface-50 dark:bg-surface-900">
-                <h4 style="margin: 0 0 8px;">CharacterStatsPanel Test:</h4>
+                <h4 style="margin: 0 0 8px">CharacterStatsPanel Test:</h4>
                 <CharacterStatsPanel
                   v-if="loadCharacterStats"
                   :profile="null"
@@ -122,7 +142,7 @@ TinkerPlants Debug - Test version to identify CSS issues
               </div>
 
               <div class="h-screen flex flex-col bg-surface-50 dark:bg-surface-900">
-                <h4 style="margin: 0 0 8px;">Build Summary Test:</h4>
+                <h4 style="margin: 0 0 8px">Build Summary Test:</h4>
                 <BuildSummary
                   v-if="loadBuildSummary"
                   :current-build="currentBuild"
@@ -138,7 +158,7 @@ TinkerPlants Debug - Test version to identify CSS issues
 
             <div v-else>
               <div class="h-screen flex flex-col bg-surface-50 dark:bg-surface-900">
-                <h4 style="margin: 0 0 8px;">SymbiantSearch Test:</h4>
+                <h4 style="margin: 0 0 8px">SymbiantSearch Test:</h4>
                 <SymbiantSearch
                   v-if="loadSymbiantSearch"
                   v-model="searchQuery"
@@ -194,7 +214,8 @@ onMounted(async () => {
     console.error('Failed to load SymbiantSearch:', error);
   }
 
-  testComponentLoad.value = loadCharacterStats.value && loadBuildSummary.value && loadSymbiantSearch.value;
+  testComponentLoad.value =
+    loadCharacterStats.value && loadBuildSummary.value && loadSymbiantSearch.value;
 });
 
 // Reactive data
@@ -205,12 +226,12 @@ const stats = ref({
   strength: 400,
   agility: 350,
   intelligence: 300,
-  stamina: 400
+  stamina: 400,
 });
 
 const profileOptions = ref([
   { label: 'No Profile Selected', value: null },
-  { label: 'Test Character', value: 'test' }
+  { label: 'Test Character', value: 'test' },
 ]);
 
 // Mock data for component testing
@@ -218,7 +239,7 @@ const currentBuild = ref({
   id: '',
   name: '',
   symbiants: {},
-  totalStats: {}
+  totalStats: {},
 });
 
 const buildStatBonuses = computed(() => ({}));

@@ -5,12 +5,16 @@ Advanced implant construction analysis and step-by-step instructions
 <template>
   <div class="construction-planner space-y-6">
     <!-- Skill Input Section -->
-    <div class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-6">
-      <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2">
+    <div
+      class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-6"
+    >
+      <h3
+        class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2"
+      >
         <i class="pi pi-user text-primary-500"></i>
         Character Skills
       </h3>
-      
+
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <!-- Core Skills -->
         <div class="space-y-3">
@@ -27,7 +31,7 @@ Advanced implant construction analysis and step-by-step instructions
             @input="onSkillChange"
           />
         </div>
-        
+
         <div class="space-y-3">
           <label class="text-sm font-medium text-surface-700 dark:text-surface-300">
             Break & Entry *
@@ -42,7 +46,7 @@ Advanced implant construction analysis and step-by-step instructions
             @input="onSkillChange"
           />
         </div>
-        
+
         <!-- Jobe Skills -->
         <div class="space-y-3">
           <label class="text-sm font-medium text-surface-700 dark:text-surface-300">
@@ -58,7 +62,7 @@ Advanced implant construction analysis and step-by-step instructions
             @input="onSkillChange"
           />
         </div>
-        
+
         <div class="space-y-3">
           <label class="text-sm font-medium text-surface-700 dark:text-surface-300">
             Quantum FT
@@ -73,7 +77,7 @@ Advanced implant construction analysis and step-by-step instructions
             @input="onSkillChange"
           />
         </div>
-        
+
         <div class="space-y-3">
           <label class="text-sm font-medium text-surface-700 dark:text-surface-300">
             Computer Literacy
@@ -88,7 +92,7 @@ Advanced implant construction analysis and step-by-step instructions
             @input="onSkillChange"
           />
         </div>
-        
+
         <div class="space-y-3">
           <label class="text-sm font-medium text-surface-700 dark:text-surface-300">
             Pharma Tech
@@ -107,12 +111,16 @@ Advanced implant construction analysis and step-by-step instructions
     </div>
 
     <!-- Implant Selection Section -->
-    <div class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-6">
-      <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2">
+    <div
+      class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-6"
+    >
+      <h3
+        class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2"
+      >
         <i class="pi pi-cog text-primary-500"></i>
         Implant Selection
       </h3>
-      
+
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="space-y-3">
           <label class="text-sm font-medium text-surface-700 dark:text-surface-300">
@@ -128,7 +136,7 @@ Advanced implant construction analysis and step-by-step instructions
             @change="onSlotChange"
           />
         </div>
-        
+
         <div class="space-y-3">
           <label class="text-sm font-medium text-surface-700 dark:text-surface-300">
             Auto-analyze
@@ -149,9 +157,12 @@ Advanced implant construction analysis and step-by-step instructions
           </div>
         </div>
       </div>
-      
+
       <!-- Current Configuration Display -->
-      <div v-if="selectedImplantConfig" class="mt-4 p-4 bg-surface-50 dark:bg-surface-900 rounded border">
+      <div
+        v-if="selectedImplantConfig"
+        class="mt-4 p-4 bg-surface-50 dark:bg-surface-900 rounded border"
+      >
         <h4 class="font-medium text-surface-900 dark:text-surface-50 mb-2">
           Current Configuration: {{ selectedSlot }}
         </h4>
@@ -173,10 +184,13 @@ Advanced implant construction analysis and step-by-step instructions
             <span class="ml-1 font-mono">{{ selectedImplantConfig.ql }}</span>
           </div>
         </div>
-        
+
         <!-- Feasibility Check -->
         <div class="mt-3 flex items-center gap-2">
-          <div v-if="constructionFeasibility.feasible" class="flex items-center gap-2 text-green-600 dark:text-green-400">
+          <div
+            v-if="constructionFeasibility.feasible"
+            class="flex items-center gap-2 text-green-600 dark:text-green-400"
+          >
             <i class="pi pi-check-circle"></i>
             <span class="text-sm">Construction appears feasible</span>
           </div>
@@ -197,7 +211,10 @@ Advanced implant construction analysis and step-by-step instructions
     />
 
     <!-- Error Display -->
-    <div v-if="lastError" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
+    <div
+      v-if="lastError"
+      class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4"
+    >
       <div class="flex items-start gap-3">
         <i class="pi pi-exclamation-triangle text-red-600 dark:text-red-400 mt-0.5"></i>
         <div>
@@ -208,14 +225,17 @@ Advanced implant construction analysis and step-by-step instructions
     </div>
 
     <!-- Skill Requirements -->
-    <div v-if="skillRecommendations.length > 0" class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+    <div
+      v-if="skillRecommendations.length > 0"
+      class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4"
+    >
       <h4 class="font-medium text-blue-900 dark:text-blue-100 mb-3 flex items-center gap-2">
         <i class="pi pi-lightbulb text-blue-600 dark:text-blue-400"></i>
         Skill Requirements
       </h4>
       <div class="space-y-2">
-        <div 
-          v-for="rec in skillRecommendations" 
+        <div
+          v-for="rec in skillRecommendations"
           :key="rec.skill"
           class="flex justify-between items-center text-sm"
         >
@@ -223,7 +243,9 @@ Advanced implant construction analysis and step-by-step instructions
           <div class="flex items-center gap-2">
             <span class="text-blue-600 dark:text-blue-400 font-mono">{{ rec.current }}</span>
             <i class="pi pi-arrow-right text-blue-500 text-xs"></i>
-            <span class="text-blue-800 dark:text-blue-200 font-mono font-medium">{{ rec.recommended }}</span>
+            <span class="text-blue-800 dark:text-blue-200 font-mono font-medium">{{
+              rec.recommended
+            }}</span>
             <span v-if="rec.current >= rec.recommended" class="text-green-600 dark:text-green-400">
               <i class="pi pi-check text-xs"></i>
             </span>
@@ -261,19 +283,19 @@ const tinkerPlantsStore = useTinkerPlantsStore();
 
 // Mapping from construction planner slot names (IMP_SLOTS format) to bitflags
 const slotNameToBitflag: Record<string, string> = {
-  'Eye': String(IMPLANT_SLOT.Eyes),
-  'Head': String(IMPLANT_SLOT.Head),
-  'Ear': String(IMPLANT_SLOT.Ears),
+  Eye: String(IMPLANT_SLOT.Eyes),
+  Head: String(IMPLANT_SLOT.Head),
+  Ear: String(IMPLANT_SLOT.Ears),
   'Right-Arm': String(IMPLANT_SLOT.RightArm),
-  'Chest': String(IMPLANT_SLOT.Chest),
+  Chest: String(IMPLANT_SLOT.Chest),
   'Left-Arm': String(IMPLANT_SLOT.LeftArm),
   'Right-Wrist': String(IMPLANT_SLOT.RightWrist),
-  'Waist': String(IMPLANT_SLOT.Waist),
+  Waist: String(IMPLANT_SLOT.Waist),
   'Left-Wrist': String(IMPLANT_SLOT.LeftWrist),
   'Right-Hand': String(IMPLANT_SLOT.RightHand),
-  'Leg': String(IMPLANT_SLOT.Legs),
+  Leg: String(IMPLANT_SLOT.Legs),
   'Left-Hand': String(IMPLANT_SLOT.LeftHand),
-  'Feet': String(IMPLANT_SLOT.Feet)
+  Feet: String(IMPLANT_SLOT.Feet),
 };
 
 // ============================================================================
@@ -295,7 +317,7 @@ const implantData = computed(() => {
         shiny: selection.shiny ? skillService.getName(selection.shiny) : null,
         bright: selection.bright ? skillService.getName(selection.bright) : null,
         faded: selection.faded ? skillService.getName(selection.faded) : null,
-        ql: selection.ql
+        ql: selection.ql,
       };
     }
   }
@@ -319,7 +341,7 @@ const {
   skillRecommendations,
   setSkills,
   selectSlotForAnalysis,
-  setAutoAnalysis
+  setAutoAnalysis,
 } = useConstructionPlanner(implantData);
 
 // ============================================================================
@@ -335,22 +357,30 @@ const autoAnalyze = ref(false);
 
 // Computed property for skill values using ID-based access
 const skillValues = computed(() => ({
-  nanoProgramming: tinkerProfilesStore.activeProfile?.skills[skillService.resolveId('Nano Programming')]?.total ?? 0,
-  breakAndEntry: tinkerProfilesStore.activeProfile?.skills[skillService.resolveId('Break & Entry')]?.total ?? 0,
-  psychology: tinkerProfilesStore.activeProfile?.skills[skillService.resolveId('Psychology')]?.total ?? 0,
-  quantumFT: tinkerProfilesStore.activeProfile?.skills[skillService.resolveId('Quantum FT')]?.total ?? 0,
-  computerLiteracy: tinkerProfilesStore.activeProfile?.skills[skillService.resolveId('Computer Literacy')]?.total ?? 0,
-  pharmaTech: tinkerProfilesStore.activeProfile?.skills[skillService.resolveId('Pharma Tech')]?.total ?? 0
+  nanoProgramming:
+    tinkerProfilesStore.activeProfile?.skills[skillService.resolveId('Nano Programming')]?.total ??
+    0,
+  breakAndEntry:
+    tinkerProfilesStore.activeProfile?.skills[skillService.resolveId('Break & Entry')]?.total ?? 0,
+  psychology:
+    tinkerProfilesStore.activeProfile?.skills[skillService.resolveId('Psychology')]?.total ?? 0,
+  quantumFT:
+    tinkerProfilesStore.activeProfile?.skills[skillService.resolveId('Quantum FT')]?.total ?? 0,
+  computerLiteracy:
+    tinkerProfilesStore.activeProfile?.skills[skillService.resolveId('Computer Literacy')]?.total ??
+    0,
+  pharmaTech:
+    tinkerProfilesStore.activeProfile?.skills[skillService.resolveId('Pharma Tech')]?.total ?? 0,
 }));
 
 // Local skills for form binding - these track the profile values but allow editing
 const localSkills = reactive<SkillSet>({
-  'Nanoprogramming': 0,
+  Nanoprogramming: 0,
   'Break & Entry': 0,
-  'Psychology': 0,
+  Psychology: 0,
   'Quantum FT': 0,
   'Computer Literacy': 0,
-  'Pharma Tech': 0
+  'Pharma Tech': 0,
 });
 
 // ============================================================================
@@ -378,20 +408,28 @@ watch(selectedSlot, (newSlot) => {
 });
 
 // Sync skills from profile to local form
-watch(skillValues, (newSkillValues) => {
-  // Update localSkills from profile skill values (ID-based access)
-  localSkills.Nanoprogramming = newSkillValues.nanoProgramming;
-  localSkills['Break & Entry'] = newSkillValues.breakAndEntry;
-  localSkills.Psychology = newSkillValues.psychology;
-  localSkills['Quantum FT'] = newSkillValues.quantumFT;
-  localSkills['Computer Literacy'] = newSkillValues.computerLiteracy;
-  localSkills['Pharma Tech'] = newSkillValues.pharmaTech;
-}, { immediate: true, deep: true });
+watch(
+  skillValues,
+  (newSkillValues) => {
+    // Update localSkills from profile skill values (ID-based access)
+    localSkills.Nanoprogramming = newSkillValues.nanoProgramming;
+    localSkills['Break & Entry'] = newSkillValues.breakAndEntry;
+    localSkills.Psychology = newSkillValues.psychology;
+    localSkills['Quantum FT'] = newSkillValues.quantumFT;
+    localSkills['Computer Literacy'] = newSkillValues.computerLiteracy;
+    localSkills['Pharma Tech'] = newSkillValues.pharmaTech;
+  },
+  { immediate: true, deep: true }
+);
 
 // Sync local skills to construction planner service
-watch(localSkills, (newSkills) => {
-  setSkills(newSkills);
-}, { immediate: true, deep: true });
+watch(
+  localSkills,
+  (newSkills) => {
+    setSkills(newSkills);
+  },
+  { immediate: true, deep: true }
+);
 </script>
 
 <style scoped>

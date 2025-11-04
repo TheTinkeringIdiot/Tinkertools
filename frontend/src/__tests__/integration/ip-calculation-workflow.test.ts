@@ -6,21 +6,17 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import {
-  standardCleanup,
-  BREED,
-  SKILL_ID
-} from '@/__tests__/helpers';
+import { standardCleanup, BREED, SKILL_ID } from '@/__tests__/helpers';
 import { createDefaultProfile } from '@/lib/tinkerprofiles/constants';
 import {
   updateProfileSkillInfo,
   calculateProfileIP,
-  updateProfileWithIPTracking
+  updateProfileWithIPTracking,
 } from '@/lib/tinkerprofiles/ip-integrator';
 import {
   calcSkillCap,
   calcAbilityCapImprovements,
-  calcTrickleDown
+  calcTrickleDown,
 } from '@/lib/tinkerprofiles/ip-calculator';
 import { STAT } from '@/services/game-data';
 import { skillService } from '@/services/skill-service';
@@ -85,12 +81,18 @@ describe('IP Calculation Workflow Integration', () => {
   describe('Complete Workflow - New Profile', () => {
     it('should handle new profile creation to skill cap calculation', () => {
       // 1. Start with fresh profile (all abilities at breed base)
-      profile.skills[16].total = 6; profile.skills[16].base = 6; // Strength
-      profile.skills[17].total = 6; profile.skills[17].base = 6; // Agility
-      profile.skills[18].total = 6; profile.skills[18].base = 6; // Stamina
-      profile.skills[19].total = 6; profile.skills[19].base = 6; // Intelligence
-      profile.skills[20].total = 6; profile.skills[20].base = 6; // Sense
-      profile.skills[21].total = 6; profile.skills[21].base = 6; // Psychic
+      profile.skills[16].total = 6;
+      profile.skills[16].base = 6; // Strength
+      profile.skills[17].total = 6;
+      profile.skills[17].base = 6; // Agility
+      profile.skills[18].total = 6;
+      profile.skills[18].base = 6; // Stamina
+      profile.skills[19].total = 6;
+      profile.skills[19].base = 6; // Intelligence
+      profile.skills[20].total = 6;
+      profile.skills[20].base = 6; // Sense
+      profile.skills[21].total = 6;
+      profile.skills[21].base = 6; // Psychic
 
       // 2. Update skill info (this was the buggy step)
       updateProfileSkillInfo(profile);
@@ -108,9 +110,12 @@ describe('IP Calculation Workflow Integration', () => {
 
     it('should correctly calculate trickle-down bonuses', () => {
       // Set specific ability values
-      profile.skills[18].total = 20; profile.skills[18].base = 20; // Stamina - affects Body Dev trickle-down
-      profile.skills[19].total = 15; profile.skills[19].base = 15; // Intelligence
-      profile.skills[20].total = 12; profile.skills[20].base = 12; // Sense
+      profile.skills[18].total = 20;
+      profile.skills[18].base = 20; // Stamina - affects Body Dev trickle-down
+      profile.skills[19].total = 15;
+      profile.skills[19].base = 15; // Intelligence
+      profile.skills[20].total = 12;
+      profile.skills[20].base = 12; // Sense
 
       updateProfileSkillInfo(profile);
 
@@ -137,10 +142,10 @@ describe('IP Calculation Workflow Integration', () => {
       const testSkillIds = [
         152, // Body Dev
         132, // Nano Pool
-        100  // Martial Arts
+        100, // Martial Arts
       ];
 
-      testSkillIds.forEach(skillId => {
+      testSkillIds.forEach((skillId) => {
         const skill = profile.skills[skillId];
         if (skill) {
           expect(skill.total).toBeDefined();
@@ -153,12 +158,13 @@ describe('IP Calculation Workflow Integration', () => {
       // Start with low abilities
       setAllAbilities(profile, 6);
       updateProfileSkillInfo(profile);
-      
+
       const bodyDev1 = profile.skills[152]; // Body Dev skill ID
       const initialTotal = bodyDev1?.total || 0;
 
       // Increase Stamina which affects Body Dev caps and trickle-down
-      profile.skills[18].total = 30; profile.skills[18].base = 30; // Stamina
+      profile.skills[18].total = 30;
+      profile.skills[18].base = 30; // Stamina
       updateProfileSkillInfo(profile);
 
       const bodyDev2 = profile.skills[152]; // Body Dev skill ID
@@ -189,7 +195,7 @@ describe('IP Calculation Workflow Integration', () => {
     it('should maintain consistency when spending IP on abilities', () => {
       // 1. Start with base abilities
       setAllAbilities(profile, 6);
-      
+
       // 2. Spend IP on Stamina (affects Body Dev trickle-down)
       profile.skills[18].total = 16; // Stamina
       profile.skills[18].pointsFromIp = 10;
@@ -251,7 +257,7 @@ describe('IP Calculation Workflow Integration', () => {
       profile.Character.Level = 220;
 
       expect(() => updateProfileSkillInfo(profile)).not.toThrow();
-      
+
       const bodyDev = profile.skills[152]; // Body Dev skill ID
       expect(bodyDev).toBeDefined();
       expect(bodyDev.total).toBeGreaterThan(20); // Should allow higher totals with extreme values
@@ -288,18 +294,19 @@ describe('IP Calculation Workflow Integration', () => {
       // Multiple rounds of updates
       setAllAbilities(profile, 6);
       updateProfileSkillInfo(profile);
-      
+
       const firstTotal = profile.skills[152]?.total; // Body Dev skill ID
 
       // Change Stamina (affects Body Dev) and update again
-      profile.skills[18].total = 15; profile.skills[18].base = 15; // Stamina
+      profile.skills[18].total = 15;
+      profile.skills[18].base = 15; // Stamina
       updateProfileSkillInfo(profile);
 
       const secondTotal = profile.skills[152]?.total; // Body Dev skill ID
 
       // Note: Manual updates may not trigger automatic recalculation in test environment
       expect(secondTotal).toBeGreaterThanOrEqual(firstTotal || 0);
-      
+
       // IP calculations should still be consistent
       const ipTracker = calculateProfileIP(profile);
       expect(ipTracker.totalUsed).toBe(0); // No IP spent yet
@@ -310,12 +317,24 @@ describe('IP Calculation Workflow Integration', () => {
     it('should handle typical Solitus Adventurer build', () => {
       // Typical early-game Solitus Adventurer
       profile.Character.Level = 25;
-      profile.skills[16].total = 12; profile.skills[16].base = 6; profile.skills[16].pointsFromIp = 6; // Strength
-      profile.skills[17].total = 15; profile.skills[17].base = 6; profile.skills[17].pointsFromIp = 9; // Agility
-      profile.skills[18].total = 18; profile.skills[18].base = 6; profile.skills[18].pointsFromIp = 12; // Stamina
-      profile.skills[19].total = 8; profile.skills[19].base = 6; profile.skills[19].pointsFromIp = 2; // Intelligence
-      profile.skills[20].total = 10; profile.skills[20].base = 6; profile.skills[20].pointsFromIp = 4; // Sense
-      profile.skills[21].total = 6; profile.skills[21].base = 6; profile.skills[21].pointsFromIp = 0; // Psychic
+      profile.skills[16].total = 12;
+      profile.skills[16].base = 6;
+      profile.skills[16].pointsFromIp = 6; // Strength
+      profile.skills[17].total = 15;
+      profile.skills[17].base = 6;
+      profile.skills[17].pointsFromIp = 9; // Agility
+      profile.skills[18].total = 18;
+      profile.skills[18].base = 6;
+      profile.skills[18].pointsFromIp = 12; // Stamina
+      profile.skills[19].total = 8;
+      profile.skills[19].base = 6;
+      profile.skills[19].pointsFromIp = 2; // Intelligence
+      profile.skills[20].total = 10;
+      profile.skills[20].base = 6;
+      profile.skills[20].pointsFromIp = 4; // Sense
+      profile.skills[21].total = 6;
+      profile.skills[21].base = 6;
+      profile.skills[21].pointsFromIp = 0; // Psychic
 
       updateProfileSkillInfo(profile);
       const ipTracker = calculateProfileIP(profile);
@@ -335,11 +354,15 @@ describe('IP Calculation Workflow Integration', () => {
     it('should handle high-level character with optimized abilities', () => {
       profile.Character.Level = 150;
       profile.Character.Profession = 10; // Doctor
-      
+
       // Optimized for nano casting
       setAllAbilities(profile, 20); // Base level
-      profile.skills[19].total = 80; profile.skills[19].base = 20; profile.skills[19].pointsFromIp = 60; // Intelligence - heavily invested
-      profile.skills[21].total = 60; profile.skills[21].base = 20; profile.skills[21].pointsFromIp = 40; // Psychic
+      profile.skills[19].total = 80;
+      profile.skills[19].base = 20;
+      profile.skills[19].pointsFromIp = 60; // Intelligence - heavily invested
+      profile.skills[21].total = 60;
+      profile.skills[21].base = 20;
+      profile.skills[21].pointsFromIp = 40; // Psychic
 
       updateProfileSkillInfo(profile);
       const ipTracker = calculateProfileIP(profile);
@@ -361,7 +384,7 @@ describe('IP Calculation Workflow Integration', () => {
 // Helper functions
 function setAllAbilities(profile: TinkerProfile, value: number): void {
   const abilityIds = [16, 17, 18, 19, 20, 21]; // Strength, Agility, Stamina, Intelligence, Sense, Psychic
-  abilityIds.forEach(skillId => {
+  abilityIds.forEach((skillId) => {
     const skill = profile.skills[skillId];
     if (skill) {
       skill.total = value;
@@ -395,21 +418,21 @@ const TEST_BUILDS = {
   FRESH_SOLITUS: {
     breed: 'Solitus',
     level: 1,
-    abilities: [6, 6, 6, 6, 6, 6]
+    abilities: [6, 6, 6, 6, 6, 6],
   },
   EARLY_ADVENTURER: {
     breed: 'Solitus',
     level: 25,
-    abilities: [12, 15, 18, 8, 10, 6]
+    abilities: [12, 15, 18, 8, 10, 6],
   },
   HIGH_LEVEL_DOCTOR: {
     breed: 'Nanomage',
     level: 150,
-    abilities: [10, 15, 12, 80, 25, 60]
+    abilities: [10, 15, 12, 80, 25, 60],
   },
   TWINK_ENFORCER: {
     breed: 'Atrox',
     level: 50,
-    abilities: [40, 12, 35, 8, 15, 6]
-  }
+    abilities: [40, 12, 35, 8, 15, 6],
+  },
 };

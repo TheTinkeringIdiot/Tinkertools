@@ -1,8 +1,5 @@
 <template>
-  <div 
-    class="criterion-chip"
-    :class="chipClasses"
-  >
+  <div class="criterion-chip" :class="chipClasses">
     <!-- Stat Requirement -->
     <div v-if="criterion.isStatRequirement" class="stat-requirement">
       <span class="stat-name">{{ criterion.statName }}</span>
@@ -14,19 +11,19 @@
         ({{ currentValue }})
       </span>
     </div>
-    
+
     <!-- State Requirement -->
     <div v-else-if="isStateRequirement" class="state-requirement">
       <i class="pi pi-info-circle mr-1"></i>
       <span>{{ criterion.description }}</span>
     </div>
-    
+
     <!-- Logical Operator -->
     <div v-else-if="criterion.isLogicalOperator" class="logical-operator">
       <i class="pi pi-code mr-1"></i>
       <span>{{ criterion.displayOperator }}</span>
     </div>
-    
+
     <!-- Unknown -->
     <div v-else class="unknown-criterion">
       <span>{{ criterion.description }}</span>
@@ -35,144 +32,153 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { DisplayCriterion } from '../services/action-criteria'
-import type { CharacterStats } from '../composables/useActionCriteria'
-import { getStatName, getProfessionName, getBreedName, getGenderName, getFlagNameFromValue, getNPCFamilyName } from '../services/game-utils'
+import { computed } from 'vue';
+import type { DisplayCriterion } from '../services/action-criteria';
+import type { CharacterStats } from '../composables/useActionCriteria';
+import {
+  getStatName,
+  getProfessionName,
+  getBreedName,
+  getGenderName,
+  getFlagNameFromValue,
+  getNPCFamilyName,
+} from '../services/game-utils';
 
 // ============================================================================
 // Props
 // ============================================================================
 
 interface Props {
-  criterion: DisplayCriterion
-  characterStats?: CharacterStats | null
-  size?: 'small' | 'normal' | 'large'
-  showStatus?: boolean
+  criterion: DisplayCriterion;
+  characterStats?: CharacterStats | null;
+  size?: 'small' | 'normal' | 'large';
+  showStatus?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   characterStats: null,
   size: 'normal',
-  showStatus: true
-})
+  showStatus: true,
+});
 
 // ============================================================================
 // Computed Properties
 // ============================================================================
 
 const isStateRequirement = computed(() => {
-  return !props.criterion.isStatRequirement && 
-         !props.criterion.isLogicalOperator && 
-         !props.criterion.isSeparator
-})
+  return (
+    !props.criterion.isStatRequirement &&
+    !props.criterion.isLogicalOperator &&
+    !props.criterion.isSeparator
+  );
+});
 
 const currentValue = computed(() => {
-  if (!props.characterStats) return 0
-  return props.characterStats[props.criterion.stat] || 0
-})
+  if (!props.characterStats) return 0;
+  return props.characterStats[props.criterion.stat] || 0;
+});
 
 const requirementMet = computed(() => {
-  if (!props.characterStats || !props.criterion.isStatRequirement) return null
-  
-  const current = currentValue.value
-  const required = props.criterion.displayValue
-  
+  if (!props.characterStats || !props.criterion.isStatRequirement) return null;
+
+  const current = currentValue.value;
+  const required = props.criterion.displayValue;
+
   switch (props.criterion.displaySymbol) {
     case '=':
-      return current === required
+      return current === required;
     case '≤':
-      return current <= required
+      return current <= required;
     case '≥':
-      return current >= required
+      return current >= required;
     case '≠':
-      return current !== required
+      return current !== required;
     case 'has':
-      return (current & required) === required
+      return (current & required) === required;
     case 'lacks':
-      return (current & required) === 0
+      return (current & required) === 0;
     default:
-      return null
+      return null;
   }
-})
+});
 
 const formattedValue = computed(() => {
-  const value = props.criterion.displayValue
-  
+  const value = props.criterion.displayValue;
+
   // Handle flag operators - use resolved flag names
   if (props.criterion.displaySymbol === 'has' || props.criterion.displaySymbol === 'lacks') {
-    return getFlagNameFromValue(props.criterion.stat, value)
+    return getFlagNameFromValue(props.criterion.stat, value);
   }
-  
+
   // Special formatting for certain stats
   switch (props.criterion.stat) {
     case 60: // Profession
-      const professionName = getProfessionName(value)
-      return professionName || value.toString()
-      
+      const professionName = getProfessionName(value);
+      return professionName || value.toString();
+
     case 368: // VisualProfession
-      const visualProfessionName = getProfessionName(value)
-      return visualProfessionName || value.toString()
-      
+      const visualProfessionName = getProfessionName(value);
+      return visualProfessionName || value.toString();
+
     case 4: // Breed
-      const breedName = getBreedName(value)
-      return breedName || value.toString()
-      
+      const breedName = getBreedName(value);
+      return breedName || value.toString();
+
     case 59: // Gender
-      const genderName = getGenderName(value)
-      return genderName || value.toString()
-      
+      const genderName = getGenderName(value);
+      return genderName || value.toString();
+
     case 455: // NPCFamily
-      const npcFamilyName = getNPCFamilyName(value)
-      return npcFamilyName || value.toString()
-      
+      const npcFamilyName = getNPCFamilyName(value);
+      return npcFamilyName || value.toString();
+
     case 54: // Level
-      return value.toString()
-      
+      return value.toString();
+
     default:
-      return value.toString()
+      return value.toString();
   }
-})
+});
 
 const chipClasses = computed(() => {
-  const classes = ['criterion-chip']
-  
+  const classes = ['criterion-chip'];
+
   // Size classes
-  classes.push(`size-${props.size}`)
-  
+  classes.push(`size-${props.size}`);
+
   // Status classes
   if (props.criterion.isStatRequirement && props.characterStats) {
     if (requirementMet.value === true) {
-      classes.push('requirement-met')
+      classes.push('requirement-met');
     } else if (requirementMet.value === false) {
-      classes.push('requirement-unmet')
+      classes.push('requirement-unmet');
     } else {
-      classes.push('requirement-unknown')
+      classes.push('requirement-unknown');
     }
   } else {
-    classes.push('requirement-neutral')
+    classes.push('requirement-neutral');
   }
-  
+
   // Type classes
   if (props.criterion.isStatRequirement) {
-    classes.push('stat-requirement-chip')
+    classes.push('stat-requirement-chip');
   } else if (props.criterion.isLogicalOperator) {
-    classes.push('logical-operator-chip')
+    classes.push('logical-operator-chip');
   } else if (isStateRequirement.value) {
-    classes.push('state-requirement-chip')
+    classes.push('state-requirement-chip');
   }
-  
-  return classes
-})
+
+  return classes;
+});
 
 const statusClasses = computed(() => {
   if (requirementMet.value === true) {
-    return 'status-met'
+    return 'status-met';
   } else if (requirementMet.value === false) {
-    return 'status-unmet'
+    return 'status-unmet';
   }
-  return 'status-neutral'
-})
+  return 'status-neutral';
+});
 </script>
 
 <style>

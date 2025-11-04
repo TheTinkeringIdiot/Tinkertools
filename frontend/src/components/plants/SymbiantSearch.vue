@@ -17,7 +17,7 @@ Provides text search with suggestions and quick filters
           @keydown.enter="onSearchSubmit"
         />
       </IconField>
-      
+
       <!-- Clear search button -->
       <Button
         v-if="searchQuery.trim()"
@@ -30,7 +30,7 @@ Provides text search with suggestions and quick filters
         aria-label="Clear search"
       />
     </div>
-    
+
     <!-- Quick filters -->
     <div v-if="showQuickFilters" class="mt-3">
       <div class="text-xs font-medium text-surface-600 dark:text-surface-400 mb-2">
@@ -49,7 +49,7 @@ Provides text search with suggestions and quick filters
         />
       </div>
     </div>
-    
+
     <!-- Search suggestions (when typing) -->
     <div
       v-if="showSuggestions && suggestions.length > 0"
@@ -98,7 +98,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   modelValue: '',
   showQuickFilters: true,
-  placeholder: 'Search symbiants...'
+  placeholder: 'Search symbiants...',
 });
 
 // Emits
@@ -120,9 +120,9 @@ const suggestions = computed<SearchSuggestion[]>(() => {
   if (!searchQuery.value || searchQuery.value.length < 2) {
     return [];
   }
-  
+
   const query = searchQuery.value.toLowerCase();
-  
+
   // Mock suggestions based on common symbiant names and families
   const mockSuggestions: SearchSuggestion[] = [
     { name: 'Seeker', type: 'Family', value: 'family:seeker' },
@@ -133,13 +133,14 @@ const suggestions = computed<SearchSuggestion[]>(() => {
     { name: 'Control', type: 'Unit Type', value: 'type:control' },
     { name: 'Head', type: 'Slot', value: 'slot:head' },
     { name: 'Chest', type: 'Slot', value: 'slot:chest' },
-    { name: 'Arms', type: 'Slot', value: 'slot:arms' }
+    { name: 'Arms', type: 'Slot', value: 'slot:arms' },
   ];
-  
+
   return mockSuggestions
-    .filter(suggestion => 
-      suggestion.name.toLowerCase().includes(query) ||
-      suggestion.type?.toLowerCase().includes(query)
+    .filter(
+      (suggestion) =>
+        suggestion.name.toLowerCase().includes(query) ||
+        suggestion.type?.toLowerCase().includes(query)
     )
     .slice(0, 8); // Limit to 8 suggestions
 });
@@ -150,14 +151,14 @@ const quickFilters = computed<QuickFilter[]>(() => [
   { label: 'Support', value: 'type:support' },
   { label: 'Control', value: 'type:control' },
   { label: 'High QL', value: 'ql:high' },
-  { label: 'Recent', value: 'sort:recent' }
+  { label: 'Recent', value: 'sort:recent' },
 ]);
 
 // Methods
 const onSearchInput = () => {
   emit('update:modelValue', searchQuery.value);
   showSuggestions.value = searchQuery.value.length >= 2;
-  
+
   // Auto-search with debounce would be implemented here
   // For now, just emit on each input
   emit('search', searchQuery.value);
@@ -199,9 +200,12 @@ const applyQuickFilter = (filterValue: string) => {
 };
 
 // Watch for external changes
-watch(() => props.modelValue, (newValue) => {
-  searchQuery.value = newValue;
-});
+watch(
+  () => props.modelValue,
+  (newValue) => {
+    searchQuery.value = newValue;
+  }
+);
 
 // Handle click outside to close suggestions
 const handleClickOutside = (event: Event) => {

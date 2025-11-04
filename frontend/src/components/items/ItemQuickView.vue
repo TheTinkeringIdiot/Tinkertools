@@ -6,25 +6,30 @@ Shows essential item information in a compact format
   <div class="item-quick-view space-y-4">
     <!-- Item Header -->
     <div class="flex items-start gap-4">
-      <div class="w-16 h-16 bg-surface-100 dark:bg-surface-800 rounded-lg flex items-center justify-center flex-shrink-0">
-        <img 
+      <div
+        class="w-16 h-16 bg-surface-100 dark:bg-surface-800 rounded-lg flex items-center justify-center flex-shrink-0"
+      >
+        <img
           v-if="itemIconUrl"
-          :src="itemIconUrl" 
+          :src="itemIconUrl"
           :alt="`${item.name} icon`"
           class="w-12 h-12 object-contain"
           @error="onIconError"
         />
         <i v-else class="pi pi-box text-2xl text-surface-400"></i>
       </div>
-      
+
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2 mb-2">
           <h3 class="text-lg font-semibold">{{ item.name }}</h3>
           <Badge :value="`QL ${item.ql}`" severity="info" />
           <Badge v-if="item.is_nano" value="Nano" severity="success" />
         </div>
-        
-        <p v-if="item.description" class="text-sm text-surface-600 dark:text-surface-400 line-clamp-2">
+
+        <p
+          v-if="item.description"
+          class="text-sm text-surface-600 dark:text-surface-400 line-clamp-2"
+        >
           {{ item.description }}
         </p>
       </div>
@@ -32,7 +37,9 @@ Shows essential item information in a compact format
 
     <!-- Key Stats -->
     <div v-if="keyStats.length > 0">
-      <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Key Statistics</h4>
+      <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        Key Statistics
+      </h4>
       <div class="grid grid-cols-2 gap-2">
         <div
           v-for="stat in keyStats"
@@ -55,7 +62,7 @@ Shows essential item information in a compact format
           class="flex justify-between text-sm p-2 rounded"
           :class="{
             'bg-green-50 dark:bg-green-900/20': canMeetRequirement(req),
-            'bg-red-50 dark:bg-red-900/20': !canMeetRequirement(req)
+            'bg-red-50 dark:bg-red-900/20': !canMeetRequirement(req),
           }"
         >
           <span class="text-surface-600 dark:text-surface-400">{{ getStatName(req.stat) }}</span>
@@ -82,87 +89,86 @@ Shows essential item information in a compact format
         size="small"
         @click="$emit('favorite')"
       />
-      <Button
-        icon="pi pi-clone"
-        label="Compare"
-        outlined
-        size="small"
-        @click="$emit('compare')"
-      />
-      <Button
-        label="View Full Details"
-        @click="$emit('view-full')"
-      />
+      <Button icon="pi pi-clone" label="Compare" outlined size="small" @click="$emit('compare')" />
+      <Button label="View Full Details" @click="$emit('view-full')" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import type { Item, TinkerProfile, ItemRequirement } from '@/types/api'
-import { getItemIconUrl } from '@/services/game-utils'
-import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
+import { computed, ref } from 'vue';
+import type { Item, TinkerProfile, ItemRequirement } from '@/types/api';
+import { getItemIconUrl } from '@/services/game-utils';
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 
 const props = defineProps<{
-  item: Item
-  profile?: TinkerProfile | null
-  showCompatibility?: boolean
-  isFavorite?: boolean
-}>()
+  item: Item;
+  profile?: TinkerProfile | null;
+  showCompatibility?: boolean;
+  isFavorite?: boolean;
+}>();
 
 defineEmits<{
-  close: []
-  'view-full': []
-  favorite: []
-  compare: []
-  'cast-buff': []
-}>()
+  close: [];
+  'view-full': [];
+  favorite: [];
+  compare: [];
+  'cast-buff': [];
+}>();
 
 // Store
-const profilesStore = useTinkerProfilesStore()
+const profilesStore = useTinkerProfilesStore();
 
 // State
-const iconLoadError = ref(false)
+const iconLoadError = ref(false);
 
 // Computed Properties
-const hasActiveProfile = computed(() => profilesStore.hasActiveProfile)
+const hasActiveProfile = computed(() => profilesStore.hasActiveProfile);
 const itemIconUrl = computed(() => {
-  if (iconLoadError.value) return null
-  return getItemIconUrl(props.item.stats || [])
-})
+  if (iconLoadError.value) return null;
+  return getItemIconUrl(props.item.stats || []);
+});
 
 const keyStats = computed(() => {
-  if (!props.item.stats || props.item.stats.length === 0) return []
-  
+  if (!props.item.stats || props.item.stats.length === 0) return [];
+
   return props.item.stats
-    .filter(stat => stat.value !== 0)
+    .filter((stat) => stat.value !== 0)
     .slice(0, 6)
-    .map(stat => ({
+    .map((stat) => ({
       name: getStatName(stat.stat),
-      value: stat.value
-    }))
-})
+      value: stat.value,
+    }));
+});
 
 // Methods
 function canMeetRequirement(requirement: ItemRequirement): boolean {
-  if (!props.profile) return false
-  const skillData = props.profile.skills?.[requirement.stat]
-  const characterStat = skillData?.total || 0
-  return characterStat >= requirement.value
+  if (!props.profile) return false;
+  const skillData = props.profile.skills?.[requirement.stat];
+  const characterStat = skillData?.total || 0;
+  return characterStat >= requirement.value;
 }
 
 function getStatName(statId: number): string {
   const statNames: Record<number, string> = {
-    16: 'Strength', 17: 'Agility', 18: 'Stamina',
-    19: 'Intelligence', 20: 'Sense', 21: 'Psychic',
-    102: '1H Blunt', 103: '1H Edged', 105: '2H Edged',
-    109: '2H Blunt', 133: 'Ranged Energy', 161: 'Computer Literacy'
-  }
-  return statNames[statId] || `Stat ${statId}`
+    16: 'Strength',
+    17: 'Agility',
+    18: 'Stamina',
+    19: 'Intelligence',
+    20: 'Sense',
+    21: 'Psychic',
+    102: '1H Blunt',
+    103: '1H Edged',
+    105: '2H Edged',
+    109: '2H Blunt',
+    133: 'Ranged Energy',
+    161: 'Computer Literacy',
+  };
+  return statNames[statId] || `Stat ${statId}`;
 }
 
 function onIconError() {
-  iconLoadError.value = true
+  iconLoadError.value = true;
 }
 </script>
 

@@ -141,7 +141,7 @@ export function createMockLocalStorage() {
       delete storage[key];
     }),
     clear: vi.fn(() => {
-      Object.keys(storage).forEach(key => delete storage[key]);
+      Object.keys(storage).forEach((key) => delete storage[key]);
     }),
     get length() {
       return Object.keys(storage).length;
@@ -164,7 +164,7 @@ export async function waitForUpdates(wrapper?: VueWrapper, ms: number = 10): Pro
   if (wrapper) {
     await wrapper.vm.$nextTick();
   }
-  await new Promise(resolve => setTimeout(resolve, ms));
+  await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -184,9 +184,9 @@ export async function waitForStatRecalculation(wrapper?: VueWrapper): Promise<vo
   }
 
   // Wait for requestAnimationFrame + async execution
-  await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
+  await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
   // Give enough time for async IP tracking recalculation
-  await new Promise(resolve => setTimeout(resolve, 100));
+  await new Promise((resolve) => setTimeout(resolve, 100));
 
   if (wrapper) {
     await wrapper.vm.$nextTick();

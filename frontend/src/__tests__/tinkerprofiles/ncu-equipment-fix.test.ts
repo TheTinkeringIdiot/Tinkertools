@@ -26,12 +26,12 @@ describe('MaxNCU Equipment Bonus Application', () => {
               spell_id: 53045, // Stat modification spell
               spell_params: {
                 Stat: 181, // MaxNCU stat ID
-                Amount: 25 // +25 NCU bonus
-              }
-            }
-          ]
-        }
-      ]
+                Amount: 25, // +25 NCU bonus
+              },
+            },
+          ],
+        },
+      ],
     } as any;
 
     // Equip the item
@@ -65,12 +65,12 @@ describe('MaxNCU Equipment Bonus Application', () => {
               spell_id: 53045,
               spell_params: {
                 Stat: 181,
-                Amount: 20
-              }
-            }
-          ]
-        }
-      ]
+                Amount: 20,
+              },
+            },
+          ],
+        },
+      ],
     } as any;
 
     const item2: Item = {
@@ -85,12 +85,12 @@ describe('MaxNCU Equipment Bonus Application', () => {
               spell_id: 53045,
               spell_params: {
                 Stat: 181,
-                Amount: 30
-              }
-            }
-          ]
-        }
-      ]
+                Amount: 30,
+              },
+            },
+          ],
+        },
+      ],
     } as any;
 
     // Equip both items
@@ -122,12 +122,12 @@ describe('MaxNCU Equipment Bonus Application', () => {
               spell_id: 53045,
               spell_params: {
                 Stat: 181,
-                Amount: -15
-              }
-            }
-          ]
-        }
-      ]
+                Amount: -15,
+              },
+            },
+          ],
+        },
+      ],
     } as any;
 
     profile.Clothing.Chest = debuffItem;
@@ -155,26 +155,26 @@ describe('MaxNCU Equipment Bonus Application', () => {
               spell_id: 53045,
               spell_params: {
                 Stat: 181, // MaxNCU
-                Amount: 35
-              }
+                Amount: 35,
+              },
             },
             {
               spell_id: 53045,
               spell_params: {
                 Stat: 276, // Add All Off
-                Amount: 10
-              }
+                Amount: 10,
+              },
             },
             {
               spell_id: 53045,
               spell_params: {
                 Stat: 277, // Add All Def
-                Amount: 15
-              }
-            }
-          ]
-        }
-      ]
+                Amount: 15,
+              },
+            },
+          ],
+        },
+      ],
     } as any;
 
     profile.Clothing.Chest = multiStatItem;

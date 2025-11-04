@@ -13,7 +13,7 @@ import {
   createTestItem,
   createPerkItem,
   mountWithContext,
-  standardCleanup
+  standardCleanup,
 } from '@/__tests__/helpers';
 ```
 
@@ -21,30 +21,30 @@ import {
 
 ```typescript
 // Abilities
-SKILL_ID.STRENGTH        // 16
-SKILL_ID.AGILITY         // 17
-SKILL_ID.STAMINA         // 18
-SKILL_ID.INTELLIGENCE    // 19
-SKILL_ID.SENSE           // 20
-SKILL_ID.PSYCHIC         // 21
+SKILL_ID.STRENGTH; // 16
+SKILL_ID.AGILITY; // 17
+SKILL_ID.STAMINA; // 18
+SKILL_ID.INTELLIGENCE; // 19
+SKILL_ID.SENSE; // 20
+SKILL_ID.PSYCHIC; // 21
 
 // Weapons
-SKILL_ID.ASSAULT_RIF     // 116
-SKILL_ID.PISTOL          // 112
-SKILL_ID.RIFLE           // 113
+SKILL_ID.ASSAULT_RIF; // 116
+SKILL_ID.PISTOL; // 112
+SKILL_ID.RIFLE; // 113
 
 // Defense
-SKILL_ID.DODGE_RNG       // 154
-SKILL_ID.BODY_DEV        // 152
-SKILL_ID.NANO_POOL       // 132
+SKILL_ID.DODGE_RNG; // 154
+SKILL_ID.BODY_DEV; // 152
+SKILL_ID.NANO_POOL; // 132
 
 // Trade
-SKILL_ID.COMPUTER_LITERACY // 161
-SKILL_ID.NANO_PROGRAMMING  // 160
+SKILL_ID.COMPUTER_LITERACY; // 161
+SKILL_ID.NANO_PROGRAMMING; // 160
 
 // Misc
-SKILL_ID.MAX_NCU         // 181
-SKILL_ID.ADD_PROJ_DAM    // 278
+SKILL_ID.MAX_NCU; // 181
+SKILL_ID.ADD_PROJ_DAM; // 278
 ```
 
 ## Profile Creation
@@ -57,7 +57,7 @@ const profile = createTestProfile();
 const profile = createTestProfile({
   breed: BREED.SOLITUS,
   profession: PROFESSION.ADVENTURER,
-  level: 220
+  level: 220,
 });
 
 // With skills
@@ -65,9 +65,9 @@ const profile = createTestProfile({
   skills: {
     [SKILL_ID.ASSAULT_RIF]: {
       pointsFromIp: 250,
-      equipmentBonus: 50
-    }
-  }
+      equipmentBonus: 50,
+    },
+  },
 });
 
 // Pre-configured
@@ -82,19 +82,19 @@ const endgame = createEndgameProfile();
 // Create bonuses
 const bonuses = createSkillBonuses([
   [SKILL_ID.ASSAULT_RIF, 10],
-  [SKILL_ID.DODGE_RNG, 5]
+  [SKILL_ID.DODGE_RNG, 5],
 ]);
 
 // Assert bonuses (CORRECT)
 expect(result).toEqual({
   [SKILL_ID.ASSAULT_RIF]: 10,
-  [SKILL_ID.DODGE_RNG]: 5
+  [SKILL_ID.DODGE_RNG]: 5,
 });
 
 // NOT this (WRONG)
 expect(result).toEqual({
-  'Assault Rifle': 10,  // ❌ Don't use strings
-  'Dodge-Rng': 5
+  'Assault Rifle': 10, // ❌ Don't use strings
+  'Dodge-Rng': 5,
 });
 ```
 
@@ -110,7 +110,7 @@ const weapon = createWeaponItem({ name: 'Rifle', ql: 180 });
 // Perk
 const perk = createPerkItem('Combat Perk', 999001, [
   [SKILL_ID.ASSAULT_RIF, 50],
-  [SKILL_ID.RANGED_INIT, 25]
+  [SKILL_ID.RANGED_INIT, 25],
 ]);
 
 // Stat value
@@ -123,7 +123,7 @@ const stat = createStatValue(SKILL_ID.ASSAULT_RIF, 10);
 describe('MyComponent', () => {
   it('should render', () => {
     const wrapper = mountWithContext(MyComponent, {
-      props: { item: mockItem }
+      props: { item: mockItem },
     });
 
     expect(wrapper.exists()).toBe(true);
@@ -159,14 +159,14 @@ afterEach(() => {
 it('should calculate bonuses correctly', () => {
   const items = [
     createPerkItem('Perk 1', 999001, [[SKILL_ID.ASSAULT_RIF, 10]]),
-    createPerkItem('Perk 2', 999002, [[SKILL_ID.DODGE_RNG, 5]])
+    createPerkItem('Perk 2', 999002, [[SKILL_ID.DODGE_RNG, 5]]),
   ];
 
   const result = calculateBonuses(items);
 
   expect(result).toEqual({
     [SKILL_ID.ASSAULT_RIF]: 10,
-    [SKILL_ID.DODGE_RNG]: 5
+    [SKILL_ID.DODGE_RNG]: 5,
   });
 });
 ```
@@ -191,7 +191,7 @@ it('should display item details', () => {
   const item = createTestItem({ name: 'Test Item', ql: 200 });
 
   const wrapper = mountWithContext(ItemCard, {
-    props: { item }
+    props: { item },
   });
 
   expect(wrapper.text()).toContain('Test Item');
@@ -205,7 +205,7 @@ it('should display item details', () => {
 it('should sum perk bonuses', () => {
   const perks = [
     createPerkItem('Perk A', 999001, [[SKILL_ID.ASSAULT_RIF, 30]]),
-    createPerkItem('Perk B', 999002, [[SKILL_ID.ASSAULT_RIF, 20]])
+    createPerkItem('Perk B', 999002, [[SKILL_ID.ASSAULT_RIF, 20]]),
   ];
 
   const total = calculateTotalBonus(perks, SKILL_ID.ASSAULT_RIF);

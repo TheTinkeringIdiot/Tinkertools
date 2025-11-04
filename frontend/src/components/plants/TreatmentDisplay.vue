@@ -1,9 +1,5 @@
 <template>
-  <div
-    class="treatment-display"
-    role="status"
-    :aria-label="accessibilityLabel"
-  >
+  <div class="treatment-display" role="status" :aria-label="accessibilityLabel">
     <div class="treatment-content">
       <!-- Treatment Required -->
       <div class="treatment-item">
@@ -26,20 +22,15 @@
       <!-- Need/Surplus with Tag -->
       <div class="treatment-item">
         <span class="treatment-label">{{ needLabel }}:</span>
-        <Tag
-          :value="deltaText"
-          :severity="tagSeverity"
-          :icon="tagIcon"
-          class="treatment-tag"
-        />
+        <Tag :value="deltaText" :severity="tagSeverity" :icon="tagIcon" class="treatment-tag" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import Tag from 'primevue/tag'
+import { computed } from 'vue';
+import Tag from 'primevue/tag';
 
 // ============================================================================
 // Props
@@ -47,16 +38,16 @@ import Tag from 'primevue/tag'
 
 interface Props {
   /** Treatment required by the highest QL implant */
-  treatmentRequired: number
+  treatmentRequired: number;
   /** Current profile treatment skill value */
-  profileTreatment: number
+  profileTreatment: number;
   /** Difference between required and profile (positive = need more) */
-  delta: number
+  delta: number;
   /** Whether profile treatment is sufficient */
-  sufficient: boolean
+  sufficient: boolean;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 
 // ============================================================================
 // Computed Properties
@@ -66,65 +57,65 @@ const props = defineProps<Props>()
  * Format number value with comma separators
  */
 const formatValue = (value: number): string => {
-  return Math.round(value).toLocaleString()
-}
+  return Math.round(value).toLocaleString();
+};
 
 /**
  * Text for the delta display
  */
 const deltaText = computed((): string => {
-  const absDelta = Math.abs(props.delta)
-  const formattedDelta = formatValue(absDelta)
+  const absDelta = Math.abs(props.delta);
+  const formattedDelta = formatValue(absDelta);
 
   if (props.delta > 0) {
     // Need more treatment
-    return `+${formattedDelta}`
+    return `+${formattedDelta}`;
   } else if (props.delta < 0) {
     // Have surplus treatment
-    return `-${formattedDelta}`
+    return `-${formattedDelta}`;
   } else {
     // Exact match
-    return 'Exact Match'
+    return 'Exact Match';
   }
-})
+});
 
 /**
  * Label for the need/surplus section
  */
 const needLabel = computed((): string => {
   if (props.delta > 0) {
-    return 'Need'
+    return 'Need';
   } else if (props.delta < 0) {
-    return 'Surplus'
+    return 'Surplus';
   } else {
-    return 'Status'
+    return 'Status';
   }
-})
+});
 
 /**
  * PrimeVue Tag severity based on sufficient status
  */
 const tagSeverity = computed((): 'success' | 'danger' => {
-  return props.sufficient ? 'success' : 'danger'
-})
+  return props.sufficient ? 'success' : 'danger';
+});
 
 /**
  * Icon for the Tag component
  */
 const tagIcon = computed((): string => {
-  return props.sufficient ? 'pi pi-check' : 'pi pi-exclamation-triangle'
-})
+  return props.sufficient ? 'pi pi-check' : 'pi pi-exclamation-triangle';
+});
 
 /**
  * Accessibility label for screen readers
  */
 const accessibilityLabel = computed((): string => {
   if (props.sufficient) {
-    return `Treatment requirement met. Required: ${props.treatmentRequired}, Your treatment: ${props.profileTreatment}`
+    return `Treatment requirement met. Required: ${props.treatmentRequired}, Your treatment: ${props.profileTreatment}`;
   } else {
-    return `Treatment requirement not met. Required: ${props.treatmentRequired}, Your treatment: ${props.profileTreatment}, Need: ${Math.abs(props.delta)} more`
+    return `Treatment requirement not met. Required: ${props.treatmentRequired}, Your treatment: ${props.profileTreatment}, Need: ${Math.abs(props.delta)} more`;
   }
-})
+});
 </script>
 
 <style scoped>

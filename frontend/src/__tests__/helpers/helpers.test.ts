@@ -224,10 +224,7 @@ describe('Test Helpers Validation', () => {
 
     it('should extract item bonuses', () => {
       const item = createTestItem({
-        stats: [
-          createStatValue(SKILL_ID.ASSAULT_RIF, 10),
-          createStatValue(SKILL_ID.DODGE_RNG, 5),
-        ],
+        stats: [createStatValue(SKILL_ID.ASSAULT_RIF, 10), createStatValue(SKILL_ID.DODGE_RNG, 5)],
       });
 
       const bonuses = extractItemBonuses(item);
@@ -276,9 +273,7 @@ describe('Test Helpers Validation', () => {
 
       // Create equipment
       const weapon = createWeaponItem({ name: 'Combat Rifle', ql: 180 });
-      const perk = createPerkItem('Combat Mastery', 999002, [
-        [SKILL_ID.ASSAULT_RIF, 50],
-      ]);
+      const perk = createPerkItem('Combat Mastery', 999002, [[SKILL_ID.ASSAULT_RIF, 50]]);
 
       // Extract bonuses
       const weaponBonuses = extractItemBonuses(weapon);

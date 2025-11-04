@@ -75,14 +75,14 @@ export interface IPTracker {
 
 /** Implant cluster information from AOSetups */
 export interface ImplantCluster {
-  stat: number;        // STAT ID from game-data
-  skillName: string;   // Human-readable skill name
-  value?: number;      // Cluster value/bonus (if applicable)
+  stat: number; // STAT ID from game-data
+  skillName: string; // Human-readable skill name
+  value?: number; // Cluster value/bonus (if applicable)
 }
 
 /** Enhanced implant item with cluster information */
 export interface ImplantWithClusters extends Item {
-  slot: number;        // Numeric slot position from IMPLANT_SLOT_POSITION
+  slot: number; // Numeric slot position from IMPLANT_SLOT_POSITION
   type: 'implant' | 'symbiant';
   clusters?: {
     Shiny?: ImplantCluster;
@@ -100,7 +100,7 @@ export interface ImplantWithClusters extends Item {
 export interface TinkerProfile {
   // Profile metadata
   id: string;
-  version: '4.0.0';  // Fixed version for v4.0.0 profiles
+  version: '4.0.0'; // Fixed version for v4.0.0 profiles
   created: string;
   updated: string;
 
@@ -108,8 +108,8 @@ export interface TinkerProfile {
   Character: {
     Name: string;
     Level: number;
-    Profession: number;  // Profession ID (1-15)
-    Breed: number;       // Breed ID (0-4 or 7)
+    Profession: number; // Profession ID (1-15)
+    Breed: number; // Breed ID (0-4 or 7)
     Faction: string;
     Expansion: string;
     AccountType: string;

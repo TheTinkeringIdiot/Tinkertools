@@ -48,21 +48,23 @@ export const themeColors = {
   },
   get border() {
     return getThemeValue('border-surface-200', 'border-surface-700');
-  }
+  },
 };
 
 /**
  * Get PrimeVue theme-aware severity colors
  */
-export const getThemeSeverity = (severity: 'info' | 'success' | 'warn' | 'error' | 'secondary' = 'info') => {
+export const getThemeSeverity = (
+  severity: 'info' | 'success' | 'warn' | 'error' | 'secondary' = 'info'
+) => {
   const severityMap = {
     info: getThemeValue('info', 'info'),
-    success: getThemeValue('success', 'success'), 
+    success: getThemeValue('success', 'success'),
     warn: getThemeValue('warn', 'warn'),
     error: getThemeValue('danger', 'danger'),
-    secondary: getThemeValue('secondary', 'secondary')
+    secondary: getThemeValue('secondary', 'secondary'),
   };
-  
+
   return severityMap[severity];
 };
 
@@ -80,5 +82,5 @@ export default {
   getThemeValue,
   themeColors,
   getThemeSeverity,
-  getThemeIcon
+  getThemeIcon,
 };

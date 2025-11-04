@@ -35,7 +35,7 @@ Provides a spacious interface for selecting function, stat, operator, and value
             />
           </div>
           <div class="text-xs text-surface-500 dark:text-surface-400 mt-1">
-            <strong>Requires:</strong> Items that need this stat to equip/use<br>
+            <strong>Requires:</strong> Items that need this stat to equip/use<br />
             <strong>Modifies:</strong> Items that boost this stat when equipped
           </div>
         </div>
@@ -91,7 +91,10 @@ Provides a spacious interface for selecting function, stat, operator, and value
       </div>
 
       <!-- Preview -->
-      <div v-if="isValidFilter" class="p-3 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700">
+      <div
+        v-if="isValidFilter"
+        class="p-3 bg-surface-100 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700"
+      >
         <div class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
           Filter Preview:
         </div>
@@ -103,57 +106,49 @@ Provides a spacious interface for selecting function, stat, operator, and value
 
     <template #footer>
       <div class="flex justify-end gap-2">
-        <Button
-          label="Cancel"
-          outlined
-          @click="cancel"
-        />
-        <Button
-          label="Add Filter"
-          :disabled="!isValidFilter"
-          @click="addFilter"
-        />
+        <Button label="Cancel" outlined @click="cancel" />
+        <Button label="Add Filter" :disabled="!isValidFilter" @click="addFilter" />
       </div>
     </template>
   </Dialog>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import type { StatFilter } from '@/types/api'
-import { STAT } from '@/services/game-data'
+import { ref, computed, watch } from 'vue';
+import type { StatFilter } from '@/types/api';
+import { STAT } from '@/services/game-data';
 
 const props = defineProps<{
-  visible: boolean
-  initialFilter?: Partial<StatFilter>
-}>()
+  visible: boolean;
+  initialFilter?: Partial<StatFilter>;
+}>();
 
 const emit = defineEmits<{
-  'update:visible': [visible: boolean]
-  'add-filter': [filter: StatFilter]
-}>()
+  'update:visible': [visible: boolean];
+  'add-filter': [filter: StatFilter];
+}>();
 
 // Local state
 const localFilter = ref<StatFilter>({
   function: 'requires',
   stat: 16, // Default to Strength
   operator: '>=',
-  value: 100
-})
+  value: 100,
+});
 
 // Modal visibility
 const isVisible = computed({
   get: () => props.visible,
-  set: (value) => emit('update:visible', value)
-})
+  set: (value) => emit('update:visible', value),
+});
 
 // Options for dropdowns
 const operatorOptions = [
   { label: '==', value: '==' },
   { label: '<=', value: '<=' },
   { label: '>=', value: '>=' },
-  { label: '!=', value: '!=' }
-]
+  { label: '!=', value: '!=' },
+];
 
 // Convert STAT mapping to dropdown options, filtering out non-useful stats
 const statOptions = computed(() => {
@@ -203,44 +198,47 @@ const statOptions = computed(() => {
     88, // DefaultSlot
     98, // StateAction
     99, // ItemAnim
-  ])
+  ]);
 
   return Object.entries(STAT)
     .filter(([key]) => !excludedStats.has(parseInt(key)))
     .map(([key, value]) => ({
       label: value,
-      value: parseInt(key)
+      value: parseInt(key),
     }))
-    .sort((a, b) => a.label.localeCompare(b.label))
-})
+    .sort((a, b) => a.label.localeCompare(b.label));
+});
 
 // Validation
 const isValidFilter = computed(() => {
-  return localFilter.value.function &&
-         localFilter.value.stat !== undefined &&
-         localFilter.value.operator &&
-         localFilter.value.value !== undefined &&
-         localFilter.value.value !== null
-})
+  return (
+    localFilter.value.function &&
+    localFilter.value.stat !== undefined &&
+    localFilter.value.operator &&
+    localFilter.value.value !== undefined &&
+    localFilter.value.value !== null
+  );
+});
 
 // Methods
 function formatFilterPreview(): string {
-  const statName = statOptions.value.find(s => s.value === localFilter.value.stat)?.label || 'Unknown'
-  const functionText = localFilter.value.function === 'requires' ? 'Requires' : 'Modifies'
-  return `${functionText} ${statName} ${localFilter.value.operator} ${localFilter.value.value}`
+  const statName =
+    statOptions.value.find((s) => s.value === localFilter.value.stat)?.label || 'Unknown';
+  const functionText = localFilter.value.function === 'requires' ? 'Requires' : 'Modifies';
+  return `${functionText} ${statName} ${localFilter.value.operator} ${localFilter.value.value}`;
 }
 
 function addFilter() {
   if (isValidFilter.value) {
-    emit('add-filter', { ...localFilter.value })
-    resetFilter()
-    isVisible.value = false
+    emit('add-filter', { ...localFilter.value });
+    resetFilter();
+    isVisible.value = false;
   }
 }
 
 function cancel() {
-  resetFilter()
-  isVisible.value = false
+  resetFilter();
+  isVisible.value = false;
 }
 
 function resetFilter() {
@@ -248,28 +246,32 @@ function resetFilter() {
     function: 'requires',
     stat: 16, // Default to Strength
     operator: '>=',
-    value: 100
-  }
+    value: 100,
+  };
 }
 
 // Watch for initial filter prop
-watch(() => props.initialFilter, (newFilter) => {
-  if (newFilter) {
-    localFilter.value = {
-      function: newFilter.function || 'requires',
-      stat: newFilter.stat ?? 16,
-      operator: newFilter.operator || '>=',
-      value: newFilter.value ?? 100
+watch(
+  () => props.initialFilter,
+  (newFilter) => {
+    if (newFilter) {
+      localFilter.value = {
+        function: newFilter.function || 'requires',
+        stat: newFilter.stat ?? 16,
+        operator: newFilter.operator || '>=',
+        value: newFilter.value ?? 100,
+      };
     }
-  }
-}, { immediate: true })
+  },
+  { immediate: true }
+);
 
 // Reset when modal opens
 watch(isVisible, (visible) => {
   if (visible && !props.initialFilter) {
-    resetFilter()
+    resetFilter();
   }
-})
+});
 </script>
 
 <style scoped>

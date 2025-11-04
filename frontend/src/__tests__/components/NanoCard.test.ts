@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mountWithContext, standardCleanup, setupLocalStorageMock, createTestProfile, PROFESSION, SKILL_ID } from '@/__tests__/helpers';
+import {
+  mountWithContext,
+  standardCleanup,
+  setupLocalStorageMock,
+  createTestProfile,
+  PROFESSION,
+  SKILL_ID,
+} from '@/__tests__/helpers';
 import { nextTick } from 'vue';
 import NanoCard from '@/components/nanos/NanoCard.vue';
 import type { NanoProgram, TinkerProfile, NanoCompatibilityInfo } from '@/types/nano';
@@ -29,7 +36,7 @@ describe('NanoCard', () => {
       castingRequirements: [
         { type: 'skill', requirement: SKILL_ID.BIO_METAMOR, value: 750, critical: true },
         { type: 'skill', requirement: SKILL_ID.NANO_PROGRAMMING, value: 600, critical: true },
-        { type: 'level', requirement: 'level', value: 125, critical: true }
+        { type: 'level', requirement: 'level', value: 125, critical: true },
       ],
       effects: [
         {
@@ -37,23 +44,53 @@ describe('NanoCard', () => {
           value: 1250,
           modifier: 'add',
           stackable: false,
-          conditions: []
-        }
+          conditions: [],
+        },
       ],
       duration: { type: 'instant' },
-      targeting: { type: 'team', range: 30 }
+      targeting: { type: 'team', range: 30 },
     };
 
     mockProfile = createTestProfile({
       profession: PROFESSION.DOCTOR,
       level: 100,
       skills: {
-        [SKILL_ID.BIO_METAMOR]: { base: 0, trickle: 0, pointsFromIp: 500, equipmentBonus: 0, total: 500 },
-        [SKILL_ID.MATTER_CREATION]: { base: 0, trickle: 0, pointsFromIp: 300, equipmentBonus: 0, total: 300 },
-        [SKILL_ID.NANO_PROGRAMMING]: { base: 0, trickle: 0, pointsFromIp: 400, equipmentBonus: 0, total: 400 },
-        [SKILL_ID.INTELLIGENCE]: { base: 0, trickle: 0, pointsFromIp: 400, equipmentBonus: 0, total: 400 },
-        [SKILL_ID.PSYCHIC]: { base: 0, trickle: 0, pointsFromIp: 300, equipmentBonus: 0, total: 300 }
-      }
+        [SKILL_ID.BIO_METAMOR]: {
+          base: 0,
+          trickle: 0,
+          pointsFromIp: 500,
+          equipmentBonus: 0,
+          total: 500,
+        },
+        [SKILL_ID.MATTER_CREATION]: {
+          base: 0,
+          trickle: 0,
+          pointsFromIp: 300,
+          equipmentBonus: 0,
+          total: 300,
+        },
+        [SKILL_ID.NANO_PROGRAMMING]: {
+          base: 0,
+          trickle: 0,
+          pointsFromIp: 400,
+          equipmentBonus: 0,
+          total: 400,
+        },
+        [SKILL_ID.INTELLIGENCE]: {
+          base: 0,
+          trickle: 0,
+          pointsFromIp: 400,
+          equipmentBonus: 0,
+          total: 400,
+        },
+        [SKILL_ID.PSYCHIC]: {
+          base: 0,
+          trickle: 0,
+          pointsFromIp: 300,
+          equipmentBonus: 0,
+          total: 300,
+        },
+      },
     }) as any; // Cast as any since the type might differ from NanoProgram TinkerProfile
 
     mockCompatibilityInfo = {
@@ -62,12 +99,12 @@ describe('NanoCard', () => {
       averageSkillGap: 200,
       skillDeficits: [
         { skill: 'Biological Metamorphosis', current: 500, required: 750, deficit: 250 },
-        { skill: 'Nano Programming', current: 400, required: 600, deficit: 200 }
+        { skill: 'Nano Programming', current: 400, required: 600, deficit: 200 },
       ],
       statDeficits: [],
       levelDeficit: 25,
       memoryUsage: 85,
-      nanoPointCost: 450
+      nanoPointCost: 450,
     };
 
     // Mock localStorage
@@ -79,8 +116,8 @@ describe('NanoCard', () => {
         compact: false,
         showCompatibility: false,
         activeProfile: null,
-        compatibilityInfo: null
-      }
+        compatibilityInfo: null,
+      },
     });
   });
 
@@ -145,7 +182,7 @@ describe('NanoCard', () => {
 
   it('renders in compact mode when compact prop is true', async () => {
     await wrapper.setProps({ compact: true });
-    
+
     // In compact mode, should still show basic info but in condensed format
     expect(wrapper.text()).toContain('Superior Heal');
     expect(wrapper.text()).toContain('BM');
@@ -154,7 +191,7 @@ describe('NanoCard', () => {
 
   it('emits select event when card is clicked', async () => {
     await wrapper.find('.card').trigger('click');
-    
+
     expect(wrapper.emitted('select')).toBeTruthy();
     expect(wrapper.emitted('select')[0][0]).toEqual(mockNano);
   });
@@ -162,7 +199,7 @@ describe('NanoCard', () => {
   it('toggles favorite when favorite button is clicked', async () => {
     const favoriteButton = wrapper.find('button');
     await favoriteButton.trigger('click');
-    
+
     expect(wrapper.emitted('favorite')).toBeTruthy();
     expect(wrapper.emitted('favorite')?.[0]).toEqual([1, true]);
     expect(localStorage.setItem).toHaveBeenCalled();
@@ -170,9 +207,9 @@ describe('NanoCard', () => {
 
   it('prevents card click event when favorite button is clicked', async () => {
     const favoriteButton = wrapper.find('button');
-    
+
     await favoriteButton.trigger('click');
-    
+
     // Should emit favorite but not select (since we're clicking the button, not the card)
     expect(wrapper.emitted('favorite')).toBeTruthy();
     // Card click should not be triggered when button is clicked
@@ -183,9 +220,9 @@ describe('NanoCard', () => {
     await wrapper.setProps({
       showCompatibility: true,
       activeProfile: mockProfile,
-      compatibilityInfo: mockCompatibilityInfo
+      compatibilityInfo: mockCompatibilityInfo,
     });
-    
+
     expect(wrapper.text()).toContain('67%'); // Compatibility score
     expect(wrapper.find('i').classes()).toContain('pi-times-circle'); // Cannot cast icon
   });
@@ -194,9 +231,9 @@ describe('NanoCard', () => {
     await wrapper.setProps({
       showCompatibility: true,
       activeProfile: mockProfile,
-      compatibilityInfo: mockCompatibilityInfo
+      compatibilityInfo: mockCompatibilityInfo,
     });
-    
+
     expect(wrapper.text()).toContain('Cannot Cast');
     expect(wrapper.text()).toContain('Biological Metamorphosis');
     expect(wrapper.text()).toContain('need 250 more'); // Skill deficit
@@ -208,9 +245,9 @@ describe('NanoCard', () => {
     await wrapper.setProps({
       showCompatibility: true,
       activeProfile: mockProfile,
-      compatibilityInfo: mockCompatibilityInfo
+      compatibilityInfo: mockCompatibilityInfo,
     });
-    
+
     expect(wrapper.text()).toContain('25 more levels'); // Level deficit
   });
 
@@ -218,9 +255,9 @@ describe('NanoCard', () => {
     await wrapper.setProps({
       showCompatibility: true,
       activeProfile: mockProfile,
-      compatibilityInfo: mockCompatibilityInfo
+      compatibilityInfo: mockCompatibilityInfo,
     });
-    
+
     expect(wrapper.text()).toContain('85mb'); // Memory usage
     expect(wrapper.text()).toContain('450'); // Nano point cost
   });
@@ -229,9 +266,9 @@ describe('NanoCard', () => {
     await wrapper.setProps({
       showCompatibility: true,
       activeProfile: mockProfile,
-      compatibilityInfo: mockCompatibilityInfo
+      compatibilityInfo: mockCompatibilityInfo,
     });
-    
+
     const card = wrapper.find('.card');
     expect(card.classes()).toContain('border-l-red-500'); // Cannot cast - red border
   });
@@ -242,15 +279,15 @@ describe('NanoCard', () => {
       canCast: true,
       compatibilityScore: 100,
       skillDeficits: [],
-      levelDeficit: 0
+      levelDeficit: 0,
     };
-    
+
     await wrapper.setProps({
       showCompatibility: true,
       activeProfile: mockProfile,
-      compatibilityInfo: castableCompatibility
+      compatibilityInfo: castableCompatibility,
     });
-    
+
     const card = wrapper.find('.card');
     expect(card.classes()).toContain('border-l-green-500'); // Can cast - green border
   });
@@ -261,15 +298,15 @@ describe('NanoCard', () => {
       canCast: false,
       compatibilityScore: 80,
       skillDeficits: [{ skill: 'Test', current: 400, required: 500, deficit: 100 }],
-      levelDeficit: 0
+      levelDeficit: 0,
     };
-    
+
     await wrapper.setProps({
       showCompatibility: true,
       activeProfile: mockProfile,
-      compatibilityInfo: partialCompatibility
+      compatibilityInfo: partialCompatibility,
     });
-    
+
     const card = wrapper.find('.card');
     expect(card.classes()).toContain('border-l-yellow-500'); // Partially compatible - yellow border
   });
@@ -287,11 +324,11 @@ describe('NanoCard', () => {
       school: 'Matter Creation',
       strain: 'Test',
       level: 1,
-      qualityLevel: 1
+      qualityLevel: 1,
     };
-    
+
     await wrapper.setProps({ nano: minimalNano });
-    
+
     expect(wrapper.text()).toContain('Basic Nano');
     expect(wrapper.text()).toContain('MC'); // Matter Creation -> MC
   });
@@ -299,9 +336,9 @@ describe('NanoCard', () => {
   it('shows requirement status when profile is active', async () => {
     await wrapper.setProps({
       showCompatibility: true,
-      activeProfile: mockProfile
+      activeProfile: mockProfile,
     });
-    
+
     // Should show current/required values for requirements
     const reqElements = wrapper.findAll('.text-red-600, .text-green-600');
     expect(reqElements.length).toBeGreaterThan(0);
@@ -323,12 +360,12 @@ describe('NanoCard', () => {
         { type: 'damage', value: 200, modifier: 'add', stackable: false, conditions: [] },
         { type: 'protection', value: 300, modifier: 'add', stackable: false, conditions: [] },
         { type: 'utility', value: 400, modifier: 'add', stackable: false, conditions: [] },
-        { type: 'summon', value: 500, modifier: 'add', stackable: false, conditions: [] }
-      ]
+        { type: 'summon', value: 500, modifier: 'add', stackable: false, conditions: [] },
+      ],
     };
-    
+
     await wrapper.setProps({ nano: nanoWithManyEffects });
-    
+
     expect(wrapper.text()).toContain('+2 more'); // Shows truncation indicator
   });
 });

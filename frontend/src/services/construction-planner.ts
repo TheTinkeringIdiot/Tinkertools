@@ -1,6 +1,6 @@
 /**
  * TinkerTools Construction Planner Service
- * 
+ *
  * High-level service for managing implant construction planning,
  * integrating construction analysis with UI state management.
  */
@@ -12,7 +12,7 @@ import {
   jobeClusterSkill,
   type SkillSet,
   type ConstructionPlan,
-  type ConstructionStep
+  type ConstructionStep,
 } from '../utils/construction-analysis';
 import { IMP_SLOTS, type ImpSlotName } from '../services/game-data';
 import { isJobeCluster } from '../utils/cluster-utilities';
@@ -31,18 +31,18 @@ interface ConstructionState {
 
 const state = reactive<ConstructionState>({
   skills: {
-    'Nanoprogramming': 0,
+    Nanoprogramming: 0,
     'Break & Entry': 0,
-    'Psychology': 0,
+    Psychology: 0,
     'Quantum FT': 0,
     'Computer Literacy': 0,
     'Pharma Tech': 0,
-    'Weaponsmithing': 0
+    Weaponsmithing: 0,
   },
   selectedSlot: null,
   currentPlan: null,
   isAnalyzing: false,
-  lastError: null
+  lastError: null,
 });
 
 // ============================================================================
@@ -50,9 +50,9 @@ const state = reactive<ConstructionState>({
 // ============================================================================
 
 const availableSlots = computed(() => {
-  return IMP_SLOTS.map(slot => ({
+  return IMP_SLOTS.map((slot) => ({
     value: slot,
-    label: slot
+    label: slot,
   }));
 });
 
@@ -74,7 +74,7 @@ const canAnalyze = computed(() => {
 function updateSkills(newSkills: Partial<SkillSet>) {
   Object.assign(state.skills, newSkills);
   state.lastError = null;
-  
+
   // Clear current plan if skills change significantly
   if (state.currentPlan && (newSkills['Nanoprogramming'] || newSkills['Break & Entry'])) {
     state.currentPlan = null;
@@ -104,31 +104,30 @@ async function analyzeConstruction(
     state.lastError = 'Please enter your Nanoprogramming and Break & Entry skills';
     return null;
   }
-  
+
   state.isAnalyzing = true;
   state.lastError = null;
-  
+
   try {
     // Simulate analysis delay for better UX
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
     const plan = generateConstructionPlan(
       slot,
       shinySkill || 'Empty',
-      brightSkill || 'Empty', 
+      brightSkill || 'Empty',
       fadedSkill || 'Empty',
       targetQL,
       state.skills
     );
-    
+
     state.currentPlan = plan;
-    
+
     if (!plan.success && plan.error) {
       state.lastError = plan.error;
     }
-    
+
     return plan;
-    
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Construction analysis failed';
     state.lastError = errorMessage;
@@ -153,13 +152,13 @@ function clearAnalysis() {
  */
 function reset() {
   state.skills = {
-    'Nanoprogramming': 0,
+    Nanoprogramming: 0,
     'Break & Entry': 0,
-    'Psychology': 0,
+    Psychology: 0,
     'Quantum FT': 0,
     'Computer Literacy': 0,
     'Pharma Tech': 0,
-    'Weaponsmithing': 0
+    Weaponsmithing: 0,
   };
   state.selectedSlot = null;
   state.currentPlan = null;
@@ -202,12 +201,12 @@ function getConstructionFeasibility(
   }
 
   // Find max NP requirement
-  const maxNPReq = Math.max(...requirements.map(r => r.npReq), 0);
+  const maxNPReq = Math.max(...requirements.map((r) => r.npReq), 0);
 
   if (maxNPReq > 0 && npSkill < maxNPReq) {
     return {
       feasible: false,
-      reason: `Nanoprogramming too low (need ${maxNPReq}, have ${npSkill})`
+      reason: `Nanoprogramming too low (need ${maxNPReq}, have ${npSkill})`,
     };
   }
 
@@ -216,7 +215,7 @@ function getConstructionFeasibility(
   if (targetQL > 50 && beSkill < beReq) {
     return {
       feasible: false,
-      reason: `Break & Entry too low for QL bumping (need ${beReq}, have ${beSkill})`
+      reason: `Break & Entry too low for QL bumping (need ${beReq}, have ${beSkill})`,
     };
   }
 
@@ -253,14 +252,13 @@ function getSkillRecommendations(
   }
 
   // Recommend max NP requirement (or fallback to estimate if no clusters)
-  const npRecommended = npRequirements.length > 0
-    ? Math.max(...npRequirements)
-    : Math.round(targetQL * 2.5); // Fallback for empty build
+  const npRecommended =
+    npRequirements.length > 0 ? Math.max(...npRequirements) : Math.round(targetQL * 2.5); // Fallback for empty build
 
   recommendations.push({
     skill: 'Nanoprogramming',
     recommended: npRecommended,
-    current: state.skills['Nanoprogramming'] || 0
+    current: state.skills['Nanoprogramming'] || 0,
   });
 
   // Break & Entry for QL bumping (game mechanic constant)
@@ -269,7 +267,7 @@ function getSkillRecommendations(
     recommendations.push({
       skill: 'Break & Entry',
       recommended: beRecommended,
-      current: state.skills['Break & Entry'] || 0
+      current: state.skills['Break & Entry'] || 0,
     });
   }
 
@@ -283,12 +281,12 @@ function getSkillRecommendations(
 export const constructionPlannerService = {
   // State
   state: readonly(state),
-  
+
   // Computed
   availableSlots,
   hasValidSkills,
   canAnalyze,
-  
+
   // Methods
   updateSkills,
   setSelectedSlot,
@@ -296,7 +294,7 @@ export const constructionPlannerService = {
   clearAnalysis,
   reset,
   getConstructionFeasibility,
-  getSkillRecommendations
+  getSkillRecommendations,
 };
 
 // For TypeScript compatibility

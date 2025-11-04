@@ -15,9 +15,7 @@ Auto-populates from active TinkerProfile buff names when available.
 <template>
   <div class="buff-presets-section space-y-4">
     <div class="section-header">
-      <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-100">
-        Buff Presets
-      </h3>
+      <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-100">Buff Presets</h3>
       <p class="text-sm text-surface-600 dark:text-surface-400 mt-1">
         Select active buff levels to adjust nano cost, damage, and regeneration calculations
       </p>
@@ -26,7 +24,10 @@ Auto-populates from active TinkerProfile buff names when available.
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <!-- Crunchcom (Nano Cost Reduction) -->
       <div class="field">
-        <label for="crunchcom" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="crunchcom"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Crunchcom <span class="text-surface-500 dark:text-surface-400">(Cost Reduction)</span>
         </label>
         <Dropdown
@@ -43,7 +44,10 @@ Auto-populates from active TinkerProfile buff names when available.
 
       <!-- Humidity (Nano Regen) -->
       <div class="field">
-        <label for="humidity" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="humidity"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Humidity <span class="text-surface-500 dark:text-surface-400">(Nano Regen)</span>
         </label>
         <Dropdown
@@ -60,7 +64,10 @@ Auto-populates from active TinkerProfile buff names when available.
 
       <!-- Notum Siphon (Nano Regen) -->
       <div class="field">
-        <label for="notumSiphon" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="notumSiphon"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Notum Siphon <span class="text-surface-500 dark:text-surface-400">(Nano Regen)</span>
         </label>
         <Dropdown
@@ -77,8 +84,12 @@ Auto-populates from active TinkerProfile buff names when available.
 
       <!-- Channeling of Notum (Nano Regen) -->
       <div class="field">
-        <label for="channeling" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
-          Channeling of Notum <span class="text-surface-500 dark:text-surface-400">(Nano Regen)</span>
+        <label
+          for="channeling"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
+          Channeling of Notum
+          <span class="text-surface-500 dark:text-surface-400">(Nano Regen)</span>
         </label>
         <Dropdown
           id="channeling"
@@ -94,7 +105,10 @@ Auto-populates from active TinkerProfile buff names when available.
 
       <!-- Enhance Nano Damage -->
       <div class="field">
-        <label for="enhanceNanoDamage" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="enhanceNanoDamage"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Enhance Nano Damage <span class="text-surface-500 dark:text-surface-400">(Damage %)</span>
         </label>
         <Dropdown
@@ -111,7 +125,10 @@ Auto-populates from active TinkerProfile buff names when available.
 
       <!-- Ancient Matrix -->
       <div class="field">
-        <label for="ancientMatrix" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="ancientMatrix"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Ancient Matrix <span class="text-surface-500 dark:text-surface-400">(Damage %)</span>
         </label>
         <Dropdown
@@ -243,8 +260,16 @@ const BUFF_NAME_PATTERNS = {
  */
 function extractBuffLevel(itemName: string): number {
   const romanNumerals: Record<string, number> = {
-    'I': 1, 'II': 2, 'III': 3, 'IV': 4, 'V': 5,
-    'VI': 6, 'VII': 7, 'VIII': 8, 'IX': 9, 'X': 10,
+    I: 1,
+    II: 2,
+    III: 3,
+    IV: 4,
+    V: 5,
+    VI: 6,
+    VII: 7,
+    VIII: 8,
+    IX: 9,
+    X: 10,
   };
 
   // Try to match Roman numeral at end of name

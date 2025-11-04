@@ -1,6 +1,6 @@
 /**
  * TinkerTools Flag Operations Utility
- * 
+ *
  * Functions for binary flag decoding, manipulation, permission checking,
  * and validation of flag-based restrictions and requirements.
  */
@@ -18,7 +18,7 @@ export enum SPECIALIZATION_FLAG {
   Bit5 = 32,
   Bit6 = 64,
   Bit7 = 128,
-  Bit8 = 256
+  Bit8 = 256,
 }
 
 export enum ACTION_FLAG {
@@ -54,7 +54,7 @@ export enum ACTION_FLAG {
   Bit28 = 268435456,
   Bit29 = 536870912,
   Bit30 = 1073741824,
-  Bit31 = 2147483648
+  Bit31 = 2147483648,
 }
 
 export enum NANO_NONE_FLAG {
@@ -90,7 +90,7 @@ export enum NANO_NONE_FLAG {
   ClassCombatDebuff = 268435456,
   ClassAoE = 536870912,
   ClassRootOrSnare = 1073741824,
-  WantCollision = 2147483648
+  WantCollision = 2147483648,
 }
 
 export enum ITEM_NONE_FLAG {
@@ -126,7 +126,7 @@ export enum ITEM_NONE_FLAG {
   CanBeAttacked = 268435456,
   DisableFalling = 536870912,
   HasDamage = 1073741824,
-  DisableStatelCollision = 2147483648
+  DisableStatelCollision = 2147483648,
 }
 
 export enum CANFLAG {
@@ -162,7 +162,7 @@ export enum CANFLAG {
   CanBeWornWithSocialArmor = 268435456,
   CanParryRiposite = 536870912,
   CanBeParriedRiposited = 1073741824,
-  ApplyOnFightingTarget = 2147483648
+  ApplyOnFightingTarget = 2147483648,
 }
 
 export enum EXPANSION_FLAG {
@@ -175,7 +175,7 @@ export enum EXPANSION_FLAG {
   LostEden = 32,
   LostEdenPreorder = 64,
   LexacyOfXan = 128,
-  LegacyOfXanPreorder = 256
+  LegacyOfXanPreorder = 256,
 }
 
 export enum WORN_ITEM {
@@ -210,7 +210,7 @@ export enum WORN_ITEM {
   Bit28 = 268435456,
   Bit29 = 536870912,
   Bit30 = 1073741824,
-  Bit31 = 2147483648
+  Bit31 = 2147483648,
 }
 
 export enum WEAPON_SLOT {
@@ -230,7 +230,7 @@ export enum WEAPON_SLOT {
   Deck4 = 4096,
   Deck5 = 8192,
   Deck6 = 16384,
-  Hud2 = 32768
+  Hud2 = 32768,
 }
 
 export enum ARMOR_SLOT {
@@ -251,7 +251,7 @@ export enum ARMOR_SLOT {
   RightFinger = 8192,
   Feet = 16384,
   LeftFinger = 32768,
-  PerkAction = 2147483648
+  PerkAction = 2147483648,
 }
 
 export enum IMPLANT_SLOT {
@@ -269,14 +269,14 @@ export enum IMPLANT_SLOT {
   RightHand = 1024,
   Legs = 2048,
   LeftHand = 4096,
-  Feet = 8192
+  Feet = 8192,
 }
 
 export enum SL_ZONE_PROTECTION {
   Adonis = 0,
   Penumbra = 1,
   Inferno = 2,
-  Pandemonium = 4
+  Pandemonium = 4,
 }
 
 export enum WEAPON_TYPE {
@@ -312,7 +312,7 @@ export enum WEAPON_TYPE {
   Bit28 = 268435456,
   Bit29 = 536870912,
   Bit30 = 1073741824,
-  Bit31 = 2147483648
+  Bit31 = 2147483648,
 }
 
 // ============================================================================
@@ -351,14 +351,14 @@ export function toggleFlag(flags: number, flag: number): number {
  * Check if all specified flags are set
  */
 export function hasAllFlags(flags: number, requiredFlags: number[]): boolean {
-  return requiredFlags.every(flag => isFlagSet(flags, flag));
+  return requiredFlags.every((flag) => isFlagSet(flags, flag));
 }
 
 /**
  * Check if any of the specified flags are set
  */
 export function hasAnyFlag(flags: number, checkFlags: number[]): boolean {
-  return checkFlags.some(flag => isFlagSet(flags, flag));
+  return checkFlags.some((flag) => isFlagSet(flags, flag));
 }
 
 /**
@@ -378,13 +378,13 @@ export function countSetBits(flags: number): number {
  */
 export function getSetFlags(flags: number, flagEnum: Record<string, number>): number[] {
   const setFlags: number[] = [];
-  
+
   for (const [name, value] of Object.entries(flagEnum)) {
     if (typeof value === 'number' && value > 0 && isFlagSet(flags, value)) {
       setFlags.push(value);
     }
   }
-  
+
   return setFlags;
 }
 
@@ -393,13 +393,13 @@ export function getSetFlags(flags: number, flagEnum: Record<string, number>): nu
  */
 export function getSetFlagNames(flags: number, flagEnum: Record<string, number>): string[] {
   const setFlagNames: string[] = [];
-  
+
   for (const [name, value] of Object.entries(flagEnum)) {
     if (typeof value === 'number' && value > 0 && isFlagSet(flags, value)) {
       setFlagNames.push(name);
     }
   }
-  
+
   return setFlagNames;
 }
 
@@ -480,22 +480,25 @@ export function canUseItem(itemCanFlags: number, requiredAction: keyof typeof CA
 /**
  * Check if an item is restricted to a specific faction
  */
-export function checkFactionRestriction(itemFlags: number, characterFaction: number): { 
-  allowed: boolean; 
-  restriction?: string 
+export function checkFactionRestriction(
+  itemFlags: number,
+  characterFaction: number
+): {
+  allowed: boolean;
+  restriction?: string;
 } {
   const isClanIllegal = isFlagSet(itemFlags, ITEM_NONE_FLAG.IllegalClan);
   const isOmniIllegal = isFlagSet(itemFlags, ITEM_NONE_FLAG.IllegalOmni);
-  
+
   // Faction IDs: 0 = Neutral, 1 = Clan, 2 = Omni
   if (characterFaction === 1 && isClanIllegal) {
     return { allowed: false, restriction: 'Clan cannot use this item' };
   }
-  
+
   if (characterFaction === 2 && isOmniIllegal) {
     return { allowed: false, restriction: 'Omni cannot use this item' };
   }
-  
+
   return { allowed: true };
 }
 
@@ -507,7 +510,7 @@ export function checkExpansionRequirements(
   availableExpansions: number
 ): { allowed: boolean; missingExpansions: string[] } {
   const missingExpansions: string[] = [];
-  
+
   for (const [name, flag] of Object.entries(EXPANSION_FLAG)) {
     if (typeof flag === 'number' && flag > 0) {
       if (isFlagSet(requiredExpansions, flag) && !isFlagSet(availableExpansions, flag)) {
@@ -515,10 +518,10 @@ export function checkExpansionRequirements(
       }
     }
   }
-  
+
   return {
     allowed: missingExpansions.length === 0,
-    missingExpansions
+    missingExpansions,
   };
 }
 
@@ -532,11 +535,10 @@ export function checkUniqueItemRestriction(
   if (!isFlagSet(itemFlags, ITEM_NONE_FLAG.Unique)) {
     return true; // Not unique, no restriction
   }
-  
+
   // Check if character already owns this unique item
-  return !ownedItems.some(item => 
-    isFlagSet(item.flags, ITEM_NONE_FLAG.Unique) && 
-    item.flags === itemFlags
+  return !ownedItems.some(
+    (item) => isFlagSet(item.flags, ITEM_NONE_FLAG.Unique) && item.flags === itemFlags
   );
 }
 
@@ -551,8 +553,10 @@ export function canDropItem(itemFlags: number): boolean {
  * Check if a nano breaks on attack
  */
 export function nanoBreaksOnAttack(nanoFlags: number): boolean {
-  return isFlagSet(nanoFlags, NANO_NONE_FLAG.BreakOnAttack) &&
-         !isFlagSet(nanoFlags, NANO_NONE_FLAG.DontBreakOnAttack);
+  return (
+    isFlagSet(nanoFlags, NANO_NONE_FLAG.BreakOnAttack) &&
+    !isFlagSet(nanoFlags, NANO_NONE_FLAG.DontBreakOnAttack)
+  );
 }
 
 /**
@@ -581,7 +585,7 @@ export function isActionAllowed(
   requestedAction: keyof typeof ACTION_FLAG
 ): boolean {
   const actionFlag = ACTION_FLAG[requestedAction];
-  
+
   // If the restriction flag is NOT set, the action is allowed
   return !isFlagSet(currentActionFlags, actionFlag);
 }
@@ -634,19 +638,19 @@ export function canEnterSLZone(
 ): { allowed: boolean; reason?: string } {
   // Check each zone protection level
   const zones = ['Adonis', 'Penumbra', 'Inferno', 'Pandemonium'] as const;
-  
+
   for (let i = 0; i < zones.length; i++) {
     const zoneFlag = 1 << i;
     if (isFlagSet(zoneProtection, zoneFlag)) {
       if (!isFlagSet(characterSLAccess, zoneFlag)) {
         return {
           allowed: false,
-          reason: `Requires access to ${zones[i]}`
+          reason: `Requires access to ${zones[i]}`,
         };
       }
     }
   }
-  
+
   return { allowed: true };
 }
 
@@ -672,20 +676,20 @@ export function flagToHexString(flags: number): string {
  * Create a human-readable description of all set flags
  */
 export function describeFlagValue(
-  flags: number, 
+  flags: number,
   flagEnum: Record<string, number>,
   flagTypeName: string = 'flags'
 ): string {
   const setFlags = getSetFlagNames(flags, flagEnum);
-  
+
   if (setFlags.length === 0) {
     return `No ${flagTypeName} set`;
   }
-  
+
   if (setFlags.length === 1) {
     return `${flagTypeName}: ${setFlags[0]}`;
   }
-  
+
   return `${flagTypeName}: ${setFlags.join(', ')}`;
 }
 
@@ -697,16 +701,16 @@ export function validateFlagCombination(
   conflictingPairs: Array<[number, number]>
 ): { valid: boolean; conflicts: string[] } {
   const conflicts: string[] = [];
-  
+
   for (const [flag1, flag2] of conflictingPairs) {
     if (isFlagSet(flags, flag1) && isFlagSet(flags, flag2)) {
       conflicts.push(`Conflicting flags: ${flag1} and ${flag2}`);
     }
   }
-  
+
   return {
     valid: conflicts.length === 0,
-    conflicts
+    conflicts,
   };
 }
 
@@ -725,7 +729,7 @@ export const flagOperations = {
   countSetBits,
   getSetFlags,
   getSetFlagNames,
-  
+
   // Decoding functions
   decodeActionFlags,
   decodeItemFlags,
@@ -734,7 +738,7 @@ export const flagOperations = {
   decodeExpansionFlags,
   decodeWeaponTypeFlags,
   decodeSlotFlags,
-  
+
   // Permission checking
   canUseItem,
   checkFactionRestriction,
@@ -744,7 +748,7 @@ export const flagOperations = {
   nanoBreaksOnAttack,
   nanoBreaksOnDebuff,
   isNanoRemovable,
-  
+
   // Action checking
   isActionAllowed,
   getRestrictedActions,
@@ -752,13 +756,13 @@ export const flagOperations = {
   canMove,
   canAttack,
   canUseConcealment,
-  
+
   // Zone restrictions
   canEnterSLZone,
-  
+
   // Utilities
   flagToBinaryString,
   flagToHexString,
   describeFlagValue,
-  validateFlagCombination
+  validateFlagCombination,
 };

@@ -22,55 +22,60 @@ const activeTab = ref(0);
 // Computed properties
 const filteredBosses = computed(() => {
   if (!searchQuery.value.trim()) return pocketBossStore.pocketBosses;
-  
+
   const search = searchQuery.value.toLowerCase();
-  return pocketBossStore.pocketBosses.filter(boss =>
-    boss.name.toLowerCase().includes(search) ||
-    boss.playfield?.toLowerCase().includes(search) ||
-    boss.location?.toLowerCase().includes(search) ||
-    boss.dropped_symbiants?.some(s => 
-      s.name.toLowerCase().includes(search) ||
-      s.slot.toLowerCase().includes(search) ||
-      s.family?.toLowerCase().includes(search)
-    )
+  return pocketBossStore.pocketBosses.filter(
+    (boss) =>
+      boss.name.toLowerCase().includes(search) ||
+      boss.playfield?.toLowerCase().includes(search) ||
+      boss.location?.toLowerCase().includes(search) ||
+      boss.dropped_symbiants?.some(
+        (s) =>
+          s.name.toLowerCase().includes(search) ||
+          s.slot.toLowerCase().includes(search) ||
+          s.family?.toLowerCase().includes(search)
+      )
   );
 });
 
 const filteredSymbiants = computed(() => {
   if (!searchQuery.value.trim()) return Array.from(symbiantStore.symbiants.values());
-  
+
   const search = searchQuery.value.toLowerCase();
-  return Array.from(symbiantStore.symbiants.values()).filter(symbiant =>
-    symbiant.name.toLowerCase().includes(search) ||
-    symbiant.slot.toLowerCase().includes(search) ||
-    symbiant.family?.toLowerCase().includes(search) ||
-    getDropSources(symbiant).some(boss =>
-      boss.name.toLowerCase().includes(search) ||
-      boss.playfield?.toLowerCase().includes(search)
-    )
+  return Array.from(symbiantStore.symbiants.values()).filter(
+    (symbiant) =>
+      symbiant.name.toLowerCase().includes(search) ||
+      symbiant.slot.toLowerCase().includes(search) ||
+      symbiant.family?.toLowerCase().includes(search) ||
+      getDropSources(symbiant).some(
+        (boss) =>
+          boss.name.toLowerCase().includes(search) || boss.playfield?.toLowerCase().includes(search)
+      )
   );
 });
 
 const bossSymbiantTable = computed(() => {
-  return filteredBosses.value.flatMap(boss =>
-    (boss.dropped_symbiants || []).map(symbiant => ({
-      bossId: boss.id,
-      bossName: boss.name,
-      bossLevel: boss.level,
-      bossPlayfield: boss.playfield,
-      bossLocation: boss.location,
-      symbiantId: symbiant.id,
-      symbiantName: symbiant.name,
-      symbiantSlot: symbiant.slot,
-      symbiantQl: symbiant.ql,
-      symbiantFamily: symbiant.family
-    }))
-  ).sort((a, b) => {
-    // Sort by boss level first, then by symbiant QL
-    if (a.bossLevel !== b.bossLevel) return a.bossLevel - b.bossLevel;
-    if (a.symbiantQl !== b.symbiantQl) return b.symbiantQl - a.symbiantQl;
-    return a.bossName.localeCompare(b.bossName);
-  });
+  return filteredBosses.value
+    .flatMap((boss) =>
+      (boss.dropped_symbiants || []).map((symbiant) => ({
+        bossId: boss.id,
+        bossName: boss.name,
+        bossLevel: boss.level,
+        bossPlayfield: boss.playfield,
+        bossLocation: boss.location,
+        symbiantId: symbiant.id,
+        symbiantName: symbiant.name,
+        symbiantSlot: symbiant.slot,
+        symbiantQl: symbiant.ql,
+        symbiantFamily: symbiant.family,
+      }))
+    )
+    .sort((a, b) => {
+      // Sort by boss level first, then by symbiant QL
+      if (a.bossLevel !== b.bossLevel) return a.bossLevel - b.bossLevel;
+      if (a.symbiantQl !== b.symbiantQl) return b.symbiantQl - a.symbiantQl;
+      return a.bossName.localeCompare(b.bossName);
+    });
 });
 
 // Methods
@@ -99,16 +104,16 @@ function getQualitySeverity(ql: number): 'success' | 'info' | 'warning' | 'dange
 
 function getSlotIcon(slot: string): string {
   const iconMap: Record<string, string> = {
-    'Head': 'pi-user',
-    'Eye': 'pi-eye',
-    'Ear': 'pi-volume-up',
-    'Chest': 'pi-shield',
-    'Arm': 'pi-stop',
-    'Wrist': 'pi-circle',
-    'Hand': 'pi-hand-paper',
-    'Waist': 'pi-minus',
-    'Leg': 'pi-sort-down',
-    'Feet': 'pi-step-forward'
+    Head: 'pi-user',
+    Eye: 'pi-eye',
+    Ear: 'pi-volume-up',
+    Chest: 'pi-shield',
+    Arm: 'pi-stop',
+    Wrist: 'pi-circle',
+    Hand: 'pi-hand-paper',
+    Waist: 'pi-minus',
+    Leg: 'pi-sort-down',
+    Feet: 'pi-step-forward',
   };
   return iconMap[slot] || 'pi-circle';
 }
@@ -119,18 +124,28 @@ function clearSearch() {
 
 function exportTableData() {
   // Simple CSV export
-  const headers = ['Boss Name', 'Boss Level', 'Location', 'Symbiant Name', 'Slot', 'Quality Level', 'Family'];
+  const headers = [
+    'Boss Name',
+    'Boss Level',
+    'Location',
+    'Symbiant Name',
+    'Slot',
+    'Quality Level',
+    'Family',
+  ];
   const csvContent = [
     headers.join(','),
-    ...bossSymbiantTable.value.map(row => [
-      `"${row.bossName}"`,
-      row.bossLevel,
-      `"${row.bossPlayfield || ''} ${row.bossLocation || ''}".trim()`,
-      `"${row.symbiantName}"`,
-      row.symbiantSlot,
-      row.symbiantQl,
-      `"${row.symbiantFamily || ''}"`
-    ].join(','))
+    ...bossSymbiantTable.value.map((row) =>
+      [
+        `"${row.bossName}"`,
+        row.bossLevel,
+        `"${row.bossPlayfield || ''} ${row.bossLocation || ''}".trim()`,
+        `"${row.symbiantName}"`,
+        row.symbiantSlot,
+        row.symbiantQl,
+        `"${row.symbiantFamily || ''}"`,
+      ].join(',')
+    ),
   ].join('\n');
 
   const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -157,7 +172,7 @@ function exportTableData() {
               Explore relationships between pocket bosses and their symbiant drops
             </p>
           </div>
-          
+
           <div class="flex items-center gap-3 w-full lg:w-auto">
             <InputText
               v-model="searchQuery"
@@ -193,18 +208,14 @@ function exportTableData() {
             <span>Boss → Symbiant</span>
           </div>
         </template>
-        
+
         <div class="space-y-4">
           <div class="text-sm text-surface-600 dark:text-surface-400">
             {{ filteredBosses.length }} bosses found
           </div>
-          
+
           <div class="space-y-3">
-            <Card
-              v-for="boss in filteredBosses"
-              :key="boss.id"
-              class="boss-symbiant-card"
-            >
+            <Card v-for="boss in filteredBosses" :key="boss.id" class="boss-symbiant-card">
               <template #content>
                 <div class="space-y-4">
                   <!-- Boss Header -->
@@ -213,7 +224,9 @@ function exportTableData() {
                       <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50">
                         {{ boss.name }}
                       </h3>
-                      <div class="flex items-center gap-3 text-sm text-surface-600 dark:text-surface-400">
+                      <div
+                        class="flex items-center gap-3 text-sm text-surface-600 dark:text-surface-400"
+                      >
                         <span>{{ boss.playfield || 'Unknown Playfield' }}</span>
                         <span v-if="boss.location">• {{ boss.location }}</span>
                       </div>
@@ -272,12 +285,12 @@ function exportTableData() {
             <span>Symbiant → Boss</span>
           </div>
         </template>
-        
+
         <div class="space-y-4">
           <div class="text-sm text-surface-600 dark:text-surface-400">
             {{ filteredSymbiants.length }} symbiants found
           </div>
-          
+
           <div class="space-y-3">
             <Card
               v-for="symbiant in filteredSymbiants"
@@ -294,16 +307,15 @@ function exportTableData() {
                         <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50">
                           {{ symbiant.name }}
                         </h3>
-                        <div class="flex items-center gap-3 text-sm text-surface-600 dark:text-surface-400">
+                        <div
+                          class="flex items-center gap-3 text-sm text-surface-600 dark:text-surface-400"
+                        >
                           <span>{{ symbiant.slot }}</span>
                           <span v-if="symbiant.family">• {{ symbiant.family }}</span>
                         </div>
                       </div>
                     </div>
-                    <Tag
-                      :value="`QL ${symbiant.ql}`"
-                      :severity="getQualitySeverity(symbiant.ql)"
-                    />
+                    <Tag :value="`QL ${symbiant.ql}`" :severity="getQualitySeverity(symbiant.ql)" />
                   </div>
 
                   <!-- Drop Sources -->
@@ -311,7 +323,10 @@ function exportTableData() {
                     <h4 class="font-medium mb-2 text-surface-700 dark:text-surface-300">
                       Drop Sources ({{ getDropSources(symbiant).length }})
                     </h4>
-                    <div v-if="getDropSources(symbiant).length > 0" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    <div
+                      v-if="getDropSources(symbiant).length > 0"
+                      class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"
+                    >
                       <div
                         v-for="boss in getDropSources(symbiant)"
                         :key="boss.id"
@@ -351,7 +366,7 @@ function exportTableData() {
             <span>Combined Table</span>
           </div>
         </template>
-        
+
         <Card>
           <template #content>
             <DataTable

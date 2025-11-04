@@ -30,7 +30,7 @@ export function calculateACValues(profile: TinkerProfile): Record<string, number
 
       // Add SL/AI perks
       if (profile.PerksAndResearch.perks && Array.isArray(profile.PerksAndResearch.perks)) {
-        profile.PerksAndResearch.perks.forEach(perkEntry => {
+        profile.PerksAndResearch.perks.forEach((perkEntry) => {
           if (perkEntry && perkEntry.item) {
             allPerkItems.push(perkEntry.item);
           }
@@ -39,7 +39,7 @@ export function calculateACValues(profile: TinkerProfile): Record<string, number
 
       // Add LE research
       if (profile.PerksAndResearch.research && Array.isArray(profile.PerksAndResearch.research)) {
-        profile.PerksAndResearch.research.forEach(researchEntry => {
+        profile.PerksAndResearch.research.forEach((researchEntry) => {
           if (researchEntry && researchEntry.item) {
             allPerkItems.push(researchEntry.item);
           }
@@ -83,14 +83,14 @@ export function calculateACValues(profile: TinkerProfile): Record<string, number
     'Cold AC',
     'Energy AC',
     'Fire AC',
-    'Melee/ma AC',  // Changed from 'Melee AC'
-    'Disease AC',   // This is 'Poison AC' in STAT but 'Disease AC' in profile
-    'Imp/Proj AC',  // Changed from 'Projectile AC'
-    'Radiation AC'
+    'Melee/ma AC', // Changed from 'Melee AC'
+    'Disease AC', // This is 'Poison AC' in STAT but 'Disease AC' in profile
+    'Imp/Proj AC', // Changed from 'Projectile AC'
+    'Radiation AC',
   ];
 
   // Calculate each AC value as sum of all bonuses (no base value)
-  acTypes.forEach(acName => {
+  acTypes.forEach((acName) => {
     const equipmentBonus = equipmentBonuses[acName] || 0;
     const perkBonus = perkBonuses[acName] || 0;
     const buffBonus = buffBonuses[acName] || 0;

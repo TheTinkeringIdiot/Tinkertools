@@ -13,6 +13,7 @@ Created comprehensive test utilities and fixtures to support the v4.0.0 ID-based
 Profile factory functions for creating test profiles with proper v4.0.0 structure.
 
 **Key Features:**
+
 - `createTestProfile()` - Flexible profile creation with sensible defaults
 - Pre-configured profiles: Fresh (L1), Endgame (L220), Soldier, NanoTech, Enforcer, Fixer
 - Utility functions: `cloneProfile()`, `setProfileSkill()`, `isValidV4Profile()`
@@ -20,6 +21,7 @@ Profile factory functions for creating test profiles with proper v4.0.0 structur
 - Profession constants (PROFESSION.ADVENTURER, etc.) - numeric IDs 1-15
 
 **Structure:**
+
 - All Character.Breed and Character.Profession are numeric IDs
 - Skills stored as flat map with numeric skill IDs as keys
 - Correct PerkSystem structure with standardPerkPoints/aiPerkPoints
@@ -30,6 +32,7 @@ Profile factory functions for creating test profiles with proper v4.0.0 structur
 Skill ID constants and skill data utilities following v4.0.0 architecture.
 
 **Key Features:**
+
 - Complete SKILL_ID mapping (all 100+ skills)
 - Organized by category: ABILITY_ID, BODY_DEFENSE_SKILL_ID, RANGED_WEAPON_SKILL_ID, etc.
 - `createSkillBonuses()` - Create bonus objects from ID/value pairs
@@ -37,6 +40,7 @@ Skill ID constants and skill data utilities following v4.0.0 architecture.
 - Pre-configured SKILL_COMBOS (COMBAT, DEFENSE, NANO, TRADE, EMPTY)
 
 **Coverage:**
+
 - Abilities (16-21)
 - Body & Defense skills (152, 132, 100, etc.)
 - Ranged/Melee weapons
@@ -48,6 +52,7 @@ Skill ID constants and skill data utilities following v4.0.0 architecture.
 Item factory functions for creating test items with proper API structure.
 
 **Key Features:**
+
 - `createTestItem()` - Generic item creation
 - Specialized factories: `createWeaponItem()`, `createArmorItem()`, `createImplantItem()`, `createNanoItem()`
 - `createPerkItem()` - Perk with multiple spell effects
@@ -57,6 +62,7 @@ Item factory functions for creating test items with proper API structure.
 - Utility functions: `cloneItem()`, `extractItemBonuses()`, `getItemSkillBonus()`
 
 **Supported Types:**
+
 - Weapons with attack bonuses
 - Armor with defense bonuses
 - Implants with stat bonuses
@@ -69,6 +75,7 @@ Item factory functions for creating test items with proper API structure.
 Vue component mounting utilities with proper test context.
 
 **Key Features:**
+
 - `mountWithContext()` - Mount with Pinia, Router, and PrimeVue context
 - Mock PrimeVue components (Card, Button, Badge, Dialog, etc.)
 - `createTestPinia()` / `createTestRouter()` - Test context creation
@@ -78,6 +85,7 @@ Vue component mounting utilities with proper test context.
 - `standardCleanup()` - Standard afterEach cleanup
 
 **Mock Components:**
+
 - Card, Button, Badge, Tag
 - DataTable, Column
 - InputText, Dropdown, MultiSelect
@@ -89,11 +97,13 @@ Vue component mounting utilities with proper test context.
 Central export point for all test helpers.
 
 **Purpose:**
+
 - Single import location for all utilities
 - Re-exports all fixtures and utilities
 - Provides organized namespace for test helpers
 
 **Usage:**
+
 ```typescript
 import {
   createTestProfile,
@@ -101,7 +111,7 @@ import {
   BREED,
   SKILL_ID,
   createTestItem,
-  mountWithContext
+  mountWithContext,
 } from '@/__tests__/helpers';
 ```
 
@@ -110,6 +120,7 @@ import {
 Comprehensive documentation for test helpers.
 
 **Contents:**
+
 - Overview of each helper file
 - Usage patterns and examples
 - Migration guide (old vs new patterns)
@@ -122,6 +133,7 @@ Comprehensive documentation for test helpers.
 Validation tests for helper utilities.
 
 **Coverage:**
+
 - Profile fixture validation (21 tests)
 - Skill constant validation
 - Item factory validation
@@ -129,6 +141,7 @@ Validation tests for helper utilities.
 - v4.0.0 pattern verification
 
 **Results:**
+
 ```
 ✓ src/__tests__/helpers/helpers.test.ts  (21 tests) 9ms
   Test Files  1 passed (1)
@@ -142,16 +155,19 @@ Implementation summary and usage guide.
 ## Verification
 
 ### TypeScript Compilation
+
 ✅ All helper files compile without errors
 ✅ Proper type safety with strict mode
 ✅ All imports resolve correctly
 
 ### Test Results
+
 ✅ 21 validation tests pass
 ✅ All helper functions work as expected
 ✅ Integration scenarios verified
 
 ### Code Quality
+
 ✅ Well-documented with JSDoc comments
 ✅ Organized by category
 ✅ Consistent naming conventions
@@ -173,9 +189,9 @@ it('should calculate bonuses correctly', () => {
         trickle: 50,
         pointsFromIp: 200,
         equipmentBonus: 30,
-        total: 285
-      }
-    }
+        total: 285,
+      },
+    },
   });
 
   expect(profile.skills[SKILL_ID.ASSAULT_RIF].total).toBe(285);
@@ -191,8 +207,8 @@ it('should return correct bonuses', () => {
   const result = calculateBonuses(items);
 
   expect(result).toEqual({
-    [SKILL_ID.ASSAULT_RIF]: 10,  // Numeric ID, not string
-    [SKILL_ID.DODGE_RNG]: 5
+    [SKILL_ID.ASSAULT_RIF]: 10, // Numeric ID, not string
+    [SKILL_ID.DODGE_RNG]: 5,
   });
 });
 ```
@@ -204,7 +220,7 @@ import { mountWithContext, findByTestId } from '@/__tests__/helpers';
 
 it('should display item name', () => {
   const wrapper = mountWithContext(ItemCard, {
-    props: { item: mockItem }
+    props: { item: mockItem },
   });
 
   const name = getTextByTestId(wrapper, 'item-name');
@@ -219,7 +235,7 @@ import { createPerkItem, SKILL_ID } from '@/__tests__/helpers';
 
 const perk = createPerkItem('Combat Perk', 999001, [
   [SKILL_ID.ASSAULT_RIF, 50],
-  [SKILL_ID.RANGED_INIT, 25]
+  [SKILL_ID.RANGED_INIT, 25],
 ]);
 ```
 
@@ -238,32 +254,34 @@ const perk = createPerkItem('Combat Perk', 999001, [
 Tests should be updated to use these helpers following this pattern:
 
 ### Before (String-based)
+
 ```typescript
 const profile = {
   Character: {
-    Breed: "Solitus",      // String
-    Profession: "Soldier"  // String
-  }
+    Breed: 'Solitus', // String
+    Profession: 'Soldier', // String
+  },
 };
 
 expect(result).toEqual({
-  'Assault Rifle': 10,     // String key
-  'Dodge-Rng': 5
+  'Assault Rifle': 10, // String key
+  'Dodge-Rng': 5,
 });
 ```
 
 ### After (ID-based)
+
 ```typescript
 import { createTestProfile, BREED, PROFESSION, SKILL_ID } from '@/__tests__/helpers';
 
 const profile = createTestProfile({
-  breed: BREED.SOLITUS,       // Numeric ID
-  profession: PROFESSION.SOLDIER
+  breed: BREED.SOLITUS, // Numeric ID
+  profession: PROFESSION.SOLDIER,
 });
 
 expect(result).toEqual({
   [SKILL_ID.ASSAULT_RIF]: 10, // Numeric ID
-  [SKILL_ID.DODGE_RNG]: 5
+  [SKILL_ID.DODGE_RNG]: 5,
 });
 ```
 

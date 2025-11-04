@@ -10,78 +10,78 @@ const WEAPON_SLOT_MAPPING = {
   // UI name -> Profile key
   'Right Hand': 'RHand',
   'Left Hand': 'LHand',
-  'Belt': 'Waist',
+  Belt: 'Waist',
   // Keep existing mappings for other weapon slots
-  'HUD1': 'HUD1',
-  'HUD2': 'HUD2',
-  'HUD3': 'HUD3',
-  'UTILS1': 'UTILS1',
-  'UTILS2': 'UTILS2',
-  'UTILS3': 'UTILS3',
-  'NCU1': 'NCU1',
-  'NCU2': 'NCU2',
-  'NCU3': 'NCU3',
-  'NCU4': 'NCU4',
-  'NCU5': 'NCU5',
-  'NCU6': 'NCU6'
+  HUD1: 'HUD1',
+  HUD2: 'HUD2',
+  HUD3: 'HUD3',
+  UTILS1: 'UTILS1',
+  UTILS2: 'UTILS2',
+  UTILS3: 'UTILS3',
+  NCU1: 'NCU1',
+  NCU2: 'NCU2',
+  NCU3: 'NCU3',
+  NCU4: 'NCU4',
+  NCU5: 'NCU5',
+  NCU6: 'NCU6',
 } as const;
 
 const CLOTHING_SLOT_MAPPING = {
   // UI name -> Profile key
-  'Head': 'Head',
-  'Shoulder': 'RightShoulder', // Default to RightShoulder for singular "Shoulder"
-  'Back': 'Back',
-  'Chest': 'Body', // UI uses "Chest", profile uses "Body"
-  'Arms': 'RightArm', // Default to RightArm for singular "Arms"
-  'Wrists': 'RightWrist', // Default to RightWrist for singular "Wrists"
-  'Hands': 'Hands',
-  'Waist': 'Belt', // UI uses "Waist", profile uses "Belt"
-  'Legs': 'Legs',
-  'Feet': 'Feet',
-  'Ring': 'RightFinger', // Default to RightFinger for singular "Ring"
-  'Deck': 'Neck', // UI uses "Deck", profile uses "Neck"
+  Head: 'Head',
+  Shoulder: 'RightShoulder', // Default to RightShoulder for singular "Shoulder"
+  Back: 'Back',
+  Chest: 'Body', // UI uses "Chest", profile uses "Body"
+  Arms: 'RightArm', // Default to RightArm for singular "Arms"
+  Wrists: 'RightWrist', // Default to RightWrist for singular "Wrists"
+  Hands: 'Hands',
+  Waist: 'Belt', // UI uses "Waist", profile uses "Belt"
+  Legs: 'Legs',
+  Feet: 'Feet',
+  Ring: 'RightFinger', // Default to RightFinger for singular "Ring"
+  Deck: 'Neck', // UI uses "Deck", profile uses "Neck"
 
   // Also support exact profile slot names
-  'RightShoulder': 'RightShoulder',
-  'LeftShoulder': 'LeftShoulder',
-  'Body': 'Body',
-  'RightArm': 'RightArm',
-  'LeftArm': 'LeftArm',
-  'RightWrist': 'RightWrist',
-  'LeftWrist': 'LeftWrist',
-  'Belt': 'Belt',
-  'RightFinger': 'RightFinger',
-  'LeftFinger': 'LeftFinger',
-  'Neck': 'Neck'
+  RightShoulder: 'RightShoulder',
+  LeftShoulder: 'LeftShoulder',
+  Body: 'Body',
+  RightArm: 'RightArm',
+  LeftArm: 'LeftArm',
+  RightWrist: 'RightWrist',
+  LeftWrist: 'LeftWrist',
+  Belt: 'Belt',
+  RightFinger: 'RightFinger',
+  LeftFinger: 'LeftFinger',
+  Neck: 'Neck',
 } as const;
 
 const IMPLANT_SLOT_MAPPING = {
   // UI name -> Profile key
-  'Head': 'Head',
-  'Ocular': 'Eye', // UI uses "Ocular", profile uses "Eye"
-  'Ear': 'Ear',
+  Head: 'Head',
+  Ocular: 'Eye', // UI uses "Ocular", profile uses "Eye"
+  Ear: 'Ear',
   'Right Arm': 'RightArm',
   'Left Arm': 'LeftArm',
-  'Chest': 'Chest',
+  Chest: 'Chest',
   'Right Wrist': 'RightWrist',
   'Left Wrist': 'LeftWrist',
-  'Waist': 'Waist',
+  Waist: 'Waist',
   'Right Hand': 'RightHand',
   'Left Hand': 'LeftHand',
-  'Thigh': 'Leg', // UI uses "Thigh", profile uses "Leg"
+  Thigh: 'Leg', // UI uses "Thigh", profile uses "Leg"
   'Right Leg': 'Leg', // Multiple UI names map to single "Leg" slot
   'Left Leg': 'Leg',
-  'Feet': 'Feet',
+  Feet: 'Feet',
 
   // Also support exact profile slot names
-  'Eye': 'Eye',
-  'RightArm': 'RightArm',
-  'LeftArm': 'LeftArm',
-  'RightWrist': 'RightWrist',
-  'LeftWrist': 'LeftWrist',
-  'RightHand': 'RightHand',
-  'LeftHand': 'LeftHand',
-  'Leg': 'Leg'
+  Eye: 'Eye',
+  RightArm: 'RightArm',
+  LeftArm: 'LeftArm',
+  RightWrist: 'RightWrist',
+  LeftWrist: 'LeftWrist',
+  RightHand: 'RightHand',
+  LeftHand: 'LeftHand',
+  Leg: 'Leg',
 } as const;
 
 // Reverse mappings for getting UI names from profile keys
@@ -90,38 +90,38 @@ const WEAPON_DISPLAY_MAPPING = Object.fromEntries(
 ) as Record<string, string>;
 
 const CLOTHING_DISPLAY_MAPPING = {
-  'Head': 'Head',
-  'RightShoulder': 'Shoulder',
-  'LeftShoulder': 'Left Shoulder',
-  'Back': 'Back',
-  'Body': 'Chest',
-  'RightArm': 'Arms',
-  'LeftArm': 'Left Arms',
-  'RightWrist': 'Wrists',
-  'LeftWrist': 'Left Wrists',
-  'Hands': 'Hands',
-  'Belt': 'Waist',
-  'Legs': 'Legs',
-  'Feet': 'Feet',
-  'RightFinger': 'Ring',
-  'LeftFinger': 'Left Ring',
-  'Neck': 'Deck'
+  Head: 'Head',
+  RightShoulder: 'Shoulder',
+  LeftShoulder: 'Left Shoulder',
+  Back: 'Back',
+  Body: 'Chest',
+  RightArm: 'Arms',
+  LeftArm: 'Left Arms',
+  RightWrist: 'Wrists',
+  LeftWrist: 'Left Wrists',
+  Hands: 'Hands',
+  Belt: 'Waist',
+  Legs: 'Legs',
+  Feet: 'Feet',
+  RightFinger: 'Ring',
+  LeftFinger: 'Left Ring',
+  Neck: 'Deck',
 } as const;
 
 const IMPLANT_DISPLAY_MAPPING = {
-  'Head': 'Head',
-  'Eye': 'Ocular',
-  'Ear': 'Ear',
-  'RightArm': 'Right Arm',
-  'LeftArm': 'Left Arm',
-  'Chest': 'Chest',
-  'RightWrist': 'Right Wrist',
-  'LeftWrist': 'Left Wrist',
-  'Waist': 'Waist',
-  'RightHand': 'Right Hand',
-  'LeftHand': 'Left Hand',
-  'Leg': 'Thigh',
-  'Feet': 'Feet'
+  Head: 'Head',
+  Eye: 'Ocular',
+  Ear: 'Ear',
+  RightArm: 'Right Arm',
+  LeftArm: 'Left Arm',
+  Chest: 'Chest',
+  RightWrist: 'Right Wrist',
+  LeftWrist: 'Left Wrist',
+  Waist: 'Waist',
+  RightHand: 'Right Hand',
+  LeftHand: 'Left Hand',
+  Leg: 'Thigh',
+  Feet: 'Feet',
 } as const;
 
 export type EquipmentType = 'weapons' | 'clothing' | 'implants';
@@ -158,9 +158,13 @@ export class EquipmentSlotMapper {
       case 'weapons':
         return WEAPON_DISPLAY_MAPPING[profileSlotKey] || profileSlotKey;
       case 'clothing':
-        return (CLOTHING_DISPLAY_MAPPING as Record<string, string>)[profileSlotKey] || profileSlotKey;
+        return (
+          (CLOTHING_DISPLAY_MAPPING as Record<string, string>)[profileSlotKey] || profileSlotKey
+        );
       case 'implants':
-        return (IMPLANT_DISPLAY_MAPPING as Record<string, string>)[profileSlotKey] || profileSlotKey;
+        return (
+          (IMPLANT_DISPLAY_MAPPING as Record<string, string>)[profileSlotKey] || profileSlotKey
+        );
       default:
         return profileSlotKey;
     }
@@ -211,7 +215,10 @@ export class EquipmentSlotMapper {
    * Normalizes equipment data by mapping UI slot names to profile keys
    * Supports legacy profiles with mixed slot naming
    */
-  static normalizeEquipmentData(equipmentData: Record<string, any>, equipmentType: EquipmentType): Record<string, any> {
+  static normalizeEquipmentData(
+    equipmentData: Record<string, any>,
+    equipmentType: EquipmentType
+  ): Record<string, any> {
     const normalized: Record<string, any> = {};
 
     for (const [slotName, item] of Object.entries(equipmentData || {})) {
@@ -226,7 +233,10 @@ export class EquipmentSlotMapper {
    * Creates a standardized equipment access interface
    * Returns an object that can be accessed using either UI names or profile keys
    */
-  static createEquipmentProxy(equipmentData: Record<string, any>, equipmentType: EquipmentType): Record<string, any> {
+  static createEquipmentProxy(
+    equipmentData: Record<string, any>,
+    equipmentType: EquipmentType
+  ): Record<string, any> {
     const normalized = this.normalizeEquipmentData(equipmentData, equipmentType);
 
     return new Proxy(normalized, {
@@ -250,14 +260,18 @@ export class EquipmentSlotMapper {
         const profileKey = EquipmentSlotMapper.mapToProfileSlot(prop, equipmentType) || prop;
         target[profileKey] = value;
         return true;
-      }
+      },
     });
   }
 
   /**
    * Validates equipment slot compatibility for item requirements
    */
-  static validateSlotCompatibility(item: any, slotName: string, equipmentType: EquipmentType): boolean {
+  static validateSlotCompatibility(
+    item: any,
+    slotName: string,
+    equipmentType: EquipmentType
+  ): boolean {
     if (!item || !this.isValidSlot(slotName, equipmentType)) {
       return false;
     }
@@ -269,7 +283,10 @@ export class EquipmentSlotMapper {
   /**
    * Legacy support: handle old profile formats with inconsistent slot names
    */
-  static migrateSlotNames(equipmentData: Record<string, any>, equipmentType: EquipmentType): Record<string, any> {
+  static migrateSlotNames(
+    equipmentData: Record<string, any>,
+    equipmentType: EquipmentType
+  ): Record<string, any> {
     return this.normalizeEquipmentData(equipmentData, equipmentType);
   }
 }

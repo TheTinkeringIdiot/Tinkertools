@@ -3,7 +3,9 @@ StatFilterRow - Individual stat filter component
 Allows users to configure a single stat filter with function, stat, operator, and value
 -->
 <template>
-  <div class="stat-filter-row flex items-center gap-2 p-3 bg-surface-50 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-lg">
+  <div
+    class="stat-filter-row flex items-center gap-2 p-3 bg-surface-50 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-lg"
+  >
     <!-- Function Dropdown -->
     <div class="flex-shrink-0">
       <Dropdown
@@ -16,7 +18,7 @@ Allows users to configure a single stat filter with function, stat, operator, an
         @change="emitUpdate"
       />
     </div>
-    
+
     <!-- Stat Dropdown -->
     <div class="flex-1 min-w-0">
       <Dropdown
@@ -31,7 +33,7 @@ Allows users to configure a single stat filter with function, stat, operator, an
         @change="emitUpdate"
       />
     </div>
-    
+
     <!-- Operator Dropdown -->
     <div class="flex-shrink-0">
       <Dropdown
@@ -44,7 +46,7 @@ Allows users to configure a single stat filter with function, stat, operator, an
         @change="emitUpdate"
       />
     </div>
-    
+
     <!-- Value Input -->
     <div class="flex-shrink-0">
       <InputNumber
@@ -56,7 +58,7 @@ Allows users to configure a single stat filter with function, stat, operator, an
         @update:model-value="emitUpdate"
       />
     </div>
-    
+
     <!-- Remove Button -->
     <div class="flex-shrink-0">
       <Button
@@ -72,39 +74,43 @@ Allows users to configure a single stat filter with function, stat, operator, an
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
-import type { StatFilter } from '@/types/api'
-import { STAT } from '@/services/game-data'
+import { ref, watch, computed } from 'vue';
+import type { StatFilter } from '@/types/api';
+import { STAT } from '@/services/game-data';
 
 const props = defineProps<{
-  filter: StatFilter
-}>()
+  filter: StatFilter;
+}>();
 
 const emit = defineEmits<{
-  update: [filter: StatFilter]
-  remove: []
-}>()
+  update: [filter: StatFilter];
+  remove: [];
+}>();
 
 // Local copy of the filter to handle intermediate states
-const localFilter = ref<StatFilter>({ ...props.filter })
+const localFilter = ref<StatFilter>({ ...props.filter });
 
 // Watch for prop changes from parent
-watch(() => props.filter, (newFilter) => {
-  localFilter.value = { ...newFilter }
-}, { deep: true })
+watch(
+  () => props.filter,
+  (newFilter) => {
+    localFilter.value = { ...newFilter };
+  },
+  { deep: true }
+);
 
 // Options for dropdowns
 const functionOptions = [
   { label: 'Requires', value: 'requires' },
-  { label: 'Modifies', value: 'modifies' }
-]
+  { label: 'Modifies', value: 'modifies' },
+];
 
 const operatorOptions = [
   { label: '==', value: '==' },
   { label: '<=', value: '<=' },
   { label: '>=', value: '>=' },
-  { label: '!=', value: '!=' }
-]
+  { label: '!=', value: '!=' },
+];
 
 // Convert STAT mapping to dropdown options, filtering out common non-useful stats
 const statOptions = computed(() => {
@@ -154,24 +160,26 @@ const statOptions = computed(() => {
     88, // DefaultSlot
     98, // StateAction
     99, // ItemAnim
-  ])
+  ]);
 
   return Object.entries(STAT)
     .filter(([key]) => !excludedStats.has(parseInt(key)))
     .map(([key, value]) => ({
       label: value,
-      value: parseInt(key)
+      value: parseInt(key),
     }))
-    .sort((a, b) => a.label.localeCompare(b.label))
-})
+    .sort((a, b) => a.label.localeCompare(b.label));
+});
 
 function emitUpdate() {
   // Only emit if all required fields are filled
-  if (localFilter.value.function && 
-      localFilter.value.stat !== undefined && 
-      localFilter.value.operator && 
-      localFilter.value.value !== undefined) {
-    emit('update', { ...localFilter.value })
+  if (
+    localFilter.value.function &&
+    localFilter.value.stat !== undefined &&
+    localFilter.value.operator &&
+    localFilter.value.value !== undefined
+  ) {
+    emit('update', { ...localFilter.value });
   }
 }
 </script>

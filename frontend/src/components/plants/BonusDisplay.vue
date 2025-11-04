@@ -5,13 +5,20 @@ Shows per-implant bonuses and aggregate totals with responsive layout
 <template>
   <div class="bonus-display space-y-6">
     <!-- Aggregate Total Section -->
-    <div class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-6">
-      <h3 class="text-xl font-bold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2">
+    <div
+      class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-6"
+    >
+      <h3
+        class="text-xl font-bold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2"
+      >
         <i class="pi pi-chart-bar text-primary-500" aria-hidden="true"></i>
         Total Bonuses
       </h3>
 
-      <div v-if="hasAnyBonuses" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+      <div
+        v-if="hasAnyBonuses"
+        class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4"
+      >
         <div
           v-for="bonus in sortedAggregateBonuses"
           :key="bonus.statId"
@@ -33,8 +40,12 @@ Shows per-implant bonuses and aggregate totals with responsive layout
     </div>
 
     <!-- Per-Implant Bonuses Section -->
-    <div class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-6">
-      <h3 class="text-xl font-bold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2">
+    <div
+      class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg p-6"
+    >
+      <h3
+        class="text-xl font-bold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2"
+      >
         <i class="pi pi-list text-primary-500" aria-hidden="true"></i>
         Per-Implant Bonuses
       </h3>
@@ -57,7 +68,11 @@ Shows per-implant bonuses and aggregate totals with responsive layout
                 </span>
               </template>
             </Column>
-            <Column field="clusters" header="Clusters" class="text-surface-700 dark:text-surface-300">
+            <Column
+              field="clusters"
+              header="Clusters"
+              class="text-surface-700 dark:text-surface-300"
+            >
               <template #body="{ data }">
                 <span class="text-xs">{{ data.clusters }}</span>
               </template>
@@ -132,7 +147,7 @@ export interface BonusDisplayProps {
 
 const props = withDefaults(defineProps<BonusDisplayProps>(), {
   bonuses: () => ({}),
-  perImplantBonuses: () => ({})
+  perImplantBonuses: () => ({}),
 });
 
 // ============================================================================
@@ -173,7 +188,7 @@ function getSlotDisplayName(slotBitflag: string): string {
     '1024': 'Right Hand',
     '2048': 'Legs',
     '4096': 'Left Hand',
-    '8192': 'Feet'
+    '8192': 'Feet',
   };
   return slotMap[slotBitflag] || `Slot ${slotBitflag}`;
 }
@@ -198,7 +213,7 @@ function formatBonuses(bonuses: Record<number, number>): BonusEntry[] {
       return {
         statId,
         statName,
-        value
+        value,
       };
     })
     .sort((a, b) => a.statName.localeCompare(b.statName)); // Sort alphabetically by stat name
@@ -228,7 +243,21 @@ const perImplantTableData = computed<ImplantTableRow[]>(() => {
   const rows: ImplantTableRow[] = [];
 
   // Standard slot order (by bitflag value)
-  const slotOrder = ['2', '4', '8', '16', '32', '64', '128', '256', '512', '1024', '2048', '4096', '8192'];
+  const slotOrder = [
+    '2',
+    '4',
+    '8',
+    '16',
+    '32',
+    '64',
+    '128',
+    '256',
+    '512',
+    '1024',
+    '2048',
+    '4096',
+    '8192',
+  ];
 
   for (const slotBitflag of slotOrder) {
     const slotBonuses = props.perImplantBonuses[slotBitflag];
@@ -237,13 +266,13 @@ const perImplantTableData = computed<ImplantTableRow[]>(() => {
     }
 
     const bonusList = formatBonuses(slotBonuses);
-    const bonusesText = bonusList.map(b => `+${b.value} ${b.statName}`).join(', ');
+    const bonusesText = bonusList.map((b) => `+${b.value} ${b.statName}`).join(', ');
 
     rows.push({
       slot: getSlotDisplayName(slotBitflag),
       clusters: '', // Cluster info could be added if needed
       bonuses: bonusesText,
-      bonusList
+      bonusList,
     });
   }
 

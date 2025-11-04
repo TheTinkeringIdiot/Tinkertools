@@ -1,38 +1,47 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { nextTick } from 'vue';
 import { mount } from '@vue/test-utils';
-import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION, BREED } from '@/__tests__/helpers';
+import {
+  mountWithContext,
+  standardCleanup,
+  createTestProfile,
+  SKILL_ID,
+  PROFESSION,
+  BREED,
+} from '@/__tests__/helpers';
 import SymbiantSearch from '@/components/plants/SymbiantSearch.vue';
 
 // Mock PrimeVue components with simpler templates to avoid syntax issues
 vi.mock('primevue/button', () => ({
   default: {
     name: 'Button',
-    template: '<button @click="$emit(\'click\')" class="mock-button"><slot>{{ label }}</slot></button>',
+    template:
+      '<button @click="$emit(\'click\')" class="mock-button"><slot>{{ label }}</slot></button>',
     props: ['icon', 'label', 'severity', 'size', 'text', 'rounded'],
-    emits: ['click']
-  }
+    emits: ['click'],
+  },
 }));
 
 vi.mock('primevue/iconfield', () => ({
   default: {
-    name: 'IconField', 
+    name: 'IconField',
     template: '<div class="mock-icon-field"><slot /></div>',
-    props: ['iconPosition']
-  }
+    props: ['iconPosition'],
+  },
 }));
 
 vi.mock('primevue/inputicon', () => ({
   default: {
     name: 'InputIcon',
-    template: '<div class="mock-input-icon"><slot /></div>'
-  }
+    template: '<div class="mock-input-icon"><slot /></div>',
+  },
 }));
 
 vi.mock('primevue/inputtext', () => ({
   default: {
     name: 'InputText',
-    template: '<input :value="modelValue" @input="handleInput" @keydown="$emit(\'keydown\', $event)" :placeholder="placeholder" class="mock-input-text" />',
+    template:
+      '<input :value="modelValue" @input="handleInput" @keydown="$emit(\'keydown\', $event)" :placeholder="placeholder" class="mock-input-text" />',
     props: ['modelValue', 'placeholder'],
     emits: ['update:modelValue', 'input', 'keydown'],
     methods: {
@@ -40,9 +49,9 @@ vi.mock('primevue/inputtext', () => ({
         const target = e.target as HTMLInputElement;
         this.$emit('update:modelValue', target.value);
         this.$emit('input', e);
-      }
-    }
-  }
+      },
+    },
+  },
 }));
 
 describe('SymbiantSearch', () => {
@@ -52,13 +61,13 @@ describe('SymbiantSearch', () => {
     wrapper = mountWithContext(SymbiantSearch, {
       props: {
         modelValue: '',
-        showQuickFilters: true
-      }
+        showQuickFilters: true,
+      },
     });
   });
 
   afterEach(() => {
-    standardCleanup()
+    standardCleanup();
     wrapper?.unmount();
   });
 
@@ -69,7 +78,9 @@ describe('SymbiantSearch', () => {
 
   it('renders search input field', () => {
     expect(wrapper.find('input.mock-input-text').exists()).toBe(true);
-    expect(wrapper.find('input.mock-input-text').attributes('placeholder')).toBe('Search symbiants...');
+    expect(wrapper.find('input.mock-input-text').attributes('placeholder')).toBe(
+      'Search symbiants...'
+    );
   });
 
   it('renders quick filters when enabled', () => {
@@ -103,7 +114,7 @@ describe('SymbiantSearch', () => {
   it('shows clear button when search has content', async () => {
     await wrapper.setProps({ modelValue: 'test' });
     await wrapper.vm.$nextTick();
-    
+
     // Check for clear button by class or text content
     const clearButton = wrapper.find('.mock-button[aria-label="Clear search"]');
     expect(clearButton.exists() || wrapper.text().includes('pi-times')).toBe(true);
@@ -112,10 +123,10 @@ describe('SymbiantSearch', () => {
   it('clears search when clear button is clicked', async () => {
     await wrapper.setProps({ modelValue: 'test' });
     await wrapper.vm.$nextTick();
-    
+
     const clearButtons = wrapper.findAll('.mock-button');
-    const clearButton = clearButtons.find(btn => btn.attributes('aria-label') === 'Clear search');
-    
+    const clearButton = clearButtons.find((btn) => btn.attributes('aria-label') === 'Clear search');
+
     if (clearButton) {
       await clearButton.trigger('click');
       expect(wrapper.emitted('update:modelValue')).toBeTruthy();
@@ -126,10 +137,8 @@ describe('SymbiantSearch', () => {
 
   it('applies quick filter when clicked', async () => {
     const buttons = wrapper.findAll('.mock-button');
-    const artilleryButton = buttons.find((button: any) => 
-      button.text().includes('Artillery')
-    );
-    
+    const artilleryButton = buttons.find((button: any) => button.text().includes('Artillery'));
+
     if (artilleryButton) {
       await artilleryButton.trigger('click');
       expect(wrapper.emitted('filter-applied')).toBeTruthy();
@@ -141,7 +150,7 @@ describe('SymbiantSearch', () => {
   it('shows suggestions when search query length >= 2', async () => {
     await wrapper.setProps({ modelValue: 'se' });
     await wrapper.vm.$nextTick();
-    
+
     // Component should handle suggestions (may or may not be implemented)
     expect(wrapper.vm.suggestions !== undefined || true).toBe(true);
   });
@@ -153,27 +162,29 @@ describe('SymbiantSearch', () => {
       props: {
         modelValue: '',
         showQuickFilters: true,
-        placeholder: 'Custom search...'
-      }
+        placeholder: 'Custom search...',
+      },
     });
-    
+
     const input = customWrapper.find('input.mock-input-text');
     const placeholder = input.attributes('placeholder');
-    
+
     // Component may use default placeholder due to withDefaults behavior
     expect(placeholder === 'Custom search...' || placeholder === 'Search symbiants...').toBe(true);
-    
+
     customWrapper.unmount();
   });
 
   it('toggles quick filter selection', async () => {
-    const quickFilterButtons = wrapper.findAll('.mock-button').filter((button: any) => 
-      button.text().includes('Artillery')
-    );
-    
+    const quickFilterButtons = wrapper
+      .findAll('.mock-button')
+      .filter((button: any) => button.text().includes('Artillery'));
+
     if (quickFilterButtons.length > 0) {
       await quickFilterButtons[0].trigger('click');
-      expect(wrapper.emitted('filter-applied') || wrapper.emitted('update:modelValue')).toBeTruthy();
+      expect(
+        wrapper.emitted('filter-applied') || wrapper.emitted('update:modelValue')
+      ).toBeTruthy();
     } else {
       // Skip test if quick filter buttons not found
       expect(true).toBe(true);

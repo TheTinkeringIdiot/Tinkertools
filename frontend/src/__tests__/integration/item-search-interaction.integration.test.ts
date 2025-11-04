@@ -119,10 +119,7 @@ describe('Item Search Interaction Integration', () => {
         name: 'Strength Implant QL75',
         ql: 75,
         item_class: 3,
-        stats: [
-          createStatValue(SKILL_ID.STRENGTH, 15),
-          createStatValue(SKILL_ID.BODY_DEV, 30),
-        ],
+        stats: [createStatValue(SKILL_ID.STRENGTH, 15), createStatValue(SKILL_ID.BODY_DEV, 30)],
       }),
 
       // Nanos
@@ -164,9 +161,7 @@ describe('Item Search Interaction Integration', () => {
       expect(advancedSearch.exists()).toBe(true);
 
       // Mock filtered results
-      const filteredItems = testItems.filter((item) =>
-        item.name.toLowerCase().includes('rifle')
-      );
+      const filteredItems = testItems.filter((item) => item.name.toLowerCase().includes('rifle'));
       context.mockApi.searchItems.mockResolvedValue({
         items: filteredItems,
         total: filteredItems.length,
@@ -191,9 +186,9 @@ describe('Item Search Interaction Integration', () => {
       // Verify results are displayed
       const itemsStore = useItemsStore();
       expect(itemsStore.currentSearchResults).toHaveLength(2);
-      expect(itemsStore.currentSearchResults.every((item) =>
-        item.name.toLowerCase().includes('rifle')
-      )).toBe(true);
+      expect(
+        itemsStore.currentSearchResults.every((item) => item.name.toLowerCase().includes('rifle'))
+      ).toBe(true);
     });
 
     it('should show all items when search is cleared', async () => {
@@ -229,9 +224,7 @@ describe('Item Search Interaction Integration', () => {
       const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
 
       // Mock results for case-insensitive search
-      const filteredItems = testItems.filter((item) =>
-        item.name.toLowerCase().includes('armor')
-      );
+      const filteredItems = testItems.filter((item) => item.name.toLowerCase().includes('armor'));
       context.mockApi.searchItems.mockResolvedValue({
         items: filteredItems,
         total: filteredItems.length,
@@ -249,9 +242,9 @@ describe('Item Search Interaction Integration', () => {
       // Verify results match
       const itemsStore = useItemsStore();
       expect(itemsStore.currentSearchResults).toHaveLength(2);
-      expect(itemsStore.currentSearchResults.every((item) =>
-        item.name.toLowerCase().includes('armor')
-      )).toBe(true);
+      expect(
+        itemsStore.currentSearchResults.every((item) => item.name.toLowerCase().includes('armor'))
+      ).toBe(true);
     });
   });
 
@@ -266,9 +259,7 @@ describe('Item Search Interaction Integration', () => {
       const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
 
       // Mock filtered results for QL 100-200
-      const filteredItems = testItems.filter(
-        (item) => item.ql >= 100 && item.ql <= 200
-      );
+      const filteredItems = testItems.filter((item) => item.ql >= 100 && item.ql <= 200);
       context.mockApi.searchItems.mockResolvedValue({
         items: filteredItems,
         total: filteredItems.length,
@@ -297,9 +288,9 @@ describe('Item Search Interaction Integration', () => {
 
       // Verify results are in range
       const itemsStore = useItemsStore();
-      expect(itemsStore.currentSearchResults.every((item) =>
-        item.ql >= 100 && item.ql <= 200
-      )).toBe(true);
+      expect(
+        itemsStore.currentSearchResults.every((item) => item.ql >= 100 && item.ql <= 200)
+      ).toBe(true);
     });
 
     it('should use quick QL range buttons', async () => {
@@ -359,9 +350,7 @@ describe('Item Search Interaction Integration', () => {
 
       // Verify results match class
       const itemsStore = useItemsStore();
-      expect(itemsStore.currentSearchResults.every((item) =>
-        item.item_class === 1
-      )).toBe(true);
+      expect(itemsStore.currentSearchResults.every((item) => item.item_class === 1)).toBe(true);
     });
 
     it('should filter nano programs', async () => {
@@ -396,9 +385,7 @@ describe('Item Search Interaction Integration', () => {
 
       // Verify only nanos returned
       const itemsStore = useItemsStore();
-      expect(itemsStore.currentSearchResults.every((item) =>
-        item.is_nano
-      )).toBe(true);
+      expect(itemsStore.currentSearchResults.every((item) => item.is_nano)).toBe(true);
     });
   });
 
@@ -659,8 +646,7 @@ describe('Item Search Interaction Integration', () => {
       // Mock filtered results: items with Strength OR Intelligence
       const filteredItems = testItems.filter((item) =>
         item.stats.some(
-          (stat) =>
-            stat.stat === SKILL_ID.STRENGTH || stat.stat === SKILL_ID.INTELLIGENCE
+          (stat) => stat.stat === SKILL_ID.STRENGTH || stat.stat === SKILL_ID.INTELLIGENCE
         )
       );
       context.mockApi.searchItems.mockResolvedValue({
@@ -673,10 +659,7 @@ describe('Item Search Interaction Integration', () => {
       });
 
       // Select multiple stat bonuses
-      advancedSearch.vm.selectedStatBonuses = [
-        SKILL_ID.STRENGTH,
-        SKILL_ID.INTELLIGENCE,
-      ];
+      advancedSearch.vm.selectedStatBonuses = [SKILL_ID.STRENGTH, SKILL_ID.INTELLIGENCE];
       await waitForUpdates(wrapper);
 
       // Trigger search
@@ -686,10 +669,7 @@ describe('Item Search Interaction Integration', () => {
       // Verify API was called with multiple stat bonuses
       expect(context.mockApi.searchItems).toHaveBeenCalledWith(
         expect.objectContaining({
-          stat_bonuses: expect.arrayContaining([
-            SKILL_ID.STRENGTH,
-            SKILL_ID.INTELLIGENCE,
-          ]),
+          stat_bonuses: expect.arrayContaining([SKILL_ID.STRENGTH, SKILL_ID.INTELLIGENCE]),
         })
       );
 
@@ -938,9 +918,7 @@ describe('Item Search Interaction Integration', () => {
       await waitForUpdates(wrapper);
 
       // Mock API error
-      context.mockApi.searchItems.mockRejectedValue(
-        new Error('Network error')
-      );
+      context.mockApi.searchItems.mockRejectedValue(new Error('Network error'));
 
       const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
 

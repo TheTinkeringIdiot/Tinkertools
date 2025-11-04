@@ -5,10 +5,15 @@ Shows nanos organized by strain in decreasing QL order
 <template>
   <div class="profession-nano-display h-full flex flex-col">
     <!-- Header -->
-    <div class="bg-surface-50 dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 p-4">
+    <div
+      class="bg-surface-50 dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 p-4"
+    >
       <div class="flex items-center justify-between">
         <div>
-          <h2 v-if="selectedProfessionName" class="text-xl font-bold text-surface-900 dark:text-surface-50">
+          <h2
+            v-if="selectedProfessionName"
+            class="text-xl font-bold text-surface-900 dark:text-surface-50"
+          >
             <i class="pi pi-flash mr-2"></i>
             {{ selectedProfessionName }} Nanos
           </h2>
@@ -17,12 +22,19 @@ Shows nanos organized by strain in decreasing QL order
             Select a Profession
           </h2>
           <p class="text-sm text-surface-600 dark:text-surface-400 mt-1">
-            {{ selectedProfessionName ? `${totalNanos} nanos organized by strain` : 'Choose a profession from the left panel' }}
+            {{
+              selectedProfessionName
+                ? `${totalNanos} nanos organized by strain`
+                : 'Choose a profession from the left panel'
+            }}
           </p>
         </div>
-        
+
         <!-- Sort Controls and Compatibility Toggle -->
-        <div v-if="selectedProfessionName && nanosByStrain.length > 0" class="flex items-center gap-4">
+        <div
+          v-if="selectedProfessionName && nanosByStrain.length > 0"
+          class="flex items-center gap-4"
+        >
           <!-- Compatibility Toggle -->
           <div class="flex items-center gap-2">
             <label class="text-sm text-surface-600 dark:text-surface-400">Show Unusable:</label>
@@ -64,7 +76,10 @@ Shows nanos organized by strain in decreasing QL order
       </div>
 
       <!-- Empty State - No Profession Selected -->
-      <div v-else-if="!selectedProfession" class="flex flex-col items-center justify-center h-64 text-center p-8">
+      <div
+        v-else-if="!selectedProfession"
+        class="flex flex-col items-center justify-center h-64 text-center p-8"
+      >
         <i class="pi pi-user text-4xl text-surface-400 dark:text-surface-600 mb-4"></i>
         <h3 class="text-lg font-medium text-surface-700 dark:text-surface-300 mb-2">
           Choose a Profession
@@ -75,7 +90,10 @@ Shows nanos organized by strain in decreasing QL order
       </div>
 
       <!-- Empty State - No Nanos -->
-      <div v-else-if="totalNanos === 0" class="flex flex-col items-center justify-center h-64 text-center p-8">
+      <div
+        v-else-if="totalNanos === 0"
+        class="flex flex-col items-center justify-center h-64 text-center p-8"
+      >
         <i class="pi pi-search text-4xl text-surface-400 dark:text-surface-600 mb-4"></i>
         <h3 class="text-lg font-medium text-surface-700 dark:text-surface-300 mb-2">
           No Nanos Found
@@ -95,9 +113,9 @@ Shows nanos organized by strain in decreasing QL order
           <!-- Strain Header -->
           <div class="flex items-center gap-3 mb-6">
             <RouterLink
-              :to="{ 
-                name: 'TinkerItems', 
-                query: { strain: strainGroup.strain, is_nano: 'true' } 
+              :to="{
+                name: 'TinkerItems',
+                query: { strain: strainGroup.strain, is_nano: 'true' },
               }"
               class="text-lg font-bold text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
             >
@@ -116,8 +134,10 @@ Shows nanos organized by strain in decreasing QL order
               class="substrain-group"
             >
               <!-- Substrain Header (only show if not "General" or if multiple substrains exist) -->
-              <div 
-                v-if="substrainGroup.substrainName !== 'General' || strainGroup.substrains.length > 1"
+              <div
+                v-if="
+                  substrainGroup.substrainName !== 'General' || strainGroup.substrains.length > 1
+                "
                 class="flex items-center gap-2 mb-3 pb-2 border-b border-surface-100 dark:border-surface-800"
               >
                 <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300">
@@ -129,22 +149,27 @@ Shows nanos organized by strain in decreasing QL order
               </div>
 
               <!-- Nanos in Substrain - Table View -->
-              <div class="overflow-x-auto rounded-lg border border-surface-200 dark:border-surface-700">
+              <div
+                class="overflow-x-auto rounded-lg border border-surface-200 dark:border-surface-700"
+              >
                 <table class="w-full min-w-[900px] bg-surface-0 dark:bg-surface-900 table-fixed">
                   <thead class="bg-surface-100 dark:bg-surface-800 sticky top-0">
-                    <tr class="text-xs text-surface-600 dark:text-surface-400 uppercase tracking-wider">
-                      <th class="px-3 py-3 text-left" style="width: 40px;"></th> <!-- Icon -->
-                      <th class="px-3 py-3 text-left" style="width: 280px;">Name</th>
-                      <th class="px-3 py-3 text-center" style="width: 80px;">QL</th>
-                      <th class="px-3 py-3 text-center" style="width: 80px;">Spec</th>
-                      <th class="px-3 py-3 text-center" style="width: 100px;">Expansion</th>
-                      <th class="px-3 py-3 text-center font-mono" style="width: 60px;">MM</th>
-                      <th class="px-3 py-3 text-center font-mono" style="width: 60px;">BM</th>
-                      <th class="px-3 py-3 text-center font-mono" style="width: 60px;">PM</th>
-                      <th class="px-3 py-3 text-center font-mono" style="width: 60px;">SI</th>
-                      <th class="px-3 py-3 text-center font-mono" style="width: 60px;">MC</th>
-                      <th class="px-3 py-3 text-center font-mono" style="width: 60px;">TS</th>
-                      <th class="px-3 py-3 text-left" style="width: 200px;">Source</th>
+                    <tr
+                      class="text-xs text-surface-600 dark:text-surface-400 uppercase tracking-wider"
+                    >
+                      <th class="px-3 py-3 text-left" style="width: 40px"></th>
+                      <!-- Icon -->
+                      <th class="px-3 py-3 text-left" style="width: 280px">Name</th>
+                      <th class="px-3 py-3 text-center" style="width: 80px">QL</th>
+                      <th class="px-3 py-3 text-center" style="width: 80px">Spec</th>
+                      <th class="px-3 py-3 text-center" style="width: 100px">Expansion</th>
+                      <th class="px-3 py-3 text-center font-mono" style="width: 60px">MM</th>
+                      <th class="px-3 py-3 text-center font-mono" style="width: 60px">BM</th>
+                      <th class="px-3 py-3 text-center font-mono" style="width: 60px">PM</th>
+                      <th class="px-3 py-3 text-center font-mono" style="width: 60px">SI</th>
+                      <th class="px-3 py-3 text-center font-mono" style="width: 60px">MC</th>
+                      <th class="px-3 py-3 text-center font-mono" style="width: 60px">TS</th>
+                      <th class="px-3 py-3 text-left" style="width: 200px">Source</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -154,16 +179,17 @@ Shows nanos organized by strain in decreasing QL order
                       class="border-b border-surface-200 dark:border-surface-700 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors cursor-pointer"
                       :class="{
                         'opacity-60': !canUseNano(nano) && showUnusableNanos,
-                        'bg-surface-100/30 dark:bg-surface-800/30': !canUseNano(nano) && showUnusableNanos
+                        'bg-surface-100/30 dark:bg-surface-800/30':
+                          !canUseNano(nano) && showUnusableNanos,
                       }"
                       @click="onNanoSelect(nano)"
                     >
                       <!-- Icon -->
                       <td class="px-3 py-4">
                         <div class="w-7 h-7 flex items-center justify-center">
-                          <img 
+                          <img
                             v-if="getItemIconUrl(nano.stats || [])"
-                            :src="getItemIconUrl(nano.stats || [])" 
+                            :src="getItemIconUrl(nano.stats || [])"
                             :alt="`${nano.name} icon`"
                             class="w-7 h-7 object-contain"
                             @error="handleIconError"
@@ -171,53 +197,114 @@ Shows nanos organized by strain in decreasing QL order
                           <i v-else class="pi pi-flash text-surface-400 text-base"></i>
                         </div>
                       </td>
-                      
+
                       <!-- Name -->
                       <td class="px-3 py-4">
                         <RouterLink
-                          :to="{ name: 'ItemDetail', params: { aoid: nano.aoid?.toString() || nano.id.toString() } }"
+                          :to="{
+                            name: 'ItemDetail',
+                            params: { aoid: nano.aoid?.toString() || nano.id.toString() },
+                          }"
                           class="font-medium text-surface-900 dark:text-surface-50 hover:text-primary-600 dark:hover:text-primary-400 transition-colors hover:underline"
                           @click.stop
                         >
                           {{ nano.name }}
                         </RouterLink>
                       </td>
-                      
+
                       <!-- QL -->
                       <td class="px-3 py-4 text-center">
                         <Badge :value="nano.ql || 1" severity="secondary" size="small" />
                       </td>
-                      
+
                       <!-- Spec -->
-                      <td class="px-3 py-4 text-center text-sm" :class="getNanoSpecialization(nano) ? 'text-surface-900 dark:text-surface-100' : 'text-surface-400 dark:text-surface-500'">
-                        {{ getNanoSpecialization(nano) ? `Spec ${getNanoSpecialization(nano)}` : '-' }}
+                      <td
+                        class="px-3 py-4 text-center text-sm"
+                        :class="
+                          getNanoSpecialization(nano)
+                            ? 'text-surface-900 dark:text-surface-100'
+                            : 'text-surface-400 dark:text-surface-500'
+                        "
+                      >
+                        {{
+                          getNanoSpecialization(nano) ? `Spec ${getNanoSpecialization(nano)}` : '-'
+                        }}
                       </td>
-                      
+
                       <!-- Expansion -->
-                      <td class="px-3 py-4 text-center text-sm" :class="getNanoExpansion(nano) ? 'text-surface-900 dark:text-surface-100' : 'text-surface-400 dark:text-surface-500'">
+                      <td
+                        class="px-3 py-4 text-center text-sm"
+                        :class="
+                          getNanoExpansion(nano)
+                            ? 'text-surface-900 dark:text-surface-100'
+                            : 'text-surface-400 dark:text-surface-500'
+                        "
+                      >
                         {{ getNanoExpansion(nano) || '-' }}
                       </td>
-                      
+
                       <!-- Nanoskills -->
-                      <td class="px-3 py-4 text-center font-mono text-sm" :class="getNanoskillValue(nano, 'mm') ? 'text-surface-900 dark:text-surface-100' : 'text-surface-400 dark:text-surface-500'">
+                      <td
+                        class="px-3 py-4 text-center font-mono text-sm"
+                        :class="
+                          getNanoskillValue(nano, 'mm')
+                            ? 'text-surface-900 dark:text-surface-100'
+                            : 'text-surface-400 dark:text-surface-500'
+                        "
+                      >
                         {{ getNanoskillValue(nano, 'mm') || '-' }}
                       </td>
-                      <td class="px-3 py-4 text-center font-mono text-sm" :class="getNanoskillValue(nano, 'bm') ? 'text-surface-900 dark:text-surface-100' : 'text-surface-400 dark:text-surface-500'">
+                      <td
+                        class="px-3 py-4 text-center font-mono text-sm"
+                        :class="
+                          getNanoskillValue(nano, 'bm')
+                            ? 'text-surface-900 dark:text-surface-100'
+                            : 'text-surface-400 dark:text-surface-500'
+                        "
+                      >
                         {{ getNanoskillValue(nano, 'bm') || '-' }}
                       </td>
-                      <td class="px-3 py-4 text-center font-mono text-sm" :class="getNanoskillValue(nano, 'pm') ? 'text-surface-900 dark:text-surface-100' : 'text-surface-400 dark:text-surface-500'">
+                      <td
+                        class="px-3 py-4 text-center font-mono text-sm"
+                        :class="
+                          getNanoskillValue(nano, 'pm')
+                            ? 'text-surface-900 dark:text-surface-100'
+                            : 'text-surface-400 dark:text-surface-500'
+                        "
+                      >
                         {{ getNanoskillValue(nano, 'pm') || '-' }}
                       </td>
-                      <td class="px-3 py-4 text-center font-mono text-sm" :class="getNanoskillValue(nano, 'si') ? 'text-surface-900 dark:text-surface-100' : 'text-surface-400 dark:text-surface-500'">
+                      <td
+                        class="px-3 py-4 text-center font-mono text-sm"
+                        :class="
+                          getNanoskillValue(nano, 'si')
+                            ? 'text-surface-900 dark:text-surface-100'
+                            : 'text-surface-400 dark:text-surface-500'
+                        "
+                      >
                         {{ getNanoskillValue(nano, 'si') || '-' }}
                       </td>
-                      <td class="px-3 py-4 text-center font-mono text-sm" :class="getNanoskillValue(nano, 'mc') ? 'text-surface-900 dark:text-surface-100' : 'text-surface-400 dark:text-surface-500'">
+                      <td
+                        class="px-3 py-4 text-center font-mono text-sm"
+                        :class="
+                          getNanoskillValue(nano, 'mc')
+                            ? 'text-surface-900 dark:text-surface-100'
+                            : 'text-surface-400 dark:text-surface-500'
+                        "
+                      >
                         {{ getNanoskillValue(nano, 'mc') || '-' }}
                       </td>
-                      <td class="px-3 py-4 text-center font-mono text-sm" :class="getNanoskillValue(nano, 'ts') ? 'text-surface-900 dark:text-surface-100' : 'text-surface-400 dark:text-surface-500'">
+                      <td
+                        class="px-3 py-4 text-center font-mono text-sm"
+                        :class="
+                          getNanoskillValue(nano, 'ts')
+                            ? 'text-surface-900 dark:text-surface-100'
+                            : 'text-surface-400 dark:text-surface-500'
+                        "
+                      >
                         {{ getNanoskillValue(nano, 'ts') || '-' }}
                       </td>
-                      
+
                       <!-- Source -->
                       <td class="px-3 py-4 text-sm text-surface-600 dark:text-surface-400">
                         <div class="truncate max-w-[180px]" :title="getFormattedSource(nano) || ''">
@@ -245,205 +332,218 @@ Shows nanos organized by strain in decreasing QL order
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
-import Badge from 'primevue/badge'
-import Dropdown from 'primevue/dropdown'
-import ToggleButton from 'primevue/togglebutton'
-import ProgressSpinner from 'primevue/progressspinner'
-import SimpleNanoCard from '@/components/nanos/SimpleNanoCard.vue'
+import { ref, computed, watch } from 'vue';
+import { RouterLink, useRouter } from 'vue-router';
+import Badge from 'primevue/badge';
+import Dropdown from 'primevue/dropdown';
+import ToggleButton from 'primevue/togglebutton';
+import ProgressSpinner from 'primevue/progressspinner';
+import SimpleNanoCard from '@/components/nanos/SimpleNanoCard.vue';
 // import NanoDetail from '@/components/nanos/NanoDetail.vue'
-import { PROFESSION, NANO_STRAIN, NANO_SUBSTRAINS } from '@/services/game-data'
-import { getItemIconUrl, getNanoskillRequirements, getPrimarySource, getNanoSpecialization, getNanoExpansion, type NanoskillRequirements } from '@/services/game-utils'
-import type { Item } from '@/types/api'
-import { ProfileStorage } from '@/lib/tinkerprofiles/storage'
-import { mapProfileToStats } from '@/utils/profile-stats-mapper'
-import { checkActionRequirements, parseAction } from '@/services/action-criteria'
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types'
-import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
+import { PROFESSION, NANO_STRAIN, NANO_SUBSTRAINS } from '@/services/game-data';
+import {
+  getItemIconUrl,
+  getNanoskillRequirements,
+  getPrimarySource,
+  getNanoSpecialization,
+  getNanoExpansion,
+  type NanoskillRequirements,
+} from '@/services/game-utils';
+import type { Item } from '@/types/api';
+import { ProfileStorage } from '@/lib/tinkerprofiles/storage';
+import { mapProfileToStats } from '@/utils/profile-stats-mapper';
+import { checkActionRequirements, parseAction } from '@/services/action-criteria';
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 
 interface SubstrainGroup {
-  substrain: number
-  substrainName: string
-  nanos: Item[]
+  substrain: number;
+  substrainName: string;
+  nanos: Item[];
 }
 
 interface StrainGroup {
-  strain: number
-  strainName: string
-  substrains: SubstrainGroup[]
-  totalNanos: number
+  strain: number;
+  strainName: string;
+  substrains: SubstrainGroup[];
+  totalNanos: number;
 }
 
 // Props
 interface Props {
-  selectedProfession?: number | null
-  loading?: boolean
+  selectedProfession?: number | null;
+  loading?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   selectedProfession: null,
-  loading: false
-})
+  loading: false,
+});
 
 // Router
-const router = useRouter()
+const router = useRouter();
 
 // Profile store
-const profileStore = useTinkerProfilesStore()
+const profileStore = useTinkerProfilesStore();
 
 // State
-const nanos = ref<Item[]>([])
-const selectedNano = ref<Item | null>(null)
-const showNanoDetail = ref(false)
-const sortOrder = ref<'ql_desc' | 'ql_asc' | 'name_asc'>('ql_desc')
-const iconLoadErrors = ref<Set<number>>(new Set())
-const activeProfile = ref<TinkerProfile | null>(null)
-const characterStats = ref<Record<number, number> | null>(null)
-const showUnusableNanos = ref<boolean>(true)
+const nanos = ref<Item[]>([]);
+const selectedNano = ref<Item | null>(null);
+const showNanoDetail = ref(false);
+const sortOrder = ref<'ql_desc' | 'ql_asc' | 'name_asc'>('ql_desc');
+const iconLoadErrors = ref<Set<number>>(new Set());
+const activeProfile = ref<TinkerProfile | null>(null);
+const characterStats = ref<Record<number, number> | null>(null);
+const showUnusableNanos = ref<boolean>(true);
 
 // Sort options
 const sortOptions = [
   { label: 'QL (High → Low)', value: 'ql_desc' },
   { label: 'QL (Low → High)', value: 'ql_asc' },
-  { label: 'Name (A → Z)', value: 'name_asc' }
-]
+  { label: 'Name (A → Z)', value: 'name_asc' },
+];
 
 // Computed
 const selectedProfessionName = computed(() => {
-  if (!props.selectedProfession) return null
-  return PROFESSION[props.selectedProfession as keyof typeof PROFESSION] || 'Unknown'
-})
+  if (!props.selectedProfession) return null;
+  return PROFESSION[props.selectedProfession as keyof typeof PROFESSION] || 'Unknown';
+});
 
 const totalNanos = computed(() => {
-  return nanos.value.filter(nano => {
+  return nanos.value.filter((nano) => {
     // Skip test items
     if (nano.name.startsWith('TESTLIVEITEM')) {
-      return false
+      return false;
     }
-    
-    const strainStat = nano.stats.find(stat => stat.stat === 75)
-    const strain = strainStat?.value || 0
-    return strain !== 0 && strain !== 99999
-  }).length
-})
+
+    const strainStat = nano.stats.find((stat) => stat.stat === 75);
+    const strain = strainStat?.value || 0;
+    return strain !== 0 && strain !== 99999;
+  }).length;
+});
 
 const nanosByStrain = computed((): StrainGroup[] => {
-  if (!nanos.value.length) return []
+  if (!nanos.value.length) return [];
 
   // Group nanos by strain first
-  const strainMap = new Map<number, Item[]>()
-  
-  nanos.value.forEach(nano => {
+  const strainMap = new Map<number, Item[]>();
+
+  nanos.value.forEach((nano) => {
     // Skip test items
     if (nano.name.startsWith('TESTLIVEITEM')) {
-      return
+      return;
     }
-    
+
     // Find strain stat (stat 75)
-    const strainStat = nano.stats.find(stat => stat.stat === 75)
-    const strain = strainStat?.value || 0
-    
+    const strainStat = nano.stats.find((stat) => stat.stat === 75);
+    const strain = strainStat?.value || 0;
+
     // Skip nanos with strain 0 or 99999
     if (strain === 0 || strain === 99999) {
-      return
+      return;
     }
-    
+
     if (!strainMap.has(strain)) {
-      strainMap.set(strain, [])
+      strainMap.set(strain, []);
     }
-    strainMap.get(strain)!.push(nano)
-  })
+    strainMap.get(strain)!.push(nano);
+  });
 
   // Convert to strain groups with nested substrain grouping
-  const strainGroups: StrainGroup[] = Array.from(strainMap.entries()).map(([strain, strainNanos]) => {
-    // Group nanos within this strain by substrain
-    const substrainMap = new Map<number, Item[]>()
-    
-    strainNanos.forEach(nano => {
-      // Find substrain stat (stat 1003)
-      const substrainStat = nano.stats.find(stat => stat.stat === 1003)
-      const substrain = substrainStat?.value || 0
-      
-      if (!substrainMap.has(substrain)) {
-        substrainMap.set(substrain, [])
-      }
-      substrainMap.get(substrain)!.push(nano)
-    })
+  const strainGroups: StrainGroup[] = Array.from(strainMap.entries()).map(
+    ([strain, strainNanos]) => {
+      // Group nanos within this strain by substrain
+      const substrainMap = new Map<number, Item[]>();
 
-    // Convert to substrain groups
-    const substrainGroups: SubstrainGroup[] = Array.from(substrainMap.entries()).map(([substrain, substrainNanos]) => {
-      // Sort nanos within substrain based on selected sort order
-      const sortedNanos = [...substrainNanos].sort((a, b) => {
-        switch (sortOrder.value) {
-          case 'ql_desc':
-            return (b.ql || 0) - (a.ql || 0)
-          case 'ql_asc':
-            return (a.ql || 0) - (b.ql || 0)
-          case 'name_asc':
-            return a.name.localeCompare(b.name)
-          default:
-            return 0
+      strainNanos.forEach((nano) => {
+        // Find substrain stat (stat 1003)
+        const substrainStat = nano.stats.find((stat) => stat.stat === 1003);
+        const substrain = substrainStat?.value || 0;
+
+        if (!substrainMap.has(substrain)) {
+          substrainMap.set(substrain, []);
         }
-      })
+        substrainMap.get(substrain)!.push(nano);
+      });
 
-      // Filter based on toggle state
-      const filteredNanos = showUnusableNanos.value
-        ? sortedNanos
-        : sortedNanos.filter(nano => canUseNano(nano))
+      // Convert to substrain groups
+      const substrainGroups: SubstrainGroup[] = Array.from(substrainMap.entries()).map(
+        ([substrain, substrainNanos]) => {
+          // Sort nanos within substrain based on selected sort order
+          const sortedNanos = [...substrainNanos].sort((a, b) => {
+            switch (sortOrder.value) {
+              case 'ql_desc':
+                return (b.ql || 0) - (a.ql || 0);
+              case 'ql_asc':
+                return (a.ql || 0) - (b.ql || 0);
+              case 'name_asc':
+                return a.name.localeCompare(b.name);
+              default:
+                return 0;
+            }
+          });
+
+          // Filter based on toggle state
+          const filteredNanos = showUnusableNanos.value
+            ? sortedNanos
+            : sortedNanos.filter((nano) => canUseNano(nano));
+
+          return {
+            substrain,
+            substrainName:
+              NANO_SUBSTRAINS[substrain as keyof typeof NANO_SUBSTRAINS] ||
+              (substrain > 0 ? `Substrain ${substrain}` : 'General'),
+            nanos: filteredNanos,
+          };
+        }
+      );
+
+      // Sort substrain groups (put general/empty substrain first, then by substrain number)
+      const sortedSubstrains = substrainGroups.sort((a, b) => {
+        if (a.substrain === 0) return -1;
+        if (b.substrain === 0) return 1;
+        return a.substrain - b.substrain;
+      });
 
       return {
-        substrain,
-        substrainName: NANO_SUBSTRAINS[substrain as keyof typeof NANO_SUBSTRAINS] || (substrain > 0 ? `Substrain ${substrain}` : 'General'),
-        nanos: filteredNanos
-      }
-    })
-
-    // Sort substrain groups (put general/empty substrain first, then by substrain number)
-    const sortedSubstrains = substrainGroups.sort((a, b) => {
-      if (a.substrain === 0) return -1
-      if (b.substrain === 0) return 1
-      return a.substrain - b.substrain
-    })
-
-    return {
-      strain,
-      strainName: NANO_STRAIN[strain as keyof typeof NANO_STRAIN] || `Unknown Strain ${strain}`,
-      substrains: sortedSubstrains,
-      totalNanos: strainNanos.length
+        strain,
+        strainName: NANO_STRAIN[strain as keyof typeof NANO_STRAIN] || `Unknown Strain ${strain}`,
+        substrains: sortedSubstrains,
+        totalNanos: strainNanos.length,
+      };
     }
-  })
+  );
 
   // Sort strain groups by strain number
-  return strainGroups.sort((a, b) => a.strain - b.strain)
-})
+  return strainGroups.sort((a, b) => a.strain - b.strain);
+});
 
 // Methods
 async function loadNanos() {
-  console.log('loadNanos called with profession:', props.selectedProfession)
-  
+  console.log('loadNanos called with profession:', props.selectedProfession);
+
   if (!props.selectedProfession) {
-    nanos.value = []
-    return
+    nanos.value = [];
+    return;
   }
 
   try {
-    const url = `/api/v1/nanos/profession/${props.selectedProfession}?page_size=1000&sort=ql&sort_order=desc`
-    console.log('Fetching from URL:', url)
-    
-    const response = await fetch(url)
-    
+    const url = `/api/v1/nanos/profession/${props.selectedProfession}?page_size=1000&sort=ql&sort_order=desc`;
+    console.log('Fetching from URL:', url);
+
+    const response = await fetch(url);
+
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
-    const data = await response.json()
-    console.log('Received data:', data)
-    nanos.value = data.items || []
-    console.log('Set nanos.value to:', nanos.value.length, 'items')
+
+    const data = await response.json();
+    console.log('Received data:', data);
+    nanos.value = data.items || [];
+    console.log('Set nanos.value to:', nanos.value.length, 'items');
   } catch (error) {
-    console.error('Failed to load profession nanos:', error)
-    nanos.value = []
+    console.error('Failed to load profession nanos:', error);
+    nanos.value = [];
   }
 }
 
@@ -453,93 +553,96 @@ function onSortChange() {
 
 function onNanoSelect(nano: Item) {
   // Navigate to item detail page
-  router.push({ name: 'ItemDetail', params: { aoid: nano.aoid?.toString() || nano.id.toString() } })
+  router.push({
+    name: 'ItemDetail',
+    params: { aoid: nano.aoid?.toString() || nano.id.toString() },
+  });
 }
 
 function getSubstrainName(nano: Item): string | null {
   // Find substrain stat (stat 1003)
-  const substrainStat = nano.stats.find(stat => stat.stat === 1003)
-  if (!substrainStat) return null
-  
-  const substrainId = substrainStat.value
-  return NANO_SUBSTRAINS[substrainId as keyof typeof NANO_SUBSTRAINS] || `Substrain ${substrainId}`
+  const substrainStat = nano.stats.find((stat) => stat.stat === 1003);
+  if (!substrainStat) return null;
+
+  const substrainId = substrainStat.value;
+  return NANO_SUBSTRAINS[substrainId as keyof typeof NANO_SUBSTRAINS] || `Substrain ${substrainId}`;
 }
 
 function handleIconError(event: Event) {
   // For simplicity, we'll just hide the broken image
-  const img = event.target as HTMLImageElement
-  img.style.display = 'none'
+  const img = event.target as HTMLImageElement;
+  img.style.display = 'none';
   // Show the fallback icon by removing the v-if condition result
 }
 
 function getNanoskillValue(nano: Item, skill: keyof NanoskillRequirements): number | null {
-  const requirements = getNanoskillRequirements(nano)
-  const requirement = requirements[skill]
-  
+  const requirements = getNanoskillRequirements(nano);
+  const requirement = requirements[skill];
+
   // Add 1 to show the usable minimum skill level
   // Game database checks "current skill > requirement", so stored requirement
   // is one less than the actual minimum skill needed to use the nano
-  return requirement ? requirement + 1 : null
+  return requirement ? requirement + 1 : null;
 }
 
 function getFormattedSource(nano: Item): string | null {
-  return getPrimarySource(nano)
+  return getPrimarySource(nano);
 }
 
 // Profile loading and requirement checking
 async function loadActiveProfile() {
   try {
-    const storage = new ProfileStorage()
-    const profile = await storage.loadActiveProfile()
-    activeProfile.value = profile
+    const storage = new ProfileStorage();
+    const profile = await storage.loadActiveProfile();
+    activeProfile.value = profile;
 
     if (profile) {
-      characterStats.value = mapProfileToStats(profile)
-      console.log('Active profile loaded for nano compatibility:', profile.Character.Name)
+      characterStats.value = mapProfileToStats(profile);
+      console.log('Active profile loaded for nano compatibility:', profile.Character.Name);
     } else {
-      characterStats.value = null
-      console.log('No active profile found')
+      characterStats.value = null;
+      console.log('No active profile found');
     }
   } catch (error) {
-    console.error('Failed to load active profile:', error)
-    activeProfile.value = null
-    characterStats.value = null
+    console.error('Failed to load active profile:', error);
+    activeProfile.value = null;
+    characterStats.value = null;
   }
 }
 
 function canUseNano(nano: Item): boolean {
   if (!characterStats.value || !nano.actions || nano.actions.length === 0) {
-    return true // No profile or no requirements = show as usable
+    return true; // No profile or no requirements = show as usable
   }
 
   // Find USE action (action type 3)
-  const useAction = nano.actions.find(action => action.action === 3)
+  const useAction = nano.actions.find((action) => action.action === 3);
   if (!useAction || !useAction.criteria || useAction.criteria.length === 0) {
-    return true // No USE action or no criteria = usable
+    return true; // No USE action or no criteria = usable
   }
 
   // Check requirements
-  const parsedAction = parseAction(useAction)
-  const { canPerform } = checkActionRequirements(parsedAction, characterStats.value)
-  return canPerform
+  const parsedAction = parseAction(useAction);
+  const { canPerform } = checkActionRequirements(parsedAction, characterStats.value);
+  return canPerform;
 }
 
 function loadShowUnusablePreference(): void {
   try {
-    const saved = localStorage.getItem('tinkertools_nano_show_unusable')
+    const saved = localStorage.getItem('tinkertools_nano_show_unusable');
     if (saved !== null) {
-      showUnusableNanos.value = JSON.parse(saved)
+      showUnusableNanos.value = JSON.parse(saved);
     }
   } catch (error) {
-    console.warn('Failed to load show unusable preference:', error)
+    console.warn('Failed to load show unusable preference:', error);
   }
 }
 
 function saveShowUnusablePreference(): void {
   try {
-    localStorage.setItem('tinkertools_nano_show_unusable', JSON.stringify(showUnusableNanos.value))
+    localStorage.setItem('tinkertools_nano_show_unusable', JSON.stringify(showUnusableNanos.value));
   } catch (error) {
-    console.warn('Failed to save show unusable preference:', error)
+    console.warn('Failed to save show unusable preference:', error);
   }
 }
 
@@ -547,33 +650,36 @@ function saveShowUnusablePreference(): void {
 watch(
   () => props.selectedProfession,
   () => {
-    loadNanos()
-    loadActiveProfile()
-    loadShowUnusablePreference()
+    loadNanos();
+    loadActiveProfile();
+    loadShowUnusablePreference();
   },
   { immediate: true }
-)
+);
 
 watch(showUnusableNanos, () => {
-  saveShowUnusablePreference()
-})
+  saveShowUnusablePreference();
+});
 
 // Watch for active profile changes in the store
 watch(
   () => profileStore.activeProfile,
   (newProfile) => {
-    activeProfile.value = newProfile
+    activeProfile.value = newProfile;
 
     if (newProfile) {
-      characterStats.value = mapProfileToStats(newProfile)
-      console.log('Active profile changed, updating nano compatibility:', newProfile.Character.Name)
+      characterStats.value = mapProfileToStats(newProfile);
+      console.log(
+        'Active profile changed, updating nano compatibility:',
+        newProfile.Character.Name
+      );
     } else {
-      characterStats.value = null
-      console.log('Active profile cleared')
+      characterStats.value = null;
+      console.log('Active profile cleared');
     }
   },
   { immediate: true }
-)
+);
 </script>
 
 <style scoped>

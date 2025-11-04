@@ -8,7 +8,7 @@
         'flex items-center justify-between p-4 rounded-lg border-2',
         req.sufficient
           ? 'border-green-500 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-950 dark:to-green-900'
-          : 'border-red-500 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-950 dark:to-red-900'
+          : 'border-red-500 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-950 dark:to-red-900',
       ]"
     >
       <!-- Left: Stat name and values -->
@@ -34,18 +34,8 @@
 
       <!-- Right: Status tag -->
       <div>
-        <Tag
-          v-if="req.sufficient"
-          severity="success"
-          :value="`✓ Met`"
-          rounded
-        />
-        <Tag
-          v-else
-          severity="danger"
-          :value="`Need +${req.delta.toLocaleString()}`"
-          rounded
-        />
+        <Tag v-if="req.sufficient" severity="success" :value="`✓ Met`" rounded />
+        <Tag v-else severity="danger" :value="`Need +${req.delta.toLocaleString()}`" rounded />
       </div>
     </div>
 
@@ -60,8 +50,8 @@
 </template>
 
 <script setup lang="ts">
-import { type AttributeRequirementInfo } from '@/types/api'
-import Tag from 'primevue/tag'
+import { type AttributeRequirementInfo } from '@/types/api';
+import Tag from 'primevue/tag';
 
 // ============================================================================
 // Props
@@ -69,10 +59,10 @@ import Tag from 'primevue/tag'
 
 interface Props {
   /** Array of attribute requirements to display */
-  requirements: AttributeRequirementInfo[]
+  requirements: AttributeRequirementInfo[];
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 </script>
 
 <style scoped>

@@ -1,9 +1,9 @@
 /**
  * TinkerTools Implant Planning Utility
- * 
+ *
  * Functions for implant construction calculations, QL bumping,
  * skill requirements, and cluster analysis.
- * 
+ *
  * Converted from TinkerPlants utils.py
  */
 
@@ -17,7 +17,7 @@ import {
   type NPModKey,
   type JobeSkillKey,
   type ClusterType,
-  type ImpSlotName
+  type ImpSlotName,
 } from '../services/game-data';
 
 // ============================================================================
@@ -77,7 +77,7 @@ export interface ClusterQualityResult {
  */
 export function initialImplants(): ImplantsData {
   const implants: ImplantsData = {};
-  
+
   for (const slot of IMP_SLOTS) {
     implants[slot] = {
       shiny: 'Empty',
@@ -92,10 +92,10 @@ export function initialImplants(): ImplantsData {
       shiny_benefit: 0,
       bright_benefit: 0,
       faded_benefit: 0,
-      jobe_reqs: {}
+      jobe_reqs: {},
     };
   }
-  
+
   return implants;
 }
 
@@ -109,7 +109,7 @@ export function initialPreferences(): AttributePreferences {
     Psychic: false,
     Sense: false,
     Stamina: false,
-    Strength: false
+    Strength: false,
   };
 }
 
@@ -121,11 +121,11 @@ export function initialPreferences(): AttributePreferences {
  * Pick the optimal faded cluster for a slot based on NP modifiers
  */
 export function pickFadedCluster(slot: ImpSlotName): string {
-  const skills = [...IMP_SKILLS[slot]['Faded']].filter(skill => skill !== 'Empty');
-  
+  const skills = [...IMP_SKILLS[slot]['Faded']].filter((skill) => skill !== 'Empty');
+
   let chosen = '';
   let chosenVal = 0.0;
-  
+
   for (const skill of skills) {
     try {
       const npMod = NP_MODS[skill as NPModKey];
@@ -137,7 +137,7 @@ export function pickFadedCluster(slot: ImpSlotName): string {
       // JOBE clusters can't be cleaned, so don't select them
     }
   }
-  
+
   return chosen;
 }
 
@@ -150,7 +150,7 @@ export function pickFadedCluster(slot: ImpSlotName): string {
  */
 export function rkClusterNP(skill: string, slot: ClusterType, ql: number): number {
   let slotMod = 1.0;
-  
+
   switch (slot) {
     case 'Shiny':
       slotMod = 2.0;
@@ -162,12 +162,12 @@ export function rkClusterNP(skill: string, slot: ClusterType, ql: number): numbe
       slotMod = 1.0;
       break;
   }
-  
+
   const npMod = NP_MODS[skill as NPModKey];
   if (!npMod) {
     throw new Error(`Unknown skill: ${skill}`);
   }
-  
+
   return Math.round(npMod * ql * slotMod);
 }
 
@@ -176,7 +176,7 @@ export function rkClusterNP(skill: string, slot: ClusterType, ql: number): numbe
  */
 export function jobeClusterSkill(skill: string, slot: ClusterType, ql: number): number {
   let slotMod = 1.0;
-  
+
   if (skill !== 'Nano Delta') {
     switch (slot) {
       case 'Shiny':
@@ -202,7 +202,7 @@ export function jobeClusterSkill(skill: string, slot: ClusterType, ql: number): 
         break;
     }
   }
-  
+
   return Math.round(ql * slotMod);
 }
 
@@ -213,13 +213,18 @@ export function jobeClusterSkill(skill: string, slot: ClusterType, ql: number): 
 /**
  * Calculate QL bump for regular cluster based on nano programming skill
  */
-export function rkQLBump(npSkill: number, skill: string, slot: ClusterType, ql: number): QLBumpResult {
+export function rkQLBump(
+  npSkill: number,
+  skill: string,
+  slot: ClusterType,
+  ql: number
+): QLBumpResult {
   const npReq = rkClusterNP(skill, slot, ql);
-  
+
   if (npSkill < npReq) {
     return { success: false, bumps: 0 };
   }
-  
+
   let overFactor: number;
   switch (slot) {
     case 'Shiny':
@@ -234,9 +239,9 @@ export function rkQLBump(npSkill: number, skill: string, slot: ClusterType, ql: 
     default:
       return { success: false, bumps: 0 };
   }
-  
+
   let bumps = Math.floor((npSkill - npReq) / overFactor);
-  
+
   // Apply QL-based bump limits
   if (ql >= 1 && ql < 50) {
     bumps = 0;
@@ -251,20 +256,25 @@ export function rkQLBump(npSkill: number, skill: string, slot: ClusterType, ql: 
   } else if (ql >= 250 && ql <= 300) {
     bumps = Math.min(bumps, 5);
   }
-  
+
   return { success: true, bumps };
 }
 
 /**
  * Calculate QL bump for Jobe cluster based on combining skill
  */
-export function jobeQLBump(combineSkill: number, skill: string, slot: ClusterType, ql: number): QLBumpResult {
+export function jobeQLBump(
+  combineSkill: number,
+  skill: string,
+  slot: ClusterType,
+  ql: number
+): QLBumpResult {
   const skillReq = jobeClusterSkill(skill, slot, ql);
-  
+
   if (combineSkill < skillReq) {
     return { success: false, bumps: 0 };
   }
-  
+
   let overFactor: number;
   switch (slot) {
     case 'Shiny':
@@ -279,9 +289,9 @@ export function jobeQLBump(combineSkill: number, skill: string, slot: ClusterTyp
     default:
       return { success: false, bumps: 0 };
   }
-  
+
   let bumps = Math.floor((combineSkill - skillReq) / overFactor);
-  
+
   // Apply QL-based bump limits for Jobe
   if (ql >= 1 && ql < 99) {
     bumps = 0;
@@ -296,7 +306,7 @@ export function jobeQLBump(combineSkill: number, skill: string, slot: ClusterTyp
   } else if (ql >= 250 && ql <= 300) {
     bumps = Math.min(bumps, 5);
   }
-  
+
   return { success: true, bumps };
 }
 
@@ -316,35 +326,35 @@ export function rkClusterQLBump(
 ): ClusterQualityResult {
   const startQL = curQL;
   const npSkill = combineSkills['Nanoprogramming'] || 0;
-  
+
   const { success: enoughSkill, bumps } = rkQLBump(npSkill, skill, slot, startQL);
-  
+
   if (!enoughSkill) {
     return {
       message: ['Your nanoprogramming skill is too low to build this implant.'],
       finalQL: startQL,
-      success: false
+      success: false,
     };
   }
-  
+
   const tempQL = startQL - bumps;
   const { bumps: checkBumps } = rkQLBump(npSkill, skill, slot, tempQL);
   const finalQL = startQL - checkBumps;
-  
+
   if (finalQL < minQL || tempQL < minQL) {
     return {
       message: ['Your nanoprogramming skill is too high to build this implant.'],
       finalQL: startQL,
-      success: false
+      success: false,
     };
   }
-  
+
   const clusterQL = Math.max(Math.ceil(CLUSTER_MIN_QL[slot] * finalQL), minQL);
-  
+
   return {
     message: `Add a QL ${clusterQL}+ ${slot} ${skill} cluster. The result is QL ${startQL}.`,
     finalQL,
-    success: true
+    success: true,
   };
 }
 
@@ -360,45 +370,45 @@ export function jobeClusterQLBump(
 ): ClusterQualityResult {
   const startQL = curQL;
   const reqSkill = JOBE_SKILL[skill as JobeSkillKey];
-  
+
   if (!reqSkill) {
     return {
       message: [`Unknown Jobe skill: ${skill}`],
       finalQL: startQL,
-      success: false
+      success: false,
     };
   }
-  
+
   const combineSkill = combineSkills[reqSkill] || 0;
-  
+
   const { success: enoughSkill, bumps } = jobeQLBump(combineSkill, skill, slot, startQL);
-  
+
   if (!enoughSkill) {
     return {
       message: [`Your ${reqSkill} is too low to build this implant.`],
       finalQL: startQL,
-      success: false
+      success: false,
     };
   }
-  
+
   const tempQL = startQL - bumps;
   const { bumps: checkBumps } = jobeQLBump(combineSkill, skill, slot, tempQL);
   const finalQL = startQL - checkBumps;
-  
+
   if (finalQL < minQL || tempQL < minQL) {
     return {
       message: [`Your ${reqSkill} skill is too high to build this implant.`],
       finalQL: startQL,
-      success: false
+      success: false,
     };
   }
-  
+
   const clusterQL = Math.max(Math.ceil(CLUSTER_MIN_QL[slot] * finalQL), minQL);
-  
+
   return {
     message: `Add a QL ${clusterQL}+ ${slot} ${skill} cluster. The result is QL ${startQL}.`,
     finalQL,
-    success: true
+    success: true,
   };
 }
 
@@ -423,10 +433,7 @@ export function getJobeRequiredSkill(skill: string): string | null {
 /**
  * Calculate total implant benefits for a slot
  */
-export function calculateSlotBenefits(
-  slotData: ImplantSlotData,
-  slot: ClusterType
-): number {
+export function calculateSlotBenefits(slotData: ImplantSlotData, slot: ClusterType): number {
   switch (slot) {
     case 'Shiny':
       return slotData.shiny_benefit;
@@ -456,13 +463,13 @@ export function validateImplantConfig(implants: ImplantsData): {
 } {
   const errors: string[] = [];
   const warnings: string[] = [];
-  
+
   for (const [slotName, slotData] of Object.entries(implants)) {
     // Check if QL is within valid range
     if (slotData.ql < 1 || slotData.ql > 300) {
       errors.push(`${slotName}: QL must be between 1 and 300`);
     }
-    
+
     // Check if selected skills are valid for the slot
     const slotSkills = IMP_SKILLS[slotName as ImpSlotName];
     if (slotSkills) {
@@ -476,20 +483,22 @@ export function validateImplantConfig(implants: ImplantsData): {
         errors.push(`${slotName}: Invalid faded skill '${slotData.faded}'`);
       }
     }
-    
+
     // Warning for high QL with no skills selected
-    if (slotData.ql > 200 && 
-        slotData.shiny === 'Empty' && 
-        slotData.bright === 'Empty' && 
-        slotData.faded === 'Empty') {
+    if (
+      slotData.ql > 200 &&
+      slotData.shiny === 'Empty' &&
+      slotData.bright === 'Empty' &&
+      slotData.faded === 'Empty'
+    ) {
       warnings.push(`${slotName}: High QL (${slotData.ql}) with no skills selected`);
     }
   }
-  
+
   return {
     valid: errors.length === 0,
     errors,
-    warnings
+    warnings,
   };
 }
 
@@ -501,10 +510,10 @@ export const implantPlanning = {
   // Initialization
   initialImplants,
   initialPreferences,
-  
+
   // Cluster selection
   pickFadedCluster,
-  
+
   // Calculations
   rkClusterNP,
   jobeClusterSkill,
@@ -512,11 +521,11 @@ export const implantPlanning = {
   jobeQLBump,
   rkClusterQLBump,
   jobeClusterQLBump,
-  
+
   // Utilities
   isJobeSkill,
   getJobeRequiredSkill,
   calculateSlotBenefits,
   getAvailableSkills,
-  validateImplantConfig
+  validateImplantConfig,
 };

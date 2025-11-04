@@ -8,7 +8,7 @@ Provides full-text search with auto-complete and search suggestions
       <label class="block text-sm font-medium text-surface-700 dark:text-surface-300">
         Search Items
       </label>
-      
+
       <!-- Main Search Input -->
       <div class="relative">
         <InputText
@@ -21,7 +21,7 @@ Provides full-text search with auto-complete and search suggestions
           @focus="showSuggestions = true"
           @blur="hideSuggestions"
         />
-        
+
         <!-- Search Actions -->
         <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
           <Button
@@ -41,15 +41,20 @@ Provides full-text search with auto-complete and search suggestions
             v-tooltip.bottom="'Search'"
           />
         </div>
-        
+
         <!-- Search Suggestions Dropdown -->
         <div
           v-if="showSuggestions && (suggestions.length > 0 || recentSearches.length > 0)"
           class="absolute top-full left-0 right-0 z-50 mt-1 bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg shadow-lg max-h-64 overflow-y-auto"
         >
           <!-- Recent Searches -->
-          <div v-if="recentSearches.length > 0 && !searchQuery" class="p-2 border-b border-surface-200 dark:border-surface-700">
-            <div class="text-xs text-surface-500 dark:text-surface-400 mb-2 px-2">Recent Searches</div>
+          <div
+            v-if="recentSearches.length > 0 && !searchQuery"
+            class="p-2 border-b border-surface-200 dark:border-surface-700"
+          >
+            <div class="text-xs text-surface-500 dark:text-surface-400 mb-2 px-2">
+              Recent Searches
+            </div>
             <div class="space-y-1">
               <div
                 v-for="search in recentSearches.slice(0, 5)"
@@ -62,7 +67,7 @@ Provides full-text search with auto-complete and search suggestions
               </div>
             </div>
           </div>
-          
+
           <!-- Auto-complete Suggestions -->
           <div v-if="suggestions.length > 0" class="p-2">
             <div class="text-xs text-surface-500 dark:text-surface-400 mb-2 px-2">Suggestions</div>
@@ -75,14 +80,21 @@ Provides full-text search with auto-complete and search suggestions
               >
                 <i :class="getSuggestionIcon(suggestion.type)" class="text-surface-400 text-xs"></i>
                 <span class="text-sm" v-html="highlightMatch(suggestion.text, searchQuery)"></span>
-                <Badge v-if="suggestion.count" :value="suggestion.count" size="small" severity="secondary" />
+                <Badge
+                  v-if="suggestion.count"
+                  :value="suggestion.count"
+                  size="small"
+                  severity="secondary"
+                />
               </div>
             </div>
           </div>
-          
+
           <!-- Quick Filters -->
           <div v-if="!searchQuery" class="p-2 border-t border-surface-200 dark:border-surface-700">
-            <div class="text-xs text-surface-500 dark:text-surface-400 mb-2 px-2">Quick Filters</div>
+            <div class="text-xs text-surface-500 dark:text-surface-400 mb-2 px-2">
+              Quick Filters
+            </div>
             <div class="flex flex-wrap gap-1">
               <Button
                 v-for="filter in quickFilters"
@@ -97,7 +109,7 @@ Provides full-text search with auto-complete and search suggestions
         </div>
       </div>
     </div>
-    
+
     <!-- Advanced Search Toggle -->
     <div class="flex items-center justify-between">
       <Button
@@ -107,16 +119,19 @@ Provides full-text search with auto-complete and search suggestions
         size="small"
         @click="toggleAdvanced"
       />
-      
+
       <div v-if="profile" class="text-xs text-surface-500 dark:text-surface-400">
         <i class="pi pi-user mr-1"></i>
         Character: {{ profile.name }}
       </div>
     </div>
-    
+
     <!-- Advanced Search Options -->
     <Transition name="slide-down">
-      <div v-if="showAdvanced" class="space-y-3 p-3 bg-surface-50 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700">
+      <div
+        v-if="showAdvanced"
+        class="space-y-3 p-3 bg-surface-50 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700"
+      >
         <!-- Search in specific fields -->
         <div class="grid grid-cols-2 gap-2">
           <div>
@@ -134,7 +149,7 @@ Provides full-text search with auto-complete and search suggestions
               :max-selected-labels="2"
             />
           </div>
-          
+
           <div>
             <label class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
               Match Type
@@ -149,17 +164,20 @@ Provides full-text search with auto-complete and search suggestions
             />
           </div>
         </div>
-        
+
         <!-- Search modifiers -->
         <div class="flex flex-wrap gap-2" v-if="profile">
           <div class="flex items-center">
             <Checkbox v-model="compatibleOnly" input-id="compatible-only" />
-            <label for="compatible-only" class="ml-2 text-sm text-surface-600 dark:text-surface-400">
+            <label
+              for="compatible-only"
+              class="ml-2 text-sm text-surface-600 dark:text-surface-400"
+            >
               Compatible items only
             </label>
           </div>
         </div>
-        
+
         <!-- Saved Searches -->
         <div v-if="savedSearches.length > 0">
           <label class="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">
@@ -178,9 +196,12 @@ Provides full-text search with auto-complete and search suggestions
         </div>
       </div>
     </Transition>
-    
+
     <!-- Search Stats -->
-    <div v-if="hasSearched" class="text-xs text-surface-500 dark:text-surface-400 flex items-center justify-between">
+    <div
+      v-if="hasSearched"
+      class="text-xs text-surface-500 dark:text-surface-400 flex items-center justify-between"
+    >
       <span>{{ searchStats.resultCount }} results in {{ searchStats.duration }}ms</span>
       <Button
         label="Save Search"
@@ -195,203 +216,205 @@ Provides full-text search with auto-complete and search suggestions
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
-import type { TinkerProfile } from '@/types/api'
-
+import { ref, computed, watch, onMounted, nextTick } from 'vue';
+import type { TinkerProfile } from '@/types/api';
 
 interface SearchSuggestion {
-  text: string
-  type: 'item' | 'category' | 'stat' | 'effect'
-  count?: number
+  text: string;
+  type: 'item' | 'category' | 'stat' | 'effect';
+  count?: number;
 }
 
 interface QuickFilter {
-  label: string
-  query: string
-  filters?: Record<string, any>
+  label: string;
+  query: string;
+  filters?: Record<string, any>;
 }
 
 interface SavedSearch {
-  name: string
-  query: string
-  filters: Record<string, any>
-  timestamp: number
+  name: string;
+  query: string;
+  filters: Record<string, any>;
+  timestamp: number;
 }
 
 const props = defineProps<{
-  query: string
-  loading?: boolean
-  profile?: TinkerProfile | null
-}>()
+  query: string;
+  loading?: boolean;
+  profile?: TinkerProfile | null;
+}>();
 
 const emit = defineEmits<{
-  search: [options: { query: string; exactMatch: boolean; searchFields: string[] }]
-  clear: []
-  'update:query': [query: string]
-}>()
+  search: [options: { query: string; exactMatch: boolean; searchFields: string[] }];
+  clear: [];
+  'update:query': [query: string];
+}>();
 
 // State
-const searchQuery = ref(props.query)
-const showSuggestions = ref(false)
-const showAdvanced = ref(false)
-const suggestions = ref<SearchSuggestion[]>([])
-const recentSearches = ref<string[]>([])
-const savedSearches = ref<SavedSearch[]>([])
+const searchQuery = ref(props.query);
+const showSuggestions = ref(false);
+const showAdvanced = ref(false);
+const suggestions = ref<SearchSuggestion[]>([]);
+const recentSearches = ref<string[]>([]);
+const savedSearches = ref<SavedSearch[]>([]);
 
 // Advanced search options
-const searchFields = ref<string[]>([])
-const matchType = ref('exact') // Default to exact matching
-const compatibleOnly = ref(false)
+const searchFields = ref<string[]>([]);
+const matchType = ref('exact'); // Default to exact matching
+const compatibleOnly = ref(false);
 
 // Search stats
-const hasSearched = ref(false)
-const searchStats = ref({ resultCount: 0, duration: 0 })
+const hasSearched = ref(false);
+const searchStats = ref({ resultCount: 0, duration: 0 });
 
 // Options
 const searchFieldOptions = [
   { label: 'Item Name', value: 'name' },
   { label: 'Description', value: 'description' },
   { label: 'Effects', value: 'effects' },
-  { label: 'Stats', value: 'stats' }
-]
+  { label: 'Stats', value: 'stats' },
+];
 
 const matchTypeOptions = [
   { label: 'Exact Match', value: 'exact', description: 'Find exact word matches (default)' },
-  { label: 'Fuzzy Search', value: 'fuzzy', description: 'Find similar words and word stems' }
-]
+  { label: 'Fuzzy Search', value: 'fuzzy', description: 'Find similar words and word stems' },
+];
 
 const quickFilters: QuickFilter[] = [
   { label: 'Weapons', query: '', filters: { item_class: [1, 2, 3, 4, 5] } },
   { label: 'Armor', query: '', filters: { item_class: [6, 7, 8, 9, 10] } },
   { label: 'Implants', query: '', filters: { item_class: [15] } },
   { label: 'High QL', query: '', filters: { min_ql: 200 } },
-  { label: 'Nano Programs', query: '', filters: { is_nano: true } }
-]
+  { label: 'Nano Programs', query: '', filters: { is_nano: true } },
+];
 
 // Computed
-const hasError = computed(() => false) // Would integrate with validation
+const hasError = computed(() => false); // Would integrate with validation
 
-const canSaveSearch = computed(() => 
-  searchQuery.value.trim().length > 0 && hasSearched.value
-)
+const canSaveSearch = computed(() => searchQuery.value.trim().length > 0 && hasSearched.value);
 
 // Methods
-let searchTimeout: NodeJS.Timeout | null = null
+let searchTimeout: NodeJS.Timeout | null = null;
 
 function onSearchInput() {
-  emit('update:query', searchQuery.value)
-  
+  emit('update:query', searchQuery.value);
+
   // Clear previous timeout
   if (searchTimeout) {
-    clearTimeout(searchTimeout)
+    clearTimeout(searchTimeout);
   }
-  
+
   // Debounce suggestions
   if (searchQuery.value.trim().length > 1) {
     searchTimeout = setTimeout(() => {
-      loadSuggestions()
-    }, 300)
+      loadSuggestions();
+    }, 300);
   } else {
-    suggestions.value = []
+    suggestions.value = [];
   }
 }
 
 async function loadSuggestions() {
   if (searchQuery.value.trim().length < 2) {
-    suggestions.value = []
-    return
+    suggestions.value = [];
+    return;
   }
-  
+
   try {
     // Mock suggestions - would integrate with backend API
     suggestions.value = [
       { text: 'Implant', type: 'category', count: 150 },
       { text: 'Viral', type: 'item', count: 23 },
-      { text: 'Bio-Communal', type: 'item', count: 8 }
-    ].filter(s => s.text.toLowerCase().includes(searchQuery.value.toLowerCase()))
+      { text: 'Bio-Communal', type: 'item', count: 8 },
+    ].filter((s) => s.text.toLowerCase().includes(searchQuery.value.toLowerCase()));
   } catch (error) {
-    console.error('Failed to load suggestions:', error)
+    console.error('Failed to load suggestions:', error);
   }
 }
 
 function performSearch() {
-  if (!searchQuery.value.trim()) return
-  
+  if (!searchQuery.value.trim()) return;
+
   // Add to recent searches
   if (!recentSearches.value.includes(searchQuery.value)) {
-    recentSearches.value.unshift(searchQuery.value)
-    recentSearches.value = recentSearches.value.slice(0, 10)
-    saveRecentSearches()
+    recentSearches.value.unshift(searchQuery.value);
+    recentSearches.value = recentSearches.value.slice(0, 10);
+    saveRecentSearches();
   }
-  
-  hasSearched.value = true
-  showSuggestions.value = false
-  
+
+  hasSearched.value = true;
+  showSuggestions.value = false;
+
   // Emit search with options
   emit('search', {
     query: searchQuery.value,
     exactMatch: matchType.value === 'exact',
-    searchFields: searchFields.value
-  })
+    searchFields: searchFields.value,
+  });
 }
 
 function clearSearch() {
-  searchQuery.value = ''
-  emit('update:query', '')
-  suggestions.value = []
-  hasSearched.value = false
-  emit('clear')
+  searchQuery.value = '';
+  emit('update:query', '');
+  suggestions.value = [];
+  hasSearched.value = false;
+  emit('clear');
 }
 
 function selectSuggestion(suggestion: SearchSuggestion) {
-  searchQuery.value = suggestion.text
-  emit('update:query', searchQuery.value)
-  showSuggestions.value = false
-  nextTick(() => performSearch())
+  searchQuery.value = suggestion.text;
+  emit('update:query', searchQuery.value);
+  showSuggestions.value = false;
+  nextTick(() => performSearch());
 }
 
 function selectRecentSearch(search: string) {
-  searchQuery.value = search
-  emit('update:query', searchQuery.value)
-  showSuggestions.value = false
-  nextTick(() => performSearch())
+  searchQuery.value = search;
+  emit('update:query', searchQuery.value);
+  showSuggestions.value = false;
+  nextTick(() => performSearch());
 }
 
 function selectQuickFilter(filter: QuickFilter) {
   if (filter.query) {
-    searchQuery.value = filter.query
-    emit('update:query', searchQuery.value)
+    searchQuery.value = filter.query;
+    emit('update:query', searchQuery.value);
   }
-  showSuggestions.value = false
-  nextTick(() => performSearch())
+  showSuggestions.value = false;
+  nextTick(() => performSearch());
 }
 
 function hideSuggestions() {
   // Delay hiding to allow clicks on suggestions
   setTimeout(() => {
-    showSuggestions.value = false
-  }, 200)
+    showSuggestions.value = false;
+  }, 200);
 }
 
 function toggleAdvanced() {
-  showAdvanced.value = !showAdvanced.value
+  showAdvanced.value = !showAdvanced.value;
 }
 
 function getSuggestionIcon(type: string): string {
   switch (type) {
-    case 'item': return 'pi pi-box'
-    case 'category': return 'pi pi-tags'
-    case 'stat': return 'pi pi-chart-bar'
-    case 'effect': return 'pi pi-sparkles'
-    default: return 'pi pi-search'
+    case 'item':
+      return 'pi pi-box';
+    case 'category':
+      return 'pi pi-tags';
+    case 'stat':
+      return 'pi pi-chart-bar';
+    case 'effect':
+      return 'pi pi-sparkles';
+    default:
+      return 'pi pi-search';
   }
 }
 
 function highlightMatch(text: string, query: string): string {
-  if (!query.trim()) return text
-  
-  const regex = new RegExp(`(${query})`, 'gi')
-  return text.replace(regex, '<mark>$1</mark>')
+  if (!query.trim()) return text;
+
+  const regex = new RegExp(`(${query})`, 'gi');
+  return text.replace(regex, '<mark>$1</mark>');
 }
 
 function saveCurrentSearch() {
@@ -399,53 +422,56 @@ function saveCurrentSearch() {
     name: searchQuery.value,
     query: searchQuery.value,
     filters: {}, // Would include current filters
-    timestamp: Date.now()
-  }
-  
-  savedSearches.value.push(search)
-  saveSavedSearches()
+    timestamp: Date.now(),
+  };
+
+  savedSearches.value.push(search);
+  saveSavedSearches();
 }
 
 function loadSavedSearch(search: SavedSearch) {
-  searchQuery.value = search.query
-  emit('update:query', searchQuery.value)
-  showSuggestions.value = false
-  nextTick(() => performSearch())
+  searchQuery.value = search.query;
+  emit('update:query', searchQuery.value);
+  showSuggestions.value = false;
+  nextTick(() => performSearch());
 }
 
 // Persistence
 function loadRecentSearches() {
-  const saved = localStorage.getItem('tinkerItems.recentSearches')
+  const saved = localStorage.getItem('tinkerItems.recentSearches');
   if (saved) {
-    recentSearches.value = JSON.parse(saved)
+    recentSearches.value = JSON.parse(saved);
   }
 }
 
 function saveRecentSearches() {
-  localStorage.setItem('tinkerItems.recentSearches', JSON.stringify(recentSearches.value))
+  localStorage.setItem('tinkerItems.recentSearches', JSON.stringify(recentSearches.value));
 }
 
 function loadSavedSearches() {
-  const saved = localStorage.getItem('tinkerItems.savedSearches')
+  const saved = localStorage.getItem('tinkerItems.savedSearches');
   if (saved) {
-    savedSearches.value = JSON.parse(saved)
+    savedSearches.value = JSON.parse(saved);
   }
 }
 
 function saveSavedSearches() {
-  localStorage.setItem('tinkerItems.savedSearches', JSON.stringify(savedSearches.value))
+  localStorage.setItem('tinkerItems.savedSearches', JSON.stringify(savedSearches.value));
 }
 
 // Watch props
-watch(() => props.query, (newQuery) => {
-  searchQuery.value = newQuery
-})
+watch(
+  () => props.query,
+  (newQuery) => {
+    searchQuery.value = newQuery;
+  }
+);
 
 // Initialize
 onMounted(() => {
-  loadRecentSearches()
-  loadSavedSearches()
-})
+  loadRecentSearches();
+  loadSavedSearches();
+});
 </script>
 
 <style scoped>

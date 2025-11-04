@@ -8,18 +8,18 @@ export interface NanoProgram {
   school: NanoSchool;
   strain: string;
   description?: string;
-  
+
   // Casting requirements
   castingRequirements?: CastingRequirement[];
   nanoPointCost?: number;
   castingTime?: number;
   rechargeTime?: number;
-  
+
   // Effects
   effects?: NanoEffect[];
   duration?: EffectDuration;
   targeting?: TargetingData;
-  
+
   // Meta information
   level: number;
   qualityLevel: number;
@@ -47,18 +47,18 @@ export interface NanoEffect {
   conflicts?: number[]; // Conflicting nano IDs
 }
 
-export type NanoSchool = 
+export type NanoSchool =
   | 'Matter Metamorphosis'
-  | 'Biological Metamorphosis' 
+  | 'Biological Metamorphosis'
   | 'Psychological Modifications'
   | 'Matter Creation'
   | 'Time and Space'
   | 'Sensory Improvement';
 
-export type EffectType = 
+export type EffectType =
   | 'stat_boost'
   | 'heal'
-  | 'damage' 
+  | 'damage'
   | 'protection'
   | 'teleport'
   | 'summon'
@@ -147,19 +147,19 @@ export interface NanoLineup {
   name: string;
   description?: string;
   scenario: LineupScenario;
-  
+
   // Active nanos
   uploadedNanos: number[];
   memoryUsage: MemoryUsage;
-  
+
   // Lineup optimization
   priorities: NanoPriority[];
   constraints: LineupConstraints;
-  
+
   // Performance metrics
   effectiveness: EffectivenessMetrics;
   conflicts: NanoConflict[];
-  
+
   // Metadata
   created: Date;
   lastModified: Date;
@@ -189,7 +189,7 @@ export interface LineupConstraints {
   conflictResolution: ConflictResolutionStrategy;
 }
 
-export type LineupScenario = 
+export type LineupScenario =
   | 'pvp'
   | 'pve_solo'
   | 'pve_team'
@@ -198,7 +198,7 @@ export type LineupScenario =
   | 'social'
   | 'general';
 
-export type ConflictResolutionStrategy = 
+export type ConflictResolutionStrategy =
   | 'prioritize_higher'
   | 'prioritize_duration'
   | 'prioritize_efficiency'
@@ -219,11 +219,7 @@ export interface NanoConflict {
   resolution?: string;
 }
 
-export type ConflictType = 
-  | 'strain'
-  | 'effect'
-  | 'memory'
-  | 'resource';
+export type ConflictType = 'strain' | 'effect' | 'memory' | 'resource';
 
 // Strain conflict detection
 export interface StrainConflict {
@@ -344,12 +340,7 @@ export interface EffectInteraction {
   recommendation?: string;
 }
 
-export type InteractionType = 
-  | 'stacking'
-  | 'conflict'
-  | 'synergy'
-  | 'override'
-  | 'enhancement';
+export type InteractionType = 'stacking' | 'conflict' | 'synergy' | 'override' | 'enhancement';
 
 export interface InteractionResult {
   type: 'positive' | 'negative' | 'neutral';
@@ -365,7 +356,7 @@ export interface EffectSynergy {
   effectiveness: number;
 }
 
-export type SynergyType = 
+export type SynergyType =
   | 'multiplicative'
   | 'additive'
   | 'conditional'

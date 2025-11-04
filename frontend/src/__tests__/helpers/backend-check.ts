@@ -5,9 +5,9 @@
  * Tests that require a real backend should skip if it's not available.
  */
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
-let backendAvailable: boolean | null = null
+let backendAvailable: boolean | null = null;
 
 /**
  * Check if the backend is available by making a lightweight request
@@ -15,20 +15,20 @@ let backendAvailable: boolean | null = null
 export async function isBackendAvailable(): Promise<boolean> {
   // Cache result to avoid repeated checks
   if (backendAvailable !== null) {
-    return backendAvailable
+    return backendAvailable;
   }
 
   try {
     const response = await fetch(`${BACKEND_URL}/api/v1/health`, {
       method: 'GET',
-      signal: AbortSignal.timeout(2000) // 2 second timeout
-    })
-    backendAvailable = response.ok
+      signal: AbortSignal.timeout(2000), // 2 second timeout
+    });
+    backendAvailable = response.ok;
   } catch (error) {
-    backendAvailable = false
+    backendAvailable = false;
   }
 
-  return backendAvailable
+  return backendAvailable;
 }
 
 /**
@@ -36,12 +36,12 @@ export async function isBackendAvailable(): Promise<boolean> {
  * Useful for testing or when you want to force a recheck
  */
 export function resetBackendCheck() {
-  backendAvailable = null
+  backendAvailable = null;
 }
 
 /**
  * Get the backend URL being used for tests
  */
 export function getBackendUrl(): string {
-  return BACKEND_URL
+  return BACKEND_URL;
 }

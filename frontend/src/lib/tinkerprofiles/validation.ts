@@ -46,7 +46,7 @@ export function validateCharacterIds(profile: TinkerProfile): ValidationResult {
   return {
     valid: errors.length === 0,
     errors,
-    warnings
+    warnings,
   };
 }
 
@@ -88,7 +88,7 @@ export function validateProfile(profile: TinkerProfile): ValidationResult {
   return {
     valid: errors.length === 0,
     errors,
-    warnings
+    warnings,
   };
 }
 

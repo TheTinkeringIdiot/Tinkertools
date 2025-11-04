@@ -7,9 +7,7 @@ Organizes items by vendor for easy in-game shopping
     <div class="max-w-4xl mx-auto space-y-6">
       <!-- Header -->
       <div class="text-center mb-6">
-        <h2 class="text-2xl font-bold text-surface-900 dark:text-surface-50 mb-2">
-          Shopping List
-        </h2>
+        <h2 class="text-2xl font-bold text-surface-900 dark:text-surface-50 mb-2">Shopping List</h2>
         <p class="text-surface-600 dark:text-surface-400">
           Track your purchases across different vendors
         </p>
@@ -19,7 +17,8 @@ Organizes items by vendor for easy in-game shopping
       <div v-if="isEmpty" class="text-center py-12">
         <i class="pi pi-shopping-bag text-6xl text-surface-300 dark:text-surface-600 mb-4"></i>
         <p class="text-surface-600 dark:text-surface-400 text-lg">
-          No implants configured yet. Configure your build in the Build tab to generate a shopping list.
+          No implants configured yet. Configure your build in the Build tab to generate a shopping
+          list.
         </p>
       </div>
 
@@ -28,9 +27,13 @@ Organizes items by vendor for easy in-game shopping
         <!-- Empty Implants Section -->
         <Card v-if="emptyImplants.length > 0" class="vendor-section">
           <template #header>
-            <div class="p-4 bg-primary-50 dark:bg-primary-900/20 border-b border-surface-200 dark:border-surface-700">
+            <div
+              class="p-4 bg-primary-50 dark:bg-primary-900/20 border-b border-surface-200 dark:border-surface-700"
+            >
               <div class="flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 flex items-center gap-2">
+                <h3
+                  class="text-lg font-semibold text-surface-900 dark:text-surface-50 flex items-center gap-2"
+                >
                   <i class="pi pi-box"></i>
                   Empty Implants
                 </h3>
@@ -45,11 +48,7 @@ Organizes items by vendor for easy in-game shopping
                 :key="item.id"
                 class="flex items-center gap-3 p-2 hover:bg-surface-50 dark:hover:bg-surface-800 rounded transition-colors"
               >
-                <Checkbox
-                  v-model="item.checked"
-                  :input-id="item.id"
-                  binary
-                />
+                <Checkbox v-model="item.checked" :input-id="item.id" binary />
                 <label
                   :for="item.id"
                   class="flex-1 cursor-pointer"
@@ -65,9 +64,13 @@ Organizes items by vendor for easy in-game shopping
         <!-- Shiny Clusters Section -->
         <Card v-if="shinyClusters.length > 0" class="vendor-section">
           <template #header>
-            <div class="p-4 bg-yellow-50 dark:bg-yellow-900/20 border-b border-surface-200 dark:border-surface-700">
+            <div
+              class="p-4 bg-yellow-50 dark:bg-yellow-900/20 border-b border-surface-200 dark:border-surface-700"
+            >
               <div class="flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 flex items-center gap-2">
+                <h3
+                  class="text-lg font-semibold text-surface-900 dark:text-surface-50 flex items-center gap-2"
+                >
                   <i class="pi pi-circle-fill text-yellow-500"></i>
                   Shiny Clusters
                 </h3>
@@ -82,11 +85,7 @@ Organizes items by vendor for easy in-game shopping
                 :key="item.id"
                 class="flex items-center gap-3 p-2 hover:bg-surface-50 dark:hover:bg-surface-800 rounded transition-colors"
               >
-                <Checkbox
-                  v-model="item.checked"
-                  :input-id="item.id"
-                  binary
-                />
+                <Checkbox v-model="item.checked" :input-id="item.id" binary />
                 <label
                   :for="item.id"
                   class="flex-1 cursor-pointer"
@@ -102,9 +101,13 @@ Organizes items by vendor for easy in-game shopping
         <!-- Bright Clusters Section -->
         <Card v-if="brightClusters.length > 0" class="vendor-section">
           <template #header>
-            <div class="p-4 bg-blue-50 dark:bg-blue-900/20 border-b border-surface-200 dark:border-surface-700">
+            <div
+              class="p-4 bg-blue-50 dark:bg-blue-900/20 border-b border-surface-200 dark:border-surface-700"
+            >
               <div class="flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 flex items-center gap-2">
+                <h3
+                  class="text-lg font-semibold text-surface-900 dark:text-surface-50 flex items-center gap-2"
+                >
                   <i class="pi pi-circle-fill text-blue-500"></i>
                   Bright Clusters
                 </h3>
@@ -119,11 +122,7 @@ Organizes items by vendor for easy in-game shopping
                 :key="item.id"
                 class="flex items-center gap-3 p-2 hover:bg-surface-50 dark:hover:bg-surface-800 rounded transition-colors"
               >
-                <Checkbox
-                  v-model="item.checked"
-                  :input-id="item.id"
-                  binary
-                />
+                <Checkbox v-model="item.checked" :input-id="item.id" binary />
                 <label
                   :for="item.id"
                   class="flex-1 cursor-pointer"
@@ -139,13 +138,20 @@ Organizes items by vendor for easy in-game shopping
         <!-- Faded Clusters Section -->
         <Card v-if="fadedClusters.length > 0" class="vendor-section">
           <template #header>
-            <div class="p-4 bg-purple-50 dark:bg-purple-900/20 border-b border-surface-200 dark:border-surface-700">
+            <div
+              class="p-4 bg-purple-50 dark:bg-purple-900/20 border-b border-surface-200 dark:border-surface-700"
+            >
               <div class="flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 flex items-center gap-2">
+                <h3
+                  class="text-lg font-semibold text-surface-900 dark:text-surface-50 flex items-center gap-2"
+                >
                   <i class="pi pi-circle-fill text-purple-500"></i>
                   Faded Clusters
                 </h3>
-                <Badge :value="`${checkedFadedCount}/${fadedClusters.length}`" severity="secondary" />
+                <Badge
+                  :value="`${checkedFadedCount}/${fadedClusters.length}`"
+                  severity="secondary"
+                />
               </div>
             </div>
           </template>
@@ -156,11 +162,7 @@ Organizes items by vendor for easy in-game shopping
                 :key="item.id"
                 class="flex items-center gap-3 p-2 hover:bg-surface-50 dark:hover:bg-surface-800 rounded transition-colors"
               >
-                <Checkbox
-                  v-model="item.checked"
-                  :input-id="item.id"
-                  binary
-                />
+                <Checkbox v-model="item.checked" :input-id="item.id" binary />
                 <label
                   :for="item.id"
                   class="flex-1 cursor-pointer"
@@ -216,26 +218,28 @@ const fadedClusters = ref<ShoppingItem[]>([]);
 // ============================================================================
 
 const isEmpty = computed(() => {
-  return emptyImplants.value.length === 0 &&
+  return (
+    emptyImplants.value.length === 0 &&
     shinyClusters.value.length === 0 &&
     brightClusters.value.length === 0 &&
-    fadedClusters.value.length === 0;
+    fadedClusters.value.length === 0
+  );
 });
 
 const checkedImplantsCount = computed(() => {
-  return emptyImplants.value.filter(item => item.checked).length;
+  return emptyImplants.value.filter((item) => item.checked).length;
 });
 
 const checkedShinyCount = computed(() => {
-  return shinyClusters.value.filter(item => item.checked).length;
+  return shinyClusters.value.filter((item) => item.checked).length;
 });
 
 const checkedBrightCount = computed(() => {
-  return brightClusters.value.filter(item => item.checked).length;
+  return brightClusters.value.filter((item) => item.checked).length;
 });
 
 const checkedFadedCount = computed(() => {
-  return fadedClusters.value.filter(item => item.checked).length;
+  return fadedClusters.value.filter((item) => item.checked).length;
 });
 
 // ============================================================================
@@ -256,7 +260,7 @@ const slotNames: Record<string, string> = {
   '1024': 'Right-Hand',
   '2048': 'Leg',
   '4096': 'Left-Hand',
-  '8192': 'Feet'
+  '8192': 'Feet',
 };
 
 // ============================================================================
@@ -288,7 +292,7 @@ function extractShoppingLists() {
       id: `implant-${slotBitflag}`,
       name: slotName,
       ql: selection.ql,
-      checked: false
+      checked: false,
     });
 
     // Add shiny cluster if configured
@@ -297,7 +301,7 @@ function extractShoppingLists() {
       shiny.push({
         id: `shiny-${slotBitflag}`,
         name: clusterName,
-        checked: false
+        checked: false,
       });
     }
 
@@ -307,7 +311,7 @@ function extractShoppingLists() {
       bright.push({
         id: `bright-${slotBitflag}`,
         name: clusterName,
-        checked: false
+        checked: false,
       });
     }
 
@@ -317,7 +321,7 @@ function extractShoppingLists() {
       faded.push({
         id: `faded-${slotBitflag}`,
         name: clusterName,
-        checked: false
+        checked: false,
       });
     }
   }

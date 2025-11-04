@@ -17,61 +17,64 @@ vi.mock('@/services/api-client', () => ({
       page_size: 50,
       pages: 0,
       has_next: false,
-      has_prev: false
-    })
-  }
+      has_prev: false,
+    }),
+  },
 }));
 
 // Mock PrimeVue components
 vi.mock('primevue/card', () => ({
-  default: { template: '<div class="mock-card"><slot name="content"></slot></div>' }
+  default: { template: '<div class="mock-card"><slot name="content"></slot></div>' },
 }));
 
 vi.mock('primevue/inputtext', () => ({
-  default: { template: '<input class="mock-inputtext" v-bind="$attrs" />' }
+  default: { template: '<input class="mock-inputtext" v-bind="$attrs" />' },
 }));
 
 vi.mock('primevue/dropdown', () => ({
-  default: { template: '<select class="mock-dropdown" v-bind="$attrs"><option value="">All</option></select>' }
+  default: {
+    template:
+      '<select class="mock-dropdown" v-bind="$attrs"><option value="">All</option></select>',
+  },
 }));
 
 vi.mock('primevue/slider', () => ({
-  default: { template: '<input type="range" class="mock-slider" v-bind="$attrs" />' }
+  default: { template: '<input type="range" class="mock-slider" v-bind="$attrs" />' },
 }));
 
 vi.mock('primevue/button', () => ({
-  default: { template: '<button class="mock-button" v-bind="$attrs"><slot></slot></button>' }
+  default: { template: '<button class="mock-button" v-bind="$attrs"><slot></slot></button>' },
 }));
 
 vi.mock('primevue/dataview', () => ({
-  default: { 
+  default: {
     template: `
       <div class="mock-dataview">
         <slot name="empty" v-if="!value || value.length === 0"></slot>
         <slot name="grid" v-else :items="value"></slot>
       </div>
     `,
-    props: ['value', 'layout', 'paginator', 'rows', 'rowsPerPageOptions']
-  }
+    props: ['value', 'layout', 'paginator', 'rows', 'rowsPerPageOptions'],
+  },
 }));
 
 vi.mock('primevue/tag', () => ({
-  default: { 
+  default: {
     template: '<span class="mock-tag" :class="`severity-${severity}`">{{ value }}</span>',
-    props: ['value', 'severity']
-  }
+    props: ['value', 'severity'],
+  },
 }));
 
 vi.mock('primevue/dialog', () => ({
-  default: { 
+  default: {
     template: `
       <div class="mock-dialog" v-if="visible">
         <slot name="header"></slot>
         <slot></slot>
       </div>
     `,
-    props: ['visible']
-  }
+    props: ['visible'],
+  },
 }));
 
 describe('PocketBossDatabase', () => {
@@ -86,9 +89,7 @@ describe('PocketBossDatabase', () => {
       playfield: 'Nascence',
       location: 'Central Complex',
       mobs: 'Test mobs 1',
-      dropped_symbiants: [
-        { id: 1, aoid: 100, name: 'Test Symbiant 1', slot: 'Head', ql: 150 }
-      ]
+      dropped_symbiants: [{ id: 1, aoid: 100, name: 'Test Symbiant 1', slot: 'Head', ql: 150 }],
     },
     {
       id: 2,
@@ -97,17 +98,17 @@ describe('PocketBossDatabase', () => {
       playfield: 'Shadowlands',
       location: 'Dark Tunnels',
       mobs: 'Test mobs 2',
-      dropped_symbiants: []
-    }
+      dropped_symbiants: [],
+    },
   ];
 
   beforeEach(() => {
     const pinia = createPinia();
-    
+
     wrapper = mountWithContext(PocketBossDatabase, {
       global: {
-        plugins: [pinia, PrimeVue]
-      }
+        plugins: [pinia, PrimeVue],
+      },
     });
 
     store = usePocketBossStore(pinia);
@@ -167,20 +168,20 @@ describe('PocketBossDatabase', () => {
 
   it('formats location correctly', () => {
     const component = wrapper.vm as any;
-    
+
     const bossWithBoth = {
       playfield: 'Nascence',
-      location: 'Central Complex'
+      location: 'Central Complex',
     };
     expect(component.formatLocation(bossWithBoth)).toBe('Nascence - Central Complex');
 
     const bossWithPlayfield = {
-      playfield: 'Nascence'
+      playfield: 'Nascence',
     };
     expect(component.formatLocation(bossWithPlayfield)).toBe('Nascence');
 
     const bossWithLocation = {
-      location: 'Central Complex'
+      location: 'Central Complex',
     };
     expect(component.formatLocation(bossWithLocation)).toBe('Central Complex');
 
@@ -190,7 +191,7 @@ describe('PocketBossDatabase', () => {
 
   it('calculates severity correctly for different levels', () => {
     const component = wrapper.vm as any;
-    
+
     expect(component.getSeverity(30)).toBe('success');
     expect(component.getSeverity(70)).toBe('info');
     expect(component.getSeverity(120)).toBe('warning');
@@ -199,7 +200,7 @@ describe('PocketBossDatabase', () => {
 
   it('handles boss details dialog', async () => {
     const component = wrapper.vm as any;
-    
+
     // Initially dialog should be closed
     expect(component.showBossDetails).toBe(false);
     expect(component.selectedBoss).toBeNull();
@@ -224,20 +225,20 @@ describe('PocketBossDatabase', () => {
 
   it('handles level range updates', async () => {
     const component = wrapper.vm as any;
-    
+
     // Simulate level filter change
     component.levelFilter = [75, 125];
     component.updateLevelRange();
 
     expect(store.updateFilters).toHaveBeenCalledWith({
       minLevel: 75,
-      maxLevel: 125
+      maxLevel: 125,
     });
   });
 
   it('handles playfield filter updates', async () => {
     const component = wrapper.vm as any;
-    
+
     component.selectedPlayfield = 'Nascence';
     component.updatePlayfield();
 

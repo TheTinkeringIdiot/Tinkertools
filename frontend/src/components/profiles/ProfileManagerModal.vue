@@ -13,7 +13,9 @@ Modal dialog for managing all profiles - create, edit, delete, import, export
   >
     <div class="flex flex-col h-full">
       <!-- Header Actions -->
-      <div class="flex justify-between items-center mb-4 pb-4 border-b border-surface-200 dark:border-surface-700">
+      <div
+        class="flex justify-between items-center mb-4 pb-4 border-b border-surface-200 dark:border-surface-700"
+      >
         <div class="flex items-center gap-2">
           <Button
             @click="showCreateModal = true"
@@ -30,7 +32,7 @@ Modal dialog for managing all profiles - create, edit, delete, import, export
             outlined
           />
         </div>
-        
+
         <div class="flex items-center gap-2">
           <span class="text-sm text-surface-600 dark:text-surface-400">
             {{ profileMetadata.length }} profile{{ profileMetadata.length !== 1 ? 's' : '' }}
@@ -46,14 +48,20 @@ Modal dialog for managing all profiles - create, edit, delete, import, export
           />
         </div>
       </div>
-      
+
       <!-- Profiles List -->
       <div class="flex-1 overflow-auto">
-        <div v-if="loading && profileMetadata.length === 0" class="flex items-center justify-center h-32">
+        <div
+          v-if="loading && profileMetadata.length === 0"
+          class="flex items-center justify-center h-32"
+        >
           <ProgressSpinner />
         </div>
-        
-        <div v-else-if="profileMetadata.length === 0" class="flex flex-col items-center justify-center h-32 text-center">
+
+        <div
+          v-else-if="profileMetadata.length === 0"
+          class="flex flex-col items-center justify-center h-32 text-center"
+        >
           <i class="pi pi-user-plus text-4xl text-surface-400 dark:text-surface-600 mb-4"></i>
           <h3 class="text-lg font-medium text-surface-700 dark:text-surface-300 mb-2">
             No profiles found
@@ -61,13 +69,9 @@ Modal dialog for managing all profiles - create, edit, delete, import, export
           <p class="text-surface-500 dark:text-surface-400 mb-4">
             Create your first profile to get started
           </p>
-          <Button
-            @click="showCreateModal = true"
-            label="Create Profile"
-            icon="pi pi-plus"
-          />
+          <Button @click="showCreateModal = true" label="Create Profile" icon="pi pi-plus" />
         </div>
-        
+
         <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           <div
             v-for="profile in profileMetadata"
@@ -78,7 +82,9 @@ Modal dialog for managing all profiles - create, edit, delete, import, export
             <!-- Profile Header -->
             <div class="flex items-start justify-between mb-3">
               <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
+                <div
+                  class="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center"
+                >
                   <i class="pi pi-user text-primary-600 dark:text-primary-400"></i>
                 </div>
                 <div class="flex-1 min-w-0">
@@ -90,7 +96,7 @@ Modal dialog for managing all profiles - create, edit, delete, import, export
                   </p>
                 </div>
               </div>
-              
+
               <div class="flex items-center gap-1">
                 <Button
                   v-if="profile.id !== activeProfileId"
@@ -111,23 +117,15 @@ Modal dialog for managing all profiles - create, edit, delete, import, export
                 </span>
               </div>
             </div>
-            
+
             <!-- Profile Details -->
             <div class="grid grid-cols-2 gap-2 text-xs text-surface-600 dark:text-surface-400 mb-4">
-              <div>
-                <span class="font-medium">Breed:</span> {{ profile.breed }}
-              </div>
-              <div>
-                <span class="font-medium">Faction:</span> {{ profile.faction }}
-              </div>
-              <div>
-                <span class="font-medium">Created:</span> {{ formatDate(profile.created) }}
-              </div>
-              <div>
-                <span class="font-medium">Updated:</span> {{ formatDate(profile.updated) }}
-              </div>
+              <div><span class="font-medium">Breed:</span> {{ profile.breed }}</div>
+              <div><span class="font-medium">Faction:</span> {{ profile.faction }}</div>
+              <div><span class="font-medium">Created:</span> {{ formatDate(profile.created) }}</div>
+              <div><span class="font-medium">Updated:</span> {{ formatDate(profile.updated) }}</div>
             </div>
-            
+
             <!-- Profile Actions -->
             <div class="flex gap-1">
               <Button
@@ -168,26 +166,20 @@ Modal dialog for managing all profiles - create, edit, delete, import, export
         </div>
       </div>
     </div>
-    
+
     <!-- Create Profile Modal -->
-    <ProfileCreateModal
-      v-model:visible="showCreateModal"
-      @created="onProfileCreated"
-    />
-    
+    <ProfileCreateModal v-model:visible="showCreateModal" @created="onProfileCreated" />
+
     <!-- Profile Details Modal -->
     <ProfileDetailsModal
       v-model:visible="showDetailsModal"
       :profile="selectedProfile"
       @updated="onProfileUpdated"
     />
-    
+
     <!-- Import Modal -->
-    <ProfileImportModal
-      v-model:visible="showImportModal"
-      @imported="onProfileImported"
-    />
-    
+    <ProfileImportModal v-model:visible="showImportModal" @imported="onProfileImported" />
+
     <!-- Delete Confirmation -->
     <ConfirmDialog />
   </Dialog>
@@ -215,7 +207,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:visible': [value: boolean];
   'profile-selected': [profileId: string];
-  'refresh': [];
+  refresh: [];
 }>();
 
 // Services
@@ -223,11 +215,7 @@ const confirm = useConfirm();
 const profilesStore = useTinkerProfilesStore();
 
 // Store state
-const { 
-  profileMetadata, 
-  activeProfileId, 
-  loading 
-} = storeToRefs(profilesStore);
+const { profileMetadata, activeProfileId, loading } = storeToRefs(profilesStore);
 
 // Local state
 const showCreateModal = ref(false);
@@ -258,7 +246,7 @@ function viewProfile(profile: ProfileMetadata) {
 async function exportProfile(profile: ProfileMetadata) {
   try {
     const exported = await profilesStore.exportProfile(profile.id, 'json');
-    
+
     // Create download
     const blob = new Blob([exported], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -269,7 +257,6 @@ async function exportProfile(profile: ProfileMetadata) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
   } catch (error) {
     console.error('Failed to export profile:', error);
   }
@@ -294,7 +281,7 @@ function confirmDeleteProfile(profile: ProfileMetadata) {
     rejectLabel: 'Cancel',
     acceptClass: 'p-button-danger',
     acceptLabel: 'Delete',
-    accept: () => deleteProfile(profile.id)
+    accept: () => deleteProfile(profile.id),
   });
 }
 

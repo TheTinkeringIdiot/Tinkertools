@@ -18,19 +18,16 @@ Allows users to set desired stat values for optimization
         aria-label="Add target"
       />
     </div>
-    
-    <div v-if="targets.length === 0" class="text-center py-4 text-surface-500 dark:text-surface-400">
+
+    <div
+      v-if="targets.length === 0"
+      class="text-center py-4 text-surface-500 dark:text-surface-400"
+    >
       <i class="pi pi-bullseye text-2xl mb-2 block"></i>
       <p class="text-sm">No stat targets set</p>
-      <Button
-        @click="addTarget"
-        label="Add First Target"
-        size="small"
-        text
-        class="mt-2"
-      />
+      <Button @click="addTarget" label="Add First Target" size="small" text class="mt-2" />
     </div>
-    
+
     <div v-else class="space-y-3">
       <div
         v-for="(target, index) in targets"
@@ -56,7 +53,7 @@ Allows users to set desired stat values for optimization
             aria-label="Remove target"
           />
         </div>
-        
+
         <div class="flex items-center gap-2 mb-2">
           <InputNumber
             v-model="target.targetValue"
@@ -68,7 +65,7 @@ Allows users to set desired stat values for optimization
             @input="updateTarget(index)"
           />
         </div>
-        
+
         <div class="flex items-center gap-2">
           <Dropdown
             v-model="target.priority"
@@ -79,7 +76,10 @@ Allows users to set desired stat values for optimization
             class="w-24"
             @change="updateTarget(index)"
           />
-          <div v-if="currentStats[target.statId]" class="text-xs text-surface-500 dark:text-surface-400">
+          <div
+            v-if="currentStats[target.statId]"
+            class="text-xs text-surface-500 dark:text-surface-400"
+          >
             Current: {{ currentStats[target.statId] || 0 }}
           </div>
         </div>
@@ -102,7 +102,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  currentStats: () => ({})
+  currentStats: () => ({}),
 });
 
 interface Emits {
@@ -119,13 +119,13 @@ const availableStats = [
   { id: 'stamina', name: 'Stamina' },
   { id: 'intelligence', name: 'Intelligence' },
   { id: 'sense', name: 'Sense' },
-  { id: 'psychic', name: 'Psychic' }
+  { id: 'psychic', name: 'Psychic' },
 ];
 
 const priorities = [
   { label: 'High', value: 'high' },
   { label: 'Medium', value: 'medium' },
-  { label: 'Low', value: 'low' }
+  { label: 'Low', value: 'low' },
 ];
 
 const addTarget = () => {
@@ -133,7 +133,7 @@ const addTarget = () => {
     statId: '',
     statName: '',
     targetValue: 0,
-    priority: 'medium'
+    priority: 'medium',
   });
   updateTargets();
 };
@@ -146,7 +146,7 @@ const removeTarget = (index: number) => {
 const updateTarget = (index: number) => {
   const target = targets.value[index];
   if (target.statId) {
-    const stat = availableStats.find(s => s.id === target.statId);
+    const stat = availableStats.find((s) => s.id === target.statId);
     if (stat) {
       target.statName = stat.name;
     }
@@ -158,7 +158,11 @@ const updateTargets = () => {
   emit('update:modelValue', [...targets.value]);
 };
 
-watch(() => props.modelValue, (newTargets) => {
-  targets.value = [...newTargets];
-}, { deep: true });
+watch(
+  () => props.modelValue,
+  (newTargets) => {
+    targets.value = [...newTargets];
+  },
+  { deep: true }
+);
 </script>

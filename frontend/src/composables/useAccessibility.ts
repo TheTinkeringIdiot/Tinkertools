@@ -16,10 +16,9 @@ export function useAccessibility() {
   // Focus management utilities
   const focusElement = (selector: string | HTMLElement) => {
     nextTick(() => {
-      const element = typeof selector === 'string' 
-        ? document.querySelector(selector) as HTMLElement
-        : selector;
-      
+      const element =
+        typeof selector === 'string' ? (document.querySelector(selector) as HTMLElement) : selector;
+
       if (element && typeof element.focus === 'function') {
         element.focus();
       }
@@ -62,7 +61,7 @@ export function useAccessibility() {
         callback();
       }
     };
-    
+
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   };
@@ -110,7 +109,7 @@ export function useAccessibility() {
     // State
     announceText,
     isLoading,
-    
+
     // Methods
     announce,
     focusElement,
@@ -119,6 +118,6 @@ export function useAccessibility() {
     announceError,
     announceSuccess,
     handleEscapeKey,
-    handleArrowKeys
+    handleArrowKeys,
   };
 }

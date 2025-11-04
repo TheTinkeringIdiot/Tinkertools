@@ -5,10 +5,12 @@ Complete character management with skills, equipment, and IP tracking
 <template>
   <div class="tinker-profile-detail min-h-screen bg-surface-50 dark:bg-surface-950">
     <!-- Breadcrumb Header -->
-    <div class="bg-surface-0 dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 py-4">
+    <div
+      class="bg-surface-0 dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 py-4"
+    >
       <div class="max-w-7xl mx-auto px-6">
         <nav class="flex items-center gap-2 text-sm mb-4" aria-label="Breadcrumb">
-          <router-link 
+          <router-link
             :to="{ name: 'TinkerProfiles' }"
             class="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
           >
@@ -19,14 +21,19 @@ Complete character management with skills, equipment, and IP tracking
             {{ profileData?.Character?.Name || 'Loading...' }}
           </span>
         </nav>
-        
+
         <!-- Profile Header -->
         <div v-if="profileData" class="flex items-center justify-between">
           <div class="flex items-center gap-4">
-            <div class="w-16 h-16 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center">
-              <i :class="professionIcon" class="text-primary-600 dark:text-primary-400 text-2xl"></i>
+            <div
+              class="w-16 h-16 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center"
+            >
+              <i
+                :class="professionIcon"
+                class="text-primary-600 dark:text-primary-400 text-2xl"
+              ></i>
             </div>
-            
+
             <div>
               <div class="flex items-center gap-3 mb-1">
                 <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50">
@@ -41,7 +48,7 @@ Complete character management with skills, equipment, and IP tracking
               </div>
             </div>
           </div>
-          
+
           <!-- Header Actions -->
           <div class="flex items-center gap-2">
             <Button
@@ -77,12 +84,12 @@ Complete character management with skills, equipment, and IP tracking
         </div>
       </div>
     </div>
-    
+
     <!-- Loading State -->
     <div v-if="loading" class="flex items-center justify-center py-16">
       <ProgressSpinner />
     </div>
-    
+
     <!-- Error State -->
     <div v-else-if="error" class="text-center py-16">
       <i class="pi pi-exclamation-triangle text-4xl text-red-500 mb-4"></i>
@@ -92,7 +99,7 @@ Complete character management with skills, equipment, and IP tracking
       <p class="text-surface-500 dark:text-surface-500 mb-4">{{ error }}</p>
       <Button label="Retry" @click="loadProfile" />
     </div>
-    
+
     <!-- Profile Content -->
     <div v-else-if="profileData" class="max-w-7xl mx-auto px-6 py-6">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -100,19 +107,17 @@ Complete character management with skills, equipment, and IP tracking
         <div class="lg:col-span-1 space-y-6">
           <!-- Character Info Panel -->
           <CharacterInfoPanel :profile="profileData" />
-          
+
           <!-- IP Tracker -->
           <IPTrackerPanel :profile="profileData" />
-          
         </div>
-        
+
         <!-- Right Column: Tabbed Management -->
         <div class="lg:col-span-2">
-          <div class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg h-full">
-            <TabView
-              v-model:activeIndex="activeTabIndex"
-              class="h-full profile-tabs"
-            >
+          <div
+            class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg h-full"
+          >
+            <TabView v-model:activeIndex="activeTabIndex" class="h-full profile-tabs">
               <!-- Equipment Tab -->
               <TabPanel>
                 <template #header>
@@ -123,11 +128,15 @@ Complete character management with skills, equipment, and IP tracking
                 </template>
 
                 <div class="h-full p-6">
-                  <h2 class="text-xl font-semibold text-surface-900 dark:text-surface-50 mb-4">Equipment</h2>
+                  <h2 class="text-xl font-semibold text-surface-900 dark:text-surface-50 mb-4">
+                    Equipment
+                  </h2>
                   <div class="grid grid-cols-3 gap-4">
                     <!-- Weapons -->
                     <div class="text-center">
-                      <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2 flex items-center justify-center gap-1">
+                      <h3
+                        class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2 flex items-center justify-center gap-1"
+                      >
                         <i class="pi pi-shield text-orange-500 text-xs"></i>
                         Weapons
                       </h3>
@@ -141,7 +150,9 @@ Complete character management with skills, equipment, and IP tracking
 
                     <!-- Armor -->
                     <div class="text-center">
-                      <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2 flex items-center justify-center gap-1">
+                      <h3
+                        class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2 flex items-center justify-center gap-1"
+                      >
                         <i class="pi pi-user text-blue-500 text-xs"></i>
                         Armor
                       </h3>
@@ -155,7 +166,9 @@ Complete character management with skills, equipment, and IP tracking
 
                     <!-- Implants -->
                     <div class="text-center">
-                      <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2 flex items-center justify-center gap-1">
+                      <h3
+                        class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2 flex items-center justify-center gap-1"
+                      >
                         <i class="pi pi-cpu text-green-500 text-xs"></i>
                         Implants
                       </h3>
@@ -200,23 +213,39 @@ Complete character management with skills, equipment, and IP tracking
                     </div>
 
                     <!-- IP Summary -->
-                    <div v-if="profileData.IPTracker" class="mt-4 p-3 bg-surface-50 dark:bg-surface-800 rounded-lg">
+                    <div
+                      v-if="profileData.IPTracker"
+                      class="mt-4 p-3 bg-surface-50 dark:bg-surface-800 rounded-lg"
+                    >
                       <div class="flex items-center gap-4 text-sm">
                         <span class="text-surface-600 dark:text-surface-400">
-                          Available IP: <strong class="text-surface-900 dark:text-surface-50">{{ profileData.IPTracker.totalAvailable }}</strong>
+                          Available IP:
+                          <strong class="text-surface-900 dark:text-surface-50">{{
+                            profileData.IPTracker.totalAvailable
+                          }}</strong>
                         </span>
                         <span class="text-surface-600 dark:text-surface-400">
-                          Used: <strong class="text-surface-900 dark:text-surface-50">{{ profileData.IPTracker.totalUsed }}</strong>
+                          Used:
+                          <strong class="text-surface-900 dark:text-surface-50">{{
+                            profileData.IPTracker.totalUsed
+                          }}</strong>
                         </span>
                         <span class="text-surface-600 dark:text-surface-400">
-                          Remaining: <strong :class="remainingIPColor">{{ profileData.IPTracker.remaining }}</strong>
+                          Remaining:
+                          <strong :class="remainingIPColor">{{
+                            profileData.IPTracker.remaining
+                          }}</strong>
                         </span>
                       </div>
                     </div>
                   </div>
 
                   <!-- Skills Content -->
-                  <div ref="skillsScrollContainer" class="flex-1 p-6 overflow-y-auto" style="scroll-behavior: auto;">
+                  <div
+                    ref="skillsScrollContainer"
+                    class="flex-1 p-6 overflow-y-auto"
+                    style="scroll-behavior: auto"
+                  >
                     <SkillsManager
                       v-if="profileData"
                       :key="`skills-${profileData.id}`"
@@ -247,7 +276,7 @@ Complete character management with skills, equipment, and IP tracking
         </div>
       </div>
     </div>
-    
+
     <!-- Edit Character Dialog -->
     <EditCharacterDialog
       v-model:visible="showEditDialog"
@@ -302,11 +331,11 @@ const activeTabIndex = ref(0); // Track the active tab index
 const skillsScrollContainer = ref<HTMLElement | null>(null); // Reference to skills scroll container
 
 // Computed
-const isActiveProfile = computed(() => 
-  profilesStore.activeProfileId === props.profileId
-);
+const isActiveProfile = computed(() => profilesStore.activeProfileId === props.profileId);
 
-const displayProfession = computed(() => getProfessionName(profileData.value?.Character?.Profession || 0));
+const displayProfession = computed(() =>
+  getProfessionName(profileData.value?.Character?.Profession || 0)
+);
 const displayBreed = computed(() => getBreedName(profileData.value?.Character?.Breed || 0));
 
 const professionIcon = computed(() => {
@@ -314,27 +343,27 @@ const professionIcon = computed(() => {
 
   const professionName = getProfessionName(profileData.value.Character.Profession);
   const iconMap: Record<string, string> = {
-    'Adventurer': 'pi pi-compass',
-    'Agent': 'pi pi-eye-slash',
-    'Bureaucrat': 'pi pi-briefcase',
-    'Doctor': 'pi pi-heart',
-    'Enforcer': 'pi pi-shield',
-    'Engineer': 'pi pi-wrench',
-    'Fixer': 'pi pi-bolt',
-    'Keeper': 'pi pi-sun',
+    Adventurer: 'pi pi-compass',
+    Agent: 'pi pi-eye-slash',
+    Bureaucrat: 'pi pi-briefcase',
+    Doctor: 'pi pi-heart',
+    Enforcer: 'pi pi-shield',
+    Engineer: 'pi pi-wrench',
+    Fixer: 'pi pi-bolt',
+    Keeper: 'pi pi-sun',
     'Martial Artist': 'pi pi-hand-fist',
     'Meta-Physicist': 'pi pi-sparkles',
     'Nano-Technician': 'pi pi-cog',
-    'Soldier': 'pi pi-rifle',
-    'Trader': 'pi pi-dollar',
-    'Shade': 'pi pi-moon'
+    Soldier: 'pi pi-rifle',
+    Trader: 'pi pi-dollar',
+    Shade: 'pi pi-moon',
   };
   return iconMap[professionName] || 'pi pi-user';
 });
 
 const remainingIPColor = computed(() => {
   if (!profileData.value?.IPTracker) return 'text-surface-900 dark:text-surface-50';
-  
+
   const remaining = profileData.value.IPTracker.remaining;
   if (remaining < 0) return 'text-red-600 dark:text-red-400';
   if (remaining < 100) return 'text-orange-600 dark:text-orange-400';
@@ -374,15 +403,15 @@ async function setActiveProfile() {
 
 async function duplicateProfile() {
   if (!profileData.value) return;
-  
+
   try {
     const newName = `${profileData.value.Character.Name} (Copy)`;
     const newProfileId = await profilesStore.duplicateProfile(props.profileId, newName);
-    
+
     // Navigate to the new profile
     router.push({
       name: 'TinkerProfileDetail',
-      params: { profileId: newProfileId }
+      params: { profileId: newProfileId },
     });
   } catch (err) {
     console.error('Failed to duplicate profile:', err);
@@ -396,7 +425,6 @@ async function exportProfile() {
     console.error('Failed to export profile:', err);
   }
 }
-
 
 async function handleSkillChange(category: string, skillId: string | number, newValue: number) {
   try {
@@ -441,7 +469,6 @@ async function handleAbilityChange(abilityId: string | number, newValue: number)
     error.value = err instanceof Error ? err.message : 'Failed to modify ability';
   }
 }
-
 
 async function handleCharacterUpdate(changes: any) {
   if (!profileData.value) return;
@@ -502,7 +529,7 @@ async function handleRemoveAllBuffs() {
 function showTrickleDownFeedback(affectedSkillsCount: number) {
   // Simple console feedback for now - could be enhanced with toast notifications
   console.info(`✨ Ability change updated trickle-down bonuses for ${affectedSkillsCount} skills`);
-  
+
   // Could add a toast notification here if PrimeVue Toast is set up:
   // toast.add({
   //   severity: 'success',
@@ -526,12 +553,15 @@ function getEquippedImplants(implants: Record<string, Item | null>) {
 }
 
 // Watchers
-watch(() => props.profileId, () => {
-  if (props.profileId) {
-    loadProfile();
-  }
-}, { immediate: true });
-
+watch(
+  () => props.profileId,
+  () => {
+    if (props.profileId) {
+      loadProfile();
+    }
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped>

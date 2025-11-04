@@ -16,12 +16,7 @@
  * The five symbiant family types in Anarchy Online
  * Each family provides different combat/support capabilities
  */
-export type SymbiantFamily =
-  | 'Artillery'
-  | 'Control'
-  | 'Extermination'
-  | 'Infantry'
-  | 'Support';
+export type SymbiantFamily = 'Artillery' | 'Control' | 'Extermination' | 'Infantry' | 'Support';
 
 /**
  * All playable professions in Anarchy Online
@@ -146,10 +141,7 @@ export function getFamiliesForProfession(profession: Profession): SymbiantFamily
  * // Returns: false (Shades can't use any symbiants)
  * ```
  */
-export function canProfessionUseFamily(
-  profession: Profession,
-  family: SymbiantFamily
-): boolean {
+export function canProfessionUseFamily(profession: Profession, family: SymbiantFamily): boolean {
   return professionFamilies[profession]?.includes(family) || false;
 }
 

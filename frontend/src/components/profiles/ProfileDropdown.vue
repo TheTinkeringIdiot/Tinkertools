@@ -16,11 +16,11 @@ Global profile selection dropdown for the top navigation bar
       @change="onProfileChange"
       :pt="{
         root: { class: 'w-64' },
-        input: { 
-          class: hasActiveProfile 
-            ? 'font-medium text-primary-700 dark:text-primary-300' 
-            : 'text-surface-600 dark:text-surface-400'
-        }
+        input: {
+          class: hasActiveProfile
+            ? 'font-medium text-primary-700 dark:text-primary-300'
+            : 'text-surface-600 dark:text-surface-400',
+        },
       }"
     >
       <template #value="slotProps">
@@ -32,18 +32,18 @@ Global profile selection dropdown for the top navigation bar
             </span>
           </div>
         </div>
-        <span v-else class="text-surface-500 dark:text-surface-400">
-          No Profile Selected
-        </span>
+        <span v-else class="text-surface-500 dark:text-surface-400"> No Profile Selected </span>
       </template>
-      
+
       <template #option="slotProps">
         <div v-if="slotProps.option.value === null" class="flex items-center gap-2 py-1">
           <i class="pi pi-user-minus text-surface-400"></i>
           <span class="text-surface-600 dark:text-surface-300">{{ slotProps.option.label }}</span>
         </div>
         <div v-else class="flex items-center gap-2 py-1">
-          <div class="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
+          <div
+            class="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center"
+          >
             <i class="pi pi-user text-primary-600 dark:text-primary-400 text-sm"></i>
           </div>
           <div class="flex flex-col flex-1">
@@ -60,7 +60,6 @@ Global profile selection dropdown for the top navigation bar
         </div>
       </template>
     </Dropdown>
-    
   </div>
 </template>
 
@@ -77,18 +76,16 @@ const profilesStore = useTinkerProfilesStore();
 const selectedProfileId = ref<string | null>(null);
 
 // Computed
-const { 
-  loading, 
-  hasActiveProfile, 
+const {
+  loading,
+  hasActiveProfile,
   profileOptions: storeProfileOptions,
   activeProfileName,
   activeProfileProfession,
-  activeProfileLevel 
+  activeProfileLevel,
 } = storeToRefs(profilesStore);
 
-const profileOptions = computed(() => [
-  ...storeProfileOptions.value
-]);
+const profileOptions = computed(() => [...storeProfileOptions.value]);
 
 const dropdownPlaceholder = computed(() => {
   return loading.value ? 'Loading...' : 'Select Profile';
@@ -107,7 +104,7 @@ function getProfileDetails(option: any): string {
 
 async function onProfileChange(event: any) {
   const value = event.value;
-  
+
   try {
     await profilesStore.setActiveProfile(value);
   } catch (error) {
@@ -117,11 +114,14 @@ async function onProfileChange(event: any) {
   }
 }
 
-
 // Watchers
-watch(() => profilesStore.activeProfileId, (newId) => {
-  selectedProfileId.value = newId;
-}, { immediate: true });
+watch(
+  () => profilesStore.activeProfileId,
+  (newId) => {
+    selectedProfileId.value = newId;
+  },
+  { immediate: true }
+);
 
 // Lifecycle
 onMounted(async () => {

@@ -9,7 +9,9 @@ Task 4.4: Complete view integration
 <template>
   <div class="tinker-nukes h-full flex flex-col">
     <!-- Header -->
-    <div class="bg-surface-50 dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 p-4">
+    <div
+      class="bg-surface-50 dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 p-4"
+    >
       <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div class="flex items-center gap-4">
           <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50">
@@ -31,11 +33,16 @@ Task 4.4: Complete view integration
       </div>
 
       <!-- Profile Selection Info (if active profile exists) -->
-      <div v-if="activeProfile" class="mt-3 flex items-center gap-2 text-sm text-surface-700 dark:text-surface-300">
+      <div
+        v-if="activeProfile"
+        class="mt-3 flex items-center gap-2 text-sm text-surface-700 dark:text-surface-300"
+      >
         <i class="pi pi-user"></i>
         <span>
-          Active Profile: <strong>{{ activeProfile.Character.Name }}</strong>
-          ({{ getProfessionName(activeProfile.Character.Profession) }} {{ activeProfile.Character.Level }})
+          Active Profile: <strong>{{ activeProfile.Character.Name }}</strong> ({{
+            getProfessionName(activeProfile.Character.Profession)
+          }}
+          {{ activeProfile.Character.Level }})
         </span>
       </div>
     </div>
@@ -57,11 +64,7 @@ Task 4.4: Complete view integration
           <!-- Search -->
           <div class="flex items-center gap-2">
             <i class="pi pi-search text-surface-400"></i>
-            <InputText
-              v-model="searchQuery"
-              placeholder="Search nanos..."
-              class="w-64"
-            />
+            <InputText v-model="searchQuery" placeholder="Search nanos..." class="w-64" />
           </div>
 
           <!-- School Filter -->
@@ -78,21 +81,9 @@ Task 4.4: Complete view integration
           <!-- QL Range Filters -->
           <div class="flex items-center gap-2">
             <label class="text-sm text-surface-700 dark:text-surface-300">QL:</label>
-            <InputNumber
-              v-model="minQL"
-              :min="1"
-              :max="300"
-              placeholder="Min"
-              class="w-24"
-            />
+            <InputNumber v-model="minQL" :min="1" :max="300" placeholder="Min" class="w-24" />
             <span class="text-surface-500">-</span>
-            <InputNumber
-              v-model="maxQL"
-              :min="1"
-              :max="300"
-              placeholder="Max"
-              class="w-24"
-            />
+            <InputNumber v-model="maxQL" :min="1" :max="300" placeholder="Max" class="w-24" />
           </div>
         </div>
 
@@ -117,47 +108,53 @@ Task 4.4: Complete view integration
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
-import { getProfessionName } from '@/services/game-utils'
-import Badge from 'primevue/badge'
-import Dropdown from 'primevue/dropdown'
-import InputText from 'primevue/inputtext'
-import InputNumber from 'primevue/inputnumber'
+import { ref, computed, watch, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
+import { getProfessionName } from '@/services/game-utils';
+import Badge from 'primevue/badge';
+import Dropdown from 'primevue/dropdown';
+import InputText from 'primevue/inputtext';
+import InputNumber from 'primevue/inputnumber';
 
 // Import components from Task 4.1, 4.3
-import NukeInputForm from '@/components/nukes/NukeInputForm.vue'
-import NukeTable from '@/components/nukes/NukeTable.vue'
+import NukeInputForm from '@/components/nukes/NukeInputForm.vue';
+import NukeTable from '@/components/nukes/NukeTable.vue';
 
 // Import types from Task 3.4
-import type { OffensiveNano, NukeInputState, CharacterStats, DamageModifiers, BuffPresets } from '@/types/offensive-nano'
+import type {
+  OffensiveNano,
+  NukeInputState,
+  CharacterStats,
+  DamageModifiers,
+  BuffPresets,
+} from '@/types/offensive-nano';
 
 // Import service from Task 4.1
-import { fetchOffensiveNanos, buildOffensiveNano } from '@/services/offensive-nano-service'
+import { fetchOffensiveNanos, buildOffensiveNano } from '@/services/offensive-nano-service';
 
 // Import filtering utilities from Task 4.2
-import { filterByCharacterProfile, applyNanoFilters } from '@/utils/nuke-filtering'
-import type { Character } from '@/utils/stat-calculations'
-import { convertInputStateToCharacter } from '@/utils/input-to-character'
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types'
+import { filterByCharacterProfile, applyNanoFilters } from '@/utils/nuke-filtering';
+import type { Character } from '@/utils/stat-calculations';
+import { convertInputStateToCharacter } from '@/utils/input-to-character';
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 
 // ============================================================================
 // Store and Router
 // ============================================================================
 
-const profileStore = useTinkerProfilesStore()
-const router = useRouter()
+const profileStore = useTinkerProfilesStore();
+const router = useRouter();
 
 // ============================================================================
 // Reactive State
 // ============================================================================
 
 // Loading state
-const loading = ref(false)
+const loading = ref(false);
 
 // Offensive nanos fetched from backend (profession ID 11 = Nanotechnician)
-const offensiveNanos = ref<OffensiveNano[]>([])
+const offensiveNanos = ref<OffensiveNano[]>([]);
 
 // Manual input state (28 fields organized into 3 sections)
 const inputState = ref<NukeInputState>({
@@ -197,13 +194,13 @@ const inputState = ref<NukeInputState>({
     enhanceNanoDamage: 0,
     ancientMatrix: 0,
   },
-})
+});
 
 // Search and filter state
-const searchQuery = ref('')
-const selectedSchoolId = ref<number | null>(null)
-const minQL = ref<number | undefined>(undefined)
-const maxQL = ref<number | undefined>(undefined)
+const searchQuery = ref('');
+const selectedSchoolId = ref<number | null>(null);
+const minQL = ref<number | undefined>(undefined);
+const maxQL = ref<number | undefined>(undefined);
 
 // ============================================================================
 // Computed Properties
@@ -213,7 +210,7 @@ const maxQL = ref<number | undefined>(undefined)
  * Active profile from TinkerProfiles store
  * Exposed as reactive ref for components
  */
-const activeProfile = computed(() => profileStore.activeProfile)
+const activeProfile = computed(() => profileStore.activeProfile);
 
 /**
  * School filter options for dropdown
@@ -226,18 +223,18 @@ const schoolFilterOptions = computed(() => [
   { label: 'Psychological Modifications', value: 129 },
   { label: 'Sensory Improvement', value: 122 },
   { label: 'Time and Space', value: 131 },
-])
+]);
 
 /**
  * Current character as Character type for profile-based filtering
  * Extracted from activeProfile when available, otherwise uses manual inputState
  */
 const currentCharacter = computed((): Character | null => {
-  if (!activeProfile.value) return null
+  if (!activeProfile.value) return null;
 
   // Convert manual inputs to Character format for validation
-  return convertInputStateToCharacter(inputState.value, activeProfile.value as TinkerProfile)
-})
+  return convertInputStateToCharacter(inputState.value, activeProfile.value as TinkerProfile);
+});
 
 /**
  * Filtered nanos based on profile requirements and user filters
@@ -245,11 +242,11 @@ const currentCharacter = computed((): Character | null => {
  */
 const filteredNanos = computed((): OffensiveNano[] => {
   // Start with all offensive nanos
-  let filtered = offensiveNanos.value
+  let filtered = offensiveNanos.value;
 
   // Step 1: Filter by character profile requirements (if profile exists)
   if (currentCharacter.value) {
-    filtered = filterByCharacterProfile(filtered, currentCharacter.value)
+    filtered = filterByCharacterProfile(filtered, currentCharacter.value);
   }
 
   // Step 2: Apply additional filters (school, QL range, search)
@@ -258,10 +255,10 @@ const filteredNanos = computed((): OffensiveNano[] => {
     minQL: minQL.value,
     maxQL: maxQL.value,
     searchQuery: searchQuery.value,
-  })
+  });
 
-  return filtered
-})
+  return filtered;
+});
 
 // ============================================================================
 // Event Handlers
@@ -272,7 +269,7 @@ const filteredNanos = computed((): OffensiveNano[] => {
  * Updates local state and triggers table recalculation
  */
 function onInputStateUpdate(newState: NukeInputState): void {
-  inputState.value = { ...newState }
+  inputState.value = { ...newState };
 }
 
 /**
@@ -280,7 +277,7 @@ function onInputStateUpdate(newState: NukeInputState): void {
  * Navigate to /items/:id detail page
  */
 function onNanoSelected(nanoId: number): void {
-  router.push(`/items/${nanoId}`)
+  router.push(`/items/${nanoId}`);
 }
 
 /**
@@ -288,10 +285,10 @@ function onNanoSelected(nanoId: number): void {
  */
 function clearTable(): void {
   // Clear filters to show empty table
-  searchQuery.value = ''
-  selectedSchoolId.value = null
-  minQL.value = undefined
-  maxQL.value = undefined
+  searchQuery.value = '';
+  selectedSchoolId.value = null;
+  minQL.value = undefined;
+  maxQL.value = undefined;
 }
 
 // ============================================================================
@@ -303,24 +300,24 @@ function clearTable(): void {
  * Call GET /api/nanos/offensive/11 (profession ID 11 = Nanotechnician)
  */
 onMounted(async () => {
-  loading.value = true
+  loading.value = true;
 
   try {
     // Fetch offensive nanos for Nanotechnician (profession ID 11)
-    const items = await fetchOffensiveNanos(11)
+    const items = await fetchOffensiveNanos(11);
 
     // Transform ItemDetail[] into OffensiveNano[]
     offensiveNanos.value = items
       .map(buildOffensiveNano)
-      .filter((nano): nano is OffensiveNano => nano !== null)
+      .filter((nano): nano is OffensiveNano => nano !== null);
 
-    console.log(`[TinkerNukes] Loaded ${offensiveNanos.value.length} offensive nanos`)
+    console.log(`[TinkerNukes] Loaded ${offensiveNanos.value.length} offensive nanos`);
   } catch (error) {
-    console.error('[TinkerNukes] Failed to fetch offensive nanos:', error)
+    console.error('[TinkerNukes] Failed to fetch offensive nanos:', error);
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-})
+});
 
 // ============================================================================
 // Watchers
@@ -341,29 +338,33 @@ watch(
   (newProfile, oldProfile) => {
     // Only react if profile actually changed
     if (newProfile?.Character.Name === oldProfile?.Character.Name) {
-      return
+      return;
     }
 
     // Clear table on profile switch
-    clearTable()
+    clearTable();
 
     // Log profile change
     if (newProfile) {
-      const profession = getProfessionName(newProfile.Character.Profession)
-      console.log(`[TinkerNukes] Profile switched to: ${newProfile.Character.Name} (${profession})`)
+      const profession = getProfessionName(newProfile.Character.Profession);
+      console.log(
+        `[TinkerNukes] Profile switched to: ${newProfile.Character.Name} (${profession})`
+      );
 
       if (profession !== 'Nanotechnician') {
-        console.warn('[TinkerNukes] Active profile is not Nanotechnician, fields will reset to defaults')
+        console.warn(
+          '[TinkerNukes] Active profile is not Nanotechnician, fields will reset to defaults'
+        );
       }
     } else {
-      console.log('[TinkerNukes] No active profile, fields will reset to defaults')
+      console.log('[TinkerNukes] No active profile, fields will reset to defaults');
     }
 
     // Note: Auto-population and reset logic handled by NukeInputForm component
     // filteredNanos will automatically re-filter based on new inputState values
   },
   { immediate: false }
-)
+);
 
 // ============================================================================
 // Expose for Tests
@@ -380,17 +381,17 @@ defineExpose({
   maxQL,
   filteredNanos,
   currentSkills: computed(() => {
-    const skills: Record<number, number> = {}
-    skills[130] = inputState.value.characterStats.matterCreation
-    skills[127] = inputState.value.characterStats.matterMeta
-    skills[128] = inputState.value.characterStats.bioMeta
-    skills[129] = inputState.value.characterStats.psychModi
-    skills[122] = inputState.value.characterStats.sensoryImp
-    skills[131] = inputState.value.characterStats.timeSpace
-    return skills
+    const skills: Record<number, number> = {};
+    skills[130] = inputState.value.characterStats.matterCreation;
+    skills[127] = inputState.value.characterStats.matterMeta;
+    skills[128] = inputState.value.characterStats.bioMeta;
+    skills[129] = inputState.value.characterStats.psychModi;
+    skills[122] = inputState.value.characterStats.sensoryImp;
+    skills[131] = inputState.value.characterStats.timeSpace;
+    return skills;
   }),
-  schoolFilterOptions
-})
+  schoolFilterOptions,
+});
 </script>
 
 <style scoped>

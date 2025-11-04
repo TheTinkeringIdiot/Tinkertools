@@ -1,15 +1,11 @@
 /**
  * TinkerProfiles Storage Manager
- * 
+ *
  * Handles persistent storage for profiles with compression and encryption
  * capabilities
  */
 
-import type {
-  TinkerProfile,
-  ProfileStorageOptions,
-  ProfileMetadata
-} from './types';
+import type { TinkerProfile, ProfileStorageOptions, ProfileMetadata } from './types';
 import { STORAGE_KEYS, CURRENT_VERSION } from './constants';
 import { toRaw } from 'vue';
 import { getProfessionName, getBreedName } from '../../services/game-utils';
@@ -23,17 +19,17 @@ export class ProfileStorage {
       encrypt: false,
       autoSave: true,
       migrationEnabled: true,
-      ...options
+      ...options,
     };
 
     // Clean up legacy backup data on initialization
     this.cleanupLegacyBackups();
   }
-  
+
   // ============================================================================
   // Core Storage Operations
   // ============================================================================
-  
+
   /**
    * Prepare profile for v4.0.0 serialization
    * v4.0.0 stores computed totals and uses flat skill ID structure
@@ -41,7 +37,9 @@ export class ProfileStorage {
   private prepareProfileForSerialization(profile: TinkerProfile): TinkerProfile {
     // Validate version before serialization
     if (profile.version !== '4.0.0') {
-      throw new Error(`Cannot serialize profile version ${profile.version}. Only v4.0.0 supported.`);
+      throw new Error(
+        `Cannot serialize profile version ${profile.version}. Only v4.0.0 supported.`
+      );
     }
 
     // Convert Vue proxy to raw object first, then create a deep clone
@@ -60,7 +58,9 @@ export class ProfileStorage {
     try {
       // Validate profile version
       if (profile.version !== '4.0.0') {
-        throw new Error(`Invalid profile version: ${profile.version}. Only v4.0.0 profiles are supported.`);
+        throw new Error(
+          `Invalid profile version: ${profile.version}. Only v4.0.0 profiles are supported.`
+        );
       }
 
       // Prepare profile for v4.0.0 serialization (stores computed totals)
@@ -68,19 +68,24 @@ export class ProfileStorage {
 
       // Save the individual profile
       const profileKey = `${STORAGE_KEYS.PROFILE_PREFIX}${profile.id}`;
-      const data = this.options.compress ? await this.compress(profileToSave) : JSON.stringify(profileToSave);
+      const data = this.options.compress
+        ? await this.compress(profileToSave)
+        : JSON.stringify(profileToSave);
       localStorage.setItem(profileKey, data);
 
       // Update the index
       await this.updateProfileIndex(profile.id, 'add');
 
-      console.log(`[ProfileStorage] Saved profile ${profile.id} to individual key (v4.0.0 format with computed totals)`);
-
+      console.log(
+        `[ProfileStorage] Saved profile ${profile.id} to individual key (v4.0.0 format with computed totals)`
+      );
     } catch (error) {
-      throw new Error(`Failed to save profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to save profile: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
-  
+
   /**
    * Load a specific profile by ID
    */
@@ -103,7 +108,9 @@ export class ProfileStorage {
 
       // Strict v4.0.0 validation
       if (!profile.version || profile.version !== '4.0.0') {
-        throw new Error(`Profile version ${profile.version || 'unknown'} not supported. Only v4.0.0 profiles can be loaded.`);
+        throw new Error(
+          `Profile version ${profile.version || 'unknown'} not supported. Only v4.0.0 profiles can be loaded.`
+        );
       }
 
       // Auto-migrate legacy string-based Character IDs
@@ -115,12 +122,18 @@ export class ProfileStorage {
       const { validateCharacterIds } = await import('./validation');
       const validation = validateCharacterIds(migrated);
       if (!validation.valid) {
-        console.error(`[ProfileStorage] Loaded profile ${profileId} has invalid IDs:`, validation.errors);
+        console.error(
+          `[ProfileStorage] Loaded profile ${profileId} has invalid IDs:`,
+          validation.errors
+        );
         // Still return the profile, but log errors for debugging
       }
 
       if (validation.warnings.length > 0) {
-        console.warn(`[ProfileStorage] Profile ${profileId} validation warnings:`, validation.warnings);
+        console.warn(
+          `[ProfileStorage] Profile ${profileId} validation warnings:`,
+          validation.warnings
+        );
       }
 
       // Save back if migration occurred
@@ -135,7 +148,7 @@ export class ProfileStorage {
       return null;
     }
   }
-  
+
   /**
    * Load all profiles
    */
@@ -155,13 +168,12 @@ export class ProfileStorage {
       }
 
       return profiles;
-
     } catch (error) {
       console.error('Failed to load profiles from storage:', error);
       return new Map();
     }
   }
-  
+
   /**
    * Delete a profile
    */
@@ -175,13 +187,14 @@ export class ProfileStorage {
       await this.updateProfileIndex(profileId, 'remove');
 
       console.log(`[ProfileStorage] Deleted profile ${profileId}`);
-
     } catch (error) {
       console.error(`[ProfileStorage] Failed to delete profile ${profileId}:`, error);
-      throw new Error(`Failed to delete profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to delete profile: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
-  
+
   /**
    * Get profile metadata (lightweight profile info)
    */
@@ -197,29 +210,28 @@ export class ProfileStorage {
           metadata.push({
             id: profile.id,
             name: profile.Character.Name,
-            profession: getProfessionName(profile.Character.Profession),  // Convert ID to name
+            profession: getProfessionName(profile.Character.Profession), // Convert ID to name
             level: profile.Character.Level,
-            breed: getBreedName(profile.Character.Breed),  // Convert ID to name
+            breed: getBreedName(profile.Character.Breed), // Convert ID to name
             faction: profile.Character.Faction,
             created: profile.created,
             updated: profile.updated,
-            version: profile.version
+            version: profile.version,
           });
         }
       }
 
       return metadata;
-
     } catch (error) {
       console.error('Failed to load profile metadata:', error);
       return [];
     }
   }
-  
+
   // ============================================================================
   // Active Profile Management
   // ============================================================================
-  
+
   /**
    * Set the active profile ID
    */
@@ -231,10 +243,12 @@ export class ProfileStorage {
         localStorage.removeItem(STORAGE_KEYS.ACTIVE_PROFILE);
       }
     } catch (error) {
-      throw new Error(`Failed to set active profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to set active profile: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
-  
+
   /**
    * Get the active profile ID
    */
@@ -246,35 +260,33 @@ export class ProfileStorage {
       return null;
     }
   }
-  
+
   /**
    * Load the active profile
    */
   async loadActiveProfile(): Promise<TinkerProfile | null> {
     const activeId = this.getActiveProfileId();
     if (!activeId) return null;
-    
+
     return await this.loadProfile(activeId);
   }
-  
-
 
   // ============================================================================
   // Compression (Future Enhancement)
   // ============================================================================
-  
+
   private async compress(data: any): Promise<string> {
     // For now, just return JSON string
     // In future, could implement actual compression
     return JSON.stringify(data);
   }
-  
+
   private async decompress(data: string): Promise<any> {
     // For now, just parse JSON
     // In future, could implement actual decompression
     return JSON.parse(data);
   }
-  
+
   // ============================================================================
   // Private Utilities
   // ============================================================================
@@ -316,10 +328,11 @@ export class ProfileStorage {
       localStorage.setItem(STORAGE_KEYS.PROFILE_INDEX, JSON.stringify(index));
     } catch (error) {
       console.error('Failed to update profile index:', error);
-      throw new Error(`Failed to update profile index: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to update profile index: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
-
 
   /**
    * Save all profiles to storage (DEPRECATED - kept for backward compatibility)
@@ -327,7 +340,9 @@ export class ProfileStorage {
   private async saveAllProfiles(profiles: Map<string, TinkerProfile>): Promise<void> {
     // This method is no longer used but kept to avoid breaking changes
     // Individual profiles are now saved separately
-    console.warn('[ProfileStorage] saveAllProfiles is deprecated - profiles are now saved individually');
+    console.warn(
+      '[ProfileStorage] saveAllProfiles is deprecated - profiles are now saved individually'
+    );
 
     // Save each profile individually
     for (const [id, profile] of Array.from(profiles.entries())) {
@@ -335,11 +350,10 @@ export class ProfileStorage {
     }
   }
 
-  
   // ============================================================================
   // Legacy Data Cleanup
   // ============================================================================
-  
+
   /**
    * Clean up legacy backup data from localStorage
    */
@@ -353,11 +367,11 @@ export class ProfileStorage {
       console.warn('[ProfileStorage] Failed to clean up legacy backups:', error);
     }
   }
-  
+
   // ============================================================================
   // Cleanup Operations
   // ============================================================================
-  
+
   /**
    * Clear all profile data
    */
@@ -384,12 +398,13 @@ export class ProfileStorage {
       // Clean up legacy data
       localStorage.removeItem(STORAGE_KEYS.PROFILES);
       localStorage.removeItem('tinkertools_profile_backups');
-
     } catch (error) {
-      throw new Error(`Failed to clear profile data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to clear profile data: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
-  
+
   /**
    * Get storage usage statistics
    */
@@ -418,7 +433,7 @@ export class ProfileStorage {
         STORAGE_KEYS.ACTIVE_PROFILE,
         STORAGE_KEYS.PROFILE_METADATA,
         STORAGE_KEYS.PROFILE_PREFERENCES,
-        STORAGE_KEYS.VERSION
+        STORAGE_KEYS.VERSION,
       ];
 
       for (const key of otherKeys) {
@@ -433,14 +448,13 @@ export class ProfileStorage {
       return {
         used: used,
         total: 5 * 1024 * 1024, // 5MB typical localStorage limit
-        profiles: profiles
+        profiles: profiles,
       };
-
     } catch (error) {
       return { used: 0, total: 0, profiles: 0 };
     }
   }
-  
+
   /**
    * Get number of stored profiles
    */
@@ -453,7 +467,6 @@ export class ProfileStorage {
 
       const index = JSON.parse(indexData);
       return index.length;
-
     } catch (error) {
       return 0;
     }

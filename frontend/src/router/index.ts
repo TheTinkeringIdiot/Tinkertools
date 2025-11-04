@@ -4,67 +4,71 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/',
     name: 'Home',
-    component: () => import('@/views/Home.vue')
+    component: () => import('@/views/Home.vue'),
   },
   {
     path: '/items',
     name: 'TinkerItems',
-    component: () => import('@/views/TinkerItems.vue')
+    component: () => import('@/views/TinkerItems.vue'),
   },
   {
     path: '/profiles',
     name: 'TinkerProfiles',
-    component: () => import('@/views/TinkerProfiles.vue')
+    component: () => import('@/views/TinkerProfiles.vue'),
   },
   {
     path: '/profiles/:profileId',
     name: 'TinkerProfileDetail',
     component: () => import('@/views/TinkerProfileDetail.vue'),
-    props: true
+    props: true,
   },
   {
     path: '/items/:aoid',
     name: 'ItemDetail',
     component: () => import('@/views/ItemDetail.vue'),
-    props: true
+    props: true,
   },
   {
     path: '/nanos',
     name: 'TinkerNanos',
-    component: () => import('@/views/TinkerNanos.vue')
+    component: () => import('@/views/TinkerNanos.vue'),
   },
   {
     path: '/tinkernukes',
     name: 'TinkerNukes',
     component: () => import('@/views/TinkerNukes.vue'),
-    meta: { title: 'TinkerNukes - Offensive Nano Analysis' }
+    meta: { title: 'TinkerNukes - Offensive Nano Analysis' },
   },
   {
     path: '/fite',
     name: 'TinkerFite',
-    component: () => import('@/views/TinkerFiteMinimal.vue')
+    component: () => import('@/views/TinkerFite.vue'),
+    meta: {
+      title: 'TinkerFite - Weapon Analysis',
+      description: 'Analyze and compare weapons for your character',
+    },
   },
   {
     path: '/plants',
     name: 'TinkerPlants',
-    component: () => import('@/views/TinkerPlants.vue')
+    component: () => import('@/views/TinkerPlants.vue'),
   },
   {
     path: '/pocket',
     name: 'TinkerPocket',
-    component: () => import('@/views/TinkerPocket.vue')
+    component: () => import('@/views/TinkerPocket.vue'),
   },
   {
     path: '/pocket/bosses/:id',
     name: 'BossDetail',
     component: () => import('@/views/BossDetail.vue'),
-    props: true
-  }
+    props: true,
+  },
 ];
 
 const router = createRouter({
   history: createWebHistory(),
-  routes
+  routes,
 });
 
 // Set page title from route meta

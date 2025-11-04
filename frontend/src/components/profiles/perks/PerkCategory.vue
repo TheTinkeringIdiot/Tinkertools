@@ -3,7 +3,9 @@ PerkCategory - Expandable perk category panel with progression display
 Shows individual perk with all levels (1-10), current ownership, costs, and requirements
 -->
 <template>
-  <div class="perk-category bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg overflow-hidden">
+  <div
+    class="perk-category bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg overflow-hidden"
+  >
     <!-- Category Header -->
     <div
       class="category-header p-4 bg-surface-50 dark:bg-surface-800 cursor-pointer select-none transition-colors hover:bg-surface-100 dark:hover:bg-surface-700"
@@ -20,11 +22,7 @@ Shows individual perk with all levels (1-10), current ownership, costs, and requ
           </h4>
 
           <!-- Owned Level Badge -->
-          <Badge
-            v-if="ownedLevel > 0"
-            :value="`Level ${ownedLevel}`"
-            severity="success"
-          />
+          <Badge v-if="ownedLevel > 0" :value="`Level ${ownedLevel}`" severity="success" />
 
           <!-- Perk Type Badge -->
           <Badge
@@ -41,7 +39,10 @@ Shows individual perk with all levels (1-10), current ownership, costs, and requ
           </div>
 
           <!-- Max Level Indicator -->
-          <div v-if="ownedLevel >= 10" class="text-sm text-green-600 dark:text-green-400 font-medium">
+          <div
+            v-if="ownedLevel >= 10"
+            class="text-sm text-green-600 dark:text-green-400 font-medium"
+          >
             MAX
           </div>
 
@@ -64,7 +65,10 @@ Shows individual perk with all levels (1-10), current ownership, costs, and requ
       </div>
 
       <!-- Requirements Summary (when collapsed) -->
-      <div v-if="!isExpanded && requirementsSummary" class="mt-2 text-sm text-surface-600 dark:text-surface-400">
+      <div
+        v-if="!isExpanded && requirementsSummary"
+        class="mt-2 text-sm text-surface-600 dark:text-surface-400"
+      >
         <i class="pi pi-info-circle mr-1"></i>
         {{ requirementsSummary }}
       </div>
@@ -75,7 +79,10 @@ Shows individual perk with all levels (1-10), current ownership, costs, and requ
       <div v-if="isExpanded" class="category-content">
         <div class="p-4">
           <!-- Perk Description -->
-          <div v-if="perkDescription" class="mb-4 p-3 bg-surface-100 dark:bg-surface-800 rounded-lg">
+          <div
+            v-if="perkDescription"
+            class="mb-4 p-3 bg-surface-100 dark:bg-surface-800 rounded-lg"
+          >
             <p class="text-sm text-surface-700 dark:text-surface-300">
               {{ perkDescription }}
             </p>
@@ -134,7 +141,10 @@ Shows individual perk with all levels (1-10), current ownership, costs, and requ
                 <div v-if="category.type !== 'LE'" class="text-xs mt-1">
                   {{ level }} pt{{ level !== 1 ? 's' : '' }}
                 </div>
-                <div v-if="level <= ownedLevel" class="text-xs text-green-600 dark:text-green-400 mt-1">
+                <div
+                  v-if="level <= ownedLevel"
+                  class="text-xs text-green-600 dark:text-green-400 mt-1"
+                >
                   Owned
                 </div>
               </div>
@@ -150,16 +160,24 @@ Shows individual perk with all levels (1-10), current ownership, costs, and requ
                 @click="onLevelClick(level)"
               >
                 <div class="flex items-center gap-3">
-                  <div class="level-indicator w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm"
-                       :class="getLevelIndicatorClass(level)">
+                  <div
+                    class="level-indicator w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm"
+                    :class="getLevelIndicatorClass(level)"
+                  >
                     {{ level }}
                   </div>
                   <div>
                     <div class="font-medium">Level {{ level }}</div>
-                    <div v-if="level <= ownedLevel" class="text-sm text-green-600 dark:text-green-400">
+                    <div
+                      v-if="level <= ownedLevel"
+                      class="text-sm text-green-600 dark:text-green-400"
+                    >
                       Currently Owned
                     </div>
-                    <div v-else-if="canPurchaseLevel(level)" class="text-sm text-blue-600 dark:text-blue-400">
+                    <div
+                      v-else-if="canPurchaseLevel(level)"
+                      class="text-sm text-blue-600 dark:text-blue-400"
+                    >
                       Available to Purchase
                     </div>
                     <div v-else class="text-sm text-surface-500 dark:text-surface-400">
@@ -171,7 +189,9 @@ Shows individual perk with all levels (1-10), current ownership, costs, and requ
                 <div class="flex items-center gap-3">
                   <!-- Point Cost -->
                   <div v-if="category.type !== 'LE'" class="text-right">
-                    <div class="font-medium">{{ level }} {{ category.type === 'AI' ? 'AI' : 'SL' }}</div>
+                    <div class="font-medium">
+                      {{ level }} {{ category.type === 'AI' ? 'AI' : 'SL' }}
+                    </div>
                     <div class="text-xs text-surface-500 dark:text-surface-400">
                       point{{ level !== 1 ? 's' : '' }}
                     </div>
@@ -195,34 +215,36 @@ Shows individual perk with all levels (1-10), current ownership, costs, and requ
                     :disabled="!hasRequiredPoints"
                     @click.stop="onAddLevel(level)"
                   />
-                  <Button
-                    v-else
-                    label="Locked"
-                    icon="pi pi-lock"
-                    size="small"
-                    disabled
-                    outlined
-                  />
+                  <Button v-else label="Locked" icon="pi pi-lock" size="small" disabled outlined />
                 </div>
               </div>
             </div>
           </div>
 
           <!-- Point Cost Summary -->
-          <div v-if="category.type !== 'LE'" class="mt-4 p-3 bg-surface-100 dark:bg-surface-800 rounded-lg">
+          <div
+            v-if="category.type !== 'LE'"
+            class="mt-4 p-3 bg-surface-100 dark:bg-surface-800 rounded-lg"
+          >
             <div class="flex justify-between items-center text-sm">
               <span class="text-surface-700 dark:text-surface-300">
                 Total Cost to Level {{ ownedLevel + 1 }}:
               </span>
               <span class="font-medium">
-                {{ getCumulativeCost(ownedLevel + 1) }} {{ category.type === 'AI' ? 'AI' : 'SL' }} points
+                {{ getCumulativeCost(ownedLevel + 1) }}
+                {{ category.type === 'AI' ? 'AI' : 'SL' }} points
               </span>
             </div>
             <div class="flex justify-between items-center text-sm mt-1">
-              <span class="text-surface-700 dark:text-surface-300">
-                Available Points:
-              </span>
-              <span class="font-medium" :class="hasRequiredPoints ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+              <span class="text-surface-700 dark:text-surface-300"> Available Points: </span>
+              <span
+                class="font-medium"
+                :class="
+                  hasRequiredPoints
+                    ? 'text-green-600 dark:text-green-400'
+                    : 'text-red-600 dark:text-red-400'
+                "
+              >
                 {{ availablePoints }}
               </span>
             </div>
@@ -272,16 +294,12 @@ const emit = defineEmits<{
 const isExpanded = ref(false);
 
 // Computed
-const ownedPerk = computed(() =>
-  props.ownedPerks.find(p => p.name === props.category.name)
-);
+const ownedPerk = computed(() => props.ownedPerks.find((p) => p.name === props.category.name));
 
 const ownedLevel = computed(() => ownedPerk.value?.level || 0);
 
 const availablePoints = computed(() => {
-  return props.category.type === 'AI'
-    ? props.availableAIPoints
-    : props.availableStandardPoints;
+  return props.category.type === 'AI' ? props.availableAIPoints : props.availableStandardPoints;
 });
 
 const availableLevels = computed(() => {
@@ -309,12 +327,18 @@ const baseRequirements = computed(() => ({
   alienLevel: props.category.type === 'AI' ? 1 : undefined,
   professions: [], // Example: empty means all professions
   breeds: [], // Example: empty means all breeds
-  expansion: undefined
+  expansion: undefined,
 }));
 
 const hasRequirements = computed(() => {
   const req = baseRequirements.value;
-  return !!(req.level || req.alienLevel || req.professions?.length || req.breeds?.length || req.expansion);
+  return !!(
+    req.level ||
+    req.alienLevel ||
+    req.professions?.length ||
+    req.breeds?.length ||
+    req.expansion
+  );
 });
 
 const meetsBaseRequirements = computed(() => {
@@ -362,19 +386,27 @@ const requirementsSummary = computed(() => {
 
 const typeIcon = computed(() => {
   switch (props.category.type) {
-    case 'SL': return 'pi pi-star';
-    case 'AI': return 'pi pi-bolt';
-    case 'LE': return 'pi pi-book';
-    default: return 'pi pi-circle';
+    case 'SL':
+      return 'pi pi-star';
+    case 'AI':
+      return 'pi pi-bolt';
+    case 'LE':
+      return 'pi pi-book';
+    default:
+      return 'pi pi-circle';
   }
 });
 
 const typeColor = computed(() => {
   switch (props.category.type) {
-    case 'SL': return '#3b82f6'; // Blue
-    case 'AI': return '#10b981'; // Green
-    case 'LE': return '#f59e0b'; // Amber
-    default: return '#6b7280'; // Gray
+    case 'SL':
+      return '#3b82f6'; // Blue
+    case 'AI':
+      return '#10b981'; // Green
+    case 'LE':
+      return '#f59e0b'; // Amber
+    default:
+      return '#6b7280'; // Gray
   }
 });
 
@@ -410,9 +442,13 @@ function getLevelCardClass(level: number): string {
   if (level <= ownedLevel.value) {
     classes.push('border-green-500 bg-green-50 dark:bg-green-900/20');
   } else if (canPurchaseLevel(level)) {
-    classes.push('border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30');
+    classes.push(
+      'border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30'
+    );
   } else {
-    classes.push('border-surface-300 dark:border-surface-600 bg-surface-100 dark:bg-surface-800 opacity-50');
+    classes.push(
+      'border-surface-300 dark:border-surface-600 bg-surface-100 dark:bg-surface-800 opacity-50'
+    );
   }
 
   return classes.join(' ');
@@ -424,9 +460,13 @@ function getLevelRowClass(level: number): string {
   if (level <= ownedLevel.value) {
     classes.push('border-green-500 bg-green-50 dark:bg-green-900/20');
   } else if (canPurchaseLevel(level)) {
-    classes.push('border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30');
+    classes.push(
+      'border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30'
+    );
   } else {
-    classes.push('border-surface-300 dark:border-surface-600 bg-surface-100 dark:bg-surface-800 opacity-50');
+    classes.push(
+      'border-surface-300 dark:border-surface-600 bg-surface-100 dark:bg-surface-800 opacity-50'
+    );
   }
 
   return classes.join(' ');
@@ -489,9 +529,9 @@ function onAddLevel(level: number) {
     name: props.category.name,
     level: level,
     type: props.category.type,
-    cost: props.category.type === 'LE' ? 0 : 1,  // Each perk level costs 1 point
+    cost: props.category.type === 'LE' ? 0 : 1, // Each perk level costs 1 point
     requirements: baseRequirements.value,
-    effects: []
+    effects: [],
   };
 
   emit('perk-select', mockPerkInfo, level);

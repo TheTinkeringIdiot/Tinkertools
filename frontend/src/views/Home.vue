@@ -9,5 +9,4 @@
 // Minimal view
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>

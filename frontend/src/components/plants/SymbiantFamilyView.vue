@@ -10,17 +10,11 @@ Shows symbiants grouped by their family types
         <h3 class="text-lg font-medium text-surface-700 dark:text-surface-300 mb-2">
           No symbiants found
         </h3>
-        <p class="text-surface-500 dark:text-surface-400">
-          Try adjusting your search criteria
-        </p>
+        <p class="text-surface-500 dark:text-surface-400">Try adjusting your search criteria</p>
       </div>
-      
+
       <div v-else class="space-y-6">
-        <div
-          v-for="group in familyGroups"
-          :key="group.family"
-          class="family-group"
-        >
+        <div v-for="group in familyGroups" :key="group.family" class="family-group">
           <!-- Family Header -->
           <div class="flex items-center gap-3 mb-3">
             <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-100">
@@ -29,13 +23,15 @@ Shows symbiants grouped by their family types
             <Badge :value="group.symbiants.length" severity="info" />
             <Button
               @click="toggleFamily(group.family)"
-              :icon="expandedFamilies.includes(group.family) ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
+              :icon="
+                expandedFamilies.includes(group.family) ? 'pi pi-chevron-up' : 'pi pi-chevron-down'
+              "
               size="small"
               text
               severity="secondary"
             />
           </div>
-          
+
           <!-- Symbiants Grid -->
           <div
             v-show="expandedFamilies.includes(group.family)"
@@ -53,12 +49,18 @@ Shows symbiants grouped by their family types
                   <h4 class="font-medium text-surface-900 dark:text-surface-100 mb-1">
                     {{ symbiant.name }}
                   </h4>
-                  <div class="flex items-center gap-2 text-xs text-surface-500 dark:text-surface-400">
-                    <Badge v-if="symbiant.qualityLevel" :value="`QL ${symbiant.qualityLevel}`" size="small" />
+                  <div
+                    class="flex items-center gap-2 text-xs text-surface-500 dark:text-surface-400"
+                  >
+                    <Badge
+                      v-if="symbiant.qualityLevel"
+                      :value="`QL ${symbiant.qualityLevel}`"
+                      size="small"
+                    />
                     <span v-if="symbiant.slot">{{ formatSlotName(symbiant.slot) }}</span>
                   </div>
                 </div>
-                
+
                 <div class="flex items-center gap-1">
                   <Button
                     v-if="buildMode"
@@ -71,12 +73,15 @@ Shows symbiants grouped by their family types
                   />
                 </div>
               </div>
-              
+
               <!-- Description -->
-              <p v-if="symbiant.description" class="text-xs text-surface-600 dark:text-surface-400 mb-3 line-clamp-3">
+              <p
+                v-if="symbiant.description"
+                class="text-xs text-surface-600 dark:text-surface-400 mb-3 line-clamp-3"
+              >
                 {{ symbiant.description }}
               </p>
-              
+
               <!-- Stat Bonuses -->
               <div v-if="symbiant.statBonuses && symbiant.statBonuses.length > 0" class="space-y-1">
                 <div class="text-xs font-medium text-surface-700 dark:text-surface-300">
@@ -98,9 +103,12 @@ Shows symbiants grouped by their family types
                   />
                 </div>
               </div>
-              
+
               <!-- Boss Source (if available) -->
-              <div v-if="symbiant.bossSource" class="mt-2 pt-2 border-t border-surface-100 dark:border-surface-800">
+              <div
+                v-if="symbiant.bossSource"
+                class="mt-2 pt-2 border-t border-surface-100 dark:border-surface-800"
+              >
                 <div class="text-xs text-surface-500 dark:text-surface-400">
                   <i class="pi pi-map-marker mr-1"></i>
                   {{ symbiant.bossSource }}
@@ -108,9 +116,12 @@ Shows symbiants grouped by their family types
               </div>
             </div>
           </div>
-          
+
           <!-- Show More Button for large families -->
-          <div v-if="group.symbiants.length > 9 && expandedFamilies.includes(group.family)" class="text-center mt-3">
+          <div
+            v-if="group.symbiants.length > 9 && expandedFamilies.includes(group.family)"
+            class="text-center mt-3"
+          >
             <Button
               label="Show All"
               size="small"
@@ -139,7 +150,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  buildMode: false
+  buildMode: false,
 });
 
 interface Emits {
@@ -160,61 +171,61 @@ interface FamilyGroup {
 // Computed
 const familyGroups = computed((): FamilyGroup[] => {
   const groups = new Map<string, PlantSymbiant[]>();
-  
+
   // Group symbiants by family
-  props.symbiants.forEach(symbiant => {
+  props.symbiants.forEach((symbiant) => {
     const family = symbiant.family || 'Unknown';
     if (!groups.has(family)) {
       groups.set(family, []);
     }
     groups.get(family)!.push(symbiant);
   });
-  
+
   // Convert to array and sort by family name
   const result: FamilyGroup[] = Array.from(groups.entries())
     .map(([family, symbiants]) => ({
       family,
-      symbiants: symbiants.sort((a, b) => a.name.localeCompare(b.name))
+      symbiants: symbiants.sort((a, b) => a.name.localeCompare(b.name)),
     }))
     .sort((a, b) => a.family.localeCompare(b.family));
-  
+
   return result;
 });
 
 // Methods
 const formatSlotName = (slot: string): string => {
   const slotNames: Record<string, string> = {
-    'head': 'Head',
-    'eye': 'Eye',
-    'ear': 'Ear',
-    'rarm': 'Right Arm',
-    'chest': 'Chest',
-    'larm': 'Left Arm',
-    'waist': 'Waist',
-    'rwrist': 'Right Wrist',
-    'legs': 'Legs',
-    'lwrist': 'Left Wrist',
-    'rfinger': 'Right Finger',
-    'feet': 'Feet',
-    'lfinger': 'Left Finger'
+    head: 'Head',
+    eye: 'Eye',
+    ear: 'Ear',
+    rarm: 'Right Arm',
+    chest: 'Chest',
+    larm: 'Left Arm',
+    waist: 'Waist',
+    rwrist: 'Right Wrist',
+    legs: 'Legs',
+    lwrist: 'Left Wrist',
+    rfinger: 'Right Finger',
+    feet: 'Feet',
+    lfinger: 'Left Finger',
   };
   return slotNames[slot] || slot;
 };
 
 const formatStatName = (statId: string): string => {
   const statNames: Record<string, string> = {
-    'strength': 'STR',
-    'agility': 'AGI',
-    'stamina': 'STA',
-    'intelligence': 'INT',
-    'sense': 'SEN',
-    'psychic': 'PSY',
-    'matter_creation': 'MC',
-    'matter_metamorphosis': 'MM',
-    'psychological_modifications': 'PM',
-    'biological_metamorphosis': 'BM',
-    'sensory_improvement': 'SI',
-    'time_and_space': 'TS'
+    strength: 'STR',
+    agility: 'AGI',
+    stamina: 'STA',
+    intelligence: 'INT',
+    sense: 'SEN',
+    psychic: 'PSY',
+    matter_creation: 'MC',
+    matter_metamorphosis: 'MM',
+    psychological_modifications: 'PM',
+    biological_metamorphosis: 'BM',
+    sensory_improvement: 'SI',
+    time_and_space: 'TS',
   };
   return statNames[statId] || statId.toUpperCase().slice(0, 3);
 };
@@ -238,7 +249,7 @@ const toggleFamily = (family: string) => {
 
 // Initialize with first few families expanded
 onMounted(() => {
-  const firstFamilies = familyGroups.value.slice(0, 3).map(group => group.family);
+  const firstFamilies = familyGroups.value.slice(0, 3).map((group) => group.family);
   expandedFamilies.value = firstFamilies;
 });
 </script>

@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION } from '@/__tests__/helpers';
+import {
+  mountWithContext,
+  standardCleanup,
+  createTestProfile,
+  SKILL_ID,
+  PROFESSION,
+} from '@/__tests__/helpers';
 import { nextTick } from 'vue';
 import NanoSearch from '@/components/nanos/NanoSearch.vue';
 
@@ -8,8 +14,8 @@ vi.mock('primevue/button', () => ({
   default: {
     name: 'Button',
     template: '<button><slot /></button>',
-    props: ['icon', 'label', 'severity', 'text', 'rounded', 'size']
-  }
+    props: ['icon', 'label', 'severity', 'text', 'rounded', 'size'],
+  },
 }));
 
 vi.mock('primevue/checkbox', () => ({
@@ -17,33 +23,34 @@ vi.mock('primevue/checkbox', () => ({
     name: 'Checkbox',
     template: '<input type="checkbox" v-model="modelValue" :id="inputId" />',
     props: ['modelValue', 'inputId', 'binary', 'value'],
-    emits: ['update:modelValue']
-  }
+    emits: ['update:modelValue'],
+  },
 }));
 
 vi.mock('primevue/chip', () => ({
   default: {
     name: 'Chip',
-    template: '<span @click="$emit(\'click\')" @remove="$emit(\'remove\')"><slot>{{ label }}</slot></span>',
+    template:
+      '<span @click="$emit(\'click\')" @remove="$emit(\'remove\')"><slot>{{ label }}</slot></span>',
     props: ['label', 'removable'],
-    emits: ['click', 'remove']
-  }
+    emits: ['click', 'remove'],
+  },
 }));
 
 vi.mock('primevue/iconfield', () => ({
   default: {
     name: 'IconField',
     template: '<div><slot /></div>',
-    props: ['iconPosition']
-  }
+    props: ['iconPosition'],
+  },
 }));
 
 vi.mock('primevue/inputicon', () => ({
   default: {
     name: 'InputIcon',
     template: '<i :class="class"></i>',
-    props: ['class']
-  }
+    props: ['class'],
+  },
 }));
 
 vi.mock('primevue/inputtext', () => ({
@@ -51,8 +58,8 @@ vi.mock('primevue/inputtext', () => ({
     name: 'InputText',
     template: '<input type="text" v-model="modelValue" :placeholder="placeholder" />',
     props: ['modelValue', 'placeholder'],
-    emits: ['update:modelValue', 'input', 'keyup']
-  }
+    emits: ['update:modelValue', 'input', 'keyup'],
+  },
 }));
 
 describe('NanoSearch', () => {
@@ -62,8 +69,8 @@ describe('NanoSearch', () => {
     wrapper = mountWithContext(NanoSearch, {
       props: {
         modelValue: '',
-        totalResults: 0
-      }
+        totalResults: 0,
+      },
     });
   });
 
@@ -76,7 +83,7 @@ describe('NanoSearch', () => {
     const input = wrapper.find('input[type="text"]');
     await input.setValue('heal');
     await input.trigger('keyup.enter');
-    
+
     expect(wrapper.emitted('search')).toBeTruthy();
     expect(wrapper.emitted('update:modelValue')).toBeTruthy();
   });
@@ -84,11 +91,11 @@ describe('NanoSearch', () => {
   it('displays nano schools as filter chips', () => {
     const schools = [
       'Matter Metamorphosis',
-      'Biological Metamorphosis', 
+      'Biological Metamorphosis',
       'Psychological Modifications',
       'Matter Creation',
       'Time and Space',
-      'Sensory Improvement'
+      'Sensory Improvement',
     ];
 
     const chips = wrapper.findAll('[data-testid^="school-chip-"], span');
@@ -108,7 +115,7 @@ describe('NanoSearch', () => {
     if (advancedToggle.exists()) {
       await advancedToggle.setChecked(true);
       await nextTick();
-      
+
       // Should show search fields options
       expect(wrapper.text()).toContain('Search In:');
     }
@@ -117,8 +124,8 @@ describe('NanoSearch', () => {
   it('displays search presets', () => {
     const expectedPresets = ['Stat Buffs', 'Healing', 'Damage', 'Transport', 'Summons'];
     const text = wrapper.text();
-    
-    expectedPresets.forEach(preset => {
+
+    expectedPresets.forEach((preset) => {
       expect(text).toContain(preset);
     });
   });
@@ -135,7 +142,7 @@ describe('NanoSearch', () => {
   it('shows clear button when there is search text', async () => {
     await wrapper.setProps({ modelValue: 'test search' });
     await nextTick();
-    
+
     const clearButton = wrapper.find('button[data-testid="clear-search"]');
     // Clear button should be present when there's text (mocked as any button for simplicity)
     expect(wrapper.findAll('button').length).toBeGreaterThan(0);
@@ -143,7 +150,7 @@ describe('NanoSearch', () => {
 
   it('clears search when clear button is clicked', async () => {
     await wrapper.setProps({ modelValue: 'test search' });
-    
+
     // Find and click any button (simulating clear)
     const buttons = wrapper.findAll('button');
     if (buttons.length > 0) {
@@ -159,7 +166,7 @@ describe('NanoSearch', () => {
       getItem: vi.fn(),
       setItem: vi.fn(),
       removeItem: vi.fn(),
-      clear: vi.fn()
+      clear: vi.fn(),
     };
     global.localStorage = localStorageMock as any;
 
@@ -169,19 +176,19 @@ describe('NanoSearch', () => {
     wrapper = mountWithContext(NanoSearch, {
       props: {
         modelValue: '',
-        totalResults: 0
-      }
+        totalResults: 0,
+      },
     });
 
     expect(localStorageMock.getItem).toHaveBeenCalledWith('tinkertools_nano_recent_searches');
   });
 
   it('displays search statistics', async () => {
-    await wrapper.setProps({ 
+    await wrapper.setProps({
       modelValue: 'healing',
-      totalResults: 15 
+      totalResults: 15,
     });
-    
+
     // Should show search stats somewhere in the component
     const text = wrapper.text();
     expect(text.includes('healing') || text.includes('All nanos')).toBe(true);
@@ -192,7 +199,7 @@ describe('NanoSearch', () => {
     if (advancedToggle.exists()) {
       await advancedToggle.setChecked(true);
       await nextTick();
-      
+
       // Find field checkboxes and test selection
       const fieldCheckboxes = wrapper.findAll('input[type="checkbox"]');
       if (fieldCheckboxes.length > 1) {
@@ -207,9 +214,14 @@ describe('NanoSearch', () => {
     if (advancedToggle.exists()) {
       await advancedToggle.setChecked(true);
       await nextTick();
-      
+
       const text = wrapper.text();
-      expect(text.includes('quotes') || text.includes('exact') || text.includes('+') || text.includes('-')).toBe(true);
+      expect(
+        text.includes('quotes') ||
+          text.includes('exact') ||
+          text.includes('+') ||
+          text.includes('-')
+      ).toBe(true);
     }
   });
 });

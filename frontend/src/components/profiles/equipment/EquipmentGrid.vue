@@ -5,8 +5,12 @@ Shows character's equipped items in visual slot grids for Weapons, Clothing, and
 <template>
   <div class="equipment-grid space-y-6">
     <!-- Weapons Table -->
-    <div class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
-      <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2">
+    <div
+      class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-4"
+    >
+      <h3
+        class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2"
+      >
         <i class="pi pi-shield text-orange-500"></i>
         Weapons
       </h3>
@@ -14,8 +18,12 @@ Shows character's equipped items in visual slot grids for Weapons, Clothing, and
     </div>
 
     <!-- Clothing Table -->
-    <div class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
-      <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2">
+    <div
+      class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-4"
+    >
+      <h3
+        class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2"
+      >
         <i class="pi pi-user text-blue-500"></i>
         Clothing
       </h3>
@@ -23,8 +31,12 @@ Shows character's equipped items in visual slot grids for Weapons, Clothing, and
     </div>
 
     <!-- Implants Table -->
-    <div class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-4">
-      <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2">
+    <div
+      class="bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-4"
+    >
+      <h3
+        class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4 flex items-center gap-2"
+      >
         <i class="pi pi-cpu text-green-500"></i>
         Implants
       </h3>

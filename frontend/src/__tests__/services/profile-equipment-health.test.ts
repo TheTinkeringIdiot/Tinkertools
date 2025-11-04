@@ -19,7 +19,7 @@ describe('Equipment Health and Nano Bonuses', () => {
         AccountType: 'Free',
         Faction: 'Neutral',
         MaxHealth: 0,
-        MaxNano: 0
+        MaxNano: 0,
       },
       Skills: {
         Attributes: {
@@ -28,15 +28,15 @@ describe('Equipment Health and Nano Bonuses', () => {
           Stamina: { value: 200, ipSpent: 0, pointsFromIp: 0 }, // Higher stamina for health calc
           Intelligence: { value: 100, ipSpent: 0, pointsFromIp: 0 },
           Sense: { value: 100, ipSpent: 0, pointsFromIp: 0 },
-          Psychic: { value: 100, ipSpent: 0, pointsFromIp: 0 }
+          Psychic: { value: 100, ipSpent: 0, pointsFromIp: 0 },
         },
         'Body & Defense': {
           'Body Dev.': { value: 500, ipSpent: 0, pointsFromIp: 0 }, // Body Dev affects health
-          'Nano Pool': { value: 300, ipSpent: 0, pointsFromIp: 0 } // Nano Pool affects nano
-        }
+          'Nano Pool': { value: 300, ipSpent: 0, pointsFromIp: 0 }, // Nano Pool affects nano
+        },
       },
       Clothing: {
-        'Head': {
+        Head: {
           id: 1,
           aoid: 12345,
           name: 'Health Boosting Helmet',
@@ -51,19 +51,19 @@ describe('Equipment Health and Nano Bonuses', () => {
                   spell_id: 53045, // Stat modification spell
                   spell_params: {
                     Stat: 1, // Max Health stat ID
-                    Amount: 500 // Add 500 health
-                  }
-                }
-              ]
-            }
-          ]
-        }
+                    Amount: 500, // Add 500 health
+                  },
+                },
+              ],
+            },
+          ],
+        },
       },
       Weapons: {},
       Implants: {},
       id: 'test-profile',
       created: new Date().toISOString(),
-      updated: new Date().toISOString()
+      updated: new Date().toISOString(),
     } as any; // Using any to bypass strict typing for test
 
     // Calculate health and nano with equipment bonuses
@@ -96,7 +96,7 @@ describe('Equipment Health and Nano Bonuses', () => {
         AccountType: 'Free',
         Faction: 'Neutral',
         MaxHealth: 0,
-        MaxNano: 0
+        MaxNano: 0,
       },
       Skills: {
         Attributes: {
@@ -105,15 +105,15 @@ describe('Equipment Health and Nano Bonuses', () => {
           Stamina: { value: 100, ipSpent: 0, pointsFromIp: 0 },
           Intelligence: { value: 200, ipSpent: 0, pointsFromIp: 0 }, // Higher int for nano calc
           Sense: { value: 100, ipSpent: 0, pointsFromIp: 0 },
-          Psychic: { value: 200, ipSpent: 0, pointsFromIp: 0 } // Higher psychic for nano calc
+          Psychic: { value: 200, ipSpent: 0, pointsFromIp: 0 }, // Higher psychic for nano calc
         },
         'Body & Defense': {
           'Body Dev.': { value: 300, ipSpent: 0, pointsFromIp: 0 },
-          'Nano Pool': { value: 500, ipSpent: 0, pointsFromIp: 0 } // Higher Nano Pool
-        }
+          'Nano Pool': { value: 500, ipSpent: 0, pointsFromIp: 0 }, // Higher Nano Pool
+        },
       },
       Clothing: {
-        'Chest': {
+        Chest: {
           id: 2,
           aoid: 23456,
           name: 'Nano Boosting Robe',
@@ -128,19 +128,19 @@ describe('Equipment Health and Nano Bonuses', () => {
                   spell_id: 53045, // Stat modification spell
                   spell_params: {
                     Stat: 221, // Max Nano stat ID
-                    Amount: 300 // Add 300 nano
-                  }
-                }
-              ]
-            }
-          ]
-        }
+                    Amount: 300, // Add 300 nano
+                  },
+                },
+              ],
+            },
+          ],
+        },
       },
       Weapons: {},
       Implants: {},
       id: 'test-profile-2',
       created: new Date().toISOString(),
-      updated: new Date().toISOString()
+      updated: new Date().toISOString(),
     } as any; // Using any to bypass strict typing for test
 
     // Calculate health and nano with equipment bonuses
@@ -173,7 +173,7 @@ describe('Equipment Health and Nano Bonuses', () => {
         AccountType: 'Paid',
         Faction: 'Clan',
         MaxHealth: 0,
-        MaxNano: 0
+        MaxNano: 0,
       },
       Skills: {
         Attributes: {
@@ -182,15 +182,15 @@ describe('Equipment Health and Nano Bonuses', () => {
           Stamina: { value: 300, ipSpent: 0, pointsFromIp: 0 },
           Intelligence: { value: 100, ipSpent: 0, pointsFromIp: 0 },
           Sense: { value: 100, ipSpent: 0, pointsFromIp: 0 },
-          Psychic: { value: 100, ipSpent: 0, pointsFromIp: 0 }
+          Psychic: { value: 100, ipSpent: 0, pointsFromIp: 0 },
         },
         'Body & Defense': {
           'Body Dev.': { value: 700, ipSpent: 0, pointsFromIp: 0 },
-          'Nano Pool': { value: 400, ipSpent: 0, pointsFromIp: 0 }
-        }
+          'Nano Pool': { value: 400, ipSpent: 0, pointsFromIp: 0 },
+        },
       },
       Clothing: {
-        'Back': {
+        Back: {
           id: 3,
           aoid: 34567,
           name: 'Omni-Boost Cloak',
@@ -205,26 +205,26 @@ describe('Equipment Health and Nano Bonuses', () => {
                   spell_id: 53045,
                   spell_params: {
                     Stat: 1, // Max Health
-                    Amount: 750
-                  }
+                    Amount: 750,
+                  },
                 },
                 {
                   spell_id: 53045,
                   spell_params: {
                     Stat: 221, // Max Nano
-                    Amount: 250
-                  }
-                }
-              ]
-            }
-          ]
-        }
+                    Amount: 250,
+                  },
+                },
+              ],
+            },
+          ],
+        },
       },
       Weapons: {},
       Implants: {},
       id: 'test-profile-3',
       created: new Date().toISOString(),
-      updated: new Date().toISOString()
+      updated: new Date().toISOString(),
     } as any;
 
     // Calculate with equipment

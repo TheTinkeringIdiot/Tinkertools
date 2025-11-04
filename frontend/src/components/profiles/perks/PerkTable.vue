@@ -39,11 +39,7 @@ Shows owned perks with their levels, points used, and stat bonuses
         <template #body="{ data }">
           <div class="perk-effects">
             <div v-if="getPerkEffects(data).length > 0" class="space-y-1">
-              <div
-                v-for="(effect, index) in getPerkEffects(data)"
-                :key="index"
-                class="text-sm"
-              >
+              <div v-for="(effect, index) in getPerkEffects(data)" :key="index" class="text-sm">
                 <span class="text-primary-600 dark:text-primary-400">
                   {{ effect }}
                 </span>
@@ -110,53 +106,53 @@ Shows owned perks with their levels, points used, and stat bonuses
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
-import Button from 'primevue/button'
-import type { PerkEntry, ResearchEntry, PerkEffect } from '@/lib/tinkerprofiles/perk-types'
-import { parseItemForStatBonuses } from '@/services/perk-bonus-calculator'
-import type { Item } from '@/types/api'
-import { skillService } from '@/services/skill-service'
+import { computed } from 'vue';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
+import Button from 'primevue/button';
+import type { PerkEntry, ResearchEntry, PerkEffect } from '@/lib/tinkerprofiles/perk-types';
+import { parseItemForStatBonuses } from '@/services/perk-bonus-calculator';
+import type { Item } from '@/types/api';
+import { skillService } from '@/services/skill-service';
 
 // Props
 const props = defineProps<{
-  perks: (PerkEntry | ResearchEntry)[]
-  perkType: 'SL' | 'AI' | 'LE'
-  editable?: boolean
-}>()
+  perks: (PerkEntry | ResearchEntry)[];
+  perkType: 'SL' | 'AI' | 'LE';
+  editable?: boolean;
+}>();
 
 // Emits
 const emit = defineEmits<{
-  'add-perks': []
-  'upgrade': [perk: PerkEntry | ResearchEntry]
-  'remove': [perk: PerkEntry | ResearchEntry]
-}>()
+  'add-perks': [];
+  upgrade: [perk: PerkEntry | ResearchEntry];
+  remove: [perk: PerkEntry | ResearchEntry];
+}>();
 
 // Helper functions
 function getPerkIcon(type: 'SL' | 'AI' | 'LE'): string {
   switch (type) {
     case 'SL':
-      return 'pi pi-star text-primary-500'
+      return 'pi pi-star text-primary-500';
     case 'AI':
-      return 'pi pi-bolt text-cyan-500'
+      return 'pi pi-bolt text-cyan-500';
     case 'LE':
-      return 'pi pi-book text-purple-500'
+      return 'pi pi-book text-purple-500';
     default:
-      return 'pi pi-star'
+      return 'pi pi-star';
   }
 }
 
 function getPerkTypeName(type: 'SL' | 'AI' | 'LE'): string {
   switch (type) {
     case 'SL':
-      return 'Standard (SL)'
+      return 'Standard (SL)';
     case 'AI':
-      return 'Alien (AI)'
+      return 'Alien (AI)';
     case 'LE':
-      return 'Research (LE)'
+      return 'Research (LE)';
     default:
-      return type
+      return type;
   }
 }
 
@@ -165,33 +161,33 @@ function getPerkEffects(perk: PerkEntry | ResearchEntry): string[] {
     // Extract the item data from the perk/research entry
     // Both PerkEntry and ResearchEntry have an optional item property
     if (!perk || typeof perk !== 'object') {
-      return []
+      return [];
     }
 
     // Check if item data is available
-    const item = perk.item as Item | undefined
+    const item = perk.item as Item | undefined;
     if (!item || typeof item !== 'object') {
       // No item data available - this is normal for perks without effects
-      return []
+      return [];
     }
 
     // Use the perk-bonus-calculator to extract stat bonuses
-    const bonuses = parseItemForStatBonuses(item)
+    const bonuses = parseItemForStatBonuses(item);
 
     if (!bonuses || bonuses.length === 0) {
-      return []
+      return [];
     }
 
     // Format bonuses as "Skill: +X" strings
-    const effectStrings: string[] = []
+    const effectStrings: string[] = [];
 
     // Group bonuses by skill ID and resolve names
-    const skillBonuses: Record<number, number> = {}
+    const skillBonuses: Record<number, number> = {};
     for (const bonus of bonuses) {
       if (skillBonuses[bonus.statId]) {
-        skillBonuses[bonus.statId] += bonus.amount
+        skillBonuses[bonus.statId] += bonus.amount;
       } else {
-        skillBonuses[bonus.statId] = bonus.amount
+        skillBonuses[bonus.statId] = bonus.amount;
       }
     }
 
@@ -199,23 +195,23 @@ function getPerkEffects(perk: PerkEntry | ResearchEntry): string[] {
     for (const [statIdStr, amount] of Object.entries(skillBonuses)) {
       if (amount !== 0) {
         try {
-          const statId = parseInt(statIdStr, 10)
-          const skillName = skillService.getName(statId)
-          const sign = amount > 0 ? '+' : ''
-          effectStrings.push(`${skillName}: ${sign}${amount}`)
+          const statId = parseInt(statIdStr, 10);
+          const skillName = skillService.getName(statId);
+          const sign = amount > 0 ? '+' : '';
+          effectStrings.push(`${skillName}: ${sign}${amount}`);
         } catch (error) {
           // If skill name resolution fails, use the stat ID
-          console.warn(`Failed to resolve skill name for stat ID ${statIdStr}:`, error)
-          const sign = amount > 0 ? '+' : ''
-          effectStrings.push(`Stat ${statIdStr}: ${sign}${amount}`)
+          console.warn(`Failed to resolve skill name for stat ID ${statIdStr}:`, error);
+          const sign = amount > 0 ? '+' : '';
+          effectStrings.push(`Stat ${statIdStr}: ${sign}${amount}`);
         }
       }
     }
 
-    return effectStrings.length > 0 ? effectStrings : []
+    return effectStrings.length > 0 ? effectStrings : [];
   } catch (error) {
-    console.warn('Error parsing perk effects for perk:', perk?.name || 'unknown', error)
-    return []
+    console.warn('Error parsing perk effects for perk:', perk?.name || 'unknown', error);
+    return [];
   }
 }
 </script>

@@ -20,7 +20,7 @@ Displays comprehensive nano information including effects, requirements, and com
           size="xlarge"
           shape="circle"
         />
-        
+
         <div class="flex-1 min-w-0">
           <div class="flex items-start justify-between mb-2">
             <h2 class="text-2xl font-bold text-surface-900 dark:text-surface-100">
@@ -35,7 +35,7 @@ Displays comprehensive nano information including effects, requirements, and com
               @click="toggleFavorite"
             />
           </div>
-          
+
           <div class="flex flex-wrap gap-2 mb-3">
             <Badge :value="nano.school" severity="info" />
             <Badge :value="`QL ${nano.qualityLevel}`" severity="secondary" />
@@ -43,7 +43,7 @@ Displays comprehensive nano information including effects, requirements, and com
             <Badge v-if="nano.strain" :value="`Strain ${nano.strain}`" severity="warning" />
             <Badge v-if="nano.profession" :value="nano.profession" severity="help" />
           </div>
-          
+
           <p v-if="nano.description" class="text-surface-600 dark:text-surface-400">
             {{ nano.description }}
           </p>
@@ -51,8 +51,8 @@ Displays comprehensive nano information including effects, requirements, and com
       </div>
 
       <!-- Compatibility Panel (when profile active) -->
-      <div 
-        v-if="showCompatibility && activeProfile && compatibilityInfo" 
+      <div
+        v-if="showCompatibility && activeProfile && compatibilityInfo"
         class="compatibility-panel p-4 rounded-lg border"
         :class="compatibilityPanelClass"
       >
@@ -65,38 +65,45 @@ Displays comprehensive nano information including effects, requirements, and com
               </h3>
               <div class="flex items-center gap-2">
                 <span class="text-sm">Compatibility Score:</span>
-                <Badge :value="`${compatibilityInfo.compatibilityScore}%`" :severity="compatibilityScoreSeverity" />
+                <Badge
+                  :value="`${compatibilityInfo.compatibilityScore}%`"
+                  :severity="compatibilityScoreSeverity"
+                />
               </div>
             </div>
-            
+
             <!-- Compatibility Details -->
             <div v-if="!compatibilityInfo.canCast" class="space-y-2 text-sm">
               <div v-if="compatibilityInfo.skillDeficits.length > 0">
                 <strong>Skill Requirements Not Met:</strong>
                 <ul class="list-disc list-inside ml-2 mt-1">
                   <li v-for="deficit in compatibilityInfo.skillDeficits" :key="deficit.skill">
-                    {{ deficit.skill }}: {{ deficit.current }}/{{ deficit.required }} 
-                    <span class="text-red-600 dark:text-red-400">(need {{ deficit.deficit }} more)</span>
+                    {{ deficit.skill }}: {{ deficit.current }}/{{ deficit.required }}
+                    <span class="text-red-600 dark:text-red-400"
+                      >(need {{ deficit.deficit }} more)</span
+                    >
                   </li>
                 </ul>
               </div>
-              
+
               <div v-if="compatibilityInfo.statDeficits.length > 0">
                 <strong>Stat Requirements Not Met:</strong>
                 <ul class="list-disc list-inside ml-2 mt-1">
                   <li v-for="deficit in compatibilityInfo.statDeficits" :key="deficit.stat">
                     {{ deficit.stat }}: {{ deficit.current }}/{{ deficit.required }}
-                    <span class="text-red-600 dark:text-red-400">(need {{ deficit.deficit }} more)</span>
+                    <span class="text-red-600 dark:text-red-400"
+                      >(need {{ deficit.deficit }} more)</span
+                    >
                   </li>
                 </ul>
               </div>
-              
+
               <div v-if="compatibilityInfo.levelDeficit > 0">
                 <strong>Level Requirement:</strong>
                 Need {{ compatibilityInfo.levelDeficit }} more levels
               </div>
             </div>
-            
+
             <!-- Resource Information -->
             <div class="grid grid-cols-2 gap-4 mt-3 text-sm">
               <div>
@@ -225,7 +232,10 @@ Displays comprehensive nano information including effects, requirements, and com
                 class="flex items-center justify-between p-3 bg-surface-50 dark:bg-surface-800 rounded-lg"
               >
                 <div class="flex items-center gap-3">
-                  <i :class="getRequirementIcon(req.type)" class="text-surface-500 dark:text-surface-400"></i>
+                  <i
+                    :class="getRequirementIcon(req.type)"
+                    class="text-surface-500 dark:text-surface-400"
+                  ></i>
                   <div>
                     <div class="font-medium">{{ formatRequirement(req) }}</div>
                     <div v-if="req.critical" class="text-xs text-red-600 dark:text-red-400">
@@ -233,7 +243,7 @@ Displays comprehensive nano information including effects, requirements, and com
                     </div>
                   </div>
                 </div>
-                
+
                 <div v-if="showCompatibility && activeProfile" class="text-right">
                   <div :class="getRequirementStatusClass(req)">
                     {{ getRequirementStatus(req) }}
@@ -261,7 +271,10 @@ Displays comprehensive nano information including effects, requirements, and com
               >
                 <div class="flex items-start gap-3">
                   <div class="flex-shrink-0">
-                    <Badge :value="formatEffectType(effect.type)" :severity="getEffectSeverity(effect.type)" />
+                    <Badge
+                      :value="formatEffectType(effect.type)"
+                      :severity="getEffectSeverity(effect.type)"
+                    />
                   </div>
                   <div class="flex-1">
                     <div class="font-medium mb-1">
@@ -273,9 +286,11 @@ Displays comprehensive nano information including effects, requirements, and com
                       <span>{{ effect.stackable ? 'Stackable' : 'Non-stackable' }}</span>
                     </div>
                     <div v-if="effect.conditions && effect.conditions.length > 0" class="mt-2">
-                      <div class="text-xs text-surface-500 dark:text-surface-400 mb-1">Conditions:</div>
+                      <div class="text-xs text-surface-500 dark:text-surface-400 mb-1">
+                        Conditions:
+                      </div>
                       <div class="flex flex-wrap gap-1">
-                        <Chip 
+                        <Chip
                           v-for="(condition, i) in effect.conditions"
                           :key="i"
                           :label="condition.toString()"
@@ -302,25 +317,34 @@ Displays comprehensive nano information including effects, requirements, and com
               <h4 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-3">
                 Strain Conflicts
               </h4>
-              <div class="p-3 bg-orange-50 dark:bg-orange-950 rounded-lg border border-orange-200 dark:border-orange-800">
+              <div
+                class="p-3 bg-orange-50 dark:bg-orange-950 rounded-lg border border-orange-200 dark:border-orange-800"
+              >
                 <div class="flex items-start gap-2">
-                  <i class="pi pi-exclamation-triangle text-orange-600 dark:text-orange-400 mt-1"></i>
+                  <i
+                    class="pi pi-exclamation-triangle text-orange-600 dark:text-orange-400 mt-1"
+                  ></i>
                   <div class="text-sm text-orange-800 dark:text-orange-200">
-                    This nano uses strain <strong>{{ nano.strain }}</strong>. Only one nano per strain can be active at a time.
-                    Other nanos using this strain will be deactivated when this nano is cast.
+                    This nano uses strain <strong>{{ nano.strain }}</strong
+                    >. Only one nano per strain can be active at a time. Other nanos using this
+                    strain will be deactivated when this nano is cast.
                   </div>
                 </div>
               </div>
             </div>
 
             <!-- Effect Conflicts -->
-            <div v-if="nano.effects && nano.effects.some(e => e.conflicts && e.conflicts.length > 0)">
+            <div
+              v-if="nano.effects && nano.effects.some((e) => e.conflicts && e.conflicts.length > 0)"
+            >
               <h4 class="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-3">
                 Effect Conflicts
               </h4>
               <div class="space-y-3">
                 <div
-                  v-for="(effect, index) in nano.effects.filter(e => e.conflicts && e.conflicts.length > 0)"
+                  v-for="(effect, index) in nano.effects.filter(
+                    (e) => e.conflicts && e.conflicts.length > 0
+                  )"
                   :key="index"
                   class="p-3 bg-red-50 dark:bg-red-950 rounded-lg border border-red-200 dark:border-red-800"
                 >
@@ -348,16 +372,28 @@ Displays comprehensive nano information including effects, requirements, and com
                   v-for="(effect, index) in nano.effects"
                   :key="index"
                   class="p-3 rounded-lg border"
-                  :class="effect.stackable 
-                    ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800'
-                    : 'bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800'"
+                  :class="
+                    effect.stackable
+                      ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800'
+                      : 'bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800'
+                  "
                 >
                   <div class="flex items-center gap-2 text-sm">
-                    <i 
-                      :class="effect.stackable ? 'pi pi-check text-green-600 dark:text-green-400' : 'pi pi-times text-yellow-600 dark:text-yellow-400'"
+                    <i
+                      :class="
+                        effect.stackable
+                          ? 'pi pi-check text-green-600 dark:text-green-400'
+                          : 'pi pi-times text-yellow-600 dark:text-yellow-400'
+                      "
                     ></i>
                     <span class="font-medium">{{ formatEffectType(effect.type) }}</span>
-                    <span :class="effect.stackable ? 'text-green-700 dark:text-green-300' : 'text-yellow-700 dark:text-yellow-300'">
+                    <span
+                      :class="
+                        effect.stackable
+                          ? 'text-green-700 dark:text-green-300'
+                          : 'text-yellow-700 dark:text-yellow-300'
+                      "
+                    >
                       {{ effect.stackable ? 'Stackable' : 'Non-stackable' }}
                     </span>
                   </div>
@@ -396,20 +432,29 @@ import Dialog from 'primevue/dialog';
 import TabView from 'primevue/tabview';
 import TabPanel from 'primevue/tabpanel';
 
-import type { NanoProgram, TinkerProfile, NanoCompatibilityInfo, CastingRequirement, NanoEffect } from '@/types/nano';
+import type {
+  NanoProgram,
+  TinkerProfile,
+  NanoCompatibilityInfo,
+  CastingRequirement,
+  NanoEffect,
+} from '@/types/nano';
 
 // Props
-const props = withDefaults(defineProps<{
-  visible: boolean;
-  nano?: NanoProgram | null;
-  activeProfile?: TinkerProfile | null;
-  showCompatibility?: boolean;
-}>(), {
-  visible: false,
-  nano: null,
-  activeProfile: null,
-  showCompatibility: false
-});
+const props = withDefaults(
+  defineProps<{
+    visible: boolean;
+    nano?: NanoProgram | null;
+    activeProfile?: TinkerProfile | null;
+    showCompatibility?: boolean;
+  }>(),
+  {
+    visible: false,
+    nano: null,
+    activeProfile: null,
+    showCompatibility: false,
+  }
+);
 
 // Emits
 const emit = defineEmits<{
@@ -423,14 +468,14 @@ const isFavorite = ref(false);
 // Computed
 const schoolAvatarClass = computed(() => {
   if (!props.nano) return 'bg-surface-500 text-white';
-  
+
   const schoolColors: Record<string, string> = {
     'Matter Metamorphosis': 'bg-red-500 text-white',
     'Biological Metamorphosis': 'bg-green-500 text-white',
     'Psychological Modifications': 'bg-purple-500 text-white',
     'Matter Creation': 'bg-blue-500 text-white',
     'Time and Space': 'bg-yellow-500 text-white',
-    'Sensory Improvement': 'bg-indigo-500 text-white'
+    'Sensory Improvement': 'bg-indigo-500 text-white',
   };
   return schoolColors[props.nano.school] || 'bg-surface-500 text-white';
 });
@@ -442,12 +487,12 @@ const compatibilityInfo = computed((): NanoCompatibilityInfo | null => {
 
   const profile = props.activeProfile;
   const requirements = props.nano.castingRequirements || [];
-  
+
   let canCast = true;
   let skillDeficits: { skill: string; current: number; required: number; deficit: number }[] = [];
   let statDeficits: { stat: string; current: number; required: number; deficit: number }[] = [];
   let levelDeficit = 0;
-  
+
   for (const req of requirements) {
     switch (req.type) {
       case 'skill':
@@ -459,11 +504,11 @@ const compatibilityInfo = computed((): NanoCompatibilityInfo | null => {
             skill,
             current: currentSkill,
             required: req.value,
-            deficit: req.value - currentSkill
+            deficit: req.value - currentSkill,
           });
         }
         break;
-        
+
       case 'stat':
         const stat = req.requirement as string;
         const currentStat = profile.stats[stat] || 0;
@@ -473,11 +518,11 @@ const compatibilityInfo = computed((): NanoCompatibilityInfo | null => {
             stat,
             current: currentStat,
             required: req.value,
-            deficit: req.value - currentStat
+            deficit: req.value - currentStat,
           });
         }
         break;
-        
+
       case 'level':
         if (profile.level < req.value) {
           canCast = false;
@@ -488,12 +533,14 @@ const compatibilityInfo = computed((): NanoCompatibilityInfo | null => {
   }
 
   const totalRequirements = requirements.length;
-  const metRequirements = totalRequirements - skillDeficits.length - statDeficits.length - (levelDeficit > 0 ? 1 : 0);
-  const compatibilityScore = totalRequirements > 0 ? Math.round((metRequirements / totalRequirements) * 100) : 100;
+  const metRequirements =
+    totalRequirements - skillDeficits.length - statDeficits.length - (levelDeficit > 0 ? 1 : 0);
+  const compatibilityScore =
+    totalRequirements > 0 ? Math.round((metRequirements / totalRequirements) * 100) : 100;
 
-  const allSkillReqs = requirements.filter(req => req.type === 'skill');
+  const allSkillReqs = requirements.filter((req) => req.type === 'skill');
   let averageSkillGap = 0;
-  
+
   if (allSkillReqs.length > 0) {
     const totalGap = skillDeficits.reduce((sum, deficit) => sum + deficit.deficit, 0);
     averageSkillGap = Math.round(totalGap / allSkillReqs.length);
@@ -507,13 +554,13 @@ const compatibilityInfo = computed((): NanoCompatibilityInfo | null => {
     statDeficits,
     levelDeficit,
     memoryUsage: props.nano.memoryUsage || 0,
-    nanoPointCost: props.nano.nanoPointCost || 0
+    nanoPointCost: props.nano.nanoPointCost || 0,
   };
 });
 
 const compatibilityPanelClass = computed(() => {
   if (!compatibilityInfo.value) return '';
-  
+
   if (compatibilityInfo.value.canCast) {
     return 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800';
   } else if (compatibilityInfo.value.compatibilityScore >= 75) {
@@ -525,7 +572,7 @@ const compatibilityPanelClass = computed(() => {
 
 const compatibilityIcon = computed(() => {
   if (!compatibilityInfo.value) return '';
-  
+
   if (compatibilityInfo.value.canCast) {
     return 'pi pi-check-circle text-green-600 dark:text-green-400';
   } else if (compatibilityInfo.value.compatibilityScore >= 75) {
@@ -537,7 +584,7 @@ const compatibilityIcon = computed(() => {
 
 const compatibilityScoreSeverity = computed(() => {
   if (!compatibilityInfo.value) return 'secondary';
-  
+
   if (compatibilityInfo.value.compatibilityScore >= 90) return 'success';
   if (compatibilityInfo.value.compatibilityScore >= 75) return 'warning';
   return 'danger';
@@ -551,7 +598,7 @@ const getSchoolShortName = (school: string): string => {
     'Psychological Modifications': 'PM',
     'Matter Creation': 'MC',
     'Time and Space': 'TS',
-    'Sensory Improvement': 'SI'
+    'Sensory Improvement': 'SI',
   };
   return shortNames[school] || school.charAt(0);
 };
@@ -583,7 +630,7 @@ const formatTargeting = (targeting: any): string => {
 
 const formatRequirement = (req: CastingRequirement): string => {
   const capitalizeFirst = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
-  
+
   switch (req.type) {
     case 'skill':
       return `${capitalizeFirst(req.requirement as string)}: ${req.value}`;
@@ -598,11 +645,11 @@ const formatRequirement = (req: CastingRequirement): string => {
 
 const getRequirementIcon = (type: string): string => {
   const icons: Record<string, string> = {
-    'skill': 'pi pi-graduation-cap',
-    'stat': 'pi pi-chart-bar',
-    'level': 'pi pi-user',
-    'nano': 'pi pi-flash',
-    'item': 'pi pi-box'
+    skill: 'pi pi-graduation-cap',
+    stat: 'pi pi-chart-bar',
+    level: 'pi pi-user',
+    nano: 'pi pi-flash',
+    item: 'pi pi-box',
   };
   return icons[type] || 'pi pi-question-circle';
 };
@@ -646,23 +693,23 @@ const getRequirementStatusClass = (req: CastingRequirement): string => {
       break;
   }
 
-  return currentValue >= req.value 
+  return currentValue >= req.value
     ? 'text-green-600 dark:text-green-400 font-medium'
     : 'text-red-600 dark:text-red-400 font-medium';
 };
 
 const formatEffectType = (type: string): string => {
   const typeLabels: Record<string, string> = {
-    'stat_boost': 'Stat Boost',
-    'heal': 'Heal',
-    'damage': 'Damage',
-    'protection': 'Protection',
-    'teleport': 'Teleport',
-    'summon': 'Summon',
-    'debuff': 'Debuff',
-    'utility': 'Utility'
+    stat_boost: 'Stat Boost',
+    heal: 'Heal',
+    damage: 'Damage',
+    protection: 'Protection',
+    teleport: 'Teleport',
+    summon: 'Summon',
+    debuff: 'Debuff',
+    utility: 'Utility',
   };
-  
+
   return typeLabels[type] || type.charAt(0).toUpperCase() + type.slice(1);
 };
 
@@ -670,34 +717,34 @@ const formatEffectDescription = (effect: NanoEffect): string => {
   const type = formatEffectType(effect.type);
   const value = effect.value || '';
   const stat = effect.statId ? ` (${effect.statId})` : '';
-  
+
   return `${type}${value ? ` ${value}` : ''}${stat}`;
 };
 
 const getEffectSeverity = (type: string): string => {
   const severityMap: Record<string, string> = {
-    'stat_boost': 'success',
-    'heal': 'success',
-    'damage': 'danger',
-    'protection': 'info',
-    'teleport': 'help',
-    'summon': 'warning',
-    'debuff': 'danger',
-    'utility': 'secondary'
+    stat_boost: 'success',
+    heal: 'success',
+    damage: 'danger',
+    protection: 'info',
+    teleport: 'help',
+    summon: 'warning',
+    debuff: 'danger',
+    utility: 'secondary',
   };
-  
+
   return severityMap[type] || 'secondary';
 };
 
 const toggleFavorite = () => {
   if (!props.nano) return;
-  
+
   isFavorite.value = !isFavorite.value;
-  
+
   try {
     const favorites = JSON.parse(localStorage.getItem('tinkertools_nano_favorites') || '[]');
     const nanoId = props.nano.id;
-    
+
     if (isFavorite.value) {
       if (!favorites.includes(nanoId)) {
         favorites.push(nanoId);
@@ -708,7 +755,7 @@ const toggleFavorite = () => {
         favorites.splice(index, 1);
       }
     }
-    
+
     localStorage.setItem('tinkertools_nano_favorites', JSON.stringify(favorites));
   } catch (error) {
     console.warn('Failed to save favorite status:', error);
@@ -717,7 +764,7 @@ const toggleFavorite = () => {
 
 const loadFavoriteStatus = () => {
   if (!props.nano) return;
-  
+
   try {
     const favorites = JSON.parse(localStorage.getItem('tinkertools_nano_favorites') || '[]');
     isFavorite.value = favorites.includes(props.nano.id);
@@ -735,11 +782,15 @@ const handleClose = () => {
 };
 
 // Watch for nano changes
-watch(() => props.nano, () => {
-  if (props.nano) {
-    loadFavoriteStatus();
-  }
-}, { immediate: true });
+watch(
+  () => props.nano,
+  () => {
+    if (props.nano) {
+      loadFavoriteStatus();
+    }
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped>

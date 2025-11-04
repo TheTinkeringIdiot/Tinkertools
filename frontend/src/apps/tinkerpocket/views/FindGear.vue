@@ -1,68 +1,68 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
-import { useSymbiantsStore } from '@/stores/symbiants'
-import { usePocketBossStore } from '@/stores/pocketBossStore'
-import { mapProfileToStats } from '@/utils/profile-stats-mapper'
-import { parseAction, checkActionRequirements } from '@/services/action-criteria'
-import { IMPLANT_SLOT } from '@/services/game-data'
-import { getImplantSlotNameFromBitflag, getMinimumLevel } from '@/services/game-utils'
-import type { SymbiantItem, Mob } from '@/types/api'
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
+import { useSymbiantsStore } from '@/stores/symbiants';
+import { usePocketBossStore } from '@/stores/pocketBossStore';
+import { mapProfileToStats } from '@/utils/profile-stats-mapper';
+import { parseAction, checkActionRequirements } from '@/services/action-criteria';
+import { IMPLANT_SLOT } from '@/services/game-data';
+import { getImplantSlotNameFromBitflag, getMinimumLevel } from '@/services/game-utils';
+import type { SymbiantItem, Mob } from '@/types/api';
 
 // Props
 const props = defineProps<{
-  view: 'symbiants' | 'bosses'
-}>()
+  view: 'symbiants' | 'bosses';
+}>();
 
 // PrimeVue Components
-import Button from 'primevue/button'
-import Dropdown from 'primevue/dropdown'
-import InputText from 'primevue/inputtext'
-import Slider from 'primevue/slider'
-import InputSwitch from 'primevue/inputswitch'
-import Card from 'primevue/card'
-import Tag from 'primevue/tag'
-import DataView from 'primevue/dataview'
-import Badge from 'primevue/badge'
-import { useToast } from 'primevue/usetoast'
+import Button from 'primevue/button';
+import Dropdown from 'primevue/dropdown';
+import InputText from 'primevue/inputtext';
+import Slider from 'primevue/slider';
+import InputSwitch from 'primevue/inputswitch';
+import Card from 'primevue/card';
+import Tag from 'primevue/tag';
+import DataView from 'primevue/dataview';
+import Badge from 'primevue/badge';
+import { useToast } from 'primevue/usetoast';
 
 // Router
-const router = useRouter()
-const route = useRoute()
+const router = useRouter();
+const route = useRoute();
 
 // Stores
-const profileStore = useTinkerProfilesStore()
-const symbiantsStore = useSymbiantsStore()
-const pocketBossStore = usePocketBossStore()
+const profileStore = useTinkerProfilesStore();
+const symbiantsStore = useSymbiantsStore();
+const pocketBossStore = usePocketBossStore();
 
 // Toast
-const toast = useToast()
+const toast = useToast();
 
 // Filter State (Symbiants)
-const familyFilter = ref<string | null>(null)
-const slotFilter = ref<number | null>(null)
-const minQL = ref<number>(1)
-const maxQL = ref<number>(300)
-const qlRange = ref<[number, number]>([1, 300]) // Local state for slider
-const symbiantMinLevel = ref<number>(1)
-const symbiantMaxLevel = ref<number>(220)
-const symbiantLevelRange = ref<[number, number]>([1, 220]) // Local state for slider
-const searchText = ref<string>('')
-const profileToggle = ref<boolean>(false)
+const familyFilter = ref<string | null>(null);
+const slotFilter = ref<number | null>(null);
+const minQL = ref<number>(1);
+const maxQL = ref<number>(300);
+const qlRange = ref<[number, number]>([1, 300]); // Local state for slider
+const symbiantMinLevel = ref<number>(1);
+const symbiantMaxLevel = ref<number>(220);
+const symbiantLevelRange = ref<[number, number]>([1, 220]); // Local state for slider
+const searchText = ref<string>('');
+const profileToggle = ref<boolean>(false);
 
 // Filter State (Bosses)
-const bossSearchText = ref<string>('')
-const playfieldFilter = ref<string | null>(null)
-const minLevel = ref<number>(1)
-const maxLevel = ref<number>(220)
-const bossViewMode = ref<'grid' | 'list'>('list')
+const bossSearchText = ref<string>('');
+const playfieldFilter = ref<string | null>(null);
+const minLevel = ref<number>(1);
+const maxLevel = ref<number>(220);
+const bossViewMode = ref<'grid' | 'list'>('list');
 
 // Loading State
-const loading = ref<boolean>(false)
+const loading = ref<boolean>(false);
 
 // Debounce timer for search
-let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Slot mapping constant (slot_id -> name)
 // Uses equipment slot bitflags from stat 298
@@ -79,8 +79,8 @@ const SLOT_OPTIONS = [
   { label: 'Right Hand', value: IMPLANT_SLOT.RightHand },
   { label: 'Legs', value: IMPLANT_SLOT.Legs },
   { label: 'Left Hand', value: IMPLANT_SLOT.LeftHand },
-  { label: 'Feet', value: IMPLANT_SLOT.Feet }
-]
+  { label: 'Feet', value: IMPLANT_SLOT.Feet },
+];
 
 // Family options
 const FAMILY_OPTIONS = [
@@ -88,271 +88,270 @@ const FAMILY_OPTIONS = [
   { label: 'Control', value: 'Control' },
   { label: 'Extermination', value: 'Extermination' },
   { label: 'Infantry', value: 'Infantry' },
-  { label: 'Support', value: 'Support' }
-]
+  { label: 'Support', value: 'Support' },
+];
 
 // Computed Properties
-const activeProfile = computed(() => profileStore.activeProfile)
+const activeProfile = computed(() => profileStore.activeProfile);
 
 const characterStats = computed(() => {
-  if (!activeProfile.value) return null
+  if (!activeProfile.value) return null;
   // Convert to plain object to satisfy type requirements
-  return mapProfileToStats(activeProfile.value as any)
-})
+  return mapProfileToStats(activeProfile.value as any);
+});
 
 const filteredSymbiants = computed(() => {
-  let result = symbiantsStore.allSymbiants
+  let result = symbiantsStore.allSymbiants;
 
   // 1. Family filter (most selective - apply first)
   if (familyFilter.value) {
-    result = result.filter(s => s.family === familyFilter.value)
+    result = result.filter((s) => s.family === familyFilter.value);
   }
 
   // 2. Slot filter (very selective)
   if (slotFilter.value) {
-    result = result.filter(s => s.slot_id === slotFilter.value)
+    result = result.filter((s) => s.slot_id === slotFilter.value);
   }
 
   // 3. QL range filter
   if (minQL.value > 1 || maxQL.value < 300) {
-    result = result.filter(s => s.ql >= minQL.value && s.ql <= maxQL.value)
+    result = result.filter((s) => s.ql >= minQL.value && s.ql <= maxQL.value);
   }
 
   // 4. Level range filter
   if (symbiantMinLevel.value > 1 || symbiantMaxLevel.value < 220) {
-    result = result.filter(s => {
+    result = result.filter((s) => {
       try {
-        const minLevel = getMinimumLevel(s)
-        return minLevel >= symbiantMinLevel.value && minLevel <= symbiantMaxLevel.value
+        const minLevel = getMinimumLevel(s);
+        return minLevel >= symbiantMinLevel.value && minLevel <= symbiantMaxLevel.value;
       } catch {
-        return true // Include if level extraction fails
+        return true; // Include if level extraction fails
       }
-    })
+    });
   }
 
   // 5. Text search (debounced)
   if (searchText.value.trim()) {
-    const searchLower = searchText.value.toLowerCase()
-    result = result.filter(s => s.name.toLowerCase().includes(searchLower))
+    const searchLower = searchText.value.toLowerCase();
+    result = result.filter((s) => s.name.toLowerCase().includes(searchLower));
   }
 
   // 6. Profile filter (most expensive - apply last)
   if (profileToggle.value && characterStats.value) {
-    result = result.filter(s => {
+    result = result.filter((s) => {
       try {
-        const wearAction = s.actions?.find(a => a.action === 6)
-        if (!wearAction) return false
-        return checkActionRequirements(parseAction(wearAction), characterStats.value!).canPerform
+        const wearAction = s.actions?.find((a) => a.action === 6);
+        if (!wearAction) return false;
+        return checkActionRequirements(parseAction(wearAction), characterStats.value!).canPerform;
       } catch {
-        return false
+        return false;
       }
-    })
+    });
   }
 
-  return result
-})
+  return result;
+});
 
 const displayedSymbiantCount = computed(() => {
-  return filteredSymbiants.value.length
-})
+  return filteredSymbiants.value.length;
+});
 
-const filteredBosses = computed(() => pocketBossStore.filteredPocketBosses)
-const playfields = computed(() => pocketBossStore.playfields)
-const levelRange = computed(() => pocketBossStore.levelRange)
+const filteredBosses = computed(() => pocketBossStore.filteredPocketBosses);
+const playfields = computed(() => pocketBossStore.playfields);
+const levelRange = computed(() => pocketBossStore.levelRange);
 
 // Comparison state
-const comparisonCount = computed(() => symbiantsStore.getComparisonCount())
-const hasComparisons = computed(() => comparisonCount.value > 0)
+const comparisonCount = computed(() => symbiantsStore.getComparisonCount());
+const hasComparisons = computed(() => comparisonCount.value > 0);
 
 // Methods
-let debugCount = 0
+let debugCount = 0;
 function checkSymbiantRequirements(symbiant: SymbiantItem): boolean {
-  const shouldLog = debugCount === 0
+  const shouldLog = debugCount === 0;
 
   if (shouldLog) {
-    console.log('🔍 Checking symbiant:', symbiant.name, 'ID:', symbiant.id)
+    console.log('🔍 Checking symbiant:', symbiant.name, 'ID:', symbiant.id);
   }
 
   if (!characterStats.value) {
-    if (shouldLog) console.log('❌ No character stats')
-    return true
+    if (shouldLog) console.log('❌ No character stats');
+    return true;
   }
 
   if (shouldLog) {
-    console.log('📊 Character stats:', characterStats.value)
-    console.log('📊 Profession stat (60):', characterStats.value[60])
+    console.log('📊 Character stats:', characterStats.value);
+    console.log('📊 Profession stat (60):', characterStats.value[60]);
   }
 
   if (!symbiant.actions || symbiant.actions.length === 0) {
-    if (shouldLog) console.log('✅ No actions, returning true')
-    return true
+    if (shouldLog) console.log('✅ No actions, returning true');
+    return true;
   }
 
-  const action = symbiant.actions[0]
+  const action = symbiant.actions[0];
   if (shouldLog) {
-    console.log('📋 Action criteria count:', action.criteria?.length)
+    console.log('📋 Action criteria count:', action.criteria?.length);
   }
 
-  const parsedAction = parseAction(action)
+  const parsedAction = parseAction(action);
   if (shouldLog) {
-    console.log('🔨 Parsed action:', parsedAction)
+    console.log('🔨 Parsed action:', parsedAction);
   }
 
-  const result = checkActionRequirements(parsedAction, characterStats.value)
+  const result = checkActionRequirements(parsedAction, characterStats.value);
   if (shouldLog) {
-    console.log('✅ Can perform?', result.canPerform, 'Unmet:', result.unmetRequirements.length)
+    console.log('✅ Can perform?', result.canPerform, 'Unmet:', result.unmetRequirements.length);
 
     if (!result.canPerform && result.unmetRequirements.length > 0) {
-      console.log('❌ Unmet requirements:')
-      result.unmetRequirements.forEach(req => {
-        console.log(`  - Stat ${req.stat}: need ${req.required}, have ${req.current}`)
-      })
+      console.log('❌ Unmet requirements:');
+      result.unmetRequirements.forEach((req) => {
+        console.log(`  - Stat ${req.stat}: need ${req.required}, have ${req.current}`);
+      });
     }
   }
 
-  debugCount++
-  return result.canPerform
+  debugCount++;
+  return result.canPerform;
 }
 
 async function fetchSymbiants() {
-  await symbiantsStore.loadAllSymbiants()
+  await symbiantsStore.loadAllSymbiants();
   // Computed property (filteredSymbiants) handles filtering
 }
 
 function updateFilters() {
   // No page reset needed
-  updateURL()
+  updateURL();
 }
 
 function onSearchInput() {
   if (searchDebounceTimer) {
-    clearTimeout(searchDebounceTimer)
+    clearTimeout(searchDebounceTimer);
   }
 
   searchDebounceTimer = setTimeout(() => {
-    updateFilters()
-  }, 300)
+    updateFilters();
+  }, 300);
 }
 
-
 function clearFilters() {
-  familyFilter.value = null
-  slotFilter.value = null
-  minQL.value = 1
-  maxQL.value = 300
-  qlRange.value = [1, 300]
-  symbiantMinLevel.value = 1
-  symbiantMaxLevel.value = 220
-  symbiantLevelRange.value = [1, 220]
-  searchText.value = ''
-  profileToggle.value = false
-  updateFilters()
+  familyFilter.value = null;
+  slotFilter.value = null;
+  minQL.value = 1;
+  maxQL.value = 300;
+  qlRange.value = [1, 300];
+  symbiantMinLevel.value = 1;
+  symbiantMaxLevel.value = 220;
+  symbiantLevelRange.value = [1, 220];
+  searchText.value = '';
+  profileToggle.value = false;
+  updateFilters();
 }
 
 function applyQlFilter() {
-  minQL.value = qlRange.value[0]
-  maxQL.value = qlRange.value[1]
-  updateFilters()
+  minQL.value = qlRange.value[0];
+  maxQL.value = qlRange.value[1];
+  updateFilters();
 }
 
 function applyLevelFilter() {
-  symbiantMinLevel.value = symbiantLevelRange.value[0]
-  symbiantMaxLevel.value = symbiantLevelRange.value[1]
-  updateFilters()
+  symbiantMinLevel.value = symbiantLevelRange.value[0];
+  symbiantMaxLevel.value = symbiantLevelRange.value[1];
+  updateFilters();
 }
 
 function updateURL() {
-  const query: any = {}
+  const query: any = {};
 
-  if (familyFilter.value) query.family = familyFilter.value
-  if (slotFilter.value) query.slot = slotFilter.value.toString()
-  if (minQL.value > 1) query.minql = minQL.value.toString()
-  if (maxQL.value < 300) query.maxql = maxQL.value.toString()
-  if (symbiantMinLevel.value > 1) query.minlvl = symbiantMinLevel.value.toString()
-  if (symbiantMaxLevel.value < 220) query.maxlvl = symbiantMaxLevel.value.toString()
-  if (searchText.value.trim()) query.search = searchText.value.trim()
-  if (profileToggle.value) query.profile = 'true'
+  if (familyFilter.value) query.family = familyFilter.value;
+  if (slotFilter.value) query.slot = slotFilter.value.toString();
+  if (minQL.value > 1) query.minql = minQL.value.toString();
+  if (maxQL.value < 300) query.maxql = maxQL.value.toString();
+  if (symbiantMinLevel.value > 1) query.minlvl = symbiantMinLevel.value.toString();
+  if (symbiantMaxLevel.value < 220) query.maxlvl = symbiantMaxLevel.value.toString();
+  if (searchText.value.trim()) query.search = searchText.value.trim();
+  if (profileToggle.value) query.profile = 'true';
 
-  router.push({ path: '/pocket', query })
+  router.push({ path: '/pocket', query });
 }
 
 function readURLParams() {
-  const query = route.query
+  const query = route.query;
 
   if (query.family && typeof query.family === 'string') {
-    familyFilter.value = query.family
+    familyFilter.value = query.family;
   }
 
   if (query.slot && typeof query.slot === 'string') {
-    const slotId = parseInt(query.slot)
+    const slotId = parseInt(query.slot);
     if (!isNaN(slotId)) {
-      slotFilter.value = slotId
+      slotFilter.value = slotId;
     }
   }
 
   if (query.minql && typeof query.minql === 'string') {
-    const min = parseInt(query.minql)
+    const min = parseInt(query.minql);
     if (!isNaN(min)) {
-      minQL.value = min
-      qlRange.value[0] = min
+      minQL.value = min;
+      qlRange.value[0] = min;
     }
   }
 
   if (query.maxql && typeof query.maxql === 'string') {
-    const max = parseInt(query.maxql)
+    const max = parseInt(query.maxql);
     if (!isNaN(max)) {
-      maxQL.value = max
-      qlRange.value[1] = max
+      maxQL.value = max;
+      qlRange.value[1] = max;
     }
   }
 
   if (query.search && typeof query.search === 'string') {
-    searchText.value = query.search
+    searchText.value = query.search;
   }
 
   if (query.minlvl && typeof query.minlvl === 'string') {
-    const minLvl = parseInt(query.minlvl)
+    const minLvl = parseInt(query.minlvl);
     if (!isNaN(minLvl)) {
-      symbiantMinLevel.value = minLvl
-      symbiantLevelRange.value[0] = minLvl
+      symbiantMinLevel.value = minLvl;
+      symbiantLevelRange.value[0] = minLvl;
     }
   }
 
   if (query.maxlvl && typeof query.maxlvl === 'string') {
-    const maxLvl = parseInt(query.maxlvl)
+    const maxLvl = parseInt(query.maxlvl);
     if (!isNaN(maxLvl)) {
-      symbiantMaxLevel.value = maxLvl
-      symbiantLevelRange.value[1] = maxLvl
+      symbiantMaxLevel.value = maxLvl;
+      symbiantLevelRange.value[1] = maxLvl;
     }
   }
 
   if (query.profile === 'true') {
-    profileToggle.value = true
+    profileToggle.value = true;
   }
 }
 
 function navigateToItem(aoid: number) {
-  router.push(`/items/${aoid}`)
+  router.push(`/items/${aoid}`);
 }
 
 function handleAddToComparison(symbiant: SymbiantItem) {
-  const added = symbiantsStore.addToComparison(symbiant)
+  const added = symbiantsStore.addToComparison(symbiant);
   if (!added) {
     toast.add({
       severity: 'warn',
       summary: 'Comparison Full',
       detail: 'Comparison full (maximum 3 symbiants)',
-      life: 3000
-    })
+      life: 3000,
+    });
   }
 }
 
 function handleClearComparison() {
-  symbiantsStore.clearComparison()
+  symbiantsStore.clearComparison();
 }
 
 function isSymbiantInComparison(symbiantId: number): boolean {
-  return symbiantsStore.isInComparison(symbiantId) !== null
+  return symbiantsStore.isInComparison(symbiantId) !== null;
 }
 
 // Boss Methods
@@ -361,94 +360,101 @@ function updateBossFilters() {
     search: bossSearchText.value || undefined,
     playfield: playfieldFilter.value || undefined,
     minLevel: minLevel.value,
-    maxLevel: maxLevel.value
-  })
+    maxLevel: maxLevel.value,
+  });
 }
 
 function clearBossFilters() {
-  bossSearchText.value = ''
-  playfieldFilter.value = null
-  minLevel.value = levelRange.value.min
-  maxLevel.value = levelRange.value.max
-  pocketBossStore.clearFilters()
+  bossSearchText.value = '';
+  playfieldFilter.value = null;
+  minLevel.value = levelRange.value.min;
+  maxLevel.value = levelRange.value.max;
+  pocketBossStore.clearFilters();
 }
 
 function navigateToBoss(bossId: number) {
-  router.push(`/pocket/bosses/${bossId}`)
+  router.push(`/pocket/bosses/${bossId}`);
 }
 
 function formatLocation(boss: Mob): string {
-  const parts = []
-  if (boss.playfield) parts.push(boss.playfield)
-  if (boss.location) parts.push(boss.location)
-  return parts.join(' - ') || 'Unknown Location'
+  const parts = [];
+  if (boss.playfield) parts.push(boss.playfield);
+  if (boss.location) parts.push(boss.location);
+  return parts.join(' - ') || 'Unknown Location';
 }
 
 function getSeverity(level: number): 'success' | 'info' | 'warning' | 'danger' {
-  if (level < 50) return 'success'
-  if (level < 100) return 'info'
-  if (level < 150) return 'warning'
-  return 'danger'
+  if (level < 50) return 'success';
+  if (level < 100) return 'info';
+  if (level < 150) return 'warning';
+  return 'danger';
 }
 
 function formatMinimumLevel(symbiant: SymbiantItem): string {
   try {
-    const level = getMinimumLevel(symbiant)
-    return `Lvl ${level}+`
+    const level = getMinimumLevel(symbiant);
+    return `Lvl ${level}+`;
   } catch (error) {
-    console.error('Failed to extract level from symbiant:', symbiant.name, error)
-    return 'Lvl ?'
+    console.error('Failed to extract level from symbiant:', symbiant.name, error);
+    return 'Lvl ?';
   }
 }
 
 async function loadBosses() {
-  await pocketBossStore.fetchPocketBosses()
+  await pocketBossStore.fetchPocketBosses();
   // Set initial level range from store
-  minLevel.value = levelRange.value.min
-  maxLevel.value = levelRange.value.max
+  minLevel.value = levelRange.value.min;
+  maxLevel.value = levelRange.value.max;
 }
 
 // Lifecycle
 onMounted(async () => {
-  readURLParams()
+  readURLParams();
 
   if (props.view === 'symbiants') {
     if (symbiantsStore.isDataStale || symbiantsStore.symbiantsCount === 0) {
-      await symbiantsStore.loadAllSymbiants()
+      await symbiantsStore.loadAllSymbiants();
     }
   } else if (props.view === 'bosses') {
-    await loadBosses()
+    await loadBosses();
   }
-})
+});
 
 // Watch for route changes
-watch(() => route.query, () => {
-  if (route.path === '/pocket') {
-    readURLParams()
+watch(
+  () => route.query,
+  () => {
+    if (route.path === '/pocket') {
+      readURLParams();
+    }
   }
-})
+);
 
 // Watch for profile changes to auto-set max level
-watch(() => activeProfile.value, (newProfile, oldProfile) => {
-  if (props.view !== 'symbiants') return
+watch(
+  () => activeProfile.value,
+  (newProfile, oldProfile) => {
+    if (props.view !== 'symbiants') return;
 
-  // Only update if profile actually changed (not just a reference change)
-  const oldLevel = oldProfile?.Character.Level
-  const newLevel = newProfile?.Character.Level
+    // Only update if profile actually changed (not just a reference change)
+    const oldLevel = oldProfile?.Character.Level;
+    const newLevel = newProfile?.Character.Level;
 
-  if (newProfile && newLevel && oldLevel !== newLevel) {
-    // Auto-set max level to profile level
-    symbiantMaxLevel.value = newLevel
-    symbiantLevelRange.value[1] = newLevel
-    // Trigger update
-    applyLevelFilter()
-  } else if (!newProfile && oldProfile) {
-    // Profile was cleared, reset to max
-    symbiantMaxLevel.value = 220
-    symbiantLevelRange.value[1] = 220
-    applyLevelFilter()
-  }
-}, { immediate: false })
+    if (newProfile && newLevel && oldLevel !== newLevel) {
+      // Auto-set max level to profile level
+      symbiantMaxLevel.value = newLevel;
+      symbiantLevelRange.value[1] = newLevel;
+      // Trigger update
+      applyLevelFilter();
+    } else if (!newProfile && oldProfile) {
+      // Profile was cleared, reset to max
+      symbiantMaxLevel.value = 220;
+      symbiantLevelRange.value[1] = 220;
+      applyLevelFilter();
+    }
+  },
+  { immediate: false }
+);
 </script>
 
 <template>
@@ -493,7 +499,9 @@ watch(() => activeProfile.value, (newProfile, oldProfile) => {
             <div class="flex flex-col gap-2">
               <label class="font-medium text-sm">Search</label>
               <div class="relative w-full">
-                <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 dark:text-surface-500 pointer-events-none"></i>
+                <i
+                  class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 dark:text-surface-500 pointer-events-none"
+                ></i>
                 <InputText
                   v-model="searchText"
                   placeholder="Search by name..."
@@ -523,7 +531,10 @@ watch(() => activeProfile.value, (newProfile, oldProfile) => {
           <div class="mt-4">
             <div class="flex items-center gap-3">
               <label class="text-sm font-medium whitespace-nowrap">QL Range:</label>
-              <span class="text-sm text-surface-600 dark:text-surface-400 min-w-[2rem] text-center">{{ qlRange[0] }}</span>
+              <span
+                class="text-sm text-surface-600 dark:text-surface-400 min-w-[2rem] text-center"
+                >{{ qlRange[0] }}</span
+              >
               <Slider
                 v-model="qlRange"
                 :range="true"
@@ -532,7 +543,10 @@ watch(() => activeProfile.value, (newProfile, oldProfile) => {
                 @slideend="applyQlFilter"
                 class="flex-1"
               />
-              <span class="text-sm text-surface-600 dark:text-surface-400 min-w-[2rem] text-center">{{ qlRange[1] }}</span>
+              <span
+                class="text-sm text-surface-600 dark:text-surface-400 min-w-[2rem] text-center"
+                >{{ qlRange[1] }}</span
+              >
             </div>
           </div>
 
@@ -540,7 +554,10 @@ watch(() => activeProfile.value, (newProfile, oldProfile) => {
           <div class="mt-4">
             <div class="flex items-center gap-3">
               <label class="text-sm font-medium whitespace-nowrap">Level Range:</label>
-              <span class="text-sm text-surface-600 dark:text-surface-400 min-w-[2rem] text-center">{{ symbiantLevelRange[0] }}</span>
+              <span
+                class="text-sm text-surface-600 dark:text-surface-400 min-w-[2rem] text-center"
+                >{{ symbiantLevelRange[0] }}</span
+              >
               <Slider
                 v-model="symbiantLevelRange"
                 :range="true"
@@ -549,7 +566,10 @@ watch(() => activeProfile.value, (newProfile, oldProfile) => {
                 @slideend="applyLevelFilter"
                 class="flex-1"
               />
-              <span class="text-sm text-surface-600 dark:text-surface-400 min-w-[2rem] text-center">{{ symbiantLevelRange[1] }}</span>
+              <span
+                class="text-sm text-surface-600 dark:text-surface-400 min-w-[2rem] text-center"
+                >{{ symbiantLevelRange[1] }}</span
+              >
               <i
                 v-if="activeProfile && symbiantMaxLevel === activeProfile.Character.Level"
                 class="pi pi-user text-primary-500"
@@ -559,7 +579,9 @@ watch(() => activeProfile.value, (newProfile, oldProfile) => {
           </div>
 
           <!-- Action Buttons -->
-          <div class="mt-4 pt-4 border-t border-surface-200 dark:border-surface-700 flex justify-between items-center">
+          <div
+            class="mt-4 pt-4 border-t border-surface-200 dark:border-surface-700 flex justify-between items-center"
+          >
             <div class="flex items-center gap-2">
               <Button
                 label="Clear Filters"
@@ -587,9 +609,7 @@ watch(() => activeProfile.value, (newProfile, oldProfile) => {
       <!-- Loading State -->
       <div v-if="symbiantsStore.loading" class="flex flex-col justify-center items-center py-12">
         <i class="pi pi-spin pi-spinner text-4xl text-primary-500 mb-3"></i>
-        <p class="text-lg text-surface-600 dark:text-surface-400">
-          Loading symbiants...
-        </p>
+        <p class="text-lg text-surface-600 dark:text-surface-400">Loading symbiants...</p>
       </div>
 
       <!-- Error State -->
@@ -598,18 +618,16 @@ watch(() => activeProfile.value, (newProfile, oldProfile) => {
         <p class="text-lg text-red-600 dark:text-red-400 mb-4">
           {{ symbiantsStore.error }}
         </p>
-        <Button
-          label="Retry"
-          icon="pi pi-refresh"
-          @click="symbiantsStore.loadAllSymbiants(true)"
-        />
+        <Button label="Retry" icon="pi pi-refresh" @click="symbiantsStore.loadAllSymbiants(true)" />
       </div>
 
       <!-- Results -->
       <div v-else>
         <!-- Result Count -->
         <div class="mb-4 text-sm text-surface-600 dark:text-surface-400">
-          Showing {{ filteredSymbiants.length }} symbiant{{ filteredSymbiants.length !== 1 ? 's' : '' }}
+          Showing {{ filteredSymbiants.length }} symbiant{{
+            filteredSymbiants.length !== 1 ? 's' : ''
+          }}
           <span v-if="symbiantsStore.symbiantsCount !== filteredSymbiants.length">
             (filtered from {{ symbiantsStore.symbiantsCount }} total)
           </span>
@@ -621,16 +639,16 @@ watch(() => activeProfile.value, (newProfile, oldProfile) => {
             v-for="symbiant in filteredSymbiants"
             :key="symbiant.id"
             @click="navigateToItem(symbiant.aoid)"
-            class="symbiant-card flex items-center gap-4 p-4 bg-surface-0 dark:bg-surface-800
-                   border border-surface-200 dark:border-surface-700 rounded-lg
-                   cursor-pointer transition-all duration-200"
+            class="symbiant-card flex items-center gap-4 p-4 bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-lg cursor-pointer transition-all duration-200"
           >
             <!-- Info -->
             <div class="flex-1 min-w-0">
               <div class="font-semibold text-surface-900 dark:text-surface-50">
                 {{ symbiant.name }}
               </div>
-              <div class="text-sm text-surface-600 dark:text-surface-400 flex items-center gap-2 flex-wrap">
+              <div
+                class="text-sm text-surface-600 dark:text-surface-400 flex items-center gap-2 flex-wrap"
+              >
                 <span>{{ symbiant.family }}</span>
                 <span>•</span>
                 <span>{{ getImplantSlotNameFromBitflag(symbiant.slot_id) }}</span>
@@ -657,9 +675,7 @@ watch(() => activeProfile.value, (newProfile, oldProfile) => {
         <div v-else class="text-center py-12">
           <i class="pi pi-search text-4xl text-surface-400 mb-4"></i>
           <p class="text-lg text-surface-600 dark:text-surface-400">No symbiants found</p>
-          <p class="text-sm text-surface-500 dark:text-surface-500">
-            Try adjusting your filters
-          </p>
+          <p class="text-sm text-surface-500 dark:text-surface-500">Try adjusting your filters</p>
         </div>
       </div>
     </div>
@@ -674,7 +690,9 @@ watch(() => activeProfile.value, (newProfile, oldProfile) => {
             <div class="flex flex-col gap-2">
               <label class="font-medium text-sm">Search Bosses</label>
               <div class="relative w-full">
-                <i class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 dark:text-surface-500 pointer-events-none"></i>
+                <i
+                  class="pi pi-search absolute left-3 top-1/2 -translate-y-1/2 text-surface-400 dark:text-surface-500 pointer-events-none"
+                ></i>
                 <InputText
                   v-model="bossSearchText"
                   placeholder="Search by name or location..."
@@ -699,7 +717,9 @@ watch(() => activeProfile.value, (newProfile, oldProfile) => {
 
             <!-- Level Range Slider -->
             <div class="flex flex-col gap-2">
-              <label class="font-medium text-sm">Level Range: {{ minLevel }} - {{ maxLevel }}</label>
+              <label class="font-medium text-sm"
+                >Level Range: {{ minLevel }} - {{ maxLevel }}</label
+              >
               <Slider
                 v-model="minLevel"
                 :min="levelRange.min"
@@ -710,7 +730,9 @@ watch(() => activeProfile.value, (newProfile, oldProfile) => {
           </div>
 
           <!-- Action Buttons -->
-          <div class="flex items-center justify-between mt-4 pt-4 border-t border-surface-200 dark:border-surface-700">
+          <div
+            class="flex items-center justify-between mt-4 pt-4 border-t border-surface-200 dark:border-surface-700"
+          >
             <div class="flex items-center gap-2">
               <Button
                 label="Clear Filters"
@@ -744,8 +766,8 @@ watch(() => activeProfile.value, (newProfile, oldProfile) => {
 
       <!-- Boss List/Grid -->
       <DataView
-        :value="(filteredBosses as any)"
-        :layout="(bossViewMode as any)"
+        :value="filteredBosses as any"
+        :layout="bossViewMode as any"
         :paginator="true"
         :rows="20"
         :rowsPerPageOptions="[10, 20, 50]"
@@ -754,9 +776,7 @@ watch(() => activeProfile.value, (newProfile, oldProfile) => {
           <div class="text-center py-12">
             <i class="pi pi-search text-4xl text-surface-400 mb-4"></i>
             <p class="text-lg text-surface-600 dark:text-surface-400">No pocket bosses found</p>
-            <p class="text-sm text-surface-500 dark:text-surface-500">
-              Try adjusting your filters
-            </p>
+            <p class="text-sm text-surface-500 dark:text-surface-500">Try adjusting your filters</p>
           </div>
         </template>
 
@@ -780,16 +800,15 @@ watch(() => activeProfile.value, (newProfile, oldProfile) => {
                         {{ formatLocation(boss) }}
                       </p>
                     </div>
-                    <Tag
-                      :value="`Level ${boss.level}`"
-                      :severity="getSeverity(boss.level)"
-                    />
+                    <Tag :value="`Level ${boss.level}`" :severity="getSeverity(boss.level)" />
                   </div>
 
                   <!-- Symbiant Count -->
                   <div class="text-sm text-surface-600 dark:text-surface-400">
                     <i class="pi pi-box mr-1"></i>
-                    {{ boss.symbiant_count || 0 }} symbiant{{ (boss.symbiant_count || 0) !== 1 ? 's' : '' }}
+                    {{ boss.symbiant_count || 0 }} symbiant{{
+                      (boss.symbiant_count || 0) !== 1 ? 's' : ''
+                    }}
                   </div>
 
                   <!-- Navigation Arrow -->
@@ -814,7 +833,9 @@ watch(() => activeProfile.value, (newProfile, oldProfile) => {
                 <div class="flex items-center justify-between py-2">
                   <div class="flex items-center gap-4 flex-1">
                     <div class="min-w-0 flex-1">
-                      <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 truncate">
+                      <h3
+                        class="text-lg font-semibold text-surface-900 dark:text-surface-50 truncate"
+                      >
                         {{ boss.name }}
                       </h3>
                       <p class="text-sm text-surface-600 dark:text-surface-400 truncate">
@@ -825,12 +846,11 @@ watch(() => activeProfile.value, (newProfile, oldProfile) => {
                     <div class="flex items-center gap-4">
                       <div class="text-sm text-surface-600 dark:text-surface-400">
                         <i class="pi pi-box mr-1"></i>
-                        {{ boss.symbiant_count || 0 }} symbiant{{ (boss.symbiant_count || 0) !== 1 ? 's' : '' }}
+                        {{ boss.symbiant_count || 0 }} symbiant{{
+                          (boss.symbiant_count || 0) !== 1 ? 's' : ''
+                        }}
                       </div>
-                      <Tag
-                        :value="`Level ${boss.level}`"
-                        :severity="getSeverity(boss.level)"
-                      />
+                      <Tag :value="`Level ${boss.level}`" :severity="getSeverity(boss.level)" />
                       <i class="pi pi-arrow-right text-primary-500"></i>
                     </div>
                   </div>

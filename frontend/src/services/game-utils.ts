@@ -1,6 +1,6 @@
 /**
  * TinkerTools Core Game Utility Functions
- * 
+ *
  * Core utility functions for common game data operations that all TinkerTools need.
  * These are lightweight helper functions for basic lookups and validations.
  */
@@ -44,7 +44,7 @@ import {
   type NanoSchoolId,
   type NanoSchoolName,
   type NanoStrainId,
-  type NanoStrainName
+  type NanoStrainName,
 } from './game-data';
 
 import type { Item, ItemSource } from '@/types/api';
@@ -176,19 +176,19 @@ export function getImplantSlotName(id: number): string | undefined {
 export function getImplantSlotNameFromBitflag(bitflag: number): string {
   // Map bitflag values to slot names
   const slotMap: Record<number, string> = {
-    2: 'Eyes',        // 1 << 1
-    4: 'Head',        // 1 << 2
-    8: 'Ears',        // 1 << 3
-    16: 'Right Arm',  // 1 << 4
-    32: 'Chest',      // 1 << 5
-    64: 'Left Arm',   // 1 << 6
+    2: 'Eyes', // 1 << 1
+    4: 'Head', // 1 << 2
+    8: 'Ears', // 1 << 3
+    16: 'Right Arm', // 1 << 4
+    32: 'Chest', // 1 << 5
+    64: 'Left Arm', // 1 << 6
     128: 'Right Wrist', // 1 << 7
-    256: 'Waist',     // 1 << 8
+    256: 'Waist', // 1 << 8
     512: 'Left Wrist', // 1 << 9
     1024: 'Right Hand', // 1 << 10
-    2048: 'Legs',     // 1 << 11
+    2048: 'Legs', // 1 << 11
     4096: 'Left Hand', // 1 << 12
-    8192: 'Feet'      // 1 << 13
+    8192: 'Feet', // 1 << 13
   };
 
   return slotMap[bitflag] || `Unknown Slot (${bitflag})`;
@@ -340,14 +340,18 @@ export function isValidImplantSlot(id: number): boolean {
  * Get all valid profession IDs
  */
 export function getAllProfessionIds(): number[] {
-  return Object.keys(PROFESSION).map(Number).filter(id => id > 0);
+  return Object.keys(PROFESSION)
+    .map(Number)
+    .filter((id) => id > 0);
 }
 
 /**
  * Get all valid breed IDs
  */
 export function getAllBreedIds(): number[] {
-  return Object.keys(BREED).map(Number).filter(id => id > 0);
+  return Object.keys(BREED)
+    .map(Number)
+    .filter((id) => id > 0);
 }
 
 /**
@@ -368,21 +372,23 @@ export function getAllNanoSchoolIds(): number[] {
  * Get all stat IDs (excluding 0 = 'None')
  */
 export function getAllStatIds(): number[] {
-  return Object.keys(STAT).map(Number).filter(id => id > 0);
+  return Object.keys(STAT)
+    .map(Number)
+    .filter((id) => id > 0);
 }
 
 /**
  * Get all profession names
  */
 export function getAllProfessionNames(): string[] {
-  return Object.values(PROFESSION).filter(name => name !== 'Unknown' && name !== 'Monster');
+  return Object.values(PROFESSION).filter((name) => name !== 'Unknown' && name !== 'Monster');
 }
 
 /**
  * Get all breed names
  */
 export function getAllBreedNames(): string[] {
-  return Object.values(BREED).filter(name => name !== 'Unknown' && name !== 'HumanMonster');
+  return Object.values(BREED).filter((name) => name !== 'Unknown' && name !== 'HumanMonster');
 }
 
 /**
@@ -451,11 +457,11 @@ export function formatCharacterName(
   breed?: number
 ): string {
   let displayName = name;
-  
+
   if (level) {
     displayName += ` (${level})`;
   }
-  
+
   const parts: string[] = [];
   if (breed && breed > 0) {
     const breedName = getBreedName(breed);
@@ -463,18 +469,18 @@ export function formatCharacterName(
       parts.push(breedName);
     }
   }
-  
+
   if (profession && profession > 0) {
     const professionName = getProfessionName(profession);
     if (professionName && professionName !== 'Unknown' && professionName !== 'Monster') {
       parts.push(professionName);
     }
   }
-  
+
   if (parts.length > 0) {
     displayName += ` - ${parts.join(' ')}`;
   }
-  
+
   return displayName;
 }
 
@@ -484,25 +490,25 @@ export function formatCharacterName(
 export function canProfessionUseNanoSchool(professionId: number, nanoSchoolId: number): boolean {
   const profession = getProfessionName(professionId);
   const school = getNanoSchoolName(nanoSchoolId);
-  
+
   if (!profession || !school) return false;
 
   // Basic profession to nano school compatibility
   const compatibility: Record<string, string[]> = {
-    'Doctor': ['Medical', 'Protection'],
-    'NanoTechnician': ['Combat', 'Psi'],
-    'MetaPhysicist': ['Psi', 'Space'],
-    'Bureaucrat': ['Psi', 'Protection'],
-    'Agent': ['Psi', 'Combat'],
-    'Adventurer': ['Medical', 'Protection'],
-    'Trader': ['Medical', 'Protection'],
-    'Engineer': ['Protection', 'Combat'],
-    'Fixer': ['Medical', 'Combat'],
-    'Soldier': ['Combat', 'Protection'],
-    'Enforcer': ['Combat', 'Protection'],
-    'MartialArtist': ['Medical', 'Combat'],
-    'Keeper': ['Medical', 'Protection', 'Psi'],
-    'Shade': ['Combat', 'Psi']
+    Doctor: ['Medical', 'Protection'],
+    NanoTechnician: ['Combat', 'Psi'],
+    MetaPhysicist: ['Psi', 'Space'],
+    Bureaucrat: ['Psi', 'Protection'],
+    Agent: ['Psi', 'Combat'],
+    Adventurer: ['Medical', 'Protection'],
+    Trader: ['Medical', 'Protection'],
+    Engineer: ['Protection', 'Combat'],
+    Fixer: ['Medical', 'Combat'],
+    Soldier: ['Combat', 'Protection'],
+    Enforcer: ['Combat', 'Protection'],
+    MartialArtist: ['Medical', 'Combat'],
+    Keeper: ['Medical', 'Protection', 'Psi'],
+    Shade: ['Combat', 'Psi'],
   };
 
   const compatibleSchools = compatibility[profession] || [];
@@ -512,18 +518,45 @@ export function canProfessionUseNanoSchool(professionId: number, nanoSchoolId: n
 /**
  * Get common stat names used in requirements
  */
-export function getCommonRequirementStats(): Array<{id: number; name: string}> {
+export function getCommonRequirementStats(): Array<{ id: number; name: string }> {
   const commonStats = [
-    16, 17, 18, 19, 20, 21, // Attributes
-    54, 60, 4, 59, // Level, Profession, Breed, Gender
-    100, 101, 102, 103, 104, 105, 106, 107, 108, // Combat skills
-    123, 124, 125, 126, 127, 128, 129, 130, 131, // Support skills
-    160, 161, 162, 163, // Trade skills
+    16,
+    17,
+    18,
+    19,
+    20,
+    21, // Attributes
+    54,
+    60,
+    4,
+    59, // Level, Profession, Breed, Gender
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108, // Combat skills
+    123,
+    124,
+    125,
+    126,
+    127,
+    128,
+    129,
+    130,
+    131, // Support skills
+    160,
+    161,
+    162,
+    163, // Trade skills
   ];
 
   return commonStats
-    .map(id => ({ id, name: getStatName(id) || 'Unknown' }))
-    .filter(stat => stat.name !== 'Unknown');
+    .map((id) => ({ id, name: getStatName(id) || 'Unknown' }))
+    .filter((stat) => stat.name !== 'Unknown');
 }
 
 /**
@@ -531,24 +564,23 @@ export function getCommonRequirementStats(): Array<{id: number; name: string}> {
  */
 export function normalizeProfessionName(name: string): string {
   const normalizations: Record<string, string> = {
-    'ma': 'MartialArtist',
+    ma: 'MartialArtist',
     'martial artist': 'MartialArtist',
-    'nt': 'NanoTechnician',
-    'nanotechnician': 'NanoTechnician',
+    nt: 'NanoTechnician',
+    nanotechnician: 'NanoTechnician',
     'nano technician': 'NanoTechnician',
-    'mp': 'MetaPhysicist',
-    'metaphysicist': 'MetaPhysicist',
+    mp: 'MetaPhysicist',
+    metaphysicist: 'MetaPhysicist',
     'meta physicist': 'MetaPhysicist',
-    'crat': 'Bureaucrat',
-    'doc': 'Doctor',
-    'enf': 'Enforcer',
-    'eng': 'Engineer',
-    'adv': 'Adventurer'
+    crat: 'Bureaucrat',
+    doc: 'Doctor',
+    enf: 'Enforcer',
+    eng: 'Engineer',
+    adv: 'Adventurer',
   };
 
   const normalized = name.toLowerCase();
-  return normalizations[normalized] || 
-         name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+  return normalizations[normalized] || name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
 }
 
 /**
@@ -556,15 +588,14 @@ export function normalizeProfessionName(name: string): string {
  */
 export function normalizeBreedName(name: string): string {
   const normalizations: Record<string, string> = {
-    'sol': 'Solitus',
-    'opi': 'Opifex', 
-    'nano': 'Nanomage',
-    'nm': 'Nanomage'
+    sol: 'Solitus',
+    opi: 'Opifex',
+    nano: 'Nanomage',
+    nm: 'Nanomage',
   };
 
   const normalized = name.toLowerCase();
-  return normalizations[normalized] || 
-         name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+  return normalizations[normalized] || name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
 }
 
 // ============================================================================
@@ -574,9 +605,11 @@ export function normalizeBreedName(name: string): string {
 /**
  * Extract icon ID from item stats
  */
-export function getItemIconId(stats: Array<{stat: number, value: number}> | undefined | null): number | null {
+export function getItemIconId(
+  stats: Array<{ stat: number; value: number }> | undefined | null
+): number | null {
   if (!stats || !Array.isArray(stats)) return null;
-  const iconStat = stats.find(stat => stat.stat === 79); // Stat ID 79 is 'Icon'
+  const iconStat = stats.find((stat) => stat.stat === 79); // Stat ID 79 is 'Icon'
   return iconStat ? iconStat.value : null;
 }
 
@@ -590,7 +623,9 @@ export function getIconUrl(iconId: number): string {
 /**
  * Get item icon URL from item stats
  */
-export function getItemIconUrl(stats: Array<{stat: number, value: number}> | undefined | null): string | null {
+export function getItemIconUrl(
+  stats: Array<{ stat: number; value: number }> | undefined | null
+): string | null {
   const iconId = getItemIconId(stats);
   return iconId ? getIconUrl(iconId) : null;
 }
@@ -599,7 +634,7 @@ export function getItemIconUrl(stats: Array<{stat: number, value: number}> | und
  * Get item icon URL with fallback
  */
 export function getItemIconUrlWithFallback(
-  stats: Array<{stat: number, value: number}>, 
+  stats: Array<{ stat: number; value: number }>,
   fallbackUrl: string = '/default-item-icon.png'
 ): string {
   return getItemIconUrl(stats) || fallbackUrl;
@@ -614,13 +649,13 @@ export function getItemIconUrlWithFallback(
  */
 export function parseCanFlags(canFlagValue: number): string[] {
   const flags: string[] = [];
-  
+
   for (const [flagName, flagValue] of Object.entries(CANFLAG)) {
     if (flagName !== 'NONE' && (canFlagValue & flagValue) === flagValue) {
       flags.push(flagName);
     }
   }
-  
+
   return flags;
 }
 
@@ -629,36 +664,39 @@ export function parseCanFlags(canFlagValue: number): string[] {
  */
 export function parseItemFlags(itemFlagValue: number): string[] {
   const flags: string[] = [];
-  
+
   for (const [flagName, flagValue] of Object.entries(ITEM_NONE_FLAG)) {
     if (flagName !== 'NONE' && (itemFlagValue & flagValue) === flagValue) {
       flags.push(flagName);
     }
   }
-  
+
   return flags;
 }
 
 /**
  * Get CAN flags from item stats
  */
-export function getItemCanFlags(stats: Array<{stat: number, value: number}>): string[] {
-  const canStat = stats.find(stat => stat.stat === 30); // Stat 30 is 'Can'
+export function getItemCanFlags(stats: Array<{ stat: number; value: number }>): string[] {
+  const canStat = stats.find((stat) => stat.stat === 30); // Stat 30 is 'Can'
   return canStat ? parseCanFlags(canStat.value) : [];
 }
 
 /**
  * Get item flags from item stats
  */
-export function getItemFlags(stats: Array<{stat: number, value: number}>): string[] {
-  const flagStat = stats.find(stat => stat.stat === 0); // Stat 0 contains item flags
+export function getItemFlags(stats: Array<{ stat: number; value: number }>): string[] {
+  const flagStat = stats.find((stat) => stat.stat === 0); // Stat 0 contains item flags
   return flagStat ? parseItemFlags(flagStat.value) : [];
 }
 
 /**
  * Check if item has specific CAN flag
  */
-export function hasCanFlag(stats: Array<{stat: number, value: number}>, flagName: keyof typeof CANFLAG): boolean {
+export function hasCanFlag(
+  stats: Array<{ stat: number; value: number }>,
+  flagName: keyof typeof CANFLAG
+): boolean {
   const canFlags = getItemCanFlags(stats);
   return canFlags.includes(flagName);
 }
@@ -666,7 +704,10 @@ export function hasCanFlag(stats: Array<{stat: number, value: number}>, flagName
 /**
  * Check if item has specific item flag
  */
-export function hasItemFlag(stats: Array<{stat: number, value: number}>, flagName: keyof typeof ITEM_NONE_FLAG): boolean {
+export function hasItemFlag(
+  stats: Array<{ stat: number; value: number }>,
+  flagName: keyof typeof ITEM_NONE_FLAG
+): boolean {
   const itemFlags = getItemFlags(stats);
   return itemFlags.includes(flagName);
 }
@@ -674,55 +715,70 @@ export function hasItemFlag(stats: Array<{stat: number, value: number}>, flagNam
 /**
  * Get important CAN flags for display (common ones users care about)
  */
-export function getDisplayCanFlags(stats: Array<{stat: number, value: number}>): Array<{name: string, severity: string}> {
+export function getDisplayCanFlags(
+  stats: Array<{ stat: number; value: number }>
+): Array<{ name: string; severity: string }> {
   const canFlags = getItemCanFlags(stats);
-  const displayFlags: Array<{name: string, severity: string}> = [];
-  
+  const displayFlags: Array<{ name: string; severity: string }> = [];
+
   // Map flags to display with appropriate severities
   const flagSeverityMap: Record<string, string> = {
-    'Carry': 'info',
-    'Wear': 'success', 
-    'Use': 'info',
-    'Consume': 'warning',
-    'NoDrop': 'danger',
-    'Unique': 'warning',
-    'Stackable': 'secondary',
-    'Burst': 'warning',
-    'FlingShot': 'warning',
-    'FullAuto': 'warning',
-    'AimedShot': 'warning'
+    Carry: 'info',
+    Wear: 'success',
+    Use: 'info',
+    Consume: 'warning',
+    NoDrop: 'danger',
+    Unique: 'warning',
+    Stackable: 'secondary',
+    Burst: 'warning',
+    FlingShot: 'warning',
+    FullAuto: 'warning',
+    AimedShot: 'warning',
   };
-  
-  canFlags.forEach(flag => {
+
+  canFlags.forEach((flag) => {
     const severity = flagSeverityMap[flag] || 'secondary';
     displayFlags.push({ name: flag, severity });
   });
-  
+
   return displayFlags;
 }
 
 /**
  * Get important item flags for display (stat 0 - ITEM_NONE_FLAG)
  */
-export function getDisplayItemFlags(stats: Array<{stat: number, value: number}>): Array<{name: string, severity: string}> {
+export function getDisplayItemFlags(
+  stats: Array<{ stat: number; value: number }>
+): Array<{ name: string; severity: string }> {
   const itemFlags = getItemFlags(stats);
-  const displayFlags: Array<{name: string, severity: string}> = [];
-  
+  const displayFlags: Array<{ name: string; severity: string }> = [];
+
   // Filter to important flags that users care about
   const importantFlags = [
-    'Visible', 'NoDrop', 'Unique', 'Locked', 'Open', 'ItemSocialArmour',
-    'Stationary', 'IllegalClan', 'IllegalOmni', 'CanBeAttacked', 'HasDamage',
-    'ModifiedName', 'ModifiedDescription', 'HasAnimation'
+    'Visible',
+    'NoDrop',
+    'Unique',
+    'Locked',
+    'Open',
+    'ItemSocialArmour',
+    'Stationary',
+    'IllegalClan',
+    'IllegalOmni',
+    'CanBeAttacked',
+    'HasDamage',
+    'ModifiedName',
+    'ModifiedDescription',
+    'HasAnimation',
   ];
-  
-  itemFlags.forEach(flag => {
+
+  itemFlags.forEach((flag) => {
     if (importantFlags.includes(flag)) {
       // NoDrop gets danger severity (red), all others get secondary
       const severity = flag === 'NoDrop' ? 'danger' : 'secondary';
       displayFlags.push({ name: flag, severity });
     }
   });
-  
+
   return displayFlags;
 }
 
@@ -755,7 +811,7 @@ export const WEAPON_STATS = {
   RANGED_ENERGY: 133,
   RANGED_INIT: 119,
   FULL_AUTO: 167,
-  FULL_AUTO_RECHARGE: 375
+  FULL_AUTO_RECHARGE: 375,
 } as const;
 
 /**
@@ -770,13 +826,13 @@ export const DAMAGE_TYPES = {
   5: 'Cold',
   6: 'Poison',
   7: 'Fire',
-  8: 'Projectile'
+  8: 'Projectile',
 } as const;
 
 /**
  * Get weapon statistics from item stats
  */
-export function getWeaponStats(stats: Array<{stat: number, value: number}>): {
+export function getWeaponStats(stats: Array<{ stat: number; value: number }>): {
   minDamage?: number;
   maxDamage?: number;
   criticalBonus?: number;
@@ -801,8 +857,8 @@ export function getWeaponStats(stats: Array<{stat: number, value: number}>): {
   fullAutoRecharge?: number;
 } {
   const weaponStats: Record<string, number> = {};
-  
-  stats.forEach(stat => {
+
+  stats.forEach((stat) => {
     switch (stat.stat) {
       case WEAPON_STATS.MIN_DAMAGE:
         weaponStats.minDamage = stat.value;
@@ -872,7 +928,7 @@ export function getWeaponStats(stats: Array<{stat: number, value: number}>): {
         break;
     }
   });
-  
+
   return weaponStats;
 }
 
@@ -903,12 +959,16 @@ export function formatRechargeTime(rechargeTime: number): string {
 /**
  * Calculate DPS (Damage Per Second) for a weapon
  */
-export function calculateWeaponDPS(minDamage: number, maxDamage: number, attackSpeed: number): number {
+export function calculateWeaponDPS(
+  minDamage: number,
+  maxDamage: number,
+  attackSpeed: number
+): number {
   if (!minDamage || !maxDamage || !attackSpeed) return 0;
-  
+
   const avgDamage = (minDamage + maxDamage) / 2;
   const attacksPerSecond = 1000 / attackSpeed; // Convert ticks to seconds
-  
+
   return avgDamage * attacksPerSecond;
 }
 
@@ -930,7 +990,7 @@ export interface SpecialAttackResult {
  * @returns Object with skill requirement and damage cap
  */
 export function calculateFling(attackTime: number): SpecialAttackResult {
-  const cap = Math.floor(5 + (attackTime / 100));
+  const cap = Math.floor(5 + attackTime / 100);
   const skill = Math.round((16 * (attackTime / 100) - 6 - 1) * 100) + 1;
   return { skill, cap };
 }
@@ -942,9 +1002,14 @@ export function calculateFling(attackTime: number): SpecialAttackResult {
  * @param burstCycle Burst cycle time in centiseconds
  * @returns Object with skill requirement and damage cap
  */
-export function calculateBurst(attackTime: number, rechTime: number, burstCycle: number): SpecialAttackResult {
-  const cap = Math.floor(8 + (attackTime / 100));
-  const skill = Math.floor((((rechTime / 100) * 20) + (burstCycle / 100) - 9 - 1 + (attackTime / 100)) * 25) + 1;
+export function calculateBurst(
+  attackTime: number,
+  rechTime: number,
+  burstCycle: number
+): SpecialAttackResult {
+  const cap = Math.floor(8 + attackTime / 100);
+  const skill =
+    Math.floor(((rechTime / 100) * 20 + burstCycle / 100 - 9 - 1 + attackTime / 100) * 25) + 1;
   return { skill, cap };
 }
 
@@ -955,12 +1020,17 @@ export function calculateBurst(attackTime: number, rechTime: number, burstCycle:
  * @param faCycle Full auto cycle time in centiseconds (defaults to 1000 if 0)
  * @returns Object with skill requirement and damage cap
  */
-export function calculateFullAuto(attackTime: number, rechTime: number, faCycle: number): SpecialAttackResult {
-  const cap = Math.floor(10 + (attackTime / 100));
+export function calculateFullAuto(
+  attackTime: number,
+  rechTime: number,
+  faCycle: number
+): SpecialAttackResult {
+  const cap = Math.floor(10 + attackTime / 100);
   if (faCycle === 0) {
     faCycle = 1000;
   }
-  const skill = Math.floor((((rechTime / 100) * 40 + (faCycle / 100) - 11 - 1 + (attackTime / 100)) * 25)) + 1;
+  const skill =
+    Math.floor(((rechTime / 100) * 40 + faCycle / 100 - 11 - 1 + attackTime / 100) * 25) + 1;
   return { skill, cap };
 }
 
@@ -971,8 +1041,8 @@ export function calculateFullAuto(attackTime: number, rechTime: number, faCycle:
  * @returns Object with skill requirement and damage cap
  */
 export function calculateAimedShot(attackTime: number, rechTime: number): SpecialAttackResult {
-  const cap = Math.floor(10 + (attackTime / 100));
-  const skill = Math.ceil((((rechTime / 100) * 40) + (attackTime / 100) - 11 - 1) * 100 / 3);
+  const cap = Math.floor(10 + attackTime / 100);
+  const skill = Math.ceil((((rechTime / 100) * 40 + attackTime / 100 - 11 - 1) * 100) / 3);
   return { skill, cap };
 }
 
@@ -982,7 +1052,7 @@ export function calculateAimedShot(attackTime: number, rechTime: number): Specia
  * @returns Object with skill requirement and damage cap
  */
 export function calculateFastAttack(attackTime: number): SpecialAttackResult {
-  const cap = Math.floor(5 + (attackTime / 100));
+  const cap = Math.floor(5 + attackTime / 100);
   const skill = Math.round(((attackTime / 100) * 16 - 5 - 1) * 100) + 1;
   return { skill, cap };
 }
@@ -1001,29 +1071,31 @@ export interface WeaponSpecialAttack {
  * @param stats Array of stat objects from item
  * @returns Array of special attacks with calculated skill and cap values
  */
-export function getWeaponSpecialAttacks(stats: Array<{stat: number, value: number}>): WeaponSpecialAttack[] {
+export function getWeaponSpecialAttacks(
+  stats: Array<{ stat: number; value: number }>
+): WeaponSpecialAttack[] {
   const specialAttacks: WeaponSpecialAttack[] = [];
   const canFlags = getItemCanFlags(stats);
   const weaponStats = getWeaponStats(stats);
-  
+
   // Get required timing stats
   const attackDelay = weaponStats.attackDelay;
   const rechargeDelay = weaponStats.rechargeDelay;
-  
+
   if (!attackDelay || !rechargeDelay) {
     return specialAttacks; // Can't calculate without timing stats
   }
-  
+
   // Check each special attack type
   if (canFlags.includes('FlingShot')) {
     const result = calculateFling(attackDelay);
     specialAttacks.push({
       name: 'Fling Shot',
       skill: result.skill,
-      cap: result.cap
+      cap: result.cap,
     });
   }
-  
+
   if (canFlags.includes('Burst')) {
     // Use BurstRecharge stat if available, otherwise default to 1000
     const burstCycle = weaponStats.burstRecharge || 1000;
@@ -1031,10 +1103,10 @@ export function getWeaponSpecialAttacks(stats: Array<{stat: number, value: numbe
     specialAttacks.push({
       name: 'Burst',
       skill: result.skill,
-      cap: result.cap
+      cap: result.cap,
     });
   }
-  
+
   if (canFlags.includes('FullAuto')) {
     // Use FullAuto stat, then FullAutoRecharge stat, then default to 0
     const faCycle = weaponStats.fullAuto || weaponStats.fullAutoRecharge || 0;
@@ -1042,28 +1114,28 @@ export function getWeaponSpecialAttacks(stats: Array<{stat: number, value: numbe
     specialAttacks.push({
       name: 'Full Auto',
       skill: result.skill,
-      cap: result.cap
+      cap: result.cap,
     });
   }
-  
+
   if (canFlags.includes('AimedShot')) {
     const result = calculateAimedShot(attackDelay, rechargeDelay);
     specialAttacks.push({
       name: 'Aimed Shot',
       skill: result.skill,
-      cap: result.cap
+      cap: result.cap,
     });
   }
-  
+
   if (canFlags.includes('FastAttack')) {
     const result = calculateFastAttack(attackDelay);
     specialAttacks.push({
       name: 'Fast Attack',
       skill: result.skill,
-      cap: result.cap
+      cap: result.cap,
     });
   }
-  
+
   return specialAttacks;
 }
 
@@ -1091,10 +1163,10 @@ export function isImplant(itemClass: number): boolean {
 /**
  * Get special attack skills for a weapon
  */
-export function getWeaponSpecialSkills(stats: Array<{stat: number, value: number}>): string[] {
+export function getWeaponSpecialSkills(stats: Array<{ stat: number; value: number }>): string[] {
   const skills: string[] = [];
-  
-  stats.forEach(stat => {
+
+  stats.forEach((stat) => {
     if (stat.value > 0) {
       switch (stat.stat) {
         case WEAPON_STATS.BURST:
@@ -1109,7 +1181,7 @@ export function getWeaponSpecialSkills(stats: Array<{stat: number, value: number
       }
     }
   });
-  
+
   return skills;
 }
 
@@ -1143,7 +1215,7 @@ export function getItemClass(item: any): number {
   if (itemClassStat) {
     return itemClassStat.value;
   }
-  
+
   // Fallback to item_class property
   return item.item_class || 0;
 }
@@ -1168,13 +1240,13 @@ export function parseWeaponSlots(slotValue: number): string[] {
  */
 export function parseArmorSlots(slotValue: number): string[] {
   const slots: string[] = [];
-  
+
   for (const [slotName, slotBit] of Object.entries(ARMOR_SLOT)) {
     if (slotName !== 'NONE' && slotName !== 'Bit0' && (slotValue & slotBit) === slotBit) {
       slots.push(slotName);
     }
   }
-  
+
   return slots;
 }
 
@@ -1183,13 +1255,13 @@ export function parseArmorSlots(slotValue: number): string[] {
  */
 export function parseImplantSlots(slotValue: number): string[] {
   const slots: string[] = [];
-  
+
   for (const [slotName, slotBit] of Object.entries(IMPLANT_SLOT)) {
     if (slotName !== 'NONE' && slotName !== 'Bit0' && (slotValue & slotBit) === slotBit) {
       slots.push(slotName);
     }
   }
-  
+
   return slots;
 }
 
@@ -1206,58 +1278,58 @@ export function getItemSlotInfo(item: any): {
   }
   const itemClass = getItemClass(item);
   const iconUrl = getItemIconUrl(item.stats);
-  
+
   // Get slot value from stat 298
   const slotStat = item.stats?.find((stat: any) => stat.stat === 298);
   const slotValue = slotStat ? slotStat.value : 0;
-  
+
   // Determine slot type based on which slot parser returns valid results
   // Some items (like gloves) have weapon item class but armor slot values
   const weaponSlots = parseWeaponSlots(slotValue);
   const armorSlots = parseArmorSlots(slotValue);
   const implantSlots = parseImplantSlots(slotValue);
-  
+
   // Check implants first (item class 3)
   if (isImplant(itemClass) && implantSlots.length > 0) {
     return {
       type: 'implant',
       slots: implantSlots,
-      iconUrl
+      iconUrl,
     };
   }
-  
+
   // Check weapon slots first for weapon item classes
   if (isWeapon(itemClass) && weaponSlots.length > 0) {
     return {
       type: 'weapon',
       slots: weaponSlots,
-      iconUrl
+      iconUrl,
     };
   }
-  
+
   // Check armor slots (can include weapons with armor slot values like gloves)
   if (armorSlots.length > 0) {
     return {
       type: 'armor',
       slots: armorSlots,
-      iconUrl
+      iconUrl,
     };
   }
-  
+
   // Check weapon slots for non-weapon classes that might still be wieldable
   if (weaponSlots.length > 0) {
     return {
       type: 'weapon',
       slots: weaponSlots,
-      iconUrl
+      iconUrl,
     };
   }
-  
+
   // No valid slots found
   return {
     type: null,
     slots: [],
-    iconUrl
+    iconUrl,
   };
 }
 
@@ -1266,39 +1338,39 @@ export function getItemSlotInfo(item: any): {
  */
 export function getWeaponSlotPosition(slotName: string): { row: number; col: number } {
   const positions: Record<string, { row: number; col: number }> = {
-    'Hud1': { row: 1, col: 1 },
-    'Hud2': { row: 1, col: 2 },
-    'Hud3': { row: 1, col: 3 },
-    'HUD1': { row: 1, col: 1 },
-    'HUD2': { row: 1, col: 2 },
-    'HUD3': { row: 1, col: 3 },
-    'Utils1': { row: 2, col: 1 },
-    'Util1': { row: 2, col: 1 },
-    'UTILS1': { row: 2, col: 1 },
-    'Utils2': { row: 2, col: 2 },
-    'Util2': { row: 2, col: 2 },
-    'UTILS2': { row: 2, col: 2 },
-    'Utils3': { row: 2, col: 3 },
-    'Util3': { row: 2, col: 3 },
-    'UTILS3': { row: 2, col: 3 },
-    'LeftHand': { row: 3, col: 1 },
-    'LHand': { row: 3, col: 1 },
-    'RightHand': { row: 3, col: 3 },
-    'RHand': { row: 3, col: 3 },
-    'Deck': { row: 3, col: 2 },
-    'Waist': { row: 3, col: 2 },
-    'Deck1': { row: 4, col: 1 },
-    'NCU1': { row: 4, col: 1 },
-    'Deck2': { row: 4, col: 2 },
-    'NCU2': { row: 4, col: 2 },
-    'Deck3': { row: 4, col: 3 },
-    'NCU3': { row: 4, col: 3 },
-    'Deck4': { row: 5, col: 1 },
-    'NCU4': { row: 5, col: 1 },
-    'Deck5': { row: 5, col: 2 },
-    'NCU5': { row: 5, col: 2 },
-    'Deck6': { row: 5, col: 3 },
-    'NCU6': { row: 5, col: 3 }
+    Hud1: { row: 1, col: 1 },
+    Hud2: { row: 1, col: 2 },
+    Hud3: { row: 1, col: 3 },
+    HUD1: { row: 1, col: 1 },
+    HUD2: { row: 1, col: 2 },
+    HUD3: { row: 1, col: 3 },
+    Utils1: { row: 2, col: 1 },
+    Util1: { row: 2, col: 1 },
+    UTILS1: { row: 2, col: 1 },
+    Utils2: { row: 2, col: 2 },
+    Util2: { row: 2, col: 2 },
+    UTILS2: { row: 2, col: 2 },
+    Utils3: { row: 2, col: 3 },
+    Util3: { row: 2, col: 3 },
+    UTILS3: { row: 2, col: 3 },
+    LeftHand: { row: 3, col: 1 },
+    LHand: { row: 3, col: 1 },
+    RightHand: { row: 3, col: 3 },
+    RHand: { row: 3, col: 3 },
+    Deck: { row: 3, col: 2 },
+    Waist: { row: 3, col: 2 },
+    Deck1: { row: 4, col: 1 },
+    NCU1: { row: 4, col: 1 },
+    Deck2: { row: 4, col: 2 },
+    NCU2: { row: 4, col: 2 },
+    Deck3: { row: 4, col: 3 },
+    NCU3: { row: 4, col: 3 },
+    Deck4: { row: 5, col: 1 },
+    NCU4: { row: 5, col: 1 },
+    Deck5: { row: 5, col: 2 },
+    NCU5: { row: 5, col: 2 },
+    Deck6: { row: 5, col: 3 },
+    NCU6: { row: 5, col: 3 },
   };
 
   return positions[slotName] || { row: 1, col: 1 };
@@ -1309,24 +1381,24 @@ export function getWeaponSlotPosition(slotName: string): { row: number; col: num
  */
 export function getArmorSlotPosition(slotName: string): { row: number; col: number } {
   const positions: Record<string, { row: number; col: number }> = {
-    'Head': { row: 1, col: 2 },
-    'Neck': { row: 1, col: 1 },
-    'Back': { row: 1, col: 3 },
-    'LeftShoulder': { row: 2, col: 1 },
-    'Chest': { row: 2, col: 2 },
-    'Body': { row: 2, col: 2 }, // Legacy compatibility - same as Chest
-    'RightShoulder': { row: 2, col: 3 },
-    'LeftArm': { row: 3, col: 1 },
-    'Hands': { row: 3, col: 2 },
-    'RightArm': { row: 3, col: 3 },
-    'LeftWrist': { row: 4, col: 1 },
-    'Legs': { row: 4, col: 2 },
-    'RightWrist': { row: 4, col: 3 },
-    'LeftFinger': { row: 5, col: 1 },
-    'Feet': { row: 5, col: 2 },
-    'RightFinger': { row: 5, col: 3 }
+    Head: { row: 1, col: 2 },
+    Neck: { row: 1, col: 1 },
+    Back: { row: 1, col: 3 },
+    LeftShoulder: { row: 2, col: 1 },
+    Chest: { row: 2, col: 2 },
+    Body: { row: 2, col: 2 }, // Legacy compatibility - same as Chest
+    RightShoulder: { row: 2, col: 3 },
+    LeftArm: { row: 3, col: 1 },
+    Hands: { row: 3, col: 2 },
+    RightArm: { row: 3, col: 3 },
+    LeftWrist: { row: 4, col: 1 },
+    Legs: { row: 4, col: 2 },
+    RightWrist: { row: 4, col: 3 },
+    LeftFinger: { row: 5, col: 1 },
+    Feet: { row: 5, col: 2 },
+    RightFinger: { row: 5, col: 3 },
   };
-  
+
   return positions[slotName] || { row: 1, col: 1 };
 }
 
@@ -1335,21 +1407,21 @@ export function getArmorSlotPosition(slotName: string): { row: number; col: numb
  */
 export function getImplantSlotPosition(slotName: string): { row: number; col: number } {
   const positions: Record<string, { row: number; col: number }> = {
-    'Eyes': { row: 1, col: 1 },
-    'Head': { row: 1, col: 2 },
-    'Ears': { row: 1, col: 3 },
-    'RightArm': { row: 2, col: 1 },
-    'Chest': { row: 2, col: 2 },
-    'LeftArm': { row: 2, col: 3 },
-    'RightWrist': { row: 3, col: 1 },
-    'Waist': { row: 3, col: 2 },
-    'LeftWrist': { row: 3, col: 3 },
-    'RightHand': { row: 4, col: 1 },
-    'Legs': { row: 4, col: 2 },
-    'LeftHand': { row: 4, col: 3 },
-    'Feet': { row: 5, col: 2 }
+    Eyes: { row: 1, col: 1 },
+    Head: { row: 1, col: 2 },
+    Ears: { row: 1, col: 3 },
+    RightArm: { row: 2, col: 1 },
+    Chest: { row: 2, col: 2 },
+    LeftArm: { row: 2, col: 3 },
+    RightWrist: { row: 3, col: 1 },
+    Waist: { row: 3, col: 2 },
+    LeftWrist: { row: 3, col: 3 },
+    RightHand: { row: 4, col: 1 },
+    Legs: { row: 4, col: 2 },
+    LeftHand: { row: 4, col: 3 },
+    Feet: { row: 5, col: 2 },
   };
-  
+
   return positions[slotName] || { row: 1, col: 1 };
 }
 
@@ -1359,21 +1431,21 @@ export function getImplantSlotPosition(slotName: string): { row: number; col: nu
  */
 export function getImplantSlotPositionFromBitflag(bitflag: number): { row: number; col: number } {
   const positions: Record<number, { row: number; col: number }> = {
-    2: { row: 1, col: 1 },      // Eyes - 1 << 1
-    4: { row: 1, col: 2 },      // Head - 1 << 2  
-    8: { row: 1, col: 3 },      // Ears - 1 << 3
-    16: { row: 2, col: 1 },     // RightArm - 1 << 4
-    32: { row: 2, col: 2 },     // Chest - 1 << 5
-    64: { row: 2, col: 3 },     // LeftArm - 1 << 6
-    128: { row: 3, col: 1 },    // RightWrist - 1 << 7
-    256: { row: 3, col: 2 },    // Waist - 1 << 8
-    512: { row: 3, col: 3 },    // LeftWrist - 1 << 9
-    1024: { row: 4, col: 1 },   // RightHand - 1 << 10
-    2048: { row: 4, col: 2 },   // Legs - 1 << 11
-    4096: { row: 4, col: 3 },   // LeftHand - 1 << 12
-    8192: { row: 5, col: 2 }    // Feet - 1 << 13
+    2: { row: 1, col: 1 }, // Eyes - 1 << 1
+    4: { row: 1, col: 2 }, // Head - 1 << 2
+    8: { row: 1, col: 3 }, // Ears - 1 << 3
+    16: { row: 2, col: 1 }, // RightArm - 1 << 4
+    32: { row: 2, col: 2 }, // Chest - 1 << 5
+    64: { row: 2, col: 3 }, // LeftArm - 1 << 6
+    128: { row: 3, col: 1 }, // RightWrist - 1 << 7
+    256: { row: 3, col: 2 }, // Waist - 1 << 8
+    512: { row: 3, col: 3 }, // LeftWrist - 1 << 9
+    1024: { row: 4, col: 1 }, // RightHand - 1 << 10
+    2048: { row: 4, col: 2 }, // Legs - 1 << 11
+    4096: { row: 4, col: 3 }, // LeftHand - 1 << 12
+    8192: { row: 5, col: 2 }, // Feet - 1 << 13
   };
-  
+
   return positions[bitflag] || { row: 1, col: 1 };
 }
 
@@ -1388,25 +1460,25 @@ export function getImplantSlotPositionFromBitflag(bitflag: number): { row: numbe
 export function getFlagNameFromBit(statId: number, bitNum: number): string {
   // Map stat IDs to their corresponding flag constants
   const flagConstants: Record<number, Record<string, number>> = {
-    30: CANFLAG,        // Can flags
-    355: WORN_ITEM,     // WornItem flags
+    30: CANFLAG, // Can flags
+    355: WORN_ITEM, // WornItem flags
     // Add more stat ID to flag mappings as needed
-  }
-  
-  const flagConstant = flagConstants[statId]
+  };
+
+  const flagConstant = flagConstants[statId];
   if (!flagConstant) {
-    return `Bit ${bitNum}`
+    return `Bit ${bitNum}`;
   }
-  
+
   // Find the flag name that corresponds to the bit position
-  const bitValue = 1 << bitNum // Convert bit position to bit value
+  const bitValue = 1 << bitNum; // Convert bit position to bit value
   for (const [flagName, flagValue] of Object.entries(flagConstant)) {
     if (flagValue === bitValue) {
-      return flagName
+      return flagName;
     }
   }
-  
-  return `Bit ${bitNum}`
+
+  return `Bit ${bitNum}`;
 }
 
 /**
@@ -1416,26 +1488,26 @@ export function getFlagNameFromBit(statId: number, bitNum: number): string {
 export function getFlagNameFromValue(statId: number, bitValue: number): string {
   // Map stat IDs to their corresponding flag constants
   const flagConstants: Record<number, Record<string, number>> = {
-    30: CANFLAG,        // Can flags
-    182: SPECIALIZATION_FLAG,  // Specialization flags
-    355: WORN_ITEM,     // WornItem flags
-    455: NPCFAMILY,     // NPCFamily flags
+    30: CANFLAG, // Can flags
+    182: SPECIALIZATION_FLAG, // Specialization flags
+    355: WORN_ITEM, // WornItem flags
+    455: NPCFAMILY, // NPCFamily flags
     // Add more stat ID to flag mappings as needed
-  }
-  
-  const flagConstant = flagConstants[statId]
+  };
+
+  const flagConstant = flagConstants[statId];
   if (!flagConstant) {
-    return `Flag ${bitValue}`
+    return `Flag ${bitValue}`;
   }
-  
+
   // Find the flag name that corresponds to the bit value
   for (const [flagName, flagValue] of Object.entries(flagConstant)) {
     if (flagValue === bitValue) {
-      return flagName
+      return flagName;
     }
   }
-  
-  return `Flag ${bitValue}`
+
+  return `Flag ${bitValue}`;
 }
 
 // ============================================================================
@@ -1468,7 +1540,7 @@ import {
   type CharacterStats,
   type IPCalculationResult,
   type SkillCap,
-  type TrickleDownResult
+  type TrickleDownResult,
 } from '../lib/tinkerprofiles/ip-calculator';
 
 /**
@@ -1488,42 +1560,67 @@ export function calculateTitleLevel(level: number): number {
 /**
  * Calculate ability cap for character
  */
-export function calculateAbilityCap(level: number, breed: number, profession: number, abilityId: number): number {
+export function calculateAbilityCap(
+  level: number,
+  breed: number,
+  profession: number,
+  abilityId: number
+): number {
   return calcAbilityMaxValue(level, breed, profession, abilityId);
 }
 
 /**
  * Calculate skill cap based on level and profession
  */
-export function calculateIPAdjustableRange(level: number, profession: number, skillId: number): number {
+export function calculateIPAdjustableRange(
+  level: number,
+  profession: number,
+  skillId: number
+): number {
   return calcIPAdjustableRange(level, profession, skillId);
 }
 
 /**
  * Calculate IP cost for next ability point
  */
-export function calculateAbilityIPCost(currentValue: number, breed: number, abilityId: number): number {
+export function calculateAbilityIPCost(
+  currentValue: number,
+  breed: number,
+  abilityId: number
+): number {
   return calcAbilityCost(currentValue, breed, abilityId);
 }
 
 /**
  * Calculate IP cost for next skill point
  */
-export function calculateSkillIPCost(currentValue: number, profession: number, skillId: number): number {
+export function calculateSkillIPCost(
+  currentValue: number,
+  profession: number,
+  skillId: number
+): number {
   return calcSkillCost(currentValue, profession, skillId);
 }
 
 /**
  * Calculate total IP spent on an ability
  */
-export function calculateTotalAbilityIP(improvements: number, breed: number, abilityId: number): number {
+export function calculateTotalAbilityIP(
+  improvements: number,
+  breed: number,
+  abilityId: number
+): number {
   return calcTotalAbilityCost(improvements, breed, abilityId);
 }
 
 /**
  * Calculate total IP spent on a skill
  */
-export function calculateTotalSkillIP(improvements: number, profession: number, skillId: number): number {
+export function calculateTotalSkillIP(
+  improvements: number,
+  profession: number,
+  skillId: number
+): number {
   return calcTotalSkillCost(improvements, profession, skillId);
 }
 
@@ -1544,21 +1641,36 @@ export function calculateAllTrickleDown(abilities: number[]): TrickleDownResult 
 /**
  * Calculate character's health
  */
-export function calculateHealth(bodyDev: number, level: number, breed: number, profession: number): number {
+export function calculateHealth(
+  bodyDev: number,
+  level: number,
+  breed: number,
+  profession: number
+): number {
   return calcHP(bodyDev, level, breed, profession);
 }
 
 /**
  * Calculate character's nano pool
  */
-export function calculateNanoPool(nanoPool: number, level: number, breed: number, profession: number): number {
+export function calculateNanoPool(
+  nanoPool: number,
+  level: number,
+  breed: number,
+  profession: number
+): number {
   return calcNP(nanoPool, level, breed, profession);
 }
 
 /**
  * Calculate comprehensive skill cap information
  */
-export function calculateSkillCaps(level: number, profession: number, skillId: number, abilities: number[]): SkillCap {
+export function calculateSkillCaps(
+  level: number,
+  profession: number,
+  skillId: number,
+  abilities: number[]
+): SkillCap {
   return calcSkillCap(level, profession, skillId, abilities);
 }
 
@@ -1611,7 +1723,11 @@ export function formatIPValue(ipValue: number): string {
 /**
  * Format skill/ability value for display
  */
-export function formatSkillValue(baseValue: number, improvements: number, trickle: number = 0): string {
+export function formatSkillValue(
+  baseValue: number,
+  improvements: number,
+  trickle: number = 0
+): string {
   const total = baseValue + improvements + trickle;
   if (trickle > 0) {
     return `${total} (${baseValue + improvements} + ${trickle})`;
@@ -1624,18 +1740,19 @@ export function formatSkillValue(baseValue: number, improvements: number, trickl
  */
 export function getProfessionSpecialization(profession: number): {
   excellent: number[]; // Skills with cost factor <= 1.2
-  good: number[];      // Skills with cost factor <= 2.0
-  average: number[];   // Skills with cost factor <= 3.0
-  poor: number[];      // Skills with cost factor > 3.0
+  good: number[]; // Skills with cost factor <= 2.0
+  average: number[]; // Skills with cost factor <= 3.0
+  poor: number[]; // Skills with cost factor > 3.0
 } {
   const specialization = {
     excellent: [] as number[],
     good: [] as number[],
     average: [] as number[],
-    poor: [] as number[]
+    poor: [] as number[],
   };
 
-  for (let skillId = 0; skillId < 97; skillId++) { // First 97 skills
+  for (let skillId = 0; skillId < 97; skillId++) {
+    // First 97 skills
     const cost = getSkillCostFactor(profession, skillId);
     if (cost <= 1.2) {
       specialization.excellent.push(skillId);
@@ -1656,13 +1773,13 @@ export function getProfessionSpecialization(profession: number): {
  */
 export function getBreedSpecialization(breed: number): {
   excellent: number[]; // Abilities with cost factor = 1
-  average: number[];   // Abilities with cost factor = 2  
-  poor: number[];      // Abilities with cost factor = 3
+  average: number[]; // Abilities with cost factor = 2
+  poor: number[]; // Abilities with cost factor = 3
 } {
   const specialization = {
     excellent: [] as number[],
     average: [] as number[],
-    poor: [] as number[]
+    poor: [] as number[],
   };
 
   for (let abilityId = 0; abilityId < 6; abilityId++) {
@@ -1687,9 +1804,9 @@ export function getRecommendedStatDistribution(
   profession: number,
   level: number
 ): {
-  primary: number[];    // Most important abilities
-  secondary: number[];  // Somewhat important abilities
-  tertiary: number[];   // Less important abilities
+  primary: number[]; // Most important abilities
+  secondary: number[]; // Somewhat important abilities
+  tertiary: number[]; // Less important abilities
 } {
   const breedSpec = getBreedSpecialization(breed);
   const profSpec = getProfessionSpecialization(profession);
@@ -1699,7 +1816,7 @@ export function getRecommendedStatDistribution(
   const recommendation = {
     primary: [...breedSpec.excellent],
     secondary: [...breedSpec.average],
-    tertiary: [...breedSpec.poor]
+    tertiary: [...breedSpec.poor],
   };
 
   // Adjust based on profession needs
@@ -1875,11 +1992,11 @@ export const gameUtils = {
   getArmorSlotPosition,
   getImplantSlotPosition,
   getImplantSlotPositionFromBitflag,
-  
+
   // Flag resolution functions
   getFlagNameFromBit,
   getFlagNameFromValue,
-  
+
   // Nanoskill functions
   getNanoskillRequirements,
   getPrimarySource,
@@ -1913,7 +2030,7 @@ export const gameUtils = {
 
   // Normalization functions
   normalizeProfessionToId,
-  normalizeBreedToId
+  normalizeBreedToId,
 };
 
 // ============================================================================
@@ -1921,12 +2038,12 @@ export const gameUtils = {
 // ============================================================================
 
 export interface NanoskillRequirements {
-  mm?: number;  // Matter Metamorphosis (127)
-  bm?: number;  // Biological Metamorphosis (128)
-  pm?: number;  // Psychological Modification (129)
-  si?: number;  // Sensory Improvement (122)
-  mc?: number;  // Matter Creation (130)
-  ts?: number;  // Time and Space (131)
+  mm?: number; // Matter Metamorphosis (127)
+  bm?: number; // Biological Metamorphosis (128)
+  pm?: number; // Psychological Modification (129)
+  si?: number; // Sensory Improvement (122)
+  mc?: number; // Matter Creation (130)
+  ts?: number; // Time and Space (131)
 }
 
 /**
@@ -1935,21 +2052,21 @@ export interface NanoskillRequirements {
  */
 export function getNanoskillRequirements(item: Item): NanoskillRequirements {
   const requirements: NanoskillRequirements = {};
-  
+
   // Find USE action (action = 3)
-  const useAction = item.actions?.find(action => action.action === 3);
+  const useAction = item.actions?.find((action) => action.action === 3);
   if (!useAction) return requirements;
-  
+
   // Map stat IDs to nanoskill properties
   const skillMap = {
-    127: 'mm' as const,  // Matter Metamorphosis
-    128: 'bm' as const,  // Biological Metamorphosis
-    129: 'pm' as const,  // Psychological Modification
-    122: 'si' as const,  // Sensory Improvement
-    130: 'mc' as const,  // Matter Creation
-    131: 'ts' as const   // Time and Space
+    127: 'mm' as const, // Matter Metamorphosis
+    128: 'bm' as const, // Biological Metamorphosis
+    129: 'pm' as const, // Psychological Modification
+    122: 'si' as const, // Sensory Improvement
+    130: 'mc' as const, // Matter Creation
+    131: 'ts' as const, // Time and Space
   };
-  
+
   // Extract requirements from criteria
   for (const criterion of useAction.criteria || []) {
     const skillKey = skillMap[criterion.value1 as keyof typeof skillMap];
@@ -1957,7 +2074,7 @@ export function getNanoskillRequirements(item: Item): NanoskillRequirements {
       requirements[skillKey] = criterion.value2;
     }
   }
-  
+
   return requirements;
 }
 
@@ -1968,7 +2085,7 @@ export function getPrimarySource(item: Item): string | null {
   if (!item.sources || item.sources.length === 0) {
     return null;
   }
-  
+
   // Find the shortest name (usually the most descriptive)
   const shortestSource = item.sources.reduce((shortest, current) => {
     // Handle both old format (current.source.name) and new format (current.source_name)
@@ -1976,7 +2093,7 @@ export function getPrimarySource(item: Item): string | null {
     const shortestName = shortest.source_name || shortest.source?.name || '';
     return currentName.length < shortestName.length ? current : shortest;
   });
-  
+
   return shortestSource.source_name || shortestSource.source?.name || null;
 }
 
@@ -1986,13 +2103,13 @@ export function getPrimarySource(item: Item): string | null {
  */
 export function getNanoSpecialization(item: Item): number | null {
   // Find USE action (action = 3)
-  const useAction = item.actions?.find(action => action.action === 3);
+  const useAction = item.actions?.find((action) => action.action === 3);
   if (!useAction) return null;
-  
+
   // Find specialization criterion (stat 182)
-  const specCriterion = useAction.criteria?.find(criterion => criterion.value1 === 182);
+  const specCriterion = useAction.criteria?.find((criterion) => criterion.value1 === 182);
   if (!specCriterion || specCriterion.value2 <= 0) return null;
-  
+
   // Map using SPECS constant (bitflag to level number)
   const specValue = specCriterion.value2;
   return SPECS[specValue as keyof typeof SPECS] || specValue;
@@ -2004,27 +2121,27 @@ export function getNanoSpecialization(item: Item): number | null {
  */
 export function getNanoExpansion(item: Item): string | null {
   // Find USE action (action = 3)
-  const useAction = item.actions?.find(action => action.action === 3);
+  const useAction = item.actions?.find((action) => action.action === 3);
   if (!useAction) return null;
-  
+
   // Find expansion criterion (stat 389)
-  const expansionCriterion = useAction.criteria?.find(criterion => criterion.value1 === 389);
+  const expansionCriterion = useAction.criteria?.find((criterion) => criterion.value1 === 389);
   if (!expansionCriterion || expansionCriterion.value2 <= 0) return null;
-  
+
   // Map expansion flags to abbreviations
   const expansionValue = expansionCriterion.value2;
   const expansionNames: { [key: number]: string } = {
-    1: 'NW',   // Notum Wars
-    2: 'SL',   // Shadowlands
+    1: 'NW', // Notum Wars
+    2: 'SL', // Shadowlands
     4: 'SL-P', // Shadowlands Preorder
-    8: 'AI',   // Alien Invasion
+    8: 'AI', // Alien Invasion
     16: 'AI-P', // Alien Invasion Preorder
-    32: 'LE',   // Lost Eden
+    32: 'LE', // Lost Eden
     64: 'LE-P', // Lost Eden Preorder
     128: 'LoX', // Legacy of Xan
-    256: 'LoX-P' // Legacy of Xan Preorder
+    256: 'LoX-P', // Legacy of Xan Preorder
   };
-  
+
   return expansionNames[expansionValue] || `Exp ${expansionValue}`;
 }
 
@@ -2040,12 +2157,12 @@ export function getNanoExpansion(item: Item): string | null {
  * @throws Error if WEAR action or level requirement is missing
  */
 export function getMinimumLevel(symbiant: { actions?: Action[] }): number {
-  const wearAction = symbiant.actions?.find(a => a.action === 6);
+  const wearAction = symbiant.actions?.find((a) => a.action === 6);
   if (!wearAction) {
     throw new Error(`Symbiant missing WEAR action (action=6)`);
   }
 
-  const levelCriterion = wearAction.criteria.find(c => c.value1 === 54);
+  const levelCriterion = wearAction.criteria.find((c) => c.value1 === 54);
   if (!levelCriterion) {
     throw new Error(`Symbiant missing level requirement (stat=54) in WEAR action`);
   }

@@ -86,15 +86,12 @@ export const STAT_BONUS_SPELL_IDS = [53045, 53012, 53014, 53175] as const;
  * @param itemName Optional item name for error reporting
  * @returns Parsed bonus result with bonuses and any errors
  */
-export function parseItemSpellBonuses(
-  spellData: SpellData[],
-  itemName?: string
-): BonusParseResult {
+export function parseItemSpellBonuses(spellData: SpellData[], itemName?: string): BonusParseResult {
   const result: BonusParseResult = {
     bonuses: [],
     errors: [],
     totalParsed: 0,
-    totalSkipped: 0
+    totalSkipped: 0,
   };
 
   if (!spellData || !Array.isArray(spellData)) {
@@ -104,9 +101,7 @@ export function parseItemSpellBonuses(
 
   try {
     // Filter for relevant equipment events
-    const relevantSpellData = spellData.filter(sd =>
-      EQUIPMENT_EVENTS.includes(sd.event as any)
-    );
+    const relevantSpellData = spellData.filter((sd) => EQUIPMENT_EVENTS.includes(sd.event as any));
 
     for (const spellDataEntry of relevantSpellData) {
       if (!spellDataEntry.spells || !Array.isArray(spellDataEntry.spells)) {
@@ -116,7 +111,7 @@ export function parseItemSpellBonuses(
       }
 
       // Filter for stat bonus spells
-      const bonusSpells = spellDataEntry.spells.filter(spell =>
+      const bonusSpells = spellDataEntry.spells.filter((spell) =>
         STAT_BONUS_SPELL_IDS.includes(spell.spell_id as any)
       );
 
@@ -138,7 +133,9 @@ export function parseItemSpellBonuses(
       }
     }
   } catch (error) {
-    result.errors.push(`Fatal error parsing spell data for ${itemName || 'unknown item'}: ${error}`);
+    result.errors.push(
+      `Fatal error parsing spell data for ${itemName || 'unknown item'}: ${error}`
+    );
   }
 
   return result;
@@ -151,10 +148,7 @@ export function parseItemSpellBonuses(
  * @param itemSource Optional source item name for debugging
  * @returns StatBonus if valid, null if not a stat bonus or malformed
  */
-export function parseSpellStatBonus(
-  spell: Spell,
-  itemSource?: string
-): StatBonus | null {
+export function parseSpellStatBonus(spell: Spell, itemSource?: string): StatBonus | null {
   if (!spell?.spell_params) {
     return null;
   }
@@ -190,7 +184,7 @@ export function parseSpellStatBonus(
       skillId,
       amount,
       spellId: spell.spell_id,
-      itemSource
+      itemSource,
     };
   } catch (error) {
     // Log error but don't throw - continue processing other spells
@@ -230,8 +224,8 @@ export function filterEquipmentEvents(spellData: SpellData[]): SpellData[] {
     return [];
   }
 
-  return spellData.filter(sd =>
-    sd?.event !== undefined && EQUIPMENT_EVENTS.includes(sd.event as any)
+  return spellData.filter(
+    (sd) => sd?.event !== undefined && EQUIPMENT_EVENTS.includes(sd.event as any)
   );
 }
 
@@ -249,9 +243,9 @@ export function extractStatBonusSpells(spellData: SpellData[]): Spell[] {
       continue;
     }
 
-    const relevantSpells = spellDataEntry.spells.filter(spell =>
-      spell?.spell_id !== undefined &&
-      STAT_BONUS_SPELL_IDS.includes(spell.spell_id as any)
+    const relevantSpells = spellDataEntry.spells.filter(
+      (spell) =>
+        spell?.spell_id !== undefined && STAT_BONUS_SPELL_IDS.includes(spell.spell_id as any)
     );
 
     bonusSpells.push(...relevantSpells);

@@ -8,12 +8,15 @@ Shows all equipped items in a slot grid layout for a specific equipment type
       <div
         v-for="(cell, index) in gridCells"
         :key="`${index}-${cell.item?.aoid || 'empty'}`"
-        :class="['equipment-slot-cell', {
-          'has-item': cell.item,
-          'empty-slot': !cell.item && cell.slotName,
-          'no-slot': !cell.slotName,
-          'unequipping': unequippingSlots.has(cell.slotName || '')
-        }]"
+        :class="[
+          'equipment-slot-cell',
+          {
+            'has-item': cell.item,
+            'empty-slot': !cell.item && cell.slotName,
+            'no-slot': !cell.slotName,
+            unequipping: unequippingSlots.has(cell.slotName || ''),
+          },
+        ]"
         :title="cell.slotName || ''"
       >
         <!-- Item icon if equipped -->
@@ -43,10 +46,7 @@ Shows all equipped items in a slot grid layout for a specific equipment type
           <i class="pi pi-times"></i>
         </button>
         <!-- Slot label for debugging (optional) -->
-        <span
-          v-if="showLabels && cell.slotName"
-          class="slot-label"
-        >
+        <span v-if="showLabels && cell.slotName" class="slot-label">
           {{ cell.slotName }}
         </span>
       </div>
@@ -64,7 +64,7 @@ import {
   getArmorSlotPosition,
   getImplantSlotPosition,
   getImplantSlotPositionFromBitflag,
-  getItemIconUrl
+  getItemIconUrl,
 } from '@/services/game-utils';
 import type { Item } from '@/types/api';
 
@@ -78,7 +78,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   showLabels: false,
-  allowUnequip: true
+  allowUnequip: true,
 });
 
 // Emits
@@ -102,10 +102,10 @@ const gridCells = computed(() => {
     slotName: string | null;
     position: { row: number; col: number };
   }> = [];
-  
+
   // Determine grid dimensions and position function
   let rows: number, cols: number, getPositionFn: Function;
-  
+
   switch (props.slotType) {
     case 'weapon':
       rows = 5;
@@ -125,55 +125,57 @@ const gridCells = computed(() => {
     default:
       return [];
   }
-  
+
   // Initialize grid with empty cells
-  const grid: Array<Array<{
-    item: Item | null;
-    iconUrl: string | null;
-    slotName: string | null;
-  }>> = [];
-  
+  const grid: Array<
+    Array<{
+      item: Item | null;
+      iconUrl: string | null;
+      slotName: string | null;
+    }>
+  > = [];
+
   for (let row = 1; row <= rows; row++) {
     grid[row] = [];
     for (let col = 1; col <= cols; col++) {
       grid[row][col] = {
         item: null,
         iconUrl: null,
-        slotName: null
+        slotName: null,
       };
     }
   }
-  
+
   // Place equipped items in their slots
   for (const [slotKey, item] of Object.entries(props.equipment)) {
     if (item) {
       let position;
-      
+
       if (props.slotType === 'implant') {
         // For implants, slotKey is a bitflag value as string
         const bitflag = parseInt(slotKey);
         position = getImplantSlotPositionFromBitflag(bitflag);
       } else {
-        // For weapons and armor, slotKey is a string slot name  
+        // For weapons and armor, slotKey is a string slot name
         position = getPositionFn(slotKey);
       }
-      
+
       if (position && grid[position.row] && grid[position.row][position.col]) {
         grid[position.row][position.col] = {
           item,
           iconUrl: getItemIconUrl(item.stats),
-          slotName: slotKey
+          slotName: slotKey,
         };
       }
     }
   }
-  
+
   // Add empty slots that exist in the slot system but don't have items
   // This requires knowing all possible slots for each type
   const allSlots = getAllSlotsForType(props.slotType);
   for (const slotKey of allSlots) {
     let position;
-    
+
     if (props.slotType === 'implant') {
       // For implants, slotKey is a bitflag value as string
       const bitflag = parseInt(slotKey);
@@ -182,7 +184,7 @@ const gridCells = computed(() => {
       // For weapons and armor, slotKey is a string slot name
       position = getPositionFn(slotKey);
     }
-    
+
     if (position && grid[position.row] && grid[position.row][position.col]) {
       // Only set slot name if no item is already there
       if (!grid[position.row][position.col].item) {
@@ -190,17 +192,17 @@ const gridCells = computed(() => {
       }
     }
   }
-  
+
   // Convert grid to flat array for template
   for (let row = 1; row <= rows; row++) {
     for (let col = 1; col <= cols; col++) {
       cells.push({
         ...grid[row][col],
-        position: { row, col }
+        position: { row, col },
       });
     }
   }
-  
+
   return cells;
 });
 
@@ -208,9 +210,43 @@ const gridCells = computed(() => {
 function getAllSlotsForType(slotType: string): string[] {
   switch (slotType) {
     case 'weapon':
-      return ['RHand', 'LHand', 'Waist', 'HUD1', 'HUD2', 'HUD3', 'UTILS1', 'UTILS2', 'UTILS3', 'NCU1', 'NCU2', 'NCU3', 'NCU4', 'NCU5', 'NCU6'];
+      return [
+        'RHand',
+        'LHand',
+        'Waist',
+        'HUD1',
+        'HUD2',
+        'HUD3',
+        'UTILS1',
+        'UTILS2',
+        'UTILS3',
+        'NCU1',
+        'NCU2',
+        'NCU3',
+        'NCU4',
+        'NCU5',
+        'NCU6',
+      ];
     case 'armor':
-      return ['Head', 'Neck', 'Back', 'RightShoulder', 'LeftShoulder', 'Body', 'Chest', 'RightArm', 'LeftArm', 'Hands', 'RightWrist', 'LeftWrist', 'Belt', 'Legs', 'RightFinger', 'LeftFinger', 'Feet'];
+      return [
+        'Head',
+        'Neck',
+        'Back',
+        'RightShoulder',
+        'LeftShoulder',
+        'Body',
+        'Chest',
+        'RightArm',
+        'LeftArm',
+        'Hands',
+        'RightWrist',
+        'LeftWrist',
+        'Belt',
+        'Legs',
+        'RightFinger',
+        'LeftFinger',
+        'Feet',
+      ];
     case 'implant':
       // Return bitflag values as strings for implants
       return ['2', '4', '8', '16', '32', '64', '128', '256', '512', '1024', '2048', '4096', '8192'];
@@ -231,11 +267,11 @@ function navigateToItem(item: Item) {
   router.push({
     name: 'ItemDetail',
     params: {
-      aoid: item.aoid.toString()
+      aoid: item.aoid.toString(),
     },
     query: {
-      ql: item.ql?.toString() || '1'
-    }
+      ql: item.ql?.toString() || '1',
+    },
   });
 }
 
@@ -263,7 +299,7 @@ async function handleUnequip(slotName: string | null, item: Item) {
 
   try {
     // Wait for animation to start
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     // Unequip the item
     await profilesStore.unequipItem(category, slotName);
@@ -273,7 +309,7 @@ async function handleUnequip(slotName: string | null, item: Item) {
       severity: 'success',
       summary: 'Item Unequipped',
       detail: `${item.name} unequipped`,
-      life: 3000
+      life: 3000,
     });
 
     // Emit event to parent to reload profile
@@ -293,7 +329,7 @@ async function handleUnequip(slotName: string | null, item: Item) {
       severity: 'error',
       summary: 'Unequip Failed',
       detail: 'Failed to unequip item',
-      life: 3000
+      life: 3000,
     });
   }
 }
@@ -353,7 +389,7 @@ async function handleUnequip(slotName: string | null, item: Item) {
 
 .equipment-slot-cell.has-item:hover {
   background: rgba(0, 255, 0, 0.3);
-  border-color: rgba(0, 255, 0, 1.0);
+  border-color: rgba(0, 255, 0, 1);
 }
 
 .equipment-slot-cell.empty-slot {
@@ -373,7 +409,9 @@ async function handleUnequip(slotName: string | null, item: Item) {
   filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.8));
   border-radius: 4px;
   cursor: pointer;
-  transition: transform 0.1s ease, filter 0.1s ease;
+  transition:
+    transform 0.1s ease,
+    filter 0.1s ease;
 }
 
 .item-icon:hover {
@@ -386,7 +424,9 @@ async function handleUnequip(slotName: string | null, item: Item) {
   color: rgba(255, 255, 255, 0.8);
   filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
   cursor: pointer;
-  transition: transform 0.1s ease, color 0.1s ease;
+  transition:
+    transform 0.1s ease,
+    color 0.1s ease;
 }
 
 .item-fallback-icon:hover {
@@ -506,7 +546,7 @@ async function handleUnequip(slotName: string | null, item: Item) {
     --cell-size: 45px; /* Smaller cells on mobile */
     min-height: 180px;
   }
-  
+
   .item-fallback-icon {
     font-size: 18px;
   }

@@ -337,7 +337,7 @@ export function fitsInNCU(nanos: NanoProgram[], ncuLimit: number): boolean {
  * Get all unique strains from a set of nanos
  */
 export function getUniqueStrains(nanos: NanoProgram[]): string[] {
-  return [...new Set(nanos.map(n => n.strain))];
+  return [...new Set(nanos.map((n) => n.strain))];
 }
 
 /**
@@ -346,7 +346,7 @@ export function getUniqueStrains(nanos: NanoProgram[]): string[] {
 export function findStrainConflicts(nanos: NanoProgram[]): Map<string, NanoProgram[]> {
   const strainMap = new Map<string, NanoProgram[]>();
 
-  nanos.forEach(nano => {
+  nanos.forEach((nano) => {
     const existing = strainMap.get(nano.strain) || [];
     existing.push(nano);
     strainMap.set(nano.strain, existing);

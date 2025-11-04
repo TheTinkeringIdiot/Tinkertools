@@ -31,18 +31,14 @@ Shows available slots for an item and allows user to choose where to equip it
           Select Equipment Slot:
         </label>
         <div class="space-y-2">
-          <div
-            v-for="slot in availableSlots"
-            :key="slot.name"
-            class="relative"
-          >
+          <div v-for="slot in availableSlots" :key="slot.name" class="relative">
             <label
               :for="`slot-${slot.name}`"
               class="flex items-center p-3 rounded-lg border cursor-pointer transition-colors"
               :class="[
                 selectedSlot === slot.name
                   ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-500'
-                  : 'bg-surface-0 dark:bg-surface-900 border-surface-200 dark:border-surface-700 hover:bg-surface-50 dark:hover:bg-surface-800'
+                  : 'bg-surface-0 dark:bg-surface-900 border-surface-200 dark:border-surface-700 hover:bg-surface-50 dark:hover:bg-surface-800',
               ]"
             >
               <input
@@ -55,14 +51,12 @@ Shows available slots for an item and allows user to choose where to equip it
               <div class="flex-1">
                 <div class="flex items-center justify-between">
                   <span class="font-medium">{{ slot.displayName }}</span>
-                  <Badge
-                    v-if="slot.occupied"
-                    value="Occupied"
-                    severity="warning"
-                    class="ml-2"
-                  />
+                  <Badge v-if="slot.occupied" value="Occupied" severity="warning" class="ml-2" />
                 </div>
-                <div v-if="slot.occupied" class="text-sm text-surface-600 dark:text-surface-400 mt-1">
+                <div
+                  v-if="slot.occupied"
+                  class="text-sm text-surface-600 dark:text-surface-400 mt-1"
+                >
                   Currently: {{ slot.currentItem.name }} (QL {{ slot.currentItem.ql }})
                 </div>
                 <div v-else class="text-sm text-green-600 dark:text-green-400 mt-1">
@@ -91,11 +85,7 @@ Shows available slots for an item and allows user to choose where to equip it
     </div>
 
     <template #footer>
-      <Button
-        label="Cancel"
-        @click="cancel"
-        text
-      />
+      <Button label="Cancel" @click="cancel" text />
       <Button
         label="Equip Item"
         @click="confirm"
@@ -123,14 +113,14 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  validSlots: () => []
+  validSlots: () => [],
 });
 
 // Emits
 const emit = defineEmits<{
   'update:visible': [value: boolean];
-  'confirm': [slot: string];
-  'cancel': [];
+  confirm: [slot: string];
+  cancel: [];
 }>();
 
 // Local state
@@ -139,7 +129,7 @@ const selectedSlot = ref<string>('');
 // Computed
 const localVisible = computed({
   get: () => props.visible,
-  set: (value) => emit('update:visible', value)
+  set: (value) => emit('update:visible', value),
 });
 
 const title = computed(() => `Equip ${props.item?.name || 'Item'}`);
@@ -182,7 +172,24 @@ const availableSlots = computed(() => {
     } else {
       // Try to guess based on the slot names
       const firstSlot = props.validSlots[0];
-      if (['HUD1', 'HUD2', 'HUD3', 'UTILS1', 'UTILS2', 'UTILS3', 'RightHand', 'LeftHand', 'Deck1', 'Deck2', 'Deck3', 'Deck4', 'Deck5', 'Deck6'].includes(firstSlot)) {
+      if (
+        [
+          'HUD1',
+          'HUD2',
+          'HUD3',
+          'UTILS1',
+          'UTILS2',
+          'UTILS3',
+          'RightHand',
+          'LeftHand',
+          'Deck1',
+          'Deck2',
+          'Deck3',
+          'Deck4',
+          'Deck5',
+          'Deck6',
+        ].includes(firstSlot)
+      ) {
         equipmentCategory = 'Weapons';
       } else if (['Head', 'Eye', 'Ear', 'Chest', 'Waist', 'Leg', 'Feet'].includes(firstSlot)) {
         equipmentCategory = 'Implants';
@@ -200,7 +207,7 @@ const availableSlots = computed(() => {
         name: slotName,
         displayName: formatSlotName(slotName),
         occupied: currentItem !== null,
-        currentItem: currentItem || { name: 'Empty', ql: 0 }
+        currentItem: currentItem || { name: 'Empty', ql: 0 },
       });
     }
 
@@ -214,7 +221,7 @@ const availableSlots = computed(() => {
 
 // Get the selected slot object
 function getSelectedSlot() {
-  return availableSlots.value.find(s => s.name === selectedSlot.value);
+  return availableSlots.value.find((s) => s.name === selectedSlot.value);
 }
 
 // Format slot name for display
@@ -222,7 +229,7 @@ function formatSlotName(slot: string): string {
   // Convert camelCase to Title Case
   return slot
     .replace(/([A-Z])/g, ' $1')
-    .replace(/^./, str => str.toUpperCase())
+    .replace(/^./, (str) => str.toUpperCase())
     .replace(/Hud/gi, 'HUD')
     .replace(/Ncu/gi, 'NCU')
     .replace(/Utils/gi, 'Utility');
@@ -246,19 +253,22 @@ function cancel() {
 }
 
 // Reset selection when dialog opens
-watch(() => props.visible, (newVal) => {
-  if (newVal) {
-    selectedSlot.value = '';
-    // Auto-select first empty slot if available
-    const emptySlot = availableSlots.value.find(s => !s.occupied);
-    if (emptySlot) {
-      selectedSlot.value = emptySlot.name;
-    } else if (availableSlots.value.length === 1) {
-      // If only one slot available, auto-select it
-      selectedSlot.value = availableSlots.value[0].name;
+watch(
+  () => props.visible,
+  (newVal) => {
+    if (newVal) {
+      selectedSlot.value = '';
+      // Auto-select first empty slot if available
+      const emptySlot = availableSlots.value.find((s) => !s.occupied);
+      if (emptySlot) {
+        selectedSlot.value = emptySlot.name;
+      } else if (availableSlots.value.length === 1) {
+        // If only one slot available, auto-select it
+        selectedSlot.value = availableSlots.value[0].name;
+      }
     }
   }
-});
+);
 </script>
 
 <style scoped>

@@ -15,8 +15,8 @@ describe('NCU Equipment Bonuses', () => {
     manager = new TinkerProfilesManager({
       validation: {
         strictMode: false,
-        autoCorrect: true
-      }
+        autoCorrect: true,
+      },
     });
 
     // Create a test profile
@@ -26,8 +26,8 @@ describe('NCU Equipment Bonuses', () => {
         Profession: PROFESSION.NANO_TECHNICIAN,
         Breed: BREED.OPIFEX,
         Level: 200,
-        Gender: 'Male'
-      }
+        Gender: 'Male',
+      },
     } as Partial<TinkerProfile>);
   });
 
@@ -45,24 +45,28 @@ describe('NCU Equipment Bonuses', () => {
       aoid: 303992,
       name: 'NCU Memory Test',
       ql: 200,
-      spell_data: [{
-        event: 14,  // Wear event
-        spells: [{
-          spell_id: 53045,  // Modify Stat spell ID
-          spell_params: {
-            Stat: 181,  // Max NCU stat ID
-            Amount: 20  // +20 Max NCU
-          }
-        }]
-      }]
+      spell_data: [
+        {
+          event: 14, // Wear event
+          spells: [
+            {
+              spell_id: 53045, // Modify Stat spell ID
+              spell_params: {
+                Stat: 181, // Max NCU stat ID
+                Amount: 20, // +20 Max NCU
+              },
+            },
+          ],
+        },
+      ],
     };
 
     // Equip the item in a slot (e.g., Chest slot for testing)
     await manager.updateProfile(profileId, {
       Clothing: {
         ...profile?.Clothing,
-        Chest: ncuItem
-      }
+        Chest: ncuItem,
+      },
     });
 
     // Load the updated profile
@@ -96,55 +100,67 @@ describe('NCU Equipment Bonuses', () => {
         aoid: 303992,
         name: 'NCU Memory 1',
         ql: 200,
-        spell_data: [{
-          event: 14,
-          spells: [{
-            spell_id: 53045,
-            spell_params: {
-              Stat: 181,
-              Amount: 20
-            }
-          }]
-        }]
+        spell_data: [
+          {
+            event: 14,
+            spells: [
+              {
+                spell_id: 53045,
+                spell_params: {
+                  Stat: 181,
+                  Amount: 20,
+                },
+              },
+            ],
+          },
+        ],
       },
       Legs: {
         aoid: 303993,
         name: 'NCU Memory 2',
         ql: 200,
-        spell_data: [{
-          event: 14,
-          spells: [{
-            spell_id: 53045,
-            spell_params: {
-              Stat: 181,
-              Amount: 25
-            }
-          }]
-        }]
+        spell_data: [
+          {
+            event: 14,
+            spells: [
+              {
+                spell_id: 53045,
+                spell_params: {
+                  Stat: 181,
+                  Amount: 25,
+                },
+              },
+            ],
+          },
+        ],
       },
       Head: {
         aoid: 303994,
         name: 'NCU Memory 3',
         ql: 200,
-        spell_data: [{
-          event: 14,
-          spells: [{
-            spell_id: 53045,
-            spell_params: {
-              Stat: 181,
-              Amount: 30
-            }
-          }]
-        }]
-      }
+        spell_data: [
+          {
+            event: 14,
+            spells: [
+              {
+                spell_id: 53045,
+                spell_params: {
+                  Stat: 181,
+                  Amount: 30,
+                },
+              },
+            ],
+          },
+        ],
+      },
     };
 
     // Equip all items at once
     await manager.updateProfile(profileId, {
       Clothing: {
         ...profile?.Clothing,
-        ...ncuItems
-      }
+        ...ncuItems,
+      },
     });
 
     // Load the updated profile
@@ -167,23 +183,27 @@ describe('NCU Equipment Bonuses', () => {
       aoid: 303992,
       name: 'NCU Memory',
       ql: 200,
-      spell_data: [{
-        event: 14,
-        spells: [{
-          spell_id: 53045,
-          spell_params: {
-            Stat: 181,
-            Amount: 50
-          }
-        }]
-      }]
+      spell_data: [
+        {
+          event: 14,
+          spells: [
+            {
+              spell_id: 53045,
+              spell_params: {
+                Stat: 181,
+                Amount: 50,
+              },
+            },
+          ],
+        },
+      ],
     };
 
     await manager.updateProfile(profileId, {
       Clothing: {
         ...profile?.Clothing,
-        Chest: ncuItem
-      }
+        Chest: ncuItem,
+      },
     });
 
     // Get the value with equipment
@@ -194,8 +214,8 @@ describe('NCU Equipment Bonuses', () => {
     await manager.updateProfile(profileId, {
       Clothing: {
         ...profile?.Clothing,
-        Chest: null
-      }
+        Chest: null,
+      },
     });
 
     // Get the value without equipment

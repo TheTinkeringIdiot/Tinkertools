@@ -98,15 +98,16 @@ export function useSkills(options: UseSkillsOptions = {}) {
           data: skillData,
           name: skillService.getName(skillId),
           category: skillService.getCategory(skillId),
-          shortName: skillService.getShortName(skillId)
+          shortName: skillService.getShortName(skillId),
         });
-
       } catch (error) {
         console.warn(`[useSkills] Error processing skill ${skillIdStr}:`, error);
       }
     }
 
-    return results.sort((a, b) => skillService.getSortOrder(a.id) - skillService.getSortOrder(b.id));
+    return results.sort(
+      (a, b) => skillService.getSortOrder(a.id) - skillService.getSortOrder(b.id)
+    );
   });
 
   /**
@@ -173,14 +174,13 @@ export function useSkills(options: UseSkillsOptions = {}) {
             equipmentBonus: 0,
             perkBonus: 0,
             buffBonus: 0,
-            total: 0
+            total: 0,
           };
           results.push([skillId, defaultSkillData]);
         }
       }
 
       return results;
-
     } catch (error) {
       console.warn(`[useSkills] Failed to get skills for category "${category}":`, error);
       return [];
@@ -219,16 +219,18 @@ export function useSkills(options: UseSkillsOptions = {}) {
           if (skill.base > 0) components.push(`Base: ${skill.base}`);
           if (skill.trickle > 0) components.push(`Trickle: ${skill.trickle}`);
           if (skill.pointsFromIp > 0) components.push(`IP: ${skill.pointsFromIp}`);
-          if (skill.equipmentBonus !== 0) components.push(`Equip: ${skill.equipmentBonus > 0 ? '+' : ''}${skill.equipmentBonus}`);
-          if (skill.perkBonus !== 0) components.push(`Perks: ${skill.perkBonus > 0 ? '+' : ''}${skill.perkBonus}`);
-          if (skill.buffBonus !== 0) components.push(`Buffs: ${skill.buffBonus > 0 ? '+' : ''}${skill.buffBonus}`);
+          if (skill.equipmentBonus !== 0)
+            components.push(`Equip: ${skill.equipmentBonus > 0 ? '+' : ''}${skill.equipmentBonus}`);
+          if (skill.perkBonus !== 0)
+            components.push(`Perks: ${skill.perkBonus > 0 ? '+' : ''}${skill.perkBonus}`);
+          if (skill.buffBonus !== 0)
+            components.push(`Buffs: ${skill.buffBonus > 0 ? '+' : ''}${skill.buffBonus}`);
 
           return `${name}: ${skill.total} (${components.join(', ')})`;
 
         default:
           return `${name}: ${skill.total}`;
       }
-
     } catch (error) {
       console.warn(`[useSkills] Failed to format skill display for ID ${id}:`, error);
       return `Unknown Skill: ${skill.total}`;
@@ -305,7 +307,7 @@ export function useSkills(options: UseSkillsOptions = {}) {
 
     // Store integration
     activeProfile: computed(() => profilesStore.activeProfile),
-    hasActiveProfile: computed(() => !!profilesStore.activeProfile)
+    hasActiveProfile: computed(() => !!profilesStore.activeProfile),
   };
 }
 
@@ -316,6 +318,9 @@ export function useSkills(options: UseSkillsOptions = {}) {
  * @param options Additional options
  * @returns Category-specific skills composable
  */
-export function useSkillsCategory(category: string, options: Omit<UseSkillsOptions, 'category'> = {}) {
+export function useSkillsCategory(
+  category: string,
+  options: Omit<UseSkillsOptions, 'category'> = {}
+) {
   return useSkills({ ...options, category });
 }

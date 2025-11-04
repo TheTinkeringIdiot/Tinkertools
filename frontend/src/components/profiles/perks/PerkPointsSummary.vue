@@ -4,8 +4,9 @@ Shows point allocation for SL, AI, and LE perks in a space-efficient format
 -->
 <template>
   <div class="perk-points-summary">
-    <div class="flex flex-wrap items-center gap-4 p-3 bg-surface-50 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700">
-
+    <div
+      class="flex flex-wrap items-center gap-4 p-3 bg-surface-50 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700"
+    >
       <!-- SL Points -->
       <div class="flex items-center gap-3">
         <div class="flex items-center gap-2">
@@ -20,12 +21,15 @@ Shows point allocation for SL, AI, and LE perks in a space-efficient format
             :pt="{
               value: {
                 style: {
-                  background: slPercentage > 100 ? 'var(--red-500)' : 'var(--primary-500)'
-                }
-              }
+                  background: slPercentage > 100 ? 'var(--red-500)' : 'var(--primary-500)',
+                },
+              },
             }"
           />
-          <span class="text-sm font-medium" :class="slPointsUsed > maxSLPoints ? 'text-red-600 dark:text-red-400' : ''">
+          <span
+            class="text-sm font-medium"
+            :class="slPointsUsed > maxSLPoints ? 'text-red-600 dark:text-red-400' : ''"
+          >
             {{ slPointsUsed }}/{{ maxSLPoints }}
           </span>
         </div>
@@ -45,12 +49,15 @@ Shows point allocation for SL, AI, and LE perks in a space-efficient format
             :pt="{
               value: {
                 style: {
-                  background: aiPercentage > 100 ? 'var(--red-500)' : 'var(--cyan-500)'
-                }
-              }
+                  background: aiPercentage > 100 ? 'var(--red-500)' : 'var(--cyan-500)',
+                },
+              },
             }"
           />
-          <span class="text-sm font-medium" :class="aiPointsUsed > maxAIPoints ? 'text-red-600 dark:text-red-400' : ''">
+          <span
+            class="text-sm font-medium"
+            :class="aiPointsUsed > maxAIPoints ? 'text-red-600 dark:text-red-400' : ''"
+          >
             {{ aiPointsUsed }}/{{ maxAIPoints }}
           </span>
         </div>
@@ -62,11 +69,7 @@ Shows point allocation for SL, AI, and LE perks in a space-efficient format
           <i class="pi pi-book text-purple-500" aria-hidden="true"></i>
           <span class="font-semibold text-sm">LE Research:</span>
         </div>
-        <Badge
-          :value="`${researchCount} active`"
-          severity="info"
-          class="text-xs"
-        />
+        <Badge :value="`${researchCount} active`" severity="info" class="text-xs" />
       </div>
 
       <!-- Spacer -->
@@ -82,31 +85,31 @@ Shows point allocation for SL, AI, and LE perks in a space-efficient format
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import ProgressBar from 'primevue/progressbar'
-import Badge from 'primevue/badge'
+import { computed } from 'vue';
+import ProgressBar from 'primevue/progressbar';
+import Badge from 'primevue/badge';
 
 // Props
 const props = defineProps<{
-  slPointsUsed: number
-  maxSLPoints: number
-  aiPointsUsed: number
-  maxAIPoints: number
-  researchCount: number
-  characterLevel: number
-  alienLevel: number
-}>()
+  slPointsUsed: number;
+  maxSLPoints: number;
+  aiPointsUsed: number;
+  maxAIPoints: number;
+  researchCount: number;
+  characterLevel: number;
+  alienLevel: number;
+}>();
 
 // Computed percentages for progress bars
 const slPercentage = computed(() => {
-  if (props.maxSLPoints === 0) return 0
-  return Math.round((props.slPointsUsed / props.maxSLPoints) * 100)
-})
+  if (props.maxSLPoints === 0) return 0;
+  return Math.round((props.slPointsUsed / props.maxSLPoints) * 100);
+});
 
 const aiPercentage = computed(() => {
-  if (props.maxAIPoints === 0) return 0
-  return Math.round((props.aiPointsUsed / props.maxAIPoints) * 100)
-})
+  if (props.maxAIPoints === 0) return 0;
+  return Math.round((props.aiPointsUsed / props.maxAIPoints) * 100);
+});
 </script>
 
 <style scoped>

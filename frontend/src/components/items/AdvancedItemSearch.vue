@@ -10,7 +10,7 @@ Provides all advanced search capabilities including item class, slot, requiremen
         <i class="pi pi-search mr-2"></i>
         Advanced Search
       </h2>
-      
+
       <!-- Quick Actions -->
       <div class="flex gap-2">
         <Button
@@ -36,10 +36,8 @@ Provides all advanced search capabilities including item class, slot, requiremen
     <div class="flex-1 overflow-y-auto p-4 space-y-6">
       <!-- Item Name Search -->
       <div class="space-y-3">
-        <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300">
-          Item Name
-        </h3>
-        
+        <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300">Item Name</h3>
+
         <div class="space-y-2">
           <InputText
             v-model="searchForm.search"
@@ -47,7 +45,7 @@ Provides all advanced search capabilities including item class, slot, requiremen
             class="w-full"
             @keydown.enter="performSearch"
           />
-          
+
           <div class="grid grid-cols-2 gap-2">
             <Dropdown
               v-model="searchForm.matchType"
@@ -57,7 +55,7 @@ Provides all advanced search capabilities including item class, slot, requiremen
               placeholder="Match Type"
               class="w-full"
             />
-            
+
             <Dropdown
               v-model="searchForm.searchFields"
               :options="searchFieldOptions"
@@ -72,10 +70,8 @@ Provides all advanced search capabilities including item class, slot, requiremen
 
       <!-- Quality Level -->
       <div class="space-y-3">
-        <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300">
-          Quality Level
-        </h3>
-        
+        <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300">Quality Level</h3>
+
         <div class="grid grid-cols-2 gap-2">
           <div>
             <label class="block text-xs text-surface-600 dark:text-surface-400 mb-1">
@@ -102,7 +98,7 @@ Provides all advanced search capabilities including item class, slot, requiremen
             />
           </div>
         </div>
-        
+
         <!-- Quick QL Buttons -->
         <div class="flex flex-wrap gap-1">
           <Button
@@ -118,10 +114,8 @@ Provides all advanced search capabilities including item class, slot, requiremen
 
       <!-- Item Class and Slot -->
       <div class="space-y-3">
-        <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300">
-          Item Type
-        </h3>
-        
+        <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300">Item Type</h3>
+
         <div class="space-y-2">
           <div>
             <label class="block text-xs text-surface-600 dark:text-surface-400 mb-1">
@@ -137,7 +131,7 @@ Provides all advanced search capabilities including item class, slot, requiremen
               @change="onItemClassChange"
             />
           </div>
-          
+
           <div v-if="availableSlots.length > 0">
             <label class="block text-xs text-surface-600 dark:text-surface-400 mb-1">
               Equipment Slot
@@ -156,10 +150,8 @@ Provides all advanced search capabilities including item class, slot, requiremen
 
       <!-- Requirements -->
       <div class="space-y-3">
-        <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300">
-          Requirements
-        </h3>
-        
+        <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300">Requirements</h3>
+
         <div class="grid grid-cols-1 gap-2">
           <div>
             <label class="block text-xs text-surface-600 dark:text-surface-400 mb-1">
@@ -174,11 +166,9 @@ Provides all advanced search capabilities including item class, slot, requiremen
               class="w-full"
             />
           </div>
-          
+
           <div>
-            <label class="block text-xs text-surface-600 dark:text-surface-400 mb-1">
-              Breed
-            </label>
+            <label class="block text-xs text-surface-600 dark:text-surface-400 mb-1"> Breed </label>
             <Dropdown
               v-model="searchForm.breed"
               :options="breedOptions"
@@ -188,7 +178,7 @@ Provides all advanced search capabilities including item class, slot, requiremen
               class="w-full"
             />
           </div>
-          
+
           <div>
             <label class="block text-xs text-surface-600 dark:text-surface-400 mb-1">
               Gender
@@ -202,7 +192,7 @@ Provides all advanced search capabilities including item class, slot, requiremen
               class="w-full"
             />
           </div>
-          
+
           <div>
             <label class="block text-xs text-surface-600 dark:text-surface-400 mb-1">
               Faction
@@ -221,10 +211,8 @@ Provides all advanced search capabilities including item class, slot, requiremen
 
       <!-- Special Filters -->
       <div class="space-y-3">
-        <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300">
-          Special Filters
-        </h3>
-        
+        <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300">Special Filters</h3>
+
         <div class="space-y-2">
           <div class="flex items-center">
             <Checkbox
@@ -233,11 +221,9 @@ Provides all advanced search capabilities including item class, slot, requiremen
               input-id="froob-friendly"
               class="enhanced-checkbox"
             />
-            <label for="froob-friendly" class="ml-2 text-sm">
-              Froob Friendly
-            </label>
+            <label for="froob-friendly" class="ml-2 text-sm"> Froob Friendly </label>
           </div>
-          
+
           <div class="flex items-center">
             <Checkbox
               :key="`nodrop-${checkboxKey}`"
@@ -245,25 +231,17 @@ Provides all advanced search capabilities including item class, slot, requiremen
               input-id="nodrop"
               class="enhanced-checkbox"
             />
-            <label for="nodrop" class="ml-2 text-sm">
-              NoDrop
-            </label>
+            <label for="nodrop" class="ml-2 text-sm"> NoDrop </label>
           </div>
         </div>
       </div>
 
       <!-- Stat Bonuses -->
       <div class="space-y-3">
-        <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300">
-          Stat Bonuses
-        </h3>
-        
+        <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300">Stat Bonuses</h3>
+
         <div class="grid grid-cols-2 gap-2">
-          <div
-            v-for="stat in statBonusOptions"
-            :key="stat.value"
-            class="flex items-center"
-          >
+          <div v-for="stat in statBonusOptions" :key="stat.value" class="flex items-center">
             <Checkbox
               v-model="selectedStatBonuses"
               :value="stat.value"
@@ -280,9 +258,7 @@ Provides all advanced search capabilities including item class, slot, requiremen
       <!-- Stat Filters -->
       <div class="space-y-3">
         <div class="flex items-center justify-between">
-          <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300">
-            Stat Filters
-          </h3>
+          <h3 class="text-sm font-medium text-surface-700 dark:text-surface-300">Stat Filters</h3>
           <Button
             label="Add Filter"
             icon="pi pi-plus"
@@ -291,11 +267,14 @@ Provides all advanced search capabilities including item class, slot, requiremen
             @click="showStatFilterModal = true"
           />
         </div>
-        
-        <div v-if="statFilters.length === 0" class="text-sm text-surface-500 dark:text-surface-400 text-center py-4 border border-dashed border-surface-300 dark:border-surface-600 rounded">
+
+        <div
+          v-if="statFilters.length === 0"
+          class="text-sm text-surface-500 dark:text-surface-400 text-center py-4 border border-dashed border-surface-300 dark:border-surface-600 rounded"
+        >
           No stat filters added. Click "Add Filter" to search by stat requirements or modifications.
         </div>
-        
+
         <div v-else class="space-y-2">
           <StatFilterCard
             v-for="(filter, index) in statFilters"
@@ -304,7 +283,7 @@ Provides all advanced search capabilities including item class, slot, requiremen
             @remove="removeStatFilter(index)"
           />
         </div>
-        
+
         <div v-if="statFilters.length > 0" class="text-xs text-surface-500 dark:text-surface-400">
           <div class="flex items-center gap-1">
             <i class="pi pi-info-circle"></i>
@@ -334,19 +313,16 @@ Provides all advanced search capabilities including item class, slot, requiremen
     </div>
 
     <!-- Stat Filter Modal -->
-    <StatFilterModal
-      v-model:visible="showStatFilterModal"
-      @add-filter="addStatFilter"
-    />
+    <StatFilterModal v-model:visible="showStatFilterModal" @add-filter="addStatFilter" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
-import type { ItemSearchQuery, StatFilter } from '@/types/api'
-import StatFilterModal from './StatFilterModal.vue'
-import StatFilterCard from './StatFilterCard.vue'
-import { useItemsStore } from '@/stores/items'
+import { ref, computed, watch, onMounted, nextTick } from 'vue';
+import type { ItemSearchQuery, StatFilter } from '@/types/api';
+import StatFilterModal from './StatFilterModal.vue';
+import StatFilterCard from './StatFilterCard.vue';
+import { useItemsStore } from '@/stores/items';
 import {
   ITEM_CLASS,
   WEAPON_SLOT_POSITIONS,
@@ -355,69 +331,69 @@ import {
   PROFESSION,
   BREED,
   GENDER,
-  FACTION
-} from '@/services/game-data'
+  FACTION,
+} from '@/services/game-data';
 
 interface SearchFormData {
-  search: string
-  matchType: string
-  searchFields: string
-  min_ql?: number
-  max_ql?: number
-  item_class?: number
-  slot?: number
-  profession?: number
-  breed?: number
-  gender?: number
-  faction?: number
-  froob_friendly?: boolean
-  nodrop?: boolean
+  search: string;
+  matchType: string;
+  searchFields: string;
+  min_ql?: number;
+  max_ql?: number;
+  item_class?: number;
+  slot?: number;
+  profession?: number;
+  breed?: number;
+  gender?: number;
+  faction?: number;
+  froob_friendly?: boolean;
+  nodrop?: boolean;
 }
 
 const props = defineProps<{
-  loading?: boolean
-  resultCount?: number
-}>()
+  loading?: boolean;
+  resultCount?: number;
+}>();
 
 const emit = defineEmits<{
-  search: [query: ItemSearchQuery]
-  clear: []
-}>()
+  search: [query: ItemSearchQuery];
+  clear: [];
+}>();
 
 // Form state
 const searchForm = ref<SearchFormData>({
   search: '',
   matchType: 'exact',
-  searchFields: 'both'
-})
+  searchFields: 'both',
+});
 
-const selectedStatBonuses = ref<number[]>([])
-const statFilters = ref<StatFilter[]>([])
-const hasSearched = ref(false)
-const checkboxKey = ref(0) // Used to force checkbox re-render
-const showStatFilterModal = ref(false)
+const selectedStatBonuses = ref<number[]>([]);
+const statFilters = ref<StatFilter[]>([]);
+const hasSearched = ref(false);
+const checkboxKey = ref(0); // Used to force checkbox re-render
+const showStatFilterModal = ref(false);
 
 // Store
-const itemsStore = useItemsStore()
+const itemsStore = useItemsStore();
 
 // Options
 const matchTypeOptions = [
   { label: 'Exact Match', value: 'exact' },
-  { label: 'Fuzzy Search', value: 'fuzzy' }
-]
+  { label: 'Fuzzy Search', value: 'fuzzy' },
+];
 
 const searchFieldOptions = [
   { label: 'Both', value: 'both' },
   { label: 'Item Name', value: 'name' },
-  { label: 'Description', value: 'description' }
-]
+  { label: 'Description', value: 'description' },
+];
 
 const quickQLRanges = [
   { label: '1-50', min: 1, max: 50 },
   { label: '51-100', min: 51, max: 100 },
   { label: '101-200', min: 101, max: 200 },
-  { label: '201-300', min: 201, max: 300 }
-]
+  { label: '201-300', min: 201, max: 300 },
+];
 
 const itemClassOptions = [
   { label: 'Any', value: 0 },
@@ -425,9 +401,9 @@ const itemClassOptions = [
     .filter(([key]) => key !== '0')
     .map(([key, value]) => ({
       label: value,
-      value: parseInt(key)
-    }))
-]
+      value: parseInt(key),
+    })),
+];
 
 const professionOptions = [
   { label: 'Any', value: 0 },
@@ -435,9 +411,9 @@ const professionOptions = [
     .filter(([key]) => key !== '0')
     .map(([key, value]) => ({
       label: value,
-      value: parseInt(key)
-    }))
-]
+      value: parseInt(key),
+    })),
+];
 
 const breedOptions = [
   { label: 'Any', value: 0 },
@@ -445,9 +421,9 @@ const breedOptions = [
     .filter(([key]) => key !== '0')
     .map(([key, value]) => ({
       label: value,
-      value: parseInt(key)
-    }))
-]
+      value: parseInt(key),
+    })),
+];
 
 const genderOptions = [
   { label: 'Any', value: 0 },
@@ -455,9 +431,9 @@ const genderOptions = [
     .filter(([key]) => key !== '0')
     .map(([key, value]) => ({
       label: value,
-      value: parseInt(key)
-    }))
-]
+      value: parseInt(key),
+    })),
+];
 
 const factionOptions = [
   { label: 'Any', value: 0 },
@@ -465,9 +441,9 @@ const factionOptions = [
     .filter(([key]) => key !== '0')
     .map(([key, value]) => ({
       label: value,
-      value: parseInt(key)
-    }))
-]
+      value: parseInt(key),
+    })),
+];
 
 const statBonusOptions = [
   { label: 'Strength', value: 16 },
@@ -477,8 +453,8 @@ const statBonusOptions = [
   { label: 'Sense', value: 20 },
   { label: 'Psychic', value: 21 },
   { label: 'Treatment', value: 124 },
-  { label: 'CompLit', value: 161 }
-]
+  { label: 'CompLit', value: 161 },
+];
 
 // Computed properties
 const hasSearchCriteria = computed(() => {
@@ -496,28 +472,28 @@ const hasSearchCriteria = computed(() => {
     searchForm.value.nodrop ||
     selectedStatBonuses.value.length > 0 ||
     statFilters.value.length > 0
-  )
-})
+  );
+});
 
 const availableSlots = computed(() => {
   if (!searchForm.value.item_class || searchForm.value.item_class === 0) {
-    return []
+    return [];
   }
 
-  let slots: Record<string, string> = {}
-  
+  let slots: Record<string, string> = {};
+
   switch (searchForm.value.item_class) {
     case 1: // Weapon
-      slots = WEAPON_SLOT_POSITIONS
-      break
+      slots = WEAPON_SLOT_POSITIONS;
+      break;
     case 2: // Armor
-      slots = ARMOR_SLOT_POSITION
-      break
+      slots = ARMOR_SLOT_POSITION;
+      break;
     case 3: // Implant
-      slots = IMPLANT_SLOT_POSITION
-      break
+      slots = IMPLANT_SLOT_POSITION;
+      break;
     default:
-      return []
+      return [];
   }
 
   return [
@@ -526,227 +502,235 @@ const availableSlots = computed(() => {
       .filter(([key]) => key !== '0')
       .map(([key, value]) => ({
         label: value,
-        value: parseInt(key)
-      }))
-  ]
-})
+        value: parseInt(key),
+      })),
+  ];
+});
 
 // Methods
 function performSearch() {
-  const query: ItemSearchQuery = {}
-  
+  const query: ItemSearchQuery = {};
+
   // Basic search
   if (searchForm.value.search?.trim()) {
-    query.search = searchForm.value.search.trim()
-    query.exact_match = searchForm.value.matchType === 'exact'
-    
+    query.search = searchForm.value.search.trim();
+    query.exact_match = searchForm.value.matchType === 'exact';
+
     // Set search fields
     if (searchForm.value.searchFields === 'name') {
-      query.search_fields = ['name']
+      query.search_fields = ['name'];
     } else if (searchForm.value.searchFields === 'description') {
-      query.search_fields = ['description']
+      query.search_fields = ['description'];
     } else {
-      query.search_fields = ['name', 'description']
+      query.search_fields = ['name', 'description'];
     }
   }
-  
+
   // Quality level
-  if (searchForm.value.min_ql) query.min_ql = searchForm.value.min_ql
-  if (searchForm.value.max_ql) query.max_ql = searchForm.value.max_ql
-  
+  if (searchForm.value.min_ql) query.min_ql = searchForm.value.min_ql;
+  if (searchForm.value.max_ql) query.max_ql = searchForm.value.max_ql;
+
   // Item class and slot
   if (searchForm.value.item_class && searchForm.value.item_class > 0) {
-    query.item_class = searchForm.value.item_class
+    query.item_class = searchForm.value.item_class;
   }
   if (searchForm.value.slot && searchForm.value.slot > 0) {
-    query.slot = searchForm.value.slot
+    query.slot = searchForm.value.slot;
   }
-  
+
   // Requirements
   if (searchForm.value.profession && searchForm.value.profession > 0) {
-    query.profession = searchForm.value.profession
+    query.profession = searchForm.value.profession;
   }
   if (searchForm.value.breed && searchForm.value.breed > 0) {
-    query.breed = searchForm.value.breed
+    query.breed = searchForm.value.breed;
   }
   if (searchForm.value.gender && searchForm.value.gender > 0) {
-    query.gender = searchForm.value.gender
+    query.gender = searchForm.value.gender;
   }
   if (searchForm.value.faction && searchForm.value.faction > 0) {
-    query.faction = searchForm.value.faction
+    query.faction = searchForm.value.faction;
   }
-  
+
   // Special filters
   if (searchForm.value.froob_friendly) {
-    query.froob_friendly = true
+    query.froob_friendly = true;
   }
   if (searchForm.value.nodrop) {
-    query.nodrop = true
+    query.nodrop = true;
   }
-  
+
   // Stat bonuses
   if (selectedStatBonuses.value.length > 0) {
-    query.stat_bonuses = [...selectedStatBonuses.value]
+    query.stat_bonuses = [...selectedStatBonuses.value];
   }
-  
+
   // Stat filters
   if (statFilters.value.length > 0) {
     // Only include complete filters (all fields filled)
-    const completeFilters = statFilters.value.filter(filter => 
-      filter.function && 
-      filter.stat !== undefined && 
-      filter.operator && 
-      filter.value !== undefined
-    )
+    const completeFilters = statFilters.value.filter(
+      (filter) =>
+        filter.function &&
+        filter.stat !== undefined &&
+        filter.operator &&
+        filter.value !== undefined
+    );
     if (completeFilters.length > 0) {
-      query.stat_filters = completeFilters
+      query.stat_filters = completeFilters;
     }
   }
-  
-  hasSearched.value = true
-  emit('search', query)
+
+  hasSearched.value = true;
+  emit('search', query);
 }
 
 function clearAll() {
   searchForm.value = {
     search: '',
     matchType: 'exact',
-    searchFields: 'both'
-  }
-  selectedStatBonuses.value = []
-  statFilters.value = []
-  hasSearched.value = false
-  emit('clear')
+    searchFields: 'both',
+  };
+  selectedStatBonuses.value = [];
+  statFilters.value = [];
+  hasSearched.value = false;
+  emit('clear');
 }
 
 async function restoreSearchState() {
-  const storedQuery = itemsStore.currentSearchQuery
-  if (!storedQuery) return
-  
-  console.log('Restoring search state, stored query:', storedQuery)
-  
+  const storedQuery = itemsStore.currentSearchQuery;
+  if (!storedQuery) return;
+
+  console.log('Restoring search state, stored query:', storedQuery);
+
   // Restore basic search fields
   if (storedQuery.search) {
-    searchForm.value.search = storedQuery.search
-    searchForm.value.matchType = storedQuery.exact_match ? 'exact' : 'fuzzy'
-    
+    searchForm.value.search = storedQuery.search;
+    searchForm.value.matchType = storedQuery.exact_match ? 'exact' : 'fuzzy';
+
     // Determine search fields
     if (storedQuery.search_fields) {
       if (storedQuery.search_fields.length === 1) {
-        searchForm.value.searchFields = storedQuery.search_fields[0]
+        searchForm.value.searchFields = storedQuery.search_fields[0];
       } else {
-        searchForm.value.searchFields = 'both'
+        searchForm.value.searchFields = 'both';
       }
     }
   }
-  
+
   // Restore quality level
-  if (storedQuery.min_ql) searchForm.value.min_ql = storedQuery.min_ql
-  if (storedQuery.max_ql) searchForm.value.max_ql = storedQuery.max_ql
-  
+  if (storedQuery.min_ql) searchForm.value.min_ql = storedQuery.min_ql;
+  if (storedQuery.max_ql) searchForm.value.max_ql = storedQuery.max_ql;
+
   // Restore item class and slot
-  if (storedQuery.item_class) searchForm.value.item_class = storedQuery.item_class
-  if (storedQuery.slot) searchForm.value.slot = storedQuery.slot
-  
+  if (storedQuery.item_class) searchForm.value.item_class = storedQuery.item_class;
+  if (storedQuery.slot) searchForm.value.slot = storedQuery.slot;
+
   // Restore requirements
-  if (storedQuery.profession) searchForm.value.profession = storedQuery.profession
-  if (storedQuery.breed) searchForm.value.breed = storedQuery.breed
-  if (storedQuery.gender) searchForm.value.gender = storedQuery.gender
-  if (storedQuery.faction) searchForm.value.faction = storedQuery.faction
-  
+  if (storedQuery.profession) searchForm.value.profession = storedQuery.profession;
+  if (storedQuery.breed) searchForm.value.breed = storedQuery.breed;
+  if (storedQuery.gender) searchForm.value.gender = storedQuery.gender;
+  if (storedQuery.faction) searchForm.value.faction = storedQuery.faction;
+
   // Restore special filters using key-based component re-rendering
-  console.log('Froob friendly in stored query:', storedQuery.froob_friendly, typeof storedQuery.froob_friendly)
+  console.log(
+    'Froob friendly in stored query:',
+    storedQuery.froob_friendly,
+    typeof storedQuery.froob_friendly
+  );
   if (storedQuery.froob_friendly !== undefined) {
-    searchForm.value.froob_friendly = storedQuery.froob_friendly
-    console.log('Set froob_friendly to:', searchForm.value.froob_friendly)
+    searchForm.value.froob_friendly = storedQuery.froob_friendly;
+    console.log('Set froob_friendly to:', searchForm.value.froob_friendly);
   }
   if (storedQuery.nodrop !== undefined) {
-    searchForm.value.nodrop = storedQuery.nodrop
+    searchForm.value.nodrop = storedQuery.nodrop;
   }
-  
+
   // Force checkbox components to re-render with updated state
-  checkboxKey.value++
-  
+  checkboxKey.value++;
+
   // Restore stat bonuses
   if (storedQuery.stat_bonuses && Array.isArray(storedQuery.stat_bonuses)) {
-    selectedStatBonuses.value = storedQuery.stat_bonuses
+    selectedStatBonuses.value = storedQuery.stat_bonuses;
   }
-  
+
   // Restore stat filters
   if (storedQuery.stat_filters && Array.isArray(storedQuery.stat_filters)) {
-    statFilters.value = storedQuery.stat_filters.map(filter => ({ ...filter }))
+    statFilters.value = storedQuery.stat_filters.map((filter) => ({ ...filter }));
   }
-  
+
   // Mark as having searched if we restored any criteria
-  hasSearched.value = true
-  
-  console.log('Final searchForm after restoration:', searchForm.value)
-  
+  hasSearched.value = true;
+
+  console.log('Final searchForm after restoration:', searchForm.value);
+
   // Wait for component re-render and force DOM sync
-  await nextTick()
-  console.log('Components re-rendered with new key, checkbox should be updated')
-  
+  await nextTick();
+  console.log('Components re-rendered with new key, checkbox should be updated');
+
   // Additional DOM sync for checkboxes after component re-render
-  await nextTick()
+  await nextTick();
   if (storedQuery.froob_friendly) {
-    const froobCheckbox = document.querySelector('#froob-friendly')
+    const froobCheckbox = document.querySelector('#froob-friendly');
     if (froobCheckbox && !froobCheckbox.checked) {
-      froobCheckbox.checked = true
-      console.log('Manually synced froob checkbox to DOM')
+      froobCheckbox.checked = true;
+      console.log('Manually synced froob checkbox to DOM');
     }
   }
   if (storedQuery.nodrop) {
-    const nodropCheckbox = document.querySelector('#nodrop')
+    const nodropCheckbox = document.querySelector('#nodrop');
     if (nodropCheckbox && !nodropCheckbox.checked) {
-      nodropCheckbox.checked = true
-      console.log('Manually synced nodrop checkbox to DOM')
+      nodropCheckbox.checked = true;
+      console.log('Manually synced nodrop checkbox to DOM');
     }
   }
 }
 
 function setQLRange(min: number, max: number) {
-  searchForm.value.min_ql = min
-  searchForm.value.max_ql = max
+  searchForm.value.min_ql = min;
+  searchForm.value.max_ql = max;
 }
 
 function onItemClassChange() {
   // Clear slot when item class changes
-  searchForm.value.slot = undefined
+  searchForm.value.slot = undefined;
 }
 
 function saveSearch() {
   // TODO: Implement saved searches functionality
-  console.log('Save search functionality not yet implemented')
+  console.log('Save search functionality not yet implemented');
 }
 
 // Stat filter management methods
 function addStatFilter(filter: StatFilter) {
-  statFilters.value.push({ ...filter })
+  statFilters.value.push({ ...filter });
 }
 
 function removeStatFilter(index: number) {
   if (index >= 0 && index < statFilters.value.length) {
-    statFilters.value.splice(index, 1)
+    statFilters.value.splice(index, 1);
   }
 }
 
 // Watch for item class changes to clear slot
-watch(() => searchForm.value.item_class, () => {
-  searchForm.value.slot = undefined
-})
+watch(
+  () => searchForm.value.item_class,
+  () => {
+    searchForm.value.slot = undefined;
+  }
+);
 
 // Restore search state on mount
 onMounted(async () => {
-  await restoreSearchState()
-})
+  await restoreSearchState();
+});
 
 // Expose for tests
 defineExpose({
   searchForm,
   selectedStatBonuses,
   hasSearchCriteria,
-  hasSearched
-})
+  hasSearched,
+});
 </script>
 
 <style scoped>

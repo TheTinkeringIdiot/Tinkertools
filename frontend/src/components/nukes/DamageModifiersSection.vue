@@ -1,11 +1,18 @@
 <template>
-  <div class="bg-surface-0 dark:bg-surface-950 rounded-lg shadow-md dark:shadow-none border border-surface-200 dark:border-surface-700 p-6">
-    <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4">Damage Modifiers</h3>
+  <div
+    class="bg-surface-0 dark:bg-surface-950 rounded-lg shadow-md dark:shadow-none border border-surface-200 dark:border-surface-700 p-6"
+  >
+    <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4">
+      Damage Modifiers
+    </h3>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       <!-- Direct Nano Damage Efficiency (stat 536) - Display Only -->
       <div class="flex flex-col">
-        <label for="dnde" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="dnde"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Direct Nano Damage Efficiency
         </label>
         <InputNumber
@@ -25,7 +32,10 @@
 
       <!-- Projectile Damage Modifier (stat 278) -->
       <div class="flex flex-col">
-        <label for="projectile" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="projectile"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Projectile Damage Modifier
         </label>
         <InputNumber
@@ -40,7 +50,10 @@
 
       <!-- Melee Damage Modifier (stat 279) -->
       <div class="flex flex-col">
-        <label for="melee" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="melee"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Melee Damage Modifier
         </label>
         <InputNumber
@@ -55,7 +68,10 @@
 
       <!-- Energy Damage Modifier (stat 280) -->
       <div class="flex flex-col">
-        <label for="energy" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="energy"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Energy Damage Modifier
         </label>
         <InputNumber
@@ -70,7 +86,10 @@
 
       <!-- Chemical Damage Modifier (stat 281) -->
       <div class="flex flex-col">
-        <label for="chemical" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="chemical"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Chemical Damage Modifier
         </label>
         <InputNumber
@@ -85,7 +104,10 @@
 
       <!-- Radiation Damage Modifier (stat 282) -->
       <div class="flex flex-col">
-        <label for="radiation" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="radiation"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Radiation Damage Modifier
         </label>
         <InputNumber
@@ -100,7 +122,10 @@
 
       <!-- Cold Damage Modifier (stat 311) -->
       <div class="flex flex-col">
-        <label for="cold" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="cold"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Cold Damage Modifier
         </label>
         <InputNumber
@@ -115,7 +140,10 @@
 
       <!-- Nano Damage Modifier (stat 315) -->
       <div class="flex flex-col">
-        <label for="nano" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="nano"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Nano Damage Modifier
         </label>
         <InputNumber
@@ -130,7 +158,10 @@
 
       <!-- Fire Damage Modifier (stat 316) -->
       <div class="flex flex-col">
-        <label for="fire" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="fire"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Fire Damage Modifier
         </label>
         <InputNumber
@@ -145,7 +176,10 @@
 
       <!-- Poison Damage Modifier (stat 317) -->
       <div class="flex flex-col">
-        <label for="poison" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="poison"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Poison Damage Modifier
         </label>
         <InputNumber
@@ -160,7 +194,10 @@
 
       <!-- Target AC -->
       <div class="flex flex-col">
-        <label for="targetAC" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="targetAC"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Target AC
         </label>
         <InputNumber
@@ -177,85 +214,85 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import InputNumber from 'primevue/inputnumber'
-import type { DamageModifiers } from '@/types/offensive-nano'
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types'
-import { ENHANCE_NANO_DAMAGE, ANCIENT_MATRIX_DAMAGE } from '@/utils/nuke-regen-calculations'
+import { ref, computed, watch } from 'vue';
+import InputNumber from 'primevue/inputnumber';
+import type { DamageModifiers } from '@/types/offensive-nano';
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import { ENHANCE_NANO_DAMAGE, ANCIENT_MATRIX_DAMAGE } from '@/utils/nuke-regen-calculations';
 
 interface Props {
-  damageModifiers: DamageModifiers
-  enhanceNanoDamage: number  // 0-6 from buff dropdown
-  ancientMatrix: number       // 0-10 from buff dropdown
-  profile?: TinkerProfile | null // TinkerProfile for accessing skill 536 base value and damage modifiers
+  damageModifiers: DamageModifiers;
+  enhanceNanoDamage: number; // 0-6 from buff dropdown
+  ancientMatrix: number; // 0-10 from buff dropdown
+  profile?: TinkerProfile | null; // TinkerProfile for accessing skill 536 base value and damage modifiers
 }
 
 interface Emits {
-  (e: 'update:damageModifiers', modifiers: DamageModifiers): void
+  (e: 'update:damageModifiers', modifiers: DamageModifiers): void;
 }
 
-const props = defineProps<Props>()
-const emit = defineEmits<Emits>()
+const props = defineProps<Props>();
+const emit = defineEmits<Emits>();
 
 // Local state for modifiers
-const localModifiers = ref<DamageModifiers>({ ...props.damageModifiers })
+const localModifiers = ref<DamageModifiers>({ ...props.damageModifiers });
 
 // Flags for preventing watcher loops
-const isProgrammaticUpdate = ref(false)
+const isProgrammaticUpdate = ref(false);
 
 // Computed property for stat 536: baseValue + enhanceNanoDamage + ancientMatrix
 // Per FR-9: baseValue comes from profile.skills[536].total if profile exists, else 0
 const directNanoDamageEfficiency = computed(() => {
-  const baseValue = props.profile?.skills?.[536]?.total || 0
-  const enhanceBonus = ENHANCE_NANO_DAMAGE[props.enhanceNanoDamage] || 0
-  const ancientBonus = ANCIENT_MATRIX_DAMAGE[props.ancientMatrix] || 0
+  const baseValue = props.profile?.skills?.[536]?.total || 0;
+  const enhanceBonus = ENHANCE_NANO_DAMAGE[props.enhanceNanoDamage] || 0;
+  const ancientBonus = ANCIENT_MATRIX_DAMAGE[props.ancientMatrix] || 0;
 
-  const total = baseValue + enhanceBonus + ancientBonus
+  const total = baseValue + enhanceBonus + ancientBonus;
 
   // Return formatted with 2 decimal places for display
-  return Number(total.toFixed(2))
-})
+  return Number(total.toFixed(2));
+});
 
 /**
  * Auto-populate damage modifiers from active profile
  */
 function populateFromProfile(): void {
   if (!props.profile?.skills) {
-    return
+    return;
   }
 
-  isProgrammaticUpdate.value = true
+  isProgrammaticUpdate.value = true;
 
-  const skills = props.profile.skills
+  const skills = props.profile.skills;
 
   // Map stat IDs to damage modifier values
   // Only update if profile has non-zero values
   if (skills[278]?.total !== undefined) {
-    localModifiers.value.projectile = skills[278].total
+    localModifiers.value.projectile = skills[278].total;
   }
   if (skills[279]?.total !== undefined) {
-    localModifiers.value.melee = skills[279].total
+    localModifiers.value.melee = skills[279].total;
   }
   if (skills[280]?.total !== undefined) {
-    localModifiers.value.energy = skills[280].total
+    localModifiers.value.energy = skills[280].total;
   }
   if (skills[281]?.total !== undefined) {
-    localModifiers.value.chemical = skills[281].total
+    localModifiers.value.chemical = skills[281].total;
   }
   if (skills[282]?.total !== undefined) {
-    localModifiers.value.radiation = skills[282].total
+    localModifiers.value.radiation = skills[282].total;
   }
   if (skills[311]?.total !== undefined) {
-    localModifiers.value.cold = skills[311].total
+    localModifiers.value.cold = skills[311].total;
   }
   if (skills[315]?.total !== undefined) {
-    localModifiers.value.nano = skills[315].total
+    localModifiers.value.nano = skills[315].total;
   }
   if (skills[316]?.total !== undefined) {
-    localModifiers.value.fire = skills[316].total
+    localModifiers.value.fire = skills[316].total;
   }
   if (skills[317]?.total !== undefined) {
-    localModifiers.value.poison = skills[317].total
+    localModifiers.value.poison = skills[317].total;
   }
 
   // Target AC defaults to 0, not from profile
@@ -264,11 +301,11 @@ function populateFromProfile(): void {
   // Emit updated values with auto-calculated stat 536
   const updatedModifiers: DamageModifiers = {
     ...localModifiers.value,
-    directNanoDamageEfficiency: directNanoDamageEfficiency.value
-  }
-  emit('update:damageModifiers', updatedModifiers)
+    directNanoDamageEfficiency: directNanoDamageEfficiency.value,
+  };
+  emit('update:damageModifiers', updatedModifiers);
 
-  isProgrammaticUpdate.value = false
+  isProgrammaticUpdate.value = false;
 }
 
 /**
@@ -277,19 +314,19 @@ function populateFromProfile(): void {
 function updateModifier(field: keyof DamageModifiers, value: number | null): void {
   // Prevent emission during programmatic updates
   if (isProgrammaticUpdate.value) {
-    return
+    return;
   }
 
   if (value !== null && value >= 0) {
-    localModifiers.value[field] = value as never
+    localModifiers.value[field] = value as never;
 
     // Emit complete modifiers with computed DNDE
     const updatedModifiers: DamageModifiers = {
       ...localModifiers.value,
-      directNanoDamageEfficiency: directNanoDamageEfficiency.value
-    }
+      directNanoDamageEfficiency: directNanoDamageEfficiency.value,
+    };
 
-    emit('update:damageModifiers', updatedModifiers)
+    emit('update:damageModifiers', updatedModifiers);
   }
 }
 
@@ -297,10 +334,10 @@ function updateModifier(field: keyof DamageModifiers, value: number | null): voi
 watch(
   () => props.profile?.skills,
   () => {
-    populateFromProfile()
+    populateFromProfile();
   },
   { immediate: true, deep: true }
-)
+);
 
 // Watch for buff changes to recalculate stat 536 and re-emit
 watch(
@@ -310,11 +347,11 @@ watch(
     if (!isProgrammaticUpdate.value) {
       const updatedModifiers: DamageModifiers = {
         ...localModifiers.value,
-        directNanoDamageEfficiency: directNanoDamageEfficiency.value
-      }
-      emit('update:damageModifiers', updatedModifiers)
+        directNanoDamageEfficiency: directNanoDamageEfficiency.value,
+      };
+      emit('update:damageModifiers', updatedModifiers);
     }
   },
   { deep: true }
-)
+);
 </script>

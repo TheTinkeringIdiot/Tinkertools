@@ -17,9 +17,7 @@ interface KeyboardNavigationOptions {
   onActivate?: (index: number, element: HTMLElement) => void;
 }
 
-export function useKeyboardNavigation(
-  options: KeyboardNavigationOptions = {}
-) {
+export function useKeyboardNavigation(options: KeyboardNavigationOptions = {}) {
   const {
     itemSelector = '[data-keyboard-nav-item]',
     containerSelector = '[data-keyboard-nav-container]',
@@ -27,20 +25,16 @@ export function useKeyboardNavigation(
     enableEscape = false,
     onEscape,
     enableActivation = false,
-    onActivate
+    onActivate,
   } = options;
 
   let currentIndex = -1;
   let items: HTMLElement[] = [];
 
   const updateItems = () => {
-    const container = containerSelector 
-      ? document.querySelector(containerSelector) 
-      : document;
-    
-    items = Array.from(
-      container?.querySelectorAll(itemSelector) || []
-    ) as HTMLElement[];
+    const container = containerSelector ? document.querySelector(containerSelector) : document;
+
+    items = Array.from(container?.querySelectorAll(itemSelector) || []) as HTMLElement[];
   };
 
   const setFocus = (index: number) => {
@@ -52,7 +46,7 @@ export function useKeyboardNavigation(
 
   const moveFocus = (direction: 'next' | 'previous' | 'first' | 'last') => {
     updateItems();
-    
+
     if (items.length === 0) return;
 
     let newIndex = currentIndex;
@@ -64,18 +58,18 @@ export function useKeyboardNavigation(
           newIndex = loop ? 0 : items.length - 1;
         }
         break;
-      
+
       case 'previous':
         newIndex = currentIndex - 1;
         if (newIndex < 0) {
           newIndex = loop ? items.length - 1 : 0;
         }
         break;
-      
+
       case 'first':
         newIndex = 0;
         break;
-      
+
       case 'last':
         newIndex = items.length - 1;
         break;
@@ -102,30 +96,30 @@ export function useKeyboardNavigation(
         event.preventDefault();
         moveFocus('next');
         break;
-      
+
       case 'ArrowUp':
       case 'ArrowLeft':
         event.preventDefault();
         moveFocus('previous');
         break;
-      
+
       case 'Home':
         event.preventDefault();
         moveFocus('first');
         break;
-      
+
       case 'End':
         event.preventDefault();
         moveFocus('last');
         break;
-      
+
       case 'Escape':
         if (enableEscape && onEscape) {
           event.preventDefault();
           onEscape();
         }
         break;
-      
+
       case 'Enter':
       case ' ':
         if (enableActivation && onActivate && currentIndex >= 0) {
@@ -165,7 +159,7 @@ export function useKeyboardNavigation(
     focusFirst,
     focusLast,
     focusItem,
-    updateItems
+    updateItems,
   };
 }
 
@@ -186,7 +180,7 @@ export function useTableKeyboardNavigation(
     enableEscape: true,
     enableActivation: true,
     onEscape,
-    onActivate: onRowActivate
+    onActivate: onRowActivate,
   });
 }
 
@@ -206,6 +200,6 @@ export function useMenuKeyboardNavigation(
     enableEscape: true,
     enableActivation: true,
     onEscape,
-    onActivate: onItemActivate
+    onActivate: onItemActivate,
   });
 }

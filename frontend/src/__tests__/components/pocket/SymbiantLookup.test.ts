@@ -10,54 +10,54 @@ import type { Symbiant, PocketBoss } from '@/types/api';
 
 // Mock PrimeVue components
 vi.mock('primevue/card', () => ({
-  default: { template: '<div class="mock-card"><slot name="content"></slot></div>' }
+  default: { template: '<div class="mock-card"><slot name="content"></slot></div>' },
 }));
 
 vi.mock('primevue/inputtext', () => ({
-  default: { template: '<input class="mock-inputtext" v-bind="$attrs" />' }
+  default: { template: '<input class="mock-inputtext" v-bind="$attrs" />' },
 }));
 
 vi.mock('primevue/multiselect', () => ({
-  default: { template: '<select multiple class="mock-multiselect" v-bind="$attrs"></select>' }
+  default: { template: '<select multiple class="mock-multiselect" v-bind="$attrs"></select>' },
 }));
 
 vi.mock('primevue/dropdown', () => ({
-  default: { template: '<select class="mock-dropdown" v-bind="$attrs"></select>' }
+  default: { template: '<select class="mock-dropdown" v-bind="$attrs"></select>' },
 }));
 
 vi.mock('primevue/button', () => ({
-  default: { template: '<button class="mock-button" v-bind="$attrs"><slot></slot></button>' }
+  default: { template: '<button class="mock-button" v-bind="$attrs"><slot></slot></button>' },
 }));
 
 vi.mock('primevue/dataview', () => ({
-  default: { 
+  default: {
     template: `
       <div class="mock-dataview">
         <slot name="empty" v-if="!value || value.length === 0"></slot>
         <slot name="grid" v-else :items="value"></slot>
       </div>
     `,
-    props: ['value', 'layout', 'paginator', 'rows', 'rowsPerPageOptions']
-  }
+    props: ['value', 'layout', 'paginator', 'rows', 'rowsPerPageOptions'],
+  },
 }));
 
 vi.mock('primevue/tag', () => ({
-  default: { 
+  default: {
     template: '<span class="mock-tag" :class="`severity-${severity}`">{{ value }}</span>',
-    props: ['value', 'severity']
-  }
+    props: ['value', 'severity'],
+  },
 }));
 
 vi.mock('primevue/dialog', () => ({
-  default: { 
+  default: {
     template: `
       <div class="mock-dialog" v-if="visible">
         <slot name="header"></slot>
         <slot></slot>
       </div>
     `,
-    props: ['visible']
-  }
+    props: ['visible'],
+  },
 }));
 
 describe('SymbiantLookup', () => {
@@ -72,7 +72,7 @@ describe('SymbiantLookup', () => {
       name: 'Artillery Symbiant',
       slot: 'Head',
       ql: 150,
-      family: 'Artillery'
+      family: 'Artillery',
     },
     {
       id: 2,
@@ -80,8 +80,8 @@ describe('SymbiantLookup', () => {
       name: 'Control Symbiant',
       slot: 'Chest',
       ql: 200,
-      family: 'Control'
-    }
+      family: 'Control',
+    },
   ];
 
   const mockBosses: PocketBoss[] = [
@@ -90,8 +90,8 @@ describe('SymbiantLookup', () => {
       name: 'Test Boss 1',
       level: 100,
       playfield: 'Nascence',
-      dropped_symbiants: [mockSymbiants[0]]
-    }
+      dropped_symbiants: [mockSymbiants[0]],
+    },
   ];
 
   beforeEach(() => {
@@ -102,28 +102,26 @@ describe('SymbiantLookup', () => {
             createSpy: vi.fn,
             initialState: {
               symbiants: {
-                symbiants: new Map(mockSymbiants.map(s => [s.id, s])),
+                symbiants: new Map(mockSymbiants.map((s) => [s.id, s])),
                 loading: false,
-                error: null
+                error: null,
               },
               pocketBoss: {
-                pocketBosses: mockBosses
-              }
-            }
+                pocketBosses: mockBosses,
+              },
+            },
           }),
-          PrimeVue
-        ]
-      }
+          PrimeVue,
+        ],
+      },
     });
 
     symbiantStore = useSymbiantsStore();
     symbiantStore.symbiants = mockSymbiants;
-    
+
     pocketBossStore = usePocketBossStore();
-    pocketBossStore.getPocketBossesBySymbiant = vi.fn((id: number) => 
-      mockBosses.filter(boss => 
-        boss.dropped_symbiants?.some(s => s.id === id)
-      )
+    pocketBossStore.getPocketBossesBySymbiant = vi.fn((id: number) =>
+      mockBosses.filter((boss) => boss.dropped_symbiants?.some((s) => s.id === id))
     );
   });
 
@@ -154,10 +152,10 @@ describe('SymbiantLookup', () => {
 
   it('filters symbiants by search query', async () => {
     const component = wrapper.vm as any;
-    
+
     component.searchQuery = 'Artillery';
     await wrapper.vm.$nextTick();
-    
+
     const filtered = component.symbiants;
     expect(filtered).toHaveLength(1);
     expect(filtered[0].name).toBe('Artillery Symbiant');
@@ -165,10 +163,10 @@ describe('SymbiantLookup', () => {
 
   it('filters symbiants by slot', async () => {
     const component = wrapper.vm as any;
-    
+
     component.selectedSlots = ['Head'];
     await wrapper.vm.$nextTick();
-    
+
     const filtered = component.symbiants;
     expect(filtered).toHaveLength(1);
     expect(filtered[0].slot).toBe('Head');
@@ -176,10 +174,10 @@ describe('SymbiantLookup', () => {
 
   it('filters symbiants by quality', async () => {
     const component = wrapper.vm as any;
-    
+
     component.selectedQualities = [200];
     await wrapper.vm.$nextTick();
-    
+
     const filtered = component.symbiants;
     expect(filtered).toHaveLength(1);
     expect(filtered[0].ql).toBe(200);
@@ -187,10 +185,10 @@ describe('SymbiantLookup', () => {
 
   it('filters symbiants by family', async () => {
     const component = wrapper.vm as any;
-    
+
     component.selectedFamily = 'Control';
     await wrapper.vm.$nextTick();
-    
+
     const filtered = component.symbiants;
     expect(filtered).toHaveLength(1);
     expect(filtered[0].family).toBe('Control');
@@ -198,13 +196,13 @@ describe('SymbiantLookup', () => {
 
   it('applies multiple filters simultaneously', async () => {
     const component = wrapper.vm as any;
-    
+
     component.searchQuery = 'Control';
     component.selectedSlots = ['Chest'];
     component.selectedQualities = [200];
     component.selectedFamily = 'Control';
     await wrapper.vm.$nextTick();
-    
+
     const filtered = component.symbiants;
     expect(filtered).toHaveLength(1);
     expect(filtered[0].name).toBe('Control Symbiant');
@@ -213,7 +211,7 @@ describe('SymbiantLookup', () => {
   it('sorts symbiants correctly', async () => {
     const component = wrapper.vm as any;
     const sorted = component.symbiants;
-    
+
     // Should be sorted by slot, then QL desc, then name
     expect(sorted[0].slot).toBe('Chest');
     expect(sorted[1].slot).toBe('Head');
@@ -221,17 +219,17 @@ describe('SymbiantLookup', () => {
 
   it('clears all filters', async () => {
     const component = wrapper.vm as any;
-    
+
     // Set some filters
     component.searchQuery = 'test';
     component.selectedSlots = ['Head'];
     component.selectedQualities = [150];
     component.selectedFamily = 'Artillery';
-    
+
     // Clear filters
     component.clearAllFilters();
     await wrapper.vm.$nextTick();
-    
+
     expect(component.searchQuery).toBe('');
     expect(component.selectedSlots).toEqual([]);
     expect(component.selectedQualities).toEqual([]);
@@ -240,13 +238,13 @@ describe('SymbiantLookup', () => {
 
   it('shows symbiant details dialog', async () => {
     const component = wrapper.vm as any;
-    
+
     expect(component.showSymbiantDetails).toBe(false);
     expect(component.selectedSymbiant).toBeNull();
-    
+
     component.showDetails(mockSymbiants[0]);
     await wrapper.vm.$nextTick();
-    
+
     expect(component.showSymbiantDetails).toBe(true);
     expect(component.selectedSymbiant).toEqual(mockSymbiants[0]);
   });
@@ -254,14 +252,14 @@ describe('SymbiantLookup', () => {
   it('gets correct drop sources for symbiant', () => {
     const component = wrapper.vm as any;
     const sources = component.getDropSources(mockSymbiants[0]);
-    
+
     expect(sources).toHaveLength(1);
     expect(sources[0].name).toBe('Test Boss 1');
   });
 
   it('calculates quality severity correctly', () => {
     const component = wrapper.vm as any;
-    
+
     expect(component.getQualitySeverity(50)).toBe('success');
     expect(component.getQualitySeverity(120)).toBe('info');
     expect(component.getQualitySeverity(180)).toBe('warning');
@@ -270,7 +268,7 @@ describe('SymbiantLookup', () => {
 
   it('gets correct slot icons', () => {
     const component = wrapper.vm as any;
-    
+
     expect(component.getSlotIcon('Head')).toBe('pi-user');
     expect(component.getSlotIcon('Eye')).toBe('pi-eye');
     expect(component.getSlotIcon('Chest')).toBe('pi-shield');
@@ -291,10 +289,10 @@ describe('SymbiantLookup', () => {
 
   it('handles case insensitive search', async () => {
     const component = wrapper.vm as any;
-    
+
     component.searchQuery = 'artillery';
     await wrapper.vm.$nextTick();
-    
+
     const filtered = component.symbiants;
     expect(filtered).toHaveLength(1);
     expect(filtered[0].name).toBe('Artillery Symbiant');
@@ -302,12 +300,12 @@ describe('SymbiantLookup', () => {
 
   it('searches across multiple fields', async () => {
     const component = wrapper.vm as any;
-    
+
     // Search by slot
     component.searchQuery = 'head';
     await wrapper.vm.$nextTick();
     expect(component.symbiants).toHaveLength(1);
-    
+
     // Search by family
     component.searchQuery = 'control';
     await wrapper.vm.$nextTick();

@@ -4,61 +4,61 @@ Shows perks grouped by name with expandable categories, progression levels, and 
 -->
 <template>
   <div class="perk-selector h-full flex flex-col bg-surface-0 dark:bg-surface-950">
-      <!-- Perk List Header -->
-      <div class="p-4 border-b border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-900">
-        <div class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-50">
-            All Perks
-          </h2>
+    <!-- Perk List Header -->
+    <div
+      class="p-4 border-b border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-900"
+    >
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-50">All Perks</h2>
 
-          <!-- View Mode Toggle -->
-          <div class="flex items-center gap-2">
-            <Button
-              :icon="viewMode === 'list' ? 'pi pi-list' : 'pi pi-th-large'"
-              :label="viewMode === 'list' ? 'List View' : 'Grid View'"
-              size="small"
-              outlined
-              @click="toggleViewMode"
-            />
-          </div>
-        </div>
-      </div>
-
-      <!-- Categories List -->
-      <div class="flex-1 overflow-y-auto p-4">
-        <div v-if="loading" class="text-center py-8">
-          <ProgressSpinner class="w-8 h-8" />
-          <p class="text-surface-500 dark:text-surface-400 mt-2">Loading perks...</p>
-        </div>
-
-        <div v-else-if="filteredCategories.length === 0" class="text-center py-8">
-          <i class="pi pi-info-circle text-4xl text-surface-300 dark:text-surface-600 mb-4"></i>
-          <h3 class="text-lg font-medium text-surface-700 dark:text-surface-300 mb-2">
-            No perks found
-          </h3>
-          <p class="text-surface-500 dark:text-surface-400">
-            Try adjusting your search criteria or filters.
-          </p>
-        </div>
-
-        <div v-else class="space-y-4">
-          <PerkCategory
-            v-for="category in filteredCategories"
-            :key="category.name"
-            :category="category"
-            :view-mode="viewMode"
-            :owned-perks="ownedPerks"
-            :character-level="characterLevel"
-            :ai-level="aiLevel"
-            :profession="profession"
-            :breed="breed"
-            :available-standard-points="availableStandardPoints"
-            :available-ai-points="availableAIPoints"
-            @perk-select="onPerkSelect"
-            @perk-remove="onPerkRemove"
+        <!-- View Mode Toggle -->
+        <div class="flex items-center gap-2">
+          <Button
+            :icon="viewMode === 'list' ? 'pi pi-list' : 'pi pi-th-large'"
+            :label="viewMode === 'list' ? 'List View' : 'Grid View'"
+            size="small"
+            outlined
+            @click="toggleViewMode"
           />
         </div>
       </div>
+    </div>
+
+    <!-- Categories List -->
+    <div class="flex-1 overflow-y-auto p-4">
+      <div v-if="loading" class="text-center py-8">
+        <ProgressSpinner class="w-8 h-8" />
+        <p class="text-surface-500 dark:text-surface-400 mt-2">Loading perks...</p>
+      </div>
+
+      <div v-else-if="filteredCategories.length === 0" class="text-center py-8">
+        <i class="pi pi-info-circle text-4xl text-surface-300 dark:text-surface-600 mb-4"></i>
+        <h3 class="text-lg font-medium text-surface-700 dark:text-surface-300 mb-2">
+          No perks found
+        </h3>
+        <p class="text-surface-500 dark:text-surface-400">
+          Try adjusting your search criteria or filters.
+        </p>
+      </div>
+
+      <div v-else class="space-y-4">
+        <PerkCategory
+          v-for="category in filteredCategories"
+          :key="category.name"
+          :category="category"
+          :view-mode="viewMode"
+          :owned-perks="ownedPerks"
+          :character-level="characterLevel"
+          :ai-level="aiLevel"
+          :profession="profession"
+          :breed="breed"
+          :available-standard-points="availableStandardPoints"
+          :available-ai-points="availableAIPoints"
+          @perk-select="onPerkSelect"
+          @perk-remove="onPerkRemove"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
@@ -98,22 +98,21 @@ const allPerkSeries = ref<PerkSeries[]>([]);
 
 // Computed
 const activeProfile = computed(() => {
-  return Array.from(profilesStore.profiles.values()).find(p => p.id === props.profileId);
+  return Array.from(profilesStore.profiles.values()).find((p) => p.id === props.profileId);
 });
 
 const characterLevel = computed(() => activeProfile.value?.Character.Level || 1);
 const aiLevel = computed(() => activeProfile.value?.Character.AlienLevel || 0);
-const profession = computed(() => getProfessionName(activeProfile.value?.Character.Profession || 0));
+const profession = computed(() =>
+  getProfessionName(activeProfile.value?.Character.Profession || 0)
+);
 const breed = computed(() => getBreedName(activeProfile.value?.Character.Breed || 0));
 
 const ownedPerks = computed(() => {
   const perkSystem = activeProfile.value?.PerksAndResearch;
   if (!perkSystem) return [];
 
-  return [
-    ...perkSystem.perks,
-    ...perkSystem.research
-  ];
+  return [...perkSystem.perks, ...perkSystem.research];
 });
 
 const availableStandardPoints = computed(() => {
@@ -133,15 +132,15 @@ const filteredCategories = computed(() => {
   const categories = new Map<string, PerkCategoryData>();
 
   // Group perks by name (each perk series becomes a category)
-  filteredPerkSeries.value.forEach(series => {
-    const ownedPerk = ownedPerks.value.find(p => p.name === series.name);
+  filteredPerkSeries.value.forEach((series) => {
+    const ownedPerk = ownedPerks.value.find((p) => p.name === series.name);
 
     categories.set(series.name, {
       name: series.name,
       type: series.type,
       perks: [series],
       totalCount: series.levels.length,
-      ownedCount: ownedPerk ? 1 : 0
+      ownedCount: ownedPerk ? 1 : 0,
     });
   });
 
@@ -212,10 +211,13 @@ async function loadPerkData() {
 }
 
 // Watchers
-watch(() => props.profileId, () => {
-  // Reload when profile changes
-  loadPerkData();
-});
+watch(
+  () => props.profileId,
+  () => {
+    // Reload when profile changes
+    loadPerkData();
+  }
+);
 
 // Lifecycle
 onMounted(() => {
@@ -245,5 +247,4 @@ onMounted(() => {
 :deep(.level-input .p-inputnumber-input) {
   width: 4rem !important;
 }
-
 </style>

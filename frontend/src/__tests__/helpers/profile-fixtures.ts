@@ -233,9 +233,7 @@ export function createFreshProfile(options: Partial<ProfileCreationOptions> = {}
 /**
  * Level 220 endgame character (high skills)
  */
-export function createEndgameProfile(
-  options: Partial<ProfileCreationOptions> = {}
-): TinkerProfile {
+export function createEndgameProfile(options: Partial<ProfileCreationOptions> = {}): TinkerProfile {
   return createTestProfile({
     level: 220,
     alienLevel: 30,
@@ -270,9 +268,7 @@ export function createEndgameProfile(
 /**
  * Solitus Soldier - Tank build
  */
-export function createSoldierProfile(
-  options: Partial<ProfileCreationOptions> = {}
-): TinkerProfile {
+export function createSoldierProfile(options: Partial<ProfileCreationOptions> = {}): TinkerProfile {
   return createTestProfile({
     breed: BREED.SOLITUS,
     profession: PROFESSION.SOLDIER,
@@ -373,9 +369,7 @@ export function createEnforcerProfile(
 /**
  * Opifex Fixer - Fast and agile
  */
-export function createFixerProfile(
-  options: Partial<ProfileCreationOptions> = {}
-): TinkerProfile {
+export function createFixerProfile(options: Partial<ProfileCreationOptions> = {}): TinkerProfile {
   return createTestProfile({
     breed: BREED.OPIFEX,
     profession: PROFESSION.FIXER,

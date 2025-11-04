@@ -2,7 +2,7 @@
   <div class="tree-node" :class="nodeClasses">
     <!-- Tree connector lines -->
     <div v-if="showConnector" class="tree-connector" :class="connectorClasses"></div>
-    
+
     <!-- Node content -->
     <div class="tree-content">
       <!-- Requirement Node -->
@@ -14,7 +14,7 @@
           <span v-if="showCurrentValue" class="current-value">({{ currentValue }})</span>
         </div>
       </div>
-      
+
       <!-- Operator Node -->
       <div v-else-if="node.type === 'operator'" class="operator-node">
         <div class="operator-badge" :class="operatorClasses">
@@ -24,7 +24,7 @@
           </span>
         </div>
       </div>
-      
+
       <!-- Group Node (implicit AND) -->
       <div v-else-if="node.type === 'group'" class="group-node">
         <div class="group-label" v-if="showGroupLabel">
@@ -35,7 +35,7 @@
         </div>
       </div>
     </div>
-    
+
     <!-- Children -->
     <div v-if="node.children && node.children.length > 0" class="tree-children">
       <CriteriaTreeNode
@@ -52,28 +52,35 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { CriteriaTreeNode } from '../services/action-criteria'
-import type { CharacterStats } from '../composables/useActionCriteria'
-import { getStatName, getProfessionName, getBreedName, getGenderName, getFlagNameFromValue, getNPCFamilyName } from '../services/game-utils'
+import { computed } from 'vue';
+import type { CriteriaTreeNode } from '../services/action-criteria';
+import type { CharacterStats } from '../composables/useActionCriteria';
+import {
+  getStatName,
+  getProfessionName,
+  getBreedName,
+  getGenderName,
+  getFlagNameFromValue,
+  getNPCFamilyName,
+} from '../services/game-utils';
 
 // ============================================================================
 // Props
 // ============================================================================
 
 interface Props {
-  node: CriteriaTreeNode
-  characterStats?: CharacterStats | null
-  level?: number
-  showConnector?: boolean
-  showGroupLabel?: boolean
+  node: CriteriaTreeNode;
+  characterStats?: CharacterStats | null;
+  level?: number;
+  showConnector?: boolean;
+  showGroupLabel?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   level: 0,
   showConnector: true,
-  showGroupLabel: true
-})
+  showGroupLabel: true,
+});
 
 // ============================================================================
 // Computed Properties
@@ -85,101 +92,101 @@ const nodeClasses = computed(() => [
   {
     'is-last': props.node.isLast,
     'has-children': props.node.hasChildren,
-    [`status-${props.node.status}`]: props.node.status
-  }
-])
+    [`status-${props.node.status}`]: props.node.status,
+  },
+]);
 
 const connectorClasses = computed(() => [
   'tree-connector',
   {
     'has-siblings': !props.node.isLast,
-    'last-child': props.node.isLast
-  }
-])
+    'last-child': props.node.isLast,
+  },
+]);
 
 const chipClasses = computed(() => {
-  const classes = ['chip']
-  
+  const classes = ['chip'];
+
   if (props.node.status) {
-    classes.push(`chip-${props.node.status}`)
+    classes.push(`chip-${props.node.status}`);
   }
-  
-  return classes
-})
+
+  return classes;
+});
 
 const operatorClasses = computed(() => [
   'operator-badge',
   `operator-${props.node.operator?.toLowerCase()}`,
   {
-    [`status-${props.node.status}`]: props.node.status
-  }
-])
+    [`status-${props.node.status}`]: props.node.status,
+  },
+]);
 
 const currentValue = computed(() => {
-  if (!props.characterStats || !props.node.criterion) return 0
-  return props.characterStats[props.node.criterion.stat] || 0
-})
+  if (!props.characterStats || !props.node.criterion) return 0;
+  return props.characterStats[props.node.criterion.stat] || 0;
+});
 
 const showCurrentValue = computed(() => {
-  return props.characterStats && 
-         props.node.status === 'unmet' && 
-         props.node.criterion?.isStatRequirement
-})
+  return (
+    props.characterStats && props.node.status === 'unmet' && props.node.criterion?.isStatRequirement
+  );
+});
 
 const formattedValue = computed(() => {
-  if (!props.node.criterion) return ''
-  
-  const value = props.node.criterion.displayValue
-  const stat = props.node.criterion.stat
-  const displaySymbol = props.node.criterion.displaySymbol
-  
+  if (!props.node.criterion) return '';
+
+  const value = props.node.criterion.displayValue;
+  const stat = props.node.criterion.stat;
+  const displaySymbol = props.node.criterion.displaySymbol;
+
   // Handle flag operators - use resolved flag names
   if (displaySymbol === 'has' || displaySymbol === 'lacks') {
-    return getFlagNameFromValue(stat, value)
+    return getFlagNameFromValue(stat, value);
   }
-  
+
   // Special formatting for certain stats
   switch (stat) {
     case 60: // Profession
-      return getProfessionName(value) || value.toString()
+      return getProfessionName(value) || value.toString();
     case 368: // VisualProfession
-      return getProfessionName(value) || value.toString()
-    case 4: // Breed  
-      return getBreedName(value) || value.toString()
+      return getProfessionName(value) || value.toString();
+    case 4: // Breed
+      return getBreedName(value) || value.toString();
     case 59: // Gender
-      return getGenderName(value) || value.toString()
+      return getGenderName(value) || value.toString();
     case 455: // NPCFamily
-      return getNPCFamilyName(value) || value.toString()
+      return getNPCFamilyName(value) || value.toString();
     default:
-      return value.toString()
+      return value.toString();
   }
-})
+});
 
 const statusIcon = computed(() => {
   switch (props.node.status) {
     case 'met':
-      return '✓'
+      return '✓';
     case 'unmet':
-      return '✗'
+      return '✗';
     case 'partial':
-      return '◐'
+      return '◐';
     default:
-      return '?'
+      return '?';
   }
-})
+});
 
 const operatorLabel = computed(() => {
   switch (props.node.operator) {
     case 'AND':
-      return 'All Required'
+      return 'All Required';
     case 'OR':
-      return 'Choose One'
+      return 'Choose One';
     case 'NOT':
-      return 'Must Not'
+      return 'Must Not';
     default:
-      return props.node.operator || 'Group'
+      return props.node.operator || 'Group';
   }
-})
+});
 </script>
 
 <style scoped>
@@ -405,7 +412,7 @@ const operatorLabel = computed(() => {
   .tree-children::before {
     background: #374151;
   }
-  
+
   .chip {
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   }
@@ -416,16 +423,16 @@ const operatorLabel = computed(() => {
   .tree-content {
     padding-left: 20px;
   }
-  
+
   .tree-children {
     margin-left: 16px;
   }
-  
+
   .chip {
     padding: 4px 10px;
     font-size: 13px;
   }
-  
+
   .operator-badge {
     padding: 3px 8px;
     font-size: 11px;

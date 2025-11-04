@@ -63,55 +63,60 @@ Implements:
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import Accordion from 'primevue/accordion'
-import AccordionTab from 'primevue/accordiontab'
-import Button from 'primevue/button'
-import CharacterStatsSection from './CharacterStatsSection.vue'
-import DamageModifiersSection from './DamageModifiersSection.vue'
-import BuffPresetsSection from './BuffPresetsSection.vue'
-import type { NukeInputState, CharacterStats, DamageModifiers, BuffPresets } from '@/types/offensive-nano'
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types'
-import { ENHANCE_NANO_DAMAGE, ANCIENT_MATRIX_DAMAGE } from '@/utils/nuke-regen-calculations'
+import { ref, watch } from 'vue';
+import Accordion from 'primevue/accordion';
+import AccordionTab from 'primevue/accordiontab';
+import Button from 'primevue/button';
+import CharacterStatsSection from './CharacterStatsSection.vue';
+import DamageModifiersSection from './DamageModifiersSection.vue';
+import BuffPresetsSection from './BuffPresetsSection.vue';
+import type {
+  NukeInputState,
+  CharacterStats,
+  DamageModifiers,
+  BuffPresets,
+} from '@/types/offensive-nano';
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import { ENHANCE_NANO_DAMAGE, ANCIENT_MATRIX_DAMAGE } from '@/utils/nuke-regen-calculations';
 
 // Props
 interface Props {
-  inputState: NukeInputState
-  activeProfile?: Readonly<TinkerProfile> | TinkerProfile | null
+  inputState: NukeInputState;
+  activeProfile?: Readonly<TinkerProfile> | TinkerProfile | null;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 
 // Emits
 const emit = defineEmits<{
-  'update:inputState': [state: NukeInputState]
-}>()
+  'update:inputState': [state: NukeInputState];
+}>();
 
 // Local state - consolidated input state
-const localInputState = ref<NukeInputState>({ ...props.inputState })
+const localInputState = ref<NukeInputState>({ ...props.inputState });
 
 // Track which fields have been manually modified by user
 // Prevents auto-update of user-edited fields on profile change
-const modifiedFields = ref<Set<string>>(new Set())
+const modifiedFields = ref<Set<string>>(new Set());
 
 // Flag to indicate programmatic update (bypass modification tracking)
-const isProgrammaticUpdate = ref(false)
+const isProgrammaticUpdate = ref(false);
 
 // Debounce timer for emitting updates
-let debounceTimer: ReturnType<typeof setTimeout> | null = null
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Emit updated input state to parent with 50ms debounce
  */
 function emitInputState(): void {
   if (debounceTimer) {
-    clearTimeout(debounceTimer)
+    clearTimeout(debounceTimer);
   }
 
   debounceTimer = setTimeout(() => {
-    emit('update:inputState', { ...localInputState.value })
-    debounceTimer = null
-  }, 50)
+    emit('update:inputState', { ...localInputState.value });
+    debounceTimer = null;
+  }, 50);
 }
 
 /**
@@ -121,12 +126,12 @@ function onCharacterStatsUpdate(stats: CharacterStats): void {
   if (!isProgrammaticUpdate.value) {
     // Track all character stat fields as modified
     Object.keys(stats).forEach((key) => {
-      modifiedFields.value.add(`characterStats.${key}`)
-    })
+      modifiedFields.value.add(`characterStats.${key}`);
+    });
   }
 
-  localInputState.value.characterStats = { ...stats }
-  emitInputState()
+  localInputState.value.characterStats = { ...stats };
+  emitInputState();
 }
 
 /**
@@ -136,12 +141,12 @@ function onDamageModifiersUpdate(modifiers: DamageModifiers): void {
   if (!isProgrammaticUpdate.value) {
     // Track all damage modifier fields as modified
     Object.keys(modifiers).forEach((key) => {
-      modifiedFields.value.add(`damageModifiers.${key}`)
-    })
+      modifiedFields.value.add(`damageModifiers.${key}`);
+    });
   }
 
-  localInputState.value.damageModifiers = { ...modifiers }
-  emitInputState()
+  localInputState.value.damageModifiers = { ...modifiers };
+  emitInputState();
 }
 
 /**
@@ -152,15 +157,15 @@ function onBuffPresetsUpdate(buffs: BuffPresets): void {
   if (!isProgrammaticUpdate.value) {
     // Track all buff preset fields as modified
     Object.keys(buffs).forEach((key) => {
-      modifiedFields.value.add(`buffPresets.${key}`)
-    })
+      modifiedFields.value.add(`buffPresets.${key}`);
+    });
   }
 
-  localInputState.value.buffPresets = { ...buffs }
+  localInputState.value.buffPresets = { ...buffs };
 
   // FR-9: Recalculate stat 536 (Direct Nano Damage Efficiency) when buff dropdowns change
   // This is handled by DamageModifiersSection's computed property, but we trigger emission
-  emitInputState()
+  emitInputState();
 }
 
 /**
@@ -170,24 +175,24 @@ function onBuffPresetsUpdate(buffs: BuffPresets): void {
 function populateFromProfile(): void {
   if (!props.activeProfile) {
     // No profile: reset to defaults
-    resetToDefaults()
-    return
+    resetToDefaults();
+    return;
   }
 
   // Check if profile is Nanotechnician (profession ID 11)
-  const isNanotech = props.activeProfile.Character?.Profession === 11
+  const isNanotech = props.activeProfile.Character?.Profession === 11;
 
   if (!isNanotech) {
     // Not a Nanotechnician: reset to defaults
-    resetToDefaults()
-    return
+    resetToDefaults();
+    return;
   }
 
   // Set programmatic update flag to bypass modification tracking
-  isProgrammaticUpdate.value = true
+  isProgrammaticUpdate.value = true;
 
   // Auto-populate character stats from profile
-  const skills = props.activeProfile.skills || {}
+  const skills = props.activeProfile.skills || {};
 
   localInputState.value.characterStats = {
     breed: (props.activeProfile.Character?.Breed || 1) as 1 | 2 | 3 | 4,
@@ -203,7 +208,7 @@ function populateFromProfile(): void {
     sensoryImp: skills[122]?.total || 1,
     timeSpace: skills[131]?.total || 1,
     spec: props.activeProfile.Character?.Specialization ?? 0,
-  }
+  };
 
   // Auto-populate damage modifiers from profile
   localInputState.value.damageModifiers = {
@@ -218,7 +223,7 @@ function populateFromProfile(): void {
     poison: skills[317]?.total || 0,
     directNanoDamageEfficiency: calculateStat536(),
     targetAC: 0, // Default to 0, not from profile
-  }
+  };
 
   // Auto-populate buff presets from profile
   // BuffPresetsSection handles this internally via profile watcher
@@ -226,12 +231,12 @@ function populateFromProfile(): void {
   // The section will extract buff levels from profile.buffs array
 
   // Emit updated state
-  emitInputState()
+  emitInputState();
 
   // Clear programmatic flag after a brief delay
   setTimeout(() => {
-    isProgrammaticUpdate.value = false
-  }, 10)
+    isProgrammaticUpdate.value = false;
+  }, 10);
 }
 
 /**
@@ -239,11 +244,12 @@ function populateFromProfile(): void {
  * FR-9: baseValue + enhanceNanoDamage + ancientMatrix
  */
 function calculateStat536(): number {
-  const baseValue = props.activeProfile?.skills?.[536]?.total || 0
-  const enhanceBonus = ENHANCE_NANO_DAMAGE[localInputState.value.buffPresets.enhanceNanoDamage] || 0
-  const ancientBonus = ANCIENT_MATRIX_DAMAGE[localInputState.value.buffPresets.ancientMatrix] || 0
+  const baseValue = props.activeProfile?.skills?.[536]?.total || 0;
+  const enhanceBonus =
+    ENHANCE_NANO_DAMAGE[localInputState.value.buffPresets.enhanceNanoDamage] || 0;
+  const ancientBonus = ANCIENT_MATRIX_DAMAGE[localInputState.value.buffPresets.ancientMatrix] || 0;
 
-  return Number((baseValue + enhanceBonus + ancientBonus).toFixed(2))
+  return Number((baseValue + enhanceBonus + ancientBonus).toFixed(2));
 }
 
 /**
@@ -251,7 +257,7 @@ function calculateStat536(): number {
  * Called when no profile or profile is not Nanotechnician
  */
 function resetToDefaults(): void {
-  isProgrammaticUpdate.value = true
+  isProgrammaticUpdate.value = true;
 
   localInputState.value = {
     characterStats: {
@@ -290,13 +296,13 @@ function resetToDefaults(): void {
       enhanceNanoDamage: 0,
       ancientMatrix: 0,
     },
-  }
+  };
 
-  emitInputState()
+  emitInputState();
 
   setTimeout(() => {
-    isProgrammaticUpdate.value = false
-  }, 10)
+    isProgrammaticUpdate.value = false;
+  }, 10);
 }
 
 /**
@@ -305,10 +311,10 @@ function resetToDefaults(): void {
  */
 function resetToProfile(): void {
   // Clear all modification tracking
-  modifiedFields.value.clear()
+  modifiedFields.value.clear();
 
   // Repopulate from profile
-  populateFromProfile()
+  populateFromProfile();
 }
 
 // Watch for prop inputState changes (external updates from parent)
@@ -316,15 +322,15 @@ watch(
   () => props.inputState,
   (newState) => {
     if (!isProgrammaticUpdate.value) {
-      isProgrammaticUpdate.value = true
-      localInputState.value = { ...newState }
+      isProgrammaticUpdate.value = true;
+      localInputState.value = { ...newState };
       setTimeout(() => {
-        isProgrammaticUpdate.value = false
-      }, 10)
+        isProgrammaticUpdate.value = false;
+      }, 10);
     }
   },
   { deep: true }
-)
+);
 
 // Watch for active profile changes
 // FR-10: On profile switch, auto-populate if Nanotechnician, else reset
@@ -332,39 +338,40 @@ watch(
   () => props.activeProfile,
   () => {
     // Clear modification tracking on profile switch
-    modifiedFields.value.clear()
+    modifiedFields.value.clear();
 
     // Set programmatic flag during profile switch
-    isProgrammaticUpdate.value = true
+    isProgrammaticUpdate.value = true;
 
     // Auto-populate from new profile
-    populateFromProfile()
+    populateFromProfile();
 
     // Clear flag after brief delay
     setTimeout(() => {
-      isProgrammaticUpdate.value = false
-    }, 10)
+      isProgrammaticUpdate.value = false;
+    }, 10);
   },
   { immediate: true }
-)
+);
 
 // Watch buff presets for changes to enhanceNanoDamage or ancientMatrix
 // FR-9: Auto-update stat 536 when these buffs change
 watch(
-  () => [
-    localInputState.value.buffPresets.enhanceNanoDamage,
-    localInputState.value.buffPresets.ancientMatrix,
-  ] as const,
+  () =>
+    [
+      localInputState.value.buffPresets.enhanceNanoDamage,
+      localInputState.value.buffPresets.ancientMatrix,
+    ] as const,
   () => {
     // Recalculate stat 536 and update damage modifiers
     if (!isProgrammaticUpdate.value) {
-      const newStat536 = calculateStat536()
-      localInputState.value.damageModifiers.directNanoDamageEfficiency = newStat536
-      emitInputState()
+      const newStat536 = calculateStat536();
+      localInputState.value.damageModifiers.directNanoDamageEfficiency = newStat536;
+      emitInputState();
     }
   },
   { deep: true }
-)
+);
 </script>
 
 <style scoped>

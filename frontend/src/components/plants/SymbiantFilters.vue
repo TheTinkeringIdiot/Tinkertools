@@ -20,7 +20,7 @@ Provides filtering by family, slot, quality level, and stat bonuses
               />
             </div>
           </template>
-          
+
           <div class="space-y-2">
             <div class="flex items-center gap-2 mb-3">
               <Button
@@ -28,27 +28,15 @@ Provides filtering by family, slot, quality level, and stat bonuses
                 label="All"
                 size="small"
                 text
-                :severity="selectedFamilies.length === availableFamilies.length ? 'primary' : 'secondary'"
+                :severity="
+                  selectedFamilies.length === availableFamilies.length ? 'primary' : 'secondary'
+                "
               />
-              <Button
-                @click="clearFamilies"
-                label="None"
-                size="small"
-                text
-                severity="secondary"
-              />
+              <Button @click="clearFamilies" label="None" size="small" text severity="secondary" />
             </div>
-            
-            <div
-              v-for="family in availableFamilies"
-              :key="family"
-              class="flex items-center gap-2"
-            >
-              <Checkbox
-                v-model="selectedFamilies"
-                :inputId="`family-${family}`"
-                :value="family"
-              />
+
+            <div v-for="family in availableFamilies" :key="family" class="flex items-center gap-2">
+              <Checkbox v-model="selectedFamilies" :inputId="`family-${family}`" :value="family" />
               <label :for="`family-${family}`" class="text-sm flex-1 cursor-pointer">
                 {{ family }}
               </label>
@@ -73,7 +61,7 @@ Provides filtering by family, slot, quality level, and stat bonuses
               />
             </div>
           </template>
-          
+
           <div class="space-y-2">
             <div class="flex items-center gap-2 mb-3">
               <Button
@@ -83,25 +71,11 @@ Provides filtering by family, slot, quality level, and stat bonuses
                 text
                 :severity="selectedSlots.length === availableSlots.length ? 'primary' : 'secondary'"
               />
-              <Button
-                @click="clearSlots"
-                label="None"
-                size="small"
-                text
-                severity="secondary"
-              />
+              <Button @click="clearSlots" label="None" size="small" text severity="secondary" />
             </div>
-            
-            <div
-              v-for="slot in availableSlots"
-              :key="slot"
-              class="flex items-center gap-2"
-            >
-              <Checkbox
-                v-model="selectedSlots"
-                :inputId="`slot-${slot}`"
-                :value="slot"
-              />
+
+            <div v-for="slot in availableSlots" :key="slot" class="flex items-center gap-2">
+              <Checkbox v-model="selectedSlots" :inputId="`slot-${slot}`" :value="slot" />
               <label :for="`slot-${slot}`" class="text-sm flex-1 cursor-pointer">
                 {{ formatSlotName(slot) }}
               </label>
@@ -126,7 +100,7 @@ Provides filtering by family, slot, quality level, and stat bonuses
               />
             </div>
           </template>
-          
+
           <div class="space-y-2">
             <div class="flex items-center gap-2 mb-3">
               <Button
@@ -134,17 +108,15 @@ Provides filtering by family, slot, quality level, and stat bonuses
                 label="All"
                 size="small"
                 text
-                :severity="selectedQualityLevels.length === availableQualityLevels.length ? 'primary' : 'secondary'"
+                :severity="
+                  selectedQualityLevels.length === availableQualityLevels.length
+                    ? 'primary'
+                    : 'secondary'
+                "
               />
-              <Button
-                @click="clearQuality"
-                label="None"
-                size="small"
-                text
-                severity="secondary"
-              />
+              <Button @click="clearQuality" label="None" size="small" text severity="secondary" />
             </div>
-            
+
             <!-- Quality Level Range Slider -->
             <div class="px-2">
               <div class="flex items-center justify-between mb-2">
@@ -163,22 +135,12 @@ Provides filtering by family, slot, quality level, and stat bonuses
                 class="w-full"
               />
             </div>
-            
+
             <!-- Individual Quality Checkboxes -->
             <div class="max-h-32 overflow-y-auto">
-              <div
-                v-for="ql in availableQualityLevels"
-                :key="ql"
-                class="flex items-center gap-2"
-              >
-                <Checkbox
-                  v-model="selectedQualityLevels"
-                  :inputId="`ql-${ql}`"
-                  :value="ql"
-                />
-                <label :for="`ql-${ql}`" class="text-sm flex-1 cursor-pointer">
-                  QL {{ ql }}
-                </label>
+              <div v-for="ql in availableQualityLevels" :key="ql" class="flex items-center gap-2">
+                <Checkbox v-model="selectedQualityLevels" :inputId="`ql-${ql}`" :value="ql" />
+                <label :for="`ql-${ql}`" class="text-sm flex-1 cursor-pointer"> QL {{ ql }} </label>
                 <span class="text-xs text-surface-500 dark:text-surface-400">
                   {{ getQualityCount(ql) }}
                 </span>
@@ -201,7 +163,7 @@ Provides filtering by family, slot, quality level, and stat bonuses
               />
             </div>
           </template>
-          
+
           <div class="space-y-2">
             <div class="flex items-center gap-2 mb-3">
               <Button
@@ -209,17 +171,13 @@ Provides filtering by family, slot, quality level, and stat bonuses
                 label="All"
                 size="small"
                 text
-                :severity="selectedStatBonuses.length === availableStats.length ? 'primary' : 'secondary'"
+                :severity="
+                  selectedStatBonuses.length === availableStats.length ? 'primary' : 'secondary'
+                "
               />
-              <Button
-                @click="clearStats"
-                label="None"
-                size="small"
-                text
-                severity="secondary"
-              />
+              <Button @click="clearStats" label="None" size="small" text severity="secondary" />
             </div>
-            
+
             <!-- Minimum stat value filter -->
             <div class="px-2 mb-3">
               <div class="flex items-center justify-between mb-1">
@@ -237,19 +195,11 @@ Provides filtering by family, slot, quality level, and stat bonuses
                 class="w-full"
               />
             </div>
-            
+
             <!-- Individual stat checkboxes -->
             <div class="max-h-48 overflow-y-auto">
-              <div
-                v-for="stat in availableStats"
-                :key="stat"
-                class="flex items-center gap-2"
-              >
-                <Checkbox
-                  v-model="selectedStatBonuses"
-                  :inputId="`stat-${stat}`"
-                  :value="stat"
-                />
+              <div v-for="stat in availableStats" :key="stat" class="flex items-center gap-2">
+                <Checkbox v-model="selectedStatBonuses" :inputId="`stat-${stat}`" :value="stat" />
                 <label :for="`stat-${stat}`" class="text-sm flex-1 cursor-pointer">
                   {{ formatStatName(stat) }}
                 </label>
@@ -259,9 +209,11 @@ Provides filtering by family, slot, quality level, and stat bonuses
         </AccordionTab>
       </Accordion>
     </div>
-    
+
     <!-- Filter Actions -->
-    <div class="p-3 border-t border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-900">
+    <div
+      class="p-3 border-t border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-900"
+    >
       <Button
         @click="resetAllFilters"
         label="Reset All Filters"
@@ -293,7 +245,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  availableFamilies: () => []
+  availableFamilies: () => [],
 });
 
 // Emits
@@ -314,8 +266,19 @@ const qualityRange = ref([1, 300]); // Default range
 
 // Available options (in real implementation, these would come from data)
 const availableSlots = computed(() => [
-  'head', 'eye', 'ear', 'rarm', 'chest', 'larm', 'waist', 
-  'rwrist', 'legs', 'lwrist', 'rfinger', 'feet', 'lfinger'
+  'head',
+  'eye',
+  'ear',
+  'rarm',
+  'chest',
+  'larm',
+  'waist',
+  'rwrist',
+  'legs',
+  'lwrist',
+  'rfinger',
+  'feet',
+  'lfinger',
 ]);
 
 const availableQualityLevels = computed(() => {
@@ -331,28 +294,39 @@ const minQuality = computed(() => Math.min(...availableQualityLevels.value));
 const maxQuality = computed(() => Math.max(...availableQualityLevels.value));
 
 const availableStats = computed(() => [
-  'strength', 'agility', 'stamina', 'intelligence', 'sense', 'psychic',
-  'matter_creation', 'matter_metamorphosis', 'psychological_modifications',
-  'biological_metamorphosis', 'sensory_improvement', 'time_and_space'
+  'strength',
+  'agility',
+  'stamina',
+  'intelligence',
+  'sense',
+  'psychic',
+  'matter_creation',
+  'matter_metamorphosis',
+  'psychological_modifications',
+  'biological_metamorphosis',
+  'sensory_improvement',
+  'time_and_space',
 ]);
 
 // Computed filters object
-const currentFilters = computed((): SymbiantFilters => ({
-  families: [...selectedFamilies.value],
-  slots: [...selectedSlots.value],
-  qualityLevels: [...selectedQualityLevels.value],
-  statBonuses: [...selectedStatBonuses.value],
-  minStatValue: minStatBonus.value
-}));
+const currentFilters = computed(
+  (): SymbiantFilters => ({
+    families: [...selectedFamilies.value],
+    slots: [...selectedSlots.value],
+    qualityLevels: [...selectedQualityLevels.value],
+    statBonuses: [...selectedStatBonuses.value],
+    minStatValue: minStatBonus.value,
+  })
+);
 
 // Mock data functions (in real implementation, these would query actual data)
 const getFamilyCount = (family: string): number => {
   // Mock count for demonstration
   const mockCounts: Record<string, number> = {
-    'Seeker': 13,
-    'Hacker': 13,
-    'Soldier': 13,
-    'Medic': 13
+    Seeker: 13,
+    Hacker: 13,
+    Soldier: 13,
+    Medic: 13,
   };
   return mockCounts[family] || 0;
 };
@@ -370,27 +344,28 @@ const getQualityCount = (ql: number): number => {
 // Methods
 const formatSlotName = (slot: string): string => {
   const slotNames: Record<string, string> = {
-    'head': 'Head',
-    'eye': 'Eye',
-    'ear': 'Ear',
-    'rarm': 'Right Arm',
-    'chest': 'Chest',
-    'larm': 'Left Arm',
-    'waist': 'Waist',
-    'rwrist': 'Right Wrist',
-    'legs': 'Legs',
-    'lwrist': 'Left Wrist',
-    'rfinger': 'Right Finger',
-    'feet': 'Feet',
-    'lfinger': 'Left Finger'
+    head: 'Head',
+    eye: 'Eye',
+    ear: 'Ear',
+    rarm: 'Right Arm',
+    chest: 'Chest',
+    larm: 'Left Arm',
+    waist: 'Waist',
+    rwrist: 'Right Wrist',
+    legs: 'Legs',
+    lwrist: 'Left Wrist',
+    rfinger: 'Right Finger',
+    feet: 'Feet',
+    lfinger: 'Left Finger',
   };
   return slotNames[slot] || slot;
 };
 
 const formatStatName = (stat: string): string => {
-  return stat.split('_').map(word => 
-    word.charAt(0).toUpperCase() + word.slice(1)
-  ).join(' ');
+  return stat
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 };
 
 const selectAllFamilies = () => {
@@ -427,7 +402,7 @@ const clearStats = () => {
 
 const updateQualityFromRange = () => {
   selectedQualityLevels.value = availableQualityLevels.value.filter(
-    ql => ql >= qualityRange.value[0] && ql <= qualityRange.value[1]
+    (ql) => ql >= qualityRange.value[0] && ql <= qualityRange.value[1]
   );
 };
 
@@ -451,22 +426,24 @@ const emitFilterChange = () => {
 };
 
 // Watch for changes and emit
-watch([
-  selectedFamilies,
-  selectedSlots,
-  selectedQualityLevels,
-  selectedStatBonuses,
-  minStatBonus
-], () => {
-  emitFilterChange();
-}, { deep: true });
+watch(
+  [selectedFamilies, selectedSlots, selectedQualityLevels, selectedStatBonuses, minStatBonus],
+  () => {
+    emitFilterChange();
+  },
+  { deep: true }
+);
 
 // Watch for external changes
-watch(() => props.modelValue, (newFilters) => {
-  selectedFamilies.value = [...newFilters.families];
-  selectedSlots.value = [...newFilters.slots];
-  selectedQualityLevels.value = [...newFilters.qualityLevels];
-  selectedStatBonuses.value = [...newFilters.statBonuses];
-  minStatBonus.value = newFilters.minStatValue || 0;
-}, { deep: true });
+watch(
+  () => props.modelValue,
+  (newFilters) => {
+    selectedFamilies.value = [...newFilters.families];
+    selectedSlots.value = [...newFilters.slots];
+    selectedQualityLevels.value = [...newFilters.qualityLevels];
+    selectedStatBonuses.value = [...newFilters.statBonuses];
+    minStatBonus.value = newFilters.minStatValue || 0;
+  },
+  { deep: true }
+);
 </script>

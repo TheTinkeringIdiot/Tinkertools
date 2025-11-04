@@ -26,11 +26,13 @@ tinkertools_profile_profile3: { TinkerProfile object }
 ## Performance Characteristics
 
 ### O(1) Operations (Optimized)
+
 - `saveProfile(profile)`: Save individual profile
 - `loadProfile(profileId)`: Load specific profile
 - `deleteProfile(profileId)`: Remove specific profile
 
 ### O(n) Operations (When Necessary)
+
 - `loadAllProfiles()`: Load all profiles (iterates through index)
 - `getProfileMetadata()`: Generate metadata for all profiles
 - `clearAllData()`: Remove all profiles and index
@@ -38,19 +40,21 @@ tinkertools_profile_profile3: { TinkerProfile object }
 ## Storage Key Patterns
 
 ### Current Keys (v1.2.0+)
+
 ```typescript
 STORAGE_KEYS = {
-  PROFILE_INDEX: 'tinkertools_profile_index',    // Array of profile IDs
-  PROFILE_PREFIX: 'tinkertools_profile_',        // Prefix for individual profiles
-  PROFILES: 'tinkertools_profiles',              // LEGACY - migration only
+  PROFILE_INDEX: 'tinkertools_profile_index', // Array of profile IDs
+  PROFILE_PREFIX: 'tinkertools_profile_', // Prefix for individual profiles
+  PROFILES: 'tinkertools_profiles', // LEGACY - migration only
   ACTIVE_PROFILE: 'tinkertools_active_profile',
   PROFILE_METADATA: 'tinkertools_profile_metadata',
   PROFILE_PREFERENCES: 'tinkertools_profile_preferences',
-  VERSION: 'tinkertools_version'
-}
+  VERSION: 'tinkertools_version',
+};
 ```
 
 ### Profile Key Construction
+
 ```typescript
 const profileKey = `${STORAGE_KEYS.PROFILE_PREFIX}${profileId}`;
 // Results in: "tinkertools_profile_12345-abcd-6789-efgh"
@@ -59,15 +63,17 @@ const profileKey = `${STORAGE_KEYS.PROFILE_PREFIX}${profileId}`;
 ## Critical Implementation Details
 
 ### Index Management
+
 The profile index is the source of truth for which profiles exist:
 
 ```typescript
 // Always update index when modifying profiles
-await this.updateProfileIndex(profileId, 'add');    // When saving new
+await this.updateProfileIndex(profileId, 'add'); // When saving new
 await this.updateProfileIndex(profileId, 'remove'); // When deleting
 ```
 
 ### Migration System
+
 - **Automatic**: Runs on ProfileStorage initialization
 - **One-time**: Only migrates if legacy data exists
 - **Safe**: Preserves legacy data until migration succeeds
@@ -92,6 +98,7 @@ constructor(options: ProfileStorageOptions = {}) {
 ### Common Patterns
 
 #### Loading Profile for Display
+
 ```typescript
 const profile = await storage.loadProfile(profileId);
 if (profile) {
@@ -100,6 +107,7 @@ if (profile) {
 ```
 
 #### Bulk Operations (Avoid When Possible)
+
 ```typescript
 // Efficient: Use index and load selectively
 const index = await storage.getProfileIndex();
@@ -116,6 +124,7 @@ const allProfiles = await storage.loadAllProfiles(); // Only use when all are ne
 ```
 
 #### Safe Profile Updates
+
 ```typescript
 // Load → Modify → Save pattern
 const profile = await storage.loadProfile(profileId);
@@ -129,6 +138,7 @@ if (profile) {
 ## Error Handling Patterns
 
 ### Storage Operation Failures
+
 ```typescript
 try {
   await storage.saveProfile(profile);
@@ -141,6 +151,7 @@ try {
 ```
 
 ### Migration Failures
+
 ```typescript
 // Migration failures are logged but don't throw
 // App continues with empty profile state
@@ -148,22 +159,26 @@ try {
 ```
 
 ### Index Corruption Recovery
+
 ```typescript
 // If index is corrupted, storage operations fail gracefully
 // Manual recovery: scan localStorage for profile keys
-const profileKeys = Object.keys(localStorage)
-  .filter(key => key.startsWith(STORAGE_KEYS.PROFILE_PREFIX));
+const profileKeys = Object.keys(localStorage).filter((key) =>
+  key.startsWith(STORAGE_KEYS.PROFILE_PREFIX)
+);
 ```
 
 ## Performance Optimization Guidelines
 
 ### Do's ✅
+
 - Load only the profiles you need
 - Use `loadProfile(id)` for single profile access
 - Update profiles individually with `saveProfile()`
 - Leverage the index for efficient enumeration
 
 ### Don'ts ❌
+
 - Don't use `loadAllProfiles()` unless you actually need all profiles
 - Don't modify profiles without saving them back
 - Don't bypass the index when managing profiles
@@ -172,32 +187,34 @@ const profileKeys = Object.keys(localStorage)
 ## Debugging and Troubleshooting
 
 ### Chrome DevTools Inspection
+
 ```javascript
 // View profile index
-JSON.parse(localStorage.getItem('tinkertools_profile_index'))
+JSON.parse(localStorage.getItem('tinkertools_profile_index'));
 
 // View specific profile
-JSON.parse(localStorage.getItem('tinkertools_profile_12345-abcd-6789-efgh'))
+JSON.parse(localStorage.getItem('tinkertools_profile_12345-abcd-6789-efgh'));
 
 // Count all profile-related keys
-Object.keys(localStorage)
-  .filter(key => key.startsWith('tinkertools_profile_'))
-  .length
+Object.keys(localStorage).filter((key) => key.startsWith('tinkertools_profile_')).length;
 ```
 
 ### Common Issues
 
 #### "Profile not found" after migration
+
 - Check if migration completed successfully
 - Look for `[ProfileStorage] Migration failed:` in console
 - Verify legacy data exists in `tinkertools_profiles` key
 
 #### Performance degradation
+
 - Ensure using individual profile operations, not bulk operations
 - Check if accidentally calling `loadAllProfiles()` frequently
 - Monitor localStorage operation timing in DevTools
 
 #### Index out of sync
+
 - Profile exists but not in index: Add to index manually
 - Profile in index but doesn't exist: Remove from index
 - Use `clearAllData()` for complete reset in development
@@ -205,17 +222,20 @@ Object.keys(localStorage)
 ## Future Development Considerations
 
 ### Planned Improvements
+
 - **Lazy loading**: Defer profile parsing until needed
 - **Compression per profile**: Individual compression strategies
 - **Partial updates**: Update only changed profile sections
 - **Background sync**: Non-blocking save operations
 
 ### Breaking Changes in v2.0
+
 - Remove deprecated `saveAllProfiles()` method
 - Clean up legacy storage keys
 - Optimize index structure for large profile counts
 
 ### Extension Points
+
 - Custom serialization strategies per profile type
 - Plugin system for profile data transformations
 - Configurable storage backends (IndexedDB, etc.)
@@ -223,6 +243,7 @@ Object.keys(localStorage)
 ## Testing Considerations
 
 ### Performance Tests
+
 ```typescript
 // Measure save time (should be <50ms)
 const start = performance.now();
@@ -234,6 +255,7 @@ const saveTime = performance.now() - start;
 ```
 
 ### Data Integrity Tests
+
 ```typescript
 // Verify index consistency
 const index = await storage.getProfileIndex();
@@ -244,6 +266,7 @@ for (const profileId of index) {
 ```
 
 ### Migration Tests
+
 ```typescript
 // Test migration from various legacy states
 localStorage.setItem('tinkertools_profiles', legacyData);
@@ -276,6 +299,7 @@ The storage layer is now optimized for scale and performance. When in doubt, pre
 ### Critical Skill Calculation Patterns
 
 #### AC Values - Pure Calculated Pattern
+
 ```typescript
 // ACs are NEVER stored - always calculated fresh
 // This prevents accumulation bugs from repeated bonus applications
@@ -284,6 +308,7 @@ const acValue = calculateSingleACValue(profile, 'Chemical AC');
 ```
 
 #### Misc Skills - Bonus Integration Pattern
+
 ```typescript
 // Misc skills get bonuses applied via ip-integrator updateProfileSkillInfo()
 const miscSkill = profile.Skills.Misc['Max NCU'];
@@ -291,6 +316,7 @@ const miscSkill = profile.Skills.Misc['Max NCU'];
 ```
 
 #### Regular Skills - Composite Value Pattern
+
 ```typescript
 // Regular skills: base + trickle-down + IP + bonuses
 const skill = profile.Skills['Body & Defense']['Body Dev.'];
@@ -306,6 +332,7 @@ const skill = profile.Skills['Body & Defense']['Body Dev.'];
 5. **Misc Skills**: Apply bonuses using ip-integrator, not direct manipulation
 
 ### Pattern Matching for Skills
+
 ```typescript
 // Use skill-patterns.ts for flexible skill name matching
 const skillValue = findSkillByPattern(skillCategory, statId);
@@ -322,6 +349,7 @@ const skillValue = findSkillByPattern(skillCategory, statId);
 ## Import Validation Boundary (September 2025)
 
 ### Critical: Validate Before Import
+
 ```typescript
 // ALWAYS validate imported profiles before saving
 const { validateProfile } = await import('./validation');
@@ -332,6 +360,7 @@ if (!validation.valid) {
 ```
 
 **Validation ensures:**
+
 - Profession/Breed IDs are numeric and in valid ranges (1-15, 0-7)
 - Skills structure is correct
 - Level is 1-220
@@ -387,28 +416,27 @@ normalizeProfessionToId("invalid") → 6 (Adventurer default)
 ### Usage Patterns
 
 #### Profile Creation
+
 ```typescript
 // ALWAYS use numeric IDs when creating profiles
-const profile = createDefaultProfile("Character Name", "Solitus");
+const profile = createDefaultProfile('Character Name', 'Solitus');
 // Result: profile.Character.Breed = 1 (numeric ID)
 // Result: profile.Character.Profession = 6 (numeric ID)
 ```
 
 #### Import from External Format
+
 ```typescript
 // ALWAYS normalize at import boundary
-const importedProfession = normalizeProfessionToId(
-  aosetups.character.profession || 'Adventurer'
-);
-const importedBreed = normalizeBreedToId(
-  aosetups.character.breed || 'Solitus'
-);
+const importedProfession = normalizeProfessionToId(aosetups.character.profession || 'Adventurer');
+const importedBreed = normalizeBreedToId(aosetups.character.breed || 'Solitus');
 
 profile.Character.Profession = importedProfession; // numeric ID
 profile.Character.Breed = importedBreed; // numeric ID
 ```
 
 #### Display in UI
+
 ```typescript
 // ONLY convert to names in display layer
 import { getProfessionName, getBreedName } from '@/services/game-utils';
@@ -421,17 +449,18 @@ const displayBreed = getBreedName(profile.Character.Breed);
 ```
 
 #### IP Calculations
+
 ```typescript
 // Use numeric IDs directly in calculations
 const abilityBase = getBreedInitValue(
-  profile.Character.Breed,  // numeric ID (1-7)
-  abilityId                  // numeric ID (16-21)
+  profile.Character.Breed, // numeric ID (1-7)
+  abilityId // numeric ID (16-21)
 );
 
 const skillCap = calcAbilityMaxValue(
   level,
-  profile.Character.Breed,       // numeric ID
-  profile.Character.Profession,  // numeric ID
+  profile.Character.Breed, // numeric ID
+  profile.Character.Profession, // numeric ID
   abilityId
 );
 ```
@@ -451,6 +480,7 @@ migrateProfileCharacterIds(profile: TinkerProfile): TinkerProfile {
 ```
 
 **Automatic Migration Triggers**:
+
 - Profile load from storage
 - Profile import from JSON
 - Profile import from AOSetups
@@ -461,15 +491,19 @@ migrateProfileCharacterIds(profile: TinkerProfile): TinkerProfile {
 
 ```typescript
 // Validate numeric type and range
-if (typeof profile.Character.Profession !== 'number' ||
-    profile.Character.Profession < 1 ||
-    profile.Character.Profession > 15) {
+if (
+  typeof profile.Character.Profession !== 'number' ||
+  profile.Character.Profession < 1 ||
+  profile.Character.Profession > 15
+) {
   errors.push('Invalid profession ID');
 }
 
-if (typeof profile.Character.Breed !== 'number' ||
-    profile.Character.Breed < 0 ||
-    profile.Character.Breed > 7) {
+if (
+  typeof profile.Character.Breed !== 'number' ||
+  profile.Character.Breed < 0 ||
+  profile.Character.Breed > 7
+) {
   errors.push('Invalid breed ID');
 }
 ```
@@ -491,6 +525,7 @@ if (typeof profile.Character.Breed !== 'number' ||
 ### Critical Do's and Don'ts
 
 #### Do's ✅
+
 - Store breed/profession as numeric IDs in all profile data
 - Use normalization functions at import boundaries
 - Convert to names only in UI display layer
@@ -498,6 +533,7 @@ if (typeof profile.Character.Breed !== 'number' ||
 - Use numeric IDs directly in IP calculations
 
 #### Don'ts ❌
+
 - Don't store breed/profession as strings in profile structure
 - Don't skip normalization when importing external data
 - Don't use string values in IP calculation functions
@@ -522,6 +558,7 @@ console.log('Breed:', profile.Character.Breed, typeof profile.Character.Breed);
 ### Related Documentation
 
 See `/docs/features/breed-profession-normalization.doc.md` for complete feature documentation including:
+
 - Data flow diagrams
 - Import/export integration details
 - Migration scenarios

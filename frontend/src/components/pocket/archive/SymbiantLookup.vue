@@ -33,32 +33,27 @@ const symbiants = computed(() => {
   // Apply search filter
   if (searchQuery.value.trim()) {
     const search = searchQuery.value.toLowerCase();
-    result = result.filter(symbiant =>
-      symbiant.name.toLowerCase().includes(search) ||
-      symbiant.slot.toLowerCase().includes(search) ||
-      symbiant.family?.toLowerCase().includes(search)
+    result = result.filter(
+      (symbiant) =>
+        symbiant.name.toLowerCase().includes(search) ||
+        symbiant.slot.toLowerCase().includes(search) ||
+        symbiant.family?.toLowerCase().includes(search)
     );
   }
 
   // Apply slot filter
   if (selectedSlots.value.length > 0) {
-    result = result.filter(symbiant =>
-      selectedSlots.value.includes(symbiant.slot)
-    );
+    result = result.filter((symbiant) => selectedSlots.value.includes(symbiant.slot));
   }
 
   // Apply quality filter
   if (selectedQualities.value.length > 0) {
-    result = result.filter(symbiant =>
-      selectedQualities.value.includes(symbiant.ql)
-    );
+    result = result.filter((symbiant) => selectedQualities.value.includes(symbiant.ql));
   }
 
   // Apply family filter
   if (selectedFamily.value) {
-    result = result.filter(symbiant =>
-      symbiant.family === selectedFamily.value
-    );
+    result = result.filter((symbiant) => symbiant.family === selectedFamily.value);
   }
 
   return result.sort((a, b) => {
@@ -70,19 +65,21 @@ const symbiants = computed(() => {
 });
 
 const availableSlots = computed(() => {
-  const slots = new Set(Array.from(symbiantStore.symbiants.values()).map(s => s.slot));
+  const slots = new Set(Array.from(symbiantStore.symbiants.values()).map((s) => s.slot));
   return Array.from(slots).sort();
 });
 
 const availableQualities = computed(() => {
-  const qualities = new Set(Array.from(symbiantStore.symbiants.values()).map(s => s.ql));
+  const qualities = new Set(Array.from(symbiantStore.symbiants.values()).map((s) => s.ql));
   return Array.from(qualities).sort((a, b) => b - a); // Descending order
 });
 
 const availableFamilies = computed(() => {
-  const families = new Set(Array.from(symbiantStore.symbiants.values())
-    .map(s => s.family)
-    .filter(Boolean));
+  const families = new Set(
+    Array.from(symbiantStore.symbiants.values())
+      .map((s) => s.family)
+      .filter(Boolean)
+  );
   return Array.from(families).sort();
 });
 
@@ -112,16 +109,16 @@ function getQualitySeverity(ql: number): 'success' | 'info' | 'warning' | 'dange
 
 function getSlotIcon(slot: string): string {
   const iconMap: Record<string, string> = {
-    'Head': 'pi-user',
-    'Eye': 'pi-eye',
-    'Ear': 'pi-volume-up',
-    'Chest': 'pi-shield',
-    'Arm': 'pi-stop',
-    'Wrist': 'pi-circle',
-    'Hand': 'pi-hand-paper',
-    'Waist': 'pi-minus',
-    'Leg': 'pi-sort-down',
-    'Feet': 'pi-step-forward'
+    Head: 'pi-user',
+    Eye: 'pi-eye',
+    Ear: 'pi-volume-up',
+    Chest: 'pi-shield',
+    Arm: 'pi-stop',
+    Wrist: 'pi-circle',
+    Hand: 'pi-hand-paper',
+    Waist: 'pi-minus',
+    Leg: 'pi-sort-down',
+    Feet: 'pi-step-forward',
   };
   return iconMap[slot] || 'pi-circle';
 }
@@ -132,8 +129,8 @@ defineExpose({
   showDetails,
   getDropSources,
   getQualitySeverity,
-  getSlotIcon
-})
+  getSlotIcon,
+});
 </script>
 
 <template>
@@ -192,7 +189,9 @@ defineExpose({
         </div>
 
         <!-- Action Buttons -->
-        <div class="flex items-center justify-between mt-4 pt-4 border-t border-surface-200 dark:border-surface-700">
+        <div
+          class="flex items-center justify-between mt-4 pt-4 border-t border-surface-200 dark:border-surface-700"
+        >
           <div class="flex items-center gap-2">
             <Button
               @click="clearAllFilters"
@@ -205,7 +204,7 @@ defineExpose({
               {{ symbiants.length }} symbiant{{ symbiants.length !== 1 ? 's' : '' }} found
             </span>
           </div>
-          
+
           <div class="flex items-center gap-2">
             <Button
               @click="viewMode = 'grid'"
@@ -257,30 +256,35 @@ defineExpose({
                   <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2 mb-1">
                       <i :class="`pi ${getSlotIcon(symbiant.slot)} text-primary-500`"></i>
-                      <span class="text-xs font-medium text-surface-600 dark:text-surface-400 uppercase">
+                      <span
+                        class="text-xs font-medium text-surface-600 dark:text-surface-400 uppercase"
+                      >
                         {{ symbiant.slot }}
                       </span>
                     </div>
-                    <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 line-clamp-2">
+                    <h3
+                      class="text-lg font-semibold text-surface-900 dark:text-surface-50 line-clamp-2"
+                    >
                       {{ symbiant.name }}
                     </h3>
                   </div>
-                  <Tag
-                    :value="`QL ${symbiant.ql}`"
-                    :severity="getQualitySeverity(symbiant.ql)"
-                  />
+                  <Tag :value="`QL ${symbiant.ql}`" :severity="getQualitySeverity(symbiant.ql)" />
                 </div>
 
                 <!-- Family -->
                 <div v-if="symbiant.family" class="text-sm">
                   <span class="font-medium text-surface-700 dark:text-surface-300">Family:</span>
-                  <span class="text-surface-600 dark:text-surface-400 ml-1">{{ symbiant.family }}</span>
+                  <span class="text-surface-600 dark:text-surface-400 ml-1">{{
+                    symbiant.family
+                  }}</span>
                 </div>
 
                 <!-- Drop Sources -->
                 <div class="flex items-center justify-between text-sm">
                   <span class="text-surface-600 dark:text-surface-400">
-                    {{ getDropSources(symbiant).length }} drop source{{ getDropSources(symbiant).length !== 1 ? 's' : '' }}
+                    {{ getDropSources(symbiant).length }} drop source{{
+                      getDropSources(symbiant).length !== 1 ? 's' : ''
+                    }}
                   </span>
                   <i class="pi pi-arrow-right text-primary-500"></i>
                 </div>
@@ -302,22 +306,23 @@ defineExpose({
               <div class="flex items-center justify-between py-2">
                 <div class="flex items-center gap-4 flex-1 min-w-0">
                   <i :class="`pi ${getSlotIcon(symbiant.slot)} text-xl text-primary-500`"></i>
-                  
+
                   <div class="min-w-0 flex-1">
-                    <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 truncate">
+                    <h3
+                      class="text-lg font-semibold text-surface-900 dark:text-surface-50 truncate"
+                    >
                       {{ symbiant.name }}
                     </h3>
-                    <div class="flex items-center gap-3 text-sm text-surface-600 dark:text-surface-400">
+                    <div
+                      class="flex items-center gap-3 text-sm text-surface-600 dark:text-surface-400"
+                    >
                       <span>{{ symbiant.slot }}</span>
                       <span v-if="symbiant.family">• {{ symbiant.family }}</span>
                     </div>
                   </div>
-                  
+
                   <div class="flex items-center gap-4">
-                    <Tag
-                      :value="`QL ${symbiant.ql}`"
-                      :severity="getQualitySeverity(symbiant.ql)"
-                    />
+                    <Tag :value="`QL ${symbiant.ql}`" :severity="getQualitySeverity(symbiant.ql)" />
                     <span class="text-sm text-surface-600 dark:text-surface-400">
                       {{ getDropSources(symbiant).length }} sources
                     </span>
@@ -359,7 +364,10 @@ defineExpose({
             <div class="space-y-2">
               <div class="flex justify-between">
                 <span class="font-medium">Quality Level:</span>
-                <Tag :value="`${selectedSymbiant.ql}`" :severity="getQualitySeverity(selectedSymbiant.ql)" />
+                <Tag
+                  :value="`${selectedSymbiant.ql}`"
+                  :severity="getQualitySeverity(selectedSymbiant.ql)"
+                />
               </div>
               <div class="flex justify-between">
                 <span class="font-medium">Body Slot:</span>
@@ -398,7 +406,10 @@ defineExpose({
           <h3 class="text-lg font-semibold mb-3">
             Drop Sources ({{ getDropSources(selectedSymbiant).length }})
           </h3>
-          <div v-if="getDropSources(selectedSymbiant).length > 0" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div
+            v-if="getDropSources(selectedSymbiant).length > 0"
+            class="grid grid-cols-1 md:grid-cols-2 gap-3"
+          >
             <div
               v-for="boss in getDropSources(selectedSymbiant)"
               :key="boss.id"

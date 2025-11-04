@@ -31,7 +31,7 @@ Shows individual requirements for each configured implant slot with met/unmet st
                     'text-xs',
                     req.met
                       ? 'border-green-500 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 text-green-700 dark:text-green-300'
-                      : 'border-red-500 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 text-red-700 dark:text-red-300'
+                      : 'border-red-500 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 text-red-700 dark:text-red-300',
                   ]"
                 >
                   <template v-if="req.met">
@@ -67,7 +67,7 @@ Shows individual requirements for each configured implant slot with met/unmet st
                 'text-xs',
                 req.met
                   ? 'border-green-500 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 text-green-700 dark:text-green-300'
-                  : 'border-red-500 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 text-red-700 dark:text-red-300'
+                  : 'border-red-500 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 text-red-700 dark:text-red-300',
               ]"
             >
               <template v-if="req.met">
@@ -93,21 +93,21 @@ Shows individual requirements for each configured implant slot with met/unmet st
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
-import Tag from 'primevue/tag'
-import type { PerImplantRequirement } from '@/types/api'
+import { computed } from 'vue';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
+import Tag from 'primevue/tag';
+import type { PerImplantRequirement } from '@/types/api';
 
 interface Props {
-  perImplantRequirements: PerImplantRequirement[]
+  perImplantRequirements: PerImplantRequirement[];
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 
 const hasRequirements = computed(() => {
-  return props.perImplantRequirements && props.perImplantRequirements.length > 0
-})
+  return props.perImplantRequirements && props.perImplantRequirements.length > 0;
+});
 </script>
 
 <style scoped>

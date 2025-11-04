@@ -14,17 +14,19 @@ Modal for viewing and editing detailed profile information
     <div v-if="loading" class="flex items-center justify-center h-64">
       <ProgressSpinner />
     </div>
-    
+
     <div v-else-if="!profileData" class="flex items-center justify-center h-64">
       <div class="text-center">
         <i class="pi pi-exclamation-triangle text-4xl text-orange-500 mb-4"></i>
         <p class="text-surface-600 dark:text-surface-400">Failed to load profile data</p>
       </div>
     </div>
-    
+
     <div v-else class="h-full flex flex-col">
       <!-- Header Actions -->
-      <div class="flex justify-between items-center mb-4 pb-4 border-b border-surface-200 dark:border-surface-700">
+      <div
+        class="flex justify-between items-center mb-4 pb-4 border-b border-surface-200 dark:border-surface-700"
+      >
         <div class="flex items-center gap-2">
           <Button
             v-if="!editing"
@@ -51,7 +53,7 @@ Modal for viewing and editing detailed profile information
             />
           </div>
         </div>
-        
+
         <div class="flex items-center gap-2">
           <Button
             @click="validateProfile"
@@ -71,7 +73,7 @@ Modal for viewing and editing detailed profile information
           />
         </div>
       </div>
-      
+
       <!-- Profile Content -->
       <div class="flex-1 overflow-auto">
         <TabView class="h-full profile-tabs">
@@ -83,7 +85,7 @@ Modal for viewing and editing detailed profile information
                 <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4">
                   Basic Information
                 </h3>
-                
+
                 <div class="field">
                   <label class="font-medium text-surface-900 dark:text-surface-50">Name</label>
                   <InputText
@@ -96,7 +98,7 @@ Modal for viewing and editing detailed profile information
                     {{ profileData.Character.Name }}
                   </p>
                 </div>
-                
+
                 <div class="field">
                   <label class="font-medium text-surface-900 dark:text-surface-50">Level</label>
                   <InputNumber
@@ -110,9 +112,11 @@ Modal for viewing and editing detailed profile information
                     {{ profileData.Character.Level }}
                   </p>
                 </div>
-                
+
                 <div class="field">
-                  <label class="font-medium text-surface-900 dark:text-surface-50">Profession</label>
+                  <label class="font-medium text-surface-900 dark:text-surface-50"
+                    >Profession</label
+                  >
                   <Dropdown
                     v-if="editing"
                     v-model="editData.Character.Profession"
@@ -137,13 +141,13 @@ Modal for viewing and editing detailed profile information
                   </p>
                 </div>
               </div>
-              
+
               <!-- Additional Info -->
               <div class="space-y-4">
                 <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4">
                   Additional Information
                 </h3>
-                
+
                 <div class="field">
                   <label class="font-medium text-surface-900 dark:text-surface-50">Faction</label>
                   <Dropdown
@@ -156,7 +160,7 @@ Modal for viewing and editing detailed profile information
                     {{ profileData.Character.Faction }}
                   </p>
                 </div>
-                
+
                 <div class="field">
                   <label class="font-medium text-surface-900 dark:text-surface-50">Expansion</label>
                   <Dropdown
@@ -169,9 +173,11 @@ Modal for viewing and editing detailed profile information
                     {{ profileData.Character.Expansion }}
                   </p>
                 </div>
-                
+
                 <div class="field">
-                  <label class="font-medium text-surface-900 dark:text-surface-50">Account Type</label>
+                  <label class="font-medium text-surface-900 dark:text-surface-50"
+                    >Account Type</label
+                  >
                   <Dropdown
                     v-if="editing"
                     v-model="editData.Character.AccountType"
@@ -185,11 +191,15 @@ Modal for viewing and editing detailed profile information
               </div>
             </div>
           </TabPanel>
-          
+
           <!-- Skills Tab -->
           <TabPanel header="Skills">
             <div class="skills-editor">
-              <div v-for="(category, categoryName) in displayableSkills" :key="categoryName" class="mb-6">
+              <div
+                v-for="(category, categoryName) in displayableSkills"
+                :key="categoryName"
+                class="mb-6"
+              >
                 <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-3">
                   {{ categoryName }}
                 </h3>
@@ -215,7 +225,7 @@ Modal for viewing and editing detailed profile information
               </div>
             </div>
           </TabPanel>
-          
+
           <!-- Equipment Tab -->
           <TabPanel header="Equipment">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -225,38 +235,56 @@ Modal for viewing and editing detailed profile information
                   Weapons
                 </h3>
                 <div class="space-y-2">
-                  <div v-for="(item, slotName) in profileData.Weapons" :key="slotName" class="flex justify-between items-center py-2 border-b border-surface-100 dark:border-surface-800">
-                    <span class="font-medium text-surface-700 dark:text-surface-300">{{ slotName }}</span>
+                  <div
+                    v-for="(item, slotName) in profileData.Weapons"
+                    :key="slotName"
+                    class="flex justify-between items-center py-2 border-b border-surface-100 dark:border-surface-800"
+                  >
+                    <span class="font-medium text-surface-700 dark:text-surface-300">{{
+                      slotName
+                    }}</span>
                     <span class="text-surface-600 dark:text-surface-400">
                       {{ item ? 'Equipped' : 'Empty' }}
                     </span>
                   </div>
                 </div>
               </div>
-              
+
               <!-- Clothing -->
               <div>
                 <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-3">
                   Clothing
                 </h3>
                 <div class="space-y-2">
-                  <div v-for="(item, slotName) in profileData.Clothing" :key="slotName" class="flex justify-between items-center py-2 border-b border-surface-100 dark:border-surface-800">
-                    <span class="font-medium text-surface-700 dark:text-surface-300">{{ slotName }}</span>
+                  <div
+                    v-for="(item, slotName) in profileData.Clothing"
+                    :key="slotName"
+                    class="flex justify-between items-center py-2 border-b border-surface-100 dark:border-surface-800"
+                  >
+                    <span class="font-medium text-surface-700 dark:text-surface-300">{{
+                      slotName
+                    }}</span>
                     <span class="text-surface-600 dark:text-surface-400">
                       {{ item ? 'Equipped' : 'Empty' }}
                     </span>
                   </div>
                 </div>
               </div>
-              
+
               <!-- Implants -->
               <div>
                 <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-3">
                   Implants
                 </h3>
                 <div class="space-y-2">
-                  <div v-for="(item, slotName) in profileData.Implants" :key="slotName" class="flex justify-between items-center py-2 border-b border-surface-100 dark:border-surface-800">
-                    <span class="font-medium text-surface-700 dark:text-surface-300">{{ slotName }}</span>
+                  <div
+                    v-for="(item, slotName) in profileData.Implants"
+                    :key="slotName"
+                    class="flex justify-between items-center py-2 border-b border-surface-100 dark:border-surface-800"
+                  >
+                    <span class="font-medium text-surface-700 dark:text-surface-300">{{
+                      slotName
+                    }}</span>
                     <span class="text-surface-600 dark:text-surface-400">
                       {{ item ? 'Equipped' : 'Empty' }}
                     </span>
@@ -265,34 +293,38 @@ Modal for viewing and editing detailed profile information
               </div>
             </div>
           </TabPanel>
-          
+
           <!-- Metadata Tab -->
           <TabPanel header="Metadata">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div class="space-y-4">
                 <div class="field">
-                  <label class="font-medium text-surface-900 dark:text-surface-50">Profile ID</label>
+                  <label class="font-medium text-surface-900 dark:text-surface-50"
+                    >Profile ID</label
+                  >
                   <p class="text-surface-700 dark:text-surface-300 font-mono text-sm">
                     {{ profileData.id }}
                   </p>
                 </div>
-                
+
                 <div class="field">
                   <label class="font-medium text-surface-900 dark:text-surface-50">Version</label>
                   <p class="text-surface-700 dark:text-surface-300">
                     {{ profileData.version }}
                   </p>
                 </div>
-                
+
                 <div class="field">
                   <label class="font-medium text-surface-900 dark:text-surface-50">Created</label>
                   <p class="text-surface-700 dark:text-surface-300">
                     {{ formatDateTime(profileData.created) }}
                   </p>
                 </div>
-                
+
                 <div class="field">
-                  <label class="font-medium text-surface-900 dark:text-surface-50">Last Updated</label>
+                  <label class="font-medium text-surface-900 dark:text-surface-50"
+                    >Last Updated</label
+                  >
                   <p class="text-surface-700 dark:text-surface-300">
                     {{ formatDateTime(profileData.updated) }}
                   </p>
@@ -303,7 +335,7 @@ Modal for viewing and editing detailed profile information
         </TabView>
       </div>
     </div>
-    
+
     <!-- Validation Results Dialog -->
     <Dialog
       :visible="showValidationResults"
@@ -313,33 +345,48 @@ Modal for viewing and editing detailed profile information
       @update:visible="showValidationResults = $event"
     >
       <div v-if="validationResults" class="space-y-4">
-        <div v-if="validationResults.valid" class="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+        <div
+          v-if="validationResults.valid"
+          class="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg"
+        >
           <i class="pi pi-check-circle text-green-600 dark:text-green-400"></i>
           <span class="text-green-700 dark:text-green-300 font-medium">Profile is valid!</span>
         </div>
-        
+
         <div v-if="validationResults.errors.length > 0">
           <h4 class="font-semibold text-red-700 dark:text-red-400 mb-2">Errors:</h4>
           <ul class="list-disc list-inside space-y-1">
-            <li v-for="error in validationResults.errors" :key="error" class="text-red-600 dark:text-red-400 text-sm">
+            <li
+              v-for="error in validationResults.errors"
+              :key="error"
+              class="text-red-600 dark:text-red-400 text-sm"
+            >
               {{ error }}
             </li>
           </ul>
         </div>
-        
+
         <div v-if="validationResults.warnings.length > 0">
           <h4 class="font-semibold text-orange-700 dark:text-orange-400 mb-2">Warnings:</h4>
           <ul class="list-disc list-inside space-y-1">
-            <li v-for="warning in validationResults.warnings" :key="warning" class="text-orange-600 dark:text-orange-400 text-sm">
+            <li
+              v-for="warning in validationResults.warnings"
+              :key="warning"
+              class="text-orange-600 dark:text-orange-400 text-sm"
+            >
               {{ warning }}
             </li>
           </ul>
         </div>
-        
+
         <div v-if="validationResults.suggestions.length > 0">
           <h4 class="font-semibold text-blue-700 dark:text-blue-400 mb-2">Suggestions:</h4>
           <ul class="list-disc list-inside space-y-1">
-            <li v-for="suggestion in validationResults.suggestions" :key="suggestion" class="text-blue-600 dark:text-blue-400 text-sm">
+            <li
+              v-for="suggestion in validationResults.suggestions"
+              :key="suggestion"
+              class="text-blue-600 dark:text-blue-400 text-sm"
+            >
               {{ suggestion }}
             </li>
           </ul>
@@ -366,7 +413,7 @@ import {
   ANARCHY_BREEDS,
   ANARCHY_FACTIONS,
   ANARCHY_EXPANSIONS,
-  ACCOUNT_TYPES
+  ACCOUNT_TYPES,
 } from '@/lib/tinkerprofiles';
 import { skillService } from '@/services/skill-service';
 import type { SkillId } from '@/types/skills';
@@ -380,7 +427,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:visible': [value: boolean];
-  'updated': [];
+  updated: [];
 }>();
 
 // Services
@@ -396,11 +443,11 @@ const showValidationResults = ref(false);
 const validationResults = ref<ProfileValidationResult | null>(null);
 
 // Options
-const professionOptions = ANARCHY_PROFESSIONS.map(p => p);
-const breedOptions = ANARCHY_BREEDS.map(b => b);
-const factionOptions = ANARCHY_FACTIONS.map(f => f);
-const expansionOptions = ANARCHY_EXPANSIONS.map(e => e);
-const accountTypeOptions = ACCOUNT_TYPES.map(a => a);
+const professionOptions = ANARCHY_PROFESSIONS.map((p) => p);
+const breedOptions = ANARCHY_BREEDS.map((b) => b);
+const factionOptions = ANARCHY_FACTIONS.map((f) => f);
+const expansionOptions = ANARCHY_EXPANSIONS.map((e) => e);
+const accountTypeOptions = ACCOUNT_TYPES.map((a) => a);
 
 // Computed
 const displayableSkills = computed(() => {
@@ -434,7 +481,7 @@ const displayableSkills = computed(() => {
 // Methods
 async function loadProfileData() {
   if (!props.profile) return;
-  
+
   loading.value = true;
   try {
     const profile = await profilesStore.loadProfile(props.profile.id);
@@ -460,7 +507,7 @@ function cancelEditing() {
 
 async function saveChanges() {
   if (!editData.value || !props.profile) return;
-  
+
   saving.value = true;
   try {
     await profilesStore.updateProfile(props.profile.id, editData.value);
@@ -477,7 +524,7 @@ async function saveChanges() {
 
 async function validateProfile() {
   if (!props.profile) return;
-  
+
   try {
     const result = await profilesStore.validateProfile(props.profile.id);
     validationResults.value = result;
@@ -489,10 +536,10 @@ async function validateProfile() {
 
 async function exportProfile() {
   if (!props.profile) return;
-  
+
   try {
     const exported = await profilesStore.exportProfile(props.profile.id, 'json');
-    
+
     // Create download
     const blob = new Blob([exported], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -503,7 +550,6 @@ async function exportProfile() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
   } catch (error) {
     console.error('Failed to export profile:', error);
   }
@@ -541,7 +587,7 @@ function updateSkillValue(skillName: string, value: number | null): void {
         total: 0,
         equipmentBonus: 0,
         perkBonus: 0,
-        buffBonus: 0
+        buffBonus: 0,
       };
     }
     editData.value.skills[skillId].total = value || 0;
@@ -551,22 +597,28 @@ function updateSkillValue(skillName: string, value: number | null): void {
 }
 
 // Watchers
-watch(() => props.visible, (visible) => {
-  if (visible && props.profile) {
-    loadProfileData();
-  } else {
-    // Reset state when closing
-    profileData.value = null;
-    editData.value = null;
-    editing.value = false;
+watch(
+  () => props.visible,
+  (visible) => {
+    if (visible && props.profile) {
+      loadProfileData();
+    } else {
+      // Reset state when closing
+      profileData.value = null;
+      editData.value = null;
+      editing.value = false;
+    }
   }
-});
+);
 
-watch(() => props.profile, (profile) => {
-  if (profile && props.visible) {
-    loadProfileData();
+watch(
+  () => props.profile,
+  (profile) => {
+    if (profile && props.visible) {
+      loadProfileData();
+    }
   }
-});
+);
 </script>
 
 <style scoped>

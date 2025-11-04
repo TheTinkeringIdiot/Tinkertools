@@ -101,99 +101,101 @@ Shows owned perks with their effects and point usage in a tabbed interface
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import TabView from 'primevue/tabview'
-import TabPanel from 'primevue/tabpanel'
-import Badge from 'primevue/badge'
-import PerkTable from './PerkTable.vue'
-import PerkPointsSummary from './PerkPointsSummary.vue'
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types'
-import { calculatePerkPointsDetailed } from '@/services/perk-calculator'
-import type { PerkCharacterData, PerkEntry, ResearchEntry } from '@/lib/tinkerprofiles/perk-types'
+import { computed } from 'vue';
+import TabView from 'primevue/tabview';
+import TabPanel from 'primevue/tabpanel';
+import Badge from 'primevue/badge';
+import PerkTable from './PerkTable.vue';
+import PerkPointsSummary from './PerkPointsSummary.vue';
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import { calculatePerkPointsDetailed } from '@/services/perk-calculator';
+import type { PerkCharacterData, PerkEntry, ResearchEntry } from '@/lib/tinkerprofiles/perk-types';
 
 // Props
 const props = defineProps<{
-  profile: TinkerProfile
-}>()
+  profile: TinkerProfile;
+}>();
 
 // Character data for calculations
-const characterData = computed((): PerkCharacterData => ({
-  level: props.profile.Character?.Level || 1,
-  alienLevel: props.profile.Character?.AlienLevel || 0,
-  profession: props.profile.Character?.Profession || 'Adventurer',
-  breed: props.profile.Character?.Breed || 'Solitus',
-  expansion: 'SL' // Default expansion
-}))
+const characterData = computed(
+  (): PerkCharacterData => ({
+    level: props.profile.Character?.Level || 1,
+    alienLevel: props.profile.Character?.AlienLevel || 0,
+    profession: props.profile.Character?.Profession || 'Adventurer',
+    breed: props.profile.Character?.Breed || 'Solitus',
+    expansion: 'SL', // Default expansion
+  })
+);
 
 // Point calculations
 const pointCalculation = computed(() => {
-  return calculatePerkPointsDetailed(characterData.value)
-})
+  return calculatePerkPointsDetailed(characterData.value);
+});
 
 // Extract perks from profile
 const slPerks = computed((): PerkEntry[] => {
-  const perkSystem = props.profile.PerksAndResearch as any
+  const perkSystem = props.profile.PerksAndResearch as any;
   if (!perkSystem || typeof perkSystem !== 'object' || !Array.isArray(perkSystem.perks)) {
-    return []
+    return [];
   }
-  return perkSystem.perks.filter((perk: any) => perk.type === 'SL') as PerkEntry[]
-})
+  return perkSystem.perks.filter((perk: any) => perk.type === 'SL') as PerkEntry[];
+});
 
 const aiPerks = computed((): PerkEntry[] => {
-  const perkSystem = props.profile.PerksAndResearch as any
+  const perkSystem = props.profile.PerksAndResearch as any;
   if (!perkSystem || typeof perkSystem !== 'object' || !Array.isArray(perkSystem.perks)) {
-    return []
+    return [];
   }
-  return perkSystem.perks.filter((perk: any) => perk.type === 'AI') as PerkEntry[]
-})
+  return perkSystem.perks.filter((perk: any) => perk.type === 'AI') as PerkEntry[];
+});
 
 const lePerks = computed((): ResearchEntry[] => {
-  const perkSystem = props.profile.PerksAndResearch as any
+  const perkSystem = props.profile.PerksAndResearch as any;
   if (!perkSystem || typeof perkSystem !== 'object' || !Array.isArray(perkSystem.research)) {
-    return []
+    return [];
   }
-  return perkSystem.research as ResearchEntry[]
-})
+  return perkSystem.research as ResearchEntry[];
+});
 
 // SL Perks data
-const maxSLPoints = computed(() => pointCalculation.value.standardPoints.total)
+const maxSLPoints = computed(() => pointCalculation.value.standardPoints.total);
 const slPointsUsed = computed(() => {
-  const perkSystem = props.profile.PerksAndResearch as any
+  const perkSystem = props.profile.PerksAndResearch as any;
   if (!perkSystem || typeof perkSystem !== 'object' || !perkSystem.standardPerkPoints) {
-    return 0
+    return 0;
   }
-  return perkSystem.standardPerkPoints.spent || 0
-})
-const slPointsRemaining = computed(() => maxSLPoints.value - slPointsUsed.value)
-const slPerkCount = computed(() => slPerks.value.length)
+  return perkSystem.standardPerkPoints.spent || 0;
+});
+const slPointsRemaining = computed(() => maxSLPoints.value - slPointsUsed.value);
+const slPerkCount = computed(() => slPerks.value.length);
 
 // AI Perks data
-const maxAIPoints = computed(() => pointCalculation.value.aiPoints.total)
+const maxAIPoints = computed(() => pointCalculation.value.aiPoints.total);
 const aiPointsUsed = computed(() => {
-  const perkSystem = props.profile.PerksAndResearch as any
+  const perkSystem = props.profile.PerksAndResearch as any;
   if (!perkSystem || typeof perkSystem !== 'object' || !perkSystem.aiPerkPoints) {
-    return 0
+    return 0;
   }
-  return perkSystem.aiPerkPoints.spent || 0
-})
-const aiPointsRemaining = computed(() => maxAIPoints.value - aiPointsUsed.value)
-const aiPerkCount = computed(() => aiPerks.value.length)
-const hasAILevel = computed(() => characterData.value.alienLevel > 0)
+  return perkSystem.aiPerkPoints.spent || 0;
+});
+const aiPointsRemaining = computed(() => maxAIPoints.value - aiPointsUsed.value);
+const aiPerkCount = computed(() => aiPerks.value.length);
+const hasAILevel = computed(() => characterData.value.alienLevel > 0);
 
 // LE Research data
-const researchCount = computed(() => lePerks.value.length)
+const researchCount = computed(() => lePerks.value.length);
 
 // Event handlers for future functionality
 function handleAddPerks(type: 'SL' | 'AI' | 'LE') {
-  console.log(`Add ${type} perks - functionality coming soon`)
+  console.log(`Add ${type} perks - functionality coming soon`);
 }
 
 function handleUpgradePerk(perk: PerkEntry | ResearchEntry) {
-  console.log(`Upgrade perk ${perk.name} - functionality coming soon`)
+  console.log(`Upgrade perk ${perk.name} - functionality coming soon`);
 }
 
 function handleRemovePerk(perk: PerkEntry | ResearchEntry) {
-  console.log(`Remove perk ${perk.name} - functionality coming soon`)
+  console.log(`Remove perk ${perk.name} - functionality coming soon`);
 }
 </script>
 

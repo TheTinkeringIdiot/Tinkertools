@@ -23,19 +23,21 @@ import { SKILL_ID, createTestProfile, PROFESSION, BREED } from '@/__tests__/help
 vi.mock('primevue/slider', () => ({
   default: {
     name: 'Slider',
-    template: '<input type="range" :value="modelValue" @input="$emit(\'update:model-value\', Number($event.target.value))" :min="min" :max="max" :step="step" />',
+    template:
+      '<input type="range" :value="modelValue" @input="$emit(\'update:model-value\', Number($event.target.value))" :min="min" :max="max" :step="step" />',
     props: ['modelValue', 'min', 'max', 'step'],
-    emits: ['update:model-value']
-  }
+    emits: ['update:model-value'],
+  },
 }));
 
 vi.mock('primevue/inputnumber', () => ({
   default: {
     name: 'InputNumber',
-    template: '<input type="number" :value="modelValue" @input="$emit(\'update:model-value\', Number($event.target.value))" :min="min" :max="max" :step="step" />',
+    template:
+      '<input type="number" :value="modelValue" @input="$emit(\'update:model-value\', Number($event.target.value))" :min="min" :max="max" :step="step" />',
     props: ['modelValue', 'min', 'max', 'step', 'size'],
-    emits: ['update:model-value']
-  }
+    emits: ['update:model-value'],
+  },
 }));
 
 vi.mock('primevue/button', () => ({
@@ -43,14 +45,14 @@ vi.mock('primevue/button', () => ({
     name: 'Button',
     template: '<button @click="$emit(\'click\')" :disabled="disabled">{{ label }}</button>',
     props: ['label', 'severity', 'outlined', 'size', 'disabled'],
-    emits: ['click']
-  }
+    emits: ['click'],
+  },
 }));
 
 // Mock tooltip directive
 const tooltipDirective = {
   beforeMount() {},
-  updated() {}
+  updated() {},
 };
 
 // Mock the console to check for errors
@@ -65,7 +67,6 @@ console.error = (...args: any[]) => {
 const toSkillId = (id: number): SkillId => id as SkillId;
 
 describe('Misc Skills Integration Tests', () => {
-
   // Test profile factory with Misc skills
   const createMiscSkillsProfile = (): TinkerProfile => {
     return createTestProfile({
@@ -87,37 +88,37 @@ describe('Misc Skills Integration Tests', () => {
           equipmentBonus: 0,
           perkBonus: 0,
           buffBonus: 0,
-          total: 0
+          total: 0,
         },
         [SKILL_ID.CONCEALMENT]: {
           base: 0,
           equipmentBonus: 50,
           perkBonus: 25,
           buffBonus: 10,
-          total: 85
+          total: 85,
         },
         [SKILL_ID.PSYCHOLOGY]: {
           base: 0,
           equipmentBonus: 30,
           perkBonus: 0,
           buffBonus: 0,
-          total: 30
+          total: 30,
         },
         [SKILL_ID.SWIMMING]: {
           base: 0,
           equipmentBonus: 0,
           perkBonus: 0,
           buffBonus: 0,
-          total: 0
+          total: 0,
         },
         [SKILL_ID.DUCK_EXP]: {
           base: 0,
           equipmentBonus: 0,
           perkBonus: 15,
           buffBonus: 5,
-          total: 20
+          total: 20,
         },
-      }
+      },
     });
   };
 
@@ -138,7 +139,7 @@ describe('Misc Skills Integration Tests', () => {
         equipmentBonus: 50,
         perkBonus: 25,
         buffBonus: 0,
-        total: 75
+        total: 75,
       };
 
       const wrapper = mount(SkillSlider, {
@@ -149,13 +150,13 @@ describe('Misc Skills Integration Tests', () => {
           isAbility: false,
           isReadOnly: true,
           category: 'Misc',
-          breed: BREED.SOLITUS
+          breed: BREED.SOLITUS,
         },
         global: {
           directives: {
-            tooltip: tooltipDirective
-          }
-        }
+            tooltip: tooltipDirective,
+          },
+        },
       });
 
       // Should extract the value field properly
@@ -172,7 +173,7 @@ describe('Misc Skills Integration Tests', () => {
         equipmentBonus: 100,
         perkBonus: 50,
         buffBonus: 25,
-        total: 175
+        total: 175,
       };
 
       const wrapper = mount(SkillSlider, {
@@ -183,13 +184,13 @@ describe('Misc Skills Integration Tests', () => {
           isAbility: false,
           isReadOnly: true,
           category: 'Misc',
-          breed: BREED.SOLITUS
+          breed: BREED.SOLITUS,
         },
         global: {
           directives: {
-            tooltip: tooltipDirective
-          }
-        }
+            tooltip: tooltipDirective,
+          },
+        },
       });
 
       await nextTick();
@@ -209,7 +210,7 @@ describe('Misc Skills Integration Tests', () => {
         equipmentBonus: 50,
         perkBonus: 0,
         buffBonus: 0,
-        total: 50
+        total: 50,
       };
 
       const wrapper = mount(SkillSlider, {
@@ -220,13 +221,13 @@ describe('Misc Skills Integration Tests', () => {
           isAbility: false,
           isReadOnly: true,
           category: 'Misc',
-          breed: BREED.SOLITUS
+          breed: BREED.SOLITUS,
         },
         global: {
           directives: {
-            tooltip: tooltipDirective
-          }
-        }
+            tooltip: tooltipDirective,
+          },
+        },
       });
 
       // Should not show interactive controls for read-only Misc skills
@@ -244,7 +245,7 @@ describe('Misc Skills Integration Tests', () => {
         equipmentBonus: 75,
         perkBonus: 0,
         buffBonus: 0,
-        total: 75
+        total: 75,
       };
 
       const wrapper = mount(SkillSlider, {
@@ -255,13 +256,13 @@ describe('Misc Skills Integration Tests', () => {
           isAbility: false,
           isReadOnly: true,
           category: 'Misc',
-          breed: BREED.SOLITUS
+          breed: BREED.SOLITUS,
         },
         global: {
           directives: {
-            tooltip: tooltipDirective
-          }
-        }
+            tooltip: tooltipDirective,
+          },
+        },
       });
 
       const equipmentBonus = wrapper.find('.equipment-bonus-indicator');
@@ -280,7 +281,7 @@ describe('Misc Skills Integration Tests', () => {
         equipmentBonus: 50,
         perkBonus: 25,
         buffBonus: 10,
-        total: 85
+        total: 85,
       };
 
       const wrapper = mount(StatBreakdownTooltip, {
@@ -297,13 +298,13 @@ describe('Misc Skills Integration Tests', () => {
           buffBonus: 10,
           ipContribution: 0,
           abilityImprovements: 0,
-          totalValue: 85
+          totalValue: 85,
         },
         global: {
           directives: {
-            tooltip: tooltipDirective
-          }
-        }
+            tooltip: tooltipDirective,
+          },
+        },
       });
 
       expect(wrapper.text()).toContain('Concealment Breakdown');
@@ -324,7 +325,7 @@ describe('Misc Skills Integration Tests', () => {
         equipmentBonus: 30,
         perkBonus: 0,
         buffBonus: 0,
-        total: 30
+        total: 30,
       };
 
       const wrapper = mount(StatBreakdownTooltip, {
@@ -341,13 +342,13 @@ describe('Misc Skills Integration Tests', () => {
           buffBonus: 0,
           ipContribution: 0,
           abilityImprovements: 0,
-          totalValue: 30
+          totalValue: 30,
         },
         global: {
           directives: {
-            tooltip: tooltipDirective
-          }
-        }
+            tooltip: tooltipDirective,
+          },
+        },
       });
 
       // Should NOT show IP improvements or trickle-down
@@ -368,7 +369,7 @@ describe('Misc Skills Integration Tests', () => {
         equipmentBonus: 40,
         perkBonus: 20,
         buffBonus: 5,
-        total: 65
+        total: 65,
       };
 
       const wrapper = mount(StatBreakdownTooltip, {
@@ -385,13 +386,13 @@ describe('Misc Skills Integration Tests', () => {
           buffBonus: 5,
           ipContribution: 0,
           abilityImprovements: 0,
-          totalValue: 65
+          totalValue: 65,
         },
         global: {
           directives: {
-            tooltip: tooltipDirective
-          }
-        }
+            tooltip: tooltipDirective,
+          },
+        },
       });
 
       // Check for color classes
@@ -400,9 +401,9 @@ describe('Misc Skills Integration Tests', () => {
       const buffRow = wrapper.find('.breakdown-row:has(.text-amber-600)');
 
       // Note: These selectors may not work in jsdom, so we check text content instead
-      expect(wrapper.html()).toContain('text-blue-600');  // Equipment bonus color
+      expect(wrapper.html()).toContain('text-blue-600'); // Equipment bonus color
       expect(wrapper.html()).toContain('text-purple-600'); // Perk bonus color
-      expect(wrapper.html()).toContain('text-amber-600');  // Buff bonus color
+      expect(wrapper.html()).toContain('text-amber-600'); // Buff bonus color
     });
   });
 
@@ -412,13 +413,13 @@ describe('Misc Skills Integration Tests', () => {
 
       const wrapper = mount(SkillsManager, {
         props: {
-          profile: profile
+          profile: profile,
         },
         global: {
           directives: {
-            tooltip: tooltipDirective
-          }
-        }
+            tooltip: tooltipDirective,
+          },
+        },
       });
 
       await nextTick();
@@ -441,20 +442,21 @@ describe('Misc Skills Integration Tests', () => {
 
       const wrapper = mount(SkillsManager, {
         props: {
-          profile: profile
+          profile: profile,
         },
         global: {
           directives: {
-            tooltip: tooltipDirective
-          }
-        }
+            tooltip: tooltipDirective,
+          },
+        },
       });
 
       await nextTick();
 
       // Find and click the toggle button
-      const toggleButton = wrapper.find('[data-testid="toggle-zero-misc"]') ||
-                          wrapper.find('button:contains("Show Zero")');
+      const toggleButton =
+        wrapper.find('[data-testid="toggle-zero-misc"]') ||
+        wrapper.find('button:contains("Show Zero")');
 
       const allButtons = wrapper.findAll('button');
       const firstButton = allButtons.length > 0 ? allButtons[0] : null;
@@ -475,13 +477,13 @@ describe('Misc Skills Integration Tests', () => {
 
       const wrapper = mount(SkillsManager, {
         props: {
-          profile: profile
+          profile: profile,
         },
         global: {
           directives: {
-            tooltip: tooltipDirective
-          }
-        }
+            tooltip: tooltipDirective,
+          },
+        },
       });
 
       await nextTick();
@@ -510,13 +512,13 @@ describe('Misc Skills Integration Tests', () => {
 
       const wrapper = mount(SkillsManager, {
         props: {
-          profile: profile
+          profile: profile,
         },
         global: {
           directives: {
-            tooltip: tooltipDirective
-          }
-        }
+            tooltip: tooltipDirective,
+          },
+        },
       });
 
       // Should show zero-value skills based on saved preference
@@ -536,7 +538,7 @@ describe('Misc Skills Integration Tests', () => {
         equipmentBonus: 50,
         perkBonus: 0,
         buffBonus: 0,
-        total: 50
+        total: 50,
       };
 
       const wrapper = mount(SkillSlider, {
@@ -547,13 +549,13 @@ describe('Misc Skills Integration Tests', () => {
           isAbility: false,
           isReadOnly: true,
           category: 'Misc',
-          breed: BREED.SOLITUS
+          breed: BREED.SOLITUS,
         },
         global: {
           directives: {
-            tooltip: tooltipDirective
-          }
-        }
+            tooltip: tooltipDirective,
+          },
+        },
       });
 
       expect(wrapper.text()).toContain('50');
@@ -567,7 +569,7 @@ describe('Misc Skills Integration Tests', () => {
         equipmentBonus: 75,
         perkBonus: 25,
         buffBonus: 0,
-        total: 100
+        total: 100,
       };
 
       await wrapper.setProps({ skillData: updatedSkill });
@@ -586,7 +588,7 @@ describe('Misc Skills Integration Tests', () => {
         equipmentBonus: 30,
         perkBonus: 0,
         buffBonus: 0,
-        total: 30
+        total: 30,
       };
 
       const wrapper = mount(StatBreakdownTooltip, {
@@ -603,13 +605,13 @@ describe('Misc Skills Integration Tests', () => {
           buffBonus: 0,
           ipContribution: 0,
           abilityImprovements: 0,
-          totalValue: 30
+          totalValue: 30,
         },
         global: {
           directives: {
-            tooltip: tooltipDirective
-          }
-        }
+            tooltip: tooltipDirective,
+          },
+        },
       });
 
       expect(wrapper.text()).toContain('+30');
@@ -624,11 +626,11 @@ describe('Misc Skills Integration Tests', () => {
         equipmentBonus: 30,
         perkBonus: 20,
         buffBonus: 0,
-        total: 50
+        total: 50,
       };
 
       await wrapper.setProps({
-        skillData: updatedSkill
+        skillData: updatedSkill,
       });
       await nextTick();
 
@@ -642,13 +644,13 @@ describe('Misc Skills Integration Tests', () => {
 
       const wrapper = mount(SkillsManager, {
         props: {
-          profile: profile
+          profile: profile,
         },
         global: {
           directives: {
-            tooltip: tooltipDirective
-          }
-        }
+            tooltip: tooltipDirective,
+          },
+        },
       });
 
       await nextTick();
@@ -679,7 +681,7 @@ describe('Misc Skills Integration Tests', () => {
         equipmentBonus: 50,
         perkBonus: 25,
         buffBonus: 10,
-        total: 85
+        total: 85,
       };
 
       const wrapper = mount(SkillSlider, {
@@ -690,13 +692,13 @@ describe('Misc Skills Integration Tests', () => {
           isAbility: false,
           isReadOnly: true,
           category: 'Misc',
-          breed: BREED.SOLITUS
+          breed: BREED.SOLITUS,
         },
         global: {
           directives: {
-            tooltip: tooltipDirective
-          }
-        }
+            tooltip: tooltipDirective,
+          },
+        },
       });
 
       await nextTick();
@@ -714,7 +716,7 @@ describe('Misc Skills Integration Tests', () => {
         equipmentBonus: 0,
         perkBonus: 0,
         buffBonus: 0,
-        total: 50
+        total: 50,
       };
 
       const wrapper = mount(SkillSlider, {
@@ -725,13 +727,13 @@ describe('Misc Skills Integration Tests', () => {
           isAbility: false,
           isReadOnly: true,
           category: 'Misc',
-          breed: BREED.SOLITUS
+          breed: BREED.SOLITUS,
         },
         global: {
           directives: {
-            tooltip: tooltipDirective
-          }
-        }
+            tooltip: tooltipDirective,
+          },
+        },
       });
 
       expect(wrapper.exists()).toBe(true);
@@ -739,7 +741,7 @@ describe('Misc Skills Integration Tests', () => {
       wrapper.unmount();
 
       // Should not generate errors during unmounting
-      expect(consoleErrors.filter(error => error.includes('unmount'))).toEqual([]);
+      expect(consoleErrors.filter((error) => error.includes('unmount'))).toEqual([]);
     });
 
     it('should handle missing or malformed skill data gracefully', () => {
@@ -752,18 +754,18 @@ describe('Misc Skills Integration Tests', () => {
           isAbility: false,
           isReadOnly: true,
           category: 'Misc',
-          breed: BREED.SOLITUS
+          breed: BREED.SOLITUS,
         },
         global: {
           directives: {
-            tooltip: tooltipDirective
-          }
-        }
+            tooltip: tooltipDirective,
+          },
+        },
       });
 
       // Should not crash or generate errors
       expect(wrapper.exists()).toBe(true);
-      expect(consoleErrors.filter(error => error.includes('undefined'))).toEqual([]);
+      expect(consoleErrors.filter((error) => error.includes('undefined'))).toEqual([]);
     });
   });
 
@@ -773,13 +775,13 @@ describe('Misc Skills Integration Tests', () => {
 
       const wrapper = mount(SkillsManager, {
         props: {
-          profile: profile
+          profile: profile,
         },
         global: {
           directives: {
-            tooltip: tooltipDirective
-          }
-        }
+            tooltip: tooltipDirective,
+          },
+        },
       });
 
       await nextTick();
@@ -803,13 +805,13 @@ describe('Misc Skills Integration Tests', () => {
 
       const wrapper = mount(SkillsManager, {
         props: {
-          profile: profile
+          profile: profile,
         },
         global: {
           directives: {
-            tooltip: tooltipDirective
-          }
-        }
+            tooltip: tooltipDirective,
+          },
+        },
       });
 
       await nextTick();
@@ -827,9 +829,9 @@ describe('Misc Skills Integration Tests', () => {
             equipmentBonus: 100,
             perkBonus: 0,
             buffBonus: 0,
-            total: 100
-          }
-        }
+            total: 100,
+          },
+        },
       };
 
       await wrapper.setProps({ profile: updatedProfile });

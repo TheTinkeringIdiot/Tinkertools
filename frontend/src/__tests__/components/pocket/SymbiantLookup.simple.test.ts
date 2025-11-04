@@ -1,6 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION } from '@/__tests__/helpers';
+import {
+  mountWithContext,
+  standardCleanup,
+  createTestProfile,
+  SKILL_ID,
+  PROFESSION,
+} from '@/__tests__/helpers';
 import { createPinia } from 'pinia';
 import PrimeVue from 'primevue/config';
 
@@ -11,25 +17,29 @@ vi.mock('@/services/api-client', () => ({
       items: [],
       total: 0,
       page: 1,
-      page_size: 50
-    })
-  }
+      page_size: 50,
+    }),
+  },
 }));
 
 // Mock components
 const MockCard = { template: '<div class="mock-card"><slot name="content"></slot></div>' };
 const MockInputText = { template: '<input class="mock-inputtext" v-bind="$attrs" />' };
 const MockButton = { template: '<button class="mock-button"><slot></slot></button>' };
-const MockMultiSelect = { template: '<select multiple class="mock-multiselect" v-bind="$attrs"></select>' };
-const MockDataView = { 
-  template: '<div class="mock-dataview"><slot name="empty" v-if="!value || value.length === 0"></slot></div>',
-  props: ['value']
+const MockMultiSelect = {
+  template: '<select multiple class="mock-multiselect" v-bind="$attrs"></select>',
+};
+const MockDataView = {
+  template:
+    '<div class="mock-dataview"><slot name="empty" v-if="!value || value.length === 0"></slot></div>',
+  props: ['value'],
 };
 
 describe('SymbiantLookup Component Structure', () => {
   const createWrapper = () => {
-    return mount({
-      template: `
+    return mount(
+      {
+        template: `
         <div class="symbiant-lookup">
           <MockCard class="mb-6">
             <template #content>
@@ -59,20 +69,22 @@ describe('SymbiantLookup Component Structure', () => {
           <MockDataView :value="symbiants" />
         </div>
       `,
-      components: { MockCard, MockInputText, MockButton, MockMultiSelect, MockDataView },
-      data() {
-        return {
-          symbiants: [
-            { id: 1, name: 'Artillery Head', slot: 'Head', ql: 150, family: 'Artillery' },
-            { id: 2, name: 'Control Chest', slot: 'Chest', ql: 200, family: 'Control' }
-          ]
-        };
+        components: { MockCard, MockInputText, MockButton, MockMultiSelect, MockDataView },
+        data() {
+          return {
+            symbiants: [
+              { id: 1, name: 'Artillery Head', slot: 'Head', ql: 150, family: 'Artillery' },
+              { id: 2, name: 'Control Chest', slot: 'Chest', ql: 200, family: 'Control' },
+            ],
+          };
+        },
+      },
+      {
+        global: {
+          plugins: [createPinia(), PrimeVue],
+        },
       }
-    }, {
-      global: {
-        plugins: [createPinia(), PrimeVue]
-      }
-    });
+    );
   };
 
   it('renders the basic structure', () => {
@@ -103,10 +115,10 @@ describe('SymbiantLookup Helper Functions', () => {
   it('gets correct slot icons', () => {
     const getSlotIcon = (slot: string) => {
       const iconMap: Record<string, string> = {
-        'Head': 'pi-user',
-        'Eye': 'pi-eye',
-        'Chest': 'pi-shield',
-        'Hand': 'pi-hand-paper'
+        Head: 'pi-user',
+        Eye: 'pi-eye',
+        Chest: 'pi-shield',
+        Hand: 'pi-hand-paper',
       };
       return iconMap[slot] || 'pi-circle';
     };
@@ -134,16 +146,17 @@ describe('SymbiantLookup Helper Functions', () => {
   it('filters symbiants by search query', () => {
     const symbiants = [
       { id: 1, name: 'Artillery Head', slot: 'Head', family: 'Artillery' },
-      { id: 2, name: 'Control Chest', slot: 'Chest', family: 'Control' }
+      { id: 2, name: 'Control Chest', slot: 'Chest', family: 'Control' },
     ];
-    
+
     const filterBySearch = (items: any[], search: string) => {
       if (!search) return items;
       const searchLower = search.toLowerCase();
-      return items.filter(s => 
-        s.name.toLowerCase().includes(searchLower) ||
-        s.slot.toLowerCase().includes(searchLower) ||
-        s.family?.toLowerCase().includes(searchLower)
+      return items.filter(
+        (s) =>
+          s.name.toLowerCase().includes(searchLower) ||
+          s.slot.toLowerCase().includes(searchLower) ||
+          s.family?.toLowerCase().includes(searchLower)
       );
     };
 

@@ -1,12 +1,12 @@
 /**
  * TinkerProfiles Manager - Core Profile Management Class
- * 
+ *
  * Main interface for all profile operations, combining storage, validation,
  * transformation, and event handling capabilities
  */
 
-import type { 
-  TinkerProfile, 
+import type {
+  TinkerProfile,
   NanoCompatibleProfile,
   ProfileMetadata,
   ProfileExportFormat,
@@ -17,7 +17,7 @@ import type {
   TinkerProfilesConfig,
   ProfileSearchFilters,
   ProfileSortOptions,
-  IPTracker
+  IPTracker,
 } from './types';
 
 import { ProfileStorage } from './storage';
@@ -31,20 +31,20 @@ import type {
   PerkValidationResult,
   PerkChangeEvent,
   PerkEffectSummary,
-  PerkPointCalculation
+  PerkPointCalculation,
 } from './perk-types';
 
 // Simple event emitter for profile events
 class ProfileEventEmitter {
   private listeners: { [K in keyof ProfileEvents]?: Array<(data: ProfileEvents[K]) => void> } = {};
-  
+
   on<K extends keyof ProfileEvents>(event: K, listener: (data: ProfileEvents[K]) => void): void {
     if (!this.listeners[event]) {
       this.listeners[event] = [];
     }
     this.listeners[event]!.push(listener);
   }
-  
+
   off<K extends keyof ProfileEvents>(event: K, listener: (data: ProfileEvents[K]) => void): void {
     const eventListeners = this.listeners[event];
     if (eventListeners) {
@@ -54,11 +54,11 @@ class ProfileEventEmitter {
       }
     }
   }
-  
+
   emit<K extends keyof ProfileEvents>(event: K, data: ProfileEvents[K]): void {
     const eventListeners = this.listeners[event];
     if (eventListeners) {
-      eventListeners.forEach(listener => {
+      eventListeners.forEach((listener) => {
         try {
           listener(data);
         } catch (error) {
@@ -75,12 +75,12 @@ export class TinkerProfilesManager {
   private transformer: ProfileTransformer;
   private events: ProfileEventEmitter;
   private config: TinkerProfilesConfig;
-  
+
   // Cache for performance
   private profilesCache: Map<string, TinkerProfile> = new Map();
   private metadataCache: ProfileMetadata[] | null = null;
   private cacheInvalidated: boolean = true;
-  
+
   constructor(config: Partial<TinkerProfilesConfig> = {}) {
     this.config = {
       storage: {
@@ -88,38 +88,38 @@ export class TinkerProfilesManager {
         encrypt: false,
         autoSave: true,
         migrationEnabled: true,
-        ...config.storage
+        ...config.storage,
       },
       validation: {
         strictMode: false,
         autoCorrect: true,
         allowLegacyFormats: true,
-        ...config.validation
+        ...config.validation,
       },
       events: {
         enabled: true,
         throttle: 100,
-        ...config.events
+        ...config.events,
       },
       features: {
         autoBackup: false,
         compression: false,
         migration: true,
         analytics: false,
-        ...config.features
-      }
+        ...config.features,
+      },
     };
-    
+
     this.storage = new ProfileStorage(this.config.storage);
     this.validator = new ProfileValidator();
     this.transformer = new ProfileTransformer();
     this.events = new ProfileEventEmitter();
   }
-  
+
   // ============================================================================
   // Profile CRUD Operations
   // ============================================================================
-  
+
   /**
    * Convert numeric Misc skills to MiscSkill objects for compatibility
    */
@@ -140,7 +140,7 @@ export class TinkerProfilesManager {
           equipmentBonus: 0,
           perkBonus: 0,
           buffBonus: 0,
-          value: skillValue // Preserve the original numeric value
+          value: skillValue, // Preserve the original numeric value
         };
         skillsMigrated++;
       }
@@ -148,7 +148,9 @@ export class TinkerProfilesManager {
 
     if (skillsMigrated > 0) {
       profile.updated = new Date().toISOString();
-      console.log(`[TinkerProfilesManager] Migrated ${skillsMigrated} Misc skills from numeric to MiscSkill objects for profile ${profile.Character.Name}`);
+      console.log(
+        `[TinkerProfilesManager] Migrated ${skillsMigrated} Misc skills from numeric to MiscSkill objects for profile ${profile.Character.Name}`
+      );
     }
 
     return profile;
@@ -205,19 +207,18 @@ export class TinkerProfilesManager {
       }
 
       return profile.id;
-
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to create profile';
       if (this.config.events.enabled) {
         this.events.emit('storage:error', {
           error: new Error(errorMsg),
-          operation: 'create'
+          operation: 'create',
         });
       }
       throw new Error(errorMsg);
     }
   }
-  
+
   /**
    * Load a profile by ID
    */
@@ -259,18 +260,17 @@ export class TinkerProfilesManager {
       }
 
       return null;
-
     } catch (error) {
       if (this.config.events.enabled) {
         this.events.emit('storage:error', {
           error: error instanceof Error ? error : new Error('Failed to load profile'),
-          operation: 'load'
+          operation: 'load',
         });
       }
       return null;
     }
   }
-  
+
   /**
    * Update a profile
    */
@@ -296,7 +296,7 @@ export class TinkerProfilesManager {
       }
 
       // Apply other updates
-      Object.keys(updates).forEach(key => {
+      Object.keys(updates).forEach((key) => {
         if (key !== 'Weapons' && key !== 'Clothing' && key !== 'Implants') {
           (updated as any)[key] = (updates as any)[key];
         }
@@ -305,8 +305,12 @@ export class TinkerProfilesManager {
       updated.updated = new Date().toISOString();
 
       // Check if equipment, perks, or buffs changed - if so, recalculate stats
-      const needsRecalc = updates.Weapons || updates.Clothing || updates.Implants ||
-                         updates.PerksAndResearch || updates.buffs;
+      const needsRecalc =
+        updates.Weapons ||
+        updates.Clothing ||
+        updates.Implants ||
+        updates.PerksAndResearch ||
+        updates.buffs;
 
       if (needsRecalc) {
         // Recalculate all stats including equipment bonuses, perk bonuses, etc
@@ -328,19 +332,18 @@ export class TinkerProfilesManager {
       if (this.config.events.enabled) {
         this.events.emit('profile:updated', { profile: updated, changes: updates });
       }
-
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to update profile';
       if (this.config.events.enabled) {
         this.events.emit('storage:error', {
           error: new Error(errorMsg),
-          operation: 'update'
+          operation: 'update',
         });
       }
       throw new Error(errorMsg);
     }
   }
-  
+
   /**
    * Delete a profile
    */
@@ -349,23 +352,22 @@ export class TinkerProfilesManager {
       await this.storage.deleteProfile(profileId);
       this.profilesCache.delete(profileId);
       this.invalidateCache();
-      
+
       if (this.config.events.enabled) {
         this.events.emit('profile:deleted', { profileId });
       }
-      
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to delete profile';
       if (this.config.events.enabled) {
-        this.events.emit('storage:error', { 
-          error: new Error(errorMsg), 
-          operation: 'delete' 
+        this.events.emit('storage:error', {
+          error: new Error(errorMsg),
+          operation: 'delete',
         });
       }
       throw new Error(errorMsg);
     }
   }
-  
+
   /**
    * Get all profile metadata (lightweight)
    */
@@ -374,22 +376,21 @@ export class TinkerProfilesManager {
       if (!refresh && this.metadataCache && !this.cacheInvalidated) {
         return this.metadataCache;
       }
-      
+
       const metadata = await this.storage.getProfileMetadata();
       this.metadataCache = metadata;
-      
+
       return metadata;
-      
     } catch (error) {
       console.error('Failed to load profile metadata:', error);
       return [];
     }
   }
-  
+
   // ============================================================================
   // Active Profile Management
   // ============================================================================
-  
+
   /**
    * Set the active profile
    */
@@ -400,81 +401,88 @@ export class TinkerProfilesManager {
         if (!profile) {
           throw new Error('Profile not found');
         }
-        
+
         await this.storage.setActiveProfile(profileId);
-        
+
         if (this.config.events.enabled) {
           this.events.emit('profile:activated', { profile });
         }
       } else {
         await this.storage.setActiveProfile(null);
       }
-      
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to set active profile';
       if (this.config.events.enabled) {
-        this.events.emit('storage:error', { 
-          error: new Error(errorMsg), 
-          operation: 'setActive' 
+        this.events.emit('storage:error', {
+          error: new Error(errorMsg),
+          operation: 'setActive',
         });
       }
       throw new Error(errorMsg);
     }
   }
-  
+
   /**
    * Get the active profile
    */
   async getActiveProfile(): Promise<TinkerProfile | null> {
     return await this.storage.loadActiveProfile();
   }
-  
+
   /**
    * Get the active profile ID
    */
   getActiveProfileId(): string | null {
     return this.storage.getActiveProfileId();
   }
-  
+
   // ============================================================================
   // Profile Search and Filtering
   // ============================================================================
-  
+
   /**
    * Search profiles with filters
    */
   async searchProfiles(
-    filters: ProfileSearchFilters = {}, 
+    filters: ProfileSearchFilters = {},
     sort?: ProfileSortOptions
   ): Promise<ProfileMetadata[]> {
     const allMetadata = await this.getProfileMetadata();
-    
-    let filtered = allMetadata.filter(profile => {
+
+    let filtered = allMetadata.filter((profile) => {
       // Name filter
       if (filters.name && !profile.name.toLowerCase().includes(filters.name.toLowerCase())) {
         return false;
       }
-      
+
       // Profession filter
-      if (filters.profession && filters.profession.length > 0 && !filters.profession.includes(profile.profession)) {
+      if (
+        filters.profession &&
+        filters.profession.length > 0 &&
+        !filters.profession.includes(profile.profession)
+      ) {
         return false;
       }
-      
+
       // Level filter
       if (filters.level && (profile.level < filters.level[0] || profile.level > filters.level[1])) {
         return false;
       }
-      
+
       // Breed filter
       if (filters.breed && filters.breed.length > 0 && !filters.breed.includes(profile.breed)) {
         return false;
       }
-      
+
       // Faction filter
-      if (filters.faction && filters.faction.length > 0 && !filters.faction.includes(profile.faction)) {
+      if (
+        filters.faction &&
+        filters.faction.length > 0 &&
+        !filters.faction.includes(profile.faction)
+      ) {
         return false;
       }
-      
+
       // Date filters
       if (filters.created) {
         const created = new Date(profile.created);
@@ -484,15 +492,15 @@ export class TinkerProfilesManager {
           return false;
         }
       }
-      
+
       return true;
     });
-    
+
     // Apply sorting
     if (sort) {
       filtered.sort((a, b) => {
         let aVal: any, bVal: any;
-        
+
         switch (sort.field) {
           case 'name':
             aVal = a.name.toLowerCase();
@@ -517,30 +525,30 @@ export class TinkerProfilesManager {
           default:
             return 0;
         }
-        
+
         if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
         if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
         return 0;
       });
     }
-    
+
     return filtered;
   }
-  
+
   // ============================================================================
   // Profile Transformations
   // ============================================================================
-  
+
   /**
    * Convert profile to nano-compatible format
    */
   async getAsNanoCompatible(profileId: string): Promise<NanoCompatibleProfile | null> {
     const profile = await this.loadProfile(profileId);
     if (!profile) return null;
-    
+
     return this.transformer.toNanoCompatible(profile);
   }
-  
+
   /**
    * Create profile from nano-compatible format
    */
@@ -548,11 +556,11 @@ export class TinkerProfilesManager {
     const profile = this.transformer.fromNanoCompatible(nanoProfile);
     return await this.createProfile(profile.Character.Name, profile);
   }
-  
+
   // ============================================================================
   // Import/Export Operations
   // ============================================================================
-  
+
   /**
    * Export a profile
    */
@@ -561,56 +569,57 @@ export class TinkerProfilesManager {
     if (!profile) {
       throw new Error('Profile not found');
     }
-    
+
     const exported = this.transformer.exportProfile(profile, format);
-    
+
     if (this.config.events.enabled) {
       this.events.emit('profile:exported', { profile, format });
     }
-    
+
     return exported;
   }
-  
+
   /**
    * Import a profile
    */
   async importProfile(data: string, sourceFormat?: string): Promise<ProfileImportResult> {
     const result = await this.transformer.importProfile(data, sourceFormat);
-    
+
     if (result.success && result.profile) {
       try {
         // Validate imported profile
         const validation = this.validator.validateProfile(result.profile);
-        
+
         if (!validation.valid && this.config.validation.strictMode) {
           result.success = false;
           result.errors.push(...validation.errors);
           return result;
         }
-        
+
         result.warnings.push(...validation.warnings);
-        
+
         // Save the imported profile
         await this.storage.saveProfile(result.profile);
         this.invalidateCache();
-        
+
         if (this.config.events.enabled) {
           this.events.emit('profile:imported', { profile: result.profile, result });
         }
-        
       } catch (error) {
         result.success = false;
-        result.errors.push(error instanceof Error ? error.message : 'Failed to save imported profile');
+        result.errors.push(
+          error instanceof Error ? error.message : 'Failed to save imported profile'
+        );
       }
     }
-    
+
     return result;
   }
-  
+
   // ============================================================================
   // Validation Operations
   // ============================================================================
-  
+
   /**
    * Validate a profile
    */
@@ -621,23 +630,23 @@ export class TinkerProfilesManager {
         valid: false,
         errors: ['Profile not found'],
         warnings: [],
-        suggestions: []
+        suggestions: [],
       };
     }
-    
+
     const result = this.validator.validateProfile(profile);
-    
+
     if (!result.valid && this.config.events.enabled) {
       this.events.emit('validation:failed', { profileId, errors: result.errors });
     }
-    
+
     return result;
   }
-  
+
   // ============================================================================
   // Event System
   // ============================================================================
-  
+
   /**
    * Subscribe to profile events
    */
@@ -646,18 +655,18 @@ export class TinkerProfilesManager {
       this.events.on(event, listener);
     }
   }
-  
+
   /**
    * Unsubscribe from profile events
    */
   off<K extends keyof ProfileEvents>(event: K, listener: (data: ProfileEvents[K]) => void): void {
     this.events.off(event, listener);
   }
-  
+
   // ============================================================================
   // Cache Management
   // ============================================================================
-  
+
   /**
    * Clear all caches
    */
@@ -666,27 +675,27 @@ export class TinkerProfilesManager {
     this.metadataCache = null;
     this.cacheInvalidated = true;
   }
-  
+
   private invalidateCache(): void {
     this.cacheInvalidated = true;
     this.metadataCache = null;
   }
-  
+
   private invalidateMetadataCache(): void {
     this.metadataCache = null;
   }
-  
+
   // ============================================================================
   // Utility Methods
   // ============================================================================
-  
+
   /**
    * Get storage statistics
    */
   getStorageStats(): { used: number; total: number; profiles: number } {
     return this.storage.getStorageStats();
   }
-  
+
   /**
    * Clear all profile data (dangerous!)
    */
@@ -696,20 +705,20 @@ export class TinkerProfilesManager {
       this.clearCache();
     }
   }
-  
+
   /**
    * Get configuration
    */
   getConfig(): TinkerProfilesConfig {
     return { ...this.config };
   }
-  
+
   /**
    * Update configuration
    */
   updateConfig(updates: Partial<TinkerProfilesConfig>): void {
     this.config = { ...this.config, ...updates };
-    
+
     // Reinitialize components with new config if needed
     if (updates.storage) {
       this.storage = new ProfileStorage(this.config.storage);
@@ -726,7 +735,7 @@ export class TinkerProfilesManager {
   async getProfileIPAnalysis(profileId: string): Promise<IPTracker | null> {
     const profile = await this.loadProfile(profileId);
     if (!profile) return null;
-    
+
     return profile.IPTracker || ipIntegrator.calculateProfileIP(profile);
   }
 
@@ -760,7 +769,7 @@ export class TinkerProfilesManager {
     return {
       valid: validation.valid,
       errors: validation.errors,
-      warnings: validation.warnings
+      warnings: validation.warnings,
     };
   }
 
@@ -789,7 +798,7 @@ export class TinkerProfilesManager {
 
     return {
       success: result.success,
-      error: result.error
+      error: result.error,
     };
   }
 
@@ -817,7 +826,7 @@ export class TinkerProfilesManager {
 
     return {
       success: result.success,
-      error: result.error
+      error: result.error,
     };
   }
 
@@ -827,7 +836,7 @@ export class TinkerProfilesManager {
   async getAvailableIP(profileId: string): Promise<number> {
     const profile = await this.loadProfile(profileId);
     if (!profile) return 0;
-    
+
     const ipInfo = profile.IPTracker || ipIntegrator.calculateProfileIP(profile);
     return ipInfo.remaining;
   }
@@ -873,7 +882,7 @@ export class TinkerProfilesManager {
       if (this.config.events.enabled && result.changeEvent) {
         this.events.emit('profile:updated', {
           profile: result.updatedProfile,
-          changes: { PerksAndResearch: result.updatedProfile.PerksAndResearch }
+          changes: { PerksAndResearch: result.updatedProfile.PerksAndResearch },
         });
       }
     }
@@ -881,7 +890,7 @@ export class TinkerProfilesManager {
     return {
       success: result.success,
       error: result.error,
-      changeEvent: result.changeEvent
+      changeEvent: result.changeEvent,
     };
   }
 
@@ -911,7 +920,7 @@ export class TinkerProfilesManager {
       if (this.config.events.enabled && result.changeEvent) {
         this.events.emit('profile:updated', {
           profile: result.updatedProfile,
-          changes: { PerksAndResearch: result.updatedProfile.PerksAndResearch }
+          changes: { PerksAndResearch: result.updatedProfile.PerksAndResearch },
         });
       }
     }
@@ -919,7 +928,7 @@ export class TinkerProfilesManager {
     return {
       success: result.success,
       error: result.error,
-      changeEvent: result.changeEvent
+      changeEvent: result.changeEvent,
     };
   }
 
@@ -936,7 +945,7 @@ export class TinkerProfilesManager {
       return {
         valid: false,
         errors: ['Profile not found'],
-        warnings: []
+        warnings: [],
       };
     }
 
@@ -996,7 +1005,7 @@ export class TinkerProfilesManager {
         type: 'SL',
         cost: 1,
         requirements: {},
-        effects: []
+        effects: [],
       };
 
       const result = perkManager.addPerk(profile, dummyPerk, 1);

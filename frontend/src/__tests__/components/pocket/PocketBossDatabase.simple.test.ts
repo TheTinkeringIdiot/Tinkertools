@@ -1,6 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION } from '@/__tests__/helpers';
+import {
+  mountWithContext,
+  standardCleanup,
+  createTestProfile,
+  SKILL_ID,
+  PROFESSION,
+} from '@/__tests__/helpers';
 import { createPinia } from 'pinia';
 import PrimeVue from 'primevue/config';
 
@@ -14,24 +20,26 @@ vi.mock('@/services/api-client', () => ({
       page_size: 50,
       pages: 0,
       has_next: false,
-      has_prev: false
-    })
-  }
+      has_prev: false,
+    }),
+  },
 }));
 
 // Mock PrimeVue components to avoid complex imports
 const MockCard = { template: '<div class="mock-card"><slot name="content"></slot></div>' };
 const MockInputText = { template: '<input class="mock-inputtext" v-bind="$attrs" />' };
 const MockButton = { template: '<button class="mock-button"><slot></slot></button>' };
-const MockDataView = { 
-  template: '<div class="mock-dataview"><slot name="empty" v-if="!value || value.length === 0"></slot></div>',
-  props: ['value']
+const MockDataView = {
+  template:
+    '<div class="mock-dataview"><slot name="empty" v-if="!value || value.length === 0"></slot></div>',
+  props: ['value'],
 };
 
 describe('PocketBossDatabase Component Structure', () => {
   const createWrapper = () => {
-    return mount({
-      template: `
+    return mount(
+      {
+        template: `
         <div class="pocket-boss-database">
           <MockCard class="mb-6">
             <template #content>
@@ -51,20 +59,22 @@ describe('PocketBossDatabase Component Structure', () => {
           <MockDataView :value="bosses" />
         </div>
       `,
-      components: { MockCard, MockInputText, MockButton, MockDataView },
-      data() {
-        return {
-          bosses: [
-            { id: 1, name: 'Test Boss 1', level: 100 },
-            { id: 2, name: 'Test Boss 2', level: 150 }
-          ]
-        };
+        components: { MockCard, MockInputText, MockButton, MockDataView },
+        data() {
+          return {
+            bosses: [
+              { id: 1, name: 'Test Boss 1', level: 100 },
+              { id: 2, name: 'Test Boss 2', level: 150 },
+            ],
+          };
+        },
+      },
+      {
+        global: {
+          plugins: [createPinia(), PrimeVue],
+        },
       }
-    }, {
-      global: {
-        plugins: [createPinia(), PrimeVue]
-      }
-    });
+    );
   };
 
   it('renders the basic structure', () => {
@@ -103,7 +113,9 @@ describe('PocketBossDatabase Helper Functions', () => {
       return parts.join(' - ') || 'Unknown Location';
     };
 
-    expect(formatLocation({ playfield: 'Nascence', location: 'Central' })).toBe('Nascence - Central');
+    expect(formatLocation({ playfield: 'Nascence', location: 'Central' })).toBe(
+      'Nascence - Central'
+    );
     expect(formatLocation({ playfield: 'Nascence' })).toBe('Nascence');
     expect(formatLocation({ location: 'Central' })).toBe('Central');
     expect(formatLocation({})).toBe('Unknown Location');

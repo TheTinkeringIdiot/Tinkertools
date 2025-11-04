@@ -51,9 +51,13 @@ Shows symbiants with search, filtering, and pagination
                 <span class="font-medium text-surface-900 dark:text-surface-100">
                   {{ symbiant.name }}
                 </span>
-                <Badge v-if="symbiant.qualityLevel" :value="`QL ${symbiant.qualityLevel}`" severity="info" />
+                <Badge
+                  v-if="symbiant.qualityLevel"
+                  :value="`QL ${symbiant.qualityLevel}`"
+                  severity="info"
+                />
               </div>
-              
+
               <div class="text-sm text-surface-600 dark:text-surface-400 mb-2">
                 <div class="flex items-center gap-3">
                   <span v-if="symbiant.family">
@@ -66,12 +70,15 @@ Shows symbiants with search, filtering, and pagination
                   </span>
                 </div>
               </div>
-              
+
               <!-- Description -->
-              <p v-if="symbiant.description" class="text-xs text-surface-500 dark:text-surface-400 line-clamp-2">
+              <p
+                v-if="symbiant.description"
+                class="text-xs text-surface-500 dark:text-surface-400 line-clamp-2"
+              >
                 {{ symbiant.description }}
               </p>
-              
+
               <!-- Stat Bonuses (if available) -->
               <div v-if="symbiant.statBonuses && symbiant.statBonuses.length > 0" class="mt-2">
                 <div class="flex flex-wrap gap-1">
@@ -91,7 +98,7 @@ Shows symbiants with search, filtering, and pagination
                 </div>
               </div>
             </div>
-            
+
             <!-- Actions -->
             <div class="flex items-center gap-1 ml-3">
               <Button
@@ -129,7 +136,10 @@ Shows symbiants with search, filtering, and pagination
     </div>
 
     <!-- Pagination -->
-    <div v-if="totalPages > 1" class="flex-shrink-0 p-3 border-t border-surface-200 dark:border-surface-700">
+    <div
+      v-if="totalPages > 1"
+      class="flex-shrink-0 p-3 border-t border-surface-200 dark:border-surface-700"
+    >
       <Paginator
         :rows="pageSize"
         :totalRecords="sortedSymbiants.length"
@@ -160,7 +170,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
-  buildMode: false
+  buildMode: false,
 });
 
 interface Emits {
@@ -181,7 +191,7 @@ const sortOptions = [
   { label: 'Name', value: 'name' },
   { label: 'Family', value: 'family' },
   { label: 'Quality Level', value: 'qualityLevel' },
-  { label: 'Slot', value: 'slot' }
+  { label: 'Slot', value: 'slot' },
 ];
 
 // Computed
@@ -189,22 +199,22 @@ const sortedSymbiants = computed(() => {
   const sorted = [...props.symbiants].sort((a, b) => {
     let aValue: any = a[sortBy.value as keyof Symbiant];
     let bValue: any = b[sortBy.value as keyof Symbiant];
-    
+
     // Handle null/undefined values
     if (aValue == null) aValue = '';
     if (bValue == null) bValue = '';
-    
+
     // Convert to string for comparison
     aValue = String(aValue).toLowerCase();
     bValue = String(bValue).toLowerCase();
-    
+
     if (sortOrder.value === 'asc') {
       return aValue.localeCompare(bValue);
     } else {
       return bValue.localeCompare(aValue);
     }
   });
-  
+
   return sorted;
 });
 
@@ -219,31 +229,31 @@ const paginatedSymbiants = computed(() => {
 // Methods
 const formatSlotName = (slot: string): string => {
   const slotNames: Record<string, string> = {
-    'head': 'Head',
-    'eye': 'Eye',
-    'ear': 'Ear',
-    'rarm': 'Right Arm',
-    'chest': 'Chest',
-    'larm': 'Left Arm',
-    'waist': 'Waist',
-    'rwrist': 'Right Wrist',
-    'legs': 'Legs',
-    'lwrist': 'Left Wrist',
-    'rfinger': 'Right Finger',
-    'feet': 'Feet',
-    'lfinger': 'Left Finger'
+    head: 'Head',
+    eye: 'Eye',
+    ear: 'Ear',
+    rarm: 'Right Arm',
+    chest: 'Chest',
+    larm: 'Left Arm',
+    waist: 'Waist',
+    rwrist: 'Right Wrist',
+    legs: 'Legs',
+    lwrist: 'Left Wrist',
+    rfinger: 'Right Finger',
+    feet: 'Feet',
+    lfinger: 'Left Finger',
   };
   return slotNames[slot] || slot;
 };
 
 const formatStatName = (statId: string): string => {
   const statNames: Record<string, string> = {
-    'strength': 'STR',
-    'agility': 'AGI',
-    'stamina': 'STA',
-    'intelligence': 'INT',
-    'sense': 'SEN',
-    'psychic': 'PSY'
+    strength: 'STR',
+    agility: 'AGI',
+    stamina: 'STA',
+    intelligence: 'INT',
+    sense: 'SEN',
+    psychic: 'PSY',
   };
   return statNames[statId] || statId.toUpperCase();
 };
@@ -270,9 +280,12 @@ const onPageChange = (event: any) => {
 };
 
 // Reset page when symbiants change
-watch(() => props.symbiants, () => {
-  currentPage.value = 0;
-});
+watch(
+  () => props.symbiants,
+  () => {
+    currentPage.value = 0;
+  }
+);
 </script>
 
 <style scoped>

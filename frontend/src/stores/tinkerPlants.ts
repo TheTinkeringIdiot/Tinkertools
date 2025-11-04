@@ -5,44 +5,44 @@
  * Integrates with TinkerProfiles for profile storage and backend /implants/lookup API
  */
 
-import { defineStore } from 'pinia'
-import { ref, computed, readonly } from 'vue'
+import { defineStore } from 'pinia';
+import { ref, computed, readonly } from 'vue';
 import type {
   Item,
   ImplantSelection,
   ImplantRequirement,
   TreatmentInfo,
   AttributeRequirementInfo,
-  PerImplantRequirement
-} from '../types/api'
-import { apiClient } from '../services/api-client'
-import { useTinkerProfilesStore } from './tinkerProfiles'
-import { equipmentBonusCalculator } from '../services/equipment-bonus-calculator'
-import { getCriteriaRequirements } from '../services/action-criteria'
-import { useToast } from 'primevue/usetoast'
-import { skillService } from '../services/skill-service'
+  PerImplantRequirement,
+} from '../types/api';
+import { apiClient } from '../services/api-client';
+import { useTinkerProfilesStore } from './tinkerProfiles';
+import { equipmentBonusCalculator } from '../services/equipment-bonus-calculator';
+import { getCriteriaRequirements } from '../services/action-criteria';
+import { useToast } from 'primevue/usetoast';
+import { skillService } from '../services/skill-service';
 
 // Attribute stats that need special display
 const ATTRIBUTE_STAT_IDS = new Set([
   124, // Treatment
-  16,  // Strength
-  17,  // Agility
-  18,  // Stamina
-  19,  // Intelligence
-  20,  // Sense
-  21,  // Psychic
-])
+  16, // Strength
+  17, // Agility
+  18, // Stamina
+  19, // Intelligence
+  20, // Sense
+  21, // Psychic
+]);
 
 // Cache entry for implant lookups
 interface CacheEntry {
-  item: Item
-  timestamp: number
+  item: Item;
+  timestamp: number;
 }
 
 // Debounced lookup tracker
 interface DebouncedLookup {
-  timer: number
-  slotBitflag: string
+  timer: number;
+  slotBitflag: string;
 }
 
 /**
@@ -54,63 +54,65 @@ interface DebouncedLookup {
  *
  * Returns stat IDs for each cluster using skillService to resolve variations
  */
-function parseImplantClusters(item: any): { shiny: number | null; bright: number | null; faded: number | null } | null {
-  const description = item.description
-  if (!description) return null
+function parseImplantClusters(
+  item: any
+): { shiny: number | null; bright: number | null; faded: number | null } | null {
+  const description = item.description;
+  if (!description) return null;
 
   const clusters = {
     shiny: null as number | null,
     bright: null as number | null,
-    faded: null as number | null
-  }
+    faded: null as number | null,
+  };
 
-  const failedClusters: string[] = []
+  const failedClusters: string[] = [];
 
   // Parse each cluster line
-  const fadedMatch = description.match(/Faded NanoCluster:\s*([^\r\n]+)/i)
-  const brightMatch = description.match(/Bright NanoCluster:\s*([^\r\n]+)/i)
-  const shinyMatch = description.match(/Shining NanoCluster:\s*([^\r\n]+)/i)
+  const fadedMatch = description.match(/Faded NanoCluster:\s*([^\r\n]+)/i);
+  const brightMatch = description.match(/Bright NanoCluster:\s*([^\r\n]+)/i);
+  const shinyMatch = description.match(/Shining NanoCluster:\s*([^\r\n]+)/i);
 
   if (fadedMatch) {
-    const rawName = fadedMatch[1].trim()
+    const rawName = fadedMatch[1].trim();
     if (rawName && rawName !== 'Empty') {
       try {
         // Resolve cluster name to stat ID
-        const skillId = skillService.resolveId(rawName)
-        clusters.faded = skillId
+        const skillId = skillService.resolveId(rawName);
+        clusters.faded = skillId;
       } catch (err) {
-        console.error(`❌ [CLUSTER LOOKUP FAILED] Faded: "${rawName}"`)
-        failedClusters.push(`Faded: "${rawName}"`)
+        console.error(`❌ [CLUSTER LOOKUP FAILED] Faded: "${rawName}"`);
+        failedClusters.push(`Faded: "${rawName}"`);
         // Don't set fallback - leave as null
       }
     }
   }
 
   if (brightMatch) {
-    const rawName = brightMatch[1].trim()
+    const rawName = brightMatch[1].trim();
     if (rawName && rawName !== 'Empty') {
       try {
         // Resolve cluster name to stat ID
-        const skillId = skillService.resolveId(rawName)
-        clusters.bright = skillId
+        const skillId = skillService.resolveId(rawName);
+        clusters.bright = skillId;
       } catch (err) {
-        console.error(`❌ [CLUSTER LOOKUP FAILED] Bright: "${rawName}"`)
-        failedClusters.push(`Bright: "${rawName}"`)
+        console.error(`❌ [CLUSTER LOOKUP FAILED] Bright: "${rawName}"`);
+        failedClusters.push(`Bright: "${rawName}"`);
         // Don't set fallback - leave as null
       }
     }
   }
 
   if (shinyMatch) {
-    const rawName = shinyMatch[1].trim()
+    const rawName = shinyMatch[1].trim();
     if (rawName && rawName !== 'Empty') {
       try {
         // Resolve cluster name to stat ID
-        const skillId = skillService.resolveId(rawName)
-        clusters.shiny = skillId
+        const skillId = skillService.resolveId(rawName);
+        clusters.shiny = skillId;
       } catch (err) {
-        console.error(`❌ [CLUSTER LOOKUP FAILED] Shiny: "${rawName}"`)
-        failedClusters.push(`Shiny: "${rawName}"`)
+        console.error(`❌ [CLUSTER LOOKUP FAILED] Shiny: "${rawName}"`);
+        failedClusters.push(`Shiny: "${rawName}"`);
         // Don't set fallback - leave as null
       }
     }
@@ -118,15 +120,18 @@ function parseImplantClusters(item: any): { shiny: number | null; bright: number
 
   // Log summary of failures if any
   if (failedClusters.length > 0) {
-    console.error(`❌ [CLUSTER LOOKUP SUMMARY] ${failedClusters.length} cluster(s) failed normalization:`, failedClusters)
+    console.error(
+      `❌ [CLUSTER LOOKUP SUMMARY] ${failedClusters.length} cluster(s) failed normalization:`,
+      failedClusters
+    );
   }
 
   // Return null if all clusters are empty
   if (!clusters.shiny && !clusters.bright && !clusters.faded) {
-    return null
+    return null;
   }
 
-  return clusters
+  return clusters;
 }
 
 export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
@@ -137,43 +142,43 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
   /**
    * Loading state - true when API operations are in progress
    */
-  const loading = ref(false)
+  const loading = ref(false);
 
   /**
    * Per-slot loading state - tracks which slots are currently fetching data
    */
-  const slotLoading = ref<Record<string, boolean>>({})
+  const slotLoading = ref<Record<string, boolean>>({});
 
   /**
    * Error state - populated when operations fail
    */
-  const error = ref<string | null>(null)
+  const error = ref<string | null>(null);
 
   /**
    * Current implant configuration (working state)
    * Key: slot bitflag (e.g., "2" for Eyes)
    * Value: ImplantSelection with cluster names, QL, and fetched item
    */
-  const currentConfiguration = ref<Record<string, ImplantSelection>>({})
+  const currentConfiguration = ref<Record<string, ImplantSelection>>({});
 
   /**
    * Profile configuration (saved state from profile.Implants)
    * Used for dirty checking and revert functionality
    */
-  const profileConfiguration = ref<Record<string, ImplantSelection>>({})
+  const profileConfiguration = ref<Record<string, ImplantSelection>>({});
 
   /**
    * Calculated stat bonuses from current implant configuration
    * Key: stat ID (number)
    * Value: total bonus amount
    */
-  const calculatedBonuses = ref<Record<number, number>>({})
+  const calculatedBonuses = ref<Record<number, number>>({});
 
   /**
    * Calculated requirements for current implant configuration
    * Includes equipment requirements (Treatment, Attributes) and build requirements (NP, skills)
    */
-  const calculatedRequirements = ref<ImplantRequirement[]>([])
+  const calculatedRequirements = ref<ImplantRequirement[]>([]);
 
   /**
    * Treatment requirement information
@@ -183,37 +188,37 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
     required: 0,
     current: 0,
     delta: 0,
-    sufficient: false
-  })
+    sufficient: false,
+  });
 
   /**
    * In-memory cache for implant lookups
    * Key: generated from slot + QL + clusters hash
    * Value: cached item data with timestamp
    */
-  const lookupCache = ref<Map<string, CacheEntry>>(new Map())
+  const lookupCache = ref<Map<string, CacheEntry>>(new Map());
 
   /**
    * Cache TTL in milliseconds (5 minutes)
    */
-  const cacheTTL = 5 * 60 * 1000
+  const cacheTTL = 5 * 60 * 1000;
 
   /**
    * Toast service for user notifications
    */
-  const toast = useToast()
+  const toast = useToast();
 
   /**
    * Debounced lookup timers
    * Tracks pending lookups to avoid rapid-fire API calls on manual changes
    */
-  const debouncedLookups = ref<Map<string, DebouncedLookup>>(new Map())
+  const debouncedLookups = ref<Map<string, DebouncedLookup>>(new Map());
 
   /**
    * Attribute preference for filtering implant variants
    * Defaults to null (no preference)
    */
-  const attributePreference = ref<string | null>(null)
+  const attributePreference = ref<string | null>(null);
 
   /**
    * Per-implant requirements (not deduplicated)
@@ -221,7 +226,7 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
    * Key: slot bitflag (e.g., "2" for Eyes)
    * Value: array of requirements for that specific implant
    */
-  const perImplantRequirements = ref<Record<string, ImplantRequirement[]>>({})
+  const perImplantRequirements = ref<Record<string, ImplantRequirement[]>>({});
 
   // ============================================================================
   // Helper Functions
@@ -244,9 +249,9 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
       '1024': 'Right Hand',
       '2048': 'Legs',
       '4096': 'Left Hand',
-      '8192': 'Feet'
-    }
-    return slotMap[slotBitflag] || `Slot ${slotBitflag}`
+      '8192': 'Feet',
+    };
+    return slotMap[slotBitflag] || `Slot ${slotBitflag}`;
   }
 
   // ============================================================================
@@ -257,36 +262,34 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
    * Treatment required for current implant configuration
    * Extracted from highest Treatment requirement across all implants
    */
-  const treatmentRequired = computed(() => treatmentInfo.value.required)
+  const treatmentRequired = computed(() => treatmentInfo.value.required);
 
   /**
    * Unmet requirements for current configuration
    * Returns array of requirements where met === false
    */
-  const unmetRequirements = computed(() =>
-    calculatedRequirements.value.filter(req => !req.met)
-  )
+  const unmetRequirements = computed(() => calculatedRequirements.value.filter((req) => !req.met));
 
   /**
    * Has unsaved changes
    * True if currentConfiguration differs from profileConfiguration
    */
   const hasChanges = computed(() => {
-    const currentKeys = Object.keys(currentConfiguration.value).sort()
-    const profileKeys = Object.keys(profileConfiguration.value).sort()
+    const currentKeys = Object.keys(currentConfiguration.value).sort();
+    const profileKeys = Object.keys(profileConfiguration.value).sort();
 
     // Different number of configured slots
     if (currentKeys.length !== profileKeys.length) {
-      return true
+      return true;
     }
 
     // Check if any slot configuration differs
     for (const key of currentKeys) {
-      const current = currentConfiguration.value[key]
-      const profile = profileConfiguration.value[key]
+      const current = currentConfiguration.value[key];
+      const profile = profileConfiguration.value[key];
 
       if (!profile) {
-        return true
+        return true;
       }
 
       if (
@@ -295,12 +298,12 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
         current.faded !== profile.faded ||
         current.ql !== profile.ql
       ) {
-        return true
+        return true;
       }
     }
 
-    return false
-  })
+    return false;
+  });
 
   /**
    * Attribute requirements for current configuration
@@ -308,7 +311,7 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
    * Sorted with Treatment first, then alphabetically
    */
   const attributeRequirements = computed((): AttributeRequirementInfo[] => {
-    const requirements: AttributeRequirementInfo[] = []
+    const requirements: AttributeRequirementInfo[] = [];
 
     for (const req of calculatedRequirements.value) {
       // Only include attribute stats (not build skills)
@@ -319,46 +322,60 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
           required: req.required,
           current: req.current,
           delta: req.required - req.current,
-          sufficient: req.met
-        })
+          sufficient: req.met,
+        });
       }
     }
 
     // Sort: Treatment first, then alphabetically
     requirements.sort((a, b) => {
-      if (a.stat === 124) return -1  // Treatment first
-      if (b.stat === 124) return 1
-      return a.statName.localeCompare(b.statName)
-    })
+      if (a.stat === 124) return -1; // Treatment first
+      if (b.stat === 124) return 1;
+      return a.statName.localeCompare(b.statName);
+    });
 
-    return requirements
-  })
+    return requirements;
+  });
 
   /**
    * Per-implant requirements formatted for display
    * Returns array of requirements grouped by implant slot
    */
   const perImplantRequirementsList = computed((): PerImplantRequirement[] => {
-    const result: PerImplantRequirement[] = []
+    const result: PerImplantRequirement[] = [];
 
     // Standard slot order (by bitflag value)
-    const slotOrder = ['2', '4', '8', '16', '32', '64', '128', '256', '512', '1024', '2048', '4096', '8192']
+    const slotOrder = [
+      '2',
+      '4',
+      '8',
+      '16',
+      '32',
+      '64',
+      '128',
+      '256',
+      '512',
+      '1024',
+      '2048',
+      '4096',
+      '8192',
+    ];
 
     for (const slotBitflag of slotOrder) {
-      const requirements = perImplantRequirements.value[slotBitflag]
+      const requirements = perImplantRequirements.value[slotBitflag];
       if (!requirements || requirements.length === 0) {
-        continue // Skip empty slots
+        continue; // Skip empty slots
       }
 
       result.push({
         slot: slotBitflag,
         slotName: getSlotDisplayName(slotBitflag),
-        requirements
-      })
+        requirements,
+      });
     }
 
-    return result
-  })
+    return result;
+  });
 
   // ============================================================================
   // Actions
@@ -369,80 +386,86 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
    * Populates currentConfiguration and profileConfiguration from profile.Implants
    */
   async function loadFromProfile(): Promise<void> {
-    const profilesStore = useTinkerProfilesStore()
-    const profile = profilesStore.activeProfile
+    const profilesStore = useTinkerProfilesStore();
+    const profile = profilesStore.activeProfile;
 
     if (!profile) {
-      error.value = 'No active profile selected'
+      error.value = 'No active profile selected';
       toast.add({
         severity: 'error',
         summary: 'No Active Profile',
         detail: 'Please select a profile to use the implant planner',
-        life: 3000
-      })
-      return
+        life: 3000,
+      });
+      return;
     }
 
     try {
-      loading.value = true
-      error.value = null
+      loading.value = true;
+      error.value = null;
 
       // Extract implants from profile.Implants (uses bitflag keys)
-      const implants = profile.Implants || {}
+      const implants = profile.Implants || {};
 
-      console.log('[TinkerPlants] Profile Implants keys:', Object.keys(implants))
+      console.log('[TinkerPlants] Profile Implants keys:', Object.keys(implants));
 
       // Convert profile implant data to ImplantSelection format
-      const loadedConfiguration: Record<string, ImplantSelection> = {}
+      const loadedConfiguration: Record<string, ImplantSelection> = {};
 
       for (const [slotBitflag, implantData] of Object.entries(implants)) {
         if (!implantData || typeof implantData !== 'object') {
-          console.log(`[TinkerPlants] Skipping slot ${slotBitflag}: invalid data`)
-          continue
+          console.log(`[TinkerPlants] Skipping slot ${slotBitflag}: invalid data`);
+          continue;
         }
 
         // Profile stores Item objects directly - parse cluster names from description
         if ('id' in implantData && 'name' in implantData && 'description' in implantData) {
-          const clusters = parseImplantClusters(implantData)
-          console.log(`[TinkerPlants] Slot ${slotBitflag} parsed clusters:`, clusters)
+          const clusters = parseImplantClusters(implantData);
+          console.log(`[TinkerPlants] Slot ${slotBitflag} parsed clusters:`, clusters);
           if (clusters) {
             // ImplantWithClusters extends Item, so cast to unknown first then to Item
             // This is safe because we're only using the Item properties
-            const item = implantData as unknown as Item
+            const item = implantData as unknown as Item;
             loadedConfiguration[slotBitflag] = {
               shiny: clusters.shiny,
               bright: clusters.bright,
               faded: clusters.faded,
               ql: (implantData as any).ql || 200,
               slotBitflag,
-              item: item
-            }
+              item: item,
+            };
           } else {
-            console.log(`[TinkerPlants] Slot ${slotBitflag}: parser returned null`)
+            console.log(`[TinkerPlants] Slot ${slotBitflag}: parser returned null`);
           }
         } else {
-          console.log(`[TinkerPlants] Slot ${slotBitflag}: missing Item properties (id, name, description)`)
+          console.log(
+            `[TinkerPlants] Slot ${slotBitflag}: missing Item properties (id, name, description)`
+          );
         }
       }
 
-      currentConfiguration.value = loadedConfiguration
-      profileConfiguration.value = JSON.parse(JSON.stringify(loadedConfiguration))
+      currentConfiguration.value = loadedConfiguration;
+      profileConfiguration.value = JSON.parse(JSON.stringify(loadedConfiguration));
 
-      console.log('[TinkerPlants] Loaded configuration from profile:', Object.keys(loadedConfiguration).length, 'slots')
+      console.log(
+        '[TinkerPlants] Loaded configuration from profile:',
+        Object.keys(loadedConfiguration).length,
+        'slots'
+      );
 
       // Auto-recalculate bonuses and requirements
-      recalculate()
+      recalculate();
     } catch (err: any) {
-      error.value = err instanceof Error ? err.message : 'Failed to load configuration'
+      error.value = err instanceof Error ? err.message : 'Failed to load configuration';
       toast.add({
         severity: 'error',
         summary: 'Failed to Load Configuration',
         detail: 'Could not load implant configuration from profile',
-        life: 5000
-      })
-      throw err
+        life: 5000,
+      });
+      throw err;
     } finally {
-      loading.value = false
+      loading.value = false;
     }
   }
 
@@ -451,61 +474,65 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
    * Converts currentConfiguration to profile.Implants format and persists to storage
    */
   async function saveToProfile(): Promise<void> {
-    const profilesStore = useTinkerProfilesStore()
-    const profile = profilesStore.activeProfile
+    const profilesStore = useTinkerProfilesStore();
+    const profile = profilesStore.activeProfile;
 
     if (!profile) {
       toast.add({
         severity: 'error',
         summary: 'No Active Profile',
         detail: 'Please select a profile before saving',
-        life: 3000
-      })
-      return
+        life: 3000,
+      });
+      return;
     }
 
     try {
-      loading.value = true
-      error.value = null
+      loading.value = true;
+      error.value = null;
 
       // Convert currentConfiguration to profile.Implants format
-      const implantsToSave: Record<string, any> = {}
+      const implantsToSave: Record<string, any> = {};
 
       for (const [slotBitflag, selection] of Object.entries(currentConfiguration.value)) {
         // Only save configured slots that have a fetched item
         if (selection.item) {
           // Store the Item object directly (cluster info is in description)
-          implantsToSave[slotBitflag] = selection.item
+          implantsToSave[slotBitflag] = selection.item;
         }
       }
 
       // Persist profile to storage using updateProfile with partial update
       await profilesStore.updateProfile(profile.id, {
-        Implants: implantsToSave
-      })
+        Implants: implantsToSave,
+      });
 
       // Update profileConfiguration to match currentConfiguration (no longer "dirty")
-      profileConfiguration.value = JSON.parse(JSON.stringify(currentConfiguration.value))
+      profileConfiguration.value = JSON.parse(JSON.stringify(currentConfiguration.value));
 
       toast.add({
         severity: 'success',
         summary: 'Configuration Saved',
         detail: 'Implant configuration saved to profile',
-        life: 3000
-      })
+        life: 3000,
+      });
 
-      console.log('[TinkerPlants] Saved configuration to profile:', Object.keys(implantsToSave).length, 'slots')
+      console.log(
+        '[TinkerPlants] Saved configuration to profile:',
+        Object.keys(implantsToSave).length,
+        'slots'
+      );
     } catch (err: any) {
-      error.value = err instanceof Error ? err.message : 'Failed to save configuration'
+      error.value = err instanceof Error ? err.message : 'Failed to save configuration';
       toast.add({
         severity: 'error',
         summary: 'Save Failed',
         detail: error.value,
-        life: 5000
-      })
-      throw err
+        life: 5000,
+      });
+      throw err;
     } finally {
-      loading.value = false
+      loading.value = false;
     }
   }
 
@@ -514,11 +541,11 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
    * Discards unsaved changes and reloads from profileConfiguration
    */
   function revertToProfile(): void {
-    currentConfiguration.value = JSON.parse(JSON.stringify(profileConfiguration.value))
-    console.log('[TinkerPlants] Reverted to profile configuration')
+    currentConfiguration.value = JSON.parse(JSON.stringify(profileConfiguration.value));
+    console.log('[TinkerPlants] Reverted to profile configuration');
 
     // Auto-recalculate bonuses and requirements after revert
-    recalculate()
+    recalculate();
   }
 
   /**
@@ -536,14 +563,14 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
       faded: null,
       ql: 200,
       slotBitflag,
-      item: null
-    }
+      item: null,
+    };
 
     // Merge updates
     currentConfiguration.value[slotBitflag] = {
       ...existing,
-      ...updates
-    }
+      ...updates,
+    };
   }
 
   /**
@@ -561,8 +588,8 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
     clusters: { shiny: number | null; bright: number | null; faded: number | null }
   ): string {
     // Create a simple hash of cluster IDs
-    const clusterStr = `${clusters.shiny || ''}_${clusters.bright || ''}_${clusters.faded || ''}`
-    return `implant_${slotBitflag}_${ql}_${clusterStr}`
+    const clusterStr = `${clusters.shiny || ''}_${clusters.bright || ''}_${clusters.faded || ''}`;
+    return `implant_${slotBitflag}_${ql}_${clusterStr}`;
   }
 
   /**
@@ -573,20 +600,20 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
    * @returns Cached item or null if not found/expired
    */
   function checkCache(cacheKey: string): Item | null {
-    const cached = lookupCache.value.get(cacheKey)
+    const cached = lookupCache.value.get(cacheKey);
     if (!cached) {
-      return null
+      return null;
     }
 
     // Check if cache entry is still valid (within TTL)
-    const age = Date.now() - cached.timestamp
+    const age = Date.now() - cached.timestamp;
     if (age > cacheTTL) {
       // Cache expired, remove entry
-      lookupCache.value.delete(cacheKey)
-      return null
+      lookupCache.value.delete(cacheKey);
+      return null;
     }
 
-    return cached.item
+    return cached.item;
   }
 
   /**
@@ -598,8 +625,8 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
   function cacheItem(cacheKey: string, item: Item): void {
     lookupCache.value.set(cacheKey, {
       item,
-      timestamp: Date.now()
-    })
+      timestamp: Date.now(),
+    });
   }
 
   /**
@@ -610,97 +637,98 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
    * @param slotBitflag - Slot bitflag (e.g., "2" for Eyes)
    */
   async function lookupImplantForSlot(slotBitflag: string): Promise<void> {
-    const selection = currentConfiguration.value[slotBitflag]
+    const selection = currentConfiguration.value[slotBitflag];
     if (!selection) {
-      console.warn('[TinkerPlants] No selection found for slot:', slotBitflag)
-      return
+      console.warn('[TinkerPlants] No selection found for slot:', slotBitflag);
+      return;
     }
 
     // Check if slot has any clusters configured
-    const hasAnyClusters = selection.shiny !== null || selection.bright !== null || selection.faded !== null
+    const hasAnyClusters =
+      selection.shiny !== null || selection.bright !== null || selection.faded !== null;
 
     if (!hasAnyClusters) {
       // Clear item data for empty slots
-      selection.item = null
-      return
+      selection.item = null;
+      return;
     }
 
     // Check cache first
     const cacheKey = generateCacheKey(slotBitflag, selection.ql, {
       shiny: selection.shiny,
       bright: selection.bright,
-      faded: selection.faded
-    })
+      faded: selection.faded,
+    });
 
-    const cachedItem = checkCache(cacheKey)
+    const cachedItem = checkCache(cacheKey);
     if (cachedItem) {
-      console.log('[TinkerPlants] Cache hit for slot:', slotBitflag)
-      selection.item = cachedItem
-      return
+      console.log('[TinkerPlants] Cache hit for slot:', slotBitflag);
+      selection.item = cachedItem;
+      return;
     }
 
     // Set per-slot loading state
-    slotLoading.value[slotBitflag] = true
+    slotLoading.value[slotBitflag] = true;
 
     try {
       // Clusters are already stat IDs - use them directly for API request
       // Backend expects capitalized cluster position keys
-      const clustersAsStatIds: Record<string, number> = {}
+      const clustersAsStatIds: Record<string, number> = {};
 
       if (selection.shiny !== null) {
-        clustersAsStatIds['Shiny'] = selection.shiny
+        clustersAsStatIds['Shiny'] = selection.shiny;
       }
 
       if (selection.bright !== null) {
-        clustersAsStatIds['Bright'] = selection.bright
+        clustersAsStatIds['Bright'] = selection.bright;
       }
 
       if (selection.faded !== null) {
-        clustersAsStatIds['Faded'] = selection.faded
+        clustersAsStatIds['Faded'] = selection.faded;
       }
 
       // Convert slot bitflag to slot number for API
-      const slotNumber = parseInt(slotBitflag, 10)
+      const slotNumber = parseInt(slotBitflag, 10);
 
       // Call API
-      const response = await apiClient.lookupImplant(slotNumber, selection.ql, clustersAsStatIds)
+      const response = await apiClient.lookupImplant(slotNumber, selection.ql, clustersAsStatIds);
 
       if (response.success && response.item) {
         // Cache the result
-        cacheItem(cacheKey, response.item)
+        cacheItem(cacheKey, response.item);
 
         // Update configuration with fetched item
-        selection.item = response.item
+        selection.item = response.item;
 
-        console.log('[TinkerPlants] Lookup success for slot:', slotBitflag, response.item.name)
+        console.log('[TinkerPlants] Lookup success for slot:', slotBitflag, response.item.name);
       } else {
         // No matching implant found
         toast.add({
           severity: 'info',
           summary: 'No Match Found',
           detail: `No implant found for selected cluster combination in slot ${slotBitflag}`,
-          life: 3000
-        })
-        selection.item = null
+          life: 3000,
+        });
+        selection.item = null;
       }
     } catch (err: any) {
-      console.error('[TinkerPlants] Lookup failed for slot:', slotBitflag, err)
+      console.error('[TinkerPlants] Lookup failed for slot:', slotBitflag, err);
 
-      error.value = err instanceof Error ? err.message : 'Implant lookup failed'
+      error.value = err instanceof Error ? err.message : 'Implant lookup failed';
 
       toast.add({
         severity: 'error',
         summary: 'Lookup Failed',
         detail: `Failed to lookup implant for slot ${slotBitflag}`,
-        life: 5000
-      })
+        life: 5000,
+      });
 
-      selection.item = null
+      selection.item = null;
     } finally {
-      slotLoading.value[slotBitflag] = false
+      slotLoading.value[slotBitflag] = false;
 
       // Auto-recalculate bonuses and requirements after slot update
-      recalculate()
+      recalculate();
     }
   }
 
@@ -712,18 +740,18 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
    */
   function lookupImplantForSlotDebounced(slotBitflag: string): void {
     // Clear existing timer for this slot
-    const existing = debouncedLookups.value.get(slotBitflag)
+    const existing = debouncedLookups.value.get(slotBitflag);
     if (existing) {
-      clearTimeout(existing.timer)
+      clearTimeout(existing.timer);
     }
 
     // Set new timer
     const timer = window.setTimeout(() => {
-      lookupImplantForSlot(slotBitflag)
-      debouncedLookups.value.delete(slotBitflag)
-    }, 100)
+      lookupImplantForSlot(slotBitflag);
+      debouncedLookups.value.delete(slotBitflag);
+    }, 100);
 
-    debouncedLookups.value.set(slotBitflag, { timer, slotBitflag })
+    debouncedLookups.value.set(slotBitflag, { timer, slotBitflag });
   }
 
   /**
@@ -732,50 +760,48 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
    * Updates calculatedBonuses state
    */
   function calculateBonuses(): void {
-    const bonuses: Record<number, number> = {}
+    const bonuses: Record<number, number> = {};
 
     // Iterate all slots in current configuration
     for (const [slotBitflag, selection] of Object.entries(currentConfiguration.value)) {
       // Skip slots without item data
       if (!selection.item) {
-        continue
+        continue;
       }
 
       // Skip empty slots (all clusters null)
       const hasNonEmptyClusters =
-        selection.shiny !== null ||
-        selection.bright !== null ||
-        selection.faded !== null
+        selection.shiny !== null || selection.bright !== null || selection.faded !== null;
 
       if (!hasNonEmptyClusters) {
-        continue
+        continue;
       }
 
       try {
         // Extract bonuses from item using equipment bonus calculator
-        const itemBonuses = equipmentBonusCalculator.parseItemSpells(selection.item)
+        const itemBonuses = equipmentBonusCalculator.parseItemSpells(selection.item);
 
         // Aggregate bonuses
         for (const bonus of itemBonuses) {
           if (bonuses[bonus.statId]) {
             // Stat 355 (WornItem) is a flag field - use bitwise OR
             if (bonus.statId === 355) {
-              bonuses[bonus.statId] |= bonus.amount
+              bonuses[bonus.statId] |= bonus.amount;
             } else {
-              bonuses[bonus.statId] += bonus.amount
+              bonuses[bonus.statId] += bonus.amount;
             }
           } else {
-            bonuses[bonus.statId] = bonus.amount
+            bonuses[bonus.statId] = bonus.amount;
           }
         }
       } catch (err) {
-        console.error(`[TinkerPlants] Failed to parse bonuses for slot ${slotBitflag}:`, err)
+        console.error(`[TinkerPlants] Failed to parse bonuses for slot ${slotBitflag}:`, err);
         // Continue processing other slots
       }
     }
 
-    calculatedBonuses.value = bonuses
-    console.log('[TinkerPlants] Calculated bonuses:', Object.keys(bonuses).length, 'stats')
+    calculatedBonuses.value = bonuses;
+    console.log('[TinkerPlants] Calculated bonuses:', Object.keys(bonuses).length, 'stats');
   }
 
   /**
@@ -784,68 +810,66 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
    * Updates calculatedRequirements and treatmentInfo state
    */
   function calculateRequirements(): void {
-    const profilesStore = useTinkerProfilesStore()
-    const profile = profilesStore.activeProfile
+    const profilesStore = useTinkerProfilesStore();
+    const profile = profilesStore.activeProfile;
 
     if (!profile) {
-      console.warn('[TinkerPlants] No active profile for requirement calculation')
-      return
+      console.warn('[TinkerPlants] No active profile for requirement calculation');
+      return;
     }
 
     // Use Map to track max requirement per stat (deduplication)
-    const maxRequirements = new Map<number, ImplantRequirement>()
-    let maxTreatmentRequired = 0
+    const maxRequirements = new Map<number, ImplantRequirement>();
+    let maxTreatmentRequired = 0;
 
     // Track per-slot requirements (not deduplicated)
-    const slotRequirements: Record<string, ImplantRequirement[]> = {}
+    const slotRequirements: Record<string, ImplantRequirement[]> = {};
 
     // Iterate all slots in current configuration
     for (const [slotBitflag, selection] of Object.entries(currentConfiguration.value)) {
       // Skip slots without item data
       if (!selection.item) {
-        continue
+        continue;
       }
 
       // Skip empty slots (all clusters null)
       const hasNonEmptyClusters =
-        selection.shiny !== null ||
-        selection.bright !== null ||
-        selection.faded !== null
+        selection.shiny !== null || selection.bright !== null || selection.faded !== null;
 
       if (!hasNonEmptyClusters) {
-        continue
+        continue;
       }
 
       // Initialize slot requirements array
       if (!slotRequirements[slotBitflag]) {
-        slotRequirements[slotBitflag] = []
+        slotRequirements[slotBitflag] = [];
       }
 
       try {
         // Extract requirements from item actions
-        const item = selection.item
+        const item = selection.item;
         if (!item.actions || item.actions.length === 0) {
-          continue
+          continue;
         }
 
         // Process each action's criteria
         for (const action of item.actions) {
           if (!action.criteria) {
-            continue
+            continue;
           }
 
           // Use action-criteria service to parse requirements
-          const actionRequirements = getCriteriaRequirements(action.criteria)
+          const actionRequirements = getCriteriaRequirements(action.criteria);
 
           // Convert to ImplantRequirement format with met status
           for (const req of actionRequirements) {
-            const statId = req.stat
-            const requiredValue = req.exactValue || req.minValue || 0
-            const currentValue = profile.skills?.[statId]?.total || 0
+            const statId = req.stat;
+            const requiredValue = req.exactValue || req.minValue || 0;
+            const currentValue = profile.skills?.[statId]?.total || 0;
 
             // Track max Treatment requirement (stat 124)
             if (statId === 124 && requiredValue > maxTreatmentRequired) {
-              maxTreatmentRequired = requiredValue
+              maxTreatmentRequired = requiredValue;
             }
 
             const implantReq: ImplantRequirement = {
@@ -853,45 +877,58 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
               statName: req.statName,
               required: requiredValue,
               current: currentValue,
-              met: currentValue >= requiredValue
-            }
+              met: currentValue >= requiredValue,
+            };
 
             // Add to this slot's requirement list
-            slotRequirements[slotBitflag].push(implantReq)
+            slotRequirements[slotBitflag].push(implantReq);
 
             // Deduplicate: only keep max requirement per stat for global list
-            const existing = maxRequirements.get(statId)
+            const existing = maxRequirements.get(statId);
             if (!existing || requiredValue > existing.required) {
-              maxRequirements.set(statId, implantReq)
+              maxRequirements.set(statId, implantReq);
             }
           }
         }
       } catch (err) {
-        console.error(`[TinkerPlants] Failed to parse requirements for slot ${slotBitflag}:`, err)
+        console.error(`[TinkerPlants] Failed to parse requirements for slot ${slotBitflag}:`, err);
         // Continue processing other slots
       }
     }
 
     // Calculate Treatment info
-    const profileTreatment = profile.skills?.[124]?.total || 0
-    const delta = maxTreatmentRequired - profileTreatment
+    const profileTreatment = profile.skills?.[124]?.total || 0;
+    const delta = maxTreatmentRequired - profileTreatment;
 
     treatmentInfo.value = {
       required: maxTreatmentRequired,
       current: profileTreatment,
       delta: delta > 0 ? delta : 0,
-      sufficient: profileTreatment >= maxTreatmentRequired
-    }
+      sufficient: profileTreatment >= maxTreatmentRequired,
+    };
 
     // Convert Map to array
-    calculatedRequirements.value = Array.from(maxRequirements.values())
+    calculatedRequirements.value = Array.from(maxRequirements.values());
 
     // Update per-implant requirements
-    perImplantRequirements.value = slotRequirements
+    perImplantRequirements.value = slotRequirements;
 
-    console.log('[TinkerPlants] Calculated requirements:', calculatedRequirements.value.length, 'unique stats')
-    console.log('[TinkerPlants] Per-implant requirements:', Object.keys(slotRequirements).length, 'slots')
-    console.log('[TinkerPlants] Treatment required:', maxTreatmentRequired, 'current:', profileTreatment)
+    console.log(
+      '[TinkerPlants] Calculated requirements:',
+      calculatedRequirements.value.length,
+      'unique stats'
+    );
+    console.log(
+      '[TinkerPlants] Per-implant requirements:',
+      Object.keys(slotRequirements).length,
+      'slots'
+    );
+    console.log(
+      '[TinkerPlants] Treatment required:',
+      maxTreatmentRequired,
+      'current:',
+      profileTreatment
+    );
   }
 
   /**
@@ -900,7 +937,7 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
    * @param attribute - Attribute name (Agility, Intelligence, Psychic, Sense, Stamina, Strength) or null for no preference
    */
   function setAttributePreference(attribute: string | null): void {
-    attributePreference.value = attribute
+    attributePreference.value = attribute;
     // Note: Client-side filtering not yet implemented in lookupImplantForSlot()
     // Backend may not support attribute filtering yet
   }
@@ -909,7 +946,7 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
    * Clear error state
    */
   function clearError(): void {
-    error.value = null
+    error.value = null;
   }
 
   /**
@@ -917,8 +954,8 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
    * Forces fresh API calls for all subsequent lookups
    */
   function clearCache(): void {
-    lookupCache.value.clear()
-    console.log('[TinkerPlants] Cache cleared')
+    lookupCache.value.clear();
+    console.log('[TinkerPlants] Cache cleared');
   }
 
   /**
@@ -927,8 +964,8 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
    * Called automatically after configuration changes
    */
   function recalculate(): void {
-    calculateBonuses()
-    calculateRequirements()
+    calculateBonuses();
+    calculateRequirements();
   }
 
   /**
@@ -936,23 +973,23 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
    * Clears all configuration, bonuses, requirements, and cache
    */
   function reset(): void {
-    currentConfiguration.value = {}
-    profileConfiguration.value = {}
-    calculatedBonuses.value = {}
-    calculatedRequirements.value = []
-    perImplantRequirements.value = {}
+    currentConfiguration.value = {};
+    profileConfiguration.value = {};
+    calculatedBonuses.value = {};
+    calculatedRequirements.value = [];
+    perImplantRequirements.value = {};
     treatmentInfo.value = {
       required: 0,
       current: 0,
       delta: 0,
-      sufficient: false
-    }
-    lookupCache.value.clear()
-    debouncedLookups.value.clear()
-    loading.value = false
-    error.value = null
-    slotLoading.value = {}
-    console.log('[TinkerPlants] Store reset')
+      sufficient: false,
+    };
+    lookupCache.value.clear();
+    debouncedLookups.value.clear();
+    loading.value = false;
+    error.value = null;
+    slotLoading.value = {};
+    console.log('[TinkerPlants] Store reset');
   }
 
   // ============================================================================
@@ -990,6 +1027,6 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
     clearError,
     clearCache,
     reset,
-    setAttributePreference
-  }
-})
+    setAttributePreference,
+  };
+});

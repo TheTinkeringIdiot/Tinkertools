@@ -19,7 +19,7 @@ function mockLocalStorage() {
       localStorageMock = {};
     }),
     length: 0,
-    key: vi.fn()
+    key: vi.fn(),
   } as any;
 }
 
@@ -33,11 +33,11 @@ function mockMatchMedia(dark: boolean) {
         onchange: null,
         addEventListener: vi.fn(),
         removeEventListener: vi.fn(),
-        addListener: vi.fn(),        // deprecated
-        removeListener: vi.fn(),     // deprecated
-        dispatchEvent: vi.fn()
+        addListener: vi.fn(), // deprecated
+        removeListener: vi.fn(), // deprecated
+        dispatchEvent: vi.fn(),
       };
-    })
+    }),
   });
 }
 
@@ -50,7 +50,7 @@ function getThemeClassState() {
   return {
     hasDark: document.documentElement.classList.contains('dark'),
     hasLight: document.documentElement.classList.contains('light'),
-    dataTheme: document.documentElement.getAttribute('data-theme')
+    dataTheme: document.documentElement.getAttribute('data-theme'),
   };
 }
 
@@ -150,7 +150,7 @@ describe('useTheme composable', () => {
     setDark(true);
     expect(isDark.value).toBe(true);
 
-    // Since we disabled system theme change listeners, 
+    // Since we disabled system theme change listeners,
     // theme should always stay as manually set or default to dark
     expect(isDark.value).toBe(true);
     expect(localStorage.getItem('tinkertools-theme-mode')).toBe('dark');

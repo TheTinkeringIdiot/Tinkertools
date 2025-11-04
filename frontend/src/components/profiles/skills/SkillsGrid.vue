@@ -10,7 +10,7 @@ Provides a responsive grid layout for skills with stat breakdown tooltips
       :class="{
         'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3': gridMode === 'compact',
         'grid-cols-1 lg:grid-cols-2': gridMode === 'detailed',
-        'grid-cols-1': gridMode === 'list'
+        'grid-cols-1': gridMode === 'list',
       }"
     >
       <div

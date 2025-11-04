@@ -11,38 +11,42 @@ import type { Symbiant, PocketBoss } from '@/types/api';
 
 // Mock PrimeVue components
 vi.mock('primevue/card', () => ({
-  default: { template: '<div class="mock-card"><slot name="content"></slot></div>' }
+  default: { template: '<div class="mock-card"><slot name="content"></slot></div>' },
 }));
 
 vi.mock('primevue/button', () => ({
-  default: { template: '<button class="mock-button" v-bind="$attrs" @click="$emit(\'click\')"><slot></slot></button>' }
+  default: {
+    template:
+      '<button class="mock-button" v-bind="$attrs" @click="$emit(\'click\')"><slot></slot></button>',
+  },
 }));
 
 vi.mock('primevue/checkbox', () => ({
-  default: { 
-    template: '<input type="checkbox" class="mock-checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
+  default: {
+    template:
+      '<input type="checkbox" class="mock-checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
     props: ['modelValue'],
-    emits: ['update:modelValue']
-  }
+    emits: ['update:modelValue'],
+  },
 }));
 
 vi.mock('primevue/progressbar', () => ({
-  default: { 
+  default: {
     template: '<div class="mock-progressbar" :style="`width: ${value}%`">{{ value }}%</div>',
-    props: ['value']
-  }
+    props: ['value'],
+  },
 }));
 
 vi.mock('primevue/inputtext', () => ({
-  default: { template: '<input class="mock-inputtext" v-bind="$attrs" />' }
+  default: { template: '<input class="mock-inputtext" v-bind="$attrs" />' },
 }));
 
 vi.mock('primevue/dropdown', () => ({
-  default: { template: '<select class="mock-dropdown" v-bind="$attrs"></select>' }
+  default: { template: '<select class="mock-dropdown" v-bind="$attrs"></select>' },
 }));
 
 vi.mock('primevue/datatable', () => ({
-  default: { 
+  default: {
     template: `
       <div class="mock-datatable">
         <slot name="empty" v-if="!value || value.length === 0"></slot>
@@ -51,30 +55,30 @@ vi.mock('primevue/datatable', () => ({
         </div>
       </div>
     `,
-    props: ['value']
-  }
+    props: ['value'],
+  },
 }));
 
 vi.mock('primevue/column', () => ({
-  default: { template: '<div class="mock-column"><slot></slot></div>' }
+  default: { template: '<div class="mock-column"><slot></slot></div>' },
 }));
 
 vi.mock('primevue/tag', () => ({
-  default: { 
+  default: {
     template: '<span class="mock-tag" :class="`severity-${severity}`">{{ value }}</span>',
-    props: ['value', 'severity']
-  }
+    props: ['value', 'severity'],
+  },
 }));
 
 vi.mock('primevue/confirmdialog', () => ({
-  default: { template: '<div class="mock-confirmdialog"></div>' }
+  default: { template: '<div class="mock-confirmdialog"></div>' },
 }));
 
 // Mock useConfirm
 vi.mock('primevue/useconfirm', () => ({
   useConfirm: () => ({
-    require: vi.fn()
-  })
+    require: vi.fn(),
+  }),
 }));
 
 describe('CollectionTracker', () => {
@@ -89,7 +93,7 @@ describe('CollectionTracker', () => {
       name: 'Artillery Head',
       slot: 'Head',
       ql: 150,
-      family: 'Artillery'
+      family: 'Artillery',
     },
     {
       id: 2,
@@ -97,8 +101,8 @@ describe('CollectionTracker', () => {
       name: 'Control Chest',
       slot: 'Chest',
       ql: 200,
-      family: 'Control'
-    }
+      family: 'Control',
+    },
   ];
 
   const mockBosses: PocketBoss[] = [
@@ -107,8 +111,8 @@ describe('CollectionTracker', () => {
       name: 'Test Boss',
       level: 100,
       playfield: 'Nascence',
-      dropped_symbiants: [mockSymbiants[0]]
-    }
+      dropped_symbiants: [mockSymbiants[0]],
+    },
   ];
 
   // Mock localStorage
@@ -116,14 +120,14 @@ describe('CollectionTracker', () => {
     getItem: vi.fn(),
     setItem: vi.fn(),
     removeItem: vi.fn(),
-    clear: vi.fn()
+    clear: vi.fn(),
   };
 
   beforeEach(() => {
     // Mock localStorage
     Object.defineProperty(global, 'localStorage', {
       value: mockLocalStorage,
-      writable: true
+      writable: true,
     });
 
     wrapper = mountWithContext(CollectionTracker, {
@@ -133,31 +137,29 @@ describe('CollectionTracker', () => {
             createSpy: vi.fn,
             initialState: {
               symbiants: {
-                symbiants: new Map(mockSymbiants.map(s => [s.id, s]))
+                symbiants: new Map(mockSymbiants.map((s) => [s.id, s])),
               },
               pocketBoss: {
-                pocketBosses: mockBosses
-              }
-            }
+                pocketBosses: mockBosses,
+              },
+            },
           }),
-          PrimeVue
-        ]
-      }
+          PrimeVue,
+        ],
+      },
     });
 
     symbiantStore = useSymbiantsStore();
     symbiantStore.symbiants = mockSymbiants;
-    
+
     pocketBossStore = usePocketBossStore();
-    pocketBossStore.getPocketBossesBySymbiant = vi.fn((id: number) => 
-      mockBosses.filter(boss => 
-        boss.dropped_symbiants?.some(s => s.id === id)
-      )
+    pocketBossStore.getPocketBossesBySymbiant = vi.fn((id: number) =>
+      mockBosses.filter((boss) => boss.dropped_symbiants?.some((s) => s.id === id))
     );
   });
 
   afterEach(() => {
-    standardCleanup()
+    standardCleanup();
     vi.clearAllMocks();
   });
 
@@ -173,7 +175,7 @@ describe('CollectionTracker', () => {
   it('calculates collection statistics correctly', () => {
     const component = wrapper.vm as any;
     const stats = component.collectionStats;
-    
+
     expect(stats.total).toBe(2);
     expect(stats.collected).toBe(0); // Initially no items collected
     expect(stats.percentage).toBe(0);
@@ -183,7 +185,7 @@ describe('CollectionTracker', () => {
   it('calculates progress by slot', () => {
     const component = wrapper.vm as any;
     const stats = component.collectionStats;
-    
+
     expect(stats.bySlot).toHaveLength(2);
     expect(stats.bySlot.find((s: any) => s.slot === 'Head')).toBeDefined();
     expect(stats.bySlot.find((s: any) => s.slot === 'Chest')).toBeDefined();
@@ -191,15 +193,15 @@ describe('CollectionTracker', () => {
 
   it('handles collection item toggle', async () => {
     const component = wrapper.vm as any;
-    
+
     // Initially not collected
     expect(component.getCollectionItem(1).collected).toBe(false);
-    
+
     // Toggle collection
     component.toggleCollection(1);
     expect(component.getCollectionItem(1).collected).toBe(true);
     expect(mockLocalStorage.setItem).toHaveBeenCalled();
-    
+
     // Toggle again
     component.toggleCollection(1);
     expect(component.getCollectionItem(1).collected).toBe(false);
@@ -208,7 +210,7 @@ describe('CollectionTracker', () => {
   it('creates collection items for unknown symbiants', () => {
     const component = wrapper.vm as any;
     const item = component.getCollectionItem(1);
-    
+
     expect(item).toBeDefined();
     expect(item.collected).toBe(false);
     expect(item.symbiant.id).toBe(1);
@@ -216,10 +218,10 @@ describe('CollectionTracker', () => {
 
   it('filters by search query', async () => {
     const component = wrapper.vm as any;
-    
+
     component.searchQuery = 'Artillery';
     await wrapper.vm.$nextTick();
-    
+
     const filtered = component.filteredSymbiants;
     expect(filtered).toHaveLength(1);
     expect(filtered[0].name).toBe('Artillery Head');
@@ -227,10 +229,10 @@ describe('CollectionTracker', () => {
 
   it('filters by selected slots', async () => {
     const component = wrapper.vm as any;
-    
+
     component.selectedSlots = ['Head'];
     await wrapper.vm.$nextTick();
-    
+
     const filtered = component.filteredSymbiants;
     expect(filtered).toHaveLength(1);
     expect(filtered[0].slot).toBe('Head');
@@ -238,10 +240,10 @@ describe('CollectionTracker', () => {
 
   it('filters by selected qualities', async () => {
     const component = wrapper.vm as any;
-    
+
     component.selectedQualities = [150];
     await wrapper.vm.$nextTick();
-    
+
     const filtered = component.filteredSymbiants;
     expect(filtered).toHaveLength(1);
     expect(filtered[0].ql).toBe(150);
@@ -249,10 +251,10 @@ describe('CollectionTracker', () => {
 
   it('filters by family', async () => {
     const component = wrapper.vm as any;
-    
+
     component.selectedFamily = 'Artillery';
     await wrapper.vm.$nextTick();
-    
+
     const filtered = component.filteredSymbiants;
     expect(filtered).toHaveLength(1);
     expect(filtered[0].family).toBe('Artillery');
@@ -260,14 +262,14 @@ describe('CollectionTracker', () => {
 
   it('shows only uncollected when filter is enabled', async () => {
     const component = wrapper.vm as any;
-    
+
     // Collect one item
     component.toggleCollection(1);
-    
+
     // Enable uncollected filter
     component.showOnlyUncollected = true;
     await wrapper.vm.$nextTick();
-    
+
     const filtered = component.filteredSymbiants;
     expect(filtered).toHaveLength(1);
     expect(filtered[0].id).toBe(2); // Only uncollected item
@@ -275,18 +277,18 @@ describe('CollectionTracker', () => {
 
   it('clears all filters', async () => {
     const component = wrapper.vm as any;
-    
+
     // Set filters
     component.searchQuery = 'test';
     component.selectedSlots = ['Head'];
     component.selectedQualities = [150];
     component.selectedFamily = 'Artillery';
     component.showOnlyUncollected = true;
-    
+
     // Clear filters
     component.clearFilters();
     await wrapper.vm.$nextTick();
-    
+
     expect(component.searchQuery).toBe('');
     expect(component.selectedSlots).toEqual([]);
     expect(component.selectedQualities).toEqual([]);
@@ -296,34 +298,37 @@ describe('CollectionTracker', () => {
 
   it('creates collection goals', async () => {
     const component = wrapper.vm as any;
-    
+
     component.newGoalName = 'Test Goal';
     component.newGoalDescription = 'Test Description';
     component.createCollectionGoal();
-    
+
     expect(component.collectionGoals).toHaveLength(1);
     expect(component.collectionGoals[0].name).toBe('Test Goal');
     expect(component.collectionGoals[0].description).toBe('Test Description');
-    expect(mockLocalStorage.setItem).toHaveBeenCalledWith('tinkertools-collection-goals', expect.any(String));
+    expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
+      'tinkertools-collection-goals',
+      expect.any(String)
+    );
   });
 
   it('calculates goal progress', () => {
     const component = wrapper.vm as any;
-    
+
     const goal = {
       id: '1',
       name: 'Test Goal',
       description: 'Test',
       targetSymbiants: [1, 2],
-      createdAt: new Date()
+      createdAt: new Date(),
     };
-    
+
     // No items collected
     let progress = component.getGoalProgress(goal);
     expect(progress.total).toBe(2);
     expect(progress.collected).toBe(0);
     expect(progress.percentage).toBe(0);
-    
+
     // Collect one item
     component.toggleCollection(1);
     progress = component.getGoalProgress(goal);
@@ -333,23 +338,23 @@ describe('CollectionTracker', () => {
 
   it('exports collection data', () => {
     const component = wrapper.vm as any;
-    
+
     // Mock URL.createObjectURL and related methods
     const mockUrl = 'mock-url';
     global.URL.createObjectURL = vi.fn(() => mockUrl);
     global.URL.revokeObjectURL = vi.fn();
-    
+
     const mockAnchor = {
       href: '',
       download: '',
-      click: vi.fn()
+      click: vi.fn(),
     };
     document.createElement = vi.fn(() => mockAnchor);
     document.body.appendChild = vi.fn();
     document.body.removeChild = vi.fn();
-    
+
     component.exportCollectionData();
-    
+
     expect(mockAnchor.download).toContain('symbiant-collection-');
     expect(mockAnchor.click).toHaveBeenCalled();
   });
@@ -357,14 +362,14 @@ describe('CollectionTracker', () => {
   it('gets drop sources for symbiant', () => {
     const component = wrapper.vm as any;
     const sources = component.getDropSources(mockSymbiants[0]);
-    
+
     expect(sources).toHaveLength(1);
     expect(sources[0].name).toBe('Test Boss');
   });
 
   it('gets correct slot icons', () => {
     const component = wrapper.vm as any;
-    
+
     expect(component.getSlotIcon('Head')).toBe('pi-user');
     expect(component.getSlotIcon('Chest')).toBe('pi-shield');
     expect(component.getSlotIcon('Unknown')).toBe('pi-circle');
@@ -372,7 +377,7 @@ describe('CollectionTracker', () => {
 
   it('gets quality severity', () => {
     const component = wrapper.vm as any;
-    
+
     expect(component.getQualitySeverity(50)).toBe('success');
     expect(component.getQualitySeverity(120)).toBe('info');
     expect(component.getQualitySeverity(180)).toBe('warning');
@@ -386,9 +391,9 @@ describe('CollectionTracker', () => {
 
   it('saves data to localStorage when collection changes', async () => {
     const component = wrapper.vm as any;
-    
+
     component.toggleCollection(1);
-    
+
     expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
       'tinkertools-symbiant-collection',
       expect.any(String)
@@ -397,27 +402,27 @@ describe('CollectionTracker', () => {
 
   it('handles import collection data', () => {
     const component = wrapper.vm as any;
-    
+
     const mockFile = new File(['{"collection": {}, "goals": []}'], 'test.json', {
-      type: 'application/json'
+      type: 'application/json',
     });
-    
+
     const mockEvent = {
       target: {
         files: [mockFile],
-        value: ''
-      }
+        value: '',
+      },
     };
-    
+
     // Mock FileReader
     const mockReader = {
       onload: vi.fn(),
-      readAsText: vi.fn()
+      readAsText: vi.fn(),
     };
     global.FileReader = vi.fn(() => mockReader);
-    
+
     component.importCollectionData(mockEvent);
-    
+
     expect(mockReader.readAsText).toHaveBeenCalledWith(mockFile);
     expect(mockEvent.target.value).toBe('');
   });

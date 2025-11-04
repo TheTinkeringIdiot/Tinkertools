@@ -20,13 +20,13 @@
 export function accountTypeToExpansionBitflag(accountType: string): number {
   switch (accountType) {
     case 'Froob':
-      return 1    // NotumWars only (1 << 0)
+      return 1; // NotumWars only (1 << 0)
     case 'Sloob':
-      return 7    // None + NotumWars + Shadowlands + ShadowlandsPreorder (1|2|4)
+      return 7; // None + NotumWars + Shadowlands + ShadowlandsPreorder (1|2|4)
     case 'Paid':
-      return 127  // All expansion flags (1|2|4|8|16|32|64)
+      return 127; // All expansion flags (1|2|4|8|16|32|64)
     default:
-      return 0    // Classic/None
+      return 0; // Classic/None
   }
 }
 

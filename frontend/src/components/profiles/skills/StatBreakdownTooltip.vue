@@ -22,10 +22,11 @@ Shows base value, trickle-down, equipment bonuses, IP improvements, and total
       </div>
 
       <!-- Trickle-down Row (only for skills) -->
-      <div v-if="!isAbility && trickleDownBonus > 0" class="breakdown-row flex justify-between items-center">
-        <span class="text-xs text-green-600 dark:text-green-400">
-          Trickle-down:
-        </span>
+      <div
+        v-if="!isAbility && trickleDownBonus > 0"
+        class="breakdown-row flex justify-between items-center"
+      >
+        <span class="text-xs text-green-600 dark:text-green-400"> Trickle-down: </span>
         <span class="text-xs font-medium text-green-600 dark:text-green-400">
           +{{ formatValue(trickleDownBonus) }}
         </span>
@@ -33,81 +34,120 @@ Shows base value, trickle-down, equipment bonuses, IP improvements, and total
 
       <!-- Equipment Bonuses Row (if any) -->
       <div v-if="equipmentBonus !== 0" class="breakdown-row flex justify-between items-center">
-        <span class="text-xs" :class="equipmentBonus > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'">
+        <span
+          class="text-xs"
+          :class="
+            equipmentBonus > 0
+              ? 'text-blue-600 dark:text-blue-400'
+              : 'text-red-600 dark:text-red-400'
+          "
+        >
           Equipment:
         </span>
-        <span class="text-xs font-medium" :class="equipmentBonus > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'">
+        <span
+          class="text-xs font-medium"
+          :class="
+            equipmentBonus > 0
+              ? 'text-blue-600 dark:text-blue-400'
+              : 'text-red-600 dark:text-red-400'
+          "
+        >
           {{ equipmentBonus > 0 ? '+' : '' }}{{ formatValue(equipmentBonus) }}
         </span>
       </div>
 
       <!-- Perk Bonuses Row (if any) -->
       <div v-if="perkBonus !== 0" class="breakdown-row flex justify-between items-center">
-        <span class="text-xs" :class="perkBonus > 0 ? 'text-purple-600 dark:text-purple-400' : 'text-red-600 dark:text-red-400'">
+        <span
+          class="text-xs"
+          :class="
+            perkBonus > 0
+              ? 'text-purple-600 dark:text-purple-400'
+              : 'text-red-600 dark:text-red-400'
+          "
+        >
           Perks:
         </span>
-        <span class="text-xs font-medium" :class="perkBonus > 0 ? 'text-purple-600 dark:text-purple-400' : 'text-red-600 dark:text-red-400'">
+        <span
+          class="text-xs font-medium"
+          :class="
+            perkBonus > 0
+              ? 'text-purple-600 dark:text-purple-400'
+              : 'text-red-600 dark:text-red-400'
+          "
+        >
           {{ perkBonus > 0 ? '+' : '' }}{{ formatValue(perkBonus) }}
         </span>
       </div>
 
       <!-- Buff Bonuses Row (if any) -->
       <div v-if="buffBonus !== 0" class="breakdown-row flex justify-between items-center">
-        <span class="text-xs" :class="buffBonus > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'">
+        <span
+          class="text-xs"
+          :class="
+            buffBonus > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'
+          "
+        >
           Buffs:
         </span>
-        <span class="text-xs font-medium" :class="buffBonus > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'">
+        <span
+          class="text-xs font-medium"
+          :class="
+            buffBonus > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'
+          "
+        >
           {{ buffBonus > 0 ? '+' : '' }}{{ formatValue(buffBonus) }}
         </span>
       </div>
 
       <!-- IP Improvements Row (for non-misc skills) -->
-      <div v-if="!isAbility && !isMiscSkill && ipContribution > 0" class="breakdown-row flex justify-between items-center">
-        <span class="text-xs text-blue-600 dark:text-blue-400">
-          IP Improvements:
-        </span>
+      <div
+        v-if="!isAbility && !isMiscSkill && ipContribution > 0"
+        class="breakdown-row flex justify-between items-center"
+      >
+        <span class="text-xs text-blue-600 dark:text-blue-400"> IP Improvements: </span>
         <span class="text-xs font-medium text-blue-600 dark:text-blue-400">
           +{{ formatValue(ipContribution) }}
         </span>
       </div>
 
       <!-- Ability Improvements Row (for abilities) -->
-      <div v-if="isAbility && abilityImprovements > 0" class="breakdown-row flex justify-between items-center">
-        <span class="text-xs text-blue-600 dark:text-blue-400">
-          Improvements:
-        </span>
+      <div
+        v-if="isAbility && abilityImprovements > 0"
+        class="breakdown-row flex justify-between items-center"
+      >
+        <span class="text-xs text-blue-600 dark:text-blue-400"> Improvements: </span>
         <span class="text-xs font-medium text-blue-600 dark:text-blue-400">
           +{{ formatValue(abilityImprovements) }}
         </span>
       </div>
 
       <!-- Visual Separator -->
-      <div class="breakdown-separator border-t border-surface-300 dark:border-surface-600 my-1"></div>
+      <div
+        class="breakdown-separator border-t border-surface-300 dark:border-surface-600 my-1"
+      ></div>
 
       <!-- Total Value Row -->
       <div class="breakdown-row flex justify-between items-center font-semibold">
-        <span class="text-xs text-surface-900 dark:text-surface-50">
-          Total:
-        </span>
+        <span class="text-xs text-surface-900 dark:text-surface-50"> Total: </span>
         <span class="text-xs text-surface-900 dark:text-surface-50">
           {{ formatValue(totalValue) }}
         </span>
       </div>
 
       <!-- Cap Information (if applicable) -->
-      <div v-if="skillCap && totalValue < skillCap" class="breakdown-cap mt-2 pt-1 border-t border-surface-200 dark:border-surface-700">
+      <div
+        v-if="skillCap && totalValue < skillCap"
+        class="breakdown-cap mt-2 pt-1 border-t border-surface-200 dark:border-surface-700"
+      >
         <div class="flex justify-between items-center">
-          <span class="text-xs text-surface-500 dark:text-surface-400">
-            Skill Cap:
-          </span>
+          <span class="text-xs text-surface-500 dark:text-surface-400"> Skill Cap: </span>
           <span class="text-xs text-surface-500 dark:text-surface-400">
             {{ formatValue(skillCap) }}
           </span>
         </div>
         <div class="flex justify-between items-center">
-          <span class="text-xs text-surface-500 dark:text-surface-400">
-            Remaining:
-          </span>
+          <span class="text-xs text-surface-500 dark:text-surface-400"> Remaining: </span>
           <span class="text-xs text-surface-500 dark:text-surface-400">
             {{ formatValue(skillCap - totalValue) }}
           </span>

@@ -19,11 +19,11 @@ vi.mock('@/services/api-client', () => {
   const mockClient = {
     interpolateItem: vi.fn(),
     getItem: vi.fn(),
-    lookupImplant: vi.fn()
+    lookupImplant: vi.fn(),
   };
   return {
     default: mockClient,
-    apiClient: mockClient
+    apiClient: mockClient,
   };
 });
 
@@ -37,33 +37,33 @@ const mockedApiClient = vi.mocked(apiClient);
 
 // Mock Vue Router
 const mockRoute = {
-  params: { profileId: 'test-profile-id' }
+  params: { profileId: 'test-profile-id' },
 };
 
 const mockRouter = {
-  push: vi.fn()
+  push: vi.fn(),
 };
 
 vi.mock('vue-router', () => ({
   useRoute: () => mockRoute,
-  useRouter: () => mockRouter
+  useRouter: () => mockRouter,
 }));
 
 // Mock localStorage
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
-  
+
   return {
     getItem: (key: string) => store[key] || null,
-    setItem: (key: string, value: string) => store[key] = value,
+    setItem: (key: string, value: string) => (store[key] = value),
     removeItem: (key: string) => delete store[key],
-    clear: () => store = {}
+    clear: () => (store = {}),
   };
 })();
 
 Object.defineProperty(global, 'localStorage', {
   value: localStorageMock,
-  writable: true
+  writable: true,
 });
 
 describe('Profile Equipment Integration', () => {
@@ -72,19 +72,19 @@ describe('Profile Equipment Integration', () => {
   const mockItem: Item = {
     id: 1,
     aoid: 246660,
-    name: 'Combined Commando\'s Jacket',
+    name: "Combined Commando's Jacket",
     ql: 300,
     description: 'A tactical jacket',
     item_class: 2,
     is_nano: false,
     stats: [
       { id: 1, stat: 79, value: 123456 }, // Icon stat
-      { id: 2, stat: 12, value: 100 }
+      { id: 2, stat: 12, value: 100 },
     ],
     spell_data: [],
     actions: [],
     attack_stats: [],
-    defense_stats: []
+    defense_stats: [],
   };
 
   const mockImplantItem: Item = {
@@ -99,12 +99,12 @@ describe('Profile Equipment Integration', () => {
       { id: 1, stat: 79, value: 987654 }, // Icon stat
       { id: 2, stat: 12, value: 30 }, // Strength
       { id: 3, stat: 16, value: 20 }, // Agility
-      { id: 4, stat: 17, value: 25 }  // Stamina
+      { id: 4, stat: 17, value: 25 }, // Stamina
     ],
     spell_data: [],
     actions: [],
     attack_stats: [],
-    defense_stats: []
+    defense_stats: [],
   };
 
   const mockAOSetupsData = `{
@@ -180,39 +180,43 @@ describe('Profile Equipment Integration', () => {
     it('should import AOSetups profile with equipment and display correctly', async () => {
       // Setup API responses
       mockedApiClient.interpolateItem
-        .mockResolvedValueOnce({ data: { ...mockItem, name: 'Combined Commando\'s Jacket' } })
-        .mockResolvedValueOnce({ data: { ...mockItem, id: 2, name: 'Combined Commando\'s Headwear' } })
-        .mockResolvedValueOnce({ data: { ...mockItem, id: 3, name: 'Combined Commando\'s Legwear' } })
+        .mockResolvedValueOnce({ data: { ...mockItem, name: "Combined Commando's Jacket" } })
+        .mockResolvedValueOnce({
+          data: { ...mockItem, id: 2, name: "Combined Commando's Headwear" },
+        })
+        .mockResolvedValueOnce({
+          data: { ...mockItem, id: 3, name: "Combined Commando's Legwear" },
+        })
         .mockResolvedValueOnce({ data: { ...mockItem, id: 4, name: 'Assault Rifle' } })
         .mockResolvedValueOnce({ data: { ...mockItem, id: 5, name: 'Brain Symbiant' } });
-      
+
       // Setup implant lookup API response
       mockedApiClient.lookupImplant.mockResolvedValue({
         success: true,
-        data: mockImplantItem
+        data: mockImplantItem,
       });
 
       const store = useTinkerProfilesStore();
-      
+
       // Import the profile
       const result = await store.importProfile(mockAOSetupsData, 'aosetups');
-      
+
       expect(result.success).toBe(true);
       expect(result.profile).toBeDefined();
-      
+
       if (result.profile) {
         // Verify equipment was fetched and stored correctly
         expect(result.profile.Clothing['Chest']).toBeDefined(); // BODY -> Chest mapping
-        expect(result.profile.Clothing['Chest']?.name).toBe('Combined Commando\'s Jacket');
+        expect(result.profile.Clothing['Chest']?.name).toBe("Combined Commando's Jacket");
         expect(result.profile.Clothing['Head']).toBeDefined();
-        expect(result.profile.Clothing['Head']?.name).toBe('Combined Commando\'s Headwear');
+        expect(result.profile.Clothing['Head']?.name).toBe("Combined Commando's Headwear");
         expect(result.profile.Clothing['Legs']).toBeDefined();
-        expect(result.profile.Clothing['Legs']?.name).toBe('Combined Commando\'s Legwear');
-        
+        expect(result.profile.Clothing['Legs']?.name).toBe("Combined Commando's Legwear");
+
         // Verify weapons
         expect(result.profile.Weapons['HUD1']).toBeDefined();
         expect(result.profile.Weapons['HUD1']?.name).toBe('Assault Rifle');
-        
+
         // Verify implants
         expect(result.profile.Implants['Eye']).toBeDefined();
         expect(result.profile.Implants['Eye']?.name).toBe('Ocular Enhancement');
@@ -230,7 +234,7 @@ describe('Profile Equipment Integration', () => {
       expect(mockedApiClient.interpolateItem).toHaveBeenCalledWith(246662, 290);
       expect(mockedApiClient.interpolateItem).toHaveBeenCalledWith(123456, 200);
       expect(mockedApiClient.interpolateItem).toHaveBeenCalledWith(789123, 150);
-      
+
       // Verify implant lookup was called with correct cluster mapping
       expect(mockedApiClient.lookupImplant).toHaveBeenCalledTimes(1);
       expect(mockedApiClient.lookupImplant).toHaveBeenCalledWith(
@@ -238,8 +242,8 @@ describe('Profile Equipment Integration', () => {
         100, // QL
         {
           Shiny: 16, // ClusterID 7 -> STAT 16 (Agility)
-          Bright: 16, // ClusterID 37 -> STAT 16 (Intelligence) 
-          Faded: 118   // ClusterID 31 -> STAT 118 (First Aid)
+          Bright: 16, // ClusterID 37 -> STAT 16 (Intelligence)
+          Faded: 118, // ClusterID 31 -> STAT 118 (First Aid)
         }
       );
     });
@@ -248,23 +252,23 @@ describe('Profile Equipment Integration', () => {
       mockedApiClient.interpolateItem.mockResolvedValue({ data: mockItem });
 
       const store = useTinkerProfilesStore();
-      
+
       // Import profile
       const importResult = await store.importProfile(mockAOSetupsData, 'aosetups');
       expect(importResult.success).toBe(true);
-      
+
       const profileId = importResult.profileId!;
-      
+
       // Verify profile is stored in localStorage
       const storedProfiles = JSON.parse(localStorage.getItem('tinkertools_profiles') || '{}');
       expect(storedProfiles[profileId]).toBeDefined();
       expect(storedProfiles[profileId].Clothing['Chest']).toBeDefined();
-      
+
       // Create new store instance to simulate page reload
       const newPinia = createPinia();
       setActivePinia(newPinia);
       const newStore = useTinkerProfilesStore();
-      
+
       // Load profile should restore equipment
       const loadedProfile = await newStore.loadProfile(profileId);
       expect(loadedProfile).toBeDefined();
@@ -277,19 +281,20 @@ describe('Profile Equipment Integration', () => {
     it('should display equipment correctly in profile detail view', async () => {
       // Setup store with profile
       mockedApiClient.interpolateItem.mockResolvedValue({ data: mockItem });
-      
+
       const store = useTinkerProfilesStore();
       const importResult = await store.importProfile(mockAOSetupsData, 'aosetups');
       expect(importResult.success).toBe(true);
-      
+
       const profileId = importResult.profileId!;
       mockRoute.params.profileId = profileId;
 
       // Mock the helper components to avoid deep mounting complexity
       const mockEquipmentSlotsDisplay = {
         name: 'EquipmentSlotsDisplay',
-        template: '<div class="mock-equipment-display" :data-slot-type="slotType">{{ Object.keys(equipment).length }} items</div>',
-        props: ['equipment', 'slotType', 'showLabels']
+        template:
+          '<div class="mock-equipment-display" :data-slot-type="slotType">{{ Object.keys(equipment).length }} items</div>',
+        props: ['equipment', 'slotType', 'showLabels'],
       };
 
       const wrapper = mount(TinkerProfileDetail, {
@@ -297,26 +302,26 @@ describe('Profile Equipment Integration', () => {
         global: {
           plugins: [pinia],
           stubs: {
-            'EquipmentSlotsDisplay': mockEquipmentSlotsDisplay,
-            'CharacterInfoPanel': { template: '<div>Character Info</div>' },
-            'IPTrackerPanel': { template: '<div>IP Tracker</div>' },
-            'SkillsManager': { template: '<div>Skills Manager</div>' },
-            'EditCharacterDialog': { template: '<div>Edit Dialog</div>' }
-          }
-        }
+            EquipmentSlotsDisplay: mockEquipmentSlotsDisplay,
+            CharacterInfoPanel: { template: '<div>Character Info</div>' },
+            IPTrackerPanel: { template: '<div>IP Tracker</div>' },
+            SkillsManager: { template: '<div>Skills Manager</div>' },
+            EditCharacterDialog: { template: '<div>Edit Dialog</div>' },
+          },
+        },
       });
 
       // Wait for component to load profile
       await wrapper.vm.$nextTick();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Should display equipment sections
       const equipmentDisplays = wrapper.findAll('.mock-equipment-display');
       expect(equipmentDisplays.length).toBeGreaterThanOrEqual(3); // weapons, armor, implants
 
       // Check that equipment is passed to display components
-      const armorDisplay = equipmentDisplays.find(display => 
-        display.attributes('data-slot-type') === 'armor'
+      const armorDisplay = equipmentDisplays.find(
+        (display) => display.attributes('data-slot-type') === 'armor'
       );
       expect(armorDisplay).toBeTruthy();
       expect(armorDisplay?.text()).toContain('items'); // Should show some items
@@ -341,7 +346,7 @@ describe('Profile Equipment Integration', () => {
           Expansion: 'Shadow Lands',
           AccountType: 'Paid',
           MaxHealth: 1000,
-          MaxNano: 500
+          MaxNano: 500,
         },
         Skills: {
           Attributes: {
@@ -350,7 +355,7 @@ describe('Profile Equipment Integration', () => {
             Sense: { value: 6, ipSpent: 0, pointsFromIp: 0 },
             Stamina: { value: 6, ipSpent: 0, pointsFromIp: 0 },
             Strength: { value: 6, ipSpent: 0, pointsFromIp: 0 },
-            Agility: { value: 6, ipSpent: 0, pointsFromIp: 0 }
+            Agility: { value: 6, ipSpent: 0, pointsFromIp: 0 },
           },
           'Body & Defense': {},
           ACs: {},
@@ -362,15 +367,15 @@ describe('Profile Equipment Integration', () => {
           Exploring: {},
           'Trade & Repair': {},
           'Combat & Healing': {},
-          Misc: {}
+          Misc: {},
         },
         Clothing: {
-          'Body': mockItem, // Legacy Body slot
-          'Head': { ...mockItem, name: 'Legacy Head Gear' }
+          Body: mockItem, // Legacy Body slot
+          Head: { ...mockItem, name: 'Legacy Head Gear' },
         },
         Weapons: {},
         Implants: {},
-        PerksAndResearch: []
+        PerksAndResearch: [],
       };
 
       // Store legacy profile directly
@@ -388,7 +393,7 @@ describe('Profile Equipment Integration', () => {
 
       // Equipment display component should handle both Body and Chest slots
       // This is verified by the EquipmentSlotsDisplay.test.ts tests we created
-      expect(loadedProfile?.Clothing['Body']?.name).toBe('Combined Commando\'s Jacket');
+      expect(loadedProfile?.Clothing['Body']?.name).toBe("Combined Commando's Jacket");
     });
   });
 
@@ -427,14 +432,14 @@ describe('Profile Equipment Integration', () => {
         ...mockImplantItem,
         id: 10,
         name: 'Chest Enhancement',
-        ql: 150
+        ql: 150,
       };
 
       const earImplant = {
         ...mockImplantItem,
         id: 11,
-        name: 'Ear Enhancement', 
-        ql: 200
+        name: 'Ear Enhancement',
+        ql: 200,
       };
 
       mockedApiClient.lookupImplant
@@ -443,17 +448,15 @@ describe('Profile Equipment Integration', () => {
 
       const store = useTinkerProfilesStore();
       const result = await store.importProfile(testImplantData, 'aosetups');
-      
-      
+
       expect(result.success).toBe(true);
       expect(result.profile).toBeDefined();
-      
+
       if (result.profile) {
-        
         // Verify chest implant with multiple clusters
         expect(result.profile.Implants['Chest']).toBeDefined();
         expect(result.profile.Implants['Chest']?.name).toBe('Chest Enhancement');
-        
+
         // Verify ear implant with single cluster
         expect(result.profile.Implants['Ear']).toBeDefined();
         expect(result.profile.Implants['Ear']?.name).toBe('Ear Enhancement');
@@ -461,24 +464,24 @@ describe('Profile Equipment Integration', () => {
 
       // Verify correct cluster mapping calls
       expect(mockedApiClient.lookupImplant).toHaveBeenCalledTimes(2);
-      
+
       // Chest implant call with multiple clusters mapped correctly
       expect(mockedApiClient.lookupImplant).toHaveBeenCalledWith(
         5, // Chest slot position
         150,
         {
-          Shiny: 19,  // ClusterID 37 -> STAT 19 (Intelligence)
+          Shiny: 19, // ClusterID 37 -> STAT 19 (Intelligence)
           Bright: 123, // ClusterID 31 -> STAT 123 (First Aid)
-          Faded: 124   // ClusterID 81 -> STAT 124 (Treatment)
+          Faded: 124, // ClusterID 81 -> STAT 124 (Treatment)
         }
       );
-      
+
       // Ear implant call with single cluster
       expect(mockedApiClient.lookupImplant).toHaveBeenCalledWith(
-        3, // Ear slot position  
+        3, // Ear slot position
         200,
         {
-          Bright: 17 // ClusterID 7 -> STAT 17 (Agility)
+          Bright: 17, // ClusterID 7 -> STAT 17 (Agility)
         }
       );
     });
@@ -507,10 +510,10 @@ describe('Profile Equipment Integration', () => {
 
       const store = useTinkerProfilesStore();
       const result = await store.importProfile(implantData, 'aosetups');
-      
+
       expect(result.success).toBe(true); // Should still succeed with fallback
       expect(result.warnings.length).toBeGreaterThan(0);
-      
+
       if (result.profile) {
         // Should have fallback placeholder implant
         expect(result.profile.Implants['Eye']).toBeDefined();
@@ -540,10 +543,10 @@ describe('Profile Equipment Integration', () => {
 
       const store = useTinkerProfilesStore();
       const result = await store.importProfile(invalidClusterData, 'aosetups');
-      
+
       // Should handle invalid cluster positions gracefully
       expect(result.success).toBe(true);
-      
+
       // Should either skip the invalid cluster or create a warning
       if (result.profile) {
         const eyeImplant = result.profile.Implants['Eye'];
@@ -563,18 +566,18 @@ describe('Profile Equipment Integration', () => {
 
       const store = useTinkerProfilesStore();
       const result = await store.importProfile(mockAOSetupsData, 'aosetups');
-      
+
       expect(result.success).toBe(true);
       expect(result.warnings.length).toBeGreaterThan(0);
-      
+
       if (result.profile) {
         // Should have fallback data for failed item
         expect(result.profile.Clothing['Chest']).toBeDefined();
         expect(result.profile.Clothing['Chest']?.name).toContain('fetch failed');
-        
+
         // Should have successful items
         expect(result.profile.Clothing['Head']).toBeDefined();
-        expect(result.profile.Clothing['Head']?.name).toBe('Combined Commando\'s Jacket');
+        expect(result.profile.Clothing['Head']?.name).toBe("Combined Commando's Jacket");
       }
     });
 
@@ -584,9 +587,9 @@ describe('Profile Equipment Integration', () => {
 
       const store = useTinkerProfilesStore();
       const result = await store.importProfile(mockAOSetupsData, 'aosetups');
-      
+
       expect(result.success).toBe(true);
-      
+
       if (result.profile) {
         // Items should still be stored even without icons
         expect(result.profile.Clothing['Chest']).toBeDefined();
@@ -600,25 +603,25 @@ describe('Profile Equipment Integration', () => {
       mockedApiClient.interpolateItem.mockResolvedValue({ data: mockItem });
 
       const store = useTinkerProfilesStore();
-      
+
       // Import profile
       const importResult = await store.importProfile(mockAOSetupsData, 'aosetups');
       expect(importResult.success).toBe(true);
-      
+
       const profileId = importResult.profileId!;
-      
+
       // Load profile
       const loadedProfile = await store.loadProfile(profileId);
       expect(loadedProfile).toBeDefined();
-      
+
       // Modify profile (simulate user interaction)
       await store.updateCharacterMetadata(profileId, { Name: 'Modified Name' });
-      
+
       // Reload and verify equipment is still intact
       const reloadedProfile = await store.loadProfile(profileId);
       expect(reloadedProfile?.Character.Name).toBe('Modified Name');
       expect(reloadedProfile?.Clothing['Chest']).toBeDefined();
-      expect(reloadedProfile?.Clothing['Chest']?.name).toBe('Combined Commando\'s Jacket');
+      expect(reloadedProfile?.Clothing['Chest']?.name).toBe("Combined Commando's Jacket");
     });
   });
 });

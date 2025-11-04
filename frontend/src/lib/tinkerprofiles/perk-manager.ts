@@ -5,11 +5,7 @@
  * for all three perk types: SL Perks, AI Perks, and LE Research
  */
 
-import type {
-  TinkerProfile,
-  SkillWithIP,
-  IPTracker
-} from './types';
+import type { TinkerProfile, SkillWithIP, IPTracker } from './types';
 import type {
   PerkSystem,
   PerkEntry,
@@ -21,7 +17,7 @@ import type {
   PerkChangeEvent,
   PerkInfo,
   PerkEffect,
-  AnyPerkEntry
+  AnyPerkEntry,
 } from './perk-types';
 
 import { getBreedId, getProfessionId } from '../../services/game-utils';
@@ -105,8 +101,8 @@ function validatePerkRequirements(
   const currentResearch = profile.PerksAndResearch?.research || [];
 
   // Find current level of this perk
-  const existingPerk = currentPerks.find(p => p.name === perkInfo.name);
-  const existingResearch = currentResearch.find(r => r.name === perkInfo.name);
+  const existingPerk = currentPerks.find((p) => p.name === perkInfo.name);
+  const existingResearch = currentResearch.find((r) => r.name === perkInfo.name);
   const currentLevel = existingPerk?.level || existingResearch?.level || 0;
 
   // Check level requirement
@@ -115,7 +111,10 @@ function validatePerkRequirements(
   }
 
   // Check AI level requirement (for AI perks)
-  if (perkInfo.requirements.alienLevel && (!character.AlienLevel || character.AlienLevel < perkInfo.requirements.alienLevel)) {
+  if (
+    perkInfo.requirements.alienLevel &&
+    (!character.AlienLevel || character.AlienLevel < perkInfo.requirements.alienLevel)
+  ) {
     errors.push(`Requires AI level ${perkInfo.requirements.alienLevel}`);
   }
 
@@ -155,7 +154,9 @@ function validatePerkRequirements(
 
       if (availablePoints < cost) {
         const pointName = perkInfo.type === 'AI' ? 'AI' : 'standard';
-        errors.push(`Insufficient ${pointName} perk points (need ${cost}, have ${availablePoints})`);
+        errors.push(
+          `Insufficient ${pointName} perk points (need ${cost}, have ${availablePoints})`
+        );
       }
     }
   }
@@ -173,7 +174,7 @@ function validatePerkRequirements(
   return {
     valid: errors.length === 0,
     errors,
-    warnings
+    warnings,
   };
 }
 
@@ -204,7 +205,7 @@ export class PerkManager {
       if (!validation.valid) {
         return {
           success: false,
-          error: validation.errors.join(', ')
+          error: validation.errors.join(', '),
         };
       }
 
@@ -221,14 +222,14 @@ export class PerkManager {
       // Handle different perk types
       if (perkInfo.type === 'LE') {
         // LE Research perks
-        const existingIndex = perkSystem.research.findIndex(r => r.name === perkInfo.name);
+        const existingIndex = perkSystem.research.findIndex((r) => r.name === perkInfo.name);
         const oldLevel = existingIndex >= 0 ? perkSystem.research[existingIndex].level : 0;
 
         const researchEntry: ResearchEntry = {
           aoid: perkInfo.aoid,
           name: perkInfo.name,
           level: targetLevel,
-          type: 'LE'
+          type: 'LE',
         };
 
         if (existingIndex >= 0) {
@@ -242,17 +243,17 @@ export class PerkManager {
           perk: researchEntry,
           oldLevel,
           newLevel: targetLevel,
-          pointsChanged: 0
+          pointsChanged: 0,
         };
 
         return {
           success: true,
           updatedProfile: this.finalizeProfileUpdate(updatedProfile),
-          changeEvent
+          changeEvent,
         };
       } else {
         // SL/AI Perks that cost points
-        const existingIndex = perkSystem.perks.findIndex(p => p.name === perkInfo.name);
+        const existingIndex = perkSystem.perks.findIndex((p) => p.name === perkInfo.name);
         const oldLevel = existingIndex >= 0 ? perkSystem.perks[existingIndex].level : 0;
         const cost = calculatePerkUpgradeCost(oldLevel, targetLevel, perkInfo.type);
 
@@ -260,7 +261,7 @@ export class PerkManager {
           aoid: perkInfo.aoid,
           name: perkInfo.name,
           level: targetLevel,
-          type: perkInfo.type
+          type: perkInfo.type,
         };
 
         if (existingIndex >= 0) {
@@ -279,19 +280,19 @@ export class PerkManager {
           perk: perkEntry,
           oldLevel,
           newLevel: targetLevel,
-          pointsChanged: cost
+          pointsChanged: cost,
         };
 
         return {
           success: true,
           updatedProfile: this.finalizeProfileUpdate(updatedProfile),
-          changeEvent
+          changeEvent,
         };
       }
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to add perk'
+        error: error instanceof Error ? error.message : 'Failed to add perk',
       };
     }
   }
@@ -313,7 +314,7 @@ export class PerkManager {
       if (!profile.PerksAndResearch) {
         return {
           success: false,
-          error: 'No perks to remove'
+          error: 'No perks to remove',
         };
       }
 
@@ -321,7 +322,7 @@ export class PerkManager {
       const perkSystem = updatedProfile.PerksAndResearch;
 
       // Check in regular perks first
-      const perkIndex = perkSystem.perks.findIndex(p => p.name === perkName);
+      const perkIndex = perkSystem.perks.findIndex((p) => p.name === perkName);
       if (perkIndex >= 0) {
         const perk = perkSystem.perks[perkIndex];
         const oldLevel = perk.level;
@@ -337,7 +338,7 @@ export class PerkManager {
             perk,
             oldLevel,
             newLevel: 0,
-            pointsChanged: -pointsRefunded
+            pointsChanged: -pointsRefunded,
           };
         } else {
           // Downgrade
@@ -347,7 +348,7 @@ export class PerkManager {
             perk,
             oldLevel,
             newLevel: targetLevel,
-            pointsChanged: -pointsRefunded
+            pointsChanged: -pointsRefunded,
           };
         }
 
@@ -359,12 +360,12 @@ export class PerkManager {
         return {
           success: true,
           updatedProfile: this.finalizeProfileUpdate(updatedProfile),
-          changeEvent
+          changeEvent,
         };
       }
 
       // Check in research perks
-      const researchIndex = perkSystem.research.findIndex(r => r.name === perkName);
+      const researchIndex = perkSystem.research.findIndex((r) => r.name === perkName);
       if (researchIndex >= 0) {
         const research = perkSystem.research[researchIndex];
         const oldLevel = research.level;
@@ -379,7 +380,7 @@ export class PerkManager {
             perk: research,
             oldLevel,
             newLevel: 0,
-            pointsChanged: 0
+            pointsChanged: 0,
           };
         } else {
           // Downgrade
@@ -389,25 +390,25 @@ export class PerkManager {
             perk: research,
             oldLevel,
             newLevel: targetLevel,
-            pointsChanged: 0
+            pointsChanged: 0,
           };
         }
 
         return {
           success: true,
           updatedProfile: this.finalizeProfileUpdate(updatedProfile),
-          changeEvent
+          changeEvent,
         };
       }
 
       return {
         success: false,
-        error: `Perk "${perkName}" not found`
+        error: `Perk "${perkName}" not found`,
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to remove perk'
+        error: error instanceof Error ? error.message : 'Failed to remove perk',
       };
     }
   }
@@ -428,14 +429,15 @@ export class PerkManager {
     const calculation: PerkPointCalculation = {
       standardPoints: {
         total: standardTotal,
-        formula: profile.Character.Level <= 200
-          ? `Level ${profile.Character.Level}: ${Math.floor(profile.Character.Level / 10)} points`
-          : `Level ${profile.Character.Level}: 20 + ${Math.min(profile.Character.Level - 200, 20)} = ${standardTotal} points`
+        formula:
+          profile.Character.Level <= 200
+            ? `Level ${profile.Character.Level}: ${Math.floor(profile.Character.Level / 10)} points`
+            : `Level ${profile.Character.Level}: 20 + ${Math.min(profile.Character.Level - 200, 20)} = ${standardTotal} points`,
       },
       aiPoints: {
         total: aiTotal,
-        formula: `AI Level ${profile.Character.AlienLevel || 0}: ${aiTotal} points`
-      }
+        formula: `AI Level ${profile.Character.AlienLevel || 0}: ${aiTotal} points`,
+      },
     };
 
     this.pointCalculationCache.set(cacheKey, calculation);
@@ -459,10 +461,7 @@ export class PerkManager {
     const effects: PerkEffectSummary = {};
 
     // Process all equipped perks (both SL/AI and LE research)
-    const allPerks = [
-      ...profile.PerksAndResearch.perks,
-      ...profile.PerksAndResearch.research
-    ];
+    const allPerks = [...profile.PerksAndResearch.perks, ...profile.PerksAndResearch.research];
 
     // TODO: This will need to be implemented once we have perk data in the database
     // For now, return empty effects
@@ -487,15 +486,15 @@ export class PerkManager {
       standardPerkPoints: {
         total: pointCalculation.standardPoints.total,
         spent: 0,
-        available: pointCalculation.standardPoints.total
+        available: pointCalculation.standardPoints.total,
       },
       aiPerkPoints: {
         total: pointCalculation.aiPoints.total,
         spent: 0,
-        available: pointCalculation.aiPoints.total
+        available: pointCalculation.aiPoints.total,
       },
       research: [],
-      lastCalculated: new Date().toISOString()
+      lastCalculated: new Date().toISOString(),
     };
   }
 
@@ -518,8 +517,8 @@ export class PerkManager {
    * Generate cache key for perk effects
    */
   private generateEffectCacheKey(perkSystem: PerkSystem): string {
-    const perkIds = perkSystem.perks.map(p => `${p.name}-${p.level}`).sort();
-    const researchIds = perkSystem.research.map(r => `${r.name}-${r.level}`).sort();
+    const perkIds = perkSystem.perks.map((p) => `${p.name}-${p.level}`).sort();
+    const researchIds = perkSystem.research.map((r) => `${r.name}-${r.level}`).sort();
     return [...perkIds, ...researchIds].join('|');
   }
 
@@ -546,14 +545,16 @@ export class PerkManager {
     // Update standard perk points
     const currentStandardSpent = perkSystem.standardPerkPoints.spent;
     perkSystem.standardPerkPoints.total = pointCalculation.standardPoints.total;
-    perkSystem.standardPerkPoints.available = Math.max(0,
+    perkSystem.standardPerkPoints.available = Math.max(
+      0,
       pointCalculation.standardPoints.total - currentStandardSpent
     );
 
     // Update AI perk points
     const currentAISpent = perkSystem.aiPerkPoints.spent;
     perkSystem.aiPerkPoints.total = pointCalculation.aiPoints.total;
-    perkSystem.aiPerkPoints.available = Math.max(0,
+    perkSystem.aiPerkPoints.available = Math.max(
+      0,
       pointCalculation.aiPoints.total - currentAISpent
     );
 
@@ -573,5 +574,5 @@ export {
   calculateAIPerkPoints,
   getPerkCost,
   calculatePerkUpgradeCost,
-  validatePerkRequirements
+  validatePerkRequirements,
 };

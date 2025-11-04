@@ -19,9 +19,7 @@ Shows active buff nanos with their icons, names, NCU costs and removal options
         <div class="flex justify-between items-center">
           <div class="flex items-center gap-2">
             <i class="pi pi-sparkles text-primary-500" :aria-hidden="true"></i>
-            <span class="font-semibold">
-              Buffs ({{ currentNCU }} / {{ maxNCU }} NCU)
-            </span>
+            <span class="font-semibold"> Buffs ({{ currentNCU }} / {{ maxNCU }} NCU) </span>
           </div>
           <Button
             label="Remove All"
@@ -46,11 +44,7 @@ Shows active buff nanos with their icons, names, NCU costs and removal options
               class="buff-icon"
               @error="onIconError"
             />
-            <i
-              v-else
-              class="pi pi-sparkles text-primary-500 text-xl"
-              :aria-hidden="true"
-            ></i>
+            <i v-else class="pi pi-sparkles text-primary-500 text-xl" :aria-hidden="true"></i>
           </div>
         </template>
       </Column>
@@ -65,7 +59,7 @@ Shows active buff nanos with their icons, names, NCU costs and removal options
               showDelay: 500,
               hideDelay: 200,
               escape: false,
-              class: 'buff-tooltip'
+              class: 'buff-tooltip',
             }"
           >
             <span class="font-medium cursor-help">{{ data.name }}</span>
@@ -111,9 +105,7 @@ Shows active buff nanos with their icons, names, NCU costs and removal options
       <div class="mb-4">
         <i class="pi pi-sparkles text-6xl opacity-30" :aria-hidden="true"></i>
       </div>
-      <p class="text-xl text-surface-600 dark:text-surface-400 mb-2">
-        No active buffs
-      </p>
+      <p class="text-xl text-surface-600 dark:text-surface-400 mb-2">No active buffs</p>
       <p class="text-sm text-surface-500 dark:text-surface-500 mb-4">
         Cast nano programs from TinkerItems to add buff effects to your profile.
       </p>
@@ -125,90 +117,90 @@ Shows active buff nanos with their icons, names, NCU costs and removal options
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
-import Button from 'primevue/button'
-import type { Item, StatValue } from '@/types/api'
-import { getItemIconUrl } from '@/services/game-utils'
+import { computed } from 'vue';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
+import Button from 'primevue/button';
+import type { Item, StatValue } from '@/types/api';
+import { getItemIconUrl } from '@/services/game-utils';
 
 // Props
 const props = defineProps<{
-  buffs: Item[]
-  currentNCU: number
-  maxNCU: number
-}>()
+  buffs: Item[];
+  currentNCU: number;
+  maxNCU: number;
+}>();
 
 // Emits
 const emit = defineEmits<{
-  'remove-buff': [buff: Item]
-  'remove-all-buffs': []
-}>()
+  'remove-buff': [buff: Item];
+  'remove-all-buffs': [];
+}>();
 
 // Helper functions
 function getBuffIconUrl(buff: Item): string | null {
   if (!buff.stats || buff.stats.length === 0) {
-    return null
+    return null;
   }
-  return getItemIconUrl(buff.stats)
+  return getItemIconUrl(buff.stats);
 }
 
 function getBuffNCUCost(buff: Item): number {
   // NCU cost is stored in stat 54 (Level stat for nano programs)
-  const ncuStat = buff.stats?.find((stat: StatValue) => stat.stat === 54)
-  return ncuStat?.value || 0
+  const ncuStat = buff.stats?.find((stat: StatValue) => stat.stat === 54);
+  return ncuStat?.value || 0;
 }
 
 function getBuffTooltip(buff: Item): string {
   try {
-    const effects = getBuffEffects(buff)
-    const ncuCost = getBuffNCUCost(buff)
+    const effects = getBuffEffects(buff);
+    const ncuCost = getBuffNCUCost(buff);
 
-    let tooltip = `<div class="buff-tooltip-content">`
+    let tooltip = `<div class="buff-tooltip-content">`;
 
     // Buff name and QL
-    tooltip += `<div class="tooltip-header">`
-    tooltip += `<strong>${buff.name}</strong>`
+    tooltip += `<div class="tooltip-header">`;
+    tooltip += `<strong>${buff.name}</strong>`;
     if (buff.ql) {
-      tooltip += ` (QL ${buff.ql})`
+      tooltip += ` (QL ${buff.ql})`;
     }
-    tooltip += `</div>`
+    tooltip += `</div>`;
 
     // NCU cost
     if (ncuCost > 0) {
-      tooltip += `<div class="tooltip-ncu">NCU Cost: ${ncuCost}</div>`
+      tooltip += `<div class="tooltip-ncu">NCU Cost: ${ncuCost}</div>`;
     }
 
     // Effects
     if (effects.length > 0) {
-      tooltip += `<div class="tooltip-effects">`
-      tooltip += `<div class="tooltip-section-title">Effects:</div>`
+      tooltip += `<div class="tooltip-effects">`;
+      tooltip += `<div class="tooltip-section-title">Effects:</div>`;
       for (const effect of effects) {
-        const effectClass = effect.startsWith('-') ? 'negative-effect' : 'positive-effect'
-        tooltip += `<div class="${effectClass}">${effect}</div>`
+        const effectClass = effect.startsWith('-') ? 'negative-effect' : 'positive-effect';
+        tooltip += `<div class="${effectClass}">${effect}</div>`;
       }
-      tooltip += `</div>`
+      tooltip += `</div>`;
     }
 
     // Description if available
     if (buff.description) {
-      tooltip += `<div class="tooltip-description">`
-      tooltip += `<div class="tooltip-section-title">Description:</div>`
-      tooltip += `<div>${buff.description}</div>`
-      tooltip += `</div>`
+      tooltip += `<div class="tooltip-description">`;
+      tooltip += `<div class="tooltip-section-title">Description:</div>`;
+      tooltip += `<div>${buff.description}</div>`;
+      tooltip += `</div>`;
     }
 
-    tooltip += `</div>`
-    return tooltip
+    tooltip += `</div>`;
+    return tooltip;
   } catch (error) {
-    console.warn('Error generating buff tooltip:', error)
-    return buff.name || 'Unknown Buff'
+    console.warn('Error generating buff tooltip:', error);
+    return buff.name || 'Unknown Buff';
   }
 }
 
 function getBuffEffects(buff: Item): string[] {
   try {
-    const effects: string[] = []
+    const effects: string[] = [];
 
     // Parse spell data for stat modifications
     if (buff.spell_data && buff.spell_data.length > 0) {
@@ -216,16 +208,16 @@ function getBuffEffects(buff: Item): string[] {
         if (spellData.spells && spellData.spells.length > 0) {
           for (const spell of spellData.spells) {
             // Look for common buff spell IDs that modify stats
-            const spellId = spell.spell_id
+            const spellId = spell.spell_id;
 
             // Spell ID 53045: Modify Skill
             // Spell ID 53012: Modify Ability
             // Spell ID 53014: Modify AC
             // Spell ID 53175: Modify Max Health/Nano
             if (spellId && [53045, 53012, 53014, 53175].includes(spellId)) {
-              const effect = parseSpellEffect(spell.spell_params, spellId)
+              const effect = parseSpellEffect(spell.spell_params, spellId);
               if (effect) {
-                effects.push(effect)
+                effects.push(effect);
               }
             }
           }
@@ -233,35 +225,35 @@ function getBuffEffects(buff: Item): string[] {
       }
     }
 
-    return effects
+    return effects;
   } catch (error) {
-    console.warn('Error parsing buff effects:', error)
-    return []
+    console.warn('Error parsing buff effects:', error);
+    return [];
   }
 }
 
 function parseSpellEffect(spellParams: Record<string, any>, spellId: number): string | null {
   try {
     if (!spellParams || typeof spellParams !== 'object') {
-      return null
+      return null;
     }
 
     // Common spell parameter keys for stat modifications
-    const statId = spellParams.stat || spellParams.stat_id || spellParams[0]
-    const amount = spellParams.amount || spellParams.value || spellParams[1]
+    const statId = spellParams.stat || spellParams.stat_id || spellParams[0];
+    const amount = spellParams.amount || spellParams.value || spellParams[1];
 
     if (typeof statId === 'number' && typeof amount === 'number') {
-      const skillName = getSkillNameFromStatId(statId)
+      const skillName = getSkillNameFromStatId(statId);
       if (skillName) {
-        const sign = amount >= 0 ? '+' : ''
-        return `${skillName}: ${sign}${amount}`
+        const sign = amount >= 0 ? '+' : '';
+        return `${skillName}: ${sign}${amount}`;
       }
     }
 
-    return null
+    return null;
   } catch (error) {
-    console.warn('Error parsing spell effect:', error)
-    return null
+    console.warn('Error parsing spell effect:', error);
+    return null;
   }
 }
 
@@ -298,14 +290,14 @@ function getSkillNameFromStatId(statId: number): string | null {
 
     // Combat & Healing
     124: 'First Aid',
-    125: 'Treatment'
-  }
+    125: 'Treatment',
+  };
 
-  return statMap[statId] || `Stat ${statId}`
+  return statMap[statId] || `Stat ${statId}`;
 }
 
 function onIconError() {
-  console.warn('Failed to load buff icon')
+  console.warn('Failed to load buff icon');
 }
 </script>
 

@@ -49,7 +49,9 @@ interface StatComparison {
   isRequirement: boolean;
 }
 
-function extractStatsFromSymbiant(symbiant: EnrichedSymbiant | null): Map<number, { value: number; isRequirement: boolean }> {
+function extractStatsFromSymbiant(
+  symbiant: EnrichedSymbiant | null
+): Map<number, { value: number; isRequirement: boolean }> {
   const stats = new Map<number, { value: number; isRequirement: boolean }>();
 
   if (!symbiant) return stats;
@@ -82,7 +84,7 @@ const comparisonData = computed((): StatComparison[] => {
   const statsBySymbiant: Map<number, { value: number; isRequirement: boolean }>[] = [];
 
   // Extract stats from each selected symbiant
-  selectedSymbiants.value.forEach(symbiant => {
+  selectedSymbiants.value.forEach((symbiant) => {
     const stats = extractStatsFromSymbiant(symbiant);
     statsBySymbiant.push(stats);
     stats.forEach((_, statId) => allStats.add(statId));
@@ -91,7 +93,7 @@ const comparisonData = computed((): StatComparison[] => {
   // Build comparison rows
   const rows: StatComparison[] = [];
 
-  allStats.forEach(statId => {
+  allStats.forEach((statId) => {
     const statName = STAT[statId as keyof typeof STAT] || `Stat ${statId}`;
     const values: (number | null)[] = [];
     let isRequirement = false;
@@ -108,7 +110,7 @@ const comparisonData = computed((): StatComparison[] => {
       statId,
       statName,
       values,
-      isRequirement
+      isRequirement,
     });
   });
 
@@ -122,18 +124,12 @@ const comparisonData = computed((): StatComparison[] => {
 });
 
 // Group comparison data
-const requirementStats = computed(() =>
-  comparisonData.value.filter(s => s.isRequirement)
-);
+const requirementStats = computed(() => comparisonData.value.filter((s) => s.isRequirement));
 
-const modifierStats = computed(() =>
-  comparisonData.value.filter(s => !s.isRequirement)
-);
+const modifierStats = computed(() => comparisonData.value.filter((s) => !s.isRequirement));
 
 // Check if any symbiant is selected
-const hasSelection = computed(() =>
-  selectedSymbiants.value.some(s => s !== null)
-);
+const hasSelection = computed(() => selectedSymbiants.value.some((s) => s !== null));
 
 // Get quality severity for tag
 function getQualitySeverity(ql: number): 'success' | 'info' | 'warning' | 'danger' {
@@ -165,19 +161,23 @@ function formatStatValue(value: number | null, isRequirement: boolean): string {
 }
 
 // Get cell class based on value comparison
-function getCellClass(value: number | null, values: (number | null)[], isRequirement: boolean): string {
+function getCellClass(
+  value: number | null,
+  values: (number | null)[],
+  isRequirement: boolean
+): string {
   if (value === null) return 'text-surface-400';
 
   if (isRequirement) {
     // For requirements, lower is better
-    const nonNullValues = values.filter(v => v !== null) as number[];
+    const nonNullValues = values.filter((v) => v !== null) as number[];
     const minValue = Math.min(...nonNullValues);
     if (value === minValue && nonNullValues.length > 1) {
       return 'text-green-600 dark:text-green-400 font-semibold';
     }
   } else {
     // For modifiers, higher is better
-    const nonNullValues = values.filter(v => v !== null) as number[];
+    const nonNullValues = values.filter((v) => v !== null) as number[];
     const maxValue = Math.max(...nonNullValues);
     if (value === maxValue && nonNullValues.length > 1) {
       return 'text-green-600 dark:text-green-400 font-semibold';
@@ -214,7 +214,7 @@ async function loadFromUrl() {
 
   ids.forEach((id, index) => {
     if (id) {
-      const symbiant = allSymbiants.find(s => s.id === id);
+      const symbiant = allSymbiants.find((s) => s.id === id);
       if (symbiant) {
         selectedSymbiants.value[index] = symbiant;
       }
@@ -223,7 +223,7 @@ async function loadFromUrl() {
 
   // Sync loaded symbiants back to store
   symbiantStore.clearComparison();
-  selectedSymbiants.value.forEach(s => s && symbiantStore.addToComparison(s));
+  selectedSymbiants.value.forEach((s) => s && symbiantStore.addToComparison(s));
 }
 
 function loadFromStore() {
@@ -248,19 +248,26 @@ onMounted(async () => {
 });
 
 // Watch for URL changes
-watch(() => route.query, () => {
-  if (route.name === 'TinkerPocket') {
-    loadFromUrl();
+watch(
+  () => route.query,
+  () => {
+    if (route.name === 'TinkerPocket') {
+      loadFromUrl();
+    }
   }
-});
+);
 
 // Watch for store changes (from other tabs/components)
-watch(() => symbiantStore.selectedForComparison, (newSelection) => {
-  // Only update if there are no URL params (to respect URL priority)
-  if (!route.query.s1 && !route.query.s2 && !route.query.s3) {
-    selectedSymbiants.value = [...newSelection] as (EnrichedSymbiant | null)[];
-  }
-}, { deep: true });
+watch(
+  () => symbiantStore.selectedForComparison,
+  (newSelection) => {
+    // Only update if there are no URL params (to respect URL priority)
+    if (!route.query.s1 && !route.query.s2 && !route.query.s3) {
+      selectedSymbiants.value = [...newSelection] as (EnrichedSymbiant | null)[];
+    }
+  },
+  { deep: true }
+);
 </script>
 
 <template>
@@ -285,7 +292,10 @@ watch(() => symbiantStore.selectedForComparison, (newSelection) => {
             <!-- Symbiant Slot 1 -->
             <div class="flex flex-col gap-2">
               <label class="font-medium text-sm">Symbiant 1</label>
-              <div v-if="selectedSymbiants[0]" class="p-3 bg-surface-50 dark:bg-surface-800 rounded border border-surface-200 dark:border-surface-700">
+              <div
+                v-if="selectedSymbiants[0]"
+                class="p-3 bg-surface-50 dark:bg-surface-800 rounded border border-surface-200 dark:border-surface-700"
+              >
                 <div class="flex items-start justify-between mb-2">
                   <div class="font-semibold">{{ selectedSymbiants[0].name }}</div>
                   <Button
@@ -302,11 +312,17 @@ watch(() => symbiantStore.selectedForComparison, (newSelection) => {
                   {{ selectedSymbiants[0].slot }} • {{ selectedSymbiants[0].family }}
                 </div>
                 <div class="flex gap-2 mt-2">
-                  <Tag :value="`QL ${selectedSymbiants[0].ql}`" :severity="getQualitySeverity(selectedSymbiants[0].ql)" />
+                  <Tag
+                    :value="`QL ${selectedSymbiants[0].ql}`"
+                    :severity="getQualitySeverity(selectedSymbiants[0].ql)"
+                  />
                   <Tag :value="formatMinimumLevel(selectedSymbiants[0])" severity="info" />
                 </div>
               </div>
-              <div v-else class="p-6 bg-surface-50 dark:bg-surface-800 rounded border border-dashed border-surface-300 dark:border-surface-600 text-center">
+              <div
+                v-else
+                class="p-6 bg-surface-50 dark:bg-surface-800 rounded border border-dashed border-surface-300 dark:border-surface-600 text-center"
+              >
                 <span class="text-surface-400 dark:text-surface-500 text-sm">Empty slot</span>
               </div>
             </div>
@@ -314,7 +330,10 @@ watch(() => symbiantStore.selectedForComparison, (newSelection) => {
             <!-- Symbiant Slot 2 -->
             <div class="flex flex-col gap-2">
               <label class="font-medium text-sm">Symbiant 2</label>
-              <div v-if="selectedSymbiants[1]" class="p-3 bg-surface-50 dark:bg-surface-800 rounded border border-surface-200 dark:border-surface-700">
+              <div
+                v-if="selectedSymbiants[1]"
+                class="p-3 bg-surface-50 dark:bg-surface-800 rounded border border-surface-200 dark:border-surface-700"
+              >
                 <div class="flex items-start justify-between mb-2">
                   <div class="font-semibold">{{ selectedSymbiants[1].name }}</div>
                   <Button
@@ -331,11 +350,17 @@ watch(() => symbiantStore.selectedForComparison, (newSelection) => {
                   {{ selectedSymbiants[1].slot }} • {{ selectedSymbiants[1].family }}
                 </div>
                 <div class="flex gap-2 mt-2">
-                  <Tag :value="`QL ${selectedSymbiants[1].ql}`" :severity="getQualitySeverity(selectedSymbiants[1].ql)" />
+                  <Tag
+                    :value="`QL ${selectedSymbiants[1].ql}`"
+                    :severity="getQualitySeverity(selectedSymbiants[1].ql)"
+                  />
                   <Tag :value="formatMinimumLevel(selectedSymbiants[1])" severity="info" />
                 </div>
               </div>
-              <div v-else class="p-6 bg-surface-50 dark:bg-surface-800 rounded border border-dashed border-surface-300 dark:border-surface-600 text-center">
+              <div
+                v-else
+                class="p-6 bg-surface-50 dark:bg-surface-800 rounded border border-dashed border-surface-300 dark:border-surface-600 text-center"
+              >
                 <span class="text-surface-400 dark:text-surface-500 text-sm">Empty slot</span>
               </div>
             </div>
@@ -343,7 +368,10 @@ watch(() => symbiantStore.selectedForComparison, (newSelection) => {
             <!-- Symbiant Slot 3 -->
             <div class="flex flex-col gap-2">
               <label class="font-medium text-sm">Symbiant 3</label>
-              <div v-if="selectedSymbiants[2]" class="p-3 bg-surface-50 dark:bg-surface-800 rounded border border-surface-200 dark:border-surface-700">
+              <div
+                v-if="selectedSymbiants[2]"
+                class="p-3 bg-surface-50 dark:bg-surface-800 rounded border border-surface-200 dark:border-surface-700"
+              >
                 <div class="flex items-start justify-between mb-2">
                   <div class="font-semibold">{{ selectedSymbiants[2].name }}</div>
                   <Button
@@ -360,11 +388,17 @@ watch(() => symbiantStore.selectedForComparison, (newSelection) => {
                   {{ selectedSymbiants[2].slot }} • {{ selectedSymbiants[2].family }}
                 </div>
                 <div class="flex gap-2 mt-2">
-                  <Tag :value="`QL ${selectedSymbiants[2].ql}`" :severity="getQualitySeverity(selectedSymbiants[2].ql)" />
+                  <Tag
+                    :value="`QL ${selectedSymbiants[2].ql}`"
+                    :severity="getQualitySeverity(selectedSymbiants[2].ql)"
+                  />
                   <Tag :value="formatMinimumLevel(selectedSymbiants[2])" severity="info" />
                 </div>
               </div>
-              <div v-else class="p-6 bg-surface-50 dark:bg-surface-800 rounded border border-dashed border-surface-300 dark:border-surface-600 text-center">
+              <div
+                v-else
+                class="p-6 bg-surface-50 dark:bg-surface-800 rounded border border-dashed border-surface-300 dark:border-surface-600 text-center"
+              >
                 <span class="text-surface-400 dark:text-surface-500 text-sm">Empty slot</span>
               </div>
             </div>
@@ -402,7 +436,9 @@ watch(() => symbiantStore.selectedForComparison, (newSelection) => {
               :header="symbiant ? symbiant.name : `Symbiant ${index + 1}`"
             >
               <template #body="slotProps">
-                <span :class="getCellClass(slotProps.data.values[index], slotProps.data.values, true)">
+                <span
+                  :class="getCellClass(slotProps.data.values[index], slotProps.data.values, true)"
+                >
                   {{ formatStatValue(slotProps.data.values[index], true) }}
                 </span>
               </template>
@@ -432,7 +468,9 @@ watch(() => symbiantStore.selectedForComparison, (newSelection) => {
               :header="symbiant ? symbiant.name : `Symbiant ${index + 1}`"
             >
               <template #body="slotProps">
-                <span :class="getCellClass(slotProps.data.values[index], slotProps.data.values, false)">
+                <span
+                  :class="getCellClass(slotProps.data.values[index], slotProps.data.values, false)"
+                >
                   {{ formatStatValue(slotProps.data.values[index], false) }}
                 </span>
               </template>

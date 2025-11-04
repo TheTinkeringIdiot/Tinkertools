@@ -25,7 +25,7 @@ global.localStorage = {
   removeItem: vi.fn(),
   clear: vi.fn(),
   length: 0,
-  key: vi.fn()
+  key: vi.fn(),
 } as any;
 
 // Create a minimal router for the test
@@ -33,8 +33,8 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', component: { template: '<div>Home</div>' } },
-    { path: '/nanos', component: TinkerNanos }
-  ]
+    { path: '/nanos', component: TinkerNanos },
+  ],
 });
 
 // Simple component mocks that just render content
@@ -43,17 +43,17 @@ vi.mock('@/components/nanos/NanoSearch.vue', () => ({
     name: 'NanoSearch',
     template: '<div class="nano-search"><input type="text" placeholder="Search nanos" /></div>',
     props: ['modelValue', 'totalResults'],
-    emits: ['search', 'update:modelValue']
-  }
+    emits: ['search', 'update:modelValue'],
+  },
 }));
 
 vi.mock('@/components/nanos/NanoFilters.vue', () => ({
   default: {
-    name: 'NanoFilters', 
+    name: 'NanoFilters',
     template: '<div class="nano-filters">Filters</div>',
     props: ['modelValue', 'showCompatibility', 'activeProfile'],
-    emits: ['update:modelValue', 'filter-change']
-  }
+    emits: ['update:modelValue', 'filter-change'],
+  },
 }));
 
 vi.mock('@/components/nanos/NanoList.vue', () => ({
@@ -61,8 +61,8 @@ vi.mock('@/components/nanos/NanoList.vue', () => ({
     name: 'NanoList',
     template: '<div class="nano-list">{{ nanos.length }} nanos</div>',
     props: ['nanos', 'loading', 'showCompatibility', 'activeProfile'],
-    emits: ['nano-select', 'page-change', 'favorite']
-  }
+    emits: ['nano-select', 'page-change', 'favorite'],
+  },
 }));
 
 vi.mock('@/components/nanos/NanoSchoolView.vue', () => ({
@@ -70,8 +70,8 @@ vi.mock('@/components/nanos/NanoSchoolView.vue', () => ({
     name: 'NanoSchoolView',
     template: '<div class="nano-school-view">School view</div>',
     props: ['nanos', 'showCompatibility', 'activeProfile'],
-    emits: ['nano-select', 'strain-conflict', 'favorite']
-  }
+    emits: ['nano-select', 'strain-conflict', 'favorite'],
+  },
 }));
 
 vi.mock('@/components/nanos/NanoDetail.vue', () => ({
@@ -79,8 +79,8 @@ vi.mock('@/components/nanos/NanoDetail.vue', () => ({
     name: 'NanoDetail',
     template: '<div class="nano-detail" v-if="visible">{{ nano?.name }}</div>',
     props: ['visible', 'nano', 'activeProfile', 'showCompatibility'],
-    emits: ['update:visible', 'close']
-  }
+    emits: ['update:visible', 'close'],
+  },
 }));
 
 // Mock PrimeVue components minimally
@@ -88,8 +88,8 @@ vi.mock('primevue/badge', () => ({
   default: {
     name: 'Badge',
     template: '<span>{{ value }}</span>',
-    props: ['value', 'severity']
-  }
+    props: ['value', 'severity'],
+  },
 }));
 
 vi.mock('primevue/button', () => ({
@@ -97,8 +97,8 @@ vi.mock('primevue/button', () => ({
     name: 'Button',
     template: '<button @click="$emit(\'click\')">{{ label }}</button>',
     props: ['label', 'severity', 'text'],
-    emits: ['click']
-  }
+    emits: ['click'],
+  },
 }));
 
 vi.mock('primevue/dropdown', () => ({
@@ -109,33 +109,35 @@ vi.mock('primevue/dropdown', () => ({
       <option v-for="opt in options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
     </select>`,
     props: ['modelValue', 'options', 'placeholder'],
-    emits: ['update:modelValue', 'change']
-  }
+    emits: ['update:modelValue', 'change'],
+  },
 }));
 
 vi.mock('primevue/inputswitch', () => ({
   default: {
     name: 'InputSwitch',
-    template: '<input type="checkbox" v-model="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
+    template:
+      '<input type="checkbox" v-model="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
     props: ['modelValue'],
-    emits: ['update:modelValue']
-  }
+    emits: ['update:modelValue'],
+  },
 }));
 
 vi.mock('primevue/progressspinner', () => ({
   default: {
     name: 'ProgressSpinner',
-    template: '<div class="loading">Loading...</div>'
-  }
+    template: '<div class="loading">Loading...</div>',
+  },
 }));
 
 vi.mock('primevue/togglebutton', () => ({
   default: {
     name: 'ToggleButton',
-    template: '<button @click="$emit(\'update:modelValue\', !modelValue)">{{ modelValue ? "List" : "Schools" }}</button>',
+    template:
+      '<button @click="$emit(\'update:modelValue\', !modelValue)">{{ modelValue ? "List" : "Schools" }}</button>',
     props: ['modelValue', 'onLabel', 'offLabel'],
-    emits: ['update:modelValue']
-  }
+    emits: ['update:modelValue'],
+  },
 }));
 
 // Check backend availability before running tests
@@ -161,8 +163,8 @@ describe.skipIf(!BACKEND_AVAILABLE)('TinkerNanos Backend Integration', () => {
   it('loads and displays TinkerNanos view', () => {
     const wrapper = mount(TinkerNanos, {
       global: {
-        plugins: [pinia, router]
-      }
+        plugins: [pinia, router],
+      },
     });
 
     expect(wrapper.find('h1').text()).toContain('TinkerNanos');
@@ -176,8 +178,8 @@ describe.skipIf(!BACKEND_AVAILABLE)('TinkerNanos Backend Integration', () => {
 
     const wrapper = mount(TinkerNanos, {
       global: {
-        plugins: [pinia, router]
-      }
+        plugins: [pinia, router],
+      },
     });
 
     // Wait for component to mount and stores to initialize
@@ -185,17 +187,17 @@ describe.skipIf(!BACKEND_AVAILABLE)('TinkerNanos Backend Integration', () => {
 
     expect(nanosStore).toBeDefined();
     expect(profilesStore).toBeDefined();
-    
+
     // Manually trigger fetch to test backend integration
     expect(nanosStore.loading).toBe(false);
-    
+
     // Start fetch
     const fetchPromise = nanosStore.fetchNanos();
     expect(nanosStore.loading).toBe(true);
-    
+
     // Wait for real backend data
     await fetchPromise;
-    
+
     expect(nanosStore.loading).toBe(false);
     expect(nanosStore.nanos.length).toBeGreaterThan(0);
     expect(nanosStore.totalCount).toBeGreaterThan(0);
@@ -206,8 +208,8 @@ describe.skipIf(!BACKEND_AVAILABLE)('TinkerNanos Backend Integration', () => {
 
     const wrapper = mount(TinkerNanos, {
       global: {
-        plugins: [pinia, router]
-      }
+        plugins: [pinia, router],
+      },
     });
 
     // Load real data
@@ -227,8 +229,8 @@ describe.skipIf(!BACKEND_AVAILABLE)('TinkerNanos Backend Integration', () => {
 
     const wrapper = mount(TinkerNanos, {
       global: {
-        plugins: [pinia, router]
-      }
+        plugins: [pinia, router],
+      },
     });
 
     // Create a test profile
@@ -236,8 +238,8 @@ describe.skipIf(!BACKEND_AVAILABLE)('TinkerNanos Backend Integration', () => {
       Character: {
         Profession: PROFESSION.DOCTOR, // 10
         Breed: BREED.SOLITUS, // 1
-        Level: 100
-      }
+        Level: 100,
+      },
     });
 
     await wrapper.vm.$nextTick();
@@ -245,11 +247,11 @@ describe.skipIf(!BACKEND_AVAILABLE)('TinkerNanos Backend Integration', () => {
     // Should show profile in dropdown
     const dropdown = wrapper.find('select');
     expect(dropdown.exists()).toBe(true);
-    
+
     // Select the profile
     await dropdown.setValue(profile.id);
     await dropdown.trigger('change');
-    
+
     expect(profilesStore.activeProfile).toBeTruthy();
     expect(profilesStore.activeProfile?.id).toBe(profile.id);
   }, 10000);
@@ -257,24 +259,23 @@ describe.skipIf(!BACKEND_AVAILABLE)('TinkerNanos Backend Integration', () => {
   it('toggles between list and school view modes', async () => {
     const wrapper = mount(TinkerNanos, {
       global: {
-        plugins: [pinia, router]
-      }
+        plugins: [pinia, router],
+      },
     });
 
     await wrapper.vm.$nextTick();
 
     // Find view toggle button
-    const viewToggle = wrapper.findAll('button').find(btn => 
-      btn.text().includes('List') || btn.text().includes('Schools')
-    );
-    
+    const viewToggle = wrapper
+      .findAll('button')
+      .find((btn) => btn.text().includes('List') || btn.text().includes('Schools'));
+
     expect(viewToggle).toBeDefined();
 
     // Should initially show one view
-    expect(
-      wrapper.find('.nano-list').exists() || 
-      wrapper.find('.nano-school-view').exists()
-    ).toBe(true);
+    expect(wrapper.find('.nano-list').exists() || wrapper.find('.nano-school-view').exists()).toBe(
+      true
+    );
 
     // Toggle view mode
     if (viewToggle) {
@@ -283,40 +284,39 @@ describe.skipIf(!BACKEND_AVAILABLE)('TinkerNanos Backend Integration', () => {
 
       // Should still show a view component
       expect(
-        wrapper.find('.nano-list').exists() || 
-        wrapper.find('.nano-school-view').exists()
+        wrapper.find('.nano-list').exists() || wrapper.find('.nano-school-view').exists()
       ).toBe(true);
     }
   });
 
   it('handles loading states correctly', async () => {
     const nanosStore = useNanosStore();
-    
+
     const wrapper = mount(TinkerNanos, {
       global: {
-        plugins: [pinia, router]
-      }
+        plugins: [pinia, router],
+      },
     });
 
     // Initially not loading
     expect(nanosStore.loading).toBe(false);
-    
+
     // Start loading
     const fetchPromise = nanosStore.fetchNanos();
     expect(nanosStore.loading).toBe(true);
-    
+
     await wrapper.vm.$nextTick();
-    
+
     // Should show loading indicator
     const loading = wrapper.find('.loading');
     expect(loading.exists()).toBe(true);
-    
+
     // Wait for completion
     await fetchPromise;
     expect(nanosStore.loading).toBe(false);
-    
+
     await wrapper.vm.$nextTick();
-    
+
     // Loading should be gone
     expect(wrapper.find('.loading').exists()).toBe(false);
   }, 10000);

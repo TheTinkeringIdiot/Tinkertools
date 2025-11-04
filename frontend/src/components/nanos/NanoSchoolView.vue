@@ -6,13 +6,9 @@ Provides a hierarchical view of nano programs grouped by their nano schools
   <div class="nano-school-view h-full overflow-auto p-4">
     <!-- School Sections -->
     <div class="space-y-4">
-      <div
-        v-for="school in schoolsWithNanos"
-        :key="school.name"
-        class="school-section"
-      >
+      <div v-for="school in schoolsWithNanos" :key="school.name" class="school-section">
         <!-- School Header -->
-        <div 
+        <div
           class="flex items-center justify-between p-4 bg-surface-100 dark:bg-surface-800 rounded-lg cursor-pointer hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors"
           @click="toggleSchool(school.name)"
         >
@@ -35,10 +31,12 @@ Provides a hierarchical view of nano programs grouped by their nano schools
               </p>
             </div>
           </div>
-          
+
           <div class="flex items-center gap-3">
             <!-- School Stats -->
-            <div class="hidden md:flex items-center gap-4 text-sm text-surface-600 dark:text-surface-400">
+            <div
+              class="hidden md:flex items-center gap-4 text-sm text-surface-600 dark:text-surface-400"
+            >
               <div class="flex items-center gap-1">
                 <i class="pi pi-chart-bar"></i>
                 <span>{{ getAverageLevelRange(school.nanos) }}</span>
@@ -48,9 +46,9 @@ Provides a hierarchical view of nano programs grouped by their nano schools
                 <span>{{ getStrainCount(school.nanos) }} strains</span>
               </div>
             </div>
-            
+
             <!-- Expand/Collapse Icon -->
-            <i 
+            <i
               class="pi transition-transform duration-200"
               :class="expandedSchools.has(school.name) ? 'pi-chevron-up' : 'pi-chevron-down'"
             />
@@ -63,23 +61,17 @@ Provides a hierarchical view of nano programs grouped by their nano schools
             <!-- Strain Organization Toggle -->
             <div class="flex items-center justify-between mb-4 px-4">
               <div class="flex items-center gap-2">
-                <Checkbox
-                  v-model="organizeByStrain"
-                  inputId="organize-by-strain"
-                  binary
-                />
-                <label 
+                <Checkbox v-model="organizeByStrain" inputId="organize-by-strain" binary />
+                <label
                   for="organize-by-strain"
                   class="text-sm text-surface-700 dark:text-surface-300 cursor-pointer"
                 >
                   Organize by Strain
                 </label>
               </div>
-              
+
               <div class="flex items-center gap-2">
-                <label class="text-sm text-surface-600 dark:text-surface-400">
-                  Sort:
-                </label>
+                <label class="text-sm text-surface-600 dark:text-surface-400"> Sort: </label>
                 <Dropdown
                   v-model="sortBy"
                   :options="sortOptions"
@@ -99,16 +91,18 @@ Provides a hierarchical view of nano programs grouped by their nano schools
                 class="strain-section"
               >
                 <!-- Strain Header -->
-                <div class="flex items-center justify-between p-3 bg-surface-50 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700">
+                <div
+                  class="flex items-center justify-between p-3 bg-surface-50 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700"
+                >
                   <div class="flex items-center gap-3">
                     <Badge :value="strain.name" severity="warning" />
                     <span class="text-sm text-surface-700 dark:text-surface-300">
                       {{ strain.nanos.length }} nano{{ strain.nanos.length !== 1 ? 's' : '' }}
                     </span>
                   </div>
-                  
+
                   <!-- Strain Conflict Warning -->
-                  <div 
+                  <div
                     v-if="strain.hasConflicts"
                     class="flex items-center gap-2 text-orange-600 dark:text-orange-400"
                     :title="getStrainConflictTooltip(strain)"
@@ -155,7 +149,10 @@ Provides a hierarchical view of nano programs grouped by their nano schools
     </div>
 
     <!-- Empty State -->
-    <div v-if="schoolsWithNanos.length === 0" class="flex flex-col items-center justify-center h-64">
+    <div
+      v-if="schoolsWithNanos.length === 0"
+      class="flex flex-col items-center justify-center h-64"
+    >
       <i class="pi pi-search text-4xl text-surface-400 dark:text-surface-600 mb-4"></i>
       <h3 class="text-lg font-medium text-surface-700 dark:text-surface-300 mb-2">
         No nanos found
@@ -175,7 +172,12 @@ import Checkbox from 'primevue/checkbox';
 import Dropdown from 'primevue/dropdown';
 
 import NanoCard from './NanoCard.vue';
-import type { NanoProgram, TinkerProfile, NanoCompatibilityInfo, StrainConflict } from '@/types/nano';
+import type {
+  NanoProgram,
+  TinkerProfile,
+  NanoCompatibilityInfo,
+  StrainConflict,
+} from '@/types/nano';
 
 // Types
 interface SchoolWithNanos {
@@ -195,14 +197,17 @@ interface SortOption {
 }
 
 // Props
-const props = withDefaults(defineProps<{
-  nanos: NanoProgram[];
-  showCompatibility?: boolean;
-  activeProfile?: TinkerProfile | null;
-}>(), {
-  showCompatibility: false,
-  activeProfile: null
-});
+const props = withDefaults(
+  defineProps<{
+    nanos: NanoProgram[];
+    showCompatibility?: boolean;
+    activeProfile?: TinkerProfile | null;
+  }>(),
+  {
+    showCompatibility: false,
+    activeProfile: null,
+  }
+);
 
 // Emits
 const emit = defineEmits<{
@@ -223,37 +228,37 @@ const sortOptions: SortOption[] = [
   { label: 'Quality Level', value: 'qualityLevel' },
   { label: 'NP Cost', value: 'nanoPointCost' },
   { label: 'Memory', value: 'memoryUsage' },
-  { label: 'Compatibility', value: 'compatibility' }
+  { label: 'Compatibility', value: 'compatibility' },
 ];
 
 // Nano schools from the design document
 const nanoSchools = [
   'Matter Metamorphosis',
   'Biological Metamorphosis',
-  'Psychological Modifications', 
+  'Psychological Modifications',
   'Matter Creation',
   'Time and Space',
   'Sensory Improvement',
-  'Unknown School'
+  'Unknown School',
 ];
 
 // Computed
 const schoolsWithNanos = computed(() => {
   const schoolMap = new Map<string, NanoProgram[]>();
-  
+
   // Initialize all schools
-  nanoSchools.forEach(school => {
+  nanoSchools.forEach((school) => {
     schoolMap.set(school, []);
   });
-  
+
   // Group nanos by school
-  props.nanos.forEach(nano => {
+  props.nanos.forEach((nano) => {
     const school = nano.school || 'Unknown School';
     const nanos = schoolMap.get(school) || [];
     nanos.push(nano);
     schoolMap.set(school, nanos);
   });
-  
+
   // Convert to array and filter out empty schools
   return Array.from(schoolMap.entries())
     .filter(([_, nanos]) => nanos.length > 0)
@@ -263,36 +268,36 @@ const schoolsWithNanos = computed(() => {
 // Methods
 const getSchoolShortName = (school: string | null | undefined): string => {
   if (!school) return '?';
-  
+
   const shortNames: Record<string, string> = {
     'Matter Metamorphosis': 'MM',
-    'Biological Metamorphosis': 'BM', 
+    'Biological Metamorphosis': 'BM',
     'Psychological Modifications': 'PM',
     'Matter Creation': 'MC',
     'Time and Space': 'TS',
-    'Sensory Improvement': 'SI'
+    'Sensory Improvement': 'SI',
   };
   return shortNames[school] || school.charAt(0);
 };
 
 const getSchoolAvatarClass = (school: string | null | undefined): string => {
   if (!school) return 'bg-surface-500 text-white';
-  
+
   const schoolColors: Record<string, string> = {
     'Matter Metamorphosis': 'bg-red-500 text-white',
     'Biological Metamorphosis': 'bg-green-500 text-white',
     'Psychological Modifications': 'bg-purple-500 text-white',
     'Matter Creation': 'bg-blue-500 text-white',
     'Time and Space': 'bg-yellow-500 text-white',
-    'Sensory Improvement': 'bg-indigo-500 text-white'
+    'Sensory Improvement': 'bg-indigo-500 text-white',
   };
   return schoolColors[school] || 'bg-surface-500 text-white';
 };
 
 const getCastableCount = (nanos: NanoProgram[]): number => {
   if (!props.showCompatibility || !props.activeProfile) return 0;
-  
-  return nanos.filter(nano => {
+
+  return nanos.filter((nano) => {
     const info = getCompatibilityInfo(nano);
     return info?.canCast || false;
   }).length;
@@ -300,56 +305,56 @@ const getCastableCount = (nanos: NanoProgram[]): number => {
 
 const getAverageLevelRange = (nanos: NanoProgram[]): string => {
   if (nanos.length === 0) return 'N/A';
-  
-  const levels = nanos.filter(nano => nano.level > 0).map(nano => nano.level);
+
+  const levels = nanos.filter((nano) => nano.level > 0).map((nano) => nano.level);
   if (levels.length === 0) return 'N/A';
-  
+
   const min = Math.min(...levels);
   const max = Math.max(...levels);
-  
+
   return min === max ? `${min}` : `${min}-${max}`;
 };
 
 const getStrainCount = (nanos: NanoProgram[]): number => {
-  const strains = new Set(nanos.map(nano => nano.strain).filter(Boolean));
+  const strains = new Set(nanos.map((nano) => nano.strain).filter(Boolean));
   return strains.size;
 };
 
 const getSchoolStrains = (nanos: NanoProgram[]): StrainWithNanos[] => {
   const strainMap = new Map<string, NanoProgram[]>();
-  
-  nanos.forEach(nano => {
+
+  nanos.forEach((nano) => {
     if (nano.strain) {
       const strainNanos = strainMap.get(nano.strain) || [];
       strainNanos.push(nano);
       strainMap.set(nano.strain, strainNanos);
     }
   });
-  
+
   return Array.from(strainMap.entries()).map(([name, strainNanos]) => ({
     name,
     nanos: strainNanos,
-    hasConflicts: checkStrainConflicts(name, strainNanos)
+    hasConflicts: checkStrainConflicts(name, strainNanos),
   }));
 };
 
 const checkStrainConflicts = (strain: string, nanos: NanoProgram[]): boolean => {
   // Check if multiple nanos in this strain would conflict if used together
   // This is a simplified check - in reality, strain conflicts are more complex
-  return nanos.length > 1 && nanos.some(nano => 
-    nano.effects?.some(effect => !effect.stackable)
+  return (
+    nanos.length > 1 && nanos.some((nano) => nano.effects?.some((effect) => !effect.stackable))
   );
 };
 
 const getStrainConflictTooltip = (strain: StrainWithNanos): string => {
   if (!strain.hasConflicts) return '';
-  
+
   return `Multiple nanos in strain "${strain.name}" may conflict when used together. Only one can be active at a time.`;
 };
 
 const getSortedNanos = (nanos: NanoProgram[]): NanoProgram[] => {
   const sorted = [...nanos];
-  
+
   sorted.sort((a, b) => {
     switch (sortBy.value) {
       case 'name':
@@ -373,7 +378,7 @@ const getSortedNanos = (nanos: NanoProgram[]): NanoProgram[] => {
         return a.name.localeCompare(b.name);
     }
   });
-  
+
   return sorted;
 };
 
@@ -392,12 +397,12 @@ const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null =
 
   const profile = props.activeProfile;
   const requirements = nano.castingRequirements || [];
-  
+
   let canCast = true;
   let skillDeficits: { skill: string; current: number; required: number; deficit: number }[] = [];
   let statDeficits: { stat: string; current: number; required: number; deficit: number }[] = [];
   let levelDeficit = 0;
-  
+
   // Check each requirement
   for (const req of requirements) {
     switch (req.type) {
@@ -410,11 +415,11 @@ const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null =
             skill,
             current: currentSkill,
             required: req.value,
-            deficit: req.value - currentSkill
+            deficit: req.value - currentSkill,
           });
         }
         break;
-        
+
       case 'stat':
         const stat = req.requirement as string;
         const currentStat = profile.stats[stat] || 0;
@@ -424,11 +429,11 @@ const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null =
             stat,
             current: currentStat,
             required: req.value,
-            deficit: req.value - currentStat
+            deficit: req.value - currentStat,
           });
         }
         break;
-        
+
       case 'level':
         if (profile.level < req.value) {
           canCast = false;
@@ -440,13 +445,15 @@ const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null =
 
   // Calculate compatibility score (0-100)
   const totalRequirements = requirements.length;
-  const metRequirements = totalRequirements - skillDeficits.length - statDeficits.length - (levelDeficit > 0 ? 1 : 0);
-  const compatibilityScore = totalRequirements > 0 ? Math.round((metRequirements / totalRequirements) * 100) : 100;
+  const metRequirements =
+    totalRequirements - skillDeficits.length - statDeficits.length - (levelDeficit > 0 ? 1 : 0);
+  const compatibilityScore =
+    totalRequirements > 0 ? Math.round((metRequirements / totalRequirements) * 100) : 100;
 
   // Calculate skill gap (average deficit across all skill requirements)
-  const allSkillReqs = requirements.filter(req => req.type === 'skill');
+  const allSkillReqs = requirements.filter((req) => req.type === 'skill');
   let averageSkillGap = 0;
-  
+
   if (allSkillReqs.length > 0) {
     const totalGap = skillDeficits.reduce((sum, deficit) => sum + deficit.deficit, 0);
     averageSkillGap = Math.round(totalGap / allSkillReqs.length);
@@ -460,7 +467,7 @@ const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null =
     statDeficits,
     levelDeficit,
     memoryUsage: nano.memoryUsage || 0,
-    nanoPointCost: nano.nanoPointCost || 0
+    nanoPointCost: nano.nanoPointCost || 0,
   };
 };
 
@@ -470,7 +477,7 @@ const toggleSchool = (schoolName: string) => {
   } else {
     expandedSchools.value.add(schoolName);
   }
-  
+
   // Save expanded state
   try {
     const state = Array.from(expandedSchools.value);
@@ -493,7 +500,6 @@ const handleFavorite = (nanoId: number, isFavorite: boolean) => {
   emit('favorite', nanoId, isFavorite);
 };
 
-
 // Component initialization - only run once when component mounts
 onMounted(() => {
   // Load saved preferences from localStorage
@@ -501,10 +507,11 @@ onMounted(() => {
     const preferences = localStorage.getItem('tinkertools_nano_school_view_preferences');
     if (preferences) {
       const parsed = JSON.parse(preferences);
-      organizeByStrain.value = parsed.organizeByStrain !== undefined ? parsed.organizeByStrain : true;
+      organizeByStrain.value =
+        parsed.organizeByStrain !== undefined ? parsed.organizeByStrain : true;
       compactCards.value = parsed.compactCards !== undefined ? parsed.compactCards : true;
       sortBy.value = parsed.sortBy || 'name';
-      
+
       if (parsed.expandedSchools) {
         expandedSchools.value = new Set(parsed.expandedSchools);
       }
@@ -512,10 +519,10 @@ onMounted(() => {
   } catch (error) {
     console.warn('Failed to load school view preferences:', error);
   }
-  
+
   // Initialize expanded schools if none are set
   if (expandedSchools.value.size === 0 && schoolsWithNanos.value.length > 0) {
-    schoolsWithNanos.value.slice(0, 2).forEach(school => {
+    schoolsWithNanos.value.slice(0, 2).forEach((school) => {
       expandedSchools.value.add(school.name);
     });
     try {
@@ -534,7 +541,7 @@ watch([organizeByStrain, compactCards, sortBy], () => {
       organizeByStrain: organizeByStrain.value,
       compactCards: compactCards.value,
       sortBy: sortBy.value,
-      expandedSchools: Array.from(expandedSchools.value)
+      expandedSchools: Array.from(expandedSchools.value),
     };
     localStorage.setItem('tinkertools_nano_school_view_preferences', JSON.stringify(preferences));
   } catch (error) {
@@ -545,7 +552,7 @@ watch([organizeByStrain, compactCards, sortBy], () => {
 // Watch for school changes and update expanded state
 watch(schoolsWithNanos, () => {
   if (expandedSchools.value.size === 0 && schoolsWithNanos.value.length > 0) {
-    schoolsWithNanos.value.slice(0, 2).forEach(school => {
+    schoolsWithNanos.value.slice(0, 2).forEach((school) => {
       expandedSchools.value.add(school.name);
     });
   }

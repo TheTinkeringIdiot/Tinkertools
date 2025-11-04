@@ -5,31 +5,31 @@
  * for requirements checking against items and actions
  */
 
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types'
-import { PROFESSION, BREED } from '@/services/game-data'
-import { skillService } from '@/services/skill-service'
-import { accountTypeToExpansionBitflag, specializationLevelToBitflag } from './expansion-utils'
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import { PROFESSION, BREED } from '@/services/game-data';
+import { skillService } from '@/services/skill-service';
+import { accountTypeToExpansionBitflag, specializationLevelToBitflag } from './expansion-utils';
 
 /**
  * Maps a TinkerProfile v4.0.0 to a flat record of stat ID → value
  * Used for checking requirements against profile skills and attributes
  */
 export function mapProfileToStats(profile: TinkerProfile): Record<number, number> {
-  const stats: Record<number, number> = {}
+  const stats: Record<number, number> = {};
 
   // ============================================================================
   // Character Properties
   // ============================================================================
 
   // Level (stat ID 54)
-  stats[54] = profile.Character.Level || 1
+  stats[54] = profile.Character.Level || 1;
 
   // Breed (stat ID 4) - map breed name to ID
   if (profile.Character.Breed) {
     for (const [id, name] of Object.entries(BREED)) {
       if (name === profile.Character.Breed) {
-        stats[4] = parseInt(id)
-        break
+        stats[4] = parseInt(id);
+        break;
       }
     }
   }
@@ -38,22 +38,22 @@ export function mapProfileToStats(profile: TinkerProfile): Record<number, number
   if (profile.Character.Profession) {
     for (const [id, name] of Object.entries(PROFESSION)) {
       if (name === profile.Character.Profession) {
-        stats[60] = parseInt(id)
-        stats[368] = parseInt(id)  // VisualProfession (mirrors Profession)
-        break
+        stats[60] = parseInt(id);
+        stats[368] = parseInt(id); // VisualProfession (mirrors Profession)
+        break;
       }
     }
   }
 
   // MaxHealth and MaxNano (now in Character)
-  stats[1] = profile.Character.MaxHealth || 1  // MaxHealth
-  stats[214] = profile.Character.MaxNano || 1  // MaxNano
+  stats[1] = profile.Character.MaxHealth || 1; // MaxHealth
+  stats[214] = profile.Character.MaxNano || 1; // MaxNano
 
   // Specialization (stat ID 182) - convert level to cumulative bitflag
-  stats[182] = specializationLevelToBitflag(profile.Character.Specialization ?? 0)
+  stats[182] = specializationLevelToBitflag(profile.Character.Specialization ?? 0);
 
   // Expansion (stat ID 389) - map account type to bitflag
-  stats[389] = accountTypeToExpansionBitflag(profile.Character.AccountType)
+  stats[389] = accountTypeToExpansionBitflag(profile.Character.AccountType);
 
   // ============================================================================
   // Skills - Direct ID-based access (v4.0.0 structure)
@@ -63,11 +63,11 @@ export function mapProfileToStats(profile: TinkerProfile): Record<number, number
   // This preserves the flat structure and uses the total values from calculations
   if (profile.skills) {
     for (const [skillIdStr, skillData] of Object.entries(profile.skills)) {
-      const skillId = parseInt(skillIdStr, 10)
+      const skillId = parseInt(skillIdStr, 10);
 
       // Use the total value from the unified SkillData structure
       // This includes: base + trickle + pointsFromIp + equipmentBonus + perkBonus + buffBonus
-      stats[skillId] = (skillData as any)?.total || 1
+      stats[skillId] = (skillData as any)?.total || 1;
     }
   }
 
@@ -78,22 +78,96 @@ export function mapProfileToStats(profile: TinkerProfile): Record<number, number
   // Ensure minimum values for commonly required skills if not present
   const defaultSkillIds = [
     // Attributes (16-21)
-    16, 17, 18, 19, 20, 21,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
     // ACs (90-97)
-    90, 91, 92, 93, 94, 95, 96, 97,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
     // Common skills (100-167)
-    100, 101, 102, 103, 104, 105, 106, 107, // Melee weapons
-    108, 109, 110, 111, 112, 113, 114, 115, 116, 117, // Ranged weapons
-    118, 119, 120, 121, 122, // Initiative skills
-    123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, // Various skills
-    136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150,
-    151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167
-  ]
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107, // Melee weapons
+    108,
+    109,
+    110,
+    111,
+    112,
+    113,
+    114,
+    115,
+    116,
+    117, // Ranged weapons
+    118,
+    119,
+    120,
+    121,
+    122, // Initiative skills
+    123,
+    124,
+    125,
+    126,
+    127,
+    128,
+    129,
+    130,
+    131,
+    132,
+    133,
+    134,
+    135, // Various skills
+    136,
+    137,
+    138,
+    139,
+    140,
+    141,
+    142,
+    143,
+    144,
+    145,
+    146,
+    147,
+    148,
+    149,
+    150,
+    151,
+    152,
+    153,
+    154,
+    155,
+    156,
+    157,
+    158,
+    159,
+    160,
+    161,
+    162,
+    163,
+    164,
+    165,
+    166,
+    167,
+  ];
 
   // Set default value of 1 for any skill not present in profile
   for (const skillId of defaultSkillIds) {
     if (stats[skillId] === undefined) {
-      stats[skillId] = 1
+      stats[skillId] = 1;
     }
   }
 
@@ -103,42 +177,42 @@ export function mapProfileToStats(profile: TinkerProfile): Record<number, number
 
   // WornItem (stat 355) - flag field for worn item requirements
   // Use optional chaining since it may not exist if no bonuses are present
-  stats[355] = profile.skills[355]?.total ?? 0
+  stats[355] = profile.skills[355]?.total ?? 0;
 
-  return stats
+  return stats;
 }
 
 /**
  * Helper function to get a specific stat value from a profile
  */
 export function getProfileStat(profile: TinkerProfile, statId: number): number {
-  const stats = mapProfileToStats(profile)
-  return stats[statId] || 0
+  const stats = mapProfileToStats(profile);
+  return stats[statId] || 0;
 }
 
 /**
  * Helper function to check if a profile meets a specific requirement
  */
 export function profileMeetsRequirement(
-  profile: TinkerProfile, 
-  statId: number, 
-  operator: number, 
+  profile: TinkerProfile,
+  statId: number,
+  operator: number,
   requiredValue: number
 ): boolean {
-  const currentValue = getProfileStat(profile, statId)
-  
+  const currentValue = getProfileStat(profile, statId);
+
   // Map operators based on game-data.ts STAT_OPERATOR
   switch (operator) {
     case 0: // Equal
-      return currentValue === requiredValue
+      return currentValue === requiredValue;
     case 1: // LessThan
-      return currentValue < requiredValue
+      return currentValue < requiredValue;
     case 2: // GreaterThan (most common for requirements)
-      return currentValue >= requiredValue
+      return currentValue >= requiredValue;
     case 24: // NotEqual
-      return currentValue !== requiredValue
+      return currentValue !== requiredValue;
     default:
-      console.warn(`Unknown requirement operator: ${operator}`)
-      return false
+      console.warn(`Unknown requirement operator: ${operator}`);
+      return false;
   }
 }

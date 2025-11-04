@@ -3,12 +3,9 @@ NanoCard - Individual nano program display card
 Shows nano information with compatibility indicators and quick actions
 -->
 <template>
-  <Card 
+  <Card
     class="nano-card transition-all duration-200 cursor-pointer hover:shadow-lg"
-    :class="[
-      { 'border-l-4': showCompatibility && compatibilityInfo },
-      compatibilityBorderClass
-    ]"
+    :class="[{ 'border-l-4': showCompatibility && compatibilityInfo }, compatibilityBorderClass]"
     @click="handleSelect"
   >
     <template #header v-if="!compact">
@@ -28,7 +25,11 @@ Shows nano information with compatibility indicators and quick actions
                 {{ nano.name }}
               </h3>
               <div class="flex items-center gap-2 mt-1">
-                <Badge v-if="nano.school" :value="getSchoolShortName(nano.school)" severity="info" />
+                <Badge
+                  v-if="nano.school"
+                  :value="getSchoolShortName(nano.school)"
+                  severity="info"
+                />
                 <Badge :value="`QL ${nano.qualityLevel}`" severity="secondary" />
                 <Badge v-if="nano.level" :value="`Lvl ${nano.level}`" severity="secondary" />
               </div>
@@ -44,13 +45,10 @@ Shows nano information with compatibility indicators and quick actions
                 rounded
                 @click.stop="toggleFavorite"
               />
-              
+
               <!-- Compatibility Indicator -->
               <div v-if="showCompatibility && compatibilityInfo" class="flex items-center gap-1">
-                <i 
-                  :class="compatibilityIcon"
-                  :title="compatibilityTooltip"
-                />
+                <i :class="compatibilityIcon" :title="compatibilityTooltip" />
                 <span class="text-xs text-surface-600 dark:text-surface-400">
                   {{ compatibilityInfo.compatibilityScore }}%
                 </span>
@@ -73,7 +71,7 @@ Shows nano information with compatibility indicators and quick actions
               shape="circle"
             />
           </div>
-          
+
           <div class="flex-1 min-w-0">
             <div class="flex items-start justify-between">
               <div class="flex-1 min-w-0">
@@ -81,12 +79,17 @@ Shows nano information with compatibility indicators and quick actions
                   {{ nano.name }}
                 </h4>
                 <div class="flex items-center gap-2 mt-1">
-                  <Badge v-if="nano.school" :value="getSchoolShortName(nano.school)" severity="info" size="small" />
+                  <Badge
+                    v-if="nano.school"
+                    :value="getSchoolShortName(nano.school)"
+                    severity="info"
+                    size="small"
+                  />
                   <Badge :value="`QL ${nano.qualityLevel}`" severity="secondary" size="small" />
                   <Badge v-if="nano.strain" :value="nano.strain" severity="warning" size="small" />
                 </div>
               </div>
-              
+
               <div class="flex items-center gap-2 ml-2">
                 <!-- Favorite Button -->
                 <Button
@@ -98,13 +101,10 @@ Shows nano information with compatibility indicators and quick actions
                   rounded
                   @click.stop="toggleFavorite"
                 />
-                
+
                 <!-- Compatibility Indicator -->
                 <div v-if="showCompatibility && compatibilityInfo" class="flex items-center gap-1">
-                  <i 
-                    :class="compatibilityIcon"
-                    :title="compatibilityTooltip"
-                  />
+                  <i :class="compatibilityIcon" :title="compatibilityTooltip" />
                   <span class="text-xs text-surface-600 dark:text-surface-400">
                     {{ compatibilityInfo.compatibilityScore }}%
                   </span>
@@ -117,8 +117,8 @@ Shows nano information with compatibility indicators and quick actions
         <!-- Detailed View -->
         <div v-else class="space-y-3">
           <!-- Description -->
-          <p 
-            v-if="nano.description" 
+          <p
+            v-if="nano.description"
             class="text-sm text-surface-600 dark:text-surface-400 line-clamp-2"
           >
             {{ nano.description }}
@@ -132,30 +132,30 @@ Shows nano information with compatibility indicators and quick actions
                 <span class="text-surface-500 dark:text-surface-400">Strain:</span>
                 <Badge :value="nano.strain" severity="warning" />
               </div>
-              
+
               <div v-if="nano.profession" class="flex items-center gap-2">
                 <span class="text-surface-500 dark:text-surface-400">Profession:</span>
                 <span class="font-medium">{{ nano.profession }}</span>
               </div>
-              
+
               <div v-if="nano.nanoPointCost" class="flex items-center gap-2">
                 <span class="text-surface-500 dark:text-surface-400">NP Cost:</span>
                 <span class="font-medium">{{ nano.nanoPointCost }}</span>
               </div>
             </div>
-            
+
             <!-- Right Column -->
             <div class="space-y-2">
               <div v-if="nano.memoryUsage" class="flex items-center gap-2">
                 <span class="text-surface-500 dark:text-surface-400">Memory:</span>
                 <span class="font-medium">{{ nano.memoryUsage }}mb</span>
               </div>
-              
+
               <div v-if="nano.castingTime" class="flex items-center gap-2">
                 <span class="text-surface-500 dark:text-surface-400">Cast Time:</span>
                 <span class="font-medium">{{ formatTime(nano.castingTime) }}</span>
               </div>
-              
+
               <div v-if="nano.rechargeTime" class="flex items-center gap-2">
                 <span class="text-surface-500 dark:text-surface-400">Recharge:</span>
                 <span class="font-medium">{{ formatTime(nano.rechargeTime) }}</span>
@@ -183,11 +183,19 @@ Shows nano information with compatibility indicators and quick actions
           </div>
 
           <!-- Casting Requirements -->
-          <div v-if="nano.castingRequirements && nano.castingRequirements.length > 0" class="space-y-2">
-            <span class="text-sm font-medium text-surface-700 dark:text-surface-300">Requirements:</span>
+          <div
+            v-if="nano.castingRequirements && nano.castingRequirements.length > 0"
+            class="space-y-2"
+          >
+            <span class="text-sm font-medium text-surface-700 dark:text-surface-300"
+              >Requirements:</span
+            >
             <div class="space-y-1">
               <div
-                v-for="(req, index) in nano.castingRequirements.slice(0, showCompatibility ? 99 : 3)"
+                v-for="(req, index) in nano.castingRequirements.slice(
+                  0,
+                  showCompatibility ? 99 : 3
+                )"
                 :key="index"
                 class="flex items-center justify-between text-xs"
               >
@@ -211,19 +219,26 @@ Shows nano information with compatibility indicators and quick actions
           </div>
 
           <!-- Compatibility Details -->
-          <div 
+          <div
             v-if="showCompatibility && compatibilityInfo && !compatibilityInfo.canCast"
             class="mt-3 p-3 bg-orange-50 dark:bg-orange-950 rounded-lg border border-orange-200 dark:border-orange-800"
           >
             <div class="flex items-start gap-2">
-              <i class="pi pi-exclamation-triangle text-orange-600 dark:text-orange-400 text-sm mt-0.5"></i>
+              <i
+                class="pi pi-exclamation-triangle text-orange-600 dark:text-orange-400 text-sm mt-0.5"
+              ></i>
               <div class="flex-1">
                 <div class="text-sm font-medium text-orange-800 dark:text-orange-200 mb-1">
                   Cannot Cast
                 </div>
                 <div class="text-xs text-orange-700 dark:text-orange-300">
                   <div v-if="compatibilityInfo.skillDeficits.length > 0">
-                    Skill gaps: {{ compatibilityInfo.skillDeficits.map(d => `${d.skill} (${d.deficit})`).join(', ') }}
+                    Skill gaps:
+                    {{
+                      compatibilityInfo.skillDeficits
+                        .map((d) => `${d.skill} (${d.deficit})`)
+                        .join(', ')
+                    }}
                   </div>
                   <div v-if="compatibilityInfo.levelDeficit > 0">
                     Level gap: {{ compatibilityInfo.levelDeficit }} levels
@@ -246,21 +261,30 @@ import Button from 'primevue/button';
 import Card from 'primevue/card';
 import Chip from 'primevue/chip';
 
-import type { NanoProgram, NanoCompatibilityInfo, CastingRequirement, NanoEffect, TinkerProfile } from '@/types/nano';
+import type {
+  NanoProgram,
+  NanoCompatibilityInfo,
+  CastingRequirement,
+  NanoEffect,
+  TinkerProfile,
+} from '@/types/nano';
 
 // Props
-const props = withDefaults(defineProps<{
-  nano: NanoProgram;
-  compact?: boolean;
-  showCompatibility?: boolean;
-  activeProfile?: TinkerProfile | null;
-  compatibilityInfo?: NanoCompatibilityInfo | null;
-}>(), {
-  compact: false,
-  showCompatibility: false,
-  activeProfile: null,
-  compatibilityInfo: null
-});
+const props = withDefaults(
+  defineProps<{
+    nano: NanoProgram;
+    compact?: boolean;
+    showCompatibility?: boolean;
+    activeProfile?: TinkerProfile | null;
+    compatibilityInfo?: NanoCompatibilityInfo | null;
+  }>(),
+  {
+    compact: false,
+    showCompatibility: false,
+    activeProfile: null,
+    compatibilityInfo: null,
+  }
+);
 
 // Emits
 const emit = defineEmits<{
@@ -279,7 +303,7 @@ const schoolAvatarClass = computed(() => {
     'Psychological Modifications': 'bg-purple-500 text-white',
     'Matter Creation': 'bg-blue-500 text-white',
     'Time and Space': 'bg-yellow-500 text-white',
-    'Sensory Improvement': 'bg-indigo-500 text-white'
+    'Sensory Improvement': 'bg-indigo-500 text-white',
   };
   return (props.nano.school && schoolColors[props.nano.school]) || 'bg-surface-500 text-white';
 });
@@ -335,7 +359,7 @@ const getSchoolShortName = (school: string): string => {
     'Psychological Modifications': 'PM',
     'Matter Creation': 'MC',
     'Time and Space': 'TS',
-    'Sensory Improvement': 'SI'
+    'Sensory Improvement': 'SI',
   };
   return shortNames[school] || school;
 };
@@ -356,22 +380,22 @@ const formatTime = (seconds: number): string => {
 
 const formatEffect = (effect: NanoEffect): string => {
   const typeLabels: Record<string, string> = {
-    'stat_boost': 'Stat Boost',
-    'heal': 'Heal',
-    'damage': 'Damage',
-    'protection': 'Protection',
-    'teleport': 'Teleport',
-    'summon': 'Summon',
-    'debuff': 'Debuff',
-    'utility': 'Utility'
+    stat_boost: 'Stat Boost',
+    heal: 'Heal',
+    damage: 'Damage',
+    protection: 'Protection',
+    teleport: 'Teleport',
+    summon: 'Summon',
+    debuff: 'Debuff',
+    utility: 'Utility',
   };
-  
+
   return typeLabels[effect.type] || effect.type;
 };
 
 const formatRequirement = (req: CastingRequirement): string => {
   const capitalizeFirst = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
-  
+
   switch (req.type) {
     case 'skill':
       return `${capitalizeFirst(req.requirement as string)}: ${req.value}`;
@@ -423,7 +447,7 @@ const getRequirementStatusClass = (req: CastingRequirement): string => {
       break;
   }
 
-  return currentValue >= req.value 
+  return currentValue >= req.value
     ? 'text-green-600 dark:text-green-400 font-medium'
     : 'text-red-600 dark:text-red-400';
 };

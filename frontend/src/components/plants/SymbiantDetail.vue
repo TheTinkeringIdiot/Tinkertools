@@ -34,7 +34,7 @@ Shows complete symbiant information and build options
             </div>
           </div>
         </div>
-        
+
         <div v-if="symbiant.statBonuses && symbiant.statBonuses.length > 0">
           <h4 class="font-medium text-surface-900 dark:text-surface-100 mb-2">Stat Bonuses</h4>
           <div class="space-y-1">
@@ -43,25 +43,30 @@ Shows complete symbiant information and build options
               :key="bonus.statId"
               class="flex justify-between text-sm"
             >
-              <span class="text-surface-600 dark:text-surface-400">{{ formatStatName(bonus.statId) }}:</span>
+              <span class="text-surface-600 dark:text-surface-400"
+                >{{ formatStatName(bonus.statId) }}:</span
+              >
               <span class="font-medium text-green-600 dark:text-green-400">+{{ bonus.value }}</span>
             </div>
           </div>
         </div>
       </div>
-      
+
       <!-- Description -->
       <div v-if="symbiant.description">
         <h4 class="font-medium text-surface-900 dark:text-surface-100 mb-2">Description</h4>
         <p class="text-sm text-surface-700 dark:text-surface-300">{{ symbiant.description }}</p>
       </div>
-      
+
       <!-- Build Integration -->
       <div v-if="showBuildOptions && currentBuild">
         <h4 class="font-medium text-surface-900 dark:text-surface-100 mb-2">Add to Build</h4>
         <div class="space-y-2">
           <!-- Suggested slot (if symbiant has a slot) -->
-          <div v-if="symbiant.slot" class="flex items-center justify-between p-3 bg-surface-50 dark:bg-surface-800 rounded">
+          <div
+            v-if="symbiant.slot"
+            class="flex items-center justify-between p-3 bg-surface-50 dark:bg-surface-800 rounded"
+          >
             <div>
               <div class="font-medium">{{ formatSlotName(symbiant.slot) }}</div>
               <div class="text-sm text-surface-500 dark:text-surface-400">
@@ -75,10 +80,12 @@ Shows complete symbiant information and build options
               size="small"
             />
           </div>
-          
+
           <!-- Alternative slots (if any conflicts) -->
           <div v-if="alternativeSlots.length > 0">
-            <div class="text-sm text-surface-600 dark:text-surface-400 mb-2">Alternative slots:</div>
+            <div class="text-sm text-surface-600 dark:text-surface-400 mb-2">
+              Alternative slots:
+            </div>
             <div class="flex flex-wrap gap-2">
               <Button
                 v-for="slot in alternativeSlots"
@@ -93,7 +100,7 @@ Shows complete symbiant information and build options
           </div>
         </div>
       </div>
-      
+
       <!-- Boss Source -->
       <div v-if="symbiant.bossSource">
         <h4 class="font-medium text-surface-900 dark:text-surface-100 mb-2">Source</h4>
@@ -104,16 +111,12 @@ Shows complete symbiant information and build options
           </div>
         </div>
       </div>
-      
+
       <!-- Stats Impact (if character profile available) -->
       <div v-if="showStatsImpact">
         <h4 class="font-medium text-surface-900 dark:text-surface-100 mb-2">Stats Impact</h4>
         <div class="grid grid-cols-2 gap-4 text-sm">
-          <div
-            v-for="impact in statsImpact"
-            :key="impact.statId"
-            class="flex justify-between"
-          >
+          <div v-for="impact in statsImpact" :key="impact.statId" class="flex justify-between">
             <span class="text-surface-600 dark:text-surface-400">{{ impact.statName }}:</span>
             <span class="font-medium" :class="impact.value > 0 ? 'text-green-600' : 'text-red-600'">
               {{ impact.current }} → {{ impact.newValue }}
@@ -122,13 +125,13 @@ Shows complete symbiant information and build options
         </div>
       </div>
     </div>
-    
+
     <!-- No symbiant selected -->
     <div v-else class="text-center py-8">
       <i class="pi pi-search text-4xl text-surface-400 dark:text-surface-600 mb-4 block"></i>
       <p class="text-surface-500 dark:text-surface-400">No symbiant selected</p>
     </div>
-    
+
     <template #footer>
       <div class="flex justify-between">
         <div>
@@ -141,11 +144,7 @@ Shows complete symbiant information and build options
           />
         </div>
         <div class="flex gap-2">
-          <Button
-            label="Close"
-            severity="secondary"
-            @click="$emit('close')"
-          />
+          <Button label="Close" severity="secondary" @click="$emit('close')" />
         </div>
       </div>
     </template>
@@ -170,7 +169,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   symbiant: null,
   showBuildOptions: false,
-  currentBuild: undefined
+  currentBuild: undefined,
 });
 
 interface Emits {
@@ -194,52 +193,52 @@ const showStatsImpact = computed(() => {
 
 const statsImpact = computed(() => {
   if (!props.symbiant?.statBonuses) return [];
-  
-  return props.symbiant.statBonuses.map(bonus => ({
+
+  return props.symbiant.statBonuses.map((bonus) => ({
     statId: bonus.statId,
     statName: formatStatName(bonus.statId),
     value: bonus.value,
     current: 100, // Mock current value
-    newValue: 100 + bonus.value // Mock new value
+    newValue: 100 + bonus.value, // Mock new value
   }));
 });
 
 // Methods
 const formatSlotName = (slot: string): string => {
   const slotNames: Record<string, string> = {
-    'head': 'Head',
-    'eye': 'Eye',
-    'ear': 'Ear',
-    'rarm': 'Right Arm',
-    'chest': 'Chest',
-    'larm': 'Left Arm',
-    'waist': 'Waist',
-    'rwrist': 'Right Wrist',
-    'legs': 'Legs',
-    'lwrist': 'Left Wrist',
-    'rfinger': 'Right Finger',
-    'feet': 'Feet',
-    'lfinger': 'Left Finger'
+    head: 'Head',
+    eye: 'Eye',
+    ear: 'Ear',
+    rarm: 'Right Arm',
+    chest: 'Chest',
+    larm: 'Left Arm',
+    waist: 'Waist',
+    rwrist: 'Right Wrist',
+    legs: 'Legs',
+    lwrist: 'Left Wrist',
+    rfinger: 'Right Finger',
+    feet: 'Feet',
+    lfinger: 'Left Finger',
   };
   return slotNames[slot] || slot;
 };
 
 const formatStatName = (statId: string): string => {
   const statNames: Record<string, string> = {
-    'strength': 'Strength',
-    'agility': 'Agility',
-    'stamina': 'Stamina',
-    'intelligence': 'Intelligence',
-    'sense': 'Sense',
-    'psychic': 'Psychic',
-    'matter_creation': 'Matter Creation',
-    'matter_metamorphosis': 'Matter Metamorphosis',
-    'psychological_modifications': 'Psychological Modifications',
-    'biological_metamorphosis': 'Biological Metamorphosis',
-    'sensory_improvement': 'Sensory Improvement',
-    'time_and_space': 'Time and Space'
+    strength: 'Strength',
+    agility: 'Agility',
+    stamina: 'Stamina',
+    intelligence: 'Intelligence',
+    sense: 'Sense',
+    psychic: 'Psychic',
+    matter_creation: 'Matter Creation',
+    matter_metamorphosis: 'Matter Metamorphosis',
+    psychological_modifications: 'Psychological Modifications',
+    biological_metamorphosis: 'Biological Metamorphosis',
+    sensory_improvement: 'Sensory Improvement',
+    time_and_space: 'Time and Space',
   };
-  return statNames[statId] || statId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  return statNames[statId] || statId.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
 };
 
 const isSlotOccupied = (slot: string): boolean => {
@@ -248,7 +247,7 @@ const isSlotOccupied = (slot: string): boolean => {
 
 const getSlotStatus = (slot: string): string => {
   if (!props.currentBuild) return 'Available';
-  
+
   const existing = props.currentBuild.symbiants[slot];
   if (existing) {
     return `Currently: ${existing.name}`;

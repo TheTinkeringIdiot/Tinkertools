@@ -1,6 +1,6 @@
 /**
  * TinkerProfiles Library - Core Profile Management for TinkerTools
- * 
+ *
  * This library provides a unified interface for character profile management
  * across all TinkerTools applications, handling storage, validation, and
  * data transformations.
@@ -20,7 +20,7 @@ export type {
   ProfileValidationResult,
   ProfileStorageOptions,
   ProfileEvents,
-  TinkerProfilesConfig
+  TinkerProfilesConfig,
 } from './types';
 
 export {
@@ -33,5 +33,5 @@ export {
   ANARCHY_EXPANSIONS,
   ACCOUNT_TYPES,
   DEFAULT_SKILLS,
-  STORAGE_KEYS
+  STORAGE_KEYS,
 } from './constants';

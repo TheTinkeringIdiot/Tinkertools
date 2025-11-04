@@ -12,7 +12,7 @@
  * Breed enum matching game-data.ts
  * 1 = Solitus, 2 = Opifex, 3 = Nanomage, 4 = Atrox
  */
-export type Breed = 1 | 2 | 3 | 4
+export type Breed = 1 | 2 | 3 | 4;
 
 /**
  * Calculate modified cast time based on Nano Init skill
@@ -40,27 +40,31 @@ export type Breed = 1 | 2 | 3 | 4
  * // Nano with 1000cs base cast time, 1800 init, 200cs cap
  * calculateCastTime(1000, 1800, 200) // Returns 2.00 (1000 - 1000 = 0cs, clamped to 200cs)
  */
-export function calculateCastTime(baseCastTime: number, nanoInit: number, attackDelayCap?: number): number {
+export function calculateCastTime(
+  baseCastTime: number,
+  nanoInit: number,
+  attackDelayCap?: number
+): number {
   // Two-tier reduction calculation
-  const firstTierReduction = Math.floor(nanoInit / 2)
-  const secondTierReduction = Math.floor(Math.max(0, nanoInit - 1200) / 6)
-  const totalReduction = firstTierReduction + secondTierReduction
+  const firstTierReduction = Math.floor(nanoInit / 2);
+  const secondTierReduction = Math.floor(Math.max(0, nanoInit - 1200) / 6);
+  const totalReduction = firstTierReduction + secondTierReduction;
 
   // Apply reduction
-  const reducedCastTimeCs = baseCastTime - totalReduction
+  const reducedCastTimeCs = baseCastTime - totalReduction;
 
   // Apply hard minimum if attackDelayCap is provided, otherwise allow 0
-  let modifiedCastTimeCs: number
+  let modifiedCastTimeCs: number;
   if (attackDelayCap !== undefined) {
     // If stat 523 exists, use it as minimum
-    modifiedCastTimeCs = Math.max(attackDelayCap, reducedCastTimeCs)
+    modifiedCastTimeCs = Math.max(attackDelayCap, reducedCastTimeCs);
   } else {
     // No cap stat: allow reduction to 0 but not below
-    modifiedCastTimeCs = Math.max(0, reducedCastTimeCs)
+    modifiedCastTimeCs = Math.max(0, reducedCastTimeCs);
   }
 
   // Convert centiseconds to seconds
-  return centisecondsToSeconds(modifiedCastTimeCs)
+  return centisecondsToSeconds(modifiedCastTimeCs);
 }
 
 /**
@@ -87,27 +91,31 @@ export function calculateCastTime(baseCastTime: number, nanoInit: number, attack
  * // Nano with 800cs base recharge, 1800 init, 150cs cap
  * calculateRechargeTime(800, 1800, 150) // Returns 1.50 (800 - 1000 = -200cs, clamped to 150cs)
  */
-export function calculateRechargeTime(baseRecharge: number, nanoInit: number, rechargeDelayCap?: number): number {
+export function calculateRechargeTime(
+  baseRecharge: number,
+  nanoInit: number,
+  rechargeDelayCap?: number
+): number {
   // Two-tier reduction calculation (same as cast time)
-  const firstTierReduction = Math.floor(nanoInit / 2)
-  const secondTierReduction = Math.floor(Math.max(0, nanoInit - 1200) / 6)
-  const totalReduction = firstTierReduction + secondTierReduction
+  const firstTierReduction = Math.floor(nanoInit / 2);
+  const secondTierReduction = Math.floor(Math.max(0, nanoInit - 1200) / 6);
+  const totalReduction = firstTierReduction + secondTierReduction;
 
   // Apply reduction
-  const reducedRechargeCs = baseRecharge - totalReduction
+  const reducedRechargeCs = baseRecharge - totalReduction;
 
   // Apply hard minimum if rechargeDelayCap is provided, otherwise allow 0
-  let modifiedRechargeCs: number
+  let modifiedRechargeCs: number;
   if (rechargeDelayCap !== undefined) {
     // If stat 524 exists, use it as minimum
-    modifiedRechargeCs = Math.max(rechargeDelayCap, reducedRechargeCs)
+    modifiedRechargeCs = Math.max(rechargeDelayCap, reducedRechargeCs);
   } else {
     // No cap stat: allow reduction to 0 but not below
-    modifiedRechargeCs = Math.max(0, reducedRechargeCs)
+    modifiedRechargeCs = Math.max(0, reducedRechargeCs);
   }
 
   // Convert centiseconds to seconds
-  return centisecondsToSeconds(modifiedRechargeCs)
+  return centisecondsToSeconds(modifiedRechargeCs);
 }
 
 /**
@@ -140,22 +148,22 @@ export function calculateNanoCost(
   breed: Breed
 ): number {
   // Apply breed-specific caps
-  let cappedReduction = costReductionPct
+  let cappedReduction = costReductionPct;
 
   if (breed === 1 || breed === 2) {
     // Solitus/Opifex: 50% cap
-    cappedReduction = Math.min(costReductionPct, 50)
+    cappedReduction = Math.min(costReductionPct, 50);
   } else if (breed === 3) {
     // Nanomage: 55% cap
-    cappedReduction = Math.min(costReductionPct, 55)
+    cappedReduction = Math.min(costReductionPct, 55);
   } else if (breed === 4) {
     // Atrox: 45% cap
-    cappedReduction = Math.min(costReductionPct, 45)
+    cappedReduction = Math.min(costReductionPct, 45);
   }
 
   // Calculate modified cost and round to nearest integer
-  const modifiedCost = baseCost * (1 - cappedReduction / 100)
-  return Math.round(modifiedCost)
+  const modifiedCost = baseCost * (1 - cappedReduction / 100);
+  return Math.round(modifiedCost);
 }
 
 /**
@@ -171,7 +179,7 @@ export function calculateNanoCost(
  * centisecondsToSeconds(3000) // Returns 30.00
  */
 export function centisecondsToSeconds(centiseconds: number): number {
-  return Number((centiseconds / 100).toFixed(2))
+  return Number((centiseconds / 100).toFixed(2));
 }
 
 /**
@@ -191,10 +199,10 @@ export function centisecondsToSeconds(centiseconds: number): number {
  */
 export function formatTime(seconds: number): string {
   if (seconds >= 60) {
-    const minutes = Math.floor(seconds / 60)
-    const remainingSeconds = Math.floor(seconds % 60)
-    return `${minutes}m ${remainingSeconds}s`
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}m ${remainingSeconds}s`;
   }
 
-  return `${Math.floor(seconds)}s`
+  return `${Math.floor(seconds)}s`;
 }

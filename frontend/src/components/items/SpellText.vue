@@ -20,60 +20,60 @@ Handles [LINK:AOID] placeholders and converts them to router links with item nam
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from 'vue'
-import { useItemsStore } from '@/stores/items'
+import { computed, ref, watch, onMounted } from 'vue';
+import { useItemsStore } from '@/stores/items';
 
 // ============================================================================
 // Props
 // ============================================================================
 
 interface Props {
-  text: string
+  text: string;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 
 // ============================================================================
 // Stores
 // ============================================================================
 
-const itemsStore = useItemsStore()
+const itemsStore = useItemsStore();
 
 // ============================================================================
 // State
 // ============================================================================
 
-const linkedItems = ref<Map<number, { name?: string; loading: boolean }>>(new Map())
+const linkedItems = ref<Map<number, { name?: string; loading: boolean }>>(new Map());
 
 // ============================================================================
 // Methods
 // ============================================================================
 
 async function loadItemName(aoid: number) {
-  if (linkedItems.value.has(aoid)) return
-  
+  if (linkedItems.value.has(aoid)) return;
+
   // Set loading state
-  linkedItems.value.set(aoid, { loading: true })
-  
+  linkedItems.value.set(aoid, { loading: true });
+
   // Try cache first
-  const cachedItem = itemsStore.getItemFromCache(aoid)
+  const cachedItem = itemsStore.getItemFromCache(aoid);
   if (cachedItem) {
-    linkedItems.value.set(aoid, { name: cachedItem.name, loading: false })
-    return
+    linkedItems.value.set(aoid, { name: cachedItem.name, loading: false });
+    return;
   }
-  
+
   // Fetch from API
   try {
-    const item = await itemsStore.getItem(aoid)
-    linkedItems.value.set(aoid, { 
-      name: item?.name || `Item ${aoid}`, 
-      loading: false 
-    })
+    const item = await itemsStore.getItem(aoid);
+    linkedItems.value.set(aoid, {
+      name: item?.name || `Item ${aoid}`,
+      loading: false,
+    });
   } catch (error) {
-    linkedItems.value.set(aoid, { 
-      name: `Item ${aoid}`, 
-      loading: false 
-    })
+    linkedItems.value.set(aoid, {
+      name: `Item ${aoid}`,
+      loading: false,
+    });
   }
 }
 
@@ -82,48 +82,48 @@ async function loadItemName(aoid: number) {
 // ============================================================================
 
 interface TextPart {
-  type: 'text' | 'link'
-  text?: string
-  aoid?: number
-  itemName?: string
-  loading?: boolean
+  type: 'text' | 'link';
+  text?: string;
+  aoid?: number;
+  itemName?: string;
+  loading?: boolean;
 }
 
 const textParts = computed((): TextPart[] => {
-  if (!props.text) return []
-  
-  const parts: TextPart[] = []
-  const linkRegex = /\[LINK:(\d+)\]/g
-  let lastIndex = 0
-  let match
-  
+  if (!props.text) return [];
+
+  const parts: TextPart[] = [];
+  const linkRegex = /\[LINK:(\d+)\]/g;
+  let lastIndex = 0;
+  let match;
+
   while ((match = linkRegex.exec(props.text)) !== null) {
-    const beforeText = props.text.slice(lastIndex, match.index)
+    const beforeText = props.text.slice(lastIndex, match.index);
     if (beforeText) {
-      parts.push({ type: 'text', text: beforeText })
+      parts.push({ type: 'text', text: beforeText });
     }
-    
-    const aoid = parseInt(match[1])
-    const linkedItem = linkedItems.value.get(aoid)
-    
+
+    const aoid = parseInt(match[1]);
+    const linkedItem = linkedItems.value.get(aoid);
+
     parts.push({
       type: 'link',
       aoid,
       itemName: linkedItem?.name || `Item ${aoid}`,
-      loading: linkedItem?.loading || false
-    })
-    
-    lastIndex = match.index + match[0].length
+      loading: linkedItem?.loading || false,
+    });
+
+    lastIndex = match.index + match[0].length;
   }
-  
+
   // Add remaining text
-  const remainingText = props.text.slice(lastIndex)
+  const remainingText = props.text.slice(lastIndex);
   if (remainingText) {
-    parts.push({ type: 'text', text: remainingText })
+    parts.push({ type: 'text', text: remainingText });
   }
-  
-  return parts
-})
+
+  return parts;
+});
 
 // ============================================================================
 // Watchers & Lifecycle
@@ -131,26 +131,30 @@ const textParts = computed((): TextPart[] => {
 
 // Extract AOIDs from text and load their names
 const extractAndLoadItems = () => {
-  if (!props.text) return
-  
-  const linkRegex = /\[LINK:(\d+)\]/g
-  let match
-  
+  if (!props.text) return;
+
+  const linkRegex = /\[LINK:(\d+)\]/g;
+  let match;
+
   while ((match = linkRegex.exec(props.text)) !== null) {
-    const aoid = parseInt(match[1])
-    loadItemName(aoid)
+    const aoid = parseInt(match[1]);
+    loadItemName(aoid);
   }
-}
+};
 
 // Load items when component mounts
 onMounted(() => {
-  extractAndLoadItems()
-})
+  extractAndLoadItems();
+});
 
 // Load items when text changes
-watch(() => props.text, () => {
-  extractAndLoadItems()
-}, { immediate: true })
+watch(
+  () => props.text,
+  () => {
+    extractAndLoadItems();
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped>

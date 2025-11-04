@@ -9,7 +9,7 @@
  * Features comprehensive caching and validation following the equipment bonus calculator pattern.
  */
 
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types'
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import type {
   PerkEntry,
   ResearchEntry,
@@ -20,9 +20,9 @@ import type {
   PerkPointCalculation,
   PerkPurchaseTransaction,
   PerkInfo,
-  AnyPerkEntry
-} from '@/lib/tinkerprofiles/perk-types'
-import { getSkillName } from '@/lib/tinkerprofiles/skill-mappings'
+  AnyPerkEntry,
+} from '@/lib/tinkerprofiles/perk-types';
+import { getSkillName } from '@/lib/tinkerprofiles/skill-mappings';
 
 // ============================================================================
 // Type Definitions
@@ -30,43 +30,43 @@ import { getSkillName } from '@/lib/tinkerprofiles/skill-mappings'
 
 export interface PerkCalculationError {
   /** Type of error for user display */
-  type: 'warning' | 'error'
+  type: 'warning' | 'error';
   /** User-friendly error message */
-  message: string
+  message: string;
   /** Technical details for debugging */
-  details: string
+  details: string;
   /** Source perk that caused the error */
-  perkName?: string
+  perkName?: string;
   /** Whether calculation can continue */
-  recoverable: boolean
+  recoverable: boolean;
 }
 
 export interface PerkCalculationResult {
   /** Successfully calculated effects */
-  effects: PerkEffectSummary
+  effects: PerkEffectSummary;
   /** Non-fatal warnings */
-  warnings: PerkCalculationError[]
+  warnings: PerkCalculationError[];
   /** Fatal errors */
-  errors: PerkCalculationError[]
+  errors: PerkCalculationError[];
   /** Whether calculation completed successfully */
-  success: boolean
+  success: boolean;
 }
 
 export interface PointValidationResult {
   /** Whether the purchase is valid */
-  valid: boolean
+  valid: boolean;
   /** Available points of each type */
   availablePoints: {
-    standard: number
-    ai: number
-  }
+    standard: number;
+    ai: number;
+  };
   /** Points required for the purchase */
   requiredPoints: {
-    standard: number
-    ai: number
-  }
+    standard: number;
+    ai: number;
+  };
   /** Error messages if invalid */
-  errors: string[]
+  errors: string[];
 }
 
 // ============================================================================
@@ -83,15 +83,15 @@ export const PERK_EFFECT_SPELL_IDS = [
   53014, // "Modify {Stat} for {Duration}s by {Amount}" - timed bonus
   53175, // "Modify {Stat} by {Amount}" - additional stat modifier format
   53234, // "Reset all perks" - special perk-related spell
-  53187  // "Lock perk {PerkID} for {Duration}s" - perk interaction
-] as const
+  53187, // "Lock perk {PerkID} for {Duration}s" - perk interaction
+] as const;
 
 /**
  * Perk activation events
  * - 1: Cast (for active perk abilities)
  * - 14: Wear (for passive perk effects)
  */
-export const PERK_EVENTS = [1, 14] as const
+export const PERK_EVENTS = [1, 14] as const;
 
 // ============================================================================
 // Performance Caching
@@ -101,56 +101,56 @@ export const PERK_EVENTS = [1, 14] as const
  * Cache for perk effect calculations to avoid re-parsing the same spell data
  */
 class PerkEffectCache {
-  private cache = new Map<string, PerkEffect[]>()
-  private maxSize = 1000 // Larger cache for perks since they don't change often
-  private hitCount = 0
-  private missCount = 0
+  private cache = new Map<string, PerkEffect[]>();
+  private maxSize = 1000; // Larger cache for perks since they don't change often
+  private hitCount = 0;
+  private missCount = 0;
 
   private getCacheKey(perkAoid: number): string {
-    return `perk_${perkAoid}`
+    return `perk_${perkAoid}`;
   }
 
   get(perkAoid: number): PerkEffect[] | null {
-    const key = this.getCacheKey(perkAoid)
-    const cached = this.cache.get(key)
+    const key = this.getCacheKey(perkAoid);
+    const cached = this.cache.get(key);
 
     if (cached) {
-      this.hitCount++
-      return cached
+      this.hitCount++;
+      return cached;
     } else {
-      this.missCount++
-      return null
+      this.missCount++;
+      return null;
     }
   }
 
   set(perkAoid: number, effects: PerkEffect[]): void {
-    const key = this.getCacheKey(perkAoid)
+    const key = this.getCacheKey(perkAoid);
 
     // If cache is full, remove oldest entry (simple LRU)
     if (this.cache.size >= this.maxSize) {
-      const firstKey = this.cache.keys().next().value
+      const firstKey = this.cache.keys().next().value;
       if (firstKey) {
-        this.cache.delete(firstKey)
+        this.cache.delete(firstKey);
       }
     }
 
-    this.cache.set(key, effects)
+    this.cache.set(key, effects);
   }
 
   clear(): void {
-    this.cache.clear()
-    this.hitCount = 0
-    this.missCount = 0
+    this.cache.clear();
+    this.hitCount = 0;
+    this.missCount = 0;
   }
 
   getStats(): { size: number; hitRate: number; hitCount: number; missCount: number } {
-    const total = this.hitCount + this.missCount
+    const total = this.hitCount + this.missCount;
     return {
       size: this.cache.size,
       hitRate: total > 0 ? (this.hitCount / total) * 100 : 0,
       hitCount: this.hitCount,
-      missCount: this.missCount
-    }
+      missCount: this.missCount,
+    };
   }
 }
 
@@ -158,39 +158,39 @@ class PerkEffectCache {
  * Cache for point calculations
  */
 class PointCalculationCache {
-  private cache = new Map<string, number>()
-  private maxSize = 500
+  private cache = new Map<string, number>();
+  private maxSize = 500;
 
   private getStandardPointsKey(level: number): string {
-    return `standard_${level}`
+    return `standard_${level}`;
   }
 
   private getAIPointsKey(alienLevel: number): string {
-    return `ai_${alienLevel}`
+    return `ai_${alienLevel}`;
   }
 
   getStandardPoints(level: number): number | null {
-    const key = this.getStandardPointsKey(level)
-    return this.cache.get(key) ?? null
+    const key = this.getStandardPointsKey(level);
+    return this.cache.get(key) ?? null;
   }
 
   setStandardPoints(level: number, points: number): void {
-    const key = this.getStandardPointsKey(level)
-    this.cache.set(key, points)
+    const key = this.getStandardPointsKey(level);
+    this.cache.set(key, points);
   }
 
   getAIPoints(alienLevel: number): number | null {
-    const key = this.getAIPointsKey(alienLevel)
-    return this.cache.get(key) ?? null
+    const key = this.getAIPointsKey(alienLevel);
+    return this.cache.get(key) ?? null;
   }
 
   setAIPoints(alienLevel: number, points: number): void {
-    const key = this.getAIPointsKey(alienLevel)
-    this.cache.set(key, points)
+    const key = this.getAIPointsKey(alienLevel);
+    this.cache.set(key, points);
   }
 
   clear(): void {
-    this.cache.clear()
+    this.cache.clear();
   }
 }
 
@@ -199,15 +199,15 @@ class PointCalculationCache {
 // ============================================================================
 
 export class PerkCalculatorService {
-  private effectCache = new PerkEffectCache()
-  private pointCache = new PointCalculationCache()
+  private effectCache = new PerkEffectCache();
+  private pointCache = new PointCalculationCache();
 
   // Performance tracking
   private performanceMetrics = {
     lastCalculationTime: 0,
     averageCalculationTime: 0,
-    calculationCount: 0
-  }
+    calculationCount: 0,
+  };
 
   /**
    * Calculate standard perk points based on character level
@@ -215,27 +215,27 @@ export class PerkCalculatorService {
    * @returns Standard perk points available
    */
   calculateStandardPerkPoints(level: number): number {
-    if (level < 10) return 0
+    if (level < 10) return 0;
 
     // Check cache first
-    const cached = this.pointCache.getStandardPoints(level)
+    const cached = this.pointCache.getStandardPoints(level);
     if (cached !== null) {
-      return cached
+      return cached;
     }
 
     // 1 point every 10 levels up to level 200 (20 points)
-    const pointsUpTo200 = Math.min(Math.floor(level / 10), 20)
+    const pointsUpTo200 = Math.min(Math.floor(level / 10), 20);
 
     // 1 point per level from 201-220 (20 points)
-    const pointsAfter200 = level > 200 ? Math.min(level - 200, 20) : 0
+    const pointsAfter200 = level > 200 ? Math.min(level - 200, 20) : 0;
 
     // Total: maximum 40 points at level 220
-    const totalPoints = pointsUpTo200 + pointsAfter200
+    const totalPoints = pointsUpTo200 + pointsAfter200;
 
     // Cache the result
-    this.pointCache.setStandardPoints(level, totalPoints)
+    this.pointCache.setStandardPoints(level, totalPoints);
 
-    return totalPoints
+    return totalPoints;
   }
 
   /**
@@ -244,21 +244,21 @@ export class PerkCalculatorService {
    * @returns AI perk points available
    */
   calculateAIPerkPoints(alienLevel: number): number {
-    if (alienLevel <= 0) return 0
+    if (alienLevel <= 0) return 0;
 
     // Check cache first
-    const cached = this.pointCache.getAIPoints(alienLevel)
+    const cached = this.pointCache.getAIPoints(alienLevel);
     if (cached !== null) {
-      return cached
+      return cached;
     }
 
     // 1 AI perk point per alien level, max 30
-    const totalPoints = Math.min(alienLevel, 30)
+    const totalPoints = Math.min(alienLevel, 30);
 
     // Cache the result
-    this.pointCache.setAIPoints(alienLevel, totalPoints)
+    this.pointCache.setAIPoints(alienLevel, totalPoints);
 
-    return totalPoints
+    return totalPoints;
   }
 
   /**
@@ -267,19 +267,19 @@ export class PerkCalculatorService {
    * @returns Detailed point calculation with formulas
    */
   calculatePerkPointsDetailed(characterData: PerkCharacterData): PerkPointCalculation {
-    const standardPoints = this.calculateStandardPerkPoints(characterData.level)
-    const aiPoints = this.calculateAIPerkPoints(characterData.alienLevel || 0)
+    const standardPoints = this.calculateStandardPerkPoints(characterData.level);
+    const aiPoints = this.calculateAIPerkPoints(characterData.alienLevel || 0);
 
     return {
       standardPoints: {
         total: standardPoints,
-        formula: this.getStandardPointsFormula(characterData.level)
+        formula: this.getStandardPointsFormula(characterData.level),
       },
       aiPoints: {
         total: aiPoints,
-        formula: this.getAIPointsFormula(characterData.alienLevel || 0)
-      }
-    }
+        formula: this.getAIPointsFormula(characterData.alienLevel || 0),
+      },
+    };
   }
 
   /**
@@ -288,13 +288,13 @@ export class PerkCalculatorService {
    * @returns Aggregated stat effects and any errors
    */
   async aggregatePerkEffects(perks: AnyPerkEntry[]): Promise<PerkCalculationResult> {
-    const startTime = performance.now()
+    const startTime = performance.now();
     const result: PerkCalculationResult = {
       effects: {},
       warnings: [],
       errors: [],
-      success: true
-    }
+      success: true,
+    };
 
     try {
       // Validate input
@@ -303,52 +303,50 @@ export class PerkCalculatorService {
           type: 'error',
           message: 'Invalid perks data',
           details: 'Perks parameter is not an array',
-          recoverable: false
-        })
-        result.success = false
-        return result
+          recoverable: false,
+        });
+        result.success = false;
+        return result;
       }
 
       // Process each perk and accumulate effects
       for (const perk of perks) {
         try {
-          const perkEffects = await this.getPerkEffects(perk)
+          const perkEffects = await this.getPerkEffects(perk);
 
           // Aggregate effects by stat ID
           for (const effect of perkEffects) {
             if (!result.effects[effect.stat]) {
-              result.effects[effect.stat] = 0
+              result.effects[effect.stat] = 0;
             }
-            result.effects[effect.stat] += effect.value
+            result.effects[effect.stat] += effect.value;
           }
-
         } catch (error) {
           result.warnings.push({
             type: 'warning',
             message: 'Failed to process perk effects',
             details: `Error processing perk ${perk.name}: ${error instanceof Error ? error.message : String(error)}`,
             perkName: perk.name,
-            recoverable: true
-          })
+            recoverable: true,
+          });
           // Continue processing other perks
         }
       }
-
     } catch (error) {
       result.errors.push({
         type: 'error',
         message: 'Critical error aggregating perk effects',
         details: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
-        recoverable: false
-      })
-      result.success = false
+        recoverable: false,
+      });
+      result.success = false;
     } finally {
       // Track performance metrics
-      const endTime = performance.now()
-      this.updatePerformanceMetrics(endTime - startTime)
+      const endTime = performance.now();
+      this.updatePerformanceMetrics(endTime - startTime);
     }
 
-    return result
+    return result;
   }
 
   /**
@@ -365,75 +363,87 @@ export class PerkCalculatorService {
     targetLevel: number,
     currentPerks: AnyPerkEntry[]
   ): PerkValidationResult {
-    const errors: string[] = []
-    const warnings: string[] = []
+    const errors: string[] = [];
+    const warnings: string[] = [];
 
     try {
       // Validate target level
       if (targetLevel < 1 || targetLevel > 10) {
-        errors.push(`Invalid target level ${targetLevel} (must be 1-10)`)
+        errors.push(`Invalid target level ${targetLevel} (must be 1-10)`);
       }
 
       // Find current level of this perk
-      const currentPerk = currentPerks.find(p => p.name === perk.name)
-      const currentLevel = currentPerk?.level || 0
+      const currentPerk = currentPerks.find((p) => p.name === perk.name);
+      const currentLevel = currentPerk?.level || 0;
 
       // Check sequential purchase requirement
       if (targetLevel > currentLevel + 1) {
-        errors.push(`Must purchase level ${currentLevel + 1} first (sequential purchase required)`)
+        errors.push(`Must purchase level ${currentLevel + 1} first (sequential purchase required)`);
       }
 
       // Check if downgrading (not allowed)
       if (targetLevel <= currentLevel) {
-        errors.push(`Cannot downgrade perk (current level: ${currentLevel}, target: ${targetLevel})`)
+        errors.push(
+          `Cannot downgrade perk (current level: ${currentLevel}, target: ${targetLevel})`
+        );
       }
 
       // Check character level requirement
       if (perk.requirements.level && character.level < perk.requirements.level) {
-        errors.push(`Requires character level ${perk.requirements.level} (current: ${character.level})`)
+        errors.push(
+          `Requires character level ${perk.requirements.level} (current: ${character.level})`
+        );
       }
 
       // Check AI level requirement (for AI perks)
-      if (perk.requirements.alienLevel && (!character.alienLevel || character.alienLevel < perk.requirements.alienLevel)) {
-        errors.push(`Requires AI level ${perk.requirements.alienLevel} (current: ${character.alienLevel || 0})`)
+      if (
+        perk.requirements.alienLevel &&
+        (!character.alienLevel || character.alienLevel < perk.requirements.alienLevel)
+      ) {
+        errors.push(
+          `Requires AI level ${perk.requirements.alienLevel} (current: ${character.alienLevel || 0})`
+        );
       }
 
       // Check profession restriction
       if (perk.requirements.professions && perk.requirements.professions.length > 0) {
         if (!perk.requirements.professions.includes(character.profession)) {
-          errors.push(`Not available for ${character.profession} (requires: ${perk.requirements.professions.join(', ')})`)
+          errors.push(
+            `Not available for ${character.profession} (requires: ${perk.requirements.professions.join(', ')})`
+          );
         }
       }
 
       // Check breed restriction
       if (perk.requirements.breeds && perk.requirements.breeds.length > 0) {
         if (!perk.requirements.breeds.includes(character.breed)) {
-          errors.push(`Not available for ${character.breed} (requires: ${perk.requirements.breeds.join(', ')})`)
+          errors.push(
+            `Not available for ${character.breed} (requires: ${perk.requirements.breeds.join(', ')})`
+          );
         }
       }
 
       // Check expansion requirement
       if (perk.requirements.expansion && character.expansion !== perk.requirements.expansion) {
-        errors.push(`Requires ${perk.requirements.expansion} expansion`)
+        errors.push(`Requires ${perk.requirements.expansion} expansion`);
       }
 
       // Check perk points available (not for LE research)
       if (perk.type !== 'LE') {
-        const pointsResult = this.validatePerkPoints(character, perk, targetLevel, currentPerks)
+        const pointsResult = this.validatePerkPoints(character, perk, targetLevel, currentPerks);
         if (!pointsResult.valid) {
-          errors.push(...pointsResult.errors)
+          errors.push(...pointsResult.errors);
         }
       }
-
     } catch (error) {
-      errors.push(`Validation error: ${error instanceof Error ? error.message : String(error)}`)
+      errors.push(`Validation error: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     return {
       valid: errors.length === 0,
       errors,
-      warnings
-    }
+      warnings,
+    };
   }
 
   /**
@@ -451,59 +461,63 @@ export class PerkCalculatorService {
     currentPerks: AnyPerkEntry[]
   ): PointValidationResult {
     // Calculate total available points
-    const totalStandardPoints = this.calculateStandardPerkPoints(character.level)
-    const totalAIPoints = this.calculateAIPerkPoints(character.alienLevel || 0)
+    const totalStandardPoints = this.calculateStandardPerkPoints(character.level);
+    const totalAIPoints = this.calculateAIPerkPoints(character.alienLevel || 0);
 
     // Calculate currently spent points
-    let spentStandardPoints = 0
-    let spentAIPoints = 0
+    let spentStandardPoints = 0;
+    let spentAIPoints = 0;
 
     for (const currentPerk of currentPerks) {
       if (currentPerk.type === 'SL') {
-        spentStandardPoints += currentPerk.level  // Each level costs 1 point
+        spentStandardPoints += currentPerk.level; // Each level costs 1 point
       } else if (currentPerk.type === 'AI') {
-        spentAIPoints += currentPerk.level  // Each level costs 1 point
+        spentAIPoints += currentPerk.level; // Each level costs 1 point
       }
       // LE perks don't cost points
     }
 
     // Calculate available points
-    const availableStandardPoints = totalStandardPoints - spentStandardPoints
-    const availableAIPoints = totalAIPoints - spentAIPoints
+    const availableStandardPoints = totalStandardPoints - spentStandardPoints;
+    const availableAIPoints = totalAIPoints - spentAIPoints;
 
     // Calculate required points for this purchase
-    const currentLevel = currentPerks.find(p => p.name === perk.name)?.level || 0
-    const pointsNeeded = targetLevel - currentLevel
+    const currentLevel = currentPerks.find((p) => p.name === perk.name)?.level || 0;
+    const pointsNeeded = targetLevel - currentLevel;
 
-    const requiredStandardPoints = perk.type === 'SL' ? pointsNeeded : 0
-    const requiredAIPoints = perk.type === 'AI' ? pointsNeeded : 0
+    const requiredStandardPoints = perk.type === 'SL' ? pointsNeeded : 0;
+    const requiredAIPoints = perk.type === 'AI' ? pointsNeeded : 0;
 
     // Validate availability
-    const errors: string[] = []
-    let valid = true
+    const errors: string[] = [];
+    let valid = true;
 
     if (perk.type === 'SL' && requiredStandardPoints > availableStandardPoints) {
-      errors.push(`Insufficient standard perk points (need ${requiredStandardPoints}, have ${availableStandardPoints})`)
-      valid = false
+      errors.push(
+        `Insufficient standard perk points (need ${requiredStandardPoints}, have ${availableStandardPoints})`
+      );
+      valid = false;
     }
 
     if (perk.type === 'AI' && requiredAIPoints > availableAIPoints) {
-      errors.push(`Insufficient AI perk points (need ${requiredAIPoints}, have ${availableAIPoints})`)
-      valid = false
+      errors.push(
+        `Insufficient AI perk points (need ${requiredAIPoints}, have ${availableAIPoints})`
+      );
+      valid = false;
     }
 
     return {
       valid,
       availablePoints: {
         standard: availableStandardPoints,
-        ai: availableAIPoints
+        ai: availableAIPoints,
       },
       requiredPoints: {
         standard: requiredStandardPoints,
-        ai: requiredAIPoints
+        ai: requiredAIPoints,
       },
-      errors
-    }
+      errors,
+    };
   }
 
   // ============================================================================
@@ -518,19 +532,19 @@ export class PerkCalculatorService {
    */
   private async getPerkEffects(perk: AnyPerkEntry): Promise<PerkEffect[]> {
     // Check cache first
-    const cached = this.effectCache.get(perk.aoid)
+    const cached = this.effectCache.get(perk.aoid);
     if (cached) {
-      return cached
+      return cached;
     }
 
     // TODO: Implement actual database query to get spell data
     // For now, return empty effects as a placeholder
-    const effects: PerkEffect[] = []
+    const effects: PerkEffect[] = [];
 
     // Cache the result
-    this.effectCache.set(perk.aoid, effects)
+    this.effectCache.set(perk.aoid, effects);
 
-    return effects
+    return effects;
   }
 
   /**
@@ -540,21 +554,21 @@ export class PerkCalculatorService {
    */
   private getStandardPointsFormula(level: number): string {
     if (level < 10) {
-      return 'No points until level 10'
+      return 'No points until level 10';
     }
 
-    const pointsUpTo200 = Math.min(Math.floor(level / 10), 20)
-    const pointsAfter200 = level > 200 ? Math.min(level - 200, 20) : 0
+    const pointsUpTo200 = Math.min(Math.floor(level / 10), 20);
+    const pointsAfter200 = level > 200 ? Math.min(level - 200, 20) : 0;
 
-    let formula = `${pointsUpTo200} points (1 per 10 levels up to 200)`
+    let formula = `${pointsUpTo200} points (1 per 10 levels up to 200)`;
 
     if (pointsAfter200 > 0) {
-      formula += ` + ${pointsAfter200} points (1 per level from 201-220)`
+      formula += ` + ${pointsAfter200} points (1 per level from 201-220)`;
     }
 
-    formula += ` = ${pointsUpTo200 + pointsAfter200} total`
+    formula += ` = ${pointsUpTo200 + pointsAfter200} total`;
 
-    return formula
+    return formula;
   }
 
   /**
@@ -564,47 +578,47 @@ export class PerkCalculatorService {
    */
   private getAIPointsFormula(alienLevel: number): string {
     if (alienLevel <= 0) {
-      return 'No AI levels = 0 points'
+      return 'No AI levels = 0 points';
     }
 
-    const points = Math.min(alienLevel, 30)
-    return `${alienLevel} AI level${alienLevel === 1 ? '' : 's'} = ${points} point${points === 1 ? '' : 's'} (max 30)`
+    const points = Math.min(alienLevel, 30);
+    return `${alienLevel} AI level${alienLevel === 1 ? '' : 's'} = ${points} point${points === 1 ? '' : 's'} (max 30)`;
   }
 
   /**
    * Update performance metrics for monitoring
    */
   private updatePerformanceMetrics(calculationTime: number): void {
-    this.performanceMetrics.lastCalculationTime = calculationTime
-    this.performanceMetrics.calculationCount++
+    this.performanceMetrics.lastCalculationTime = calculationTime;
+    this.performanceMetrics.calculationCount++;
 
     // Calculate running average
-    const { averageCalculationTime, calculationCount } = this.performanceMetrics
+    const { averageCalculationTime, calculationCount } = this.performanceMetrics;
     this.performanceMetrics.averageCalculationTime =
-      ((averageCalculationTime * (calculationCount - 1)) + calculationTime) / calculationCount
+      (averageCalculationTime * (calculationCount - 1) + calculationTime) / calculationCount;
   }
 
   /**
    * Get performance statistics for debugging
    */
   getPerformanceStats(): {
-    lastCalculationTime: number
-    averageCalculationTime: number
-    calculationCount: number
-    effectCacheStats: ReturnType<PerkEffectCache['getStats']>
+    lastCalculationTime: number;
+    averageCalculationTime: number;
+    calculationCount: number;
+    effectCacheStats: ReturnType<PerkEffectCache['getStats']>;
   } {
     return {
       ...this.performanceMetrics,
-      effectCacheStats: this.effectCache.getStats()
-    }
+      effectCacheStats: this.effectCache.getStats(),
+    };
   }
 
   /**
    * Clear all caches (useful for memory management)
    */
   clearCaches(): void {
-    this.effectCache.clear()
-    this.pointCache.clear()
+    this.effectCache.clear();
+    this.pointCache.clear();
   }
 }
 
@@ -613,7 +627,7 @@ export class PerkCalculatorService {
 // ============================================================================
 
 /** Singleton instance for easy access */
-export const perkCalculator = new PerkCalculatorService()
+export const perkCalculator = new PerkCalculatorService();
 
 /**
  * Convenience function to calculate standard perk points
@@ -621,7 +635,7 @@ export const perkCalculator = new PerkCalculatorService()
  * @returns Standard perk points available
  */
 export function calculateStandardPerkPoints(level: number): number {
-  return perkCalculator.calculateStandardPerkPoints(level)
+  return perkCalculator.calculateStandardPerkPoints(level);
 }
 
 /**
@@ -630,7 +644,7 @@ export function calculateStandardPerkPoints(level: number): number {
  * @returns AI perk points available
  */
 export function calculateAIPerkPoints(alienLevel: number): number {
-  return perkCalculator.calculateAIPerkPoints(alienLevel)
+  return perkCalculator.calculateAIPerkPoints(alienLevel);
 }
 
 /**
@@ -640,21 +654,21 @@ export function calculateAIPerkPoints(alienLevel: number): number {
  */
 export async function aggregatePerkEffects(perks: AnyPerkEntry[]): Promise<PerkEffectSummary> {
   try {
-    const result = await perkCalculator.aggregatePerkEffects(perks)
+    const result = await perkCalculator.aggregatePerkEffects(perks);
 
     // Log warnings for debugging
     if (result.warnings.length > 0) {
-      console.warn('Perk effect calculation warnings:', result.warnings)
+      console.warn('Perk effect calculation warnings:', result.warnings);
     }
 
     if (result.errors.length > 0) {
-      console.error('Perk effect calculation errors:', result.errors)
+      console.error('Perk effect calculation errors:', result.errors);
     }
 
-    return result.effects
+    return result.effects;
   } catch (error) {
-    console.error('Error in aggregatePerkEffects convenience function:', error)
-    return {}
+    console.error('Error in aggregatePerkEffects convenience function:', error);
+    return {};
   }
 }
 
@@ -672,7 +686,7 @@ export function validatePerkPurchase(
   targetLevel: number,
   currentPerks: AnyPerkEntry[]
 ): PerkValidationResult {
-  return perkCalculator.validatePerkPurchase(character, perk, targetLevel, currentPerks)
+  return perkCalculator.validatePerkPurchase(character, perk, targetLevel, currentPerks);
 }
 
 /**
@@ -680,6 +694,8 @@ export function validatePerkPurchase(
  * @param characterData Character information
  * @returns Detailed point calculation
  */
-export function calculatePerkPointsDetailed(characterData: PerkCharacterData): PerkPointCalculation {
-  return perkCalculator.calculatePerkPointsDetailed(characterData)
+export function calculatePerkPointsDetailed(
+  characterData: PerkCharacterData
+): PerkPointCalculation {
+  return perkCalculator.calculatePerkPointsDetailed(characterData);
 }

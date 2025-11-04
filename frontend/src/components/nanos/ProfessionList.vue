@@ -33,7 +33,7 @@ Displays all Anarchy Online professions in a selectable list for nano filtering
             size="normal"
             shape="circle"
           />
-          
+
           <!-- Profession Details -->
           <div class="flex-1 min-w-0">
             <div class="font-medium text-surface-900 dark:text-surface-100 truncate">
@@ -44,10 +44,7 @@ Displays all Anarchy Online professions in a selectable list for nano filtering
 
         <!-- Selection Indicator -->
         <div class="flex-shrink-0">
-          <i 
-            v-if="selectedProfession === profession.id"
-            class="pi pi-check text-primary-500"
-          />
+          <i v-if="selectedProfession === profession.id" class="pi pi-check text-primary-500" />
         </div>
       </div>
     </div>
@@ -60,32 +57,32 @@ Displays all Anarchy Online professions in a selectable list for nano filtering
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import Avatar from 'primevue/avatar'
-import ProgressSpinner from 'primevue/progressspinner'
-import { PROFESSION } from '@/services/game-data'
+import { ref, computed, onMounted } from 'vue';
+import Avatar from 'primevue/avatar';
+import ProgressSpinner from 'primevue/progressspinner';
+import { PROFESSION } from '@/services/game-data';
 
 interface ProfessionInfo {
-  id: number
-  name: string
-  shortName: string
+  id: number;
+  name: string;
+  shortName: string;
 }
 
 // Props
 interface Props {
-  loading?: boolean
-  selectedProfession?: number | null
+  loading?: boolean;
+  selectedProfession?: number | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
-  selectedProfession: null
-})
+  selectedProfession: null,
+});
 
 // Emits
 const emit = defineEmits<{
-  professionSelected: [professionId: number]
-}>()
+  professionSelected: [professionId: number];
+}>();
 
 // Computed
 const professions = computed((): ProfessionInfo[] => {
@@ -93,64 +90,71 @@ const professions = computed((): ProfessionInfo[] => {
   return Object.entries(PROFESSION)
     .map(([id, name]) => ({
       id: parseInt(id),
-      name: name === 'MartialArtist' ? 'Martial Artist' : 
-           name === 'NanoTechnician' ? 'Nanotechnician' : 
-           name === 'MetaPhysicist' ? 'Meta-Physicist' : 
-           name,
-      shortName: name === 'MartialArtist' ? 'MA' : 
-                name === 'NanoTechnician' ? 'NT' : 
-                name === 'MetaPhysicist' ? 'MP' : 
-                name.substring(0, 2).toUpperCase()
+      name:
+        name === 'MartialArtist'
+          ? 'Martial Artist'
+          : name === 'NanoTechnician'
+            ? 'Nanotechnician'
+            : name === 'MetaPhysicist'
+              ? 'Meta-Physicist'
+              : name,
+      shortName:
+        name === 'MartialArtist'
+          ? 'MA'
+          : name === 'NanoTechnician'
+            ? 'NT'
+            : name === 'MetaPhysicist'
+              ? 'MP'
+              : name.substring(0, 2).toUpperCase(),
     }))
-    .filter(p => p.id > 0 && p.id !== 13) // Exclude Unknown (0) and Monster (13)
-    .sort((a, b) => a.name.localeCompare(b.name))
-})
+    .filter((p) => p.id > 0 && p.id !== 13) // Exclude Unknown (0) and Monster (13)
+    .sort((a, b) => a.name.localeCompare(b.name));
+});
 
 // Methods
 function selectProfession(professionId: number) {
-  emit('professionSelected', professionId)
+  emit('professionSelected', professionId);
 }
 
 function getProfessionItemClass(professionId: number): string {
-  const isSelected = props.selectedProfession === professionId
-  
+  const isSelected = props.selectedProfession === professionId;
+
   if (isSelected) {
-    return 'bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 text-primary-900 dark:text-primary-100'
+    return 'bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 text-primary-900 dark:text-primary-100';
   }
-  
-  return 'hover:bg-surface-100 dark:hover:bg-surface-800 border border-transparent'
+
+  return 'hover:bg-surface-100 dark:hover:bg-surface-800 border border-transparent';
 }
 
 function getProfessionAvatarClass(professionId: number): string {
-  const isSelected = props.selectedProfession === professionId
-  
+  const isSelected = props.selectedProfession === professionId;
+
   // Profession-specific colors
   const colorMap: Record<number, string> = {
-    1: 'bg-red-500 text-white',      // Soldier
-    2: 'bg-orange-500 text-white',   // Martial Artist
-    3: 'bg-blue-500 text-white',     // Engineer
-    4: 'bg-green-500 text-white',    // Fixer
-    5: 'bg-purple-500 text-white',   // Agent
-    6: 'bg-yellow-500 text-black',   // Adventurer
-    7: 'bg-cyan-500 text-white',     // Trader
-    8: 'bg-pink-500 text-white',     // Bureaucrat
-    9: 'bg-gray-500 text-white',     // Enforcer
+    1: 'bg-red-500 text-white', // Soldier
+    2: 'bg-orange-500 text-white', // Martial Artist
+    3: 'bg-blue-500 text-white', // Engineer
+    4: 'bg-green-500 text-white', // Fixer
+    5: 'bg-purple-500 text-white', // Agent
+    6: 'bg-yellow-500 text-black', // Adventurer
+    7: 'bg-cyan-500 text-white', // Trader
+    8: 'bg-pink-500 text-white', // Bureaucrat
+    9: 'bg-gray-500 text-white', // Enforcer
     10: 'bg-emerald-500 text-white', // Doctor
-    11: 'bg-indigo-500 text-white',  // Nanotechnician
-    12: 'bg-violet-500 text-white',  // Meta-Physicist
-    14: 'bg-amber-500 text-black',   // Keeper
-    15: 'bg-slate-500 text-white'    // Shade
-  }
-  
-  let baseClass = colorMap[professionId] || 'bg-surface-400 text-white'
-  
-  if (isSelected) {
-    baseClass = 'bg-primary-600 text-white'
-  }
-  
-  return baseClass
-}
+    11: 'bg-indigo-500 text-white', // Nanotechnician
+    12: 'bg-violet-500 text-white', // Meta-Physicist
+    14: 'bg-amber-500 text-black', // Keeper
+    15: 'bg-slate-500 text-white', // Shade
+  };
 
+  let baseClass = colorMap[professionId] || 'bg-surface-400 text-white';
+
+  if (isSelected) {
+    baseClass = 'bg-primary-600 text-white';
+  }
+
+  return baseClass;
+}
 </script>
 
 <style scoped>

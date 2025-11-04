@@ -11,21 +11,25 @@ const activeTab = ref(0);
 defineExpose({
   currentStep: computed(() => {
     // Map activeTab to step names for tests
-    const steps = ['initial', 'loading', 'loaded']
-    return steps[Math.min(activeTab.value, steps.length - 1)]
-  })
-})
+    const steps = ['initial', 'loading', 'loaded'];
+    return steps[Math.min(activeTab.value, steps.length - 1)];
+  }),
+});
 </script>
 
 <template>
   <div class="tinker-pocket h-full flex flex-col">
     <!-- Header -->
-    <div class="bg-surface-50 dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 p-6">
+    <div
+      class="bg-surface-50 dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 p-6"
+    >
       <div class="container mx-auto">
         <div class="flex items-center gap-3 mb-2">
           <i class="pi pi-map text-2xl text-primary-500"></i>
           <h1 class="text-3xl font-bold text-surface-900 dark:text-surface-50">TinkerPocket</h1>
-          <span class="text-xs bg-surface-100 dark:bg-surface-800 px-2 py-1 rounded text-surface-600 dark:text-surface-400">
+          <span
+            class="text-xs bg-surface-100 dark:bg-surface-800 px-2 py-1 rounded text-surface-600 dark:text-surface-400"
+          >
             Pocket Boss & Symbiant Tool
           </span>
         </div>

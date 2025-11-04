@@ -12,108 +12,121 @@ import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 const mockRouter = {
   currentRoute: { value: { path: '/nanos' } },
   push: vi.fn(),
-  replace: vi.fn()
+  replace: vi.fn(),
 };
 
 const mockRoute = {
   path: '/nanos',
   params: {},
-  query: {}
+  query: {},
 };
 
 // Mock PrimeVue components
 vi.mock('primevue/badge', () => ({
-  default: { name: 'Badge', template: '<span>{{ value }}</span>', props: ['value', 'severity'] }
+  default: { name: 'Badge', template: '<span>{{ value }}</span>', props: ['value', 'severity'] },
 }));
 
 vi.mock('primevue/button', () => ({
-  default: { name: 'Button', template: '<button @click="$emit(\'click\')">{{ label }}</button>', props: ['label'], emits: ['click'] }
+  default: {
+    name: 'Button',
+    template: '<button @click="$emit(\'click\')">{{ label }}</button>',
+    props: ['label'],
+    emits: ['click'],
+  },
 }));
 
 vi.mock('primevue/dialog', () => ({
-  default: { 
-    name: 'Dialog', 
-    template: '<div v-if="visible"><slot name="header" /><slot /><slot name="footer" /></div>', 
+  default: {
+    name: 'Dialog',
+    template: '<div v-if="visible"><slot name="header" /><slot /><slot name="footer" /></div>',
     props: ['visible', 'modal', 'header', 'style'],
-    emits: ['update:visible']
-  }
+    emits: ['update:visible'],
+  },
 }));
 
 vi.mock('primevue/dropdown', () => ({
   default: {
     name: 'Dropdown',
-    template: '<select v-model="modelValue" @change="$emit(\'update:modelValue\', $event.target.value); $emit(\'change\')"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select>',
+    template:
+      '<select v-model="modelValue" @change="$emit(\'update:modelValue\', $event.target.value); $emit(\'change\')"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select>',
     props: ['modelValue', 'options', 'optionLabel', 'optionValue', 'placeholder'],
-    emits: ['update:modelValue', 'change']
-  }
+    emits: ['update:modelValue', 'change'],
+  },
 }));
 
 vi.mock('primevue/inputswitch', () => ({
   default: {
     name: 'InputSwitch',
-    template: '<input type="checkbox" v-model="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
+    template:
+      '<input type="checkbox" v-model="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
     props: ['modelValue', 'inputId', 'disabled'],
-    emits: ['update:modelValue']
-  }
+    emits: ['update:modelValue'],
+  },
 }));
 
 vi.mock('primevue/progressspinner', () => ({
-  default: { name: 'ProgressSpinner', template: '<div>Loading...</div>' }
+  default: { name: 'ProgressSpinner', template: '<div>Loading...</div>' },
 }));
 
 vi.mock('primevue/togglebutton', () => ({
   default: {
     name: 'ToggleButton',
-    template: '<button @click="$emit(\'update:modelValue\', !modelValue)">{{ modelValue ? onLabel : offLabel }}</button>',
+    template:
+      '<button @click="$emit(\'update:modelValue\', !modelValue)">{{ modelValue ? onLabel : offLabel }}</button>',
     props: ['modelValue', 'onLabel', 'offLabel', 'onIcon', 'offIcon'],
-    emits: ['update:modelValue']
-  }
+    emits: ['update:modelValue'],
+  },
 }));
 
 // Mock child components
 vi.mock('@/components/nanos/NanoSearch.vue', () => ({
   default: {
     name: 'NanoSearch',
-    template: '<div class="nano-search"><input type="text" @input="$emit(\'search\', $event.target.value, [], [])" /></div>',
+    template:
+      '<div class="nano-search"><input type="text" @input="$emit(\'search\', $event.target.value, [], [])" /></div>',
     props: ['modelValue', 'totalResults'],
-    emits: ['search', 'update:modelValue']
-  }
+    emits: ['search', 'update:modelValue'],
+  },
 }));
 
 vi.mock('@/components/nanos/NanoFilters.vue', () => ({
   default: {
     name: 'NanoFilters',
-    template: '<div class="nano-filters"><button @click="$emit(\'filter-change\', { skillCompatible: true })">Enable Compatibility</button></div>',
+    template:
+      '<div class="nano-filters"><button @click="$emit(\'filter-change\', { skillCompatible: true })">Enable Compatibility</button></div>',
     props: ['modelValue', 'showCompatibility', 'activeProfile', 'availableStrains'],
-    emits: ['update:modelValue', 'filter-change']
-  }
+    emits: ['update:modelValue', 'filter-change'],
+  },
 }));
 
 vi.mock('@/components/nanos/NanoList.vue', () => ({
   default: {
     name: 'NanoList',
-    template: '<div class="nano-list"><div v-for="nano in nanos" :key="nano.id" @click="$emit(\'nano-select\', nano)">{{ nano.name }}</div></div>',
+    template:
+      '<div class="nano-list"><div v-for="nano in nanos" :key="nano.id" @click="$emit(\'nano-select\', nano)">{{ nano.name }}</div></div>',
     props: ['nanos', 'loading', 'showCompatibility', 'activeProfile'],
-    emits: ['nano-select', 'page-change', 'favorite']
-  }
+    emits: ['nano-select', 'page-change', 'favorite'],
+  },
 }));
 
 vi.mock('@/components/nanos/NanoSchoolView.vue', () => ({
   default: {
     name: 'NanoSchoolView',
-    template: '<div class="nano-school-view"><div v-for="nano in nanos" :key="nano.id" @click="$emit(\'nano-select\', nano)">{{ nano.name }}</div></div>',
+    template:
+      '<div class="nano-school-view"><div v-for="nano in nanos" :key="nano.id" @click="$emit(\'nano-select\', nano)">{{ nano.name }}</div></div>',
     props: ['nanos', 'showCompatibility', 'activeProfile'],
-    emits: ['nano-select', 'strain-conflict', 'favorite']
-  }
+    emits: ['nano-select', 'strain-conflict', 'favorite'],
+  },
 }));
 
 vi.mock('@/components/nanos/NanoDetail.vue', () => ({
   default: {
     name: 'NanoDetail',
-    template: '<div class="nano-detail"><h3>{{ nano?.name }}</h3><button @click="$emit(\'close\')">Close</button></div>',
+    template:
+      '<div class="nano-detail"><h3>{{ nano?.name }}</h3><button @click="$emit(\'close\')">Close</button></div>',
     props: ['visible', 'nano', 'activeProfile', 'showCompatibility'],
-    emits: ['update:visible', 'close']
-  }
+    emits: ['update:visible', 'close'],
+  },
 }));
 
 // Mock localStorage
@@ -121,7 +134,7 @@ const mockLocalStorage = {
   getItem: vi.fn(() => null),
   setItem: vi.fn(),
   removeItem: vi.fn(),
-  clear: vi.fn()
+  clear: vi.fn(),
 };
 global.localStorage = mockLocalStorage as any;
 
@@ -152,8 +165,8 @@ describe('Nano Compatibility Workflow', () => {
         castingRequirements: [
           { type: 'skill', requirement: 'Biological Metamorphosis', value: 750, critical: true },
           { type: 'skill', requirement: 'Nano Programming', value: 600, critical: true },
-          { type: 'level', requirement: 'level', value: 125, critical: true }
-        ]
+          { type: 'level', requirement: 'level', value: 125, critical: true },
+        ],
       },
       {
         id: 2,
@@ -166,9 +179,9 @@ describe('Nano Compatibility Workflow', () => {
         castingRequirements: [
           { type: 'skill', requirement: 'Biological Metamorphosis', value: 200, critical: true },
           { type: 'skill', requirement: 'Nano Programming', value: 150, critical: true },
-          { type: 'level', requirement: 'level', value: 50, critical: true }
-        ]
-      }
+          { type: 'level', requirement: 'level', value: 50, critical: true },
+        ],
+      },
     ];
     nanosStore.totalCount = 2;
 
@@ -177,9 +190,9 @@ describe('Nano Compatibility Workflow', () => {
         plugins: [pinia],
         mocks: {
           $router: mockRouter,
-          $route: mockRoute
-        }
-      }
+          $route: mockRoute,
+        },
+      },
     });
 
     await wrapper.vm.$nextTick();

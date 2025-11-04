@@ -16,8 +16,7 @@ Shows item spell effects in a compact, scannable table format following WeaponSt
             {{ spellDataSummary }}
           </div>
         </div>
-        
-        
+
         <!-- Compact Mode (for simple effects) -->
         <div v-if="useCompactMode" class="compact-effects">
           <div v-for="spellData in formattedSpellData" :key="spellData.id" class="effect-group">
@@ -26,12 +25,16 @@ Shows item spell effects in a compact, scannable table format following WeaponSt
               <span class="event-name">{{ spellData.eventName || 'Effect' }}</span>
             </div>
             <div class="spells-list">
-              <div v-for="spell in visibleSpells(spellData.spells)" :key="spell.id" class="spell-compact">
+              <div
+                v-for="spell in visibleSpells(spellData.spells)"
+                :key="spell.id"
+                class="spell-compact"
+              >
                 <span class="spell-text">{{ spell.formattedText }}</span>
                 <div v-if="spell.parameters.length > 0" class="spell-params">
-                  <span 
-                    v-for="param in spell.parameters.slice(0, 2)" 
-                    :key="param.key" 
+                  <span
+                    v-for="param in spell.parameters.slice(0, 2)"
+                    :key="param.key"
                     :class="param.color"
                     class="param-value"
                   >
@@ -42,7 +45,7 @@ Shows item spell effects in a compact, scannable table format following WeaponSt
             </div>
           </div>
         </div>
-        
+
         <!-- Full Table Mode (for complex effects) -->
         <div v-else class="effects-table">
           <table class="w-full border-collapse">
@@ -55,12 +58,12 @@ Shows item spell effects in a compact, scannable table format following WeaponSt
                 <th class="header-cell">Duration</th>
               </tr>
             </thead>
-            
+
             <!-- Data Rows -->
             <tbody>
               <template v-for="spellData in formattedSpellData" :key="spellData.id">
-                <tr 
-                  v-for="(spell, index) in visibleSpells(spellData.spells)" 
+                <tr
+                  v-for="(spell, index) in visibleSpells(spellData.spells)"
                   :key="spell.id"
                   class="data-row"
                 >
@@ -71,32 +74,33 @@ Shows item spell effects in a compact, scannable table format following WeaponSt
                       <span class="event-name">{{ spellData.eventName || 'Effect' }}</span>
                     </div>
                   </td>
-                  
+
                   <!-- Target Column -->
                   <td class="table-cell">
-                    <div v-if="spell.targetName && spell.targetName !== 'Self'" class="target-display">
+                    <div
+                      v-if="spell.targetName && spell.targetName !== 'Self'"
+                      class="target-display"
+                    >
                       <span class="target-name">{{ spell.targetName }}</span>
                     </div>
-                    <div v-else class="target-self">
-                      Self
-                    </div>
+                    <div v-else class="target-self">Self</div>
                   </td>
-                  
+
                   <!-- Effect Column -->
                   <td class="table-cell">
                     <div class="effect-text">
                       <SpellText :text="spell.formattedText" />
                     </div>
                     <div v-if="spell.criteria.length > 0" class="effect-criteria">
-                      <CriteriaDisplay 
-                        :criteria="spell.criteria" 
+                      <CriteriaDisplay
+                        :criteria="spell.criteria"
                         :character-stats="characterStats"
                         :expanded="false"
                         size="small"
                       />
                     </div>
                   </td>
-                  
+
                   <!-- Duration Column -->
                   <td class="table-cell">
                     <div v-if="spell.tickCount && spell.tickCount > 1" class="duration-display">
@@ -104,13 +108,24 @@ Shows item spell effects in a compact, scannable table format following WeaponSt
                         <div class="duration-label">Ticks</div>
                         <div class="duration-value">{{ spell.tickCount }}</div>
                       </div>
-                      <div v-if="spell.tickInterval && spell.tickInterval > 0" class="duration-divider"></div>
-                      <div v-if="spell.tickInterval && spell.tickInterval > 0" class="duration-stat">
+                      <div
+                        v-if="spell.tickInterval && spell.tickInterval > 0"
+                        class="duration-divider"
+                      ></div>
+                      <div
+                        v-if="spell.tickInterval && spell.tickInterval > 0"
+                        class="duration-stat"
+                      >
                         <div class="duration-label">Interval</div>
-                        <div class="duration-value">{{ formatTickInterval(spell.tickInterval) }}s</div>
+                        <div class="duration-value">
+                          {{ formatTickInterval(spell.tickInterval) }}s
+                        </div>
                       </div>
                     </div>
-                    <div v-else class="text-xs text-surface-500 dark:text-surface-400 text-center py-4">
+                    <div
+                      v-else
+                      class="text-xs text-surface-500 dark:text-surface-400 text-center py-4"
+                    >
                       Instant
                     </div>
                   </td>
@@ -125,90 +140,90 @@ Shows item spell effects in a compact, scannable table format following WeaponSt
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import Card from 'primevue/card'
-import type { SpellData, TinkerProfile } from '@/types/api'
-import { 
-  formatSpellDataList, 
-  shouldUseCompactMode, 
+import { computed } from 'vue';
+import Card from 'primevue/card';
+import type { SpellData, TinkerProfile } from '@/types/api';
+import {
+  formatSpellDataList,
+  shouldUseCompactMode,
   getSpellDataSummary,
   getEventIcon,
   type FormattedSpellData,
-  type FormattedSpell
-} from '@/services/spell-data-utils'
-import CriteriaDisplay from '@/components/CriteriaDisplay.vue'
-import SpellParameters from './SpellParameters.vue'
-import SpellText from './SpellText.vue'
+  type FormattedSpell,
+} from '@/services/spell-data-utils';
+import CriteriaDisplay from '@/components/CriteriaDisplay.vue';
+import SpellParameters from './SpellParameters.vue';
+import SpellText from './SpellText.vue';
 
 // ============================================================================
 // Props
 // ============================================================================
 
 interface Props {
-  spellData: SpellData[]
-  profile?: TinkerProfile | null
-  showHidden?: boolean
-  advancedView?: boolean
+  spellData: SpellData[];
+  profile?: TinkerProfile | null;
+  showHidden?: boolean;
+  advancedView?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   spellData: () => [],
   profile: null,
   showHidden: false,
-  advancedView: false
-})
+  advancedView: false,
+});
 
 // ============================================================================
 // Computed Properties
 // ============================================================================
 
 const hasSpellData = computed(() => {
-  return props.spellData && props.spellData.length > 0
-})
+  return props.spellData && props.spellData.length > 0;
+});
 
 const filteredSpellData = computed(() => {
   if (!hasSpellData.value) {
-    return []
+    return [];
   }
-  
+
   if (!props.advancedView) {
     // Filter out spell_data containing spells with spell_id 53065 (Attractor Effects)
-    return props.spellData.filter(spellData => 
-      !spellData.spells.some(spell => spell.spell_id === 53065)
-    )
+    return props.spellData.filter(
+      (spellData) => !spellData.spells.some((spell) => spell.spell_id === 53065)
+    );
   }
-  
-  return props.spellData
-})
+
+  return props.spellData;
+});
 
 const formattedSpellData = computed(() => {
-  return formatSpellDataList(filteredSpellData.value)
-})
+  return formatSpellDataList(filteredSpellData.value);
+});
 
 const useCompactMode = computed(() => {
-  return shouldUseCompactMode(formattedSpellData.value)
-})
+  return shouldUseCompactMode(formattedSpellData.value);
+});
 
 const spellDataSummary = computed(() => {
-  return getSpellDataSummary(formattedSpellData.value)
-})
+  return getSpellDataSummary(formattedSpellData.value);
+});
 
 const characterStats = computed(() => {
-  if (!props.profile?.skills) return {}
+  if (!props.profile?.skills) return {};
 
   // Convert TinkerProfile to character stats format expected by CriteriaDisplay
-  const stats: Record<number, number> = {}
+  const stats: Record<number, number> = {};
 
   // Profile.skills is already a flat map of skillId -> SkillData
   Object.entries(props.profile.skills).forEach(([skillId, skillData]) => {
-    const id = Number(skillId)
+    const id = Number(skillId);
     if (!isNaN(id) && skillData?.total !== undefined) {
-      stats[id] = skillData.total
+      stats[id] = skillData.total;
     }
-  })
+  });
 
-  return stats
-})
+  return stats;
+});
 
 // ============================================================================
 // Methods
@@ -216,28 +231,28 @@ const characterStats = computed(() => {
 
 function visibleSpells(spells: FormattedSpell[]): FormattedSpell[] {
   if (props.showHidden) {
-    return spells
+    return spells;
   }
-  return spells.filter(spell => !spell.isHidden)
+  return spells.filter((spell) => !spell.isHidden);
 }
 
 function formatTickInterval(tickInterval: number): string {
   // Convert tick interval to seconds (assuming 100 ticks per second)
-  return (tickInterval / 100).toFixed(1)
+  return (tickInterval / 100).toFixed(1);
 }
 
 function getStatIdFromSkillName(skillName: string): number | null {
   // Simplified mapping - in a real implementation this would be comprehensive
   const skillMap: Record<string, number> = {
-    'Strength': 16,
-    'Agility': 17,
-    'Stamina': 18,
-    'Intelligence': 19,
-    'Sense': 20,
-    'Psychic': 21,
+    Strength: 16,
+    Agility: 17,
+    Stamina: 18,
+    Intelligence: 19,
+    Sense: 20,
+    Psychic: 21,
     // Add more mappings as needed
-  }
-  return skillMap[skillName] || null
+  };
+  return skillMap[skillName] || null;
 }
 </script>
 

@@ -6,9 +6,9 @@ When changes are saved, the parent component handles ID-based skill recalculatio
 through the ip-integrator system for proper v4.0.0 profile updates.
 -->
 <template>
-  <Dialog 
-    v-model:visible="dialogVisible" 
-    modal 
+  <Dialog
+    v-model:visible="dialogVisible"
+    modal
     header="Edit Character Information"
     :style="{ width: '32rem' }"
     :closable="true"
@@ -17,10 +17,13 @@ through the ip-integrator system for proper v4.0.0 profile updates.
     <form @submit.prevent="onSave" class="space-y-4">
       <!-- Character Name -->
       <div class="field">
-        <label for="characterName" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="characterName"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Character Name <span class="text-red-500">*</span>
         </label>
-        <InputText 
+        <InputText
           id="characterName"
           v-model="formData.name"
           :class="{ 'p-invalid': errors.name }"
@@ -34,10 +37,13 @@ through the ip-integrator system for proper v4.0.0 profile updates.
 
       <!-- Level -->
       <div class="field">
-        <label for="level" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="level"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Level <span class="text-red-500">*</span>
         </label>
-        <InputNumber 
+        <InputNumber
           id="level"
           v-model="formData.level"
           :class="{ 'p-invalid': errors.level }"
@@ -49,17 +55,18 @@ through the ip-integrator system for proper v4.0.0 profile updates.
           required
         />
         <small v-if="errors.level" class="p-error">{{ errors.level }}</small>
-        <small v-else class="text-surface-500 dark:text-surface-400">
-          Valid range: 1-220
-        </small>
+        <small v-else class="text-surface-500 dark:text-surface-400"> Valid range: 1-220 </small>
       </div>
 
       <!-- Profession -->
       <div class="field">
-        <label for="profession" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="profession"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Profession <span class="text-red-500">*</span>
         </label>
-        <Dropdown 
+        <Dropdown
           id="profession"
           v-model="formData.profession"
           :options="professionOptions"
@@ -71,17 +78,23 @@ through the ip-integrator system for proper v4.0.0 profile updates.
           required
         />
         <small v-if="errors.profession" class="p-error">{{ errors.profession }}</small>
-        <small v-if="formData.profession !== originalData.profession" class="text-orange-600 dark:text-orange-400">
+        <small
+          v-if="formData.profession !== originalData.profession"
+          class="text-orange-600 dark:text-orange-400"
+        >
           ⚠️ Changing profession will recalculate skill IP costs
         </small>
       </div>
 
       <!-- Breed -->
       <div class="field">
-        <label for="breed" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="breed"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Breed <span class="text-red-500">*</span>
         </label>
-        <Dropdown 
+        <Dropdown
           id="breed"
           v-model="formData.breed"
           :options="breedOptions"
@@ -100,10 +113,13 @@ through the ip-integrator system for proper v4.0.0 profile updates.
 
       <!-- Faction -->
       <div class="field">
-        <label for="faction" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="faction"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Faction <span class="text-red-500">*</span>
         </label>
-        <Dropdown 
+        <Dropdown
           id="faction"
           v-model="formData.faction"
           :options="factionOptions"
@@ -119,7 +135,10 @@ through the ip-integrator system for proper v4.0.0 profile updates.
 
       <!-- Account Type -->
       <div class="field">
-        <label for="accountType" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="accountType"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Account Type
         </label>
         <Dropdown
@@ -135,7 +154,10 @@ through the ip-integrator system for proper v4.0.0 profile updates.
 
       <!-- Specialization -->
       <div class="field">
-        <label for="specialization" class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+        <label
+          for="specialization"
+          class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2"
+        >
           Specialization
         </label>
         <Dropdown
@@ -153,7 +175,10 @@ through the ip-integrator system for proper v4.0.0 profile updates.
       </div>
 
       <!-- Warning Message -->
-      <div v-if="hasSignificantChanges" class="p-4 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-lg">
+      <div
+        v-if="hasSignificantChanges"
+        class="p-4 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-lg"
+      >
         <div class="flex items-start gap-3">
           <i class="pi pi-exclamation-triangle text-orange-600 dark:text-orange-400 mt-1"></i>
           <div>
@@ -162,7 +187,8 @@ through the ip-integrator system for proper v4.0.0 profile updates.
             </h4>
             <ul class="text-sm text-orange-700 dark:text-orange-300 space-y-1">
               <li v-if="formData.breed !== originalData.breed">
-                • Breed change will reset base ability values to {{ getBreedName(formData.breed) }} defaults
+                • Breed change will reset base ability values to
+                {{ getBreedName(formData.breed) }} defaults
               </li>
               <li v-if="formData.profession !== originalData.profession">
                 • Profession change will recalculate skill improvement point costs
@@ -182,14 +208,9 @@ through the ip-integrator system for proper v4.0.0 profile updates.
     <!-- Dialog Footer -->
     <template #footer>
       <div class="flex justify-end gap-2">
-        <Button 
-          label="Cancel" 
-          severity="secondary" 
-          outlined
-          @click="onCancel"
-        />
-        <Button 
-          label="Save Changes" 
+        <Button label="Cancel" severity="secondary" outlined @click="onCancel" />
+        <Button
+          label="Save Changes"
           severity="primary"
           :loading="saving"
           @click="onSave"
@@ -219,7 +240,7 @@ const props = defineProps<{
 // Emits
 const emit = defineEmits<{
   'update:visible': [value: boolean];
-  'save': [changes: CharacterChanges];
+  save: [changes: CharacterChanges];
 }>();
 
 // Types
@@ -259,7 +280,7 @@ const formData = ref<FormData>({
   breed: 0,
   faction: 'Neutral',
   accountType: 'Froob',
-  Specialization: 0
+  Specialization: 0,
 });
 
 const originalData = ref<FormData>({
@@ -269,7 +290,7 @@ const originalData = ref<FormData>({
   breed: 0,
   faction: 'Neutral',
   accountType: 'Froob',
-  Specialization: 0
+  Specialization: 0,
 });
 
 const errors = ref<Partial<FormData>>({});
@@ -277,23 +298,19 @@ const errors = ref<Partial<FormData>>({});
 // Options
 const professionOptions = PROFESSION_NAMES.map((name, index) => ({
   id: index,
-  name
+  name,
 }));
 
 const breedOptions = BREED_NAMES.map((name, index) => ({
   id: index,
-  name
+  name,
 }));
 
-const factionOptions = [
-  { name: 'Omni' },
-  { name: 'Clan' },
-  { name: 'Neutral' }
-];
+const factionOptions = [{ name: 'Omni' }, { name: 'Clan' }, { name: 'Neutral' }];
 
-const accountTypeOptions = ACCOUNT_TYPES.map(type => ({
+const accountTypeOptions = ACCOUNT_TYPES.map((type) => ({
   name: type,
-  value: type
+  value: type,
 }));
 
 const specializationOptions = [
@@ -301,34 +318,41 @@ const specializationOptions = [
   { label: 'Level 1', value: 1 },
   { label: 'Level 2', value: 2 },
   { label: 'Level 3', value: 4 },
-  { label: 'Level 4', value: 8 }
+  { label: 'Level 4', value: 8 },
 ];
 
 // Computed
 const hasSignificantChanges = computed(() => {
-  return formData.value.breed !== originalData.value.breed ||
-         formData.value.profession !== originalData.value.profession ||
-         formData.value.level !== originalData.value.level ||
-         formData.value.Specialization !== originalData.value.Specialization;
+  return (
+    formData.value.breed !== originalData.value.breed ||
+    formData.value.profession !== originalData.value.profession ||
+    formData.value.level !== originalData.value.level ||
+    formData.value.Specialization !== originalData.value.Specialization
+  );
 });
 
 const isFormValid = computed(() => {
-  return formData.value.name.trim().length > 0 &&
-         formData.value.level >= 1 &&
-         formData.value.level <= 220 &&
-         formData.value.profession >= 0 &&
-         formData.value.breed >= 0 &&
-         formData.value.faction.length > 0 &&
-         Object.keys(errors.value).length === 0;
+  return (
+    formData.value.name.trim().length > 0 &&
+    formData.value.level >= 1 &&
+    formData.value.level <= 220 &&
+    formData.value.profession >= 0 &&
+    formData.value.breed >= 0 &&
+    formData.value.faction.length > 0 &&
+    Object.keys(errors.value).length === 0
+  );
 });
 
 // Watchers
-watch(() => props.visible, (visible) => {
-  dialogVisible.value = visible;
-  if (visible) {
-    initializeForm();
+watch(
+  () => props.visible,
+  (visible) => {
+    dialogVisible.value = visible;
+    if (visible) {
+      initializeForm();
+    }
   }
-});
+);
 
 watch(dialogVisible, (visible) => {
   emit('update:visible', visible);
@@ -351,7 +375,7 @@ function initializeForm(): void {
     breed: character.Breed || 1, // Already a numeric ID
     faction: character.Faction || 'Neutral',
     accountType: character.AccountType || 'Froob',
-    Specialization: character.Specialization ?? 0
+    Specialization: character.Specialization ?? 0,
   };
 
   formData.value = { ...data };
@@ -401,23 +425,23 @@ async function onSave(): Promise<void> {
     if (formData.value.name !== originalData.value.name) {
       changes.name = formData.value.name.trim();
     }
-    
+
     if (formData.value.level !== originalData.value.level) {
       changes.level = formData.value.level;
     }
-    
+
     if (formData.value.profession !== originalData.value.profession) {
       changes.profession = getProfessionName(formData.value.profession);
     }
-    
+
     if (formData.value.breed !== originalData.value.breed) {
       changes.breed = getBreedName(formData.value.breed);
     }
-    
+
     if (formData.value.faction !== originalData.value.faction) {
       changes.faction = formData.value.faction;
     }
-    
+
     if (formData.value.accountType !== originalData.value.accountType) {
       changes.accountType = formData.value.accountType;
     }
@@ -431,7 +455,6 @@ async function onSave(): Promise<void> {
 
     // Close dialog
     dialogVisible.value = false;
-
   } catch (error) {
     console.error('Error saving character changes:', error);
   } finally {

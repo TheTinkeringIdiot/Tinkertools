@@ -24,41 +24,49 @@ import type { NanoProgram } from '@/types/nano';
 import { PROFESSION } from '@/__tests__/helpers';
 
 // Mock PrimeVue components
-vi.mock('primevue/badge', () => ({ 
-  default: { 
+vi.mock('primevue/badge', () => ({
+  default: {
     template: '<div class="mock-badge" data-testid="badge">{{ value }}<slot></slot></div>',
-    props: ['modelValue', 'value', 'severity']
-  } 
+    props: ['modelValue', 'value', 'severity'],
+  },
 }));
-vi.mock('primevue/dropdown', () => ({ 
-  default: { 
+vi.mock('primevue/dropdown', () => ({
+  default: {
     template: '<div class="mock-dropdown" data-testid="dropdown"><slot></slot></div>',
-    props: ['modelValue', 'value', 'options', 'placeholder', 'optionLabel', 'optionValue', 'showClear']
-  } 
+    props: [
+      'modelValue',
+      'value',
+      'options',
+      'placeholder',
+      'optionLabel',
+      'optionValue',
+      'showClear',
+    ],
+  },
 }));
-vi.mock('primevue/inputswitch', () => ({ 
-  default: { 
+vi.mock('primevue/inputswitch', () => ({
+  default: {
     template: '<div class="mock-inputswitch" data-testid="inputswitch"><slot></slot></div>',
-    props: ['modelValue', 'value', 'inputId', 'disabled']
-  } 
+    props: ['modelValue', 'value', 'inputId', 'disabled'],
+  },
 }));
-vi.mock('primevue/inputnumber', () => ({ 
-  default: { 
+vi.mock('primevue/inputnumber', () => ({
+  default: {
     template: '<div class="mock-inputnumber" data-testid="inputnumber"><slot></slot></div>',
-    props: ['modelValue', 'value', 'min', 'max', 'step']
-  } 
+    props: ['modelValue', 'value', 'min', 'max', 'step'],
+  },
 }));
-vi.mock('primevue/inputtext', () => ({ 
-  default: { 
+vi.mock('primevue/inputtext', () => ({
+  default: {
     template: '<div class="mock-inputtext" data-testid="inputtext"><slot></slot></div>',
-    props: ['modelValue', 'value', 'placeholder']
-  } 
+    props: ['modelValue', 'value', 'placeholder'],
+  },
 }));
-vi.mock('primevue/tag', () => ({ 
-  default: { 
+vi.mock('primevue/tag', () => ({
+  default: {
     template: '<div class="mock-tag" data-testid="tag"><slot></slot></div>',
-    props: ['modelValue', 'value', 'severity']
-  } 
+    props: ['modelValue', 'value', 'severity'],
+  },
 }));
 
 vi.mock('primevue/datatable', () => ({
@@ -79,16 +87,24 @@ vi.mock('primevue/datatable', () => ({
         </div>
       </div>
     `,
-    props: ['value', 'loading', 'paginator', 'rows', 'rowsPerPageOptions', 'sortMode', 'globalFilter']
-  }
+    props: [
+      'value',
+      'loading',
+      'paginator',
+      'rows',
+      'rowsPerPageOptions',
+      'sortMode',
+      'globalFilter',
+    ],
+  },
 }));
 
 vi.mock('primevue/column', () => ({
   default: {
     name: 'Column',
     template: '<div class="mock-column"><slot></slot></div>',
-    props: ['field', 'header', 'sortable']
-  }
+    props: ['field', 'header', 'sortable'],
+  },
 }));
 
 describe('TinkerNukes Component Unit Tests', () => {
@@ -102,11 +118,9 @@ describe('TinkerNukes Component Unit Tests', () => {
     // Create router
     router = createRouter({
       history: createWebHistory(),
-      routes: [
-        { path: '/nukes', name: 'TinkerNukes', component: TinkerNukes }
-      ]
+      routes: [{ path: '/nukes', name: 'TinkerNukes', component: TinkerNukes }],
     });
-    
+
     // Create fresh pinia instance
     pinia = createPinia();
 
@@ -116,9 +130,9 @@ describe('TinkerNukes Component Unit Tests', () => {
         plugins: [PrimeVue, pinia, router],
         stubs: {
           'router-link': true,
-          'router-view': true
-        }
-      }
+          'router-view': true,
+        },
+      },
     });
 
     // Get store instances
@@ -175,11 +189,11 @@ describe('TinkerNukes Component Unit Tests', () => {
   describe('Real Backend Integration', () => {
     it('loads nanos from backend on mount', async () => {
       // Wait for the component to finish loading
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       // The fetchNanos should have been called
       expect(nanosStore.nanos.length).toBeGreaterThanOrEqual(0);
-      
+
       // If there are nanos, verify structure
       if (nanosStore.nanos.length > 0) {
         const firstNano = nanosStore.nanos[0];
@@ -190,11 +204,11 @@ describe('TinkerNukes Component Unit Tests', () => {
     }, 10000); // Longer timeout for real API
 
     it('loads profiles from backend', async () => {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       // Profiles should be loaded (may be empty array)
       expect(Array.isArray(profilesStore.profiles)).toBe(true);
-      
+
       // If there are profiles, verify structure
       if (profilesStore.profiles.length > 0) {
         const firstProfile = profilesStore.profiles[0];
@@ -206,18 +220,18 @@ describe('TinkerNukes Component Unit Tests', () => {
 
     it('filters nanos to only Nanotechnician offensive types', async () => {
       // Wait for data loading
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
       const component = wrapper.vm as any;
       const offensiveNanos = component.offensiveNanos;
-      
+
       // Should only include nanos that are either unspecified profession or NT
       offensiveNanos.forEach((nano: NanoProgram) => {
         if (nano.profession) {
           expect(nano.profession).toBe(PROFESSION.NANOTECHNICIAN);
         }
       });
-      
+
       // Should only include nanos with offensive effects or damage potential
       // Note: Since we don't know the exact data structure, we check that filtering occurred
       expect(offensiveNanos.length).toBeLessThanOrEqual(nanosStore.nanos.length);
@@ -249,7 +263,7 @@ describe('TinkerNukes Component Unit Tests', () => {
     });
 
     it('calculates skill-based filtering correctly', async () => {
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       const component = wrapper.vm as any;
 
@@ -276,7 +290,7 @@ describe('TinkerNukes Component Unit Tests', () => {
 
   describe('Profile Integration', () => {
     it('displays active profile information', async () => {
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       const component = wrapper.vm as any;
 
@@ -296,7 +310,7 @@ describe('TinkerNukes Component Unit Tests', () => {
     }, 10000);
 
     it('extracts skills from active profile', async () => {
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       const component = wrapper.vm as any;
 
@@ -324,7 +338,7 @@ describe('TinkerNukes Component Unit Tests', () => {
     });
 
     it('shows filtered nano count', async () => {
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       const component = wrapper.vm as any;
       const filteredCount = component.filteredNanos.length;
@@ -334,7 +348,7 @@ describe('TinkerNukes Component Unit Tests', () => {
     }, 10000);
 
     it('provides school filtering options', async () => {
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       const component = wrapper.vm as any;
       const schoolOptions = component.schoolFilterOptions;
@@ -349,7 +363,7 @@ describe('TinkerNukes Component Unit Tests', () => {
     }, 10000);
 
     it('filters by selected school', async () => {
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       const component = wrapper.vm as any;
 
@@ -429,9 +443,9 @@ describe('TinkerNukes Component Unit Tests', () => {
           Profession: 11, // Nanotechnician
           Level: 100,
           Breed: 1,
-          MaxNano: 1000
+          MaxNano: 1000,
         },
-        skills: {} // Missing nano skills
+        skills: {}, // Missing nano skills
       };
 
       profilesStore.activeProfile = badProfile;

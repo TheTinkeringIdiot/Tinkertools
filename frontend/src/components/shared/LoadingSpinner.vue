@@ -1,8 +1,8 @@
 <template>
-  <div 
+  <div
     :class="[
       'flex items-center justify-center',
-      size === 'small' ? 'p-2' : size === 'large' ? 'p-8' : 'p-4'
+      size === 'small' ? 'p-2' : size === 'large' ? 'p-8' : 'p-4',
     ]"
     role="status"
     :aria-label="ariaLabel"
@@ -11,21 +11,21 @@
     <div
       :class="[
         'animate-spin border-2 border-surface-300 border-t-primary-500 rounded-full',
-        size === 'small' ? 'w-4 h-4' : size === 'large' ? 'w-8 h-8' : 'w-6 h-6'
+        size === 'small' ? 'w-4 h-4' : size === 'large' ? 'w-8 h-8' : 'w-6 h-6',
       ]"
       aria-hidden="true"
     ></div>
-    
-    <span 
+
+    <span
       v-if="showText"
       :class="[
         'ml-2 text-surface-600 dark:text-surface-400',
-        size === 'small' ? 'text-sm' : 'text-base'
+        size === 'small' ? 'text-sm' : 'text-base',
       ]"
     >
       {{ loadingText }}
     </span>
-    
+
     <!-- Screen reader only text -->
     <span v-if="!showText" class="sr-only">
       {{ loadingText }}
@@ -45,7 +45,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   size: 'medium',
   loadingText: 'Loading...',
-  showText: false
+  showText: false,
 });
 
 const ariaLabel = computed(() => {

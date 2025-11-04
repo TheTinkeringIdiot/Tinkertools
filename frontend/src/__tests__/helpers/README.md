@@ -34,8 +34,8 @@ const profile = createTestProfile({
   profession: PROFESSION.ADVENTURER,
   level: 220,
   skills: {
-    [SKILL_ID.ASSAULT_RIF]: { pointsFromIp: 250, equipmentBonus: 50 }
-  }
+    [SKILL_ID.ASSAULT_RIF]: { pointsFromIp: 250, equipmentBonus: 50 },
+  },
 });
 ```
 
@@ -63,13 +63,13 @@ import { SKILL_ID, createSkillBonuses } from '@/__tests__/helpers';
 
 const bonuses = createSkillBonuses([
   [SKILL_ID.ASSAULT_RIF, 10],
-  [SKILL_ID.DODGE_RNG, 5]
+  [SKILL_ID.DODGE_RNG, 5],
 ]);
 // Result: { 116: 10, 154: 5 }
 
 expect(result).toEqual({
   [SKILL_ID.ASSAULT_RIF]: 10,
-  [SKILL_ID.DODGE_RNG]: 5
+  [SKILL_ID.DODGE_RNG]: 5,
 });
 ```
 
@@ -96,7 +96,7 @@ import { createPerkItem, SKILL_ID } from '@/__tests__/helpers';
 
 const perk = createPerkItem('Combat Perk', 999001, [
   [SKILL_ID.ASSAULT_RIF, 50],
-  [SKILL_ID.RANGED_INIT, 25]
+  [SKILL_ID.RANGED_INIT, 25],
 ]);
 ```
 
@@ -122,8 +122,8 @@ import { mountWithContext, findByTestId } from '@/__tests__/helpers';
 const wrapper = mountWithContext(MyComponent, {
   props: { item: mockItem },
   global: {
-    stubs: { 'router-link': true }
-  }
+    stubs: { 'router-link': true },
+  },
 });
 
 const button = findByTestId(wrapper, 'submit-button');
@@ -146,9 +146,9 @@ it('should calculate bonuses correctly', () => {
         trickle: 50,
         pointsFromIp: 200,
         equipmentBonus: 30,
-        total: 285
-      }
-    }
+        total: 285,
+      },
+    },
   });
 
   const skill = profile.skills[SKILL_ID.ASSAULT_RIF];
@@ -165,8 +165,8 @@ it('should return correct bonuses', () => {
   const result = calculateBonuses(items);
 
   expect(result).toEqual({
-    [SKILL_ID.ASSAULT_RIF]: 10,  // Numeric ID
-    [SKILL_ID.DODGE_RNG]: 5
+    [SKILL_ID.ASSAULT_RIF]: 10, // Numeric ID
+    [SKILL_ID.DODGE_RNG]: 5,
   });
 });
 ```
@@ -179,7 +179,7 @@ import { mountWithContext, findByTestId } from '@/__tests__/helpers';
 describe('ItemCard', () => {
   it('should display item name', () => {
     const wrapper = mountWithContext(ItemCard, {
-      props: { item: mockItem }
+      props: { item: mockItem },
     });
 
     const name = getTextByTestId(wrapper, 'item-name');
@@ -208,7 +208,7 @@ import { createItemWithRequirements, SKILL_ID } from '@/__tests__/helpers';
 
 const item = createItemWithRequirements([
   [SKILL_ID.ASSAULT_RIF, 500],
-  [SKILL_ID.RANGED_INIT, 400]
+  [SKILL_ID.RANGED_INIT, 400],
 ]);
 
 // Item has criteria requiring Assault Rif >= 500, Ranged Init >= 400
@@ -222,14 +222,14 @@ const item = createItemWithRequirements([
 // DON'T DO THIS
 expect(result).toEqual({
   'Assault Rifle': 10,
-  'Dodge-Rng': 5
+  'Dodge-Rng': 5,
 });
 
 const profile = {
   Character: {
-    Breed: "Solitus",      // String
-    Profession: "Soldier"  // String
-  }
+    Breed: 'Solitus', // String
+    Profession: 'Soldier', // String
+  },
 };
 ```
 
@@ -240,13 +240,13 @@ const profile = {
 import { SKILL_ID, BREED, PROFESSION } from '@/__tests__/helpers';
 
 expect(result).toEqual({
-  [SKILL_ID.ASSAULT_RIF]: 10,  // Numeric ID
-  [SKILL_ID.DODGE_RNG]: 5
+  [SKILL_ID.ASSAULT_RIF]: 10, // Numeric ID
+  [SKILL_ID.DODGE_RNG]: 5,
 });
 
 const profile = createTestProfile({
-  breed: BREED.SOLITUS,       // Numeric ID
-  profession: PROFESSION.SOLDIER
+  breed: BREED.SOLITUS, // Numeric ID
+  profession: PROFESSION.SOLDIER,
 });
 ```
 
@@ -254,27 +254,27 @@ const profile = createTestProfile({
 
 ```typescript
 // Abilities
-SKILL_ID.STRENGTH        // 16
-SKILL_ID.AGILITY         // 17
-SKILL_ID.STAMINA         // 18
-SKILL_ID.INTELLIGENCE    // 19
-SKILL_ID.SENSE           // 20
-SKILL_ID.PSYCHIC         // 21
+SKILL_ID.STRENGTH; // 16
+SKILL_ID.AGILITY; // 17
+SKILL_ID.STAMINA; // 18
+SKILL_ID.INTELLIGENCE; // 19
+SKILL_ID.SENSE; // 20
+SKILL_ID.PSYCHIC; // 21
 
 // Common Skills
-SKILL_ID.ASSAULT_RIF     // 116
-SKILL_ID.PISTOL          // 112
-SKILL_ID.RIFLE           // 113
-SKILL_ID.DODGE_RNG       // 154
-SKILL_ID.BODY_DEV        // 152
-SKILL_ID.NANO_POOL       // 132
-SKILL_ID.COMPUTER_LITERACY // 161
-SKILL_ID.MAX_NCU         // 181
+SKILL_ID.ASSAULT_RIF; // 116
+SKILL_ID.PISTOL; // 112
+SKILL_ID.RIFLE; // 113
+SKILL_ID.DODGE_RNG; // 154
+SKILL_ID.BODY_DEV; // 152
+SKILL_ID.NANO_POOL; // 132
+SKILL_ID.COMPUTER_LITERACY; // 161
+SKILL_ID.MAX_NCU; // 181
 
 // Misc
-SKILL_ID.MAX_HEALTH      // 1
-SKILL_ID.MAX_NANO        // 221
-SKILL_ID.ADD_PROJ_DAM    // 278
+SKILL_ID.MAX_HEALTH; // 1
+SKILL_ID.MAX_NANO; // 221
+SKILL_ID.ADD_PROJ_DAM; // 278
 ```
 
 ## Test Cleanup

@@ -1,33 +1,17 @@
 <template>
   <div>
     <!-- Polite announcements -->
-    <div
-      id="polite-announcer"
-      aria-live="polite"
-      aria-atomic="true"
-      class="sr-only"
-    >
+    <div id="polite-announcer" aria-live="polite" aria-atomic="true" class="sr-only">
       {{ politeMessage }}
     </div>
-    
+
     <!-- Assertive announcements -->
-    <div
-      id="assertive-announcer"
-      aria-live="assertive"
-      aria-atomic="true"
-      class="sr-only"
-    >
+    <div id="assertive-announcer" aria-live="assertive" aria-atomic="true" class="sr-only">
       {{ assertiveMessage }}
     </div>
-    
+
     <!-- Status announcements -->
-    <div
-      id="status-announcer"
-      role="status"
-      aria-live="polite"
-      aria-atomic="true"
-      class="sr-only"
-    >
+    <div id="status-announcer" role="status" aria-live="polite" aria-atomic="true" class="sr-only">
       {{ statusMessage }}
     </div>
   </div>

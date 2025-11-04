@@ -11,53 +11,54 @@ global.localStorage = {
   removeItem: vi.fn(),
   clear: vi.fn(),
   length: 0,
-  key: vi.fn()
+  key: vi.fn(),
 } as any;
 
 // Minimal PrimeVue component mocks - just render basic HTML
 vi.mock('primevue/card', () => ({
   default: {
     name: 'Card',
-    template: '<div class="nano-card"><slot name="header" /><slot /></div>'
-  }
+    template: '<div class="nano-card"><slot name="header" /><slot /></div>',
+  },
 }));
 
 vi.mock('primevue/avatar', () => ({
   default: {
     name: 'Avatar',
     template: '<div class="avatar">{{ label || "?" }}</div>',
-    props: ['label', 'size', 'shape']
-  }
+    props: ['label', 'size', 'shape'],
+  },
 }));
 
 vi.mock('primevue/badge', () => ({
   default: {
     name: 'Badge',
     template: '<span class="badge">{{ value }}</span>',
-    props: ['value', 'severity', 'size']
-  }
+    props: ['value', 'severity', 'size'],
+  },
 }));
 
 vi.mock('primevue/button', () => ({
   default: {
     name: 'Button',
-    template: '<button class="nano-favorite-btn" @click="handleClick"><i :class="icon"></i>{{ label }}</button>',
+    template:
+      '<button class="nano-favorite-btn" @click="handleClick"><i :class="icon"></i>{{ label }}</button>',
     props: ['icon', 'label', 'severity', 'text', 'rounded', 'size'],
     emits: ['click'],
     methods: {
       handleClick(event: Event) {
         this.$emit('click', event);
-      }
-    }
-  }
+      },
+    },
+  },
 }));
 
 vi.mock('primevue/chip', () => ({
   default: {
     name: 'Chip',
     template: '<span class="chip">{{ label }}</span>',
-    props: ['label', 'severity']
-  }
+    props: ['label', 'severity'],
+  },
 }));
 
 describe('NanoCard Simple Tests', () => {
@@ -77,19 +78,19 @@ describe('NanoCard Simple Tests', () => {
     level: 50,
     qualityLevel: 100,
     description: 'A test nano program',
-    ...overrides
+    ...overrides,
   });
 
   it('renders nano name correctly', () => {
     const nano = createNano({ name: 'Superior Heal' });
-    
+
     const wrapper = mount(NanoCard, {
       global: { plugins: [pinia] },
       props: {
         nano,
         compact: false,
-        showCompatibility: false
-      }
+        showCompatibility: false,
+      },
     });
 
     expect(wrapper.text()).toContain('Superior Heal');
@@ -103,8 +104,8 @@ describe('NanoCard Simple Tests', () => {
       props: {
         nano,
         compact: false,
-        showCompatibility: false
-      }
+        showCompatibility: false,
+      },
     });
 
     expect(wrapper.text()).toContain('175');
@@ -112,14 +113,14 @@ describe('NanoCard Simple Tests', () => {
 
   it('shows favorite button', () => {
     const nano = createNano();
-    
+
     const wrapper = mount(NanoCard, {
       global: { plugins: [pinia] },
       props: {
         nano,
         compact: false,
-        showCompatibility: false
-      }
+        showCompatibility: false,
+      },
     });
 
     const favoriteBtn = wrapper.find('.nano-favorite-btn');
@@ -134,14 +135,14 @@ describe('NanoCard Simple Tests', () => {
       props: {
         nano,
         compact: false,
-        showCompatibility: false
-      }
+        showCompatibility: false,
+      },
     });
 
     const card = wrapper.find('.nano-card');
     await card.trigger('click', {
       stopPropagation: () => {},
-      preventDefault: () => {}
+      preventDefault: () => {},
     });
 
     expect(wrapper.emitted('select')).toBeTruthy();
@@ -156,14 +157,14 @@ describe('NanoCard Simple Tests', () => {
       props: {
         nano,
         compact: false,
-        showCompatibility: false
-      }
+        showCompatibility: false,
+      },
     });
 
     const favoriteBtn = wrapper.find('.nano-favorite-btn');
     await favoriteBtn.trigger('click', {
       stopPropagation: () => {},
-      preventDefault: () => {}
+      preventDefault: () => {},
     });
 
     expect(wrapper.emitted('favorite')).toBeTruthy();
@@ -178,8 +179,8 @@ describe('NanoCard Simple Tests', () => {
       props: {
         nano,
         compact: true,
-        showCompatibility: false
-      }
+        showCompatibility: false,
+      },
     });
 
     // In compact mode, card should still exist
@@ -194,7 +195,7 @@ describe('NanoCard Simple Tests', () => {
       school: 'Matter Metamorphosis',
       strain: 'Basic',
       level: 1,
-      qualityLevel: 1
+      qualityLevel: 1,
     };
 
     const wrapper = mount(NanoCard, {
@@ -202,8 +203,8 @@ describe('NanoCard Simple Tests', () => {
       props: {
         nano: minimalNano,
         compact: false,
-        showCompatibility: false
-      }
+        showCompatibility: false,
+      },
     });
 
     expect(wrapper.text()).toContain('Minimal Nano');
@@ -212,7 +213,7 @@ describe('NanoCard Simple Tests', () => {
 
   it('shows description when provided', () => {
     const nano = createNano({
-      description: 'This is a test nano description'
+      description: 'This is a test nano description',
     });
 
     const wrapper = mount(NanoCard, {
@@ -220,8 +221,8 @@ describe('NanoCard Simple Tests', () => {
       props: {
         nano,
         compact: false,
-        showCompatibility: false
-      }
+        showCompatibility: false,
+      },
     });
 
     // Component should render without errors when description is provided
@@ -231,16 +232,16 @@ describe('NanoCard Simple Tests', () => {
 
   it('loads favorite status from localStorage on mount', () => {
     const nano = createNano();
-    
+
     mount(NanoCard, {
       global: { plugins: [pinia] },
       props: {
         nano,
         compact: false,
-        showCompatibility: false
-      }
+        showCompatibility: false,
+      },
     });
-    
+
     expect(localStorage.getItem).toHaveBeenCalledWith('tinkertools_nano_favorites');
   });
 });

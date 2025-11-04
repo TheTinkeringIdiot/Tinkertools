@@ -13,9 +13,9 @@
  * - Continue operation if individual items fail
  */
 
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types'
-import type { Item, SpellData, Spell } from '@/types/api'
-import { skillService } from './skill-service'
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { Item, SpellData, Spell } from '@/types/api';
+import { skillService } from './skill-service';
 
 // ============================================================================
 // Type Definitions
@@ -23,37 +23,37 @@ import { skillService } from './skill-service'
 
 export interface StatBonus {
   /** STAT ID from game data */
-  statId: number
+  statId: number;
   /** Bonus amount (can be negative) */
-  amount: number
+  amount: number;
   /** Source item for debugging */
-  itemName?: string
+  itemName?: string;
 }
 
 export interface EquipmentBonusError {
   /** Type of error for user display */
-  type: 'warning' | 'error'
+  type: 'warning' | 'error';
   /** User-friendly error message */
-  message: string
+  message: string;
   /** Technical details for debugging */
-  details: string
+  details: string;
   /** Source item that caused the error */
-  itemName?: string
+  itemName?: string;
   /** Slot where the error occurred */
-  slotName?: string
+  slotName?: string;
   /** Whether calculation can continue */
-  recoverable: boolean
+  recoverable: boolean;
 }
 
 export interface CalculationResult {
   /** Successfully calculated bonuses */
-  bonuses: Record<number, number>
+  bonuses: Record<number, number>;
   /** Non-fatal warnings */
-  warnings: EquipmentBonusError[]
+  warnings: EquipmentBonusError[];
   /** Fatal errors */
-  errors: EquipmentBonusError[]
+  errors: EquipmentBonusError[];
   /** Whether calculation completed successfully */
-  success: boolean
+  success: boolean;
 }
 
 // ============================================================================
@@ -69,15 +69,15 @@ export const STAT_BONUS_SPELL_IDS = [
   53012, // "Modify {Stat} by {Amount}" - alternative format
   53014, // "Modify {Stat} for {Duration}s by {Amount}" - timed bonus (some equipment uses this)
   53175, // "Modify {Stat} by {Amount}" - additional stat modifier format
-  53139  // "Set flag {Stat} &{BitNum}" - WornItem flag setting spell
-] as const
+  53139, // "Set flag {Stat} &{BitNum}" - WornItem flag setting spell
+] as const;
 
 /**
  * Equipment events that provide stat bonuses
  * - 14: Wear (armor/jewelry effects)
  * - 2: Wield (weapon effects)
  */
-export const EQUIPMENT_EVENTS = [14, 2] as const
+export const EQUIPMENT_EVENTS = [14, 2] as const;
 
 // ============================================================================
 // Performance Caching
@@ -89,57 +89,57 @@ export const EQUIPMENT_EVENTS = [14, 2] as const
  * Value: StatBonus[] array
  */
 class SpellDataCache {
-  private cache = new Map<string, StatBonus[]>()
-  private maxSize = 500 // Limit cache size to prevent memory issues
-  private hitCount = 0
-  private missCount = 0
+  private cache = new Map<string, StatBonus[]>();
+  private maxSize = 500; // Limit cache size to prevent memory issues
+  private hitCount = 0;
+  private missCount = 0;
 
   private getCacheKey(item: Item): string {
     // Use AOID and QL if available for precise caching, fallback to name
-    return item.aoid && item.ql ? `${item.aoid}-${item.ql}` : item.name || 'unknown'
+    return item.aoid && item.ql ? `${item.aoid}-${item.ql}` : item.name || 'unknown';
   }
 
   get(item: Item): StatBonus[] | null {
-    const key = this.getCacheKey(item)
-    const cached = this.cache.get(key)
+    const key = this.getCacheKey(item);
+    const cached = this.cache.get(key);
 
     if (cached) {
-      this.hitCount++
-      return cached
+      this.hitCount++;
+      return cached;
     } else {
-      this.missCount++
-      return null
+      this.missCount++;
+      return null;
     }
   }
 
   set(item: Item, bonuses: StatBonus[]): void {
-    const key = this.getCacheKey(item)
+    const key = this.getCacheKey(item);
 
     // If cache is full, remove oldest entry (simple LRU)
     if (this.cache.size >= this.maxSize) {
-      const firstKey = this.cache.keys().next().value
+      const firstKey = this.cache.keys().next().value;
       if (firstKey) {
-        this.cache.delete(firstKey)
+        this.cache.delete(firstKey);
       }
     }
 
-    this.cache.set(key, bonuses)
+    this.cache.set(key, bonuses);
   }
 
   clear(): void {
-    this.cache.clear()
-    this.hitCount = 0
-    this.missCount = 0
+    this.cache.clear();
+    this.hitCount = 0;
+    this.missCount = 0;
   }
 
   getStats(): { size: number; hitRate: number; hitCount: number; missCount: number } {
-    const total = this.hitCount + this.missCount
+    const total = this.hitCount + this.missCount;
     return {
       size: this.cache.size,
       hitRate: total > 0 ? (this.hitCount / total) * 100 : 0,
       hitCount: this.hitCount,
-      missCount: this.missCount
-    }
+      missCount: this.missCount,
+    };
   }
 }
 
@@ -147,37 +147,37 @@ class SpellDataCache {
  * Memoization for aggregated bonuses calculation
  */
 class BonusAggregationCache {
-  private cache = new Map<string, Record<number, number>>()
-  private maxSize = 100
+  private cache = new Map<string, Record<number, number>>();
+  private maxSize = 100;
 
   private getCacheKey(bonuses: StatBonus[]): string {
     // Create a deterministic key from the bonuses array
     return bonuses
-      .map(b => `${b.statId}:${b.amount}`)
+      .map((b) => `${b.statId}:${b.amount}`)
       .sort()
-      .join('|')
+      .join('|');
   }
 
   get(bonuses: StatBonus[]): Record<number, number> | null {
-    const key = this.getCacheKey(bonuses)
-    return this.cache.get(key) || null
+    const key = this.getCacheKey(bonuses);
+    return this.cache.get(key) || null;
   }
 
   set(bonuses: StatBonus[], result: Record<number, number>): void {
-    const key = this.getCacheKey(bonuses)
+    const key = this.getCacheKey(bonuses);
 
     if (this.cache.size >= this.maxSize) {
-      const firstKey = this.cache.keys().next().value
+      const firstKey = this.cache.keys().next().value;
       if (firstKey) {
-        this.cache.delete(firstKey)
+        this.cache.delete(firstKey);
       }
     }
 
-    this.cache.set(key, result)
+    this.cache.set(key, result);
   }
 
   clear(): void {
-    this.cache.clear()
+    this.cache.clear();
   }
 }
 
@@ -186,15 +186,15 @@ class BonusAggregationCache {
 // ============================================================================
 
 export class EquipmentBonusCalculator {
-  private spellCache = new SpellDataCache()
-  private bonusCache = new BonusAggregationCache()
+  private spellCache = new SpellDataCache();
+  private bonusCache = new BonusAggregationCache();
 
   // Performance tracking
   private performanceMetrics = {
     lastCalculationTime: 0,
     averageCalculationTime: 0,
-    calculationCount: 0
-  }
+    calculationCount: 0,
+  };
   /**
    * Calculate equipment bonuses for all equipped items in a profile
    * @param profile TinkerProfile containing equipped items
@@ -202,24 +202,23 @@ export class EquipmentBonusCalculator {
    */
   calculateBonuses(profile: TinkerProfile): Record<number, number> {
     try {
-      const result = this.calculateBonusesWithErrorHandling(profile)
+      const result = this.calculateBonusesWithErrorHandling(profile);
 
       // Log any warnings or errors for debugging
       if (result.warnings.length > 0) {
-        console.warn('Equipment bonus calculation warnings:', result.warnings)
+        console.warn('Equipment bonus calculation warnings:', result.warnings);
       }
 
       if (result.errors.length > 0) {
-        console.error('Equipment bonus calculation errors:', result.errors)
+        console.error('Equipment bonus calculation errors:', result.errors);
         // For backward compatibility, still return bonuses even with errors
       }
 
-      return result.bonuses
-
+      return result.bonuses;
     } catch (error) {
-      console.error('Critical error in equipment bonus calculation:', error)
+      console.error('Critical error in equipment bonus calculation:', error);
       // Fallback to empty bonuses to ensure system continues working
-      return {}
+      return {};
     }
   }
 
@@ -229,13 +228,13 @@ export class EquipmentBonusCalculator {
    * @returns CalculationResult with bonuses, warnings, and errors
    */
   calculateBonusesWithErrorHandling(profile: TinkerProfile): CalculationResult {
-    const startTime = performance.now()
+    const startTime = performance.now();
     const result: CalculationResult = {
       bonuses: {},
       warnings: [],
       errors: [],
-      success: true
-    }
+      success: true,
+    };
 
     try {
       // Validate profile structure
@@ -244,50 +243,49 @@ export class EquipmentBonusCalculator {
           type: 'error',
           message: 'Profile data is missing',
           details: 'TinkerProfile object is null or undefined',
-          recoverable: false
-        })
-        result.success = false
-        return result
+          recoverable: false,
+        });
+        result.success = false;
+        return result;
       }
 
-      const allBonuses: StatBonus[] = []
+      const allBonuses: StatBonus[] = [];
 
       // Process all equipment slots with individual error handling
-      this.processEquipmentSlotsWithErrorHandling(profile.Weapons, 'Weapons', allBonuses, result)
-      this.processEquipmentSlotsWithErrorHandling(profile.Clothing, 'Clothing', allBonuses, result)
-      this.processEquipmentSlotsWithErrorHandling(profile.Implants, 'Implants', allBonuses, result)
-      this.processEquipmentSlotsWithErrorHandling(profile.HUD, 'HUD', allBonuses, result)
+      this.processEquipmentSlotsWithErrorHandling(profile.Weapons, 'Weapons', allBonuses, result);
+      this.processEquipmentSlotsWithErrorHandling(profile.Clothing, 'Clothing', allBonuses, result);
+      this.processEquipmentSlotsWithErrorHandling(profile.Implants, 'Implants', allBonuses, result);
+      this.processEquipmentSlotsWithErrorHandling(profile.HUD, 'HUD', allBonuses, result);
 
       // Aggregate bonuses by skill ID with error handling
       try {
-        result.bonuses = this.aggregateBonusesOptimized(allBonuses)
+        result.bonuses = this.aggregateBonusesOptimized(allBonuses);
       } catch (error) {
         result.errors.push({
           type: 'error',
           message: 'Failed to aggregate stat bonuses',
           details: `Aggregation error: ${error instanceof Error ? error.message : String(error)}`,
-          recoverable: false
-        })
-        result.success = false
-        result.bonuses = {} // Fallback to empty bonuses
+          recoverable: false,
+        });
+        result.success = false;
+        result.bonuses = {}; // Fallback to empty bonuses
       }
-
     } catch (error) {
       result.errors.push({
         type: 'error',
         message: 'Unexpected error during bonus calculation',
         details: `Critical error: ${error instanceof Error ? error.message : String(error)}`,
-        recoverable: false
-      })
-      result.success = false
-      result.bonuses = {} // Ensure we always return something
+        recoverable: false,
+      });
+      result.success = false;
+      result.bonuses = {}; // Ensure we always return something
     } finally {
       // Track performance metrics
-      const endTime = performance.now()
-      this.updatePerformanceMetrics(endTime - startTime)
+      const endTime = performance.now();
+      this.updatePerformanceMetrics(endTime - startTime);
     }
 
-    return result
+    return result;
   }
 
   /**
@@ -301,8 +299,8 @@ export class EquipmentBonusCalculator {
   ): void {
     for (const [slotName, item] of Object.entries(equipmentSlots)) {
       if (item) {
-        const itemBonuses = this.parseItemSpells(item)
-        bonuses.push(...itemBonuses)
+        const itemBonuses = this.parseItemSpells(item);
+        bonuses.push(...itemBonuses);
       }
     }
   }
@@ -315,13 +313,13 @@ export class EquipmentBonusCalculator {
     bonuses: StatBonus[]
   ): void {
     // Filter out null items first to avoid unnecessary iterations
-    const validItems = Object.values(equipmentSlots).filter((item): item is Item => item !== null)
+    const validItems = Object.values(equipmentSlots).filter((item): item is Item => item !== null);
 
     // Batch process items for better performance
     for (const item of validItems) {
-      const itemBonuses = this.parseItemSpellsOptimized(item)
+      const itemBonuses = this.parseItemSpellsOptimized(item);
       if (itemBonuses.length > 0) {
-        bonuses.push(...itemBonuses)
+        bonuses.push(...itemBonuses);
       }
     }
   }
@@ -341,23 +339,22 @@ export class EquipmentBonusCalculator {
   ): void {
     // Empty equipment slots are valid - only warn if structure is invalid
     if (!equipmentSlots) {
-      return
+      return;
     }
 
     try {
       for (const [slotName, item] of Object.entries(equipmentSlots)) {
         if (item) {
           try {
-            const itemBonuses = this.parseItemSpellsWithErrorHandling(item, slotName)
+            const itemBonuses = this.parseItemSpellsWithErrorHandling(item, slotName);
 
             if (itemBonuses.bonuses.length > 0) {
-              bonuses.push(...itemBonuses.bonuses)
+              bonuses.push(...itemBonuses.bonuses);
             }
 
             // Collect warnings and errors from item parsing
-            result.warnings.push(...itemBonuses.warnings)
-            result.errors.push(...itemBonuses.errors)
-
+            result.warnings.push(...itemBonuses.warnings);
+            result.errors.push(...itemBonuses.errors);
           } catch (error) {
             result.warnings.push({
               type: 'warning',
@@ -365,8 +362,8 @@ export class EquipmentBonusCalculator {
               details: `Error parsing item ${item.name || 'unknown'} in slot ${slotName}: ${error instanceof Error ? error.message : String(error)}`,
               itemName: item.name,
               slotName,
-              recoverable: true
-            })
+              recoverable: true,
+            });
             // Continue processing other items
           }
         }
@@ -376,8 +373,8 @@ export class EquipmentBonusCalculator {
         type: 'error',
         message: `Failed to process ${categoryName} equipment`,
         details: `Error processing ${categoryName}: ${error instanceof Error ? error.message : String(error)}`,
-        recoverable: false
-      })
+        recoverable: false,
+      });
     }
   }
 
@@ -387,32 +384,32 @@ export class EquipmentBonusCalculator {
    * @returns Array of stat bonuses found in the item
    */
   parseItemSpells(item: Item): StatBonus[] {
-    const bonuses: StatBonus[] = []
+    const bonuses: StatBonus[] = [];
 
     // Extract bonuses from spell_data only (item.stats does NOT contain implant bonuses)
     if (!item.spell_data || !Array.isArray(item.spell_data)) {
-      return bonuses
+      return bonuses;
     }
 
     for (const spellData of item.spell_data) {
       // Only process equipment-related events (Wear=14, Wield=2)
       if (!spellData.event || !EQUIPMENT_EVENTS.includes(spellData.event as any)) {
-        continue
+        continue;
       }
 
       if (!spellData.spells || !Array.isArray(spellData.spells)) {
-        continue
+        continue;
       }
 
       for (const spell of spellData.spells) {
-        const bonus = this.parseSpellForStatBonus(spell, item.name)
+        const bonus = this.parseSpellForStatBonus(spell, item.name);
         if (bonus) {
-          bonuses.push(bonus)
+          bonuses.push(bonus);
         }
       }
     }
 
-    return bonuses
+    return bonuses;
   }
 
   /**
@@ -420,18 +417,18 @@ export class EquipmentBonusCalculator {
    */
   private parseItemSpellsOptimized(item: Item): StatBonus[] {
     // Check cache first
-    const cached = this.spellCache.get(item)
+    const cached = this.spellCache.get(item);
     if (cached) {
-      return cached
+      return cached;
     }
 
     // Parse as usual if not cached
-    const bonuses = this.parseItemSpells(item)
+    const bonuses = this.parseItemSpells(item);
 
     // Cache the result for future use
-    this.spellCache.set(item, bonuses)
+    this.spellCache.set(item, bonuses);
 
-    return bonuses
+    return bonuses;
   }
 
   /**
@@ -447,8 +444,8 @@ export class EquipmentBonusCalculator {
     const result = {
       bonuses: [] as StatBonus[],
       warnings: [] as EquipmentBonusError[],
-      errors: [] as EquipmentBonusError[]
-    }
+      errors: [] as EquipmentBonusError[],
+    };
 
     try {
       // Validate item structure
@@ -458,15 +455,15 @@ export class EquipmentBonusCalculator {
           message: 'Item data is missing',
           details: 'Item is null or undefined',
           slotName,
-          recoverable: true
-        })
-        return result
+          recoverable: true,
+        });
+        return result;
       }
 
       // Check for spell_data
       if (!item.spell_data) {
         // This is normal for items without spell effects, not an error
-        return result
+        return result;
       }
 
       if (!Array.isArray(item.spell_data)) {
@@ -476,19 +473,23 @@ export class EquipmentBonusCalculator {
           details: `spell_data is not an array for item ${item.name || 'unknown'}`,
           itemName: item.name,
           slotName,
-          recoverable: true
-        })
-        return result
+          recoverable: true,
+        });
+        return result;
       }
 
       // Process each spell data entry
       for (let i = 0; i < item.spell_data.length; i++) {
-        const spellData = item.spell_data[i]
+        const spellData = item.spell_data[i];
 
         try {
           // Only process equipment-related events (Wear=14, Wield=2)
-          if (!spellData || !spellData.event || !EQUIPMENT_EVENTS.includes(spellData.event as any)) {
-            continue
+          if (
+            !spellData ||
+            !spellData.event ||
+            !EQUIPMENT_EVENTS.includes(spellData.event as any)
+          ) {
+            continue;
           }
 
           if (!spellData.spells || !Array.isArray(spellData.spells)) {
@@ -498,25 +499,28 @@ export class EquipmentBonusCalculator {
               details: `spell_data[${i}].spells is not an array for item ${item.name || 'unknown'}`,
               itemName: item.name,
               slotName,
-              recoverable: true
-            })
-            continue
+              recoverable: true,
+            });
+            continue;
           }
 
           // Process each spell in the spell data
           for (let j = 0; j < spellData.spells.length; j++) {
-            const spell = spellData.spells[j]
+            const spell = spellData.spells[j];
 
             try {
-              const bonus = this.parseSpellForStatBonusWithErrorHandling(spell, item.name, slotName)
+              const bonus = this.parseSpellForStatBonusWithErrorHandling(
+                spell,
+                item.name,
+                slotName
+              );
 
               if (bonus.bonus) {
-                result.bonuses.push(bonus.bonus)
+                result.bonuses.push(bonus.bonus);
               }
 
-              result.warnings.push(...bonus.warnings)
-              result.errors.push(...bonus.errors)
-
+              result.warnings.push(...bonus.warnings);
+              result.errors.push(...bonus.errors);
             } catch (error) {
               result.warnings.push({
                 type: 'warning',
@@ -524,8 +528,8 @@ export class EquipmentBonusCalculator {
                 details: `Error parsing spell ${j} in spell_data[${i}] for item ${item.name || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
                 itemName: item.name,
                 slotName,
-                recoverable: true
-              })
+                recoverable: true,
+              });
               // Continue processing other spells
             }
           }
@@ -536,8 +540,8 @@ export class EquipmentBonusCalculator {
             details: `Error processing spell_data[${i}] for item ${item.name || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
             itemName: item.name,
             slotName,
-            recoverable: true
-          })
+            recoverable: true,
+          });
           // Continue processing other spell data entries
         }
       }
@@ -548,11 +552,11 @@ export class EquipmentBonusCalculator {
         details: `Unexpected error parsing item ${item.name || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
         itemName: item.name,
         slotName,
-        recoverable: false
-      })
+        recoverable: false,
+      });
     }
 
-    return result
+    return result;
   }
 
   /**
@@ -564,71 +568,71 @@ export class EquipmentBonusCalculator {
   private parseSpellForStatBonus(spell: Spell, itemName?: string): StatBonus | null {
     // Fast path: check spell_id first (most common rejection case)
     if (!spell.spell_id || !STAT_BONUS_SPELL_IDS.includes(spell.spell_id as any)) {
-      return null
+      return null;
     }
 
     // Fast path: check spell_params existence and type
     if (!spell.spell_params || typeof spell.spell_params !== 'object') {
-      return null
+      return null;
     }
 
     // Extract parameters with hot path optimization
-    const params = spell.spell_params
-    const statValue = params.Stat ?? params.stat ?? params.StatID ?? params.statId
+    const params = spell.spell_params;
+    const statValue = params.Stat ?? params.stat ?? params.StatID ?? params.statId;
 
     // Fast numeric conversion for statId
-    let statId: number | null = null
-    let amount: number | null = null
+    let statId: number | null = null;
+    let amount: number | null = null;
 
     if (typeof statValue === 'number') {
-      statId = statValue
+      statId = statValue;
     } else if (typeof statValue === 'string') {
-      const parsed = parseInt(statValue, 10)
-      statId = isNaN(parsed) ? null : parsed
+      const parsed = parseInt(statValue, 10);
+      statId = isNaN(parsed) ? null : parsed;
     }
 
     // Handle spell 53139 (WornItem flag) using BitNum parameter
     if (spell.spell_id === 53139) {
-      const bitNumValue = params.BitNum ?? params.bitNum
+      const bitNumValue = params.BitNum ?? params.bitNum;
 
       if (typeof bitNumValue === 'number') {
-        amount = 1 << bitNumValue
+        amount = 1 << bitNumValue;
       } else if (typeof bitNumValue === 'string') {
-        const parsed = parseInt(bitNumValue, 10)
-        amount = isNaN(parsed) ? null : (1 << parsed)
+        const parsed = parseInt(bitNumValue, 10);
+        amount = isNaN(parsed) ? null : 1 << parsed;
       }
     } else {
       // Handle other spells using Amount parameter
-      const amountValue = params.Amount ?? params.amount ?? params.Value ?? params.value
+      const amountValue = params.Amount ?? params.amount ?? params.Value ?? params.value;
 
       if (typeof amountValue === 'number') {
-        amount = amountValue
+        amount = amountValue;
       } else if (typeof amountValue === 'string') {
-        const parsed = parseInt(amountValue, 10)
-        amount = isNaN(parsed) ? null : parsed
+        const parsed = parseInt(amountValue, 10);
+        amount = isNaN(parsed) ? null : parsed;
       }
     }
 
     if (statId === null || amount === null) {
-      return null
+      return null;
     }
 
     // Validate that the stat ID is a known trainable skill
     // Skip non-trainable stats (e.g., Mass=2) that don't map to skills
     try {
       if (!skillService.validateId(statId)) {
-        return null
+        return null;
       }
     } catch {
       // Skip unknown stat IDs
-      return null
+      return null;
     }
 
     return {
       statId,
       amount,
-      itemName
-    }
+      itemName,
+    };
   }
 
   /**
@@ -646,8 +650,8 @@ export class EquipmentBonusCalculator {
     const result = {
       bonus: null as StatBonus | null,
       warnings: [] as EquipmentBonusError[],
-      errors: [] as EquipmentBonusError[]
-    }
+      errors: [] as EquipmentBonusError[],
+    };
 
     try {
       // Validate spell structure
@@ -658,20 +662,20 @@ export class EquipmentBonusCalculator {
           details: 'Spell is null or undefined',
           itemName,
           slotName,
-          recoverable: true
-        })
-        return result
+          recoverable: true,
+        });
+        return result;
       }
 
       // Check if this spell modifies stats
       if (!spell.spell_id) {
         // Not an error - many spells don't have IDs or aren't stat modifiers
-        return result
+        return result;
       }
 
       if (!STAT_BONUS_SPELL_IDS.includes(spell.spell_id as any)) {
         // Not an error - this spell doesn't modify stats
-        return result
+        return result;
       }
 
       // Validate spell parameters
@@ -682,9 +686,9 @@ export class EquipmentBonusCalculator {
           details: `Spell ${spell.spell_id} has no parameters in item ${itemName || 'unknown'}`,
           itemName,
           slotName,
-          recoverable: true
-        })
-        return result
+          recoverable: true,
+        });
+        return result;
       }
 
       if (typeof spell.spell_params !== 'object') {
@@ -694,17 +698,17 @@ export class EquipmentBonusCalculator {
           details: `Spell ${spell.spell_id} parameters are not an object in item ${itemName || 'unknown'}`,
           itemName,
           slotName,
-          recoverable: true
-        })
-        return result
+          recoverable: true,
+        });
+        return result;
       }
 
       // Extract and validate parameters using the same logic as parseSpellForStatBonus
-      const params = spell.spell_params
-      const statValue = params.Stat ?? params.stat ?? params.StatID ?? params.statId
+      const params = spell.spell_params;
+      const statValue = params.Stat ?? params.stat ?? params.StatID ?? params.statId;
 
-      let statId: number | null = null
-      let amount: number | null = null
+      let statId: number | null = null;
+      let amount: number | null = null;
 
       // Extract stat ID with error handling
       if (typeof statValue === 'number') {
@@ -715,12 +719,12 @@ export class EquipmentBonusCalculator {
             details: `Stat ID ${statValue} is outside expected range (0-1000) in item ${itemName || 'unknown'}`,
             itemName,
             slotName,
-            recoverable: true
-          })
+            recoverable: true,
+          });
         }
-        statId = statValue
+        statId = statValue;
       } else if (typeof statValue === 'string') {
-        const parsed = parseInt(statValue, 10)
+        const parsed = parseInt(statValue, 10);
         if (isNaN(parsed)) {
           result.warnings.push({
             type: 'warning',
@@ -728,8 +732,8 @@ export class EquipmentBonusCalculator {
             details: `Unable to parse stat ID "${statValue}" in item ${itemName || 'unknown'}`,
             itemName,
             slotName,
-            recoverable: true
-          })
+            recoverable: true,
+          });
         } else {
           if (parsed < 0 || parsed > 1000) {
             result.warnings.push({
@@ -738,21 +742,21 @@ export class EquipmentBonusCalculator {
               details: `Parsed stat ID ${parsed} is outside expected range (0-1000) in item ${itemName || 'unknown'}`,
               itemName,
               slotName,
-              recoverable: true
-            })
+              recoverable: true,
+            });
           }
-          statId = parsed
+          statId = parsed;
         }
       }
 
       // Handle spell 53139 (WornItem flag) using BitNum parameter
       if (spell.spell_id === 53139) {
-        const bitNumValue = params.BitNum ?? params.bitNum
+        const bitNumValue = params.BitNum ?? params.bitNum;
 
         if (typeof bitNumValue === 'number') {
-          amount = 1 << bitNumValue
+          amount = 1 << bitNumValue;
         } else if (typeof bitNumValue === 'string') {
-          const parsed = parseInt(bitNumValue, 10)
+          const parsed = parseInt(bitNumValue, 10);
           if (isNaN(parsed)) {
             result.warnings.push({
               type: 'warning',
@@ -760,15 +764,15 @@ export class EquipmentBonusCalculator {
               details: `Unable to parse BitNum "${bitNumValue}" in item ${itemName || 'unknown'}`,
               itemName,
               slotName,
-              recoverable: true
-            })
+              recoverable: true,
+            });
           } else {
-            amount = 1 << parsed
+            amount = 1 << parsed;
           }
         }
       } else {
         // Extract amount with error handling for other spell types
-        const amountValue = params.Amount ?? params.amount ?? params.Value ?? params.value
+        const amountValue = params.Amount ?? params.amount ?? params.Value ?? params.value;
 
         if (typeof amountValue === 'number') {
           if (Math.abs(amountValue) > 10000) {
@@ -778,12 +782,12 @@ export class EquipmentBonusCalculator {
               details: `Stat bonus amount ${amountValue} is unusually large in item ${itemName || 'unknown'}`,
               itemName,
               slotName,
-              recoverable: true
-            })
+              recoverable: true,
+            });
           }
-          amount = amountValue
+          amount = amountValue;
         } else if (typeof amountValue === 'string') {
-          const parsed = parseInt(amountValue, 10)
+          const parsed = parseInt(amountValue, 10);
           if (isNaN(parsed)) {
             result.warnings.push({
               type: 'warning',
@@ -791,8 +795,8 @@ export class EquipmentBonusCalculator {
               details: `Unable to parse amount "${amountValue}" in item ${itemName || 'unknown'}`,
               itemName,
               slotName,
-              recoverable: true
-            })
+              recoverable: true,
+            });
           } else {
             if (Math.abs(parsed) > 10000) {
               result.warnings.push({
@@ -801,25 +805,25 @@ export class EquipmentBonusCalculator {
                 details: `Parsed amount ${parsed} is unusually large in item ${itemName || 'unknown'}`,
                 itemName,
                 slotName,
-                recoverable: true
-              })
+                recoverable: true,
+              });
             }
-            amount = parsed
+            amount = parsed;
           }
         }
       }
 
       if (statId === null || amount === null) {
         if (statId === null && amount === null) {
-          const missingParam = spell.spell_id === 53139 ? 'BitNum' : 'Amount'
+          const missingParam = spell.spell_id === 53139 ? 'BitNum' : 'Amount';
           result.warnings.push({
             type: 'warning',
             message: 'Spell parameters missing stat ID and value',
             details: `Spell ${spell.spell_id} in item ${itemName || 'unknown'} is missing both Stat and ${missingParam} parameters`,
             itemName,
             slotName,
-            recoverable: true
-          })
+            recoverable: true,
+          });
         } else if (statId === null) {
           result.warnings.push({
             type: 'warning',
@@ -827,20 +831,20 @@ export class EquipmentBonusCalculator {
             details: `Spell ${spell.spell_id} in item ${itemName || 'unknown'} is missing Stat parameter`,
             itemName,
             slotName,
-            recoverable: true
-          })
+            recoverable: true,
+          });
         } else {
-          const missingParam = spell.spell_id === 53139 ? 'BitNum' : 'Amount'
+          const missingParam = spell.spell_id === 53139 ? 'BitNum' : 'Amount';
           result.warnings.push({
             type: 'warning',
             message: `Spell parameters missing ${missingParam.toLowerCase()}`,
             details: `Spell ${spell.spell_id} in item ${itemName || 'unknown'} is missing ${missingParam} parameter`,
             itemName,
             slotName,
-            recoverable: true
-          })
+            recoverable: true,
+          });
         }
-        return result
+        return result;
       }
 
       // Validate that the stat ID is a known skill
@@ -852,9 +856,9 @@ export class EquipmentBonusCalculator {
             details: `Stat ID ${statId} from spell ${spell.spell_id} in item ${itemName || 'unknown'} does not map to a known skill`,
             itemName,
             slotName,
-            recoverable: true
-          })
-          return result
+            recoverable: true,
+          });
+          return result;
         }
       } catch (error) {
         result.warnings.push({
@@ -863,18 +867,17 @@ export class EquipmentBonusCalculator {
           details: `Error validating stat ID ${statId} for spell ${spell.spell_id} in item ${itemName || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
           itemName,
           slotName,
-          recoverable: true
-        })
-        return result
+          recoverable: true,
+        });
+        return result;
       }
 
       // Successfully parsed
       result.bonus = {
         statId,
         amount,
-        itemName
-      }
-
+        itemName,
+      };
     } catch (error) {
       result.errors.push({
         type: 'error',
@@ -882,11 +885,11 @@ export class EquipmentBonusCalculator {
         details: `Unexpected error parsing spell in item ${itemName || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
         itemName,
         slotName,
-        recoverable: false
-      })
+        recoverable: false,
+      });
     }
 
-    return result
+    return result;
   }
 
   // Note: extractStatId and extractAmount methods were removed and inlined into parseSpellForStatBonus for performance
@@ -897,31 +900,31 @@ export class EquipmentBonusCalculator {
    * @returns Record mapping skill IDs to total bonus amounts
    */
   aggregateBonuses(bonuses: StatBonus[]): Record<number, number> {
-    const aggregated: Record<number, number> = {}
+    const aggregated: Record<number, number> = {};
 
     for (const bonus of bonuses) {
       if (aggregated[bonus.statId]) {
         // Stat 355 (WornItem) is a flag field - use bitwise OR instead of addition
         if (bonus.statId === 355) {
-          aggregated[bonus.statId] |= bonus.amount
+          aggregated[bonus.statId] |= bonus.amount;
         } else {
-          aggregated[bonus.statId] += bonus.amount
+          aggregated[bonus.statId] += bonus.amount;
         }
       } else {
-        aggregated[bonus.statId] = bonus.amount
+        aggregated[bonus.statId] = bonus.amount;
       }
     }
 
     // Filter out zero bonuses to keep the result clean
-    const filtered: Record<number, number> = {}
+    const filtered: Record<number, number> = {};
     for (const [statId, amount] of Object.entries(aggregated)) {
-      const numericStatId = parseInt(statId, 10)
+      const numericStatId = parseInt(statId, 10);
       if (amount !== 0) {
-        filtered[numericStatId] = amount
+        filtered[numericStatId] = amount;
       }
     }
 
-    return filtered
+    return filtered;
   }
 
   /**
@@ -930,58 +933,58 @@ export class EquipmentBonusCalculator {
   private aggregateBonusesOptimized(bonuses: StatBonus[]): Record<number, number> {
     // Early return for empty bonuses
     if (bonuses.length === 0) {
-      return {}
+      return {};
     }
 
     // Check memoization cache
-    const cached = this.bonusCache.get(bonuses)
+    const cached = this.bonusCache.get(bonuses);
     if (cached) {
-      return cached
+      return cached;
     }
 
     // Calculate as usual
-    const result = this.aggregateBonuses(bonuses)
+    const result = this.aggregateBonuses(bonuses);
 
     // Cache the result
-    this.bonusCache.set(bonuses, result)
+    this.bonusCache.set(bonuses, result);
 
-    return result
+    return result;
   }
 
   /**
    * Update performance metrics for monitoring
    */
   private updatePerformanceMetrics(calculationTime: number): void {
-    this.performanceMetrics.lastCalculationTime = calculationTime
-    this.performanceMetrics.calculationCount++
+    this.performanceMetrics.lastCalculationTime = calculationTime;
+    this.performanceMetrics.calculationCount++;
 
     // Calculate running average
-    const { averageCalculationTime, calculationCount } = this.performanceMetrics
+    const { averageCalculationTime, calculationCount } = this.performanceMetrics;
     this.performanceMetrics.averageCalculationTime =
-      ((averageCalculationTime * (calculationCount - 1)) + calculationTime) / calculationCount
+      (averageCalculationTime * (calculationCount - 1) + calculationTime) / calculationCount;
   }
 
   /**
    * Get performance statistics for debugging
    */
   getPerformanceStats(): {
-    lastCalculationTime: number
-    averageCalculationTime: number
-    calculationCount: number
-    cacheStats: ReturnType<SpellDataCache['getStats']>
+    lastCalculationTime: number;
+    averageCalculationTime: number;
+    calculationCount: number;
+    cacheStats: ReturnType<SpellDataCache['getStats']>;
   } {
     return {
       ...this.performanceMetrics,
-      cacheStats: this.spellCache.getStats()
-    }
+      cacheStats: this.spellCache.getStats(),
+    };
   }
 
   /**
    * Clear all caches (useful for memory management)
    */
   clearCaches(): void {
-    this.spellCache.clear()
-    this.bonusCache.clear()
+    this.spellCache.clear();
+    this.bonusCache.clear();
   }
 }
 
@@ -990,7 +993,7 @@ export class EquipmentBonusCalculator {
 // ============================================================================
 
 /** Singleton instance for easy access */
-export const equipmentBonusCalculator = new EquipmentBonusCalculator()
+export const equipmentBonusCalculator = new EquipmentBonusCalculator();
 
 /**
  * Convenience function to calculate equipment bonuses for a profile with performance monitoring
@@ -999,24 +1002,26 @@ export const equipmentBonusCalculator = new EquipmentBonusCalculator()
  */
 export function calculateEquipmentBonuses(profile: TinkerProfile): Record<number, number> {
   try {
-    const startTime = performance.now()
-    const result = equipmentBonusCalculator.calculateBonuses(profile)
-    const endTime = performance.now()
+    const startTime = performance.now();
+    const result = equipmentBonusCalculator.calculateBonuses(profile);
+    const endTime = performance.now();
 
     // Warn if calculation takes longer than 100ms (NFR-1 requirement)
-    const calculationTime = endTime - startTime
+    const calculationTime = endTime - startTime;
     if (calculationTime > 100) {
-      console.warn(`Equipment bonus calculation exceeded 100ms threshold: ${calculationTime.toFixed(2)}ms`)
+      console.warn(
+        `Equipment bonus calculation exceeded 100ms threshold: ${calculationTime.toFixed(2)}ms`
+      );
 
       // Log performance stats for debugging
-      const stats = equipmentBonusCalculator.getPerformanceStats()
-      console.warn('Performance stats:', stats)
+      const stats = equipmentBonusCalculator.getPerformanceStats();
+      console.warn('Performance stats:', stats);
     }
 
-    return result
+    return result;
   } catch (error) {
-    console.error('Error in calculateEquipmentBonuses convenience function:', error)
-    return {}
+    console.error('Error in calculateEquipmentBonuses convenience function:', error);
+    return {};
   }
 }
 
@@ -1027,19 +1032,21 @@ export function calculateEquipmentBonuses(profile: TinkerProfile): Record<number
  */
 export function calculateEquipmentBonusesWithErrors(profile: TinkerProfile): CalculationResult {
   try {
-    return equipmentBonusCalculator.calculateBonusesWithErrorHandling(profile)
+    return equipmentBonusCalculator.calculateBonusesWithErrorHandling(profile);
   } catch (error) {
     return {
       bonuses: {},
       warnings: [],
-      errors: [{
-        type: 'error',
-        message: 'Critical error in equipment bonus calculation',
-        details: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
-        recoverable: false
-      }],
-      success: false
-    }
+      errors: [
+        {
+          type: 'error',
+          message: 'Critical error in equipment bonus calculation',
+          details: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
+          recoverable: false,
+        },
+      ],
+      success: false,
+    };
   }
 }
 
@@ -1050,10 +1057,10 @@ export function calculateEquipmentBonusesWithErrors(profile: TinkerProfile): Cal
  */
 export function parseItemForStatBonuses(item: Item): StatBonus[] {
   try {
-    return equipmentBonusCalculator.parseItemSpells(item)
+    return equipmentBonusCalculator.parseItemSpells(item);
   } catch (error) {
-    console.error('Error in parseItemForStatBonuses convenience function:', error)
-    return []
+    console.error('Error in parseItemForStatBonuses convenience function:', error);
+    return [];
   }
 }
 
@@ -1068,19 +1075,21 @@ export function parseItemForStatBonusesWithErrors(
   slotName?: string
 ): { bonuses: StatBonus[]; warnings: EquipmentBonusError[]; errors: EquipmentBonusError[] } {
   try {
-    return equipmentBonusCalculator.parseItemSpellsWithErrorHandling(item, slotName || 'unknown')
+    return equipmentBonusCalculator.parseItemSpellsWithErrorHandling(item, slotName || 'unknown');
   } catch (error) {
     return {
       bonuses: [],
       warnings: [],
-      errors: [{
-        type: 'error',
-        message: 'Critical error parsing item spells',
-        details: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
-        itemName: item?.name,
-        slotName,
-        recoverable: false
-      }]
-    }
+      errors: [
+        {
+          type: 'error',
+          message: 'Critical error parsing item spells',
+          details: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
+          itemName: item?.name,
+          slotName,
+          recoverable: false,
+        },
+      ],
+    };
   }
 }

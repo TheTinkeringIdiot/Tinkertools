@@ -12,25 +12,31 @@ vi.mock('@/services/api-client', () => ({
       items: [],
       total: 0,
       page: 1,
-      page_size: 50
+      page_size: 50,
     }),
     searchSymbiants: vi.fn().mockResolvedValue({
       items: [],
       total: 0,
       page: 1,
-      page_size: 50
-    })
-  }
+      page_size: 50,
+    }),
+  },
 }));
 
 // Mock child components
-const MockPocketBossDatabase = { template: '<div class="mock-pocket-boss-database">Pocket Boss Database</div>' };
+const MockPocketBossDatabase = {
+  template: '<div class="mock-pocket-boss-database">Pocket Boss Database</div>',
+};
 const MockSymbiantLookup = { template: '<div class="mock-symbiant-lookup">Symbiant Lookup</div>' };
-const MockBossSymbiantMatcher = { template: '<div class="mock-boss-symbiant-matcher">Boss Symbiant Matcher</div>' };
-const MockCollectionTracker = { template: '<div class="mock-collection-tracker">Collection Tracker</div>' };
+const MockBossSymbiantMatcher = {
+  template: '<div class="mock-boss-symbiant-matcher">Boss Symbiant Matcher</div>',
+};
+const MockCollectionTracker = {
+  template: '<div class="mock-collection-tracker">Collection Tracker</div>',
+};
 
 // Mock PrimeVue components
-const MockTabView = { 
+const MockTabView = {
   template: `
     <div class="mock-tabview">
       <div class="tab-navigation">
@@ -43,10 +49,10 @@ const MockTabView = {
       </div>
     </div>
   `,
-  props: ['activeIndex']
+  props: ['activeIndex'],
 };
 
-const MockTabPanel = { 
+const MockTabPanel = {
   template: `
     <div class="mock-tabpanel">
       <div class="panel-header">
@@ -56,14 +62,14 @@ const MockTabPanel = {
         <slot></slot>
       </div>
     </div>
-  `
+  `,
 };
 
 describe('TinkerPocket View Structure', () => {
   const createWrapper = (options = {}) => {
     const router = createRouter({
       history: createWebHistory(),
-      routes: [{ path: '/pocket', component: { template: '<div>Pocket</div>' } }]
+      routes: [{ path: '/pocket', component: { template: '<div>Pocket</div>' } }],
     });
 
     const defaultData = {
@@ -74,13 +80,14 @@ describe('TinkerPocket View Structure', () => {
         { label: 'Pocket Bosses', icon: 'pi pi-users' },
         { label: 'Symbiant Lookup', icon: 'pi pi-search' },
         { label: 'Boss-Symbiant Match', icon: 'pi pi-link' },
-        { label: 'Collection Tracker', icon: 'pi pi-list-check' }
+        { label: 'Collection Tracker', icon: 'pi pi-list-check' },
       ],
-      ...options
+      ...options,
     };
 
-    return mount({
-      template: `
+    return mount(
+      {
+        template: `
         <div class="tinker-pocket container mx-auto px-4 py-6">
           <!-- Header -->
           <div class="mb-6">
@@ -131,27 +138,29 @@ describe('TinkerPocket View Structure', () => {
           </div>
         </div>
       `,
-      components: {
-        MockTabView,
-        MockTabPanel,
-        MockPocketBossDatabase,
-        MockSymbiantLookup,
-        MockBossSymbiantMatcher,
-        MockCollectionTracker
+        components: {
+          MockTabView,
+          MockTabPanel,
+          MockPocketBossDatabase,
+          MockSymbiantLookup,
+          MockBossSymbiantMatcher,
+          MockCollectionTracker,
+        },
+        data() {
+          return defaultData;
+        },
+        computed: {
+          loadingMessage() {
+            return this.loading ? 'Loading pocket boss and symbiant data...' : '';
+          },
+        },
       },
-      data() {
-        return defaultData;
-      },
-      computed: {
-        loadingMessage() {
-          return this.loading ? 'Loading pocket boss and symbiant data...' : '';
-        }
+      {
+        global: {
+          plugins: [createPinia(), PrimeVue, router],
+        },
       }
-    }, {
-      global: {
-        plugins: [createPinia(), PrimeVue, router]
-      }
-    });
+    );
   };
 
   it('renders the main TinkerPocket view', () => {
@@ -163,7 +172,9 @@ describe('TinkerPocket View Structure', () => {
     const wrapper = createWrapper();
     expect(wrapper.text()).toContain('TinkerPocket');
     expect(wrapper.text()).toContain('Pocket Boss & Symbiant Tool');
-    expect(wrapper.text()).toContain('Track pocket bosses, symbiant drops, and manage your collection progress');
+    expect(wrapper.text()).toContain(
+      'Track pocket bosses, symbiant drops, and manage your collection progress'
+    );
   });
 
   it('shows loading state', () => {
@@ -212,19 +223,19 @@ describe('TinkerPocket View Structure', () => {
   it('manages active tab state', async () => {
     const wrapper = createWrapper();
     const component = wrapper.vm as any;
-    
+
     expect(component.activeTab).toBe(0);
-    
+
     component.activeTab = 2;
     await wrapper.vm.$nextTick();
-    
+
     expect(component.activeTab).toBe(2);
   });
 
   it('has correct tab configuration', () => {
     const wrapper = createWrapper();
     const component = wrapper.vm as any;
-    
+
     expect(component.tabItems).toHaveLength(4);
     expect(component.tabItems[0].label).toBe('Pocket Bosses');
     expect(component.tabItems[1].label).toBe('Symbiant Lookup');
@@ -236,8 +247,9 @@ describe('TinkerPocket View Structure', () => {
 // Test integration workflow
 describe('TinkerPocket Integration Workflow', () => {
   it('simulates complete loading workflow', async () => {
-    const wrapper = mount({
-      template: `
+    const wrapper = mount(
+      {
+        template: `
         <div class="workflow-test">
           <div v-if="currentStep === 'loading'">Loading...</div>
           <div v-else-if="currentStep === 'loaded'">Content Loaded</div>
@@ -245,41 +257,43 @@ describe('TinkerPocket Integration Workflow', () => {
           <button @click="simulateLoad">Start Load</button>
         </div>
       `,
-      data() {
-        return {
-          currentStep: 'initial'
-        };
-      },
-      methods: {
-        async simulateLoad() {
-          this.currentStep = 'loading';
+        data() {
+          return {
+            currentStep: 'initial',
+          };
+        },
+        methods: {
+          async simulateLoad() {
+            this.currentStep = 'loading';
 
-          try {
-            // Simulate API calls
-            await new Promise(resolve => setTimeout(resolve, 10));
-            this.currentStep = 'loaded';
-          } catch {
-            this.currentStep = 'error';
-          }
-        }
+            try {
+              // Simulate API calls
+              await new Promise((resolve) => setTimeout(resolve, 10));
+              this.currentStep = 'loaded';
+            } catch {
+              this.currentStep = 'error';
+            }
+          },
+        },
+      },
+      {
+        global: {
+          plugins: [createPinia(), PrimeVue],
+        },
       }
-    }, {
-      global: {
-        plugins: [createPinia(), PrimeVue]
-      }
-    });
+    );
 
     expect(wrapper.vm.currentStep).toBe('initial');
 
     await wrapper.find('button').trigger('click', {
       stopPropagation: () => {},
-      preventDefault: () => {}
+      preventDefault: () => {},
     });
     expect(wrapper.vm.currentStep).toBe('loading');
 
     // Wait for async operation
     await wrapper.vm.$nextTick();
-    await new Promise(resolve => setTimeout(resolve, 20));
+    await new Promise((resolve) => setTimeout(resolve, 20));
 
     expect(wrapper.vm.currentStep).toBe('loaded');
   });

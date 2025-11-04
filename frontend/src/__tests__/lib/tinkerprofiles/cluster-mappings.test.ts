@@ -8,7 +8,7 @@ import {
   isValidClusterId,
   getSlotPosition,
   CLUSTER_ID_TO_STAT,
-  AOSETUPS_SLOT_TO_BITFLAG
+  AOSETUPS_SLOT_TO_BITFLAG,
 } from '@/lib/tinkerprofiles/cluster-mappings';
 
 describe('Cluster Mappings', () => {
@@ -19,21 +19,21 @@ describe('Cluster Mappings', () => {
       expect(strengthMapping).toEqual({
         stat: 16,
         skillName: 'Strength',
-        longName: 'Strength'
+        longName: 'Strength',
       });
 
       const agilityMapping = getClusterMapping(7);
       expect(agilityMapping).toEqual({
         stat: 17,
         skillName: 'Agility',
-        longName: 'Agility'
+        longName: 'Agility',
       });
 
       const pistolMapping = getClusterMapping(60);
       expect(pistolMapping).toEqual({
         stat: 112,
         skillName: 'Pistol',
-        longName: 'Pistol'
+        longName: 'Pistol',
       });
     });
 
@@ -53,7 +53,7 @@ describe('Cluster Mappings', () => {
   describe('isValidClusterId', () => {
     it('should return true for valid cluster IDs', () => {
       expect(isValidClusterId(77)).toBe(true); // Strength
-      expect(isValidClusterId(7)).toBe(true);  // Agility
+      expect(isValidClusterId(7)).toBe(true); // Agility
       expect(isValidClusterId(60)).toBe(true); // Pistol
     });
 
@@ -66,19 +66,19 @@ describe('Cluster Mappings', () => {
 
   describe('getSlotPosition', () => {
     it('should map AOSetups slot names to bitflag values', () => {
-      expect(getSlotPosition('eye')).toBe(2);      // 1 << 1
-      expect(getSlotPosition('head')).toBe(4);     // 1 << 2
-      expect(getSlotPosition('ear')).toBe(8);      // 1 << 3
-      expect(getSlotPosition('rarm')).toBe(16);    // 1 << 4
-      expect(getSlotPosition('chest')).toBe(32);   // 1 << 5
-      expect(getSlotPosition('larm')).toBe(64);    // 1 << 6
+      expect(getSlotPosition('eye')).toBe(2); // 1 << 1
+      expect(getSlotPosition('head')).toBe(4); // 1 << 2
+      expect(getSlotPosition('ear')).toBe(8); // 1 << 3
+      expect(getSlotPosition('rarm')).toBe(16); // 1 << 4
+      expect(getSlotPosition('chest')).toBe(32); // 1 << 5
+      expect(getSlotPosition('larm')).toBe(64); // 1 << 6
       expect(getSlotPosition('rwrist')).toBe(128); // 1 << 7
-      expect(getSlotPosition('waist')).toBe(256);  // 1 << 8
+      expect(getSlotPosition('waist')).toBe(256); // 1 << 8
       expect(getSlotPosition('lwrist')).toBe(512); // 1 << 9
       expect(getSlotPosition('rhand')).toBe(1024); // 1 << 10
-      expect(getSlotPosition('leg')).toBe(2048);   // 1 << 11
+      expect(getSlotPosition('leg')).toBe(2048); // 1 << 11
       expect(getSlotPosition('lhand')).toBe(4096); // 1 << 12
-      expect(getSlotPosition('feet')).toBe(8192);  // 1 << 13
+      expect(getSlotPosition('feet')).toBe(8192); // 1 << 13
     });
 
     it('should handle case insensitive slot names', () => {
@@ -98,7 +98,7 @@ describe('Cluster Mappings', () => {
     it('should contain expected skill mappings', () => {
       // Check that key skills are mapped
       expect(CLUSTER_ID_TO_STAT[77]).toBeDefined(); // Strength
-      expect(CLUSTER_ID_TO_STAT[7]).toBeDefined();  // Agility
+      expect(CLUSTER_ID_TO_STAT[7]).toBeDefined(); // Agility
       expect(CLUSTER_ID_TO_STAT[37]).toBeDefined(); // Intelligence
       expect(CLUSTER_ID_TO_STAT[61]).toBeDefined(); // Psychic
       expect(CLUSTER_ID_TO_STAT[71]).toBeDefined(); // Sense
@@ -107,7 +107,7 @@ describe('Cluster Mappings', () => {
       // Check weapon skills
       expect(CLUSTER_ID_TO_STAT[60]).toBeDefined(); // Pistol
       expect(CLUSTER_ID_TO_STAT[68]).toBeDefined(); // Rifle
-      expect(CLUSTER_ID_TO_STAT[2]).toBeDefined();  // 1h Blunt
+      expect(CLUSTER_ID_TO_STAT[2]).toBeDefined(); // 1h Blunt
     });
 
     it('should exclude modifier clusters with "*" suffixes', () => {
@@ -131,8 +131,19 @@ describe('Cluster Mappings', () => {
   describe('AOSETUPS_SLOT_TO_BITFLAG mapping', () => {
     it('should cover all standard implant slots', () => {
       const expectedSlots = [
-        'eye', 'head', 'ear', 'rarm', 'chest', 'larm',
-        'rwrist', 'waist', 'lwrist', 'rhand', 'leg', 'lhand', 'feet'
+        'eye',
+        'head',
+        'ear',
+        'rarm',
+        'chest',
+        'larm',
+        'rwrist',
+        'waist',
+        'lwrist',
+        'rhand',
+        'leg',
+        'lhand',
+        'feet',
       ];
 
       for (const slot of expectedSlots) {
@@ -159,10 +170,10 @@ describe('Cluster Mappings', () => {
         type: 'implant',
         ql: 100,
         clusters: {
-          Shiny: { ClusterID: 77 },    // Strength
-          Bright: { ClusterID: 60 },   // Pistol
-          Faded: { ClusterID: 37 }     // Intelligence
-        }
+          Shiny: { ClusterID: 77 }, // Strength
+          Bright: { ClusterID: 60 }, // Pistol
+          Faded: { ClusterID: 37 }, // Intelligence
+        },
       };
 
       // Get slot bitflag
@@ -177,19 +188,19 @@ describe('Cluster Mappings', () => {
       expect(shinyMapping).toEqual({
         stat: 16,
         skillName: 'Strength',
-        longName: 'Strength'
+        longName: 'Strength',
       });
 
       expect(brightMapping).toEqual({
         stat: 112,
         skillName: 'Pistol',
-        longName: 'Pistol'
+        longName: 'Pistol',
       });
 
       expect(fadedMapping).toEqual({
         stat: 19,
         skillName: 'Intelligence',
-        longName: 'Intelligence'
+        longName: 'Intelligence',
       });
     });
 
@@ -199,8 +210,8 @@ describe('Cluster Mappings', () => {
         slot: 'chest',
         symbiant: {
           highid: 123456,
-          selectedQl: 150
-        }
+          selectedQl: 150,
+        },
       };
 
       const slotBitflag = getSlotPosition(aoSetupsSymbiant.slot);

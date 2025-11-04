@@ -1,6 +1,6 @@
 /**
  * API Type Definitions for TinkerTools
- * 
+ *
  * Defines all TypeScript interfaces for API requests and responses
  * following the patterns specified in docs/11_api_design_and_data_flow.md
  */
@@ -10,28 +10,28 @@
 // ============================================================================
 
 export interface ApiResponse<T> {
-  success: boolean
-  data?: T
+  success: boolean;
+  data?: T;
   error?: {
-    code: string
-    message: string
-    details?: any
-  }
+    code: string;
+    message: string;
+    details?: any;
+  };
   meta?: {
-    timestamp: string
-    requestId: string
-    version: string
-  }
+    timestamp: string;
+    requestId: string;
+    version: string;
+  };
 }
 
 export interface PaginatedResponse<T> {
-  items: T[]
-  total: number
-  page: number
-  page_size: number
-  pages: number
-  has_next: boolean
-  has_prev: boolean
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+  has_next: boolean;
+  has_prev: boolean;
 }
 
 // ============================================================================
@@ -39,211 +39,210 @@ export interface PaginatedResponse<T> {
 // ============================================================================
 
 export interface StatValue {
-  id: number
-  stat: number
-  value: number
+  id: number;
+  stat: number;
+  value: number;
 }
 
 export interface Criterion {
-  id: number
-  value1: number
-  value2: number
-  operator: number
+  id: number;
+  value1: number;
+  value2: number;
+  operator: number;
 }
 
 export interface Spell {
-  id: number
-  target?: number
-  tick_count?: number
-  tick_interval?: number
-  spell_id?: number
+  id: number;
+  target?: number;
+  tick_count?: number;
+  tick_interval?: number;
+  spell_id?: number;
   /** @deprecated Use spell_id to look up format from SPELL_FORMATS constant instead */
-  spell_format?: string
-  spell_params: Record<string, any>
-  criteria: Criterion[]
+  spell_format?: string;
+  spell_params: Record<string, any>;
+  criteria: Criterion[];
 }
 
 export interface SpellData {
-  id: number
-  event?: number
-  spells: Spell[]
+  id: number;
+  event?: number;
+  spells: Spell[];
 }
 
 export interface AttackDefense {
-  id: number
-  attack: StatValue[]
-  defense: StatValue[]
+  id: number;
+  attack: StatValue[];
+  defense: StatValue[];
 }
 
 export interface AnimationMesh {
-  id: number
-  animation?: StatValue
-  mesh?: StatValue
+  id: number;
+  animation?: StatValue;
+  mesh?: StatValue;
 }
 
 export interface Action {
-  id: number
-  action?: number
-  item_id: number
-  criteria: Criterion[]
+  id: number;
+  action?: number;
+  item_id: number;
+  criteria: Criterion[];
 }
 
 export interface SourceType {
-  id: number
-  name: string
-  description?: string
+  id: number;
+  name: string;
+  description?: string;
 }
 
 export interface Source {
-  id: number
-  source_type_id: number
-  source_id: number
-  name: string
-  extra_data: Record<string, any>
-  source_type?: SourceType
+  id: number;
+  source_type_id: number;
+  source_id: number;
+  name: string;
+  extra_data: Record<string, any>;
+  source_type?: SourceType;
 }
 
 export interface ItemSource {
-  source: Source
-  drop_rate?: number
-  min_ql?: number
-  max_ql?: number
-  conditions?: string
-  extra_data: Record<string, any>
+  source: Source;
+  drop_rate?: number;
+  min_ql?: number;
+  max_ql?: number;
+  conditions?: string;
+  extra_data: Record<string, any>;
 }
 
-
 export interface Item {
-  id: number
-  aoid?: number
-  name: string
-  ql?: number
-  description?: string
-  item_class?: number
-  is_nano: boolean
-  stats: StatValue[]
-  spell_data: SpellData[]
-  actions: Action[]
-  attack_defense?: AttackDefense
-  animation_mesh?: AnimationMesh
-  attack_stats: StatValue[]
-  defense_stats: StatValue[]
-  sources?: ItemSource[]
+  id: number;
+  aoid?: number;
+  name: string;
+  ql?: number;
+  description?: string;
+  item_class?: number;
+  is_nano: boolean;
+  stats: StatValue[];
+  spell_data: SpellData[];
+  actions: Action[];
+  attack_defense?: AttackDefense;
+  animation_mesh?: AnimationMesh;
+  attack_stats: StatValue[];
+  defense_stats: StatValue[];
+  sources?: ItemSource[];
 }
 
 export interface InterpolatedSpell {
-  target?: number
-  tick_count?: number
-  tick_interval?: number
-  spell_id?: number
-  spell_format?: string
-  spell_params: Record<string, any>
-  criteria: Criterion[]
+  target?: number;
+  tick_count?: number;
+  tick_interval?: number;
+  spell_id?: number;
+  spell_format?: string;
+  spell_params: Record<string, any>;
+  criteria: Criterion[];
 }
 
 export interface InterpolatedSpellData {
-  event?: number
-  spells: InterpolatedSpell[]
+  event?: number;
+  spells: InterpolatedSpell[];
 }
 
 export interface InterpolatedAction {
-  action?: number
-  criteria: Criterion[]
+  action?: number;
+  criteria: Criterion[];
 }
 
 export interface InterpolatedItem {
   // Original item data
-  id: number
-  aoid?: number
-  name: string
-  ql?: number
-  description?: string
-  item_class?: number
-  is_nano: boolean
-  
+  id: number;
+  aoid?: number;
+  name: string;
+  ql?: number;
+  description?: string;
+  item_class?: number;
+  is_nano: boolean;
+
   // Interpolation metadata
-  interpolating: boolean
-  low_ql?: number
-  high_ql?: number
-  target_ql?: number
-  ql_delta?: number
-  ql_delta_full?: number
-  
+  interpolating: boolean;
+  low_ql?: number;
+  high_ql?: number;
+  target_ql?: number;
+  ql_delta?: number;
+  ql_delta_full?: number;
+
   // Interpolated data
-  stats: StatValue[]
-  spell_data: InterpolatedSpellData[]
-  actions: InterpolatedAction[]
-  
+  stats: StatValue[];
+  spell_data: InterpolatedSpellData[];
+  actions: InterpolatedAction[];
+
   // Optional related data
-  attack_defense_id?: number
-  animation_mesh_id?: number
+  attack_defense_id?: number;
+  animation_mesh_id?: number;
 }
 
 export interface InterpolationRequest {
-  aoid: number
-  target_ql: number
+  aoid: number;
+  target_ql: number;
 }
 
 export interface InterpolationResponse {
-  success: boolean
-  item?: InterpolatedItem
-  error?: string
+  success: boolean;
+  item?: InterpolatedItem;
+  error?: string;
   interpolation_range?: {
-    min_ql: number
-    max_ql: number
-  }
+    min_ql: number;
+    max_ql: number;
+  };
 }
 
 export interface InterpolationRange {
-  min_ql: number
-  max_ql: number
-  interpolatable: boolean
-  base_aoid: number
+  min_ql: number;
+  max_ql: number;
+  interpolatable: boolean;
+  base_aoid: number;
 }
 
 export interface InterpolationInfo {
-  aoid: number
-  interpolatable: boolean
-  ranges: InterpolationRange[]
-  min_ql: number
-  max_ql: number
-  ql_range: number
+  aoid: number;
+  interpolatable: boolean;
+  ranges: InterpolationRange[];
+  min_ql: number;
+  max_ql: number;
+  ql_range: number;
 }
 
 export interface SymbiantItem {
-  id: number
-  aoid: number
-  name: string
-  ql: number
-  slot_id: number
-  family: 'Artillery' | 'Control' | 'Extermination' | 'Infantry' | 'Support'
-  actions: Action[]
-  spell_data?: SpellData[]
+  id: number;
+  aoid: number;
+  name: string;
+  ql: number;
+  slot_id: number;
+  family: 'Artillery' | 'Control' | 'Extermination' | 'Infantry' | 'Support';
+  actions: Action[];
+  spell_data?: SpellData[];
 }
 
 export interface Mob {
-  id: number
-  name: string
-  level: number | null
-  playfield: string
-  location: string
-  mob_names: string[]
-  is_pocket_boss: boolean
-  metadata?: Record<string, any>
-  symbiant_count?: number
+  id: number;
+  name: string;
+  level: number | null;
+  playfield: string;
+  location: string;
+  mob_names: string[];
+  is_pocket_boss: boolean;
+  metadata?: Record<string, any>;
+  symbiant_count?: number;
 }
 
 export interface MobWithDrops extends Mob {
-  dropped_items: SymbiantItem[]
+  dropped_items: SymbiantItem[];
 }
 
 // Legacy compatibility - will be deprecated
-export type PocketBoss = Mob
-export type Symbiant = SymbiantItem
+export type PocketBoss = Mob;
+export type Symbiant = SymbiantItem;
 
 export interface StatBonus {
-  stat: string
-  bonus: number
+  stat: string;
+  bonus: number;
 }
 
 // ============================================================================
@@ -252,67 +251,67 @@ export interface StatBonus {
 
 /** Skill entry with IP tracking */
 export interface SkillWithIP {
-  value: number
-  ipSpent: number
-  pointFromIp: number
+  value: number;
+  ipSpent: number;
+  pointFromIp: number;
 }
 
 export interface TinkerProfile {
   Character: {
-    Name: string
-    Level: number
-    Profession: string
-    Breed: string
-    Faction: string
-    Expansion: string
-    AccountType: string
-    MaxHealth: number
-    MaxNano: number
-  }
+    Name: string;
+    Level: number;
+    Profession: string;
+    Breed: string;
+    Faction: string;
+    Expansion: string;
+    AccountType: string;
+    MaxHealth: number;
+    MaxNano: number;
+  };
   Skills: {
     Attributes: {
-      Intelligence: SkillWithIP
-      Psychic: SkillWithIP
-      Sense: SkillWithIP
-      Stamina: SkillWithIP
-      Strength: SkillWithIP
-      Agility: SkillWithIP
-    }
-    'Body & Defense': Record<string, SkillWithIP>
-    ACs: Record<string, number>
-    'Ranged Weapons': Record<string, SkillWithIP>
-    'Ranged Specials': Record<string, SkillWithIP>
-    'Melee Weapons': Record<string, SkillWithIP>
-    'Melee Specials': Record<string, SkillWithIP>
-    'Nanos & Casting': Record<string, SkillWithIP>
-    Exploring: Record<string, SkillWithIP>
-    'Trade & Repair': Record<string, SkillWithIP>
-    'Combat & Healing': Record<string, SkillWithIP>
-    Misc: Record<string, number> // Misc doesn't use IP tracking
-  }
-  Weapons: Record<string, Item | null>
-  Clothing: Record<string, Item | null>
-  Implants: Record<string, Item | null>
-  PerksAndResearch: any[]
+      Intelligence: SkillWithIP;
+      Psychic: SkillWithIP;
+      Sense: SkillWithIP;
+      Stamina: SkillWithIP;
+      Strength: SkillWithIP;
+      Agility: SkillWithIP;
+    };
+    'Body & Defense': Record<string, SkillWithIP>;
+    ACs: Record<string, number>;
+    'Ranged Weapons': Record<string, SkillWithIP>;
+    'Ranged Specials': Record<string, SkillWithIP>;
+    'Melee Weapons': Record<string, SkillWithIP>;
+    'Melee Specials': Record<string, SkillWithIP>;
+    'Nanos & Casting': Record<string, SkillWithIP>;
+    Exploring: Record<string, SkillWithIP>;
+    'Trade & Repair': Record<string, SkillWithIP>;
+    'Combat & Healing': Record<string, SkillWithIP>;
+    Misc: Record<string, number>; // Misc doesn't use IP tracking
+  };
+  Weapons: Record<string, Item | null>;
+  Clothing: Record<string, Item | null>;
+  Implants: Record<string, Item | null>;
+  PerksAndResearch: any[];
 }
 
 export interface UserPreferences {
-  theme: 'light' | 'dark'
-  language: string
-  itemsPerPage: number
-  defaultExpansion: string[]
-  favoriteItems: number[]
-  recentSearches: string[]
-  lastUpdated: string
+  theme: 'light' | 'dark';
+  language: string;
+  itemsPerPage: number;
+  defaultExpansion: string[];
+  favoriteItems: number[];
+  recentSearches: string[];
+  lastUpdated: string;
 }
 
 export interface CollectionTracking {
   symbiants: {
-    collected: number[]
-    wishlist: number[]
-    notes: Record<number, string>
-  }
-  lastUpdated: string
+    collected: number[];
+    wishlist: number[];
+    notes: Record<number, string>;
+  };
+  lastUpdated: string;
 }
 
 // ============================================================================
@@ -320,142 +319,142 @@ export interface CollectionTracking {
 // ============================================================================
 
 export interface StatFilter {
-  function: 'requires' | 'modifies'
-  stat: number
-  operator: '==' | '<=' | '>=' | '!='
-  value: number
+  function: 'requires' | 'modifies';
+  stat: number;
+  operator: '==' | '<=' | '>=' | '!=';
+  value: number;
 }
 
 export interface ItemSearchQuery {
-  search?: string
-  exact_match?: boolean
-  search_fields?: string[]
-  item_class?: number | number[]  // Support both single value and array for backwards compatibility
-  min_ql?: number
-  max_ql?: number
-  is_nano?: boolean
-  has_stats?: number[]
+  search?: string;
+  exact_match?: boolean;
+  search_fields?: string[];
+  item_class?: number | number[]; // Support both single value and array for backwards compatibility
+  min_ql?: number;
+  max_ql?: number;
+  is_nano?: boolean;
+  has_stats?: number[];
   // New advanced search parameters
-  slot?: number
-  profession?: number
-  breed?: number
-  gender?: number
-  faction?: number
-  froob_friendly?: boolean
-  nodrop?: boolean
-  stat_bonuses?: number[]
-  stat_filters?: StatFilter[]
-  strain?: number
-  page?: number
-  limit?: number
-  sort?: 'name' | 'ql' | 'item_class' | 'aoid'
-  sort_order?: 'asc' | 'desc'
+  slot?: number;
+  profession?: number;
+  breed?: number;
+  gender?: number;
+  faction?: number;
+  froob_friendly?: boolean;
+  nodrop?: boolean;
+  stat_bonuses?: number[];
+  stat_filters?: StatFilter[];
+  strain?: number;
+  page?: number;
+  limit?: number;
+  sort?: 'name' | 'ql' | 'item_class' | 'aoid';
+  sort_order?: 'asc' | 'desc';
 }
 
 export interface SpellSearchQuery {
-  search?: string
-  has_criteria?: boolean
-  spell_id?: number
-  page?: number
-  limit?: number
+  search?: string;
+  has_criteria?: boolean;
+  spell_id?: number;
+  page?: number;
+  limit?: number;
 }
 
 // Pagination fields removed - all filtering now handled client-side
 export interface SymbiantSearchQuery {
-  search?: string
-  family?: string
-  families?: string[]
-  slot_id?: number
-  min_ql?: number
-  max_ql?: number
-  min_level?: number
-  max_level?: number
+  search?: string;
+  family?: string;
+  families?: string[];
+  slot_id?: number;
+  min_ql?: number;
+  max_ql?: number;
+  min_level?: number;
+  max_level?: number;
 }
 
 export interface MobSearchQuery {
-  search?: string
-  is_pocket_boss?: boolean
-  playfield?: string
-  min_level?: number
-  max_level?: number
-  page?: number
-  limit?: number
+  search?: string;
+  is_pocket_boss?: boolean;
+  playfield?: string;
+  min_level?: number;
+  max_level?: number;
+  page?: number;
+  limit?: number;
 }
 
 export interface MobDropsQuery {
-  family?: string
+  family?: string;
 }
 
 // Legacy compatibility - will be deprecated
-export type PocketBossSearchQuery = MobSearchQuery
+export type PocketBossSearchQuery = MobSearchQuery;
 
 // ============================================================================
 // Advanced Query Types
 // ============================================================================
 
 export interface StatRequirement {
-  stat: number
-  operator: 'gte' | 'lte' | 'eq'
-  value: number
+  stat: number;
+  operator: 'gte' | 'lte' | 'eq';
+  value: number;
 }
 
 export interface ItemFilterRequest {
-  stat_requirements?: StatRequirement[]
-  item_class?: number[]
-  ql_range?: [number, number]
-  is_nano?: boolean
-  has_attack_defense?: boolean
-  has_spell_data?: boolean
+  stat_requirements?: StatRequirement[];
+  item_class?: number[];
+  ql_range?: [number, number];
+  is_nano?: boolean;
+  has_attack_defense?: boolean;
+  has_spell_data?: boolean;
 }
 
 export interface ItemFilters {
   // Basic type filters
-  isNano?: boolean
-  isWeapon?: boolean
-  itemClasses?: number[]
-  
+  isNano?: boolean;
+  isWeapon?: boolean;
+  itemClasses?: number[];
+
   // Quality level filters
-  minQL?: number
-  maxQL?: number
-  
+  minQL?: number;
+  maxQL?: number;
+
   // Stat filters
-  statFilterMode?: 'any' | 'can_meet' | 'cannot_meet' | 'has_stats'
-  selectedStats?: number[]
-  statMinValues?: Record<number, number>
-  
+  statFilterMode?: 'any' | 'can_meet' | 'cannot_meet' | 'has_stats';
+  selectedStats?: number[];
+  statMinValues?: Record<number, number>;
+
   // Property filters
-  hasEffects?: boolean | null
-  hasRequirements?: boolean | null
-  isTradeable?: boolean | null
-  isDroppable?: boolean | null
-  
+  hasEffects?: boolean | null;
+  hasRequirements?: boolean | null;
+  isTradeable?: boolean | null;
+  isDroppable?: boolean | null;
+
   // Source filters
-  sources?: string[]
-  
+  sources?: string[];
+
   // Special filters
-  favorite_items?: boolean
+  favorite_items?: boolean;
 }
 
 export interface PaginationInfo {
-  page: number
-  limit: number
-  offset: number
-  total: number
-  hasNext: boolean
-  hasPrev: boolean
+  page: number;
+  limit: number;
+  offset: number;
+  total: number;
+  hasNext: boolean;
+  hasPrev: boolean;
 }
 
 export interface ItemCompatibilityRequest {
-  profile: TinkerProfile
-  item_ids: number[]
-  check_type: 'equip' | 'use' | 'cast'
+  profile: TinkerProfile;
+  item_ids: number[];
+  check_type: 'equip' | 'use' | 'cast';
 }
 
 export interface ItemCompatibilityResult {
-  item_id: number
-  compatible: boolean
-  missing_requirements?: StatRequirement[]
-  suggestions?: string[]
+  item_id: number;
+  compatible: boolean;
+  missing_requirements?: StatRequirement[];
+  suggestions?: string[];
 }
 
 // ============================================================================
@@ -463,30 +462,30 @@ export interface ItemCompatibilityResult {
 // ============================================================================
 
 export interface BuildComponent {
-  slot: string
-  item: Item
-  priority: number
+  slot: string;
+  item: Item;
+  priority: number;
 }
 
 export interface CharacterBuild {
-  id: string
-  name: string
-  description: string
-  profile: TinkerProfile
-  components: BuildComponent[]
+  id: string;
+  name: string;
+  description: string;
+  profile: TinkerProfile;
+  components: BuildComponent[];
   metadata: {
-    created_at: string
-    updated_at: string
-    version: string
-  }
+    created_at: string;
+    updated_at: string;
+    version: string;
+  };
 }
 
 export interface BuildAnalysis {
-  total_stats: Record<number, number>
-  conflicts: string[]
-  suggestions: string[]
-  missing_requirements: StatRequirement[]
-  optimization_score: number
+  total_stats: Record<number, number>;
+  conflicts: string[];
+  suggestions: string[];
+  missing_requirements: StatRequirement[];
+  optimization_score: number;
 }
 
 // ============================================================================
@@ -503,28 +502,28 @@ export enum ErrorCodes {
   INTERNAL_ERROR = 'INTERNAL_ERROR',
   SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE',
   TIMEOUT = 'TIMEOUT',
-  DATABASE_ERROR = 'DATABASE_ERROR'
+  DATABASE_ERROR = 'DATABASE_ERROR',
 }
 
 export interface ApiError {
-  code: ErrorCodes
-  message: string
+  code: ErrorCodes;
+  message: string;
   details?: {
-    field?: string
-    constraint?: string
-    suggestion?: string
-  }
-  timestamp: string
-  requestId: string
+    field?: string;
+    constraint?: string;
+    suggestion?: string;
+  };
+  timestamp: string;
+  requestId: string;
 }
 
 export interface UserFriendlyError {
-  type: 'error' | 'warning' | 'info'
-  title: string
-  message: string
-  action: string
-  recoverable: boolean
-  retryAfter?: number
+  type: 'error' | 'warning' | 'info';
+  title: string;
+  message: string;
+  action: string;
+  recoverable: boolean;
+  retryAfter?: number;
 }
 
 // ============================================================================
@@ -532,24 +531,24 @@ export interface UserFriendlyError {
 // ============================================================================
 
 export interface CacheEntry<T> {
-  data: T
-  timestamp: number
-  expiry: number
+  data: T;
+  timestamp: number;
+  expiry: number;
 }
 
 export interface CacheConfig {
   staticData: {
-    ttl: number
-    keys: string[]
-  }
+    ttl: number;
+    keys: string[];
+  };
   dynamicData: {
-    ttl: number
-    keys: string[]
-  }
+    ttl: number;
+    keys: string[];
+  };
   userData: {
-    ttl: number
-    keys: string[]
-  }
+    ttl: number;
+    keys: string[];
+  };
 }
 
 // ============================================================================
@@ -557,24 +556,24 @@ export interface CacheConfig {
 // ============================================================================
 
 export interface BatchRequest<T> {
-  items: T[]
-  include_related?: boolean
+  items: T[];
+  include_related?: boolean;
 }
 
 export interface BatchItemRequest {
-  item_ids: number[]
-  include_stats?: boolean
-  include_spells?: boolean
-  include_actions?: boolean
+  item_ids: number[];
+  include_stats?: boolean;
+  include_spells?: boolean;
+  include_actions?: boolean;
 }
 
 export interface SearchResponse<T> extends PaginatedResponse<T> {
   facets?: {
-    item_class?: Array<{ value: number; count: number }>
-    ql_range?: { min: number; max: number }
-    expansions?: Array<{ value: string; count: number }>
-  }
-  suggestions?: string[]
+    item_class?: Array<{ value: number; count: number }>;
+    ql_range?: { min: number; max: number };
+    expansions?: Array<{ value: string; count: number }>;
+  };
+  suggestions?: string[];
 }
 
 // ============================================================================
@@ -584,101 +583,101 @@ export interface SearchResponse<T> extends PaginatedResponse<T> {
 /** Implant selection configuration for a single slot */
 export interface ImplantSelection {
   /** Shiny cluster stat ID (e.g., 112 for Pistol, 131 for Time & Space) or null if empty */
-  shiny: number | null
+  shiny: number | null;
   /** Bright cluster stat ID or null if empty */
-  bright: number | null
+  bright: number | null;
   /** Faded cluster stat ID or null if empty */
-  faded: number | null
+  faded: number | null;
   /** Quality level (1-300) */
-  ql: number
+  ql: number;
   /** Slot bitflag string key (e.g., "2" for Eyes, "4" for Head) */
-  slotBitflag: string
+  slotBitflag: string;
   /** Full item data from API (null if not yet loaded) */
-  item: Item | null
+  item: Item | null;
 }
 
 /** Request format for implant lookup API */
 export interface ImplantLookupRequest {
   /** Slot position number or bitflag */
-  slot: number
+  slot: number;
   /** Quality level (1-300) */
-  ql: number
+  ql: number;
   /** Cluster configuration as stat ID → cluster name mapping */
-  clusters: Record<string, number>
+  clusters: Record<string, number>;
 }
 
 /** Response format for implant lookup API */
 export interface ImplantLookupResponse {
   /** Whether the lookup was successful */
-  success: boolean
+  success: boolean;
   /** The found implant item data (null if not found) */
-  item: Item | null
+  item: Item | null;
   /** Success or error message */
-  message?: string
+  message?: string;
   /** Whether the item was interpolated to target QL */
-  interpolated: boolean
+  interpolated: boolean;
   /** Base QL of the database item used */
-  base_ql?: number
+  base_ql?: number;
 }
 
 /** Requirement check result for a single stat */
 export interface ImplantRequirement {
   /** Stat ID (e.g., 134 for Treatment) */
-  stat: number
+  stat: number;
   /** Human-readable stat name */
-  statName: string
+  statName: string;
   /** Required value for this stat */
-  required: number
+  required: number;
   /** Current profile value for this stat */
-  current: number
+  current: number;
   /** Whether requirement is met */
-  met: boolean
+  met: boolean;
 }
 
 /** Treatment requirement information */
 export interface TreatmentInfo {
   /** Treatment value required by implant configuration */
-  required: number
+  required: number;
   /** Current Treatment value from profile */
-  current: number
+  current: number;
   /** Delta between required and current (positive = need more) */
-  delta: number
+  delta: number;
   /** Whether profile treatment meets requirement */
-  sufficient: boolean
+  sufficient: boolean;
 }
 
 /** Attribute requirement information for display in Requirements tab */
 export interface AttributeRequirementInfo {
   /** Stat ID (e.g., 124 for Treatment) */
-  stat: number
+  stat: number;
   /** Human-readable stat name */
-  statName: string
+  statName: string;
   /** Maximum required value for this stat */
-  required: number
+  required: number;
   /** Current profile value for this stat */
-  current: number
+  current: number;
   /** Difference (positive = need more, negative = surplus) */
-  delta: number
+  delta: number;
   /** Whether current meets requirement */
-  sufficient: boolean
+  sufficient: boolean;
 }
 
 /** Per-implant requirements grouped by slot */
 export interface PerImplantRequirement {
   /** Slot bitflag (e.g., "2" for Eyes) */
-  slot: string
+  slot: string;
   /** Display name (e.g., "Eyes") */
-  slotName: string
+  slotName: string;
   /** Requirements for this implant */
-  requirements: ImplantRequirement[]
+  requirements: ImplantRequirement[];
 }
 
 /** Validation result for implant configuration */
 export interface ImplantValidationResult {
   /** Whether configuration is valid */
-  valid: boolean
+  valid: boolean;
   /** Blocking errors (invalid clusters, QoL out of range, etc.) */
-  errors: string[]
+  errors: string[];
   /** Non-blocking warnings (suboptimal choices, etc.) */
-  warnings: string[]
+  warnings: string[];
 }

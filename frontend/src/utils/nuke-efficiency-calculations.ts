@@ -9,8 +9,8 @@
  *      .docs/plans/tinkernukes/damage-calculations.docs.md (lines 242-268)
  */
 
-import { formatTime } from './nuke-casting-calculations'
-import { calculateSustainTime, calculateCastsToEmpty } from './nuke-regen-calculations'
+import { formatTime } from './nuke-casting-calculations';
+import { calculateSustainTime, calculateCastsToEmpty } from './nuke-regen-calculations';
 
 // ============================================================================
 // Core Efficiency Calculations
@@ -47,32 +47,32 @@ export function calculateDPS(
 ): number {
   // Validate inputs - ensure all are valid numbers
   if (!Number.isFinite(midDamage) || !Number.isFinite(castTime) || !Number.isFinite(rechargeTime)) {
-    return 0
+    return 0;
   }
 
   // Calculate base cycle time (cast + recharge)
-  let cycleTime = castTime + rechargeTime
+  let cycleTime = castTime + rechargeTime;
 
   // For DoT nanos, add tick duration to cycle time
   if (tickCount > 1 && tickInterval > 0) {
-    const tickDuration = (tickCount * tickInterval) / 100
-    cycleTime += tickDuration
+    const tickDuration = (tickCount * tickInterval) / 100;
+    cycleTime += tickDuration;
   }
 
   // Prevent division by zero or invalid cycle time
   if (cycleTime === 0 || !Number.isFinite(cycleTime)) {
-    return 0
+    return 0;
   }
 
   // Calculate DPS with 2 decimal precision
-  const dps = midDamage / cycleTime
+  const dps = midDamage / cycleTime;
 
   // Ensure result is valid
   if (!Number.isFinite(dps)) {
-    return 0
+    return 0;
   }
 
-  return Number(dps.toFixed(2))
+  return Number(dps.toFixed(2));
 }
 
 /**
@@ -92,29 +92,26 @@ export function calculateDPS(
  * // 1000 damage, 450 nano cost
  * calculateDamagePerNano(1000, 450) // Returns 2.22
  */
-export function calculateDamagePerNano(
-  midDamage: number,
-  modifiedNanoCost: number
-): number {
+export function calculateDamagePerNano(midDamage: number, modifiedNanoCost: number): number {
   // Validate inputs
   if (!Number.isFinite(midDamage) || !Number.isFinite(modifiedNanoCost)) {
-    return 0
+    return 0;
   }
 
   // Prevent division by zero
   if (modifiedNanoCost === 0) {
-    return 0
+    return 0;
   }
 
   // Calculate ratio with 2 decimal precision
-  const ratio = midDamage / modifiedNanoCost
+  const ratio = midDamage / modifiedNanoCost;
 
   // Ensure result is valid
   if (!Number.isFinite(ratio)) {
-    return 0
+    return 0;
   }
 
-  return Number(ratio.toFixed(2))
+  return Number(ratio.toFixed(2));
 }
 
 /**
@@ -143,27 +140,31 @@ export function calculateNanoPerSecond(
   rechargeTime: number
 ): number {
   // Validate inputs
-  if (!Number.isFinite(modifiedNanoCost) || !Number.isFinite(castTime) || !Number.isFinite(rechargeTime)) {
-    return 0
+  if (
+    !Number.isFinite(modifiedNanoCost) ||
+    !Number.isFinite(castTime) ||
+    !Number.isFinite(rechargeTime)
+  ) {
+    return 0;
   }
 
   // Calculate cycle time (cast + recharge)
-  const cycleTime = castTime + rechargeTime
+  const cycleTime = castTime + rechargeTime;
 
   // Prevent division by zero or invalid cycle time
   if (cycleTime === 0 || !Number.isFinite(cycleTime)) {
-    return 0
+    return 0;
   }
 
   // Calculate consumption rate with 2 decimal precision
-  const nanoPerSecond = modifiedNanoCost / cycleTime
+  const nanoPerSecond = modifiedNanoCost / cycleTime;
 
   // Ensure result is valid
   if (!Number.isFinite(nanoPerSecond)) {
-    return 0
+    return 0;
   }
 
-  return Number(nanoPerSecond.toFixed(2))
+  return Number(nanoPerSecond.toFixed(2));
 }
 
 // ============================================================================
@@ -180,7 +181,7 @@ export function calculateNanoPerSecond(
  * formatDPS(111.11111) // Returns "111.11"
  */
 export function formatDPS(dps: number): string {
-  return dps.toFixed(2)
+  return dps.toFixed(2);
 }
 
 /**
@@ -193,7 +194,7 @@ export function formatDPS(dps: number): string {
  * formatDamagePerNano(5.0) // Returns "5.00"
  */
 export function formatDamagePerNano(damagePerNano: number): string {
-  return damagePerNano.toFixed(2)
+  return damagePerNano.toFixed(2);
 }
 
 /**
@@ -206,7 +207,7 @@ export function formatDamagePerNano(damagePerNano: number): string {
  * formatNanoPerSecond(22.222) // Returns "22.22"
  */
 export function formatNanoPerSecond(nanoPerSecond: number): string {
-  return nanoPerSecond.toFixed(2)
+  return nanoPerSecond.toFixed(2);
 }
 
 /**
@@ -227,11 +228,11 @@ export function formatNanoPerSecond(nanoPerSecond: number): string {
  */
 export function formatSustainTime(sustainTime: number): string {
   if (sustainTime === Infinity) {
-    return '∞'
+    return '∞';
   }
 
   // Use formatTime from nuke-casting-calculations
-  return formatTime(sustainTime)
+  return formatTime(sustainTime);
 }
 
 /**
@@ -250,10 +251,10 @@ export function formatSustainTime(sustainTime: number): string {
  */
 export function formatCastsToEmpty(castsToEmpty: number): string {
   if (castsToEmpty === Infinity) {
-    return '∞'
+    return '∞';
   }
 
-  return Math.floor(castsToEmpty).toString()
+  return Math.floor(castsToEmpty).toString();
 }
 
 // ============================================================================
@@ -291,26 +292,26 @@ export function calculateSustainMetrics(
   rechargeTime: number,
   regenPerSecond: number
 ): {
-  nanoPerSecond: number
-  sustainTime: number
-  sustainTimeFormatted: string
-  castsToEmpty: number
-  isSustainable: boolean
+  nanoPerSecond: number;
+  sustainTime: number;
+  sustainTimeFormatted: string;
+  castsToEmpty: number;
+  isSustainable: boolean;
 } {
   // Calculate nano consumption rate
-  const nanoPerSecond = calculateNanoPerSecond(modifiedNanoCost, castTime, rechargeTime)
+  const nanoPerSecond = calculateNanoPerSecond(modifiedNanoCost, castTime, rechargeTime);
 
   // Check if sustainable (regen >= consumption)
-  const isSustainable = regenPerSecond >= nanoPerSecond
+  const isSustainable = regenPerSecond >= nanoPerSecond;
 
   // Calculate sustain time using utility from nuke-regen-calculations
-  const sustainTime = calculateSustainTime(maxNano, nanoPerSecond, regenPerSecond)
+  const sustainTime = calculateSustainTime(maxNano, nanoPerSecond, regenPerSecond);
 
   // Format sustain time for display
-  const sustainTimeFormatted = formatSustainTime(sustainTime)
+  const sustainTimeFormatted = formatSustainTime(sustainTime);
 
   // Calculate casts to empty using utility from nuke-regen-calculations
-  const castsToEmpty = calculateCastsToEmpty(maxNano, modifiedNanoCost, isSustainable)
+  const castsToEmpty = calculateCastsToEmpty(maxNano, modifiedNanoCost, isSustainable);
 
   return {
     nanoPerSecond,
@@ -318,7 +319,7 @@ export function calculateSustainMetrics(
     sustainTimeFormatted,
     castsToEmpty,
     isSustainable,
-  }
+  };
 }
 
 /**
@@ -353,19 +354,19 @@ export function calculateAllEfficiencyMetrics(
   tickCount: number = 1,
   tickInterval: number = 0
 ): {
-  dps: number
-  damagePerNano: number
-  nanoPerSecond: number
-  sustainTime: number
-  sustainTimeFormatted: string
-  castsToEmpty: number
-  isSustainable: boolean
+  dps: number;
+  damagePerNano: number;
+  nanoPerSecond: number;
+  sustainTime: number;
+  sustainTimeFormatted: string;
+  castsToEmpty: number;
+  isSustainable: boolean;
 } {
   // Calculate DPS
-  const dps = calculateDPS(midDamage, castTime, rechargeTime, tickCount, tickInterval)
+  const dps = calculateDPS(midDamage, castTime, rechargeTime, tickCount, tickInterval);
 
   // Calculate damage per nano
-  const damagePerNano = calculateDamagePerNano(midDamage, modifiedNanoCost)
+  const damagePerNano = calculateDamagePerNano(midDamage, modifiedNanoCost);
 
   // Calculate sustain metrics (composes nanoPerSecond + sustain calculations)
   const sustainMetrics = calculateSustainMetrics(
@@ -374,13 +375,13 @@ export function calculateAllEfficiencyMetrics(
     castTime,
     rechargeTime,
     regenPerSecond
-  )
+  );
 
   return {
     dps,
     damagePerNano,
     ...sustainMetrics,
-  }
+  };
 }
 
 // ============================================================================
@@ -398,4 +399,4 @@ export const nukeEfficiencyCalculations = {
   formatNanoPerSecond,
   formatSustainTime,
   formatCastsToEmpty,
-}
+};

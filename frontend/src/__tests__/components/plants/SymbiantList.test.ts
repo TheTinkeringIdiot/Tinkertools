@@ -1,6 +1,13 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest';
 import { nextTick } from 'vue';
-import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION, BREED } from '@/__tests__/helpers';
+import {
+  mountWithContext,
+  standardCleanup,
+  createTestProfile,
+  SKILL_ID,
+  PROFESSION,
+  BREED,
+} from '@/__tests__/helpers';
 import SymbiantList from '@/components/plants/SymbiantList.vue';
 import type { PlantSymbiant } from '@/types/plants';
 import { apiClient } from '@/services/api-client';
@@ -10,14 +17,15 @@ vi.mock('primevue/badge', () => ({
   default: {
     name: 'Badge',
     template: '<span class="badge" :class="severity">{{ value }}</span>',
-    props: ['value', 'severity', 'size']
-  }
+    props: ['value', 'severity', 'size'],
+  },
 }));
 
 vi.mock('primevue/button', () => ({
   default: {
     name: 'Button',
-    template: '<button @click="handleClick" :class="[severity, { text }]" :aria-label="ariaLabel">{{ label }}<i :class="icon"></i></button>',
+    template:
+      '<button @click="handleClick" :class="[severity, { text }]" :aria-label="ariaLabel">{{ label }}<i :class="icon"></i></button>',
     props: ['icon', 'label', 'severity', 'size', 'text', 'ariaLabel'],
     emits: ['click'],
     methods: {
@@ -26,34 +34,36 @@ vi.mock('primevue/button', () => ({
           event.stopPropagation();
         }
         this.$emit('click', event);
-      }
-    }
-  }
+      },
+    },
+  },
 }));
 
 vi.mock('primevue/dropdown', () => ({
   default: {
     name: 'Dropdown',
-    template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select>',
+    template:
+      '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select>',
     props: ['modelValue', 'options', 'optionLabel', 'optionValue', 'placeholder'],
-    emits: ['update:modelValue']
-  }
+    emits: ['update:modelValue'],
+  },
 }));
 
 vi.mock('primevue/paginator', () => ({
   default: {
     name: 'Paginator',
-    template: '<div class="paginator"><button @click="$emit(\'page\', { page: 0 })">First</button><button @click="$emit(\'page\', { page: Math.floor(first/rows) - 1 })">Prev</button><button @click="$emit(\'page\', { page: Math.floor(first/rows) + 1 })">Next</button></div>',
+    template:
+      '<div class="paginator"><button @click="$emit(\'page\', { page: 0 })">First</button><button @click="$emit(\'page\', { page: Math.floor(first/rows) - 1 })">Prev</button><button @click="$emit(\'page\', { page: Math.floor(first/rows) + 1 })">Next</button></div>',
     props: ['rows', 'totalRecords', 'first', 'template', 'currentPageReportTemplate'],
-    emits: ['page']
-  }
+    emits: ['page'],
+  },
 }));
 
 vi.mock('primevue/progressspinner', () => ({
   default: {
     name: 'ProgressSpinner',
-    template: '<div class="progress-spinner">Loading...</div>'
-  }
+    template: '<div class="progress-spinner">Loading...</div>',
+  },
 }));
 
 describe('SymbiantList', () => {
@@ -64,13 +74,13 @@ describe('SymbiantList', () => {
     // Fetch real symbiants from backend for testing
     const response = await apiClient.searchSymbiants({ limit: 5 });
     if (response.success) {
-      realSymbiants = response.data.map(symbiant => ({
+      realSymbiants = response.data.map((symbiant) => ({
         ...symbiant,
         name: symbiant.name || `Symbiant ${symbiant.id}`,
         description: symbiant.description || `Symbiant with AOID ${symbiant.aoid}`,
         slot: symbiant.slot || 'unknown',
         qualityLevel: symbiant.qualityLevel || 100,
-        statBonuses: symbiant.statBonuses || []
+        statBonuses: symbiant.statBonuses || [],
       })) as PlantSymbiant[];
     } else {
       // Fallback minimal data for testing
@@ -81,16 +91,16 @@ describe('SymbiantList', () => {
           name: 'Test Symbiant 1',
           family: 'Test',
           slot: 'head',
-          qualityLevel: 200
+          qualityLevel: 200,
         },
         {
-          id: 2, 
+          id: 2,
           aoid: 102,
           name: 'Test Symbiant 2',
           family: 'Test',
           slot: 'chest',
-          qualityLevel: 150
-        }
+          qualityLevel: 150,
+        },
       ] as PlantSymbiant[];
     }
   });
@@ -100,13 +110,13 @@ describe('SymbiantList', () => {
       props: {
         symbiants: realSymbiants,
         loading: false,
-        buildMode: false
-      }
+        buildMode: false,
+      },
     });
   });
 
   afterEach(() => {
-    standardCleanup()
+    standardCleanup();
     wrapper?.unmount();
   });
 
@@ -131,7 +141,7 @@ describe('SymbiantList', () => {
   });
 
   it('displays all symbiants in list', () => {
-    realSymbiants.forEach(symbiant => {
+    realSymbiants.forEach((symbiant) => {
       expect(wrapper.text()).toContain(symbiant.name);
     });
   });
@@ -140,10 +150,12 @@ describe('SymbiantList', () => {
     const firstSymbiant = realSymbiants[0];
     if (firstSymbiant) {
       if (firstSymbiant.family) expect(wrapper.text()).toContain(firstSymbiant.family);
-      if (firstSymbiant.qualityLevel) expect(wrapper.text()).toContain(`QL ${firstSymbiant.qualityLevel}`);
+      if (firstSymbiant.qualityLevel)
+        expect(wrapper.text()).toContain(`QL ${firstSymbiant.qualityLevel}`);
       if (firstSymbiant.slot) {
         // Check for formatted slot name (e.g. 'head' becomes 'Head')
-        const formattedSlot = firstSymbiant.slot.charAt(0).toUpperCase() + firstSymbiant.slot.slice(1);
+        const formattedSlot =
+          firstSymbiant.slot.charAt(0).toUpperCase() + firstSymbiant.slot.slice(1);
         expect(wrapper.text()).toContain(formattedSlot);
       }
       if (firstSymbiant.description) expect(wrapper.text()).toContain(firstSymbiant.description);
@@ -154,17 +166,20 @@ describe('SymbiantList', () => {
 
   it('displays stat bonuses as badges when available', () => {
     const badges = wrapper.findAll('.badge');
-    const symbiantsWithBonuses = realSymbiants.filter(s => s.statBonuses && s.statBonuses.length > 0);
-    
+    const symbiantsWithBonuses = realSymbiants.filter(
+      (s) => s.statBonuses && s.statBonuses.length > 0
+    );
+
     if (symbiantsWithBonuses.length > 0) {
       // Should have some badges (QL badges + stat bonus badges)
       expect(badges.length).toBeGreaterThanOrEqual(0);
-      
+
       // Check for stat bonus patterns in the component HTML
-      const hasStatBonuses = wrapper.html().includes('+') || 
-                           wrapper.text().includes('STR') || 
-                           wrapper.text().includes('AGI') ||
-                           wrapper.text().includes('INT');
+      const hasStatBonuses =
+        wrapper.html().includes('+') ||
+        wrapper.text().includes('STR') ||
+        wrapper.text().includes('AGI') ||
+        wrapper.text().includes('INT');
       expect(hasStatBonuses || symbiantsWithBonuses.length === 0).toBe(true);
     } else {
       // No symbiants with bonuses, that's OK
@@ -183,16 +198,20 @@ describe('SymbiantList', () => {
         { statId: 'agility', statName: 'Agility', value: 25, type: 'bonus' },
         { statId: 'stamina', statName: 'Stamina', value: 30, type: 'bonus' },
         { statId: 'intelligence', statName: 'Intelligence', value: 40, type: 'bonus' },
-        { statId: 'sense', statName: 'Sense', value: 20, type: 'bonus' }
-      ]
+        { statId: 'sense', statName: 'Sense', value: 20, type: 'bonus' },
+      ],
     };
 
     await wrapper.setProps({ symbiants: [symbiantWithManyBonuses] });
     await wrapper.vm.$nextTick();
-    
+
     // Check if the component shows more badge or has the expected pattern
     const text = wrapper.text();
-    expect(text.includes('+2 more') || text.includes('more') || symbiantWithManyBonuses.statBonuses.length > 3).toBe(true);
+    expect(
+      text.includes('+2 more') ||
+        text.includes('more') ||
+        symbiantWithManyBonuses.statBonuses.length > 3
+    ).toBe(true);
   });
 
   it('shows add to build button in build mode', async () => {
@@ -221,7 +240,7 @@ describe('SymbiantList', () => {
 
   it('emits add-to-build when add button clicked', async () => {
     await wrapper.setProps({ buildMode: true });
-    
+
     const addButton = wrapper.find('button[aria-label="Add to build"]');
     if (addButton.exists()) {
       // Mock the event to prevent stopPropagation errors
@@ -230,9 +249,9 @@ describe('SymbiantList', () => {
       expect(wrapper.emitted('add-to-build')[0][0]).toEqual(realSymbiants[0]);
     } else {
       // Button not found, check if it exists with different selector
-      const plusButtons = wrapper.findAll('button').filter((btn: any) => 
-        btn.attributes('icon') === 'pi pi-plus'
-      );
+      const plusButtons = wrapper
+        .findAll('button')
+        .filter((btn: any) => btn.attributes('icon') === 'pi pi-plus');
       if (plusButtons.length > 0) {
         await plusButtons[0].trigger('click', { stopPropagation: vi.fn() });
         expect(wrapper.emitted('add-to-build')).toBeTruthy();
@@ -269,9 +288,9 @@ describe('SymbiantList', () => {
   it('toggles sort order when sort button clicked', async () => {
     const sortButton = wrapper.find('button[aria-label^="Sort"]');
     const initialOrder = wrapper.vm.sortOrder;
-    
+
     await sortButton.trigger('click');
-    
+
     expect(wrapper.vm.sortOrder).not.toBe(initialOrder);
   });
 
@@ -285,9 +304,9 @@ describe('SymbiantList', () => {
   it('formats slot names correctly', () => {
     // Check if any formatted slot names appear
     const possibleSlots = ['Head', 'Chest', 'Legs', 'Arms', 'Feet', 'Unknown'];
-    const foundSlot = possibleSlots.some(slot => wrapper.text().includes(slot));
-    
-    if (realSymbiants.some(s => s.slot)) {
+    const foundSlot = possibleSlots.some((slot) => wrapper.text().includes(slot));
+
+    if (realSymbiants.some((s) => s.slot)) {
       expect(foundSlot).toBe(true);
     } else {
       expect(true).toBe(true); // Skip if no slots in test data
@@ -297,10 +316,12 @@ describe('SymbiantList', () => {
   it('formats stat names correctly for badges', () => {
     // Check if any formatted stat names appear
     const possibleStats = ['STR', 'AGI', 'INT', 'STA', 'SEN', 'PSY'];
-    const foundStat = possibleStats.some(stat => wrapper.text().includes(stat));
-    
-    const hasSymbiantsWithBonuses = realSymbiants.some(s => s.statBonuses && s.statBonuses.length > 0);
-    
+    const foundStat = possibleStats.some((stat) => wrapper.text().includes(stat));
+
+    const hasSymbiantsWithBonuses = realSymbiants.some(
+      (s) => s.statBonuses && s.statBonuses.length > 0
+    );
+
     if (hasSymbiantsWithBonuses) {
       expect(foundStat).toBe(true);
     } else {
@@ -313,11 +334,11 @@ describe('SymbiantList', () => {
       id: i + 1,
       aoid: i + 100,
       name: `Test Symbiant ${i + 1}`,
-      family: 'Test'
+      family: 'Test',
     })) as PlantSymbiant[];
 
     await wrapper.setProps({ symbiants: manySymbiants });
-    
+
     const paginator = wrapper.find('.paginator');
     expect(paginator.exists()).toBe(true);
   });
@@ -327,15 +348,16 @@ describe('SymbiantList', () => {
       id: i + 1,
       aoid: i + 100,
       name: `Test Symbiant ${i + 1}`,
-      family: 'Test'
+      family: 'Test',
     })) as PlantSymbiant[];
 
     await wrapper.setProps({ symbiants: manySymbiants });
-    
-    const nextButton = wrapper.find('button').findAll('button').find((btn: any) => 
-      btn.text().includes('Next')
-    );
-    
+
+    const nextButton = wrapper
+      .find('button')
+      .findAll('button')
+      .find((btn: any) => btn.text().includes('Next'));
+
     if (nextButton) {
       await nextButton.trigger('click');
       expect(wrapper.emitted('page-change')).toBeTruthy();
@@ -344,9 +366,9 @@ describe('SymbiantList', () => {
 
   it('resets to first page when symbiants change', async () => {
     wrapper.vm.currentPage = 2;
-    
+
     await wrapper.setProps({ symbiants: [realSymbiants[0]] });
-    
+
     expect(wrapper.vm.currentPage).toBe(0);
   });
 
@@ -355,11 +377,11 @@ describe('SymbiantList', () => {
       id: 4,
       aoid: 104,
       name: 'Plain Symbiant',
-      family: 'Basic'
+      family: 'Basic',
     };
 
     await wrapper.setProps({ symbiants: [symbiantWithoutBonuses] });
-    
+
     expect(wrapper.text()).toContain('Plain Symbiant');
     // Should not crash and should not show stat bonus badges
   });

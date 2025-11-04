@@ -3,18 +3,14 @@ SymbiantSlot - Individual symbiant slot in character builder
 Represents a single equipable slot on the character
 -->
 <template>
-  <div
-    :style="position"
-    class="absolute symbiant-slot"
-    @click="onClick"
-  >
+  <div :style="position" class="absolute symbiant-slot" @click="onClick">
     <!-- Slot Circle -->
     <div
       :class="[
         'w-8 h-8 rounded-full border-2 cursor-pointer transition-all duration-200 flex items-center justify-center',
-        symbiant 
-          ? 'border-primary-500 bg-primary-50 dark:bg-primary-950' 
-          : 'border-surface-400 dark:border-surface-600 bg-surface-100 dark:bg-surface-800 hover:border-primary-400'
+        symbiant
+          ? 'border-primary-500 bg-primary-50 dark:bg-primary-950'
+          : 'border-surface-400 dark:border-surface-600 bg-surface-100 dark:bg-surface-800 hover:border-primary-400',
       ]"
       :title="slotName"
     >
@@ -23,12 +19,12 @@ Represents a single equipable slot on the character
       <!-- Empty Slot -->
       <i v-else class="pi pi-plus text-xs text-surface-500 dark:text-surface-400"></i>
     </div>
-    
+
     <!-- Slot Label -->
     <div class="mt-1 text-xs text-center text-surface-600 dark:text-surface-400 whitespace-nowrap">
       {{ slotName }}
     </div>
-    
+
     <!-- Symbiant Name (if equipped) -->
     <div
       v-if="symbiant"
@@ -37,7 +33,7 @@ Represents a single equipable slot on the character
     >
       {{ symbiant.name }}
     </div>
-    
+
     <!-- Remove Button (on hover, if symbiant equipped) -->
     <Button
       v-if="symbiant"
@@ -65,7 +61,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  symbiant: null
+  symbiant: null,
 });
 
 interface Emits {

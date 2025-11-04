@@ -14,9 +14,9 @@
  * - .docs/plans/tinkernukes/shared.md (ID-based skill access pattern)
  */
 
-import type { OffensiveNano, UsabilityStatus } from '@/types/offensive-nano'
-import type { Character } from './stat-calculations'
-import { checkActionRequirements, parseAction } from '@/services/action-criteria'
+import type { OffensiveNano, UsabilityStatus } from '@/types/offensive-nano';
+import type { Character } from './stat-calculations';
+import { checkActionRequirements, parseAction } from '@/services/action-criteria';
 
 // ============================================================================
 // Profile-Based Requirement Filtering
@@ -46,15 +46,15 @@ export function filterByCharacterProfile(
   return nanos.filter((nano) => {
     // Check if nano has actions (should always have at least one)
     if (!nano.item.actions || nano.item.actions.length === 0) {
-      console.warn(`[filterByCharacterProfile] Nano ${nano.id} has no actions`)
-      return true // No requirements means always usable
+      console.warn(`[filterByCharacterProfile] Nano ${nano.id} has no actions`);
+      return true; // No requirements means always usable
     }
 
     // Use first action (typically "Use" action for nanos)
-    const action = parseAction(nano.item.actions[0])
-    const result = checkActionRequirements(action, character.baseStats || {})
-    return result.canPerform
-  })
+    const action = parseAction(nano.item.actions[0]);
+    const result = checkActionRequirements(action, character.baseStats || {});
+    return result.canPerform;
+  });
 }
 
 // ============================================================================
@@ -83,26 +83,27 @@ export function filterBySkillRequirements(
   return nanos.filter((nano) => {
     // No requirements means nano is always usable
     if (!nano.castingRequirements || nano.castingRequirements.length === 0) {
-      return true
+      return true;
     }
 
     // Check all skill requirements
     return nano.castingRequirements.every((requirement) => {
       // Only check skill requirements (ignore stat, level, etc.)
       if (requirement.type !== 'skill') {
-        return true
+        return true;
       }
 
       // Get skill ID from requirement
-      const skillId = typeof requirement.requirement === 'number'
-        ? requirement.requirement
-        : parseInt(requirement.requirement as string, 10)
+      const skillId =
+        typeof requirement.requirement === 'number'
+          ? requirement.requirement
+          : parseInt(requirement.requirement as string, 10);
 
       // Check if skill value meets requirement
-      const currentSkillValue = skills[skillId] ?? 0
-      return currentSkillValue >= requirement.value
-    })
-  })
+      const currentSkillValue = skills[skillId] ?? 0;
+      return currentSkillValue >= requirement.value;
+    });
+  });
 }
 
 // ============================================================================
@@ -128,34 +129,31 @@ export function filterBySkillRequirements(
  * const matterCreationNanos = filterBySchool(allNanos, 130)
  * const allNanos = filterBySchool(nanos, null)
  */
-export function filterBySchool(
-  nanos: OffensiveNano[],
-  schoolId: number | null
-): OffensiveNano[] {
+export function filterBySchool(nanos: OffensiveNano[], schoolId: number | null): OffensiveNano[] {
   // null means no filtering
   if (schoolId === null) {
-    return nanos
+    return nanos;
   }
 
   return nanos.filter((nano) => {
     // Check if nano has actions
     if (!nano.item.actions || nano.item.actions.length === 0) {
-      return false
+      return false;
     }
 
     // Check first action's criteria for school requirement
-    const criteria = nano.item.actions[0].criteria || []
+    const criteria = nano.item.actions[0].criteria || [];
 
     return criteria.some((criterion) => {
       // School requirements are skill stat checks (value1 = skill ID)
       // Skip logical operators (value1 = 0)
       if (criterion.value1 === 0) {
-        return false
+        return false;
       }
 
-      return criterion.value1 === schoolId
-    })
-  })
+      return criterion.value1 === schoolId;
+    });
+  });
 }
 
 // ============================================================================
@@ -180,9 +178,9 @@ export function filterByQLRange(
   maxQL: number
 ): OffensiveNano[] {
   return nanos.filter((nano) => {
-    const ql = nano.qualityLevel
-    return ql >= minQL && ql <= maxQL
-  })
+    const ql = nano.qualityLevel;
+    return ql >= minQL && ql <= maxQL;
+  });
 }
 
 // ============================================================================
@@ -200,20 +198,17 @@ export function filterByQLRange(
  * const nukeNanos = searchNanosByName(allNanos, "nuke")
  * const zapNanos = searchNanosByName(allNanos, "zap")
  */
-export function searchNanosByName(
-  nanos: OffensiveNano[],
-  query: string
-): OffensiveNano[] {
+export function searchNanosByName(nanos: OffensiveNano[], query: string): OffensiveNano[] {
   // Empty query returns all nanos
   if (!query || query.trim() === '') {
-    return nanos
+    return nanos;
   }
 
-  const lowerQuery = query.toLowerCase().trim()
+  const lowerQuery = query.toLowerCase().trim();
 
   return nanos.filter((nano) => {
-    return nano.name.toLowerCase().includes(lowerQuery)
-  })
+    return nano.name.toLowerCase().includes(lowerQuery);
+  });
 }
 
 // ============================================================================
@@ -244,32 +239,32 @@ export function calculateUsabilityStatus(
 ): UsabilityStatus {
   // Check if nano has actions
   if (!nano.item.actions || nano.item.actions.length === 0) {
-    return 'usable' // No requirements means always usable
+    return 'usable'; // No requirements means always usable
   }
 
   // Use first action (typically "Use" action for nanos)
-  const action = parseAction(nano.item.actions[0])
-  const result = checkActionRequirements(action, skills)
+  const action = parseAction(nano.item.actions[0]);
+  const result = checkActionRequirements(action, skills);
 
   // If all requirements met, status is 'usable'
   if (result.canPerform) {
-    return 'usable'
+    return 'usable';
   }
 
   // Calculate maximum gap from unmet requirements
-  let maxGap = 0
+  let maxGap = 0;
   for (const unmet of result.unmetRequirements) {
-    const gap = unmet.required - unmet.current
+    const gap = unmet.required - unmet.current;
     if (gap > maxGap) {
-      maxGap = gap
+      maxGap = gap;
     }
   }
 
   // Determine status based on maximum gap
   if (maxGap <= 100) {
-    return 'close'
+    return 'close';
   } else {
-    return 'far'
+    return 'far';
   }
 }
 
@@ -299,36 +294,36 @@ export function calculateUsabilityStatus(
 export function applyNanoFilters(
   nanos: OffensiveNano[],
   options: {
-    schoolId?: number | null
-    minQL?: number
-    maxQL?: number
-    skills?: Record<number, number>
-    searchQuery?: string
+    schoolId?: number | null;
+    minQL?: number;
+    maxQL?: number;
+    skills?: Record<number, number>;
+    searchQuery?: string;
   }
 ): OffensiveNano[] {
-  let filtered = nanos
+  let filtered = nanos;
 
   // Apply school filter
   if (options.schoolId !== undefined) {
-    filtered = filterBySchool(filtered, options.schoolId)
+    filtered = filterBySchool(filtered, options.schoolId);
   }
 
   // Apply QL range filter
   if (options.minQL !== undefined && options.maxQL !== undefined) {
-    filtered = filterByQLRange(filtered, options.minQL, options.maxQL)
+    filtered = filterByQLRange(filtered, options.minQL, options.maxQL);
   }
 
   // Apply skill requirements filter
   if (options.skills) {
-    filtered = filterBySkillRequirements(filtered, options.skills)
+    filtered = filterBySkillRequirements(filtered, options.skills);
   }
 
   // Apply name search
   if (options.searchQuery) {
-    filtered = searchNanosByName(filtered, options.searchQuery)
+    filtered = searchNanosByName(filtered, options.searchQuery);
   }
 
-  return filtered
+  return filtered;
 }
 
 // ============================================================================
@@ -353,6 +348,6 @@ export function filterByUsabilityStatus(
   status: UsabilityStatus
 ): OffensiveNano[] {
   return nanos.filter((nano) => {
-    return calculateUsabilityStatus(nano, skills) === status
-  })
+    return calculateUsabilityStatus(nano, skills) === status;
+  });
 }

@@ -6,18 +6,18 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, 'src')
-    }
+      '@': path.resolve(__dirname, 'src'),
+    },
   },
   build: {
-    sourcemap: false
+    sourcemap: false,
   },
   css: {
-    devSourcemap: false
+    devSourcemap: false,
   },
   optimizeDeps: {
     exclude: ['vue-demi'],
-    force: true
+    force: true,
   },
   server: {
     host: '0.0.0.0',
@@ -28,18 +28,18 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-        secure: false
-      }
-    }
+        secure: false,
+      },
+    },
   },
   test: {
     environment: 'jsdom',
     globals: true,
-    testTimeout: 10000,  // Default 10s for all tests
+    testTimeout: 10000, // Default 10s for all tests
     hookTimeout: 10000,
     env: {
       // Backend availability check for integration tests
-      VITE_BACKEND_URL: process.env.BACKEND_URL || 'http://localhost:8000'
+      VITE_BACKEND_URL: process.env.BACKEND_URL || 'http://localhost:8000',
     },
     coverage: {
       provider: 'v8',
@@ -50,14 +50,14 @@ export default defineConfig({
         '**/tests/**',
         '**/__tests__/**',
         '**/node_modules/**',
-        '**/dist/**'
+        '**/dist/**',
       ],
       thresholds: {
         lines: 60,
         functions: 60,
         branches: 60,
-        statements: 60
-      }
-    }
-  }
+        statements: 60,
+      },
+    },
+  },
 });

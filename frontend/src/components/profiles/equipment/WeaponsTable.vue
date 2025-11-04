@@ -7,40 +7,33 @@ Visual grid showing weapon slot positions with equipped items as icons
     <div class="equipment-grid">
       <!-- First row: Right Hand, Left Hand -->
       <div class="grid grid-cols-2 gap-2 mb-2">
-        <EquipmentSlot
-          slot-name="Right Hand"
-          :item="getWeaponBySlot('Right Hand')"
-        />
-        <EquipmentSlot
-          slot-name="Left Hand"
-          :item="getWeaponBySlot('Left Hand')"
-        />
+        <EquipmentSlot slot-name="Right Hand" :item="getWeaponBySlot('Right Hand')" />
+        <EquipmentSlot slot-name="Left Hand" :item="getWeaponBySlot('Left Hand')" />
       </div>
-      
+
       <!-- Second row: Belt (centered) -->
       <div class="flex justify-center">
-        <EquipmentSlot
-          slot-name="Belt"
-          :item="getWeaponBySlot('Belt')"
-        />
+        <EquipmentSlot slot-name="Belt" :item="getWeaponBySlot('Belt')" />
       </div>
     </div>
-    
+
     <!-- Equipment List (fallback for non-visual display) -->
     <div v-if="hasEquippedItems" class="mt-4">
       <div class="text-sm text-surface-600 dark:text-surface-400 mb-2">Equipped Weapons:</div>
       <div class="space-y-1">
-        <div 
+        <div
           v-for="(item, slotName) in equippedWeapons"
           :key="slotName"
           class="flex justify-between text-sm"
         >
           <span class="text-surface-700 dark:text-surface-300">{{ slotName }}:</span>
-          <span class="text-surface-900 dark:text-surface-50 font-medium">{{ getItemName(item) }}</span>
+          <span class="text-surface-900 dark:text-surface-50 font-medium">{{
+            getItemName(item)
+          }}</span>
         </div>
       </div>
     </div>
-    
+
     <!-- Empty State -->
     <div v-else class="text-center py-4">
       <i class="pi pi-shield text-2xl text-surface-300 dark:text-surface-600 mb-2"></i>

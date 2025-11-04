@@ -1,11 +1,11 @@
 /**
  * Vue Composable for Action and Criteria Display
- * 
+ *
  * Provides reactive utilities for Vue components to display and evaluate
  * action requirements and criteria in an intuitive format.
  */
 
-import { computed, ref, type Ref } from 'vue'
+import { computed, ref, type Ref } from 'vue';
 import {
   parseAction,
   transformCriterionForDisplay,
@@ -19,9 +19,9 @@ import {
   type ParsedAction,
   type DisplayCriterion,
   type CriteriaExpression,
-  type CriteriaTreeNode
-} from '../services/action-criteria'
-import type { Action, Criterion } from '../types/api'
+  type CriteriaTreeNode,
+} from '../services/action-criteria';
+import type { Action, Criterion } from '../types/api';
 
 // ============================================================================
 // Action Display Composable
@@ -32,49 +32,49 @@ import type { Action, Criterion } from '../types/api'
  */
 export function useActionDisplay(actions: Ref<Action[]>) {
   const parsedActions = computed(() => {
-    return actions.value.map(parseAction)
-  })
-  
+    return actions.value.map(parseAction);
+  });
+
   const actionsWithRequirements = computed(() => {
-    return parsedActions.value.filter(action => action.hasRequirements)
-  })
-  
+    return parsedActions.value.filter((action) => action.hasRequirements);
+  });
+
   const simpleActions = computed(() => {
-    return parsedActions.value.filter(action => !action.hasRequirements)
-  })
-  
+    return parsedActions.value.filter((action) => !action.hasRequirements);
+  });
+
   /**
    * Get formatted action names
    */
   const getActionNames = computed(() => {
-    return parsedActions.value.map(action => action.actionName)
-  })
-  
+    return parsedActions.value.map((action) => action.actionName);
+  });
+
   /**
    * Get primary action (usually first action or "Wield")
    */
   const primaryAction = computed(() => {
     // Look for Wield action first
-    const wieldAction = parsedActions.value.find(action => 
-      action.actionName === 'Wield' || action.actionName === 'Wear'
-    )
-    if (wieldAction) return wieldAction
-    
+    const wieldAction = parsedActions.value.find(
+      (action) => action.actionName === 'Wield' || action.actionName === 'Wear'
+    );
+    if (wieldAction) return wieldAction;
+
     // Otherwise return first action with requirements
-    const actionWithReqs = actionsWithRequirements.value[0]
-    if (actionWithReqs) return actionWithReqs
-    
+    const actionWithReqs = actionsWithRequirements.value[0];
+    if (actionWithReqs) return actionWithReqs;
+
     // Fallback to first action
-    return parsedActions.value[0] || null
-  })
-  
+    return parsedActions.value[0] || null;
+  });
+
   return {
     parsedActions,
     actionsWithRequirements,
     simpleActions,
     getActionNames,
-    primaryAction
-  }
+    primaryAction,
+  };
 }
 
 // ============================================================================
@@ -86,60 +86,60 @@ export function useActionDisplay(actions: Ref<Action[]>) {
  */
 export function useCriteriaDisplay(criteria: Ref<Criterion[]>) {
   const displayCriteria = computed(() => {
-    return criteria.value.map(transformCriterionForDisplay)
-  })
-  
+    return criteria.value.map(transformCriterionForDisplay);
+  });
+
   const statRequirements = computed(() => {
-    return displayCriteria.value.filter(criterion => criterion.isStatRequirement)
-  })
-  
+    return displayCriteria.value.filter((criterion) => criterion.isStatRequirement);
+  });
+
   const logicalOperators = computed(() => {
-    return displayCriteria.value.filter(criterion => criterion.isLogicalOperator)
-  })
-  
+    return displayCriteria.value.filter((criterion) => criterion.isLogicalOperator);
+  });
+
   const expression = computed(() => {
-    return parseCriteriaExpression(criteria.value)
-  })
-  
+    return parseCriteriaExpression(criteria.value);
+  });
+
   const formattedText = computed(() => {
-    return expression.value ? formatCriteriaText(expression.value) : ''
-  })
-  
+    return expression.value ? formatCriteriaText(expression.value) : '';
+  });
+
   const requirements = computed(() => {
-    return getCriteriaRequirements(criteria.value)
-  })
-  
+    return getCriteriaRequirements(criteria.value);
+  });
+
   /**
    * Get simplified requirements text
    */
   const simplifiedText = computed(() => {
-    const reqs = statRequirements.value
-    if (reqs.length === 0) return 'No requirements'
-    if (reqs.length === 1) return reqs[0].description
-    
+    const reqs = statRequirements.value;
+    if (reqs.length === 0) return 'No requirements';
+    if (reqs.length === 1) return reqs[0].description;
+
     // For multiple requirements, show count
-    return `${reqs.length} requirements`
-  })
-  
+    return `${reqs.length} requirements`;
+  });
+
   /**
    * Get requirements grouped by stat
    */
   const groupedRequirements = computed(() => {
-    const groups = new Map<number, DisplayCriterion[]>()
-    
+    const groups = new Map<number, DisplayCriterion[]>();
+
     for (const criterion of statRequirements.value) {
-      const existing = groups.get(criterion.stat) || []
-      existing.push(criterion)
-      groups.set(criterion.stat, existing)
+      const existing = groups.get(criterion.stat) || [];
+      existing.push(criterion);
+      groups.set(criterion.stat, existing);
     }
-    
+
     return Array.from(groups.entries()).map(([stat, criteria]) => ({
       stat,
       statName: criteria[0].statName,
-      criteria
-    }))
-  })
-  
+      criteria,
+    }));
+  });
+
   return {
     displayCriteria,
     statRequirements,
@@ -148,8 +148,8 @@ export function useCriteriaDisplay(criteria: Ref<Criterion[]>) {
     formattedText,
     requirements,
     simplifiedText,
-    groupedRequirements
-  }
+    groupedRequirements,
+  };
 }
 
 // ============================================================================
@@ -160,7 +160,7 @@ export function useCriteriaDisplay(criteria: Ref<Criterion[]>) {
  * Character stats type for evaluation
  */
 export interface CharacterStats {
-  [statId: number]: number
+  [statId: number]: number;
 }
 
 /**
@@ -170,118 +170,122 @@ export function useCriteriaEvaluation(
   actions: Ref<Action[]>,
   characterStats: Ref<CharacterStats | null>
 ) {
-  const { parsedActions } = useActionDisplay(actions)
-  
+  const { parsedActions } = useActionDisplay(actions);
+
   /**
    * Check if character can perform each action
    */
   const actionEvaluations = computed(() => {
     if (!characterStats.value) {
-      return parsedActions.value.map(action => ({
+      return parsedActions.value.map((action) => ({
         action,
         canPerform: null,
-        unmetRequirements: []
-      }))
+        unmetRequirements: [],
+      }));
     }
-    
-    return parsedActions.value.map(action => {
-      const result = checkActionRequirements(action, characterStats.value!)
+
+    return parsedActions.value.map((action) => {
+      const result = checkActionRequirements(action, characterStats.value!);
       return {
         action,
         canPerform: result.canPerform,
-        unmetRequirements: result.unmetRequirements
-      }
-    })
-  })
-  
+        unmetRequirements: result.unmetRequirements,
+      };
+    });
+  });
+
   /**
    * Get primary action evaluation
    */
   const primaryActionEvaluation = computed(() => {
-    const primary = parsedActions.value.find(action => 
-      action.actionName === 'Wield' || action.actionName === 'Wear'
-    ) || parsedActions.value[0]
-    
-    if (!primary || !characterStats.value) return null
-    
-    return checkActionRequirements(primary, characterStats.value)
-  })
-  
+    const primary =
+      parsedActions.value.find(
+        (action) => action.actionName === 'Wield' || action.actionName === 'Wear'
+      ) || parsedActions.value[0];
+
+    if (!primary || !characterStats.value) return null;
+
+    return checkActionRequirements(primary, characterStats.value);
+  });
+
   /**
    * Check if character can use the item (any action)
    */
   const canUseItem = computed(() => {
-    if (!characterStats.value) return null
-    
-    return actionEvaluations.value.some(evaluation => evaluation.canPerform === true)
-  })
-  
+    if (!characterStats.value) return null;
+
+    return actionEvaluations.value.some((evaluation) => evaluation.canPerform === true);
+  });
+
   /**
    * Get all unmet requirements across all actions
    */
   const allUnmetRequirements = computed(() => {
-    const unmet = new Map<number, any>()
-    
+    const unmet = new Map<number, any>();
+
     for (const evaluation of actionEvaluations.value) {
       for (const req of evaluation.unmetRequirements) {
         if (!unmet.has(req.stat)) {
-          unmet.set(req.stat, req)
+          unmet.set(req.stat, req);
         }
       }
     }
-    
-    return Array.from(unmet.values())
-  })
-  
+
+    return Array.from(unmet.values());
+  });
+
   /**
    * Get minimum requirements to use the item
    */
   const minimumRequirements = computed(() => {
-    const requirements = new Map<number, {
-      stat: number
-      statName: string
-      minValue: number
-      currentValue: number
-      shortfall: number
-    }>()
-    
-    if (!characterStats.value) return []
-    
+    const requirements = new Map<
+      number,
+      {
+        stat: number;
+        statName: string;
+        minValue: number;
+        currentValue: number;
+        shortfall: number;
+      }
+    >();
+
+    if (!characterStats.value) return [];
+
     for (const action of parsedActions.value) {
       for (const criterion of action.criteria) {
-        if (!criterion.isStatRequirement) continue
-        
-        const currentValue = characterStats.value[criterion.stat] || 0
-        let requiredValue = criterion.displayValue
-        
+        if (!criterion.isStatRequirement) continue;
+
+        const currentValue = characterStats.value[criterion.stat] || 0;
+        let requiredValue = criterion.displayValue;
+
         // Only consider "greater than or equal" requirements for minimums
         if (criterion.displaySymbol === '≥') {
-          const existing = requirements.get(criterion.stat)
+          const existing = requirements.get(criterion.stat);
           if (!existing || requiredValue > existing.minValue) {
             requirements.set(criterion.stat, {
               stat: criterion.stat,
               statName: criterion.statName,
               minValue: requiredValue,
               currentValue,
-              shortfall: Math.max(0, requiredValue - currentValue)
-            })
+              shortfall: Math.max(0, requiredValue - currentValue),
+            });
           }
         }
       }
     }
-    
+
     return Array.from(requirements.values())
-      .filter(req => req.shortfall > 0)
-      .sort((a, b) => b.shortfall - a.shortfall)
-  })
-  
+      .filter((req) => req.shortfall > 0)
+      .sort((a, b) => b.shortfall - a.shortfall);
+  });
+
   return {
     actionEvaluations,
     primaryActionEvaluation,
     canUseItem,
     allUnmetRequirements,
-    minimumRequirements
-  }
+    minimumRequirements,
+  };
 }
 
 // ============================================================================
@@ -295,46 +299,46 @@ export function useItemActions(
   actions: Ref<Action[]>,
   characterStats: Ref<CharacterStats | null> = ref(null)
 ) {
-  const actionDisplay = useActionDisplay(actions)
-  const evaluation = useCriteriaEvaluation(actions, characterStats)
-  
+  const actionDisplay = useActionDisplay(actions);
+  const evaluation = useCriteriaEvaluation(actions, characterStats);
+
   /**
    * Get display color for requirement status
    */
   const getRequirementColor = (canPerform: boolean | null) => {
-    if (canPerform === null) return 'gray'
-    return canPerform ? 'green' : 'red'
-  }
-  
+    if (canPerform === null) return 'gray';
+    return canPerform ? 'green' : 'red';
+  };
+
   /**
    * Get requirement severity class
    */
   const getRequirementSeverity = (canPerform: boolean | null) => {
-    if (canPerform === null) return 'secondary'
-    return canPerform ? 'success' : 'danger'
-  }
-  
+    if (canPerform === null) return 'secondary';
+    return canPerform ? 'success' : 'danger';
+  };
+
   /**
    * Format requirement shortfall
    */
   const formatShortfall = (required: number, current: number) => {
-    const shortfall = required - current
-    if (shortfall <= 0) return ''
-    return `(need ${shortfall} more)`
-  }
-  
+    const shortfall = required - current;
+    if (shortfall <= 0) return '';
+    return `(need ${shortfall} more)`;
+  };
+
   return {
     // Action display
     ...actionDisplay,
-    
+
     // Evaluation
     ...evaluation,
-    
+
     // Utility functions
     getRequirementColor,
     getRequirementSeverity,
-    formatShortfall
-  }
+    formatShortfall,
+  };
 }
 
 // ============================================================================
@@ -345,18 +349,18 @@ export function useItemActions(
  * Helper to get criteria display for a single action
  */
 export function useActionCriteria(action: Ref<Action>) {
-  const criteria = computed(() => action.value.criteria)
-  return useCriteriaDisplay(criteria)
+  const criteria = computed(() => action.value.criteria);
+  return useCriteriaDisplay(criteria);
 }
 
 /**
  * Helper to check if an action has any stat requirements
  */
 export function hasStatRequirements(action: Action): boolean {
-  return action.criteria.some(criterion => {
-    const display = transformCriterionForDisplay(criterion)
-    return display.isStatRequirement
-  })
+  return action.criteria.some((criterion) => {
+    const display = transformCriterionForDisplay(criterion);
+    return display.isStatRequirement;
+  });
 }
 
 /**
@@ -368,27 +372,27 @@ export function getMostRestrictiveRequirement(
 ): DisplayCriterion | null {
   const requirements = criteria
     .map(transformCriterionForDisplay)
-    .filter(c => c.stat === statId && c.isStatRequirement)
-  
-  if (requirements.length === 0) return null
-  
+    .filter((c) => c.stat === statId && c.isStatRequirement);
+
+  if (requirements.length === 0) return null;
+
   // For "greater than or equal" requirements, return the highest
-  const minRequirements = requirements.filter(r => r.displaySymbol === '≥')
+  const minRequirements = requirements.filter((r) => r.displaySymbol === '≥');
   if (minRequirements.length > 0) {
-    return minRequirements.reduce((highest, current) => 
+    return minRequirements.reduce((highest, current) =>
       current.displayValue > highest.displayValue ? current : highest
-    )
+    );
   }
-  
+
   // For other requirements, return the first one
-  return requirements[0]
+  return requirements[0];
 }
 
 /**
  * Helper to format a requirement for display
  */
 export function formatRequirement(criterion: DisplayCriterion): string {
-  return criterion.description
+  return criterion.description;
 }
 
 /**
@@ -398,25 +402,25 @@ export function isRequirementMet(
   criterion: DisplayCriterion,
   characterStats: CharacterStats
 ): boolean | null {
-  if (!criterion.isStatRequirement) return null
-  
-  const currentValue = characterStats[criterion.stat] || 0
-  
+  if (!criterion.isStatRequirement) return null;
+
+  const currentValue = characterStats[criterion.stat] || 0;
+
   switch (criterion.displaySymbol) {
     case '=':
-      return currentValue === criterion.displayValue
+      return currentValue === criterion.displayValue;
     case '≤':
-      return currentValue <= criterion.displayValue
+      return currentValue <= criterion.displayValue;
     case '≥':
-      return currentValue >= criterion.displayValue
+      return currentValue >= criterion.displayValue;
     case '≠':
-      return currentValue !== criterion.displayValue
+      return currentValue !== criterion.displayValue;
     case 'has':
-      return (currentValue & criterion.displayValue) === criterion.displayValue
+      return (currentValue & criterion.displayValue) === criterion.displayValue;
     case 'lacks':
-      return (currentValue & criterion.displayValue) === 0
+      return (currentValue & criterion.displayValue) === 0;
     default:
-      return null
+      return null;
   }
 }
 
@@ -432,79 +436,79 @@ export function useCriteriaTree(
   characterStats: Ref<CharacterStats | null> = ref(null)
 ) {
   const tree = computed(() => {
-    return buildCriteriaTree(criteria.value, characterStats.value || undefined)
-  })
-  
+    return buildCriteriaTree(criteria.value, characterStats.value || undefined);
+  });
+
   const shouldUseTree = computed(() => {
-    return shouldUseTreeDisplay(criteria.value)
-  })
-  
+    return shouldUseTreeDisplay(criteria.value);
+  });
+
   const treeSummary = computed(() => {
-    return getTreeSummary(tree.value)
-  })
-  
+    return getTreeSummary(tree.value);
+  });
+
   const treeStats = computed(() => {
-    if (!tree.value) return { met: 0, total: 0, partial: 0 }
-    
-    const { metCount = 0, totalCount = 0 } = tree.value
+    if (!tree.value) return { met: 0, total: 0, partial: 0 };
+
+    const { metCount = 0, totalCount = 0 } = tree.value;
     return {
       met: metCount,
       total: totalCount,
       partial: totalCount - metCount,
-      percentage: totalCount > 0 ? Math.round((metCount / totalCount) * 100) : 0
-    }
-  })
-  
+      percentage: totalCount > 0 ? Math.round((metCount / totalCount) * 100) : 0,
+    };
+  });
+
   const overallStatus = computed(() => {
-    if (!tree.value || !characterStats.value) return 'unknown'
-    return tree.value.status || 'unknown'
-  })
-  
+    if (!tree.value || !characterStats.value) return 'unknown';
+    return tree.value.status || 'unknown';
+  });
+
   return {
     tree,
     shouldUseTree,
     treeSummary,
     treeStats,
-    overallStatus
-  }
+    overallStatus,
+  };
 }
 
 /**
  * Composable for tree navigation and interaction
  */
 export function useTreeNavigation() {
-  const expandedNodes = ref<Set<string>>(new Set())
-  const focusedNodeId = ref<string | null>(null)
-  
+  const expandedNodes = ref<Set<string>>(new Set());
+  const focusedNodeId = ref<string | null>(null);
+
   function toggleNode(nodeId: string) {
     if (expandedNodes.value.has(nodeId)) {
-      expandedNodes.value.delete(nodeId)
+      expandedNodes.value.delete(nodeId);
     } else {
-      expandedNodes.value.add(nodeId)
+      expandedNodes.value.add(nodeId);
     }
   }
-  
+
   function expandAll() {
     // Implementation would depend on having access to all node IDs
     // This is a placeholder for the interface
   }
-  
+
   function collapseAll() {
-    expandedNodes.value.clear()
+    expandedNodes.value.clear();
   }
-  
+
   function isExpanded(nodeId: string): boolean {
-    return expandedNodes.value.has(nodeId)
+    return expandedNodes.value.has(nodeId);
   }
-  
+
   function focusNode(nodeId: string) {
-    focusedNodeId.value = nodeId
+    focusedNodeId.value = nodeId;
   }
-  
+
   function clearFocus() {
-    focusedNodeId.value = null
+    focusedNodeId.value = null;
   }
-  
+
   return {
     expandedNodes: computed(() => Array.from(expandedNodes.value)),
     focusedNodeId: computed(() => focusedNodeId.value),
@@ -513,8 +517,8 @@ export function useTreeNavigation() {
     collapseAll,
     isExpanded,
     focusNode,
-    clearFocus
-  }
+    clearFocus,
+  };
 }
 
 /**
@@ -525,30 +529,30 @@ export function useEnhancedCriteriaDisplay(
   characterStats: Ref<CharacterStats | null> = ref(null)
 ) {
   // Get basic criteria display
-  const basicDisplay = useCriteriaDisplay(criteria)
-  
+  const basicDisplay = useCriteriaDisplay(criteria);
+
   // Get tree capabilities
-  const treeDisplay = useCriteriaTree(criteria, characterStats)
-  
+  const treeDisplay = useCriteriaTree(criteria, characterStats);
+
   // Get navigation
-  const navigation = useTreeNavigation()
-  
+  const navigation = useTreeNavigation();
+
   // Combined display mode decision
   const displayMode = computed(() => {
     if (treeDisplay.shouldUseTree.value) {
-      return 'tree'
+      return 'tree';
     } else if (basicDisplay.statRequirements.value.length <= 2) {
-      return 'simple'
+      return 'simple';
     } else {
-      return 'compact'
+      return 'compact';
     }
-  })
-  
+  });
+
   // Combined requirements info
   const requirementsInfo = computed(() => {
-    const basic = basicDisplay.statRequirements.value
-    const tree = treeDisplay.treeStats.value
-    
+    const basic = basicDisplay.statRequirements.value;
+    const tree = treeDisplay.treeStats.value;
+
     return {
       hasRequirements: basic.length > 0,
       count: basic.length,
@@ -558,22 +562,22 @@ export function useEnhancedCriteriaDisplay(
       summary: treeDisplay.treeSummary.value,
       allMet: tree.met === tree.total && tree.total > 0,
       noneMet: tree.met === 0 && tree.total > 0,
-      partiallyMet: tree.met > 0 && tree.met < tree.total
-    }
-  })
-  
+      partiallyMet: tree.met > 0 && tree.met < tree.total,
+    };
+  });
+
   return {
     // Basic display
     ...basicDisplay,
-    
+
     // Tree display
     ...treeDisplay,
-    
+
     // Navigation
     ...navigation,
-    
+
     // Combined properties
     displayMode,
-    requirementsInfo
-  }
+    requirementsInfo,
+  };
 }

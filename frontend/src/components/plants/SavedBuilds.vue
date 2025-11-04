@@ -13,7 +13,7 @@ Load, delete, and organize saved builds
         Create and save builds to manage them here
       </p>
     </div>
-    
+
     <div v-else class="space-y-3">
       <div
         v-for="build in builds"
@@ -33,15 +33,10 @@ Load, delete, and organize saved builds
               {{ build.notes }}
             </div>
           </div>
-          
+
           <!-- Actions Menu -->
           <div class="flex items-center gap-2">
-            <Button
-              @click="loadBuild(build)"
-              label="Load"
-              size="small"
-              severity="primary"
-            />
+            <Button @click="loadBuild(build)" label="Load" size="small" severity="primary" />
             <Button
               @click="duplicateBuild(build)"
               icon="pi pi-copy"
@@ -60,7 +55,7 @@ Load, delete, and organize saved builds
             />
           </div>
         </div>
-        
+
         <!-- Build Stats Summary -->
         <div v-if="build.totalStats && Object.keys(build.totalStats).length > 0" class="mb-3">
           <div class="text-xs font-medium text-surface-700 dark:text-surface-300 mb-2">
@@ -82,7 +77,7 @@ Load, delete, and organize saved builds
             />
           </div>
         </div>
-        
+
         <!-- Equipped Symbiants -->
         <div class="mb-3">
           <div class="text-xs font-medium text-surface-700 dark:text-surface-300 mb-2">
@@ -105,12 +100,12 @@ Load, delete, and organize saved builds
             </div>
           </div>
         </div>
-        
+
         <!-- Build Metadata -->
-        <div class="text-xs text-surface-500 dark:text-surface-400 flex justify-between items-center pt-2 border-t border-surface-100 dark:border-surface-800">
-          <div>
-            Created: {{ formatDate(build.createdAt) }}
-          </div>
+        <div
+          class="text-xs text-surface-500 dark:text-surface-400 flex justify-between items-center pt-2 border-t border-surface-100 dark:border-surface-800"
+        >
+          <div>Created: {{ formatDate(build.createdAt) }}</div>
           <div v-if="build.updatedAt && build.updatedAt !== build.createdAt">
             Modified: {{ formatDate(build.updatedAt) }}
           </div>
@@ -142,31 +137,31 @@ const emit = defineEmits<Emits>();
 // Methods
 const formatSlotName = (slot: string): string => {
   const slotNames: Record<string, string> = {
-    'head': 'Head',
-    'eye': 'Eye',
-    'ear': 'Ear',
-    'rarm': 'R.Arm',
-    'chest': 'Chest',
-    'larm': 'L.Arm',
-    'waist': 'Waist',
-    'rwrist': 'R.Wrist',
-    'legs': 'Legs',
-    'lwrist': 'L.Wrist',
-    'rfinger': 'R.Finger',
-    'feet': 'Feet',
-    'lfinger': 'L.Finger'
+    head: 'Head',
+    eye: 'Eye',
+    ear: 'Ear',
+    rarm: 'R.Arm',
+    chest: 'Chest',
+    larm: 'L.Arm',
+    waist: 'Waist',
+    rwrist: 'R.Wrist',
+    legs: 'Legs',
+    lwrist: 'L.Wrist',
+    rfinger: 'R.Finger',
+    feet: 'Feet',
+    lfinger: 'L.Finger',
   };
   return slotNames[slot] || slot;
 };
 
 const formatStatName = (statId: string): string => {
   const statNames: Record<string, string> = {
-    'strength': 'STR',
-    'agility': 'AGI',
-    'stamina': 'STA',
-    'intelligence': 'INT',
-    'sense': 'SEN',
-    'psychic': 'PSY'
+    strength: 'STR',
+    agility: 'AGI',
+    stamina: 'STA',
+    intelligence: 'INT',
+    sense: 'SEN',
+    psychic: 'PSY',
   };
   return statNames[statId] || statId.toUpperCase().slice(0, 3);
 };

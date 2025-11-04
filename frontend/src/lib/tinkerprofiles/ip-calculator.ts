@@ -1,18 +1,18 @@
 /**
  * IP Calculator - Anarchy Online Improvement Points calculation system
- * 
+ *
  * This module implements the complete IP calculation system from AOSkills4,
  * including skill costs, ability costs, caps, and trickle-down mechanics.
- * 
+ *
  * Now uses game-data.ts as the single source of truth for all game constants.
  */
 
-import { 
-  BREED_ABILITY_DATA, 
-  PROFESSION_VITALS, 
-  SKILL_COST_FACTORS, 
+import {
+  BREED_ABILITY_DATA,
+  PROFESSION_VITALS,
+  SKILL_COST_FACTORS,
   SKILL_TRICKLE_DOWN,
-  STAT
+  STAT,
 } from '@/services/game-data';
 
 // ============================================================================
@@ -38,12 +38,12 @@ export const ABILITY_NAMES = ['Strength', 'Agility', 'Stamina', 'Intelligence', 
 
 // Ability STAT IDs from game-data.ts
 export const ABILITY_STAT_IDS = {
-  'Strength': 16,
-  'Agility': 17,
-  'Stamina': 18,
-  'Intelligence': 19,
-  'Sense': 20,
-  'Psychic': 21
+  Strength: 16,
+  Agility: 17,
+  Stamina: 18,
+  Intelligence: 19,
+  Sense: 20,
+  Psychic: 21,
 } as const;
 
 // Map from 0-based ability index to STAT ID
@@ -56,7 +56,7 @@ export const STAT_ID_TO_ABILITY_INDEX: Record<number, number> = {
   18: 2, // Stamina
   19: 3, // Intelligence
   20: 4, // Sense
-  21: 5  // Psychic
+  21: 5, // Psychic
 };
 
 // Cost factor to skill cap conversion table
@@ -102,7 +102,7 @@ const COST_TO_RATE: number[][] = [
   [4.7, 3, 35, 115, 245, 325, 345, 355, 5],
   [4.8, 3, 35, 115, 245, 325, 345, 355, 5],
   [4.9, 3, 35, 115, 245, 325, 345, 355, 5],
-  [5.0, 3, 35, 115, 245, 325, 345, 355, 5]
+  [5.0, 3, 35, 115, 245, 325, 345, 355, 5],
 ];
 
 // All breed and profession data now imported from game-data.ts
@@ -187,13 +187,17 @@ export function calcPrevTitleLevel(level: number): number {
  */
 export function calcIP(level: number): number {
   const tl = level === 1 ? 0 : calcTitleLevel(level);
-  return BASE_IP_BY_TL[tl] + ((level - LEVEL_ADJUST_BY_TL[tl]) * IP_BY_TL[tl]);
+  return BASE_IP_BY_TL[tl] + (level - LEVEL_ADJUST_BY_TL[tl]) * IP_BY_TL[tl];
 }
 
 /**
  * Calculate IP cost to raise an ability by one point
  */
-export function calcAbilityCost(currentValue: number, breed: number, abilityStatId: number): number {
+export function calcAbilityCost(
+  currentValue: number,
+  breed: number,
+  abilityStatId: number
+): number {
   // Convert STAT ID to ability index for breed data lookup
   const abilityIndex = STAT_ID_TO_ABILITY_INDEX[abilityStatId];
   if (abilityIndex === undefined) {
@@ -214,7 +218,11 @@ export function calcAbilityCost(currentValue: number, breed: number, abilityStat
 /**
  * Calculate total IP cost for an ability at a given level
  */
-export function calcTotalAbilityCost(improvements: number, breed: number, abilityStatId: number): number {
+export function calcTotalAbilityCost(
+  improvements: number,
+  breed: number,
+  abilityStatId: number
+): number {
   // Convert STAT ID to ability index for breed data lookup
   const abilityIndex = STAT_ID_TO_ABILITY_INDEX[abilityStatId];
   if (abilityIndex === undefined) {
@@ -232,7 +240,9 @@ export function calcTotalAbilityCost(improvements: number, breed: number, abilit
   let totalIP = 0;
   if (improvements > 0) {
     for (let i = 0; i < improvements; i++) {
-      totalIP += roundDown(calcAbilityCost(i + BREED_ABILITY_DATA.initial[breed][abilityIndex], breed, abilityStatId));
+      totalIP += roundDown(
+        calcAbilityCost(i + BREED_ABILITY_DATA.initial[breed][abilityIndex], breed, abilityStatId)
+      );
     }
   }
   return totalIP;
@@ -254,7 +264,11 @@ export function calcSkillCost(currentValue: number, profession: number, skillId:
 /**
  * Calculate total IP cost for a skill at a given level
  */
-export function calcTotalSkillCost(improvements: number, profession: number, skillId: number): number {
+export function calcTotalSkillCost(
+  improvements: number,
+  profession: number,
+  skillId: number
+): number {
   let totalIP = 0;
   if (improvements > 0) {
     for (let i = 0; i < improvements; i++) {
@@ -267,7 +281,12 @@ export function calcTotalSkillCost(improvements: number, profession: number, ski
 /**
  * Calculate maximum value for an ability (breed base + adjustable range)
  */
-export function calcAbilityMaxValue(level: number, breed: number, profession: number, abilityStatId: number): number {
+export function calcAbilityMaxValue(
+  level: number,
+  breed: number,
+  profession: number,
+  abilityStatId: number
+): number {
   // Convert STAT ID to ability index for breed data lookup
   const abilityIndex = STAT_ID_TO_ABILITY_INDEX[abilityStatId];
   if (abilityIndex === undefined) {
@@ -300,12 +319,14 @@ export function calcIPAdjustableRange(level: number, profession: number, skillId
     console.warn(`[calcIPAdjustableRange] Unknown skill ID ${skillId}, using fallback`);
     return 10; // Minimal fallback for truly unknown skills
   }
-  
+
   const tl = calcTitleLevel(level);
   const costFac = skillCostFactors[profession];
 
   if (costFac === undefined || isNaN(costFac)) {
-    console.warn(`[calcIPAdjustableRange] Invalid profession ${profession} or cost factor for skill ${skillId}`);
+    console.warn(
+      `[calcIPAdjustableRange] Invalid profession ${profession} or cost factor for skill ${skillId}`
+    );
     return 0;
   }
 
@@ -318,11 +339,13 @@ export function calcIPAdjustableRange(level: number, profession: number, skillId
   const rateData = COST_TO_RATE[costIndex];
 
   if (!rateData) {
-    console.warn(`[calcIPAdjustableRange] Invalid rateData at costIndex ${costIndex} for skill ${skillId}`);
+    console.warn(
+      `[calcIPAdjustableRange] Invalid rateData at costIndex ${costIndex} for skill ${skillId}`
+    );
     return 0;
   }
   let adjustableRange: number;
-  
+
   if (level < 201) {
     if (tl === 1) {
       // For TL1, adjustable range is limited by both leveling and TL1 cap
@@ -333,18 +356,18 @@ export function calcIPAdjustableRange(level: number, profession: number, skillId
       // For TL2-6, caps grow by inc_per_level for each level within the title level
       // Start with the previous TL's cap and add inc_per_level for each level into the current TL
 
-      const prevTLCap = tl > 1 ? rateData[tl] : 0;  // Cap from previous TL (or 0 if TL2)
-      const incPerLevel = rateData[1];               // Inc per level from COST_TO_RATE table
-      const currentTLMaxCap = rateData[tl + 1];      // Maximum cap for current TL
+      const prevTLCap = tl > 1 ? rateData[tl] : 0; // Cap from previous TL (or 0 if TL2)
+      const incPerLevel = rateData[1]; // Inc per level from COST_TO_RATE table
+      const currentTLMaxCap = rateData[tl + 1]; // Maximum cap for current TL
 
       // Calculate the level range for current TL
-      const tlStartLevel = TITLE_LEVELS[tl - 1];     // Start level of current TL
+      const tlStartLevel = TITLE_LEVELS[tl - 1]; // Start level of current TL
 
       // Calculate how many levels into the current TL we are
       const levelsIntoTL = level - tlStartLevel + 1; // +1 because levels 50-60 is 11 levels, not 10
 
       // Cap increases by inc_per_level for each level, but cannot exceed the TL max cap
-      adjustableRange = Math.min(prevTLCap + (incPerLevel * levelsIntoTL), currentTLMaxCap);
+      adjustableRange = Math.min(prevTLCap + incPerLevel * levelsIntoTL, currentTLMaxCap);
     }
   } else {
     // Post-201: TL6 cap plus post-201 progression
@@ -355,7 +378,6 @@ export function calcIPAdjustableRange(level: number, profession: number, skillId
     // Add post-201 progression: levels beyond 200 * post-201 increment per level
     const post201Levels = level - 200;
     adjustableRange += post201Levels * rateData[8];
-
   }
 
   return adjustableRange;
@@ -365,7 +387,11 @@ export function calcIPAdjustableRange(level: number, profession: number, skillId
  * Calculate IP adjustable range specifically for abilities
  * Abilities have breed-specific cost factors that affect their progression differently from skills
  */
-export function calcAbilityIPAdjustableRange(level: number, breed: number, abilityStatId: number): number {
+export function calcAbilityIPAdjustableRange(
+  level: number,
+  breed: number,
+  abilityStatId: number
+): number {
   // Convert STAT ID to ability index for breed data lookup
   const abilityIndex = STAT_ID_TO_ABILITY_INDEX[abilityStatId];
   if (abilityIndex === undefined) {
@@ -382,7 +408,9 @@ export function calcAbilityIPAdjustableRange(level: number, breed: number, abili
   const costFactor = breedCostFactors[abilityIndex];
 
   if (costFactor === undefined || isNaN(costFactor)) {
-    console.warn(`[calcAbilityIPAdjustableRange] Invalid cost factor for breed ${breed}, ability ${abilityStatId}`);
+    console.warn(
+      `[calcAbilityIPAdjustableRange] Invalid cost factor for breed ${breed}, ability ${abilityStatId}`
+    );
     return 3;
   }
 
@@ -405,13 +433,15 @@ export function calcAbilityIPAdjustableRange(level: number, breed: number, abili
         console.warn(`[calcAbilityIPAdjustableRange] Invalid rateData at costIndex ${costIndex}`);
         adjustableRange = 0;
       } else {
-      
-      let cap: number;
+        let cap: number;
 
-      cap = Math.min(level * 3 + breedBase, BREED_ABILITY_DATA.caps_pre201[breed]?.[abilityIndex])  // Breed-specific pre-201 cap
+        cap = Math.min(
+          level * 3 + breedBase,
+          BREED_ABILITY_DATA.caps_pre201[breed]?.[abilityIndex]
+        ); // Breed-specific pre-201 cap
 
-      // Adjustable range is the cap minus the base
-      adjustableRange = cap - breedBase;
+        // Adjustable range is the cap minus the base
+        adjustableRange = cap - breedBase;
       }
     }
   } else {
@@ -419,7 +449,7 @@ export function calcAbilityIPAdjustableRange(level: number, breed: number, abili
     const post201PerLevel = BREED_ABILITY_DATA.caps_post201_per_level[breed]?.[abilityIndex] || 15;
     const pre201Cap = BREED_ABILITY_DATA.caps_pre201[breed]?.[abilityIndex] || 480;
     const breedBase = BREED_ABILITY_DATA.initial[breed]?.[abilityIndex] || 6;
-    
+
     const pre201Adjustable = pre201Cap - breedBase;
     const post201Levels = level - 200;
     const post201Adjustable = post201PerLevel * post201Levels;
@@ -433,7 +463,12 @@ export function calcAbilityIPAdjustableRange(level: number, breed: number, abili
 /**
  * Calculate maximum value for a skill (base + trickle-down + adjustable range)
  */
-export function calcSkillMaxValue(level: number, profession: number, skillId: number, abilities: number[]): number {
+export function calcSkillMaxValue(
+  level: number,
+  profession: number,
+  skillId: number,
+  abilities: number[]
+): number {
   const baseValue = BASE_SKILL; // All IP-based skills start at 5
   const trickleDown = calcTrickleDown(abilities, skillId);
   const adjustableRange = calcIPAdjustableRange(level, profession, skillId);
@@ -443,7 +478,6 @@ export function calcSkillMaxValue(level: number, profession: number, skillId: nu
   return maxValue;
 }
 
-
 /**
  * Calculate trickle-down bonus from abilities to skill
  */
@@ -452,12 +486,12 @@ export function calcTrickleDown(abilities: number[], skillId: number): number {
   if (!trickleFactors) {
     return 0;
   }
-  
+
   let weightedAbility = 0;
   for (let i = 0; i < 6; i++) {
     weightedAbility += abilities[i] * trickleFactors[i];
   }
-  
+
   return roundDown(weightedAbility / 4.0);
 }
 
@@ -466,18 +500,25 @@ export function calcTrickleDown(abilities: number[], skillId: number): number {
  */
 export function calcAllTrickleDown(abilities: number[]): TrickleDownResult {
   const result: TrickleDownResult = {};
-  
+
   for (const skillId of Object.keys(SKILL_TRICKLE_DOWN).map(Number)) {
     result[skillId] = calcTrickleDown(abilities, skillId);
   }
-  
+
   return result;
 }
 
 /**
  * Calculate maximum health
  */
-export function calcHP(bodyDev: number, level: number, breed: number, profession: number, stamina: number = 0, maxHealthBonus: number = 0): number {
+export function calcHP(
+  bodyDev: number,
+  level: number,
+  breed: number,
+  profession: number,
+  stamina: number = 0,
+  maxHealthBonus: number = 0
+): number {
   const professionHPPerLevel = PROFESSION_VITALS.hp_per_level[profession];
   if (!professionHPPerLevel) {
     console.warn(`Unknown profession ID: ${profession}`);
@@ -516,7 +557,7 @@ export function calcHP(bodyDev: number, level: number, breed: number, profession
   // Calculate using accurate AO formula:
   // HP = base_hp + cumulative_hp + (body_dev * breed_factor) + floor(stamina / 4) + max_health_bonus
   const staminaBonus = Math.floor(stamina / 4);
-  return breedBaseHP + cumulativeHP + (bodyDev * breedBodyFactor) + staminaBonus + maxHealthBonus;
+  return breedBaseHP + cumulativeHP + bodyDev * breedBodyFactor + staminaBonus + maxHealthBonus;
 }
 
 /**
@@ -545,13 +586,13 @@ export function calcNP(nanoPool: number, level: number, breed: number, professio
 
   // Title level ranges with their end levels
   const tlRanges = [
-    { start: 1, end: 14, tlIndex: 0 },    // TL1
-    { start: 15, end: 49, tlIndex: 1 },   // TL2
-    { start: 50, end: 99, tlIndex: 2 },   // TL3
+    { start: 1, end: 14, tlIndex: 0 }, // TL1
+    { start: 15, end: 49, tlIndex: 1 }, // TL2
+    { start: 50, end: 99, tlIndex: 2 }, // TL3
     { start: 100, end: 149, tlIndex: 3 }, // TL4
     { start: 150, end: 189, tlIndex: 4 }, // TL5
     { start: 190, end: 204, tlIndex: 5 }, // TL6
-    { start: 205, end: 220, tlIndex: 6 }  // TL7
+    { start: 205, end: 220, tlIndex: 6 }, // TL7
   ];
 
   // Accumulate nano through each title level range
@@ -563,7 +604,7 @@ export function calcNP(nanoPool: number, level: number, breed: number, professio
     cumulativeNano += levelsInRange * nanoPerLevel;
   }
 
-  return breedBaseNP + (nanoPool * breedNanoFactor) + cumulativeNano;
+  return breedBaseNP + nanoPool * breedNanoFactor + cumulativeNano;
 }
 
 /**
@@ -585,7 +626,7 @@ export function calcAbilityCapImprovements(abilities: number[], skillId: number)
 
   // AOSkills4 formula: round(((weightedAbility - 5) * 2) + 5)
   // This returns the maximum number of improvements that can be made via IP
-  const result = roundAO(((weightedAbility - 5) * 2) + 5);
+  const result = roundAO((weightedAbility - 5) * 2 + 5);
 
   return result;
 }
@@ -593,7 +634,12 @@ export function calcAbilityCapImprovements(abilities: number[], skillId: number)
 /**
  * Calculate skill cap for a character taking both level-based and ability-based limits into account
  */
-export function calcSkillCap(level: number, profession: number, skillId: number, abilities: number[]): number {
+export function calcSkillCap(
+  level: number,
+  profession: number,
+  skillId: number,
+  abilities: number[]
+): number {
   const baseValue = BASE_SKILL;
   const trickleDown = calcTrickleDown(abilities, skillId);
 
@@ -618,30 +664,30 @@ export function calcIPAnalysis(stats: CharacterStats): IPCalculationResult {
   const totalIP = calcIP(stats.level);
   let abilityIP = 0;
   let skillIP = 0;
-  
+
   // Calculate ability costs using STAT IDs
   for (let i = 0; i < 6; i++) {
     const abilityStatId = ABILITY_INDEX_TO_STAT_ID[i];
     abilityIP += calcTotalAbilityCost(stats.abilities[i], stats.breed, abilityStatId);
   }
-  
+
   // Calculate skill costs using proper STAT IDs
   for (const [statIdStr, skillValue] of Object.entries(stats.skills)) {
     const statId = parseInt(statIdStr);
     skillIP += calcTotalSkillCost(skillValue, stats.profession, statId);
   }
-  
+
   const usedIP = abilityIP + skillIP;
   const availableIP = totalIP - usedIP;
   const efficiency = totalIP > 0 ? Math.round((usedIP / totalIP) * 100) : 0;
-  
+
   return {
     totalIP,
     usedIP,
     availableIP,
     abilityIP,
     skillIP,
-    efficiency
+    efficiency,
   };
 }
 
@@ -655,12 +701,12 @@ export function validateCharacterBuild(stats: CharacterStats): {
 } {
   const errors: string[] = [];
   const ipAnalysis = calcIPAnalysis(stats);
-  
+
   // Check IP constraints
   if (ipAnalysis.availableIP < 0) {
     errors.push(`Character exceeds available IP by ${Math.abs(ipAnalysis.availableIP)} points`);
   }
-  
+
   // Check ability caps using STAT IDs
   for (let i = 0; i < 6; i++) {
     const abilityStatId = ABILITY_INDEX_TO_STAT_ID[i];
@@ -669,7 +715,7 @@ export function validateCharacterBuild(stats: CharacterStats): {
       errors.push(`${ABILITY_NAMES[i]} exceeds cap of ${cap} (current: ${stats.abilities[i]})`);
     }
   }
-  
+
   // Check skill caps using proper STAT IDs
   for (const [statIdStr, skillValue] of Object.entries(stats.skills)) {
     const statId = parseInt(statIdStr);
@@ -679,11 +725,11 @@ export function validateCharacterBuild(stats: CharacterStats): {
       errors.push(`${skillName} exceeds cap of ${skillCap} (current: ${skillValue})`);
     }
   }
-  
+
   return {
     valid: errors.length === 0,
     errors,
-    ipAnalysis
+    ipAnalysis,
   };
 }
 
@@ -711,7 +757,7 @@ export function getAbilityCostFactor(breed: number, abilityStatId: number): numb
   if (abilityIndex === undefined || breed < 0) {
     return 2.0; // Conservative fallback
   }
-  
+
   const breedCostFactors = BREED_ABILITY_DATA.cost_factors[breed];
   if (!breedCostFactors) {
     return 2.0;
@@ -728,7 +774,7 @@ export function getBreedInitValue(breed: number, abilityStatId: number): number 
   if (abilityIndex === undefined || breed < 0) {
     return 6; // Conservative fallback
   }
-  
+
   const breedInitialValues = BREED_ABILITY_DATA.initial[breed];
   if (!breedInitialValues) {
     return 6;

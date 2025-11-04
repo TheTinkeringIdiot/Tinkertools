@@ -1,12 +1,12 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { 
-  NanoProgram, 
-  NanoFilters, 
-  NanosState, 
-  NanoPreferences, 
+import type {
+  NanoProgram,
+  NanoFilters,
+  NanosState,
+  NanoPreferences,
   NanoSearchRequest,
-  NanoApiResponse 
+  NanoApiResponse,
 } from '@/types/nano';
 
 export const useNanosStore = defineStore('nanos', () => {
@@ -19,7 +19,7 @@ export const useNanosStore = defineStore('nanos', () => {
   const selectedProfession = ref<number | null>(null);
   const favorites = ref<number[]>([]);
   const searchHistory = ref<string[]>([]);
-  
+
   const filters = ref<NanoFilters>({
     schools: [],
     strains: [],
@@ -35,80 +35,80 @@ export const useNanosStore = defineStore('nanos', () => {
     skillCompatible: false,
     castable: false,
     sortBy: 'name',
-    sortDescending: false
+    sortDescending: false,
   });
-  
+
   const preferences = ref<NanoPreferences>({
     defaultView: 'school',
     compactCards: true,
     autoExpandSchools: true,
     showCompatibility: false,
     defaultSort: 'name',
-    itemsPerPage: 25
+    itemsPerPage: 25,
   });
 
   // Getters
   const filteredNanos = computed(() => {
     let result = [...nanos.value];
-    
+
     // Apply school filter
     if (filters.value.schools.length > 0) {
-      result = result.filter(nano => filters.value.schools.includes(nano.school));
+      result = result.filter((nano) => filters.value.schools.includes(nano.school));
     }
-    
+
     // Apply strain filter
     if (filters.value.strains.length > 0) {
-      result = result.filter(nano => filters.value.strains.includes(nano.strain));
+      result = result.filter((nano) => filters.value.strains.includes(nano.strain));
     }
-    
+
     // Apply profession filter
     if (filters.value.professions.length > 0) {
-      result = result.filter(nano => 
-        !nano.profession || filters.value.professions.includes(nano.profession)
+      result = result.filter(
+        (nano) => !nano.profession || filters.value.professions.includes(nano.profession)
       );
     }
-    
+
     // Apply quality level filter
     if (filters.value.qualityLevels.length > 0) {
-      result = result.filter(nano => filters.value.qualityLevels.includes(nano.qualityLevel));
+      result = result.filter((nano) => filters.value.qualityLevels.includes(nano.qualityLevel));
     }
-    
+
     // Apply effect type filter
     if (filters.value.effectTypes && filters.value.effectTypes.length > 0) {
-      result = result.filter(nano => 
-        nano.effects?.some(effect => filters.value.effectTypes!.includes(effect.type))
+      result = result.filter((nano) =>
+        nano.effects?.some((effect) => filters.value.effectTypes!.includes(effect.type))
       );
     }
-    
+
     // Apply level range filter
     if (filters.value.levelRange) {
       const [minLevel, maxLevel] = filters.value.levelRange;
-      result = result.filter(nano => nano.level >= minLevel && nano.level <= maxLevel);
+      result = result.filter((nano) => nano.level >= minLevel && nano.level <= maxLevel);
     }
-    
+
     // Apply memory usage filter
     if (filters.value.memoryUsageRange) {
       const [minMemory, maxMemory] = filters.value.memoryUsageRange;
-      result = result.filter(nano => {
+      result = result.filter((nano) => {
         const memory = nano.memoryUsage || 0;
         return memory >= minMemory && memory <= maxMemory;
       });
     }
-    
+
     // Apply nano point cost filter
     if (filters.value.nanoPointRange) {
       const [minNP, maxNP] = filters.value.nanoPointRange;
-      result = result.filter(nano => {
+      result = result.filter((nano) => {
         const np = nano.nanoPointCost || 0;
         return np >= minNP && np <= maxNP;
       });
     }
-    
+
     // Apply sorting
     if (filters.value.sortBy) {
       result.sort((a, b) => {
         let comparison = 0;
-        
+
         switch (filters.value.sortBy) {
           case 'name':
             comparison = a.name.localeCompare(b.name);
@@ -131,30 +131,30 @@ export const useNanosStore = defineStore('nanos', () => {
           default:
             comparison = a.name.localeCompare(b.name);
         }
-        
+
         return filters.value.sortDescending ? -comparison : comparison;
       });
     }
-    
+
     return result;
   });
-  
+
   const favoriteNanos = computed(() => {
-    return nanos.value.filter(nano => favorites.value.includes(nano.id));
+    return nanos.value.filter((nano) => favorites.value.includes(nano.id));
   });
-  
+
   const availableSchools = computed(() => {
-    const schools = new Set(nanos.value.map(nano => nano.school));
+    const schools = new Set(nanos.value.map((nano) => nano.school));
     return Array.from(schools).sort();
   });
-  
+
   const availableStrains = computed(() => {
-    const strains = new Set(nanos.value.map(nano => nano.strain).filter(Boolean));
+    const strains = new Set(nanos.value.map((nano) => nano.strain).filter(Boolean));
     return Array.from(strains).sort();
   });
-  
+
   const availableProfessions = computed(() => {
-    const professions = new Set(nanos.value.map(nano => nano.profession).filter(Boolean));
+    const professions = new Set(nanos.value.map((nano) => nano.profession).filter(Boolean));
     return Array.from(professions).sort();
   });
 
@@ -162,28 +162,28 @@ export const useNanosStore = defineStore('nanos', () => {
   const fetchNanos = async (searchRequest?: NanoSearchRequest): Promise<void> => {
     loading.value = true;
     error.value = null;
-    
+
     try {
       // Call the real nano API endpoint
       const params = new URLSearchParams();
-      
+
       // Add pagination
       params.append('page', '1');
       params.append('page_size', '200'); // Get more items for frontend filtering
-      
+
       // Add basic filters that the backend supports
       if (searchRequest?.filters?.schools?.length) {
         params.append('school', searchRequest.filters.schools[0]); // Backend supports one school filter
       }
-      
+
       const response = await fetch(`http://localhost:8000/api/v1/nanos?${params}`);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
-      
+
       // Map backend response to frontend format
       nanos.value = data.items.map((item: any) => ({
         id: item.id,
@@ -205,18 +205,17 @@ export const useNanosStore = defineStore('nanos', () => {
         duration: item.duration,
         targeting: item.targeting,
         sourceLocation: item.source_location,
-        acquisitionMethod: item.acquisition_method
+        acquisitionMethod: item.acquisition_method,
       }));
-      
+
       totalCount.value = data.total;
-      
+
       // Save to localStorage for persistence
       saveNanosToStorage();
-      
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to fetch nanos';
       console.error('Failed to fetch nanos:', err);
-      
+
       // Fallback to cached data if available
       loadNanosFromStorage();
     } finally {
@@ -224,25 +223,29 @@ export const useNanosStore = defineStore('nanos', () => {
     }
   };
 
-  const searchNanos = async (query: string, schools?: string[], fields?: string[]): Promise<void> => {
+  const searchNanos = async (
+    query: string,
+    schools?: string[],
+    fields?: string[]
+  ): Promise<void> => {
     loading.value = true;
     error.value = null;
-    
+
     try {
       // Use the search endpoint if we have a query, otherwise use regular fetch
       if (query.trim()) {
         const params = new URLSearchParams();
         params.append('q', query.trim());
         params.append('page_size', '200');
-        
+
         const response = await fetch(`http://localhost:8000/api/v1/nanos/search?${params}`);
-        
+
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
         const data = await response.json();
-        
+
         // Map backend response to frontend format
         nanos.value = data.items.map((item: any) => ({
           id: item.id,
@@ -264,15 +267,15 @@ export const useNanosStore = defineStore('nanos', () => {
           duration: item.duration,
           targeting: item.targeting,
           sourceLocation: item.source_location,
-          acquisitionMethod: item.acquisition_method
+          acquisitionMethod: item.acquisition_method,
         }));
-        
+
         totalCount.value = data.total;
       } else {
         // No search query, fetch all nanos
         await fetchNanos();
       }
-      
+
       // Add to search history
       if (query.trim() && !searchHistory.value.includes(query.trim())) {
         searchHistory.value.unshift(query.trim());
@@ -308,7 +311,7 @@ export const useNanosStore = defineStore('nanos', () => {
       skillCompatible: false,
       castable: false,
       sortBy: 'name',
-      sortDescending: false
+      sortDescending: false,
     };
     saveFilters();
   };
@@ -353,25 +356,28 @@ export const useNanosStore = defineStore('nanos', () => {
   };
 
   const getNanoById = (id: number): NanoProgram | undefined => {
-    return nanos.value.find(nano => nano.id === id);
+    return nanos.value.find((nano) => nano.id === id);
   };
 
   const getNanosBySchool = (school: string): NanoProgram[] => {
-    return nanos.value.filter(nano => nano.school === school);
+    return nanos.value.filter((nano) => nano.school === school);
   };
 
   const getNanosByStrain = (strain: string): NanoProgram[] => {
-    return nanos.value.filter(nano => nano.strain === strain);
+    return nanos.value.filter((nano) => nano.strain === strain);
   };
 
   // Persistence helpers
   const saveNanosToStorage = (): void => {
     try {
-      localStorage.setItem('tinkertools_nanos_cache', JSON.stringify({
-        data: nanos.value,
-        totalCount: totalCount.value,
-        timestamp: Date.now()
-      }));
+      localStorage.setItem(
+        'tinkertools_nanos_cache',
+        JSON.stringify({
+          data: nanos.value,
+          totalCount: totalCount.value,
+          timestamp: Date.now(),
+        })
+      );
     } catch (error) {
       console.warn('Failed to save nanos to storage:', error);
     }
@@ -471,7 +477,10 @@ export const useNanosStore = defineStore('nanos', () => {
 
   const saveSelectedProfession = (): void => {
     try {
-      localStorage.setItem('tinkertools_nano_selected_profession', JSON.stringify(selectedProfession.value));
+      localStorage.setItem(
+        'tinkertools_nano_selected_profession',
+        JSON.stringify(selectedProfession.value)
+      );
     } catch (error) {
       console.warn('Failed to save selected profession:', error);
     }
@@ -513,14 +522,14 @@ export const useNanosStore = defineStore('nanos', () => {
     filters: filters as Readonly<typeof filters>,
     preferences: preferences as Readonly<typeof preferences>,
     searchHistory: searchHistory as Readonly<typeof searchHistory>,
-    
+
     // Getters
     filteredNanos,
     favoriteNanos,
     availableSchools,
     availableStrains,
     availableProfessions,
-    
+
     // Actions
     fetchNanos,
     searchNanos,
@@ -535,15 +544,15 @@ export const useNanosStore = defineStore('nanos', () => {
     getNanoById,
     getNanosBySchool,
     getNanosByStrain,
-    initialize
+    initialize,
   };
 });
 
 // Mock API function - replace with actual API implementation
 async function mockFetchNanos(request?: NanoSearchRequest): Promise<NanoApiResponse> {
   // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
+  await new Promise((resolve) => setTimeout(resolve, 500));
+
   // Mock data - in real implementation, this would come from the backend API
   const mockNanos: NanoProgram[] = [
     {
@@ -564,7 +573,7 @@ async function mockFetchNanos(request?: NanoSearchRequest): Promise<NanoApiRespo
       castingRequirements: [
         { type: 'skill', requirement: 'Biological Metamorphosis', value: 750, critical: true },
         { type: 'skill', requirement: 'Nano Programming', value: 600, critical: true },
-        { type: 'level', requirement: 'level', value: 125, critical: true }
+        { type: 'level', requirement: 'level', value: 125, critical: true },
       ],
       effects: [
         {
@@ -572,11 +581,11 @@ async function mockFetchNanos(request?: NanoSearchRequest): Promise<NanoApiRespo
           value: 1250,
           modifier: 'add',
           stackable: false,
-          conditions: []
-        }
+          conditions: [],
+        },
       ],
       duration: { type: 'instant' },
-      targeting: { type: 'team', range: 30 }
+      targeting: { type: 'team', range: 30 },
     },
     {
       id: 2,
@@ -595,7 +604,7 @@ async function mockFetchNanos(request?: NanoSearchRequest): Promise<NanoApiRespo
       castingRequirements: [
         { type: 'skill', requirement: 'Matter Creation', value: 650, critical: true },
         { type: 'skill', requirement: 'Nano Programming', value: 550, critical: true },
-        { type: 'level', requirement: 'level', value: 100, critical: true }
+        { type: 'level', requirement: 'level', value: 100, critical: true },
       ],
       effects: [
         {
@@ -604,11 +613,11 @@ async function mockFetchNanos(request?: NanoSearchRequest): Promise<NanoApiRespo
           value: 200,
           modifier: 'add',
           stackable: false,
-          conditions: []
-        }
+          conditions: [],
+        },
       ],
       duration: { type: 'duration', value: 1800 },
-      targeting: { type: 'self' }
+      targeting: { type: 'self' },
     },
     {
       id: 3,
@@ -628,7 +637,7 @@ async function mockFetchNanos(request?: NanoSearchRequest): Promise<NanoApiRespo
       castingRequirements: [
         { type: 'skill', requirement: 'Matter Creation', value: 500, critical: true },
         { type: 'skill', requirement: 'Nano Programming', value: 450, critical: true },
-        { type: 'level', requirement: 'level', value: 75, critical: true }
+        { type: 'level', requirement: 'level', value: 75, critical: true },
       ],
       effects: [
         {
@@ -636,37 +645,36 @@ async function mockFetchNanos(request?: NanoSearchRequest): Promise<NanoApiRespo
           value: 1,
           modifier: 'set',
           stackable: false,
-          conditions: []
-        }
+          conditions: [],
+        },
       ],
       duration: { type: 'duration', value: 3600 },
-      targeting: { type: 'self' }
-    }
+      targeting: { type: 'self' },
+    },
   ];
-  
+
   let filteredData = mockNanos;
-  
+
   // Apply query filter
   if (request?.query) {
     const query = request.query.toLowerCase();
-    filteredData = filteredData.filter(nano =>
-      nano.name.toLowerCase().includes(query) ||
-      nano.description?.toLowerCase().includes(query) ||
-      nano.school.toLowerCase().includes(query)
+    filteredData = filteredData.filter(
+      (nano) =>
+        nano.name.toLowerCase().includes(query) ||
+        nano.description?.toLowerCase().includes(query) ||
+        nano.school.toLowerCase().includes(query)
     );
   }
-  
+
   // Apply school filter
   if (request?.filters?.schools && request.filters.schools.length > 0) {
-    filteredData = filteredData.filter(nano =>
-      request.filters!.schools!.includes(nano.school)
-    );
+    filteredData = filteredData.filter((nano) => request.filters!.schools!.includes(nano.school));
   }
-  
+
   return {
     data: filteredData,
     total: filteredData.length,
     page: request?.page || 0,
-    size: request?.size || filteredData.length
+    size: request?.size || filteredData.length,
   };
 }

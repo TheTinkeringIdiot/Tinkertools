@@ -1,6 +1,6 @@
 /**
  * TinkerProfiles Library Constants
- * 
+ *
  * Game data constants and default values for Anarchy Online profiles
  */
 
@@ -19,7 +19,7 @@ const BASE_SKILL = 5; // Base skill value that all characters start with
 
 export const ANARCHY_PROFESSIONS = [
   'Adventurer',
-  'Agent', 
+  'Agent',
   'Bureaucrat',
   'Doctor',
   'Enforcer',
@@ -31,35 +31,22 @@ export const ANARCHY_PROFESSIONS = [
   'Nanotechnician',
   'Soldier',
   'Trader',
-  'Shade'
+  'Shade',
 ] as const;
 
-export const ANARCHY_BREEDS = [
-  'Solitus',
-  'Opifex', 
-  'Nanomage',
-  'Atrox'
-] as const;
+export const ANARCHY_BREEDS = ['Solitus', 'Opifex', 'Nanomage', 'Atrox'] as const;
 
-export const ANARCHY_FACTIONS = [
-  'Omni-Tek',
-  'Clan',
-  'Neutral'
-] as const;
+export const ANARCHY_FACTIONS = ['Omni-Tek', 'Clan', 'Neutral'] as const;
 
 export const ANARCHY_EXPANSIONS = [
   'Classic',
   'Notum Wars',
-  'Shadowlands', 
+  'Shadowlands',
   'Alien Invasion',
-  'Lost Eden'
+  'Lost Eden',
 ] as const;
 
-export const ACCOUNT_TYPES = [
-  'Froob',
-  'Paid',
-  'Sloob'
-] as const;
+export const ACCOUNT_TYPES = ['Froob', 'Paid', 'Sloob'] as const;
 
 // ============================================================================
 // Stat ID Constants
@@ -71,7 +58,6 @@ export const WORN_ITEM_STAT_ID = 355;
 // Default Skills Structure
 // ============================================================================
 
-
 // Keep the old DEFAULT_SKILLS for backward compatibility (uses Solitus breed)
 // Note: This is a legacy constant that may be removed in future versions
 // New code should use createDefaultSkillsV4() instead
@@ -82,7 +68,7 @@ export const DEFAULT_SKILLS = {
     Stamina: { value: 15, ipSpent: 0, pointFromIp: 0, cap: undefined },
     Intelligence: { value: 15, ipSpent: 0, pointFromIp: 0, cap: undefined },
     Sense: { value: 15, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    Psychic: { value: 15, ipSpent: 0, pointFromIp: 0, cap: undefined }
+    Psychic: { value: 15, ipSpent: 0, pointFromIp: 0, cap: undefined },
   },
   'Body & Defense': {
     'Nano Pool': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
@@ -91,7 +77,7 @@ export const DEFAULT_SKILLS = {
     'Dodge-Rng': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Duck-Exp': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Evade-ClsC': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    'Deflect': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined }
+    Deflect: { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
   },
   ACs: {
     'Imp/Proj AC': 1,
@@ -101,30 +87,30 @@ export const DEFAULT_SKILLS = {
     'Cold AC': 1,
     'Chemical AC': 1,
     'Radiation AC': 1,
-    'Disease AC': 1
+    'Disease AC': 1,
   },
   'Ranged Weapons': {
-    'Pistol': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    Pistol: { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Ranged Init': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    'Grenade': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    Grenade: { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Heavy Weapons': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    'Bow': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    'Rifle': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    Bow: { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    Rifle: { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'MG/SMG': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    'Shotgun': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    Shotgun: { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Assault Rif': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    'Multi Ranged': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined }
+    'Multi Ranged': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
   },
   'Ranged Specials': {
     'Fling Shot': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Sharp Obj': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Bow Spc Att': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    'Burst': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    Burst: { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Full Auto': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    'Aimed Shot': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined }
+    'Aimed Shot': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
   },
   'Melee Weapons': {
-    'Piercing': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    Piercing: { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Melee Init': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Physical Init': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     '1h Blunt': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
@@ -133,14 +119,14 @@ export const DEFAULT_SKILLS = {
     '2h Edged': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     '2h Blunt': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Martial Arts': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    'Multi Melee': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined }
+    'Multi Melee': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
   },
   'Melee Specials': {
-    'Riposte': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    'Dimach': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    Riposte: { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    Dimach: { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Sneak Attack': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Fast Attack': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    'Brawling': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined }
+    Brawling: { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
   },
   'Nanos & Casting': {
     'Matter Creation': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
@@ -149,47 +135,53 @@ export const DEFAULT_SKILLS = {
     'Sensory Improvement': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Time & Space': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Bio Metamor': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    'Matt Metam': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined }
+    'Matt Metam': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
   },
   Exploring: {
     'Vehicle Air': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Vehicle Ground': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Vehicle Water': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    'Adventuring': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    'Run Speed': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined }
+    Adventuring: { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Run Speed': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
   },
   'Trade & Repair': {
-    'Chemistry': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    Chemistry: { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Computer Literacy': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Elec Eng': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Mech Eng': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Nano Programming': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Pharma Tech': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Quantum FT': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    'Tutoring': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    Tutoring: { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Weapon Smith': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    'Break & Entry': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined }
+    'Break & Entry': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
   },
   'Combat & Healing': {
-    'Concealment': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    'Perception': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    'Psychology': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    'Treatment': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    Concealment: { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    Perception: { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    Psychology: { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    Treatment: { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'First Aid': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
-    'Trap Disarm.': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined }
+    'Trap Disarm.': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
   },
   Misc: {
     '% Add. Xp': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
     '% Add. Nano Cost': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
     'Max NCU': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
-    'Decreased Nano-Interrupt Modifier %': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
-    'SkillLockModifier': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
-    'HealDelta': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
+    'Decreased Nano-Interrupt Modifier %': {
+      baseValue: 0,
+      equipmentBonus: 0,
+      perkBonus: 0,
+      buffBonus: 0,
+      value: 0,
+    },
+    SkillLockModifier: { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
+    HealDelta: { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
     'Add All Def.': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
-    'NanoDelta': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
+    NanoDelta: { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
     'RangeInc. NF': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
     'RangeInc. Weapon': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
-    'CriticalIncrease': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
+    CriticalIncrease: { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
     'Free deck slot': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
     'Healing Efficiency': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
     'Add All Off.': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
@@ -201,18 +193,24 @@ export const DEFAULT_SKILLS = {
     'Add. Cold Dam.': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
     'Add. Fire Dam.': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
     'Add. Poison Dam.': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
-    'ShieldMeleeAC': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
-    'ShieldProjectileAC': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
-    'ShieldEnergyAC': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
-    'ShieldFireAC': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
-    'ShieldColdAC': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
-    'ShieldChemicalAC': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
-    'ShieldRadiationAC': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
-    'ShieldPoisonAC': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
-    'Direct Nano Damage Efficiency': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
+    ShieldMeleeAC: { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
+    ShieldProjectileAC: { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
+    ShieldEnergyAC: { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
+    ShieldFireAC: { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
+    ShieldColdAC: { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
+    ShieldChemicalAC: { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
+    ShieldRadiationAC: { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
+    ShieldPoisonAC: { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
+    'Direct Nano Damage Efficiency': {
+      baseValue: 0,
+      equipmentBonus: 0,
+      perkBonus: 0,
+      buffBonus: 0,
+      value: 0,
+    },
     'Add. Nano Dam.': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
-    'Scale': { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 }
-  }
+    Scale: { baseValue: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, value: 0 },
+  },
 } as const;
 
 // ============================================================================
@@ -234,7 +232,7 @@ export const DEFAULT_WEAPONS = {
   NCU3: null,
   NCU4: null,
   NCU5: null,
-  NCU6: null
+  NCU6: null,
 } as const;
 
 export const DEFAULT_CLOTHING = {
@@ -253,7 +251,7 @@ export const DEFAULT_CLOTHING = {
   RightFinger: null,
   LeftFinger: null,
   Neck: null,
-  Belt: null
+  Belt: null,
 } as const;
 
 export const DEFAULT_IMPLANTS = {
@@ -269,7 +267,7 @@ export const DEFAULT_IMPLANTS = {
   Leg: null,
   RightHand: null,
   LeftHand: null,
-  Feet: null
+  Feet: null,
 } as const;
 
 // ============================================================================
@@ -283,7 +281,7 @@ export const STORAGE_KEYS = {
   ACTIVE_PROFILE: 'tinkertools_active_profile',
   PROFILE_METADATA: 'tinkertools_profile_metadata',
   PROFILE_PREFERENCES: 'tinkertools_profile_preferences',
-  VERSION: 'tinkertools_profiles_version'
+  VERSION: 'tinkertools_profiles_version',
 } as const;
 
 // ============================================================================
@@ -302,7 +300,10 @@ export const SUPPORTED_VERSIONS = ['1.0.0', '1.1.0', '2.0.0'];
  */
 function createDefaultPerkSystem(level: number = 1, alienLevel: number = 0): PerkSystem {
   // Calculate available perk points based on level
-  const standardPerkPoints = level >= 10 ? Math.min(Math.floor(level / 10), 20) + (level > 200 ? Math.min(level - 200, 20) : 0) : 0;
+  const standardPerkPoints =
+    level >= 10
+      ? Math.min(Math.floor(level / 10), 20) + (level > 200 ? Math.min(level - 200, 20) : 0)
+      : 0;
   const aiPerkPoints = Math.min(alienLevel, 30);
 
   return {
@@ -310,15 +311,15 @@ function createDefaultPerkSystem(level: number = 1, alienLevel: number = 0): Per
     standardPerkPoints: {
       total: standardPerkPoints,
       spent: 0,
-      available: standardPerkPoints
+      available: standardPerkPoints,
     },
     aiPerkPoints: {
       total: aiPerkPoints,
       spent: 0,
-      available: aiPerkPoints
+      available: aiPerkPoints,
     },
     research: [],
-    lastCalculated: new Date().toISOString()
+    lastCalculated: new Date().toISOString(),
   };
 }
 
@@ -327,10 +328,10 @@ function createDefaultPerkSystem(level: number = 1, alienLevel: number = 0): Per
  */
 function getBreedIdFromBreedName(breed: string): number {
   const breedMap: Record<string, number> = {
-    'Solitus': 1,
-    'Opifex': 2,
-    'Nanomage': 3,
-    'Atrox': 4
+    Solitus: 1,
+    Opifex: 2,
+    Nanomage: 3,
+    Atrox: 4,
   };
   return breedMap[breed] || 1; // Default to Solitus
 }
@@ -369,7 +370,7 @@ export function createDefaultSkillsV4(breed: string): { [skillId: number]: Skill
       equipmentBonus: 0,
       perkBonus: 0,
       buffBonus: 0,
-      total: baseValue
+      total: baseValue,
     };
   }
 
@@ -379,7 +380,10 @@ export function createDefaultSkillsV4(breed: string): { [skillId: number]: Skill
 /**
  * Create a default comprehensive TinkerProfile
  */
-export function createDefaultProfile(name: string = 'New Character', breed: string = 'Solitus'): TinkerProfile {
+export function createDefaultProfile(
+  name: string = 'New Character',
+  breed: string = 'Solitus'
+): TinkerProfile {
   const now = new Date().toISOString();
 
   // Calculate initial health and nano based on level 1 defaults
@@ -401,14 +405,14 @@ export function createDefaultProfile(name: string = 'New Character', breed: stri
     Character: {
       Name: name,
       Level: 1,
-      Profession: professionId as any,  // Store as numeric ID
-      Breed: breedId as any,            // Store as numeric ID
+      Profession: professionId as any, // Store as numeric ID
+      Breed: breedId as any, // Store as numeric ID
       Faction: 'Neutral',
       Expansion: 'Lost Eden',
       AccountType: 'Paid',
       MaxHealth: initialHealth,
       MaxNano: initialNano,
-      Specialization: 0
+      Specialization: 0,
     },
 
     skills: createDefaultSkillsV4(breed),
@@ -417,20 +421,23 @@ export function createDefaultProfile(name: string = 'New Character', breed: stri
     Clothing: structuredClone(DEFAULT_CLOTHING),
     Implants: structuredClone(DEFAULT_IMPLANTS),
 
-    PerksAndResearch: createDefaultPerkSystem(level, 0)
+    PerksAndResearch: createDefaultPerkSystem(level, 0),
   };
 }
 
 /**
  * Create a simplified nano-compatible profile
  */
-export function createDefaultNanoProfile(name: string = 'New Character', breed: string = 'Solitus'): NanoCompatibleProfile {
+export function createDefaultNanoProfile(
+  name: string = 'New Character',
+  breed: string = 'Solitus'
+): NanoCompatibleProfile {
   const breedId = getBreedId(breed) || 1;
 
   return {
     id: `nano_profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     name,
-    profession: 'Adventurer',  // NanoCompatibleProfile uses string types
+    profession: 'Adventurer', // NanoCompatibleProfile uses string types
     level: 1,
     skills: {
       // Nano Schools
@@ -444,20 +451,20 @@ export function createDefaultNanoProfile(name: string = 'New Character', breed: 
       // Core Skills
       'Nano Programming': BASE_SKILL,
       'Computer Literacy': BASE_SKILL,
-      'Tutoring': BASE_SKILL,
+      Tutoring: BASE_SKILL,
       'First Aid': BASE_SKILL,
-      'Treatment': BASE_SKILL
+      Treatment: BASE_SKILL,
     },
     stats: {
-      'Strength': getBreedInitValue(breedId, 0),
-      'Agility': getBreedInitValue(breedId, 1),
-      'Stamina': getBreedInitValue(breedId, 2),
-      'Intelligence': getBreedInitValue(breedId, 3),
-      'Sense': getBreedInitValue(breedId, 4),
-      'Psychic': getBreedInitValue(breedId, 5)
+      Strength: getBreedInitValue(breedId, 0),
+      Agility: getBreedInitValue(breedId, 1),
+      Stamina: getBreedInitValue(breedId, 2),
+      Intelligence: getBreedInitValue(breedId, 3),
+      Sense: getBreedInitValue(breedId, 4),
+      Psychic: getBreedInitValue(breedId, 5),
     },
     activeNanos: [],
     memoryCapacity: 500,
-    nanoPoints: 1000
+    nanoPoints: 1000,
   };
 }

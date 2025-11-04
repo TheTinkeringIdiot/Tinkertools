@@ -11,24 +11,24 @@ import type { PocketBoss, Symbiant } from '@/types/api';
 
 // Mock child components
 vi.mock('@/components/pocket/PocketBossDatabase.vue', () => ({
-  default: { template: '<div class="mock-pocket-boss-database">Pocket Boss Database</div>' }
+  default: { template: '<div class="mock-pocket-boss-database">Pocket Boss Database</div>' },
 }));
 
 vi.mock('@/components/pocket/SymbiantLookup.vue', () => ({
-  default: { template: '<div class="mock-symbiant-lookup">Symbiant Lookup</div>' }
+  default: { template: '<div class="mock-symbiant-lookup">Symbiant Lookup</div>' },
 }));
 
 vi.mock('@/components/pocket/BossSymbiantMatcher.vue', () => ({
-  default: { template: '<div class="mock-boss-symbiant-matcher">Boss Symbiant Matcher</div>' }
+  default: { template: '<div class="mock-boss-symbiant-matcher">Boss Symbiant Matcher</div>' },
 }));
 
 vi.mock('@/components/pocket/CollectionTracker.vue', () => ({
-  default: { template: '<div class="mock-collection-tracker">Collection Tracker</div>' }
+  default: { template: '<div class="mock-collection-tracker">Collection Tracker</div>' },
 }));
 
 // Mock PrimeVue components
 vi.mock('primevue/tabview', () => ({
-  default: { 
+  default: {
     template: `
       <div class="mock-tabview">
         <div class="tab-headers">
@@ -41,12 +41,12 @@ vi.mock('primevue/tabview', () => ({
         </div>
       </div>
     `,
-    props: ['activeIndex']
-  }
+    props: ['activeIndex'],
+  },
 }));
 
 vi.mock('primevue/tabpanel', () => ({
-  default: { 
+  default: {
     template: `
       <div class="mock-tabpanel">
         <div class="panel-header">
@@ -56,8 +56,8 @@ vi.mock('primevue/tabpanel', () => ({
           <slot></slot>
         </div>
       </div>
-    `
-  }
+    `,
+  },
 }));
 
 describe('TinkerPocket', () => {
@@ -73,8 +73,8 @@ describe('TinkerPocket', () => {
       level: 100,
       playfield: 'Nascence',
       location: 'Central',
-      dropped_symbiants: []
-    }
+      dropped_symbiants: [],
+    },
   ];
 
   const mockSymbiants: Symbiant[] = [
@@ -84,17 +84,15 @@ describe('TinkerPocket', () => {
       name: 'Test Symbiant',
       slot: 'Head',
       ql: 150,
-      family: 'Artillery'
-    }
+      family: 'Artillery',
+    },
   ];
 
   beforeEach(() => {
     // Create router
     router = createRouter({
       history: createWebHistory(),
-      routes: [
-        { path: '/pocket', component: { template: '<div>Pocket</div>' } }
-      ]
+      routes: [{ path: '/pocket', component: { template: '<div>Pocket</div>' } }],
     });
 
     wrapper = mount(TinkerPocket, {
@@ -106,24 +104,24 @@ describe('TinkerPocket', () => {
               pocketBoss: {
                 pocketBosses: mockBosses,
                 loading: false,
-                error: null
+                error: null,
               },
               symbiants: {
-                symbiants: new Map(mockSymbiants.map(s => [s.id, s])),
+                symbiants: new Map(mockSymbiants.map((s) => [s.id, s])),
                 loading: false,
-                error: null
-              }
-            }
+                error: null,
+              },
+            },
           }),
           PrimeVue,
-          router
-        ]
-      }
+          router,
+        ],
+      },
     });
 
     pocketBossStore = usePocketBossStore();
     pocketBossStore.fetchPocketBosses = vi.fn().mockResolvedValue(undefined);
-    
+
     symbiantStore = useSymbiantsStore();
     symbiantStore.searchSymbiants = vi.fn().mockResolvedValue(mockSymbiants);
   });
@@ -135,7 +133,9 @@ describe('TinkerPocket', () => {
   it('displays the header with title and description', () => {
     expect(wrapper.text()).toContain('TinkerPocket');
     expect(wrapper.text()).toContain('Pocket Boss & Symbiant Tool');
-    expect(wrapper.text()).toContain('Track pocket bosses, symbiant drops, and manage your collection progress');
+    expect(wrapper.text()).toContain(
+      'Track pocket bosses, symbiant drops, and manage your collection progress'
+    );
   });
 
   it('displays the beta badge', () => {
@@ -150,7 +150,7 @@ describe('TinkerPocket', () => {
   it('displays all four tab panels', () => {
     const tabPanels = wrapper.findAll('.mock-tabpanel');
     expect(tabPanels).toHaveLength(4);
-    
+
     // Check that each component is rendered
     expect(wrapper.find('.mock-pocket-boss-database').exists()).toBe(true);
     expect(wrapper.find('.mock-symbiant-lookup').exists()).toBe(true);
@@ -166,13 +166,13 @@ describe('TinkerPocket', () => {
             createSpy: vi.fn,
             initialState: {
               pocketBoss: { loading: true },
-              symbiants: { loading: true }
-            }
+              symbiants: { loading: true },
+            },
           }),
           PrimeVue,
-          router
-        ]
-      }
+          router,
+        ],
+      },
     });
 
     expect(loadingWrapper.text()).toContain('Loading pocket boss and symbiant data...');
@@ -186,13 +186,13 @@ describe('TinkerPocket', () => {
             createSpy: vi.fn,
             initialState: {
               pocketBoss: { error: 'Failed to load' },
-              symbiants: { error: null }
-            }
+              symbiants: { error: null },
+            },
           }),
           PrimeVue,
-          router
-        ]
-      }
+          router,
+        ],
+      },
     });
 
     const component = errorWrapper.vm as any;
@@ -211,17 +211,17 @@ describe('TinkerPocket', () => {
   it('handles data loading errors', async () => {
     const errorMessage = 'Network error';
     pocketBossStore.fetchPocketBosses.mockRejectedValue(new Error(errorMessage));
-    
+
     const errorWrapper = mount(TinkerPocket, {
       global: {
         plugins: [
           createTestingPinia({
-            createSpy: vi.fn
+            createSpy: vi.fn,
           }),
           PrimeVue,
-          router
-        ]
-      }
+          router,
+        ],
+      },
     });
 
     await errorWrapper.vm.$nextTick();
@@ -230,21 +230,21 @@ describe('TinkerPocket', () => {
 
   it('manages active tab state', async () => {
     const component = wrapper.vm as any;
-    
+
     expect(component.activeTab).toBe(0);
-    
+
     component.activeTab = 1;
     await wrapper.vm.$nextTick();
-    
+
     expect(component.activeTab).toBe(1);
   });
 
   it('displays correct loading message', () => {
     const component = wrapper.vm as any;
     component.loading = true;
-    
+
     expect(component.loadingMessage).toBe('Loading pocket boss and symbiant data...');
-    
+
     component.loading = false;
     expect(component.loadingMessage).toBe('');
   });
@@ -252,7 +252,7 @@ describe('TinkerPocket', () => {
   it('has correct tab configuration', () => {
     const component = wrapper.vm as any;
     const tabs = component.tabItems;
-    
+
     expect(tabs).toHaveLength(4);
     expect(tabs[0].label).toBe('Pocket Bosses');
     expect(tabs[1].label).toBe('Symbiant Lookup');
@@ -268,12 +268,12 @@ describe('TinkerPocket', () => {
 
   it('handles successful data loading', async () => {
     const component = wrapper.vm as any;
-    
+
     // Simulate successful loading
     component.loading = false;
     component.error = null;
     await wrapper.vm.$nextTick();
-    
+
     expect(wrapper.find('.tinker-pocket-content').exists()).toBe(true);
     expect(wrapper.find('.mock-tabview').exists()).toBe(true);
   });

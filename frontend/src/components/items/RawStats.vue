@@ -16,7 +16,7 @@ Shows all item stats with stat numbers translated to names using game-data
             {{ formattedStats.length }} stats
           </div>
         </div>
-        
+
         <!-- Stats Table -->
         <div class="stats-table">
           <table class="w-full border-collapse">
@@ -28,24 +28,20 @@ Shows all item stats with stat numbers translated to names using game-data
                 <th class="header-cell">Value</th>
               </tr>
             </thead>
-            
+
             <!-- Data Rows -->
             <tbody>
-              <tr 
-                v-for="stat in formattedStats" 
-                :key="stat.stat"
-                class="data-row"
-              >
+              <tr v-for="stat in formattedStats" :key="stat.stat" class="data-row">
                 <!-- Stat ID Column -->
                 <td class="table-cell stat-id-cell">
                   <span class="font-mono text-xs">{{ stat.stat }}</span>
                 </td>
-                
+
                 <!-- Stat Name Column -->
                 <td class="table-cell stat-name-cell">
                   <span class="stat-name">{{ stat.name }}</span>
                 </td>
-                
+
                 <!-- Value Column -->
                 <td class="table-cell value-cell">
                   <span class="stat-value" :class="getValueClass(stat.value)">
@@ -62,64 +58,64 @@ Shows all item stats with stat numbers translated to names using game-data
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import Card from 'primevue/card'
-import type { StatValue } from '@/types/api'
-import { getStatName } from '@/services/game-utils'
+import { computed } from 'vue';
+import Card from 'primevue/card';
+import type { StatValue } from '@/types/api';
+import { getStatName } from '@/services/game-utils';
 
 // ============================================================================
 // Props
 // ============================================================================
 
 interface Props {
-  stats: StatValue[]
+  stats: StatValue[];
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  stats: () => []
-})
+  stats: () => [],
+});
 
 // ============================================================================
 // Computed Properties
 // ============================================================================
 
 const hasStats = computed(() => {
-  return props.stats && props.stats.length > 0
-})
+  return props.stats && props.stats.length > 0;
+});
 
 interface FormattedStat {
-  stat: number
-  name: string
-  value: number
+  stat: number;
+  name: string;
+  value: number;
 }
 
 const formattedStats = computed((): FormattedStat[] => {
-  if (!hasStats.value) return []
-  
+  if (!hasStats.value) return [];
+
   return props.stats
-    .map(stat => ({
+    .map((stat) => ({
       stat: stat.stat,
       name: getStatName(stat.stat) || `Unknown Stat`,
-      value: stat.value
+      value: stat.value,
     }))
-    .sort((a, b) => a.name.localeCompare(b.name))
-})
+    .sort((a, b) => a.name.localeCompare(b.name));
+});
 
 // ============================================================================
 // Methods
 // ============================================================================
 
 function formatValue(value: number): string {
-  return value.toLocaleString()
+  return value.toLocaleString();
 }
 
 function getValueClass(value: number): string {
   if (value > 0) {
-    return 'text-green-600 dark:text-green-400'
+    return 'text-green-600 dark:text-green-400';
   } else if (value < 0) {
-    return 'text-red-600 dark:text-red-400'
+    return 'text-red-600 dark:text-red-400';
   } else {
-    return 'text-surface-500 dark:text-surface-400'
+    return 'text-surface-500 dark:text-surface-400';
   }
 }
 </script>

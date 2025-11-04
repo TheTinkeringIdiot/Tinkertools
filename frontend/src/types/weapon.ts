@@ -3,81 +3,81 @@
  */
 
 export interface StatValue {
-  id: number
-  stat: number
-  value: number
+  id: number;
+  stat: number;
+  value: number;
 }
 
 export interface Weapon {
-  id: number
-  aoid: number
-  name: string
-  ql: number
-  item_class: number
-  description?: string
-  is_nano: boolean
-  stats: StatValue[]
-  attack_stats: StatValue[]
-  defense_stats: StatValue[]
-  spells: any[] // Will define spell type later if needed
+  id: number;
+  aoid: number;
+  name: string;
+  ql: number;
+  item_class: number;
+  description?: string;
+  is_nano: boolean;
+  stats: StatValue[];
+  attack_stats: StatValue[];
+  defense_stats: StatValue[];
+  spells: any[]; // Will define spell type later if needed
 }
 
 export interface CharacterSkills {
-  [skillId: number]: number
+  [skillId: number]: number;
 }
 
 export interface WeaponRequirement {
-  stat: number
-  statName: string
-  value: number
-  met: boolean
-  characterValue?: number
+  stat: number;
+  statName: string;
+  value: number;
+  met: boolean;
+  characterValue?: number;
 }
 
 export interface WeaponUsability {
-  canUse: boolean
-  requirements: WeaponRequirement[]
-  missingRequirements: WeaponRequirement[]
+  canUse: boolean;
+  requirements: WeaponRequirement[];
+  missingRequirements: WeaponRequirement[];
 }
 
 export interface WeaponFilters {
-  weaponTypes: number[]
-  qualityLevels: number[]
-  usableOnly: boolean
-  sortBy: string
-  sortDescending: boolean
+  weaponTypes: number[];
+  qualityLevels: number[];
+  usableOnly: boolean;
+  sortBy: string;
+  sortDescending: boolean;
 }
 
 export interface WeaponSearchRequest {
-  query?: string
-  filters?: Partial<WeaponFilters>
-  characterSkills?: CharacterSkills
+  query?: string;
+  filters?: Partial<WeaponFilters>;
+  characterSkills?: CharacterSkills;
 }
 
 export interface WeaponApiResponse {
-  items: Weapon[]
-  total: number
-  page: number
-  page_size: number
-  pages: number
-  has_next: boolean
-  has_prev: boolean
+  items: Weapon[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+  has_next: boolean;
+  has_prev: boolean;
 }
 
 // Anarchy Online skill mappings (stat IDs to skill names)
 export const SKILL_NAMES: Record<number, string> = {
   // Main stats
   16: 'Strength',
-  17: 'Stamina', 
+  17: 'Stamina',
   18: 'Agility',
   19: 'Sense',
   20: 'Intelligence',
   21: 'Psychic',
-  
+
   // Weapon skills
   100: '1h Blunt',
   101: '1h Edged',
-  102: '2h Blunt', 
+  102: '2h Blunt',
   103: '2h Edged',
   104: 'Pistol',
   105: 'Bow',
@@ -90,13 +90,13 @@ export const SKILL_NAMES: Record<number, string> = {
   112: 'Piercing',
   113: 'Multi Melee',
   114: 'Multi Ranged',
-  
+
   // Other common requirements
   54: 'Level',
   152: 'Martial Arts',
-  
+
   // Add more as discovered in the data
-}
+};
 
 // Weapon type classifications
 export const WEAPON_TYPES: Record<number, string> = {
@@ -104,9 +104,9 @@ export const WEAPON_TYPES: Record<number, string> = {
   2: 'Armor',
   3: 'Implant',
   4: 'Template',
-  5: 'Spirit', 
+  5: 'Spirit',
   // Add more weapon sub-types as needed
-}
+};
 
 // Quality level ranges for filtering
 export const QUALITY_RANGES = [
@@ -114,4 +114,4 @@ export const QUALITY_RANGES = [
   { label: 'Medium (51-100)', min: 51, max: 100 },
   { label: 'High (101-200)', min: 101, max: 200 },
   { label: 'Premium (201-300)', min: 201, max: 300 },
-]
+];

@@ -1,18 +1,18 @@
 /**
  * Pagination Fix Tests
- * 
+ *
  * Comprehensive tests for the pagination offset fix
  * Tests both API client pagination response transformation and ItemList component pagination behavior
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { nextTick } from 'vue'
-import { createPinia } from 'pinia'
-import axios from 'axios'
-import { apiClient } from '../services/api-client'
-import ItemList from '../components/items/ItemList.vue'
-import type { Item, PaginationInfo, ItemSearchQuery } from '../types/api'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mount } from '@vue/test-utils';
+import { nextTick } from 'vue';
+import { createPinia } from 'pinia';
+import axios from 'axios';
+import { apiClient } from '../services/api-client';
+import ItemList from '../components/items/ItemList.vue';
+import type { Item, PaginationInfo, ItemSearchQuery } from '../types/api';
 
 // Mock axios
 vi.mock('axios', () => ({
@@ -22,21 +22,21 @@ vi.mock('axios', () => ({
       post: vi.fn(),
       interceptors: {
         request: { use: vi.fn() },
-        response: { use: vi.fn() }
-      }
-    }))
-  }
-}))
-const mockedAxios = vi.mocked(axios)
+        response: { use: vi.fn() },
+      },
+    })),
+  },
+}));
+const mockedAxios = vi.mocked(axios);
 
 // Mock PrimeVue components for ItemList tests
 vi.mock('primevue/button', () => ({
   default: {
     name: 'Button',
     template: '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
-    emits: ['click']
-  }
-}))
+    emits: ['click'],
+  },
+}));
 
 vi.mock('primevue/paginator', () => ({
   default: {
@@ -48,11 +48,18 @@ vi.mock('primevue/paginator', () => ({
         <button @click="$emit('page', { first: 48, rows: 24 })" data-testid="page-3">3</button>
       </div>
     `,
-    props: ['first', 'rows', 'totalRecords', 'rowsPerPageOptions', 'template', 'currentPageReportTemplate'],
+    props: [
+      'first',
+      'rows',
+      'totalRecords',
+      'rowsPerPageOptions',
+      'template',
+      'currentPageReportTemplate',
+    ],
     emits: ['page'],
-    expose: ['first']
-  }
-}))
+    expose: ['first'],
+  },
+}));
 
 // Mock other components that aren't the focus of these tests
 vi.mock('../components/items/ItemCard.vue', () => ({
@@ -60,42 +67,42 @@ vi.mock('../components/items/ItemCard.vue', () => ({
     name: 'ItemCard',
     template: '<div class="item-card">{{ item.name }}</div>',
     props: ['item', 'profile', 'showCompatibility', 'isFavorite', 'isComparing'],
-    emits: ['click', 'favorite', 'compare', 'quick-view']
-  }
-}))
+    emits: ['click', 'favorite', 'compare', 'quick-view'],
+  },
+}));
 
 vi.mock('../components/items/ItemQuickView.vue', () => ({
   default: {
     name: 'ItemQuickView',
     template: '<div class="item-quick-view">{{ item.name }}</div>',
     props: ['item', 'profile', 'showCompatibility'],
-    emits: ['close', 'view-full', 'favorite', 'compare']
-  }
-}))
+    emits: ['close', 'view-full', 'favorite', 'compare'],
+  },
+}));
 
 vi.mock('primevue/badge', () => ({
-  default: { name: 'Badge', template: '<span>{{ value }}</span>', props: ['value'] }
-}))
+  default: { name: 'Badge', template: '<span>{{ value }}</span>', props: ['value'] },
+}));
 
 vi.mock('primevue/tag', () => ({
-  default: { name: 'Tag', template: '<span>{{ value }}</span>', props: ['value'] }
-}))
+  default: { name: 'Tag', template: '<span>{{ value }}</span>', props: ['value'] },
+}));
 
 vi.mock('primevue/contextmenu', () => ({
-  default: { name: 'ContextMenu', template: '<div></div>', props: ['model'] }
-}))
+  default: { name: 'ContextMenu', template: '<div></div>', props: ['model'] },
+}));
 
 vi.mock('primevue/dialog', () => ({
-  default: { name: 'Dialog', template: '<div v-if="visible"><slot /></div>', props: ['visible'] }
-}))
+  default: { name: 'Dialog', template: '<div v-if="visible"><slot /></div>', props: ['visible'] },
+}));
 
 // Mock services
 vi.mock('../services/game-utils', () => ({
-  getItemIconUrl: () => null
-}))
+  getItemIconUrl: () => null,
+}));
 
 // This will be the instance returned by axios.create()
-let mockAxiosInstance: any
+let mockAxiosInstance: any;
 
 const mockItem: Item = {
   id: 1,
@@ -109,30 +116,30 @@ const mockItem: Item = {
   spell_data: [],
   actions: [],
   attack_defense: null,
-  animation_mesh: null
-}
+  animation_mesh: null,
+};
 
 describe('Pagination Fix', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
-    
+    vi.clearAllMocks();
+
     // Create fresh mock instance
     mockAxiosInstance = {
       get: vi.fn(),
       post: vi.fn(),
       interceptors: {
         request: { use: vi.fn() },
-        response: { use: vi.fn() }
-      }
-    }
-    
+        response: { use: vi.fn() },
+      },
+    };
+
     // Make axios.create return our mock instance
-    mockedAxios.create.mockReturnValue(mockAxiosInstance as any)
-  })
+    mockedAxios.create.mockReturnValue(mockAxiosInstance as any);
+  });
 
   afterEach(() => {
-    vi.restoreAllMocks()
-  })
+    vi.restoreAllMocks();
+  });
 
   describe('API Client Offset Calculation', () => {
     it('should calculate correct offset for page 1', async () => {
@@ -143,29 +150,29 @@ describe('Pagination Fix', () => {
         page_size: 24,
         pages: 5,
         has_next: true,
-        has_prev: false
-      }
+        has_prev: false,
+      };
 
-      mockAxiosInstance.get.mockResolvedValue({ data: mockBackendResponse })
+      mockAxiosInstance.get.mockResolvedValue({ data: mockBackendResponse });
 
       const query: ItemSearchQuery = {
         search: 'test',
         page: 1,
-        limit: 24
-      }
+        limit: 24,
+      };
 
-      const result = await apiClient.searchItems(query)
+      const result = await apiClient.searchItems(query);
 
-      expect(result.success).toBe(true)
+      expect(result.success).toBe(true);
       expect(result.pagination).toEqual({
         page: 1,
         limit: 24,
         offset: 0, // (1 - 1) * 24 = 0
         total: 100,
         hasNext: true,
-        hasPrev: false
-      })
-    })
+        hasPrev: false,
+      });
+    });
 
     it('should calculate correct offset for page 2', async () => {
       const mockBackendResponse = {
@@ -175,29 +182,29 @@ describe('Pagination Fix', () => {
         page_size: 24,
         pages: 5,
         has_next: true,
-        has_prev: true
-      }
+        has_prev: true,
+      };
 
-      mockAxiosInstance.get.mockResolvedValue({ data: mockBackendResponse })
+      mockAxiosInstance.get.mockResolvedValue({ data: mockBackendResponse });
 
       const query: ItemSearchQuery = {
         search: 'test',
         page: 2,
-        limit: 24
-      }
+        limit: 24,
+      };
 
-      const result = await apiClient.searchItems(query)
+      const result = await apiClient.searchItems(query);
 
-      expect(result.success).toBe(true)
+      expect(result.success).toBe(true);
       expect(result.pagination).toEqual({
         page: 2,
         limit: 24,
         offset: 24, // (2 - 1) * 24 = 24
         total: 100,
         hasNext: true,
-        hasPrev: true
-      })
-    })
+        hasPrev: true,
+      });
+    });
 
     it('should calculate correct offset for page 3', async () => {
       const mockBackendResponse = {
@@ -207,21 +214,21 @@ describe('Pagination Fix', () => {
         page_size: 24,
         pages: 5,
         has_next: true,
-        has_prev: true
-      }
+        has_prev: true,
+      };
 
-      mockAxiosInstance.get.mockResolvedValue({ data: mockBackendResponse })
+      mockAxiosInstance.get.mockResolvedValue({ data: mockBackendResponse });
 
       const query: ItemSearchQuery = {
         search: 'test',
         page: 3,
-        limit: 24
-      }
+        limit: 24,
+      };
 
-      const result = await apiClient.searchItems(query)
+      const result = await apiClient.searchItems(query);
 
-      expect(result.pagination?.offset).toBe(48) // (3 - 1) * 24 = 48
-    })
+      expect(result.pagination?.offset).toBe(48); // (3 - 1) * 24 = 48
+    });
 
     it('should handle different page sizes correctly', async () => {
       const mockBackendResponse = {
@@ -231,21 +238,21 @@ describe('Pagination Fix', () => {
         page_size: 12,
         pages: 9,
         has_next: true,
-        has_prev: true
-      }
+        has_prev: true,
+      };
 
-      mockAxiosInstance.get.mockResolvedValue({ data: mockBackendResponse })
+      mockAxiosInstance.get.mockResolvedValue({ data: mockBackendResponse });
 
       const query: ItemSearchQuery = {
         search: 'test',
         page: 2,
-        limit: 12
-      }
+        limit: 12,
+      };
 
-      const result = await apiClient.searchItems(query)
+      const result = await apiClient.searchItems(query);
 
-      expect(result.pagination?.offset).toBe(12) // (2 - 1) * 12 = 12
-    })
+      expect(result.pagination?.offset).toBe(12); // (2 - 1) * 12 = 12
+    });
 
     it('should work for filter endpoint as well', async () => {
       const mockBackendResponse = {
@@ -255,31 +262,31 @@ describe('Pagination Fix', () => {
         page_size: 10,
         pages: 5,
         has_next: true,
-        has_prev: true
-      }
+        has_prev: true,
+      };
 
-      mockAxiosInstance.get.mockResolvedValue({ data: mockBackendResponse })
+      mockAxiosInstance.get.mockResolvedValue({ data: mockBackendResponse });
 
       const query: ItemSearchQuery = {
         item_class: [3],
         page: 3,
-        limit: 10
-      }
+        limit: 10,
+      };
 
-      const result = await apiClient.searchItems(query)
+      const result = await apiClient.searchItems(query);
 
-      expect(result.pagination?.offset).toBe(20) // (3 - 1) * 10 = 20
-    })
-  })
+      expect(result.pagination?.offset).toBe(20); // (3 - 1) * 10 = 20
+    });
+  });
 
   describe('ItemList Pagination State Management', () => {
-    let wrapper: any
+    let wrapper: any;
 
     afterEach(() => {
       if (wrapper) {
-        wrapper.unmount()
+        wrapper.unmount();
       }
-    })
+    });
 
     it('should initialize currentOffset from pagination prop', () => {
       const pagination: PaginationInfo = {
@@ -288,23 +295,23 @@ describe('Pagination Fix', () => {
         offset: 24,
         total: 100,
         hasNext: true,
-        hasPrev: true
-      }
+        hasPrev: true,
+      };
 
       wrapper = mount(ItemList, {
         props: {
           items: [mockItem],
           viewMode: 'grid',
-          pagination
+          pagination,
         },
         global: {
-          plugins: [createPinia()]
-        }
-      })
+          plugins: [createPinia()],
+        },
+      });
 
       // Check that currentOffset is initialized correctly
-      expect(wrapper.vm.currentOffset).toBe(24)
-    })
+      expect(wrapper.vm.currentOffset).toBe(24);
+    });
 
     it('should update currentOffset when pagination prop changes', async () => {
       const initialPagination: PaginationInfo = {
@@ -313,18 +320,18 @@ describe('Pagination Fix', () => {
         offset: 0,
         total: 100,
         hasNext: true,
-        hasPrev: false
-      }
+        hasPrev: false,
+      };
 
       wrapper = mount(ItemList, {
         props: {
           items: [mockItem],
           viewMode: 'grid',
-          pagination: initialPagination
-        }
-      })
+          pagination: initialPagination,
+        },
+      });
 
-      expect(wrapper.vm.currentOffset).toBe(0)
+      expect(wrapper.vm.currentOffset).toBe(0);
 
       // Update pagination to page 2
       const newPagination: PaginationInfo = {
@@ -333,14 +340,14 @@ describe('Pagination Fix', () => {
         offset: 24,
         total: 100,
         hasNext: true,
-        hasPrev: true
-      }
+        hasPrev: true,
+      };
 
-      await wrapper.setProps({ pagination: newPagination })
-      await nextTick()
+      await wrapper.setProps({ pagination: newPagination });
+      await nextTick();
 
-      expect(wrapper.vm.currentOffset).toBe(24)
-    })
+      expect(wrapper.vm.currentOffset).toBe(24);
+    });
 
     it('should emit correct page number when paginator events trigger', async () => {
       const pagination: PaginationInfo = {
@@ -349,29 +356,29 @@ describe('Pagination Fix', () => {
         offset: 0,
         total: 100,
         hasNext: true,
-        hasPrev: false
-      }
+        hasPrev: false,
+      };
 
       wrapper = mount(ItemList, {
         props: {
           items: [mockItem],
           viewMode: 'grid',
-          pagination
+          pagination,
         },
         global: {
-          plugins: [createPinia()]
-        }
-      })
+          plugins: [createPinia()],
+        },
+      });
 
-      const paginator = wrapper.findComponent({ name: 'Paginator' })
-      
+      const paginator = wrapper.findComponent({ name: 'Paginator' });
+
       // Simulate page 2 click (offset 24, rows 24)
-      await paginator.vm.$emit('page', { first: 24, rows: 24 })
+      await paginator.vm.$emit('page', { first: 24, rows: 24 });
 
-      const emittedEvents = wrapper.emitted('page-change')
-      expect(emittedEvents).toBeTruthy()
-      expect(emittedEvents![0]).toEqual([2]) // Should emit page 2
-    })
+      const emittedEvents = wrapper.emitted('page-change');
+      expect(emittedEvents).toBeTruthy();
+      expect(emittedEvents![0]).toEqual([2]); // Should emit page 2
+    });
 
     it('should handle page calculations correctly for different page sizes', async () => {
       const pagination: PaginationInfo = {
@@ -380,28 +387,28 @@ describe('Pagination Fix', () => {
         offset: 0,
         total: 60,
         hasNext: true,
-        hasPrev: false
-      }
+        hasPrev: false,
+      };
 
       wrapper = mount(ItemList, {
         props: {
           items: [mockItem],
           viewMode: 'grid',
-          pagination
+          pagination,
         },
         global: {
-          plugins: [createPinia()]
-        }
-      })
+          plugins: [createPinia()],
+        },
+      });
 
-      const paginator = wrapper.findComponent({ name: 'Paginator' })
-      
+      const paginator = wrapper.findComponent({ name: 'Paginator' });
+
       // Simulate page 3 click (offset 24, rows 12)
-      await paginator.vm.$emit('page', { first: 24, rows: 12 })
+      await paginator.vm.$emit('page', { first: 24, rows: 12 });
 
-      const emittedEvents = wrapper.emitted('page-change')
-      expect(emittedEvents![0]).toEqual([3]) // (24 / 12) + 1 = 3
-    })
+      const emittedEvents = wrapper.emitted('page-change');
+      expect(emittedEvents![0]).toEqual([3]); // (24 / 12) + 1 = 3
+    });
 
     it('should update currentOffset reactive to pagination changes', async () => {
       wrapper = mount(ItemList, {
@@ -414,21 +421,21 @@ describe('Pagination Fix', () => {
             offset: 0,
             total: 100,
             hasNext: true,
-            hasPrev: false
-          }
+            hasPrev: false,
+          },
         },
         global: {
-          plugins: [createPinia()]
-        }
-      })
+          plugins: [createPinia()],
+        },
+      });
 
       // Sequence of pagination updates to simulate real navigation
       const paginationUpdates = [
         { page: 2, offset: 24 },
         { page: 3, offset: 48 },
         { page: 1, offset: 0 },
-        { page: 4, offset: 72 }
-      ]
+        { page: 4, offset: 72 },
+      ];
 
       for (const update of paginationUpdates) {
         await wrapper.setProps({
@@ -438,14 +445,14 @@ describe('Pagination Fix', () => {
             offset: update.offset,
             total: 100,
             hasNext: update.page < 5,
-            hasPrev: update.page > 1
-          }
-        })
-        await nextTick()
+            hasPrev: update.page > 1,
+          },
+        });
+        await nextTick();
 
-        expect(wrapper.vm.currentOffset).toBe(update.offset)
+        expect(wrapper.vm.currentOffset).toBe(update.offset);
       }
-    })
+    });
 
     it('should display correct pagination info text', () => {
       const pagination: PaginationInfo = {
@@ -454,30 +461,30 @@ describe('Pagination Fix', () => {
         offset: 24,
         total: 100,
         hasNext: true,
-        hasPrev: true
-      }
+        hasPrev: true,
+      };
 
       wrapper = mount(ItemList, {
         props: {
           items: Array.from({ length: 24 }, (_, i) => ({ ...mockItem, id: i + 25 })),
           viewMode: 'grid',
-          pagination
+          pagination,
         },
         global: {
-          plugins: [createPinia()]
-        }
-      })
+          plugins: [createPinia()],
+        },
+      });
 
       // Component displays: "Showing 25-48 of 100 items" format at line 155-156 in ItemList.vue
-      const paginationInfo = wrapper.find('.text-sm')
-      expect(paginationInfo.text()).toContain('Showing 25-48 of 100 items')
-    })
-  })
+      const paginationInfo = wrapper.find('.text-sm');
+      expect(paginationInfo.text()).toContain('Showing 25-48 of 100 items');
+    });
+  });
 
   describe('Integration Tests', () => {
     it('should handle complete pagination workflow', async () => {
       // Test the complete flow: API response -> offset calculation -> component state update
-      
+
       // 1. Mock API response for page 1
       let mockBackendResponse = {
         items: Array.from({ length: 24 }, (_, i) => ({ ...mockItem, id: i + 1 })),
@@ -486,29 +493,29 @@ describe('Pagination Fix', () => {
         page_size: 24,
         pages: 5,
         has_next: true,
-        has_prev: false
-      }
+        has_prev: false,
+      };
 
-      mockAxiosInstance.get.mockResolvedValue({ data: mockBackendResponse })
+      mockAxiosInstance.get.mockResolvedValue({ data: mockBackendResponse });
 
       // 2. Get page 1 results
-      let result = await apiClient.searchItems({ search: 'test', page: 1, limit: 24 })
-      
-      expect(result.pagination?.offset).toBe(0)
-      
+      let result = await apiClient.searchItems({ search: 'test', page: 1, limit: 24 });
+
+      expect(result.pagination?.offset).toBe(0);
+
       // 3. Mount component with page 1 results
       let wrapper = mount(ItemList, {
         props: {
           items: result.data || [],
           viewMode: 'grid',
-          pagination: result.pagination
+          pagination: result.pagination,
         },
         global: {
-          plugins: [createPinia()]
-        }
-      })
+          plugins: [createPinia()],
+        },
+      });
 
-      expect(wrapper.vm.currentOffset).toBe(0)
+      expect(wrapper.vm.currentOffset).toBe(0);
 
       // 4. Mock API response for page 2
       mockBackendResponse = {
@@ -518,26 +525,26 @@ describe('Pagination Fix', () => {
         page_size: 24,
         pages: 5,
         has_next: true,
-        has_prev: true
-      }
+        has_prev: true,
+      };
 
-      mockAxiosInstance.get.mockResolvedValue({ data: mockBackendResponse })
+      mockAxiosInstance.get.mockResolvedValue({ data: mockBackendResponse });
 
       // 5. Get page 2 results
-      result = await apiClient.searchItems({ search: 'test', page: 2, limit: 24 })
-      
-      expect(result.pagination?.offset).toBe(24)
+      result = await apiClient.searchItems({ search: 'test', page: 2, limit: 24 });
+
+      expect(result.pagination?.offset).toBe(24);
 
       // 6. Update component props with page 2 results
       await wrapper.setProps({
         items: result.data || [],
-        pagination: result.pagination
-      })
-      await nextTick()
+        pagination: result.pagination,
+      });
+      await nextTick();
 
-      expect(wrapper.vm.currentOffset).toBe(24)
+      expect(wrapper.vm.currentOffset).toBe(24);
 
-      wrapper.unmount()
-    })
-  })
-})
+      wrapper.unmount();
+    });
+  });
+});

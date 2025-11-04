@@ -21,9 +21,22 @@ vi.mock('primevue/usetoast', () => ({
     removeAllGroups: vi.fn(),
   }),
 }));
-import { setupIntegrationTest, mountForIntegration, waitForUpdates } from '../helpers/integration-test-utils';
-import { createNanoWithRequirements, createCastingRequirement, createTestNano } from '../helpers/nano-fixtures';
-import { createTestProfile, PROFESSION, BREED, setProfileSkills } from '../helpers/profile-fixtures';
+import {
+  setupIntegrationTest,
+  mountForIntegration,
+  waitForUpdates,
+} from '../helpers/integration-test-utils';
+import {
+  createNanoWithRequirements,
+  createCastingRequirement,
+  createTestNano,
+} from '../helpers/nano-fixtures';
+import {
+  createTestProfile,
+  PROFESSION,
+  BREED,
+  setProfileSkills,
+} from '../helpers/profile-fixtures';
 import { createTestSkillData, SKILL_ID } from '../helpers/skill-fixtures';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { useNanosStore } from '@/stores/nanosStore';
@@ -50,44 +63,35 @@ describe('Nano Compatibility Integration', () => {
     await profileStore.loadProfiles();
 
     // Create test nanos with different requirement levels
-    lowReqNano = createNanoWithRequirements(
-      [[SKILL_ID.MATTER_CREATION, 200]],
-      {
-        id: 1,
-        name: 'Basic Buff',
-        school: 'Matter Creation',
-        strain: 'BasicBuff',
-        level: 50,
-        ql: 75,
-        memoryUsage: 20,
-      }
-    );
+    lowReqNano = createNanoWithRequirements([[SKILL_ID.MATTER_CREATION, 200]], {
+      id: 1,
+      name: 'Basic Buff',
+      school: 'Matter Creation',
+      strain: 'BasicBuff',
+      level: 50,
+      ql: 75,
+      memoryUsage: 20,
+    });
 
-    mediumReqNano = createNanoWithRequirements(
-      [[SKILL_ID.MATTER_CREATION, 500]],
-      {
-        id: 2,
-        name: 'Intermediate Buff',
-        school: 'Matter Creation',
-        strain: 'IntermediateBuff',
-        level: 100,
-        ql: 150,
-        memoryUsage: 35,
-      }
-    );
+    mediumReqNano = createNanoWithRequirements([[SKILL_ID.MATTER_CREATION, 500]], {
+      id: 2,
+      name: 'Intermediate Buff',
+      school: 'Matter Creation',
+      strain: 'IntermediateBuff',
+      level: 100,
+      ql: 150,
+      memoryUsage: 35,
+    });
 
-    highReqNano = createNanoWithRequirements(
-      [[SKILL_ID.MATTER_CREATION, 1000]],
-      {
-        id: 3,
-        name: 'Advanced Buff',
-        school: 'Matter Creation',
-        strain: 'AdvancedBuff',
-        level: 180,
-        ql: 220,
-        memoryUsage: 50,
-      }
-    );
+    highReqNano = createNanoWithRequirements([[SKILL_ID.MATTER_CREATION, 1000]], {
+      id: 3,
+      name: 'Advanced Buff',
+      school: 'Matter Creation',
+      strain: 'AdvancedBuff',
+      level: 180,
+      ql: 220,
+      memoryUsage: 50,
+    });
 
     multiReqNano = createNanoWithRequirements(
       [
@@ -127,8 +131,8 @@ describe('Nano Compatibility Integration', () => {
         level: 100,
         skills: {
           [SKILL_ID.MATTER_CREATION]: createTestSkillData({
-            pointsFromIp: 300,  // This will give us ~305 total with trickle
-            total: 305
+            pointsFromIp: 300, // This will give us ~305 total with trickle
+            total: 305,
           }),
         },
       });
@@ -139,7 +143,9 @@ describe('Nano Compatibility Integration', () => {
       // Verify profile is active
       expect(profileStore.activeProfile).toBeTruthy();
       if (!profileStore.activeProfile) throw new Error('Profile not active');
-      expect(profileStore.activeProfile.skills[SKILL_ID.MATTER_CREATION]?.total).toBeGreaterThanOrEqual(200);
+      expect(
+        profileStore.activeProfile.skills[SKILL_ID.MATTER_CREATION]?.total
+      ).toBeGreaterThanOrEqual(200);
 
       // Check castability (this would be done by a component or composable)
       const requirement = lowReqNano.castingRequirements![0];
@@ -202,7 +208,7 @@ describe('Nano Compatibility Integration', () => {
       await profileStore.setActiveProfile(profileId);
 
       // Check each requirement
-      const unmetRequirements = multiReqNano.castingRequirements!.filter(req => {
+      const unmetRequirements = multiReqNano.castingRequirements!.filter((req) => {
         if (req.type === 'skill') {
           const skillId = req.requirement as number;
           const characterSkill = profileStore.activeProfile!.skills[skillId];
@@ -212,8 +218,8 @@ describe('Nano Compatibility Integration', () => {
       });
 
       expect(unmetRequirements).toHaveLength(2); // Matter Crea and Time&Space are unmet
-      expect(unmetRequirements.map(r => r.requirement)).toContain(SKILL_ID.MATTER_CREATION);
-      expect(unmetRequirements.map(r => r.requirement)).toContain(SKILL_ID.TIME_SPACE);
+      expect(unmetRequirements.map((r) => r.requirement)).toContain(SKILL_ID.MATTER_CREATION);
+      expect(unmetRequirements.map((r) => r.requirement)).toContain(SKILL_ID.TIME_SPACE);
     });
 
     it('shows all missing requirements when multiple requirements are not met', async () => {
@@ -239,7 +245,7 @@ describe('Nano Compatibility Integration', () => {
       await profileStore.setActiveProfile(profileId);
 
       // Check all requirements
-      const unmetRequirements = multiReqNano.castingRequirements!.filter(req => {
+      const unmetRequirements = multiReqNano.castingRequirements!.filter((req) => {
         if (req.type === 'skill') {
           const skillId = req.requirement as number;
           const characterSkill = profileStore.activeProfile!.skills[skillId];
@@ -249,7 +255,7 @@ describe('Nano Compatibility Integration', () => {
       });
 
       expect(unmetRequirements).toHaveLength(3);
-      expect(unmetRequirements.map(r => r.requirement)).toEqual([
+      expect(unmetRequirements.map((r) => r.requirement)).toEqual([
         SKILL_ID.MATTER_CREATION,
         SKILL_ID.TIME_SPACE,
         SKILL_ID.NANO_PROGRAMMING,
@@ -291,7 +297,9 @@ describe('Nano Compatibility Integration', () => {
       // Verify now castable
       canCast = profileStore.activeProfile!.skills[SKILL_ID.MATTER_CREATION].total >= 400;
       expect(canCast).toBe(true);
-      expect(profileStore.activeProfile!.skills[SKILL_ID.MATTER_CREATION].total).toBeGreaterThanOrEqual(410);
+      expect(
+        profileStore.activeProfile!.skills[SKILL_ID.MATTER_CREATION].total
+      ).toBeGreaterThanOrEqual(410);
     });
 
     it('updates compatibility when skills decrease', async () => {
@@ -514,12 +522,12 @@ describe('Nano Compatibility Integration', () => {
       await profileStore.setActiveProfile(profileId);
 
       // Filter nanos by castability
-      const castableNanos = nanoStore.nanos.filter(nano => {
+      const castableNanos = nanoStore.nanos.filter((nano) => {
         if (!nano.castingRequirements || nano.castingRequirements.length === 0) {
           return true; // No requirements means castable
         }
 
-        return nano.castingRequirements.every(req => {
+        return nano.castingRequirements.every((req) => {
           if (req.type === 'skill') {
             const skillId = req.requirement as number;
             const characterSkill = profileStore.activeProfile!.skills[skillId];
@@ -530,7 +538,7 @@ describe('Nano Compatibility Integration', () => {
       });
 
       expect(castableNanos).toHaveLength(2);
-      expect(castableNanos.map(n => n.name)).toEqual(['Basic Buff', 'Intermediate Buff']);
+      expect(castableNanos.map((n) => n.name)).toEqual(['Basic Buff', 'Intermediate Buff']);
       expect(castableNanos).not.toContainEqual(expect.objectContaining({ name: 'Advanced Buff' }));
     });
 
@@ -552,12 +560,12 @@ describe('Nano Compatibility Integration', () => {
       await profileStore.setActiveProfile(profileId);
 
       // Filter nanos by non-castability
-      const nonCastableNanos = nanoStore.nanos.filter(nano => {
+      const nonCastableNanos = nanoStore.nanos.filter((nano) => {
         if (!nano.castingRequirements || nano.castingRequirements.length === 0) {
           return false; // No requirements means castable
         }
 
-        return !nano.castingRequirements.every(req => {
+        return !nano.castingRequirements.every((req) => {
           if (req.type === 'skill') {
             const skillId = req.requirement as number;
             const characterSkill = profileStore.activeProfile!.skills[skillId];
@@ -568,7 +576,7 @@ describe('Nano Compatibility Integration', () => {
       });
 
       expect(nonCastableNanos).toHaveLength(3);
-      expect(nonCastableNanos.map(n => n.name)).toEqual([
+      expect(nonCastableNanos.map((n) => n.name)).toEqual([
         'Intermediate Buff',
         'Advanced Buff',
         'Complex Nano',
@@ -594,11 +602,11 @@ describe('Nano Compatibility Integration', () => {
       await profileStore.setActiveProfile(profileId);
 
       // Initially cannot cast any nanos
-      let castableNanos = nanoStore.nanos.filter(nano => {
+      let castableNanos = nanoStore.nanos.filter((nano) => {
         if (!nano.castingRequirements || nano.castingRequirements.length === 0) {
           return true;
         }
-        return nano.castingRequirements.every(req => {
+        return nano.castingRequirements.every((req) => {
           if (req.type === 'skill') {
             const skillId = req.requirement as number;
             const characterSkill = profileStore.activeProfile!.skills[skillId];
@@ -615,11 +623,11 @@ describe('Nano Compatibility Integration', () => {
       await waitForUpdates();
 
       // Now can cast low req nano
-      castableNanos = nanoStore.nanos.filter(nano => {
+      castableNanos = nanoStore.nanos.filter((nano) => {
         if (!nano.castingRequirements || nano.castingRequirements.length === 0) {
           return true;
         }
-        return nano.castingRequirements.every(req => {
+        return nano.castingRequirements.every((req) => {
           if (req.type === 'skill') {
             const skillId = req.requirement as number;
             const characterSkill = profileStore.activeProfile!.skills[skillId];
@@ -630,7 +638,7 @@ describe('Nano Compatibility Integration', () => {
       });
 
       expect(castableNanos).toHaveLength(1);
-      expect(castableNanos.map(n => n.name)).toEqual(['Basic Buff']);
+      expect(castableNanos.map((n) => n.name)).toEqual(['Basic Buff']);
     });
   });
 
@@ -640,10 +648,9 @@ describe('Nano Compatibility Integration', () => {
 
   describe('Multiple Requirement Types', () => {
     it('handles skill requirements correctly', () => {
-      const nano = createNanoWithRequirements(
-        [[SKILL_ID.MATTER_CREATION, 500]],
-        { name: 'Skill Test Nano' }
-      );
+      const nano = createNanoWithRequirements([[SKILL_ID.MATTER_CREATION, 500]], {
+        name: 'Skill Test Nano',
+      });
 
       expect(nano.castingRequirements).toHaveLength(1);
       expect(nano.castingRequirements![0].type).toBe('skill');
@@ -655,9 +662,7 @@ describe('Nano Compatibility Integration', () => {
       const nano = createTestNano({
         name: 'Level Test Nano',
         level: 150,
-        castingRequirements: [
-          createCastingRequirement('level', 'level', 150),
-        ],
+        castingRequirements: [createCastingRequirement('level', 'level', 150)],
       });
 
       expect(nano.castingRequirements).toHaveLength(1);
@@ -677,8 +682,8 @@ describe('Nano Compatibility Integration', () => {
       });
 
       expect(nano.castingRequirements).toHaveLength(3);
-      expect(nano.castingRequirements!.filter(r => r.type === 'skill')).toHaveLength(2);
-      expect(nano.castingRequirements!.filter(r => r.type === 'level')).toHaveLength(1);
+      expect(nano.castingRequirements!.filter((r) => r.type === 'skill')).toHaveLength(2);
+      expect(nano.castingRequirements!.filter((r) => r.type === 'level')).toHaveLength(1);
 
       // Create profile that meets some but not all requirements
       const profile = createTestProfile({
@@ -719,7 +724,7 @@ describe('Nano Compatibility Integration', () => {
       });
 
       // Check multiReqNano castability
-      const canCast = multiReqNano.castingRequirements!.every(req => {
+      const canCast = multiReqNano.castingRequirements!.every((req) => {
         if (req.type === 'skill') {
           const skillId = req.requirement as number;
           const characterSkill = profile.skills[skillId];
@@ -736,7 +741,7 @@ describe('Nano Compatibility Integration', () => {
       // But if we fix the one missing requirement
       profile.skills[SKILL_ID.NANO_PROGRAMMING].total = 510;
 
-      const canCastNow = multiReqNano.castingRequirements!.every(req => {
+      const canCastNow = multiReqNano.castingRequirements!.every((req) => {
         if (req.type === 'skill') {
           const skillId = req.requirement as number;
           const characterSkill = profile.skills[skillId];
@@ -790,10 +795,9 @@ describe('Nano Compatibility Integration', () => {
     });
 
     it('handles zero-value skill requirements', () => {
-      const zeroReqNano = createNanoWithRequirements(
-        [[SKILL_ID.MATTER_CREATION, 0]],
-        { name: 'Zero Requirement Nano' }
-      );
+      const zeroReqNano = createNanoWithRequirements([[SKILL_ID.MATTER_CREATION, 0]], {
+        name: 'Zero Requirement Nano',
+      });
 
       const profile = createTestProfile({
         name: 'Any Character',

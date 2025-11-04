@@ -65,7 +65,7 @@ async function shareLink() {
       severity: 'success',
       summary: 'Link Copied',
       detail: 'Boss detail link copied to clipboard',
-      life: 3000
+      life: 3000,
     });
   } catch (err) {
     console.error('Failed to copy link:', err);
@@ -73,7 +73,7 @@ async function shareLink() {
       severity: 'error',
       summary: 'Copy Failed',
       detail: 'Failed to copy link to clipboard',
-      life: 3000
+      life: 3000,
     });
   }
 }
@@ -86,7 +86,7 @@ async function fetchBossData() {
     // Fetch boss info and drops in parallel
     const [bossResponse, dropsResponse] = await Promise.all([
       apiClient.getMob(bossId.value),
-      apiClient.getMobDrops(bossId.value)
+      apiClient.getMobDrops(bossId.value),
     ]);
 
     if (!bossResponse.data) {
@@ -116,7 +116,9 @@ onMounted(() => {
 <template>
   <div class="boss-detail h-full flex flex-col">
     <!-- Header -->
-    <div class="bg-surface-50 dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 p-6">
+    <div
+      class="bg-surface-50 dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 p-6"
+    >
       <div class="container mx-auto">
         <div class="flex items-center justify-between mb-2">
           <div class="flex items-center gap-3">
@@ -135,13 +137,7 @@ onMounted(() => {
               Boss Details
             </h1>
           </div>
-          <Button
-            v-if="boss"
-            icon="pi pi-share-alt"
-            label="Share"
-            outlined
-            @click="shareLink"
-          />
+          <Button v-if="boss" icon="pi pi-share-alt" label="Share" outlined @click="shareLink" />
         </div>
         <p v-if="boss" class="text-surface-600 dark:text-surface-400">
           {{ formatLocation() }}
@@ -163,11 +159,7 @@ onMounted(() => {
           <i class="pi pi-exclamation-triangle text-4xl text-red-500 mb-4"></i>
           <p class="text-lg text-red-600 dark:text-red-400 mb-4">{{ error }}</p>
           <div class="flex gap-2 justify-center">
-            <Button
-              label="Try Again"
-              icon="pi pi-refresh"
-              @click="fetchBossData"
-            />
+            <Button label="Try Again" icon="pi pi-refresh" @click="fetchBossData" />
             <Button
               label="Back to Pocket Bosses"
               icon="pi pi-arrow-left"
@@ -184,7 +176,9 @@ onMounted(() => {
             <template #content>
               <!-- Level Section (prominent, separate) -->
               <div class="mb-6">
-                <h3 class="text-sm font-medium text-surface-600 dark:text-surface-400 mb-2">Boss Level</h3>
+                <h3 class="text-sm font-medium text-surface-600 dark:text-surface-400 mb-2">
+                  Boss Level
+                </h3>
                 <Tag
                   v-if="boss.level !== null"
                   :value="`Level ${boss.level}`"
@@ -209,7 +203,10 @@ onMounted(() => {
                     </div>
 
                     <!-- Location (child) - with visual connector -->
-                    <div v-if="boss.location" class="mt-3 ml-4 border-l-2 border-primary-200 dark:border-primary-800 pl-4">
+                    <div
+                      v-if="boss.location"
+                      class="mt-3 ml-4 border-l-2 border-primary-200 dark:border-primary-800 pl-4"
+                    >
                       <div class="flex items-center gap-2 text-surface-700 dark:text-surface-300">
                         <i class="pi pi-angle-right text-sm"></i>
                         <span class="font-medium">{{ boss.location }}</span>
@@ -294,7 +291,9 @@ onMounted(() => {
               </div>
               <div v-else class="text-center py-8">
                 <i class="pi pi-info-circle text-3xl text-surface-400 mb-3"></i>
-                <p class="text-surface-600 dark:text-surface-400">No symbiant drops recorded for this boss</p>
+                <p class="text-surface-600 dark:text-surface-400">
+                  No symbiant drops recorded for this boss
+                </p>
               </div>
             </template>
           </Card>

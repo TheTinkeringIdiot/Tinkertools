@@ -18,7 +18,7 @@ Shows all item data with profile compatibility and comparison options
         <Badge v-if="displayedItem && currentQl" :value="`QL ${currentQl}`" severity="info" />
         <Badge v-if="item?.is_nano" value="Nano" severity="success" />
       </div>
-      
+
       <!-- Header Actions -->
       <div v-if="item" class="flex items-center gap-2">
         <Button
@@ -40,13 +40,13 @@ Shows all item data with profile compatibility and comparison options
           label="Compare"
           severity="primary"
           outlined
-                    @click="addToComparison"
+          @click="addToComparison"
         />
         <Button
           icon="pi pi-share-alt"
           severity="secondary"
           outlined
-                    @click="shareItem"
+          @click="shareItem"
           v-tooltip.bottom="'Share Item'"
         />
       </div>
@@ -68,7 +68,9 @@ Shows all item data with profile compatibility and comparison options
 
     <div v-else-if="item" class="space-y-3">
       <!-- Item Flags, Interpolation Controls, and Advanced View Toggle -->
-      <div class="flex items-center gap-4 p-4 bg-surface-50 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700">
+      <div
+        class="flex items-center gap-4 p-4 bg-surface-50 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700"
+      >
         <!-- Item Flags (left side) -->
         <div class="flex items-center gap-2 flex-wrap">
           <Tag
@@ -76,35 +78,38 @@ Shows all item data with profile compatibility and comparison options
             :key="flag.name"
             :value="flag.name"
             :severity="flag.severity"
-                        :class="['outline-tag', flag.severity === 'danger' ? 'outline-tag-danger' : 'outline-tag-secondary']"
+            :class="[
+              'outline-tag',
+              flag.severity === 'danger' ? 'outline-tag-danger' : 'outline-tag-secondary',
+            ]"
           />
-          <span v-if="displayItemFlags.length === 0" class="text-sm text-surface-500 dark:text-surface-400 italic">
+          <span
+            v-if="displayItemFlags.length === 0"
+            class="text-sm text-surface-500 dark:text-surface-400 italic"
+          >
             No special properties
           </span>
         </div>
-        
+
         <!-- Interpolation Controls (right-aligned) -->
         <div class="flex-1 flex justify-end">
-          <ItemInterpolationBar 
+          <ItemInterpolationBar
             :item="item"
             :initial-ql="route.query.ql ? parseInt(route.query.ql as string) : undefined"
             @item-update="handleInterpolatedItem"
             @error="handleInterpolationError"
           />
         </div>
-        
+
         <!-- Advanced View Toggle (right side) -->
         <div class="flex items-center gap-2">
           <label for="advanced-view-toggle" class="text-sm text-surface-700 dark:text-surface-300">
             Advanced view
           </label>
-          <InputSwitch 
-            id="advanced-view-toggle"
-            v-model="advancedView"
-          />
+          <InputSwitch id="advanced-view-toggle" v-model="advancedView" />
         </div>
       </div>
-      
+
       <!-- Item Overview -->
       <div class="grid grid-cols-1 lg:grid-cols-4 gap-3">
         <!-- Item Slots Display and Basic Info -->
@@ -118,7 +123,7 @@ Shows all item data with profile compatibility and comparison options
             </template>
           </Card>
         </div>
-        
+
         <!-- Item Description -->
         <div class="lg:col-span-2">
           <Card>
@@ -131,7 +136,7 @@ Shows all item data with profile compatibility and comparison options
                     <h3 class="text-base font-semibold">Description</h3>
                   </div>
                 </div>
-                
+
                 <div v-if="item.description">
                   <p class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
                     {{ item.description }}
@@ -144,7 +149,7 @@ Shows all item data with profile compatibility and comparison options
             </template>
           </Card>
         </div>
-        
+
         <!-- You can help! -->
         <div class="lg:col-span-1">
           <Card>
@@ -157,32 +162,33 @@ Shows all item data with profile compatibility and comparison options
                     <h3 class="text-base font-semibold">You can help!</h3>
                   </div>
                 </div>
-                
+
                 <div class="text-sm text-surface-600 dark:text-surface-400">
                   <p class="mb-4 leading-relaxed">
-                    TinkerItems and the other TinkerTools are a player-run project. Your kind help keeping them online and ad-free is GREATLY appreciated!
+                    TinkerItems and the other TinkerTools are a player-run project. Your kind help
+                    keeping them online and ad-free is GREATLY appreciated!
                   </p>
                   <div class="flex items-center gap-2">
-                    <a 
-                      href="https://patreon.com/tinkeringidiot" 
-                      target="_blank" 
+                    <a
+                      href="https://patreon.com/tinkeringidiot"
+                      target="_blank"
                       rel="noopener noreferrer"
                       class="hover:opacity-80 transition-opacity flex-1"
                     >
-                      <img 
-                        src="https://cdn.tinkeringidiot.com/static/image/patreon_name.png" 
+                      <img
+                        src="https://cdn.tinkeringidiot.com/static/image/patreon_name.png"
                         alt="Support on Patreon"
                         class="h-10 w-full object-fill"
                       />
                     </a>
-                    <a 
-                      href="https://discord.gg/a7baGx76un" 
-                      target="_blank" 
+                    <a
+                      href="https://discord.gg/a7baGx76un"
+                      target="_blank"
                       rel="noopener noreferrer"
                       class="hover:opacity-80 transition-opacity flex-1"
                     >
-                      <img 
-                        src="https://cdn.tinkeringidiot.com/static/image/discord_logo.svg" 
+                      <img
+                        src="https://cdn.tinkeringidiot.com/static/image/discord_logo.svg"
                         alt="Join Discord"
                         class="h-10 w-full object-fill"
                       />
@@ -196,7 +202,7 @@ Shows all item data with profile compatibility and comparison options
       </div>
 
       <!-- Weapon Statistics (for weapons only) -->
-      <WeaponStats 
+      <WeaponStats
         v-if="item && item.item_class && isWeapon(item.item_class)"
         :item="displayedItem"
         :profile="profile"
@@ -206,7 +212,7 @@ Shows all item data with profile compatibility and comparison options
       />
 
       <!-- Nano Statistics (for nanos only) -->
-      <NanoStatistics 
+      <NanoStatistics
         v-if="item && item.is_nano"
         :item="displayedItem"
         :profile="profile"
@@ -228,8 +234,8 @@ Shows all item data with profile compatibility and comparison options
                 <h3 class="text-base font-semibold">Requirements</h3>
               </div>
             </div>
-            
-            <ActionRequirements 
+
+            <ActionRequirements
               :actions="displayedItem.actions"
               :character-stats="characterStats"
               :expanded="true"
@@ -248,23 +254,10 @@ Shows all item data with profile compatibility and comparison options
       />
 
       <!-- Raw Stats (only visible in advanced view) -->
-      <RawStats
-        v-if="item && item.stats"
-        v-show="advancedView"
-        :stats="item.stats"
-      />
+      <RawStats v-if="item && item.stats" v-show="advancedView" :stats="item.stats" />
 
       <!-- Item Sources -->
-      <ItemSources
-        v-if="item && item.sources && item.sources.length > 0"
-        :sources="item.sources"
-      />
-
-
-
-
-
-
+      <ItemSources v-if="item && item.sources && item.sources.length > 0" :sources="item.sources" />
     </div>
   </div>
 
@@ -286,7 +279,7 @@ Shows all item data with profile compatibility and comparison options
           <Badge v-if="displayedItem && currentQl" :value="`QL ${currentQl}`" severity="info" />
           <Badge v-if="item?.is_nano" value="Nano" severity="success" />
         </div>
-        
+
         <!-- Header Actions -->
         <div v-if="item" class="flex items-center gap-2">
           <Button
@@ -308,13 +301,13 @@ Shows all item data with profile compatibility and comparison options
             label="Compare"
             severity="primary"
             outlined
-                        @click="addToComparison"
+            @click="addToComparison"
           />
           <Button
             icon="pi pi-share-alt"
             severity="secondary"
             outlined
-                        @click="shareItem"
+            @click="shareItem"
             v-tooltip.bottom="'Share Item'"
           />
         </div>
@@ -337,7 +330,9 @@ Shows all item data with profile compatibility and comparison options
 
     <div v-else-if="item" class="space-y-6 max-h-[70vh] overflow-y-auto">
       <!-- Item Flags and Advanced View Toggle -->
-      <div class="flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700">
+      <div
+        class="flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700"
+      >
         <!-- Item Flags (left side) -->
         <div class="flex items-center gap-2 flex-wrap">
           <Tag
@@ -345,25 +340,28 @@ Shows all item data with profile compatibility and comparison options
             :key="flag.name"
             :value="flag.name"
             :severity="flag.severity"
-                        :class="['outline-tag', flag.severity === 'danger' ? 'outline-tag-danger' : 'outline-tag-secondary']"
+            :class="[
+              'outline-tag',
+              flag.severity === 'danger' ? 'outline-tag-danger' : 'outline-tag-secondary',
+            ]"
           />
-          <span v-if="displayItemFlags.length === 0" class="text-sm text-surface-500 dark:text-surface-400 italic">
+          <span
+            v-if="displayItemFlags.length === 0"
+            class="text-sm text-surface-500 dark:text-surface-400 italic"
+          >
             No special properties
           </span>
         </div>
-        
+
         <!-- Advanced View Toggle (right side) -->
         <div class="flex items-center gap-2">
           <label for="advanced-view-toggle" class="text-sm text-surface-700 dark:text-surface-300">
             Advanced view
           </label>
-          <InputSwitch 
-            id="advanced-view-toggle"
-            v-model="advancedView"
-          />
+          <InputSwitch id="advanced-view-toggle" v-model="advancedView" />
         </div>
       </div>
-      
+
       <!-- Item Overview -->
       <div class="grid grid-cols-1 lg:grid-cols-4 gap-3">
         <!-- Item Slots Display and Basic Info -->
@@ -377,7 +375,7 @@ Shows all item data with profile compatibility and comparison options
             </template>
           </Card>
         </div>
-        
+
         <!-- Item Description -->
         <div class="lg:col-span-2">
           <Card>
@@ -390,7 +388,7 @@ Shows all item data with profile compatibility and comparison options
                     <h3 class="text-base font-semibold">Description</h3>
                   </div>
                 </div>
-                
+
                 <div v-if="item.description">
                   <p class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
                     {{ item.description }}
@@ -403,7 +401,7 @@ Shows all item data with profile compatibility and comparison options
             </template>
           </Card>
         </div>
-        
+
         <!-- You can help! -->
         <div class="lg:col-span-1">
           <Card>
@@ -416,32 +414,33 @@ Shows all item data with profile compatibility and comparison options
                     <h3 class="text-base font-semibold">You can help!</h3>
                   </div>
                 </div>
-                
+
                 <div class="text-sm text-surface-600 dark:text-surface-400">
                   <p class="mb-4 leading-relaxed">
-                    TinkerItems and the other TinkerTools are a player-run project. Your kind help keeping them online and ad-free is GREATLY appreciated!
+                    TinkerItems and the other TinkerTools are a player-run project. Your kind help
+                    keeping them online and ad-free is GREATLY appreciated!
                   </p>
                   <div class="flex items-center gap-2">
-                    <a 
-                      href="https://patreon.com/tinkeringidiot" 
-                      target="_blank" 
+                    <a
+                      href="https://patreon.com/tinkeringidiot"
+                      target="_blank"
                       rel="noopener noreferrer"
                       class="hover:opacity-80 transition-opacity flex-1"
                     >
-                      <img 
-                        src="https://cdn.tinkeringidiot.com/static/image/patreon_name.png" 
+                      <img
+                        src="https://cdn.tinkeringidiot.com/static/image/patreon_name.png"
                         alt="Support on Patreon"
                         class="h-10 w-full object-fill"
                       />
                     </a>
-                    <a 
-                      href="https://discord.gg/a7baGx76un" 
-                      target="_blank" 
+                    <a
+                      href="https://discord.gg/a7baGx76un"
+                      target="_blank"
                       rel="noopener noreferrer"
                       class="hover:opacity-80 transition-opacity flex-1"
                     >
-                      <img 
-                        src="https://cdn.tinkeringidiot.com/static/image/discord_logo.svg" 
+                      <img
+                        src="https://cdn.tinkeringidiot.com/static/image/discord_logo.svg"
                         alt="Join Discord"
                         class="h-10 w-full object-fill"
                       />
@@ -455,7 +454,7 @@ Shows all item data with profile compatibility and comparison options
       </div>
 
       <!-- Weapon Statistics (for weapons only) -->
-      <WeaponStats 
+      <WeaponStats
         v-if="item && item.item_class && isWeapon(item.item_class)"
         :item="displayedItem"
         :profile="profile"
@@ -465,7 +464,7 @@ Shows all item data with profile compatibility and comparison options
       />
 
       <!-- Nano Statistics (for nanos only) -->
-      <NanoStatistics 
+      <NanoStatistics
         v-if="item && item.is_nano"
         :item="displayedItem"
         :profile="profile"
@@ -487,8 +486,8 @@ Shows all item data with profile compatibility and comparison options
                 <h3 class="text-base font-semibold">Requirements</h3>
               </div>
             </div>
-            
-            <ActionRequirements 
+
+            <ActionRequirements
               :actions="displayedItem.actions"
               :character-stats="characterStats"
               :expanded="true"
@@ -507,24 +506,10 @@ Shows all item data with profile compatibility and comparison options
       />
 
       <!-- Raw Stats (only visible in advanced view) -->
-      <RawStats
-        v-if="item && item.stats"
-        v-show="advancedView"
-        :stats="item.stats"
-      />
+      <RawStats v-if="item && item.stats" v-show="advancedView" :stats="item.stats" />
 
       <!-- Item Sources -->
-      <ItemSources
-        v-if="item && item.sources && item.sources.length > 0"
-        :sources="item.sources"
-      />
-
-
-
-
-
-
-
+      <ItemSources v-if="item && item.sources && item.sources.length > 0" :sources="item.sources" />
     </div>
 
     <template #footer>
@@ -534,7 +519,12 @@ Shows all item data with profile compatibility and comparison options
         </div>
         <div class="flex gap-2">
           <Button label="Close" severity="secondary" @click="onClose" />
-          <Button v-if="item" label="Add to Comparison" icon="pi pi-clone" @click="addToComparison" />
+          <Button
+            v-if="item"
+            label="Add to Comparison"
+            icon="pi pi-clone"
+            @click="addToComparison"
+          />
         </div>
       </div>
     </template>
@@ -552,337 +542,365 @@ Shows all item data with profile compatibility and comparison options
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useItemsStore } from '@/stores/items'
-import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
-import { getItemIconUrl, isWeapon, getDisplayItemFlags, getDisplayCanFlags, getProfessionId, getBreedId, getStatId, getItemSlotInfo } from '@/services/game-utils'
-import { mapProfileToStats, getProfileStat } from '@/utils/profile-stats-mapper'
-import type { Item, TinkerProfile, InterpolatedItem, InterpolationInfo } from '@/types/api'
+import { ref, computed, watch, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { useItemsStore } from '@/stores/items';
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
+import {
+  getItemIconUrl,
+  isWeapon,
+  getDisplayItemFlags,
+  getDisplayCanFlags,
+  getProfessionId,
+  getBreedId,
+  getStatId,
+  getItemSlotInfo,
+} from '@/services/game-utils';
+import { mapProfileToStats, getProfileStat } from '@/utils/profile-stats-mapper';
+import type { Item, TinkerProfile, InterpolatedItem, InterpolationInfo } from '@/types/api';
 
 // Import new components
-import WeaponStats from '@/components/items/WeaponStats.vue'
-import NanoStatistics from '@/components/items/NanoStatistics.vue'
-import SpellDataDisplay from '@/components/items/SpellDataDisplay.vue'
-import ItemAttributes from '@/components/items/ItemAttributes.vue'
-import ItemSlotsDisplay from '@/components/items/ItemSlotsDisplay.vue'
-import ActionRequirements from '@/components/ActionRequirements.vue'
-import RawStats from '@/components/items/RawStats.vue'
-import ItemSources from '@/components/items/ItemSources.vue'
-import ItemInterpolationBar from '@/components/items/ItemInterpolationBar.vue'
-import EquipSlotSelector from '@/components/items/EquipSlotSelector.vue'
-import { useToast } from 'primevue/usetoast'
+import WeaponStats from '@/components/items/WeaponStats.vue';
+import NanoStatistics from '@/components/items/NanoStatistics.vue';
+import SpellDataDisplay from '@/components/items/SpellDataDisplay.vue';
+import ItemAttributes from '@/components/items/ItemAttributes.vue';
+import ItemSlotsDisplay from '@/components/items/ItemSlotsDisplay.vue';
+import ActionRequirements from '@/components/ActionRequirements.vue';
+import RawStats from '@/components/items/RawStats.vue';
+import ItemSources from '@/components/items/ItemSources.vue';
+import ItemInterpolationBar from '@/components/items/ItemInterpolationBar.vue';
+import EquipSlotSelector from '@/components/items/EquipSlotSelector.vue';
+import { useToast } from 'primevue/usetoast';
 
-const route = useRoute()
-const router = useRouter()
-const itemsStore = useItemsStore()
-const profilesStore = useTinkerProfilesStore()
-const toast = useToast()
+const route = useRoute();
+const router = useRouter();
+const itemsStore = useItemsStore();
+const profilesStore = useTinkerProfilesStore();
+const toast = useToast();
 
 // Props
 const props = defineProps<{
-  aoid?: string
-}>()
+  aoid?: string;
+}>();
 
 // State
-const isVisible = ref(true)
-const item = ref<Item | null>(null)
-const loading = ref(false)
-const error = ref<string | null>(null)
-const showAllStats = ref(false)
-const iconLoadError = ref(false)
-const advancedView = ref(false)
-const equipDialogVisible = ref(false)
-const validSlots = ref<string[]>([])
+const isVisible = ref(true);
+const item = ref<Item | null>(null);
+const loading = ref(false);
+const error = ref<string | null>(null);
+const showAllStats = ref(false);
+const iconLoadError = ref(false);
+const advancedView = ref(false);
+const equipDialogVisible = ref(false);
+const validSlots = ref<string[]>([]);
 
 // Interpolation state
-const interpolationInfo = ref<InterpolationInfo | null>(null)
-const interpolatedItem = ref<InterpolatedItem | null>(null)
-const isInterpolating = ref(false)
-const interpolationError = ref<string | null>(null)
+const interpolationInfo = ref<InterpolationInfo | null>(null);
+const interpolatedItem = ref<InterpolatedItem | null>(null);
+const isInterpolating = ref(false);
+const interpolationError = ref<string | null>(null);
 
 // Current QL for interpolation (from query param or item's base QL)
 const currentQl = computed(() => {
-  const queryQl = route.query.ql ? parseInt(route.query.ql as string) : null
-  return queryQl || item.value?.ql || null
-})
+  const queryQl = route.query.ql ? parseInt(route.query.ql as string) : null;
+  return queryQl || item.value?.ql || null;
+});
 
 // Computed
-const profile = computed(() => profilesStore.activeProfile)
-const showCompatibility = computed(() => !!profile.value)
+const profile = computed(() => profilesStore.activeProfile);
+const showCompatibility = computed(() => !!profile.value);
 
 // Character stats for action requirements
 const characterStats = computed(() => {
-  if (!profile.value) return null
-  
+  if (!profile.value) return null;
+
   // Use the profile stats mapper utility to convert TinkerProfile to flat stat map
-  return mapProfileToStats(profile.value)
-})
+  return mapProfileToStats(profile.value);
+});
 
 // Determine if we're in modal mode (opened from items list) or page mode (direct URL)
 const isModal = computed(() => {
   // If there's an ID prop passed from parent, we're in modal mode
   // If we're accessing via route and no prop, we're in page mode
   // For now, let's default to page mode for direct URL access
-  return false // Always use page mode for now
-})
+  return false; // Always use page mode for now
+});
 
-
-
-const hasSpecialEffects = computed(() => 
-  item.value?.spell_data && item.value.spell_data.length > 0
-)
+const hasSpecialEffects = computed(
+  () => item.value?.spell_data && item.value.spell_data.length > 0
+);
 
 const itemIconUrl = computed(() => {
-  if (iconLoadError.value || !item.value?.stats) return null
-  return getItemIconUrl(item.value.stats)
-})
+  if (iconLoadError.value || !item.value?.stats) return null;
+  return getItemIconUrl(item.value.stats);
+});
 
 const displayedStats = computed(() => {
-  if (!item.value?.stats) return []
-  
+  if (!item.value?.stats) return [];
+
   if (showAllStats.value) {
-    return item.value.stats.filter(stat => stat.value !== 0)
+    return item.value.stats.filter((stat) => stat.value !== 0);
   } else {
     return item.value.stats
-      .filter(stat => stat.value !== 0 && Math.abs(stat.value) > 5)
-      .slice(0, 9)
+      .filter((stat) => stat.value !== 0 && Math.abs(stat.value) > 5)
+      .slice(0, 9);
   }
-})
+});
 
 const displayItemFlags = computed(() => {
-  if (!item.value?.stats) return []
-  
+  if (!item.value?.stats) return [];
+
   // Combine CAN flags and item flags
-  const canFlags = getDisplayCanFlags(item.value.stats)
-  const itemFlags = getDisplayItemFlags(item.value.stats)
-  
+  const canFlags = getDisplayCanFlags(item.value.stats);
+  const itemFlags = getDisplayItemFlags(item.value.stats);
+
   // CAN flags first, then item flags
-  return [...canFlags, ...itemFlags]
-})
+  return [...canFlags, ...itemFlags];
+});
 
 // Use interpolated item if available, otherwise use original item
 const displayedItem = computed(() => {
-  return interpolatedItem.value || item.value
-})
+  return interpolatedItem.value || item.value;
+});
 
 // Check if item can be equipped (is equippable and profile meets requirements)
 const canEquip = computed(() => {
-  if (!profile.value || !displayedItem.value) return false
+  if (!profile.value || !displayedItem.value) return false;
 
   // Check if item is equippable (weapons, armor, implants)
-  const itemClass = displayedItem.value.item_class
-  if (itemClass !== 1 && itemClass !== 2 && itemClass !== 3) return false
+  const itemClass = displayedItem.value.item_class;
+  if (itemClass !== 1 && itemClass !== 2 && itemClass !== 3) return false;
 
   // Check if requirements are met (you can add more sophisticated checks here)
   // For now, just check if there's an active profile
-  return true
-})
+  return true;
+});
 
 // Methods
 async function loadItem() {
-  const itemAoid = props.aoid || route.params.aoid as string
-  if (!itemAoid) return
-  
-  loading.value = true
-  error.value = null
-  
+  const itemAoid = props.aoid || (route.params.aoid as string);
+  if (!itemAoid) return;
+
+  loading.value = true;
+  error.value = null;
+
   try {
-    const loadedItem = await itemsStore.getItem(parseInt(itemAoid))
+    const loadedItem = await itemsStore.getItem(parseInt(itemAoid));
     if (loadedItem) {
-      item.value = loadedItem
+      item.value = loadedItem;
     } else {
       // Check if there's an error in the store
       if (itemsStore.error) {
-        error.value = itemsStore.error.message || 'Failed to load item'
+        error.value = itemsStore.error.message || 'Failed to load item';
       } else {
-        error.value = 'Item not found'
+        error.value = 'Item not found';
       }
     }
   } catch (err: any) {
-    error.value = err.message || 'Failed to load item'
+    error.value = err.message || 'Failed to load item';
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 function onClose() {
-  isVisible.value = false
-  router.push('/items')
+  isVisible.value = false;
+  router.push('/items');
 }
 
 function goBack() {
   // Try to go back in browser history
   // If there's no history or we came from outside the app, fall back to items page
   if (window.history.length > 1 && document.referrer.includes(window.location.origin)) {
-    router.go(-1)
+    router.go(-1);
   } else {
-    router.push('/items')
+    router.push('/items');
   }
 }
 
-
 function addToComparison() {
   // Emit event or call parent method to add to comparison
-  console.log('Add to comparison:', item.value?.id)
+  console.log('Add to comparison:', item.value?.id);
 }
 
 function shareItem() {
-  if (!item.value) return
+  if (!item.value) return;
 
-  const url = `${window.location.origin}/items/${item.value.aoid}`
+  const url = `${window.location.origin}/items/${item.value.aoid}`;
 
   if (navigator.share) {
     navigator.share({
       title: item.value.name,
       text: item.value.description,
-      url
-    })
+      url,
+    });
   } else {
-    navigator.clipboard.writeText(url)
+    navigator.clipboard.writeText(url);
     toast.add({
       severity: 'success',
       summary: 'Link Copied',
       detail: 'Item URL copied to clipboard',
-      life: 3000
-    })
+      life: 3000,
+    });
   }
 }
 
 function showEquipDialog() {
-  if (!displayedItem.value) return
+  if (!displayedItem.value) return;
 
   // Determine valid slots for this item based on its type and stats
-  const slotInfo = getItemSlotInfo(displayedItem.value)
-  validSlots.value = slotInfo.slots
+  const slotInfo = getItemSlotInfo(displayedItem.value);
+  validSlots.value = slotInfo.slots;
 
-  equipDialogVisible.value = true
+  equipDialogVisible.value = true;
 }
 
 async function handleEquipItem(slot: string) {
-  if (!displayedItem.value || !profile.value) return
+  if (!displayedItem.value || !profile.value) return;
 
   try {
     // Use the store's equipItem method
-    await profilesStore.equipItem(displayedItem.value, slot)
+    await profilesStore.equipItem(displayedItem.value, slot);
 
     // Close the dialog
-    equipDialogVisible.value = false
+    equipDialogVisible.value = false;
 
     // Show success message
     toast.add({
       severity: 'success',
       summary: 'Item Equipped',
       detail: `${displayedItem.value.name} has been equipped to ${slot}`,
-      life: 3000
-    })
+      life: 3000,
+    });
   } catch (error) {
-    console.error('Failed to equip item:', error)
+    console.error('Failed to equip item:', error);
     toast.add({
       severity: 'error',
       summary: 'Equip Failed',
       detail: 'Failed to equip the item. Please try again.',
-      life: 3000
-    })
+      life: 3000,
+    });
   }
 }
 
 async function castBuff() {
-  if (!displayedItem.value) return
+  if (!displayedItem.value) return;
 
   try {
     // Cast to Item type to handle both interpolated and regular items
-    await profilesStore.castBuff(displayedItem.value as Item)
+    await profilesStore.castBuff(displayedItem.value as Item);
     toast.add({
       severity: 'success',
       summary: 'Buff Cast',
       detail: `${displayedItem.value.name} has been cast on your active profile`,
-      life: 3000
-    })
+      life: 3000,
+    });
   } catch (error) {
-    console.error('Failed to cast buff:', error)
+    console.error('Failed to cast buff:', error);
     toast.add({
       severity: 'error',
       summary: 'Cast Failed',
       detail: error instanceof Error ? error.message : 'Failed to cast the buff',
-      life: 3000
-    })
+      life: 3000,
+    });
   }
 }
 
 function getCharacterStat(statId: number): number {
-  if (!profile.value) return 0
-  
+  if (!profile.value) return 0;
+
   // Use the profile stats mapper utility
-  return getProfileStat(profile.value, statId)
+  return getProfileStat(profile.value, statId);
 }
 
 // Utility functions
 const statNames: Record<number, string> = {
-  16: 'Strength', 17: 'Agility', 18: 'Stamina',
-  19: 'Intelligence', 20: 'Sense', 21: 'Psychic',
-  102: '1H Blunt', 103: '1H Edged', 105: '2H Edged',
-  109: '2H Blunt', 133: 'Ranged Energy', 161: 'Computer Literacy'
-}
+  16: 'Strength',
+  17: 'Agility',
+  18: 'Stamina',
+  19: 'Intelligence',
+  20: 'Sense',
+  21: 'Psychic',
+  102: '1H Blunt',
+  103: '1H Edged',
+  105: '2H Edged',
+  109: '2H Blunt',
+  133: 'Ranged Energy',
+  161: 'Computer Literacy',
+};
 
 const itemClassNames: Record<number, string> = {
-  1: '1H Blunt Weapon', 2: '1H Edged Weapon', 3: '2H Blunt Weapon',
-  4: '2H Edged Weapon', 5: 'Ranged Weapon', 6: 'Body Armor',
-  7: 'Head Armor', 8: 'Arm Armor', 9: 'Leg Armor', 10: 'Foot Armor',
-  15: 'Implant', 20: 'Utility Item'
-}
+  1: '1H Blunt Weapon',
+  2: '1H Edged Weapon',
+  3: '2H Blunt Weapon',
+  4: '2H Edged Weapon',
+  5: 'Ranged Weapon',
+  6: 'Body Armor',
+  7: 'Head Armor',
+  8: 'Arm Armor',
+  9: 'Leg Armor',
+  10: 'Foot Armor',
+  15: 'Implant',
+  20: 'Utility Item',
+};
 
 function getStatName(statId: number): string {
-  return statNames[statId] || `Stat ${statId}`
+  return statNames[statId] || `Stat ${statId}`;
 }
 
 function getItemClassName(classId: number): string {
-  return itemClassNames[classId] || `Class ${classId}`
+  return itemClassNames[classId] || `Class ${classId}`;
 }
 
 function getTradeableText(): string {
-  return 'Unknown' // Would need actual property from item data
+  return 'Unknown'; // Would need actual property from item data
 }
 
 function getDroppableText(): string {
-  return 'Unknown' // Would need actual property from item data
+  return 'Unknown'; // Would need actual property from item data
 }
 
 function getEffectTrigger(event: number): string {
   const triggers: Record<number, string> = {
-    0: 'On Use', 5: 'On Hit', 14: 'When Equipped', 15: 'Passive'
-  }
-  return triggers[event] || `Event ${event}`
+    0: 'On Use',
+    5: 'On Hit',
+    14: 'When Equipped',
+    15: 'Passive',
+  };
+  return triggers[event] || `Event ${event}`;
 }
 
 function onIconError() {
-  iconLoadError.value = true
+  iconLoadError.value = true;
 }
 
 // Interpolation methods
 function handleInterpolatedItem(interpolated: InterpolatedItem | null) {
-  interpolatedItem.value = interpolated
+  interpolatedItem.value = interpolated;
 }
 
 function handleInterpolationError(errorMessage: string) {
-  interpolationError.value = errorMessage
+  interpolationError.value = errorMessage;
 }
 
 // Initialize
 onMounted(async () => {
   // Load profiles if not already loaded
   if (!profilesStore.hasProfiles) {
-    await profilesStore.loadProfiles()
+    await profilesStore.loadProfiles();
   }
-  loadItem()
-})
+  loadItem();
+});
 
 // Watch for route changes
-watch(() => route.params.aoid, () => {
-  if (route.name === 'ItemDetail') {
-    loadItem()
+watch(
+  () => route.params.aoid,
+  () => {
+    if (route.name === 'ItemDetail') {
+      loadItem();
+    }
   }
-})
+);
 
 // Route QL handling is now done entirely by ItemInterpolationBar
 
@@ -893,8 +911,8 @@ watch(() => route.params.aoid, () => {
 defineExpose({
   interpolatedItem,
   displayedItem,
-  interpolationError
-})
+  interpolationError,
+});
 </script>
 
 <style scoped>
@@ -918,5 +936,4 @@ defineExpose({
 .overflow-y-auto::-webkit-scrollbar-thumb {
   @apply bg-surface-300 dark:bg-surface-600 rounded-full;
 }
-
 </style>

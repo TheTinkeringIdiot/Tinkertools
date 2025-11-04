@@ -3,21 +3,18 @@ IPTrackerPanel - IP (Improvement Points) tracking display
 Shows IP allocation, usage, and breakdown with visual indicators
 -->
 <template>
-  <div class="ip-tracker-panel bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-6">
+  <div
+    class="ip-tracker-panel bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-6"
+  >
     <div class="flex items-center justify-between mb-4">
       <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50">
         Improvement Points
       </h3>
-      <Badge
-        :value="`TL${titleLevel}`"
-        severity="info"
-        v-tooltip.bottom="'Title Level'"
-      />
+      <Badge :value="`TL${titleLevel}`" severity="info" v-tooltip.bottom="'Title Level'" />
     </div>
-    
+
     <!-- IP Summary -->
     <div v-if="ipTracker" class="space-y-4">
-      
       <!-- IP Stats Grid -->
       <div class="grid grid-cols-3 gap-4 mb-4">
         <div class="text-center p-3 bg-surface-50 dark:bg-surface-800 rounded-lg">
@@ -26,14 +23,14 @@ Shows IP allocation, usage, and breakdown with visual indicators
           </div>
           <div class="text-xs text-surface-500 dark:text-surface-400">Available</div>
         </div>
-        
+
         <div class="text-center p-3 bg-surface-50 dark:bg-surface-800 rounded-lg">
           <div class="text-lg font-bold text-surface-900 dark:text-surface-50">
             {{ formatNumber(ipTracker.totalUsed) }}
           </div>
           <div class="text-xs text-surface-500 dark:text-surface-400">Used</div>
         </div>
-        
+
         <div class="text-center p-3 bg-surface-50 dark:bg-surface-800 rounded-lg">
           <div class="text-lg font-bold" :class="remainingColor">
             {{ formatNumber(ipTracker.remaining) }}
@@ -41,18 +38,20 @@ Shows IP allocation, usage, and breakdown with visual indicators
           <div class="text-xs text-surface-500 dark:text-surface-400">Remaining</div>
         </div>
       </div>
-      
+
       <!-- IP Allocation Breakdown -->
       <div class="space-y-3">
-        <h4 class="text-sm font-semibold text-surface-900 dark:text-surface-50">
-          IP Allocation
-        </h4>
-        
+        <h4 class="text-sm font-semibold text-surface-900 dark:text-surface-50">IP Allocation</h4>
+
         <!-- Abilities vs Skills -->
         <div class="grid grid-cols-2 gap-4">
-          <div class="p-3 bg-purple-50 dark:bg-purple-950 rounded-lg border border-purple-200 dark:border-purple-800">
+          <div
+            class="p-3 bg-purple-50 dark:bg-purple-950 rounded-lg border border-purple-200 dark:border-purple-800"
+          >
             <div class="flex items-center justify-between mb-2">
-              <span class="text-sm font-medium text-purple-700 dark:text-purple-300">Abilities</span>
+              <span class="text-sm font-medium text-purple-700 dark:text-purple-300"
+                >Abilities</span
+              >
               <i class="pi pi-user text-purple-600 dark:text-purple-400"></i>
             </div>
             <div class="text-lg font-bold text-purple-900 dark:text-purple-100">
@@ -62,8 +61,10 @@ Shows IP allocation, usage, and breakdown with visual indicators
               {{ getPercentage(ipTracker.abilityIP, ipTracker.totalUsed) }}% of used IP
             </div>
           </div>
-          
-          <div class="p-3 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+
+          <div
+            class="p-3 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800"
+          >
             <div class="flex items-center justify-between mb-2">
               <span class="text-sm font-medium text-green-700 dark:text-green-300">Skills</span>
               <i class="pi pi-cog text-green-600 dark:text-green-400"></i>
@@ -76,9 +77,13 @@ Shows IP allocation, usage, and breakdown with visual indicators
             </div>
           </div>
         </div>
-        
+
         <!-- Ability Breakdown -->
-        <div v-if="ipTracker.breakdown?.abilities && Object.keys(ipTracker.breakdown.abilities).length > 0">
+        <div
+          v-if="
+            ipTracker.breakdown?.abilities && Object.keys(ipTracker.breakdown.abilities).length > 0
+          "
+        >
           <h5 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
             Ability Breakdown
           </h5>
@@ -89,13 +94,20 @@ Shows IP allocation, usage, and breakdown with visual indicators
               class="flex items-center justify-between text-sm"
             >
               <span class="text-surface-600 dark:text-surface-400">{{ abilityName }}</span>
-              <span class="font-medium text-surface-900 dark:text-surface-50">{{ formatNumber(ipSpent as number) }}</span>
+              <span class="font-medium text-surface-900 dark:text-surface-50">{{
+                formatNumber(ipSpent as number)
+              }}</span>
             </div>
           </div>
         </div>
-        
+
         <!-- Skill Category Breakdown -->
-        <div v-if="ipTracker.breakdown?.skillCategories && Object.keys(ipTracker.breakdown.skillCategories).length > 0">
+        <div
+          v-if="
+            ipTracker.breakdown?.skillCategories &&
+            Object.keys(ipTracker.breakdown.skillCategories).length > 0
+          "
+        >
           <h5 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
             Top Skill Categories
           </h5>
@@ -106,7 +118,9 @@ Shows IP allocation, usage, and breakdown with visual indicators
               class="flex items-center justify-between text-sm"
             >
               <span class="text-surface-600 dark:text-surface-400">{{ categoryName }}</span>
-              <span class="font-medium text-surface-900 dark:text-surface-50">{{ formatNumber(ipSpent as number) }}</span>
+              <span class="font-medium text-surface-900 dark:text-surface-50">{{
+                formatNumber(ipSpent as number)
+              }}</span>
             </div>
           </div>
         </div>
@@ -123,12 +137,14 @@ Shows IP allocation, usage, and breakdown with visual indicators
               class="flex items-center justify-between text-sm"
             >
               <span class="text-surface-600 dark:text-surface-400">{{ skill.name }}</span>
-              <span class="font-medium text-surface-900 dark:text-surface-50">{{ formatNumber(skill.ipSpent) }}</span>
+              <span class="font-medium text-surface-900 dark:text-surface-50">{{
+                formatNumber(skill.ipSpent)
+              }}</span>
             </div>
           </div>
         </div>
       </div>
-      
+
       <!-- Last Calculated -->
       <div class="pt-4 mt-4 border-t border-surface-200 dark:border-surface-700">
         <div class="text-xs text-surface-500 dark:text-surface-400 text-center">
@@ -136,18 +152,14 @@ Shows IP allocation, usage, and breakdown with visual indicators
         </div>
       </div>
     </div>
-    
+
     <!-- No IP Data -->
     <div v-else class="text-center py-8">
       <i class="pi pi-info-circle text-4xl text-surface-300 dark:text-surface-600 mb-4"></i>
       <p class="text-surface-500 dark:text-surface-400 mb-4">
         IP tracking not available for this profile
       </p>
-      <Button
-        label="Initialize IP Tracking"
-        size="small"
-        @click="$emit('initialize-ip')"
-      />
+      <Button label="Initialize IP Tracking" size="small" @click="$emit('initialize-ip')" />
     </div>
   </div>
 </template>
@@ -191,22 +203,22 @@ const ipUsagePercent = computed(() => {
 const progressOffset = computed(() => {
   if (!ipTracker.value) return circumference.value;
   const progress = ipUsagePercent.value / 100;
-  return circumference.value - (progress * circumference.value);
+  return circumference.value - progress * circumference.value;
 });
 
 const progressColor = computed(() => {
   if (!ipTracker.value) return 'text-surface-300';
-  
+
   const usage = ipUsagePercent.value;
-  if (usage <= 50) return 'text-green-500';   // Low usage - green
-  if (usage <= 75) return 'text-blue-500';    // Medium usage - blue  
-  if (usage <= 90) return 'text-orange-500';  // High usage - orange
-  return 'text-red-500';                      // Very high usage - red
+  if (usage <= 50) return 'text-green-500'; // Low usage - green
+  if (usage <= 75) return 'text-blue-500'; // Medium usage - blue
+  if (usage <= 90) return 'text-orange-500'; // High usage - orange
+  return 'text-red-500'; // Very high usage - red
 });
 
 const remainingColor = computed(() => {
   if (!ipTracker.value) return 'text-surface-900 dark:text-surface-50';
-  
+
   const remaining = ipTracker.value.remaining;
   if (remaining < 0) return 'text-red-600 dark:text-red-400';
   if (remaining < 100) return 'text-orange-600 dark:text-orange-400';
@@ -239,7 +251,7 @@ const topIndividualSkills = computed(() => {
         skillsWithIP.push({
           id: skillId,
           name: skillName,
-          ipSpent: skillData.ipSpent
+          ipSpent: skillData.ipSpent,
         });
       } catch {
         // Skip invalid skill IDs silently
@@ -248,9 +260,7 @@ const topIndividualSkills = computed(() => {
   });
 
   // Sort by IP spent and take top 10
-  return skillsWithIP
-    .sort((a, b) => b.ipSpent - a.ipSpent)
-    .slice(0, 10);
+  return skillsWithIP.sort((a, b) => b.ipSpent - a.ipSpent).slice(0, 10);
 });
 
 // Methods
@@ -274,7 +284,7 @@ function formatDateTime(dateString: string): string {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   } catch {
     return 'Unknown';
@@ -302,11 +312,11 @@ circle {
   .grid-cols-3 {
     @apply grid-cols-1;
   }
-  
+
   .grid-cols-2 {
     @apply grid-cols-1;
   }
-  
+
   .w-32.h-32 {
     @apply w-24 h-24;
   }

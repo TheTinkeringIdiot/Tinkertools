@@ -3,7 +3,7 @@ SimpleNanoCard - Basic nano item display card
 Shows nano information from Item objects for profession-based display
 -->
 <template>
-  <Card 
+  <Card
     class="simple-nano-card transition-all duration-200 cursor-pointer hover:shadow-lg border border-surface-200 dark:border-surface-700"
     @click="handleSelect"
   >
@@ -23,8 +23,8 @@ Shows nano information from Item objects for profession-based display
         </div>
 
         <!-- Description -->
-        <p 
-          v-if="nano.description" 
+        <p
+          v-if="nano.description"
           class="text-sm text-surface-600 dark:text-surface-400 line-clamp-2"
         >
           {{ nano.description }}
@@ -35,37 +35,37 @@ Shows nano information from Item objects for profession-based display
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import Card from 'primevue/card'
-import Badge from 'primevue/badge'
-import { NANO_STRAIN } from '@/services/game-data'
-import type { Item } from '@/types/api'
+import { computed } from 'vue';
+import Card from 'primevue/card';
+import Badge from 'primevue/badge';
+import { NANO_STRAIN } from '@/services/game-data';
+import type { Item } from '@/types/api';
 
 // Props
 interface Props {
-  nano: Item
+  nano: Item;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 
 // Emits
 const emit = defineEmits<{
-  select: [nano: Item]
-}>()
+  select: [nano: Item];
+}>();
 
 // Computed
 const strainName = computed(() => {
   // Find strain stat (stat 75)
-  const strainStat = props.nano.stats.find(stat => stat.stat === 75)
-  if (!strainStat) return null
-  
-  const strainId = strainStat.value
-  return NANO_STRAIN[strainId as keyof typeof NANO_STRAIN] || `Strain ${strainId}`
-})
+  const strainStat = props.nano.stats.find((stat) => stat.stat === 75);
+  if (!strainStat) return null;
+
+  const strainId = strainStat.value;
+  return NANO_STRAIN[strainId as keyof typeof NANO_STRAIN] || `Strain ${strainId}`;
+});
 
 // Methods
 function handleSelect() {
-  emit('select', props.nano)
+  emit('select', props.nano);
 }
 </script>
 

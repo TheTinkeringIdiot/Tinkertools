@@ -6,10 +6,10 @@ Shows items in grid or list view with pagination and compatibility indicators
   <div class="item-list">
     <!-- View Mode Controls (Mobile) -->
     <div class="flex items-center justify-between mb-4 md:hidden">
-      <span class="text-sm text-surface-600 dark:text-surface-400">
-        {{ items.length }} items
-      </span>
-      <div class="flex items-center gap-1 border border-surface-300 dark:border-surface-600 rounded">
+      <span class="text-sm text-surface-600 dark:text-surface-400"> {{ items.length }} items </span>
+      <div
+        class="flex items-center gap-1 border border-surface-300 dark:border-surface-600 rounded"
+      >
         <Button
           icon="pi pi-th-large"
           :severity="viewMode === 'grid' ? 'primary' : 'secondary'"
@@ -59,17 +59,19 @@ Shows items in grid or list view with pagination and compatibility indicators
           <div class="p-4">
             <div class="flex items-start gap-4">
               <!-- Item Icon/Image -->
-              <div class="w-12 h-12 bg-surface-100 dark:bg-surface-800 rounded flex items-center justify-center flex-shrink-0">
-                <img 
+              <div
+                class="w-12 h-12 bg-surface-100 dark:bg-surface-800 rounded flex items-center justify-center flex-shrink-0"
+              >
+                <img
                   v-if="getItemIconUrl(item)"
-                  :src="getItemIconUrl(item)" 
+                  :src="getItemIconUrl(item)"
                   :alt="`${item.name} icon`"
                   class="w-10 h-10 object-contain"
                   @error="(e) => handleIconError(e, item.id)"
                 />
                 <i v-else class="pi pi-box text-surface-400"></i>
               </div>
-              
+
               <!-- Item Info -->
               <div class="flex-1 min-w-0">
                 <div class="flex items-start justify-between gap-4">
@@ -82,16 +84,18 @@ Shows items in grid or list view with pagination and compatibility indicators
                       <Badge :value="`QL ${item.ql}`" severity="info" size="small" />
                       <Badge v-if="item.is_nano" value="Nano" severity="success" size="small" />
                     </div>
-                    
+
                     <!-- Description -->
-                    <p v-if="item.description" class="text-sm text-surface-600 dark:text-surface-400 line-clamp-2 mb-2">
+                    <p
+                      v-if="item.description"
+                      class="text-sm text-surface-600 dark:text-surface-400 line-clamp-2 mb-2"
+                    >
                       {{ item.description }}
                     </p>
-                    
-                    
+
                     <!-- Requirements (if showing compatibility) -->
                   </div>
-                  
+
                   <!-- Actions -->
                   <div class="flex items-center gap-1 flex-shrink-0">
                     <!-- Compatibility Status -->
@@ -152,10 +156,12 @@ Shows items in grid or list view with pagination and compatibility indicators
       <!-- Pagination -->
       <div v-if="pagination" class="flex items-center justify-between">
         <div class="text-sm text-surface-600 dark:text-surface-400">
-          Showing {{ pagination.offset + 1 }}-{{ Math.min(pagination.offset + pagination.limit, pagination.total) }}
+          Showing {{ pagination.offset + 1 }}-{{
+            Math.min(pagination.offset + pagination.limit, pagination.total)
+          }}
           of {{ pagination.total }} items
         </div>
-        
+
         <Paginator
           v-model:first="currentOffset"
           :rows="pagination.limit"
@@ -204,50 +210,54 @@ Shows items in grid or list view with pagination and compatibility indicators
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import type { Item, TinkerProfile, PaginationInfo } from '@/types/api'
-import { getItemIconUrl as getItemIconUrlUtil } from '@/services/game-utils'
-import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
+import { ref, computed, watch } from 'vue';
+import type { Item, TinkerProfile, PaginationInfo } from '@/types/api';
+import { getItemIconUrl as getItemIconUrlUtil } from '@/services/game-utils';
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 
 // Components (to be created)
-import ItemCard from './ItemCard.vue'
-import ItemQuickView from './ItemQuickView.vue'
+import ItemCard from './ItemCard.vue';
+import ItemQuickView from './ItemQuickView.vue';
 
 const props = defineProps<{
-  items: Item[]
-  viewMode: 'grid' | 'list'
-  compatibilityProfile?: TinkerProfile | null
-  showCompatibility?: boolean
-  loading?: boolean
-  pagination?: PaginationInfo
-  favoriteItems?: number[]
-  comparisonItems?: number[]
-}>()
+  items: Item[];
+  viewMode: 'grid' | 'list';
+  compatibilityProfile?: TinkerProfile | null;
+  showCompatibility?: boolean;
+  loading?: boolean;
+  pagination?: PaginationInfo;
+  favoriteItems?: number[];
+  comparisonItems?: number[];
+}>();
 
 const emit = defineEmits<{
-  'item-click': [item: Item]
-  'item-compare': [item: Item]
-  'cast-buff': [item: Item]
-  'page-change': [page: number]
-  'view-mode-change': [mode: 'grid' | 'list']
-}>()
+  'item-click': [item: Item];
+  'item-compare': [item: Item];
+  'cast-buff': [item: Item];
+  'page-change': [page: number];
+  'view-mode-change': [mode: 'grid' | 'list'];
+}>();
 
 // Store
-const profilesStore = useTinkerProfilesStore()
+const profilesStore = useTinkerProfilesStore();
 
 // State
-const currentOffset = ref(props.pagination?.offset || 0)
-const showQuickViewDialog = ref(false)
-const selectedItem = ref<Item | null>(null)
-const itemMenu = ref()
-const iconLoadErrors = ref<Set<number>>(new Set())
+const currentOffset = ref(props.pagination?.offset || 0);
+const showQuickViewDialog = ref(false);
+const selectedItem = ref<Item | null>(null);
+const itemMenu = ref();
+const iconLoadErrors = ref<Set<number>>(new Set());
 
 // Watch for pagination changes to update currentOffset
-watch(() => props.pagination?.offset, (newOffset) => {
-  if (newOffset !== undefined) {
-    currentOffset.value = newOffset
-  }
-}, { immediate: true })
+watch(
+  () => props.pagination?.offset,
+  (newOffset) => {
+    if (newOffset !== undefined) {
+      currentOffset.value = newOffset;
+    }
+  },
+  { immediate: true }
+);
 
 // Context menu items
 const itemMenuItems = ref([
@@ -256,16 +266,16 @@ const itemMenuItems = ref([
     icon: 'pi pi-eye',
     command: () => {
       if (selectedItem.value) {
-        emit('item-click', selectedItem.value)
+        emit('item-click', selectedItem.value);
       }
-    }
+    },
   },
   {
     label: 'Quick View',
     icon: 'pi pi-search',
     command: () => {
-      showQuickViewDialog.value = true
-    }
+      showQuickViewDialog.value = true;
+    },
   },
   { separator: true },
   {
@@ -273,9 +283,9 @@ const itemMenuItems = ref([
     icon: 'pi pi-clone',
     command: () => {
       if (selectedItem.value) {
-        emit('item-compare', selectedItem.value)
+        emit('item-compare', selectedItem.value);
       }
-    }
+    },
   },
   { separator: true },
   {
@@ -283,67 +293,73 @@ const itemMenuItems = ref([
     icon: 'pi pi-copy',
     command: () => {
       if (selectedItem.value) {
-        copyItemLink(selectedItem.value)
+        copyItemLink(selectedItem.value);
       }
-    }
+    },
   },
   {
     label: 'Share Item',
     icon: 'pi pi-share-alt',
     command: () => {
       if (selectedItem.value) {
-        shareItem(selectedItem.value)
+        shareItem(selectedItem.value);
       }
-    }
-  }
-])
+    },
+  },
+]);
 
 // Computed
 const statNameMap = computed(() => ({
-  16: 'Strength', 17: 'Agility', 18: 'Stamina',
-  19: 'Intelligence', 20: 'Sense', 21: 'Psychic',
-  102: '1H Blunt', 103: '1H Edged', 105: '2H Edged',
-  109: '2H Blunt', 133: 'Ranged Energy', 161: 'Computer Literacy'
-}))
+  16: 'Strength',
+  17: 'Agility',
+  18: 'Stamina',
+  19: 'Intelligence',
+  20: 'Sense',
+  21: 'Psychic',
+  102: '1H Blunt',
+  103: '1H Edged',
+  105: '2H Edged',
+  109: '2H Blunt',
+  133: 'Ranged Energy',
+  161: 'Computer Literacy',
+}));
 
 // Methods
 function isFavorite(itemId: number): boolean {
-  return props.favoriteItems?.includes(itemId) || false
+  return props.favoriteItems?.includes(itemId) || false;
 }
 
 function isComparing(itemId: number): boolean {
-  return props.comparisonItems?.includes(itemId) || false
+  return props.comparisonItems?.includes(itemId) || false;
 }
-
 
 function getStatName(statId: number): string {
-  return statNameMap.value[statId] || `Stat ${statId}`
+  return statNameMap.value[statId] || `Stat ${statId}`;
 }
 
-
 function showQuickView(item: Item) {
-  selectedItem.value = item
-  showQuickViewDialog.value = true
+  selectedItem.value = item;
+  showQuickViewDialog.value = true;
 }
 
 function viewFullItem() {
   if (selectedItem.value) {
-    emit('item-click', selectedItem.value)
-    showQuickViewDialog.value = false
+    emit('item-click', selectedItem.value);
+    showQuickViewDialog.value = false;
   }
 }
 
 function showItemMenu(event: MouseEvent, item: Item) {
-  selectedItem.value = item
-  itemMenu.value.show(event)
+  selectedItem.value = item;
+  itemMenu.value.show(event);
 }
 
 function copyItemLink(item: Item) {
-  const url = `${window.location.origin}/items/${item.id}`
+  const url = `${window.location.origin}/items/${item.id}`;
   navigator.clipboard.writeText(url).then(() => {
     // Show success toast
-    console.log('Item link copied to clipboard')
-  })
+    console.log('Item link copied to clipboard');
+  });
 }
 
 function shareItem(item: Item) {
@@ -351,25 +367,25 @@ function shareItem(item: Item) {
     navigator.share({
       title: item.name,
       text: item.description,
-      url: `${window.location.origin}/items/${item.id}`
-    })
+      url: `${window.location.origin}/items/${item.id}`,
+    });
   } else {
-    copyItemLink(item)
+    copyItemLink(item);
   }
 }
 
 function onPageChange(event: any) {
-  currentOffset.value = event.first
-  emit('page-change', Math.floor(event.first / event.rows) + 1)
+  currentOffset.value = event.first;
+  emit('page-change', Math.floor(event.first / event.rows) + 1);
 }
 
 function getItemIconUrl(item: Item): string | null {
-  if (iconLoadErrors.value.has(item.id)) return null
-  return getItemIconUrlUtil(item.stats || [])
+  if (iconLoadErrors.value.has(item.id)) return null;
+  return getItemIconUrlUtil(item.stats || []);
 }
 
 function handleIconError(event: Event, itemId: number) {
-  iconLoadErrors.value.add(itemId)
+  iconLoadErrors.value.add(itemId);
 }
 </script>
 

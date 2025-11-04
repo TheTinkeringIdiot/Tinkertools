@@ -3,9 +3,11 @@ SkillCategory - Expandable skill category with interactive sliders
 Shows skills in a category with IP cost calculations and interactive value adjustment
 -->
 <template>
-  <div class="skill-category bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg overflow-hidden">
+  <div
+    class="skill-category bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg overflow-hidden"
+  >
     <!-- Category Header -->
-    <div 
+    <div
       class="category-header p-4 bg-surface-50 dark:bg-surface-800 cursor-pointer select-none transition-colors hover:bg-surface-100 dark:hover:bg-surface-700"
       @click="toggleExpanded"
     >
@@ -17,22 +19,22 @@ Shows skills in a category with IP cost calculations and interactive value adjus
           </h4>
           <Badge v-if="skillCount > 0" :value="skillCount.toString()" severity="info" />
         </div>
-        
+
         <div class="flex items-center gap-2">
           <!-- Total IP Cost for Category -->
           <div v-if="totalIPCost > 0" class="text-sm text-surface-600 dark:text-surface-400">
             IP: {{ totalIPCost }}
           </div>
-          
+
           <!-- Expand/Collapse Icon -->
-          <i 
+          <i
             :class="isExpanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"
             class="text-surface-500 dark:text-surface-400 transition-transform duration-200"
           ></i>
         </div>
       </div>
     </div>
-    
+
     <!-- Category Content -->
     <Transition name="expand">
       <div v-if="isExpanded" class="category-content">
@@ -55,11 +57,7 @@ Shows skills in a category with IP cost calculations and interactive value adjus
           <!-- List Layout (Default) -->
           <div v-else class="space-y-3">
             <!-- Skills/Abilities List -->
-            <div
-              v-for="(skill, skillId) in skills"
-              :key="skillId"
-              class="skill-item"
-            >
+            <div v-for="(skill, skillId) in skills" :key="skillId" class="skill-item">
               <SkillSlider
                 :skill-name="getSkillName(skillId)"
                 :skill-data="skill"
@@ -77,7 +75,9 @@ Shows skills in a category with IP cost calculations and interactive value adjus
             <!-- Empty State -->
             <div v-if="skillCount === 0" class="text-center py-4">
               <i class="pi pi-info-circle text-2xl text-surface-300 dark:text-surface-600 mb-2"></i>
-              <p class="text-sm text-surface-500 dark:text-surface-400">No skills in this category</p>
+              <p class="text-sm text-surface-500 dark:text-surface-400">
+                No skills in this category
+              </p>
             </div>
           </div>
         </div>
@@ -213,7 +213,7 @@ function handleAbilityChanged(abilityName: string, newValue: number) {
   .category-header {
     padding: 1rem;
   }
-  
+
   .category-content {
     padding: 1rem;
   }

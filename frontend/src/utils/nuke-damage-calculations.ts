@@ -20,18 +20,18 @@
  */
 export interface DamageModifiers {
   // Type-specific damage modifiers (stats 278-282, 311, 315-317)
-  projectileDamage: number;      // stat 278
-  meleeDamage: number;            // stat 279
-  energyDamage: number;           // stat 280
-  chemicalDamage: number;         // stat 281
-  radiationDamage: number;        // stat 282
-  coldDamage: number;             // stat 311
-  nanoDamage: number;             // stat 315
-  fireDamage: number;             // stat 316
-  poisonDamage: number;           // stat 317
+  projectileDamage: number; // stat 278
+  meleeDamage: number; // stat 279
+  energyDamage: number; // stat 280
+  chemicalDamage: number; // stat 281
+  radiationDamage: number; // stat 282
+  coldDamage: number; // stat 311
+  nanoDamage: number; // stat 315
+  fireDamage: number; // stat 316
+  poisonDamage: number; // stat 317
 
   // Direct Nano Damage Efficiency (stat 536)
-  directNanoDamageEfficiency: number;  // stat 536 (percentage)
+  directNanoDamageEfficiency: number; // stat 536 (percentage)
 }
 
 /**
@@ -40,36 +40,36 @@ export interface DamageModifiers {
 export interface SpellDamage {
   minValue: number;
   maxValue: number;
-  modifierStat: number;  // Maps to damage type (90-97)
-  tickCount?: number;    // For DoT spells
+  modifierStat: number; // Maps to damage type (90-97)
+  tickCount?: number; // For DoT spells
 }
 
 /**
  * Mapping of ModifierStat values to damage type stat IDs
  */
 export const DAMAGE_TYPE_MAP: Record<number, number> = {
-  90: 278,  // Projectile
-  91: 279,  // Melee
-  92: 280,  // Energy
-  93: 281,  // Chemical
-  94: 282,  // Radiation
-  95: 311,  // Cold
-  96: 317,  // Poison
-  97: 316,  // Fire
+  90: 278, // Projectile
+  91: 279, // Melee
+  92: 280, // Energy
+  93: 281, // Chemical
+  94: 282, // Radiation
+  95: 311, // Cold
+  96: 317, // Poison
+  97: 316, // Fire
 };
 
 /**
  * Reverse mapping: stat ID to modifier stat
  */
 export const STAT_TO_MODIFIER_STAT: Record<number, number> = {
-  278: 90,  // Projectile
-  279: 91,  // Melee
-  280: 92,  // Energy
-  281: 93,  // Chemical
-  282: 94,  // Radiation
-  311: 95,  // Cold
-  317: 96,  // Poison
-  316: 97,  // Fire
+  278: 90, // Projectile
+  279: 91, // Melee
+  280: 92, // Energy
+  281: 93, // Chemical
+  282: 94, // Radiation
+  311: 95, // Cold
+  317: 96, // Poison
+  316: 97, // Fire
 };
 
 /**
@@ -114,15 +114,24 @@ export function parseDamageType(modifierStat: number): number {
  */
 export function getTypeModifier(damageTypeStatId: number, modifiers: DamageModifiers): number {
   switch (damageTypeStatId) {
-    case 278: return modifiers.projectileDamage;
-    case 279: return modifiers.meleeDamage;
-    case 280: return modifiers.energyDamage;
-    case 281: return modifiers.chemicalDamage;
-    case 282: return modifiers.radiationDamage;
-    case 311: return modifiers.coldDamage;
-    case 315: return modifiers.nanoDamage;
-    case 316: return modifiers.fireDamage;
-    case 317: return modifiers.poisonDamage;
+    case 278:
+      return modifiers.projectileDamage;
+    case 279:
+      return modifiers.meleeDamage;
+    case 280:
+      return modifiers.energyDamage;
+    case 281:
+      return modifiers.chemicalDamage;
+    case 282:
+      return modifiers.radiationDamage;
+    case 311:
+      return modifiers.coldDamage;
+    case 315:
+      return modifiers.nanoDamage;
+    case 316:
+      return modifiers.fireDamage;
+    case 317:
+      return modifiers.poisonDamage;
     default:
       console.warn(`Unknown damage type stat ID: ${damageTypeStatId}`);
       return 0;
@@ -159,7 +168,7 @@ export function calculateDamage(
 
   // Tier 2: Apply Direct Nano Damage Efficiency (DNDE)
   // stat536 is a percentage, so divide by 100
-  const dndeMultiplier = 1 + (stat536 / 100);
+  const dndeMultiplier = 1 + stat536 / 100;
   const nanoEnhancedDamage = modifiedDamage * dndeMultiplier;
 
   // Tier 3: Apply target AC reduction
@@ -236,7 +245,7 @@ export function calculateModifiedDamage(
     nanoModifier,
     stat536,
     targetAC,
-    absMinValue  // Max damage also floors to MinValue
+    absMinValue // Max damage also floors to MinValue
   );
 
   // Calculate mid damage (midpoint between min and max)

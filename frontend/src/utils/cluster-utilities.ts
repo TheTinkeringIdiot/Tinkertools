@@ -20,7 +20,7 @@ import {
   type ImpSlotKey,
   type ClusterType,
   type NPModKey,
-  type JobeSkillKey
+  type JobeSkillKey,
 } from '../services/game-data';
 
 // ============================================================================
@@ -76,10 +76,7 @@ export interface AvailableClusters {
  * // Returns: ['Empty', 'Aimed Shot', 'Elec. Engi', 'Map Navig', ...]
  * ```
  */
-export function getAvailableClusters(
-  slotName: ImpSlotName,
-  clusterType: ClusterType
-): string[] {
+export function getAvailableClusters(slotName: ImpSlotName, clusterType: ClusterType): string[] {
   const slotSkills = IMP_SKILLS[slotName];
 
   if (!slotSkills) {
@@ -114,7 +111,7 @@ export function getAvailableClustersWithMetadata(
     slot: slotName,
     type: clusterType,
     clusters,
-    hasEmpty: clusters.includes('Empty')
+    hasEmpty: clusters.includes('Empty'),
   };
 }
 
@@ -174,31 +171,45 @@ export function validateClusterConfig(
   }
 
   // Validate shiny cluster
-  if (shiny && shiny !== ('Empty' as string) && !(slotSkills.Shiny as readonly string[]).includes(shiny)) {
+  if (
+    shiny &&
+    shiny !== ('Empty' as string) &&
+    !(slotSkills.Shiny as readonly string[]).includes(shiny)
+  ) {
     errors.push(`Invalid shiny cluster '${shiny}' for slot ${slot}`);
   }
 
   // Validate bright cluster
-  if (bright && bright !== ('Empty' as string) && !(slotSkills.Bright as readonly string[]).includes(bright)) {
+  if (
+    bright &&
+    bright !== ('Empty' as string) &&
+    !(slotSkills.Bright as readonly string[]).includes(bright)
+  ) {
     errors.push(`Invalid bright cluster '${bright}' for slot ${slot}`);
   }
 
   // Validate faded cluster
-  if (faded && faded !== ('Empty' as string) && !(slotSkills.Faded as readonly string[]).includes(faded)) {
+  if (
+    faded &&
+    faded !== ('Empty' as string) &&
+    !(slotSkills.Faded as readonly string[]).includes(faded)
+  ) {
     errors.push(`Invalid faded cluster '${faded}' for slot ${slot}`);
   }
 
   // Warning if all clusters are empty
-  if ((shiny === ('Empty' as string) || !shiny) &&
-      (bright === ('Empty' as string) || !bright) &&
-      (faded === ('Empty' as string) || !faded)) {
+  if (
+    (shiny === ('Empty' as string) || !shiny) &&
+    (bright === ('Empty' as string) || !bright) &&
+    (faded === ('Empty' as string) || !faded)
+  ) {
     warnings.push(`All clusters are empty for slot ${slot}`);
   }
 
   return {
     valid: errors.length === 0,
     errors,
-    warnings
+    warnings,
   };
 }
 
@@ -252,7 +263,7 @@ export function getClusterNPRequirement(
       isJobe: false,
       skill: cluster || 'Empty',
       clusterType,
-      ql
+      ql,
     };
   }
 
@@ -283,7 +294,7 @@ export function getClusterNPRequirement(
       jobeSkill,
       skill: cluster,
       clusterType,
-      ql
+      ql,
     };
   } else {
     // Calculate regular cluster NP requirement
@@ -301,7 +312,7 @@ export function getClusterNPRequirement(
       isJobe: false,
       skill: cluster,
       clusterType,
-      ql
+      ql,
     };
   }
 }
@@ -538,7 +549,7 @@ export function getAllUniqueClusters(includeEmpty: boolean = false): string[] {
   const result = Array.from(clusters);
 
   if (!includeEmpty) {
-    return result.filter(c => c !== 'Empty');
+    return result.filter((c) => c !== 'Empty');
   }
 
   return result;
@@ -574,5 +585,5 @@ export const clusterUtilities = {
 
   // Utilities
   getSlotsForCluster,
-  getAllUniqueClusters
+  getAllUniqueClusters,
 };

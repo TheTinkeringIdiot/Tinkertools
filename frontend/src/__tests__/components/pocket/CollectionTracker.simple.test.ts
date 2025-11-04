@@ -1,6 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { mountWithContext, standardCleanup, createTestProfile, SKILL_ID, PROFESSION } from '@/__tests__/helpers';
+import {
+  mountWithContext,
+  standardCleanup,
+  createTestProfile,
+  SKILL_ID,
+  PROFESSION,
+} from '@/__tests__/helpers';
 import { createPinia } from 'pinia';
 import PrimeVue from 'primevue/config';
 
@@ -9,21 +15,31 @@ const mockLocalStorage = {
   getItem: vi.fn(),
   setItem: vi.fn(),
   removeItem: vi.fn(),
-  clear: vi.fn()
+  clear: vi.fn(),
 };
 Object.defineProperty(global, 'localStorage', { value: mockLocalStorage });
 
 // Mock components
 const MockCard = { template: '<div class="mock-card"><slot name="content"></slot></div>' };
-const MockButton = { template: '<button class="mock-button" @click="$emit(\'click\')"><slot></slot></button>' };
-const MockProgressBar = { template: '<div class="mock-progressbar">{{ value }}%</div>', props: ['value'] };
+const MockButton = {
+  template: '<button class="mock-button" @click="$emit(\'click\')"><slot></slot></button>',
+};
+const MockProgressBar = {
+  template: '<div class="mock-progressbar">{{ value }}%</div>',
+  props: ['value'],
+};
 const MockCheckbox = { template: '<input type="checkbox" class="mock-checkbox" />' };
-const MockDataTable = { template: '<div class="mock-datatable"><slot name="empty" v-if="!value || value.length === 0"></slot></div>', props: ['value'] };
+const MockDataTable = {
+  template:
+    '<div class="mock-datatable"><slot name="empty" v-if="!value || value.length === 0"></slot></div>',
+  props: ['value'],
+};
 
 describe('CollectionTracker Component Structure', () => {
   const createWrapper = () => {
-    return mount({
-      template: `
+    return mount(
+      {
+        template: `
         <div class="collection-tracker">
           <MockCard class="mb-6">
             <template #content>
@@ -56,24 +72,26 @@ describe('CollectionTracker Component Structure', () => {
           </MockCard>
         </div>
       `,
-      components: { MockCard, MockButton, MockProgressBar, MockCheckbox, MockDataTable },
-      data() {
-        return {
-          total: 100,
-          collected: 25,
-          remaining: 75,
-          percentage: 25,
-          symbiants: [
-            { id: 1, name: 'Test Symbiant 1', collected: false },
-            { id: 2, name: 'Test Symbiant 2', collected: true }
-          ]
-        };
+        components: { MockCard, MockButton, MockProgressBar, MockCheckbox, MockDataTable },
+        data() {
+          return {
+            total: 100,
+            collected: 25,
+            remaining: 75,
+            percentage: 25,
+            symbiants: [
+              { id: 1, name: 'Test Symbiant 1', collected: false },
+              { id: 2, name: 'Test Symbiant 2', collected: true },
+            ],
+          };
+        },
+      },
+      {
+        global: {
+          plugins: [createPinia(), PrimeVue],
+        },
       }
-    }, {
-      global: {
-        plugins: [createPinia(), PrimeVue]
-      }
-    });
+    );
   };
 
   it('renders the basic structure', () => {
@@ -105,10 +123,10 @@ describe('CollectionTracker Helper Functions', () => {
   it('calculates collection statistics', () => {
     const calculateStats = (items: any[]) => {
       const total = items.length;
-      const collected = items.filter(item => item.collected).length;
+      const collected = items.filter((item) => item.collected).length;
       const percentage = total > 0 ? Math.round((collected / total) * 100) : 0;
       const remaining = total - collected;
-      
+
       return { total, collected, percentage, remaining };
     };
 
@@ -116,7 +134,7 @@ describe('CollectionTracker Helper Functions', () => {
       { id: 1, collected: true },
       { id: 2, collected: false },
       { id: 3, collected: true },
-      { id: 4, collected: false }
+      { id: 4, collected: false },
     ];
 
     const stats = calculateStats(items);
@@ -129,8 +147,8 @@ describe('CollectionTracker Helper Functions', () => {
   it('calculates progress by slot', () => {
     const calculateSlotProgress = (items: any[]) => {
       const bySlot: Record<string, { total: number; collected: number }> = {};
-      
-      items.forEach(item => {
+
+      items.forEach((item) => {
         if (!bySlot[item.slot]) {
           bySlot[item.slot] = { total: 0, collected: 0 };
         }
@@ -143,7 +161,7 @@ describe('CollectionTracker Helper Functions', () => {
       return Object.entries(bySlot).map(([slot, stats]) => ({
         slot,
         ...stats,
-        percentage: Math.round((stats.collected / stats.total) * 100)
+        percentage: Math.round((stats.collected / stats.total) * 100),
       }));
     };
 
@@ -151,39 +169,42 @@ describe('CollectionTracker Helper Functions', () => {
       { id: 1, slot: 'Head', collected: true },
       { id: 2, slot: 'Head', collected: false },
       { id: 3, slot: 'Chest', collected: true },
-      { id: 4, slot: 'Chest', collected: true }
+      { id: 4, slot: 'Chest', collected: true },
     ];
 
     const slotProgress = calculateSlotProgress(items);
     expect(slotProgress).toHaveLength(2);
-    
-    const headSlot = slotProgress.find(s => s.slot === 'Head');
+
+    const headSlot = slotProgress.find((s) => s.slot === 'Head');
     expect(headSlot?.percentage).toBe(50);
-    
-    const chestSlot = slotProgress.find(s => s.slot === 'Chest');
+
+    const chestSlot = slotProgress.find((s) => s.slot === 'Chest');
     expect(chestSlot?.percentage).toBe(100);
   });
 
   it('handles goal progress calculation', () => {
-    const calculateGoalProgress = (goal: any, collectionData: Record<number, { collected: boolean }>) => {
+    const calculateGoalProgress = (
+      goal: any,
+      collectionData: Record<number, { collected: boolean }>
+    ) => {
       const total = goal.targetSymbiants.length;
-      const collected = goal.targetSymbiants.filter((id: number) => 
-        collectionData[id]?.collected
+      const collected = goal.targetSymbiants.filter(
+        (id: number) => collectionData[id]?.collected
       ).length;
       const percentage = total > 0 ? Math.round((collected / total) * 100) : 0;
-      
+
       return { total, collected, percentage };
     };
 
     const goal = {
-      targetSymbiants: [1, 2, 3, 4]
+      targetSymbiants: [1, 2, 3, 4],
     };
 
     const collectionData = {
       1: { collected: true },
       2: { collected: false },
       3: { collected: true },
-      4: { collected: false }
+      4: { collected: false },
     };
 
     const progress = calculateGoalProgress(goal, collectionData);
@@ -203,7 +224,7 @@ describe('CollectionTracker Helper Functions', () => {
     };
 
     const testData = { 1: { collected: true }, 2: { collected: false } };
-    
+
     saveCollectionData(testData);
     expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
       'tinkertools-symbiant-collection',

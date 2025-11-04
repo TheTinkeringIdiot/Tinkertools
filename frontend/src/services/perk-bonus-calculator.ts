@@ -20,7 +20,7 @@
  * - LRU caching with error recovery for performance optimization
  */
 
-import type { Item, SpellData, Spell } from '@/types/api'
+import type { Item, SpellData, Spell } from '@/types/api';
 
 // ============================================================================
 // Type Definitions
@@ -28,39 +28,39 @@ import type { Item, SpellData, Spell } from '@/types/api'
 
 export interface PerkStatBonus {
   /** STAT ID from game data */
-  statId: number
+  statId: number;
   /** Bonus amount (can be negative) */
-  amount: number
+  amount: number;
   /** Source perk item for debugging */
-  perkName?: string
+  perkName?: string;
   /** Perk AOID for identification */
-  perkAoid?: number
+  perkAoid?: number;
 }
 
 export interface PerkBonusError {
   /** Type of error for user display */
-  type: 'warning' | 'error'
+  type: 'warning' | 'error';
   /** User-friendly error message */
-  message: string
+  message: string;
   /** Technical details for debugging */
-  details: string
+  details: string;
   /** Source perk that caused the error */
-  perkName?: string
+  perkName?: string;
   /** Perk AOID for identification */
-  perkAoid?: number
+  perkAoid?: number;
   /** Whether calculation can continue */
-  recoverable: boolean
+  recoverable: boolean;
 }
 
 export interface PerkCalculationResult {
   /** Successfully calculated bonuses */
-  bonuses: Record<number, number>
+  bonuses: Record<number, number>;
   /** Non-fatal warnings */
-  warnings: PerkBonusError[]
+  warnings: PerkBonusError[];
   /** Fatal errors */
-  errors: PerkBonusError[]
+  errors: PerkBonusError[];
   /** Whether calculation completed successfully */
-  success: boolean
+  success: boolean;
 }
 
 // ============================================================================
@@ -75,15 +75,15 @@ export const STAT_BONUS_SPELL_IDS = [
   53045, // "Modify {Stat} by {Amount}" - primary stat bonus spell
   53012, // "Modify {Stat} by {Amount}" - alternative format
   53014, // "Modify {Stat} for {Duration}s by {Amount}" - timed bonus (some perks use this)
-  53175  // "Modify {Stat} by {Amount}" - additional stat modifier format
-] as const
+  53175, // "Modify {Stat} by {Amount}" - additional stat modifier format
+] as const;
 
 /**
  * Perk events that provide stat bonuses
  * - 1: Cast (perks may trigger on cast)
  * - 14: Wear (standard wear effect like equipment)
  */
-export const PERK_EVENTS = [1, 14] as const
+export const PERK_EVENTS = [1, 14] as const;
 
 // ============================================================================
 // Performance Caching
@@ -95,57 +95,57 @@ export const PERK_EVENTS = [1, 14] as const
  * Value: PerkStatBonus[] array
  */
 class PerkSpellDataCache {
-  private cache = new Map<string, PerkStatBonus[]>()
-  private maxSize = 500 // Limit cache size to prevent memory issues
-  private hitCount = 0
-  private missCount = 0
+  private cache = new Map<string, PerkStatBonus[]>();
+  private maxSize = 500; // Limit cache size to prevent memory issues
+  private hitCount = 0;
+  private missCount = 0;
 
   private getCacheKey(perk: Item): string {
     // Use AOID for perks since they don't have quality levels
-    return perk.aoid ? String(perk.aoid) : perk.name || 'unknown'
+    return perk.aoid ? String(perk.aoid) : perk.name || 'unknown';
   }
 
   get(perk: Item): PerkStatBonus[] | null {
-    const key = this.getCacheKey(perk)
-    const cached = this.cache.get(key)
+    const key = this.getCacheKey(perk);
+    const cached = this.cache.get(key);
 
     if (cached) {
-      this.hitCount++
-      return cached
+      this.hitCount++;
+      return cached;
     } else {
-      this.missCount++
-      return null
+      this.missCount++;
+      return null;
     }
   }
 
   set(perk: Item, bonuses: PerkStatBonus[]): void {
-    const key = this.getCacheKey(perk)
+    const key = this.getCacheKey(perk);
 
     // If cache is full, remove oldest entry (simple LRU)
     if (this.cache.size >= this.maxSize) {
-      const firstKey = this.cache.keys().next().value
+      const firstKey = this.cache.keys().next().value;
       if (firstKey) {
-        this.cache.delete(firstKey)
+        this.cache.delete(firstKey);
       }
     }
 
-    this.cache.set(key, bonuses)
+    this.cache.set(key, bonuses);
   }
 
   clear(): void {
-    this.cache.clear()
-    this.hitCount = 0
-    this.missCount = 0
+    this.cache.clear();
+    this.hitCount = 0;
+    this.missCount = 0;
   }
 
   getStats(): { size: number; hitRate: number; hitCount: number; missCount: number } {
-    const total = this.hitCount + this.missCount
+    const total = this.hitCount + this.missCount;
     return {
       size: this.cache.size,
       hitRate: total > 0 ? (this.hitCount / total) * 100 : 0,
       hitCount: this.hitCount,
-      missCount: this.missCount
-    }
+      missCount: this.missCount,
+    };
   }
 }
 
@@ -153,37 +153,37 @@ class PerkSpellDataCache {
  * Memoization for aggregated perk bonuses calculation
  */
 class PerkBonusAggregationCache {
-  private cache = new Map<string, Record<number, number>>()
-  private maxSize = 100
+  private cache = new Map<string, Record<number, number>>();
+  private maxSize = 100;
 
   private getCacheKey(bonuses: PerkStatBonus[]): string {
     // Create a deterministic key from the bonuses array
     return bonuses
-      .map(b => `${b.statId}:${b.amount}`)
+      .map((b) => `${b.statId}:${b.amount}`)
       .sort()
-      .join('|')
+      .join('|');
   }
 
   get(bonuses: PerkStatBonus[]): Record<number, number> | null {
-    const key = this.getCacheKey(bonuses)
-    return this.cache.get(key) || null
+    const key = this.getCacheKey(bonuses);
+    return this.cache.get(key) || null;
   }
 
   set(bonuses: PerkStatBonus[], result: Record<number, number>): void {
-    const key = this.getCacheKey(bonuses)
+    const key = this.getCacheKey(bonuses);
 
     if (this.cache.size >= this.maxSize) {
-      const firstKey = this.cache.keys().next().value
+      const firstKey = this.cache.keys().next().value;
       if (firstKey) {
-        this.cache.delete(firstKey)
+        this.cache.delete(firstKey);
       }
     }
 
-    this.cache.set(key, result)
+    this.cache.set(key, result);
   }
 
   clear(): void {
-    this.cache.clear()
+    this.cache.clear();
   }
 }
 
@@ -192,15 +192,15 @@ class PerkBonusAggregationCache {
 // ============================================================================
 
 export class PerkBonusCalculator {
-  private spellCache = new PerkSpellDataCache()
-  private bonusCache = new PerkBonusAggregationCache()
+  private spellCache = new PerkSpellDataCache();
+  private bonusCache = new PerkBonusAggregationCache();
 
   // Performance tracking
   private performanceMetrics = {
     lastCalculationTime: 0,
     averageCalculationTime: 0,
-    calculationCount: 0
-  }
+    calculationCount: 0,
+  };
 
   /**
    * Calculate perk bonuses for all equipped perks
@@ -209,24 +209,23 @@ export class PerkBonusCalculator {
    */
   calculateBonuses(perks: Item[]): Record<number, number> {
     try {
-      const result = this.calculateBonusesWithErrorHandling(perks)
+      const result = this.calculateBonusesWithErrorHandling(perks);
 
       // Log any warnings or errors for debugging
       if (result.warnings.length > 0) {
-        console.warn('Perk bonus calculation warnings:', result.warnings)
+        console.warn('Perk bonus calculation warnings:', result.warnings);
       }
 
       if (result.errors.length > 0) {
-        console.error('Perk bonus calculation errors:', result.errors)
+        console.error('Perk bonus calculation errors:', result.errors);
         // For backward compatibility, still return bonuses even with errors
       }
 
-      return result.bonuses
-
+      return result.bonuses;
     } catch (error) {
-      console.error('Critical error in perk bonus calculation:', error)
+      console.error('Critical error in perk bonus calculation:', error);
       // Fallback to empty bonuses to ensure system continues working
-      return {}
+      return {};
     }
   }
 
@@ -236,13 +235,13 @@ export class PerkBonusCalculator {
    * @returns PerkCalculationResult with bonuses, warnings, and errors
    */
   calculateBonusesWithErrorHandling(perks: Item[]): PerkCalculationResult {
-    const startTime = performance.now()
+    const startTime = performance.now();
     const result: PerkCalculationResult = {
       bonuses: {},
       warnings: [],
       errors: [],
-      success: true
-    }
+      success: true,
+    };
 
     try {
       // Validate perks array
@@ -251,10 +250,10 @@ export class PerkBonusCalculator {
           type: 'error',
           message: 'Perks data is missing',
           details: 'Perks array is null or undefined',
-          recoverable: false
-        })
-        result.success = false
-        return result
+          recoverable: false,
+        });
+        result.success = false;
+        return result;
       }
 
       if (!Array.isArray(perks)) {
@@ -262,14 +261,14 @@ export class PerkBonusCalculator {
           type: 'error',
           message: 'Invalid perks data format',
           details: 'Perks data is not an array',
-          recoverable: false
-        })
-        result.success = false
-        return result
+          recoverable: false,
+        });
+        result.success = false;
+        return result;
       }
 
-      const allBonuses: PerkStatBonus[] = []
-      const processedPerks = new Set<string>() // Track processed perks to prevent infinite loops
+      const allBonuses: PerkStatBonus[] = [];
+      const processedPerks = new Set<string>(); // Track processed perks to prevent infinite loops
 
       // Enhanced bounds checking for perks array
       if (perks.length > 1000) {
@@ -277,22 +276,22 @@ export class PerkBonusCalculator {
           type: 'warning',
           message: 'Unusually large number of perks',
           details: `Processing ${perks.length} perks, which may impact performance`,
-          recoverable: true
-        })
+          recoverable: true,
+        });
       }
 
       // Process each perk with individual error handling
       for (let i = 0; i < perks.length; i++) {
-        const perk = perks[i]
+        const perk = perks[i];
 
         if (!perk) {
           result.warnings.push({
             type: 'warning',
             message: 'Null perk in perks array',
             details: `Perk at index ${i} is null or undefined`,
-            recoverable: true
-          })
-          continue
+            recoverable: true,
+          });
+          continue;
         }
 
         // Enhanced validation for perk structure
@@ -301,13 +300,13 @@ export class PerkBonusCalculator {
             type: 'warning',
             message: 'Invalid perk data type in array',
             details: `Perk at index ${i} is not an object (type: ${typeof perk})`,
-            recoverable: true
-          })
-          continue
+            recoverable: true,
+          });
+          continue;
         }
 
         // Prevent processing the same perk multiple times (circular reference protection)
-        const perkId = perk.aoid ? String(perk.aoid) : (perk.name || `index_${i}`)
+        const perkId = perk.aoid ? String(perk.aoid) : perk.name || `index_${i}`;
         if (processedPerks.has(perkId)) {
           result.warnings.push({
             type: 'warning',
@@ -315,18 +314,18 @@ export class PerkBonusCalculator {
             details: `Perk ${perk.name || 'unknown'} (${perkId}) appears multiple times in the array`,
             perkName: perk.name,
             perkAoid: perk.aoid,
-            recoverable: true
-          })
-          continue
+            recoverable: true,
+          });
+          continue;
         }
-        processedPerks.add(perkId)
+        processedPerks.add(perkId);
 
         try {
-          const perkBonuses = this.parsePerkSpellsWithErrorHandling(perk)
+          const perkBonuses = this.parsePerkSpellsWithErrorHandling(perk);
 
           if (perkBonuses.bonuses.length > 0) {
             // Validate bonuses before adding them
-            const validBonuses = perkBonuses.bonuses.filter(bonus => {
+            const validBonuses = perkBonuses.bonuses.filter((bonus) => {
               if (!bonus || typeof bonus !== 'object') {
                 result.warnings.push({
                   type: 'warning',
@@ -334,22 +333,21 @@ export class PerkBonusCalculator {
                   details: `Perk ${perk.name || 'unknown'} returned invalid bonus data`,
                   perkName: perk.name,
                   perkAoid: perk.aoid,
-                  recoverable: true
-                })
-                return false
+                  recoverable: true,
+                });
+                return false;
               }
-              return true
-            })
+              return true;
+            });
 
             if (validBonuses.length > 0) {
-              allBonuses.push(...validBonuses)
+              allBonuses.push(...validBonuses);
             }
           }
 
           // Collect warnings and errors from perk parsing
-          result.warnings.push(...perkBonuses.warnings)
-          result.errors.push(...perkBonuses.errors)
-
+          result.warnings.push(...perkBonuses.warnings);
+          result.errors.push(...perkBonuses.errors);
         } catch (error) {
           result.warnings.push({
             type: 'warning',
@@ -357,42 +355,41 @@ export class PerkBonusCalculator {
             details: `Error parsing perk ${perk.name || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
             perkName: perk.name,
             perkAoid: perk.aoid,
-            recoverable: true
-          })
+            recoverable: true,
+          });
           // Continue processing other perks - critical for error recovery
         }
       }
 
       // Aggregate bonuses by skill ID with error handling
       try {
-        result.bonuses = this.aggregateBonusesOptimized(allBonuses)
+        result.bonuses = this.aggregateBonusesOptimized(allBonuses);
       } catch (error) {
         result.errors.push({
           type: 'error',
           message: 'Failed to aggregate perk bonuses',
           details: `Aggregation error: ${error instanceof Error ? error.message : String(error)}`,
-          recoverable: false
-        })
-        result.success = false
-        result.bonuses = {} // Fallback to empty bonuses
+          recoverable: false,
+        });
+        result.success = false;
+        result.bonuses = {}; // Fallback to empty bonuses
       }
-
     } catch (error) {
       result.errors.push({
         type: 'error',
         message: 'Unexpected error during perk bonus calculation',
         details: `Critical error: ${error instanceof Error ? error.message : String(error)}`,
-        recoverable: false
-      })
-      result.success = false
-      result.bonuses = {} // Ensure we always return something
+        recoverable: false,
+      });
+      result.success = false;
+      result.bonuses = {}; // Ensure we always return something
     } finally {
       // Track performance metrics
-      const endTime = performance.now()
-      this.updatePerformanceMetrics(endTime - startTime)
+      const endTime = performance.now();
+      this.updatePerformanceMetrics(endTime - startTime);
     }
 
-    return result
+    return result;
   }
 
   /**
@@ -401,31 +398,31 @@ export class PerkBonusCalculator {
    * @returns Array of stat bonuses found in the perk
    */
   parsePerkSpells(perk: Item): PerkStatBonus[] {
-    const bonuses: PerkStatBonus[] = []
+    const bonuses: PerkStatBonus[] = [];
 
     if (!perk.spell_data || !Array.isArray(perk.spell_data)) {
-      return bonuses
+      return bonuses;
     }
 
     for (const spellData of perk.spell_data) {
       // Only process perk-related events (Cast=1, Wear=14)
       if (!spellData.event || !PERK_EVENTS.includes(spellData.event as any)) {
-        continue
+        continue;
       }
 
       if (!spellData.spells || !Array.isArray(spellData.spells)) {
-        continue
+        continue;
       }
 
       for (const spell of spellData.spells) {
-        const bonus = this.parseSpellForStatBonus(spell, perk.name, perk.aoid)
+        const bonus = this.parseSpellForStatBonus(spell, perk.name, perk.aoid);
         if (bonus) {
-          bonuses.push(bonus)
+          bonuses.push(bonus);
         }
       }
     }
 
-    return bonuses
+    return bonuses;
   }
 
   /**
@@ -434,34 +431,36 @@ export class PerkBonusCalculator {
   private parsePerkSpellsOptimized(perk: Item): PerkStatBonus[] {
     try {
       // Check cache first with error handling
-      const cached = this.spellCache.get(perk)
+      const cached = this.spellCache.get(perk);
       if (cached) {
         // Validate cached data before returning
         if (Array.isArray(cached)) {
-          return cached
+          return cached;
         } else {
-          console.warn(`Invalid cached data for perk ${perk.name || 'unknown'}, clearing entire cache`)
+          console.warn(
+            `Invalid cached data for perk ${perk.name || 'unknown'}, clearing entire cache`
+          );
           // Clear entire cache to prevent corruption spread
-          this.spellCache.clear()
+          this.spellCache.clear();
         }
       }
     } catch (error) {
-      console.warn(`Cache retrieval error for perk ${perk.name || 'unknown'}:`, error)
+      console.warn(`Cache retrieval error for perk ${perk.name || 'unknown'}:`, error);
       // Continue without cache on error
     }
 
     // Parse as usual if not cached or cache failed
-    const bonuses = this.parsePerkSpells(perk)
+    const bonuses = this.parsePerkSpells(perk);
 
     try {
       // Cache the result for future use with error handling
-      this.spellCache.set(perk, bonuses)
+      this.spellCache.set(perk, bonuses);
     } catch (error) {
-      console.warn(`Cache storage error for perk ${perk.name || 'unknown'}:`, error)
+      console.warn(`Cache storage error for perk ${perk.name || 'unknown'}:`, error);
       // Continue without caching on error
     }
 
-    return bonuses
+    return bonuses;
   }
 
   /**
@@ -469,14 +468,16 @@ export class PerkBonusCalculator {
    * @param perk Perk item with spell_data to parse
    * @returns Object with bonuses array and error/warning arrays
    */
-  parsePerkSpellsWithErrorHandling(
-    perk: Item
-  ): { bonuses: PerkStatBonus[]; warnings: PerkBonusError[]; errors: PerkBonusError[] } {
+  parsePerkSpellsWithErrorHandling(perk: Item): {
+    bonuses: PerkStatBonus[];
+    warnings: PerkBonusError[];
+    errors: PerkBonusError[];
+  } {
     const result = {
       bonuses: [] as PerkStatBonus[],
       warnings: [] as PerkBonusError[],
-      errors: [] as PerkBonusError[]
-    }
+      errors: [] as PerkBonusError[],
+    };
 
     try {
       // Validate perk structure
@@ -485,9 +486,9 @@ export class PerkBonusCalculator {
           type: 'error',
           message: 'Perk data is missing',
           details: 'Perk is null or undefined',
-          recoverable: true
-        })
-        return result
+          recoverable: true,
+        });
+        return result;
       }
 
       // Enhanced validation of perk data structure
@@ -498,15 +499,15 @@ export class PerkBonusCalculator {
           details: `Perk is not an object: ${typeof perk}`,
           perkName: (perk as any)?.name,
           perkAoid: (perk as any)?.aoid,
-          recoverable: true
-        })
-        return result
+          recoverable: true,
+        });
+        return result;
       }
 
       // Check for spell_data
       if (!perk.spell_data) {
         // This is normal for perks without spell effects, not an error
-        return result
+        return result;
       }
 
       if (!Array.isArray(perk.spell_data)) {
@@ -516,20 +517,20 @@ export class PerkBonusCalculator {
           details: `spell_data is not an array for perk ${perk.name || 'unknown'} (type: ${typeof perk.spell_data})`,
           perkName: perk.name,
           perkAoid: perk.aoid,
-          recoverable: true
-        })
-        return result
+          recoverable: true,
+        });
+        return result;
       }
 
       // Additional safety check for empty or invalid spell_data array
       if (perk.spell_data.length === 0) {
         // Not an error - perk has spell_data array but no spells
-        return result
+        return result;
       }
 
       // Process each spell data entry
       for (let i = 0; i < perk.spell_data.length; i++) {
-        const spellData = perk.spell_data[i]
+        const spellData = perk.spell_data[i];
 
         try {
           // Enhanced null/undefined check for spell data entry
@@ -540,9 +541,9 @@ export class PerkBonusCalculator {
               details: `spell_data[${i}] is null or undefined for perk ${perk.name || 'unknown'}`,
               perkName: perk.name,
               perkAoid: perk.aoid,
-              recoverable: true
-            })
-            continue
+              recoverable: true,
+            });
+            continue;
           }
 
           // Enhanced type validation for spell data entry
@@ -553,19 +554,22 @@ export class PerkBonusCalculator {
               details: `spell_data[${i}] is not an object for perk ${perk.name || 'unknown'} (type: ${typeof spellData})`,
               perkName: perk.name,
               perkAoid: perk.aoid,
-              recoverable: true
-            })
-            continue
+              recoverable: true,
+            });
+            continue;
           }
 
           // Only process perk-related events (Cast=1, Wear=14)
           if (!spellData.event) {
             // Event missing - not necessarily an error as some spells may not have events
-            continue
+            continue;
           }
 
           // Enhanced event validation with type checking
-          if (typeof spellData.event !== 'number' || !PERK_EVENTS.includes(spellData.event as any)) {
+          if (
+            typeof spellData.event !== 'number' ||
+            !PERK_EVENTS.includes(spellData.event as any)
+          ) {
             // Log suspicious event IDs for debugging but continue processing
             if (typeof spellData.event === 'number' && spellData.event !== 2) {
               // Only warn about unexpected numeric events (event 2 is equipment wield, expected to be ignored)
@@ -575,10 +579,10 @@ export class PerkBonusCalculator {
                 details: `spell_data[${i}].event = ${spellData.event} (type: ${typeof spellData.event}) is not a perk event for perk ${perk.name || 'unknown'}`,
                 perkName: perk.name,
                 perkAoid: perk.aoid,
-                recoverable: true
-              })
+                recoverable: true,
+              });
             }
-            continue
+            continue;
           }
 
           if (!spellData.spells) {
@@ -588,9 +592,9 @@ export class PerkBonusCalculator {
               details: `spell_data[${i}].spells is missing for perk ${perk.name || 'unknown'}`,
               perkName: perk.name,
               perkAoid: perk.aoid,
-              recoverable: true
-            })
-            continue
+              recoverable: true,
+            });
+            continue;
           }
 
           if (!Array.isArray(spellData.spells)) {
@@ -600,20 +604,20 @@ export class PerkBonusCalculator {
               details: `spell_data[${i}].spells is not an array for perk ${perk.name || 'unknown'} (type: ${typeof spellData.spells})`,
               perkName: perk.name,
               perkAoid: perk.aoid,
-              recoverable: true
-            })
-            continue
+              recoverable: true,
+            });
+            continue;
           }
 
           // Additional safety check for empty spells array
           if (spellData.spells.length === 0) {
             // Not an error - spell data entry has no spells
-            continue
+            continue;
           }
 
           // Process each spell in the spell data
           for (let j = 0; j < spellData.spells.length; j++) {
-            const spell = spellData.spells[j]
+            const spell = spellData.spells[j];
 
             try {
               // Enhanced null/undefined check for individual spell
@@ -624,9 +628,9 @@ export class PerkBonusCalculator {
                   details: `spell_data[${i}].spells[${j}] is null or undefined for perk ${perk.name || 'unknown'}`,
                   perkName: perk.name,
                   perkAoid: perk.aoid,
-                  recoverable: true
-                })
-                continue
+                  recoverable: true,
+                });
+                continue;
               }
 
               // Enhanced type validation for individual spell
@@ -637,20 +641,23 @@ export class PerkBonusCalculator {
                   details: `spell_data[${i}].spells[${j}] is not an object for perk ${perk.name || 'unknown'} (type: ${typeof spell})`,
                   perkName: perk.name,
                   perkAoid: perk.aoid,
-                  recoverable: true
-                })
-                continue
+                  recoverable: true,
+                });
+                continue;
               }
 
-              const bonus = this.parseSpellForStatBonusWithErrorHandling(spell, perk.name, perk.aoid)
+              const bonus = this.parseSpellForStatBonusWithErrorHandling(
+                spell,
+                perk.name,
+                perk.aoid
+              );
 
               if (bonus.bonus) {
-                result.bonuses.push(bonus.bonus)
+                result.bonuses.push(bonus.bonus);
               }
 
-              result.warnings.push(...bonus.warnings)
-              result.errors.push(...bonus.errors)
-
+              result.warnings.push(...bonus.warnings);
+              result.errors.push(...bonus.errors);
             } catch (error) {
               result.warnings.push({
                 type: 'warning',
@@ -658,8 +665,8 @@ export class PerkBonusCalculator {
                 details: `Error parsing spell ${j} in spell_data[${i}] for perk ${perk.name || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
                 perkName: perk.name,
                 perkAoid: perk.aoid,
-                recoverable: true
-              })
+                recoverable: true,
+              });
               // Continue processing other spells - critical for error recovery
             }
           }
@@ -670,8 +677,8 @@ export class PerkBonusCalculator {
             details: `Error processing spell_data[${i}] for perk ${perk.name || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
             perkName: perk.name,
             perkAoid: perk.aoid,
-            recoverable: true
-          })
+            recoverable: true,
+          });
           // Continue processing other spell data entries
         }
       }
@@ -682,11 +689,11 @@ export class PerkBonusCalculator {
         details: `Unexpected error parsing perk ${perk.name || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
         perkName: perk.name,
         perkAoid: perk.aoid,
-        recoverable: false
-      })
+        recoverable: false,
+      });
     }
 
-    return result
+    return result;
   }
 
   /**
@@ -696,42 +703,46 @@ export class PerkBonusCalculator {
    * @param perkAoid AOID of source perk for identification
    * @returns PerkStatBonus if spell modifies stats, null otherwise
    */
-  private parseSpellForStatBonus(spell: Spell, perkName?: string, perkAoid?: number): PerkStatBonus | null {
+  private parseSpellForStatBonus(
+    spell: Spell,
+    perkName?: string,
+    perkAoid?: number
+  ): PerkStatBonus | null {
     // Fast path: check spell_id first (most common rejection case)
     if (!spell.spell_id || !STAT_BONUS_SPELL_IDS.includes(spell.spell_id as any)) {
-      return null
+      return null;
     }
 
     // Fast path: check spell_params existence and type
     if (!spell.spell_params || typeof spell.spell_params !== 'object') {
-      return null
+      return null;
     }
 
     // Extract parameters with hot path optimization
-    const params = spell.spell_params
-    const statValue = params.Stat ?? params.stat ?? params.StatID ?? params.statId
-    const amountValue = params.Amount ?? params.amount ?? params.Value ?? params.value
+    const params = spell.spell_params;
+    const statValue = params.Stat ?? params.stat ?? params.StatID ?? params.statId;
+    const amountValue = params.Amount ?? params.amount ?? params.Value ?? params.value;
 
     // Fast numeric conversion
-    let statId: number | null = null
-    let amount: number | null = null
+    let statId: number | null = null;
+    let amount: number | null = null;
 
     if (typeof statValue === 'number') {
-      statId = statValue
+      statId = statValue;
     } else if (typeof statValue === 'string') {
-      const parsed = parseInt(statValue, 10)
-      statId = isNaN(parsed) ? null : parsed
+      const parsed = parseInt(statValue, 10);
+      statId = isNaN(parsed) ? null : parsed;
     }
 
     if (typeof amountValue === 'number') {
-      amount = amountValue
+      amount = amountValue;
     } else if (typeof amountValue === 'string') {
-      const parsed = parseInt(amountValue, 10)
-      amount = isNaN(parsed) ? null : parsed
+      const parsed = parseInt(amountValue, 10);
+      amount = isNaN(parsed) ? null : parsed;
     }
 
     if (statId === null || amount === null) {
-      return null
+      return null;
     }
 
     // Return bonus with stat ID directly - no name conversion needed
@@ -739,8 +750,8 @@ export class PerkBonusCalculator {
       statId,
       amount,
       perkName,
-      perkAoid
-    }
+      perkAoid,
+    };
   }
 
   /**
@@ -758,8 +769,8 @@ export class PerkBonusCalculator {
     const result = {
       bonus: null as PerkStatBonus | null,
       warnings: [] as PerkBonusError[],
-      errors: [] as PerkBonusError[]
-    }
+      errors: [] as PerkBonusError[],
+    };
 
     try {
       // Validate spell structure
@@ -770,20 +781,20 @@ export class PerkBonusCalculator {
           details: 'Spell is null or undefined',
           perkName,
           perkAoid,
-          recoverable: true
-        })
-        return result
+          recoverable: true,
+        });
+        return result;
       }
 
       // Check if this spell modifies stats
       if (!spell.spell_id) {
         // Not an error - many spells don't have IDs or aren't stat modifiers
-        return result
+        return result;
       }
 
       if (!STAT_BONUS_SPELL_IDS.includes(spell.spell_id as any)) {
         // Not an error - this spell doesn't modify stats
-        return result
+        return result;
       }
 
       // Validate spell parameters
@@ -794,9 +805,9 @@ export class PerkBonusCalculator {
           details: `Spell ${spell.spell_id} has no parameters in perk ${perkName || 'unknown'}`,
           perkName,
           perkAoid,
-          recoverable: true
-        })
-        return result
+          recoverable: true,
+        });
+        return result;
       }
 
       if (typeof spell.spell_params !== 'object') {
@@ -806,18 +817,18 @@ export class PerkBonusCalculator {
           details: `Spell ${spell.spell_id} parameters are not an object in perk ${perkName || 'unknown'}`,
           perkName,
           perkAoid,
-          recoverable: true
-        })
-        return result
+          recoverable: true,
+        });
+        return result;
       }
 
       // Extract and validate parameters using the same logic as parseSpellForStatBonus
-      const params = spell.spell_params
-      const statValue = params.Stat ?? params.stat ?? params.StatID ?? params.statId
-      const amountValue = params.Amount ?? params.amount ?? params.Value ?? params.value
+      const params = spell.spell_params;
+      const statValue = params.Stat ?? params.stat ?? params.StatID ?? params.statId;
+      const amountValue = params.Amount ?? params.amount ?? params.Value ?? params.value;
 
-      let statId: number | null = null
-      let amount: number | null = null
+      let statId: number | null = null;
+      let amount: number | null = null;
 
       // Extract stat ID with error handling
       if (typeof statValue === 'number') {
@@ -828,12 +839,12 @@ export class PerkBonusCalculator {
             details: `Stat ID ${statValue} is outside expected range (0-1000) in perk ${perkName || 'unknown'}`,
             perkName,
             perkAoid,
-            recoverable: true
-          })
+            recoverable: true,
+          });
         }
-        statId = statValue
+        statId = statValue;
       } else if (typeof statValue === 'string') {
-        const parsed = parseInt(statValue, 10)
+        const parsed = parseInt(statValue, 10);
         if (isNaN(parsed)) {
           result.warnings.push({
             type: 'warning',
@@ -841,8 +852,8 @@ export class PerkBonusCalculator {
             details: `Unable to parse stat ID "${statValue}" in perk ${perkName || 'unknown'}`,
             perkName,
             perkAoid,
-            recoverable: true
-          })
+            recoverable: true,
+          });
         } else {
           if (parsed < 0 || parsed > 1000) {
             result.warnings.push({
@@ -851,10 +862,10 @@ export class PerkBonusCalculator {
               details: `Parsed stat ID ${parsed} is outside expected range (0-1000) in perk ${perkName || 'unknown'}`,
               perkName,
               perkAoid,
-              recoverable: true
-            })
+              recoverable: true,
+            });
           }
-          statId = parsed
+          statId = parsed;
         }
       }
 
@@ -867,12 +878,12 @@ export class PerkBonusCalculator {
             details: `Stat bonus amount ${amountValue} is unusually large in perk ${perkName || 'unknown'}`,
             perkName,
             perkAoid,
-            recoverable: true
-          })
+            recoverable: true,
+          });
         }
-        amount = amountValue
+        amount = amountValue;
       } else if (typeof amountValue === 'string') {
-        const parsed = parseInt(amountValue, 10)
+        const parsed = parseInt(amountValue, 10);
         if (isNaN(parsed)) {
           result.warnings.push({
             type: 'warning',
@@ -880,8 +891,8 @@ export class PerkBonusCalculator {
             details: `Unable to parse amount "${amountValue}" in perk ${perkName || 'unknown'}`,
             perkName,
             perkAoid,
-            recoverable: true
-          })
+            recoverable: true,
+          });
         } else {
           if (Math.abs(parsed) > 10000) {
             result.warnings.push({
@@ -890,10 +901,10 @@ export class PerkBonusCalculator {
               details: `Parsed amount ${parsed} is unusually large in perk ${perkName || 'unknown'}`,
               perkName,
               perkAoid,
-              recoverable: true
-            })
+              recoverable: true,
+            });
           }
-          amount = parsed
+          amount = parsed;
         }
       }
 
@@ -905,8 +916,8 @@ export class PerkBonusCalculator {
             details: `Spell ${spell.spell_id} in perk ${perkName || 'unknown'} is missing both Stat and Amount parameters`,
             perkName,
             perkAoid,
-            recoverable: true
-          })
+            recoverable: true,
+          });
         } else if (statId === null) {
           result.warnings.push({
             type: 'warning',
@@ -914,8 +925,8 @@ export class PerkBonusCalculator {
             details: `Spell ${spell.spell_id} in perk ${perkName || 'unknown'} is missing Stat parameter`,
             perkName,
             perkAoid,
-            recoverable: true
-          })
+            recoverable: true,
+          });
         } else {
           result.warnings.push({
             type: 'warning',
@@ -923,10 +934,10 @@ export class PerkBonusCalculator {
             details: `Spell ${spell.spell_id} in perk ${perkName || 'unknown'} is missing Amount parameter`,
             perkName,
             perkAoid,
-            recoverable: true
-          })
+            recoverable: true,
+          });
         }
-        return result
+        return result;
       }
 
       // Successfully parsed - use stat ID directly
@@ -934,9 +945,8 @@ export class PerkBonusCalculator {
         statId,
         amount,
         perkName,
-        perkAoid
-      }
-
+        perkAoid,
+      };
     } catch (error) {
       result.errors.push({
         type: 'error',
@@ -944,11 +954,11 @@ export class PerkBonusCalculator {
         details: `Unexpected error parsing spell in perk ${perkName || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
         perkName,
         perkAoid,
-        recoverable: false
-      })
+        recoverable: false,
+      });
     }
 
-    return result
+    return result;
   }
 
   /**
@@ -957,26 +967,26 @@ export class PerkBonusCalculator {
    * @returns Record mapping skill IDs to total bonus amounts
    */
   aggregateBonuses(bonuses: PerkStatBonus[]): Record<number, number> {
-    const aggregated: Record<number, number> = {}
+    const aggregated: Record<number, number> = {};
 
     for (const bonus of bonuses) {
       if (aggregated[bonus.statId]) {
-        aggregated[bonus.statId] += bonus.amount
+        aggregated[bonus.statId] += bonus.amount;
       } else {
-        aggregated[bonus.statId] = bonus.amount
+        aggregated[bonus.statId] = bonus.amount;
       }
     }
 
     // Filter out zero bonuses to keep the result clean
-    const filtered: Record<number, number> = {}
+    const filtered: Record<number, number> = {};
     for (const [statId, amount] of Object.entries(aggregated)) {
-      const numericStatId = Number(statId)
+      const numericStatId = Number(statId);
       if (amount !== 0) {
-        filtered[numericStatId] = amount
+        filtered[numericStatId] = amount;
       }
     }
 
-    return filtered
+    return filtered;
   }
 
   /**
@@ -985,138 +995,137 @@ export class PerkBonusCalculator {
   private aggregateBonusesOptimized(bonuses: PerkStatBonus[]): Record<number, number> {
     // Early return for empty bonuses
     if (bonuses.length === 0) {
-      return {}
+      return {};
     }
 
     // Enhanced validation of bonuses array
     if (!Array.isArray(bonuses)) {
-      console.warn('Invalid bonuses array passed to aggregateBonusesOptimized:', typeof bonuses)
-      return {}
+      console.warn('Invalid bonuses array passed to aggregateBonusesOptimized:', typeof bonuses);
+      return {};
     }
 
     try {
       // Check memoization cache with error handling
-      const cached = this.bonusCache.get(bonuses)
+      const cached = this.bonusCache.get(bonuses);
       if (cached) {
         // Validate cached data before returning
         if (cached && typeof cached === 'object' && !Array.isArray(cached)) {
-          return cached
+          return cached;
         } else {
-          console.warn('Invalid cached aggregation data, clearing cache')
-          this.bonusCache.clear()
+          console.warn('Invalid cached aggregation data, clearing cache');
+          this.bonusCache.clear();
         }
       }
     } catch (error) {
-      console.warn('Cache retrieval error in aggregateBonusesOptimized:', error)
+      console.warn('Cache retrieval error in aggregateBonusesOptimized:', error);
       // Continue without cache on error
     }
 
     // Calculate as usual with error handling
-    let result: Record<string, number>
+    let result: Record<string, number>;
     try {
-      result = this.aggregateBonuses(bonuses)
+      result = this.aggregateBonuses(bonuses);
     } catch (error) {
-      console.error('Error in aggregateBonuses, falling back to safe aggregation:', error)
+      console.error('Error in aggregateBonuses, falling back to safe aggregation:', error);
       // Safe fallback aggregation with individual error handling
-      result = this.safeAggregateBonuses(bonuses)
+      result = this.safeAggregateBonuses(bonuses);
     }
 
     try {
       // Cache the result with error handling
-      this.bonusCache.set(bonuses, result)
+      this.bonusCache.set(bonuses, result);
     } catch (error) {
-      console.warn('Cache storage error in aggregateBonusesOptimized:', error)
+      console.warn('Cache storage error in aggregateBonusesOptimized:', error);
       // Continue without caching on error
     }
 
-    return result
+    return result;
   }
 
   /**
    * Safe aggregation method with individual error handling for each bonus
    */
   private safeAggregateBonuses(bonuses: PerkStatBonus[]): Record<number, number> {
-    const aggregated: Record<number, number> = {}
+    const aggregated: Record<number, number> = {};
 
     for (let i = 0; i < bonuses.length; i++) {
       try {
-        const bonus = bonuses[i]
+        const bonus = bonuses[i];
 
         // Validate individual bonus structure
         if (!bonus || typeof bonus !== 'object') {
-          console.warn(`Invalid bonus at index ${i}:`, bonus)
-          continue
+          console.warn(`Invalid bonus at index ${i}:`, bonus);
+          continue;
         }
 
         if (typeof bonus.statId !== 'number' || isNaN(bonus.statId)) {
-          console.warn(`Invalid statId in bonus at index ${i}:`, bonus.statId)
-          continue
+          console.warn(`Invalid statId in bonus at index ${i}:`, bonus.statId);
+          continue;
         }
 
         if (typeof bonus.amount !== 'number' || isNaN(bonus.amount)) {
-          console.warn(`Invalid amount in bonus at index ${i}:`, bonus.amount)
-          continue
+          console.warn(`Invalid amount in bonus at index ${i}:`, bonus.amount);
+          continue;
         }
 
         // Safely aggregate
         if (aggregated[bonus.statId]) {
-          aggregated[bonus.statId] += bonus.amount
+          aggregated[bonus.statId] += bonus.amount;
         } else {
-          aggregated[bonus.statId] = bonus.amount
+          aggregated[bonus.statId] = bonus.amount;
         }
-
       } catch (error) {
-        console.warn(`Error processing bonus at index ${i}:`, error)
+        console.warn(`Error processing bonus at index ${i}:`, error);
         // Continue processing other bonuses
       }
     }
 
     // Filter out zero bonuses to keep the result clean
-    const filtered: Record<number, number> = {}
+    const filtered: Record<number, number> = {};
     for (const [statId, amount] of Object.entries(aggregated)) {
-      const numericStatId = Number(statId)
+      const numericStatId = Number(statId);
       if (amount !== 0) {
-        filtered[numericStatId] = amount
+        filtered[numericStatId] = amount;
       }
     }
 
-    return filtered
+    return filtered;
   }
 
   /**
    * Update performance metrics for monitoring
    */
   private updatePerformanceMetrics(calculationTime: number): void {
-    this.performanceMetrics.lastCalculationTime = calculationTime
-    this.performanceMetrics.calculationCount++
+    this.performanceMetrics.lastCalculationTime = calculationTime;
+    this.performanceMetrics.calculationCount++;
 
     // Calculate running average
-    const { averageCalculationTime, calculationCount } = this.performanceMetrics
+    const { averageCalculationTime, calculationCount } = this.performanceMetrics;
     this.performanceMetrics.averageCalculationTime =
-      ((averageCalculationTime * (calculationCount - 1)) + calculationTime) / calculationCount
+      (averageCalculationTime * (calculationCount - 1) + calculationTime) / calculationCount;
   }
 
   /**
    * Get performance statistics for debugging
    */
   getPerformanceStats(): {
-    lastCalculationTime: number
-    averageCalculationTime: number
-    calculationCount: number
-    cacheStats: ReturnType<PerkSpellDataCache['getStats']>
+    lastCalculationTime: number;
+    averageCalculationTime: number;
+    calculationCount: number;
+    cacheStats: ReturnType<PerkSpellDataCache['getStats']>;
   } {
     return {
       ...this.performanceMetrics,
-      cacheStats: this.spellCache.getStats()
-    }
+      cacheStats: this.spellCache.getStats(),
+    };
   }
 
   /**
    * Clear all caches (useful for memory management)
    */
   clearCaches(): void {
-    this.spellCache.clear()
-    this.bonusCache.clear()
+    this.spellCache.clear();
+    this.bonusCache.clear();
   }
 }
 
@@ -1125,7 +1134,7 @@ export class PerkBonusCalculator {
 // ============================================================================
 
 /** Singleton instance for easy access */
-export const perkBonusCalculator = new PerkBonusCalculator()
+export const perkBonusCalculator = new PerkBonusCalculator();
 
 /**
  * Convenience function to calculate perk bonuses with performance monitoring and enhanced error recovery
@@ -1136,44 +1145,46 @@ export function calculatePerkBonuses(perks: Item[]): Record<number, number> {
   try {
     // Enhanced input validation
     if (!perks) {
-      console.warn('calculatePerkBonuses called with null/undefined perks')
-      return {}
+      console.warn('calculatePerkBonuses called with null/undefined perks');
+      return {};
     }
 
     if (!Array.isArray(perks)) {
-      console.warn('calculatePerkBonuses called with non-array perks:', typeof perks)
-      return {}
+      console.warn('calculatePerkBonuses called with non-array perks:', typeof perks);
+      return {};
     }
 
-    const startTime = performance.now()
-    const result = perkBonusCalculator.calculateBonuses(perks)
-    const endTime = performance.now()
+    const startTime = performance.now();
+    const result = perkBonusCalculator.calculateBonuses(perks);
+    const endTime = performance.now();
 
     // Enhanced result validation
     if (!result || typeof result !== 'object' || Array.isArray(result)) {
-      console.warn('calculatePerkBonuses received invalid result from calculator:', typeof result)
-      return {}
+      console.warn('calculatePerkBonuses received invalid result from calculator:', typeof result);
+      return {};
     }
 
     // Warn if calculation takes longer than 200ms (performance requirement for perks)
-    const calculationTime = endTime - startTime
+    const calculationTime = endTime - startTime;
     if (calculationTime > 200) {
-      console.warn(`Perk bonus calculation exceeded 200ms threshold: ${calculationTime.toFixed(2)}ms for ${perks.length} perks`)
+      console.warn(
+        `Perk bonus calculation exceeded 200ms threshold: ${calculationTime.toFixed(2)}ms for ${perks.length} perks`
+      );
 
       // Log performance stats for debugging
       try {
-        const stats = perkBonusCalculator.getPerformanceStats()
-        console.warn('Performance stats:', stats)
+        const stats = perkBonusCalculator.getPerformanceStats();
+        console.warn('Performance stats:', stats);
       } catch (statsError) {
-        console.warn('Failed to retrieve performance stats:', statsError)
+        console.warn('Failed to retrieve performance stats:', statsError);
       }
     }
 
-    return result
+    return result;
   } catch (error) {
-    console.error('Critical error in calculatePerkBonuses convenience function:', error)
+    console.error('Critical error in calculatePerkBonuses convenience function:', error);
     // Return empty object to ensure system continues working
-    return {}
+    return {};
   }
 }
 
@@ -1184,19 +1195,21 @@ export function calculatePerkBonuses(perks: Item[]): Record<number, number> {
  */
 export function calculatePerkBonusesWithErrors(perks: Item[]): PerkCalculationResult {
   try {
-    return perkBonusCalculator.calculateBonusesWithErrorHandling(perks)
+    return perkBonusCalculator.calculateBonusesWithErrorHandling(perks);
   } catch (error) {
     return {
       bonuses: {},
       warnings: [],
-      errors: [{
-        type: 'error',
-        message: 'Critical error in perk bonus calculation',
-        details: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
-        recoverable: false
-      }],
-      success: false
-    }
+      errors: [
+        {
+          type: 'error',
+          message: 'Critical error in perk bonus calculation',
+          details: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
+          recoverable: false,
+        },
+      ],
+      success: false,
+    };
   }
 }
 
@@ -1209,28 +1222,31 @@ export function parseItemForStatBonuses(perk: Item): PerkStatBonus[] {
   try {
     // Enhanced input validation
     if (!perk) {
-      console.warn('parseItemForStatBonuses called with null/undefined perk')
-      return []
+      console.warn('parseItemForStatBonuses called with null/undefined perk');
+      return [];
     }
 
     if (typeof perk !== 'object') {
-      console.warn('parseItemForStatBonuses called with non-object perk:', typeof perk)
-      return []
+      console.warn('parseItemForStatBonuses called with non-object perk:', typeof perk);
+      return [];
     }
 
-    const result = perkBonusCalculator.parsePerkSpells(perk)
+    const result = perkBonusCalculator.parsePerkSpells(perk);
 
     // Enhanced result validation
     if (!Array.isArray(result)) {
-      console.warn('parseItemForStatBonuses received invalid result from calculator:', typeof result)
-      return []
+      console.warn(
+        'parseItemForStatBonuses received invalid result from calculator:',
+        typeof result
+      );
+      return [];
     }
 
-    return result
+    return result;
   } catch (error) {
-    console.error('Critical error in parseItemForStatBonuses convenience function:', error)
+    console.error('Critical error in parseItemForStatBonuses convenience function:', error);
     // Return empty array to ensure system continues working
-    return []
+    return [];
   }
 }
 
@@ -1239,23 +1255,27 @@ export function parseItemForStatBonuses(perk: Item): PerkStatBonus[] {
  * @param perk Perk item to analyze
  * @returns Object with bonuses array and error/warning arrays
  */
-export function parseItemForStatBonusesWithErrors(
-  perk: Item
-): { bonuses: PerkStatBonus[]; warnings: PerkBonusError[]; errors: PerkBonusError[] } {
+export function parseItemForStatBonusesWithErrors(perk: Item): {
+  bonuses: PerkStatBonus[];
+  warnings: PerkBonusError[];
+  errors: PerkBonusError[];
+} {
   try {
-    return perkBonusCalculator.parsePerkSpellsWithErrorHandling(perk)
+    return perkBonusCalculator.parsePerkSpellsWithErrorHandling(perk);
   } catch (error) {
     return {
       bonuses: [],
       warnings: [],
-      errors: [{
-        type: 'error',
-        message: 'Critical error parsing perk spells',
-        details: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
-        perkName: perk?.name,
-        perkAoid: perk?.aoid,
-        recoverable: false
-      }]
-    }
+      errors: [
+        {
+          type: 'error',
+          message: 'Critical error parsing perk spells',
+          details: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
+          perkName: perk?.name,
+          perkAoid: perk?.aoid,
+          recoverable: false,
+        },
+      ],
+    };
   }
 }

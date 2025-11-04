@@ -4,7 +4,9 @@ TinkerPlants Simple - Minimal version to debug layout issues
 <template>
   <div class="tinker-plants h-full flex flex-col bg-surface-0 dark:bg-surface-950">
     <!-- Header -->
-    <div class="bg-surface-50 dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 p-4">
+    <div
+      class="bg-surface-50 dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 p-4"
+    >
       <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50">
         <i class="pi pi-cog mr-2"></i>
         TinkerPlants - Simple Layout Test
@@ -17,18 +19,20 @@ TinkerPlants Simple - Minimal version to debug layout issues
     <!-- Test Layout -->
     <div class="flex-1 flex min-h-0">
       <!-- Left Sidebar -->
-      <div class="w-80 bg-surface-100 dark:bg-surface-800 border-r border-surface-200 dark:border-surface-700 p-4">
+      <div
+        class="w-80 bg-surface-100 dark:bg-surface-800 border-r border-surface-200 dark:border-surface-700 p-4"
+      >
         <h3 class="font-medium text-surface-900 dark:text-surface-100 mb-4">
           <i class="pi pi-user mr-2"></i>
           Character Panel
         </h3>
-        
+
         <!-- Profile Selection -->
         <div class="mb-4">
           <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
             Character Profile:
           </label>
-          <Dropdown 
+          <Dropdown
             v-model="selectedProfile"
             :options="profileOptions"
             option-label="label"
@@ -43,7 +47,7 @@ TinkerPlants Simple - Minimal version to debug layout issues
           <label class="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
             Mode:
           </label>
-          <ToggleButton 
+          <ToggleButton
             v-model="buildMode"
             on-label="Build Mode"
             off-label="Browse Mode"
@@ -55,9 +59,7 @@ TinkerPlants Simple - Minimal version to debug layout issues
 
         <!-- Stats Display -->
         <div class="space-y-2">
-          <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300">
-            Base Stats:
-          </h4>
+          <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300">Base Stats:</h4>
           <div class="grid grid-cols-2 gap-2 text-xs">
             <div class="bg-surface-0 dark:bg-surface-900 p-2 rounded">
               <span class="text-surface-500 dark:text-surface-400">STR:</span>
@@ -100,12 +102,17 @@ TinkerPlants Simple - Minimal version to debug layout issues
               <p class="text-sm text-surface-600 dark:text-surface-400">
                 Build your character by selecting symbiants and optimizing stats.
               </p>
-              
+
               <!-- Simple Character Slots -->
               <div class="grid grid-cols-4 gap-2 mt-4">
-                <div v-for="slot in slots" :key="slot" 
-                     class="aspect-square bg-surface-100 dark:bg-surface-700 border-2 border-dashed border-surface-300 dark:border-surface-600 rounded-lg flex items-center justify-center">
-                  <span class="text-xs text-surface-500 dark:text-surface-400 capitalize">{{ slot }}</span>
+                <div
+                  v-for="slot in slots"
+                  :key="slot"
+                  class="aspect-square bg-surface-100 dark:bg-surface-700 border-2 border-dashed border-surface-300 dark:border-surface-600 rounded-lg flex items-center justify-center"
+                >
+                  <span class="text-xs text-surface-500 dark:text-surface-400 capitalize">{{
+                    slot
+                  }}</span>
                 </div>
               </div>
             </div>
@@ -121,18 +128,21 @@ TinkerPlants Simple - Minimal version to debug layout issues
               <p class="text-sm text-surface-600 dark:text-surface-400 mb-4">
                 Browse and search available symbiants.
               </p>
-              
+
               <!-- Search Input -->
               <InputText
                 v-model="searchQuery"
                 placeholder="Search symbiants..."
                 class="w-full mb-4"
               />
-              
+
               <!-- Sample Symbiant List -->
               <div class="space-y-2">
-                <div v-for="n in 5" :key="n" 
-                     class="bg-surface-0 dark:bg-surface-900 p-3 rounded border border-surface-200 dark:border-surface-700">
+                <div
+                  v-for="n in 5"
+                  :key="n"
+                  class="bg-surface-0 dark:bg-surface-900 p-3 rounded border border-surface-200 dark:border-surface-700"
+                >
                   <div class="font-medium text-surface-900 dark:text-surface-100">
                     Sample Symbiant {{ n }}
                   </div>
@@ -163,13 +173,13 @@ const stats = ref({
   strength: 400,
   agility: 350,
   intelligence: 300,
-  stamina: 400
+  stamina: 400,
 });
 
 // Profile options
 const profileOptions = ref([
   { label: 'No Profile Selected', value: null },
-  { label: 'Test Character', value: 'test' }
+  { label: 'Test Character', value: 'test' },
 ]);
 
 // Character slots for build mode

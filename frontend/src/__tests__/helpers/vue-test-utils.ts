@@ -95,7 +95,8 @@ export function createTestPinia(): Pinia {
 export function createTestRouter(routes: any[] = []): Router {
   return createRouter({
     history: createMemoryHistory(),
-    routes: routes.length > 0 ? routes : [{ path: '/', component: { template: '<div>Home</div>' } }],
+    routes:
+      routes.length > 0 ? routes : [{ path: '/', component: { template: '<div>Home</div>' } }],
   });
 }
 
@@ -437,7 +438,9 @@ export function expectEmitted(wrapper: VueWrapper, eventName: string, payload?: 
  */
 export function expectToHaveClass(wrapper: VueWrapper, className: string) {
   if (!wrapper.classes().includes(className)) {
-    throw new Error(`Component does not have class "${className}". Classes: ${wrapper.classes().join(', ')}`);
+    throw new Error(
+      `Component does not have class "${className}". Classes: ${wrapper.classes().join(', ')}`
+    );
   }
 }
 

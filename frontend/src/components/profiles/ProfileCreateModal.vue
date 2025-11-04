@@ -28,7 +28,7 @@ Modal for creating new character profiles
         />
         <small v-if="errors.name" class="text-red-500">{{ errors.name }}</small>
       </div>
-      
+
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <!-- Profession -->
         <div class="field">
@@ -43,7 +43,7 @@ Modal for creating new character profiles
             class="w-full"
           />
         </div>
-        
+
         <!-- Level -->
         <div class="field">
           <label for="level" class="font-semibold text-surface-900 dark:text-surface-50">
@@ -60,7 +60,7 @@ Modal for creating new character profiles
           />
         </div>
       </div>
-      
+
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <!-- Breed -->
         <div class="field">
@@ -75,7 +75,7 @@ Modal for creating new character profiles
             class="w-full"
           />
         </div>
-        
+
         <!-- Faction -->
         <div class="field">
           <label for="faction" class="font-semibold text-surface-900 dark:text-surface-50">
@@ -90,7 +90,7 @@ Modal for creating new character profiles
           />
         </div>
       </div>
-      
+
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <!-- Expansion -->
         <div class="field">
@@ -105,7 +105,7 @@ Modal for creating new character profiles
             class="w-full"
           />
         </div>
-        
+
         <!-- Account Type -->
         <div class="field">
           <label for="account-type" class="font-semibold text-surface-900 dark:text-surface-50">
@@ -120,30 +120,20 @@ Modal for creating new character profiles
           />
         </div>
       </div>
-      
+
       <!-- Create Options -->
       <div class="field">
         <div class="flex items-center">
-          <Checkbox
-            id="set-active"
-            v-model="formData.setAsActive"
-            binary
-          />
+          <Checkbox id="set-active" v-model="formData.setAsActive" binary />
           <label for="set-active" class="ml-2 text-surface-900 dark:text-surface-50">
             Set as active profile after creation
           </label>
         </div>
       </div>
-      
+
       <!-- Actions -->
       <div class="flex justify-end gap-2 pt-4">
-        <Button
-          type="button"
-          label="Cancel"
-          severity="secondary"
-          outlined
-          @click="cancel"
-        />
+        <Button type="button" label="Cancel" severity="secondary" outlined @click="cancel" />
         <Button
           type="submit"
           label="Create Profile"
@@ -165,12 +155,12 @@ import Dropdown from 'primevue/dropdown';
 import InputText from 'primevue/inputtext';
 import InputNumber from 'primevue/inputnumber';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
-import { 
+import {
   ANARCHY_PROFESSIONS,
-  ANARCHY_BREEDS, 
+  ANARCHY_BREEDS,
   ANARCHY_FACTIONS,
   ANARCHY_EXPANSIONS,
-  ACCOUNT_TYPES
+  ACCOUNT_TYPES,
 } from '@/lib/tinkerprofiles';
 
 // Props & Emits
@@ -180,7 +170,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:visible': [value: boolean];
-  'created': [profileId: string];
+  created: [profileId: string];
 }>();
 
 // Services
@@ -195,18 +185,18 @@ const formData = reactive({
   faction: 'Neutral',
   expansion: 'Lost Eden',
   accountType: 'Paid',
-  setAsActive: true
+  setAsActive: true,
 });
 
 const errors = ref<Record<string, string>>({});
 const creating = ref(false);
 
 // Options
-const professionOptions = ANARCHY_PROFESSIONS.map(p => p);
-const breedOptions = ANARCHY_BREEDS.map(b => b);
-const factionOptions = ANARCHY_FACTIONS.map(f => f);
-const expansionOptions = ANARCHY_EXPANSIONS.map(e => e);
-const accountTypeOptions = ACCOUNT_TYPES.map(a => a);
+const professionOptions = ANARCHY_PROFESSIONS.map((p) => p);
+const breedOptions = ANARCHY_BREEDS.map((b) => b);
+const factionOptions = ANARCHY_FACTIONS.map((f) => f);
+const expansionOptions = ANARCHY_EXPANSIONS.map((e) => e);
+const accountTypeOptions = ACCOUNT_TYPES.map((a) => a);
 
 // Computed
 const isValid = computed(() => {
@@ -216,15 +206,16 @@ const isValid = computed(() => {
 // Methods
 function validateForm() {
   errors.value = {};
-  
+
   if (!formData.name.trim()) {
     errors.value.name = 'Character name is required';
   } else if (formData.name.length > 50) {
     errors.value.name = 'Character name must be 50 characters or less';
   } else if (!/^[a-zA-Z][a-zA-Z0-9]*$/.test(formData.name)) {
-    errors.value.name = 'Character name must start with a letter and contain only letters and numbers';
+    errors.value.name =
+      'Character name must start with a letter and contain only letters and numbers';
   }
-  
+
   return Object.keys(errors.value).length === 0;
 }
 
@@ -245,8 +236,8 @@ async function createProfile() {
         Breed: formData.breed,
         Faction: formData.faction,
         Expansion: formData.expansion,
-        AccountType: formData.accountType
-      }
+        AccountType: formData.accountType,
+      },
     };
 
     const profileId = await profilesStore.createProfile(formData.name.trim(), profileData);
@@ -258,7 +249,6 @@ async function createProfile() {
     emit('created', profileId);
     emit('update:visible', false);
     resetForm();
-
   } catch (error) {
     console.error('Failed to create profile:', error);
     errors.value.general = 'Failed to create profile. Please try again.';

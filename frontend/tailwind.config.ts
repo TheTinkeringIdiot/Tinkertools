@@ -2,10 +2,7 @@ import type { Config } from 'tailwindcss';
 
 export default {
   darkMode: 'class',
-  content: [
-    './index.html',
-    './src/**/*.{vue,js,ts,jsx,tsx}'
-  ],
+  content: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
@@ -20,7 +17,7 @@ export default {
           700: 'rgb(var(--primary-700))',
           800: 'rgb(var(--primary-800))',
           900: 'rgb(var(--primary-900))',
-          950: 'rgb(var(--primary-950))'
+          950: 'rgb(var(--primary-950))',
         },
         surface: {
           0: 'rgb(var(--surface-0))',
@@ -34,10 +31,10 @@ export default {
           700: 'rgb(var(--surface-700))',
           800: 'rgb(var(--surface-800))',
           900: 'rgb(var(--surface-900))',
-          950: 'rgb(var(--surface-950))'
-        }
-      }
-    }
+          950: 'rgb(var(--surface-950))',
+        },
+      },
+    },
   },
-  plugins: []
+  plugins: [],
 } satisfies Config;

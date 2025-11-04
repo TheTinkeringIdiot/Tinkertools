@@ -13,8 +13,8 @@
  * - FR-8: Buff lookup tables
  */
 
-import type { NanoProgram } from './nano'
-import type { Item } from './api'
+import type { NanoProgram } from './nano';
+import type { Item } from './api';
 
 // ============================================================================
 // Core Offensive Nano Types
@@ -26,40 +26,40 @@ import type { Item } from './api'
  */
 export interface OffensiveNano extends NanoProgram {
   /** Full item object with actions and criteria for requirement validation */
-  item: Item
+  item: Item;
 
   /** Minimum damage value (after all modifiers, AC reduction, and tick count) */
-  minDamage: number
+  minDamage: number;
 
   /** Maximum damage value (after all modifiers, AC reduction, and tick count) */
-  maxDamage: number
+  maxDamage: number;
 
   /** Midpoint damage value: (minDamage + maxDamage) / 2 */
-  midDamage: number
+  midDamage: number;
 
   /** Damage type identifier mapped from spell modifier_stat (90-97) */
-  damageType: DamageType
+  damageType: DamageType;
 
   /** Number of damage ticks (DoT mechanics). 1 for instant damage, >1 for DoT */
-  tickCount: number
+  tickCount: number;
 
   /** Interval between damage ticks in centiseconds. Only relevant if tickCount > 1 */
-  tickInterval: number
+  tickInterval: number;
 
   /** Cast time in centiseconds from AttackDelay (stat 294) */
-  castTime: number
+  castTime: number;
 
   /** Recharge time in centiseconds from RechargeDelay (stat 210) */
-  rechargeTime: number
+  rechargeTime: number;
 
   /** Attack delay cap in centiseconds from stat 523 (minimum cast time after init reduction) */
-  attackDelayCap?: number
+  attackDelayCap?: number;
 
   /** Recharge delay cap in centiseconds from stat 524 (minimum recharge time after init reduction) */
-  rechargeDelayCap?: number
+  rechargeDelayCap?: number;
 
   /** Base nano point cost from stat 407 (NanoPoint) */
-  nanoPointCost: number
+  nanoPointCost: number;
 }
 
 /**
@@ -67,14 +67,14 @@ export interface OffensiveNano extends NanoProgram {
  * Used to select appropriate damage modifier from character stats
  */
 export type DamageType =
-  | 'projectile'  // ModifierStat 90 → stat 278
-  | 'melee'       // ModifierStat 91 → stat 279
-  | 'energy'      // ModifierStat 92 → stat 280
-  | 'chemical'    // ModifierStat 93 → stat 281
-  | 'radiation'   // ModifierStat 94 → stat 282
-  | 'cold'        // ModifierStat 95 → stat 311
-  | 'poison'      // ModifierStat 96 → stat 317
-  | 'fire'        // ModifierStat 97 → stat 316
+  | 'projectile' // ModifierStat 90 → stat 278
+  | 'melee' // ModifierStat 91 → stat 279
+  | 'energy' // ModifierStat 92 → stat 280
+  | 'chemical' // ModifierStat 93 → stat 281
+  | 'radiation' // ModifierStat 94 → stat 282
+  | 'cold' // ModifierStat 95 → stat 311
+  | 'poison' // ModifierStat 96 → stat 317
+  | 'fire'; // ModifierStat 97 → stat 316
 
 // ============================================================================
 // Damage Modifier Types
@@ -95,37 +95,37 @@ export type DamageType =
  */
 export interface DamageModifiers {
   /** Projectile Damage Modifier (stat 278) */
-  projectile: number
+  projectile: number;
 
   /** Melee Damage Modifier (stat 279) */
-  melee: number
+  melee: number;
 
   /** Energy Damage Modifier (stat 280) */
-  energy: number
+  energy: number;
 
   /** Chemical Damage Modifier (stat 281) */
-  chemical: number
+  chemical: number;
 
   /** Radiation Damage Modifier (stat 282) */
-  radiation: number
+  radiation: number;
 
   /** Cold Damage Modifier (stat 311) */
-  cold: number
+  cold: number;
 
   /** Nano Damage Modifier (stat 315) */
-  nano: number
+  nano: number;
 
   /** Fire Damage Modifier (stat 316) */
-  fire: number
+  fire: number;
 
   /** Poison Damage Modifier (stat 317) */
-  poison: number
+  poison: number;
 
   /** Direct Nano Damage Efficiency (stat 536) - percentage modifier */
-  directNanoDamageEfficiency: number
+  directNanoDamageEfficiency: number;
 
   /** Target's Armor Class (used for damage reduction: damage - AC/10) */
-  targetAC: number
+  targetAC: number;
 }
 
 // ============================================================================
@@ -138,22 +138,22 @@ export interface DamageModifiers {
  */
 export interface CastingStats {
   /** Modified cast time in seconds (after Nano Init reduction) */
-  castTime: number
+  castTime: number;
 
   /** Modified recharge time in seconds (after Nano Init reduction) */
-  rechargeTime: number
+  rechargeTime: number;
 
   /** Modified nano cost (after Crunchcom cost reduction and breed cap) */
-  nanoCost: number
+  nanoCost: number;
 
   /** Base cast time in centiseconds (raw from spell data) */
-  baseCastTime: number
+  baseCastTime: number;
 
   /** Base recharge time in centiseconds (raw from spell data) */
-  baseRechargeTime: number
+  baseRechargeTime: number;
 
   /** Base nano cost (raw from spell data, before modifiers) */
-  baseNanoCost: number
+  baseNanoCost: number;
 }
 
 /**
@@ -162,25 +162,25 @@ export interface CastingStats {
  */
 export interface EfficiencyMetrics {
   /** Damage Per Second: midDamage / (castTime + rechargeTime + dotDuration) */
-  dps: number
+  dps: number;
 
   /** Damage per nano point spent: midDamage / nanoCost */
-  damagePerNano: number
+  damagePerNano: number;
 
   /** Time until nano pool is empty (seconds). Infinity (∞) if sustainable */
-  sustainTime: number | typeof Infinity
+  sustainTime: number | typeof Infinity;
 
   /** Number of casts until nano pool is empty. Infinity (∞) if sustainable */
-  castsToEmpty: number | typeof Infinity
+  castsToEmpty: number | typeof Infinity;
 
   /** Nano points consumed per second: nanoCost / (castTime + rechargeTime) */
-  nanoPerSecond: number
+  nanoPerSecond: number;
 
   /** Nano points regenerated per second (from buffs + base regen) */
-  regenPerSecond: number
+  regenPerSecond: number;
 
   /** Whether nano regeneration can sustain continuous casting */
-  isSustainable: boolean
+  isSustainable: boolean;
 }
 
 // ============================================================================
@@ -195,43 +195,43 @@ export interface EfficiencyMetrics {
  */
 export interface CharacterStats {
   /** Character breed (1=Solitus, 2=Opifex, 3=Nanomage, 4=Atrox) */
-  breed: 1 | 2 | 3 | 4
+  breed: 1 | 2 | 3 | 4;
 
   /** Character level */
-  level: number
+  level: number;
 
   /** Psychic ability (affects nano regen tick speed) */
-  psychic: number
+  psychic: number;
 
   /** Nano Init skill (reduces cast time and recharge time) */
-  nanoInit: number
+  nanoInit: number;
 
   /** Max Nano skill (total nano pool size) */
-  maxNano: number
+  maxNano: number;
 
   /** Nano Delta skill (base nano regeneration) */
-  nanoDelta: number
+  nanoDelta: number;
 
   /** Matter Creation skill (skill ID 126) */
-  matterCreation: number
+  matterCreation: number;
 
   /** Matter Metamorphosis skill (skill ID 127) */
-  matterMeta: number
+  matterMeta: number;
 
   /** Biological Metamorphosis skill (skill ID 128) */
-  bioMeta: number
+  bioMeta: number;
 
   /** Psychological Modifications skill (skill ID 129) */
-  psychModi: number
+  psychModi: number;
 
   /** Sensory Improvement skill (skill ID 130) */
-  sensoryImp: number
+  sensoryImp: number;
 
   /** Time and Space skill (skill ID 131) */
-  timeSpace: number
+  timeSpace: number;
 
   /** Specialization level (stat ID 182, bitflags: 0, 1, 2, 4, 8) */
-  spec: number
+  spec: number;
 }
 
 /**
@@ -243,22 +243,22 @@ export interface CharacterStats {
  */
 export interface BuffPresets {
   /** Crunchcom level (0-7): Nano cost reduction % */
-  crunchcom: number
+  crunchcom: number;
 
   /** Humidity level (0-7): Nano regen per second */
-  humidity: number
+  humidity: number;
 
   /** Notum Siphon level (0-10): Nano regen per second */
-  notumSiphon: number
+  notumSiphon: number;
 
   /** Channeling of Notum level (0-4): Nano regen per second */
-  channeling: number
+  channeling: number;
 
   /** Enhance Nano Damage level (0-6): Direct Nano Damage Efficiency % */
-  enhanceNanoDamage: number
+  enhanceNanoDamage: number;
 
   /** Ancient Matrix level (0-10): Direct Nano Damage Efficiency % */
-  ancientMatrix: number
+  ancientMatrix: number;
 }
 
 /**
@@ -273,13 +273,13 @@ export interface BuffPresets {
  */
 export interface NukeInputState {
   /** Character stats (12 fields) */
-  characterStats: CharacterStats
+  characterStats: CharacterStats;
 
   /** Damage modifiers (11 fields) */
-  damageModifiers: DamageModifiers
+  damageModifiers: DamageModifiers;
 
   /** Buff presets (6 fields) */
-  buffPresets: BuffPresets
+  buffPresets: BuffPresets;
 }
 
 // ============================================================================
@@ -292,25 +292,25 @@ export interface NukeInputState {
  */
 export interface DamageCalculationInput {
   /** Base spell damage (MinValue or MaxValue from spell_params) */
-  spellDamage: number
+  spellDamage: number;
 
   /** Type-specific modifier (from damageModifiers based on damage type) */
-  typeModifier: number
+  typeModifier: number;
 
   /** Nano damage modifier (stat 315) */
-  nanoModifier: number
+  nanoModifier: number;
 
   /** Direct Nano Damage Efficiency percentage (stat 536) */
-  stat536: number
+  stat536: number;
 
   /** Target's Armor Class (for damage reduction) */
-  targetAC: number
+  targetAC: number;
 
   /** Spell's minimum damage value (floor for AC reduction) */
-  minValue: number
+  minValue: number;
 
   /** Tick count for DoT nanoprograms (multiplier applied after all modifiers) */
-  tickCount: number
+  tickCount: number;
 }
 
 /**
@@ -319,13 +319,13 @@ export interface DamageCalculationInput {
  */
 export interface CastTimeCalculationInput {
   /** Base cast time in centiseconds (from spell data) */
-  baseCastTime: number
+  baseCastTime: number;
 
   /** Base recharge time in centiseconds (from spell data) */
-  baseRechargeTime: number
+  baseRechargeTime: number;
 
   /** Nano Init skill value (two-tier scaling reduction) */
-  nanoInit: number
+  nanoInit: number;
 }
 
 /**
@@ -334,13 +334,13 @@ export interface CastTimeCalculationInput {
  */
 export interface NanoCostCalculationInput {
   /** Base nano cost (from spell data) */
-  baseCost: number
+  baseCost: number;
 
   /** Cost reduction percentage from Crunchcom buff (0-28%) */
-  costReductionPct: number
+  costReductionPct: number;
 
   /** Character breed (determines cost reduction cap) */
-  breed: 1 | 2 | 3 | 4
+  breed: 1 | 2 | 3 | 4;
 }
 
 /**
@@ -349,16 +349,16 @@ export interface NanoCostCalculationInput {
  */
 export interface NanoRegenCalculationInput {
   /** Psychic ability (affects tick speed) */
-  psychic: number
+  psychic: number;
 
   /** Character breed (determines base nano delta) */
-  breed: 1 | 2 | 3 | 4
+  breed: 1 | 2 | 3 | 4;
 
   /** Nano Delta skill value */
-  nanoDelta: number
+  nanoDelta: number;
 
   /** Active buff presets (for regen lookup) */
-  buffs: BuffPresets
+  buffs: BuffPresets;
 }
 
 /**
@@ -367,28 +367,28 @@ export interface NanoRegenCalculationInput {
  */
 export interface EfficiencyCalculationInput {
   /** Mid damage value (from damage calculation) */
-  midDamage: number
+  midDamage: number;
 
   /** Modified cast time in seconds */
-  castTime: number
+  castTime: number;
 
   /** Modified recharge time in seconds */
-  rechargeTime: number
+  rechargeTime: number;
 
   /** Modified nano cost */
-  modifiedNanoCost: number
+  modifiedNanoCost: number;
 
   /** Tick count (for DoT duration in DPS calculation) */
-  tickCount: number
+  tickCount: number;
 
   /** Tick interval in centiseconds (for DoT duration) */
-  tickInterval: number
+  tickInterval: number;
 
   /** Max nano pool size */
-  maxNano: number
+  maxNano: number;
 
   /** Nano regeneration per second */
-  regenPerSecond: number
+  regenPerSecond: number;
 }
 
 // ============================================================================
@@ -402,10 +402,10 @@ export interface EfficiencyCalculationInput {
  */
 export interface FieldModificationState {
   /** Set of field keys that have been manually edited */
-  modifiedFields: Set<string>
+  modifiedFields: Set<string>;
 
   /** Flag to indicate programmatic update (bypass modification tracking) */
-  isProgrammaticUpdate: boolean
+  isProgrammaticUpdate: boolean;
 }
 
 // ============================================================================
@@ -417,9 +417,9 @@ export interface FieldModificationState {
  * Used for visual indicators and filtering
  */
 export type UsabilityStatus =
-  | 'usable'    // All requirements met
-  | 'close'     // Within 100 points of requirements
-  | 'far'       // More than 100 points from requirements
+  | 'usable' // All requirements met
+  | 'close' // Within 100 points of requirements
+  | 'far'; // More than 100 points from requirements
 
 /**
  * Nano filtering criteria for TinkerNukes table
@@ -427,20 +427,20 @@ export type UsabilityStatus =
  */
 export interface NanoFilterCriteria {
   /** Filter by nano school (skill ID: 126-131) */
-  schoolId?: number | null
+  schoolId?: number | null;
 
   /** Filter by QL range */
-  minQL?: number
-  maxQL?: number
+  minQL?: number;
+  maxQL?: number;
 
   /** Search by nano name (case-insensitive) */
-  searchQuery?: string
+  searchQuery?: string;
 
   /** Filter by usability status */
-  usabilityStatus?: UsabilityStatus | null
+  usabilityStatus?: UsabilityStatus | null;
 
   /** Only show nanoprograms with specific damage type */
-  damageType?: DamageType | null
+  damageType?: DamageType | null;
 }
 
 // ============================================================================
@@ -453,41 +453,41 @@ export interface NanoFilterCriteria {
  */
 export interface FormattedNanoMetrics {
   /** Nano name (clickable link) */
-  name: string
+  name: string;
 
   /** Quality Level */
-  ql: number
+  ql: number;
 
   /** Cast time in seconds (2 decimal places) */
-  castTime: string
+  castTime: string;
 
   /** Recharge time in seconds (2 decimal places) */
-  rechargeTime: string
+  rechargeTime: string;
 
   /** Minimum damage (integer) */
-  minDamage: string
+  minDamage: string;
 
   /** Mid damage (integer) */
-  midDamage: string
+  midDamage: string;
 
   /** Maximum damage (integer) */
-  maxDamage: string
+  maxDamage: string;
 
   /** Nano cost (integer) */
-  nanoCost: string
+  nanoCost: string;
 
   /** Damage per nano (2 decimal places) */
-  damagePerNano: string
+  damagePerNano: string;
 
   /** Damage per cast (same as midDamage) */
-  damagePerCast: string
+  damagePerCast: string;
 
   /** DPS (2 decimal places) */
-  dps: string
+  dps: string;
 
   /** Sustain time ("XXm YYs", "XXs", or "∞") */
-  sustainTime: string
+  sustainTime: string;
 
   /** Casts to empty (integer or "∞") */
-  castsToEmpty: string
+  castsToEmpty: string;
 }

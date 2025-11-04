@@ -46,10 +46,16 @@
         <div class="p-4 border-b border-surface-200 dark:border-surface-700">
           <div class="flex items-start justify-between">
             <div class="flex-1 min-w-0">
-              <h4 class="font-semibold text-surface-900 dark:text-surface-50 truncate">{{ weapon.name }}</h4>
+              <h4 class="font-semibold text-surface-900 dark:text-surface-50 truncate">
+                {{ weapon.name }}
+              </h4>
               <div class="flex items-center space-x-2 mt-1">
-                <span class="text-sm text-surface-600 dark:text-surface-400">QL {{ weapon.ql }}</span>
-                <span class="text-xs text-surface-500 dark:text-surface-400">ID: {{ weapon.aoid }}</span>
+                <span class="text-sm text-surface-600 dark:text-surface-400"
+                  >QL {{ weapon.ql }}</span
+                >
+                <span class="text-xs text-surface-500 dark:text-surface-400"
+                  >ID: {{ weapon.aoid }}</span
+                >
               </div>
             </div>
             <div class="flex space-x-1 ml-2">
@@ -81,7 +87,9 @@
 
         <!-- Attack Stats (if available) -->
         <div v-if="weapon.attack_stats && weapon.attack_stats.length > 0" class="px-4 pb-4">
-          <div class="text-xs font-medium text-surface-700 dark:text-surface-300 mb-2">Attack Stats</div>
+          <div class="text-xs font-medium text-surface-700 dark:text-surface-300 mb-2">
+            Attack Stats
+          </div>
           <div class="flex flex-wrap gap-1">
             <span
               v-for="stat in weapon.attack_stats.slice(0, 3)"
@@ -132,31 +140,31 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import Button from 'primevue/button'
-import WeaponRequirements from './WeaponRequirements.vue'
-import UsabilityBadge from './UsabilityBadge.vue'
-import type { Weapon, CharacterSkills } from '@/types/weapon'
-import { SKILL_NAMES } from '@/types/weapon'
+import { computed } from 'vue';
+import Button from 'primevue/button';
+import WeaponRequirements from './WeaponRequirements.vue';
+import UsabilityBadge from './UsabilityBadge.vue';
+import type { Weapon, CharacterSkills } from '@/types/weapon';
+import { SKILL_NAMES } from '@/types/weapon';
 
 interface Props {
-  weapons: Weapon[]
-  characterSkills?: CharacterSkills
-  sortBy: string
-  sortDescending: boolean
+  weapons: Weapon[];
+  characterSkills?: CharacterSkills;
+  sortBy: string;
+  sortDescending: boolean;
 }
 
 interface Emits {
-  (e: 'sort', sortBy: string, descending: boolean): void
-  (e: 'select', weapon: Weapon): void
-  (e: 'compare', weapon: Weapon): void
+  (e: 'sort', sortBy: string, descending: boolean): void;
+  (e: 'select', weapon: Weapon): void;
+  (e: 'compare', weapon: Weapon): void;
 }
 
-const props = defineProps<Props>()
-const emit = defineEmits<Emits>()
+const props = defineProps<Props>();
+const emit = defineEmits<Emits>();
 
 // Helper function to get stat name
 const getStatName = (statId: number): string => {
-  return SKILL_NAMES[statId] || `Stat ${statId}`
-}
+  return SKILL_NAMES[statId] || `Stat ${statId}`;
+};
 </script>

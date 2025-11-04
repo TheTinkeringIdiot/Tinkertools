@@ -16,7 +16,7 @@ Supports text search with nano school filtering and quick filters
           @keyup.enter="handleSearch"
         />
       </IconField>
-      
+
       <!-- Clear Search -->
       <Button
         v-if="searchQuery"
@@ -44,7 +44,7 @@ Supports text search with nano school filtering and quick filters
             'cursor-pointer transition-all',
             selectedSchools.includes(school)
               ? 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 border-primary-200 dark:border-primary-800'
-              : 'bg-surface-100 dark:bg-surface-800 text-surface-700 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700'
+              : 'bg-surface-100 dark:bg-surface-800 text-surface-700 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700',
           ]"
           @click="toggleSchool(school)"
         />
@@ -54,19 +54,15 @@ Supports text search with nano school filtering and quick filters
     <!-- Advanced Search Toggle -->
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <Checkbox
-          v-model="showAdvanced"
-          inputId="show-advanced"
-          binary
-        />
-        <label 
+        <Checkbox v-model="showAdvanced" inputId="show-advanced" binary />
+        <label
           for="show-advanced"
           class="text-sm text-surface-700 dark:text-surface-300 cursor-pointer"
         >
           Advanced Search
         </label>
       </div>
-      
+
       <!-- Search Stats -->
       <div class="text-xs text-surface-500 dark:text-surface-400">
         {{ searchStats }}
@@ -75,24 +71,23 @@ Supports text search with nano school filtering and quick filters
 
     <!-- Advanced Search Options -->
     <Transition name="slide-down">
-      <div v-if="showAdvanced" class="space-y-3 pt-2 border-t border-surface-200 dark:border-surface-700">
+      <div
+        v-if="showAdvanced"
+        class="space-y-3 pt-2 border-t border-surface-200 dark:border-surface-700"
+      >
         <!-- Search in Fields -->
         <div>
           <label class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2 block">
             Search In:
           </label>
           <div class="flex flex-wrap gap-2">
-            <div
-              v-for="field in searchFields"
-              :key="field.value"
-              class="flex items-center gap-2"
-            >
+            <div v-for="field in searchFields" :key="field.value" class="flex items-center gap-2">
               <Checkbox
                 v-model="selectedFields"
                 :inputId="`field-${field.value}`"
                 :value="field.value"
               />
-              <label 
+              <label
                 :for="`field-${field.value}`"
                 class="text-sm text-surface-700 dark:text-surface-300 cursor-pointer"
               >
@@ -181,13 +176,16 @@ interface SearchPreset {
 }
 
 // Props
-const props = withDefaults(defineProps<{
-  modelValue?: string;
-  totalResults?: number;
-}>(), {
-  modelValue: '',
-  totalResults: 0
-});
+const props = withDefaults(
+  defineProps<{
+    modelValue?: string;
+    totalResults?: number;
+  }>(),
+  {
+    modelValue: '',
+    totalResults: 0,
+  }
+);
 
 // Emits
 const emit = defineEmits<{
@@ -205,11 +203,11 @@ const recentSearches = ref<string[]>([]);
 // Nano schools from the design document
 const nanoSchools = [
   'Matter Metamorphosis',
-  'Biological Metamorphosis', 
+  'Biological Metamorphosis',
   'Psychological Modifications',
   'Matter Creation',
   'Time and Space',
-  'Sensory Improvement'
+  'Sensory Improvement',
 ];
 
 const searchFields: SearchField[] = [
@@ -218,7 +216,7 @@ const searchFields: SearchField[] = [
   { value: 'school', label: 'School' },
   { value: 'strain', label: 'Strain' },
   { value: 'effects', label: 'Effects' },
-  { value: 'requirements', label: 'Requirements' }
+  { value: 'requirements', label: 'Requirements' },
 ];
 
 const searchPresets: SearchPreset[] = [
@@ -226,50 +224,52 @@ const searchPresets: SearchPreset[] = [
     name: 'Stat Buffs',
     query: 'boost strength agility',
     schools: ['Matter Metamorphosis', 'Biological Metamorphosis'],
-    fields: ['name', 'description', 'effects']
+    fields: ['name', 'description', 'effects'],
   },
   {
     name: 'Healing',
     query: 'heal health',
     schools: ['Biological Metamorphosis'],
-    fields: ['name', 'description', 'effects']
+    fields: ['name', 'description', 'effects'],
   },
   {
     name: 'Damage',
     query: 'damage hurt nuke',
     schools: ['Matter Creation', 'Psychological Modifications'],
-    fields: ['name', 'description', 'effects']
+    fields: ['name', 'description', 'effects'],
   },
   {
     name: 'Transport',
     query: 'teleport recall gate',
     schools: ['Time and Space'],
-    fields: ['name', 'description', 'effects']
+    fields: ['name', 'description', 'effects'],
   },
   {
     name: 'Summons',
     query: 'summon pet companion',
     schools: ['Matter Creation'],
-    fields: ['name', 'description', 'effects']
-  }
+    fields: ['name', 'description', 'effects'],
+  },
 ];
 
 // Computed
 const searchStats = computed(() => {
   const parts: string[] = [];
-  
+
   if (searchQuery.value.trim()) {
     parts.push(`"${searchQuery.value.trim()}"`);
   }
-  
+
   if (selectedSchools.value.length > 0) {
-    parts.push(`${selectedSchools.value.length} school${selectedSchools.value.length !== 1 ? 's' : ''}`);
+    parts.push(
+      `${selectedSchools.value.length} school${selectedSchools.value.length !== 1 ? 's' : ''}`
+    );
   }
-  
+
   if (parts.length === 0) {
     return 'All nanos';
   }
-  
+
   return parts.join(' • ');
 });
 
@@ -278,10 +278,10 @@ const getSchoolShortName = (school: string): string => {
   const shortNames: Record<string, string> = {
     'Matter Metamorphosis': 'MM',
     'Biological Metamorphosis': 'BM',
-    'Psychological Modifications': 'PM', 
+    'Psychological Modifications': 'PM',
     'Matter Creation': 'MC',
     'Time and Space': 'TS',
-    'Sensory Improvement': 'SI'
+    'Sensory Improvement': 'SI',
   };
   return shortNames[school] || school;
 };
@@ -341,17 +341,17 @@ const removeRecentSearch = (search: string) => {
 
 const saveRecentSearch = () => {
   if (!searchQuery.value.trim()) return;
-  
+
   const query = searchQuery.value.trim();
   const index = recentSearches.value.indexOf(query);
-  
+
   if (index > -1) {
     recentSearches.value.splice(index, 1);
   }
-  
+
   recentSearches.value.unshift(query);
   recentSearches.value = recentSearches.value.slice(0, 5); // Keep only 5 recent searches
-  
+
   saveRecentSearches();
 };
 
@@ -375,16 +375,19 @@ const saveRecentSearches = () => {
 };
 
 // Watch for external changes to modelValue
-watch(() => props.modelValue, (newValue) => {
-  if (newValue !== searchQuery.value) {
-    searchQuery.value = newValue;
+watch(
+  () => props.modelValue,
+  (newValue) => {
+    if (newValue !== searchQuery.value) {
+      searchQuery.value = newValue;
+    }
   }
-});
+);
 
 // Lifecycle
 onMounted(() => {
   loadRecentSearches();
-  
+
   // Initialize selected fields with defaults
   if (selectedFields.value.length === 0) {
     selectedFields.value = ['name', 'description'];
@@ -392,11 +395,15 @@ onMounted(() => {
 });
 
 // Watch for changes to trigger search
-watch([selectedFields], () => {
-  if (searchQuery.value.trim() || selectedSchools.value.length > 0) {
-    performSearch();
-  }
-}, { deep: true });
+watch(
+  [selectedFields],
+  () => {
+    if (searchQuery.value.trim() || selectedSchools.value.length > 0) {
+      performSearch();
+    }
+  },
+  { deep: true }
+);
 </script>
 
 <style scoped>
