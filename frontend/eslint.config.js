@@ -5,10 +5,7 @@ import tseslint from 'typescript-eslint';
 
 export default [
   {
-    ignores: [
-      'dist',
-      'node_modules'
-    ]
+    ignores: ['dist', 'node_modules'],
   },
   js.configs.recommended,
   ...vuePlugin.configs['flat/recommended'],
@@ -17,18 +14,18 @@ export default [
   {
     languageOptions: {
       parserOptions: {
-        project: ['./tsconfig.json']
-      }
+        project: ['./tsconfig.json'],
+      },
     },
     rules: {
       'prettier/prettier': ['error'],
       // Allow single-word component names
-      'vue/multi-word-component-names': 'off'
+      'vue/multi-word-component-names': 'off',
     },
     plugins: {
       prettier: {
-        rules: {}
-      }
-    }
-  }
+        rules: {},
+      },
+    },
+  },
 ];

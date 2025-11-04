@@ -34,7 +34,7 @@ export function useDarkMode(): DarkModeState {
     isDark: themeIsDark,
     toggle,
     setDark,
-    setLight
+    setLight,
   };
 }
 
