@@ -37,6 +37,7 @@ from .equipment_bonus import (
     StatBonus,
     ItemBonusBreakdown
 )
+from .weapon_analysis import WeaponSkill, WeaponAnalyzeRequest
 from .common import PaginatedResponse, ErrorResponse
 
 __all__ = [
@@ -83,6 +84,8 @@ __all__ = [
     'ItemBonusDetailResponse',
     'StatBonus',
     'ItemBonusBreakdown',
+    'WeaponSkill',
+    'WeaponAnalyzeRequest',
     'PaginatedResponse',
     'ErrorResponse',
 ]
