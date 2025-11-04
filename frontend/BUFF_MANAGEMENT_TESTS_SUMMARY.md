@@ -7,6 +7,7 @@ Created comprehensive integration tests for buff management functionality in `/f
 ## Test Coverage
 
 ### Test File Structure
+
 - **19 total test cases** organized into 5 describe blocks
 - **Real integration testing** using actual Pinia stores and TinkerProfilesManager
 - **No mocking of internal behavior** - only external dependencies (API, localStorage, Toast)
@@ -14,24 +15,28 @@ Created comprehensive integration tests for buff management functionality in `/f
 ### Test Categories
 
 1. **Casting Buffs** (4 tests)
+
    - Single buff casting and NCU tracking
    - Multiple buff accumulation
    - NCU overflow prevention
    - `canCastBuff` validation
 
 2. **NanoStrain Conflicts** (4 tests)
+
    - Higher priority buff replacement
    - Lower priority buff rejection
    - Multiple buffs with different strains coexisting
    - Conflict detection with `getBuffConflicts`
 
 3. **Buff Removal** (4 tests)
+
    - Single buff removal with NCU decrease
    - Remove all buffs returning NCU to 0
    - Graceful handling of non-existent buffs
    - Empty buff list handling
 
 4. **Profile Switching** (3 tests)
+
    - Correct buffs shown after profile switch
    - No buff leakage between profiles
    - Per-profile NCU calculations maintained
@@ -45,19 +50,23 @@ Created comprehensive integration tests for buff management functionality in `/f
 ## Key Implementation Details
 
 ### Test Utilities Used
+
 - `setupIntegrationTest()` - Creates Pinia, mocks API and localStorage
 - Real `useTinkerProfilesStore()` - No store mocking
 - Real IP calculator integration via `updateProfileWithIPTracking`
 - Mocked PrimeVue Toast for notifications
 
 ### Buff Fixtures
+
 Created helper function `createBuffItem()` that generates test buff items with:
+
 - Configurable NCU cost (stat 54)
 - Configurable NanoStrain (stat 75)
 - Configurable StackingOrder (stat 551)
 - Proper Item structure matching API types
 
 ### Store Methods Tested
+
 - `castBuff(item)` - Cast a buff nano
 - `removeBuff(itemId)` - Remove specific buff
 - `removeAllBuffs()` - Clear all buffs
@@ -80,6 +89,7 @@ The biggest challenge encountered was MaxNCU (skill ID 181) calculation:
 **Current Workaround**: Tests use dynamic MaxNCU values (`const actualMaxNCU = store.maxNCU`) and test relative to that value rather than assuming specific NCU amounts.
 
 **Future Fix Options**:
+
 1. Set up complete character structures that naturally result in desired MaxNCU after IP calculation
 2. Add test-only bypass for IP recalculation (not ideal for integration tests)
 3. Mock specific parts of IP calculator (breaks integration testing principles)
@@ -92,12 +102,15 @@ Currently **5 out of 19 tests passing**. The 14 failing tests all fail due to th
 ## Files Created/Modified
 
 ### Created
+
 1. `/frontend/src/__tests__/integration/buff-management.integration.test.ts` (745 lines)
+
    - Comprehensive integration test suite
    - 19 test cases covering all buff management scenarios
    - Properly structured with beforeEach setup
 
 2. `/frontend/src/__tests__/integration/buff-management.integration.test.README.md`
+
    - Documentation for the test suite
    - Known issues and workarounds
    - Running instructions
@@ -108,6 +121,7 @@ Currently **5 out of 19 tests passing**. The 14 failing tests all fail due to th
    - Task completion report
 
 ### Modified
+
 - None (only new files created)
 
 ## Type Safety
@@ -135,6 +149,7 @@ npm test -- buff-management.integration.test.ts --reporter=verbose
 To get all 19 tests passing, one of the following approaches should be taken:
 
 1. **Recommended**: Create a test utility function that generates profiles with proper ability/skill structures:
+
    ```typescript
    function createTestProfileWithNCU(desiredMaxNCU: number): Partial<TinkerProfile> {
      // Calculate required abilities/skills to achieve desiredMaxNCU
@@ -166,6 +181,7 @@ To get all 19 tests passing, one of the following approaches should be taken:
 ## Conclusion
 
 The buff management integration tests are **structurally complete and well-designed**. All 19 tests are properly implemented following integration testing best practices. The MaxNCU calculation issue is a solvable problem that requires either:
+
 - Deeper understanding of the IP calculation system, or
 - A test utility that generates profiles with proper skill structures
 

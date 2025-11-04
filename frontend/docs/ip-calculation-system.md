@@ -31,7 +31,7 @@ The game uses "Title Levels" (TL) to create progression breakpoints. These are n
 
 ```
 TL1: Levels 1-14    (Newbie)
-TL2: Levels 15-49   (Beginner) 
+TL2: Levels 15-49   (Beginner)
 TL3: Levels 50-99   (Intermediate)
 TL4: Levels 100-149 (Advanced)
 TL5: Levels 150-189 (Expert)
@@ -54,6 +54,7 @@ End Function
 ```
 
 Title levels affect:
+
 - Skill caps (maximum attainable skill values)
 - IP gain rates
 - Health and Nano Pool progression
@@ -63,9 +64,10 @@ Title levels affect:
 Each level provides IP according to a complex formula based on title level:
 
 ### Base IP by Title Level
+
 ```
 TL1: 1,500 base + (level - 1) × 4,000 IP per level
-TL2: 53,500 base + (level - 14) × 10,000 IP per level  
+TL2: 53,500 base + (level - 14) × 10,000 IP per level
 TL3: 403,500 base + (level - 49) × 20,000 IP per level
 TL4: 1,403,500 base + (level - 99) × 40,000 IP per level
 TL5: 3,403,500 base + (level - 149) × 80,000 IP per level
@@ -74,6 +76,7 @@ TL7: 8,853,500 base + (level - 204) × 600,000 IP per level
 ```
 
 ### IP Calculation Function
+
 ```vb
 Public Function calcIP(ByVal level As Integer) As Int32
     Dim tl As Integer
@@ -83,6 +86,7 @@ End Function
 ```
 
 ### Example IP Totals
+
 - Level 1: 1,500 IP
 - Level 15: 57,500 IP
 - Level 50: 763,500 IP
@@ -97,10 +101,12 @@ Skills have profession-specific cost multipliers that determine how much IP is r
 ### Cost Multiplier Matrix
 
 The system uses a 97×14 matrix where:
+
 - **Rows**: 97 different skills (0-96)
 - **Columns**: 14 professions (Adventurer, Agent, Bureaucrat, Doctor, Enforcer, Engineer, Fixer, Keeper, MA, MP, NT, Shade, Soldier, Trader)
 
 ### Example Cost Multipliers (first few skills)
+
 ```
 Skill               Adv  Agt  Bur  Doc  Enf  Eng  Fix  Kep  MA   MP   NT   Shd  Sol  Trd
 Body Development   1.2  2.4  2.4  2.0  1.0  2.4  1.8  1.2  1.5  2.4  2.4  2.6  1.1  2.0
@@ -111,6 +117,7 @@ Martial Arts      2.8  1.6  2.8  2.0  1.6  2.8  2.8  3.0  1.0  2.8  2.8  1.6  2.
 ### Skill Cost Calculation
 
 The IP cost to raise a skill by one point:
+
 ```vb
 Public Function calcSkillCost(ByVal curBS As Integer, ByVal profID As Integer, ByVal skillID As Integer) As Double
     Return (curBS) * skillCosts(skillID, profID)
@@ -118,11 +125,12 @@ End Function
 ```
 
 The total IP cost for a skill at a given level:
+
 ```vb
 Public Function calcTotalSkillCost(ByVal curBS As Integer, ByVal profID As Integer, ByVal skillID As Integer) As Int32
     Dim totalIP As Double
     Dim i As Integer
-    
+
     totalIP = 0
     If curBS > 0 Then
         For i = 0 To curBS - 1
@@ -149,6 +157,7 @@ Each profession has skills they excel in (low multipliers) and skills they strug
 Abilities (Strength, Agility, Stamina, Intelligence, Sense, Psychic) have breed-specific costs.
 
 ### Breed Cost Multipliers
+
 ```
 Breed      Str  Agi  Sta  Int  Sen  Psy
 Solitus     2    2    2    2    2    2    (balanced)
@@ -158,6 +167,7 @@ Atrox       1    2    1    3    3    3    (strong, poor mental stats)
 ```
 
 ### Ability Cost Calculation
+
 ```vb
 Public Function calcAttrCost(ByVal curAV As Integer, ByVal breedID As Integer, ByVal attrID As Integer) As Double
     Return curAV * breedCosts(breedID, attrID)
@@ -165,11 +175,12 @@ End Function
 ```
 
 ### Total Ability Cost
+
 ```vb
 Public Function calcTotalAttrCost(ByVal curAV As Integer, ByVal breedID As Integer, ByVal attrID As Integer) As Int32
     Dim totalIP As Double
     Dim i As Integer
-    
+
     totalIP = 0
     If curAV > 0 Then
         For i = 0 To curAV - 1
@@ -181,11 +192,12 @@ End Function
 ```
 
 ### Breed Starting Values
+
 ```
 Breed      Str  Agi  Sta  Int  Sen  Psy
 Solitus     6    6    6    6    6    6
 Opifex      3   15    6    6   10    3
-Nanomage    3    3    3   15    6   10  
+Nanomage    3    3    3   15    6   10
 Atrox      15    6   10    3    3    3
 ```
 
@@ -203,7 +215,7 @@ Public Function calcLevelCap(ByVal level As Integer, ByVal profID As Integer, By
     Dim costFac As Double = skillCosts(skillID, profID)
     Dim maxValCap As Integer
     Dim maxVal As Integer
-    
+
     tl = calcTitleLevel(level)
     If level < 201 Then
         maxValCap = CInt(costToRate(CInt((costFac * 10) - 10), tl + 1))
@@ -244,7 +256,7 @@ Skills are also limited by character abilities through the trickle-down system:
 Public Function calcAbilityCap(ByVal abilities() As Integer, ByVal skillID As Integer) As Integer
     Dim weightedAbility As Double
     Dim i As Integer
-    
+
     weightedAbility = 0
     For i = 0 To 5
         weightedAbility = weightedAbility + abilities(i) * skillAbilities(skillID, i)
@@ -267,7 +279,7 @@ A 97×6 matrix defines how each ability contributes to each skill:
 ' Example: Martial Arts skill (skillID = 2)
 {0.2, 0.5, 0.0, 0.0, 0.0, 0.3}  ' 20% Str, 50% Agi, 30% Psy
 
-' Example: 1h Blunt skill (skillID = 8)  
+' Example: 1h Blunt skill (skillID = 8)
 {0.5, 0.1, 0.4, 0.0, 0.0, 0.0}  ' 50% Str, 10% Agi, 40% Sta
 ```
 
@@ -277,7 +289,7 @@ A 97×6 matrix defines how each ability contributes to each skill:
 Public Function calcTrickleDown(ByVal abilities() As Integer, ByVal skillID As Integer) As Integer
     Dim i As Integer
     Dim weightedAbility As Double = 0
-    
+
     For i = 0 To 5
         weightedAbility = weightedAbility + (abilities(i) * skillAbilities(skillID, i))
     Next
@@ -303,7 +315,7 @@ Health depends on Body Development skill, character level, breed, and profession
 Public Function calcHP(ByVal bd As Integer, ByVal level As Integer, ByVal breedID As Integer, ByVal profID As Integer) As Integer
     Dim tl As Integer
     Dim lhp As Integer = 0
-    
+
     tl = calcTitleLevel(level)
     tl = CInt(IIf(tl = 7, 6, tl))
     lhp = (profHP(tl - 1, profID) + breedHP(breedID)) * level
@@ -312,6 +324,7 @@ End Function
 ```
 
 **Components**:
+
 - **Base HP by breed**: Solitus/Atrox: 10/25, Opifex/Nanomage: 15/10
 - **Body Development bonus**: BD skill × breed factor (2-4)
 - **Level bonus**: Level × (profession HP + breed modifier)
@@ -324,7 +337,7 @@ Similar to health but based on Nano Pool skill:
 Public Function calcNP(ByVal np As Integer, ByVal level As Integer, ByVal breedID As Integer, ByVal profID As Integer) As Integer
     Dim tl As Integer
     Dim lnp As Integer = 0
-    
+
     tl = calcTitleLevel(level)
     tl = CInt(IIf(tl = 7, 6, tl))
     lnp = (profNP(tl - 1, profID) + breedNP(breedID)) * level
@@ -335,8 +348,9 @@ End Function
 ## Data Tables Reference
 
 ### Profession IDs
+
 ```
-0: Adventurer    7: Keeper         
+0: Adventurer    7: Keeper
 1: Agent         8: Martial Artist
 2: Bureaucrat    9: Meta-Physicist
 3: Doctor       10: Nano-Technician
@@ -346,17 +360,19 @@ End Function
 ```
 
 ### Breed IDs
+
 ```
 0: Solitus
-1: Opifex  
+1: Opifex
 2: Nanomage
 3: Atrox
 ```
 
 ### Skill IDs (first 20)
+
 ```
 0: Body Dev        10: Piercing
-1: Nano Pool       11: 2h Blunt  
+1: Nano Pool       11: 2h Blunt
 2: Martial Arts    12: 2h Edged
 3: Brawling        13: Melee Energy
 4: Dimach          14: Deflect
@@ -368,12 +384,13 @@ End Function
 ```
 
 ### Ability IDs
+
 ```
 0: Strength
 1: Agility
 2: Stamina
 3: Intelligence
-4: Sense  
+4: Sense
 5: Psychic
 ```
 
@@ -404,7 +421,7 @@ Post-201: `breed_cap[breed][ability] + (level - 200) × breed_rate[breed][abilit
 ### Critical System Interactions
 
 1. **IP Spending Order**: Abilities should be raised before skills due to trickle-down benefits
-2. **Soft vs Hard Caps**: Level caps are "hard" limits, ability caps are "soft" limits  
+2. **Soft vs Hard Caps**: Level caps are "hard" limits, ability caps are "soft" limits
 3. **Breed Selection Impact**: Affects both ability costs and maximum potential
 4. **Profession Selection Impact**: Dramatically affects skill costs and viable builds
 
@@ -420,7 +437,7 @@ Post-201: `breed_cap[breed][ability] + (level - 200) × breed_rate[breed][abilit
 The Anarchy Online IP system is a sophisticated character progression mechanism that creates meaningful choices between breeds, professions, and skill development paths. Understanding these mechanics is essential for:
 
 - Character build planning
-- Equipment requirement validation  
+- Equipment requirement validation
 - Twinking optimization
 - End-game character optimization
 

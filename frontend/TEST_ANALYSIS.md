@@ -9,6 +9,7 @@
 The frontend test suite contains a mix of **good pure function tests** (lib, utils, services) and **problematic store unit tests** that fight Vue's reactivity and mock internal implementation details. The key finding: **store tests should either be deleted or migrated to integration tests using real TinkerProfilesManager**.
 
 ### Key Metrics
+
 - **Pure Function Tests (GOOD)**: ~13 files (utils, lib, services)
 - **Store Unit Tests (DELETE/MIGRATE)**: 8 files - heavy mocking, fights reactivity
 - **Integration Tests (GOOD)**: 8 files - real database/API testing
@@ -18,17 +19,20 @@ The frontend test suite contains a mix of **good pure function tests** (lib, uti
 ### Test Quality Patterns
 
 #### ✅ **EXCELLENT** - Pure Function Tests
+
 - No mocking of framework internals
 - Clear inputs → outputs
 - Fast, reliable, maintainable
 - Examples: `nuke-calculations.test.ts`, `ip-calculator.test.ts`
 
 #### ✅ **GOOD** - Real Integration Tests
+
 - Use real backend/database
 - Test actual data flows
 - Examples: `nanosStore.integration.test.ts`, `backend-integration.test.ts`
 
 #### ❌ **WRONG LEVEL** - Store Unit Tests
+
 - Mock TinkerProfilesManager (wrong level)
 - Use `$patch`, `as any` to bypass readonly
 - Test computed properties in isolation
@@ -36,6 +40,7 @@ The frontend test suite contains a mix of **good pure function tests** (lib, uti
 - Examples: `profile.test.ts`, `profilesStore.test.ts`, `nanosStore.test.ts`
 
 #### ⚠️ **MIXED** - Component Tests
+
 - Some good (test UI behavior): `SkillSlider.test.ts`, `CharacterInfoPanel.test.ts`
 - Some problematic (mock stores heavily)
 - Need case-by-case evaluation
@@ -79,6 +84,7 @@ frontend/tests/          # Additional test directory
 These tests are **excellent** and should be kept. They test pure functions with clear inputs/outputs, no mocking of framework internals.
 
 **Calculation/Utility Tests:**
+
 - `/tests/utils/nuke-calculations.test.ts` - **922 lines** - Comprehensive damage, casting, regen, efficiency calculations
 - `/__tests__/lib/tinkerprofiles/ip-calculator.test.ts` - IP system, ability caps, title level enforcement
 - `/__tests__/lib/tinkerprofiles/cluster-mappings.test.ts` - Implant cluster mappings
@@ -88,6 +94,7 @@ These tests are **excellent** and should be kept. They test pure functions with 
 - `/__tests__/lib/tinkerprofiles/ip-integrator.test.ts` - IP integration
 
 **Service Tests:**
+
 - `/__tests__/services/api-client.test.ts` - API client logic
 - `/__tests__/services/cache-manager.test.ts` - Cache management
 - `/__tests__/services/game-utils.test.ts` - Game utility functions
@@ -95,9 +102,11 @@ These tests are **excellent** and should be kept. They test pure functions with 
 - `/__tests__/services/profile-equipment-health.test.ts` - Equipment health checks
 
 **Utility Tests:**
+
 - `/__tests__/utils/symbiantHelpers.test.ts` - Symbiant helper functions
 
 **Helper Tests:**
+
 - `/__tests__/helpers/helpers.test.ts` - Test helper utilities
 
 ---
@@ -109,15 +118,18 @@ These tests are **wrong-level** and should be **deleted** or **migrated to integ
 #### Problems with Store Unit Tests:
 
 1. **Mock TinkerProfilesManager** - Wrong abstraction level
+
    - Store should be tested WITH real manager, not mocking it
    - Mocks create false confidence - tests pass but integration fails
 
 2. **Fight Vue Reactivity** - Use `$patch`, `as any` to bypass readonly
+
    - `store.$patch({ pocketBosses: mockBosses })` - Violates encapsulation
    - `(store as any).activeProfile = mockProfile` - Bypasses readonly
    - Tests become brittle when store implementation changes
 
 3. **Test Computed Properties in Isolation** - Wrong level
+
    - Should test through user actions, not direct state manipulation
    - Example: Testing `filteredPocketBosses` by patching state instead of calling `updateFilters()`
 
@@ -128,24 +140,28 @@ These tests are **wrong-level** and should be **deleted** or **migrated to integ
 #### Files to DELETE:
 
 1. **`/__tests__/stores/profile.test.ts`** (565 lines)
+
    - **Why Delete**: Basic CRUD operations, localStorage mocking, no unique logic
    - Mocks localStorage extensively
    - Tests basic state management covered by integration tests
    - No complex business logic that needs unit testing
 
 2. **`/__tests__/stores/profilesStore.test.ts`** (567 lines)
+
    - **Why Delete**: Duplicate of profile.test.ts functionality
    - Tests same create/update/delete operations
    - Uses mocked localStorage
    - Same coverage as `profile.test.ts` but less clear
 
 3. **`/__tests__/stores/nanosStore.test.ts`** (391 lines)
+
    - **Why Delete**: Mocks fetch, tests basic filtering
    - All functionality tested in `nanosStore.integration.test.ts` with real data
    - No complex business logic
    - Integration test is more valuable
 
 4. **`/__tests__/stores/items.test.ts`** (439 lines)
+
    - **Why Delete**: Mocks apiClient, tests basic CRUD
    - Cache management tested at service level
    - Filtering logic simple, covered by integration tests
@@ -159,6 +175,7 @@ These tests are **wrong-level** and should be **deleted** or **migrated to integ
 #### Files to MIGRATE (consider keeping IF refactored):
 
 6. **`/stores/__tests__/tinkerProfiles.buff.test.ts`** (617 lines)
+
    - **Current State**: Mocks TinkerProfilesManager, mocks IP integrator
    - **Why Keep Logic**: NCU tracking, NanoStrain conflicts, stacking order - **complex game rules**
    - **Migration Strategy**: Rewrite as integration test using **real TinkerProfilesManager**
@@ -170,6 +187,7 @@ These tests are **wrong-level** and should be **deleted** or **migrated to integ
    - **Action**: **Migrate to integration test** - This is valuable domain logic
 
 7. **`/__tests__/stores/symbiantsStore.integration.test.ts`**
+
    - **Current State**: Name says "integration" but likely uses mocks
    - **Action**: Verify if truly integration test, otherwise migrate
 
@@ -216,7 +234,9 @@ Component tests need **case-by-case evaluation**. Good pattern: test UI behavior
 #### GOOD Component Tests (Keep):
 
 **Profile Components:**
+
 - `SkillSlider.test.ts` (510 lines) - **Excellent UI testing**
+
   - Tests slider/input synchronization
   - Tests emit events
   - Tests visual display
@@ -233,10 +253,12 @@ Component tests need **case-by-case evaluation**. Good pattern: test UI behavior
 #### Component Tests to EVALUATE:
 
 Need to check which ones:
+
 1. Mock stores heavily (migrate/delete)
 2. Test UI behavior with minimal mocking (keep)
 
 **Items Components (7 files):**
+
 - `AdvancedItemSearch.test.ts`
 - `ItemCard.test.ts`
 - `ItemFilters.test.ts`
@@ -248,6 +270,7 @@ Need to check which ones:
 - `items/NanoStatistics.test.ts`
 
 **Nano Components (5 files):**
+
 - `NanoCard.test.ts`
 - `NanoCard.simple.test.ts`
 - `NanoFilters.test.ts`
@@ -255,6 +278,7 @@ Need to check which ones:
 - `NanoSearch.test.ts`
 
 **Plants Components (4 files):**
+
 - `plants/BuildSummary.test.ts`
 - `plants/CharacterStatsPanel.test.ts`
 - `plants/SymbiantFilters.test.ts`
@@ -262,6 +286,7 @@ Need to check which ones:
 - `plants/SymbiantSearch.test.ts`
 
 **Pocket Components (6 files):**
+
 - `pocket/CollectionTracker.test.ts`
 - `pocket/CollectionTracker.simple.test.ts`
 - `pocket/PocketBossDatabase.test.ts`
@@ -270,6 +295,7 @@ Need to check which ones:
 - `pocket/SymbiantLookup.simple.test.ts`
 
 **Profiles Components (5 files):**
+
 - `profiles/CharacterInfoPanel.test.ts` ✅ KEEP
 - `profiles/ProfileCard.test.ts`
 - `profiles/ProfileCreateModal.test.ts`
@@ -277,10 +303,12 @@ Need to check which ones:
 - `profiles/SkillSlider.test.ts` ✅ KEEP
 
 **Shared Components (2 files):**
+
 - `shared/AccessibilityAnnouncer.test.ts`
 - `shared/LoadingSpinner.test.ts`
 
 **Other Components (4 files):**
+
 - `ActionRequirements.test.ts`
 - `CriteriaDisplay.test.ts`
 - `CriterionChip.test.ts`
@@ -345,18 +373,19 @@ vi.mock('@/lib/tinkerprofiles', () => {
         loadProfile: vi.fn().mockResolvedValue(mockProfile),
         updateProfile: vi.fn().mockResolvedValue(undefined),
         // ... complex mock setup
-      }
-      return manager
-    })
-  }
-})
+      };
+      return manager;
+    }),
+  };
+});
 
 // ❌ WRONG - Testing store with mocked manager
-const store = useTinkerProfilesStore()
-await store.castBuff(nano)
+const store = useTinkerProfilesStore();
+await store.castBuff(nano);
 ```
 
 **Why Wrong:**
+
 - Store logic **depends on TinkerProfilesManager** - testing with mock doesn't validate real integration
 - If manager API changes, tests pass but app breaks
 - Integration test with real manager would catch real bugs
@@ -377,6 +406,7 @@ expect(store.filteredPocketBosses).toHaveLength(1);
 ```
 
 **Why Wrong:**
+
 - Bypasses store's public API
 - Tests internal implementation, not behavior
 - Should test through actions: `await store.fetchPocketBosses()` then `store.updateFilters()`
@@ -389,15 +419,16 @@ expect(store.filteredPocketBosses).toHaveLength(1);
 // ⚠️ ACCEPTABLE - Mocking pure function to isolate UI behavior
 vi.mock('@/lib/tinkerprofiles/ip-calculator', () => ({
   calcIP: vi.fn(() => 100000),
-  getBreedInitValue: vi.fn(() => 6)
-}))
+  getBreedInitValue: vi.fn(() => 6),
+}));
 
 // ✅ GOOD - Testing UI behavior, not calculation logic
-const wrapper = mount(SkillSlider, { props: defaultProps })
-expect(wrapper.text()).toContain('6 / 13')
+const wrapper = mount(SkillSlider, { props: defaultProps });
+expect(wrapper.text()).toContain('6 / 13');
 ```
 
 **Why Acceptable:**
+
 - Component test focuses on **UI rendering**, not calculation logic
 - Calculation logic tested separately in `ip-calculator.test.ts`
 - Appropriate level of abstraction
@@ -417,6 +448,7 @@ expect(wrapper.text()).toContain('6 / 13')
 5. `/__tests__/stores/pocketBossStore.test.ts` (275 lines)
 
 **Rationale:**
+
 - No unique business logic - just CRUD operations
 - Coverage provided by integration tests
 - Maintenance burden > value
@@ -435,39 +467,39 @@ expect(wrapper.text()).toContain('6 / 13')
 
 ```typescript
 // ✅ GOOD - Integration test with real manager
-import { TinkerProfilesManager } from '@/lib/tinkerprofiles'
-import { useTinkerProfilesStore } from '@/stores/tinkerProfiles'
+import { TinkerProfilesManager } from '@/lib/tinkerprofiles';
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 
 describe('TinkerProfiles Store - Buff Management (Integration)', () => {
-  let manager: TinkerProfilesManager
-  let store: ReturnType<typeof useTinkerProfilesStore>
+  let manager: TinkerProfilesManager;
+  let store: ReturnType<typeof useTinkerProfilesStore>;
 
   beforeEach(async () => {
-    setActivePinia(createPinia())
+    setActivePinia(createPinia());
 
     // Use REAL manager, not mock
-    manager = new TinkerProfilesManager()
+    manager = new TinkerProfilesManager();
 
     // Initialize store with real manager
-    store = useTinkerProfilesStore()
+    store = useTinkerProfilesStore();
 
     // Create real profile through manager
-    const profileId = await manager.createProfile('Test Character')
-    await store.setActiveProfile(profileId)
-  })
+    const profileId = await manager.createProfile('Test Character');
+    await store.setActiveProfile(profileId);
+  });
 
   it('should track NCU from cast buffs', async () => {
     // Real nano item from test data
-    const nano = createTestNano({ ncuCost: 25 })
+    const nano = createTestNano({ ncuCost: 25 });
 
     // Real integration through store
-    await store.castBuff(nano)
+    await store.castBuff(nano);
 
     // Verify real behavior
-    expect(store.currentNCU).toBe(25)
-    expect(store.availableNCU).toBe(1175) // Real calculation
-  })
-})
+    expect(store.currentNCU).toBe(25);
+    expect(store.availableNCU).toBe(1175); // Real calculation
+  });
+});
 ```
 
 ### 4.3 Component Test Evaluation (MANUAL REVIEW)
@@ -475,10 +507,12 @@ describe('TinkerProfiles Store - Buff Management (Integration)', () => {
 **For each component test file (~49 files), check:**
 
 1. **Does it mock stores?**
+
    - If YES: Can the test be rewritten without store mocking?
    - If mock is essential: Is the component too coupled to store? Refactor component first.
 
 2. **Does it test UI behavior?**
+
    - If YES: Keep the test
    - Focus on: rendering, user interaction, emitted events
 
@@ -487,6 +521,7 @@ describe('TinkerProfiles Store - Buff Management (Integration)', () => {
    - Components should be thin
 
 **Keep these component test patterns:**
+
 - ✅ Mock PrimeVue components (UI framework, not business logic)
 - ✅ Mock pure utility functions (already tested separately)
 - ✅ Test component props, events, rendering
@@ -512,14 +547,14 @@ describe('TinkerProfiles Store - Buff Management (Integration)', () => {
 
 **What to Test Where:**
 
-| Type | Test Level | Example | Mocking |
-|------|-----------|---------|---------|
-| **Pure Functions** | Unit | `calcIP()`, `calculateDamage()` | None |
-| **Services** | Unit | `apiClient`, `cacheManager` | Mock fetch/HTTP |
-| **Store Logic** | Integration | `useTinkerProfilesStore()` | Real manager, mock API |
-| **Components (UI)** | Component | `<SkillSlider>` rendering | Mock PrimeVue, pure fns |
-| **Components (Logic)** | Integration | `<SkillSlider>` with store | Real store, real manager |
-| **User Workflows** | E2E | Profile creation → equipment → export | Real everything |
+| Type                   | Test Level  | Example                               | Mocking                  |
+| ---------------------- | ----------- | ------------------------------------- | ------------------------ |
+| **Pure Functions**     | Unit        | `calcIP()`, `calculateDamage()`       | None                     |
+| **Services**           | Unit        | `apiClient`, `cacheManager`           | Mock fetch/HTTP          |
+| **Store Logic**        | Integration | `useTinkerProfilesStore()`            | Real manager, mock API   |
+| **Components (UI)**    | Component   | `<SkillSlider>` rendering             | Mock PrimeVue, pure fns  |
+| **Components (Logic)** | Integration | `<SkillSlider>` with store            | Real store, real manager |
+| **User Workflows**     | E2E         | Profile creation → equipment → export | Real everything          |
 
 ---
 
@@ -569,6 +604,7 @@ After deleting store unit tests, clean up unused mocks:
 ## 6. Summary Statistics
 
 ### Before Refactoring:
+
 - **Total Test Files**: 86
 - **Store Unit Tests (wrong-level)**: 8 files (~2,854 lines)
 - **Pure Function Tests**: 13 files
@@ -576,11 +612,13 @@ After deleting store unit tests, clean up unused mocks:
 - **E2E Tests**: 8 files
 
 ### After Refactoring:
+
 - **Delete**: 5 store unit tests (~2,237 lines)
 - **Migrate to Integration**: 1 store test (~617 lines)
 - **Keep**: ~80 files (pure function, integration, E2E, good component tests)
 
 ### Expected Benefits:
+
 - **Less maintenance burden** - No fighting Vue reactivity
 - **More confidence** - Integration tests catch real bugs
 - **Faster test suite** - Fewer complex mocks to set up
@@ -606,6 +644,7 @@ After deleting store unit tests, clean up unused mocks:
 ### Files to KEEP (80 files):
 
 **Pure Function Tests (13 files):**
+
 - All tests in `/__tests__/lib/` (6 files)
 - All tests in `/__tests__/services/` (4 files)
 - All tests in `/__tests__/utils/` (1 file)
@@ -613,16 +652,20 @@ After deleting store unit tests, clean up unused mocks:
 - All tests in `/__tests__/helpers/` (1 file)
 
 **Integration Tests (8 files):**
+
 - All tests in `/__tests__/integration/` (8 files)
 
 **E2E Tests (8 files):**
+
 - All tests in `/__tests__/e2e/` (8 files)
 
 **Good Component Tests (2 files confirmed, others need review):**
+
 - `/__tests__/components/profiles/SkillSlider.test.ts`
 - `/__tests__/components/profiles/CharacterInfoPanel.test.ts`
 
 **Files to EVALUATE (47 files):**
+
 - Component tests (25 files) - check for store mocking
 - View tests (6 files) - check for store mocking
 - Composable tests (3 files) - check for store mocking
@@ -645,6 +688,7 @@ After deleting store unit tests, clean up unused mocks:
 ## 9. Testing Principles (Going Forward)
 
 ### ✅ DO:
+
 - Test pure functions at unit level
 - Test stores with real TinkerProfilesManager (integration level)
 - Test components' UI behavior with minimal mocking
@@ -653,6 +697,7 @@ After deleting store unit tests, clean up unused mocks:
 - Mock UI framework components (PrimeVue)
 
 ### ❌ DON'T:
+
 - Mock TinkerProfilesManager in store tests
 - Use `$patch` or `as any` to manipulate store state
 - Test computed properties in isolation
@@ -661,6 +706,7 @@ After deleting store unit tests, clean up unused mocks:
 - Create store unit tests that fight Vue's reactivity
 
 ### 🎯 Test at the Right Level:
+
 - **Pure Functions**: Unit test with real inputs/outputs
 - **Stores**: Integration test with real manager
 - **Components**: Test UI behavior, not store logic
@@ -673,6 +719,7 @@ After deleting store unit tests, clean up unused mocks:
 ### `/src/__tests__/` (78 files)
 
 #### `components/` (27 files)
+
 - `AdvancedItemSearch.test.ts`
 - `ItemCard.test.ts`
 - `ItemFilters.test.ts`
@@ -711,12 +758,14 @@ After deleting store unit tests, clean up unused mocks:
 - `ItemInterpolationBar.test.ts`
 
 #### `composables/` (3 files)
+
 - `useActionCriteria.test.ts`
 - `useInterpolation.test.ts`
 - `useItems.test.ts`
 - `useTheme.test.ts`
 
 #### `e2e/` (8 files) ✅
+
 - `item-search-workflow.test.ts`
 - `nano-search-workflow.test.ts`
 - `nano-compatibility-workflow.test.ts`
@@ -727,6 +776,7 @@ After deleting store unit tests, clean up unused mocks:
 - `TinkerPocket.workflow.test.ts`
 
 #### `integration/` (8 files) ✅
+
 - `nanosStore.integration.test.ts`
 - `backend-integration.test.ts`
 - `TinkerItems.integration.test.ts`
@@ -737,6 +787,7 @@ After deleting store unit tests, clean up unused mocks:
 - `action-criteria-cross-tool.test.ts`
 
 #### `lib/` (6 files) ✅
+
 - `tinkerprofiles.test.ts`
 - `tinkerprofiles/ip-calculator.test.ts`
 - `tinkerprofiles/cluster-mappings.test.ts`
@@ -746,6 +797,7 @@ After deleting store unit tests, clean up unused mocks:
 - `tinkerprofiles/ip-integrator.test.ts`
 
 #### `services/` (4 files) ✅
+
 - `api-client.test.ts`
 - `cache-manager.test.ts`
 - `game-utils.test.ts`
@@ -753,6 +805,7 @@ After deleting store unit tests, clean up unused mocks:
 - `profile-equipment-health.test.ts`
 
 #### `stores/` (8 files)
+
 - `items.test.ts` ❌ DELETE
 - `nanosStore.test.ts` ❌ DELETE
 - `pocketBossStore.test.ts` ❌ DELETE
@@ -763,15 +816,18 @@ After deleting store unit tests, clean up unused mocks:
 - `pocketBossStore.integration.test.ts` ⚠️ VERIFY
 
 #### `tinkerprofiles/` (3 files)
+
 - `misc-skills-fix.test.ts`
 - `ncu-equipment.test.ts`
 - `ncu-equipment-fix.test.ts`
 - `misc-equipment-bonuses.test.ts`
 
 #### `utils/` (1 file) ✅
+
 - `symbiantHelpers.test.ts`
 
 #### `views/` (8 files)
+
 - `ItemDetail.test.ts`
 - `TinkerNukes.test.ts`
 - `TinkerNukes.simple.test.ts`
@@ -783,6 +839,7 @@ After deleting store unit tests, clean up unused mocks:
 - `TinkerProfileDetail.equipment.test.ts`
 
 #### Root Level (4 files)
+
 - `helpers/helpers.test.ts` ✅
 - `pagination-fix.test.ts`
 - `pagination-integration.test.ts`
@@ -791,16 +848,20 @@ After deleting store unit tests, clean up unused mocks:
 ### `/tests/` (4 files)
 
 #### `utils/` (1 file) ✅
+
 - `nuke-calculations.test.ts`
 
 #### `components/nukes/` (2 files)
+
 - `NukeInputForm.test.ts`
 - `NukeTable.test.ts`
 
 #### `views/` (1 file)
+
 - `TinkerNukes.test.ts`
 
 ### `/src/stores/__tests__/` (1 file)
+
 - `tinkerProfiles.buff.test.ts` ⚠️ MIGRATE
 
 ---
@@ -810,6 +871,7 @@ After deleting store unit tests, clean up unused mocks:
 Use this checklist to evaluate any test file:
 
 **🚩 RED FLAGS (Consider deleting/migrating):**
+
 - [ ] Mocks `TinkerProfilesManager`
 - [ ] Uses `$patch` to set store state
 - [ ] Uses `as any` to bypass readonly
@@ -819,6 +881,7 @@ Use this checklist to evaluate any test file:
 - [ ] Duplicates integration test coverage
 
 **✅ GREEN FLAGS (Keep):**
+
 - [ ] Tests pure functions with real inputs/outputs
 - [ ] Uses real backend/database (integration)
 - [ ] Tests UI rendering and user interaction (component)
@@ -828,6 +891,7 @@ Use this checklist to evaluate any test file:
 - [ ] Provides unique coverage not found elsewhere
 
 **⚠️ YELLOW FLAGS (Evaluate case-by-case):**
+
 - [ ] Mocks PrimeVue components (OK for component tests)
 - [ ] Mocks pure utility functions (OK if tested elsewhere)
 - [ ] Tests store actions (OK if using real manager)
