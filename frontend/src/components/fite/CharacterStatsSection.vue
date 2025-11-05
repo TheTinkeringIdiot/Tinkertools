@@ -123,7 +123,7 @@ Inputs (7 fields):
           id="targetAC"
           v-model="localStats.targetAC"
           :min="0"
-          :max="5000"
+          :max="15000"
           :step="1"
           class="w-full font-mono"
           @update:model-value="onFieldChange"
