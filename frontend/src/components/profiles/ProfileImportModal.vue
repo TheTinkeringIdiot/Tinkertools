@@ -96,7 +96,7 @@ Modal for importing profiles from various formats
           id="aosetups-url"
           v-model="aosetupsUrl"
           class="w-full"
-          placeholder="https://www.aosetups.com/equip/63d44b91a247b52f79ea5ff6"
+          placeholder="https://www.aosetups.com/equip/YOUR_PROFILE_ID"
         />
         <small class="text-surface-600 dark:text-surface-400">
           Enter the full AOSetups profile URL

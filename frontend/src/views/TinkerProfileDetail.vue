@@ -308,11 +308,13 @@ import type { Item } from '@/types/api';
 import { skillService } from '@/services/skill-service';
 import type { SkillId } from '@/types/skills';
 import { getProfessionName, getBreedName } from '@/services/game-utils';
+import { useToast } from 'primevue/usetoast';
 
 // Router
 const route = useRoute();
 const router = useRouter();
 const profilesStore = useTinkerProfilesStore();
+const toast = useToast();
 
 // Props
 const props = defineProps<{
@@ -408,6 +410,14 @@ async function duplicateProfile() {
     const newName = `${profileData.value.Character.Name} (Copy)`;
     const newProfileId = await profilesStore.duplicateProfile(props.profileId, newName);
 
+    // Show success notification
+    toast.add({
+      severity: 'success',
+      summary: 'Profile Duplicated',
+      detail: `Created ${newName}`,
+      life: 3000,
+    });
+
     // Navigate to the new profile
     router.push({
       name: 'TinkerProfileDetail',
@@ -415,14 +425,47 @@ async function duplicateProfile() {
     });
   } catch (err) {
     console.error('Failed to duplicate profile:', err);
+    toast.add({
+      severity: 'error',
+      summary: 'Duplication Failed',
+      detail: err instanceof Error ? err.message : 'Failed to duplicate profile',
+      life: 5000,
+    });
   }
 }
 
 async function exportProfile() {
+  if (!profileData.value) return;
+
   try {
-    await profilesStore.exportProfile(props.profileId, 'json');
+    const exported = await profilesStore.exportProfile(props.profileId, 'json');
+
+    // Create download
+    const blob = new Blob([exported], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${profileData.value.Character.Name}_profile.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    // Show success notification
+    toast.add({
+      severity: 'success',
+      summary: 'Profile Exported',
+      detail: `Downloaded ${profileData.value.Character.Name}_profile.json`,
+      life: 3000,
+    });
   } catch (err) {
     console.error('Failed to export profile:', err);
+    toast.add({
+      severity: 'error',
+      summary: 'Export Failed',
+      detail: err instanceof Error ? err.message : 'Failed to export profile',
+      life: 5000,
+    });
   }
 }
 

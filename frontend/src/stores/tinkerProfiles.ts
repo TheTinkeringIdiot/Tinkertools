@@ -700,6 +700,11 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     const duplicated = structuredClone(original);
     duplicated.Character.Name = newName || `${original.Character.Name} (Copy)`;
 
+    // Remove ID and timestamps so createProfile generates new ones
+    delete (duplicated as any).id;
+    delete (duplicated as any).created;
+    delete (duplicated as any).updated;
+
     return await createProfile(duplicated.Character.Name, duplicated);
   }
 
