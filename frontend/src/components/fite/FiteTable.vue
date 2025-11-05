@@ -172,7 +172,10 @@ const props = defineProps<Props>();
 const router = useRouter();
 
 // Damage type names mapping
+// Maps both AC stat IDs (90-97) and enum values (0-8)
 const DAMAGE_TYPE_NAMES: Record<number, string> = {
+  // Enum values (0-8)
+  [DAMAGE_TYPES.NONE]: 'None',
   [DAMAGE_TYPES.MELEE]: 'Melee',
   [DAMAGE_TYPES.ENERGY]: 'Energy',
   [DAMAGE_TYPES.CHEMICAL]: 'Chemical',
@@ -181,6 +184,15 @@ const DAMAGE_TYPE_NAMES: Record<number, string> = {
   [DAMAGE_TYPES.POISON]: 'Poison',
   [DAMAGE_TYPES.FIRE]: 'Fire',
   [DAMAGE_TYPES.PROJECTILE]: 'Projectile',
+  // AC stat IDs (90-97) - database stores these
+  90: 'Projectile', // ProjectileAC
+  91: 'Melee', // MeleeAC
+  92: 'Energy', // EnergyAC
+  93: 'Chemical', // ChemicalAC
+  94: 'Radiation', // RadiationAC
+  95: 'Cold', // ColdAC
+  96: 'Poison', // PoisonAC
+  97: 'Fire', // FireAC
 };
 
 // Empty message based on loading state
@@ -269,27 +281,40 @@ function formatTime(centiseconds: number | undefined): string {
 
 /**
  * Get PrimeVue severity for damage type badge
+ * Handles both enum values (0-8) and AC stat IDs (90-97)
  */
 function getDamageTypeSeverity(damageType: number | undefined): string {
   if (!damageType) return 'secondary';
 
   switch (damageType) {
+    // Enum values
     case DAMAGE_TYPES.MELEE:
-      return 'danger';
-    case DAMAGE_TYPES.ENERGY:
-      return 'info';
-    case DAMAGE_TYPES.CHEMICAL:
-      return 'warning';
-    case DAMAGE_TYPES.RADIATION:
-      return 'success';
-    case DAMAGE_TYPES.COLD:
-      return 'info';
-    case DAMAGE_TYPES.POISON:
-      return 'success';
     case DAMAGE_TYPES.FIRE:
+    // AC stat IDs
+    case 91: // MeleeAC
+    case 97: // FireAC
       return 'danger';
+
+    case DAMAGE_TYPES.ENERGY:
+    case DAMAGE_TYPES.COLD:
+    case 92: // EnergyAC
+    case 95: // ColdAC
+      return 'info';
+
+    case DAMAGE_TYPES.CHEMICAL:
+    case 93: // ChemicalAC
+      return 'warning';
+
+    case DAMAGE_TYPES.RADIATION:
+    case DAMAGE_TYPES.POISON:
+    case 94: // RadiationAC
+    case 96: // PoisonAC
+      return 'success';
+
     case DAMAGE_TYPES.PROJECTILE:
+    case 90: // ProjectileAC
       return 'secondary';
+
     default:
       return 'secondary';
   }

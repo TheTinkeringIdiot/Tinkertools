@@ -191,12 +191,14 @@ export function getWeaponTypeName(item: Item): string {
 
 /**
  * Get damage type name from damage type stat
+ * Handles both enum values (0-8) and AC stat IDs (90-97)
  *
- * @param damageType Damage type stat value
+ * @param damageType Damage type stat value (or AC stat ID)
  * @returns Damage type name
  */
 export function getDamageTypeName(damageType: number): string {
   const DAMAGE_TYPE_NAMES: Record<number, string> = {
+    // Enum values (0-8)
     0: 'None',
     1: 'Melee',
     2: 'Energy',
@@ -206,6 +208,15 @@ export function getDamageTypeName(damageType: number): string {
     6: 'Poison',
     7: 'Fire',
     8: 'Projectile',
+    // AC stat IDs (90-97) - database stores these
+    90: 'Projectile', // ProjectileAC
+    91: 'Melee', // MeleeAC
+    92: 'Energy', // EnergyAC
+    93: 'Chemical', // ChemicalAC
+    94: 'Radiation', // RadiationAC
+    95: 'Cold', // ColdAC
+    96: 'Poison', // PoisonAC
+    97: 'Fire', // FireAC
   };
 
   return DAMAGE_TYPE_NAMES[damageType] || 'Unknown';
