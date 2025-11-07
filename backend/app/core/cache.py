@@ -150,5 +150,6 @@ CACHE_TTL = {
     'pocket_bosses': 1800,  # 30 minutes - boss info is very static
     'symbiants': 1800,      # 30 minutes - symbiant info is very static
     'search_results': 180,  # 3 minutes - search results can be cached briefly
-    'stats': 60             # 1 minute - stats change more frequently
+    'stats': 60,            # 1 minute - stats change more frequently
+    'weapons_analyze': 3600 # 1 hour - weapon analysis is static game data
 }

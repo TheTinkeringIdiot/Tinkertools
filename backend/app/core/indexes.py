@@ -42,7 +42,13 @@ PERFORMANCE_INDEXES = [
         'name': 'idx_items_nano_ql',
         'query': 'CREATE INDEX IF NOT EXISTS idx_items_nano_ql ON items(is_nano, ql) WHERE is_nano = true;'
     },
-    
+    # Weapon filtering composite indexes (TinkerFite performance)
+    {
+        'name': 'idx_items_weapon_composite',
+        'query': '''CREATE INDEX IF NOT EXISTS idx_items_weapon_composite
+                    ON items(item_class, atkdef_id) WHERE atkdef_id IS NOT NULL;'''
+    },
+
     # Full-text search indexes
     {
         'name': 'idx_items_name_fts',
@@ -74,6 +80,20 @@ PERFORMANCE_INDEXES = [
         'name': 'idx_stat_values_stat',
         'query': 'CREATE INDEX IF NOT EXISTS idx_stat_values_stat ON stat_values(stat);'
     },
+    {
+        'name': 'idx_stat_values_weapon_skills',
+        'query': 'CREATE INDEX IF NOT EXISTS idx_stat_values_weapon_skills ON stat_values(stat, value) WHERE value >= 50;'
+    },
+
+    # Attack/Defense indexes for weapon filtering
+    {
+        'name': 'idx_attack_defense_attack_lookup',
+        'query': 'CREATE INDEX IF NOT EXISTS idx_attack_defense_attack_lookup ON attack_defense_attack(attack_defense_id, stat_value_id);'
+    },
+    {
+        'name': 'idx_attack_defense_defense_lookup',
+        'query': 'CREATE INDEX IF NOT EXISTS idx_attack_defense_defense_lookup ON attack_defense_defense(attack_defense_id, stat_value_id);'
+    },
     
     # Spells indexes
     {
@@ -98,7 +118,17 @@ PERFORMANCE_INDEXES = [
         'name': 'idx_spell_criteria_criterion_id',
         'query': 'CREATE INDEX IF NOT EXISTS idx_spell_criteria_criterion_id ON spell_criteria(criterion_id);'
     },
-    
+
+    # Action criteria indexes for weapon filtering
+    {
+        'name': 'idx_action_criteria_composite',
+        'query': 'CREATE INDEX IF NOT EXISTS idx_action_criteria_composite ON action_criteria(action_id, criterion_id);'
+    },
+    {
+        'name': 'idx_actions_item_action',
+        'query': 'CREATE INDEX IF NOT EXISTS idx_actions_item_action ON actions(item_id, action);'
+    },
+
     # Pocket bosses indexes
     {
         'name': 'idx_pocket_bosses_level',

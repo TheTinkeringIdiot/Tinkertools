@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
 
 from app.models import (
-    Item, ItemStats, StatValue, AttackDefense, AttackDefenseAttack,
+    Item, ItemStats, StatValue, AttackDefense, AttackDefenseAttack, AttackDefenseDefense,
     Action, ActionCriteria, Criterion, ItemSpellData, SpellData,
     SpellDataSpells, Spell, SpellCriterion, ItemSource, Source, SourceType
 )
@@ -54,6 +54,8 @@ class WeaponFilterService:
         # No QL filtering - return all QL variants for proper interpolation
         query = self.db.query(Item).options(
             joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
+            joinedload(Item.attack_defense).joinedload(AttackDefense.attack_stats).joinedload(AttackDefenseAttack.stat_value),
+            joinedload(Item.attack_defense).joinedload(AttackDefense.defense_stats).joinedload(AttackDefenseDefense.stat_value),
             joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data).joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell).joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
             joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion),
             joinedload(Item.item_sources).joinedload(ItemSource.source).joinedload(Source.source_type)
@@ -66,35 +68,31 @@ class WeaponFilterService:
         # Include weapons where any of the top 3 skills is:
         # - The highest attack stat contributor (primary skill)
         # - OR contributes >= 50% to attack rating (50/50 split)
-        skill_filters = []
-        for weapon_skill in request.top_weapon_skills:
-            # Subquery to find weapons where this skill contributes >= 50%
-            skill_subquery = self.db.query(Item.id.distinct()).join(
+        if request.top_weapon_skills:
+            # Optimize: Use single JOIN instead of 3 separate subqueries
+            query = query.join(
                 AttackDefense, Item.atkdef_id == AttackDefense.id
             ).join(
                 AttackDefenseAttack, AttackDefense.id == AttackDefenseAttack.attack_defense_id
             ).join(
                 StatValue, AttackDefenseAttack.stat_value_id == StatValue.id
             ).filter(
-                StatValue.stat == weapon_skill.skill_id,
-                StatValue.value >= 50  # Skill contributes >= 50%
+                or_(*[
+                    and_(StatValue.stat == skill.skill_id, StatValue.value >= 50)
+                    for skill in request.top_weapon_skills
+                ])
             )
 
-            skill_filters.append(Item.id.in_(skill_subquery))
-
-        # Apply OR filter for weapon skills
-        if skill_filters:
-            query = query.filter(or_(*skill_filters))
-
         # Only include items with at least one requirement (excludes unequippable items)
-        items_with_requirements = self.db.query(Item.id.distinct()).join(
+        # Optimize: Use JOIN instead of subquery
+        query = query.join(
             Action, Item.id == Action.item_id
         ).join(
             ActionCriteria, Action.id == ActionCriteria.action_id
         )
-        query = query.filter(Item.id.in_(items_with_requirements))
 
         # Exclude items with NPC family requirements (NPC-only weapons)
+        # Note: Must use subquery for exclusion to avoid false positives
         npc_family_subquery = self.db.query(Item.id).join(
             Action, Item.id == Action.item_id
         ).join(

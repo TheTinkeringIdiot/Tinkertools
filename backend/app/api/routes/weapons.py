@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.decorators import cached_response
 from app.api.schemas import ItemDetail
 from app.api.schemas.weapon_analysis import WeaponAnalyzeRequest
 from app.api.services.weapon_filter_service import WeaponFilterService
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("/analyze", response_model=List[ItemDetail])
+@cached_response("weapons_analyze", ttl=3600)
 def analyze_weapons(
     request: WeaponAnalyzeRequest,
     db: Session = Depends(get_db)

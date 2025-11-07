@@ -182,19 +182,13 @@ def build_item_detail(item: Item, db: Session) -> ItemDetail:
             spells=spells_with_criteria
         ))
     
-    # Get attack/defense stats
+    # Get attack/defense stats from preloaded data
     attack_stats = []
     defense_stats = []
-    if hasattr(item, 'atkdef_id') and item.atkdef_id:
-        # Get attack stats
-        attack_stats = db.query(StatValue).join(
-            AttackDefenseAttack, StatValue.id == AttackDefenseAttack.stat_value_id
-        ).filter(AttackDefenseAttack.attack_defense_id == item.atkdef_id).all()
-        
-        # Get defense stats  
-        defense_stats = db.query(StatValue).join(
-            AttackDefenseDefense, StatValue.id == AttackDefenseDefense.stat_value_id
-        ).filter(AttackDefenseDefense.attack_defense_id == item.atkdef_id).all()
+    if item.attack_defense:
+        # Use preloaded attack/defense relationships
+        attack_stats = [ada.stat_value for ada in item.attack_defense.attack_stats]
+        defense_stats = [add.stat_value for add in item.attack_defense.defense_stats]
     
     # Get actions with criteria
     actions = []
