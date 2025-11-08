@@ -413,8 +413,39 @@ function getSuggestionIcon(type: string): string {
 function highlightMatch(text: string, query: string): string {
   if (!query.trim()) return text;
 
-  const regex = new RegExp(`(${query})`, 'gi');
-  return text.replace(regex, '<mark>$1</mark>');
+  // Escape regex metacharacters to prevent regex injection
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  // Helper to escape HTML entities
+  const escapeHtml = (str: string): string => {
+    const htmlEscapeMap: Record<string, string> = {
+      '<': '&lt;',
+      '>': '&gt;',
+      '&': '&amp;',
+      '"': '&quot;',
+      "'": '&#39;',
+    };
+    return str.replace(/[<>&"']/g, (char) => htmlEscapeMap[char]);
+  };
+
+  // Find all matches and build result with escaped HTML
+  const regex = new RegExp(`(${escapedQuery})`, 'gi');
+  let result = '';
+  let lastIndex = 0;
+
+  text.replace(regex, (match, p1, offset) => {
+    // Add text before match (escaped)
+    result += escapeHtml(text.substring(lastIndex, offset));
+    // Add highlighted match (escaped)
+    result += '<mark>' + escapeHtml(match) + '</mark>';
+    lastIndex = offset + match.length;
+    return match;
+  });
+
+  // Add remaining text (escaped)
+  result += escapeHtml(text.substring(lastIndex));
+
+  return result;
 }
 
 function saveCurrentSearch() {

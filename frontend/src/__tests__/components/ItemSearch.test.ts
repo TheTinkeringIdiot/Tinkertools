@@ -453,4 +453,92 @@ describe('ItemSearch', () => {
       expect(input.classes()).toContain('border-red-500');
     });
   });
+
+  describe('XSS Protection (highlightMatch)', () => {
+    beforeEach(() => {
+      wrapper = mountWithContext(ItemSearch, {
+        props: {
+          query: '',
+          loading: false,
+        },
+      });
+    });
+
+    it('should escape HTML entities to prevent XSS attacks', () => {
+      const highlightMatch = wrapper.vm.highlightMatch;
+
+      // Test XSS attack payloads with HTML tags
+      const htmlPayloads = [
+        '<img src=x onerror=alert("XSS")>',
+        '<script>alert("XSS")</script>',
+        '<svg onload=alert("XSS")>',
+        '"><script>alert("XSS")</script>',
+      ];
+
+      htmlPayloads.forEach((payload) => {
+        const result = highlightMatch(payload, 'test');
+        // Result should not contain unescaped < or >
+        expect(result).not.toMatch(/<(?!mark>|\/mark>)/);
+        // Should contain escaped entities
+        expect(result).toContain('&lt;');
+      });
+
+      // Test payload without HTML tags still escapes quotes properly
+      const scriptPayload = "';alert('XSS');//";
+      const result = highlightMatch(scriptPayload, 'alert');
+      expect(result).toContain('&#39;');
+      expect(result).not.toContain('<script>');
+    });
+
+    it('should escape regex metacharacters to prevent regex injection', () => {
+      const highlightMatch = wrapper.vm.highlightMatch;
+
+      // Test regex metacharacters that could break the regex
+      const regexPayloads = ['.*', '(test)', '[abc]', '{1,2}', '^test$', 'test|demo', 'test\\w+'];
+
+      regexPayloads.forEach((payload) => {
+        // Should not throw an error
+        expect(() => {
+          highlightMatch('some text with test in it', payload);
+        }).not.toThrow();
+      });
+    });
+
+    it('should properly highlight matches in safe text', () => {
+      const highlightMatch = wrapper.vm.highlightMatch;
+
+      const result = highlightMatch('Implant Research', 'Implant');
+      expect(result).toBe('<mark>Implant</mark> Research');
+    });
+
+    it('should be case-insensitive when highlighting', () => {
+      const highlightMatch = wrapper.vm.highlightMatch;
+
+      const result = highlightMatch('Implant Research', 'implant');
+      expect(result).toBe('<mark>Implant</mark> Research');
+    });
+
+    it('should handle empty query gracefully', () => {
+      const highlightMatch = wrapper.vm.highlightMatch;
+
+      const result = highlightMatch('Test Text', '');
+      expect(result).toBe('Test Text');
+    });
+
+    it('should escape HTML in text while highlighting', () => {
+      const highlightMatch = wrapper.vm.highlightMatch;
+
+      const result = highlightMatch('Test <script>alert("XSS")</script> implant', 'implant');
+      expect(result).toContain('&lt;script&gt;');
+      expect(result).toContain('<mark>implant</mark>');
+      expect(result).not.toMatch(/<script>/);
+    });
+
+    it('should escape special characters in both text and query', () => {
+      const highlightMatch = wrapper.vm.highlightMatch;
+
+      const result = highlightMatch('Test & Test', '&');
+      expect(result).toBe('Test <mark>&amp;</mark> Test');
+    });
+  });
 });
