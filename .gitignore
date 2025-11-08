@@ -35,6 +35,7 @@ htmlcov
 # Backend debug/test scripts and logs
 backend/*.log
 backend/*import*.py
+!backend/import_cli.py
 backend/*debug*.py
 backend/*test*.py
 backend/check_*.py
@@ -42,6 +43,9 @@ backend/trace_*.py
 backend/benchmark_*.py
 backend/run_*.sh
 backend/.~lock.*
+backend/*nano*extractor*.py
+backend/*nano*analyzer*.py
+backend/*strain*matcher*.py
 
 # Database artifacts
 database/migrations/versions/*.py
