@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
     """
 )
 @performance_monitor
-async def calculate_equipment_bonuses(
+def calculate_equipment_bonuses(
     request: EquipmentBonusRequest,
     db: Session = Depends(get_db)
 ) -> EquipmentBonusResponse:
@@ -110,7 +110,7 @@ async def calculate_equipment_bonuses(
     """
 )
 @performance_monitor
-async def get_item_bonus_detail(
+def get_item_bonus_detail(
     item_id: int,
     db: Session = Depends(get_db)
 ) -> ItemBonusDetailResponse:
@@ -152,7 +152,7 @@ async def get_item_bonus_detail(
     """
 )
 @performance_monitor
-async def get_batch_item_bonus_details(
+def get_batch_item_bonus_details(
     item_ids: List[int],
     db: Session = Depends(get_db)
 ) -> List[ItemBonusDetailResponse]:

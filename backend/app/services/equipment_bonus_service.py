@@ -143,8 +143,8 @@ class EquipmentBonusService:
         # - Aggregates all spell data in single query
         query = self.db.query(
             Item.id.label('item_id'),
-            func.cast(Spell.spell_params.op('->>')(text("'Stat'")), Integer).label('stat_id'),
-            func.cast(Spell.spell_params.op('->>')(text("'Amount'")), Integer).label('amount'),
+            Spell.spell_params['Stat'].astext.cast(Integer).label('stat_id'),
+            Spell.spell_params['Amount'].astext.cast(Integer).label('amount'),
             Spell.spell_id.label('spell_type')
         ).select_from(Item)\
          .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
@@ -157,8 +157,8 @@ class EquipmentBonusService:
          .filter(Item.id.in_(item_ids))\
          .filter(SpellData.event.in_(self.EQUIPMENT_EVENTS))\
          .filter(and_(
-             Spell.spell_params.op('->')(text("'Stat'")).isnot(None),
-             Spell.spell_params.op('->')(text("'Amount'")).isnot(None)
+             Spell.spell_params['Stat'].isnot(None),
+             Spell.spell_params['Amount'].isnot(None)
          ))
 
         results = query.all()
@@ -228,8 +228,8 @@ class EquipmentBonusService:
         # Query that includes item_id in results for proper caching
         query = self.db.query(
             Item.id.label('item_id'),
-            func.cast(Spell.spell_params.op('->>')(text("'Stat'")), Integer).label('stat_id'),
-            func.cast(Spell.spell_params.op('->>')(text("'Amount'")), Integer).label('amount')
+            Spell.spell_params['Stat'].astext.cast(Integer).label('stat_id'),
+            Spell.spell_params['Amount'].astext.cast(Integer).label('amount')
         ).select_from(Item)\
          .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
          .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
@@ -241,8 +241,8 @@ class EquipmentBonusService:
          .filter(Item.id.in_(item_ids))\
          .filter(SpellData.event.in_(self.EQUIPMENT_EVENTS))\
          .filter(and_(
-             Spell.spell_params.op('->')(text("'Stat'")).isnot(None),
-             Spell.spell_params.op('->')(text("'Amount'")).isnot(None)
+             Spell.spell_params['Stat'].isnot(None),
+             Spell.spell_params['Amount'].isnot(None)
          ))
 
         results = query.all()

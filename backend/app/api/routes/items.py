@@ -112,17 +112,17 @@ def apply_stat_filters(query, stat_filters: str, db: Session):
                     .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
                     .join(Spell, SpellDataSpells.spell_id == Spell.id)\
                     .filter(Spell.spell_id == 53045)\
-                    .filter(func.cast(Spell.spell_params.op('->>')(text("'Stat'")), Integer) == stat_id)
-                
+                    .filter(Spell.spell_params['Stat'].astext.cast(Integer) == stat_id)
+
                 # Apply operator to the modification value
                 if operator == '>=':
-                    subquery = subquery.filter(func.cast(Spell.spell_params.op('->>')(text("'Amount'")), Integer) >= value)
+                    subquery = subquery.filter(Spell.spell_params['Amount'].astext.cast(Integer) >= value)
                 elif operator == '<=':
-                    subquery = subquery.filter(func.cast(Spell.spell_params.op('->>')(text("'Amount'")), Integer) <= value)
+                    subquery = subquery.filter(Spell.spell_params['Amount'].astext.cast(Integer) <= value)
                 elif operator == '==':
-                    subquery = subquery.filter(func.cast(Spell.spell_params.op('->>')(text("'Amount'")), Integer) == value)
+                    subquery = subquery.filter(Spell.spell_params['Amount'].astext.cast(Integer) == value)
                 elif operator == '!=':
-                    subquery = subquery.filter(func.cast(Spell.spell_params.op('->>')(text("'Amount'")), Integer) != value)
+                    subquery = subquery.filter(Spell.spell_params['Amount'].astext.cast(Integer) != value)
                 
                 query = query.filter(Item.id.in_(subquery))
         
@@ -388,7 +388,7 @@ def get_items(
                     .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
                     .join(Spell, SpellDataSpells.spell_id == Spell.id)\
                     .filter(Spell.spell_id == 53045)\
-                    .filter(func.cast(Spell.spell_params.op('->>')(text("'Stat'")), Integer).in_(bonus_stat_ids))
+                    .filter(Spell.spell_params['Stat'].astext.cast(Integer).in_(bonus_stat_ids))
                 
                 query = query.filter(Item.id.in_(stat_bonus_subquery))
         except ValueError:
@@ -668,7 +668,7 @@ def search_items(
                     .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
                     .join(Spell, SpellDataSpells.spell_id == Spell.id)\
                     .filter(Spell.spell_id == 53045)\
-                    .filter(func.cast(Spell.spell_params.op('->>')(text("'Stat'")), Integer).in_(bonus_stat_ids))
+                    .filter(Spell.spell_params['Stat'].astext.cast(Integer).in_(bonus_stat_ids))
                 
                 query = query.filter(Item.id.in_(stat_bonus_subquery))
         except ValueError:

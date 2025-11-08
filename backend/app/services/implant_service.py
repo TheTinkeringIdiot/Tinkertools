@@ -136,11 +136,11 @@ class ImplantService:
                 .filter(Item.item_class == 3)\
                 .filter(Item.ql == base_ql)\
                 .filter(Spell.spell_id == 53045)\
-                .filter(func.cast(Spell.spell_params.op('->>')(text("'Stat'")), Integer).in_(cluster_stats))\
+                .filter(Spell.spell_params['Stat'].astext.cast(Integer).in_(cluster_stats))\
                 .group_by(Item.id)\
                 .having(func.count(Spell.id.distinct()) == cluster_count)\
                 .subquery()
-            
+
             # Subquery: Items that have NO extra clusters (other Modify Stat spells not in our list)
             has_no_extra_clusters = self.db.query(Item.id)\
                 .filter(Item.item_class == 3)\
@@ -152,7 +152,7 @@ class ImplantService:
                         SpellData.id == SpellDataSpells.spell_data_id,
                         SpellDataSpells.spell_id == Spell.id,
                         Spell.spell_id == 53045,
-                        ~func.cast(Spell.spell_params.op('->>')(text("'Stat'")), Integer).in_(cluster_stats)
+                        ~Spell.spell_params['Stat'].astext.cast(Integer).in_(cluster_stats)
                     )
                 ))\
                 .subquery()

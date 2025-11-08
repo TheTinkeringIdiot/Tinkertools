@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 @router.post("/lookup", response_model=ImplantLookupResponse)
 @performance_monitor
-async def implant_lookup(
+def implant_lookup(
     request: ImplantLookupRequest,
     db: Session = Depends(get_db)
 ):
@@ -139,7 +139,7 @@ async def implant_lookup(
 
 @router.get("/slots/{slot}/available", response_model=List[ItemResponse])
 @performance_monitor
-async def get_available_implants(
+def get_available_implants(
     slot: int,
     ql: int = 1,
     db: Session = Depends(get_db)
@@ -215,7 +215,7 @@ async def get_available_implants(
 
 
 @router.post("/validate-clusters")
-async def validate_cluster_combination(
+def validate_cluster_combination(
     clusters: dict,
     db: Session = Depends(get_db)
 ):

@@ -32,7 +32,7 @@ def get_perk_service(db: Session = Depends(get_db)) -> PerkService:
     return PerkService(db)
 
 
-async def _get_filtered_perks_from_service(
+def _get_filtered_perks_from_service(
     perk_service: PerkService,
     type: Optional[str] = None,
     profession: Optional[str] = None,
@@ -189,7 +189,7 @@ async def _get_filtered_perks_from_service(
 @router.get("", response_model=PaginatedResponse[PerkResponse])
 @cached_response("perks_list")
 @performance_monitor
-async def get_perks(
+def get_perks(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page"),
     type: Optional[str] = Query(None, description="Filter by perk type (SL, AI, LE)"),
@@ -227,7 +227,7 @@ async def get_perks(
     logger.info(f"Getting perks: page={page}, series={series}, profession={profession}, type={type}")
 
     # Get filtered perks using database queries for better performance
-    filtered_perks = await _get_filtered_perks_from_service(
+    filtered_perks = _get_filtered_perks_from_service(
         perk_service=perk_service,
         type=type,
         profession=profession,
@@ -280,7 +280,7 @@ async def get_perks(
 @router.get("/search", response_model=PaginatedResponse[PerkResponse])
 @cached_response("perks_search")
 @performance_monitor
-async def search_perks(
+def search_perks(
     request: PerkSearchRequest,
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page"),
@@ -296,7 +296,7 @@ async def search_perks(
     logger.info(f"Advanced perk search with query: {request.query}")
 
     # Get available perks from service
-    perks = await perk_service.get_available_perks(
+    perks = perk_service.get_available_perks(
         character_level=request.character_level,
         character_profession=request.character_professions[0] if request.character_professions else None,
         character_breed=request.character_breed,
@@ -375,7 +375,7 @@ async def search_perks(
 @router.get("/stats", response_model=PerkStatsResponse)
 @cached_response("perks_stats", ttl=3600)
 @performance_monitor
-async def get_perk_stats(
+def get_perk_stats(
     perk_service: PerkService = Depends(get_perk_service)
 ):
     """
@@ -387,7 +387,7 @@ async def get_perk_stats(
     logger.info("Getting perk statistics")
 
     # Get all perks for statistics
-    all_perks = await perk_service.get_available_perks()
+    all_perks = perk_service.get_available_perks()
 
     # Collect statistics
     types = set()
@@ -431,7 +431,7 @@ async def get_perk_stats(
 @router.get("/series", response_model=List[PerkSeriesResponse])
 @cached_response("perks_series")
 @performance_monitor
-async def get_perk_series_grouped(
+def get_perk_series_grouped(
     profession: Optional[str] = Query(None, description="Filter by required profession"),
     breed: Optional[str] = Query(None, description="Filter by required breed"),
     type: Optional[str] = Query(None, description="Filter by perk type (SL, AI, LE)"),
@@ -535,7 +535,7 @@ async def get_perk_series_grouped(
 @router.get("/{perk_name}", response_model=PerkSeries)
 @cached_response("perk_series")
 @performance_monitor
-async def get_perk_series(
+def get_perk_series(
     perk_name: str,
     perk_service: PerkService = Depends(get_perk_service)
 ):
@@ -548,7 +548,7 @@ async def get_perk_series(
     """
     logger.info(f"Getting perk series for '{perk_name}'")
 
-    perk_series = await perk_service.get_perk_series(perk_name)
+    perk_series = perk_service.get_perk_series(perk_name)
 
     if not perk_series:
         raise HTTPException(status_code=404, detail=f"Perk series '{perk_name}' not found")
@@ -559,7 +559,7 @@ async def get_perk_series(
 
 @router.post("/calculate", response_model=PerkCalculationResponse)
 @performance_monitor
-async def calculate_perk_effects(
+def calculate_perk_effects(
     request: PerkCalculationRequest,
     perk_service: PerkService = Depends(get_perk_service)
 ):
@@ -595,7 +595,7 @@ async def calculate_perk_effects(
 
         if levels_to_buy > 0:
             # Get perk series to determine type
-            perk_series = await perk_service.get_perk_series(perk_name)
+            perk_series = perk_service.get_perk_series(perk_name)
             if perk_series:
                 if perk_series.type == 'SL':
                     total_sl_cost += levels_to_buy
@@ -611,7 +611,7 @@ async def calculate_perk_effects(
     affordable = sl_points_remaining >= 0 and ai_points_remaining >= 0
 
     # Calculate aggregate effects
-    perk_effects = await perk_service.calculate_perk_effects(request.target_perks)
+    perk_effects = perk_service.calculate_perk_effects(request.target_perks)
 
     # Check requirements (simplified for now)
     requirements_met = True
@@ -637,7 +637,7 @@ async def calculate_perk_effects(
 @router.get("/lookup/{aoid}")
 @cached_response("perk_lookup")
 @performance_monitor
-async def lookup_perk_by_aoid(
+def lookup_perk_by_aoid(
     aoid: int,
     perk_service: PerkService = Depends(get_perk_service)
 ):
@@ -650,7 +650,7 @@ async def lookup_perk_by_aoid(
     """
     logger.info(f"Looking up perk by AOID: {aoid}")
 
-    perk_info = await perk_service.get_perk_info_by_aoid(aoid)
+    perk_info = perk_service.get_perk_info_by_aoid(aoid)
 
     if not perk_info:
         # Return a 404 with null body for easier handling in frontend
@@ -662,7 +662,7 @@ async def lookup_perk_by_aoid(
 
 @router.get("/{perk_name}/validate")
 @performance_monitor
-async def validate_perk_requirements(
+def validate_perk_requirements(
     perk_name: str,
     target_level: int = Query(..., description="Target perk level to validate"),
     character_level: int = Query(..., description="Character level"),
@@ -690,7 +690,7 @@ async def validate_perk_requirements(
         except (json.JSONDecodeError, ValueError):
             logger.warning(f"Invalid owned_perks JSON: {owned_perks}")
 
-    validation = await perk_service.validate_perk_requirements(
+    validation = perk_service.validate_perk_requirements(
         perk_name=perk_name,
         target_level=target_level,
         character_level=character_level,

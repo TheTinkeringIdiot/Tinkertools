@@ -8,6 +8,8 @@ FastAPI routes, schemas, and services for TinkerTools backend API endpoints.
 - **JOIN over Subqueries**: Convert subqueries to JOINs for better query performance
 - **Response Caching**: Use `@cached_response` decorator for expensive endpoints with static data
 - **Dependency Injection**: Use FastAPI `Depends()` for database sessions and services
+- **Synchronous DB Operations**: Use synchronous SQLAlchemy (not async) - FastAPI handles concurrency via thread pool
+- **Modern JSON Querying**: Use `column['key'].astext.cast(Type)` instead of `.op('->>')` for JSONB columns
 
 ## Critical Guidelines
 - Use `joinedload()` for preloading relationships when building complex response objects
@@ -20,6 +22,7 @@ FastAPI routes, schemas, and services for TinkerTools backend API endpoints.
 - `routes/` - API endpoint handlers (items, weapons, nanos, etc.)
 - `schemas/` - Pydantic request/response models
 - `services/` - Business logic and complex queries
+- Database session management: `backend/app/core/database.py` (centralized)
 
 ## Documentation
 - Features: `.docs/features/tinkerfite-performance-optimization.doc.md`

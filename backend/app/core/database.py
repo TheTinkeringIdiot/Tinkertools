@@ -19,13 +19,9 @@ if not DATABASE_URL:
     DATABASE_URL = "sqlite:///./test.db"
 
 # Create SQLAlchemy engine with connection pooling
-# Default pool size for normal operations
+# Connection pool configuration
 _default_pool_size = 10
 _default_max_overflow = 20
-
-# Enhanced pool size for bulk operations (as specified in import-optimizer requirements)
-_bulk_pool_size = 40
-_bulk_max_overflow = 60
 
 engine = create_engine(
     DATABASE_URL,
@@ -106,56 +102,6 @@ def get_table_count() -> int:
     except Exception as e:
         print(f"Failed to get table count: {e}")
         return 0
-
-def configure_for_bulk_operations() -> bool:
-    """
-    Configure the database engine for bulk operations.
-    Increases connection pool size for parallel processing.
-
-    Returns:
-        bool: True if successful
-    """
-    global engine
-    try:
-        # Create new engine with enhanced pool settings for bulk operations
-        engine = create_engine(
-            DATABASE_URL,
-            pool_pre_ping=True,
-            pool_size=_bulk_pool_size,
-            max_overflow=_bulk_max_overflow,
-            echo=os.getenv("SQL_DEBUG", "false").lower() == "true"
-        )
-        logger.info(f"Database configured for bulk operations: pool_size={_bulk_pool_size}, max_overflow={_bulk_max_overflow}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to configure database for bulk operations: {e}")
-        return False
-
-
-def configure_for_normal_operations() -> bool:
-    """
-    Configure the database engine for normal operations.
-    Resets connection pool to default size.
-
-    Returns:
-        bool: True if successful
-    """
-    global engine
-    try:
-        # Create new engine with default pool settings
-        engine = create_engine(
-            DATABASE_URL,
-            pool_pre_ping=True,
-            pool_size=_default_pool_size,
-            max_overflow=_default_max_overflow,
-            echo=os.getenv("SQL_DEBUG", "false").lower() == "true"
-        )
-        logger.info(f"Database configured for normal operations: pool_size={_default_pool_size}, max_overflow={_default_max_overflow}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to configure database for normal operations: {e}")
-        return False
-
 
 def get_database_info() -> dict:
     """
