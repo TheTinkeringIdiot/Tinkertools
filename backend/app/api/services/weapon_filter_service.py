@@ -4,8 +4,8 @@ Service for filtering weapons based on character stats and requirements.
 
 import logging
 from typing import List, Optional
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, or_
+from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy import and_, or_, select
 
 from app.models import (
     Item, ItemStats, StatValue, AttackDefense, AttackDefenseAttack, AttackDefenseDefense,
@@ -14,7 +14,7 @@ from app.models import (
 )
 from app.api.schemas import ItemDetail
 from app.api.schemas.weapon_analysis import WeaponAnalyzeRequest
-from app.api.routes.items import build_item_detail
+from app.api.routes.items import build_item_details_bulk
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,10 @@ class WeaponFilterService:
         """
         Filter weapons based on character stats and requirements.
 
+        Uses two-stage loading to prevent timeout:
+        1. Filter with minimal loading (only attack stats for filtering)
+        2. Load full details for filtered results only
+
         Args:
             request: WeaponAnalyzeRequest containing character data
 
@@ -50,15 +54,13 @@ class WeaponFilterService:
             f"skills={[s.skill_id for s in request.top_weapon_skills]}"
         )
 
-        # Start with base query for weapons with attack/defense data
+        # STAGE 1: Filter with minimal loading (only what's needed for filtering)
         # No QL filtering - return all QL variants for proper interpolation
         query = self.db.query(Item).options(
-            joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
-            joinedload(Item.attack_defense).joinedload(AttackDefense.attack_stats).joinedload(AttackDefenseAttack.stat_value),
-            joinedload(Item.attack_defense).joinedload(AttackDefense.defense_stats).joinedload(AttackDefenseDefense.stat_value),
-            joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data).joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell).joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
-            joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion),
-            joinedload(Item.item_sources).joinedload(ItemSource.source).joinedload(Source.source_type)
+            # Only load attack stats (needed for weapon skill filtering)
+            joinedload(Item.attack_defense)
+                .joinedload(AttackDefense.attack_stats)
+                .joinedload(AttackDefenseAttack.stat_value)
         ).filter(
             Item.atkdef_id.isnot(None),
             Item.item_class == self.WEAPON_ITEM_CLASS
@@ -84,87 +86,138 @@ class WeaponFilterService:
             )
 
         # Only include items with at least one requirement (excludes unequippable items)
-        # Optimize: Use JOIN instead of subquery
         query = query.join(
             Action, Item.id == Action.item_id
         ).join(
             ActionCriteria, Action.id == ActionCriteria.action_id
         )
 
+        # OPTIMIZED: Use subqueries materialized once + NOT IN for exclusions
+        # Much faster than multiple correlated NOT EXISTS subqueries that scan tables repeatedly
+
         # Exclude items with NPC family requirements (NPC-only weapons)
-        # Note: Must use subquery for exclusion to avoid false positives
-        npc_family_subquery = self.db.query(Item.id).join(
+        npc_weapon_ids = select(Item.id).select_from(Item).join(
             Action, Item.id == Action.item_id
         ).join(
             ActionCriteria, Action.id == ActionCriteria.action_id
         ).join(
             Criterion, ActionCriteria.criterion_id == Criterion.id
-        ).filter(
+        ).where(
             Criterion.value1 == self.NPC_FAMILY_STAT
-        )
-        query = query.filter(~Item.id.in_(npc_family_subquery))
+        ).scalar_subquery()
+
+        query = query.filter(Item.id.not_in(npc_weapon_ids))
 
         # Apply faction filter if needed (side 0 = neutral can use all)
         if request.side > 0:
-            # Include items with no faction requirement OR matching faction requirement
-            faction_subquery = self.db.query(Item.id).join(
-                ItemStats, Item.id == ItemStats.item_id
+            faction_restricted_ids = select(Item.id).select_from(Item).join(
+                ItemStats, ItemStats.item_id == Item.id
             ).join(
-                StatValue, ItemStats.stat_value_id == StatValue.id
-            ).filter(
+                StatValue, StatValue.id == ItemStats.stat_value_id
+            ).where(
                 StatValue.stat == self.FACTION_STAT,
                 StatValue.value != request.side,
-                StatValue.value != 0  # 0 = no faction requirement
-            )
-            query = query.filter(~Item.id.in_(faction_subquery))
+                StatValue.value != 0
+            ).scalar_subquery()
+
+            query = query.filter(Item.id.not_in(faction_restricted_ids))
 
         # Apply breed filter
-        # Breed requirements are stored in actions/criteria with stat 4
-        # Only exclude if breed requirement exists and doesn't match
-        breed_subquery = self.db.query(Item.id).join(
+        breed_restricted_ids = select(Item.id).select_from(Item).join(
             Action, Item.id == Action.item_id
         ).join(
             ActionCriteria, Action.id == ActionCriteria.action_id
         ).join(
             Criterion, ActionCriteria.criterion_id == Criterion.id
-        ).filter(
+        ).where(
             Criterion.value1 == 4,  # Stat 4 = Breed
             Criterion.value2 != request.breed_id,
-            Criterion.value2 != 0  # 0 = no breed requirement
-        )
-        query = query.filter(~Item.id.in_(breed_subquery))
+            Criterion.value2 != 0
+        ).scalar_subquery()
+
+        query = query.filter(Item.id.not_in(breed_restricted_ids))
 
         # Apply profession filter
-        # Profession requirements are in stat 60 or 368
-        # Only exclude if profession requirement exists and doesn't match
-        # Profession 0 = "Any" can use all items
         if request.profession_id > 0:
-            profession_subquery = self.db.query(Item.id).join(
+            prof_restricted_ids = select(Item.id).select_from(Item).join(
                 Action, Item.id == Action.item_id
             ).join(
                 ActionCriteria, Action.id == ActionCriteria.action_id
             ).join(
                 Criterion, ActionCriteria.criterion_id == Criterion.id
-            ).filter(
+            ).where(
                 Action.action == 3,  # Action type 3 = Use/Equip
                 or_(
                     Criterion.value1 == 60,   # Stat 60 = Profession
                     Criterion.value1 == 368   # Stat 368 = VisualProfession
                 ),
                 Criterion.value2 != request.profession_id,
-                Criterion.value2 != 0  # 0 = any profession
-            )
-            query = query.filter(~Item.id.in_(profession_subquery))
+                Criterion.value2 != 0
+            ).scalar_subquery()
+
+            query = query.filter(Item.id.not_in(prof_restricted_ids))
 
         # Use distinct to avoid duplicates
         query = query.distinct()
 
-        # Execute query and get results
+        # Execute filtering query (Stage 1)
         items = query.all()
 
         logger.info(f"Found {len(items)} weapons matching criteria")
 
-        # Build detailed item responses
-        detailed_items = [build_item_detail(item, self.db) for item in items]
+        # STAGE 2: Load full details for filtered results only
+        # This prevents timeout by only loading deep relationships for filtered items
+        if not items:
+            return []
+
+        item_ids = [item.id for item in items]
+
+        # Stage 2a: Load item details with selectinload to avoid Cartesian products
+        detailed_query = self.db.query(Item).options(
+            selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
+            selectinload(Item.attack_defense)
+                .selectinload(AttackDefense.attack_stats)
+                .selectinload(AttackDefenseAttack.stat_value),
+            selectinload(Item.attack_defense)
+                .selectinload(AttackDefense.defense_stats)
+                .selectinload(AttackDefenseDefense.stat_value),
+            # Only load 2 levels deep for spell data (not the full spell criteria chain)
+            selectinload(Item.item_spell_data).selectinload(ItemSpellData.spell_data),
+            selectinload(Item.actions),
+            selectinload(Item.item_sources)
+                .selectinload(ItemSource.source)
+                .selectinload(Source.source_type)
+        ).filter(Item.id.in_(item_ids))
+
+        detailed_items_objs = detailed_query.all()
+
+        # Stage 2b: Batch load spell criteria separately if needed
+        spell_data_ids = [
+            isd.spell_data_id
+            for item in detailed_items_objs
+            for isd in item.item_spell_data if isd.spell_data_id
+        ]
+
+        if spell_data_ids:
+            # Load spell details with criteria in separate optimized query
+            self.db.query(SpellData).options(
+                selectinload(SpellData.spell_data_spells)
+                    .selectinload(SpellDataSpells.spell)
+                    .selectinload(Spell.spell_criteria)
+                    .selectinload(SpellCriterion.criterion)
+            ).filter(SpellData.id.in_(spell_data_ids)).all()
+
+        # Stage 2c: Batch load action criteria separately
+        action_ids = [action.id for item in detailed_items_objs for action in item.actions]
+
+        if action_ids:
+            self.db.query(ActionCriteria).options(
+                selectinload(ActionCriteria.criterion)
+            ).filter(ActionCriteria.action_id.in_(action_ids)).all()
+
+        logger.info(f"Loaded full details for {len(detailed_items_objs)} weapons")
+
+        # Build detailed item responses using bulk transformation
+        detailed_items = build_item_details_bulk(detailed_items_objs, self.db)
 
         return detailed_items

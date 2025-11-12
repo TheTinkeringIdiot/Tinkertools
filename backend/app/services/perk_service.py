@@ -61,7 +61,7 @@ class PerkService:
     def __init__(self, db: Session):
         self.db = db
 
-    async def get_available_perks(
+    def get_available_perks(
         self,
         character_level: Optional[int] = None,
         character_profession: Optional[str] = None,
@@ -186,7 +186,7 @@ class PerkService:
         logger.info(f"Found {len(perk_responses)} available perks")
         return perk_responses
 
-    async def get_perk_series(self, perk_name: str) -> Optional[PerkSeries]:
+    def get_perk_series(self, perk_name: str) -> Optional[PerkSeries]:
         """
         Get all levels of a perk series (levels 1-10).
 
@@ -254,8 +254,8 @@ class PerkService:
             )
 
             # Get spell data and effects
-            spell_data_responses = await self._get_spell_data_responses(item)
-            effects = await self._extract_perk_effects(item)
+            spell_data_responses = self._get_spell_data_responses(item)
+            effects = self._extract_perk_effects(item)
             requirements = self._extract_perk_requirements(item)
 
             perk_detail = PerkDetail(
@@ -295,7 +295,7 @@ class PerkService:
         logger.info(f"Found perk series '{perk_name}' with {len(perk_levels)} levels")
         return perk_series
 
-    async def calculate_perk_effects(self, owned_perks: Dict[str, int]) -> Dict[str, int]:
+    def calculate_perk_effects(self, owned_perks: Dict[str, int]) -> Dict[str, int]:
         """
         Calculate aggregate spell_data effects from owned perks.
 
@@ -328,7 +328,7 @@ class PerkService:
                     continue
 
                 # Extract effects from spell data
-                effects = await self._extract_perk_effects(perk_item)
+                effects = self._extract_perk_effects(perk_item)
 
                 # Aggregate effects
                 for effect in effects:
@@ -350,7 +350,7 @@ class PerkService:
         logger.info(f"Calculated effects for {len(total_effects)} stats")
         return total_effects
 
-    async def get_perk_info_by_aoid(self, aoid: int) -> Optional[Dict[str, Any]]:
+    def get_perk_info_by_aoid(self, aoid: int) -> Optional[Dict[str, Any]]:
         """
         Get complete perk item with full item details and perk metadata.
 
@@ -503,7 +503,7 @@ class PerkService:
         logger.info(f"Found complete perk item: {perk.name} (type: {perk.type}, level: {perk.counter})")
         return perk_info
 
-    async def get_perk_by_aoid(self, aoid: int) -> Optional[PerkDetail]:
+    def get_perk_by_aoid(self, aoid: int) -> Optional[PerkDetail]:
         """
         Get a perk by its AOID (Anarchy Online ID).
 
@@ -546,8 +546,8 @@ class PerkService:
         )
 
         # Get spell data and effects
-        spell_data_responses = await self._get_spell_data_responses(perk_item)
-        effects = await self._extract_perk_effects(perk_item)
+        spell_data_responses = self._get_spell_data_responses(perk_item)
+        effects = self._extract_perk_effects(perk_item)
         requirements = self._extract_perk_requirements(perk_item)
 
         # Handle empty arrays as "all professions/breeds allowed"
@@ -583,7 +583,7 @@ class PerkService:
         logger.info(f"Found perk: {perk.name} (type: {perk.type}, level: {perk.counter})")
         return perk_detail
 
-    async def validate_perk_requirements(
+    def validate_perk_requirements(
         self,
         perk_name: str,
         target_level: int,
@@ -748,7 +748,7 @@ class PerkService:
 
         return True  # If no point limits specified, assume affordable
 
-    async def _get_spell_data_responses(self, item: Item) -> List[SpellDataResponse]:
+    def _get_spell_data_responses(self, item: Item) -> List[SpellDataResponse]:
         """Convert item spell data to response format following the pattern from items endpoint."""
         from app.api.schemas.spell import SpellWithCriteria
         from app.api.schemas.criterion import CriterionResponse
@@ -813,7 +813,7 @@ class PerkService:
 
         return spell_data_list
 
-    async def _extract_perk_effects(self, item: Item) -> List[PerkEffect]:
+    def _extract_perk_effects(self, item: Item) -> List[PerkEffect]:
         """Extract stat effects from item spell data."""
         effects = []
 

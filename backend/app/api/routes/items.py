@@ -143,17 +143,17 @@ def build_item_detail(item: Item, db: Session) -> ItemDetail:
     """
     # Get basic stats
     stats = [stat.stat_value for stat in item.item_stats] if item.item_stats else []
-    
+
     # Get spell data with nested spells and criteria
     spell_data_list = []
     for isd in item.item_spell_data:
         spell_data = isd.spell_data
-        
+
         # Get spells for this spell_data
         spells_with_criteria = []
         for sds in spell_data.spell_data_spells:
             spell = sds.spell
-            
+
             # Get criteria for this spell
             criteria = [
                 CriterionResponse(
@@ -164,7 +164,7 @@ def build_item_detail(item: Item, db: Session) -> ItemDetail:
                 )
                 for sc in spell.spell_criteria
             ]
-            
+
             spells_with_criteria.append(SpellWithCriteria(
                 id=spell.id,
                 target=spell.target,
@@ -175,13 +175,13 @@ def build_item_detail(item: Item, db: Session) -> ItemDetail:
                 spell_params=spell.spell_params or {},
                 criteria=criteria
             ))
-        
+
         spell_data_list.append(SpellDataResponse(
             id=spell_data.id,
             event=spell_data.event,
             spells=spells_with_criteria
         ))
-    
+
     # Get attack/defense stats from preloaded data
     attack_stats = []
     defense_stats = []
@@ -189,7 +189,7 @@ def build_item_detail(item: Item, db: Session) -> ItemDetail:
         # Use preloaded attack/defense relationships
         attack_stats = [ada.stat_value for ada in item.attack_defense.attack_stats]
         defense_stats = [add.stat_value for add in item.attack_defense.defense_stats]
-    
+
     # Get actions with criteria
     actions = []
     for action in item.actions:
@@ -202,14 +202,14 @@ def build_item_detail(item: Item, db: Session) -> ItemDetail:
             )
             for ac in action.action_criteria
         ]
-        
+
         actions.append(ActionResponse(
             id=action.id,
             action=action.action,
             item_id=action.item_id,
             criteria=criteria
         ))
-    
+
     # Get sources
     sources = []
     for item_source in item.item_sources:
@@ -226,7 +226,7 @@ def build_item_detail(item: Item, db: Session) -> ItemDetail:
                 description=source.source_type.description
             ) if source.source_type else None
         )
-        
+
         sources.append(ItemSourceResponse(
             source=source_response,
             drop_rate=float(item_source.drop_rate) if item_source.drop_rate else None,
@@ -235,7 +235,7 @@ def build_item_detail(item: Item, db: Session) -> ItemDetail:
             conditions=item_source.conditions,
             extra_data=item_source.extra_data
         ))
-    
+
     # Convert stats to StatValueResponse objects
     stats_response = [
         StatValueResponse(id=stat.id, stat=stat.stat, value=stat.value)
@@ -249,7 +249,7 @@ def build_item_detail(item: Item, db: Session) -> ItemDetail:
         StatValueResponse(id=stat.id, stat=stat.stat, value=stat.value)
         for stat in defense_stats
     ]
-    
+
     return ItemDetail(
         id=item.id,
         aoid=item.aoid,
@@ -265,6 +265,158 @@ def build_item_detail(item: Item, db: Session) -> ItemDetail:
         actions=actions,
         sources=sources
     )
+
+
+def build_item_details_bulk(items: List[Item], db: Session) -> List[ItemDetail]:
+    """
+    Build ItemDetail responses for multiple items with optimized caching.
+
+    Caches StatValueResponse objects to avoid creating duplicate response objects
+    for stat_values that appear across multiple items (e.g., common attack stats).
+
+    Args:
+        items: List of Item objects with preloaded relationships
+        db: Database session (kept for signature compatibility)
+
+    Returns:
+        List of ItemDetail objects
+    """
+    if not items:
+        return []
+
+    # Cache stat responses to reuse across items
+    stat_value_cache = {}
+
+    def get_stat_response(stat_value):
+        """Get cached StatValueResponse or create and cache new one."""
+        if stat_value.id not in stat_value_cache:
+            stat_value_cache[stat_value.id] = StatValueResponse(
+                id=stat_value.id,
+                stat=stat_value.stat,
+                value=stat_value.value
+            )
+        return stat_value_cache[stat_value.id]
+
+    # Process all items with caching
+    result = []
+    for item in items:
+        # Get basic stats with caching
+        stats = [stat.stat_value for stat in item.item_stats] if item.item_stats else []
+
+        # Get spell data with nested spells and criteria
+        spell_data_list = []
+        for isd in item.item_spell_data:
+            spell_data = isd.spell_data
+
+            # Get spells for this spell_data
+            spells_with_criteria = []
+            for sds in spell_data.spell_data_spells:
+                spell = sds.spell
+
+                # Get criteria for this spell
+                criteria = [
+                    CriterionResponse(
+                        id=sc.criterion.id,
+                        value1=sc.criterion.value1,
+                        value2=sc.criterion.value2,
+                        operator=sc.criterion.operator
+                    )
+                    for sc in spell.spell_criteria
+                ]
+
+                spells_with_criteria.append(SpellWithCriteria(
+                    id=spell.id,
+                    target=spell.target,
+                    tick_count=spell.tick_count,
+                    tick_interval=spell.tick_interval,
+                    spell_id=spell.spell_id,
+                    spell_format=spell.spell_format,
+                    spell_params=spell.spell_params or {},
+                    criteria=criteria
+                ))
+
+            spell_data_list.append(SpellDataResponse(
+                id=spell_data.id,
+                event=spell_data.event,
+                spells=spells_with_criteria
+            ))
+
+        # Get attack/defense stats from preloaded data with caching
+        attack_stats = []
+        defense_stats = []
+        if item.attack_defense:
+            # Use preloaded attack/defense relationships
+            attack_stats = [ada.stat_value for ada in item.attack_defense.attack_stats]
+            defense_stats = [add.stat_value for add in item.attack_defense.defense_stats]
+
+        # Get actions with criteria
+        actions = []
+        for action in item.actions:
+            criteria = [
+                CriterionResponse(
+                    id=ac.criterion.id,
+                    value1=ac.criterion.value1,
+                    value2=ac.criterion.value2,
+                    operator=ac.criterion.operator
+                )
+                for ac in action.action_criteria
+            ]
+
+            actions.append(ActionResponse(
+                id=action.id,
+                action=action.action,
+                item_id=action.item_id,
+                criteria=criteria
+            ))
+
+        # Get sources
+        sources = []
+        for item_source in item.item_sources:
+            source = item_source.source
+            source_response = SourceResponse(
+                id=source.id,
+                source_type_id=source.source_type_id,
+                source_id=source.source_id,
+                name=source.name,
+                extra_data=source.extra_data,
+                source_type=SourceTypeResponse(
+                    id=source.source_type.id,
+                    name=source.source_type.name,
+                    description=source.source_type.description
+                ) if source.source_type else None
+            )
+
+            sources.append(ItemSourceResponse(
+                source=source_response,
+                drop_rate=float(item_source.drop_rate) if item_source.drop_rate else None,
+                min_ql=item_source.min_ql,
+                max_ql=item_source.max_ql,
+                conditions=item_source.conditions,
+                extra_data=item_source.extra_data
+            ))
+
+        # Convert stats to StatValueResponse objects using cache
+        stats_response = [get_stat_response(stat) for stat in stats]
+        attack_stats_response = [get_stat_response(stat) for stat in attack_stats]
+        defense_stats_response = [get_stat_response(stat) for stat in defense_stats]
+
+        result.append(ItemDetail(
+            id=item.id,
+            aoid=item.aoid,
+            name=item.name,
+            ql=item.ql,
+            item_class=item.item_class,
+            description=item.description,
+            is_nano=item.is_nano,
+            stats=stats_response,
+            spell_data=spell_data_list,
+            attack_stats=attack_stats_response,
+            defense_stats=defense_stats_response,
+            actions=actions,
+            sources=sources
+        ))
+
+    return result
 
 
 @router.get("", response_model=PaginatedResponse[ItemDetail])

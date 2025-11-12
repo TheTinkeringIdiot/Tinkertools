@@ -6,7 +6,7 @@ Handles implant lookup by slot, QL, and exact cluster combinations.
 
 from typing import List, Optional, Dict, Tuple
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, func, text, exists, not_, Integer
+from sqlalchemy import func, Integer, cast, String, select
 import logging
 
 from app.models.item import Item, ItemStats, ItemSpellData
@@ -136,41 +136,51 @@ class ImplantService:
                 .filter(Item.item_class == 3)\
                 .filter(Item.ql == base_ql)\
                 .filter(Spell.spell_id == 53045)\
-                .filter(Spell.spell_params['Stat'].astext.cast(Integer).in_(cluster_stats))\
+                .filter(cast(Spell.spell_params['Stat'], String).cast(Integer).in_(cluster_stats))\
                 .group_by(Item.id)\
                 .having(func.count(Spell.id.distinct()) == cluster_count)\
                 .subquery()
 
             # Subquery: Items that have NO extra clusters (other Modify Stat spells not in our list)
+            # First get items with extra clusters
+            items_with_extra_clusters = self.db.query(Item.id)\
+                .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
+                .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
+                .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
+                .join(Spell, SpellDataSpells.spell_id == Spell.id)\
+                .filter(Item.item_class == 3)\
+                .filter(Item.ql == base_ql)\
+                .filter(Spell.spell_id == 53045)\
+                .filter(~cast(Spell.spell_params['Stat'], String).cast(Integer).in_(cluster_stats))\
+                .distinct()\
+                .subquery()
+
+            # Then create subquery for items WITHOUT extra clusters
             has_no_extra_clusters = self.db.query(Item.id)\
                 .filter(Item.item_class == 3)\
                 .filter(Item.ql == base_ql)\
-                .filter(~exists().where(
-                    and_(
-                        ItemSpellData.item_id == Item.id,
-                        ItemSpellData.spell_data_id == SpellData.id,
-                        SpellData.id == SpellDataSpells.spell_data_id,
-                        SpellDataSpells.spell_id == Spell.id,
-                        Spell.spell_id == 53045,
-                        ~Spell.spell_params['Stat'].astext.cast(Integer).in_(cluster_stats)
-                    )
-                ))\
+                .filter(~Item.id.in_(select(items_with_extra_clusters.c.id)))\
                 .subquery()
-            
+
             # Combine conditions: must have all required clusters and no extra ones
-            query = query.filter(Item.id.in_(has_all_clusters))\
-                         .filter(Item.id.in_(has_no_extra_clusters))
+            query = query.filter(Item.id.in_(select(has_all_clusters.c.id)))\
+                         .filter(Item.id.in_(select(has_no_extra_clusters.c.id)))
         else:
             # Handle case where no clusters specified (basic implants with no Modify Stat spells)
-            query = query.filter(~exists().where(
-                and_(
-                    ItemSpellData.item_id == Item.id,
-                    ItemSpellData.spell_data_id == SpellData.id,
-                    SpellData.id == SpellDataSpells.spell_data_id,
-                    SpellDataSpells.spell_id == Spell.id,
-                    Spell.spell_id == 53045
-                )
-            ))
+            # First get items that have any Modify Stat spells
+            items_with_modify_stat = self.db.query(Item.id)\
+                .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
+                .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
+                .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
+                .join(Spell, SpellDataSpells.spell_id == Spell.id)\
+                .filter(Item.item_class == 3)\
+                .filter(Item.ql == base_ql)\
+                .filter(Spell.spell_id == 53045)\
+                .distinct()\
+                .subquery()
+
+            # Then filter to items WITHOUT Modify Stat spells
+            query = query.filter(~Item.id.in_(select(items_with_modify_stat.c.id)))
         
         # Filter by slot using stat 298 (Slot) with bitwise AND operation
         # The slot parameter should be a bitflag value (e.g., 32 for chest)
@@ -180,8 +190,8 @@ class ImplantService:
             .filter(StatValue.stat == 298)\
             .filter(StatValue.value.op('&')(slot) > 0)\
             .subquery()
-        
-        query = query.filter(Item.id.in_(slot_filter_query))
+
+        query = query.filter(Item.id.in_(select(slot_filter_query.c.id)))
         
         # Execute query and get first result
         result = query.first()

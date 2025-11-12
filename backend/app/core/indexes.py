@@ -169,6 +169,39 @@ PERFORMANCE_INDEXES = [
     {
         'name': 'idx_pb_symbiant_drops_symbiant_id',
         'query': 'CREATE INDEX IF NOT EXISTS idx_pb_symbiant_drops_symbiant_id ON pocket_boss_symbiant_drops(symbiant_id);'
+    },
+
+    # Phase 2: Strategic performance indexes for weapon filtering and criteria lookups
+    # Partial index for criteria value1 lookups (used in weapon filtering)
+    {
+        'name': 'idx_criteria_value1_common_stats',
+        'query': '''CREATE INDEX IF NOT EXISTS idx_criteria_value1_common_stats
+                    ON criteria(value1)
+                    WHERE value1 IN (4, 33, 60, 368, 455);''',
+        'description': 'Partial index for common stat criteria (breed, faction, profession, NPC)'
+    },
+    # Covering index for Action + ActionCriteria join
+    {
+        'name': 'idx_action_criteria_covering',
+        'query': '''CREATE INDEX IF NOT EXISTS idx_action_criteria_covering
+                    ON action_criteria(action_id, criterion_id)
+                    INCLUDE (order_index);''',
+        'description': 'Covering index for action criteria lookups'
+    },
+    # Partial index for weapon items only
+    {
+        'name': 'idx_items_weapons_only',
+        'query': '''CREATE INDEX IF NOT EXISTS idx_items_weapons_only
+                    ON items(id, atkdef_id)
+                    WHERE item_class = 1 AND atkdef_id IS NOT NULL;''',
+        'description': 'Partial index for weapon-class items with attack/defense data'
+    },
+    # Composite index for item_stats faction filtering
+    {
+        'name': 'idx_item_stats_faction_lookup',
+        'query': '''CREATE INDEX IF NOT EXISTS idx_item_stats_faction_lookup
+                    ON item_stats(item_id, stat_value_id);''',
+        'description': 'Composite index for item stats lookups'
     }
 ]
 

@@ -26,36 +26,36 @@ $$ LANGUAGE plpgsql;
 -- Test 1: Verify All Required Tables Exist
 -- ============================================================================
 
-\echo 'Test 1: Checking if all 20 required tables exist...'
+\echo 'Test 1: Checking if all required tables exist...'
 
 DO $$
 DECLARE
     required_tables TEXT[] := ARRAY[
         'stat_values', 'criteria', 'spells', 'spell_criteria', 'spell_data',
-        'spell_data_spells', 'attack_defense', 'attack_defense_attack', 
+        'spell_data_spells', 'attack_defense', 'attack_defense_attack',
         'attack_defense_defense', 'animation_mesh', 'shop_hash', 'items',
         'item_stats', 'item_spell_data', 'item_shop_hash', 'actions',
-        'action_criteria', 'symbiants', 'pocket_bosses', 
-        'pocket_boss_symbiant_drops', 'application_cache'
+        'action_criteria', 'application_cache', 'mobs', 'perks',
+        'source_types', 'sources', 'item_sources', 'schema_migrations'
     ];
-    table_name TEXT;
+    tbl_name TEXT;
     table_exists BOOLEAN;
     missing_tables TEXT := '';
 BEGIN
-    FOREACH table_name IN ARRAY required_tables
+    FOREACH tbl_name IN ARRAY required_tables
     LOOP
         SELECT EXISTS (
-            SELECT FROM information_schema.tables 
-            WHERE table_schema = 'public' AND table_name = table_name
+            SELECT FROM information_schema.tables t
+            WHERE t.table_schema = 'public' AND t.table_name = tbl_name
         ) INTO table_exists;
-        
+
         IF NOT table_exists THEN
-            missing_tables := missing_tables || table_name || ', ';
+            missing_tables := missing_tables || tbl_name || ', ';
         END IF;
     END LOOP;
-    
+
     IF missing_tables = '' THEN
-        PERFORM record_test('table_existence', TRUE, 'All 21 required tables exist');
+        PERFORM record_test('table_existence', TRUE, 'All required tables exist');
     ELSE
         PERFORM record_test('table_existence', FALSE, 'Missing tables: ' || missing_tables);
     END IF;
@@ -148,9 +148,13 @@ DECLARE
         'idx_stat_values_stat_value',
         'idx_items_name',
         'idx_items_aoid',
-        'idx_pocket_bosses_name',
-        'idx_symbiants_aoid',
-        'idx_spells_spell_id'
+        'idx_mobs_name',
+        'idx_mobs_is_pocket_boss',
+        'idx_symbiant_items_aoid',
+        'idx_symbiant_items_family',
+        'idx_spells_spell_id',
+        'idx_perks_series',
+        'idx_perks_type'
     ];
     index_name TEXT;
     index_exists BOOLEAN;
@@ -159,16 +163,16 @@ BEGIN
     FOREACH index_name IN ARRAY required_indexes
     LOOP
         SELECT EXISTS (
-            SELECT FROM pg_class c 
-            JOIN pg_namespace n ON n.oid = c.relnamespace 
+            SELECT FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
             WHERE c.relname = index_name AND n.nspname = 'public'
         ) INTO index_exists;
-        
+
         IF NOT index_exists THEN
             missing_indexes := missing_indexes || index_name || ', ';
         END IF;
     END LOOP;
-    
+
     IF missing_indexes = '' THEN
         PERFORM record_test('required_indexes', TRUE, 'All required indexes exist');
     ELSE
@@ -285,32 +289,44 @@ END $$;
 
 DO $$
 DECLARE
-    boss_id INTEGER;
-    symbiant_id INTEGER;
+    test_item_id INTEGER;
+    test_source_type_id INTEGER;
+    test_source_id INTEGER;
     relationship_count INTEGER;
 BEGIN
-    -- Create test data
-    INSERT INTO pocket_bosses (name, level) VALUES ('Test Boss', 100) RETURNING id INTO boss_id;
-    INSERT INTO symbiants (aoid, family) VALUES (12345, 'Test Family') RETURNING id INTO symbiant_id;
-    
-    -- Create relationship
-    INSERT INTO pocket_boss_symbiant_drops (pocket_boss_id, symbiant_id) VALUES (boss_id, symbiant_id);
-    
+    -- Get or create test source type
+    INSERT INTO source_types (name, description)
+    VALUES ('test_junction', 'Test source type for junction test')
+    ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+    RETURNING id INTO test_source_type_id;
+
+    -- Create test source (e.g., a specific mob or mission)
+    INSERT INTO sources (source_type_id, source_id, name)
+    VALUES (test_source_type_id, 999, 'Test Source')
+    RETURNING id INTO test_source_id;
+
+    -- Create test item
+    INSERT INTO items (name, ql) VALUES ('Test Junction Item', 100) RETURNING id INTO test_item_id;
+
+    -- Create relationship via item_sources junction table
+    INSERT INTO item_sources (item_id, source_id, drop_rate)
+    VALUES (test_item_id, test_source_id, 25.5);
+
     -- Verify relationship exists
-    SELECT COUNT(*) INTO relationship_count 
-    FROM pocket_boss_symbiant_drops 
-    WHERE pocket_boss_id = boss_id AND symbiant_id = symbiant_id;
-    
+    SELECT COUNT(*) INTO relationship_count
+    FROM item_sources
+    WHERE item_id = test_item_id AND source_id = test_source_id;
+
     IF relationship_count = 1 THEN
         PERFORM record_test('junction_relationships', TRUE, 'Many-to-many relationships working');
     ELSE
         PERFORM record_test('junction_relationships', FALSE, 'Many-to-many relationships not working');
     END IF;
-    
-    -- Cleanup
-    DELETE FROM pocket_boss_symbiant_drops WHERE pocket_boss_id = boss_id;
-    DELETE FROM pocket_bosses WHERE id = boss_id;
-    DELETE FROM symbiants WHERE id = symbiant_id;
+
+    -- Cleanup (cascade deletes should handle item_sources)
+    DELETE FROM items WHERE id = test_item_id;
+    DELETE FROM sources WHERE id = test_source_id;
+    DELETE FROM source_types WHERE id = test_source_type_id AND name = 'test_junction';
 END $$;
 
 -- ============================================================================
