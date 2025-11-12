@@ -30,9 +30,6 @@ import { SKILL_ID } from '../helpers/skill-fixtures';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import type { Item, TinkerProfile } from '@/types/api';
 import type { IntegrationTestContext } from '../helpers/integration-test-utils';
-import { createApp } from 'vue';
-import PrimeVue from 'primevue/config';
-import ToastService from 'primevue/toastservice';
 
 describe('Equipment Interaction Integration', () => {
   let context: IntegrationTestContext;
@@ -47,15 +44,9 @@ describe('Equipment Interaction Integration', () => {
   };
 
   beforeEach(async () => {
-    // Setup PrimeVue with ToastService BEFORE initializing Pinia/stores
-    const app = createApp({});
-    app.use(PrimeVue);
-    app.use(ToastService);
-
+    // setupIntegrationTest() now handles PrimeVue/ToastService/Pinia registration
+    // in the correct order (PrimeVue -> ToastService -> Pinia)
     context = await setupIntegrationTest();
-
-    // Attach Pinia to the app to ensure Toast is available
-    app.use(context.pinia);
 
     store = useTinkerProfilesStore();
 

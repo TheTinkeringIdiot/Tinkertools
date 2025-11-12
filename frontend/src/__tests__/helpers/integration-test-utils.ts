@@ -8,7 +8,8 @@
 import { mount, VueWrapper } from '@vue/test-utils';
 import { createPinia, setActivePinia, type Pinia } from 'pinia';
 import { vi, expect } from 'vitest';
-import type { Component } from 'vue';
+import type { Component, App } from 'vue';
+import { createApp } from 'vue';
 import { mockPrimeVueComponents, createTestRouter } from './vue-test-utils';
 import PrimeVue from 'primevue/config';
 import ToastService from 'primevue/toastservice';
@@ -32,6 +33,7 @@ export async function getMockApiClient() {
 // ============================================================================
 
 export interface IntegrationTestContext {
+  app: App;
   pinia: Pinia;
   mockApi: any; // Mock API client from __mocks__/api-client.ts
   mockLocalStorage: ReturnType<typeof createMockLocalStorage>;
@@ -42,6 +44,9 @@ export interface IntegrationTestContext {
  *
  * IMPORTANT: Use vi.mock('@/services/api-client') at the top of your test file
  * BEFORE importing any stores.
+ *
+ * CRITICAL: PrimeVue/ToastService MUST be registered BEFORE Pinia because components
+ * that use stores may also use PrimeVue components (like Toast).
  *
  * @example
  * // At top of test file:
@@ -55,10 +60,19 @@ export interface IntegrationTestContext {
  *
  * beforeEach(async () => {
  *   context = await setupIntegrationTest();
+ *   // Stores are now safe to use - PrimeVue is already registered
  * });
  */
 export async function setupIntegrationTest(): Promise<IntegrationTestContext> {
+  // CRITICAL: Registration order matters!
+  // PrimeVue + ToastService FIRST, then Pinia
+  // This ensures components that use stores can also use PrimeVue components
+  const app = createApp({});
+  app.use(PrimeVue);        // ← FIRST: UI framework
+  app.use(ToastService);    // ← SECOND: Toast notifications
+
   const pinia = createPinia();
+  app.use(pinia);           // ← THIRD: State management
   setActivePinia(pinia);
 
   const mockApi = await getMockApiClient();
@@ -70,7 +84,7 @@ export async function setupIntegrationTest(): Promise<IntegrationTestContext> {
     writable: true,
   });
 
-  return { pinia, mockApi, mockLocalStorage };
+  return { app, pinia, mockApi, mockLocalStorage };
 }
 
 /**

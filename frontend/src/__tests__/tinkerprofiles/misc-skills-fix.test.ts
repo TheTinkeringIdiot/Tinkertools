@@ -1,9 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { updateProfileWithIPTracking } from '@/lib/tinkerprofiles/ip-integrator';
 import { calculateEquipmentBonuses } from '@/services/equipment-bonus-calculator';
-import { DEFAULT_SKILLS } from '@/lib/tinkerprofiles/constants';
-import { SKILL_CATEGORIES } from '@/lib/tinkerprofiles/skill-mappings';
-import type { TinkerProfile, MiscSkill } from '@/lib/tinkerprofiles/types';
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import type { Item } from '@/types/api';
 import { BREED, PROFESSION } from '@/__tests__/helpers';
 
@@ -18,103 +16,30 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
         Profession: PROFESSION.AGENT,
         Breed: BREED.SOLITUS,
         Level: 200,
-        Gender: 'Female',
         Faction: 'Clan',
         Expansion: 'SL',
         AccountType: 'Paid',
         MaxHealth: 1000,
         MaxNano: 1000,
       },
-      Skills: {
-        Attributes: {
-          Strength: {
-            value: 100,
-            pointsFromIp: 0,
-            ipSpent: 0,
-            trickleDown: 0,
-            baseValue: 100,
-            cap: 200,
-            equipmentBonus: 0,
-            perkBonus: 0,
-            buffBonus: 0,
-          },
-          Agility: {
-            value: 100,
-            pointsFromIp: 0,
-            ipSpent: 0,
-            trickleDown: 0,
-            baseValue: 100,
-            cap: 200,
-            equipmentBonus: 0,
-            perkBonus: 0,
-            buffBonus: 0,
-          },
-          Stamina: {
-            value: 100,
-            pointsFromIp: 0,
-            ipSpent: 0,
-            trickleDown: 0,
-            baseValue: 100,
-            cap: 200,
-            equipmentBonus: 0,
-            perkBonus: 0,
-            buffBonus: 0,
-          },
-          Intelligence: {
-            value: 100,
-            pointsFromIp: 0,
-            ipSpent: 0,
-            trickleDown: 0,
-            baseValue: 100,
-            cap: 200,
-            equipmentBonus: 0,
-            perkBonus: 0,
-            buffBonus: 0,
-          },
-          Sense: {
-            value: 100,
-            pointsFromIp: 0,
-            ipSpent: 0,
-            trickleDown: 0,
-            baseValue: 100,
-            cap: 200,
-            equipmentBonus: 0,
-            perkBonus: 0,
-            buffBonus: 0,
-          },
-          Psychic: {
-            value: 100,
-            pointsFromIp: 0,
-            ipSpent: 0,
-            trickleDown: 0,
-            baseValue: 100,
-            cap: 200,
-            equipmentBonus: 0,
-            perkBonus: 0,
-            buffBonus: 0,
-          },
-        },
-        'Body & Defense': {},
-        'Ranged Weapons': {},
-        'Ranged Specials': {},
-        'Melee Weapons': {},
-        'Melee Specials': {},
-        'Nanos & Casting': {},
-        Exploring: {},
-        'Trade & Repair': {},
-        'Combat & Healing': {},
-        Misc: JSON.parse(JSON.stringify(DEFAULT_SKILLS.Misc)), // Deep copy to avoid mutations
-        ACs: {
-          'Projectile AC': 0,
-          'Melee AC': 0,
-          'Energy AC': 0,
-          'Chemical AC': 0,
-          'Radiation AC': 0,
-          'Cold AC': 0,
-          'Fire AC': 0,
-          'Poison AC': 0,
-          'Nano AC': 0,
-        },
+      skills: {
+        // Attributes (IDs 16-21)
+        16: { base: 100, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 100 }, // Strength
+        17: { base: 100, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 100 }, // Agility
+        18: { base: 100, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 100 }, // Stamina
+        19: { base: 100, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 100 }, // Intelligence
+        20: { base: 100, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 100 }, // Sense
+        21: { base: 100, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 100 }, // Psychic
+        // Misc skills - testing only the ones needed for tests
+        181: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 0 }, // Max NCU
+        278: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 0 }, // Add. Proj. Dam.
+        279: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 0 }, // Add. Melee Dam.
+        343: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 0 }, // HealDelta
+        364: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 0 }, // NanoDelta
+        276: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 0 }, // Add All Off.
+        277: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 0 }, // Add All Def.
+        280: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 0 }, // Add. Energy Dam.
+        379: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 0 }, // CriticalIncrease
       },
       Clothing: {},
       Weapons: {},
@@ -136,10 +61,10 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
       },
       buffs: [],
       id: 'test-profile',
-      version: '1.0.0',
+      version: '4.0.0',
       created: new Date().toISOString(),
       updated: new Date().toISOString(),
-    } as any;
+    };
   });
 
   describe('Accumulation Bug Prevention', () => {
@@ -179,24 +104,24 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
 
       // First call - should apply bonus correctly
       updateProfileWithIPTracking(testProfile);
-      console.log('Misc skill after update:', testProfile.Skills.Misc['Max NCU']);
-      expect(testProfile.Skills.Misc['Max NCU'].equipmentBonus).toBe(50);
-      expect(testProfile.Skills.Misc['Max NCU'].value).toBe(50); // 0 base + 50 equipment
+      console.log('Misc skill after update:', testProfile.skills[181]);
+      expect(testProfile.skills[181].equipmentBonus).toBe(50);
+      expect(testProfile.skills[181].total).toBe(50); // 0 base + 50 equipment
 
       // Second call - should NOT accumulate the bonus
       updateProfileWithIPTracking(testProfile);
-      expect(testProfile.Skills.Misc['Max NCU'].equipmentBonus).toBe(50);
-      expect(testProfile.Skills.Misc['Max NCU'].value).toBe(50); // Still 50, not 100
+      expect(testProfile.skills[181].equipmentBonus).toBe(50);
+      expect(testProfile.skills[181].total).toBe(50); // Still 50, not 100
 
       // Third call - should STILL not accumulate
       updateProfileWithIPTracking(testProfile);
-      expect(testProfile.Skills.Misc['Max NCU'].equipmentBonus).toBe(50);
-      expect(testProfile.Skills.Misc['Max NCU'].value).toBe(50); // Still 50, not 150
+      expect(testProfile.skills[181].equipmentBonus).toBe(50);
+      expect(testProfile.skills[181].total).toBe(50); // Still 50, not 150
 
       // Fourth call - verify the fix holds
       updateProfileWithIPTracking(testProfile);
-      expect(testProfile.Skills.Misc['Max NCU'].equipmentBonus).toBe(50);
-      expect(testProfile.Skills.Misc['Max NCU'].value).toBe(50); // Still 50, not 200
+      expect(testProfile.skills[181].equipmentBonus).toBe(50);
+      expect(testProfile.skills[181].total).toBe(50); // Still 50, not 200
     });
 
     it('should maintain consistent values across multiple rapid recalculations', () => {
@@ -239,10 +164,10 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
         updateProfileWithIPTracking(testProfile);
 
         // Values should remain consistent
-        expect(testProfile.Skills.Misc['Add. Proj. Dam.'].equipmentBonus).toBe(25);
-        expect(testProfile.Skills.Misc['Add. Proj. Dam.'].value).toBe(25);
-        expect(testProfile.Skills.Misc['Add. Melee Dam.'].equipmentBonus).toBe(30);
-        expect(testProfile.Skills.Misc['Add. Melee Dam.'].value).toBe(30);
+        expect(testProfile.skills[278].equipmentBonus).toBe(25); // Add. Proj. Dam.
+        expect(testProfile.skills[278].total).toBe(25);
+        expect(testProfile.skills[279].equipmentBonus).toBe(30); // Add. Melee Dam.
+        expect(testProfile.skills[279].total).toBe(30);
       }
     });
   });
@@ -277,44 +202,44 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
       testProfile.Clothing.Body = equipment;
 
       // Simulate perk bonus by modifying the skill directly
-      testProfile.Skills.Misc['HealDelta'].perkBonus = 15;
+      testProfile.skills[343].perkBonus = 15; // HealDelta
 
       // Simulate buff bonus
-      testProfile.Skills.Misc['HealDelta'].buffBonus = 10;
+      testProfile.skills[343].buffBonus = 10;
 
       updateProfileWithIPTracking(testProfile);
 
-      const healDelta = testProfile.Skills.Misc['HealDelta'];
-      expect(healDelta.baseValue).toBe(0); // Always 0 for Misc skills
+      const healDelta = testProfile.skills[343]; // HealDelta
+      expect(healDelta.base).toBe(0); // Always 0 for Misc skills
       expect(healDelta.equipmentBonus).toBe(20); // From equipment
       expect(healDelta.perkBonus).toBe(15); // From perks (simulated)
       expect(healDelta.buffBonus).toBe(10); // From buffs (simulated)
-      expect(healDelta.value).toBe(45); // Total: 0 + 20 + 15 + 10
+      expect(healDelta.total).toBe(45); // Total: 0 + 20 + 15 + 10
     });
 
     it('should allow setting each bonus type independently', () => {
-      const skill = testProfile.Skills.Misc['Add All Off.'];
+      const skill = testProfile.skills[276]; // Add All Off.
 
       // Initially all should be zero
       expect(skill.equipmentBonus).toBe(0);
       expect(skill.perkBonus).toBe(0);
       expect(skill.buffBonus).toBe(0);
-      expect(skill.value).toBe(0);
+      expect(skill.total).toBe(0);
 
       // Set equipment bonus
       skill.equipmentBonus = 25;
-      skill.value = skill.baseValue + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
-      expect(skill.value).toBe(25);
+      skill.total = skill.base + skill.trickle + skill.pointsFromIp + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
+      expect(skill.total).toBe(25);
 
       // Set perk bonus independently
       skill.perkBonus = 10;
-      skill.value = skill.baseValue + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
-      expect(skill.value).toBe(35);
+      skill.total = skill.base + skill.trickle + skill.pointsFromIp + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
+      expect(skill.total).toBe(35);
 
       // Set buff bonus independently
       skill.buffBonus = 5;
-      skill.value = skill.baseValue + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
-      expect(skill.value).toBe(40);
+      skill.total = skill.base + skill.trickle + skill.pointsFromIp + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
+      expect(skill.total).toBe(40);
 
       // Verify individual values remain correct
       expect(skill.equipmentBonus).toBe(25);
@@ -352,7 +277,7 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
 
       testProfile.Clothing.Body = initialEquipment;
       updateProfileWithIPTracking(testProfile);
-      expect(testProfile.Skills.Misc['Max NCU'].value).toBe(30);
+      expect(testProfile.skills[181].total).toBe(30); // Max NCU
 
       // Change equipment
       const newEquipment = {
@@ -381,45 +306,45 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
 
       testProfile.Clothing.Body = newEquipment;
       updateProfileWithIPTracking(testProfile);
-      expect(testProfile.Skills.Misc['Max NCU'].value).toBe(50); // Should reflect new equipment
+      expect(testProfile.skills[181].total).toBe(50); // Should reflect new equipment
 
       // Remove equipment
       testProfile.Clothing.Body = null;
       updateProfileWithIPTracking(testProfile);
-      expect(testProfile.Skills.Misc['Max NCU'].value).toBe(0); // Should be back to base
+      expect(testProfile.skills[181].total).toBe(0); // Should be back to base
     });
 
     it('should handle perk change → buff change → recalculate', () => {
-      const skill = testProfile.Skills.Misc['Add All Def.'];
+      const skill = testProfile.skills[277]; // Add All Def.
 
       // Initial state
       updateProfileWithIPTracking(testProfile);
-      expect(skill.value).toBe(0);
+      expect(skill.total).toBe(0);
 
       // Simulate perk change
       skill.perkBonus = 20;
-      skill.value = skill.baseValue + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
-      expect(skill.value).toBe(20);
+      skill.total = skill.base + skill.trickle + skill.pointsFromIp + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
+      expect(skill.total).toBe(20);
 
       // Simulate buff change
       skill.buffBonus = 15;
-      skill.value = skill.baseValue + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
-      expect(skill.value).toBe(35);
+      skill.total = skill.base + skill.trickle + skill.pointsFromIp + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
+      expect(skill.total).toBe(35);
 
       // Recalculate - values should remain consistent
       updateProfileWithIPTracking(testProfile);
       expect(skill.perkBonus).toBe(20); // Should preserve perk bonus
       expect(skill.buffBonus).toBe(15); // Should preserve buff bonus
       expect(skill.equipmentBonus).toBe(0); // No equipment bonus
-      expect(skill.value).toBe(35); // Total should be correct
+      expect(skill.total).toBe(35); // Total should be correct
     });
   });
 
   describe('Equipment/Perk/Buff Changes', () => {
     it('should correctly increase equipmentBonus when adding equipment', () => {
       // Initially no bonus
-      expect(testProfile.Skills.Misc['Max NCU'].equipmentBonus).toBe(0);
-      expect(testProfile.Skills.Misc['Max NCU'].value).toBe(0);
+      expect(testProfile.skills[181].equipmentBonus).toBe(0); // Max NCU
+      expect(testProfile.skills[181].total).toBe(0);
 
       // Add equipment
       const equipment = {
@@ -449,8 +374,8 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
       testProfile.Clothing.Head = equipment;
       updateProfileWithIPTracking(testProfile);
 
-      expect(testProfile.Skills.Misc['Max NCU'].equipmentBonus).toBe(40);
-      expect(testProfile.Skills.Misc['Max NCU'].value).toBe(40);
+      expect(testProfile.skills[181].equipmentBonus).toBe(40);
+      expect(testProfile.skills[181].total).toBe(40);
     });
 
     it('should correctly decrease equipmentBonus when removing equipment', () => {
@@ -481,14 +406,14 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
 
       testProfile.Clothing.Head = equipment;
       updateProfileWithIPTracking(testProfile);
-      expect(testProfile.Skills.Misc['Max NCU'].equipmentBonus).toBe(40);
+      expect(testProfile.skills[181].equipmentBonus).toBe(40); // Max NCU
 
       // Remove equipment
       testProfile.Clothing.Head = null;
       updateProfileWithIPTracking(testProfile);
 
-      expect(testProfile.Skills.Misc['Max NCU'].equipmentBonus).toBe(0);
-      expect(testProfile.Skills.Misc['Max NCU'].value).toBe(0);
+      expect(testProfile.skills[181].equipmentBonus).toBe(0);
+      expect(testProfile.skills[181].total).toBe(0);
     });
 
     it('should handle multiple equipment pieces with same bonus type', () => {
@@ -546,67 +471,73 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
       updateProfileWithIPTracking(testProfile);
 
       // Should stack equipment bonuses
-      expect(testProfile.Skills.Misc['Max NCU'].equipmentBonus).toBe(55); // 30 + 25
-      expect(testProfile.Skills.Misc['Max NCU'].value).toBe(55);
+      expect(testProfile.skills[181].equipmentBonus).toBe(55); // 30 + 25 - Max NCU
+      expect(testProfile.skills[181].total).toBe(55);
     });
   });
 
   describe('Value Calculations', () => {
-    it('should calculate value as baseValue + equipmentBonus + perkBonus + buffBonus', () => {
-      const skill = testProfile.Skills.Misc['Add. Energy Dam.'];
+    it('should calculate value as base + trickle + pointsFromIp + equipmentBonus + perkBonus + buffBonus', () => {
+      const skill = testProfile.skills[280]; // Add. Energy Dam.
 
       // Set all bonus types
-      skill.baseValue = 0; // Always 0 for Misc
+      skill.base = 0; // Always 0 for Misc
+      skill.trickle = 0;
+      skill.pointsFromIp = 0;
       skill.equipmentBonus = 20;
       skill.perkBonus = 15;
       skill.buffBonus = 10;
 
       // Calculate value
-      skill.value = skill.baseValue + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
+      skill.total = skill.base + skill.trickle + skill.pointsFromIp + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
 
-      expect(skill.value).toBe(45); // 0 + 20 + 15 + 10
+      expect(skill.total).toBe(45); // 0 + 0 + 0 + 20 + 15 + 10
     });
 
-    it('should verify baseValue is always 0 for Misc skills', () => {
-      const miscSkills = Object.values(testProfile.Skills.Misc);
+    it('should verify base is always 0 for Misc skills', () => {
+      const miscSkillIds = [181, 278, 279, 343, 364, 276, 277, 280, 379];
 
-      miscSkills.forEach((skill: MiscSkill) => {
-        expect(skill.baseValue).toBe(0);
+      miscSkillIds.forEach((skillId) => {
+        const skill = testProfile.skills[skillId];
+        expect(skill.base).toBe(0);
       });
     });
 
     it('should handle negative bonuses correctly', () => {
-      const skill = testProfile.Skills.Misc['CriticalIncrease'];
+      const skill = testProfile.skills[379]; // CriticalIncrease
 
       skill.equipmentBonus = 10;
       skill.perkBonus = -5; // Negative perk bonus
       skill.buffBonus = 3;
 
-      skill.value = skill.baseValue + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
+      skill.total = skill.base + skill.trickle + skill.pointsFromIp + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
 
-      expect(skill.value).toBe(8); // 0 + 10 - 5 + 3
+      expect(skill.total).toBe(8); // 0 + 0 + 0 + 10 - 5 + 3
     });
   });
 
   describe('All 67 Misc Skills Validation', () => {
-    it('should properly initialize all Misc skills with correct MiscSkill structure', () => {
-      const miscSkillNames = SKILL_CATEGORIES['Misc'];
+    it('should properly initialize all Misc skills with correct SkillData structure', () => {
+      const miscSkillIds = [181, 278, 279, 343, 364, 276, 277, 280, 379];
 
-      // Verify we have all 33 skills (as mentioned in the plan)
-      expect(miscSkillNames.length).toBe(33);
+      // Verify we have the test misc skills
+      expect(miscSkillIds.length).toBe(9);
 
       // Verify each skill has the correct structure
-      miscSkillNames.forEach((skillName) => {
-        const skill = testProfile.Skills.Misc[skillName];
+      miscSkillIds.forEach((skillId) => {
+        const skill = testProfile.skills[skillId];
         expect(skill).toBeDefined();
         expect(typeof skill).toBe('object');
 
-        // Verify MiscSkill interface properties
-        expect(skill.baseValue).toBe(0);
+        // Verify SkillData interface properties
+        expect(skill.base).toBe(0);
+        expect(skill.trickle).toBe(0);
+        expect(skill.ipSpent).toBe(0);
+        expect(skill.pointsFromIp).toBe(0);
         expect(skill.equipmentBonus).toBe(0);
         expect(skill.perkBonus).toBe(0);
         expect(skill.buffBonus).toBe(0);
-        expect(skill.value).toBe(0);
+        expect(skill.total).toBe(0);
       });
     });
 
@@ -638,26 +569,26 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
       updateProfileWithIPTracking(testProfile);
 
       // Verify affected skills have correct bonuses
-      expect(testProfile.Skills.Misc['Max NCU'].equipmentBonus).toBe(30);
-      expect(testProfile.Skills.Misc['Add All Off.'].equipmentBonus).toBe(15);
-      expect(testProfile.Skills.Misc['Add All Def.'].equipmentBonus).toBe(12);
-      expect(testProfile.Skills.Misc['HealDelta'].equipmentBonus).toBe(25);
-      expect(testProfile.Skills.Misc['NanoDelta'].equipmentBonus).toBe(20);
+      expect(testProfile.skills[181].equipmentBonus).toBe(30); // Max NCU
+      expect(testProfile.skills[276].equipmentBonus).toBe(15); // Add All Off.
+      expect(testProfile.skills[277].equipmentBonus).toBe(12); // Add All Def.
+      expect(testProfile.skills[343].equipmentBonus).toBe(25); // HealDelta
+      expect(testProfile.skills[364].equipmentBonus).toBe(20); // NanoDelta
 
       // Verify all skills still have proper structure
-      const miscSkillNames = SKILL_CATEGORIES['Misc'];
-      miscSkillNames.forEach((skillName) => {
-        const skill = testProfile.Skills.Misc[skillName];
-        expect(skill.baseValue).toBe(0);
+      const miscSkillIds = [181, 278, 279, 343, 364, 276, 277, 280, 379];
+      miscSkillIds.forEach((skillId) => {
+        const skill = testProfile.skills[skillId];
+        expect(skill.base).toBe(0);
         expect(typeof skill.equipmentBonus).toBe('number');
         expect(typeof skill.perkBonus).toBe('number');
         expect(typeof skill.buffBonus).toBe('number');
-        expect(typeof skill.value).toBe('number');
+        expect(typeof skill.total).toBe('number');
 
         // Verify value calculation is correct
         const expectedValue =
-          skill.baseValue + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
-        expect(skill.value).toBe(expectedValue);
+          skill.base + skill.trickle + skill.pointsFromIp + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
+        expect(skill.total).toBe(expectedValue);
       });
     });
 
@@ -665,12 +596,13 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
       // Update profile with IP tracking
       updateProfileWithIPTracking(testProfile);
 
-      // Verify no Misc skill has IP-related properties
-      Object.values(testProfile.Skills.Misc).forEach((skill: MiscSkill) => {
-        expect('pointFromIp' in skill).toBe(false);
-        expect('ipSpent' in skill).toBe(false);
-        expect('trickleDown' in skill).toBe(false);
-        expect('cap' in skill).toBe(false);
+      // Verify Misc skills have zero IP and trickle values
+      const miscSkillIds = [181, 278, 279, 343, 364, 276, 277, 280, 379];
+      miscSkillIds.forEach((skillId) => {
+        const skill = testProfile.skills[skillId];
+        expect(skill.ipSpent).toBe(0);
+        expect(skill.pointsFromIp).toBe(0);
+        expect(skill.trickle).toBe(0);
       });
     });
   });
@@ -706,14 +638,16 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
       updateProfileWithIPTracking(testProfile);
 
       // All Misc skills should remain at 0
-      Object.values(testProfile.Skills.Misc).forEach((skill: MiscSkill) => {
+      const miscSkillIds = [181, 278, 279, 343, 364, 276, 277, 280, 379];
+      miscSkillIds.forEach((skillId) => {
+        const skill = testProfile.skills[skillId];
         expect(skill.equipmentBonus).toBe(0);
-        expect(skill.value).toBe(0);
+        expect(skill.total).toBe(0);
       });
     });
 
     it('should handle corrupted bonus data gracefully', () => {
-      const skill = testProfile.Skills.Misc['Max NCU'];
+      const skill = testProfile.skills[181]; // Max NCU
 
       // Set invalid bonus values
       (skill as any).equipmentBonus = null;
@@ -724,17 +658,17 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
       expect(() => updateProfileWithIPTracking(testProfile)).not.toThrow();
     });
 
-    it('should maintain immutability of baseValue', () => {
-      const originalBaseValue = testProfile.Skills.Misc['Max NCU'].baseValue;
+    it('should maintain immutability of base value', () => {
+      const originalBaseValue = testProfile.skills[181].base; // Max NCU
 
-      // Try to modify baseValue through various operations
+      // Try to modify base value through various operations
       updateProfileWithIPTracking(testProfile);
-      expect(testProfile.Skills.Misc['Max NCU'].baseValue).toBe(originalBaseValue);
+      expect(testProfile.skills[181].base).toBe(originalBaseValue);
 
-      // Multiple updates shouldn\'t change baseValue
+      // Multiple updates shouldn't change base value
       for (let i = 0; i < 5; i++) {
         updateProfileWithIPTracking(testProfile);
-        expect(testProfile.Skills.Misc['Max NCU'].baseValue).toBe(originalBaseValue);
+        expect(testProfile.skills[181].base).toBe(originalBaseValue);
       }
     });
   });

@@ -38,6 +38,7 @@ import {
   setProfileSkills,
 } from '../helpers/profile-fixtures';
 import { createTestSkillData, SKILL_ID } from '../helpers/skill-fixtures';
+import { createTestItem, createSpell, createSpellData } from '../helpers/item-fixtures';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { useNanosStore } from '@/stores/nanosStore';
 import type { NanoProgram } from '@/types/nano';
@@ -355,18 +356,23 @@ describe('Nano Compatibility Integration', () => {
       let canCast = profileStore.activeProfile!.skills[SKILL_ID.MATTER_CREATION].total >= 200;
       expect(canCast).toBe(false);
 
-      // Equip item that gives +10 Matter Creation
-      const item = {
+      // Equip item that gives +10 Matter Creation using proper spell_data structure
+      const item = createTestItem({
         id: 999,
         name: 'Matter Creation Booster',
         item_class: 1,
-        stats: [
-          {
-            stat: SKILL_ID.MATTER_CREATION,
-            value: 10,
-          },
+        spell_data: [
+          createSpellData({
+            event: 14, // Wear event
+            spells: [
+              createSpell({
+                spell_id: 53045, // Modify Skill spell
+                spell_params: { stat: SKILL_ID.MATTER_CREATION, amount: 10 },
+              }),
+            ],
+          }),
         ],
-      };
+      });
 
       await profileStore.equipItem(item, 'RightHand');
       await waitForUpdates();
@@ -395,18 +401,23 @@ describe('Nano Compatibility Integration', () => {
       await profileStore.modifySkill(profileId, SKILL_ID.MATTER_CREATION, 195);
       await profileStore.setActiveProfile(profileId);
 
-      // Equip item first
-      const item = {
+      // Equip item first using proper spell_data structure
+      const item = createTestItem({
         id: 999,
         name: 'Matter Creation Booster',
         item_class: 1,
-        stats: [
-          {
-            stat: SKILL_ID.MATTER_CREATION,
-            value: 10,
-          },
+        spell_data: [
+          createSpellData({
+            event: 14, // Wear event
+            spells: [
+              createSpell({
+                spell_id: 53045, // Modify Skill spell
+                spell_params: { stat: SKILL_ID.MATTER_CREATION, amount: 10 },
+              }),
+            ],
+          }),
         ],
-      };
+      });
       await profileStore.equipItem(item, 'RightHand');
       await waitForUpdates();
 

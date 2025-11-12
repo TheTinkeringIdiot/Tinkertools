@@ -26,9 +26,6 @@ import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import ProfileCreateModal from '@/components/profiles/ProfileCreateModal.vue';
 import ProfileDropdown from '@/components/profiles/ProfileDropdown.vue';
 import CharacterInfoPanel from '@/components/profiles/CharacterInfoPanel.vue';
-import { createApp } from 'vue';
-import PrimeVue from 'primevue/config';
-import ToastService from 'primevue/toastservice';
 
 // Mock the API client module
 vi.mock('@/services/api-client', () => {
@@ -47,16 +44,9 @@ describe('Profile Management Integration', () => {
   let context: IntegrationTestContext;
 
   beforeEach(async () => {
-    // Setup PrimeVue with ToastService for stores
-    // Stores call useToast() which requires app-level ToastService
-    const app = createApp({});
-    app.use(PrimeVue);
-    app.use(ToastService);
-
+    // setupIntegrationTest() now handles PrimeVue/ToastService/Pinia registration
+    // in the correct order (PrimeVue -> ToastService -> Pinia)
     context = await setupIntegrationTest();
-
-    // Attach Pinia to app for Toast availability
-    app.use(context.pinia);
   });
 
   // ============================================================================

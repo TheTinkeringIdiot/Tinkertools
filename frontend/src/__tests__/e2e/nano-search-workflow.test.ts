@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { nextTick } from 'vue';
+import { nextTick, createApp } from 'vue';
 import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
+import PrimeVue from 'primevue/config';
+import ToastService from 'primevue/toastservice';
 import TinkerNanos from '@/views/TinkerNanos.vue';
 import { useNanosStore } from '@/stores/nanosStore';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
@@ -341,8 +343,14 @@ describe('Nano Search Workflow', () => {
   let profilesStore: any;
 
   beforeEach(async () => {
+    // Setup PrimeVue + ToastService first (CRITICAL)
+    const app = createApp({});
+    app.use(PrimeVue);
+    app.use(ToastService);
+
     pinia = createPinia();
     setActivePinia(pinia);
+    app.use(pinia);
 
     nanosStore = useNanosStore();
     profilesStore = useTinkerProfilesStore();
