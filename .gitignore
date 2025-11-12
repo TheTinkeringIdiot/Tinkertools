@@ -72,3 +72,9 @@ docs/review/
 
 # Playwright MCP screenshots (temporary testing artifacts)
 .playwright-mcp/
+
+# Playwright E2E test artifacts
+frontend/test-results/
+frontend/playwright-report/
+frontend/e2e/screenshots/
+frontend/.playwright/

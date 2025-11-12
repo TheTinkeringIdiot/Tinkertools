@@ -134,8 +134,17 @@ The database follows a legacy-compatible design with:
 
 ### Data Privacy
 - All user/character data stored client-side only (LocalStorage)
+- TinkerFite weapon cache uses IndexedDB for larger storage capacity (50MB+ vs LocalStorage 5-10MB)
 - Server contains only game reference data
 - No user accounts or authentication required
+
+### Client-Side Storage Strategy
+- **LocalStorage**: User profiles, preferences, settings (~10-50 KB per profile)
+- **IndexedDB**: TinkerFite weapon analysis cache (~5-6 MB for 5 profiles)
+  - Uses `idb-keyval` library (500 bytes gzipped)
+  - 1 hour TTL, LRU eviction with max 5 cached profiles
+  - Automatic cleanup of legacy LocalStorage keys on first load
+  - Debug: Chrome DevTools → Application → IndexedDB
 
 ## Important Project Decisions
 
@@ -164,36 +173,67 @@ The database follows a legacy-compatible design with:
 
 ### Testing Strategy
 
-**Frontend Testing** (Vitest + Vue Test Utils):
-The frontend test suite was refactored in September 2025 to use true integration tests with **real Pinia stores + mocked backend only**. This approach catches real bugs while maintaining test speed.
+**Frontend Testing** (Vitest + Playwright):
+The frontend test suite was refactored in November 2025 with an **E2E-first approach** and **aggressive deletion strategy**. We deleted 45 fragile test files (~4,500 lines) and focused on tests that catch real bugs.
 
-**Test Architecture**:
-- ✅ Use **real** Pinia stores (actual state management logic)
-- ✅ Use **real** Vue components (actual rendering + reactivity)
-- ✅ Mock **only** external boundaries (API, localStorage, router)
-- ❌ Never mock store internals or Vue reactivity
+**Test Philosophy**:
+- ✅ Test **user behavior**, not implementation details
+- ✅ Use **real stores** with mocked API only (no Pinia mocks)
+- ✅ Use **E2E tests** for critical workflows (not fragile component tests)
+- ❌ Deleted all component tests with mocked stores (brittle, false confidence)
 
-**Test Types**:
-1. **Integration Tests** (91/107 passing - 85%):
-   - Real Pinia stores with mocked API client
-   - Test infrastructure: `src/__tests__/helpers/integration-test-utils.ts`
-   - Test fixtures: `profile-fixtures.ts`, `item-fixtures.ts`, `nano-fixtures.ts`
-   - Suites: buff-management, equipment-interaction, item-search, nano-compatibility, profile-management
+**Test Pyramid** (55/40/5 distribution):
+1. **Unit/Service Tests** (~23 files, ~400 tests, 95% pass):
+   - Pure functions: IP calculator, bonus calculator, weapon DPS
+   - Business logic: action criteria, game formulas, stat lookups
+   - No external dependencies, fast execution (< 5s)
+   - Examples: `action-criteria.test.ts`, `perk-bonus-calculator.test.ts`, `ip-calculator.test.ts`
 
-2. **Backend Integration Tests**:
+2. **Integration Tests** (~13 files, ~250 tests, 80% pass):
+   - **Real Pinia stores** with **mocked API client** only
+   - Tests real state management, reactivity, component integration
+   - Caught 4 production bugs that mocked tests missed
+   - Examples: `buff-management.integration.test.ts`, `equipment-interaction.integration.test.ts`
+   - Infrastructure: `src/__tests__/helpers/integration-test-utils.ts`
+   - Fixtures: `profile-fixtures.ts`, `item-fixtures.ts`, `nano-fixtures.ts`
+
+3. **E2E Tests** (~8 files, ~80 tests, 60% pass):
+   - **Playwright** browser automation for critical user workflows
+   - Tests real browser, real rendering, real user interactions
+   - Optional backend (can mock for speed)
+   - Examples: `item-search-workflow.test.ts`, `profile-management-workflow.test.ts`
+   - Use page object pattern for maintainability
+
+4. **Backend Integration Tests** (~3 files, ~50 tests, skipped):
    - Require real backend running
    - Use `describe.skipIf(!BACKEND_AVAILABLE)` pattern
    - Backend availability check: `helpers/backend-check.ts`
 
-3. **E2E Tests** (Playwright - pending):
-   - Critical user workflows
-   - Full system integration
+**What We Deleted** (November 2025 refactoring):
+- 31 component test files - Fragile selectors, wrong level of testing
+- 8 view test files - Same issues as component tests
+- 6 store unit test files - Mocking stores defeats the purpose
+- 2 composable test files - Thin wrappers, better tested via integration
+- 3 transformer test files - Too tightly coupled to implementation
 
-**Key Test Patterns**:
+**Production Bugs Fixed** (discovered via integration tests):
+1. Equipment bonuses not applied - `ip-integrator.ts` only checked `spell_data`
+2. MaxNCU calculation wrong - base + level formula broken
+3. Skill auto-creation missing - `modifySkill()` didn't create trainable skills
+4. Profile localStorage keys wrong - using legacy format instead of individual keys
+
+**Critical Test Setup Pattern**:
 ```typescript
-// Integration test setup (required pattern)
+// Integration test setup (REQUIRED)
+import { createApp } from 'vue';
+import PrimeVue from 'primevue/config';
+import ToastService from 'primevue/toastservice';
+
+// CRITICAL: Mock API BEFORE store imports
+vi.mock('@/services/api-client');
+
 beforeEach(async () => {
-  // CRITICAL: Setup PrimeVue + ToastService first
+  // Setup PrimeVue + ToastService (stores use toasts)
   const app = createApp({});
   app.use(PrimeVue);
   app.use(ToastService);
@@ -205,25 +245,20 @@ beforeEach(async () => {
 });
 ```
 
-**Critical Requirements**:
-- PrimeVue + ToastService setup in all integration tests
-- Mock API client BEFORE store imports: `vi.mock('@/services/api-client')`
-- Use individual profile localStorage keys: `tinkertools_profile_{id}`
-- Use test fixtures for realistic game data
+**Test Execution**:
+```bash
+# Run all tests (< 30s without E2E)
+npm test
 
-**Test Results** (September 2025):
-- Buff Management: 19/19 (100%) ✅
-- Item Search: 22/22 (100%) ✅
-- Equipment Interaction: 23/23 (100%) ✅
-- Nano Compatibility: 16/21 (76%) ⚠️
-- Profile Management: 11/22 (50%) ⚠️
-- **Overall: 91/107 (85%)**
+# Run with UI
+npm run test:ui
 
-**Infrastructure Fixes Applied**:
-- MaxNCU calculation: base (1200 + level*6) + bonuses
-- Equipment bonus extraction from `item.stats` and `spell_data`
-- Skill auto-creation in `modifySkill()` for missing skills
-- localStorage key migration from legacy to individual profile keys
+# Run E2E tests
+npx playwright test
+
+# Run E2E with UI
+npx playwright test --ui
+```
 
 **Backend Testing** (pytest):
 - Unit tests for API endpoints
@@ -231,9 +266,9 @@ beforeEach(async () => {
 - Query performance validation
 
 **Documentation**:
-- Detailed strategy: `frontend/src/__tests__/TESTING_STRATEGY.md`
-- Refactoring results: `frontend/TEST_REFACTORING_RESULTS.md`
-- Test examples in `src/__tests__/integration/`
+- **Test Strategy**: `frontend/src/__tests__/TESTING_STRATEGY.md` - Comprehensive guide
+- **Refactoring Summary**: `frontend/TEST_REFACTORING_SUMMARY.md` - What was deleted and why
+- **Test Examples**: `src/__tests__/integration/`, `src/__tests__/e2e/`
 
 ## Resources
 

@@ -12,13 +12,18 @@
     "lint": "cd frontend && eslint .",
     "format": "cd frontend && prettier --write .",
     "test": "cd frontend && vitest run",
-    "test:ui": "cd frontend && vitest"
+    "test:ui": "cd frontend && vitest",
+    "test:e2e": "cd frontend && playwright test",
+    "test:e2e:ui": "cd frontend && playwright test --ui",
+    "test:e2e:debug": "cd frontend && playwright test --debug",
+    "test:e2e:headed": "cd frontend && playwright test --headed"
   },
   "dependencies": {
     "@primeuix/themes": "^1.2.3",
     "axios": "^1.6.0",
     "dayjs": "1.11.11",
     "fuse.js": "7.0.0",
+    "idb-keyval": "^6.2.2",
     "lodash-es": "4.17.21",
     "pinia": "2.2.2",
     "primeicons": "7.0.0",
@@ -29,7 +34,7 @@
   },
   "devDependencies": {
     "@eslint/js": "9.7.0",
-    "@playwright/test": "^1.56.0",
+    "@playwright/test": "^1.56.1",
     "@types/node": "20.14.11",
     "@vitejs/plugin-legacy": "5.4.2",
     "@vitejs/plugin-vue": "5.1.2",
