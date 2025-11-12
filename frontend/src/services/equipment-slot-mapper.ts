@@ -56,32 +56,34 @@ const CLOTHING_SLOT_MAPPING = {
 } as const;
 
 const IMPLANT_SLOT_MAPPING = {
-  // UI name -> Profile key
-  Head: 'Head',
-  Ocular: 'Eye', // UI uses "Ocular", profile uses "Eye"
-  Ear: 'Ear',
-  'Right Arm': 'RightArm',
-  'Left Arm': 'LeftArm',
-  Chest: 'Chest',
-  'Right Wrist': 'RightWrist',
-  'Left Wrist': 'LeftWrist',
-  Waist: 'Waist',
-  'Right Hand': 'RightHand',
-  'Left Hand': 'LeftHand',
-  Thigh: 'Leg', // UI uses "Thigh", profile uses "Leg"
-  'Right Leg': 'Leg', // Multiple UI names map to single "Leg" slot
-  'Left Leg': 'Leg',
-  Feet: 'Feet',
+  // UI name -> Profile bitflag key
+  Head: '4',        // Head (1 << 2)
+  Ocular: '2',      // Eyes (1 << 1)
+  Ear: '8',         // Ears (1 << 3)
+  'Right Arm': '16',   // RightArm (1 << 4)
+  'Left Arm': '64',    // LeftArm (1 << 6)
+  Chest: '32',      // Chest (1 << 5)
+  'Right Wrist': '128',  // RightWrist (1 << 7)
+  'Left Wrist': '512',   // LeftWrist (1 << 9)
+  Waist: '256',     // Waist (1 << 8)
+  'Right Hand': '1024',  // RightHand (1 << 10)
+  'Left Hand': '4096',   // LeftHand (1 << 12)
+  Thigh: '2048',    // Legs (1 << 11)
+  'Right Leg': '2048',   // Multiple UI names map to single Leg slot
+  'Left Leg': '2048',
+  Feet: '8192',     // Feet (1 << 13)
 
-  // Also support exact profile slot names
-  Eye: 'Eye',
-  RightArm: 'RightArm',
-  LeftArm: 'LeftArm',
-  RightWrist: 'RightWrist',
-  LeftWrist: 'LeftWrist',
-  RightHand: 'RightHand',
-  LeftHand: 'LeftHand',
-  Leg: 'Leg',
+  // Also support alternate UI names
+  Eye: '2',
+  Eyes: '2',
+  RightArm: '16',
+  LeftArm: '64',
+  RightWrist: '128',
+  LeftWrist: '512',
+  RightHand: '1024',
+  LeftHand: '4096',
+  Leg: '2048',
+  Legs: '2048',
 } as const;
 
 // Reverse mappings for getting UI names from profile keys
@@ -109,19 +111,19 @@ const CLOTHING_DISPLAY_MAPPING = {
 } as const;
 
 const IMPLANT_DISPLAY_MAPPING = {
-  Head: 'Head',
-  Eye: 'Ocular',
-  Ear: 'Ear',
-  RightArm: 'Right Arm',
-  LeftArm: 'Left Arm',
-  Chest: 'Chest',
-  RightWrist: 'Right Wrist',
-  LeftWrist: 'Left Wrist',
-  Waist: 'Waist',
-  RightHand: 'Right Hand',
-  LeftHand: 'Left Hand',
-  Leg: 'Thigh',
-  Feet: 'Feet',
+  '2': 'Ocular',      // Eyes
+  '4': 'Head',        // Head
+  '8': 'Ear',         // Ears
+  '16': 'Right Arm',  // RightArm
+  '32': 'Chest',      // Chest
+  '64': 'Left Arm',   // LeftArm
+  '128': 'Right Wrist', // RightWrist
+  '256': 'Waist',     // Waist
+  '512': 'Left Wrist',  // LeftWrist
+  '1024': 'Right Hand', // RightHand
+  '2048': 'Thigh',    // Legs
+  '4096': 'Left Hand',  // LeftHand
+  '8192': 'Feet',     // Feet
 } as const;
 
 export type EquipmentType = 'weapons' | 'clothing' | 'implants';

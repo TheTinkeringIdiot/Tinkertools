@@ -243,6 +243,18 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
     try {
       await profileManager.updateProfile(profileId, updates);
+
+      // CRITICAL: Reload the updated profile and sync reactive state
+      // This ensures that in-memory refs stay synchronized with localStorage
+      const updatedProfile = await profileManager.loadProfile(profileId);
+      if (updatedProfile) {
+        profiles.value.set(profileId, updatedProfile);
+
+        // Update activeProfile if this is the active profile
+        if (profileId === activeProfileId.value) {
+          activeProfile.value = updatedProfile;
+        }
+      }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to update profile';
       throw err;
@@ -1391,8 +1403,10 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
     try {
       // Trigger recalculation using the IP integrator
+      // Convert profile to raw to avoid reactive proxy serialization issues
       const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
-      const updatedProfile = await updateProfileWithIPTracking(activeProfile.value);
+      const rawProfile = toRaw(activeProfile.value);
+      const updatedProfile = await updateProfileWithIPTracking(rawProfile);
 
       // Update the profile in storage and state
       await updateProfile(activeProfile.value.id, updatedProfile);
@@ -1426,16 +1440,20 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       return;
     }
 
-    // Remove the buff
-    activeProfile.value.buffs = activeProfile.value.buffs.filter((buff) => buff.id !== itemId);
+    // Remove the buff and convert to plain objects
+    activeProfile.value.buffs = activeProfile.value.buffs
+      .filter((buff) => buff.id !== itemId)
+      .map((buff) => toRaw(buff));
 
     // Set flag to prevent watcher loops
     isUpdatingFromBuffs = true;
 
     try {
       // Trigger recalculation using the IP integrator
+      // Convert profile to raw to avoid reactive proxy serialization issues
       const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
-      const updatedProfile = await updateProfileWithIPTracking(activeProfile.value);
+      const rawProfile = toRaw(activeProfile.value);
+      const updatedProfile = await updateProfileWithIPTracking(rawProfile);
 
       // Update the profile in storage and state
       await updateProfile(activeProfile.value.id, updatedProfile);
@@ -1478,8 +1496,10 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
     try {
       // Trigger recalculation using the IP integrator
+      // Convert profile to raw to avoid reactive proxy serialization issues
       const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
-      const updatedProfile = await updateProfileWithIPTracking(activeProfile.value);
+      const rawProfile = toRaw(activeProfile.value);
+      const updatedProfile = await updateProfileWithIPTracking(rawProfile);
 
       // Update the profile in storage and state
       await updateProfile(activeProfile.value.id, updatedProfile);

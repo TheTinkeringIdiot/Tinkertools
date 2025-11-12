@@ -664,7 +664,9 @@ export class ProfileTransformer {
           if (clusterData && clusterData.ClusterID) {
             const mapping = getClusterMapping(clusterData.ClusterID);
             if (mapping) {
-              clusters[position] = mapping.stat;
+              // Capitalize position key to match backend requirements (Shiny, Bright, Faded)
+              const capitalizedPosition = position.charAt(0).toUpperCase() + position.slice(1).toLowerCase();
+              clusters[capitalizedPosition] = mapping.stat;
               hasValidClusters = true;
             } else {
               result.warnings.push(`Unknown ClusterID: ${clusterData.ClusterID}`);
@@ -685,13 +687,13 @@ export class ProfileTransformer {
         );
 
         // Check if lookup was successful
-        if (!lookupResponse.success || !lookupResponse.data) {
-          const errorMsg = lookupResponse.error?.message || 'Implant lookup failed';
+        if (!lookupResponse.success || !lookupResponse.item) {
+          const errorMsg = lookupResponse.message || 'Implant lookup failed';
           result.warnings.push(`Failed to lookup implant for slot ${placement.slot}: ${errorMsg}`);
           return this.createPlaceholderImplant(placement, result, slotPosition);
         }
 
-        const lookupItem = lookupResponse.data;
+        const lookupItem = lookupResponse.item;
 
         // Create enhanced implant with the real data
         const enhancedImplant: ImplantWithClusters = {

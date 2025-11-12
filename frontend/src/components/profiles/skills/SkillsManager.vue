@@ -77,7 +77,7 @@ Interactive skill categories with expandable panels and sliders with IP calculat
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, provide } from 'vue';
+import { computed, ref, onMounted, provide, toRef } from 'vue';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
 import { useSkills } from '@/composables/useSkills';
 import { skillService } from '@/services/skill-service';
@@ -96,10 +96,12 @@ const emit = defineEmits<{
 }>();
 
 // Provide profile for AC calculation in child components
-provide('profile', props.profile);
+// IMPORTANT: Provide computed ref to ensure reactivity when profile prop changes
+provide('profile', computed(() => props.profile));
 
 // Use skills composable for skill operations with the viewed profile
-const { getSkillsByCategory } = useSkills({ profile: props.profile });
+// Don't pass profile in options - rely on injection for reactivity
+const { getSkillsByCategory } = useSkills();
 
 // State for Misc skills zero-value toggle
 const showZeroMiscSkills = ref(false);

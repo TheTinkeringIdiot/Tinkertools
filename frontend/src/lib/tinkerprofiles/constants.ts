@@ -255,19 +255,19 @@ export const DEFAULT_CLOTHING = {
 } as const;
 
 export const DEFAULT_IMPLANTS = {
-  Head: null,
-  Eye: null,
-  Ear: null,
-  Chest: null,
-  RightArm: null,
-  LeftArm: null,
-  Waist: null,
-  RightWrist: null,
-  LeftWrist: null,
-  Leg: null,
-  RightHand: null,
-  LeftHand: null,
-  Feet: null,
+  '2': null,    // Eyes (1 << 1)
+  '4': null,    // Head (1 << 2)
+  '8': null,    // Ears (1 << 3)
+  '16': null,   // RightArm (1 << 4)
+  '32': null,   // Chest (1 << 5)
+  '64': null,   // LeftArm (1 << 6)
+  '128': null,  // RightWrist (1 << 7)
+  '256': null,  // Waist (1 << 8)
+  '512': null,  // LeftWrist (1 << 9)
+  '1024': null, // RightHand (1 << 10)
+  '2048': null, // Legs (1 << 11)
+  '4096': null, // LeftHand (1 << 12)
+  '8192': null, // Feet (1 << 13)
 } as const;
 
 // ============================================================================

@@ -52,14 +52,21 @@ const ATTRIBUTE_IDS = new Set([16, 17, 18, 19, 20, 21]);
 const TRAINABLE_SKILL_IDS = new Set(Object.keys(SKILL_COST_FACTORS).map(Number));
 
 /**
+ * Stats with calculated base values (no IP cost, but have a base formula)
+ * These stats have their base value calculated from character properties
+ */
+const CALCULATED_BASE_STAT_IDS = new Set([
+  1, // MaxHealth - calculated from abilities
+  221, // MaxNano - calculated from abilities
+  181, // MaxNCU - calculated from level: 1200 + (level * 6)
+]);
+
+/**
  * Bonus-only stat IDs (no base value, no IP cost, only receive bonuses)
  * These stats need to be initialized if they have any bonuses from equipment/perks/buffs
  */
 const BONUS_ONLY_STAT_IDS = new Set([
-  1, // MaxHealth
-  221, // MaxNano
   45, // BeltSlots
-  181, // MaxNCU
   90, // ProjectileAC
   91, // MeleeAC
   92, // EnergyAC
@@ -117,6 +124,43 @@ function createEmptySkillData(): SkillData {
   };
 }
 
+/**
+ * Ensure a profile has required attribute skills (16-21) initialized
+ * This is critical for IP calculations and should be called on any profile
+ * that might not have been properly initialized
+ *
+ * @param profile - Profile to ensure has required skills
+ * @param breed - Breed ID for calculating base values (optional, uses profile's breed if not provided)
+ */
+export function ensureRequiredSkills(profile: TinkerProfile, breed?: number): void {
+  // Ensure skills object exists
+  if (!profile.skills) {
+    profile.skills = {};
+  }
+
+  const characterBreed = breed ?? profile.Character?.Breed ?? 1; // Default to Solitus
+
+  // Attribute IDs: Strength=16, Agility=17, Stamina=18, Intelligence=19, Sense=20, Psychic=21
+  const ATTRIBUTE_IDS = [16, 17, 18, 19, 20, 21];
+
+  for (const abilityId of ATTRIBUTE_IDS) {
+    if (!profile.skills[abilityId]) {
+      const breedBase = getBreedInitValue(characterBreed, abilityId);
+      profile.skills[abilityId] = {
+        base: breedBase,
+        trickle: 0,
+        pointsFromIp: 0,
+        equipmentBonus: 0,
+        perkBonus: 0,
+        buffBonus: 0,
+        ipSpent: 0,
+        cap: breedBase, // Initial cap equals base
+        total: breedBase, // Initial total equals base
+      };
+    }
+  }
+}
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -129,6 +173,9 @@ function createEmptySkillData(): SkillData {
  * Convert TinkerProfile to CharacterStats for IP calculations
  */
 export function profileToCharacterStats(profile: TinkerProfile): CharacterStats {
+  // Defensive: ensure required attribute skills exist
+  ensureRequiredSkills(profile);
+
   // Direct access - no conversion needed since Character stores numeric IDs
   const breed = profile.Character.Breed;
   const profession = profile.Character.Profession;
@@ -172,7 +219,7 @@ export function profileToCharacterStats(profile: TinkerProfile): CharacterStats 
 /**
  * Calculate perk bonuses for skills and abilities from profile's perk system
  */
-async function calculatePerkBonuses(profile: TinkerProfile): Promise<Record<number, number>> {
+function calculatePerkBonuses(profile: TinkerProfile): Record<number, number> {
   if (!profile.PerksAndResearch) {
     return {};
   }
@@ -343,6 +390,13 @@ export function updateProfileSkillInfo(
   // Use provided buff bonuses or calculate them
   const buffBonuses = providedBuffBonuses || calculateBuffBonuses(profile);
 
+  // Initialize calculated base stats (always need to exist)
+  for (const statId of CALCULATED_BASE_STAT_IDS) {
+    if (!profile.skills[statId]) {
+      profile.skills[statId] = createEmptySkillData();
+    }
+  }
+
   // Initialize any bonus-only stats that have bonuses but don't exist in profile yet
   for (const statId of BONUS_ONLY_STAT_IDS) {
     const hasBonus =
@@ -481,11 +535,67 @@ export function updateProfileSkillInfo(
     if (BONUS_ONLY_STAT_IDS.has(skillId)) {
       // Get bonuses for this stat
       const equipmentBonus = equipmentBonuses[skillId] || 0;
-      const perkBonus = perkBonuses[skillId] || 0;
-      const buffBonus = buffBonuses[skillId] || 0;
+      const perkBonus = perkBonuses[skillId];
+      const buffBonus = buffBonuses[skillId];
 
       // Bonus-only stats have no base skill value, no trickle-down, no IP
       skillData.base = 0;
+      skillData.trickle = 0;
+      skillData.ipSpent = 0;
+      skillData.pointsFromIp = 0;
+
+      // Update bonus fields
+      // Always update equipment bonus (recalculated from current equipment)
+      skillData.equipmentBonus = equipmentBonus;
+
+      // Only update perk/buff bonuses if we have calculated values
+      // Otherwise preserve existing values (allows manual setting for testing)
+      if (perkBonus !== undefined) {
+        skillData.perkBonus = perkBonus;
+      }
+      if (buffBonus !== undefined) {
+        skillData.buffBonus = buffBonus;
+      }
+
+      // Ensure bonus fields exist (default to 0 if undefined)
+      skillData.perkBonus = skillData.perkBonus || 0;
+      skillData.buffBonus = skillData.buffBonus || 0;
+
+      // Bonus-only stats have total = sum of bonuses (no base value)
+      skillData.total = skillData.equipmentBonus + skillData.perkBonus + skillData.buffBonus;
+    }
+  }
+
+  // Apply calculated base values and bonuses to stats with formulas
+  for (const [skillIdStr, skillData] of Object.entries(profile.skills)) {
+    const skillId = Number(skillIdStr);
+
+    // Process stats with calculated base values
+    if (CALCULATED_BASE_STAT_IDS.has(skillId)) {
+      let calculatedBase = 0;
+
+      // Calculate base value based on stat type
+      if (skillId === 181) {
+        // MaxNCU = 1200 + (level * 6)
+        const level = profile.Character.Level ?? 1;
+        calculatedBase = 1200 + level * 6;
+      } else if (skillId === 1) {
+        // MaxHealth - TODO: implement proper formula (requires abilities)
+        // For now, use a placeholder
+        calculatedBase = 0;
+      } else if (skillId === 221) {
+        // MaxNano - TODO: implement proper formula (requires abilities)
+        // For now, use a placeholder
+        calculatedBase = 0;
+      }
+
+      // Get bonuses for this stat
+      const equipmentBonus = equipmentBonuses[skillId] || 0;
+      const perkBonus = perkBonuses[skillId] || 0;
+      const buffBonus = buffBonuses[skillId] || 0;
+
+      // Calculated base stats have no trickle-down or IP
+      skillData.base = calculatedBase;
       skillData.trickle = 0;
       skillData.ipSpent = 0;
       skillData.pointsFromIp = 0;
@@ -495,26 +605,8 @@ export function updateProfileSkillInfo(
       skillData.perkBonus = perkBonus;
       skillData.buffBonus = buffBonus;
 
-      // Special case: MaxNCU (stat 181) - has a base value that receives bonuses
-      if (skillId === 181) {
-        const totalBonuses = equipmentBonus + perkBonus + buffBonus;
-
-        if (totalBonuses === 0) {
-          // No bonuses: preserve existing total (for test profiles with custom MaxNCU)
-          // or calculate default from level
-          if (!skillData.total || skillData.total === 0) {
-            skillData.total = Math.max(1200, characterStats.level * 6);
-          }
-          // else: keep existing total unchanged
-        } else {
-          // Has bonuses: calculate base from level and add bonuses
-          const baseMaxNCU = Math.max(1200, characterStats.level * 6);
-          skillData.total = baseMaxNCU + totalBonuses;
-        }
-      } else {
-        // Other bonus-only stats: no base value, only bonuses
-        skillData.total = equipmentBonus + perkBonus + buffBonus;
-      }
+      // Total = base + bonuses
+      skillData.total = calculatedBase + equipmentBonus + perkBonus + buffBonus;
     }
   }
 
@@ -707,15 +799,13 @@ export function validateProfileIP(profile: TinkerProfile): {
 
 /**
  * Recalculate all IP-related information for a profile
+ * IMPORTANT: This function modifies the profile in place for performance
  */
-export async function recalculateProfileIP(profile: TinkerProfile): Promise<TinkerProfile> {
-  // Create a deep copy to avoid mutations
-  const updatedProfile = JSON.parse(JSON.stringify(profile)) as TinkerProfile;
-
+export function recalculateProfileIP(profile: TinkerProfile): TinkerProfile {
   // Calculate perk bonuses if perks are present
   let perkBonuses: Record<number, number> = {};
   try {
-    perkBonuses = await calculatePerkBonuses(updatedProfile);
+    perkBonuses = calculatePerkBonuses(profile);
   } catch (error) {
     console.warn('Failed to calculate perk bonuses during IP recalculation:', error);
   }
@@ -723,29 +813,21 @@ export async function recalculateProfileIP(profile: TinkerProfile): Promise<Tink
   // Calculate buff bonuses if buffs are present
   let buffBonuses: Record<number, number> = {};
   try {
-    buffBonuses = calculateBuffBonuses(updatedProfile);
+    buffBonuses = calculateBuffBonuses(profile);
   } catch (error) {
     console.warn('Failed to calculate buff bonuses during IP recalculation:', error);
   }
 
   // Update skill information (trickle-down, caps) with all bonuses
-  updateProfileSkillInfo(updatedProfile, undefined, perkBonuses, buffBonuses);
+  updateProfileSkillInfo(profile, undefined, perkBonuses, buffBonuses);
 
   // Recalculate IP tracker
-  updatedProfile.IPTracker = calculateProfileIP(updatedProfile);
-
-  // Recalculate health and nano since trickle-down effects might impact Body Dev and Nano Pool
-  try {
-    const { recalculateHealthAndNano } = await import('@/services/profile-update-service');
-    await recalculateHealthAndNano(updatedProfile);
-  } catch (error) {
-    console.warn('Could not recalculate health/nano in IP tracker update:', error);
-  }
+  profile.IPTracker = calculateProfileIP(profile);
 
   // Update timestamp
-  updatedProfile.updated = new Date().toISOString();
+  profile.updated = new Date().toISOString();
 
-  return updatedProfile;
+  return profile;
 }
 
 // ============================================================================
@@ -755,15 +837,15 @@ export async function recalculateProfileIP(profile: TinkerProfile): Promise<Tink
 /**
  * Safely modify a skill value while maintaining IP constraints
  */
-export async function modifySkill(
+export function modifySkill(
   profile: TinkerProfile,
   skillId: number,
   newValue: number
-): Promise<{
+): {
   success: boolean;
   error?: string;
   updatedProfile?: TinkerProfile;
-}> {
+} {
   let skillData = profile.skills[skillId];
 
   // Auto-create missing trainable skills for better UX
@@ -851,23 +933,23 @@ export async function modifySkill(
   // Recalculate all IP information (includes perk bonuses)
   return {
     success: true,
-    updatedProfile: await recalculateProfileIP(updatedProfile),
+    updatedProfile: recalculateProfileIP(updatedProfile),
   };
 }
 
 /**
  * Safely modify an ability value while maintaining IP constraints
  */
-export async function modifyAbility(
+export function modifyAbility(
   profile: TinkerProfile,
   abilityId: number,
   newValue: number
-): Promise<{
+): {
   success: boolean;
   error?: string;
   updatedProfile?: TinkerProfile;
   trickleDownChanges?: Record<number, { old: number; new: number }>;
-}> {
+} {
   const abilityData = profile.skills[abilityId];
   if (!abilityData) {
     return {
@@ -969,7 +1051,7 @@ export async function modifyAbility(
   }
 
   // Full IP recalculation (for IP tracker, includes perk bonuses)
-  const finalProfile = await recalculateProfileIP(profileWithTrickleDown);
+  const finalProfile = recalculateProfileIP(profileWithTrickleDown);
 
   return {
     success: true,
@@ -982,9 +1064,9 @@ export async function modifyAbility(
  * Recalculate profile with updated perk bonuses
  * Use this when perks change to ensure all skill/ability values are updated
  */
-export async function recalculateProfileWithPerkChanges(
+export function recalculateProfileWithPerkChanges(
   profile: TinkerProfile
-): Promise<TinkerProfile> {
+): TinkerProfile {
   return recalculateProfileIP(profile);
 }
 

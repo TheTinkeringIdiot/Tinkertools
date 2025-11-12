@@ -12,7 +12,7 @@
  * - Type-safe skill access with error handling
  */
 
-import { computed, readonly, inject, type ComputedRef } from 'vue';
+import { computed, readonly, inject, unref, type ComputedRef } from 'vue';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { skillService } from '@/services/skill-service';
 import type { SkillId, SkillData } from '@/types/skills';
@@ -47,7 +47,8 @@ export function useSkills(options: UseSkillsOptions = {}) {
   const profilesStore = useTinkerProfilesStore();
 
   // Try to inject profile from parent component (e.g., SkillsManager)
-  const injectedProfile = inject<TinkerProfile | null>('profile', null);
+  // Support both direct profile injection and ComputedRef<TinkerProfile> injection
+  const injectedProfile = inject<TinkerProfile | ComputedRef<TinkerProfile> | null>('profile', null);
 
   // ============================================================================
   // Reactive Computed Properties
@@ -58,7 +59,10 @@ export function useSkills(options: UseSkillsOptions = {}) {
    * Priority: options.profile > injected profile > active profile
    */
   const profileSkills = computed((): Record<string, SkillData> => {
-    const targetProfile = options.profile ?? injectedProfile ?? profilesStore.activeProfile;
+    // Use unref to safely unwrap refs/computed refs
+    const injected = unref(injectedProfile);
+
+    const targetProfile = options.profile ?? injected ?? profilesStore.activeProfile;
     return targetProfile?.skills || {};
   });
 
