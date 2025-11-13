@@ -90,7 +90,7 @@ Shows where items can be obtained (crystals, NPCs, missions, etc.)
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { getItemIconUrl } from '@/services/game-utils';
+import { getItemIconUrl, getSourceNavigationRoute } from '@/services/game-utils';
 import type { ItemSource } from '@/types/api';
 
 // Props
@@ -193,12 +193,9 @@ function onIconError(event: Event) {
 }
 
 function navigateToSourceItem(source: ItemSource) {
-  // Get the source item's AOID from source_id
-  const sourceItemId = source.source.source_id;
-
-  if (sourceItemId) {
-    // Navigate to the source item's detail page
-    router.push(`/items/${sourceItemId}`);
+  const route = getSourceNavigationRoute(source);
+  if (route !== '#') {
+    router.push(route);
   }
 }
 </script>

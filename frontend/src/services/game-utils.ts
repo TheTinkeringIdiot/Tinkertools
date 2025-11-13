@@ -2180,3 +2180,28 @@ export function getMinimumLevel(symbiant: { actions?: Action[] }): number {
   // Equal or other operators: use value as-is
   return value2;
 }
+
+// ============================================================================
+// Source Navigation Functions
+// ============================================================================
+
+/**
+ * Get navigation route for an item source based on source type
+ * Routes pocket boss sources (type='mob') to TinkerPocket, items to TinkerItems
+ */
+export function getSourceNavigationRoute(source: ItemSource): string {
+  const sourceType = source.source?.source_type?.name;
+  const sourceId = source.source?.source_id;
+
+  if (!sourceId) return '#';
+
+  // Route based on source type
+  switch (sourceType) {
+    case 'mob':
+      return `/pocket/bosses/${sourceId}`;
+    case 'item':
+      return `/items/${sourceId}`;
+    default:
+      return `/items/${sourceId}`;
+  }
+}
