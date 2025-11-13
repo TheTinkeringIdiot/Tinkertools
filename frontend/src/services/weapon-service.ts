@@ -13,7 +13,7 @@ import {
   generateCacheKey,
   getCachedWeapons,
   cacheWeapons,
-} from './weapon-cache';
+} from './indexed-db-weapon-cache';
 
 // ============================================================================
 // API Calls
@@ -49,7 +49,7 @@ export async function analyzeWeaponsWithCache(request: WeaponAnalyzeRequest): Pr
   const cacheKey = generateCacheKey(request);
 
   // Try cache first
-  const cached = getCachedWeapons(cacheKey);
+  const cached = await getCachedWeapons(cacheKey);
   if (cached) {
     return cached;
   }
@@ -63,7 +63,7 @@ export async function analyzeWeaponsWithCache(request: WeaponAnalyzeRequest): Pr
   const responseTime = performance.now() - startTime;
   console.log(`[WeaponService] Backend query: ${Math.round(responseTime)}ms, ${weapons.length} weapons`);
 
-  // Cache the result
+  // Cache the result (no need to await, fire-and-forget)
   cacheWeapons(cacheKey, weapons);
 
   return weapons;

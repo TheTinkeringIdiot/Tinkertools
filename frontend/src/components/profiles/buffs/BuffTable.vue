@@ -19,7 +19,7 @@ Shows active buff nanos with their icons, names, NCU costs and removal options
         <div class="flex justify-between items-center">
           <div class="flex items-center gap-2">
             <i class="pi pi-sparkles text-primary-500" :aria-hidden="true"></i>
-            <span class="font-semibold"> Buffs ({{ currentNCU }} / {{ maxNCU }} NCU) </span>
+            <span class="font-semibold text-surface-900 dark:text-surface-50"> Buffs ({{ currentNCU }} / {{ maxNCU }} NCU) </span>
           </div>
           <Button
             label="Remove All"
@@ -101,7 +101,7 @@ Shows active buff nanos with their icons, names, NCU costs and removal options
     </DataTable>
 
     <!-- Empty State -->
-    <div v-else class="empty-state p-8 text-center">
+    <div v-else class="bg-surface-50 dark:bg-surface-900 border-2 border-dashed border-surface-300 dark:border-surface-700 rounded-lg p-8 text-center">
       <div class="mb-4">
         <i class="pi pi-sparkles text-6xl opacity-30" :aria-hidden="true"></i>
       </div>
@@ -302,19 +302,37 @@ function onIconError() {
 </script>
 
 <style scoped>
-.buff-data-table :deep(.p-datatable-tbody) {
-  font-size: 0.9rem;
+.buff-data-table :deep(.p-datatable) {
+  background: transparent;
+}
+
+.buff-data-table :deep(.p-datatable-wrapper) {
+  background: var(--p-surface-0);
+  border-radius: 0.5rem;
 }
 
 .buff-data-table :deep(.p-datatable-header) {
-  background: var(--surface-50);
-  border-bottom: 1px solid var(--surface-200);
+  background: var(--p-surface-50);
+  border-bottom: 1px solid var(--p-surface-200);
   padding: 0.75rem 1rem;
 }
 
-.dark .buff-data-table :deep(.p-datatable-header) {
-  background: var(--surface-900);
-  border-bottom: 1px solid var(--surface-700);
+.buff-data-table :deep(.p-datatable-tbody) {
+  font-size: 0.9rem;
+  background: var(--p-surface-0);
+}
+
+:global(.dark) .buff-data-table :deep(.p-datatable-wrapper) {
+  background: var(--p-surface-900);
+}
+
+:global(.dark) .buff-data-table :deep(.p-datatable-header) {
+  background: var(--p-surface-800);
+  border-bottom: 1px solid var(--p-surface-700);
+}
+
+:global(.dark) .buff-data-table :deep(.p-datatable-tbody) {
+  background: var(--p-surface-900);
 }
 
 .buff-icon {
@@ -329,17 +347,6 @@ function onIconError() {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-
-.empty-state {
-  background: var(--surface-50);
-  border: 2px dashed var(--surface-300);
-  border-radius: 0.5rem;
-}
-
-.dark .empty-state {
-  background: var(--surface-900);
-  border-color: var(--surface-700);
 }
 
 /* Custom tooltip styling */

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ref } from 'vue';
+import { ref, nextTick } from 'vue';
 import { mountWithContext, standardCleanup } from '@/__tests__/helpers';
 import ActionRequirements from '../ActionRequirements.vue';
 import type { Action } from '../../types/api';

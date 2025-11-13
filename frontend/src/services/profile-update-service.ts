@@ -91,7 +91,7 @@ export async function updateCharacterMetadata(
       updatedProfile.Character.Level = newLevel;
 
       // Recalculate health and nano based on new level
-      await recalculateHealthAndNano(updatedProfile);
+      recalculateHealthAndNano(updatedProfile);
     }
 
     // Handle breed change (most impactful)
@@ -378,7 +378,7 @@ async function recalculateTrickleDown(profile: TinkerProfile): Promise<void> {
 /**
  * Recalculate health and nano based on current stats
  */
-export async function recalculateHealthAndNano(profile: TinkerProfile): Promise<void> {
+export function recalculateHealthAndNano(profile: TinkerProfile): void {
   if (!profile.Character || !profile.skills) return;
 
   const level = profile.Character.Level || 1;

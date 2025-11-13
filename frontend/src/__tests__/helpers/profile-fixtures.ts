@@ -185,16 +185,8 @@ function createDefaultSkills(
     }
   });
 
-  // Always ensure MaxNCU exists with reasonable default
-  // MaxNCU (stat 181) is a BONUS_ONLY_STAT_ID in ip-integrator
-  // Formula: 1200 base + (level * 6) for game-accurate values
-  if (!overrides[181]) {
-    const maxNCUValue = Math.max(1200, level * 6);
-    skills[181] = createTestSkillData({
-      base: 0, // Bonus-only stats have no base
-      total: maxNCUValue,
-    });
-  }
+  // MaxNCU (stat 181) is a BONUS_ONLY_STAT_ID - no base value, only from equipment/buffs
+  // It will be initialized automatically by ip-integrator if it has bonuses
 
   // Apply any additional skill overrides
   Object.entries(overrides).forEach(([skillIdStr, override]) => {

@@ -738,7 +738,7 @@ describe('useInterpolationBatch', () => {
 // getInterpolationRanges Tests (New Functionality)
 // ============================================================================
 
-describe('getInterpolationRanges', () => {
+describe('getInterpolationRanges', async () => {
   const { apiClient } = await import('../../services/api-client');
   const mockApiClient = apiClient as {
     getInterpolationInfo: Mock;

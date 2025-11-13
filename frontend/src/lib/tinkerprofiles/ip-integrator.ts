@@ -28,6 +28,7 @@ import {
 } from './ip-calculator';
 
 import { getSkillId, getSkillName } from './skill-mappings';
+import { recalculateHealthAndNano } from '@/services/profile-update-service';
 import { calculateEquipmentBonuses } from '../../services/equipment-bonus-calculator';
 import { calculatePerkBonuses as calculatePerkBonusesService } from '../../services/perk-bonus-calculator';
 import { calculateNanoBonuses } from '../../services/nano-bonus-calculator';
@@ -58,7 +59,6 @@ const TRAINABLE_SKILL_IDS = new Set(Object.keys(SKILL_COST_FACTORS).map(Number))
 const CALCULATED_BASE_STAT_IDS = new Set([
   1, // MaxHealth - calculated from abilities
   221, // MaxNano - calculated from abilities
-  181, // MaxNCU - calculated from level: 1200 + (level * 6)
 ]);
 
 /**
@@ -66,6 +66,7 @@ const CALCULATED_BASE_STAT_IDS = new Set([
  * These stats need to be initialized if they have any bonuses from equipment/perks/buffs
  */
 const BONUS_ONLY_STAT_IDS = new Set([
+  181, // MaxNCU
   45, // BeltSlots
   90, // ProjectileAC
   91, // MeleeAC
@@ -575,11 +576,7 @@ export function updateProfileSkillInfo(
       let calculatedBase = 0;
 
       // Calculate base value based on stat type
-      if (skillId === 181) {
-        // MaxNCU = 1200 + (level * 6)
-        const level = profile.Character.Level ?? 1;
-        calculatedBase = 1200 + level * 6;
-      } else if (skillId === 1) {
+      if (skillId === 1) {
         // MaxHealth - TODO: implement proper formula (requires abilities)
         // For now, use a placeholder
         calculatedBase = 0;
@@ -820,6 +817,9 @@ export function recalculateProfileIP(profile: TinkerProfile): TinkerProfile {
 
   // Update skill information (trickle-down, caps) with all bonuses
   updateProfileSkillInfo(profile, undefined, perkBonuses, buffBonuses);
+
+  // Recalculate health and nano now that all skills/bonuses are updated
+  recalculateHealthAndNano(profile);
 
   // Recalculate IP tracker
   profile.IPTracker = calculateProfileIP(profile);

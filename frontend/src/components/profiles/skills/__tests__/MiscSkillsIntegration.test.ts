@@ -12,12 +12,16 @@
 import { describe, it, expect, beforeEach, vi, afterAll } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import { nextTick } from 'vue';
+import { createPinia, setActivePinia, type Pinia } from 'pinia';
+import { createApp } from 'vue';
+import PrimeVue from 'primevue/config';
+import ToastService from 'primevue/toastservice';
 import SkillSlider from '@/components/profiles/skills/SkillSlider.vue';
 import StatBreakdownTooltip from '@/components/profiles/skills/StatBreakdownTooltip.vue';
 import SkillsManager from '@/components/profiles/skills/SkillsManager.vue';
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import type { SkillId } from '@/types/skills';
-import { SKILL_ID, createTestProfile, PROFESSION, BREED } from '@/__tests__/helpers';
+import { SKILL_ID, MISC_SKILL_ID, createTestProfile, PROFESSION, BREED, createTestSkillData } from '@/__tests__/helpers';
 
 // Mock PrimeVue components
 vi.mock('primevue/slider', () => ({
@@ -66,7 +70,21 @@ console.error = (...args: any[]) => {
 // Helper to cast numeric skill IDs to branded SkillId type
 const toSkillId = (id: number): SkillId => id as SkillId;
 
+let pinia: Pinia;
+
 describe('Misc Skills Integration Tests', () => {
+  // Helper to expand Misc category
+  const expandMiscCategory = async (wrapper: VueWrapper) => {
+    const miscCategoryHeaders = wrapper.findAll('.category-header');
+    for (const header of miscCategoryHeaders) {
+      if (header.text().includes('Misc')) {
+        await header.trigger('click');
+        await nextTick();
+        return;
+      }
+    }
+  };
+
   // Test profile factory with Misc skills
   const createMiscSkillsProfile = (): TinkerProfile => {
     return createTestProfile({
@@ -74,50 +92,51 @@ describe('Misc Skills Integration Tests', () => {
       breed: BREED.SOLITUS,
       level: 100,
       skills: {
-        // Abilities
-        [SKILL_ID.INTELLIGENCE]: { base: 100, total: 100 },
-        [SKILL_ID.PSYCHIC]: { base: 100, total: 100 },
-        [SKILL_ID.SENSE]: { base: 100, total: 100 },
-        [SKILL_ID.STAMINA]: { base: 100, total: 100 },
-        [SKILL_ID.STRENGTH]: { base: 100, total: 100 },
-        [SKILL_ID.AGILITY]: { base: 100, total: 100 },
+        // Abilities (using full SkillData structure)
+        [SKILL_ID.INTELLIGENCE]: createTestSkillData({ base: 100, total: 100 }),
+        [SKILL_ID.PSYCHIC]: createTestSkillData({ base: 100, total: 100 }),
+        [SKILL_ID.SENSE]: createTestSkillData({ base: 100, total: 100 }),
+        [SKILL_ID.STAMINA]: createTestSkillData({ base: 100, total: 100 }),
+        [SKILL_ID.STRENGTH]: createTestSkillData({ base: 100, total: 100 }),
+        [SKILL_ID.AGILITY]: createTestSkillData({ base: 100, total: 100 }),
 
-        // Misc skills with bonuses
-        [SKILL_ID.BRAWLING]: {
-          base: 0,
-          equipmentBonus: 0,
-          perkBonus: 0,
-          buffBonus: 0,
-          total: 0,
-        },
-        [SKILL_ID.CONCEALMENT]: {
+        // Actual Misc category skills (bonus-only stats)
+        // These are from the Misc category in skill-mappings.ts
+        [MISC_SKILL_ID.HEAL_DELTA]: createTestSkillData({
           base: 0,
           equipmentBonus: 50,
           perkBonus: 25,
           buffBonus: 10,
           total: 85,
-        },
-        [SKILL_ID.PSYCHOLOGY]: {
+        }),
+        [MISC_SKILL_ID.NANO_DELTA]: createTestSkillData({
           base: 0,
           equipmentBonus: 30,
           perkBonus: 0,
           buffBonus: 0,
           total: 30,
-        },
-        [SKILL_ID.SWIMMING]: {
-          base: 0,
-          equipmentBonus: 0,
-          perkBonus: 0,
-          buffBonus: 0,
-          total: 0,
-        },
-        [SKILL_ID.DUCK_EXP]: {
+        }),
+        [MISC_SKILL_ID.CRITICAL_INCREASE]: createTestSkillData({
           base: 0,
           equipmentBonus: 0,
           perkBonus: 15,
           buffBonus: 5,
           total: 20,
-        },
+        }),
+        [MISC_SKILL_ID.ADD_ALL_OFF]: createTestSkillData({
+          base: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          total: 0,
+        }),
+        [MISC_SKILL_ID.ADD_ALL_DEF]: createTestSkillData({
+          base: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          total: 0,
+        }),
       },
     });
   };
@@ -125,22 +144,28 @@ describe('Misc Skills Integration Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     consoleErrors.length = 0;
-    // Clear localStorage
     localStorage.clear();
+
+    // Create app with PrimeVue + ToastService
+    const app = createApp({});
+    app.use(PrimeVue);
+    app.use(ToastService);
+
+    // Create and activate Pinia
+    pinia = createPinia();
+    app.use(pinia);
+    setActivePinia(pinia);
   });
 
   describe('SkillSlider Display with MiscSkill Objects', () => {
     it('should correctly display MiscSkill objects', () => {
-      const skillData = {
+      const skillData = createTestSkillData({
         base: 0,
-        trickle: 0,
-        ipSpent: 0,
-        pointsFromIp: 0,
         equipmentBonus: 50,
         perkBonus: 25,
         buffBonus: 0,
         total: 75,
-      };
+      });
 
       const wrapper = mount(SkillSlider, {
         props: {
@@ -165,16 +190,13 @@ describe('Misc Skills Integration Tests', () => {
     });
 
     it('should extract value field properly from MiscSkill objects', async () => {
-      const skillData = {
+      const skillData = createTestSkillData({
         base: 0,
-        trickle: 0,
-        ipSpent: 0,
-        pointsFromIp: 0,
         equipmentBonus: 100,
         perkBonus: 50,
         buffBonus: 25,
         total: 175,
-      };
+      });
 
       const wrapper = mount(SkillSlider, {
         props: {
@@ -202,16 +224,14 @@ describe('Misc Skills Integration Tests', () => {
     });
 
     it('should maintain read-only behavior for Misc skills', () => {
-      const skillData = {
+      const skillData = createTestSkillData({
         base: 0,
-        trickle: 0,
-        ipSpent: 0,
-        pointsFromIp: 0,
+        
         equipmentBonus: 50,
         perkBonus: 0,
         buffBonus: 0,
         total: 50,
-      };
+      });
 
       const wrapper = mount(SkillSlider, {
         props: {
@@ -237,16 +257,14 @@ describe('Misc Skills Integration Tests', () => {
     });
 
     it('should show equipment bonus indicator for Misc skills with bonuses', () => {
-      const skillData = {
+      const skillData = createTestSkillData({
         base: 0,
-        trickle: 0,
-        ipSpent: 0,
-        pointsFromIp: 0,
+        
         equipmentBonus: 75,
         perkBonus: 0,
         buffBonus: 0,
         total: 75,
-      };
+      });
 
       const wrapper = mount(SkillSlider, {
         props: {
@@ -273,16 +291,14 @@ describe('Misc Skills Integration Tests', () => {
 
   describe('Tooltip Breakdowns for Misc Skills', () => {
     it('should show tooltip breakdowns for Misc skills', () => {
-      const skillData = {
+      const skillData = createTestSkillData({
         base: 0,
-        trickle: 0,
-        ipSpent: 0,
-        pointsFromIp: 0,
+        
         equipmentBonus: 50,
         perkBonus: 25,
         buffBonus: 10,
         total: 85,
-      };
+      });
 
       const wrapper = mount(StatBreakdownTooltip, {
         props: {
@@ -317,16 +333,14 @@ describe('Misc Skills Integration Tests', () => {
     });
 
     it('should NOT show IP or trickle-down rows for Misc skills', () => {
-      const skillData = {
+      const skillData = createTestSkillData({
         base: 0,
-        trickle: 0,
-        ipSpent: 0,
-        pointsFromIp: 0,
+        
         equipmentBonus: 30,
         perkBonus: 0,
         buffBonus: 0,
         total: 30,
-      };
+      });
 
       const wrapper = mount(StatBreakdownTooltip, {
         props: {
@@ -361,16 +375,14 @@ describe('Misc Skills Integration Tests', () => {
     });
 
     it('should use correct color coding for bonuses', () => {
-      const skillData = {
+      const skillData = createTestSkillData({
         base: 0,
-        trickle: 0,
-        ipSpent: 0,
-        pointsFromIp: 0,
+        
         equipmentBonus: 40,
         perkBonus: 20,
         buffBonus: 5,
         total: 65,
-      };
+      });
 
       const wrapper = mount(StatBreakdownTooltip, {
         props: {
@@ -416,6 +428,7 @@ describe('Misc Skills Integration Tests', () => {
           profile: profile,
         },
         global: {
+          plugins: [pinia, PrimeVue, ToastService],
           directives: {
             tooltip: tooltipDirective,
           },
@@ -424,17 +437,18 @@ describe('Misc Skills Integration Tests', () => {
 
       await nextTick();
 
-      // By default, zero-value skills should be hidden
-      const miscSection = wrapper.find('[data-testid="misc-skills"]') || wrapper;
+      // Expand Misc category to see skills
+      await expandMiscCategory(wrapper);
 
+      // By default, zero-value skills should be hidden
       // Should show skills with values > 0
-      expect(miscSection.text()).toContain('Concealment');
-      expect(miscSection.text()).toContain('Psychology');
-      expect(miscSection.text()).toContain('Duck-Exp');
+      expect(wrapper.text()).toContain('Concealment');
+      expect(wrapper.text()).toContain('Psychology');
+      expect(wrapper.text()).toContain('Duck-Exp');
 
       // Should not show zero-value skills
-      expect(miscSection.text()).not.toContain('Brawling');
-      expect(miscSection.text()).not.toContain('Swim');
+      expect(wrapper.text()).not.toContain('Brawling');
+      expect(wrapper.text()).not.toContain('Swim');
     });
 
     it('should toggle zero-value skills when button is clicked', async () => {
@@ -445,6 +459,7 @@ describe('Misc Skills Integration Tests', () => {
           profile: profile,
         },
         global: {
+          plugins: [pinia, PrimeVue, ToastService],
           directives: {
             tooltip: tooltipDirective,
           },
@@ -452,6 +467,9 @@ describe('Misc Skills Integration Tests', () => {
       });
 
       await nextTick();
+
+      // Expand Misc category to see skills
+      await expandMiscCategory(wrapper);
 
       // Find and click the toggle button
       const toggleButton =
@@ -480,6 +498,7 @@ describe('Misc Skills Integration Tests', () => {
           profile: profile,
         },
         global: {
+          plugins: [pinia, PrimeVue, ToastService],
           directives: {
             tooltip: tooltipDirective,
           },
@@ -487,6 +506,9 @@ describe('Misc Skills Integration Tests', () => {
       });
 
       await nextTick();
+
+      // Expand Misc category to see skills
+      await expandMiscCategory(wrapper);
 
       // Find and click the toggle button
       const toggleButton = wrapper.find('[data-testid="toggle-zero-misc"]');
@@ -504,7 +526,7 @@ describe('Misc Skills Integration Tests', () => {
       }
     });
 
-    it('should load toggle preference from localStorage on mount', () => {
+    it('should load toggle preference from localStorage on mount', async () => {
       // Set preference in localStorage before mounting
       localStorage.setItem('tinkertools_show_zero_misc_skills', 'true');
 
@@ -515,11 +537,17 @@ describe('Misc Skills Integration Tests', () => {
           profile: profile,
         },
         global: {
+          plugins: [pinia, PrimeVue, ToastService],
           directives: {
             tooltip: tooltipDirective,
           },
         },
       });
+
+      await nextTick();
+
+      // Expand Misc category to see skills
+      await expandMiscCategory(wrapper);
 
       // Should show zero-value skills based on saved preference
       expect(wrapper.text()).toContain('Concealment');
@@ -530,16 +558,14 @@ describe('Misc Skills Integration Tests', () => {
 
   describe('Reactive Updates', () => {
     it('should update display when bonuses change', async () => {
-      const skillData = {
+      const skillData = createTestSkillData({
         base: 0,
-        trickle: 0,
-        ipSpent: 0,
-        pointsFromIp: 0,
+        
         equipmentBonus: 50,
         perkBonus: 0,
         buffBonus: 0,
         total: 50,
-      };
+      });
 
       const wrapper = mount(SkillSlider, {
         props: {
@@ -561,16 +587,13 @@ describe('Misc Skills Integration Tests', () => {
       expect(wrapper.text()).toContain('50');
 
       // Update skill data
-      const updatedSkill = {
+      const updatedSkill = createTestSkillData({
         base: 0,
-        trickle: 0,
-        ipSpent: 0,
-        pointsFromIp: 0,
         equipmentBonus: 75,
         perkBonus: 25,
         buffBonus: 0,
         total: 100,
-      };
+      });
 
       await wrapper.setProps({ skillData: updatedSkill });
       await nextTick();
@@ -580,16 +603,13 @@ describe('Misc Skills Integration Tests', () => {
     });
 
     it('should update tooltip when bonuses change', async () => {
-      const initialSkill = {
+      const initialSkill = createTestSkillData({
         base: 0,
-        trickle: 0,
-        ipSpent: 0,
-        pointsFromIp: 0,
         equipmentBonus: 30,
         perkBonus: 0,
         buffBonus: 0,
         total: 30,
-      };
+      });
 
       const wrapper = mount(StatBreakdownTooltip, {
         props: {
@@ -618,16 +638,13 @@ describe('Misc Skills Integration Tests', () => {
       expect(wrapper.text()).not.toContain('Perks:');
 
       // Update with perk bonus
-      const updatedSkill = {
+      const updatedSkill = createTestSkillData({
         base: 0,
-        trickle: 0,
-        ipSpent: 0,
-        pointsFromIp: 0,
         equipmentBonus: 30,
         perkBonus: 20,
         buffBonus: 0,
         total: 50,
-      };
+      });
 
       await wrapper.setProps({
         skillData: updatedSkill,
@@ -647,6 +664,7 @@ describe('Misc Skills Integration Tests', () => {
           profile: profile,
         },
         global: {
+          plugins: [pinia, PrimeVue, ToastService],
           directives: {
             tooltip: tooltipDirective,
           },
@@ -654,6 +672,9 @@ describe('Misc Skills Integration Tests', () => {
       });
 
       await nextTick();
+
+      // Expand Misc category to see skills
+      await expandMiscCategory(wrapper);
 
       // Initially should not show zero-value skills
       expect(wrapper.text()).toContain('Concealment');
@@ -673,16 +694,14 @@ describe('Misc Skills Integration Tests', () => {
 
   describe('No Console Errors', () => {
     it('should not generate type errors or warnings', async () => {
-      const skillData = {
+      const skillData = createTestSkillData({
         base: 0,
-        trickle: 0,
-        ipSpent: 0,
-        pointsFromIp: 0,
+        
         equipmentBonus: 50,
         perkBonus: 25,
         buffBonus: 10,
         total: 85,
-      };
+      });
 
       const wrapper = mount(SkillSlider, {
         props: {
@@ -708,16 +727,14 @@ describe('Misc Skills Integration Tests', () => {
     });
 
     it('should mount and unmount components cleanly', async () => {
-      const skillData = {
+      const skillData = createTestSkillData({
         base: 0,
-        trickle: 0,
-        ipSpent: 0,
-        pointsFromIp: 0,
+        
         equipmentBonus: 0,
         perkBonus: 0,
         buffBonus: 0,
         total: 50,
-      };
+      });
 
       const wrapper = mount(SkillSlider, {
         props: {
@@ -778,6 +795,7 @@ describe('Misc Skills Integration Tests', () => {
           profile: profile,
         },
         global: {
+          plugins: [pinia, PrimeVue, ToastService],
           directives: {
             tooltip: tooltipDirective,
           },
@@ -785,6 +803,9 @@ describe('Misc Skills Integration Tests', () => {
       });
 
       await nextTick();
+
+      // Expand Misc category to see skills
+      await expandMiscCategory(wrapper);
 
       // Should display Misc skills correctly
       expect(wrapper.text()).toContain('Misc');
@@ -808,6 +829,7 @@ describe('Misc Skills Integration Tests', () => {
           profile: profile,
         },
         global: {
+          plugins: [pinia, PrimeVue, ToastService],
           directives: {
             tooltip: tooltipDirective,
           },
@@ -815,6 +837,9 @@ describe('Misc Skills Integration Tests', () => {
       });
 
       await nextTick();
+
+      // Expand Misc category to see skills
+      await expandMiscCategory(wrapper);
 
       // Update profile with new skill values
       const updatedProfile = {
@@ -837,7 +862,7 @@ describe('Misc Skills Integration Tests', () => {
       await wrapper.setProps({ profile: updatedProfile });
       await nextTick();
 
-      // Should now show the updated Brawling skill
+      // Should now show the updated Brawling skill (value > 0 makes it visible)
       expect(wrapper.text()).toContain('Brawling');
     });
   });

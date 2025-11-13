@@ -592,23 +592,20 @@ describe('PerkBonusCalculator', () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       // Mock performance.now to simulate slow calculation
-      const originalNow = performance.now;
       let callCount = 0;
-      vi.stubGlobal('performance', {
-        now: () => {
-          callCount++;
-          return callCount === 1 ? 0 : 250; // 250ms calculation time
-        },
+      const mockNow = vi.fn(() => {
+        callCount++;
+        return callCount === 1 ? 0 : 250; // 250ms calculation time
       });
+      vi.spyOn(performance, 'now').mockImplementation(mockNow);
 
       const perks = createPerformanceTestPerks(10);
       calculatePerkBonuses(perks);
 
       expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('exceeded 200ms threshold'));
 
-      // Restore original implementation
-      vi.stubGlobal('performance', { now: originalNow });
-      consoleSpy.mockRestore();
+      // Restore spies
+      vi.restoreAllMocks();
     });
 
     it('should handle errors in convenience functions gracefully', () => {

@@ -44,40 +44,28 @@ for (const item of equippedItems) {
 
 **Validation**: Integration tests verified equipment bonuses now apply correctly by checking stat totals after equipping test items.
 
-### Bug 2: MaxNCU Calculation Formula Broken
-**Impact**: Character NCU capacity showed as 0, preventing nano program planning.
+### Bug 2: MaxNCU Calculation Formula (REVERTED - Was Incorrect Fix)
+**Impact**: MaxNCU incorrectly calculated with base formula instead of pure bonuses.
 
-**Root Cause**: MaxNCU (stat 181) was treated as a bonus-only stat with no base value:
+**Root Cause**: MaxNCU (stat 181) was incorrectly moved to `CALCULATED_BASE_STAT_IDS` with formula `1200 + (level * 6)`. This was wrong - in Anarchy Online, MaxNCU is purely from equipment and buff bonuses, with no base value.
+
+**Correct Behavior**: MaxNCU is a bonus-only stat:
 ```typescript
-// OLD - BROKEN
+// CORRECT
 const BONUS_ONLY_STAT_IDS = new Set([
-  1, // MaxHealth
-  221, // MaxNano
-  181, // MaxNCU  <-- WRONG! This has a base value
-]);
-```
-
-MaxNCU has a calculated base value: `1200 + (level * 6)`. Treating it as bonus-only meant the base was never calculated.
-
-**Fix**: Created new category `CALCULATED_BASE_STAT_IDS` for stats with formula-based bases:
-```typescript
-// NEW - FIXED
-const CALCULATED_BASE_STAT_IDS = new Set([
-  1, // MaxHealth - base = f(abilities)
-  221, // MaxNano - base = f(abilities)
-  181, // MaxNCU - base = 1200 + (level * 6)
+  181, // MaxNCU - NO base value, only equipment/buff bonuses
+  45, // BeltSlots
+  // ... other bonus-only stats
 ]);
 
-// Calculate base value
-if (skillId === 181) {
-  const level = profile.Character.Level ?? 1;
-  calculatedBase = 1200 + level * 6;
-  skillData.base = calculatedBase;
-  skillData.total = calculatedBase + equipmentBonus + perkBonus + buffBonus;
-}
+// MaxNCU calculated as pure bonuses
+skillData.total = equipmentBonus + perkBonus + buffBonus;
 ```
 
-**Validation**: Integration tests verify MaxNCU = 1200 + (level * 6) + bonuses for all test profiles.
+**Previous Incorrect Fix** (November 2025 - REVERTED):
+The stat was incorrectly moved to `CALCULATED_BASE_STAT_IDS` with formula `1200 + (level * 6)`. This resulted in inflated MaxNCU values (e.g., 1752 for level 92 instead of just equipment bonuses).
+
+**Validation**: Integration tests verify MaxNCU = equipmentBonus + perkBonus + buffBonus (no base value).
 
 ### Bug 3: Skill Auto-Creation Missing for Trainable Skills
 **Impact**: Modifying trainable skills (Body Dev, Nano Pool, etc.) that weren't in the profile failed silently.

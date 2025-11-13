@@ -9,7 +9,7 @@ Main view component with profile integration, filtering, and DPS calculations
 import { ref, computed, watch, onMounted } from 'vue';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { analyzeWeaponsWithCache } from '@/services/weapon-service';
-import { clearWeaponCache, logCacheStats } from '@/services/weapon-cache';
+import { clearWeaponCache, logCacheStats, clearLegacyLocalStorageCache } from '@/services/indexed-db-weapon-cache';
 import type { FiteInputState, WeaponCandidate } from '@/types/weapon-analysis';
 import { WEAPON_SKILL_IDS, SPECIAL_ATTACK_IDS, INITIATIVE_IDS, DAMAGE_MODIFIER_IDS } from '@/types/weapon-analysis';
 import { getEquipableWeapons } from '@/utils/weapon-filtering';
@@ -378,6 +378,10 @@ watch(
  */
 onMounted(() => {
   console.log('[TinkerFite] Component mounted');
+
+  // One-time cleanup of legacy LocalStorage weapon cache
+  clearLegacyLocalStorageCache();
+
   populateFromProfile();
   if (activeProfile.value) {
     fetchWeapons();

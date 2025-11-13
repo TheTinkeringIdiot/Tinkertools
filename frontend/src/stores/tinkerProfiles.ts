@@ -189,8 +189,12 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       const active = await profileManager.getActiveProfile();
       if (active) {
         // Ensure caps and trickle-down are calculated for display
+        // This also recalculates stale values like MaxNCU from stored profiles
         const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
         const activeWithCaps = await updateProfileWithIPTracking(active);
+
+        // Save the recalculated profile back to storage to fix any stale values
+        await profileManager.updateProfile(activeWithCaps.id, activeWithCaps);
 
         activeProfile.value = activeWithCaps;
         activeProfileId.value = activeWithCaps.id;
