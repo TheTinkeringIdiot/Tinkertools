@@ -163,7 +163,7 @@ const selectedProfessionName = computed(() => {
 
 const activeProfile = computed(() => {
   if (!selectedProfile.value) return null;
-  return profilesStore.profiles.find((p) => p.id === selectedProfile.value) || null;
+  return profilesStore.activeProfile;
 });
 
 const filteredNanos = computed(() => {
