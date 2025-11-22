@@ -6,7 +6,7 @@
  */
 
 import { defineStore } from 'pinia';
-import { ref, computed, readonly } from 'vue';
+import { ref, computed, readonly, toRaw } from 'vue';
 import type {
   Item,
   ImplantSelection,
@@ -14,9 +14,11 @@ import type {
   TreatmentInfo,
   AttributeRequirementInfo,
   PerImplantRequirement,
+  SymbiantItem,
 } from '../types/api';
 import { apiClient } from '../services/api-client';
 import { useTinkerProfilesStore } from './tinkerProfiles';
+import { useSymbiantsStore } from './symbiants';
 import { equipmentBonusCalculator } from '../services/equipment-bonus-calculator';
 import { getCriteriaRequirements } from '../services/action-criteria';
 import { useToast } from 'primevue/usetoast';
@@ -292,13 +294,30 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
         return true;
       }
 
-      if (
-        current.shiny !== profile.shiny ||
-        current.bright !== profile.bright ||
-        current.faded !== profile.faded ||
-        current.ql !== profile.ql
-      ) {
+      // Check type change
+      if (current.type !== profile.type) {
         return true;
+      }
+
+      // Check implant-specific changes
+      if (current.type === 'implant') {
+        if (
+          current.shiny !== profile.shiny ||
+          current.bright !== profile.bright ||
+          current.faded !== profile.faded ||
+          current.ql !== profile.ql
+        ) {
+          return true;
+        }
+      }
+
+      // Check symbiant-specific changes
+      if (current.type === 'symbiant') {
+        const currentSymbiantId = current.symbiant?.id || null;
+        const profileSymbiantId = profile.symbiant?.id || null;
+        if (currentSymbiantId !== profileSymbiantId || current.ql !== profile.ql) {
+          return true;
+        }
       }
     }
 
@@ -412,35 +431,41 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
       // Convert profile implant data to ImplantSelection format
       const loadedConfiguration: Record<string, ImplantSelection> = {};
 
-      for (const [slotBitflag, implantData] of Object.entries(implants)) {
-        if (!implantData || typeof implantData !== 'object') {
-          console.log(`[TinkerPlants] Skipping slot ${slotBitflag}: invalid data`);
-          continue;
-        }
+      for (const [slotBitflag, item] of Object.entries(implants)) {
+        if (!item) continue;
 
-        // Profile stores Item objects directly - parse cluster names from description
-        if ('id' in implantData && 'name' in implantData && 'description' in implantData) {
-          const clusters = parseImplantClusters(implantData);
+        // Check for symbiant using type discriminator (ImplantWithClusters has 'type' field)
+        if ('type' in item && item.type === 'symbiant') {
+          // Load as symbiant
+          loadedConfiguration[slotBitflag] = {
+            type: 'symbiant',
+            slotBitflag,
+            ql: item.ql || 200,
+            symbiant: JSON.parse(JSON.stringify(item)) as SymbiantItem,
+            item: null,
+            shiny: null,
+            bright: null,
+            faded: null,
+          };
+          console.log(`[TinkerPlants] Slot ${slotBitflag}: loaded symbiant ${item.name}`);
+        } else {
+          // Load as implant (existing cluster parsing logic)
+          const clusters = parseImplantClusters(item);
           console.log(`[TinkerPlants] Slot ${slotBitflag} parsed clusters:`, clusters);
           if (clusters) {
-            // ImplantWithClusters extends Item, so cast to unknown first then to Item
-            // This is safe because we're only using the Item properties
-            const item = implantData as unknown as Item;
             loadedConfiguration[slotBitflag] = {
+              type: 'implant',
               shiny: clusters.shiny,
               bright: clusters.bright,
               faded: clusters.faded,
-              ql: (implantData as any).ql || 200,
+              ql: (item as any).ql || 200,
               slotBitflag,
-              item: item,
+              item: JSON.parse(JSON.stringify(item)) as Item,
+              symbiant: null,
             };
           } else {
             console.log(`[TinkerPlants] Slot ${slotBitflag}: parser returned null`);
           }
-        } else {
-          console.log(
-            `[TinkerPlants] Slot ${slotBitflag}: missing Item properties (id, name, description)`
-          );
         }
       }
 
@@ -491,14 +516,47 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
       loading.value = true;
       error.value = null;
 
-      // Convert currentConfiguration to profile.Implants format
+      // Convert currentConfiguration to unified profile.Implants format (ImplantWithClusters)
       const implantsToSave: Record<string, any> = {};
 
       for (const [slotBitflag, selection] of Object.entries(currentConfiguration.value)) {
-        // Only save configured slots that have a fetched item
-        if (selection.item) {
-          // Store the Item object directly (cluster info is in description)
-          implantsToSave[slotBitflag] = selection.item;
+        const slotNumber = parseInt(slotBitflag, 10);
+
+        if (selection.type === 'implant' && selection.item) {
+          // Transform Item to ImplantWithClusters format
+          const clusters: any = {};
+          if (selection.shiny !== null && selection.shiny !== undefined) {
+            clusters.Shiny = {
+              stat: selection.shiny,
+              skillName: skillService.getName(selection.shiny),
+            };
+          }
+          if (selection.bright !== null && selection.bright !== undefined) {
+            clusters.Bright = {
+              stat: selection.bright,
+              skillName: skillService.getName(selection.bright),
+            };
+          }
+          if (selection.faded !== null && selection.faded !== undefined) {
+            clusters.Faded = {
+              stat: selection.faded,
+              skillName: skillService.getName(selection.faded),
+            };
+          }
+
+          implantsToSave[slotBitflag] = {
+            ...toRaw(selection.item),
+            slot: slotNumber,
+            type: 'implant' as const,
+            clusters: Object.keys(clusters).length > 0 ? clusters : undefined,
+          };
+        } else if (selection.type === 'symbiant' && selection.symbiant) {
+          // Transform SymbiantItem to ImplantWithClusters format
+          implantsToSave[slotBitflag] = {
+            ...toRaw(selection.symbiant),
+            slot: slotNumber,
+            type: 'symbiant' as const,
+          };
         }
       }
 
@@ -520,7 +578,7 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
       console.log(
         '[TinkerPlants] Saved configuration to profile:',
         Object.keys(implantsToSave).length,
-        'slots'
+        'items'
       );
     } catch (err: any) {
       error.value = err instanceof Error ? err.message : 'Failed to save configuration';
@@ -558,12 +616,14 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
   function updateSlot(slotBitflag: string, updates: Partial<ImplantSelection>): void {
     // Get existing configuration for this slot or create new
     const existing = currentConfiguration.value[slotBitflag] || {
+      type: 'implant' as const,
       shiny: null,
       bright: null,
       faded: null,
       ql: 200,
       slotBitflag,
       item: null,
+      symbiant: null,
     };
 
     // Merge updates
@@ -571,6 +631,119 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
       ...existing,
       ...updates,
     };
+  }
+
+  /**
+   * Set equipment type for a slot (implant or symbiant)
+   * Switching types clears the current configuration to avoid conflicts
+   *
+   * @param slotBitflag - Slot bitflag (e.g., "2" for Eyes)
+   * @param type - Equipment type ('implant' or 'symbiant')
+   */
+  function setSlotType(slotBitflag: string, type: 'implant' | 'symbiant'): void {
+    const existing = currentConfiguration.value[slotBitflag];
+
+    if (type === 'symbiant') {
+      // Switching to symbiant: clear implant-specific data
+      updateSlot(slotBitflag, {
+        type: 'symbiant',
+        shiny: null,
+        bright: null,
+        faded: null,
+        item: null,
+        symbiant: null,
+        // Preserve QL as symbiants also have QL (though it's fixed per item)
+      });
+    } else {
+      // Switching to implant: clear symbiant-specific data
+      updateSlot(slotBitflag, {
+        type: 'implant',
+        symbiant: null,
+        item: null,
+        shiny: null,
+        bright: null,
+        faded: null,
+        // Preserve QL
+      });
+    }
+
+    // Trigger recalculation since slot type changed
+    recalculate();
+  }
+
+  /**
+   * Set a symbiant for a slot
+   * Only valid when slot type is 'symbiant'
+   *
+   * @param slotBitflag - Slot bitflag (e.g., "2" for Eyes)
+   * @param symbiant - SymbiantItem or null to clear
+   */
+  async function setSymbiant(slotBitflag: string, symbiant: SymbiantItem | null): Promise<void> {
+    const existing = currentConfiguration.value[slotBitflag];
+
+    // Ensure slot is in symbiant mode
+    if (!existing || existing.type !== 'symbiant') {
+      setSlotType(slotBitflag, 'symbiant');
+    }
+
+    let enrichedSymbiant: Item | null = null;
+
+    // Fetch full item data from backend if symbiant is provided
+    if (symbiant) {
+      try {
+        const fullItemResponse = await apiClient.getItem(symbiant.aoid);
+
+        if (fullItemResponse.data) {
+          // Use the complete Item structure with all fields
+          enrichedSymbiant = fullItemResponse.data;
+        } else {
+          // Fallback: convert minimal symbiant to Item structure
+          console.warn(`Could not fetch full item data for symbiant ${symbiant.aoid}, using minimal data`);
+          enrichedSymbiant = {
+            id: symbiant.id,
+            aoid: symbiant.aoid,
+            name: symbiant.name,
+            ql: symbiant.ql,
+            description: '',
+            item_class: 3,
+            is_nano: false,
+            stats: [],
+            spell_data: symbiant.spell_data || [],
+            actions: symbiant.actions || [],
+            attack_stats: [],
+            defense_stats: [],
+            sources: [],
+          };
+        }
+      } catch (error) {
+        console.error(`Failed to fetch full item data for symbiant ${symbiant.aoid}:`, error);
+        // Fallback: convert minimal symbiant to Item structure
+        enrichedSymbiant = {
+          id: symbiant.id,
+          aoid: symbiant.aoid,
+          name: symbiant.name,
+          ql: symbiant.ql,
+          description: '',
+          item_class: 3,
+          is_nano: false,
+          stats: [],
+          spell_data: symbiant.spell_data || [],
+          actions: symbiant.actions || [],
+          attack_stats: [],
+          defense_stats: [],
+          sources: [],
+        };
+      }
+    }
+
+    updateSlot(slotBitflag, {
+      symbiant: enrichedSymbiant,
+      // Update QL to match symbiant's QL if provided
+      ql: enrichedSymbiant?.ql || existing?.ql || 200,
+    });
+
+    // Trigger recalculation
+    recalculate();
   }
 
   /**
@@ -655,9 +828,9 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
 
     // Check cache first
     const cacheKey = generateCacheKey(slotBitflag, selection.ql, {
-      shiny: selection.shiny,
-      bright: selection.bright,
-      faded: selection.faded,
+      shiny: selection.shiny ?? null,
+      bright: selection.bright ?? null,
+      faded: selection.faded ?? null,
     });
 
     const cachedItem = checkCache(cacheKey);
@@ -675,15 +848,15 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
       // Backend expects capitalized cluster position keys
       const clustersAsStatIds: Record<string, number> = {};
 
-      if (selection.shiny !== null) {
+      if (selection.shiny !== null && selection.shiny !== undefined) {
         clustersAsStatIds['Shiny'] = selection.shiny;
       }
 
-      if (selection.bright !== null) {
+      if (selection.bright !== null && selection.bright !== undefined) {
         clustersAsStatIds['Bright'] = selection.bright;
       }
 
-      if (selection.faded !== null) {
+      if (selection.faded !== null && selection.faded !== undefined) {
         clustersAsStatIds['Faded'] = selection.faded;
       }
 
@@ -764,22 +937,33 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
 
     // Iterate all slots in current configuration
     for (const [slotBitflag, selection] of Object.entries(currentConfiguration.value)) {
-      // Skip slots without item data
-      if (!selection.item) {
-        continue;
+      let equipmentItem: Item | SymbiantItem | null = null;
+
+      // Determine which equipment type is active
+      if (selection.type === 'symbiant' && selection.symbiant) {
+        equipmentItem = selection.symbiant;
+      } else if (selection.type === 'implant' && selection.item) {
+        // Skip empty implant slots (all clusters null)
+        const hasNonEmptyClusters =
+          selection.shiny !== null || selection.bright !== null || selection.faded !== null;
+
+        if (!hasNonEmptyClusters) {
+          continue;
+        }
+
+        equipmentItem = selection.item;
       }
 
-      // Skip empty slots (all clusters null)
-      const hasNonEmptyClusters =
-        selection.shiny !== null || selection.bright !== null || selection.faded !== null;
-
-      if (!hasNonEmptyClusters) {
+      // Skip slots without equipment
+      if (!equipmentItem) {
         continue;
       }
 
       try {
-        // Extract bonuses from item using equipment bonus calculator
-        const itemBonuses = equipmentBonusCalculator.parseItemSpells(selection.item);
+        // Extract bonuses from equipment using equipment bonus calculator
+        // Works for both implants and symbiants (both have spell_data)
+        // Cast to Item since SymbiantItem has compatible structure
+        const itemBonuses = equipmentBonusCalculator.parseItemSpells(equipmentItem as Item);
 
         // Aggregate bonuses
         for (const bonus of itemBonuses) {
@@ -827,16 +1011,25 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
 
     // Iterate all slots in current configuration
     for (const [slotBitflag, selection] of Object.entries(currentConfiguration.value)) {
-      // Skip slots without item data
-      if (!selection.item) {
-        continue;
+      let equipmentItem: Item | SymbiantItem | null = null;
+
+      // Determine which equipment type is active
+      if (selection.type === 'symbiant' && selection.symbiant) {
+        equipmentItem = selection.symbiant;
+      } else if (selection.type === 'implant' && selection.item) {
+        // Skip empty implant slots (all clusters null)
+        const hasNonEmptyClusters =
+          selection.shiny !== null || selection.bright !== null || selection.faded !== null;
+
+        if (!hasNonEmptyClusters) {
+          continue;
+        }
+
+        equipmentItem = selection.item;
       }
 
-      // Skip empty slots (all clusters null)
-      const hasNonEmptyClusters =
-        selection.shiny !== null || selection.bright !== null || selection.faded !== null;
-
-      if (!hasNonEmptyClusters) {
+      // Skip slots without equipment
+      if (!equipmentItem) {
         continue;
       }
 
@@ -846,14 +1039,14 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
       }
 
       try {
-        // Extract requirements from item actions
-        const item = selection.item;
-        if (!item.actions || item.actions.length === 0) {
+        // Extract requirements from equipment actions
+        // Works for both implants and symbiants (both have actions)
+        if (!equipmentItem.actions || equipmentItem.actions.length === 0) {
           continue;
         }
 
         // Process each action's criteria
-        for (const action of item.actions) {
+        for (const action of equipmentItem.actions) {
           if (!action.criteria) {
             continue;
           }
@@ -1019,6 +1212,8 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
     saveToProfile,
     revertToProfile,
     updateSlot,
+    setSlotType,
+    setSymbiant,
     lookupImplantForSlot,
     lookupImplantForSlotDebounced,
     calculateBonuses,

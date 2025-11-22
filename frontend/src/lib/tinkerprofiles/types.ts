@@ -6,7 +6,7 @@
  * Version 4.0.0 - ID-based skill architecture
  */
 
-import type { Item } from '@/types/api';
+import type { Item, SymbiantItem } from '@/types/api';
 import type { PerkSystem } from './perk-types';
 
 // ============================================================================
@@ -144,6 +144,10 @@ export interface TinkerProfile {
   Weapons: Record<string, Item | null>;
   Clothing: Record<string, Item | null>;
   Implants: Record<string, ImplantWithClusters | null>;
+  /**
+   * @deprecated Symbiants are now stored in Implants with type='symbiant'. This field will be removed in v5.0.0.
+   */
+  Symbiants?: Record<string, SymbiantItem | null>; // Symbiant items by slot bitflag
 
   // Perk system (unchanged)
   PerksAndResearch: PerkSystem;

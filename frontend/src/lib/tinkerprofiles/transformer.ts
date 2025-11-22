@@ -127,6 +127,7 @@ export class ProfileTransformer {
       Weapons: profile.Weapons,
       Clothing: profile.Clothing,
       Implants: profile.Implants,
+      Symbiants: profile.Symbiants || {}, // Include symbiant equipment
       PerksAndResearch: this.serializePerkSystem(profile.PerksAndResearch),
       buffs: profile.buffs,
     };
@@ -978,6 +979,7 @@ export class ProfileTransformer {
       if (data.Weapons) profile.Weapons = data.Weapons;
       if (data.Clothing) profile.Clothing = data.Clothing;
       if (data.Implants) profile.Implants = data.Implants;
+      if (data.Symbiants) profile.Symbiants = data.Symbiants;
 
       result.warnings.push('Profile imported with missing required fields - filled with defaults');
     } else {

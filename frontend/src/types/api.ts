@@ -220,6 +220,14 @@ export interface SymbiantItem {
   spell_data?: SpellData[];
 }
 
+/**
+ * Type guard to distinguish symbiants from implants
+ * Symbiants have family/slot_id, implants have item_class/icon_id
+ */
+export function isSymbiant(item: Item | SymbiantItem): item is SymbiantItem {
+  return 'family' in item && 'slot_id' in item;
+}
+
 export interface Mob {
   id: number;
   name: string;
@@ -580,20 +588,24 @@ export interface SearchResponse<T> extends PaginatedResponse<T> {
 // TinkerPlants Types
 // ============================================================================
 
-/** Implant selection configuration for a single slot */
+/** Implant or symbiant selection configuration for a single slot */
 export interface ImplantSelection {
-  /** Shiny cluster stat ID (e.g., 112 for Pistol, 131 for Time & Space) or null if empty */
-  shiny: number | null;
-  /** Bright cluster stat ID or null if empty */
-  bright: number | null;
-  /** Faded cluster stat ID or null if empty */
-  faded: number | null;
+  /** Equipment type: 'implant' for custom implants or 'symbiant' for fixed symbiants */
+  type: 'implant' | 'symbiant';
+  /** Shiny cluster stat ID (e.g., 112 for Pistol, 131 for Time & Space) or null if empty (implants only) */
+  shiny?: number | null;
+  /** Bright cluster stat ID or null if empty (implants only) */
+  bright?: number | null;
+  /** Faded cluster stat ID or null if empty (implants only) */
+  faded?: number | null;
   /** Quality level (1-300) */
   ql: number;
   /** Slot bitflag string key (e.g., "2" for Eyes, "4" for Head) */
   slotBitflag: string;
-  /** Full item data from API (null if not yet loaded) */
+  /** Full implant item data from API (null if not yet loaded, implants only) */
   item: Item | null;
+  /** Symbiant item data (symbiants only) */
+  symbiant?: SymbiantItem | null;
 }
 
 /** Request format for implant lookup API */

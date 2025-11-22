@@ -1,14 +1,16 @@
 # TinkerPlants - Implant and Symbiant Planning System
 
 ## Overview
-TinkerPlants is a comprehensive implant planning tool that enables users to design, optimize, and manage implant configurations for their Anarchy Online characters. The system integrates with TinkerProfiles to provide real-time requirement checking, treatment calculations, and bonus aggregation across a character's complete implant setup.
+TinkerPlants is a comprehensive implant and symbiant planning tool that enables users to design, optimize, and manage equipment configurations for their Anarchy Online characters. The system supports both custom implants (with cluster selection) and fixed symbiants in a unified interface, integrating with TinkerProfiles to provide real-time requirement checking, treatment calculations, and bonus aggregation across a character's complete equipment setup.
 
 ## User Perspective
-Users can configure implants across 13 body slots (Eye, Head, Ear, Right Arm, Chest, Left Arm, Right Wrist, Waist, Left Wrist, Right Hand, Leg, Left Hand, Feet) by selecting cluster combinations (Shiny/Bright/Faded) and quality levels. The interface is organized into five dedicated tabs:
+Users can configure implants and symbiants across 13 body slots (Eye, Head, Ear, Right Arm, Chest, Left Arm, Right Wrist, Waist, Left Wrist, Right Hand, Leg, Left Hand, Feet). Each slot can be configured as either a custom implant (with cluster selections) or a fixed symbiant. The interface is organized into five dedicated tabs:
 
 **Build Tab** (Configuration):
-- Configure clusters and QLs across the 13-slot implant grid
-- Inline ClusterLookup search component for finding clusters across slots
+- Per-slot type toggle (Implant vs Symbiant) for flexible equipment planning
+- **Implant mode**: Configure clusters (Shiny/Bright/Faded) and QLs via dropdowns
+- **Symbiant mode**: Search and select symbiants by name/family via autocomplete
+- Inline ClusterLookup search component for finding clusters across slots (implant mode)
 - QL inputs trigger lookups on blur (not every keystroke) for optimal performance
 - Auto-recalculation: Results update automatically after each change
 - Attribute preference selection (defaults to "None" for no filtering)
@@ -145,12 +147,14 @@ The system automatically:
 #### ImplantSelection (Store State)
 ```typescript
 interface ImplantSelection {
-  shiny: number | null;      // Stat ID or null
-  bright: number | null;     // Stat ID or null
-  faded: number | null;      // Stat ID or null
-  ql: number;                // Quality Level (1-300)
-  slotBitflag: string;       // Slot identifier (e.g., "2" for Eyes)
-  item?: Item;               // Fetched item data (optional until lookup completes)
+  type: 'implant' | 'symbiant';  // Equipment type discriminator
+  shiny: number | null;          // Stat ID or null (implants only)
+  bright: number | null;         // Stat ID or null (implants only)
+  faded: number | null;          // Stat ID or null (implants only)
+  ql: number;                    // Quality Level (1-300)
+  slotBitflag: string;           // Slot identifier (e.g., "2" for Eyes)
+  item: Item | null;             // Fetched implant data (null for symbiants or until lookup completes)
+  symbiant: SymbiantItem | null; // Symbiant data (null for implants)
 }
 ```
 
@@ -178,12 +182,105 @@ interface ImplantRequirement {
 #### Profile Storage Format
 ```typescript
 profile.Implants = {
-  "2": Item,     // Eyes slot
-  "4": Item,     // Head slot
-  "8": Item,     // Ears slot
+  "2": ImplantWithClusters,  // Eyes slot (implant or symbiant)
+  "4": ImplantWithClusters,  // Head slot (implant or symbiant)
+  "8": ImplantWithClusters,  // Ears slot (implant or symbiant)
   // ... etc for all 13 slots
 }
+
+// ImplantWithClusters structure:
+{
+  ...Item,                   // Full item data
+  slot: 2,                   // Numeric slot position
+  type: 'implant' | 'symbiant',
+  clusters?: {               // Only for type='implant'
+    Shiny?: { stat: number, skillName: string },
+    Bright?: { stat: number, skillName: string },
+    Faded?: { stat: number, skillName: string }
+  }
+}
+
+// Legacy (deprecated v5.0.0):
+profile.Symbiants = {
+  "2": SymbiantItem,  // Separate symbiant storage (backward compatibility only)
+}
 ```
+
+### Recent Improvements (November 2025)
+
+#### Symbiant Integration (November 21, 2025)
+**Problem**: Users could not plan symbiant equipment alongside traditional implants, requiring separate tracking and manual comparison of stat bonuses and requirements.
+
+**Solution**: Integrated symbiant support directly into TinkerPlants with unified implant/symbiant slot configuration:
+- Per-slot type toggle (Implant vs Symbiant) using SelectButton component
+- Symbiant autocomplete selection with fuzzy search by name/family
+- Unified bonus calculation supporting both implants and symbiants
+- Unified requirement calculation across equipment types
+- Profile storage integration using type discriminator pattern
+
+**Data Flow**:
+1. User toggles slot type to "Symbiant" → `setSlotType()` clears implant data
+2. AutoComplete searches symbiants filtered by slot bitflag
+3. Selection triggers `setSymbiant()` → enriches minimal symbiant with full Item data from API
+4. Store updates `currentConfiguration` with symbiant type and enriched data
+5. Bonuses/requirements recalculated using existing equipment calculator
+6. Save converts to unified `ImplantWithClusters` format with type='symbiant'
+
+**Implementation Details**:
+- **Store Changes** (`tinkerPlants.ts`):
+  - Enhanced `ImplantSelection` with type discriminator ('implant' | 'symbiant')
+  - Added `symbiant` field to selection (null for implants, SymbiantItem for symbiants)
+  - New `setSlotType()` action to toggle equipment type (clears conflicting data)
+  - New `setSymbiant()` action to enrich and store symbiant with full Item data
+  - Modified `loadFromProfile()` to detect and load symbiants using type discriminator
+  - Modified `saveToProfile()` to convert symbiants to `ImplantWithClusters` format
+  - Bonus/requirement calculations now handle both types uniformly
+
+- **UI Changes** (`TinkerPlants.vue`):
+  - Added SelectButton type toggle (I=Implant, S=Symbiant) per slot
+  - Conditional rendering: Implant mode shows cluster dropdowns, Symbiant mode shows AutoComplete
+  - Symbiant AutoComplete spans 3 columns (Shiny/Bright/Faded grid columns) for width
+  - Symbiant selection searches by name/family with QL display in dropdown options
+  - QL input hidden in symbiant mode (QL fixed per symbiant item)
+  - Slot loading spinner shows during symbiant API enrichment
+
+- **Type System Changes** (`types.ts`, `api.ts`):
+  - Extended `ImplantSelection` interface with type and symbiant fields
+  - Added `SymbiantItem` import to tinkerprofiles types
+  - Profile `Implants` field now accepts `ImplantWithClusters` (implants + symbiants)
+  - Deprecated `profile.Symbiants` field (will be removed in v5.0.0)
+
+- **Profile Storage** (`transformer.ts`):
+  - Added `Symbiants` field to JSON export (backward compatibility)
+  - Import handles both new unified format and legacy separate fields
+  - Migration support: Reads legacy `Symbiants` if present during import
+
+**Benefits**:
+- Single interface for all implant slot equipment planning
+- Direct stat comparison between implants and symbiants
+- Unified save/load workflow (no separate symbiant management needed)
+- Accurate bonus aggregation across mixed equipment types
+- Future-proof architecture for additional equipment types
+
+**Files Modified**:
+- `frontend/src/stores/tinkerPlants.ts` - Core symbiant integration logic (+313 lines)
+- `frontend/src/views/TinkerPlants.vue` - UI type toggle and selection (+346 lines)
+- `frontend/src/types/api.ts` - Enhanced ImplantSelection interface (+28 lines)
+- `frontend/src/lib/tinkerprofiles/types.ts` - Added deprecated Symbiants field (+6 lines)
+- `frontend/src/lib/tinkerprofiles/transformer.ts` - Export/import support (+2 lines)
+
+**Edge Cases Handled**:
+- Type switching clears conflicting data (implant clusters cleared when switching to symbiant)
+- Symbiant API fetch failures gracefully fall back to minimal data structure
+- Empty symbiant selections handled (null symbiant field)
+- QL preservation across type switches
+- Legacy profile migration (separate Symbiants field → unified Implants)
+
+**Integration Points**:
+- Uses existing `useSymbiantsStore` for symbiant data loading
+- Leverages `apiClient.getItem()` for symbiant enrichment with full metadata
+- Reuses `equipmentBonusCalculator` for symbiant bonus extraction (spell_data parsing)
+- Reuses `getCriteriaRequirements()` for symbiant requirement parsing (actions criteria)
 
 ### Recent Improvements (October 2025)
 

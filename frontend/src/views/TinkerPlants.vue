@@ -60,7 +60,7 @@ Grid-based implant selection following the legacy TinkerPlants format
           <!-- Build Tab -->
           <TabPanel header="Build" class="h-full">
             <div class="p-4">
-              <div class="max-w-6xl mx-auto space-y-6">
+              <div class="max-w-7xl mx-auto space-y-6">
                 <!-- Build Controls Toolbar -->
                 <div
                   class="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-surface-50 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg p-4"
@@ -125,6 +125,11 @@ Grid-based implant selection following the legacy TinkerPlants format
                     <div
                       class="p-3 font-semibold text-surface-900 dark:text-surface-50 text-center border-r border-surface-200 dark:border-surface-700"
                     >
+                      Type
+                    </div>
+                    <div
+                      class="p-3 font-semibold text-surface-900 dark:text-surface-50 text-center border-r border-surface-200 dark:border-surface-700"
+                    >
                       Shiny
                     </div>
                     <div
@@ -174,89 +179,138 @@ Grid-based implant selection following the legacy TinkerPlants format
                       </div>
                     </div>
 
-                    <!-- Shiny Dropdown -->
-                    <div
-                      class="p-2 border-r border-surface-200 dark:border-surface-700"
-                      :class="{
-                        'bg-primary-50 dark:bg-primary-900 border-primary-500 dark:border-primary-400 border-2':
-                          isSlotHighlighted(slot.name, 'Shiny'),
-                      }"
-                    >
-                      <Dropdown
-                        :id="`${slot.id}-shiny`"
-                        v-model="implantSelections[slot.id].shiny"
-                        :options="getSkillOptions(slot.name, 'shiny')"
+                    <!-- Type Toggle -->
+                    <div class="p-2 border-r border-surface-200 dark:border-surface-700 flex items-center justify-center">
+                      <SelectButton
+                        v-model="slotType[slot.id]"
+                        :options="[
+                          { label: 'I', value: 'Implant' },
+                          { label: 'S', value: 'Symbiant' }
+                        ]"
                         option-label="label"
                         option-value="value"
-                        placeholder="None"
-                        show-clear
-                        class="w-full"
-                        :disabled="isSlotLoading(slot.id)"
-                        :aria-label="`Select shiny skill cluster for ${slot.name} slot`"
-                        @change="onImplantChange(slot.id, 'shiny', $event.value)"
+                        :aria-label="`Select equipment type for ${slot.name} slot`"
+                        @change="onSlotTypeChange(slot.id, $event.value)"
                       />
                     </div>
 
-                    <!-- Bright Dropdown -->
-                    <div
-                      class="p-2 border-r border-surface-200 dark:border-surface-700"
-                      :class="{
-                        'bg-primary-50 dark:bg-primary-900 border-primary-500 dark:border-primary-400 border-2':
-                          isSlotHighlighted(slot.name, 'Bright'),
-                      }"
-                    >
-                      <Dropdown
-                        :id="`${slot.id}-bright`"
-                        v-model="implantSelections[slot.id].bright"
-                        :options="getSkillOptions(slot.name, 'bright')"
-                        option-label="label"
-                        option-value="value"
-                        placeholder="None"
-                        show-clear
-                        class="w-full"
-                        :disabled="isSlotLoading(slot.id)"
-                        :aria-label="`Select bright skill cluster for ${slot.name} slot`"
-                        @change="onImplantChange(slot.id, 'bright', $event.value)"
-                      />
-                    </div>
+                    <!-- Implant Mode: Cluster Dropdowns -->
+                    <template v-if="slotType[slot.id] === 'Implant'">
+                      <!-- Shiny Dropdown -->
+                      <div
+                        class="p-2 border-r border-surface-200 dark:border-surface-700"
+                        :class="{
+                          'bg-primary-50 dark:bg-primary-900 border-primary-500 dark:border-primary-400 border-2':
+                            isSlotHighlighted(slot.name, 'Shiny'),
+                        }"
+                      >
+                        <Dropdown
+                          :id="`${slot.id}-shiny`"
+                          v-model="implantSelections[slot.id].shiny"
+                          :options="getSkillOptions(slot.name, 'shiny')"
+                          option-label="label"
+                          option-value="value"
+                          placeholder="None"
+                          show-clear
+                          class="w-full"
+                          :disabled="isSlotLoading(slot.id)"
+                          :aria-label="`Select shiny skill cluster for ${slot.name} slot`"
+                          @change="onImplantChange(slot.id, 'shiny', $event.value)"
+                        />
+                      </div>
 
-                    <!-- Faded Dropdown -->
-                    <div
-                      class="p-2 border-r border-surface-200 dark:border-surface-700"
-                      :class="{
-                        'bg-primary-50 dark:bg-primary-900 border-primary-500 dark:border-primary-400 border-2':
-                          isSlotHighlighted(slot.name, 'Faded'),
-                      }"
-                    >
-                      <Dropdown
-                        :id="`${slot.id}-faded`"
-                        v-model="implantSelections[slot.id].faded"
-                        :options="getSkillOptions(slot.name, 'faded')"
-                        option-label="label"
-                        option-value="value"
-                        placeholder="None"
-                        show-clear
-                        class="w-full"
-                        :disabled="isSlotLoading(slot.id)"
-                        :aria-label="`Select faded skill cluster for ${slot.name} slot`"
-                        @change="onImplantChange(slot.id, 'faded', $event.value)"
-                      />
-                    </div>
+                      <!-- Bright Dropdown -->
+                      <div
+                        class="p-2 border-r border-surface-200 dark:border-surface-700"
+                        :class="{
+                          'bg-primary-50 dark:bg-primary-900 border-primary-500 dark:border-primary-400 border-2':
+                            isSlotHighlighted(slot.name, 'Bright'),
+                        }"
+                      >
+                        <Dropdown
+                          :id="`${slot.id}-bright`"
+                          v-model="implantSelections[slot.id].bright"
+                          :options="getSkillOptions(slot.name, 'bright')"
+                          option-label="label"
+                          option-value="value"
+                          placeholder="None"
+                          show-clear
+                          class="w-full"
+                          :disabled="isSlotLoading(slot.id)"
+                          :aria-label="`Select bright skill cluster for ${slot.name} slot`"
+                          @change="onImplantChange(slot.id, 'bright', $event.value)"
+                        />
+                      </div>
 
-                    <!-- QL Input -->
-                    <div class="p-2 flex items-center">
-                      <InputNumber
-                        :id="`${slot.id}-ql`"
-                        v-model="implantSelections[slot.id].ql"
-                        :min="1"
-                        :max="300"
-                        :step="1"
-                        class="w-full ql-input"
-                        :disabled="isSlotLoading(slot.id)"
-                        :aria-label="`Quality Level for ${slot.name} implant`"
-                        @blur="onQLComplete(slot.id)"
-                      />
-                    </div>
+                      <!-- Faded Dropdown -->
+                      <div
+                        class="p-2 border-r border-surface-200 dark:border-surface-700"
+                        :class="{
+                          'bg-primary-50 dark:bg-primary-900 border-primary-500 dark:border-primary-400 border-2':
+                            isSlotHighlighted(slot.name, 'Faded'),
+                        }"
+                      >
+                        <Dropdown
+                          :id="`${slot.id}-faded`"
+                          v-model="implantSelections[slot.id].faded"
+                          :options="getSkillOptions(slot.name, 'faded')"
+                          option-label="label"
+                          option-value="value"
+                          placeholder="None"
+                          show-clear
+                          class="w-full"
+                          :disabled="isSlotLoading(slot.id)"
+                          :aria-label="`Select faded skill cluster for ${slot.name} slot`"
+                          @change="onImplantChange(slot.id, 'faded', $event.value)"
+                        />
+                      </div>
+                    </template>
+
+                    <!-- Symbiant Mode: Symbiant Selector -->
+                    <template v-else>
+                      <div class="p-2 border-r border-surface-200 dark:border-surface-700 flex items-stretch" style="grid-column: 3 / 6;">
+                        <AutoComplete
+                          :id="`${slot.id}-symbiant`"
+                          :model-value="getSelectedSymbiant(slot.id)"
+                          :suggestions="symbiantSuggestions[slot.id] || []"
+                          option-label="name"
+                          placeholder="Select symbiant..."
+                          fluid
+                          class="w-full symbiant-autocomplete"
+                          :disabled="isSlotLoading(slot.id)"
+                          :aria-label="`Select symbiant for ${slot.name} slot`"
+                          @complete="searchSymbiants($event, slot.id)"
+                          @item-select="onSymbiantSelected(slot.id, $event.value)"
+                          @clear="onSymbiantSelected(slot.id, null)"
+                        >
+                          <template #option="slotProps">
+                            <div class="flex flex-col">
+                              <span class="font-medium">{{ slotProps.option.name }}</span>
+                              <span class="text-xs text-surface-500 dark:text-surface-400">
+                                {{ slotProps.option.family }} - QL {{ slotProps.option.ql }}
+                              </span>
+                            </div>
+                          </template>
+                        </AutoComplete>
+                      </div>
+                    </template>
+
+                    <!-- QL Input (Implant mode only) -->
+                    <template v-if="slotType[slot.id] === 'Implant'">
+                      <div class="p-2 flex items-center">
+                        <InputNumber
+                          :id="`${slot.id}-ql`"
+                          v-model="implantSelections[slot.id].ql"
+                          :min="1"
+                          :max="300"
+                          :step="1"
+                          class="w-full ql-input"
+                          :disabled="isSlotLoading(slot.id)"
+                          :aria-label="`Quality Level for ${slot.name} implant`"
+                          @blur="onQLComplete(slot.id)"
+                        />
+                      </div>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -266,7 +320,7 @@ Grid-based implant selection following the legacy TinkerPlants format
           <!-- Requirements Tab -->
           <TabPanel header="Requirements" class="h-full">
             <div class="p-4">
-              <div class="max-w-6xl mx-auto space-y-6">
+              <div class="max-w-7xl mx-auto space-y-6">
                 <!-- Total Requirements Section -->
                 <div
                   v-if="showResults"
@@ -316,7 +370,7 @@ Grid-based implant selection following the legacy TinkerPlants format
           <!-- Bonuses Tab -->
           <TabPanel header="Bonuses" class="h-full">
             <div class="p-4">
-              <div class="max-w-6xl mx-auto space-y-6">
+              <div class="max-w-7xl mx-auto space-y-6">
                 <!-- Results Section -->
                 <div v-if="showResults" class="space-y-6">
                   <!-- Skeleton loaders while calculating -->
@@ -391,9 +445,11 @@ import { ref, computed, onMounted, reactive, watch } from 'vue';
 import { useAccessibility } from '@/composables/useAccessibility';
 import { useTinkerPlantsStore } from '@/stores/tinkerPlants';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
+import { useSymbiantsStore } from '@/stores/symbiants';
 import { equipmentBonusCalculator } from '@/services/equipment-bonus-calculator';
 import { IMP_SKILLS, IMPLANT_SLOT } from '@/services/game-data';
 import { skillService } from '@/services/skill-service';
+import type { SymbiantItem } from '@/types/api';
 import Badge from 'primevue/badge';
 import Button from 'primevue/button';
 import Dropdown from 'primevue/dropdown';
@@ -401,6 +457,8 @@ import InputNumber from 'primevue/inputnumber';
 import TabView from 'primevue/tabview';
 import TabPanel from 'primevue/tabpanel';
 import Skeleton from 'primevue/skeleton';
+import SelectButton from 'primevue/selectbutton';
+import AutoComplete from 'primevue/autocomplete';
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue';
 import ConstructionPlanner from '@/components/plants/ConstructionPlanner.vue';
 import ClusterLookup from '@/components/plants/ClusterLookup.vue';
@@ -428,6 +486,7 @@ const { announce, setLoading } = useAccessibility();
 // Stores
 const tinkerPlantsStore = useTinkerPlantsStore();
 const tinkerProfilesStore = useTinkerProfilesStore();
+const symbiantsStore = useSymbiantsStore();
 
 // State
 const qualityLevel = ref(200);
@@ -435,6 +494,12 @@ const selectedClusterInfo = ref<{
   clusterName: string;
   matchingSlots: Array<{ slot: string; types: string[] }>;
 } | null>(null);
+
+// Slot type state (implant vs symbiant) - initialized to 'Implant' for all slots
+const slotType = reactive<Record<string, 'Implant' | 'Symbiant'>>({});
+
+// Symbiant autocomplete suggestions state
+const symbiantSuggestions = ref<Record<string, any[]>>({});
 
 // Computed loading from store
 const loading = computed(() => tinkerPlantsStore.loading);
@@ -486,6 +551,8 @@ implantSlots.value.forEach((slot) => {
     faded: null,
     ql: qualityLevel.value,
   };
+  // Initialize slot type to 'Implant' by default
+  slotType[slot.id] = 'Implant';
 });
 
 // Helper function to get slot-specific skill options from IMP_SKILLS
@@ -609,6 +676,97 @@ const isSlotHighlighted = (slotName: string, columnType: string): boolean => {
   return selectedClusterInfo.value.matchingSlots.some(
     (match) => normalizeSlot(match.slot) === normalizedSlotName && match.types.includes(columnType)
   );
+};
+
+/**
+ * Get symbiants available for a specific slot
+ * Filters by slot_id bitflag
+ */
+const getSymbiantsForSlot = (slotId: string): any[] => {
+  const mapping = slotMapping[slotId as keyof typeof slotMapping];
+  if (!mapping) return [];
+
+  const slotBitflag = parseInt(mapping.bitflag, 10);
+
+  return symbiantsStore.allSymbiants.filter(
+    (symbiant) => symbiant.slot_id === slotBitflag
+  );
+};
+
+/**
+ * Search symbiants for autocomplete
+ * Filters by slot and search query
+ */
+const searchSymbiants = (event: any, slotId: string) => {
+  const query = event.query.toLowerCase();
+  const availableSymbiants = getSymbiantsForSlot(slotId);
+
+  if (!query) {
+    symbiantSuggestions.value[slotId] = availableSymbiants.slice(0, 10); // Limit to 10 suggestions
+  } else {
+    symbiantSuggestions.value[slotId] = availableSymbiants
+      .filter(
+        (symbiant) =>
+          symbiant.name.toLowerCase().includes(query) ||
+          symbiant.family?.toLowerCase().includes(query)
+      )
+      .slice(0, 10);
+  }
+};
+
+/**
+ * Get selected symbiant for a slot
+ */
+const getSelectedSymbiant = (slotId: string): any | null => {
+  const mapping = slotMapping[slotId as keyof typeof slotMapping];
+  if (!mapping) return null;
+
+  const slotBitflag = mapping.bitflag;
+  const selection = tinkerPlantsStore.currentConfiguration[slotBitflag];
+
+  return selection?.symbiant || null;
+};
+
+/**
+ * Handle slot type change (Implant <-> Symbiant)
+ */
+const onSlotTypeChange = (slotId: string, newType: 'Implant' | 'Symbiant') => {
+  const mapping = slotMapping[slotId as keyof typeof slotMapping];
+  if (!mapping) {
+    console.error(`No mapping found for slot: ${slotId}`);
+    return;
+  }
+
+  const slotBitflag = mapping.bitflag;
+
+  // Update store with new type
+  tinkerPlantsStore.setSlotType(slotBitflag, newType === 'Symbiant' ? 'symbiant' : 'implant');
+
+  announce(
+    `${slotId} slot switched to ${newType} mode`
+  );
+};
+
+/**
+ * Handle symbiant selection for a slot
+ */
+const onSymbiantSelected = async (slotId: string, symbiant: any | null) => {
+  const mapping = slotMapping[slotId as keyof typeof slotMapping];
+  if (!mapping) {
+    console.error(`No mapping found for slot: ${slotId}`);
+    return;
+  }
+
+  const slotBitflag = mapping.bitflag;
+
+  // Update store with selected symbiant (cast to SymbiantItem for store)
+  await tinkerPlantsStore.setSymbiant(slotBitflag, symbiant as SymbiantItem | null);
+
+  if (symbiant) {
+    announce(`${symbiant.name} selected for ${slotId} slot`);
+  } else {
+    announce(`Symbiant cleared for ${slotId} slot`);
+  }
 };
 
 // Event handlers
@@ -781,6 +939,8 @@ const syncImplantSelectionsFromStore = () => {
         faded: selection.faded,
         ql: selection.ql,
       };
+      // Sync slot type
+      slotType[slotName] = selection.type === 'symbiant' ? 'Symbiant' : 'Implant';
     }
   }
 };
@@ -918,6 +1078,11 @@ onMounted(async () => {
   setLoading(true, 'Loading implant planner...');
 
   try {
+    // Preload symbiants for selection (runs in background)
+    symbiantsStore.loadAllSymbiants().catch((err) => {
+      console.warn('Failed to preload symbiants:', err);
+    });
+
     // Load implant configuration from active profile
     await tinkerPlantsStore.loadFromProfile();
 
@@ -957,10 +1122,29 @@ watch(
 </script>
 
 <style scoped>
-/* Custom grid layout with reduced QL column and expanded dropdown columns */
+/* Custom grid layout with type toggle, cluster columns, and QL column */
 .tinker-plants-grid {
   display: grid;
-  grid-template-columns: 1fr 2fr 2fr 2fr 100px;
+  grid-template-columns: 1fr 140px 2fr 2fr 2fr 100px;
+}
+
+/* Symbiant autocomplete styling to match dropdown appearance */
+.symbiant-autocomplete :deep(.p-autocomplete) {
+  width: 100%;
+  display: flex;
+}
+
+.symbiant-autocomplete :deep(.p-autocomplete-input) {
+  width: 100%;
+  height: 100%;
+  min-height: 2.5rem;
+  padding-left: 0.75rem !important;
+  padding-right: 0.75rem !important;
+}
+
+/* Hide the dropdown trigger button to make it look cleaner */
+.symbiant-autocomplete :deep(.p-autocomplete-dropdown) {
+  display: none;
 }
 
 /* QL input styling for centered text and proper padding */
