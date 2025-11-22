@@ -2,7 +2,7 @@
 Mob model for NPCs that drop items (pocket bosses and regular mobs).
 """
 
-from sqlalchemy import Column, Integer, String, Boolean, ARRAY, Text, TIMESTAMP
+from sqlalchemy import Column, Integer, String, Boolean, ARRAY, Text, TIMESTAMP, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -19,7 +19,7 @@ class Mob(Base):
     mob_names = Column(ARRAY(Text))  # Array of mob names in pocket
     is_pocket_boss = Column(Boolean, default=True, index=True)
     mob_metadata = Column('metadata', JSONB)  # Column in DB is named 'metadata'
-    created_at = Column(TIMESTAMP, server_default='CURRENT_TIMESTAMP')
+    created_at = Column(TIMESTAMP, server_default=text('CURRENT_TIMESTAMP'))
 
     @property
     def dropped_items(self):

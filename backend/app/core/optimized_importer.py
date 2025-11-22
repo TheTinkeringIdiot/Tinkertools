@@ -41,13 +41,13 @@ class OptimizedImporter:
     _perk_data_cache: Optional[Dict[int, Dict]] = None
     _perk_cache_loaded = False
 
-    def __init__(self, db_url: str = None, batch_size: int = 1000):
+    def __init__(self, db_url: str = None, batch_size: int = 5000):
         """
         Initialize optimized importer.
 
         Args:
             db_url: Database URL
-            batch_size: Number of items to process before committing
+            batch_size: Number of items to process before committing (default 5000 for remote DBs)
         """
         self.batch_size = batch_size
         self.db_url = db_url or os.getenv("DATABASE_URL")
@@ -79,6 +79,13 @@ class OptimizedImporter:
         self._item_stats_buffer = []
         self._spell_criteria_buffer = []
         self._action_criteria_buffer = []
+
+        # Batch object buffers (to reduce flush frequency)
+        self._attack_defense_buffer = []
+        self._actions_buffer = []
+        self._spell_data_buffer = []
+        self._spells_buffer = []
+        self._animation_mesh_buffer = []
 
         # Load perk metadata once (class-level)
         self._load_perk_cache()
@@ -244,6 +251,13 @@ class OptimizedImporter:
         """
         success_count = 0
 
+        # OPTIMIZATION: Batch preload all existing items in this batch (single query)
+        aoids = [item_data.get('AOID') for item_data in items_data if item_data.get('AOID')]
+        existing_items = {item.aoid: item for item in db.query(Item).filter(Item.aoid.in_(aoids)).all()}
+
+        # Cache items by AOID for relationship processing (eliminates duplicate queries)
+        items_cache = {}
+
         # Process items but don't flush after each one
         created_items = []
 
@@ -253,8 +267,8 @@ class OptimizedImporter:
                 if not aoid:
                     continue
 
-                # Check for existing item
-                existing = db.query(Item).filter(Item.aoid == aoid).first()
+                # Check cache instead of querying
+                existing = existing_items.get(aoid)
 
                 if existing:
                     item = existing
@@ -285,6 +299,9 @@ class OptimizedImporter:
                 if not existing:
                     db.add(item)
 
+                # Cache for relationship processing (avoids duplicate query at line 304)
+                items_cache[aoid] = item
+
                 success_count += 1
 
             except Exception as e:
@@ -295,28 +312,100 @@ class OptimizedImporter:
         if created_items:
             db.flush()
 
-        # Now process relationships for all items in batch
+        # PHASE 1: Process all item_stats (no flush needed, uses existing IDs)
         for item_data in items_data:
             aoid = item_data.get('AOID')
             if not aoid:
                 continue
+            item = items_cache.get(aoid)
+            if item:
+                self._process_item_stats_batch(item, item_data)
 
-            item = db.query(Item).filter(Item.aoid == aoid).first()
-            if not item:
+        # PHASE 2: Create all AttackDefense objects, flush once
+        atkdef_cache = {}
+        for item_data in items_data:
+            aoid = item_data.get('AOID')
+            if not aoid:
                 continue
+            item = items_cache.get(aoid)
+            if item:
+                atkdef = self._create_attack_defense_object(item, item_data)
+                if atkdef:
+                    db.add(atkdef)
+                    atkdef_cache[aoid] = atkdef
 
-            # Create perk if applicable
-            if not is_nano and aoid in self._perk_data_cache:
+        # Flush all AttackDefense objects together (1 flush instead of N)
+        if atkdef_cache:
+            db.flush()
+            # Now process their relationships
+            for aoid, atkdef in atkdef_cache.items():
+                item_data = next((d for d in items_data if d.get('AOID') == aoid), None)
+                if item_data:
+                    item = items_cache[aoid]
+                    self._process_attack_defense_stats(db, atkdef, item, item_data)
+
+        # PHASE 3: Create all AnimationMesh objects, flush once
+        animesh_cache = {}
+        for item_data in items_data:
+            aoid = item_data.get('AOID')
+            if not aoid:
+                continue
+            item = items_cache.get(aoid)
+            if item:
+                animesh = self._create_animation_mesh_object(item, item_data)
+                if animesh:
+                    db.add(animesh)
+                    animesh_cache[aoid] = (animesh, item)
+
+        # Flush all AnimationMesh objects together
+        if animesh_cache:
+            db.flush()
+            for animesh, item in animesh_cache.values():
+                item.animation_mesh_id = animesh.id
+
+        # PHASE 4: Process Actions and SpellData (these have nested structures)
+        # Batch create all Action objects first
+        action_cache = {}
+        for item_data in items_data:
+            aoid = item_data.get('AOID')
+            if not aoid:
+                continue
+            item = items_cache.get(aoid)
+            if item:
+                actions = self._create_action_objects(item, item_data)
+                if actions:
+                    for action in actions:
+                        db.add(action)
+                    action_cache[aoid] = (item, actions, item_data)
+
+        # Flush all Actions together
+        if action_cache:
+            db.flush()
+            for item, actions, item_data in action_cache.values():
+                self._process_action_criteria(actions, item_data)
+
+        # Batch create all SpellData objects
+        spell_data_cache = {}
+        for item_data in items_data:
+            aoid = item_data.get('AOID')
+            if not aoid:
+                continue
+            item = items_cache.get(aoid)
+            if item:
+                spell_data_objects = self._create_spell_data_objects(db, item, item_data)
+                if spell_data_objects:
+                    spell_data_cache[aoid] = (item, spell_data_objects, item_data)
+
+        # PHASE 5: Create perks
+        for item_data in items_data:
+            aoid = item_data.get('AOID')
+            if not aoid or is_nano:
+                continue
+            item = items_cache.get(aoid)
+            if item and aoid in self._perk_data_cache:
                 self._create_perk_batch(db, item, aoid)
 
-            # Process relationships (these will be batched)
-            self._process_item_stats_batch(item, item_data)
-            self._process_attack_defense_batch(db, item, item_data)
-            self._process_actions_batch(db, item, item_data)
-            self._process_spell_data_batch(db, item, item_data)
-            self._process_animation_mesh_batch(db, item, item_data)
-
-        # Flush relationship buffers
+        # Flush all relationship buffers
         self._flush_buffers(db)
 
         return success_count
@@ -376,15 +465,18 @@ class OptimizedImporter:
                 })
                 seen.add(stat_value.id)
 
-    def _process_attack_defense_batch(self, db: Session, item: Item, item_data: Dict):
-        """Process AttackDefense data with batching."""
+    def _create_attack_defense_object(self, item: Item, item_data: Dict) -> Optional[AttackDefense]:
+        """Create AttackDefense object (without flush)."""
+        atkdef_data = item_data.get('AttackDefenseData')
+        if not atkdef_data:
+            return None
+        return AttackDefense()
+
+    def _process_attack_defense_stats(self, db: Session, atkdef: AttackDefense, item: Item, item_data: Dict):
+        """Process AttackDefense stats after flush (when ID is available)."""
         atkdef_data = item_data.get('AttackDefenseData')
         if not atkdef_data:
             return
-
-        atkdef = AttackDefense()
-        db.add(atkdef)
-        db.flush()  # Need ID immediately
 
         # Process attack stats
         seen = set()
@@ -418,23 +510,27 @@ class OptimizedImporter:
 
         item.atkdef_id = atkdef.id
 
-    def _process_actions_batch(self, db: Session, item: Item, item_data: Dict):
-        """Process actions with batching."""
+    def _create_action_objects(self, item: Item, item_data: Dict) -> List[Action]:
+        """Create Action objects (without flush)."""
         action_data = item_data.get('ActionData')
         if not action_data or not action_data.get('Actions'):
-            return
+            return []
 
+        actions = []
         for action_info in action_data['Actions']:
             action = Action(
                 action=action_info.get('Action'),
                 item_id=item.id
             )
-            db.add(action)
-            db.flush()  # Need ID
+            action._criteria_data = action_info.get('Criteria', [])  # Store for later processing
+            actions.append(action)
+        return actions
 
-            # Buffer criteria
+    def _process_action_criteria(self, actions: List[Action], item_data: Dict):
+        """Process action criteria after flush (when IDs are available)."""
+        for action in actions:
             order = 0
-            for crit_data in action_info.get('Criteria', []):
+            for crit_data in action._criteria_data:
                 criterion = self._criterion_cache.get((
                     crit_data['Value1'],
                     crit_data['Value2'],
@@ -448,13 +544,22 @@ class OptimizedImporter:
                     })
                     order += 1
 
-    def _process_spell_data_batch(self, db: Session, item: Item, item_data: Dict):
-        """Process spell data with batching."""
+    def _create_spell_data_objects(self, db: Session, item: Item, item_data: Dict) -> List[SpellData]:
+        """Create SpellData objects with nested Spells (batched flush)."""
+        spell_data_list = []
+
         for spell_data in item_data.get('SpellData', []):
             spell_data_obj = SpellData(event=spell_data.get('Event'))
             db.add(spell_data_obj)
-            db.flush()  # Need ID
+            spell_data_list.append(spell_data_obj)
 
+        # Flush all SpellData objects together
+        if spell_data_list:
+            db.flush()
+
+        # Now process spells for each spell_data
+        spell_data_items = item_data.get('SpellData', [])
+        for spell_data_obj, spell_data in zip(spell_data_list, spell_data_items):
             # Link to item
             item_spell = ItemSpellData(
                 item_id=item.id,
@@ -462,6 +567,8 @@ class OptimizedImporter:
             )
             db.add(item_spell)
 
+            # Collect all spells for this spell_data
+            spells = []
             for spell_info in spell_data.get('Items', []):
                 spell = Spell(
                     spell_id=spell_info.get('SpellID'),
@@ -473,36 +580,44 @@ class OptimizedImporter:
                                  if k not in ['SpellID', 'Target', 'TickCount',
                                             'TickInterval', 'SpellFormat', 'Criteria']}
                 )
+                spell._criteria_data = spell_info.get('Criteria', [])  # Store for later
                 db.add(spell)
-                db.flush()  # Need ID
+                spells.append((spell, spell_data_obj))
 
-                # Link spell to spell_data
-                spell_data_spell = SpellDataSpells(
-                    spell_data_id=spell_data_obj.id,
-                    spell_id=spell.id
-                )
-                db.add(spell_data_spell)
+            # Flush spells for this spell_data
+            if spells:
+                db.flush()
 
-                # Buffer criteria
-                seen = set()
-                for crit_data in spell_info.get('Criteria', []):
-                    criterion = self._criterion_cache.get((
-                        crit_data['Value1'],
-                        crit_data['Value2'],
-                        crit_data['Operator']
-                    ))
-                    if criterion and criterion.id not in seen:
-                        self._spell_criteria_buffer.append({
-                            'spell_id': spell.id,
-                            'criterion_id': criterion.id
-                        })
-                        seen.add(criterion.id)
+                # Link spells and buffer criteria
+                for spell, spell_data_obj in spells:
+                    spell_data_spell = SpellDataSpells(
+                        spell_data_id=spell_data_obj.id,
+                        spell_id=spell.id
+                    )
+                    db.add(spell_data_spell)
 
-    def _process_animation_mesh_batch(self, db: Session, item: Item, item_data: Dict):
-        """Process animation mesh data."""
+                    # Buffer criteria
+                    seen = set()
+                    for crit_data in spell._criteria_data:
+                        criterion = self._criterion_cache.get((
+                            crit_data['Value1'],
+                            crit_data['Value2'],
+                            crit_data['Operator']
+                        ))
+                        if criterion and criterion.id not in seen:
+                            self._spell_criteria_buffer.append({
+                                'spell_id': spell.id,
+                                'criterion_id': criterion.id
+                            })
+                            seen.add(criterion.id)
+
+        return spell_data_list
+
+    def _create_animation_mesh_object(self, item: Item, item_data: Dict) -> Optional[AnimationMesh]:
+        """Create AnimationMesh object (without flush)."""
         animesh_data = item_data.get('AnimationMesh')
         if not animesh_data:
-            return
+            return None
 
         animesh = AnimationMesh()
 
@@ -526,9 +641,7 @@ class OptimizedImporter:
             if stat_value:
                 animesh.mesh_id = stat_value.id
 
-        db.add(animesh)
-        db.flush()
-        item.animation_mesh_id = animesh.id
+        return animesh
 
     def _flush_buffers(self, db: Session):
         """Flush all buffered relationship data."""

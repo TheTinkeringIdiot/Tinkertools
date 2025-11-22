@@ -50,12 +50,16 @@ class MigrationRunner:
             # Core tables
             'items', 'stat_values', 'criteria', 'spells', 'spell_data',
             'actions', 'attack_defense', 'animation_mesh', 'symbiants',
-            'perks',
+            'perks', 'mobs', 'pocket_bosses',
 
             # Junction/relationship tables
             'item_stats', 'spell_criteria', 'action_criteria',
             'attack_defense_attack', 'attack_defense_defense',
             'spell_data_spells', 'item_spell_data',
+            'pocket_boss_symbiant_drops', 'symbiant_items',
+
+            # Shop system tables
+            'shop_hash', 'item_shop_hash',
 
             # Source system tables
             'source_types', 'sources', 'item_sources',
@@ -63,8 +67,8 @@ class MigrationRunner:
             'quest_sources', 'shop_sources', 'tradeskill_sources',
             'other_sources',
 
-            # Other tables
-            'pocket_bosses', 'schema_migrations'
+            # Cache and migrations
+            'application_cache', 'schema_migrations'
         ]
 
         # Get actual tables in database
