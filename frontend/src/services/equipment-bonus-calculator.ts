@@ -14,7 +14,7 @@
  */
 
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
-import type { Item, SpellData, Spell } from '@/types/api';
+import type { Item, SpellData, Spell, SymbiantItem } from '@/types/api';
 import { skillService } from './skill-service';
 
 // ============================================================================
@@ -94,12 +94,12 @@ class SpellDataCache {
   private hitCount = 0;
   private missCount = 0;
 
-  private getCacheKey(item: Item): string {
+  private getCacheKey(item: Item | SymbiantItem): string {
     // Use AOID and QL if available for precise caching, fallback to name
     return item.aoid && item.ql ? `${item.aoid}-${item.ql}` : item.name || 'unknown';
   }
 
-  get(item: Item): StatBonus[] | null {
+  get(item: Item | SymbiantItem): StatBonus[] | null {
     const key = this.getCacheKey(item);
     const cached = this.cache.get(key);
 
@@ -112,7 +112,7 @@ class SpellDataCache {
     }
   }
 
-  set(item: Item, bonuses: StatBonus[]): void {
+  set(item: Item | SymbiantItem, bonuses: StatBonus[]): void {
     const key = this.getCacheKey(item);
 
     // If cache is full, remove oldest entry (simple LRU)
@@ -255,7 +255,7 @@ export class EquipmentBonusCalculator {
       this.processEquipmentSlotsWithErrorHandling(profile.Weapons, 'Weapons', allBonuses, result);
       this.processEquipmentSlotsWithErrorHandling(profile.Clothing, 'Clothing', allBonuses, result);
       this.processEquipmentSlotsWithErrorHandling(profile.Implants, 'Implants', allBonuses, result);
-      this.processEquipmentSlotsWithErrorHandling(profile.HUD, 'HUD', allBonuses, result);
+      this.processEquipmentSlotsWithErrorHandling(profile.Symbiants, 'Symbiants', allBonuses, result);
 
       // Aggregate bonuses by skill ID with error handling
       try {
@@ -294,7 +294,7 @@ export class EquipmentBonusCalculator {
    * @param bonuses Array to accumulate bonuses
    */
   private processEquipmentSlots(
-    equipmentSlots: Record<string, Item | null>,
+    equipmentSlots: Record<string, Item | SymbiantItem | null>,
     bonuses: StatBonus[]
   ): void {
     for (const [slotName, item] of Object.entries(equipmentSlots)) {
@@ -309,11 +309,13 @@ export class EquipmentBonusCalculator {
    * Optimized version of processEquipmentSlots with caching
    */
   private processEquipmentSlotsOptimized(
-    equipmentSlots: Record<string, Item | null>,
+    equipmentSlots: Record<string, Item | SymbiantItem | null>,
     bonuses: StatBonus[]
   ): void {
     // Filter out null items first to avoid unnecessary iterations
-    const validItems = Object.values(equipmentSlots).filter((item): item is Item => item !== null);
+    const validItems = Object.values(equipmentSlots).filter(
+      (item): item is Item | SymbiantItem => item !== null
+    );
 
     // Batch process items for better performance
     for (const item of validItems) {
@@ -332,7 +334,7 @@ export class EquipmentBonusCalculator {
    * @param result Result object to accumulate errors and warnings
    */
   private processEquipmentSlotsWithErrorHandling(
-    equipmentSlots: Record<string, Item | null> | undefined,
+    equipmentSlots: Record<string, Item | SymbiantItem | null> | undefined,
     categoryName: string,
     bonuses: StatBonus[],
     result: CalculationResult
@@ -383,7 +385,7 @@ export class EquipmentBonusCalculator {
    * @param item Item with spell_data to parse
    * @returns Array of stat bonuses found in the item
    */
-  parseItemSpells(item: Item): StatBonus[] {
+  parseItemSpells(item: Item | SymbiantItem): StatBonus[] {
     const bonuses: StatBonus[] = [];
 
     // Extract bonuses from spell_data only (item.stats does NOT contain implant bonuses)
@@ -415,7 +417,7 @@ export class EquipmentBonusCalculator {
   /**
    * Optimized version of parseItemSpells with caching
    */
-  private parseItemSpellsOptimized(item: Item): StatBonus[] {
+  private parseItemSpellsOptimized(item: Item | SymbiantItem): StatBonus[] {
     // Check cache first
     const cached = this.spellCache.get(item);
     if (cached) {
@@ -438,7 +440,7 @@ export class EquipmentBonusCalculator {
    * @returns Object with bonuses array and error/warning arrays
    */
   parseItemSpellsWithErrorHandling(
-    item: Item,
+    item: Item | SymbiantItem,
     slotName: string
   ): { bonuses: StatBonus[]; warnings: EquipmentBonusError[]; errors: EquipmentBonusError[] } {
     const result = {
@@ -1055,7 +1057,7 @@ export function calculateEquipmentBonusesWithErrors(profile: TinkerProfile): Cal
  * @param item Item to analyze
  * @returns Array of stat bonuses found in the item
  */
-export function parseItemForStatBonuses(item: Item): StatBonus[] {
+export function parseItemForStatBonuses(item: Item | SymbiantItem): StatBonus[] {
   try {
     return equipmentBonusCalculator.parseItemSpells(item);
   } catch (error) {
@@ -1071,7 +1073,7 @@ export function parseItemForStatBonuses(item: Item): StatBonus[] {
  * @returns Object with bonuses array and error/warning arrays
  */
 export function parseItemForStatBonusesWithErrors(
-  item: Item,
+  item: Item | SymbiantItem,
   slotName?: string
 ): { bonuses: StatBonus[]; warnings: EquipmentBonusError[]; errors: EquipmentBonusError[] } {
   try {

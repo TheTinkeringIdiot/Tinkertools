@@ -66,11 +66,12 @@ import {
   getImplantSlotPositionFromBitflag,
   getItemIconUrl,
 } from '@/services/game-utils';
-import type { Item } from '@/types/api';
+import type { Item, SymbiantItem } from '@/types/api';
+import { isSymbiant } from '@/types/api';
 
 // Props
 interface Props {
-  equipment: Record<string, Item | null>;
+  equipment: Record<string, Item | SymbiantItem | null>;
   slotType: 'weapon' | 'armor' | 'implant';
   showLabels?: boolean;
   allowUnequip?: boolean;
@@ -97,7 +98,7 @@ const unequippingSlots = ref(new Set<string>());
 // Computed properties
 const gridCells = computed(() => {
   const cells: Array<{
-    item: Item | null;
+    item: Item | SymbiantItem | null;
     iconUrl: string | null;
     slotName: string | null;
     position: { row: number; col: number };
@@ -129,7 +130,7 @@ const gridCells = computed(() => {
   // Initialize grid with empty cells
   const grid: Array<
     Array<{
-      item: Item | null;
+      item: Item | SymbiantItem | null;
       iconUrl: string | null;
       slotName: string | null;
     }>
@@ -161,9 +162,19 @@ const gridCells = computed(() => {
       }
 
       if (position && grid[position.row] && grid[position.row][position.col]) {
+        // Get icon URL - handle symbiants differently (they don't have stats)
+        let iconUrl: string | null = null;
+        if (isSymbiant(item)) {
+          // Symbiants use aoid for icon lookup
+          iconUrl = `https://cdn.tinkeringidiot.com/static/icons/${item.aoid}.png`;
+        } else {
+          // Regular items use stats
+          iconUrl = getItemIconUrl((item as Item).stats);
+        }
+
         grid[position.row][position.col] = {
           item,
-          iconUrl: getItemIconUrl(item.stats),
+          iconUrl,
           slotName: slotKey,
         };
       }
@@ -260,7 +271,7 @@ function onIconError() {
   console.warn('Failed to load item icon');
 }
 
-function navigateToItem(item: Item) {
+function navigateToItem(item: Item | SymbiantItem) {
   // Navigate to ItemDetail page for the specific item at the equipped QL
   if (!item.aoid) return;
 
@@ -275,7 +286,7 @@ function navigateToItem(item: Item) {
   });
 }
 
-async function handleUnequip(slotName: string | null, item: Item) {
+async function handleUnequip(slotName: string | null, item: Item | SymbiantItem) {
   if (!slotName) return;
 
   // Determine the equipment category based on slot type

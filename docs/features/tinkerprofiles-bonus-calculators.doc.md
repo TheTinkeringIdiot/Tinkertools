@@ -168,6 +168,62 @@ class BonusAggregationCache {
 - **Debugging**: Clear stat ID trails through calculation pipelines
 - **Performance**: Optimized for scale with large equipment/perk combinations
 
+## Symbiant Integration (November 2025)
+
+### Overview
+The equipment bonus calculator was enhanced to support symbiants alongside traditional items. Symbiants are treated as a distinct item type that can occupy implant slots but have different data structures.
+
+### Key Changes
+
+#### Type System Enhancements
+All bonus calculation methods now accept `Item | SymbiantItem` union types:
+```typescript
+parseItemSpells(item: Item | SymbiantItem): StatBonus[]
+processEquipmentSlots(equipmentSlots: Record<string, Item | SymbiantItem | null>, bonuses: StatBonus[]): void
+```
+
+#### Profile Processing Updates
+- **Slot Renaming**: `profile.HUD` renamed to `profile.Symbiants` for semantic accuracy
+- **Unified Processing**: Symbiants processed through same bonus calculation pipeline as items
+- **Cache Compatibility**: AOID-based cache keys work for both items and symbiants
+
+#### Equipment Display Integration
+The `EquipmentSlotsDisplay.vue` component handles mixed implant/symbiant slots:
+```typescript
+// Type guard distinguishes item types
+if (isSymbiant(item)) {
+  // Symbiants use AOID for icon lookup (no stats property)
+  iconUrl = `https://cdn.tinkeringidiot.com/static/icons/${item.aoid}.png`;
+} else {
+  // Regular items use stats
+  iconUrl = getItemIconUrl((item as Item).stats);
+}
+```
+
+### Data Structure Differences
+
+| Property | Item | SymbiantItem |
+|----------|------|--------------|
+| `stats` | Array of StatValue | Not present |
+| `family` | Not present | String (Artillery, Control, etc.) |
+| `slot_id` | Via stats lookup | Direct property |
+| Icon lookup | Via stats | Via AOID |
+| Bonus source | `spell_data` | `spell_data` |
+
+### Type Guard Usage
+The `isSymbiant()` type guard enables safe type discrimination:
+```typescript
+export function isSymbiant(item: Item | SymbiantItem): item is SymbiantItem {
+  return 'family' in item && 'slot_id' in item;
+}
+```
+
+### Implementation Impact
+- **No Performance Degradation**: Cache and parsing logic unchanged
+- **Backward Compatible**: Existing profiles with items continue to work
+- **Unified Bonus Calculation**: Both item types processed identically for spell_data parsing
+- **Correct Icon Display**: Symbiants now render with proper icons
+
 ## Developer Guidelines
 
 ### When Working with Bonuses
@@ -175,11 +231,15 @@ class BonusAggregationCache {
 2. **Convert at Edges**: Only convert to skill names at UI or AC calculation boundaries
 3. **Handle Errors Gracefully**: Use error recovery patterns from the enhanced calculators
 4. **Cache Wisely**: Leverage existing cache infrastructure rather than adding new layers
+5. **Support Both Item Types**: Use `Item | SymbiantItem` union types in equipment-related code
+6. **Use Type Guards**: Apply `isSymbiant()` when item-type-specific logic is needed
 
 ### Testing Considerations
 - **Stat ID Validation**: Test with valid and invalid stat IDs
 - **Error Recovery**: Verify calculations continue when individual items fail
 - **Performance Bounds**: Ensure calculations stay within target time limits
 - **Cache Behavior**: Test cache hit/miss scenarios and corruption recovery
+- **Mixed Equipment**: Test profiles with both items and symbiants equipped
+- **Icon Rendering**: Verify both item types display correct icons
 
-This refactoring establishes a robust foundation for bonus calculations while maintaining backward compatibility and improving system reliability.
+This refactoring establishes a robust foundation for bonus calculations while maintaining backward compatibility and improving system reliability. The symbiant integration extends this foundation to support both traditional items and symbiants seamlessly.

@@ -592,7 +592,9 @@ function getEquippedArmor(clothing: Record<string, Item | null>) {
 }
 
 function getEquippedImplants(implants: Record<string, Item | null>) {
-  return implants || {};
+  if (!implants) return {};
+  // Return all items in Implants slot - includes both implants and symbiants
+  return implants;
 }
 
 // Watchers
