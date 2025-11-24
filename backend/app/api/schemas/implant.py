@@ -39,7 +39,7 @@ class ImplantLookupRequest(BaseModel):
         return v
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "slot": 32,  # Chest (1 << 5)
                 "ql": 200,
@@ -62,7 +62,7 @@ class ImplantLookupResponse(BaseModel):
     base_ql: Optional[int] = Field(None, description="Base QL of the database item used")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "success": True,
                 "item": {
