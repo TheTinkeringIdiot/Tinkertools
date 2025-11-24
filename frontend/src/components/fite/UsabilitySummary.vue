@@ -26,7 +26,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Weapon, CharacterSkills } from '@/types/weapon';
-import { useFiteStore } from '@/stores/fiteStore';
+import { checkWeaponUsability } from '@/utils/weaponUsability';
 
 interface Props {
   weapons: Weapon[];
@@ -34,7 +34,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-const fiteStore = useFiteStore();
 
 // Computed
 const usabilityStats = computed(() => {
@@ -43,7 +42,7 @@ const usabilityStats = computed(() => {
   let unusable = 0;
 
   props.weapons.forEach((weapon) => {
-    const usability = fiteStore.checkWeaponUsability(weapon, props.characterSkills);
+    const usability = checkWeaponUsability(weapon, props.characterSkills);
 
     if (usability.canUse) {
       usable++;

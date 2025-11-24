@@ -70,7 +70,7 @@
 import { computed } from 'vue';
 import type { Weapon, CharacterSkills, WeaponRequirement, WeaponUsability } from '@/types/weapon';
 import { SKILL_NAMES } from '@/types/weapon';
-import { useFiteStore } from '@/stores/fiteStore';
+import { checkWeaponUsability } from '@/utils/weaponUsability';
 
 interface Props {
   weapon: Weapon;
@@ -81,8 +81,6 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   compact: false,
 });
-
-const fiteStore = useFiteStore();
 const maxCompactItems = 3;
 
 // Computed
@@ -123,7 +121,7 @@ const usability = computed<WeaponUsability>(() => {
     };
   }
 
-  return fiteStore.checkWeaponUsability(props.weapon, props.characterSkills);
+  return checkWeaponUsability(props.weapon, props.characterSkills);
 });
 
 // Methods

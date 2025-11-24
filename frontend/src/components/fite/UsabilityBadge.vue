@@ -12,7 +12,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Weapon, CharacterSkills } from '@/types/weapon';
-import { useFiteStore } from '@/stores/fiteStore';
+import { checkWeaponUsability } from '@/utils/weaponUsability';
 
 interface Props {
   weapon: Weapon;
@@ -20,11 +20,10 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-const fiteStore = useFiteStore();
 
 // Computed
 const usability = computed(() => {
-  return fiteStore.checkWeaponUsability(props.weapon, props.characterSkills);
+  return checkWeaponUsability(props.weapon, props.characterSkills);
 });
 
 const badgeClass = computed(() => {
