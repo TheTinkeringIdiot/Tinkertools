@@ -42,7 +42,7 @@ import { ErrorCodes } from '../types/api';
 
 const API_CONFIG = {
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
-  timeout: 30000,
+  timeout: 120000, // 120 seconds - increased for large dataset loads (symbiants ~900+ items, pocket bosses)
   retryAttempts: 3,
   retryDelay: 1000,
   batchDelay: 50, // ms to wait before executing batch requests

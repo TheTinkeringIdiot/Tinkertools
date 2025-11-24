@@ -9,6 +9,19 @@ import { ref, computed, readonly } from 'vue';
 import type { Symbiant, UserFriendlyError } from '../types/api';
 import { apiClient } from '../services/api-client';
 import { enrichSymbiant } from '../utils/symbiantHelpers';
+import { get, set, del } from 'idb-keyval';
+
+// ============================================================================
+// Cache Configuration
+// ============================================================================
+
+const SYMBIANTS_CACHE_KEY = 'tinkertools:symbiants:all';
+
+interface SymbiantCacheEntry {
+  data: Symbiant[];
+  timestamp: number;
+  version: 1;
+}
 
 export const useSymbiantsStore = defineStore('symbiants', () => {
   // ============================================================================
@@ -77,12 +90,38 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
   // ============================================================================
 
   /**
-   * Load all symbiants with 30-day cache
+   * Load all symbiants with 30-day cache (using IndexedDB)
    */
   async function loadAllSymbiants(forceRefresh = false): Promise<Symbiant[]> {
-    // Check cache first
+    // Check memory cache first
     if (!forceRefresh && symbiants.value.size > 0 && !isDataStale.value) {
       return allSymbiants.value;
+    }
+
+    // Try to load from IndexedDB before API call
+    if (!forceRefresh) {
+      try {
+        const cached = await get<SymbiantCacheEntry>(SYMBIANTS_CACHE_KEY);
+        if (cached && cached.data && cached.version === 1) {
+          const age = Date.now() - cached.timestamp;
+          if (age < cacheExpiry) {
+            console.log(`[SymbiantsStore] Loading from IndexedDB cache (age: ${Math.round(age / 1000)}s)`);
+
+            // Populate Pinia store from cached data
+            symbiants.value.clear();
+            cached.data.forEach((symbiant) => {
+              symbiants.value.set(symbiant.id, symbiant);
+            });
+            lastFetch.value = cached.timestamp;
+
+            return cached.data;
+          } else {
+            console.log(`[SymbiantsStore] IndexedDB cache expired (age: ${Math.round(age / 1000)}s)`);
+          }
+        }
+      } catch (err) {
+        console.warn('[SymbiantsStore] Failed to read from IndexedDB:', err);
+      }
     }
 
     loading.value = true;
@@ -96,13 +135,27 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
         // Enrich symbiants with display data
         const enrichedSymbiants = response.map(enrichSymbiant);
 
-        // Clear old data and store new data
+        // Clear old data and store new data in Pinia
         symbiants.value.clear();
         enrichedSymbiants.forEach((symbiant) => {
           symbiants.value.set(symbiant.id, symbiant);
         });
 
         lastFetch.value = Date.now();
+
+        // Write to IndexedDB cache
+        try {
+          const cacheEntry: SymbiantCacheEntry = {
+            data: enrichedSymbiants,
+            timestamp: Date.now(),
+            version: 1,
+          };
+          await set(SYMBIANTS_CACHE_KEY, cacheEntry);
+          console.log(`[SymbiantsStore] Cached ${enrichedSymbiants.length} symbiants to IndexedDB`);
+        } catch (err) {
+          console.warn('[SymbiantsStore] Failed to write to IndexedDB:', err);
+        }
+
         return enrichedSymbiants;
       }
 
@@ -192,12 +245,20 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
   }
 
   /**
-   * Clear all cached data
+   * Clear all cached data (including IndexedDB)
    */
-  function clearCache(): void {
+  async function clearCache(): Promise<void> {
     symbiants.value.clear();
     lastFetch.value = 0;
     error.value = null;
+
+    // Also clear IndexedDB cache
+    try {
+      await del(SYMBIANTS_CACHE_KEY);
+      console.log('[SymbiantsStore] Cleared IndexedDB cache');
+    } catch (err) {
+      console.warn('[SymbiantsStore] Failed to clear IndexedDB cache:', err);
+    }
   }
 
   /**
