@@ -604,11 +604,13 @@ class TinkerToolsApiClient {
   // Symbiants API
   // ============================================================================
 
-  async searchSymbiants(query?: SymbiantSearchQuery): Promise<SymbiantItem[]> {
-    // No parameters needed - always fetch all
-    // Query parameter kept for backward compatibility but ignored
-    const response = await this.get<SymbiantItem[]>('/symbiants');
-    return response.data || [];
+  async searchSymbiants(query?: SymbiantSearchQuery & { page?: number; limit?: number }): Promise<PaginatedResponse<SymbiantItem>> {
+    const params = new URLSearchParams();
+
+    if (query?.page) params.append('page', query.page.toString());
+    if (query?.limit) params.append('page_size', query.limit.toString());
+
+    return this.getPaginated<SymbiantItem>(`/symbiants?${params.toString()}`);
   }
 
   async getSymbiant(id: number): Promise<ApiResponse<SymbiantItem>> {

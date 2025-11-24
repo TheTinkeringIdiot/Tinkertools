@@ -7,13 +7,11 @@ export function getSymbiantDisplayName(symbiant: Symbiant): string {
   return `Symbiant ${symbiant.aoid || symbiant.id}`;
 }
 
-export function getSymbiantSlot(symbiant: Symbiant): string {
-  if (symbiant.slot) return symbiant.slot;
+export function getSymbiantSlotId(symbiant: Symbiant): number {
+  if (symbiant.slot_id !== undefined) return symbiant.slot_id;
 
-  // Generate placeholder slots based on family or id
-  const slotTypes = ['Head', 'Eye', 'Ear', 'Chest', 'Arm', 'Wrist', 'Hand', 'Waist', 'Leg', 'Feet'];
-  const index = (symbiant.id || 0) % slotTypes.length;
-  return slotTypes[index];
+  // Generate placeholder slot_id based on id
+  return (symbiant.id || 0) % 10;
 }
 
 export function getSymbiantQL(symbiant: Symbiant): number {
@@ -23,11 +21,12 @@ export function getSymbiantQL(symbiant: Symbiant): number {
   return 50 + ((symbiant.id || 0) % 251);
 }
 
-export function getSymbiantFamily(symbiant: Symbiant): string {
+export function getSymbiantFamily(symbiant: Symbiant): 'Artillery' | 'Control' | 'Extermination' | 'Infantry' | 'Support' {
   if (symbiant.family) return symbiant.family;
 
   // Generate placeholder families
-  const families = ['Artillery', 'Control', 'Exterminator', 'Infantry', 'Support'];
+  const families: Array<'Artillery' | 'Control' | 'Extermination' | 'Infantry' | 'Support'> =
+    ['Artillery', 'Control', 'Extermination', 'Infantry', 'Support'];
   const index = (symbiant.id || 0) % families.length;
   return families[index];
 }
@@ -37,7 +36,7 @@ export function enrichSymbiant(symbiant: Symbiant): Symbiant {
   return {
     ...symbiant,
     name: getSymbiantDisplayName(symbiant),
-    slot: getSymbiantSlot(symbiant),
+    slot_id: getSymbiantSlotId(symbiant),
     ql: getSymbiantQL(symbiant),
     family: getSymbiantFamily(symbiant),
   };

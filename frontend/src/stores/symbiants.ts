@@ -91,6 +91,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
 
   /**
    * Load all symbiants with 30-day cache (using IndexedDB)
+   * Loads in paginated chunks with progress indicators
    */
   async function loadAllSymbiants(forceRefresh = false): Promise<Symbiant[]> {
     // Check memory cache first
@@ -128,38 +129,63 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     error.value = null;
 
     try {
-      // Fetch ALL symbiants with no filters
-      const response = await apiClient.searchSymbiants({});
+      // Load symbiants in chunks with progress indicator
+      const allSymbiantsData: Symbiant[] = [];
+      let currentPage = 1;
+      const pageSize = 100;
+      let hasMore = true;
 
-      if (response && Array.isArray(response)) {
-        // Enrich symbiants with display data
-        const enrichedSymbiants = response.map(enrichSymbiant);
+      console.log('[SymbiantsStore] Starting chunked symbiant load...');
 
-        // Clear old data and store new data in Pinia
-        symbiants.value.clear();
-        enrichedSymbiants.forEach((symbiant) => {
-          symbiants.value.set(symbiant.id, symbiant);
+      while (hasMore) {
+        const response = await apiClient.searchSymbiants({
+          page: currentPage,
+          limit: pageSize,
         });
 
-        lastFetch.value = Date.now();
+        if (response && response.items && Array.isArray(response.items)) {
+          // Enrich symbiants with display data
+          const enrichedChunk = response.items.map(enrichSymbiant);
+          allSymbiantsData.push(...enrichedChunk);
 
-        // Write to IndexedDB cache
-        try {
-          const cacheEntry: SymbiantCacheEntry = {
-            data: enrichedSymbiants,
-            timestamp: Date.now(),
-            version: 1,
-          };
-          await set(SYMBIANTS_CACHE_KEY, cacheEntry);
-          console.log(`[SymbiantsStore] Cached ${enrichedSymbiants.length} symbiants to IndexedDB`);
-        } catch (err) {
-          console.warn('[SymbiantsStore] Failed to write to IndexedDB:', err);
+          // Show progress
+          console.log(`[SymbiantsStore] Loaded ${allSymbiantsData.length}/${response.total} symbiants...`);
+
+          // Check if there are more pages
+          hasMore = response.has_next;
+          currentPage++;
+        } else {
+          // No more data or invalid response
+          hasMore = false;
         }
-
-        return enrichedSymbiants;
       }
 
-      throw new Error('No symbiant data received');
+      if (allSymbiantsData.length === 0) {
+        throw new Error('No symbiant data received');
+      }
+
+      // Clear old data and store new data in Pinia
+      symbiants.value.clear();
+      allSymbiantsData.forEach((symbiant) => {
+        symbiants.value.set(symbiant.id, symbiant);
+      });
+
+      lastFetch.value = Date.now();
+
+      // Write complete dataset to IndexedDB cache
+      try {
+        const cacheEntry: SymbiantCacheEntry = {
+          data: allSymbiantsData,
+          timestamp: Date.now(),
+          version: 1,
+        };
+        await set(SYMBIANTS_CACHE_KEY, cacheEntry);
+        console.log(`[SymbiantsStore] Cached ${allSymbiantsData.length} symbiants to IndexedDB`);
+      } catch (err) {
+        console.warn('[SymbiantsStore] Failed to write to IndexedDB:', err);
+      }
+
+      return allSymbiantsData;
     } catch (err: any) {
       error.value = err;
       throw err;

@@ -3,11 +3,12 @@ Symbiants API endpoints.
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_
 import time
 import logging
+import math
 
 from app.core.database import get_db
 from app.models import (
@@ -27,30 +28,44 @@ router = APIRouter(prefix="/symbiants", tags=["symbiants"])
 logger = logging.getLogger(__name__)
 
 
-@router.get("", response_model=List[SymbiantResponse])
+@router.get("", response_model=PaginatedResponse[SymbiantResponse])
 @cached_response("symbiants")
 @performance_monitor
 def list_symbiants(
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(50, ge=1, le=200, description="Items per page"),
     db: Session = Depends(get_db)
-) -> List[SymbiantResponse]:
+) -> PaginatedResponse[SymbiantResponse]:
     """
-    List all symbiants.
+    List symbiants with pagination.
 
-    Returns all symbiants in the database with default ordering.
-    Client-side filtering should be used for search, family, slot, QL, and level filtering.
+    Pagination parameters:
+    - page: Page number (1-indexed)
+    - page_size: Number of items per page (default: 50, max: 200)
+
+    Returns paginated symbiants in the database with default ordering.
     """
     start_time = time.time()
 
-    # Simple query - get all symbiants with default ordering
-    symbiants = (
+    # Base query with ordering
+    base_query = (
         db.query(SymbiantItem)
         .order_by(
             SymbiantItem.family.asc(),
             SymbiantItem.ql.asc(),
             SymbiantItem.name.asc()
         )
-        .all()
     )
+
+    # Get total count
+    total = base_query.count()
+
+    # Calculate pagination
+    pages = math.ceil(total / page_size) if total > 0 else 1
+    offset = (page - 1) * page_size
+
+    # Get paginated results
+    symbiants = base_query.limit(page_size).offset(offset).all()
 
     # Get actions/criteria and spell_data for each symbiant by joining with Item table
     symbiant_ids = [s.id for s in symbiants]
@@ -149,9 +164,17 @@ def list_symbiants(
 
     # Log performance metrics
     query_time = time.time() - start_time
-    logger.info(f"Symbiant list query (all) results={len(symbiant_responses)} time={query_time:.3f}s")
+    logger.info(f"Symbiant list query page={page} page_size={page_size} results={len(symbiant_responses)}/{total} time={query_time:.3f}s")
 
-    return symbiant_responses
+    return PaginatedResponse[SymbiantResponse](
+        items=symbiant_responses,
+        total=total,
+        page=page,
+        page_size=page_size,
+        pages=pages,
+        has_next=page < pages,
+        has_prev=page > 1
+    )
 
 
 @router.get("/{symbiant_id}/dropped-by", response_model=List[MobDropInfo])

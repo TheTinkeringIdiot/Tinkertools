@@ -7,6 +7,7 @@ FastAPI routes, schemas, and services for TinkerTools backend API endpoints.
 - **Eager Loading**: Use SQLAlchemy `joinedload()` to preload relationships and avoid N+1 queries
 - **JOIN over Subqueries**: Convert subqueries to JOINs for better query performance
 - **Response Caching**: Use `@cached_response` decorator for expensive endpoints with static data
+- **Pagination**: Return `PaginatedResponse[T]` for large datasets (prevents gateway timeouts, enables chunked loading)
 - **Dependency Injection**: Use FastAPI `Depends()` for database sessions and services
 - **Synchronous DB Operations**: Use synchronous SQLAlchemy (not async) - FastAPI handles concurrency via thread pool
 - **Modern JSON Querying**: Use `column['key'].astext.cast(Type)` instead of `.op('->>')` for JSONB columns
@@ -25,7 +26,9 @@ FastAPI routes, schemas, and services for TinkerTools backend API endpoints.
 - Database session management: `backend/app/core/database.py` (centralized)
 
 ## Documentation
-- Features: `.docs/features/tinkerfite-performance-optimization.doc.md`
+- Features:
+  - `.docs/features/tinkerfite-performance-optimization.doc.md`
+  - `.docs/features/symbiant-pagination-chunked-loading.doc.md`
 - Database: `DATABASE.md`
 
 ## Notes
