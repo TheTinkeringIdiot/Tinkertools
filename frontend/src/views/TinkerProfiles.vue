@@ -473,7 +473,8 @@ function handleProfileCreated() {
 }
 
 function handleProfileImported() {
-  showImportModal.value = false;
+  // Don't close modal here - let it show success/warnings for 2 seconds
+  // The modal handles its own closing via setTimeout
   refreshProfiles();
 }
 
