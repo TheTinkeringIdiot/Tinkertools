@@ -19,8 +19,6 @@ coverage==7.6.1
 black==24.8.0
 isort==5.13.2
 ruff==0.5.7
-pandas==2.2.2
-numpy==1.26.4
 # Memory-efficient JSON processing for large import files
 ijson==3.2.3
 psutil==5.9.8
