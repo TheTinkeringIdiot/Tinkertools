@@ -376,6 +376,8 @@ import Textarea from 'primevue/textarea';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import type { ProfileImportResult, BulkImportResult } from '@/lib/tinkerprofiles';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+
 // Props & Emits
 const props = defineProps<{
   visible: boolean;
@@ -574,7 +576,7 @@ async function importProfile() {
       console.log('[AOSetups Import] Extracted profile ID:', profileId);
       console.log('[AOSetups Import] Fetching from backend proxy...');
 
-      const response = await fetch(`http://localhost:8000/api/v1/aosetups/profile/${profileId}`);
+      const response = await fetch(`${API_BASE_URL}/aosetups/profile/${profileId}`);
       if (!response.ok) {
         const error = `Failed to fetch profile: ${response.status} ${response.statusText}`;
         console.error('[AOSetups Import] Fetch error:', error);

@@ -60,6 +60,8 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+
 const loading = ref(false);
 const backendResult = ref<string>('');
 const error = ref<string>('');
@@ -70,7 +72,7 @@ const testBackend = async () => {
   backendResult.value = '';
 
   try {
-    const response = await fetch('http://localhost:8000/api/v1/items?item_class=1&page_size=3');
+    const response = await fetch(`${API_BASE_URL}/items?item_class=1&page_size=3`);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }

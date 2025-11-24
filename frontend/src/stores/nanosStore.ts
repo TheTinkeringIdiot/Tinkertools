@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
+import { apiClient } from '@/services/api-client';
 import type {
   NanoProgram,
   NanoFilters,
@@ -176,13 +177,7 @@ export const useNanosStore = defineStore('nanos', () => {
         params.append('school', searchRequest.filters.schools[0]); // Backend supports one school filter
       }
 
-      const response = await fetch(`http://localhost:8000/api/v1/nanos?${params}`);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const data = await apiClient.getPaginated<any>(`/nanos?${params}`);
 
       // Map backend response to frontend format
       nanos.value = data.items.map((item: any) => ({
@@ -238,13 +233,7 @@ export const useNanosStore = defineStore('nanos', () => {
         params.append('q', query.trim());
         params.append('page_size', '200');
 
-        const response = await fetch(`http://localhost:8000/api/v1/nanos/search?${params}`);
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        const data = await apiClient.getPaginated<any>(`/nanos/search?${params}`);
 
         // Map backend response to frontend format
         nanos.value = data.items.map((item: any) => ({

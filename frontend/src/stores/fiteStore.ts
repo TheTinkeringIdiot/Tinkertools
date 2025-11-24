@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
+import { apiClient } from '@/services/api-client';
 import type {
   Weapon,
   CharacterSkills,
@@ -54,13 +55,7 @@ export const useFiteStore = defineStore('fite', () => {
         params.append('min_ql', searchRequest.filters.qualityLevels[0].toString());
       }
 
-      const response = await fetch(`http://localhost:8000/api/v1/items?${params}`);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const data = await apiClient.getPaginated<any>(`/items?${params}`);
 
       // Filter to items that have weapon stats (attack/defense related stats)
       weapons.value = data.items.filter((item: any) => {
@@ -92,13 +87,7 @@ export const useFiteStore = defineStore('fite', () => {
       params.append('q', query.trim());
       params.append('page_size', '200');
 
-      const response = await fetch(`http://localhost:8000/api/v1/items/search?${params}`);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const data = await apiClient.getPaginated<any>(`/items/search?${params}`);
 
       // Filter to weapons only
       weapons.value = data.items.filter((item: any) => {
