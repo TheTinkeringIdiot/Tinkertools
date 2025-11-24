@@ -356,6 +356,8 @@ import { checkActionRequirements, parseAction } from '@/services/action-criteria
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+
 interface SubstrainGroup {
   substrain: number;
   substrainName: string;
@@ -528,7 +530,7 @@ async function loadNanos() {
   }
 
   try {
-    const url = `/api/v1/nanos/profession/${props.selectedProfession}?page_size=1000&sort=ql&sort_order=desc`;
+    const url = `${API_BASE_URL}/nanos/profession/${props.selectedProfession}?page_size=1000&sort=ql&sort_order=desc`;
     console.log('Fetching from URL:', url);
 
     const response = await fetch(url);
