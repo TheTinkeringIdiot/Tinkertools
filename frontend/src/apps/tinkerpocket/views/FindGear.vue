@@ -25,6 +25,7 @@ import Card from 'primevue/card';
 import Tag from 'primevue/tag';
 import DataView from 'primevue/dataview';
 import Badge from 'primevue/badge';
+import ProgressBar from 'primevue/progressbar';
 import { useToast } from 'primevue/usetoast';
 
 // Router
@@ -609,7 +610,17 @@ watch(
       <!-- Loading State -->
       <div v-if="symbiantsStore.loading" class="flex flex-col justify-center items-center py-12">
         <i class="pi pi-spin pi-spinner text-4xl text-primary-500 mb-3"></i>
-        <p class="text-lg text-surface-600 dark:text-surface-400">Loading symbiants...</p>
+        <p class="text-lg text-surface-600 dark:text-surface-400 mb-2">
+          Loading symbiants...
+          <span v-if="symbiantsStore.totalCount > 0">
+            {{ symbiantsStore.loadedCount }} / {{ symbiantsStore.totalCount }}
+          </span>
+        </p>
+        <ProgressBar
+          v-if="symbiantsStore.totalCount > 0"
+          :value="symbiantsStore.loadingProgress"
+          class="w-full max-w-md"
+        />
       </div>
 
       <!-- Error State -->

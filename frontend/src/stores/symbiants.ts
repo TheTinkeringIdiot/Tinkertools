@@ -34,6 +34,13 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
   const lastFetch = ref(0);
   const cacheExpiry = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
 
+  // Loading progress state
+  const loadedCount = ref(0);
+  const totalCount = ref(0);
+  const loadingProgress = computed(() =>
+    totalCount.value > 0 ? Math.round((loadedCount.value / totalCount.value) * 100) : 0
+  );
+
   // Comparison selection state
   const selectedForComparison = ref<(Symbiant | null)[]>([null, null, null]);
 
@@ -127,6 +134,8 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
 
     loading.value = true;
     error.value = null;
+    loadedCount.value = 0;
+    totalCount.value = 0;
 
     try {
       // Load symbiants in chunks with progress indicator
@@ -147,6 +156,10 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
           // Enrich symbiants with display data
           const enrichedChunk = response.items.map(enrichSymbiant);
           allSymbiantsData.push(...enrichedChunk);
+
+          // Update progress state for UI
+          loadedCount.value = allSymbiantsData.length;
+          totalCount.value = response.total;
 
           // Show progress
           console.log(`[SymbiantsStore] Loaded ${allSymbiantsData.length}/${response.total} symbiants...`);
@@ -397,6 +410,9 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     error: readonly(error),
     lastFetch: readonly(lastFetch),
     selectedForComparison: readonly(selectedForComparison),
+    loadedCount: readonly(loadedCount),
+    totalCount: readonly(totalCount),
+    loadingProgress,
 
     // Getters
     allSymbiants,
