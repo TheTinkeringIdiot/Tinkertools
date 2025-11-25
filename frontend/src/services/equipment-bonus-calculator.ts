@@ -16,6 +16,7 @@
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import type { Item, SpellData, Spell, SymbiantItem } from '@/types/api';
 import { skillService } from './skill-service';
+import { STAT } from './game-data';
 
 // ============================================================================
 // Type Definitions
@@ -849,24 +850,12 @@ export class EquipmentBonusCalculator {
         return result;
       }
 
-      // Validate that the stat ID is a known skill
-      try {
-        if (!skillService.validateId(statId)) {
-          result.warnings.push({
-            type: 'warning',
-            message: 'Unknown stat ID in equipment bonus',
-            details: `Stat ID ${statId} from spell ${spell.spell_id} in item ${itemName || 'unknown'} does not map to a known skill`,
-            itemName,
-            slotName,
-            recoverable: true,
-          });
-          return result;
-        }
-      } catch (error) {
+      // Validate that the stat ID is a known stat (not just skills - equipment can modify any stat)
+      if (!(statId in STAT)) {
         result.warnings.push({
           type: 'warning',
-          message: 'Failed to validate stat ID',
-          details: `Error validating stat ID ${statId} for spell ${spell.spell_id} in item ${itemName || 'unknown'}: ${error instanceof Error ? error.message : String(error)}`,
+          message: 'Unknown stat ID in equipment bonus',
+          details: `Stat ID ${statId} from spell ${spell.spell_id} in item ${itemName || 'unknown'} is not a known stat`,
           itemName,
           slotName,
           recoverable: true,
