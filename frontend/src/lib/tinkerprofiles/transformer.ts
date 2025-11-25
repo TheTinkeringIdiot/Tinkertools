@@ -262,62 +262,73 @@ export class ProfileTransformer {
     // Map equipment (implants, weapons, clothing)
     await this.mapAOSetupsEquipment(aosetups, profile, result);
 
-    // Map perks to PerksAndResearch (fetch details from backend)
+    // Map perks to PerksAndResearch (fetch details from backend via batch)
     if (aosetups.perks && Array.isArray(aosetups.perks)) {
+      const perkAoids = aosetups.perks
+        .filter((p: any) => p && p.aoid)
+        .map((p: any) => p.aoid);
+
+      console.log(`[ProfileTransformer] Fetching ${perkAoids.length} perks via batch endpoint...`);
+
       const legacyPerks = [];
 
-      for (const perk of aosetups.perks) {
-        if (!perk.aoid) continue;
-
+      if (perkAoids.length > 0) {
         try {
-          // Try to fetch complete perk details from backend
-          const perkDetails = await apiClient.lookupPerkByAoid(perk.aoid);
+          const batchResponse = await apiClient.batchLookupPerks(perkAoids);
 
-          if (perkDetails) {
-            // Extract base perk name (without level suffix)
-            let baseName = perkDetails.perk_name || perkDetails.name;
-            if (baseName && perkDetails.perk_counter > 1) {
-              // Remove the level suffix if present (e.g., "Perk Name 5" -> "Perk Name")
-              const nameParts = baseName.split(' ');
-              if (
-                nameParts.length > 1 &&
-                nameParts[nameParts.length - 1] === perkDetails.perk_counter.toString()
-              ) {
-                baseName = nameParts.slice(0, -1).join(' ');
+          for (const perkResult of batchResponse.results) {
+            if (perkResult.success && perkResult.perk) {
+              const perkDetails = perkResult.perk;
+
+              // Extract base perk name (without level suffix)
+              let baseName = perkDetails.perk_name || perkDetails.name;
+              if (baseName && perkDetails.perk_counter > 1) {
+                // Remove the level suffix if present (e.g., "Perk Name 5" -> "Perk Name")
+                const nameParts = baseName.split(' ');
+                if (
+                  nameParts.length > 1 &&
+                  nameParts[nameParts.length - 1] === perkDetails.perk_counter.toString()
+                ) {
+                  baseName = nameParts.slice(0, -1).join(' ');
+                }
+              }
+
+              legacyPerks.push({
+                aoid: perkResult.aoid,
+                name: baseName,
+                level: perkDetails.perk_counter || perkDetails.counter || 1,
+                type: perkDetails.perk_type || perkDetails.type || 'SL',
+                item: perkDetails,
+              });
+
+              console.log(
+                `[ProfileTransformer] Fetched perk: ${baseName} (level ${perkDetails.perk_counter || perkDetails.counter}, type: ${perkDetails.perk_type || perkDetails.type})`
+              );
+            } else {
+              // Perk not found - add placeholder
+              legacyPerks.push({
+                aoid: perkResult.aoid,
+                name: `Unknown Perk (${perkResult.aoid})`,
+                level: 1,
+                type: 'SL',
+              });
+              if (perkResult.error) {
+                result.warnings.push(`Could not find perk with AOID ${perkResult.aoid}: ${perkResult.error}`);
               }
             }
-
+          }
+        } catch (error) {
+          console.error('[ProfileTransformer] Batch perk lookup failed:', error);
+          // Fallback: add placeholder perks for all
+          for (const aoid of perkAoids) {
             legacyPerks.push({
-              aoid: perk.aoid,
-              name: baseName,
-              level: perkDetails.perk_counter || perkDetails.counter || 1,
-              type: perkDetails.perk_type || perkDetails.type || 'SL',
-              item: perkDetails, // Store complete item details
-            });
-
-            console.log(
-              `[ProfileTransformer] Fetched complete perk item: ${baseName} (level ${perkDetails.perk_counter || perkDetails.counter}, type: ${perkDetails.perk_type || perkDetails.type})`
-            );
-          } else {
-            // Fallback if perk not found in database
-            legacyPerks.push({
-              aoid: perk.aoid,
-              name: `Unknown Perk (${perk.aoid})`,
+              aoid,
+              name: `Unknown Perk (${aoid})`,
               level: 1,
               type: 'SL',
             });
-            result.warnings.push(`Could not find perk with AOID ${perk.aoid} in database`);
           }
-        } catch (error) {
-          // Fallback on API error
-          console.warn(`[ProfileTransformer] Failed to fetch perk AOID ${perk.aoid}:`, error);
-          legacyPerks.push({
-            aoid: perk.aoid,
-            name: `Unknown Perk (${perk.aoid})`,
-            level: 1,
-            type: 'SL',
-          });
-          result.warnings.push(`Failed to fetch perk details for AOID ${perk.aoid}`);
+          result.warnings.push('Batch perk lookup failed - perks added as placeholders');
         }
       }
 
@@ -426,7 +437,8 @@ export class ProfileTransformer {
   private async mapAOSetupsEquipment(
     aosetups: any,
     profile: TinkerProfile,
-    result: ProfileImportResult
+    result: ProfileImportResult,
+    onProgress?: (current: number, total: number) => void
   ): Promise<void> {
     // First pass: collect all item requests
     const itemRequests: Array<{ aoid: number; targetQl?: number }> = [];
@@ -510,7 +522,7 @@ export class ProfileTransformer {
     }
 
     // Fetch all items
-    const itemMap = await this.fetchItems(itemRequests);
+    const itemMap = await this.fetchItems(itemRequests, onProgress);
 
     // Second pass: populate equipment with fetched items
     for (const placement of itemPlacement) {
@@ -826,12 +838,14 @@ export class ProfileTransformer {
   // ============================================================================
 
   /**
-   * Fetch multiple items from the backend API
+   * Fetch multiple items from the backend API using batch endpoint
    * @param itemRequests Array of {aoid: number, targetQl?: number}
+   * @param onProgress Optional callback for progress updates
    * @returns Promise<Map<string, Item | null>> - Map of "aoid:ql" to Item
    */
   private async fetchItems(
-    itemRequests: Array<{ aoid: number; targetQl?: number }>
+    itemRequests: Array<{ aoid: number; targetQl?: number }>,
+    onProgress?: (current: number, total: number) => void
   ): Promise<Map<string, Item | null>> {
     const itemMap = new Map<string, Item | null>();
 
@@ -839,76 +853,61 @@ export class ProfileTransformer {
       return itemMap;
     }
 
-    console.log(`[ProfileTransformer] Fetching ${itemRequests.length} items from backend...`);
+    console.log(`[ProfileTransformer] Fetching ${itemRequests.length} items via batch endpoint...`);
+    onProgress?.(0, itemRequests.length);
 
-    // Process each item request
-    const fetchPromises = itemRequests.map(async (request) => {
-      const key = `${request.aoid}:${request.targetQl || 'base'}`;
+    try {
+      // Use batch endpoint for all items at once
+      const batchRequest = itemRequests.map(req => ({
+        aoid: req.aoid,
+        targetQl: req.targetQl || 1
+      }));
 
-      try {
-        let itemResponse;
+      const response = await apiClient.batchInterpolateItems(batchRequest);
 
-        if (request.targetQl && request.targetQl > 1) {
-          // Use interpolation API for specific quality levels
-          console.log(
-            `[ProfileTransformer] Fetching interpolated item AOID ${request.aoid} at QL ${request.targetQl}`
-          );
-          const interpolationResponse = await apiClient.interpolateItem(
-            request.aoid,
-            request.targetQl
-          );
-          if (interpolationResponse.success && interpolationResponse.item) {
-            // Convert InterpolatedItem to Item format for TinkerProfile
-            itemResponse = {
-              success: true,
-              data: {
-                id: interpolationResponse.item.id,
-                aoid: interpolationResponse.item.aoid,
-                name: interpolationResponse.item.name,
-                ql: interpolationResponse.item.ql,
-                description: interpolationResponse.item.description,
-                item_class: interpolationResponse.item.item_class,
-                is_nano: interpolationResponse.item.is_nano,
-                stats: interpolationResponse.item.stats || [],
-                spell_data: interpolationResponse.item.spell_data || [],
-                actions: interpolationResponse.item.actions || [],
-                attack_stats: [],
-                defense_stats: [],
-                sources: [],
-              } as unknown as Item,
-            };
-          } else {
-            throw new Error(
-              `Interpolation failed: ${interpolationResponse.error || 'Unknown error'}`
-            );
-          }
+      // Process results
+      for (const result of response.results) {
+        const key = `${result.aoid}:${result.target_ql || 'base'}`;
+
+        if (result.success && result.item) {
+          // Convert InterpolatedItem to Item format
+          const item: Item = {
+            id: result.item.id,
+            aoid: result.item.aoid,
+            name: result.item.name,
+            ql: result.item.ql,
+            description: result.item.description,
+            item_class: result.item.item_class,
+            is_nano: result.item.is_nano,
+            stats: result.item.stats || [],
+            spell_data: result.item.spell_data || [],
+            actions: result.item.actions || [],
+            attack_stats: [],
+            defense_stats: [],
+            sources: [],
+          } as Item;
+
+          itemMap.set(key, item);
+          console.log(`[ProfileTransformer] Fetched ${result.item.name} (AOID: ${result.aoid})`);
         } else {
-          // Use regular item API for base item
-          console.log(`[ProfileTransformer] Fetching base item AOID ${request.aoid}`);
-          itemResponse = await apiClient.getItem(request.aoid);
-        }
-
-        if (itemResponse.success && itemResponse.data) {
-          itemMap.set(key, itemResponse.data);
-          console.log(
-            `[ProfileTransformer] Successfully fetched ${itemResponse.data.name} (AOID: ${request.aoid})`
-          );
-        } else {
-          console.warn(
-            `[ProfileTransformer] Failed to fetch item AOID ${request.aoid}: No data returned`
-          );
+          console.warn(`[ProfileTransformer] Item ${result.aoid} failed: ${result.error}`);
           itemMap.set(key, null);
         }
-      } catch (error) {
-        console.warn(`[ProfileTransformer] Failed to fetch item AOID ${request.aoid}:`, error);
+      }
+
+      onProgress?.(itemRequests.length, itemRequests.length);
+      console.log(`[ProfileTransformer] Batch fetch complete: ${itemMap.size} items processed`);
+
+    } catch (error) {
+      console.error('[ProfileTransformer] Batch fetch failed, items will be null:', error);
+      // Mark all items as failed
+      for (const req of itemRequests) {
+        const key = `${req.aoid}:${req.targetQl || 'base'}`;
         itemMap.set(key, null);
       }
-    });
+      onProgress?.(itemRequests.length, itemRequests.length);
+    }
 
-    // Wait for all fetches to complete
-    await Promise.all(fetchPromises);
-
-    console.log(`[ProfileTransformer] Completed item fetching: ${itemMap.size} items processed`);
     return itemMap;
   }
 

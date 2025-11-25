@@ -33,6 +33,8 @@ import type {
   InterpolationResponse,
   InterpolationInfo,
   ImplantLookupResponse,
+  BatchInterpolationResponse,
+  BatchPerkLookupResponse,
 } from '../types/api';
 import { ErrorCodes } from '../types/api';
 
@@ -524,6 +526,18 @@ class TinkerToolsApiClient {
     }
   }
 
+  async batchLookupPerks(aoids: number[]): Promise<BatchPerkLookupResponse> {
+    try {
+      const response = await this.client.post<BatchPerkLookupResponse>(
+        '/perks/batch/lookup',
+        { aoids }
+      );
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
+  }
+
   // ============================================================================
   // Item Interpolation API
   // ============================================================================
@@ -576,6 +590,22 @@ class TinkerToolsApiClient {
       return null;
     } catch {
       return null;
+    }
+  }
+
+  async batchInterpolateItems(
+    requests: Array<{ aoid: number; targetQl: number }>
+  ): Promise<BatchInterpolationResponse> {
+    try {
+      const response = await this.client.post<BatchInterpolationResponse>(
+        '/items/batch/interpolate',
+        {
+          items: requests.map(r => ({ aoid: r.aoid, target_ql: r.targetQl }))
+        }
+      );
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error);
     }
   }
 

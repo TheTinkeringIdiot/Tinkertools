@@ -10,8 +10,10 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, func, desc, asc
+from pydantic import BaseModel, Field
 import math
 import logging
+import time
 
 from app.core.database import get_db
 from app.services.perk_service import PerkService
@@ -25,6 +27,22 @@ from app.core.decorators import cached_response, performance_monitor
 
 router = APIRouter(prefix="/perks", tags=["perks"])
 logger = logging.getLogger(__name__)
+
+
+# Batch lookup schemas
+class BatchPerkLookupRequest(BaseModel):
+    aoids: List[int] = Field(..., max_length=100, description="List of perk AOIDs to lookup")
+
+class BatchPerkResult(BaseModel):
+    aoid: int
+    success: bool
+    perk: Optional[dict] = None
+    error: Optional[str] = None
+
+class BatchPerkLookupResponse(BaseModel):
+    success: bool
+    results: List[BatchPerkResult]
+    errors: List[str] = []
 
 
 def get_perk_service(db: Session = Depends(get_db)) -> PerkService:
@@ -658,6 +676,55 @@ def lookup_perk_by_aoid(
 
     logger.info(f"Found perk: {perk_info['name']} (type: {perk_info.get('type', 'SL')}, level: {perk_info.get('counter', 1)})")
     return perk_info
+
+
+@router.post("/batch/lookup", response_model=BatchPerkLookupResponse)
+@performance_monitor
+def batch_lookup_perks(
+    request: BatchPerkLookupRequest,
+    perk_service: PerkService = Depends(get_perk_service)
+):
+    """
+    Look up multiple perks by their AOIDs in a single request.
+    Optimized for profile imports to reduce connection pool usage.
+    Max 100 perks per request.
+    """
+    start_time = time.time()
+    results = []
+    errors = []
+
+    for aoid in request.aoids:
+        try:
+            perk_info = perk_service.get_perk_info_by_aoid(aoid)
+            if perk_info:
+                results.append(BatchPerkResult(
+                    aoid=aoid,
+                    success=True,
+                    perk=perk_info
+                ))
+            else:
+                results.append(BatchPerkResult(
+                    aoid=aoid,
+                    success=False,
+                    error=f"Perk with AOID {aoid} not found"
+                ))
+                errors.append(f"Perk {aoid} not found")
+        except Exception as e:
+            results.append(BatchPerkResult(
+                aoid=aoid,
+                success=False,
+                error=str(e)
+            ))
+            errors.append(f"Perk {aoid}: {str(e)}")
+
+    query_time = time.time() - start_time
+    logger.info(f"Batch perk lookup: {len(request.aoids)} perks, {len(errors)} errors, time={query_time:.3f}s")
+
+    return BatchPerkLookupResponse(
+        success=len(errors) == 0,
+        results=results,
+        errors=errors
+    )
 
 
 @router.get("/{perk_name}/validate")

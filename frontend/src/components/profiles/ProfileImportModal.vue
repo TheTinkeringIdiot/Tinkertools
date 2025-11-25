@@ -180,6 +180,30 @@ Modal for importing profiles from various formats
         </div>
       </div>
 
+      <!-- Import Progress -->
+      <div v-if="importing && importProgress" class="field">
+        <div class="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div class="flex items-center gap-3">
+            <ProgressSpinner style="width: 24px; height: 24px" strokeWidth="4" />
+            <div class="flex-1">
+              <div class="text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
+                {{ importProgress.message }}
+              </div>
+              <ProgressBar
+                v-if="importProgress.total > 1"
+                :value="Math.round((importProgress.current / importProgress.total) * 100)"
+                :showValue="false"
+                style="height: 6px"
+                class="mt-2"
+              />
+              <div v-if="importProgress.total > 1" class="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                {{ importProgress.current }} / {{ importProgress.total }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Import Results -->
       <div v-if="importResult" class="field">
         <div v-if="importResult.success" class="space-y-3">
@@ -371,10 +395,19 @@ import Checkbox from 'primevue/checkbox';
 import Dialog from 'primevue/dialog';
 import FileUpload from 'primevue/fileupload';
 import InputText from 'primevue/inputtext';
+import ProgressBar from 'primevue/progressbar';
+import ProgressSpinner from 'primevue/progressspinner';
 import RadioButton from 'primevue/radiobutton';
 import Textarea from 'primevue/textarea';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import type { ProfileImportResult, BulkImportResult } from '@/lib/tinkerprofiles';
+
+interface ImportProgress {
+  phase: 'parsing' | 'skills' | 'equipment' | 'perks' | 'validation' | 'saving';
+  current: number;
+  total: number;
+  message: string;
+}
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
@@ -399,6 +432,7 @@ const aosetupsUrl = ref('');
 const aosetupsError = ref('');
 const detectedFormat = ref<string | null>(null);
 const importing = ref(false);
+const importProgress = ref<ImportProgress | null>(null);
 const importResult = ref<ProfileImportResult | null>(null);
 const bulkImportResult = ref<BulkImportResult | null>(null);
 const isBulkImport = ref(false);
@@ -551,6 +585,14 @@ async function importProfile() {
   importResult.value = null;
   bulkImportResult.value = null;
 
+  // Show parsing progress
+  importProgress.value = {
+    phase: 'parsing',
+    current: 0,
+    total: 1,
+    message: 'Parsing profile data...'
+  };
+
   try {
     let data: string;
 
@@ -661,6 +703,14 @@ Visit the TinkerProfiles page to create a new profile or use the AOSetups import
         }
       }
 
+      // Show equipment fetch progress
+      importProgress.value = {
+        phase: 'equipment',
+        current: 0,
+        total: 1,
+        message: 'Fetching equipment from database...'
+      };
+
       const result = await profilesStore.importProfile(data);
       importResult.value = result;
 
@@ -755,6 +805,7 @@ Visit the TinkerProfiles page to create a new profile or use the AOSetups import
     }
   } finally {
     importing.value = false;
+    importProgress.value = null;
   }
 }
 
@@ -770,6 +821,7 @@ function resetForm() {
   aosetupsUrl.value = '';
   aosetupsError.value = '';
   detectedFormat.value = null;
+  importProgress.value = null;
   importResult.value = null;
   bulkImportResult.value = null;
   isBulkImport.value = false;

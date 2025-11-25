@@ -209,6 +209,46 @@ export interface InterpolationInfo {
   ql_range: number;
 }
 
+export interface BatchInterpolateItemRequest {
+  aoid: number;
+  target_ql: number;
+}
+
+export interface BatchInterpolationRequest {
+  items: BatchInterpolateItemRequest[];
+}
+
+export interface BatchInterpolateItemResult {
+  aoid: number;
+  target_ql: number;
+  success: boolean;
+  item: InterpolatedItem | null;
+  error: string | null;
+}
+
+export interface BatchInterpolationResponse {
+  success: boolean;
+  results: BatchInterpolateItemResult[];
+  errors: string[];
+}
+
+export interface BatchPerkLookupRequest {
+  aoids: number[];
+}
+
+export interface BatchPerkResult {
+  aoid: number;
+  success: boolean;
+  perk: any | null;
+  error: string | null;
+}
+
+export interface BatchPerkLookupResponse {
+  success: boolean;
+  results: BatchPerkResult[];
+  errors: string[];
+}
+
 export interface SymbiantItem {
   id: number;
   aoid: number;

@@ -12,11 +12,14 @@ import logging
 
 from app.core.database import get_db
 from app.models import (
-    Item, ItemStats, StatValue, AttackDefense, AttackDefenseAttack, AttackDefenseDefense, 
+    Item, ItemStats, StatValue, AttackDefense, AttackDefenseAttack, AttackDefenseDefense,
     ItemSpellData, SpellData, Action, ActionCriteria, Criterion, Spell, SpellCriterion,
     SpellDataSpells, Source, SourceType, ItemSource
 )
-from app.models.interpolated_item import InterpolatedItem, InterpolationRequest, InterpolationResponse
+from app.models.interpolated_item import (
+    InterpolatedItem, InterpolationRequest, InterpolationResponse,
+    BatchInterpolationRequest, BatchInterpolationResponse, BatchItemResult
+)
 from app.services.interpolation import InterpolationService
 from app.api.schemas import (
     ItemResponse, 
@@ -1272,6 +1275,86 @@ def interpolate_item(
             success=False,
             error=f"Failed to interpolate item: {str(e)}"
         )
+
+
+@router.post("/batch/interpolate", response_model=BatchInterpolationResponse)
+@performance_monitor
+def batch_interpolate_items(
+    request: BatchInterpolationRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Batch interpolate multiple items to specific quality levels.
+
+    Accepts up to 100 items in a single request. Returns partial success
+    (some items can fail while others succeed).
+
+    Performance: Uses a single InterpolationService instance (single DB session)
+    for all items to minimize database connection overhead.
+    """
+    start_time = time.time()
+
+    # Create single interpolation service for all items
+    interpolation_service = InterpolationService(db)
+
+    results = []
+    errors = []
+
+    for item_req in request.items:
+        try:
+            # Perform interpolation
+            interpolated_item = interpolation_service.interpolate_item(
+                item_req.aoid,
+                item_req.target_ql
+            )
+
+            if not interpolated_item:
+                # Item not found
+                error_msg = f"Item with AOID {item_req.aoid} not found"
+                errors.append(error_msg)
+                results.append(BatchItemResult(
+                    aoid=item_req.aoid,
+                    target_ql=item_req.target_ql,
+                    success=False,
+                    error=error_msg
+                ))
+            else:
+                # Success
+                results.append(BatchItemResult(
+                    aoid=item_req.aoid,
+                    target_ql=item_req.target_ql,
+                    success=True,
+                    item=interpolated_item
+                ))
+
+        except Exception as e:
+            # Unexpected error for this item
+            error_msg = f"Failed to interpolate item {item_req.aoid}: {str(e)}"
+            logger.error(error_msg)
+            errors.append(error_msg)
+            results.append(BatchItemResult(
+                aoid=item_req.aoid,
+                target_ql=item_req.target_ql,
+                success=False,
+                error=str(e)
+            ))
+
+    # Calculate success rate
+    success_count = sum(1 for r in results if r.success)
+    total_count = len(request.items)
+
+    # Log performance metrics
+    query_time = time.time() - start_time
+    logger.info(
+        f"Batch interpolation: {total_count} items, {success_count} succeeded, "
+        f"{len(errors)} errors, time={query_time:.3f}s"
+    )
+
+    return BatchInterpolationResponse(
+        success=len(errors) == 0,  # Overall success if no errors
+        results=results,
+        errors=errors
+    )
 
 
 @router.get("/{aoid}/interpolation-info")

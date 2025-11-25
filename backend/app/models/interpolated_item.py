@@ -167,3 +167,38 @@ class InterpolationResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ItemInterpolationRequest(BaseModel):
+    """
+    Single item interpolation request for batch operations.
+    """
+    aoid: int = Field(..., description="Anarchy Online ID of the item")
+    target_ql: int = Field(default=1, ge=1, le=500, description="Target quality level")
+
+
+class BatchInterpolationRequest(BaseModel):
+    """
+    Request model for batch item interpolation.
+    """
+    items: List[ItemInterpolationRequest] = Field(..., max_length=100, description="List of items to interpolate (max 100)")
+
+
+class BatchItemResult(BaseModel):
+    """
+    Result for a single item in a batch interpolation request.
+    """
+    aoid: int
+    target_ql: int
+    success: bool
+    item: Optional[InterpolatedItem] = None
+    error: Optional[str] = None
+
+
+class BatchInterpolationResponse(BaseModel):
+    """
+    Response model for batch item interpolation.
+    """
+    success: bool
+    results: List[BatchItemResult] = Field(default_factory=list)
+    errors: List[str] = Field(default_factory=list)
