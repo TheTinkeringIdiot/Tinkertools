@@ -16,6 +16,7 @@ import type {
   PerImplantRequirement,
   SymbiantItem,
 } from '../types/api';
+import { isSymbiant } from '../types/api';
 import { apiClient } from '../services/api-client';
 import { useTinkerProfilesStore } from './tinkerProfiles';
 import { useSymbiantsStore } from './symbiants';
@@ -340,7 +341,7 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
           statName: req.statName,
           required: req.required,
           current: req.current,
-          delta: req.required - req.current,
+          delta: req.current !== undefined ? req.required - req.current : undefined,
           sufficient: req.met,
         });
       }
@@ -434,20 +435,26 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
       for (const [slotBitflag, item] of Object.entries(implants)) {
         if (!item) continue;
 
-        // Check for symbiant using type discriminator (ImplantWithClusters has 'type' field)
-        if ('type' in item && item.type === 'symbiant') {
-          // Load as symbiant
+        // Check for symbiant using type guard (checks for family/slot_id properties)
+        // Also check type field for backwards compatibility
+        const isSymbiantItem =
+          isSymbiant(item as unknown as Item | SymbiantItem) ||
+          ('type' in item && item.type === 'symbiant');
+
+        if (isSymbiantItem) {
+          // Load as symbiant - store basic data now, enrich with full item data later
+          const symbiantData = item as unknown as SymbiantItem;
           loadedConfiguration[slotBitflag] = {
             type: 'symbiant',
             slotBitflag,
-            ql: item.ql || 200,
-            symbiant: JSON.parse(JSON.stringify(item)) as SymbiantItem,
+            ql: symbiantData.ql || 200,
+            symbiant: JSON.parse(JSON.stringify(symbiantData)) as SymbiantItem,
             item: null,
             shiny: null,
             bright: null,
             faded: null,
           };
-          console.log(`[TinkerPlants] Slot ${slotBitflag}: loaded symbiant ${item.name}`);
+          console.log(`[TinkerPlants] Slot ${slotBitflag}: loaded symbiant ${symbiantData.name}`);
         } else {
           // Load as implant (existing cluster parsing logic)
           const clusters = parseImplantClusters(item);
@@ -996,10 +1003,10 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
   function calculateRequirements(): void {
     const profilesStore = useTinkerProfilesStore();
     const profile = profilesStore.activeProfile;
+    const hasProfile = !!profile;
 
-    if (!profile) {
-      console.warn('[TinkerPlants] No active profile for requirement calculation');
-      return;
+    if (!hasProfile) {
+      console.info('[TinkerPlants] No active profile - calculating requirements without comparison');
     }
 
     // Use Map to track max requirement per stat (deduplication)
@@ -1058,7 +1065,9 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
           for (const req of actionRequirements) {
             const statId = req.stat;
             const requiredValue = req.exactValue || req.minValue || 0;
-            const currentValue = profile.skills?.[statId]?.total || 0;
+            const currentValue = hasProfile
+              ? (profile?.skills?.[statId]?.total || 0)
+              : undefined;
 
             // Track max Treatment requirement (stat 124)
             if (statId === 124 && requiredValue > maxTreatmentRequired) {
@@ -1070,7 +1079,7 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
               statName: req.statName,
               required: requiredValue,
               current: currentValue,
-              met: currentValue >= requiredValue,
+              met: currentValue !== undefined ? currentValue >= requiredValue : undefined,
             };
 
             // Add to this slot's requirement list
@@ -1090,15 +1099,23 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
     }
 
     // Calculate Treatment info
-    const profileTreatment = profile.skills?.[124]?.total || 0;
-    const delta = maxTreatmentRequired - profileTreatment;
-
-    treatmentInfo.value = {
-      required: maxTreatmentRequired,
-      current: profileTreatment,
-      delta: delta > 0 ? delta : 0,
-      sufficient: profileTreatment >= maxTreatmentRequired,
-    };
+    if (hasProfile) {
+      const profileTreatment = profile?.skills?.[124]?.total || 0;
+      const delta = maxTreatmentRequired - profileTreatment;
+      treatmentInfo.value = {
+        required: maxTreatmentRequired,
+        current: profileTreatment,
+        delta: delta > 0 ? delta : 0,
+        sufficient: profileTreatment >= maxTreatmentRequired,
+      };
+    } else {
+      treatmentInfo.value = {
+        required: maxTreatmentRequired,
+        current: undefined,
+        delta: undefined,
+        sufficient: undefined,
+      };
+    }
 
     // Convert Map to array
     calculatedRequirements.value = Array.from(maxRequirements.values());
@@ -1120,7 +1137,7 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
       '[TinkerPlants] Treatment required:',
       maxTreatmentRequired,
       'current:',
-      profileTreatment
+      treatmentInfo.value.current
     );
   }
 
@@ -1173,9 +1190,9 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
     perImplantRequirements.value = {};
     treatmentInfo.value = {
       required: 0,
-      current: 0,
-      delta: 0,
-      sufficient: false,
+      current: undefined,
+      delta: undefined,
+      sufficient: undefined,
     };
     lookupCache.value.clear();
     debouncedLookups.value.clear();

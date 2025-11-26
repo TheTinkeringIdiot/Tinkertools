@@ -1,7 +1,7 @@
 # TinkerPlants - Implant and Symbiant Planning System
 
 ## Overview
-TinkerPlants is a comprehensive implant and symbiant planning tool that enables users to design, optimize, and manage equipment configurations for their Anarchy Online characters. The system supports both custom implants (with cluster selection) and fixed symbiants in a unified interface, integrating with TinkerProfiles to provide real-time requirement checking, treatment calculations, and bonus aggregation across a character's complete equipment setup.
+TinkerPlants is a comprehensive implant and symbiant planning tool that enables users to design, optimize, and manage equipment configurations for their Anarchy Online characters. The system supports both custom implants (with cluster selection) and fixed symbiants in a unified interface. As of November 2025, TinkerPlants operates in **hybrid mode**: it works standalone without a profile (showing raw requirements) or integrates with TinkerProfiles when a profile is selected (showing comparison and met/unmet status), providing flexible planning for both character-specific and theoretical builds.
 
 ## User Perspective
 Users can configure implants and symbiants across 13 body slots (Eye, Head, Ear, Right Arm, Chest, Left Arm, Right Wrist, Waist, Left Wrist, Right Hand, Leg, Left Hand, Feet). Each slot can be configured as either a custom implant (with cluster selections) or a fixed symbiant. The interface is organized into five dedicated tabs:
@@ -17,6 +17,8 @@ Users can configure implants and symbiants across 13 body slots (Eye, Head, Ear,
 
 **Requirements Tab** (Validation):
 - View total attribute requirements (Treatment, Strength, etc.) with color-coded met/unmet status
+- **Profile selected**: Green (met), red (unmet), shows current vs required values
+- **No profile**: Neutral gray, shows requirements only without comparison
 - Inspect per-implant requirement breakdowns showing which implants need which stats
 - Review build requirements (Nano Programming, Jobe combining skills)
 - All requirements automatically recalculated after configuration changes
@@ -43,11 +45,12 @@ Users can configure implants and symbiants across 13 body slots (Eye, Head, Ear,
 The system automatically:
 - Looks up matching implants from the database based on cluster selections
 - Recalculates bonuses and requirements immediately after any state change (no manual refresh needed)
-- Validates equipment requirements (Treatment, Attributes) against the active profile
+- Validates equipment requirements (Treatment, Attributes) against the active profile **if selected**
+- Shows raw requirement values when no profile is active (enables theoretical planning)
 - Computes build requirements (Nano Programming, Jobe combining skills)
-- Tracks Treatment requirements and displays surplus/deficit relative to character skills
+- Tracks Treatment requirements and displays surplus/deficit relative to character skills (when profile selected)
 - Provides cluster search functionality to identify which slots support specific skills
-- Saves implant configurations to profiles for persistent storage
+- Saves implant configurations to profiles for persistent storage (requires active profile)
 
 ## Data Flow
 
@@ -207,6 +210,137 @@ profile.Symbiants = {
 ```
 
 ### Recent Improvements (November 2025)
+
+#### Profile Decoupling - Hybrid Mode (November 26, 2025)
+**Problem**: TinkerPlants required an active profile to function, blocking users from theoretical planning or exploring implant configurations without character-specific data. Requirements tab would fail or show errors when no profile was selected.
+
+**Solution**: Decoupled profile dependency to enable **hybrid mode** operation:
+- **No profile selected**: Shows raw requirement values without comparison (neutral gray styling)
+- **Profile selected**: Shows full comparison with current vs required values (green/red met/unmet status)
+- System gracefully transitions between states as profiles are selected/deselected
+
+**User Experience Changes**:
+1. **Requirements Tab** - Three-state rendering:
+   - Green tags/borders: Requirement met (current >= required)
+   - Red tags/borders: Requirement unmet (current < required, shows +delta needed)
+   - Neutral gray tags/borders: No profile, shows requirement value only
+
+2. **Treatment Display** - Conditional comparison section:
+   - Profile selected: Shows "Required | Your Treatment | Need/Surplus" with color-coded tags
+   - No profile: Shows "Required | (Select a profile to compare)" message
+
+3. **Per-Implant Requirements** - Three icon states:
+   - ✓ Check icon (green): Requirement met
+   - ⚠ Warning triangle (red): Requirement unmet with +delta
+   - ℹ Info circle (gray): No profile, requirement value only
+
+4. **Profile Transitions** - Automatic state updates:
+   - Profile selected → profile loaded → requirements recalculated with comparison
+   - Profile deselected → implants cleared → UI reset to defaults → neutral requirement display
+   - Profile switched → new profile loaded → requirements updated with new comparison
+
+**Implementation Details**:
+
+**Type System Changes** (`frontend/src/types/api.ts`):
+- `ImplantRequirement.current`: `number` → `number | undefined`
+- `ImplantRequirement.met`: `boolean` → `boolean | undefined`
+- `TreatmentInfo.current`: `number` → `number | undefined`
+- `TreatmentInfo.delta`: `number` → `number | undefined`
+- `TreatmentInfo.sufficient`: `boolean` → `boolean | undefined`
+- `AttributeRequirementInfo.current`: `number` → `number | undefined`
+- `AttributeRequirementInfo.delta`: `number` → `number | undefined`
+- `AttributeRequirementInfo.sufficient`: `boolean` → `boolean | undefined`
+
+**Store Changes** (`frontend/src/stores/tinkerPlants.ts`):
+- `calculateRequirements()`: Removed blocking early return when no profile
+- Added `hasProfile` flag to conditionally populate comparison fields
+- Profile comparison fields set to `undefined` when `hasProfile = false`
+- Improved symbiant detection with `isSymbiant()` type guard for reliability
+- `reset()`: Updated to use `undefined` for comparison fields (not 0/false)
+- Treatment calculation: Conditional branch for profile vs no-profile scenarios
+
+**View Changes** (`frontend/src/views/TinkerPlants.vue`):
+- Added `resetLocalImplantState()`: Clears all slot selections and resets to Implant mode
+- Profile watcher handles all transition scenarios:
+  - No profile → profile: Load and sync
+  - Profile → profile: Reload and sync
+  - Profile → no profile: Reset and clear
+- Fixed `hasAnySymbiants` computed to check `slotType` values (prevents all-symbiant bug)
+- `showResults` now checks both `hasAnyImplants` and `hasAnySymbiants`
+
+**Component Changes**:
+
+1. **AttributeRequirementsDisplay.vue**:
+   - Three-state styling using strict equality checks (`=== true`, `=== false`, else neutral)
+   - Conditional rendering: Shows "Current: X" when defined, "(No profile)" when undefined
+   - Tag states: Success (met), Danger (unmet), Secondary (no profile)
+   - Border colors: Green (met), Red (unmet), Surface (neutral)
+
+2. **PerImplantRequirements.vue**:
+   - Three-state Tag rendering with conditional icons
+   - `req.met === true`: Check icon + "Stat: Value"
+   - `req.met === false`: Warning icon + "Stat: Value (Need +delta)"
+   - `req.met === undefined`: Info icon + "Stat: Value"
+   - Border colors match AttributeRequirementsDisplay (green/red/gray)
+
+3. **TreatmentDisplay.vue**:
+   - Conditional profile comparison section using `v-if="profileTreatment !== undefined"`
+   - Shows full three-column layout when profile exists
+   - Shows minimal layout with message when no profile
+   - `formatValue()`: Returns "N/A" for undefined values
+   - `deltaText`, `needLabel`, `tagSeverity`, `tagIcon`: Handle undefined gracefully
+   - Accessibility label includes no-profile scenario
+   - Border colors: Neutral (no profile), Green (sufficient), Red (insufficient)
+
+**Data Flow**:
+1. **No profile scenario**:
+   - `hasProfile = false` in `calculateRequirements()`
+   - `current`, `met`, `delta`, `sufficient` set to `undefined`
+   - Components render neutral state (gray, info icons, "No profile" text)
+
+2. **Profile selected**:
+   - `hasProfile = true` in `calculateRequirements()`
+   - `current = profile.skills[statId].total || 0`
+   - `met = current >= required`
+   - `delta = required - current`
+   - `sufficient = current >= required`
+   - Components render comparison state (green/red, check/warning icons, delta values)
+
+3. **Profile deselected**:
+   - View watcher detects `newProfile === null`
+   - Calls `tinkerPlantsStore.reset()` to clear configuration
+   - Calls `resetLocalImplantState()` to reset UI
+   - Store recalculates with `hasProfile = false`
+   - Components transition to neutral state
+
+**Benefits**:
+- Users can explore implant configurations without creating a profile
+- Theoretical planning enabled (e.g., "What QL can I build at 1000 Treatment?")
+- Cleaner error handling (no blocking errors when profile missing)
+- More predictable UX with explicit visual states
+- Maintains full functionality when profile is selected
+- Graceful degradation instead of hard failure
+
+**Edge Cases Handled**:
+- All-symbiant configurations: `hasAnySymbiants` computed prevents empty results bug
+- Switching between profiles: Proper cleanup and reload of data
+- Deselecting profile: Full reset to defaults (Implant mode, no selections)
+- Undefined skill values: Defaults to 0 for comparison when profile exists but skill missing
+- Type guards: `isSymbiant()` checks for family/slot_id properties for robust detection
+
+**Files Modified**:
+- `frontend/src/types/api.ts` - Made comparison fields optional (+15 lines)
+- `frontend/src/stores/tinkerPlants.ts` - Profile-optional calculation logic (+40 lines)
+- `frontend/src/views/TinkerPlants.vue` - Profile transition handling (+30 lines)
+- `frontend/src/components/plants/AttributeRequirementsDisplay.vue` - Three-state rendering (+10 lines)
+- `frontend/src/components/plants/PerImplantRequirements.vue` - Three-state tags (+20 lines)
+- `frontend/src/components/plants/TreatmentDisplay.vue` - Conditional comparison (+40 lines)
+
+**Future Considerations**:
+- Could add "Import from profile" button when no profile selected
+- Could show comparison against multiple profiles (side-by-side)
+- Could persist last viewed configuration independent of profile
+- Could add "Create profile from build" workflow
 
 #### Symbiant Integration (November 21, 2025)
 **Problem**: Users could not plan symbiant equipment alongside traditional implants, requiring separate tracking and manual comparison of stat bonuses and requirements.

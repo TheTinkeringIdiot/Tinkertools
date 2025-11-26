@@ -555,6 +555,22 @@ implantSlots.value.forEach((slot) => {
   slotType[slot.id] = 'Implant';
 });
 
+/**
+ * Reset all local implant selections and slot types to defaults
+ * Called when profile is deselected to clear the UI
+ */
+const resetLocalImplantState = () => {
+  implantSlots.value.forEach((slot) => {
+    implantSelections[slot.id] = {
+      shiny: null,
+      bright: null,
+      faded: null,
+      ql: qualityLevel.value,
+    };
+    slotType[slot.id] = 'Implant';
+  });
+};
+
 // Helper function to get slot-specific skill options from IMP_SKILLS
 const getSkillOptions = (slotName: string, clusterType: 'shiny' | 'bright' | 'faded') => {
   // Get the mapping info for this slot
@@ -594,8 +610,13 @@ const hasAnyImplants = computed(() => {
   );
 });
 
-// Show results automatically when there are configured implants
-const showResults = computed(() => hasAnyImplants.value);
+// Check for any symbiants (slotType === 'Symbiant')
+const hasAnySymbiants = computed(() => {
+  return Object.values(slotType).some((type) => type === 'Symbiant');
+});
+
+// Show results automatically when there are configured implants OR symbiants
+const showResults = computed(() => hasAnyImplants.value || hasAnySymbiants.value);
 
 const calculatedBonuses = computed(() => {
   // Get bonuses from store calculation
@@ -1098,21 +1119,30 @@ onMounted(async () => {
   }
 });
 
-// Watch for active profile changes and reload implant data
+// Watch for active profile changes and update tabs appropriately
 watch(
   () => tinkerProfilesStore.activeProfile,
   async (newProfile, oldProfile) => {
-    // Only reload if profile actually changed (not just a reference update)
+    // Only process if profile actually changed (not just a reference update)
     if (newProfile?.id !== oldProfile?.id) {
-      setLoading(true, 'Loading implant configuration...');
+      setLoading(true);
 
       try {
-        await tinkerPlantsStore.loadFromProfile();
-        syncImplantSelectionsFromStore();
-        announce('Implant configuration loaded for ' + (newProfile?.Character.Name || 'profile'));
+        if (newProfile) {
+          // Profile selected (from no profile or switching profiles):
+          // Load profile's implant data and recalculate with comparison
+          await tinkerPlantsStore.loadFromProfile();
+          syncImplantSelectionsFromStore();
+          announce('Implant configuration loaded for ' + newProfile.Character.Name);
+        } else {
+          // Profile deselected: clear implants and reset to defaults
+          tinkerPlantsStore.reset();
+          resetLocalImplantState();
+          announce('Profile deselected - implants cleared');
+        }
       } catch (error) {
-        console.error('Failed to reload implant data:', error);
-        announce('Failed to reload implant data', 'assertive');
+        console.error('Failed to update implant data:', error);
+        announce('Failed to update implant data', 'assertive');
       } finally {
         setLoading(false);
       }

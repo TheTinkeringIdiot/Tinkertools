@@ -29,18 +29,27 @@ Shows individual requirements for each configured implant slot with met/unmet st
                   :key="req.stat"
                   :class="[
                     'text-xs',
-                    req.met
+                    req.met === true
                       ? 'border-green-500 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 text-green-700 dark:text-green-300'
-                      : 'border-red-500 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 text-red-700 dark:text-red-300',
+                      : req.met === false
+                        ? 'border-red-500 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 text-red-700 dark:text-red-300'
+                        : 'border-surface-400 bg-gradient-to-r from-surface-50 to-surface-100 dark:from-surface-800 dark:to-surface-700 text-surface-700 dark:text-surface-300',
                   ]"
                 >
-                  <template v-if="req.met">
+                  <!-- Met -->
+                  <template v-if="req.met === true">
                     <i class="pi pi-check mr-1" aria-hidden="true"></i>
                     {{ req.statName }}: {{ req.required }}
                   </template>
-                  <template v-else>
+                  <!-- Unmet -->
+                  <template v-else-if="req.met === false">
                     <i class="pi pi-exclamation-triangle mr-1" aria-hidden="true"></i>
-                    {{ req.statName }}: {{ req.required }} (Need +{{ req.required - req.current }})
+                    {{ req.statName }}: {{ req.required }} (Need +{{ req.required - req.current! }})
+                  </template>
+                  <!-- No profile - just show requirement -->
+                  <template v-else>
+                    <i class="pi pi-info-circle mr-1" aria-hidden="true"></i>
+                    {{ req.statName }}: {{ req.required }}
                   </template>
                 </Tag>
               </div>
@@ -65,18 +74,27 @@ Shows individual requirements for each configured implant slot with met/unmet st
               :key="req.stat"
               :class="[
                 'text-xs',
-                req.met
+                req.met === true
                   ? 'border-green-500 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 text-green-700 dark:text-green-300'
-                  : 'border-red-500 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 text-red-700 dark:text-red-300',
+                  : req.met === false
+                    ? 'border-red-500 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 text-red-700 dark:text-red-300'
+                    : 'border-surface-400 bg-gradient-to-r from-surface-50 to-surface-100 dark:from-surface-800 dark:to-surface-700 text-surface-700 dark:text-surface-300',
               ]"
             >
-              <template v-if="req.met">
+              <!-- Met -->
+              <template v-if="req.met === true">
                 <i class="pi pi-check mr-1" aria-hidden="true"></i>
                 {{ req.statName }}: {{ req.required }}
               </template>
-              <template v-else>
+              <!-- Unmet -->
+              <template v-else-if="req.met === false">
                 <i class="pi pi-exclamation-triangle mr-1" aria-hidden="true"></i>
-                {{ req.statName }}: {{ req.required }} (Need +{{ req.required - req.current }})
+                {{ req.statName }}: {{ req.required }} (Need +{{ req.required - req.current! }})
+              </template>
+              <!-- No profile - just show requirement -->
+              <template v-else>
+                <i class="pi pi-info-circle mr-1" aria-hidden="true"></i>
+                {{ req.statName }}: {{ req.required }}
               </template>
             </Tag>
           </div>

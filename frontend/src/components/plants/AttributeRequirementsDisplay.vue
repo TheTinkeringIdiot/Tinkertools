@@ -6,9 +6,11 @@
       :key="req.stat"
       :class="[
         'flex items-center justify-between p-4 rounded-lg border-2',
-        req.sufficient
+        req.sufficient === true
           ? 'border-green-500 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-950 dark:to-green-900'
-          : 'border-red-500 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-950 dark:to-red-900',
+          : req.sufficient === false
+            ? 'border-red-500 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-950 dark:to-red-900'
+            : 'border-surface-300 bg-gradient-to-r from-surface-50 to-surface-100 dark:from-surface-800 dark:to-surface-700 dark:border-surface-600',
       ]"
     >
       <!-- Left: Stat name and values -->
@@ -23,19 +25,23 @@
               {{ req.required.toLocaleString() }}
             </span>
           </div>
-          <div>
+          <div v-if="req.current !== undefined">
             <span class="text-xs text-surface-500 dark:text-surface-400">Current:</span>
             <span class="text-surface-900 dark:text-surface-50 font-bold text-lg font-mono ml-1">
               {{ req.current.toLocaleString() }}
             </span>
+          </div>
+          <div v-else>
+            <span class="text-xs italic text-surface-500">(No profile)</span>
           </div>
         </div>
       </div>
 
       <!-- Right: Status tag -->
       <div>
-        <Tag v-if="req.sufficient" severity="success" :value="`✓ Met`" rounded />
-        <Tag v-else severity="danger" :value="`Need +${req.delta.toLocaleString()}`" rounded />
+        <Tag v-if="req.sufficient === true" severity="success" :value="`✓ Met`" rounded />
+        <Tag v-else-if="req.sufficient === false" severity="danger" :value="`Need +${req.delta!.toLocaleString()}`" rounded />
+        <Tag v-else severity="secondary" value="Required" rounded />
       </div>
     </div>
 

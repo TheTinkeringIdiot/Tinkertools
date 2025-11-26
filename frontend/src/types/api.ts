@@ -680,22 +680,22 @@ export interface ImplantRequirement {
   statName: string;
   /** Required value for this stat */
   required: number;
-  /** Current profile value for this stat */
-  current: number;
-  /** Whether requirement is met */
-  met: boolean;
+  /** Current profile value for this stat (undefined when no profile selected) */
+  current: number | undefined;
+  /** Whether requirement is met (undefined when no profile selected) */
+  met: boolean | undefined;
 }
 
 /** Treatment requirement information */
 export interface TreatmentInfo {
   /** Treatment value required by implant configuration */
   required: number;
-  /** Current Treatment value from profile */
-  current: number;
-  /** Delta between required and current (positive = need more) */
-  delta: number;
-  /** Whether profile treatment meets requirement */
-  sufficient: boolean;
+  /** Current Treatment value from profile (undefined when no profile selected) */
+  current: number | undefined;
+  /** Delta between required and current (undefined when no profile selected) */
+  delta: number | undefined;
+  /** Whether profile treatment meets requirement (undefined when no profile selected) */
+  sufficient: boolean | undefined;
 }
 
 /** Attribute requirement information for display in Requirements tab */
@@ -706,12 +706,12 @@ export interface AttributeRequirementInfo {
   statName: string;
   /** Maximum required value for this stat */
   required: number;
-  /** Current profile value for this stat */
-  current: number;
-  /** Difference (positive = need more, negative = surplus) */
-  delta: number;
-  /** Whether current meets requirement */
-  sufficient: boolean;
+  /** Current profile value for this stat (undefined when no profile selected) */
+  current: number | undefined;
+  /** Difference (undefined when no profile selected) */
+  delta: number | undefined;
+  /** Whether current meets requirement (undefined when no profile selected) */
+  sufficient: boolean | undefined;
 }
 
 /** Per-implant requirements grouped by slot */
