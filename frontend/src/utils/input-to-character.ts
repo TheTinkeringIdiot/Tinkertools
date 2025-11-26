@@ -9,6 +9,7 @@ import type { NukeInputState } from '@/types/offensive-nano';
 import type { Character } from './stat-calculations';
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import { mapProfileToStats } from './profile-stats-mapper';
+import { specializationLevelToBitflag } from './expansion-utils';
 
 /**
  * Converts NukeInputState manual inputs to Character interface
@@ -67,7 +68,7 @@ export function convertInputStateToCharacter(
     54: profileStats[54] ?? characterStats.level ?? 1, // Level
     60: profileStats[60] ?? 11, // Profession (Nanotechnician default)
     368: profileStats[368] ?? 11, // VisualProfession (Nanotechnician default)
-    182: profileStats[182] ?? 0, // Specialization
+    182: profileStats[182] ?? specializationLevelToBitflag(characterStats.spec ?? 0), // Specialization
     355: profileStats[355] ?? 0, // WornItem equipment flags
     389: profileStats[389] ?? 0, // Expansion
   };

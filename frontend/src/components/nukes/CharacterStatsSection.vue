@@ -43,6 +43,23 @@
         />
       </div>
 
+      <!-- Specialization -->
+      <div class="flex flex-col">
+        <label for="spec" class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
+          Specialization
+        </label>
+        <Dropdown
+          id="spec"
+          v-model="localStats.spec"
+          :options="specOptions"
+          option-label="name"
+          option-value="id"
+          placeholder="Select spec"
+          class="w-full"
+          @change="onFieldChange"
+        />
+      </div>
+
       <!-- Psychic (Ability) -->
       <div class="flex flex-col">
         <label
@@ -260,6 +277,7 @@ const emit = defineEmits<{
 const localStats = ref<CharacterStats>({
   ...props.characterStats,
   level: props.characterStats.level ?? props.profile?.Character?.Level ?? 1,
+  spec: props.characterStats.spec ?? props.profile?.Character?.Specialization ?? 0,
 });
 
 // Programmatic update flag to prevent watcher loops
@@ -271,6 +289,15 @@ const breedOptions = [
   { id: 2, name: 'Opifex' },
   { id: 3, name: 'Nanomage' },
   { id: 4, name: 'Atrox' },
+];
+
+// Specialization options for dropdown (0-4)
+const specOptions = [
+  { id: 0, name: 'None' },
+  { id: 1, name: 'Spec 1' },
+  { id: 2, name: 'Spec 2' },
+  { id: 3, name: 'Spec 3' },
+  { id: 4, name: 'Spec 4' },
 ];
 
 // Skill ID mappings
@@ -487,6 +514,22 @@ watch(
     if (newValue !== undefined && !isProgrammaticUpdate.value) {
       isProgrammaticUpdate.value = true;
       localStats.value.level = newValue;
+      setTimeout(() => {
+        isProgrammaticUpdate.value = false;
+        emit('update:characterStats', { ...localStats.value });
+      }, 10);
+    }
+  },
+  { immediate: true }
+);
+
+// Watch Specialization
+watch(
+  () => props.profile?.Character?.Specialization,
+  (newValue) => {
+    if (newValue !== undefined && !isProgrammaticUpdate.value) {
+      isProgrammaticUpdate.value = true;
+      localStats.value.spec = newValue;
       setTimeout(() => {
         isProgrammaticUpdate.value = false;
         emit('update:characterStats', { ...localStats.value });
