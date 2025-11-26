@@ -273,47 +273,66 @@ export class ProfileTransformer {
       const legacyPerks = [];
 
       if (perkAoids.length > 0) {
+        // Chunk perk AOIDs into batches of 100 (backend limit)
+        const BATCH_SIZE = 100;
+        const chunks: number[][] = [];
+        for (let i = 0; i < perkAoids.length; i += BATCH_SIZE) {
+          chunks.push(perkAoids.slice(i, i + BATCH_SIZE));
+        }
+
+        console.log(
+          `[ProfileTransformer] Splitting ${perkAoids.length} perks into ${chunks.length} batch(es)`
+        );
+
         try {
-          const batchResponse = await apiClient.batchLookupPerks(perkAoids);
+          // Process all chunks in parallel
+          const batchResponses = await Promise.all(
+            chunks.map((chunk) => apiClient.batchLookupPerks(chunk))
+          );
 
-          for (const perkResult of batchResponse.results) {
-            if (perkResult.success && perkResult.perk) {
-              const perkDetails = perkResult.perk;
+          // Combine results from all batches
+          for (const batchResponse of batchResponses) {
+            for (const perkResult of batchResponse.results) {
+              if (perkResult.success && perkResult.perk) {
+                const perkDetails = perkResult.perk;
 
-              // Extract base perk name (without level suffix)
-              let baseName = perkDetails.perk_name || perkDetails.name;
-              if (baseName && perkDetails.perk_counter > 1) {
-                // Remove the level suffix if present (e.g., "Perk Name 5" -> "Perk Name")
-                const nameParts = baseName.split(' ');
-                if (
-                  nameParts.length > 1 &&
-                  nameParts[nameParts.length - 1] === perkDetails.perk_counter.toString()
-                ) {
-                  baseName = nameParts.slice(0, -1).join(' ');
+                // Extract base perk name (without level suffix)
+                let baseName = perkDetails.perk_name || perkDetails.name;
+                if (baseName && perkDetails.perk_counter > 1) {
+                  // Remove the level suffix if present (e.g., "Perk Name 5" -> "Perk Name")
+                  const nameParts = baseName.split(' ');
+                  if (
+                    nameParts.length > 1 &&
+                    nameParts[nameParts.length - 1] === perkDetails.perk_counter.toString()
+                  ) {
+                    baseName = nameParts.slice(0, -1).join(' ');
+                  }
                 }
-              }
 
-              legacyPerks.push({
-                aoid: perkResult.aoid,
-                name: baseName,
-                level: perkDetails.perk_counter || perkDetails.counter || 1,
-                type: perkDetails.perk_type || perkDetails.type || 'SL',
-                item: perkDetails,
-              });
+                legacyPerks.push({
+                  aoid: perkResult.aoid,
+                  name: baseName,
+                  level: perkDetails.perk_counter || perkDetails.counter || 1,
+                  type: perkDetails.perk_type || perkDetails.type || 'SL',
+                  item: perkDetails,
+                });
 
-              console.log(
-                `[ProfileTransformer] Fetched perk: ${baseName} (level ${perkDetails.perk_counter || perkDetails.counter}, type: ${perkDetails.perk_type || perkDetails.type})`
-              );
-            } else {
-              // Perk not found - add placeholder
-              legacyPerks.push({
-                aoid: perkResult.aoid,
-                name: `Unknown Perk (${perkResult.aoid})`,
-                level: 1,
-                type: 'SL',
-              });
-              if (perkResult.error) {
-                result.warnings.push(`Could not find perk with AOID ${perkResult.aoid}: ${perkResult.error}`);
+                console.log(
+                  `[ProfileTransformer] Fetched perk: ${baseName} (level ${perkDetails.perk_counter || perkDetails.counter}, type: ${perkDetails.perk_type || perkDetails.type})`
+                );
+              } else {
+                // Perk not found - add placeholder
+                legacyPerks.push({
+                  aoid: perkResult.aoid,
+                  name: `Unknown Perk (${perkResult.aoid})`,
+                  level: 1,
+                  type: 'SL',
+                });
+                if (perkResult.error) {
+                  result.warnings.push(
+                    `Could not find perk with AOID ${perkResult.aoid}: ${perkResult.error}`
+                  );
+                }
               }
             }
           }
