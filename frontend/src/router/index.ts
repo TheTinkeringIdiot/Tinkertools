@@ -29,6 +29,11 @@ const routes: RouteRecordRaw[] = [
     props: true,
   },
   {
+    // Legacy URL redirect: /item/:aoid -> /items/:aoid
+    path: '/item/:aoid',
+    redirect: (to) => ({ path: `/items/${to.params.aoid}` }),
+  },
+  {
     path: '/nanos',
     name: 'TinkerNanos',
     component: () => import('@/views/TinkerNanos.vue'),
