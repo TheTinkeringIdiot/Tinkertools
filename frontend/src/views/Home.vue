@@ -39,7 +39,7 @@ Welcomes users and provides navigation to all six tools with AO-themed descripti
             <div class="text-center">TinkerProfiles</div>
           </template>
           <template #subtitle>
-            <div class="text-center text-surface-600 dark:text-surface-400">Agent Database</div>
+            <div class="text-center text-surface-600 dark:text-surface-400">Character Database</div>
           </template>
           <template #content>
             <p class="text-center text-surface-700 dark:text-surface-300 mb-4">
