@@ -24,6 +24,19 @@
       <span>{{ criterion.displayOperator }}</span>
     </div>
 
+    <!-- Function Operator (CheckNcu, etc.) -->
+    <div v-else-if="criterion.isFunctionOperator" class="function-requirement">
+      <i class="pi pi-bolt mr-1"></i>
+      <span>
+        {{ functionPrefix }}
+        <RouterLink
+          v-if="criterion.referenceAoid"
+          :to="`/items/${criterion.referenceAoid}`"
+          class="function-link"
+        >{{ resolvedName || `Nano ${criterion.referenceAoid}` }}</RouterLink>
+      </span>
+    </div>
+
     <!-- Unknown -->
     <div v-else class="unknown-criterion">
       <span>{{ criterion.description }}</span>
@@ -32,7 +45,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { RouterLink } from 'vue-router';
 import type { DisplayCriterion } from '../services/action-criteria';
 import type { CharacterStats } from '../composables/useActionCriteria';
 import {
@@ -43,6 +57,7 @@ import {
   getFlagNameFromValue,
   getNPCFamilyName,
 } from '../services/game-utils';
+import { useNanoNameResolver } from '../composables/useNanoNameResolver';
 
 // ============================================================================
 // Props
@@ -62,6 +77,48 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 // ============================================================================
+// Function Operator Name Resolution
+// ============================================================================
+
+const { resolveNanoName } = useNanoNameResolver();
+const resolvedName = ref<string | null>(null);
+
+// Async resolve nano name when function operator is detected
+watch(
+  () => props.criterion.referenceAoid,
+  async (aoid) => {
+    if (aoid && props.criterion.isFunctionOperator) {
+      resolvedName.value = await resolveNanoName(aoid);
+    }
+  },
+  { immediate: true }
+);
+
+const functionDescription = computed(() => {
+  if (!props.criterion.isFunctionOperator) return '';
+
+  const name = resolvedName.value || `Nano ${props.criterion.referenceAoid}`;
+
+  switch (props.criterion.functionType) {
+    case 'CheckNcu':
+      return `Not running: ${name}`;
+    default:
+      return props.criterion.description;
+  }
+});
+
+const functionPrefix = computed(() => {
+  if (!props.criterion.isFunctionOperator) return '';
+
+  switch (props.criterion.functionType) {
+    case 'CheckNcu':
+      return 'Not running: ';
+    default:
+      return '';
+  }
+});
+
+// ============================================================================
 // Computed Properties
 // ============================================================================
 
@@ -69,7 +126,8 @@ const isStateRequirement = computed(() => {
   return (
     !props.criterion.isStatRequirement &&
     !props.criterion.isLogicalOperator &&
-    !props.criterion.isSeparator
+    !props.criterion.isSeparator &&
+    !props.criterion.isFunctionOperator
   );
 });
 
@@ -164,6 +222,8 @@ const chipClasses = computed(() => {
     classes.push('stat-requirement-chip');
   } else if (props.criterion.isLogicalOperator) {
     classes.push('logical-operator-chip');
+  } else if (props.criterion.isFunctionOperator) {
+    classes.push('function-requirement-chip');
   } else if (isStateRequirement.value) {
     classes.push('state-requirement-chip');
   }
@@ -304,6 +364,37 @@ const statusClasses = computed(() => {
   }
 }
 
+.function-requirement-chip {
+  background: rgba(234, 179, 8, 0.1);
+  border-color: #ca8a04;
+  color: #fde047;
+}
+
+@media (prefers-color-scheme: light) {
+  .function-requirement-chip {
+    background: rgba(234, 179, 8, 0.1);
+    border-color: #ca8a04;
+    color: #a16207;
+  }
+}
+
+.function-requirement .function-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.function-requirement .function-link:hover {
+  color: #fff;
+  text-decoration-thickness: 2px;
+}
+
+@media (prefers-color-scheme: light) {
+  .function-requirement .function-link:hover {
+    color: #78350f;
+  }
+}
+
 /* Status indicators with improved visibility */
 .status {
   margin-left: 6px;
@@ -343,6 +434,7 @@ const statusClasses = computed(() => {
 .stat-requirement,
 .state-requirement,
 .logical-operator,
+.function-requirement,
 .unknown-criterion {
   display: flex;
   align-items: center;
@@ -350,7 +442,8 @@ const statusClasses = computed(() => {
 }
 
 .state-requirement i,
-.logical-operator i {
+.logical-operator i,
+.function-requirement i {
   opacity: 0.8;
   margin-right: 4px;
 }

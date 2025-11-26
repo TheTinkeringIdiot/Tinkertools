@@ -40,6 +40,10 @@ export interface DisplayCriterion {
   isLogicalOperator: boolean;
   isSeparator: boolean;
   isStatRequirement: boolean;
+  // Function operator fields (CheckNcu, RunningNano, etc.)
+  isFunctionOperator?: boolean;
+  functionType?: string;
+  referenceAoid?: number;
 }
 
 export interface CriteriaExpression {
@@ -178,6 +182,26 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
       isLogicalOperator: false,
       isSeparator: false,
       isStatRequirement: false,
+    };
+  }
+
+  // Handle function operators (CheckNcu, RunningNano, etc.)
+  if (operator === 127) {
+    // CheckNcu - checks if a nano is NOT running
+    return {
+      id,
+      stat,
+      statName: 'NCU Check',
+      displayValue: value, // aoid of nano
+      displayOperator: 'not running',
+      displaySymbol: '∅',
+      description: `Not running: Nano ${value}`, // fallback until async resolved
+      isLogicalOperator: false,
+      isSeparator: false,
+      isStatRequirement: false,
+      isFunctionOperator: true,
+      functionType: 'CheckNcu',
+      referenceAoid: value,
     };
   }
 
@@ -586,7 +610,10 @@ export function buildCriteriaTree(
   const displayCriteria = criteria.map(transformCriterionForDisplay);
 
   // Simple case: only stat requirements (all AND)
-  const statRequirements = displayCriteria.filter((c) => c.isStatRequirement);
+  // Include function operators as they are also requirements (e.g., CheckNcu)
+  const statRequirements = displayCriteria.filter(
+    (c) => c.isStatRequirement || c.isFunctionOperator
+  );
   const logicalOperators = displayCriteria.filter((c) => c.isLogicalOperator);
 
   if (logicalOperators.length === 0) {
@@ -635,7 +662,10 @@ function buildTreeFromRPN(
   characterStats?: Record<number, number>
 ): CriteriaTreeNode | null {
   const stack: CriteriaTreeNode[] = [];
-  const statRequirements = displayCriteria.filter((c) => c.isStatRequirement);
+  // Include function operators as requirements
+  const statRequirements = displayCriteria.filter(
+    (c) => c.isStatRequirement || c.isFunctionOperator
+  );
   const logicalOperators = displayCriteria.filter((c) => c.isLogicalOperator);
 
   // Special case: if all logical operators are AND and we have multiple stat requirements
@@ -645,8 +675,8 @@ function buildTreeFromRPN(
   }
 
   for (const criterion of displayCriteria) {
-    if (criterion.isStatRequirement) {
-      // Push requirement node onto stack
+    if (criterion.isStatRequirement || criterion.isFunctionOperator) {
+      // Push requirement node onto stack (stat requirements and function operators)
       stack.push({
         type: 'requirement',
         criterion,

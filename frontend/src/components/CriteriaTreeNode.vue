@@ -7,7 +7,20 @@
     <div class="tree-content">
       <!-- Requirement Node -->
       <div v-if="node.type === 'requirement' && node.criterion" class="requirement-node">
-        <div class="chip" :class="chipClasses">
+        <!-- Function Operator (CheckNcu, etc.) -->
+        <div v-if="node.criterion.isFunctionOperator" class="chip chip-function">
+          <i class="pi pi-bolt function-icon"></i>
+          <span class="function-description">
+            {{ functionPrefix }}
+            <RouterLink
+              v-if="node.criterion.referenceAoid"
+              :to="`/items/${node.criterion.referenceAoid}`"
+              class="function-link"
+            >{{ resolvedName || `Nano ${node.criterion.referenceAoid}` }}</RouterLink>
+          </span>
+        </div>
+        <!-- Standard Stat Requirement -->
+        <div v-else class="chip" :class="chipClasses">
           <span class="stat-name">{{ node.criterion.statName }}</span>
           <span class="operator">{{ node.criterion.displaySymbol }}</span>
           <span class="value">{{ formattedValue }}</span>
@@ -52,7 +65,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { RouterLink } from 'vue-router';
 import type { CriteriaTreeNode } from '../services/action-criteria';
 import type { CharacterStats } from '../composables/useActionCriteria';
 import {
@@ -63,6 +77,7 @@ import {
   getFlagNameFromValue,
   getNPCFamilyName,
 } from '../services/game-utils';
+import { useNanoNameResolver } from '../composables/useNanoNameResolver';
 
 // ============================================================================
 // Props
@@ -80,6 +95,48 @@ const props = withDefaults(defineProps<Props>(), {
   level: 0,
   showConnector: true,
   showGroupLabel: true,
+});
+
+// ============================================================================
+// Function Operator Name Resolution
+// ============================================================================
+
+const { resolveNanoName } = useNanoNameResolver();
+const resolvedName = ref<string | null>(null);
+
+// Async resolve nano name when function operator is detected
+watch(
+  () => props.node.criterion?.referenceAoid,
+  async (aoid) => {
+    if (aoid && props.node.criterion?.isFunctionOperator) {
+      resolvedName.value = await resolveNanoName(aoid);
+    }
+  },
+  { immediate: true }
+);
+
+const functionDescription = computed(() => {
+  if (!props.node.criterion?.isFunctionOperator) return '';
+
+  const name = resolvedName.value || `Nano ${props.node.criterion.referenceAoid}`;
+
+  switch (props.node.criterion.functionType) {
+    case 'CheckNcu':
+      return `Not running: ${name}`;
+    default:
+      return props.node.criterion.description;
+  }
+});
+
+const functionPrefix = computed(() => {
+  if (!props.node.criterion?.isFunctionOperator) return '';
+
+  switch (props.node.criterion.functionType) {
+    case 'CheckNcu':
+      return 'Not running: ';
+    default:
+      return '';
+  }
 });
 
 // ============================================================================
@@ -275,6 +332,33 @@ const operatorLabel = computed(() => {
   background: #78350f;
   border-color: #f59e0b;
   color: #fcd34d;
+}
+
+.chip-function {
+  background: rgba(234, 179, 8, 0.15);
+  border-color: #ca8a04;
+  color: #fde047;
+}
+
+.chip-function .function-icon {
+  margin-right: 6px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.chip-function .function-description {
+  font-style: italic;
+}
+
+.chip-function .function-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.chip-function .function-link:hover {
+  color: #fff;
+  text-decoration-thickness: 2px;
 }
 
 .chip .stat-name {
