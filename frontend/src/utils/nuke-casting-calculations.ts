@@ -15,6 +15,13 @@
 export type Breed = 1 | 2 | 3 | 4;
 
 /**
+ * Default minimum delay when no explicit cap stat is present.
+ * In Anarchy Online, cast/recharge times have a hard floor of 1.00 second (100cs)
+ * unless overridden by AttackDelayCap (stat 523) or RechargeDelayCap (stat 524).
+ */
+const DEFAULT_DELAY_CAP_CS = 100;
+
+/**
  * Calculate modified cast time based on Nano Init skill
  *
  * Two-tier scaling formula:
@@ -24,21 +31,25 @@ export type Breed = 1 | 2 | 3 | 4;
  * Total reduction = floor(init/2) + floor(max(0, init-1200)/6)
  *
  * Hard minimum (AttackDelayCap):
- * - If stat 523 exists: use its value as minimum
- * - If stat 523 not present: can reduce to 0 (no minimum)
+ * - If stat 523 exists: use its value as minimum (can be < 100cs)
+ * - If stat 523 not present: use default 100cs (1.00 second) minimum
  *
  * @param baseCastTime - Base cast time in centiseconds (from database)
  * @param nanoInit - Character's Nano Init skill value
- * @param attackDelayCap - AttackDelayCap from stat 523, or undefined to allow 0
+ * @param attackDelayCap - AttackDelayCap from stat 523, or undefined for default 1.00s minimum
  * @returns Modified cast time in seconds with 2 decimal precision
  *
  * @example
  * // Nano with 300cs base cast time, 600 init, no cap stat
- * calculateCastTime(300, 600) // Returns 0.00 (300 - 300 = 0cs)
+ * calculateCastTime(300, 600) // Returns 1.00 (300 - 300 = 0cs, clamped to 100cs default)
  *
  * @example
- * // Nano with 1000cs base cast time, 1800 init, 200cs cap
- * calculateCastTime(1000, 1800, 200) // Returns 2.00 (1000 - 1000 = 0cs, clamped to 200cs)
+ * // Nano with 1000cs base cast time, 1800 init, 200cs cap from stat 523
+ * calculateCastTime(1000, 1800, 200) // Returns 2.00 (1000 - 1000 = 0cs, clamped to 200cs cap)
+ *
+ * @example
+ * // Nano with 500cs base cast time, 2000 init, 50cs cap from stat 523
+ * calculateCastTime(500, 2000, 50) // Returns 0.50 (capped at 50cs from stat 523)
  */
 export function calculateCastTime(
   baseCastTime: number,
@@ -53,15 +64,11 @@ export function calculateCastTime(
   // Apply reduction
   const reducedCastTimeCs = baseCastTime - totalReduction;
 
-  // Apply hard minimum if attackDelayCap is provided, otherwise allow 0
-  let modifiedCastTimeCs: number;
-  if (attackDelayCap !== undefined) {
-    // If stat 523 exists, use it as minimum
-    modifiedCastTimeCs = Math.max(attackDelayCap, reducedCastTimeCs);
-  } else {
-    // No cap stat: allow reduction to 0 but not below
-    modifiedCastTimeCs = Math.max(0, reducedCastTimeCs);
-  }
+  // Determine effective cap: use stat 523 if present, otherwise default 100cs (1.00s)
+  const effectiveCap = attackDelayCap !== undefined ? attackDelayCap : DEFAULT_DELAY_CAP_CS;
+
+  // Apply hard minimum
+  const modifiedCastTimeCs = Math.max(effectiveCap, reducedCastTimeCs);
 
   // Convert centiseconds to seconds
   return centisecondsToSeconds(modifiedCastTimeCs);
@@ -75,21 +82,25 @@ export function calculateCastTime(
  * - Above 1200 init: Additional 1:6 ratio ((init-1200)/6 reduction)
  *
  * Hard minimum (RechargeDelayCap):
- * - If stat 524 exists: use its value as minimum
- * - If stat 524 not present: can reduce to 0 (no minimum)
+ * - If stat 524 exists: use its value as minimum (can be < 100cs)
+ * - If stat 524 not present: use default 100cs (1.00 second) minimum
  *
  * @param baseRecharge - Base recharge time in centiseconds (from database)
  * @param nanoInit - Character's Nano Init skill value
- * @param rechargeDelayCap - RechargeDelayCap from stat 524, or undefined to allow 0
+ * @param rechargeDelayCap - RechargeDelayCap from stat 524, or undefined for default 1.00s minimum
  * @returns Modified recharge time in seconds with 2 decimal precision
  *
  * @example
  * // Nano with 500cs base recharge, 1200 init, no cap stat
- * calculateRechargeTime(500, 1200) // Returns 0.00 (500 - 600 = -100cs, clamped to 0)
+ * calculateRechargeTime(500, 1200) // Returns 1.00 (500 - 600 = -100cs, clamped to 100cs default)
  *
  * @example
- * // Nano with 800cs base recharge, 1800 init, 150cs cap
- * calculateRechargeTime(800, 1800, 150) // Returns 1.50 (800 - 1000 = -200cs, clamped to 150cs)
+ * // Nano with 800cs base recharge, 1800 init, 150cs cap from stat 524
+ * calculateRechargeTime(800, 1800, 150) // Returns 1.50 (800 - 1000 = -200cs, clamped to 150cs cap)
+ *
+ * @example
+ * // Nano with 300cs base recharge, 2000 init, 50cs cap from stat 524
+ * calculateRechargeTime(300, 2000, 50) // Returns 0.50 (capped at 50cs from stat 524)
  */
 export function calculateRechargeTime(
   baseRecharge: number,
@@ -104,15 +115,11 @@ export function calculateRechargeTime(
   // Apply reduction
   const reducedRechargeCs = baseRecharge - totalReduction;
 
-  // Apply hard minimum if rechargeDelayCap is provided, otherwise allow 0
-  let modifiedRechargeCs: number;
-  if (rechargeDelayCap !== undefined) {
-    // If stat 524 exists, use it as minimum
-    modifiedRechargeCs = Math.max(rechargeDelayCap, reducedRechargeCs);
-  } else {
-    // No cap stat: allow reduction to 0 but not below
-    modifiedRechargeCs = Math.max(0, reducedRechargeCs);
-  }
+  // Determine effective cap: use stat 524 if present, otherwise default 100cs (1.00s)
+  const effectiveCap = rechargeDelayCap !== undefined ? rechargeDelayCap : DEFAULT_DELAY_CAP_CS;
+
+  // Apply hard minimum
+  const modifiedRechargeCs = Math.max(effectiveCap, reducedRechargeCs);
 
   // Convert centiseconds to seconds
   return centisecondsToSeconds(modifiedRechargeCs);
