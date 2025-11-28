@@ -113,6 +113,7 @@ export const useItemsStore = defineStore('items', () => {
           pagination: {
             page: response.page,
             limit: response.page_size,
+            offset: (response.page - 1) * response.page_size,
             total: response.total,
             hasNext: response.has_next,
             hasPrev: response.has_prev,
