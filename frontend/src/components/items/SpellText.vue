@@ -171,7 +171,7 @@ watch(
   color: #3b82f6;
   text-decoration: none;
   font-weight: 600;
-  border-bottom: 1px solid transparent;
+  border-bottom: 1px solid currentColor;
   transition: all 0.2s ease;
 }
 
