@@ -234,7 +234,7 @@ const emit = defineEmits<{
   'item-click': [item: Item];
   'item-compare': [item: Item];
   'cast-buff': [item: Item];
-  'page-change': [page: number];
+  'page-change': [page: number, limit: number];
   'view-mode-change': [mode: 'grid' | 'list'];
 }>();
 
@@ -376,7 +376,8 @@ function shareItem(item: Item) {
 
 function onPageChange(event: any) {
   currentOffset.value = event.first;
-  emit('page-change', Math.floor(event.first / event.rows) + 1);
+  const page = Math.floor(event.first / event.rows) + 1;
+  emit('page-change', page, event.rows);
 }
 
 function getItemIconUrl(item: Item): string | null {

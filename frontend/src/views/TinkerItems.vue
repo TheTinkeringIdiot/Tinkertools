@@ -388,13 +388,14 @@ async function onItemCastBuff(item: Item) {
   }
 }
 
-function onPageChange(page: number) {
-  // Re-run the last advanced search with the new page
+function onPageChange(page: number, limit: number) {
+  // Re-run the last advanced search with the new page and limit
   if (lastAdvancedSearchQuery.value) {
-    // Create updated query with new page number
+    // Create updated query with new page number and limit
     const updatedQuery = {
       ...lastAdvancedSearchQuery.value,
       page: page,
+      limit: limit,
     };
     performAdvancedSearch(updatedQuery);
   }
