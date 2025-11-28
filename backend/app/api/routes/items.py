@@ -109,24 +109,28 @@ def apply_stat_filters(query, stat_filters: str, db: Session):
             elif function == 'modifies':
                 # Look for stat modification spells
                 # Most stat modifications use spell_id 53045 (Modify Stat)
+                # Use .op('->>') for JSON key access (not .astext which fails in filter clauses)
+                stat_accessor = Spell.spell_params.op('->>')('Stat').cast(Integer)
+                amount_accessor = Spell.spell_params.op('->>')('Amount').cast(Integer)
+
                 subquery = db.query(Item.id.distinct())\
                     .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
                     .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
                     .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
                     .join(Spell, SpellDataSpells.spell_id == Spell.id)\
                     .filter(Spell.spell_id == 53045)\
-                    .filter(Spell.spell_params['Stat'].astext.cast(Integer) == stat_id)
+                    .filter(stat_accessor == stat_id)
 
                 # Apply operator to the modification value
                 if operator == '>=':
-                    subquery = subquery.filter(Spell.spell_params['Amount'].astext.cast(Integer) >= value)
+                    subquery = subquery.filter(amount_accessor >= value)
                 elif operator == '<=':
-                    subquery = subquery.filter(Spell.spell_params['Amount'].astext.cast(Integer) <= value)
+                    subquery = subquery.filter(amount_accessor <= value)
                 elif operator == '==':
-                    subquery = subquery.filter(Spell.spell_params['Amount'].astext.cast(Integer) == value)
+                    subquery = subquery.filter(amount_accessor == value)
                 elif operator == '!=':
-                    subquery = subquery.filter(Spell.spell_params['Amount'].astext.cast(Integer) != value)
-                
+                    subquery = subquery.filter(amount_accessor != value)
+
                 query = query.filter(Item.id.in_(subquery))
         
         # Use distinct to avoid duplicates from joins
@@ -537,13 +541,15 @@ def get_items(
             if bonus_stat_ids:
                 # Find items that have "Modify Stat" spells (spell_id 53045) which modify any of the requested stats
                 # The stat ID is stored in the spell_params JSON as the "Stat" field
+                # Use .op('->>') for JSON key access (not .astext which fails in filter clauses)
+                stat_accessor = Spell.spell_params.op('->>')('Stat').cast(Integer)
                 stat_bonus_subquery = db.query(Item.id.distinct())\
                     .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
                     .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
                     .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
                     .join(Spell, SpellDataSpells.spell_id == Spell.id)\
                     .filter(Spell.spell_id == 53045)\
-                    .filter(Spell.spell_params['Stat'].astext.cast(Integer).in_(bonus_stat_ids))
+                    .filter(stat_accessor.in_(bonus_stat_ids))
                 
                 query = query.filter(Item.id.in_(stat_bonus_subquery))
         except ValueError:
@@ -817,13 +823,15 @@ def search_items(
             if bonus_stat_ids:
                 # Find items that have "Modify Stat" spells (spell_id 53045) which modify any of the requested stats
                 # The stat ID is stored in the spell_params JSON as the "Stat" field
+                # Use .op('->>') for JSON key access (not .astext which fails in filter clauses)
+                stat_accessor = Spell.spell_params.op('->>')('Stat').cast(Integer)
                 stat_bonus_subquery = db.query(Item.id.distinct())\
                     .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
                     .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
                     .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
                     .join(Spell, SpellDataSpells.spell_id == Spell.id)\
                     .filter(Spell.spell_id == 53045)\
-                    .filter(Spell.spell_params['Stat'].astext.cast(Integer).in_(bonus_stat_ids))
+                    .filter(stat_accessor.in_(bonus_stat_ids))
                 
                 query = query.filter(Item.id.in_(stat_bonus_subquery))
         except ValueError:
