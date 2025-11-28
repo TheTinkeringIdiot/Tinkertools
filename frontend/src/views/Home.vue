@@ -28,197 +28,41 @@ Welcomes users and provides navigation to all six tools with AO-themed descripti
       </h2>
 
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <!-- TinkerProfiles -->
-        <Card class="tool-card">
-          <template #header>
-            <div class="flex justify-center pt-6">
-              <i class="pi pi-users text-6xl text-primary-500"></i>
-            </div>
-          </template>
-          <template #title>
-            <div class="text-center">TinkerProfiles</div>
-          </template>
-          <template #subtitle>
-            <div class="text-center text-surface-600 dark:text-surface-400">Character Database</div>
-          </template>
-          <template #content>
-            <p class="text-center text-surface-700 dark:text-surface-300 mb-4">
-              Manage character profiles across all dimensions. Create, import, and track your characters
-              with comprehensive stat tracking.
-            </p>
-          </template>
-          <template #footer>
-            <div class="flex justify-center">
-              <Button
-                label="Launch Tool"
-                icon="pi pi-arrow-right"
-                iconPos="right"
-                @click="navigateTo('/profiles')"
-              />
-            </div>
-          </template>
-        </Card>
-
-        <!-- TinkerItems -->
-        <Card class="tool-card">
-          <template #header>
-            <div class="flex justify-center pt-6">
-              <i class="pi pi-database text-6xl text-primary-500"></i>
-            </div>
-          </template>
-          <template #title>
-            <div class="text-center">TinkerItems</div>
-          </template>
-          <template #subtitle>
-            <div class="text-center text-surface-600 dark:text-surface-400">
-              Equipment Archives
-            </div>
-          </template>
-          <template #content>
-            <p class="text-center text-surface-700 dark:text-surface-300 mb-4">
-              Search 120,000+ items from across Rubi-Ka. Advanced filtering, compatibility checking,
-              and item comparison tools.
-            </p>
-          </template>
-          <template #footer>
-            <div class="flex justify-center">
-              <Button
-                label="Launch Tool"
-                icon="pi pi-arrow-right"
-                iconPos="right"
-                @click="navigateTo('/items')"
-              />
-            </div>
-          </template>
-        </Card>
-
-        <!-- TinkerNanos -->
-        <Card class="tool-card">
-          <template #header>
-            <div class="flex justify-center pt-6">
-              <i class="pi pi-bolt text-6xl text-primary-500"></i>
-            </div>
-          </template>
-          <template #title>
-            <div class="text-center">TinkerNanos</div>
-          </template>
-          <template #subtitle>
-            <div class="text-center text-surface-600 dark:text-surface-400">
-              Nano Program Library
-            </div>
-          </template>
-          <template #content>
-            <p class="text-center text-surface-700 dark:text-surface-300 mb-4">
-              Browse and analyze nano programs by profession and school. Check strain compatibility
-              and requirements.
-            </p>
-          </template>
-          <template #footer>
-            <div class="flex justify-center">
-              <Button
-                label="Launch Tool"
-                icon="pi pi-arrow-right"
-                iconPos="right"
-                @click="navigateTo('/nanos')"
-              />
-            </div>
-          </template>
-        </Card>
-
-        <!-- TinkerFite -->
-        <Card class="tool-card">
-          <template #header>
-            <div class="flex justify-center pt-6">
-              <i class="pi pi-shield text-6xl text-primary-500"></i>
-            </div>
-          </template>
-          <template #title>
-            <div class="text-center">TinkerFite</div>
-          </template>
-          <template #subtitle>
-            <div class="text-center text-surface-600 dark:text-surface-400">Weapon Analytics</div>
-          </template>
-          <template #content>
-            <p class="text-center text-surface-700 dark:text-surface-300 mb-4">
-              Compare DPS and optimize your combat loadout. Analyze weapon performance with your
-              character's stats and skills.
-            </p>
-          </template>
-          <template #footer>
-            <div class="flex justify-center">
-              <Button
-                label="Launch Tool"
-                icon="pi pi-arrow-right"
-                iconPos="right"
-                @click="navigateTo('/fite')"
-              />
-            </div>
-          </template>
-        </Card>
-
-        <!-- TinkerPlants -->
-        <Card class="tool-card">
-          <template #header>
-            <div class="flex justify-center pt-6">
-              <i class="pi pi-cog text-6xl text-primary-500"></i>
-            </div>
-          </template>
-          <template #title>
-            <div class="text-center">TinkerPlants</div>
-          </template>
-          <template #subtitle>
-            <div class="text-center text-surface-600 dark:text-surface-400">
-              Augmentation Planner
-            </div>
-          </template>
-          <template #content>
-            <p class="text-center text-surface-700 dark:text-surface-300 mb-4">
-              Design implant and symbiant configurations. Plan your augmentations and optimize stat
-              distribution for your build.
-            </p>
-          </template>
-          <template #footer>
-            <div class="flex justify-center">
-              <Button
-                label="Launch Tool"
-                icon="pi pi-arrow-right"
-                iconPos="right"
-                @click="navigateTo('/plants')"
-              />
-            </div>
-          </template>
-        </Card>
-
-        <!-- TinkerPocket -->
-        <Card class="tool-card">
-          <template #header>
-            <div class="flex justify-center pt-6">
-              <i class="pi pi-map text-6xl text-primary-500"></i>
-            </div>
-          </template>
-          <template #title>
-            <div class="text-center">TinkerPocket</div>
-          </template>
-          <template #subtitle>
-            <div class="text-center text-surface-600 dark:text-surface-400">Pocket Boss Intel</div>
-          </template>
-          <template #content>
-            <p class="text-center text-surface-700 dark:text-surface-300 mb-4">
-              Track pocket bosses and manage your collections. Browse symbiants and plan your
-              hunting strategy across dimensions.
-            </p>
-          </template>
-          <template #footer>
-            <div class="flex justify-center">
-              <Button
-                label="Launch Tool"
-                icon="pi pi-arrow-right"
-                iconPos="right"
-                @click="navigateTo('/pocket')"
-              />
-            </div>
-          </template>
-        </Card>
+        <router-link
+          v-for="tool in tools"
+          :key="tool.route"
+          :to="tool.route"
+          class="tool-card-link"
+        >
+          <Card class="tool-card h-full">
+            <template #header>
+              <div class="flex justify-center pt-6">
+                <i :class="[tool.icon, 'text-6xl text-primary-500']"></i>
+              </div>
+            </template>
+            <template #title>
+              <div class="text-center">{{ tool.name }}</div>
+            </template>
+            <template #subtitle>
+              <div class="text-center text-surface-600 dark:text-surface-400">
+                {{ tool.subtitle }}
+              </div>
+            </template>
+            <template #content>
+              <p class="text-center text-surface-700 dark:text-surface-300 mb-4">
+                {{ tool.description }}
+              </p>
+            </template>
+            <template #footer>
+              <div class="flex justify-center">
+                <span class="p-button p-component">
+                  <span class="p-button-label">Launch Tool</span>
+                  <span class="pi pi-arrow-right p-button-icon p-button-icon-right"></span>
+                </span>
+              </div>
+            </template>
+          </Card>
+        </router-link>
       </div>
     </section>
 
@@ -272,19 +116,69 @@ Welcomes users and provides navigation to all six tools with AO-themed descripti
 </template>
 
 <script setup lang="ts">
-import { useRouter } from 'vue-router';
 import Card from 'primevue/card';
-import Button from 'primevue/button';
 import Badge from 'primevue/badge';
 
-const router = useRouter();
-
-const navigateTo = (path: string) => {
-  router.push(path);
-};
+const tools = [
+  {
+    name: 'TinkerProfiles',
+    subtitle: 'Character Database',
+    description:
+      'Manage character profiles across all dimensions. Create, import, and track your characters with comprehensive stat tracking.',
+    icon: 'pi pi-users',
+    route: '/profiles',
+  },
+  {
+    name: 'TinkerItems',
+    subtitle: 'Equipment Archives',
+    description:
+      'Search 120,000+ items from across Rubi-Ka. Advanced filtering, compatibility checking, and item comparison tools.',
+    icon: 'pi pi-database',
+    route: '/items',
+  },
+  {
+    name: 'TinkerNanos',
+    subtitle: 'Nano Program Library',
+    description:
+      'Browse and analyze nano programs by profession and school. Check strain compatibility and requirements.',
+    icon: 'pi pi-bolt',
+    route: '/nanos',
+  },
+  {
+    name: 'TinkerFite',
+    subtitle: 'Weapon Analytics',
+    description:
+      'Compare DPS and optimize your combat loadout. Analyze weapon performance with your character\'s stats and skills.',
+    icon: 'pi pi-shield',
+    route: '/fite',
+  },
+  {
+    name: 'TinkerPlants',
+    subtitle: 'Augmentation Planner',
+    description:
+      'Design implant and symbiant configurations. Plan your augmentations and optimize stat distribution for your build.',
+    icon: 'pi pi-cog',
+    route: '/plants',
+  },
+  {
+    name: 'TinkerPocket',
+    subtitle: 'Pocket Boss Intel',
+    description:
+      'Track pocket bosses and manage your collections. Browse symbiants and plan your hunting strategy across dimensions.',
+    icon: 'pi pi-map',
+    route: '/pocket',
+  },
+];
 </script>
 
 <style scoped>
+.tool-card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  cursor: pointer;
+}
+
 .tool-card {
   transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
 }

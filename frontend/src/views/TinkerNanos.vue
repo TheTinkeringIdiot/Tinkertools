@@ -18,13 +18,6 @@ Browse nano programs by profession or search across all nanos
           <Badge :value="`${filteredNanos.length} nanos`" severity="secondary" />
         </div>
         <div class="flex items-center gap-2">
-          <ToggleButton
-            v-model="viewMode"
-            on-label="School View"
-            off-label="List View"
-            on-icon="pi pi-list"
-            off-icon="pi pi-th-large"
-          />
           <Button
             label="Search Mode"
             :severity="isSearchMode ? 'primary' : 'secondary'"
@@ -68,16 +61,9 @@ Browse nano programs by profession or search across all nanos
       <div class="flex-1 overflow-auto">
         <ProgressSpinner v-if="loading" class="flex justify-center p-8" />
         <NanoList
-          v-else-if="!viewMode"
-          :nanos="filteredNanos"
-          :loading="loading"
-          :show-compatibility="showSkillCompatibility"
-          :active-profile="activeProfile"
-          @nano-select="handleNanoSelect"
-        />
-        <NanoSchoolView
           v-else
           :nanos="filteredNanos"
+          :loading="loading"
           :show-compatibility="showSkillCompatibility"
           :active-profile="activeProfile"
           @nano-select="handleNanoSelect"
@@ -127,13 +113,11 @@ import Badge from 'primevue/badge';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 import ProgressSpinner from 'primevue/progressspinner';
-import ToggleButton from 'primevue/togglebutton';
 import ProfessionList from '@/components/nanos/ProfessionList.vue';
 import ProfessionNanoDisplay from '@/components/nanos/ProfessionNanoDisplay.vue';
 import NanoSearch from '@/components/nanos/NanoSearch.vue';
 import NanoFilters from '@/components/nanos/NanoFilters.vue';
 import NanoList from '@/components/nanos/NanoList.vue';
-import NanoSchoolView from '@/components/nanos/NanoSchoolView.vue';
 import NanoDetail from '@/components/nanos/NanoDetail.vue';
 import { PROFESSION } from '@/services/game-data';
 import { useNanosStore } from '@/stores/nanosStore';
@@ -148,7 +132,6 @@ const profilesStore = useTinkerProfilesStore();
 const loading = ref(false);
 const isSearchMode = ref(false);
 const searchQuery = ref('');
-const viewMode = ref(true); // true = school view, false = list view
 const showNanoDetail = ref(false);
 const selectedNano = ref<NanoProgram | null>(null);
 const selectedProfile = ref<string | null>(null);
