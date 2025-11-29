@@ -227,13 +227,12 @@ const schoolFilterOptions = computed(() => [
 
 /**
  * Current character as Character type for profile-based filtering
- * Extracted from activeProfile when available, otherwise uses manual inputState
+ * Uses manual inputState values with optional profile augmentation
  */
-const currentCharacter = computed((): Character | null => {
-  if (!activeProfile.value) return null;
-
+const currentCharacter = computed((): Character => {
   // Convert manual inputs to Character format for validation
-  return convertInputStateToCharacter(inputState.value, activeProfile.value as TinkerProfile);
+  // Works without a profile - uses inputState values with defaults
+  return convertInputStateToCharacter(inputState.value, activeProfile.value ?? null);
 });
 
 /**
@@ -244,10 +243,8 @@ const filteredNanos = computed((): OffensiveNano[] => {
   // Start with all offensive nanos
   let filtered = offensiveNanos.value;
 
-  // Step 1: Filter by character profile requirements (if profile exists)
-  if (currentCharacter.value) {
-    filtered = filterByCharacterProfile(filtered, currentCharacter.value);
-  }
+  // Step 1: Filter by character requirements from inputState
+  filtered = filterByCharacterProfile(filtered, currentCharacter.value);
 
   // Step 2: Apply additional filters (school, QL range, search)
   filtered = applyNanoFilters(filtered, {
