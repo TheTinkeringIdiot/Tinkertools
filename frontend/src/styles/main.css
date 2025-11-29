@@ -244,6 +244,51 @@ html.dark #app {
   color: rgb(113, 113, 122) !important;
 }
 
+/* ToggleButton checked state - fix white-on-white in dark mode */
+.dark .p-togglebutton.p-highlight {
+  background-color: rgb(20, 184, 166) !important; /* primary-500 teal */
+  color: rgb(255, 255, 255) !important;
+  border-color: rgb(20, 184, 166) !important;
+  border-radius: 0.375rem !important;
+}
+
+.dark .p-togglebutton.p-highlight .p-button {
+  background-color: rgb(20, 184, 166) !important; /* primary-500 teal */
+  color: rgb(255, 255, 255) !important;
+  border-color: rgb(20, 184, 166) !important;
+  border-radius: 0.375rem !important;
+}
+
+/* Fix the ::before pseudo-element that creates the white overlay */
+.dark .p-togglebutton.p-highlight .p-button::before {
+  background-color: transparent !important;
+}
+
+.dark .p-togglebutton.p-highlight:hover,
+.dark .p-togglebutton.p-highlight:hover .p-button {
+  background-color: rgb(17, 150, 138) !important; /* primary-600 darker teal */
+}
+
+/* AutoComplete dropdown panel - fix white-on-white in dark mode */
+.dark .p-autocomplete-panel {
+  background-color: rgb(39, 39, 42) !important; /* surface-800 dark grey */
+  border-color: rgb(63, 63, 70) !important;
+}
+
+.dark .p-autocomplete-panel .p-autocomplete-items {
+  background-color: transparent !important;
+}
+
+.dark .p-autocomplete-panel .p-autocomplete-item {
+  color: rgb(255, 255, 255) !important;
+  background-color: transparent !important;
+}
+
+.dark .p-autocomplete-panel .p-autocomplete-item:hover {
+  background-color: rgb(63, 63, 70) !important; /* surface-700 */
+  color: rgb(255, 255, 255) !important;
+}
+
 /* Specific fixes for common text color classes */
 .dark .text-surface-900 {
   color: rgb(255, 255, 255) !important;
