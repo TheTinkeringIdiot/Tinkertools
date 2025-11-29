@@ -22,6 +22,7 @@ Part of TinkerPlants Revamp - Task 3.4
         :suggestions="filteredClusters"
         @complete="onSearch"
         @item-select="onClusterSelect"
+        @blur="onBlur"
         placeholder="Type cluster name (e.g., Rifle, Strength, Max NCU)..."
         input-id="cluster-search"
         class="flex-1"
@@ -158,6 +159,18 @@ function resetSelection() {
   filteredClusters.value = [];
 
   emit('cluster-reset');
+}
+
+/**
+ * Handle blur event - reset state when user closes dropdown without selection
+ * This ensures the dropdown can reopen properly on next interaction
+ */
+function onBlur() {
+  // Only reset if no cluster is selected (user abandoned the search)
+  if (!selectedCluster.value) {
+    searchQuery.value = '';
+    filteredClusters.value = [];
+  }
 }
 
 // ============================================================================
