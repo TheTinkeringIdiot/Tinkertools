@@ -210,14 +210,39 @@ html.dark #app {
   color: inherit !important;
 }
 
-/* Ensure dropdown options are visible */
+/* Dropdown panel - fix white-on-white in dark mode */
+.dark .p-dropdown-panel {
+  background-color: rgb(39, 39, 42) !important; /* surface-800 dark grey */
+  border-color: rgb(63, 63, 70) !important;
+}
+
 .dark .p-dropdown-panel .p-dropdown-item {
   color: rgb(255, 255, 255) !important;
   background-color: transparent !important;
 }
 
 .dark .p-dropdown-panel .p-dropdown-item:hover {
-  background-color: rgb(63, 63, 70) !important;
+  background-color: rgb(63, 63, 70) !important; /* surface-700 */
+  color: rgb(255, 255, 255) !important;
+}
+
+/* MultiSelect panel - fix white-on-white in dark mode */
+.dark .p-multiselect-panel {
+  background-color: rgb(39, 39, 42) !important; /* surface-800 dark grey */
+  border-color: rgb(63, 63, 70) !important;
+}
+
+.dark .p-multiselect-panel .p-multiselect-items {
+  background-color: transparent !important;
+}
+
+.dark .p-multiselect-panel .p-multiselect-item {
+  color: rgb(255, 255, 255) !important;
+  background-color: transparent !important;
+}
+
+.dark .p-multiselect-panel .p-multiselect-item:hover {
+  background-color: rgb(63, 63, 70) !important; /* surface-700 */
   color: rgb(255, 255, 255) !important;
 }
 
