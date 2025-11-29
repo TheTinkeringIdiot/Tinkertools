@@ -266,6 +266,34 @@ html.dark #app {
   color: rgb(255, 255, 255) !important;
 }
 
+/* Dialog - fix white-on-white in dark mode */
+.dark .p-dialog {
+  background-color: rgb(39, 39, 42) !important; /* surface-800 dark grey */
+  border-color: rgb(63, 63, 70) !important;
+}
+
+.dark .p-dialog-header {
+  background-color: rgb(39, 39, 42) !important;
+  border-color: rgb(63, 63, 70) !important;
+  color: rgb(255, 255, 255) !important;
+}
+
+.dark .p-dialog-content {
+  background-color: rgb(39, 39, 42) !important;
+  color: rgb(255, 255, 255) !important;
+}
+
+/* FileUpload component within dialogs */
+.dark .p-fileupload {
+  background-color: rgb(39, 39, 42) !important;
+  border-color: rgb(63, 63, 70) !important;
+}
+
+.dark .p-fileupload .p-fileupload-buttonbar {
+  background-color: rgb(63, 63, 70) !important;
+  border-color: rgb(63, 63, 70) !important;
+}
+
 /* Fix badge and tag visibility */
 .dark .p-badge,
 .dark .p-tag {
