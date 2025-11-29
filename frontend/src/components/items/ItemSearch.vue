@@ -259,8 +259,8 @@ const recentSearches = ref<string[]>([]);
 const savedSearches = ref<SavedSearch[]>([]);
 
 // Advanced search options
-const searchFields = ref<string[]>([]);
-const matchType = ref('exact'); // Default to exact matching
+const searchFields = ref<string[]>(['name']); // Default to Item Name
+const matchType = ref('fuzzy'); // Default to fuzzy search
 const compatibleOnly = ref(false);
 
 // Search stats

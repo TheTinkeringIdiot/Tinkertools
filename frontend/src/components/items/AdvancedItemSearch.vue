@@ -363,8 +363,8 @@ const emit = defineEmits<{
 // Form state
 const searchForm = ref<SearchFormData>({
   search: '',
-  matchType: 'exact',
-  searchFields: 'both',
+  matchType: 'fuzzy',
+  searchFields: 'name',
 });
 
 const selectedStatBonuses = ref<number[]>([]);
@@ -587,8 +587,8 @@ function performSearch() {
 function clearAll() {
   searchForm.value = {
     search: '',
-    matchType: 'exact',
-    searchFields: 'both',
+    matchType: 'fuzzy',
+    searchFields: 'name',
   };
   selectedStatBonuses.value = [];
   statFilters.value = [];
