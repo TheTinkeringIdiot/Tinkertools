@@ -1,5 +1,5 @@
+/* Load only light theme as base - dark mode handled via .dark class overrides */
 @import 'primevue/resources/themes/aura-light-teal/theme.css';
-@import 'primevue/resources/themes/aura-dark-teal/theme.css' (prefers-color-scheme: dark);
 
 @tailwind base;
 @tailwind components;
@@ -55,6 +55,37 @@
   color-scheme: dark;
 }
 
+/* PrimeVue light theme explicit overrides */
+[data-theme='light'] {
+  --text-color: #1e293b;
+  --text-color-secondary: #64748b;
+  --primary-color: #0d9488;
+  --primary-color-text: #ffffff;
+  --surface-ground: #f8fafc;
+  --surface-section: #f1f5f9;
+  --surface-card: #ffffff;
+  --surface-overlay: #ffffff;
+  --surface-border: #e2e8f0;
+  --surface-hover: #f1f5f9;
+  --surface-0: #ffffff;
+  --surface-50: #f8fafc;
+  --surface-100: #f1f5f9;
+  --surface-200: #e2e8f0;
+  --surface-300: #cbd5e1;
+  --surface-400: #94a3b8;
+  --surface-500: #64748b;
+  --surface-600: #475569;
+  --surface-700: #334155;
+  --surface-800: #1e293b;
+  --surface-900: #0f172a;
+  --surface-950: #020617;
+  --highlight-bg: #ccfbf1;
+  --highlight-text-color: #0f766e;
+
+  /* Color scheme */
+  color-scheme: light;
+}
+
 /* PrimeVue dark theme overrides */
 [data-theme='dark'] {
   /* PrimeVue CSS variables for dark theme */
@@ -104,10 +135,58 @@
 .dark .p-tag,
 .dark .p-dataview,
 .dark .p-dataview-content,
-.dark .p-paginator {
+.dark .p-paginator,
+.dark .p-accordion,
+.dark .p-accordion-header,
+.dark .p-accordion-content,
+.dark .p-datatable,
+.dark .p-datatable-thead,
+.dark .p-datatable-tbody,
+.dark .p-datatable-wrapper {
   background-color: var(--surface-card) !important;
   color: var(--text-color) !important;
   border-color: var(--surface-border) !important;
+}
+
+/* Accordion specific dark mode fixes */
+.dark .p-accordion-header-link {
+  background-color: var(--surface-100) !important;
+  color: #ffffff !important;
+  border-color: var(--surface-border) !important;
+}
+
+.dark .p-accordion-header-link:hover {
+  background-color: var(--surface-hover) !important;
+}
+
+.dark .p-accordion-header-text {
+  color: #ffffff !important;
+}
+
+.dark .p-accordion-toggle-icon {
+  color: #ffffff !important;
+}
+
+/* DataTable specific dark mode fixes */
+.dark .p-datatable-header,
+.dark .p-datatable-thead > tr > th,
+.dark .p-datatable-tbody > tr,
+.dark .p-datatable-tbody > tr > td {
+  background-color: var(--surface-card) !important;
+  color: #ffffff !important;
+  border-color: var(--surface-border) !important;
+}
+
+.dark .p-datatable-tbody > tr:hover {
+  background-color: var(--surface-hover) !important;
+}
+
+.dark .p-datatable .p-sortable-column:hover {
+  background-color: var(--surface-hover) !important;
+}
+
+.dark .p-datatable .p-sortable-column .p-sortable-column-icon {
+  color: #ffffff !important;
 }
 
 /* Force dark background and light text for root elements */
@@ -253,6 +332,128 @@ html.dark #app {
 }
 
 .dark .p-tabview-nav-link.p-tabview-nav-link-active {
+  background: var(--primary-color) !important;
+  color: white !important;
+  border-color: var(--primary-color) !important;
+}
+
+/* ============================================================================
+ * Light Mode Component Overrides
+ * Ensure PrimeVue components render correctly in light mode
+ * ============================================================================ */
+
+/* Comprehensive PrimeVue light theme overrides */
+.light .p-menubar,
+.light .p-dropdown,
+.light .p-button,
+.light .p-card,
+.light .p-panel,
+.light .p-tabview,
+.light .p-tabview-nav,
+.light .p-tabview-panels,
+.light .p-dialog,
+.light .p-inputtext,
+.light .p-inputswitch,
+.light .p-multiselect,
+.light .p-slider,
+.light .p-tag,
+.light .p-dataview,
+.light .p-dataview-content,
+.light .p-paginator {
+  background-color: var(--surface-card) !important;
+  color: var(--text-color) !important;
+  border-color: var(--surface-border) !important;
+}
+
+/* Force light background and dark text for root elements */
+html.light,
+html.light body,
+html.light #app {
+  background-color: rgb(var(--surface-0)) !important;
+  color: rgb(var(--surface-950)) !important;
+}
+
+/* Ensure dropdown options are visible in light mode */
+.light .p-dropdown-panel .p-dropdown-item {
+  color: var(--text-color) !important;
+  background-color: transparent !important;
+}
+
+.light .p-dropdown-panel .p-dropdown-item:hover {
+  background-color: var(--surface-hover) !important;
+  color: var(--text-color) !important;
+}
+
+/* Fix badge and tag visibility in light mode */
+.light .p-badge,
+.light .p-tag {
+  background-color: var(--primary-color) !important;
+  color: var(--primary-color-text) !important;
+}
+
+/* Ensure button styling in light mode */
+.light .p-button {
+  background-color: var(--surface-100) !important;
+  color: var(--text-color) !important;
+  border-color: var(--surface-border) !important;
+}
+
+.light .p-button:hover {
+  background-color: var(--surface-200) !important;
+}
+
+.light .p-button:disabled {
+  background-color: var(--surface-100) !important;
+  color: var(--surface-400) !important;
+}
+
+/* Light mode text color classes */
+.light .text-surface-900 {
+  color: rgb(15, 23, 42) !important;
+}
+
+.light .text-surface-800 {
+  color: rgb(30, 41, 59) !important;
+}
+
+.light .text-surface-700 {
+  color: rgb(51, 65, 85) !important;
+}
+
+.light .text-surface-600 {
+  color: rgb(71, 85, 105) !important;
+}
+
+.light .text-surface-500 {
+  color: rgb(100, 116, 139) !important;
+}
+
+/* Light mode background classes */
+.light .bg-surface-50 {
+  background-color: rgb(248, 250, 252) !important;
+}
+
+.light .bg-surface-100 {
+  background-color: rgb(241, 245, 249) !important;
+}
+
+.light .bg-surface-0 {
+  background-color: rgb(255, 255, 255) !important;
+}
+
+/* Ensure tabview components are properly themed in light mode */
+.light .p-tabview-nav-link {
+  background: var(--surface-card) !important;
+  color: var(--text-color-secondary) !important;
+  border-color: var(--surface-border) !important;
+}
+
+.light .p-tabview-nav-link:hover {
+  background: var(--surface-hover) !important;
+  color: var(--text-color) !important;
+}
+
+.light .p-tabview-nav-link.p-tabview-nav-link-active {
   background: var(--primary-color) !important;
   color: white !important;
   border-color: var(--primary-color) !important;
