@@ -22,14 +22,12 @@ Part of TinkerPlants Revamp - Task 3.4
         :suggestions="filteredClusters"
         @complete="onSearch"
         @item-select="onClusterSelect"
-        @blur="onBlur"
         placeholder="Type cluster name (e.g., Rifle, Strength, Max NCU)..."
         input-id="cluster-search"
         class="flex-1"
         :min-length="1"
         complete-on-focus
         dropdown
-        force-selection
       >
         <template #option="{ option }">
           <div class="flex items-center gap-2">
@@ -55,7 +53,7 @@ Part of TinkerPlants Revamp - Task 3.4
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, nextTick } from 'vue';
 import AutoComplete from 'primevue/autocomplete';
 import Button from 'primevue/button';
 import { getAllUniqueClusters, getSlotsForCluster } from '@/utils/cluster-utilities';
@@ -136,7 +134,7 @@ function onSearch(event: { query: string }) {
 /**
  * Handle cluster selection from AutoComplete
  */
-function onClusterSelect(event: { value: string }) {
+async function onClusterSelect(event: { value: string }) {
   const cluster = event.value;
 
   if (!cluster) {
@@ -144,7 +142,12 @@ function onClusterSelect(event: { value: string }) {
   }
 
   selectedCluster.value = cluster;
+
+  // Use nextTick to ensure state updates after AutoComplete's internal processing
+  await nextTick();
+
   searchQuery.value = cluster;
+  filteredClusters.value = [cluster];
 
   // Emit selection event with matching slots
   emit('clusterSelected', cluster, matchingSlots.value);
@@ -161,31 +164,11 @@ function resetSelection() {
   emit('cluster-reset');
 }
 
-/**
- * Handle blur event - reset state when user closes dropdown without selection
- * This ensures the dropdown can reopen properly on next interaction
- */
-function onBlur() {
-  // Only reset if no cluster is selected (user abandoned the search)
-  if (!selectedCluster.value) {
-    searchQuery.value = '';
-    filteredClusters.value = [];
-  }
-}
-
 // ============================================================================
 // Watchers
 // ============================================================================
 
-// Watch for external cluster changes (if needed for integration)
-watch(
-  () => selectedCluster.value,
-  (newCluster) => {
-    if (newCluster) {
-      emit('clusterSelected', newCluster, matchingSlots.value);
-    }
-  }
-);
+// No watchers needed - onClusterSelect handles emission directly
 
 // ============================================================================
 // Expose public methods for parent component
