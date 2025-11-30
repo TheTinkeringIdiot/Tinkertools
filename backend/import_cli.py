@@ -140,8 +140,18 @@ def import_symbiants(args):
 
 def import_items(args):
     """Import items from JSON."""
-    mode = "OPTIMIZED" if args.optimized else "STANDARD"
+    if hasattr(args, 'ultra') and args.ultra:
+        mode = "ULTRA"
+    elif args.optimized:
+        mode = "OPTIMIZED"
+    else:
+        mode = "STANDARD"
     logger.info(f"Starting items import ({mode} mode)...")
+
+    # Validate ultra mode requirements
+    if hasattr(args, 'ultra') and args.ultra and not args.optimized:
+        logger.error("--ultra flag requires --optimized flag")
+        return False
 
     # Ensure database tables exist (unless we're doing a full reset)
     if not args.clear and not ensure_tables_exist():
@@ -157,10 +167,32 @@ def import_items(args):
 
     try:
         if args.optimized:
+            # Ultra mode warning
+            if hasattr(args, 'ultra') and args.ultra:
+                logger.warning("⚠️  ULTRA MODE ENABLED")
+                logger.warning("    - 40-60x faster than standard mode")
+                logger.warning("    - synchronous_commit=OFF (data loss on crash)")
+                logger.warning("    - UNLOGGED tables (not crash-safe)")
+                logger.warning("    - Indexes dropped (database not queryable during import)")
+                logger.warning("    - PostgreSQL COPY protocol (bypasses normal query path)")
+                if not args.clear:
+                    logger.error("--ultra mode requires --clear flag for safety")
+                    return False
+
+                try:
+                    response = input("⚠️  Continue with ULTRA MODE? (yes/NO): ").strip().lower()
+                    if response != 'yes':
+                        logger.info("Import cancelled")
+                        return False
+                except EOFError:
+                    # Non-interactive environment
+                    logger.info("Non-interactive environment, proceeding with ULTRA MODE")
+
             # Use optimized importer with larger batch size
-            batch_size = args.batch_size if args.batch_size else 1000
-            logger.info(f"Using OptimizedImporter with batch_size={batch_size}")
-            importer = OptimizedImporter(batch_size=batch_size, perks_file=str(perks_path))
+            batch_size = args.batch_size if args.batch_size else 5000
+            ultra_mode = hasattr(args, 'ultra') and args.ultra
+            logger.info(f"Using OptimizedImporter with batch_size={batch_size}, ultra_mode={ultra_mode}")
+            importer = OptimizedImporter(batch_size=batch_size, perks_file=str(perks_path), ultra_mode=ultra_mode)
 
             stats = importer.import_items_from_json(
                 str(items_path),
@@ -197,8 +229,18 @@ def import_items(args):
 
 def import_nanos(args):
     """Import nanos from JSON."""
-    mode = "OPTIMIZED" if args.optimized else "STANDARD"
+    if hasattr(args, 'ultra') and args.ultra:
+        mode = "ULTRA"
+    elif args.optimized:
+        mode = "OPTIMIZED"
+    else:
+        mode = "STANDARD"
     logger.info(f"Starting nanos import ({mode} mode)...")
+
+    # Validate ultra mode requirements
+    if hasattr(args, 'ultra') and args.ultra and not args.optimized:
+        logger.error("--ultra flag requires --optimized flag")
+        return False
 
     # Ensure database tables exist (unless we're doing a full reset)
     if not args.clear and not ensure_tables_exist():
@@ -215,9 +257,10 @@ def import_nanos(args):
     try:
         if args.optimized:
             # Use optimized importer
-            batch_size = args.batch_size if args.batch_size else 1000
-            logger.info(f"Using OptimizedImporter with batch_size={batch_size}")
-            importer = OptimizedImporter(batch_size=batch_size, perks_file=str(perks_path))
+            batch_size = args.batch_size if args.batch_size else 5000
+            ultra_mode = hasattr(args, 'ultra') and args.ultra
+            logger.info(f"Using OptimizedImporter with batch_size={batch_size}, ultra_mode={ultra_mode}")
+            importer = OptimizedImporter(batch_size=batch_size, perks_file=str(perks_path), ultra_mode=ultra_mode)
 
             stats = importer.import_items_from_json(
                 str(nanos_path),
@@ -279,11 +322,15 @@ def import_all(args):
 
     # Create a modified args object that doesn't trigger reset for individual imports
     import argparse
+    # Keep clear=True for ultra mode (needed for UNLOGGED tables and safety checks)
+    # But the actual reset already happened above, so clear_existing won't run again
+    ultra_mode = args.ultra if hasattr(args, 'ultra') else False
     individual_args = argparse.Namespace(
         chunk_size=args.chunk_size if hasattr(args, 'chunk_size') else 100,
-        batch_size=args.batch_size if hasattr(args, 'batch_size') else 1000,
+        batch_size=args.batch_size if hasattr(args, 'batch_size') else 5000,
         optimized=args.optimized if hasattr(args, 'optimized') else False,
-        clear=False,  # Don't reset for individual imports since we did it above
+        ultra=ultra_mode,
+        clear=ultra_mode if ultra_mode else False,  # Keep clear=True for ultra mode safety checks
         # PASS THROUGH FILE PATHS
         items_file=args.items_file if hasattr(args, 'items_file') else None,
         nanos_file=args.nanos_file if hasattr(args, 'nanos_file') else None,
@@ -371,6 +418,9 @@ Examples:
 Optimization Modes:
   Standard mode: Uses original importer, processes items one at a time (slower but stable)
   Optimized mode (--optimized): Batch operations, singleton preloading, reduced flushes (10-20x faster)
+  ULTRA mode (--ultra --optimized --clear): EXPERIMENTAL! All aggressive optimizations (40-60x faster)
+    WARNING: Data loss possible on crash! Uses PostgreSQL COPY, drops indexes, UNLOGGED tables,
+    synchronous_commit=OFF. Requires --clear flag. Only use with backups!
 
 Data Files (default locations):
   items.json       407 MB    backend/database/items.json
@@ -412,6 +462,14 @@ Environment:
         "--optimized",
         action="store_true",
         help="Use optimized importer (10-20x faster, maintains data accuracy)"
+    )
+    parser.add_argument(
+        "--ultra",
+        action="store_true",
+        help="EXPERIMENTAL: Enable ULTRA MODE (40-60x faster, DATA LOSS RISK ON CRASH). "
+             "Uses all aggressive optimizations: PostgreSQL COPY, index dropping, "
+             "UNLOGGED tables, synchronous_commit=OFF. Requires --optimized flag. "
+             "WARNING: Data loss possible if server crashes during import!"
     )
     parser.add_argument(
         "--database-url",

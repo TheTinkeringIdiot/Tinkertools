@@ -106,8 +106,7 @@ Welcomes users and provides navigation to all six tools with AO-themed descripti
         <div class="text-center text-sm text-surface-600 dark:text-surface-400">
           <p class="mb-2">Made by TinkeringIdiot with ❤️ for the Anarchy Online community</p>
           <p class="text-xs">
-            Anarchy Online © Funcom • TinkerTools is a fan-made project and is not affiliated with
-            Funcom
+            Anarchy Online © Funcom • TinkerTools is a fan-made project and is not affiliated or supported by Funcom or Project Rubi-Ka.
           </p>
         </div>
       </div>
