@@ -166,7 +166,8 @@ const gridCells = computed(() => {
         let iconUrl: string | null = null;
         if (isSymbiant(item)) {
           // Symbiants use aoid for icon lookup
-          iconUrl = `https://cdn.tinkeringidiot.com/static/icons/${item.aoid}.png`;
+          const baseUrl = import.meta.env.VITE_ICON_BASE_URL || 'https://cdn.tinkeringidiot.com/aoicons';
+          iconUrl = `${baseUrl}/${item.aoid}.png`;
         } else {
           // Regular items use stats
           iconUrl = getItemIconUrl((item as Item).stats);

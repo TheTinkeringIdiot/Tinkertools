@@ -617,7 +617,8 @@ export function getItemIconId(
  * Get icon URL from icon ID
  */
 export function getIconUrl(iconId: number): string {
-  return `https://cdn.tinkeringidiot.com/aoicons/${iconId}.png`;
+  const baseUrl = import.meta.env.VITE_ICON_BASE_URL || 'https://cdn.tinkeringidiot.com/aoicons';
+  return `${baseUrl}/${iconId}.png`;
 }
 
 /**

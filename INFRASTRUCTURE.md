@@ -487,7 +487,8 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 - Development and production optimizations
 
 **Environment Variables:**
-- `VITE_API_BASE_URL`: Backend API base URL
+- `VITE_API_BASE_URL`: Backend API base URL (default: `http://localhost:8000/api/v1`)
+- `VITE_ICON_BASE_URL`: Icon CDN base URL including folder path (default: `https://cdn.tinkeringidiot.com/aoicons`)
 - `DATABASE_URL`: PostgreSQL connection string
 - `SQL_DEBUG`: Enable SQL query logging
 
