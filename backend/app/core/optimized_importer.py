@@ -40,20 +40,26 @@ class OptimizedImporter:
     # Class-level cache for perk data (loaded once per process)
     _perk_data_cache: Optional[Dict[int, Dict]] = None
     _perk_cache_loaded = False
+    _perks_file_path: Optional[str] = None
 
-    def __init__(self, db_url: str = None, batch_size: int = 5000):
+    def __init__(self, db_url: str = None, batch_size: int = 5000, perks_file: str = None):
         """
         Initialize optimized importer.
 
         Args:
             db_url: Database URL
             batch_size: Number of items to process before committing (default 5000 for remote DBs)
+            perks_file: Path to perks.json file (optional, uses default if not provided)
         """
         self.batch_size = batch_size
         self.db_url = db_url or os.getenv("DATABASE_URL")
 
         if not self.db_url:
             raise ValueError("DATABASE_URL required")
+
+        # Set class-level perks file path for _load_perk_cache
+        if perks_file:
+            OptimizedImporter._perks_file_path = perks_file
 
         # Create engine with optimized pool settings
         self.engine = create_engine(
@@ -105,8 +111,12 @@ class OptimizedImporter:
             return
 
         try:
-            backend_dir = Path(__file__).parent.parent.parent
-            perks_file = backend_dir / "database" / "perks.json"
+            # Get perks file path - try class variable first, else default
+            if cls._perks_file_path:
+                perks_file = Path(cls._perks_file_path)
+            else:
+                backend_dir = Path(__file__).parent.parent.parent
+                perks_file = backend_dir / "database" / "perks.json"
 
             with open(perks_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)

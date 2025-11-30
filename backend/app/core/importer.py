@@ -59,23 +59,26 @@ class ImportStats:
 class DataImporter:
     """Main data import class."""
     
-    def __init__(self, db_url: str = None, chunk_size: int = 100):
+    def __init__(self, db_url: str = None, chunk_size: int = 100, perks_file: str = None):
         self.chunk_size = chunk_size
         self.stats = ImportStats()
-        
+
         # Get database URL from environment or parameter
         self.db_url = db_url or os.getenv("DATABASE_URL")
         if not self.db_url:
             raise ValueError("DATABASE_URL environment variable must be set or db_url parameter provided")
-        
+
         # Create engine and session factory
         self.engine = create_engine(self.db_url)
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
-        
+
         # Store singleton objects to avoid repeated DB queries
         self._stat_value_cache: Dict[Tuple[int, int], StatValue] = {}
         self._criterion_cache: Dict[Tuple[int, int, int], Criterion] = {}
         self._perk_data: Dict[int, Dict] = {}
+
+        # Store perks file path
+        self.perks_file = perks_file
 
         # Load perk metadata during initialization
         self.load_perk_metadata()
@@ -87,9 +90,12 @@ class DataImporter:
     def load_perk_metadata(self):
         """Load perk metadata from perks.json file for O(1) lookup during import."""
         try:
-            # Get the path to perks.json relative to the backend directory
-            backend_dir = Path(__file__).parent.parent.parent
-            perks_file = backend_dir / "database" / "perks.json"
+            # Get the path to perks.json - use provided path or default
+            if self.perks_file:
+                perks_file = Path(self.perks_file)
+            else:
+                backend_dir = Path(__file__).parent.parent.parent
+                perks_file = backend_dir / "database" / "perks.json"
 
             logger.info(f"Loading perk metadata from {perks_file}")
 

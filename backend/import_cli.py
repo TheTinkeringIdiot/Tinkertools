@@ -36,6 +36,7 @@ import logging
 import sys
 import os
 from pathlib import Path
+from typing import Optional
 
 # Add the backend directory to the Python path
 sys.path.append(str(Path(__file__).parent))
@@ -55,6 +56,34 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_data_file_path(cli_path: Optional[str], default_filename: str) -> Path:
+    """
+    Resolve data file path from CLI argument or default location.
+    Supports home directory (~) and environment variable expansion.
+
+    Args:
+        cli_path: Path provided via CLI argument (None if not provided)
+        default_filename: Default filename to use in backend/database/
+
+    Returns:
+        Resolved Path object
+
+    Raises:
+        FileNotFoundError: If resolved path doesn't exist
+    """
+    if cli_path:
+        # Expand environment variables and home directory
+        expanded_path = os.path.expandvars(cli_path)
+        file_path = Path(expanded_path).expanduser()
+    else:
+        file_path = Path(__file__).parent / "database" / default_filename
+
+    if not file_path.exists():
+        raise FileNotFoundError(f"Data file not found: {file_path}")
+
+    return file_path
 
 
 def ensure_tables_exist():
@@ -85,10 +114,11 @@ def import_symbiants(args):
     if not args.clear and not ensure_tables_exist():
         return False
 
-    # Look for file in database directory
-    file_path = Path(__file__).parent / "database" / "symbiants.csv"
-    if not file_path.exists():
-        logger.error(f"File {file_path} not found")
+    # Resolve file path (from CLI arg or default location)
+    try:
+        file_path = resolve_data_file_path(args.symbiants_file, "symbiants.csv")
+    except FileNotFoundError as e:
+        logger.error(str(e))
         return False
 
     # Use regular importer (optimized doesn't have this method)
@@ -117,10 +147,12 @@ def import_items(args):
     if not args.clear and not ensure_tables_exist():
         return False
 
-    # Look for file in database directory
-    file_path = Path(__file__).parent / "database" / "items.json"
-    if not file_path.exists():
-        logger.error(f"File {file_path} not found")
+    # Resolve file paths
+    try:
+        items_path = resolve_data_file_path(args.items_file, "items.json")
+        perks_path = resolve_data_file_path(args.perks_file, "perks.json")
+    except FileNotFoundError as e:
+        logger.error(str(e))
         return False
 
     try:
@@ -128,10 +160,10 @@ def import_items(args):
             # Use optimized importer with larger batch size
             batch_size = args.batch_size if args.batch_size else 1000
             logger.info(f"Using OptimizedImporter with batch_size={batch_size}")
-            importer = OptimizedImporter(batch_size=batch_size)
+            importer = OptimizedImporter(batch_size=batch_size, perks_file=str(perks_path))
 
             stats = importer.import_items_from_json(
-                str(file_path),
+                str(items_path),
                 is_nano=False,
                 clear_existing=args.clear
             )
@@ -144,9 +176,9 @@ def import_items(args):
             return stats['errors'] == 0
         else:
             # Use standard importer
-            importer = DataImporter(chunk_size=args.chunk_size)
+            importer = DataImporter(chunk_size=args.chunk_size, perks_file=str(perks_path))
             stats = importer.import_items_from_json(
-                str(file_path),
+                str(items_path),
                 is_nano=False,
                 clear_existing=False,  # Don't use old clear method
                 full_reset=args.clear  # Use new full reset with migrations
@@ -172,10 +204,12 @@ def import_nanos(args):
     if not args.clear and not ensure_tables_exist():
         return False
 
-    # Look for file in database directory
-    file_path = Path(__file__).parent / "database" / "nanos.json"
-    if not file_path.exists():
-        logger.error(f"File {file_path} not found")
+    # Resolve file paths
+    try:
+        nanos_path = resolve_data_file_path(args.nanos_file, "nanos.json")
+        perks_path = resolve_data_file_path(args.perks_file, "perks.json")
+    except FileNotFoundError as e:
+        logger.error(str(e))
         return False
 
     try:
@@ -183,10 +217,10 @@ def import_nanos(args):
             # Use optimized importer
             batch_size = args.batch_size if args.batch_size else 1000
             logger.info(f"Using OptimizedImporter with batch_size={batch_size}")
-            importer = OptimizedImporter(batch_size=batch_size)
+            importer = OptimizedImporter(batch_size=batch_size, perks_file=str(perks_path))
 
             stats = importer.import_items_from_json(
-                str(file_path),
+                str(nanos_path),
                 is_nano=True,
                 clear_existing=False  # Don't clear for nanos
             )
@@ -199,11 +233,11 @@ def import_nanos(args):
             return stats['errors'] == 0
         else:
             # Use standard importer
-            importer = DataImporter(chunk_size=args.chunk_size)
+            importer = DataImporter(chunk_size=args.chunk_size, perks_file=str(perks_path))
             # Note: For nanos, we typically don't want to reset the entire database
             # since they're usually imported after items.
             stats = importer.import_items_from_json(
-                str(file_path),
+                str(nanos_path),
                 is_nano=True,
                 clear_existing=False,
                 full_reset=False  # Don't reset for nanos
@@ -249,7 +283,12 @@ def import_all(args):
         chunk_size=args.chunk_size if hasattr(args, 'chunk_size') else 100,
         batch_size=args.batch_size if hasattr(args, 'batch_size') else 1000,
         optimized=args.optimized if hasattr(args, 'optimized') else False,
-        clear=False  # Don't reset for individual imports since we did it above
+        clear=False,  # Don't reset for individual imports since we did it above
+        # PASS THROUGH FILE PATHS
+        items_file=args.items_file if hasattr(args, 'items_file') else None,
+        nanos_file=args.nanos_file if hasattr(args, 'nanos_file') else None,
+        symbiants_file=args.symbiants_file if hasattr(args, 'symbiants_file') else None,
+        perks_file=args.perks_file if hasattr(args, 'perks_file') else None
     )
 
     # Items first (contains all symbiant items that mobs will reference)
@@ -278,21 +317,30 @@ def import_all(args):
     return success
 
 
-def validate_files():
-    """Validate that all required files exist."""
-    # Files should be in the database directory
-    base_dir = Path(__file__).parent / "database"
-    files = ["symbiants.csv", "items.json", "nanos.json"]
+def validate_files(args=None):
+    """
+    Validate that all required files exist.
+
+    Args:
+        args: Optional argparse.Namespace with file path overrides
+    """
+    files_to_check = {
+        'items.json': getattr(args, 'items_file', None) if args else None,
+        'nanos.json': getattr(args, 'nanos_file', None) if args else None,
+        'symbiants.csv': getattr(args, 'symbiants_file', None) if args else None,
+        'perks.json': getattr(args, 'perks_file', None) if args else None,
+    }
+
     missing = []
 
-    for file in files:
-        path = base_dir / file
-        if path.exists():
+    for default_filename, cli_path in files_to_check.items():
+        try:
+            path = resolve_data_file_path(cli_path, default_filename)
             size_mb = path.stat().st_size / (1024 * 1024)
-            logger.info(f"✓ {file}: {size_mb:.1f} MB")
-        else:
-            missing.append(file)
-            logger.error(f"✗ {file}: Not found")
+            logger.info(f"✓ {path}: {size_mb:.1f} MB")
+        except FileNotFoundError:
+            missing.append(default_filename)
+            logger.error(f"✗ {default_filename}: Not found")
 
     if missing:
         logger.error(f"Missing files: {', '.join(missing)}")
@@ -308,15 +356,29 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Default locations
   python import_cli.py validate                    # Check if files exist
   python import_cli.py symbiants --clear           # Import symbiants, clearing existing data
   python import_cli.py items --chunk-size 50       # Import items with smaller chunks (standard mode)
   python import_cli.py items --optimized           # Import items using optimized importer (10-20x faster)
   python import_cli.py all --optimized --clear     # Import everything with optimized mode, clearing existing data
 
+  # Custom file paths
+  python import_cli.py items --items-file /data/items.json
+  python import_cli.py all --items-file ~/ao-data/items.json --nanos-file ~/ao-data/nanos.json
+  export AO_DATA=/mnt/data && python import_cli.py all --items-file $AO_DATA/items.json
+
 Optimization Modes:
   Standard mode: Uses original importer, processes items one at a time (slower but stable)
   Optimized mode (--optimized): Batch operations, singleton preloading, reduced flushes (10-20x faster)
+
+Data Files (default locations):
+  items.json       407 MB    backend/database/items.json
+  nanos.json       44 MB     backend/database/nanos.json
+  symbiants.csv    208 KB    backend/database/symbiants.csv
+  perks.json       411 KB    backend/database/perks.json (internal dependency)
+
+  Use --{dataset}-file to override default locations. Supports ~ and environment variables.
 
 Environment:
   DATABASE_URL    Database connection string (required)
@@ -355,25 +417,49 @@ Environment:
         "--database-url",
         help="Database URL (overrides DATABASE_URL environment variable)"
     )
-    
+    parser.add_argument(
+        "--items-file",
+        type=str,
+        default=None,
+        help="Path to items.json file (default: backend/database/items.json)"
+    )
+    parser.add_argument(
+        "--nanos-file",
+        type=str,
+        default=None,
+        help="Path to nanos.json file (default: backend/database/nanos.json)"
+    )
+    parser.add_argument(
+        "--symbiants-file",
+        type=str,
+        default=None,
+        help="Path to symbiants.csv file (default: backend/database/symbiants.csv)"
+    )
+    parser.add_argument(
+        "--perks-file",
+        type=str,
+        default=None,
+        help="Path to perks.json file (default: backend/database/perks.json)"
+    )
+
     args = parser.parse_args()
-    
+
     # Validate files first (doesn't need DB connection)
     if args.command == "validate":
-        success = validate_files()
+        success = validate_files(args)
         sys.exit(0 if success else 1)
-    
+
     # Check DATABASE_URL is set for import operations
     if not args.database_url and not os.getenv("DATABASE_URL"):
         logger.error("DATABASE_URL environment variable must be set or --database-url provided")
         logger.error("Example: export DATABASE_URL='postgresql://user:pass@localhost:5432/tinkertools'")
         sys.exit(1)
-    
+
     # Set database URL if provided
     if args.database_url:
         os.environ["DATABASE_URL"] = args.database_url
-    
-    if not validate_files():
+
+    if not validate_files(args):
         logger.error("File validation failed, aborting import")
         sys.exit(1)
     
