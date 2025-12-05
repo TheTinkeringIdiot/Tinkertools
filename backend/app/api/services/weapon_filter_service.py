@@ -103,6 +103,7 @@ class WeaponFilterService:
         ).join(
             Criterion, ActionCriteria.criterion_id == Criterion.id
         ).where(
+            Action.action == 8,  # Action type 8 = WIELD
             Criterion.value1 == self.NPC_FAMILY_STAT
         ).scalar_subquery()
 
@@ -130,6 +131,7 @@ class WeaponFilterService:
         ).join(
             Criterion, ActionCriteria.criterion_id == Criterion.id
         ).where(
+            Action.action == 8,  # Action type 8 = WIELD
             Criterion.value1 == 4,  # Stat 4 = Breed
             Criterion.value2 != request.breed_id,
             Criterion.value2 != 0
@@ -138,24 +140,49 @@ class WeaponFilterService:
         query = query.filter(Item.id.not_in(breed_restricted_ids))
 
         # Apply profession filter
+        # Include items where: no profession requirement OR profession matches (handles OR logic correctly)
         if request.profession_id > 0:
-            prof_restricted_ids = select(Item.id).select_from(Item).join(
+            # Items with profession requirements
+            items_with_prof_req = select(Item.id).select_from(Item).join(
                 Action, Item.id == Action.item_id
             ).join(
                 ActionCriteria, Action.id == ActionCriteria.action_id
             ).join(
                 Criterion, ActionCriteria.criterion_id == Criterion.id
             ).where(
-                Action.action == 3,  # Action type 3 = Use/Equip
+                Action.action == 8,
                 or_(
                     Criterion.value1 == 60,   # Stat 60 = Profession
                     Criterion.value1 == 368   # Stat 368 = VisualProfession
-                ),
-                Criterion.value2 != request.profession_id,
-                Criterion.value2 != 0
+                )
             ).scalar_subquery()
 
-            query = query.filter(Item.id.not_in(prof_restricted_ids))
+            # Items where profession matches (includes items with value2=0 for "any profession")
+            items_prof_match = select(Item.id).select_from(Item).join(
+                Action, Item.id == Action.item_id
+            ).join(
+                ActionCriteria, Action.id == ActionCriteria.action_id
+            ).join(
+                Criterion, ActionCriteria.criterion_id == Criterion.id
+            ).where(
+                Action.action == 8,
+                or_(
+                    Criterion.value1 == 60,
+                    Criterion.value1 == 368
+                ),
+                or_(
+                    Criterion.value2 == request.profession_id,
+                    Criterion.value2 == 0
+                )
+            ).scalar_subquery()
+
+            # Include items without profession requirements OR with matching profession
+            query = query.filter(
+                or_(
+                    Item.id.not_in(items_with_prof_req),  # No profession requirement
+                    Item.id.in_(items_prof_match)          # Has matching profession
+                )
+            )
 
         # Use distinct to avoid duplicates
         query = query.distinct()
