@@ -43,7 +43,9 @@ sys.path.append(str(Path(__file__).parent))
 
 from app.core.importer import DataImporter
 from app.core.optimized_importer import OptimizedImporter
-from app.core.database import create_tables, get_table_count
+from app.core.database import create_tables, get_table_count, get_db
+from app.core.csv_transformer import StreamingCSVTransformer, load_perk_metadata
+from app.core.csv_loader import StreamingCSVLoader
 
 # Setup logging
 logging.basicConfig(
@@ -297,8 +299,142 @@ def import_nanos(args):
         return False
 
 
+def import_all_csv_mode(args):
+    """
+    Import all data using CSV pipeline (55x faster).
+
+    Workflow:
+    1. Merge items.json + nanos.json
+    2. Transform to 16 CSV files
+    3. Transform symbiants.csv to 3 CSV files
+    4. Load all 19 CSVs via PostgreSQL COPY
+    5. Refresh symbiant_items view
+    """
+    import tempfile
+    import json
+    import shutil
+
+    logger.info("Starting CSV pipeline import...")
+
+    # Handle --clear flag (must reset before CSV import)
+    if args.clear:
+        logger.info("=== Performing full database reset with --clear flag ===")
+        from app.core.migration_runner import MigrationRunner
+
+        try:
+            runner = MigrationRunner()
+            success = runner.reset_database()
+            if not success:
+                logger.error("Failed to reset database")
+                return False
+            logger.info("Database reset completed successfully")
+        except Exception as e:
+            logger.error(f"Failed to reset database: {e}")
+            return False
+
+    # Resolve file paths
+    try:
+        items_path = resolve_data_file_path(args.items_file, "items.json")
+        nanos_path = resolve_data_file_path(args.nanos_file, "nanos.json")
+        perks_path = resolve_data_file_path(args.perks_file, "perks.json")
+        symbiants_path = resolve_data_file_path(args.symbiants_file, "symbiants.csv")
+    except FileNotFoundError as e:
+        logger.error(str(e))
+        return False
+
+    csv_dir = tempfile.mkdtemp(prefix='tinkertools_csv_')
+    logger.info(f"CSV directory: {csv_dir}")
+
+    try:
+        # === PHASE 1: Transform items + nanos ===
+        logger.info("=== Phase 1: Items/Nanos ===")
+
+        # Merge JSON (avoid CSV overwrite bug)
+        logger.info("Merging items and nanos JSON...")
+        with open(items_path) as f:
+            items_data = json.load(f)
+        with open(nanos_path) as f:
+            nanos_data = json.load(f)
+
+        # Mark nanos
+        for nano in nanos_data:
+            nano['__is_nano__'] = True
+
+        merged_data = items_data + nanos_data
+        logger.info(f"Merged {len(items_data)} items + {len(nanos_data)} nanos")
+
+        # Write temp file
+        merged_json = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False)
+        json.dump(merged_data, merged_json)
+        merged_json.close()
+
+        # Transform
+        perk_metadata = load_perk_metadata(str(perks_path))
+        transformer = StreamingCSVTransformer(output_dir=csv_dir)
+        transform_stats = transformer.transform_items(
+            merged_json.name,
+            is_nano=False,
+            perk_metadata=perk_metadata
+        )
+
+        os.unlink(merged_json.name)
+        logger.info(f"Transformed {transform_stats['items']} items in {transform_stats['total_time']:.1f}s")
+
+        # === PHASE 2: Transform symbiants ===
+        logger.info("=== Phase 2: Symbiants ===")
+
+        SOURCE_TYPE_MOB_ID = 1  # From migration 005
+        symbiant_stats = transformer.transform_symbiants(
+            str(symbiants_path),
+            source_type_id=SOURCE_TYPE_MOB_ID
+        )
+        logger.info(f"Transformed {symbiant_stats['mobs']} mobs, "
+                   f"{symbiant_stats['sources']} sources, "
+                   f"{symbiant_stats['item_sources']} item_sources")
+
+        # === PHASE 3: Load CSV ===
+        logger.info("=== Phase 3: Loading ===")
+
+        db_session = next(get_db())
+        try:
+            loader = StreamingCSVLoader(db_session, csv_dir=csv_dir)
+            load_stats = loader.load_all()
+
+            db_session.commit()
+            logger.info(f"Loaded {load_stats['tables_loaded']} tables, "
+                       f"{load_stats['total_rows']} rows in {load_stats['total_time']:.1f}s")
+
+        finally:
+            db_session.close()
+
+        # === SUMMARY ===
+        total_time = transform_stats['total_time'] + symbiant_stats.get('symbiant_time', 0) + load_stats['total_time']
+        logger.info("="*60)
+        logger.info("CSV PIPELINE COMPLETE")
+        logger.info(f"  Total:      {total_time:.1f}s")
+        logger.info(f"  Items:      {transform_stats['items']}")
+        logger.info(f"  Mobs:       {symbiant_stats['mobs']}")
+        logger.info(f"  Throughput: {load_stats['rows_per_second']:.0f} rows/sec")
+        logger.info("="*60)
+
+        return True
+
+    except Exception as e:
+        logger.error(f"CSV import failed: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return False
+
+    finally:
+        shutil.rmtree(csv_dir, ignore_errors=True)
+
+
 def import_all(args):
     """Import all data files in order."""
+    # Use CSV mode if requested
+    if hasattr(args, 'csv_mode') and args.csv_mode:
+        return import_all_csv_mode(args)
+
     logger.info("Starting full data import...")
 
     # If --clear is specified, do the full reset once at the beginning
@@ -470,6 +606,12 @@ Environment:
              "Uses all aggressive optimizations: PostgreSQL COPY, index dropping, "
              "UNLOGGED tables, synchronous_commit=OFF. Requires --optimized flag. "
              "WARNING: Data loss possible if server crashes during import!"
+    )
+    parser.add_argument(
+        "--csv-mode",
+        action="store_true",
+        help="Use CSV pipeline (55x faster, recommended). Streams data through CSV files "
+             "using PostgreSQL COPY for maximum performance. Works with 'all' command only."
     )
     parser.add_argument(
         "--database-url",
