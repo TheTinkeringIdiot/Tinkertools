@@ -91,7 +91,7 @@ const OPERATORS = {
   GREATER_THAN: 1,
   LESS_THAN: 2,
   OR: 3,
-  // Add more as needed
+  AND: 4,
 } as const;
 
 // ============================================================================
@@ -130,43 +130,57 @@ export function checkRequirements(weapon: WeaponCandidate, state: FiteInputState
 }
 
 /**
- * Evaluate a group of criteria with OR operator support
+ * Evaluate a group of criteria with RPN (Reverse Polish Notation) operator support
  *
- * Criteria are evaluated sequentially. When an OR operator is encountered,
- * it combines with the previous criterion.
+ * Uses stack-based evaluation for OR/AND operators:
+ * - When a criterion is evaluated, push result to stack
+ * - When OR/AND operator is encountered, pop 2 values, apply operator, push result
+ * - Final stack values are AND'd together
  *
- * @param criteria - Array of criteria to evaluate
+ * Example: prof==9, prof==14, OR, prof==15, OR
+ * 1. Push false (prof==9)      → stack: [false]
+ * 2. Push true (prof==14)       → stack: [false, true]
+ * 3. See OR → pop 2, OR, push   → stack: [true]
+ * 4. Push false (prof==15)      → stack: [true, false]
+ * 5. See OR → pop 2, OR, push   → stack: [true]
+ * 6. Result: stack.every() → true
+ *
+ * @param criteria - Array of criteria in RPN order
  * @param state - Character state
- * @returns true if all criteria (with OR groups) pass
+ * @returns true if all criteria (with OR/AND groups) pass
  */
 function evaluateCriteriaGroup(criteria: Criterion[], state: FiteInputState): boolean {
-  const results: boolean[] = [];
-  let pendingOr = false;
+  const stack: boolean[] = [];
 
-  for (let i = 0; i < criteria.length; i++) {
-    const criterion = criteria[i];
-
-    // Check if this is an OR operator
+  for (const criterion of criteria) {
+    // OR operator: pop 2 operands, apply OR, push result
     if (criterion.operator === OPERATORS.OR) {
-      pendingOr = true;
+      if (stack.length >= 2) {
+        const right = stack.pop()!;
+        const left = stack.pop()!;
+        stack.push(left || right);
+      }
+      // If stack has < 2 items, OR is malformed - skip it
       continue;
     }
 
-    // Evaluate the criterion
-    const result = evaluateCriterion(criterion, state);
-
-    if (pendingOr && results.length > 0) {
-      // Combine with previous result using OR
-      const prevResult = results.pop()!;
-      results.push(prevResult || result);
-      pendingOr = false;
-    } else {
-      results.push(result);
+    // AND operator: pop 2 operands, apply AND, push result
+    if (criterion.operator === OPERATORS.AND) {
+      if (stack.length >= 2) {
+        const right = stack.pop()!;
+        const left = stack.pop()!;
+        stack.push(left && right);
+      }
+      continue;
     }
+
+    // Regular criterion: evaluate and push to stack
+    const result = evaluateCriterion(criterion, state);
+    stack.push(result);
   }
 
-  // All results must be true (AND logic between groups)
-  return results.every((r) => r);
+  // All remaining stack values must be true (implicit AND between independent requirements)
+  return stack.every((r) => r);
 }
 
 /**
