@@ -5,7 +5,7 @@ Service for filtering weapons based on character stats and requirements.
 import logging
 from typing import List, Optional
 from sqlalchemy.orm import Session, joinedload, selectinload
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, or_, select, BigInteger, Integer, func
 
 from app.models import (
     Item, ItemStats, StatValue, AttackDefense, AttackDefenseAttack, AttackDefenseDefense,
@@ -30,6 +30,9 @@ class WeaponFilterService:
 
     # Faction stat
     FACTION_STAT = 33
+
+    # Expansion stat
+    EXPANSION_STAT = 389
 
     def __init__(self, db: Session):
         self.db = db
@@ -183,6 +186,50 @@ class WeaponFilterService:
                     Item.id.in_(items_prof_match)          # Has matching profession
                 )
             )
+
+        # Apply expansion filter - Operator 22 (StatBitSet)
+        # Exclude items requiring expansions character doesn't have
+        expansion_required_not_met = select(Item.id).select_from(Item).join(
+            Action, Item.id == Action.item_id
+        ).join(
+            ActionCriteria, Action.id == ActionCriteria.action_id
+        ).join(
+            Criterion, ActionCriteria.criterion_id == Criterion.id
+        ).where(
+            Action.action == 8,
+            Criterion.value1 == self.EXPANSION_STAT,
+            Criterion.operator == 22,
+            func.cast(
+                func.cast(request.expansion_bitflag, BigInteger).op('&')(
+                    func.cast(Criterion.value2, BigInteger)
+                ),
+                Integer
+            ) != Criterion.value2
+        ).scalar_subquery()
+
+        query = query.filter(Item.id.not_in(expansion_required_not_met))
+
+        # Apply expansion filter - Operator 107 (StatBitNotSet)
+        # Exclude items forbidden for character's expansions
+        expansion_forbidden = select(Item.id).select_from(Item).join(
+            Action, Item.id == Action.item_id
+        ).join(
+            ActionCriteria, Action.id == ActionCriteria.action_id
+        ).join(
+            Criterion, ActionCriteria.criterion_id == Criterion.id
+        ).where(
+            Action.action == 8,
+            Criterion.value1 == self.EXPANSION_STAT,
+            Criterion.operator == 107,
+            func.cast(
+                func.cast(request.expansion_bitflag, BigInteger).op('&')(
+                    func.cast(Criterion.value2, BigInteger)
+                ),
+                Integer
+            ) != 0
+        ).scalar_subquery()
+
+        query = query.filter(Item.id.not_in(expansion_forbidden))
 
         # Use distinct to avoid duplicates
         query = query.distinct()

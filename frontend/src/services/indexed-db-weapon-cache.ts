@@ -54,13 +54,13 @@ const memoryCache = new Map<string, WeaponCacheEntry>();
 
 /**
  * Generate cache key from request parameters
- * Cache depends on: level, breed, profession, faction, top 3 weapon skills
+ * Cache depends on: level, breed, profession, faction, expansion, top 3 weapon skills
  *
  * @param request Weapon analysis request
  * @returns Cache key string
  */
 export function generateCacheKey(request: WeaponAnalyzeRequest): string {
-  const { level, breed_id, profession_id, side, top_weapon_skills } = request;
+  const { level, breed_id, profession_id, side, expansion_bitflag, top_weapon_skills } = request;
 
   // Sort top skills by skill_id for consistent keys
   const skillsKey = top_weapon_skills
@@ -68,7 +68,7 @@ export function generateCacheKey(request: WeaponAnalyzeRequest): string {
     .map((s) => `${s.skill_id}:${s.value}`)
     .join(',');
 
-  return `${level}_${breed_id}_${profession_id}_${side}_${skillsKey}`;
+  return `${level}_${breed_id}_${profession_id}_${side}_${expansion_bitflag}_${skillsKey}`;
 }
 
 /**

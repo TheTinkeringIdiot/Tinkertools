@@ -33,6 +33,7 @@ def analyze_weapons(
     - Breed requirements
     - Profession requirements
     - Faction/side requirements
+    - Expansion requirements (stat 389 with bitflag matching)
     - Excludes NPC-only items
 
     Returns a list of weapons with full details including stats, attack_stats, actions, etc.

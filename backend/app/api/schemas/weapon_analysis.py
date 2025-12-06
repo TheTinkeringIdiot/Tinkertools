@@ -18,6 +18,12 @@ class WeaponAnalyzeRequest(BaseModel):
     breed_id: int = Field(..., ge=1, le=4, description="Breed ID (1-4)")
     profession_id: int = Field(..., ge=0, le=15, description="Profession ID (0=Any, 1-15=specific)")
     side: int = Field(..., ge=0, le=2, description="Side/Faction (0=Neutral, 1=Clan, 2=Omni)")
+    expansion_bitflag: int = Field(
+        default=127,
+        ge=0,
+        le=511,
+        description="Expansion bitflag from Character.AccountType (Froob=1, Sloob=7, Paid=127)"
+    )
     top_weapon_skills: List[WeaponSkill] = Field(
         ...,
         min_length=1,

@@ -112,6 +112,7 @@ export interface WeaponAnalyzeRequest {
   profession_id: number;
   side: number;
   top_weapon_skills: WeaponSkillRequest[];
+  expansion_bitflag: number; // 0-511 bitflag from AccountType
 }
 
 // ============================================================================

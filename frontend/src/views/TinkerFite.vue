@@ -13,6 +13,7 @@ import { clearWeaponCache, logCacheStats, clearLegacyLocalStorageCache } from '@
 import type { FiteInputState, WeaponCandidate } from '@/types/weapon-analysis';
 import { WEAPON_SKILL_IDS, SPECIAL_ATTACK_IDS, INITIATIVE_IDS, DAMAGE_MODIFIER_IDS } from '@/types/weapon-analysis';
 import { getEquipableWeapons } from '@/utils/weapon-filtering';
+import { accountTypeToExpansionBitflag } from '@/utils/expansion-utils';
 import FiteInputForm from '@/components/fite/FiteInputForm.vue';
 import FiltersSection from '@/components/fite/FiltersSection.vue';
 import FiteTable from '@/components/fite/FiteTable.vue';
@@ -193,6 +194,9 @@ async function fetchWeapons() {
       profession_id: inputState.value.characterStats.profession,
       side: inputState.value.characterStats.side,
       top_weapon_skills: top3,
+      expansion_bitflag: accountTypeToExpansionBitflag(
+        activeProfile.value.Character.AccountType || 'Paid'
+      ),
     };
 
     console.log('[TinkerFite] Fetching weapons with request:', request);
