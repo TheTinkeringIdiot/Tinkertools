@@ -31,6 +31,7 @@ import {
   WEAPON_TYPE,
   NPCFAMILY,
   SPECS,
+  EXPANSION_FLAG,
   type StatId,
   type StatName,
   type RequirementId,
@@ -192,6 +193,29 @@ export function getImplantSlotNameFromBitflag(bitflag: number): string {
   };
 
   return slotMap[bitflag] || `Unknown Slot (${bitflag})`;
+}
+
+/**
+ * Get expansion name from bitflag value
+ * Maps EXPANSION_FLAG bitflag values (from stat 389) to display names
+ * @param bitflag EXPANSION_FLAG bitflag value (e.g., 1=Notum Wars, 8=Alien Invasion)
+ * @returns Expansion name or "Unknown" for unrecognized values
+ */
+export function getExpansionName(bitflag: number): string {
+  // Map bitflag values to expansion names
+  const expansionMap: Record<number, string> = {
+    1: 'Notum Wars', // 1 << 0
+    2: 'Shadowlands', // 1 << 1
+    4: 'Shadowlands Preorder', // 1 << 2
+    8: 'Alien Invasion', // 1 << 3
+    16: 'Alien Invasion Preorder', // 1 << 4
+    32: 'Lost Eden', // 1 << 5
+    64: 'Lost Eden Preorder', // 1 << 6
+    128: 'Legacy of Xan', // 1 << 7
+    256: 'Legacy of Xan Preorder', // 1 << 8
+  };
+
+  return expansionMap[bitflag] || 'Unknown';
 }
 
 // ============================================================================
@@ -1487,6 +1511,11 @@ export function getFlagNameFromBit(statId: number, bitNum: number): string {
  * Similar to getFlagNameFromBit but works with the actual bit value instead of position
  */
 export function getFlagNameFromValue(statId: number, bitValue: number): string {
+  // Special case: Stat 389 (Expansion) uses getExpansionName for human-readable expansion names
+  if (statId === 389) {
+    return getExpansionName(bitValue);
+  }
+
   // Map stat IDs to their corresponding flag constants
   const flagConstants: Record<number, Record<string, number>> = {
     30: CANFLAG, // Can flags
@@ -1907,6 +1936,7 @@ export const gameUtils = {
   getArmorSlotName,
   getImplantSlotName,
   getImplantSlotNameFromBitflag,
+  getExpansionName,
 
   // Name to ID translations
   getStatId,

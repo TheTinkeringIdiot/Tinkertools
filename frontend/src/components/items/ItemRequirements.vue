@@ -171,7 +171,7 @@ Shows item requirements organized by category with compatibility checking
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Item, TinkerProfile } from '@/types/api';
-import { getStatName, getProfessionName, getBreedName } from '@/services/game-utils';
+import { getStatName, getProfessionName, getBreedName, getExpansionName } from '@/services/game-utils';
 import { mapProfileToStats, profileMeetsRequirement } from '@/utils/profile-stats-mapper';
 import type { Criterion } from '@/types/api';
 
@@ -190,11 +190,12 @@ const extractedRequirements = computed(() => {
   props.item.actions.forEach((action) => {
     if (action.criteria) {
       action.criteria.forEach((criterion: Criterion) => {
-        if (criterion.stat !== null && criterion.op !== null && criterion.value !== null) {
+        // Criterion uses value1 for stat ID, value2 for value, and operator
+        if (criterion.value1 !== null && criterion.operator !== null && criterion.value2 !== null) {
           requirements.push({
-            stat: criterion.stat,
-            operator: criterion.op,
-            value: criterion.value,
+            stat: criterion.value1,
+            operator: criterion.operator,
+            value: criterion.value2,
           });
         }
       });
@@ -300,8 +301,8 @@ const skillRequirements = computed(() => {
 });
 
 const characterRequirements = computed(() => {
-  // Character: Level (54), Profession (60), Breed (4), Gender (59), MaxHealth (1), MaxNano (214)
-  const characterIds = [1, 4, 54, 59, 60, 214];
+  // Character: Level (54), Profession (60), Breed (4), Gender (59), MaxHealth (1), MaxNano (214), Expansion (389)
+  const characterIds = [1, 4, 54, 59, 60, 214, 389];
   return extractedRequirements.value.filter((req) => characterIds.includes(req.stat));
 });
 
@@ -433,6 +434,8 @@ function formatCharacterRequirement(statId: number, value: number): string {
       return getProfessionName(value) || value.toString();
     case 59: // Gender
       return value === 1 ? 'Male' : value === 2 ? 'Female' : value.toString();
+    case 389: // Expansion
+      return getExpansionName(value);
     default:
       return value.toString();
   }
