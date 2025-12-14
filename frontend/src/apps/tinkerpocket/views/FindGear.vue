@@ -57,6 +57,7 @@ const bossSearchText = ref<string>('');
 const playfieldFilter = ref<string | null>(null);
 const minLevel = ref<number>(1);
 const maxLevel = ref<number>(220);
+const bossLevelRange = ref<[number, number]>([1, 220]); // Local state for slider
 const bossViewMode = ref<'grid' | 'list'>('list');
 
 // Loading State
@@ -356,6 +357,12 @@ function isSymbiantInComparison(symbiantId: number): boolean {
 }
 
 // Boss Methods
+function applyBossLevelFilter() {
+  minLevel.value = bossLevelRange.value[0];
+  maxLevel.value = bossLevelRange.value[1];
+  updateBossFilters();
+}
+
 function updateBossFilters() {
   pocketBossStore.updateFilters({
     search: bossSearchText.value || undefined,
@@ -370,11 +377,13 @@ function clearBossFilters() {
   playfieldFilter.value = null;
   minLevel.value = levelRange.value.min;
   maxLevel.value = levelRange.value.max;
+  bossLevelRange.value = [levelRange.value.min, levelRange.value.max];
   pocketBossStore.clearFilters();
 }
 
 function navigateToBoss(bossId: number) {
-  router.push(`/pocket/bosses/${bossId}`);
+  // Pass current tab to preserve it when returning from boss detail
+  router.push(`/pocket/bosses/${bossId}?returnTab=${props.view}`);
 }
 
 function formatLocation(boss: Mob): string {
@@ -406,6 +415,7 @@ async function loadBosses() {
   // Set initial level range from store
   minLevel.value = levelRange.value.min;
   maxLevel.value = levelRange.value.max;
+  bossLevelRange.value = [levelRange.value.min, levelRange.value.max];
 }
 
 // Lifecycle
@@ -728,15 +738,25 @@ watch(
 
             <!-- Level Range Slider -->
             <div class="flex flex-col gap-2">
-              <label class="font-medium text-sm"
-                >Level Range: {{ minLevel }} - {{ maxLevel }}</label
-              >
-              <Slider
-                v-model="minLevel"
-                :min="levelRange.min"
-                :max="maxLevel"
-                @change="updateBossFilters"
-              />
+              <label class="font-medium text-sm">Level Range</label>
+              <div class="flex items-center gap-3">
+                <span
+                  class="text-sm text-surface-600 dark:text-surface-400 min-w-[2rem] text-center"
+                  >{{ bossLevelRange[0] }}</span
+                >
+                <Slider
+                  v-model="bossLevelRange"
+                  :range="true"
+                  :min="levelRange.min"
+                  :max="levelRange.max"
+                  @slideend="applyBossLevelFilter"
+                  class="flex-1"
+                />
+                <span
+                  class="text-sm text-surface-600 dark:text-surface-400 min-w-[2rem] text-center"
+                  >{{ bossLevelRange[1] }}</span
+                >
+              </div>
             </div>
           </div>
 

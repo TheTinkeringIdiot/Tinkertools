@@ -58,6 +58,16 @@ function formatMinimumLevel(symbiant: SymbiantItem): string {
   }
 }
 
+function goBack() {
+  // Return to the tab the user was on when they navigated here
+  const returnTab = route.query.returnTab as string;
+  if (returnTab) {
+    router.push(`/pocket?tab=${returnTab}`);
+  } else {
+    router.push('/pocket');
+  }
+}
+
 async function shareLink() {
   try {
     await navigator.clipboard.writeText(window.location.href);
@@ -126,7 +136,7 @@ onMounted(() => {
               icon="pi pi-arrow-left"
               text
               rounded
-              @click="router.push('/pocket')"
+              @click="goBack"
               class="text-surface-600 dark:text-surface-400"
             />
             <i class="pi pi-users text-2xl text-primary-500"></i>
@@ -164,7 +174,7 @@ onMounted(() => {
               label="Back to Pocket Bosses"
               icon="pi pi-arrow-left"
               outlined
-              @click="router.push('/pocket')"
+              @click="goBack"
             />
           </div>
         </div>

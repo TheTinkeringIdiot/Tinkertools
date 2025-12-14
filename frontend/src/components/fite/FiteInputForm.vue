@@ -13,20 +13,32 @@ Sections:
 -->
 <template>
   <div class="fite-input-form">
-    <!-- Header with Reset Button -->
+    <!-- Header with Action Buttons -->
     <div class="form-header mb-4 flex justify-between items-center">
       <h2 class="text-xl font-bold text-surface-900 dark:text-surface-50">
         Weapon Analysis Parameters
       </h2>
-      <Button
-        label="Reset to Profile"
-        icon="pi pi-refresh"
-        severity="secondary"
-        size="small"
-        :disabled="!activeProfile"
-        @click="resetToProfile"
-        v-tooltip.bottom="'Clear manual edits and restore profile values'"
-      />
+      <div class="flex gap-2">
+        <Button
+          label="Update Weapons"
+          icon="pi pi-sync"
+          severity="primary"
+          size="small"
+          :disabled="!activeProfile"
+          @click="updateWeapons"
+          v-tooltip.bottom="'Fetch weapons from server with current parameters'"
+          style="border: 2px solid #14b8a6"
+        />
+        <Button
+          label="Reset to Profile"
+          icon="pi pi-refresh"
+          severity="secondary"
+          size="small"
+          :disabled="!activeProfile"
+          @click="resetToProfile"
+          v-tooltip.bottom="'Clear manual edits and restore profile values'"
+        />
+      </div>
     </div>
 
     <!-- Form Sections in Accordion -->
@@ -116,6 +128,7 @@ const props = defineProps<Props>();
 // Emits
 const emit = defineEmits<{
   'update:inputState': [state: FiteInputState];
+  'update-weapons': [];
 }>();
 
 // Local state - consolidated input state
@@ -372,6 +385,13 @@ function resetToDefaults(): void {
 function resetToProfile(): void {
   modifiedFields.value.clear();
   populateFromProfile();
+}
+
+/**
+ * Update Weapons button handler
+ */
+function updateWeapons(): void {
+  emit('update-weapons');
 }
 
 // Watch for prop inputState changes (external updates from parent)

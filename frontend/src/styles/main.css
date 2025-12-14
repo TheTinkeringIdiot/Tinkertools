@@ -148,6 +148,67 @@
   border-color: var(--surface-border) !important;
 }
 
+/* Menubar item hover states for dark mode */
+.dark .p-menubar .p-menuitem-link {
+  color: rgb(255, 255, 255) !important;
+  background-color: transparent !important;
+  border-radius: 0.375rem !important; /* rounded-md */
+  transition: background-color 0.2s ease-in-out !important;
+}
+
+.dark .p-menubar .p-menuitem-link:not(:hover) {
+  background-color: transparent !important;
+}
+
+.dark .p-menubar .p-menuitem-link:hover {
+  background-color: rgb(63, 63, 70) !important; /* surface-200 */
+  color: rgb(255, 255, 255) !important;
+  border-radius: 0.375rem !important; /* rounded-md */
+}
+
+/* Active/selected state for dark mode */
+.dark .p-menubar .p-menuitem.p-menuitem-active > .p-menuitem-content > .p-menuitem-link,
+.dark .p-menubar .p-menuitem .p-menuitem-link.router-link-active {
+  background-color: rgb(20, 184, 166) !important; /* primary-500 teal */
+  color: rgb(255, 255, 255) !important;
+  border-radius: 0.375rem !important;
+}
+
+.dark .p-menubar .p-menuitem.p-menuitem-active > .p-menuitem-content > .p-menuitem-link .p-menuitem-icon,
+.dark .p-menubar .p-menuitem .p-menuitem-link.router-link-active .p-menuitem-icon {
+  color: rgb(255, 255, 255) !important;
+}
+
+.dark .p-menubar .p-menuitem-link:focus,
+.dark .p-menubar .p-menuitem-link:active,
+.dark .p-menubar .p-menuitem-link.p-focus {
+  background-color: rgb(20, 184, 166) !important; /* primary-500 teal */
+  box-shadow: none !important;
+  border-radius: 0.375rem !important; /* rounded-md */
+  color: rgb(255, 255, 255) !important;
+}
+
+.dark .p-menubar .p-menuitem-link:focus .p-menuitem-icon,
+.dark .p-menubar .p-menuitem-link:active .p-menuitem-icon,
+.dark .p-menubar .p-menuitem-link.p-focus .p-menuitem-icon {
+  color: rgb(255, 255, 255) !important;
+}
+
+/* Override PrimeVue's default focus-visible highlight */
+.dark .p-menubar .p-menuitem-link:focus-visible {
+  background-color: rgb(20, 184, 166) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.dark .p-menubar .p-menuitem-icon {
+  color: rgb(161, 161, 170) !important; /* surface-500 */
+}
+
+.dark .p-menubar .p-menuitem-link:hover .p-menuitem-icon {
+  color: rgb(255, 255, 255) !important;
+}
+
 /* Accordion specific dark mode fixes */
 .dark .p-accordion-header-link {
   background-color: var(--surface-100) !important;
@@ -280,6 +341,41 @@ html.dark #app {
 
 .dark .p-dialog-content {
   background-color: rgb(39, 39, 42) !important;
+  color: rgb(255, 255, 255) !important;
+}
+
+/* Toast notifications - fix white-on-white in dark mode */
+.dark .p-toast {
+  background-color: rgb(39, 39, 42) !important;
+}
+
+.dark .p-toast-message {
+  background-color: rgb(39, 39, 42) !important;
+  border-color: rgb(63, 63, 70) !important;
+  color: rgb(255, 255, 255) !important;
+}
+
+.dark .p-toast-message-content {
+  background-color: transparent !important;
+}
+
+.dark .p-toast-message-text {
+  color: rgb(255, 255, 255) !important;
+}
+
+.dark .p-toast-summary {
+  color: rgb(255, 255, 255) !important;
+}
+
+.dark .p-toast-detail {
+  color: rgb(228, 228, 231) !important; /* surface-700 */
+}
+
+.dark .p-toast-icon-close {
+  color: rgb(161, 161, 170) !important;
+}
+
+.dark .p-toast-icon-close:hover {
   color: rgb(255, 255, 255) !important;
 }
 
@@ -483,6 +579,52 @@ html.dark #app {
   border-color: var(--surface-border) !important;
 }
 
+/* Menubar item hover states for light mode */
+.light .p-menubar .p-menuitem-link {
+  border-radius: 0.375rem !important; /* rounded-md */
+  transition: background-color 0.2s ease-in-out !important;
+}
+
+.light .p-menubar .p-menuitem-link:hover {
+  background-color: rgb(241, 245, 249) !important; /* surface-100 */
+  border-radius: 0.375rem !important; /* rounded-md */
+}
+
+/* Active/selected state for light mode */
+.light .p-menubar .p-menuitem.p-menuitem-active > .p-menuitem-content > .p-menuitem-link,
+.light .p-menubar .p-menuitem .p-menuitem-link.router-link-active {
+  background-color: rgb(13, 148, 136) !important; /* primary-600 teal */
+  color: rgb(255, 255, 255) !important;
+  border-radius: 0.375rem !important;
+}
+
+.light .p-menubar .p-menuitem.p-menuitem-active > .p-menuitem-content > .p-menuitem-link .p-menuitem-icon,
+.light .p-menubar .p-menuitem .p-menuitem-link.router-link-active .p-menuitem-icon {
+  color: rgb(255, 255, 255) !important;
+}
+
+.light .p-menubar .p-menuitem-link:focus,
+.light .p-menubar .p-menuitem-link:active,
+.light .p-menubar .p-menuitem-link.p-focus {
+  background-color: rgb(13, 148, 136) !important; /* primary-600 teal */
+  box-shadow: none !important;
+  border-radius: 0.375rem !important;
+  color: rgb(255, 255, 255) !important;
+}
+
+.light .p-menubar .p-menuitem-link:focus .p-menuitem-icon,
+.light .p-menubar .p-menuitem-link:active .p-menuitem-icon,
+.light .p-menubar .p-menuitem-link.p-focus .p-menuitem-icon {
+  color: rgb(255, 255, 255) !important;
+}
+
+/* Override PrimeVue's default focus-visible highlight */
+.light .p-menubar .p-menuitem-link:focus-visible {
+  background-color: rgb(13, 148, 136) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 /* Force light background and dark text for root elements */
 html.light,
 html.light body,
@@ -523,6 +665,25 @@ html.light #app {
 .light .p-button:disabled {
   background-color: var(--surface-100) !important;
   color: var(--surface-400) !important;
+}
+
+/* Toast notifications in light mode */
+.light .p-toast-message {
+  background-color: rgb(255, 255, 255) !important;
+  border-color: var(--surface-border) !important;
+  color: var(--text-color) !important;
+}
+
+.light .p-toast-message-text {
+  color: var(--text-color) !important;
+}
+
+.light .p-toast-summary {
+  color: var(--text-color) !important;
+}
+
+.light .p-toast-detail {
+  color: var(--text-color-secondary) !important;
 }
 
 /* Light mode text color classes */

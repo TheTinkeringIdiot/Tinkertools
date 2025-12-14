@@ -21,9 +21,18 @@
         </div>
         <!-- Standard Stat Requirement -->
         <div v-else class="chip" :class="chipClasses">
-          <span class="stat-name">{{ node.criterion.statName }}</span>
-          <span class="operator">{{ node.criterion.displaySymbol }}</span>
-          <span class="value">{{ formattedValue }}</span>
+          <!-- Use description for target requirements, otherwise build from parts -->
+          <template v-if="node.criterion.isTargetRequirement">
+            <span class="target-prefix">Target: </span>
+            <span class="stat-name">{{ node.criterion.statName }}</span>
+            <span class="operator">{{ node.criterion.displaySymbol }}</span>
+            <span class="value">{{ formattedValue }}</span>
+          </template>
+          <template v-else>
+            <span class="stat-name">{{ node.criterion.statName }}</span>
+            <span class="operator">{{ node.criterion.displaySymbol }}</span>
+            <span class="value">{{ formattedValue }}</span>
+          </template>
           <span v-if="showCurrentValue" class="current-value">({{ currentValue }})</span>
         </div>
       </div>

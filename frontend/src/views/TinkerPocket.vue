@@ -1,11 +1,47 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import TabView from 'primevue/tabview';
 import TabPanel from 'primevue/tabpanel';
 import FindGear from '@/apps/tinkerpocket/views/FindGear.vue';
 import SymbiantCompare from '@/components/pocket/SymbiantCompare.vue';
 
+const route = useRoute();
+const router = useRouter();
+
+// Initialize activeTab from URL query param or default to 0
 const activeTab = ref(0);
+
+// Tab name mapping
+const tabNames = ['symbiants', 'bosses', 'compare'];
+const tabIndexMap: Record<string, number> = {
+  symbiants: 0,
+  bosses: 1,
+  compare: 2,
+};
+
+// Initialize tab from URL on mount
+onMounted(() => {
+  const tabParam = route.query.tab as string;
+  if (tabParam && tabIndexMap[tabParam] !== undefined) {
+    activeTab.value = tabIndexMap[tabParam];
+  }
+});
+
+// Sync URL query param when tab changes
+watch(activeTab, (newIndex) => {
+  const tabName = tabNames[newIndex];
+  if (tabName) {
+    router.replace({ query: { ...route.query, tab: tabName } });
+  }
+});
+
+// Sync tab when URL changes (browser back/forward)
+watch(() => route.query.tab, (newTab) => {
+  if (newTab && typeof newTab === 'string' && tabIndexMap[newTab] !== undefined) {
+    activeTab.value = tabIndexMap[newTab];
+  }
+});
 
 // Expose for tests
 defineExpose({

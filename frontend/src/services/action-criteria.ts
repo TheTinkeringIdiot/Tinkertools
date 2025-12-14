@@ -44,6 +44,10 @@ export interface DisplayCriterion {
   isFunctionOperator?: boolean;
   functionType?: string;
   referenceAoid?: number;
+  // Modifier fields
+  isModifier?: boolean;
+  modifierType?: 'target';
+  isTargetRequirement?: boolean;
 }
 
 export interface CriteriaExpression {
@@ -109,7 +113,10 @@ const STATE_OPERATORS = {
   89: 'Must be falling',
   111: 'Must not be in vehicle',
   112: 'Flying allowed',
-  18: 'State check',
+} as const;
+
+const MODIFIER_OPERATORS = {
+  18: 'target', // Next criterion applies to target, not caster
 } as const;
 
 // ============================================================================
@@ -143,6 +150,25 @@ export function parseCriterion(criterion: Criterion): ParsedCriterion {
 export function transformCriterionForDisplay(criterion: Criterion): DisplayCriterion {
   const { id, value1: stat, value2: value, operator } = criterion;
   const statName = getStatName(stat) || `Stat ${stat}`;
+
+  // Handle modifier operators FIRST (before logical operator check)
+  if (operator in MODIFIER_OPERATORS) {
+    const modifierType = MODIFIER_OPERATORS[operator as keyof typeof MODIFIER_OPERATORS];
+    return {
+      id,
+      stat,
+      statName: 'Modifier',
+      displayValue: value,
+      displayOperator: 'modifier',
+      displaySymbol: 'modifier',
+      description: `Apply to ${modifierType}`,
+      isLogicalOperator: false,
+      isSeparator: false,
+      isStatRequirement: false,
+      isModifier: true,
+      modifierType,
+    };
+  }
 
   // Check for logical operators (separators and logical ops)
   if (stat === 0 && value === 0) {
@@ -609,12 +635,15 @@ export function buildCriteriaTree(
   // Transform all criteria to display format
   const displayCriteria = criteria.map(transformCriterionForDisplay);
 
+  // Process modifiers first
+  const processedCriteria = processCriteriaWithModifiers(displayCriteria);
+
   // Simple case: only stat requirements (all AND)
   // Include function operators as they are also requirements (e.g., CheckNcu)
-  const statRequirements = displayCriteria.filter(
+  const statRequirements = processedCriteria.filter(
     (c) => c.isStatRequirement || c.isFunctionOperator
   );
-  const logicalOperators = displayCriteria.filter((c) => c.isLogicalOperator);
+  const logicalOperators = processedCriteria.filter((c) => c.isLogicalOperator);
 
   if (logicalOperators.length === 0) {
     // Simple list of requirements
@@ -655,6 +684,38 @@ function createSimpleRequirementsList(
 }
 
 /**
+ * Process criteria array to apply modifiers
+ */
+function processCriteriaWithModifiers(criteria: DisplayCriterion[]): DisplayCriterion[] {
+  const processed: DisplayCriterion[] = [];
+  let activeModifier: 'target' | null = null;
+
+  for (const criterion of criteria) {
+    // Handle modifier operators
+    if (criterion.isModifier) {
+      activeModifier = criterion.modifierType || null;
+      continue; // Skip adding modifier to output
+    }
+
+    // Apply active modifier to this criterion
+    if (activeModifier && (criterion.isStatRequirement || criterion.isFunctionOperator)) {
+      processed.push({
+        ...criterion,
+        isTargetRequirement: activeModifier === 'target',
+        description: activeModifier === 'target'
+          ? `Target: ${criterion.description}`
+          : criterion.description,
+      });
+      activeModifier = null; // Clear after applying
+    } else {
+      processed.push(criterion);
+    }
+  }
+
+  return processed;
+}
+
+/**
  * Build tree from reverse polish notation expression
  */
 function buildTreeFromRPN(
@@ -662,11 +723,15 @@ function buildTreeFromRPN(
   characterStats?: Record<number, number>
 ): CriteriaTreeNode | null {
   const stack: CriteriaTreeNode[] = [];
-  // Include function operators as requirements
-  const statRequirements = displayCriteria.filter(
+
+  // Process criteria to apply modifiers
+  const processedCriteria = processCriteriaWithModifiers(displayCriteria);
+
+  // Include function operators as requirements (after modifier processing)
+  const statRequirements = processedCriteria.filter(
     (c) => c.isStatRequirement || c.isFunctionOperator
   );
-  const logicalOperators = displayCriteria.filter((c) => c.isLogicalOperator);
+  const logicalOperators = processedCriteria.filter((c) => c.isLogicalOperator);
 
   // Special case: if all logical operators are AND and we have multiple stat requirements
   // Just create a simple requirements list (common pattern: REQ1 REQ2 AND REQ3 AND ...)
@@ -674,9 +739,10 @@ function buildTreeFromRPN(
     return createSimpleRequirementsList(statRequirements, characterStats);
   }
 
-  for (const criterion of displayCriteria) {
+  // Use processed criteria (modifiers already applied)
+  for (const criterion of processedCriteria) {
     if (criterion.isStatRequirement || criterion.isFunctionOperator) {
-      // Push requirement node onto stack (stat requirements and function operators)
+      // Push requirement node onto stack
       stack.push({
         type: 'requirement',
         criterion,

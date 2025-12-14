@@ -6,10 +6,10 @@ Main view component with profile integration, filtering, and DPS calculations
 -->
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { analyzeWeaponsWithCache } from '@/services/weapon-service';
-import { clearWeaponCache, logCacheStats, clearLegacyLocalStorageCache } from '@/services/indexed-db-weapon-cache';
+import { clearWeaponCache, clearLegacyLocalStorageCache } from '@/services/indexed-db-weapon-cache';
 import type { FiteInputState, WeaponCandidate } from '@/types/weapon-analysis';
 import { WEAPON_SKILL_IDS, SPECIAL_ATTACK_IDS, INITIATIVE_IDS, DAMAGE_MODIFIER_IDS } from '@/types/weapon-analysis';
 import { getEquipableWeapons } from '@/utils/weapon-filtering';
@@ -18,7 +18,6 @@ import FiteInputForm from '@/components/fite/FiteInputForm.vue';
 import FiltersSection from '@/components/fite/FiltersSection.vue';
 import FiteTable from '@/components/fite/FiteTable.vue';
 import Badge from 'primevue/badge';
-import Button from 'primevue/button';
 
 // ============================================================================
 // Store
@@ -69,60 +68,6 @@ const maxQL = ref<number | undefined>(undefined);
 // ============================================================================
 
 const activeProfile = computed(() => profileStore.activeProfile);
-
-/**
- * Cache key data - only the profile fields that affect weapon backend query
- * Used to detect when cache should be invalidated
- */
-const cacheKeyData = computed(() => {
-  if (!activeProfile.value) return null;
-
-  const profile = activeProfile.value;
-  const weaponSkillIds = [
-    WEAPON_SKILL_IDS.MARTIAL_ARTS,
-    WEAPON_SKILL_IDS.MULTI_MELEE,
-    WEAPON_SKILL_IDS.ONE_H_BLUNT,
-    WEAPON_SKILL_IDS.ONE_H_EDGED,
-    WEAPON_SKILL_IDS.MELEE_ENERGY,
-    WEAPON_SKILL_IDS.TWO_H_EDGED,
-    WEAPON_SKILL_IDS.PIERCING,
-    WEAPON_SKILL_IDS.TWO_H_BLUNT,
-    WEAPON_SKILL_IDS.SHARP_OBJECTS,
-    WEAPON_SKILL_IDS.GRENADE,
-    WEAPON_SKILL_IDS.HEAVY_WEAPONS,
-    WEAPON_SKILL_IDS.BOW,
-    WEAPON_SKILL_IDS.PISTOL,
-    WEAPON_SKILL_IDS.RIFLE,
-    WEAPON_SKILL_IDS.MG_SMG,
-    WEAPON_SKILL_IDS.SHOTGUN,
-    WEAPON_SKILL_IDS.ASSAULT_RIFLE,
-    WEAPON_SKILL_IDS.RANGED_ENERGY,
-    WEAPON_SKILL_IDS.MULTI_RANGED,
-  ];
-
-  // Get top 3 weapon skills
-  const weaponSkills = weaponSkillIds.map(id => ({
-    id,
-    value: profile.skills[id]?.total || 0
-  }));
-
-  const top3 = weaponSkills
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 3)
-    .map(s => `${s.id}:${s.value}`)
-    .join(',');
-
-  const faction = profile.Character.Faction?.toLowerCase() || 'neutral';
-  const side = faction === 'clan' ? 1 : faction === 'omni' ? 2 : 0;
-
-  return {
-    level: profile.Character.Level,
-    breed: profile.Character.Breed,
-    profession: profile.Character.Profession,
-    side,
-    top3Skills: top3,
-  };
-});
 
 /**
  * Equipable weapons (filtered by requirements and QL interpolation)
@@ -213,6 +158,7 @@ async function fetchWeapons() {
 
 /**
  * Populate input state from active profile
+ * Called on mount
  * Extracts all weapon skills, special attacks, and combat stats
  */
 function populateFromProfile() {
@@ -309,69 +255,13 @@ function onInputStateUpdate(newState: FiteInputState) {
 }
 
 /**
- * Clear weapon cache and refetch
+ * Update weapons: clear cache and refetch
  */
-function handleClearCache() {
+function handleUpdateWeapons() {
   clearWeaponCache();
-  console.log('[TinkerFite] Cache cleared, refetching weapons');
+  console.log('[TinkerFite] Updating weapons: cache cleared, refetching weapons');
   fetchWeapons();
 }
-
-/**
- * Log cache statistics to console
- */
-function handleLogStats() {
-  logCacheStats();
-}
-
-// ============================================================================
-// Watchers
-// ============================================================================
-
-/**
- * Watch for profile switches (different profile selected)
- * Re-populate input state and fetch weapons when profile switches
- */
-watch(
-  () => profileStore.activeProfile,
-  (newProfile, oldProfile) => {
-    if (newProfile?.Character.Name === oldProfile?.Character.Name) return;
-
-    console.log('[TinkerFite] Profile switched, re-populating');
-    populateFromProfile();
-    fetchWeapons();
-  }
-);
-
-/**
- * Watch for cache-relevant profile changes within same profile
- * Refetches weapons when level, breed, profession, faction, or top 3 weapon skills change
- */
-watch(
-  cacheKeyData,
-  (newKey, oldKey) => {
-    // Skip if no profile or first run (handled by onMounted)
-    if (!newKey || !oldKey) return;
-
-    // Check if cache key actually changed
-    const changed =
-      newKey.level !== oldKey.level ||
-      newKey.breed !== oldKey.breed ||
-      newKey.profession !== oldKey.profession ||
-      newKey.side !== oldKey.side ||
-      newKey.top3Skills !== oldKey.top3Skills;
-
-    if (changed) {
-      console.log('[TinkerFite] Cache key changed, refetching weapons', {
-        old: oldKey,
-        new: newKey,
-      });
-      populateFromProfile();
-      fetchWeapons();
-    }
-  },
-  { deep: true }
-);
 
 // ============================================================================
 // Lifecycle
@@ -399,40 +289,17 @@ onMounted(() => {
     <div
       class="bg-surface-50 dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 p-4"
     >
-      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div class="flex items-center gap-4">
-          <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50">
-            <i class="pi pi-shield mr-2" aria-hidden="true"></i>
-            TinkerFite
-          </h1>
-          <Badge
-            :value="filteredWeapons.length"
-            severity="success"
-            v-if="filteredWeapons.length > 0"
-            :aria-label="`${filteredWeapons.length} weapons found`"
-          />
-        </div>
-        <div class="flex items-center gap-2">
-          <Button
-            label="Clear Cache"
-            icon="pi pi-refresh"
-            size="small"
-            severity="secondary"
-            outlined
-            @click="handleClearCache"
-            :disabled="loading"
-            v-tooltip.bottom="'Clear weapon cache and refetch from server'"
-          />
-          <Button
-            label="Cache Stats"
-            icon="pi pi-chart-bar"
-            size="small"
-            severity="secondary"
-            outlined
-            @click="handleLogStats"
-            v-tooltip.bottom="'Log cache statistics to console'"
-          />
-        </div>
+      <div class="flex items-center gap-4">
+        <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50">
+          <i class="pi pi-shield mr-2" aria-hidden="true"></i>
+          TinkerFite
+        </h1>
+        <Badge
+          :value="filteredWeapons.length"
+          severity="success"
+          v-if="filteredWeapons.length > 0"
+          :aria-label="`${filteredWeapons.length} weapons found`"
+        />
       </div>
 
       <!-- Profile Info -->
@@ -475,6 +342,7 @@ onMounted(() => {
           :input-state="inputState"
           :active-profile="(activeProfile as any) ?? null"
           @update:input-state="onInputStateUpdate"
+          @update-weapons="handleUpdateWeapons"
         />
       </div>
 

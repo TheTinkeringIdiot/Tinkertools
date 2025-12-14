@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import Button from 'primevue/button';
 import Menubar from 'primevue/menubar';
 import Toast from 'primevue/toast';
@@ -10,52 +10,61 @@ import ProfileDropdown from './components/profiles/ProfileDropdown.vue';
 import type { MenuItem } from 'primevue/menuitem';
 
 const router = useRouter();
+const route = useRoute();
 const { isDark, toggle, currentTheme } = useTheme();
 
 const themeIcon = computed(() => (isDark.value ? 'pi pi-sun' : 'pi pi-moon'));
 const themeLabel = computed(() => (isDark.value ? 'Switch to Light Mode' : 'Switch to Dark Mode'));
 const currentThemeText = computed(() => (isDark.value ? 'Dark' : 'Light'));
 
-const menuItems = ref<MenuItem[]>([
+const menuItems = computed<MenuItem[]>(() => [
   {
     label: 'Home',
     icon: 'pi pi-home',
     command: () => router.push('/'),
+    class: route.path === '/' ? 'router-link-active' : '',
   },
   {
     label: 'TinkerProfiles',
     icon: 'pi pi-users',
     command: () => router.push('/profiles'),
+    class: route.path.startsWith('/profiles') ? 'router-link-active' : '',
   },
   {
     label: 'TinkerItems',
     icon: 'pi pi-database',
     command: () => router.push('/items'),
+    class: route.path.startsWith('/items') ? 'router-link-active' : '',
   },
   {
     label: 'TinkerNanos',
     icon: 'pi pi-bolt',
     command: () => router.push('/nanos'),
+    class: route.path.startsWith('/nanos') ? 'router-link-active' : '',
   },
   {
     label: 'TinkerNukes',
     icon: 'pi pi-sparkles',
     command: () => router.push('/tinkernukes'),
+    class: route.path.startsWith('/tinkernukes') ? 'router-link-active' : '',
   },
   {
     label: 'TinkerFite',
     icon: 'pi pi-shield',
     command: () => router.push('/fite'),
+    class: route.path.startsWith('/fite') ? 'router-link-active' : '',
   },
   {
     label: 'TinkerPlants',
     icon: 'pi pi-cog',
     command: () => router.push('/plants'),
+    class: route.path.startsWith('/plants') ? 'router-link-active' : '',
   },
   {
     label: 'TinkerPocket',
     icon: 'pi pi-map',
     command: () => router.push('/pocket'),
+    class: route.path.startsWith('/pocket') ? 'router-link-active' : '',
   },
 ]);
 </script>
