@@ -246,48 +246,28 @@ class WeaponFilterService:
 
         item_ids = [item.id for item in items]
 
-        # Stage 2a: Load item details with selectinload to avoid Cartesian products
+        # Stage 2: Load item details with all relationships
+        # Use selectinload for large result sets (200-1000 weapons) to avoid Cartesian products
+        # For smaller result sets or single-item lookups, joinedload would be more efficient
         detailed_query = self.db.query(Item).options(
             selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
+            selectinload(Item.item_spell_data).selectinload(ItemSpellData.spell_data)
+                .selectinload(SpellData.spell_data_spells).selectinload(SpellDataSpells.spell)
+                .selectinload(Spell.spell_criteria).selectinload(SpellCriterion.criterion),
+            selectinload(Item.actions).selectinload(Action.action_criteria)
+                .selectinload(ActionCriteria.criterion),
             selectinload(Item.attack_defense)
                 .selectinload(AttackDefense.attack_stats)
                 .selectinload(AttackDefenseAttack.stat_value),
             selectinload(Item.attack_defense)
                 .selectinload(AttackDefense.defense_stats)
                 .selectinload(AttackDefenseDefense.stat_value),
-            # Only load 2 levels deep for spell data (not the full spell criteria chain)
-            selectinload(Item.item_spell_data).selectinload(ItemSpellData.spell_data),
-            selectinload(Item.actions),
             selectinload(Item.item_sources)
                 .selectinload(ItemSource.source)
                 .selectinload(Source.source_type)
         ).filter(Item.id.in_(item_ids))
 
         detailed_items_objs = detailed_query.all()
-
-        # Stage 2b: Batch load spell criteria separately if needed
-        spell_data_ids = [
-            isd.spell_data_id
-            for item in detailed_items_objs
-            for isd in item.item_spell_data if isd.spell_data_id
-        ]
-
-        if spell_data_ids:
-            # Load spell details with criteria in separate optimized query
-            self.db.query(SpellData).options(
-                selectinload(SpellData.spell_data_spells)
-                    .selectinload(SpellDataSpells.spell)
-                    .selectinload(Spell.spell_criteria)
-                    .selectinload(SpellCriterion.criterion)
-            ).filter(SpellData.id.in_(spell_data_ids)).all()
-
-        # Stage 2c: Batch load action criteria separately
-        action_ids = [action.id for item in detailed_items_objs for action in item.actions]
-
-        if action_ids:
-            self.db.query(ActionCriteria).options(
-                selectinload(ActionCriteria.criterion)
-            ).filter(ActionCriteria.action_id.in_(action_ids)).all()
 
         logger.info(f"Loaded full details for {len(detailed_items_objs)} weapons")
 

@@ -455,7 +455,9 @@ def get_items(
         joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
         joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data).joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell).joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
         joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion),
-        joinedload(Item.item_sources).joinedload(ItemSource.source).joinedload(Source.source_type)
+        joinedload(Item.item_sources).joinedload(ItemSource.source).joinedload(Source.source_type),
+        joinedload(Item.attack_defense).joinedload(AttackDefense.attack_stats).joinedload(AttackDefenseAttack.stat_value),
+        joinedload(Item.attack_defense).joinedload(AttackDefense.defense_stats).joinedload(AttackDefenseDefense.stat_value)
     )
     
     # Apply filters
@@ -667,7 +669,9 @@ def search_items(
             joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
             joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data).joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell).joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
             joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion),
-            joinedload(Item.item_sources).joinedload(ItemSource.source).joinedload(Source.source_type)
+            joinedload(Item.item_sources).joinedload(ItemSource.source).joinedload(Source.source_type),
+            joinedload(Item.attack_defense).joinedload(AttackDefense.attack_stats).joinedload(AttackDefenseAttack.stat_value),
+            joinedload(Item.attack_defense).joinedload(AttackDefense.defense_stats).joinedload(AttackDefenseDefense.stat_value)
         )
         
         # Apply the search filter
@@ -714,7 +718,9 @@ def search_items(
             joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
             joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data).joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell).joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
             joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion),
-            joinedload(Item.item_sources).joinedload(ItemSource.source).joinedload(Source.source_type)
+            joinedload(Item.item_sources).joinedload(ItemSource.source).joinedload(Source.source_type),
+            joinedload(Item.attack_defense).joinedload(AttackDefense.attack_stats).joinedload(AttackDefenseAttack.stat_value),
+            joinedload(Item.attack_defense).joinedload(AttackDefense.defense_stats).joinedload(AttackDefenseDefense.stat_value)
         ).filter(
             func.to_tsvector('english', search_expression).op('@@')(
                 func.to_tsquery('english', search_query)
@@ -909,12 +915,14 @@ def filter_items_advanced(
     Advanced filtering for items with multiple criteria and sorting options.
     """
     start_time = time.time()
-    
+
     query = db.query(Item).options(
         joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
         joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data).joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell).joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
         joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion),
-        joinedload(Item.item_sources).joinedload(ItemSource.source).joinedload(Source.source_type)
+        joinedload(Item.item_sources).joinedload(ItemSource.source).joinedload(Source.source_type),
+        joinedload(Item.attack_defense).joinedload(AttackDefense.attack_stats).joinedload(AttackDefenseAttack.stat_value),
+        joinedload(Item.attack_defense).joinedload(AttackDefense.defense_stats).joinedload(AttackDefenseDefense.stat_value)
     )
     
     # Apply basic filters
@@ -1171,7 +1179,9 @@ def get_item(aoid: int, db: Session = Depends(get_db)):
         joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
         joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data).joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell).joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
         joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion),
-        joinedload(Item.item_sources).joinedload(ItemSource.source).joinedload(Source.source_type)
+        joinedload(Item.item_sources).joinedload(ItemSource.source).joinedload(Source.source_type),
+        joinedload(Item.attack_defense).joinedload(AttackDefense.attack_stats).joinedload(AttackDefenseAttack.stat_value),
+        joinedload(Item.attack_defense).joinedload(AttackDefense.defense_stats).joinedload(AttackDefenseDefense.stat_value)
     ).filter(Item.aoid == aoid).first()
     
     if not item:
