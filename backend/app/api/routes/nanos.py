@@ -4,7 +4,7 @@ Nano programs API endpoints with rich spell data.
 
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy.orm import Session, joinedload, selectinload, aliased
 from sqlalchemy import and_, or_, desc, asc, Integer
 import math
 import logging
@@ -169,9 +169,11 @@ def get_nanos(
     """
     # Query nano items with their spell data
     query = db.query(Item).filter(Item.is_nano == True).options(
+        joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
         joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
         .joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell)
-        .joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion)
+        .joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
+        joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion)
     )
     
     # Apply basic filters
@@ -252,9 +254,11 @@ def search_nanos(
             )
         )
     ).options(
+        joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
         joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
         .joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell)
-        .joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion)
+        .joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
+        joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion)
     )
     
     total = query.count()
@@ -291,9 +295,11 @@ def get_nano_stats(db: Session = Depends(get_db)):
     """
     # Get all nano items
     items = db.query(Item).filter(Item.is_nano == True).options(
+        joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
         joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
         .joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell)
-        .joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion)
+        .joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
+        joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion)
     ).all()
     
     schools = set()
@@ -338,9 +344,11 @@ def get_nano(nano_id: int, db: Session = Depends(get_db)):
     item = db.query(Item).filter(
         and_(Item.id == nano_id, Item.is_nano == True)
     ).options(
+        joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
         joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
         .joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell)
-        .joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion)
+        .joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
+        joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion)
     ).first()
     
     if not item:
@@ -415,17 +423,37 @@ def get_nanos_by_profession(
     )
     
     # Filter by profession requirement using optimized subquery
+    # Excludes profession criteria preceded by operator 18 (target modifier)
     if profession_id > 0:
+        # Alias for the current and previous criteria
+        ac_current = aliased(ActionCriteria)
+        c_current = aliased(Criterion)
+        ac_prev = aliased(ActionCriteria)
+        c_prev = aliased(Criterion)
+
         profession_subquery = (
             db.query(Action.item_id)
-            .join(ActionCriteria, Action.id == ActionCriteria.action_id)
-            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
+            .join(ac_current, Action.id == ac_current.action_id)
+            .join(c_current, ac_current.criterion_id == c_current.id)
+            .outerjoin(
+                ac_prev,
+                and_(
+                    ac_prev.action_id == Action.id,
+                    ac_prev.order_index == ac_current.order_index - 1
+                )
+            )
+            .outerjoin(c_prev, ac_prev.criterion_id == c_prev.id)
             .filter(
                 and_(
                     Action.action == 3,  # USE action
                     or_(
-                        and_(Criterion.value1 == 60, Criterion.value2 == profession_id),
-                        and_(Criterion.value1 == 368, Criterion.value2 == profession_id)
+                        and_(c_current.value1 == 60, c_current.value2 == profession_id),
+                        and_(c_current.value1 == 368, c_current.value2 == profession_id)
+                    ),
+                    # Exclude if preceded by operator 18 (target modifier)
+                    or_(
+                        c_prev.id.is_(None),  # No previous criterion
+                        c_prev.operator != 18  # Previous is not operator 18
                     )
                 )
             )
@@ -571,17 +599,37 @@ def get_offensive_nanos_by_profession(
     )
 
     # Filter by profession requirement using optimized subquery
+    # Excludes profession criteria preceded by operator 18 (target modifier)
     if profession_id > 0:
+        # Alias for the current and previous criteria
+        ac_current = aliased(ActionCriteria)
+        c_current = aliased(Criterion)
+        ac_prev = aliased(ActionCriteria)
+        c_prev = aliased(Criterion)
+
         profession_subquery = (
             db.query(Action.item_id)
-            .join(ActionCriteria, Action.id == ActionCriteria.action_id)
-            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
+            .join(ac_current, Action.id == ac_current.action_id)
+            .join(c_current, ac_current.criterion_id == c_current.id)
+            .outerjoin(
+                ac_prev,
+                and_(
+                    ac_prev.action_id == Action.id,
+                    ac_prev.order_index == ac_current.order_index - 1
+                )
+            )
+            .outerjoin(c_prev, ac_prev.criterion_id == c_prev.id)
             .filter(
                 and_(
                     Action.action == 3,  # USE action
                     or_(
-                        and_(Criterion.value1 == 60, Criterion.value2 == profession_id),
-                        and_(Criterion.value1 == 368, Criterion.value2 == profession_id)
+                        and_(c_current.value1 == 60, c_current.value2 == profession_id),
+                        and_(c_current.value1 == 368, c_current.value2 == profession_id)
+                    ),
+                    # Exclude if preceded by operator 18 (target modifier)
+                    or_(
+                        c_prev.id.is_(None),  # No previous criterion
+                        c_prev.operator != 18  # Previous is not operator 18
                     )
                 )
             )
