@@ -721,8 +721,8 @@ class DataImporter:
         """
         Import pocket boss mobs and create source relationships from symbiants.csv
 
-        CSV Format (no header, semicolon-delimited):
-        QL;Slot;Family;BossName;Playfield;Location;Mobs;Level;...;ItemLink
+        CSV Format (no header, comma-delimited):
+        QL,Slot,Family,BossName,Playfield,Location,Mobs,Level,...,ItemLink
 
         Args:
             csv_path: Path to symbiants.csv file
@@ -737,7 +737,7 @@ class DataImporter:
         symbiant_drops = []  # List of {symbiant_aoid, boss_key} dicts
 
         with open(csv_path, 'r', encoding='utf-8') as f:
-            reader = csv.reader(f, delimiter=';')
+            reader = csv.reader(f, delimiter=',')
 
             for row_num, row in enumerate(reader, start=1):
                 if len(row) < 12:
@@ -817,27 +817,48 @@ class DataImporter:
             db.commit()
             logger.info(f"Created {mobs_created} new mob records, found {len(mobs_data) - mobs_created} existing")
 
-            # Step 4: Create Source records (one per mob)
+            # Step 4: Create Source records (one per mob, or get existing)
+            # Pre-load existing sources for this source_type to avoid repeated queries
+            existing_sources = {
+                (s.source_type_id, s.source_id): s.id
+                for s in db.query(Source).filter_by(source_type_id=source_type.id).all()
+            }
+
             source_map = {}  # Map boss_key to source.id
+            sources_created = 0
 
             for boss_key, mob_id in boss_key_to_id.items():
                 mob_name = mobs_data[boss_key]['name']
+                source_key = (source_type.id, mob_id)
 
-                source = Source(
-                    source_type_id=source_type.id,
-                    source_id=mob_id,
-                    name=mob_name  # Denormalized for performance
-                )
-                db.add(source)
-                db.flush()
-                source_map[boss_key] = source.id
+                # Check if source already exists
+                if source_key in existing_sources:
+                    source_map[boss_key] = existing_sources[source_key]
+                else:
+                    source = Source(
+                        source_type_id=source_type.id,
+                        source_id=mob_id,
+                        name=mob_name  # Denormalized for performance
+                    )
+                    db.add(source)
+                    db.flush()
+                    source_map[boss_key] = source.id
+                    existing_sources[source_key] = source.id  # Add to cache
+                    sources_created += 1
 
             db.commit()
-            logger.info(f"Created {len(source_map)} source records")
+            logger.info(f"Created {sources_created} new source records, found {len(source_map) - sources_created} existing")
 
             # Step 5: Create ItemSource links (deduplicate first)
+            # Pre-load existing item_sources for these sources
+            source_ids = list(source_map.values())
+            existing_item_sources = {
+                (iis.item_id, iis.source_id)
+                for iis in db.query(ItemSource).filter(ItemSource.source_id.in_(source_ids)).all()
+            }
+
             item_sources_created = 0
-            seen_pairs = set()  # Track (item_id, source_id) pairs to avoid duplicates
+            seen_pairs = set(existing_item_sources)  # Start with existing pairs from database
 
             for drop in symbiant_drops:
                 symbiant_aoid = drop['symbiant_aoid']
@@ -849,11 +870,10 @@ class DataImporter:
                     logger.warning(f"Item not found for AOID {symbiant_aoid}")
                     continue
 
-                # Check for duplicate (item_id, source_id) pair
+                # Check for duplicate (item_id, source_id) pair (from CSV or existing DB)
                 pair = (item.id, source_map[boss_key])
                 if pair in seen_pairs:
-                    logger.debug(f"Skipping duplicate item-source pair: item_id={item.id}, source_id={source_map[boss_key]}")
-                    continue
+                    continue  # Skip duplicates from CSV or already in database
 
                 seen_pairs.add(pair)
 
@@ -869,7 +889,8 @@ class DataImporter:
                 item_sources_created += 1
 
             db.commit()
-            logger.info(f"Created {item_sources_created} item-source relationships")
+            existing_count = len(existing_item_sources)
+            logger.info(f"Created {item_sources_created} new item-source relationships, found {existing_count} existing")
 
             # Step 6: Refresh materialized view
             db.execute(text("REFRESH MATERIALIZED VIEW symbiant_items"))

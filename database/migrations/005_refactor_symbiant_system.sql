@@ -60,17 +60,17 @@ SELECT DISTINCT ON (i.id)
     i.ql,
     sv.value as slot_id,
     CASE
-        WHEN i.name ~ ',\s*Artillery\s+Unit\s+Aban$' THEN 'Artillery'
-        WHEN i.name ~ ',\s*Control\s+Unit\s+Aban$' THEN 'Control'
-        WHEN i.name ~ ',\s*Extermination\s+Unit\s+Aban$' THEN 'Extermination'
-        WHEN i.name ~ ',\s*Infantry\s+Unit\s+Aban$' THEN 'Infantry'
-        WHEN i.name ~ ',\s*Support\s+Unit\s+Aban$' THEN 'Support'
+        WHEN i.name ~ ',\s*Artillery\s+Unit\s+(Aban|Alpha|Beta)$' THEN 'Artillery'
+        WHEN i.name ~ ',\s*Control\s+Unit\s+(Aban|Alpha|Beta)$' THEN 'Control'
+        WHEN i.name ~ ',\s*Extermination\s+Unit\s+(Aban|Alpha|Beta)$' THEN 'Extermination'
+        WHEN i.name ~ ',\s*Infantry\s+Unit\s+(Aban|Alpha|Beta)$' THEN 'Infantry'
+        WHEN i.name ~ ',\s*Support\s+Unit\s+(Aban|Alpha|Beta)$' THEN 'Support'
         ELSE NULL
     END as family
 FROM items i
 LEFT JOIN item_stats istats ON i.id = istats.item_id
-LEFT JOIN stat_values sv ON istats.stat_value_id = sv.id AND sv.stat = 54
-WHERE i.name ~ 'Symbiant.*Unit\s+Aban$'
+LEFT JOIN stat_values sv ON istats.stat_value_id = sv.id AND sv.stat = 298
+WHERE i.name ~ 'Symbiant.*Unit\s+(Aban|Alpha|Beta)$'
 ORDER BY i.id, sv.value DESC NULLS LAST;
 
 -- Performance indexes for symbiant_items
