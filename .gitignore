@@ -57,9 +57,7 @@ context_portal/
 # Data import files (large JSON/CSV files)
 backend/items.json
 backend/nanos.json
-backend/symbiants.csv
 *.json
-*.csv
 !**/test*.json
 !**/sample*.json
 
