@@ -12,7 +12,10 @@ import logging
 from app.models.item import Item, ItemStats, ItemSpellData
 from app.models.stat_value import StatValue
 from app.models.spell_data import SpellData, SpellDataSpells
-from app.models.spell import Spell
+from app.models.spell import Spell, SpellCriterion
+from app.models.action import Action, ActionCriteria
+from app.models.criterion import Criterion
+from app.models.source import ItemSource, Source, SourceType
 from app.services.interpolation import InterpolationService
 from app.api.schemas.item import ItemDetail
 from app.api.routes.items import build_item_detail
@@ -95,113 +98,159 @@ class ImplantService:
             return 201
     
     def _find_implant_with_clusters(
-        self, 
-        slot: int, 
-        base_ql: int, 
+        self,
+        slot: int,
+        base_ql: int,
         clusters: Dict[str, int]
     ) -> Optional[Item]:
         """
-        Find an implant item with exact cluster match.
-        
+        Find an implant item with exact cluster match using optimized CTE-based query.
+
         Implant clusters are represented as spells with ID 53045 (Modify Stat) that modify
         specific skills. This method finds implants that have exactly the requested clusters
         and no extra ones.
-        
+
         Args:
             slot: Numeric slot position
             base_ql: Base quality level to query
             clusters: Dict mapping position names to STAT IDs
-            
+
         Returns:
             Item with exact cluster match or None
         """
+        from sqlalchemy import text
+
         cluster_stats = list(clusters.values())
         cluster_count = len(cluster_stats)
-        
+
         logger.info(f"Searching for implant: slot={slot}, base_ql={base_ql}, clusters={clusters}")
-        
-        # Build base query for implants
-        query = self.db.query(Item)\
-            .filter(Item.item_class == 3)\
-            .filter(Item.ql == base_ql)
-        
-        # Filter to implants that have exactly the required clusters via spells
+
         if cluster_stats:
-            # Subquery: Items that have all required clusters via Modify Stat spells (53045)
-            has_all_clusters = self.db.query(Item.id)\
-                .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
-                .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
-                .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
-                .join(Spell, SpellDataSpells.spell_id == Spell.id)\
-                .filter(Item.item_class == 3)\
-                .filter(Item.ql == base_ql)\
-                .filter(Spell.spell_id == 53045)\
-                .filter(cast(Spell.spell_params['Stat'], String).cast(Integer).in_(cluster_stats))\
-                .group_by(Item.id)\
-                .having(func.count(Spell.id.distinct()) == cluster_count)\
-                .subquery()
+            # Use raw SQL with CTEs for optimal performance
+            # Single query that PostgreSQL can optimize effectively
+            cluster_list = ','.join(str(stat) for stat in cluster_stats)
 
-            # Subquery: Items that have NO extra clusters (other Modify Stat spells not in our list)
-            # First get items with extra clusters
-            items_with_extra_clusters = self.db.query(Item.id)\
-                .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
-                .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
-                .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
-                .join(Spell, SpellDataSpells.spell_id == Spell.id)\
-                .filter(Item.item_class == 3)\
-                .filter(Item.ql == base_ql)\
-                .filter(Spell.spell_id == 53045)\
-                .filter(~cast(Spell.spell_params['Stat'], String).cast(Integer).in_(cluster_stats))\
-                .distinct()\
-                .subquery()
+            raw_query = text(f"""
+                WITH implant_candidates AS (
+                    -- Get all implants at the specified QL and slot
+                    SELECT DISTINCT i.id
+                    FROM items i
+                    JOIN item_stats ist ON i.id = ist.item_id
+                    JOIN stat_values sv ON ist.stat_value_id = sv.id
+                    WHERE i.item_class = 3
+                      AND i.ql = :base_ql
+                      AND sv.stat = 298
+                      AND (sv.value & :slot) > 0
+                ),
+                implant_clusters AS (
+                    -- Get all Modify Stat spells for candidate implants
+                    SELECT
+                        ic.id as item_id,
+                        (s.spell_params->>'Stat')::integer as cluster_stat
+                    FROM implant_candidates ic
+                    JOIN item_spell_data isd ON ic.id = isd.item_id
+                    JOIN spell_data sd ON isd.spell_data_id = sd.id
+                    JOIN spell_data_spells sds ON sd.id = sds.spell_data_id
+                    JOIN spells s ON sds.spell_id = s.id
+                    WHERE s.spell_id = 53045
+                ),
+                cluster_matches AS (
+                    -- Count matching and non-matching clusters
+                    SELECT
+                        item_id,
+                        COUNT(*) FILTER (WHERE cluster_stat IN ({cluster_list})) as matching_count,
+                        COUNT(*) FILTER (WHERE cluster_stat NOT IN ({cluster_list})) as extra_count
+                    FROM implant_clusters
+                    GROUP BY item_id
+                )
+                -- Select items with exact cluster match
+                SELECT i.*
+                FROM items i
+                JOIN cluster_matches cm ON i.id = cm.item_id
+                WHERE cm.matching_count = :cluster_count
+                  AND cm.extra_count = 0
+                LIMIT 1
+            """)
 
-            # Then create subquery for items WITHOUT extra clusters
-            has_no_extra_clusters = self.db.query(Item.id)\
-                .filter(Item.item_class == 3)\
-                .filter(Item.ql == base_ql)\
-                .filter(~Item.id.in_(select(items_with_extra_clusters.c.id)))\
-                .subquery()
+            result = self.db.execute(
+                raw_query,
+                {"base_ql": base_ql, "slot": slot, "cluster_count": cluster_count}
+            ).first()
 
-            # Combine conditions: must have all required clusters and no extra ones
-            query = query.filter(Item.id.in_(select(has_all_clusters.c.id)))\
-                         .filter(Item.id.in_(select(has_no_extra_clusters.c.id)))
+            if result:
+                # Convert row to Item object with eager loading
+                item = self.db.query(Item)\
+                    .options(
+                        joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
+                        joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
+                            .joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell)
+                            .joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
+                        joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion),
+                        joinedload(Item.item_sources).joinedload(ItemSource.source).joinedload(Source.source_type)
+                    )\
+                    .filter(Item.id == result.id)\
+                    .first()
+                logger.info(f"Found implant: AOID={item.aoid}, name='{item.name}', QL={item.ql}")
+                return item
+            else:
+                logger.info(f"No implant found with exact cluster match")
+                return None
         else:
             # Handle case where no clusters specified (basic implants with no Modify Stat spells)
-            # First get items that have any Modify Stat spells
-            items_with_modify_stat = self.db.query(Item.id)\
-                .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
-                .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
-                .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
-                .join(Spell, SpellDataSpells.spell_id == Spell.id)\
-                .filter(Item.item_class == 3)\
-                .filter(Item.ql == base_ql)\
-                .filter(Spell.spell_id == 53045)\
-                .distinct()\
-                .subquery()
+            # Use optimized raw SQL
+            raw_query = text("""
+                WITH implant_candidates AS (
+                    -- Get all implants at the specified QL and slot
+                    SELECT DISTINCT i.id
+                    FROM items i
+                    JOIN item_stats ist ON i.id = ist.item_id
+                    JOIN stat_values sv ON ist.stat_value_id = sv.id
+                    WHERE i.item_class = 3
+                      AND i.ql = :base_ql
+                      AND sv.stat = 298
+                      AND (sv.value & :slot) > 0
+                ),
+                implants_with_clusters AS (
+                    -- Get implants that have any Modify Stat spells
+                    SELECT DISTINCT ic.id
+                    FROM implant_candidates ic
+                    JOIN item_spell_data isd ON ic.id = isd.item_id
+                    JOIN spell_data sd ON isd.spell_data_id = sd.id
+                    JOIN spell_data_spells sds ON sd.id = sds.spell_data_id
+                    JOIN spells s ON sds.spell_id = s.id
+                    WHERE s.spell_id = 53045
+                )
+                -- Select implants without any clusters
+                SELECT i.*
+                FROM items i
+                JOIN implant_candidates ic ON i.id = ic.id
+                WHERE i.id NOT IN (SELECT id FROM implants_with_clusters)
+                LIMIT 1
+            """)
 
-            # Then filter to items WITHOUT Modify Stat spells
-            query = query.filter(~Item.id.in_(select(items_with_modify_stat.c.id)))
-        
-        # Filter by slot using stat 298 (Slot) with bitwise AND operation
-        # The slot parameter should be a bitflag value (e.g., 32 for chest)
-        slot_filter_query = self.db.query(Item.id)\
-            .join(ItemStats, Item.id == ItemStats.item_id)\
-            .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
-            .filter(StatValue.stat == 298)\
-            .filter(StatValue.value.op('&')(slot) > 0)\
-            .subquery()
+            result = self.db.execute(
+                raw_query,
+                {"base_ql": base_ql, "slot": slot}
+            ).first()
 
-        query = query.filter(Item.id.in_(select(slot_filter_query.c.id)))
-        
-        # Execute query and get first result
-        result = query.first()
-        
-        if result:
-            logger.info(f"Found implant: AOID={result.aoid}, name='{result.name}', QL={result.ql}")
-        else:
-            logger.info(f"No implant found with exact cluster match")
-        
-        return result
+            if result:
+                # Convert row to Item object with eager loading
+                item = self.db.query(Item)\
+                    .options(
+                        joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
+                        joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
+                            .joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell)
+                            .joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
+                        joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion),
+                        joinedload(Item.item_sources).joinedload(ItemSource.source).joinedload(Source.source_type)
+                    )\
+                    .filter(Item.id == result.id)\
+                    .first()
+                logger.info(f"Found implant: AOID={item.aoid}, name='{item.name}', QL={item.ql}")
+                return item
+            else:
+                logger.info(f"No implant found without clusters")
+                return None
     
     def _convert_interpolated_to_detail(self, interpolated_item) -> ItemDetail:
         """

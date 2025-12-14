@@ -13,8 +13,8 @@ from sqlalchemy import and_
 from app.models.item import Item, ItemStats, ItemSpellData, ItemShopHash
 from app.models.stat_value import StatValue
 from app.models.criterion import Criterion
-from app.models.spell import Spell
-from app.models.spell_data import SpellData
+from app.models.spell import Spell, SpellCriterion
+from app.models.spell_data import SpellData, SpellDataSpells
 from app.models.action import Action, ActionCriteria
 from app.models.interpolated_item import (
     InterpolatedItem, 
@@ -181,8 +181,15 @@ class InterpolationService:
     def _find_item_variants(self, name: str, description: str) -> List[Item]:
         """
         Find all items with the same name and description, ordered by QL.
+        Uses eager loading to prevent N+1 queries during interpolation.
         """
         return (self.db.query(Item)
+                .options(
+                    joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
+                    joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
+                        .joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell),
+                    joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion)
+                )
                 .filter(and_(Item.name == name, Item.description == description))
                 .order_by(Item.ql)
                 .all())
@@ -247,13 +254,21 @@ class InterpolationService:
     def _load_item_stats(self, item: Item) -> List[Dict[str, Any]]:
         """
         Load stats for a non-interpolated item.
+        Uses preloaded relationships to avoid N+1 queries.
         """
+        # Use preloaded item_stats relationship instead of querying
+        if hasattr(item, 'item_stats') and item.item_stats:
+            return [
+                {'id': item_stat.stat_value.id, 'stat': item_stat.stat_value.stat, 'value': item_stat.stat_value.value}
+                for item_stat in item.item_stats
+            ]
+
+        # Fallback to query if relationship not loaded (shouldn't happen with eager loading)
         item_stats = (self.db.query(StatValue)
                       .join(ItemStats)
                       .filter(ItemStats.item_id == item.id)
                       .all())
-        
-        # Convert to dict format
+
         return [{'id': stat.id, 'stat': stat.stat, 'value': stat.value} for stat in item_stats]
 
     def _interpolate_stats(self, lo_item: Item, hi_item: Optional[Item], interpolated: InterpolatedItem) -> List[Dict[str, Any]]:
@@ -299,25 +314,54 @@ class InterpolationService:
     def _load_item_spell_data(self, item: Item) -> List[InterpolatedSpellData]:
         """
         Load spell data for a non-interpolated item.
+        Uses preloaded relationships to avoid N+1 queries.
         """
+        result = []
+
+        # Use preloaded relationships if available
+        if hasattr(item, 'item_spell_data') and item.item_spell_data:
+            for isd in item.item_spell_data:
+                spell_data = isd.spell_data
+                interpolated_spells = []
+
+                # Use preloaded spell_data_spells relationship
+                if hasattr(spell_data, 'spell_data_spells') and spell_data.spell_data_spells:
+                    for sds in spell_data.spell_data_spells:
+                        spell = sds.spell
+                        interpolated_spell = InterpolatedSpell(
+                            target=spell.target,
+                            tick_count=spell.tick_count,
+                            tick_interval=spell.tick_interval,
+                            spell_id=spell.spell_id,
+                            spell_format=spell.spell_format,
+                            spell_params=spell.spell_params or {},
+                            criteria=[]  # Load separately if needed
+                        )
+                        interpolated_spells.append(interpolated_spell)
+
+                result.append(InterpolatedSpellData(
+                    event=spell_data.event,
+                    spells=interpolated_spells
+                ))
+            return result
+
+        # Fallback to queries if relationships not loaded
         spell_data_entries = (self.db.query(SpellData)
                               .join(ItemSpellData)
                               .filter(ItemSpellData.item_id == item.id)
                               .all())
 
-        result = []
         for spell_data in spell_data_entries:
             interpolated_spells = []
-            
-            # Get spells for this spell data manually
+
             from app.models.spell_data import SpellDataSpells
             from app.models.spell import Spell
-            
+
             spells = (self.db.query(Spell)
                       .join(SpellDataSpells)
                       .filter(SpellDataSpells.spell_data_id == spell_data.id)
                       .all())
-            
+
             for spell in spells:
                 interpolated_spell = InterpolatedSpell(
                     target=spell.target,
@@ -326,10 +370,10 @@ class InterpolationService:
                     spell_id=spell.spell_id,
                     spell_format=spell.spell_format,
                     spell_params=spell.spell_params or {},
-                    criteria=[]  # Load separately if needed
+                    criteria=[]
                 )
                 interpolated_spells.append(interpolated_spell)
-            
+
             result.append(InterpolatedSpellData(
                 event=spell_data.event,
                 spells=interpolated_spells
@@ -466,24 +510,49 @@ class InterpolationService:
     def _load_item_actions(self, item: Item) -> List[InterpolatedAction]:
         """
         Load actions for a non-interpolated item.
+        Uses preloaded relationships to avoid N+1 queries.
         """
+        result = []
+
+        # Use preloaded actions relationship if available
+        if hasattr(item, 'actions') and item.actions:
+            for action in item.actions:
+                criteria_dicts = []
+
+                # Use preloaded action_criteria relationship
+                if hasattr(action, 'action_criteria') and action.action_criteria:
+                    # Sort by order_index (should be preloaded)
+                    sorted_criteria = sorted(action.action_criteria, key=lambda ac: ac.order_index)
+                    for ac in sorted_criteria:
+                        criterion = ac.criterion
+                        criteria_dicts.append({
+                            'id': criterion.id,
+                            'value1': criterion.value1,
+                            'value2': criterion.value2,
+                            'operator': criterion.operator
+                        })
+
+                result.append(InterpolatedAction(
+                    action=action.action,
+                    criteria=criteria_dicts
+                ))
+            return result
+
+        # Fallback to queries if relationships not loaded
         actions = (self.db.query(Action)
                    .filter(Action.item_id == item.id)
                    .all())
 
-        result = []
         for action in actions:
-            # Get criteria for this action manually
             from app.models.action import ActionCriteria
             from app.models.criterion import Criterion
-            
+
             criteria_data = (self.db.query(Criterion)
                              .join(ActionCriteria)
                              .filter(ActionCriteria.action_id == action.id)
                              .order_by(ActionCriteria.order_index)
                              .all())
-            
-            # Convert criteria to dict format
+
             criteria_dicts = []
             for criterion in criteria_data:
                 criteria_dicts.append({
@@ -492,7 +561,7 @@ class InterpolationService:
                     'value2': criterion.value2,
                     'operator': criterion.operator
                 })
-            
+
             result.append(InterpolatedAction(
                 action=action.action,
                 criteria=criteria_dicts
