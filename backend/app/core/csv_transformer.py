@@ -565,7 +565,7 @@ class StreamingCSVTransformer:
             symbiant_drops = []
 
             with open(csv_file, 'r', encoding='utf-8') as f:
-                reader = csv.reader(f, delimiter=';')
+                reader = csv.reader(f, delimiter=',')
 
                 for row_count, row in enumerate(reader, 1):
                     if len(row) < 12:
@@ -578,7 +578,7 @@ class StreamingCSVTransformer:
                     location = row[5].strip()
                     mobs = row[6].strip()
                     level = row[7].strip()
-                    item_link = row[-2].strip() if len(row) >= 11 else row[-1].strip()
+                    item_link = row[10].strip() if len(row) > 10 else ''
 
                     # Extract AOID
                     aoid = self._extract_aoid_from_link(item_link)

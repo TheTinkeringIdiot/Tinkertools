@@ -46,6 +46,7 @@ from app.core.optimized_importer import OptimizedImporter
 from app.core.database import create_tables, get_table_count, get_db
 from app.core.csv_transformer import StreamingCSVTransformer, load_perk_metadata
 from app.core.csv_loader import StreamingCSVLoader
+from app.core.indexes import create_performance_indexes
 
 # Setup logging
 logging.basicConfig(
@@ -93,7 +94,7 @@ def ensure_tables_exist():
     try:
         table_count = get_table_count()
         logger.info(f"Current table count: {table_count}")
-        
+
         if table_count == 0:
             logger.info("No tables found, creating database schema...")
             create_tables()
@@ -101,11 +102,32 @@ def ensure_tables_exist():
             logger.info(f"Created {new_count} tables")
         else:
             logger.info("Database tables already exist")
-        
+
         return True
     except Exception as e:
         logger.error(f"Failed to ensure tables exist: {e}")
         return False
+
+
+def create_database_indexes():
+    """Create performance indexes after data import."""
+    logger.info("=== Creating Performance Indexes ===")
+
+    db_session = next(get_db())
+    try:
+        created_indexes = create_performance_indexes(db_session)
+        logger.info(f"Successfully created {len(created_indexes)} performance indexes")
+        logger.info("Indexes created:")
+        for idx_name in created_indexes:
+            logger.info(f"  ✓ {idx_name}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to create indexes: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return False
+    finally:
+        db_session.close()
 
 
 def import_symbiants(args):
@@ -383,7 +405,7 @@ def import_all_csv_mode(args):
         # === PHASE 2: Transform symbiants ===
         logger.info("=== Phase 2: Symbiants ===")
 
-        SOURCE_TYPE_MOB_ID = 1  # From migration 005
+        SOURCE_TYPE_MOB_ID = 3  # From migration 005
         symbiant_stats = transformer.transform_symbiants(
             str(symbiants_path),
             source_type_id=SOURCE_TYPE_MOB_ID
@@ -406,6 +428,11 @@ def import_all_csv_mode(args):
 
         finally:
             db_session.close()
+
+        # === PHASE 4: Create Indexes ===
+        logger.info("=== Phase 4: Indexes ===")
+        if not create_database_indexes():
+            logger.warning("Index creation failed, but data import succeeded")
 
         # === SUMMARY ===
         total_time = transform_stats['total_time'] + symbiant_stats.get('symbiant_time', 0) + load_stats['total_time']
@@ -491,6 +518,11 @@ def import_all(args):
     if not import_symbiants(individual_args):
         success = False
         logger.error("Symbiant/Mobs import failed")
+
+    # Create performance indexes after all data is imported
+    logger.info("=== Creating Performance Indexes ===")
+    if not create_database_indexes():
+        logger.warning("Index creation failed, but data import succeeded")
 
     if success:
         logger.info("All imports completed successfully!")

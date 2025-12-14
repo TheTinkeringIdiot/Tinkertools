@@ -26,10 +26,6 @@ PERFORMANCE_INDEXES = [
         'query': 'CREATE INDEX IF NOT EXISTS idx_items_is_nano ON items(is_nano);'
     },
     {
-        'name': 'idx_items_slot',
-        'query': 'CREATE INDEX IF NOT EXISTS idx_items_slot ON items(slot);'
-    },
-    {
         'name': 'idx_items_name_lower',
         'query': 'CREATE INDEX IF NOT EXISTS idx_items_name_lower ON items(LOWER(name));'
     },
@@ -101,14 +97,44 @@ PERFORMANCE_INDEXES = [
         'query': 'CREATE INDEX IF NOT EXISTS idx_spells_target ON spells(target);'
     },
     {
-        'name': 'idx_spells_format',
-        'query': 'CREATE INDEX IF NOT EXISTS idx_spells_format ON spells(format);'
+        'name': 'idx_spells_spell_format',
+        'query': 'CREATE INDEX IF NOT EXISTS idx_spells_spell_format ON spells(spell_format);'
     },
     {
-        'name': 'idx_spells_name_lower',
-        'query': 'CREATE INDEX IF NOT EXISTS idx_spells_name_lower ON spells(LOWER(name));'
+        'name': 'idx_spells_spell_id',
+        'query': 'CREATE INDEX IF NOT EXISTS idx_spells_spell_id ON spells(spell_id);',
+        'description': 'Index for spell_id lookups (e.g., Modify Stat spell 53045)'
+    },
+    {
+        'name': 'idx_spells_modify_stat_param',
+        'query': '''CREATE INDEX IF NOT EXISTS idx_spells_modify_stat_param
+                    ON spells(((spell_params->>'Stat')::integer))
+                    WHERE spell_id = 53045;''',
+        'description': 'Functional index for Modify Stat spell parameter lookups (implant clusters)'
     },
     
+    # Spell data junction table indexes
+    {
+        'name': 'idx_item_spell_data_item',
+        'query': 'CREATE INDEX IF NOT EXISTS idx_item_spell_data_item ON item_spell_data(item_id);',
+        'description': 'Index for item to spell data joins'
+    },
+    {
+        'name': 'idx_item_spell_data_spell',
+        'query': 'CREATE INDEX IF NOT EXISTS idx_item_spell_data_spell ON item_spell_data(spell_data_id);',
+        'description': 'Index for spell data to item joins'
+    },
+    {
+        'name': 'idx_spell_data_spells_data',
+        'query': 'CREATE INDEX IF NOT EXISTS idx_spell_data_spells_data ON spell_data_spells(spell_data_id);',
+        'description': 'Index for spell data to spells joins'
+    },
+    {
+        'name': 'idx_spell_data_spells_spell',
+        'query': 'CREATE INDEX IF NOT EXISTS idx_spell_data_spells_spell ON spell_data_spells(spell_id);',
+        'description': 'Index for spells to spell data joins'
+    },
+
     # Spell criteria indexes
     {
         'name': 'idx_spell_criteria_spell_id',
@@ -127,48 +153,6 @@ PERFORMANCE_INDEXES = [
     {
         'name': 'idx_actions_item_action',
         'query': 'CREATE INDEX IF NOT EXISTS idx_actions_item_action ON actions(item_id, action);'
-    },
-
-    # Pocket bosses indexes
-    {
-        'name': 'idx_pocket_bosses_level',
-        'query': 'CREATE INDEX IF NOT EXISTS idx_pocket_bosses_level ON pocket_bosses(level);'
-    },
-    {
-        'name': 'idx_pocket_bosses_playfield',
-        'query': 'CREATE INDEX IF NOT EXISTS idx_pocket_bosses_playfield ON pocket_bosses(playfield);'
-    },
-    {
-        'name': 'idx_pocket_bosses_location_lower',
-        'query': 'CREATE INDEX IF NOT EXISTS idx_pocket_bosses_location_lower ON pocket_bosses(LOWER(location));'
-    },
-    {
-        'name': 'idx_pocket_bosses_name_lower',
-        'query': 'CREATE INDEX IF NOT EXISTS idx_pocket_bosses_name_lower ON pocket_bosses(LOWER(name));'
-    },
-    
-    # Symbiant indexes
-    {
-        'name': 'idx_symbiants_family',
-        'query': 'CREATE INDEX IF NOT EXISTS idx_symbiants_family ON symbiants(family);'
-    },
-    {
-        'name': 'idx_symbiants_ql',
-        'query': 'CREATE INDEX IF NOT EXISTS idx_symbiants_ql ON symbiants(ql);'
-    },
-    {
-        'name': 'idx_symbiants_slot',
-        'query': 'CREATE INDEX IF NOT EXISTS idx_symbiants_slot ON symbiants(slot);'
-    },
-    
-    # Pocket boss symbiant drops indexes
-    {
-        'name': 'idx_pb_symbiant_drops_boss_id',
-        'query': 'CREATE INDEX IF NOT EXISTS idx_pb_symbiant_drops_boss_id ON pocket_boss_symbiant_drops(pocket_boss_id);'
-    },
-    {
-        'name': 'idx_pb_symbiant_drops_symbiant_id',
-        'query': 'CREATE INDEX IF NOT EXISTS idx_pb_symbiant_drops_symbiant_id ON pocket_boss_symbiant_drops(symbiant_id);'
     },
 
     # Phase 2: Strategic performance indexes for weapon filtering and criteria lookups
@@ -209,29 +193,26 @@ PERFORMANCE_INDEXES = [
 def create_performance_indexes(db: Session) -> List[str]:
     """
     Create all performance indexes for optimizing TinkerTools API queries.
-    
+    Each index is created in its own transaction to avoid rollback issues.
+
     Returns:
         List of successfully created index names
     """
     created_indexes = []
-    
+
     for index_def in PERFORMANCE_INDEXES:
         try:
             logger.info(f"Creating index: {index_def['name']}")
             db.execute(text(index_def['query']))
+            db.commit()  # Commit each index separately
             created_indexes.append(index_def['name'])
             logger.info(f"Successfully created index: {index_def['name']}")
         except Exception as e:
             logger.warning(f"Failed to create index {index_def['name']}: {e}")
-    
-    try:
-        db.commit()
-        logger.info(f"Successfully created {len(created_indexes)} performance indexes")
-    except Exception as e:
-        logger.error(f"Failed to commit index creation: {e}")
-        db.rollback()
-        return []
-    
+            db.rollback()  # Rollback only this failed index
+            continue
+
+    logger.info(f"Successfully created {len(created_indexes)} performance indexes")
     return created_indexes
 
 
