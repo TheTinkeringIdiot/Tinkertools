@@ -452,11 +452,16 @@ class TinkerToolsApiClient {
   async lookupImplant(
     slot: number,
     ql: number,
-    clusters: Record<string, number>
+    clusters: Record<string, number>,
+    signal?: AbortSignal
   ): Promise<ImplantLookupResponse> {
     try {
       const request = { slot, ql, clusters };
-      const response = await this.client.post<ImplantLookupResponse>('/implants/lookup', request);
+      const response = await this.client.post<ImplantLookupResponse>(
+        '/implants/lookup',
+        request,
+        { signal }
+      );
 
       // Backend returns ImplantLookupResponse with item in 'item' field
       return response.data;

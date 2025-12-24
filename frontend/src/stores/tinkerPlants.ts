@@ -218,6 +218,12 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
   const debouncedLookups = ref<Map<string, DebouncedLookup>>(new Map());
 
   /**
+   * AbortControllers for in-flight requests
+   * Tracks ongoing API requests to cancel them when new requests are made
+   */
+  const abortControllers = ref<Map<string, AbortController>>(new Map());
+
+  /**
    * Attribute preference for filtering implant variants
    * Defaults to null (no preference)
    */
@@ -814,6 +820,8 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
    * Calls /implants/lookup API endpoint with cluster configuration
    * Updates currentConfiguration with returned item data
    *
+   * Prevents race conditions by canceling previous requests for the same slot
+   *
    * @param slotBitflag - Slot bitflag (e.g., "2" for Eyes)
    */
   async function lookupImplantForSlot(slotBitflag: string): Promise<void> {
@@ -847,6 +855,17 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
       return;
     }
 
+    // Cancel any previous request for this slot to prevent race conditions
+    const existingController = abortControllers.value.get(slotBitflag);
+    if (existingController) {
+      existingController.abort();
+      abortControllers.value.delete(slotBitflag);
+    }
+
+    // Create new AbortController for this request
+    const controller = new AbortController();
+    abortControllers.value.set(slotBitflag, controller);
+
     // Set per-slot loading state
     slotLoading.value[slotBitflag] = true;
 
@@ -870,8 +889,13 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
       // Convert slot bitflag to slot number for API
       const slotNumber = parseInt(slotBitflag, 10);
 
-      // Call API
-      const response = await apiClient.lookupImplant(slotNumber, selection.ql, clustersAsStatIds);
+      // Call API with abort signal
+      const response = await apiClient.lookupImplant(
+        slotNumber,
+        selection.ql,
+        clustersAsStatIds,
+        controller.signal
+      );
 
       if (response.success && response.item) {
         // Cache the result
@@ -892,6 +916,12 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
         selection.item = null;
       }
     } catch (err: any) {
+      // Ignore abort errors (expected when user makes rapid changes)
+      if (err.name === 'AbortError' || err.name === 'CanceledError') {
+        console.log('[TinkerPlants] Request cancelled for slot:', slotBitflag);
+        return;
+      }
+
       console.error('[TinkerPlants] Lookup failed for slot:', slotBitflag, err);
 
       error.value = err instanceof Error ? err.message : 'Implant lookup failed';
@@ -905,6 +935,9 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
 
       selection.item = null;
     } finally {
+      // Clean up abort controller
+      abortControllers.value.delete(slotBitflag);
+
       slotLoading.value[slotBitflag] = false;
 
       // Auto-recalculate bonuses and requirements after slot update
@@ -914,7 +947,7 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
 
   /**
    * Debounced implant lookup for manual changes
-   * Delays API call by 100ms to avoid rapid-fire requests during dropdown changes
+   * Delays API call by 300ms to batch rapid changes and reduce server load
    *
    * @param slotBitflag - Slot bitflag
    */
@@ -925,11 +958,11 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
       clearTimeout(existing.timer);
     }
 
-    // Set new timer
+    // Set new timer (300ms debounce - balances responsiveness with batching)
     const timer = window.setTimeout(() => {
       lookupImplantForSlot(slotBitflag);
       debouncedLookups.value.delete(slotBitflag);
-    }, 100);
+    }, 300);
 
     debouncedLookups.value.set(slotBitflag, { timer, slotBitflag });
   }
@@ -1181,8 +1214,17 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
   /**
    * Reset store state
    * Clears all configuration, bonuses, requirements, and cache
+   * Aborts any in-flight requests to prevent stale updates
    */
   function reset(): void {
+    // Abort all pending requests
+    abortControllers.value.forEach((controller) => controller.abort());
+    abortControllers.value.clear();
+
+    // Clear debounced timers
+    debouncedLookups.value.forEach((lookup) => clearTimeout(lookup.timer));
+    debouncedLookups.value.clear();
+
     currentConfiguration.value = {};
     profileConfiguration.value = {};
     calculatedBonuses.value = {};
@@ -1195,7 +1237,6 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
       sufficient: undefined,
     };
     lookupCache.value.clear();
-    debouncedLookups.value.clear();
     loading.value = false;
     error.value = null;
     slotLoading.value = {};
