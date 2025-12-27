@@ -356,6 +356,30 @@ function isSymbiantInComparison(symbiantId: number): boolean {
   return symbiantsStore.isInComparison(symbiantId) !== null;
 }
 
+function handleAddToFarmList(symbiant: SymbiantItem) {
+  const added = symbiantsStore.addToFarmList(symbiant);
+  if (added) {
+    toast.add({
+      severity: 'success',
+      summary: 'Added to Farm List',
+      detail: symbiant.name,
+      life: 2000,
+    });
+  } else {
+    toast.add({
+      severity: 'info',
+      summary: 'Already in Farm List',
+      detail: symbiant.name,
+      life: 2000,
+    });
+  }
+}
+
+function isSymbiantInFarmList(aoid: number | undefined): boolean {
+  if (!aoid) return false;
+  return symbiantsStore.isInFarmList(aoid);
+}
+
 // Boss Methods
 function applyBossLevelFilter() {
   minLevel.value = bossLevelRange.value[0];
@@ -680,15 +704,27 @@ watch(
               </div>
             </div>
 
-            <!-- Compare Button -->
-            <Button
-              @click.stop="handleAddToComparison(symbiant)"
-              :icon="isSymbiantInComparison(symbiant.id) ? 'pi pi-check' : 'pi pi-clone'"
-              :severity="isSymbiantInComparison(symbiant.id) ? 'success' : 'secondary'"
-              size="small"
-              outlined
-              v-tooltip="isSymbiantInComparison(symbiant.id) ? 'In comparison' : 'Add to compare'"
-            />
+            <!-- Action Buttons -->
+            <div class="flex gap-1">
+              <!-- Compare Button -->
+              <Button
+                @click.stop="handleAddToComparison(symbiant)"
+                :icon="isSymbiantInComparison(symbiant.id) ? 'pi pi-check' : 'pi pi-clone'"
+                :severity="isSymbiantInComparison(symbiant.id) ? 'success' : 'secondary'"
+                size="small"
+                outlined
+                v-tooltip="isSymbiantInComparison(symbiant.id) ? 'In comparison' : 'Add to compare'"
+              />
+              <!-- Farm List Button -->
+              <Button
+                @click.stop="handleAddToFarmList(symbiant)"
+                :icon="isSymbiantInFarmList(symbiant.aoid) ? 'pi pi-check' : 'pi pi-list'"
+                :severity="isSymbiantInFarmList(symbiant.aoid) ? 'success' : 'secondary'"
+                size="small"
+                outlined
+                v-tooltip="isSymbiantInFarmList(symbiant.aoid) ? 'In farm list' : 'Add to farm'"
+              />
+            </div>
           </div>
         </div>
 

@@ -6,10 +6,34 @@
 
 import { defineStore } from 'pinia';
 import { ref, computed, readonly } from 'vue';
-import type { Symbiant, UserFriendlyError } from '../types/api';
+import type { Symbiant, UserFriendlyError, Mob } from '../types/api';
 import { apiClient } from '../services/api-client';
 import { enrichSymbiant } from '../utils/symbiantHelpers';
 import { get, set, del } from 'idb-keyval';
+
+// ============================================================================
+// Farm List Types
+// ============================================================================
+
+interface AggregatedBoss {
+  boss: Mob;
+  symbiants: Symbiant[];
+  farmed: boolean;
+}
+
+interface FarmListStorage {
+  aoids: number[];
+  version: 2; // Bumped version for AOID migration
+}
+
+interface FarmProgressStorage {
+  farmedBossIds: number[];
+  version: 1;
+}
+
+// LocalStorage keys
+const FARM_LIST_KEY = 'tinkertools-farm-list';
+const FARM_PROGRESS_KEY = 'tinkertools-farm-progress';
 
 // ============================================================================
 // Cache Configuration
@@ -43,6 +67,13 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
 
   // Comparison selection state
   const selectedForComparison = ref<(Symbiant | null)[]>([null, null, null]);
+
+  // Farm List state (uses AOID for stability)
+  const farmListAoids = ref<number[]>([]);
+  const farmedBossIds = ref<Set<number>>(new Set());
+  const farmListLoading = ref(false);
+  const aggregatedBosses = ref<Map<number, AggregatedBoss>>(new Map());
+  const bossDropCache = ref<Map<number, Mob[]>>(new Map()); // keyed by internal ID
 
   // ============================================================================
   // Getters
@@ -381,6 +412,227 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     return selectedForComparison.value.filter((slot) => slot !== null).length;
   }
 
+  // ============================================================================
+  // Farm List Actions
+  // ============================================================================
+
+  /**
+   * Add symbiant to farm list (by AOID)
+   * Returns true if added, false if already in list
+   */
+  function addToFarmList(symbiant: Symbiant): boolean {
+    if (!symbiant.aoid) return false;
+    if (farmListAoids.value.includes(symbiant.aoid)) {
+      return false;
+    }
+    farmListAoids.value.push(symbiant.aoid);
+    saveFarmList();
+    return true;
+  }
+
+  /**
+   * Remove symbiant from farm list (by AOID)
+   */
+  function removeFromFarmList(aoid: number): void {
+    const index = farmListAoids.value.indexOf(aoid);
+    if (index > -1) {
+      farmListAoids.value.splice(index, 1);
+      saveFarmList();
+    }
+  }
+
+  /**
+   * Clear all symbiants from farm list and reset progress
+   */
+  function clearFarmList(): void {
+    farmListAoids.value = [];
+    farmedBossIds.value.clear();
+    aggregatedBosses.value.clear();
+    saveFarmList();
+    saveFarmProgress();
+  }
+
+  /**
+   * Check if symbiant is in farm list (by AOID)
+   */
+  function isInFarmList(aoid: number): boolean {
+    return farmListAoids.value.includes(aoid);
+  }
+
+  /**
+   * Toggle boss farmed status
+   */
+  function toggleBossFarmed(bossId: number): void {
+    if (farmedBossIds.value.has(bossId)) {
+      farmedBossIds.value.delete(bossId);
+    } else {
+      farmedBossIds.value.add(bossId);
+    }
+    // Update aggregatedBosses map
+    const entry = aggregatedBosses.value.get(bossId);
+    if (entry) {
+      entry.farmed = farmedBossIds.value.has(bossId);
+    }
+    saveFarmProgress();
+  }
+
+  /**
+   * Check if boss is marked as farmed
+   */
+  function isBossFarmed(bossId: number): boolean {
+    return farmedBossIds.value.has(bossId);
+  }
+
+  /**
+   * Get count of symbiants in farm list
+   */
+  function getFarmListCount(): number {
+    return farmListAoids.value.length;
+  }
+
+  /**
+   * Aggregate bosses for all symbiants in farm list
+   * Fetches boss data from API and groups by boss
+   */
+  async function aggregateBossesForFarmList(): Promise<void> {
+    console.log('[FarmList] Starting aggregation, AOIDs:', farmListAoids.value);
+
+    if (farmListAoids.value.length === 0) {
+      aggregatedBosses.value.clear();
+      return;
+    }
+
+    farmListLoading.value = true;
+
+    try {
+      const bossMap = new Map<number, AggregatedBoss>();
+
+      for (const aoid of farmListAoids.value) {
+        // Look up symbiant by AOID to get internal ID for API call
+        const symbiant = getSymbiantByAoid(aoid);
+        console.log('[FarmList] Processing AOID:', aoid, '-> symbiant:', symbiant?.name || 'NOT FOUND');
+
+        if (!symbiant) continue;
+
+        // Check cache first (keyed by internal ID)
+        let bosses = bossDropCache.value.get(symbiant.id);
+
+        if (!bosses) {
+          // Fetch from API using internal ID
+          const response = await apiClient.getSymbiantDroppedBy(symbiant.id);
+          bosses = response.data || [];
+          console.log('[FarmList] API returned bosses:', bosses);
+          bossDropCache.value.set(symbiant.id, bosses);
+        }
+
+        for (const boss of bosses) {
+          if (!bossMap.has(boss.id)) {
+            bossMap.set(boss.id, {
+              boss,
+              symbiants: [],
+              farmed: farmedBossIds.value.has(boss.id),
+            });
+          }
+          // Add symbiant to this boss's list if not already there
+          const entry = bossMap.get(boss.id)!;
+          if (!entry.symbiants.some((s) => s.id === symbiant.id)) {
+            entry.symbiants.push(symbiant);
+          }
+        }
+      }
+
+      console.log('[FarmList] Final bossMap size:', bossMap.size);
+      aggregatedBosses.value = bossMap;
+    } finally {
+      farmListLoading.value = false;
+    }
+  }
+
+  /**
+   * Save farm list to localStorage (using AOIDs)
+   */
+  function saveFarmList(): void {
+    const data: FarmListStorage = {
+      aoids: farmListAoids.value,
+      version: 2,
+    };
+    localStorage.setItem(FARM_LIST_KEY, JSON.stringify(data));
+  }
+
+  /**
+   * Load farm list from localStorage
+   * Handles migration from old format (version 1 with IDs) by clearing
+   */
+  function loadFarmList(): void {
+    try {
+      const saved = localStorage.getItem(FARM_LIST_KEY);
+      if (saved) {
+        const data = JSON.parse(saved);
+        // Check version - if old format, clear it
+        if (data.version === 2 && data.aoids) {
+          farmListAoids.value = data.aoids;
+        } else {
+          // Old format with symbiantIds - clear and start fresh
+          console.log('[SymbiantsStore] Migrating farm list to AOID format');
+          farmListAoids.value = [];
+          saveFarmList(); // Save empty list in new format
+        }
+      }
+    } catch (error) {
+      console.error('[SymbiantsStore] Failed to load farm list:', error);
+    }
+  }
+
+  /**
+   * Save farm progress to localStorage
+   */
+  function saveFarmProgress(): void {
+    const data: FarmProgressStorage = {
+      farmedBossIds: Array.from(farmedBossIds.value),
+      version: 1,
+    };
+    localStorage.setItem(FARM_PROGRESS_KEY, JSON.stringify(data));
+  }
+
+  /**
+   * Load farm progress from localStorage
+   */
+  function loadFarmProgress(): void {
+    try {
+      const saved = localStorage.getItem(FARM_PROGRESS_KEY);
+      if (saved) {
+        const data: FarmProgressStorage = JSON.parse(saved);
+        farmedBossIds.value = new Set(data.farmedBossIds || []);
+      }
+    } catch (error) {
+      console.error('[SymbiantsStore] Failed to load farm progress:', error);
+    }
+  }
+
+  /**
+   * Generate shareable URL for farm list (uses AOIDs)
+   */
+  function exportFarmListToUrl(): string {
+    const base = window.location.origin + window.location.pathname;
+    if (farmListAoids.value.length === 0) {
+      return `${base}?tab=farm`;
+    }
+    return `${base}?tab=farm&aoids=${farmListAoids.value.join(',')}`;
+  }
+
+  /**
+   * Import farm list from URL parameter (AOIDs)
+   */
+  function importFarmListFromUrl(aoidsParam: string): void {
+    if (!aoidsParam) return;
+    const aoids = aoidsParam
+      .split(',')
+      .map(Number)
+      .filter((aoid) => !isNaN(aoid) && aoid > 0);
+    farmListAoids.value = aoids;
+    saveFarmList();
+  }
+
   /**
    * Search symbiants with pagination parameters
    * Wrapper around loadAllSymbiants for API compatibility
@@ -414,6 +666,12 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     totalCount: readonly(totalCount),
     loadingProgress,
 
+    // Farm List State (uses AOIDs for stability)
+    farmListAoids: readonly(farmListAoids),
+    farmedBossIds: readonly(farmedBossIds),
+    farmListLoading: readonly(farmListLoading),
+    aggregatedBosses: readonly(aggregatedBosses),
+
     // Getters
     allSymbiants,
     symbiantsById,
@@ -440,5 +698,18 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     clearComparison,
     isInComparison,
     getComparisonCount,
+    // Farm List actions
+    addToFarmList,
+    removeFromFarmList,
+    clearFarmList,
+    isInFarmList,
+    toggleBossFarmed,
+    isBossFarmed,
+    getFarmListCount,
+    aggregateBossesForFarmList,
+    loadFarmList,
+    loadFarmProgress,
+    exportFarmListToUrl,
+    importFarmListFromUrl,
   };
 });

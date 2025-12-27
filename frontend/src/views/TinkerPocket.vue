@@ -5,6 +5,7 @@ import TabView from 'primevue/tabview';
 import TabPanel from 'primevue/tabpanel';
 import FindGear from '@/apps/tinkerpocket/views/FindGear.vue';
 import SymbiantCompare from '@/components/pocket/SymbiantCompare.vue';
+import FarmList from '@/components/pocket/FarmList.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -13,11 +14,12 @@ const router = useRouter();
 const activeTab = ref(0);
 
 // Tab name mapping
-const tabNames = ['symbiants', 'bosses', 'compare'];
+const tabNames = ['symbiants', 'bosses', 'compare', 'farm'];
 const tabIndexMap: Record<string, number> = {
   symbiants: 0,
   bosses: 1,
   compare: 2,
+  farm: 3,
 };
 
 // Initialize tab from URL on mount
@@ -110,6 +112,17 @@ defineExpose({
               </div>
             </template>
             <SymbiantCompare />
+          </TabPanel>
+
+          <!-- Farm Tab -->
+          <TabPanel>
+            <template #header>
+              <div class="flex items-center gap-2">
+                <i class="pi pi-list"></i>
+                <span>Farm</span>
+              </div>
+            </template>
+            <FarmList />
           </TabPanel>
         </TabView>
       </div>
