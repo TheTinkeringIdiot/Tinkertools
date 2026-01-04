@@ -90,7 +90,9 @@ export function useCriteriaDisplay(criteria: Ref<Criterion[]>) {
   });
 
   const statRequirements = computed(() => {
-    return displayCriteria.value.filter((criterion) => criterion.isStatRequirement);
+    return displayCriteria.value.filter(
+      (criterion) => criterion.isStatRequirement || criterion.isFunctionOperator
+    );
   });
 
   const logicalOperators = computed(() => {

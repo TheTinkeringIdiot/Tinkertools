@@ -12,6 +12,7 @@ import {
   getBreedName,
   getGenderName,
   getFlagNameFromValue,
+  getNanoStrainName,
 } from './game-utils';
 import type { Action, Criterion } from '../types/api';
 
@@ -46,8 +47,9 @@ export interface DisplayCriterion {
   referenceAoid?: number;
   // Modifier fields
   isModifier?: boolean;
-  modifierType?: 'target';
+  modifierType?: 'target' | 'caster';
   isTargetRequirement?: boolean;
+  isCasterRequirement?: boolean;
 }
 
 export interface CriteriaExpression {
@@ -117,6 +119,7 @@ const STATE_OPERATORS = {
 
 const MODIFIER_OPERATORS = {
   18: 'target', // Next criterion applies to target, not caster
+  100: 'caster', // Next criterion applies to caster
 } as const;
 
 // ============================================================================
@@ -211,7 +214,7 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
     };
   }
 
-  // Handle function operators (CheckNcu, RunningNano, etc.)
+  // Handle function operators (CheckNcu, RunningNano, RunningNanoLine, etc.)
   if (operator === 127) {
     // CheckNcu - checks if a nano is NOT running
     return {
@@ -228,6 +231,82 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
       isFunctionOperator: true,
       functionType: 'CheckNcu',
       referenceAoid: value,
+    };
+  }
+
+  if (operator === 91) {
+    // RunningNano - checks if a specific nano (by AOID) is running
+    return {
+      id,
+      stat,
+      statName: 'Running Nano',
+      displayValue: value, // aoid of nano
+      displayOperator: 'running',
+      displaySymbol: '▶',
+      description: `Running: Nano ${value}`, // fallback until async resolved
+      isLogicalOperator: false,
+      isSeparator: false,
+      isStatRequirement: false,
+      isFunctionOperator: true,
+      functionType: 'RunningNano',
+      referenceAoid: value,
+    };
+  }
+
+  if (operator === 92) {
+    // RunningNanoLine - checks if any nano from a specific line/strain is running
+    const lineName = getNanoStrainName(value) || `Line ${value}`;
+    return {
+      id,
+      stat,
+      statName: 'Running Nano Line',
+      displayValue: value, // nano line/strain ID
+      displayOperator: 'running line',
+      displaySymbol: '▶',
+      description: `Running: ${lineName}`,
+      isLogicalOperator: false,
+      isSeparator: false,
+      isStatRequirement: false,
+      isFunctionOperator: true,
+      functionType: 'RunningNanoLine',
+    };
+  }
+
+  if (operator === 101) {
+    // NotRunningNano - checks if a specific nano (by AOID) is NOT running
+    return {
+      id,
+      stat,
+      statName: 'Not Running Nano',
+      displayValue: value, // aoid of nano
+      displayOperator: 'not running',
+      displaySymbol: '∅',
+      description: `Not running: Nano ${value}`, // fallback until async resolved
+      isLogicalOperator: false,
+      isSeparator: false,
+      isStatRequirement: false,
+      isFunctionOperator: true,
+      functionType: 'NotRunningNano',
+      referenceAoid: value,
+    };
+  }
+
+  if (operator === 102) {
+    // NotRunningNanoLine - checks if NO nano from a specific line/strain is running
+    const lineName = getNanoStrainName(value) || `Line ${value}`;
+    return {
+      id,
+      stat,
+      statName: 'Not Running Nano Line',
+      displayValue: value, // nano line/strain ID
+      displayOperator: 'not running line',
+      displaySymbol: '∅',
+      description: `Not running: ${lineName}`,
+      isLogicalOperator: false,
+      isSeparator: false,
+      isStatRequirement: false,
+      isFunctionOperator: true,
+      functionType: 'NotRunningNanoLine',
     };
   }
 
@@ -688,7 +767,7 @@ function createSimpleRequirementsList(
  */
 function processCriteriaWithModifiers(criteria: DisplayCriterion[]): DisplayCriterion[] {
   const processed: DisplayCriterion[] = [];
-  let activeModifier: 'target' | null = null;
+  let activeModifier: 'target' | 'caster' | null = null;
 
   for (const criterion of criteria) {
     // Handle modifier operators
@@ -699,12 +778,12 @@ function processCriteriaWithModifiers(criteria: DisplayCriterion[]): DisplayCrit
 
     // Apply active modifier to this criterion
     if (activeModifier && (criterion.isStatRequirement || criterion.isFunctionOperator)) {
+      const prefix = activeModifier === 'target' ? 'Target: ' : 'Caster: ';
       processed.push({
         ...criterion,
         isTargetRequirement: activeModifier === 'target',
-        description: activeModifier === 'target'
-          ? `Target: ${criterion.description}`
-          : criterion.description,
+        isCasterRequirement: activeModifier === 'caster',
+        description: `${prefix}${criterion.description}`,
       });
       activeModifier = null; // Clear after applying
     } else {

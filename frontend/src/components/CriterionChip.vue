@@ -24,7 +24,7 @@
       <span>{{ criterion.displayOperator }}</span>
     </div>
 
-    <!-- Function Operator (CheckNcu, etc.) -->
+    <!-- Function Operator (CheckNcu, RunningNano, RunningNanoLine, etc.) -->
     <div v-else-if="criterion.isFunctionOperator" class="function-requirement">
       <i class="pi pi-bolt mr-1"></i>
       <span>
@@ -34,6 +34,7 @@
           :to="`/items/${criterion.referenceAoid}`"
           class="function-link"
         >{{ resolvedName || `Nano ${criterion.referenceAoid}` }}</RouterLink>
+        <template v-else>{{ nanoLineName }}</template>
       </span>
     </div>
 
@@ -112,10 +113,24 @@ const functionPrefix = computed(() => {
 
   switch (props.criterion.functionType) {
     case 'CheckNcu':
+    case 'NotRunningNano':
+    case 'NotRunningNanoLine':
       return 'Not running: ';
+    case 'RunningNano':
+    case 'RunningNanoLine':
+      return 'Running: ';
     default:
       return '';
   }
+});
+
+const nanoLineName = computed(() => {
+  if (!props.criterion.isFunctionOperator) return '';
+
+  // Extract line name from description (format: "Running: Line Name" or "Not running: Line Name")
+  const desc = props.criterion.description;
+  const colonIndex = desc.indexOf(': ');
+  return colonIndex >= 0 ? desc.substring(colonIndex + 2) : desc;
 });
 
 // ============================================================================

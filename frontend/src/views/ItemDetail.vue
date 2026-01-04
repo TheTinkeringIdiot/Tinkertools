@@ -684,6 +684,10 @@ async function loadItem() {
   loading.value = true;
   error.value = null;
 
+  // Clear stale interpolation state when loading a new item
+  interpolatedItem.value = null;
+  interpolationError.value = null;
+
   try {
     const loadedItem = await itemsStore.getItem(parseInt(itemAoid));
     if (loadedItem) {

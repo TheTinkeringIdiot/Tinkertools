@@ -191,7 +191,7 @@ class InterpolationService:
                     joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion)
                 )
                 .filter(and_(Item.name == name, Item.description == description))
-                .order_by(Item.ql)
+                .order_by(Item.ql, Item.aoid)
                 .all())
 
     def _find_interpolation_bounds(self, variants: List[Item], target_ql: int) -> Tuple[Optional[Item], Optional[Item]]:
