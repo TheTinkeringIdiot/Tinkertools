@@ -239,6 +239,7 @@ Shows all item data with profile compatibility and comparison options
               :actions="displayedItem.actions"
               :character-stats="characterStats"
               :expanded="true"
+              :show-oe-breakpoints="canWear"
             />
           </div>
         </template>
@@ -491,6 +492,7 @@ Shows all item data with profile compatibility and comparison options
               :actions="displayedItem.actions"
               :character-stats="characterStats"
               :expanded="true"
+              :show-oe-breakpoints="canWear"
             />
           </div>
         </template>
@@ -551,6 +553,7 @@ import {
   isWeapon,
   getDisplayItemFlags,
   getDisplayCanFlags,
+  getItemCanFlags,
   getProfessionId,
   getBreedId,
   getStatId,
@@ -674,6 +677,13 @@ const canEquip = computed(() => {
   // Check if requirements are met (you can add more sophisticated checks here)
   // For now, just check if there's an active profile
   return true;
+});
+
+// Check if item has "Wear" CAN flag (for showing OE breakpoints)
+const canWear = computed(() => {
+  if (!displayedItem.value?.stats) return false;
+  const canFlags = getItemCanFlags(displayedItem.value.stats);
+  return canFlags.includes('Wear');
 });
 
 // Methods

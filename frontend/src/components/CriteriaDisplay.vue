@@ -9,6 +9,7 @@
       :show-evaluation="expanded"
       :collapsible="!expanded"
       :default-collapsed="!expanded"
+      :show-oe-breakpoints="showOeBreakpoints"
     />
 
     <!-- Simple Chip Display (for basic requirements) -->
@@ -20,6 +21,7 @@
           :criterion="criterion"
           :character-stats="characterStats"
           size="small"
+          :show-oe-breakpoints="showOeBreakpoints"
         />
       </div>
     </div>
@@ -44,6 +46,7 @@
             :criterion="criterion"
             :character-stats="characterStats"
             size="small"
+            :show-oe-breakpoints="showOeBreakpoints"
           />
         </div>
       </Transition>
@@ -59,6 +62,7 @@
           :criterion="criterion"
           :character-stats="characterStats"
           size="normal"
+          :show-oe-breakpoints="showOeBreakpoints"
         />
       </div>
 
@@ -119,11 +123,13 @@ interface Props {
   criteria: Criterion[];
   characterStats?: CharacterStats | null;
   expanded?: boolean;
+  showOeBreakpoints?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   characterStats: null,
   expanded: false,
+  showOeBreakpoints: false,
 });
 
 // ============================================================================

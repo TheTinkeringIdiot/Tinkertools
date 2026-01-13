@@ -47,6 +47,9 @@ Shows item requirements organized by category with compatibility checking
                 <div v-if="showCompatibility && profile" class="text-xs text-surface-500">
                   (You: {{ getCharacterStat(req.stat) }})
                 </div>
+                <div class="text-xs text-surface-400 dark:text-surface-500 font-mono mt-0.5">
+                  OE: {{ getOEBreakpoints(req.value) }}
+                </div>
               </div>
             </div>
           </div>
@@ -79,6 +82,9 @@ Shows item requirements organized by category with compatibility checking
                 </div>
                 <div v-if="showCompatibility && profile" class="text-xs text-surface-500">
                   (You: {{ formatSkillRequirement(req.stat, getCharacterStat(req.stat)) }})
+                </div>
+                <div class="text-xs text-surface-400 dark:text-surface-500 font-mono mt-0.5">
+                  OE: {{ getOEBreakpoints(req.value) }}
                 </div>
               </div>
             </div>
@@ -439,6 +445,16 @@ function formatCharacterRequirement(statId: number, value: number): string {
     default:
       return value.toString();
   }
+}
+
+/**
+ * Calculate Over-Equip breakpoints for a requirement value.
+ * OE starts at 80% of requirement, with penalty tiers at 60%, 40%, 20%.
+ * Returns formatted string: "80%/60%/40%/20%" skill values
+ */
+function getOEBreakpoints(requirementValue: number): string {
+  const breakpoints = [0.8, 0.6, 0.4, 0.2];
+  return breakpoints.map((pct) => Math.floor(requirementValue * pct)).join('/');
 }
 </script>
 

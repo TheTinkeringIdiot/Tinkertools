@@ -10,6 +10,10 @@
       <span v-if="characterStats && showStatus" class="status" :class="statusClasses">
         ({{ currentValue }})
       </span>
+      <!-- OE Breakpoints for skills/attributes -->
+      <span v-if="showOEBreakpointsComputed" class="oe-breakpoints">
+        OE: {{ oeBreakpoints }}
+      </span>
     </div>
 
     <!-- State Requirement -->
@@ -69,12 +73,14 @@ interface Props {
   characterStats?: CharacterStats | null;
   size?: 'small' | 'normal' | 'large';
   showStatus?: boolean;
+  showOeBreakpoints?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   characterStats: null,
   size: 'normal',
   showStatus: true,
+  showOeBreakpoints: false,
 });
 
 // ============================================================================
@@ -253,6 +259,31 @@ const statusClasses = computed(() => {
     return 'status-unmet';
   }
   return 'status-neutral';
+});
+
+/**
+ * OE (Over-Equip) applies to skills and attributes on wearable items.
+ * Only shown when showOeBreakpoints prop is true (item has Wear CAN flag).
+ * Stat IDs: 16-21 (attributes), 100-169 (skills), 229 (MultiRanged)
+ * Excludes: Treatment (124) - implants/symbiants don't have OE mechanics
+ */
+const showOEBreakpointsComputed = computed(() => {
+  if (!props.showOeBreakpoints) return false;
+  if (!props.criterion.isStatRequirement) return false;
+  const stat = props.criterion.stat;
+  // Exclude Treatment (124) - implants/symbiants are binary (meet req or not)
+  if (stat === 124) return false;
+  // Attributes: 16-21, Skills: 100-169, MultiRanged: 229
+  return (stat >= 16 && stat <= 21) || (stat >= 100 && stat <= 169) || stat === 229;
+});
+
+/**
+ * Calculate OE breakpoint values at 80%/60%/40%/20% of requirement.
+ * These are the thresholds where penalty tiers increase.
+ */
+const oeBreakpoints = computed(() => {
+  const req = props.criterion.displayValue;
+  return [0.8, 0.6, 0.4, 0.2].map((pct) => Math.floor(req * pct)).join('/');
 });
 </script>
 
@@ -454,6 +485,17 @@ const statusClasses = computed(() => {
   display: flex;
   align-items: center;
   gap: 2px;
+}
+
+/* OE Breakpoints styling */
+.oe-breakpoints {
+  font-size: 9px;
+  font-family: 'Courier New', monospace;
+  opacity: 0.6;
+  margin-left: 6px;
+  padding-left: 6px;
+  border-left: 1px solid currentColor;
+  color: inherit;
 }
 
 .state-requirement i,

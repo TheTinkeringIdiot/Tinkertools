@@ -22,6 +22,7 @@
             :criteria="actions.find((a) => a.id === primaryAction.id)?.criteria || []"
             :character-stats="characterStats"
             :expanded="true"
+            :show-oe-breakpoints="showOeBreakpoints"
           />
         </div>
         <div v-else class="text-muted text-sm">No requirements</div>
@@ -40,6 +41,7 @@
                 :criteria="actions.find((a) => a.id === action.id)?.criteria || []"
                 :character-stats="characterStats"
                 :expanded="false"
+                :show-oe-breakpoints="showOeBreakpoints"
               />
             </div>
             <div v-else class="text-muted text-sm">No requirements</div>
@@ -103,11 +105,13 @@ interface Props {
   actions: Action[];
   characterStats?: CharacterStats | null;
   expanded?: boolean;
+  showOeBreakpoints?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   characterStats: null,
   expanded: false,
+  showOeBreakpoints: false,
 });
 
 // ============================================================================

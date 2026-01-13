@@ -34,6 +34,10 @@
             <span class="value">{{ formattedValue }}</span>
           </template>
           <span v-if="showCurrentValue" class="current-value">({{ currentValue }})</span>
+          <!-- OE Breakpoints for skills/attributes -->
+          <span v-if="showOEBreakpointsComputed" class="oe-breakpoints">
+            OE: {{ oeBreakpoints }}
+          </span>
         </div>
       </div>
 
@@ -68,6 +72,7 @@
         :level="node.level + 1"
         :show-connector="node.level > 0"
         :show-group-label="false"
+        :show-oe-breakpoints="showOeBreakpoints"
       />
     </div>
   </div>
@@ -98,12 +103,14 @@ interface Props {
   level?: number;
   showConnector?: boolean;
   showGroupLabel?: boolean;
+  showOeBreakpoints?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   level: 0,
   showConnector: true,
   showGroupLabel: true,
+  showOeBreakpoints: false,
 });
 
 // ============================================================================
@@ -253,6 +260,32 @@ const operatorLabel = computed(() => {
       return props.node.operator || 'Group';
   }
 });
+
+/**
+ * OE (Over-Equip) applies to skills and attributes on wearable items.
+ * Only shown when showOeBreakpoints prop is true (item has Wear CAN flag).
+ * Stat IDs: 16-21 (attributes), 100-169 (skills), 229 (MultiRanged)
+ * Excludes: Treatment (124) - implants/symbiants don't have OE mechanics
+ */
+const showOEBreakpointsComputed = computed(() => {
+  if (!props.showOeBreakpoints) return false;
+  if (!props.node.criterion?.isStatRequirement) return false;
+  const stat = props.node.criterion.stat;
+  // Exclude Treatment (124) - implants/symbiants are binary (meet req or not)
+  if (stat === 124) return false;
+  // Attributes: 16-21, Skills: 100-169, MultiRanged: 229
+  return (stat >= 16 && stat <= 21) || (stat >= 100 && stat <= 169) || stat === 229;
+});
+
+/**
+ * Calculate OE breakpoint values at 80%/60%/40%/20% of requirement.
+ * These are the thresholds where penalty tiers increase.
+ */
+const oeBreakpoints = computed(() => {
+  if (!props.node.criterion) return '';
+  const req = props.node.criterion.displayValue;
+  return [0.8, 0.6, 0.4, 0.2].map((pct) => Math.floor(req * pct)).join('/');
+});
 </script>
 
 <style scoped>
@@ -317,6 +350,16 @@ const operatorLabel = computed(() => {
   border: 1px solid;
   transition: all 0.2s;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* OE Breakpoints styling */
+.oe-breakpoints {
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  opacity: 0.6;
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 1px solid currentColor;
 }
 
 .chip-met {

@@ -36,6 +36,7 @@
           :character-stats="characterStats"
           :show-connector="false"
           :show-group-label="true"
+          :show-oe-breakpoints="showOeBreakpoints"
         />
       </div>
 
@@ -91,6 +92,7 @@ interface Props {
   showEvaluation?: boolean;
   collapsible?: boolean;
   defaultCollapsed?: boolean;
+  showOeBreakpoints?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -98,6 +100,7 @@ const props = withDefaults(defineProps<Props>(), {
   showEvaluation: true,
   collapsible: false,
   defaultCollapsed: false,
+  showOeBreakpoints: false,
 });
 
 // ============================================================================
