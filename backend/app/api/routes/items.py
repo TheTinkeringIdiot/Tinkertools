@@ -42,6 +42,72 @@ router = APIRouter(prefix="/items", tags=["items"])
 # Set up logging for performance monitoring
 logger = logging.getLogger(__name__)
 
+# Spell IDs that modify stats and their parameter field names
+# 53045: "Modify Stat" - permanent stat modification, uses 'Stat' field
+# 53012: "Modify Stat" - variant, uses 'Stat' field
+# 53014: "Modify Stat for Duration" - temporary buff, uses 'Stat' field
+# 53026: "Set Skill" - sets stat to value, uses 'Skill' field
+STAT_MODIFY_SPELLS = [
+    (53045, 'Stat'),
+    (53012, 'Stat'),
+    (53014, 'Stat'),
+    (53026, 'Skill'),
+]
+
+
+def build_stat_modifier_subquery(db: Session, stat_ids: list, operator: str = None, value: int = None):
+    """
+    Build a subquery to find items that modify specific stats.
+
+    Handles multiple spell types that can modify stats:
+    - 53045/53012/53014: Modify Stat spells (param: 'Stat')
+    - 53026: Set Skill spells (param: 'Skill')
+
+    Args:
+        db: Database session
+        stat_ids: List of stat IDs to search for
+        operator: Optional operator for value comparison ('>=', '<=', '==', '!=')
+        value: Optional value to compare against (requires operator)
+
+    Returns:
+        Subquery of Item.id values matching the criteria
+    """
+    subqueries = []
+
+    for spell_id, param_field in STAT_MODIFY_SPELLS:
+        stat_accessor = Spell.spell_params.op('->>')(param_field).cast(Integer)
+        amount_accessor = Spell.spell_params.op('->>')(
+            'Amount'
+        ).cast(Integer)
+
+        subq = db.query(Item.id.distinct())\
+            .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
+            .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
+            .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
+            .join(Spell, SpellDataSpells.spell_id == Spell.id)\
+            .filter(Spell.spell_id == spell_id)\
+            .filter(stat_accessor.in_(stat_ids))
+
+        # Apply value comparison if specified
+        if operator and value is not None:
+            if operator == '>=':
+                subq = subq.filter(amount_accessor >= value)
+            elif operator == '<=':
+                subq = subq.filter(amount_accessor <= value)
+            elif operator == '==':
+                subq = subq.filter(amount_accessor == value)
+            elif operator == '!=':
+                subq = subq.filter(amount_accessor != value)
+
+        subqueries.append(subq)
+
+    # Combine all subqueries with UNION
+    if len(subqueries) == 1:
+        return subqueries[0]
+
+    combined = subqueries[0].union(*subqueries[1:])
+    return combined
+
 
 def apply_stat_filters(query, stat_filters: str, db: Session):
     """
@@ -107,29 +173,8 @@ def apply_stat_filters(query, stat_filters: str, db: Session):
                 query = query.filter(Item.id.in_(subquery))
                 
             elif function == 'modifies':
-                # Look for stat modification spells
-                # Most stat modifications use spell_id 53045 (Modify Stat)
-                # Use .op('->>') for JSON key access (not .astext which fails in filter clauses)
-                stat_accessor = Spell.spell_params.op('->>')('Stat').cast(Integer)
-                amount_accessor = Spell.spell_params.op('->>')('Amount').cast(Integer)
-
-                subquery = db.query(Item.id.distinct())\
-                    .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
-                    .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
-                    .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
-                    .join(Spell, SpellDataSpells.spell_id == Spell.id)\
-                    .filter(Spell.spell_id == 53045)\
-                    .filter(stat_accessor == stat_id)
-
-                # Apply operator to the modification value
-                if operator == '>=':
-                    subquery = subquery.filter(amount_accessor >= value)
-                elif operator == '<=':
-                    subquery = subquery.filter(amount_accessor <= value)
-                elif operator == '==':
-                    subquery = subquery.filter(amount_accessor == value)
-                elif operator == '!=':
-                    subquery = subquery.filter(amount_accessor != value)
+                # Look for stat modification spells (handles multiple spell types)
+                subquery = build_stat_modifier_subquery(db, [stat_id], operator, value)
 
                 query = query.filter(Item.id.in_(subquery))
         
@@ -536,23 +581,12 @@ def get_items(
                          .filter(StatValue.stat == 0, StatValue.value.op('&')(16384) > 0).subquery()
             query = query.filter(~Item.id.in_(subquery))
     
-    # Stat bonus filters - look for stat modification spells (spell_id 53045)
+    # Stat bonus filters - find items that modify specific stats
     if stat_bonuses:
         try:
             bonus_stat_ids = [int(stat_id.strip()) for stat_id in stat_bonuses.split(',') if stat_id.strip()]
             if bonus_stat_ids:
-                # Find items that have "Modify Stat" spells (spell_id 53045) which modify any of the requested stats
-                # The stat ID is stored in the spell_params JSON as the "Stat" field
-                # Use .op('->>') for JSON key access (not .astext which fails in filter clauses)
-                stat_accessor = Spell.spell_params.op('->>')('Stat').cast(Integer)
-                stat_bonus_subquery = db.query(Item.id.distinct())\
-                    .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
-                    .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
-                    .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
-                    .join(Spell, SpellDataSpells.spell_id == Spell.id)\
-                    .filter(Spell.spell_id == 53045)\
-                    .filter(stat_accessor.in_(bonus_stat_ids))
-                
+                stat_bonus_subquery = build_stat_modifier_subquery(db, bonus_stat_ids)
                 query = query.filter(Item.id.in_(stat_bonus_subquery))
         except ValueError:
             logger.warning(f"Invalid stat_bonuses parameter: {stat_bonuses}")
@@ -822,23 +856,12 @@ def search_items(
                          .filter(StatValue.stat == 0, StatValue.value.op('&')(16384) > 0).subquery()
             query = query.filter(~Item.id.in_(subquery))
     
-    # Stat bonus filters - look for stat modification spells (spell_id 53045)
+    # Stat bonus filters - find items that modify specific stats
     if stat_bonuses:
         try:
             bonus_stat_ids = [int(stat_id.strip()) for stat_id in stat_bonuses.split(',') if stat_id.strip()]
             if bonus_stat_ids:
-                # Find items that have "Modify Stat" spells (spell_id 53045) which modify any of the requested stats
-                # The stat ID is stored in the spell_params JSON as the "Stat" field
-                # Use .op('->>') for JSON key access (not .astext which fails in filter clauses)
-                stat_accessor = Spell.spell_params.op('->>')('Stat').cast(Integer)
-                stat_bonus_subquery = db.query(Item.id.distinct())\
-                    .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
-                    .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
-                    .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
-                    .join(Spell, SpellDataSpells.spell_id == Spell.id)\
-                    .filter(Spell.spell_id == 53045)\
-                    .filter(stat_accessor.in_(bonus_stat_ids))
-                
+                stat_bonus_subquery = build_stat_modifier_subquery(db, bonus_stat_ids)
                 query = query.filter(Item.id.in_(stat_bonus_subquery))
         except ValueError:
             logger.warning(f"Invalid stat_bonuses parameter: {stat_bonuses}")
