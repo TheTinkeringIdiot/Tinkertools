@@ -219,6 +219,13 @@ export function interpolateSpellText(format: string, params: Record<string, any>
           return getFlagNameFromBit(statId, value);
         }
         return `Bit ${value}`;
+      } else if (paramName.toLowerCase() === 'value' && typeof value === 'number') {
+        // For Value, check if Stat is a ProcNano stat (552-554) - if so, Value is a nano AOID
+        const statId = params.Stat || params.stat;
+        if (statId >= 552 && statId <= 554) {
+          return `[LINK:${value}]`;
+        }
+        return String(value);
       }
       return String(value);
     }
