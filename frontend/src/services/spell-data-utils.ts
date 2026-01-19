@@ -95,8 +95,8 @@ export function getSpellFormat(spellId: number): string | undefined {
 export function formatSpellParameter(key: string, value: any): FormattedParameter {
   const lowerKey = key.toLowerCase();
 
-  // Handle NanoId and ItemId parameters - create links
-  if (lowerKey.includes('nanoid') || lowerKey.includes('itemid')) {
+  // Handle NanoId, ItemId, and Proc parameters - create links
+  if (lowerKey.includes('nanoid') || lowerKey.includes('itemid') || lowerKey === 'proc') {
     return {
       key,
       value,
@@ -196,10 +196,14 @@ export function interpolateSpellText(format: string, params: Record<string, any>
       // Special handling for different parameter types
       if (
         paramName.toLowerCase().includes('nanoid') ||
-        paramName.toLowerCase().includes('itemid')
+        paramName.toLowerCase().includes('itemid') ||
+        paramName.toLowerCase() === 'proc'
       ) {
-        // For NanoID/ItemID, we'll return a placeholder that will be replaced with a link in the component
+        // For NanoID/ItemID/Proc, we'll return a placeholder that will be replaced with a link in the component
         return `[LINK:${value}]`;
+      } else if (paramName.toLowerCase() === 'item' && typeof value === 'object' && value?.Text) {
+        // For Item objects, extract the Text field
+        return String(value.Text);
       } else if (paramName.toLowerCase().includes('chance')) {
         // For Chance, add % symbol after the value
         // The value is stored as the final percentage (0.25 means 0.25%, not 25%)
