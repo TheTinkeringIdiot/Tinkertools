@@ -1041,6 +1041,11 @@ function evaluateCriterionStatus(
     return 'unknown';
   }
 
+  // Credits (stat 61) are a transient in-game resource not tracked in profiles — always treat as met
+  if (criterion.stat === 61) {
+    return 'met';
+  }
+
   const currentValue = characterStats[criterion.stat] || 0;
 
   switch (criterion.displaySymbol) {
