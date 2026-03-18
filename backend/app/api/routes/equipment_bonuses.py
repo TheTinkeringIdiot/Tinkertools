@@ -168,14 +168,17 @@ def get_batch_item_bonus_details(
         logger.info(f"Getting bonus details for {len(item_ids)} items")
 
         service = EquipmentBonusService(db)
-        results = []
 
-        for item_id in item_ids:
-            item_bonuses = service.get_item_bonus_breakdown(item_id)
-            results.append(ItemBonusDetailResponse(
+        # Batch query all items at once instead of N+1 individual queries
+        all_bonuses = service._get_item_bonuses_with_item_id(item_ids)
+
+        results = [
+            ItemBonusDetailResponse(
                 item_id=item_id,
-                bonuses=item_bonuses
-            ))
+                bonuses=all_bonuses.get(item_id, {})
+            )
+            for item_id in item_ids
+        ]
 
         return results
 

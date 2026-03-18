@@ -167,14 +167,8 @@ def get_nanos(
     """
     Get paginated list of nano programs with rich spell data.
     """
-    # Query nano items with their spell data
-    query = db.query(Item).filter(Item.is_nano == True).options(
-        joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
-        joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
-        .joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell)
-        .joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
-        joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion)
-    )
+    # Build base query WITHOUT relationship loading (for filtering + counting)
+    query = db.query(Item).filter(Item.is_nano == True)
     
     # Apply basic filters
     if ql_min is not None:
@@ -182,7 +176,7 @@ def get_nanos(
     if ql_max is not None:
         query = query.filter(Item.ql <= ql_max)
     
-    # Get total count before complex processing
+    # Get total count on lightweight query (no relationship loading)
     total = query.count()
     
     # Apply sorting
@@ -193,10 +187,17 @@ def get_nanos(
     else:
         query = query.order_by(desc(Item.name) if sort_desc else asc(Item.name))
     
-    # Apply pagination
+    # Apply pagination and load relationships only for result set
     pages = math.ceil(total / page_size) if total > 0 else 1
     offset = (page - 1) * page_size
-    items = query.offset(offset).limit(page_size).all()
+    items = query.options(
+        selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
+        selectinload(Item.item_spell_data).selectinload(ItemSpellData.spell_data)
+            .selectinload(SpellData.spell_data_spells).selectinload(SpellDataSpells.spell)
+            .selectinload(Spell.spell_criteria).selectinload(SpellCriterion.criterion),
+        selectinload(Item.actions).selectinload(Action.action_criteria)
+            .selectinload(ActionCriteria.criterion)
+    ).offset(offset).limit(page_size).all()
     
     # Convert to NanoProgram objects
     nanos = []
@@ -245,6 +246,7 @@ def search_nanos(
     Search nano programs by name or description.
     """
     search_term = f"%{q}%"
+    # Build base query WITHOUT relationship loading
     query = db.query(Item).filter(
         and_(
             Item.is_nano == True,
@@ -253,18 +255,22 @@ def search_nanos(
                 Item.description.ilike(search_term)
             )
         )
-    ).options(
-        joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
-        joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
-        .joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell)
-        .joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
-        joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion)
     )
     
+    # Get total count on lightweight query
     total = query.count()
     pages = math.ceil(total / page_size) if total > 0 else 1
     offset = (page - 1) * page_size
-    items = query.offset(offset).limit(page_size).all()
+    
+    # Load relationships only for result set
+    items = query.options(
+        selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
+        selectinload(Item.item_spell_data).selectinload(ItemSpellData.spell_data)
+            .selectinload(SpellData.spell_data_spells).selectinload(SpellDataSpells.spell)
+            .selectinload(Spell.spell_criteria).selectinload(SpellCriterion.criterion),
+        selectinload(Item.actions).selectinload(Action.action_criteria)
+            .selectinload(ActionCriteria.criterion)
+    ).offset(offset).limit(page_size).all()
     
     nanos = []
     for item in items:
@@ -293,13 +299,14 @@ def get_nano_stats(db: Session = Depends(get_db)):
     """
     Get statistics about available nano programs.
     """
-    # Get all nano items
+    # Get all nano items with selectinload to avoid Cartesian product explosion
     items = db.query(Item).filter(Item.is_nano == True).options(
-        joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
-        joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
-        .joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell)
-        .joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
-        joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion)
+        selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
+        selectinload(Item.item_spell_data).selectinload(ItemSpellData.spell_data)
+            .selectinload(SpellData.spell_data_spells).selectinload(SpellDataSpells.spell)
+            .selectinload(Spell.spell_criteria).selectinload(SpellCriterion.criterion),
+        selectinload(Item.actions).selectinload(Action.action_criteria)
+            .selectinload(ActionCriteria.criterion)
     ).all()
     
     schools = set()
@@ -346,9 +353,10 @@ def get_nano(nano_id: int, db: Session = Depends(get_db)):
     ).options(
         joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
         joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
-        .joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell)
-        .joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
-        joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion)
+            .joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell)
+            .joinedload(Spell.spell_criteria).joinedload(SpellCriterion.criterion),
+        joinedload(Item.actions).joinedload(Action.action_criteria)
+            .joinedload(ActionCriteria.criterion)
     ).first()
     
     if not item:

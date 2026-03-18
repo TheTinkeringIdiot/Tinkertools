@@ -506,40 +506,45 @@ def get_perk_series_grouped(
     # Execute query to get series metadata
     series_results = query.all()
 
-    # For each series, get all perks in that series
-    series_responses = []
+    # Collect all matching series names
+    series_names = [row[0] for row in series_results]
 
-    for series_name, series_type, professions, breeds in series_results:
-        # Get all perks in this series
-        perks_query = db.query(Perk, Item.aoid)\
-            .join(Item, Perk.item_id == Item.id)\
-            .filter(Perk.perk_series == series_name)\
-            .order_by(Perk.counter)
+    # Load ALL perks for ALL matching series in a single query (eliminates N+1)
+    all_perks_query = db.query(Perk, Item.aoid)\
+        .join(Item, Perk.item_id == Item.id)\
+        .filter(Perk.perk_series.in_(series_names))\
+        .order_by(Perk.perk_series, Perk.counter)
 
-        perk_items = perks_query.all()
+    all_perk_rows = all_perks_query.all()
 
-        # Convert to PerkSeriesPerk objects
-        series_perks = []
-        for perk, aoid in perk_items:
-            series_perk = PerkSeriesPerk(
+    # Group perks by series name
+    from collections import defaultdict
+    perks_by_series = defaultdict(list)
+    for perk, aoid in all_perk_rows:
+        perks_by_series[perk.perk_series].append(
+            PerkSeriesPerk(
                 counter=perk.counter,
                 aoid=aoid,
                 level_required=perk.level_required,
                 ai_level_required=perk.ai_level_required if perk.ai_level_required > 0 else None
             )
-            series_perks.append(series_perk)
+        )
 
+    # Build responses using pre-loaded perk data
+    series_responses = []
+
+    for series_name, series_type, professions, breeds in series_results:
         # Convert profession and breed IDs to names
         profession_names = perk_service._profession_ids_to_names(professions or [])
         breed_names = perk_service._breed_ids_to_names(breeds or [])
 
-        # Create series response
+        # Create series response using pre-loaded perks
         series_response = PerkSeriesResponse(
             series_name=series_name,
             type=series_type,
             professions=profession_names,
             breeds=breed_names,
-            perks=series_perks
+            perks=perks_by_series.get(series_name, [])
         )
         series_responses.append(series_response)
 
@@ -693,29 +698,28 @@ def batch_lookup_perks(
     results = []
     errors = []
 
+    # Single batch query instead of N individual queries
+    try:
+        perk_info_map = perk_service.batch_get_perk_info_by_aoids(request.aoids)
+    except Exception as e:
+        logger.error(f"Batch perk lookup query failed: {e}")
+        perk_info_map = {}
+
     for aoid in request.aoids:
-        try:
-            perk_info = perk_service.get_perk_info_by_aoid(aoid)
-            if perk_info:
-                results.append(BatchPerkResult(
-                    aoid=aoid,
-                    success=True,
-                    perk=perk_info
-                ))
-            else:
-                results.append(BatchPerkResult(
-                    aoid=aoid,
-                    success=False,
-                    error=f"Perk with AOID {aoid} not found"
-                ))
-                errors.append(f"Perk {aoid} not found")
-        except Exception as e:
+        perk_info = perk_info_map.get(aoid)
+        if perk_info:
+            results.append(BatchPerkResult(
+                aoid=aoid,
+                success=True,
+                perk=perk_info
+            ))
+        else:
             results.append(BatchPerkResult(
                 aoid=aoid,
                 success=False,
-                error=str(e)
+                error=f"Perk with AOID {aoid} not found"
             ))
-            errors.append(f"Perk {aoid}: {str(e)}")
+            errors.append(f"Perk {aoid} not found")
 
     query_time = time.time() - start_time
     logger.info(f"Batch perk lookup: {len(request.aoids)} perks, {len(errors)} errors, time={query_time:.3f}s")
