@@ -4,7 +4,7 @@ Symbiants API endpoints.
 
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import and_
 import time
 import logging
@@ -73,15 +73,15 @@ def list_symbiants(
         db.query(Item)
         .filter(Item.id.in_(symbiant_ids))
         .options(
-            joinedload(Item.actions)
-            .joinedload(Action.action_criteria)
-            .joinedload(ActionCriteria.criterion),
-            joinedload(Item.item_spell_data)
-            .joinedload(ItemSpellData.spell_data)
-            .joinedload(SpellData.spell_data_spells)
-            .joinedload(SpellDataSpells.spell)
-            .joinedload(Spell.spell_criteria)
-            .joinedload(SpellCriterion.criterion)
+            selectinload(Item.actions)
+            .selectinload(Action.action_criteria)
+            .selectinload(ActionCriteria.criterion),
+            selectinload(Item.item_spell_data)
+            .selectinload(ItemSpellData.spell_data)
+            .selectinload(SpellData.spell_data_spells)
+            .selectinload(SpellDataSpells.spell)
+            .selectinload(Spell.spell_criteria)
+            .selectinload(SpellCriterion.criterion)
         )
     )
     items = {item.id: item for item in items_query.all()}
