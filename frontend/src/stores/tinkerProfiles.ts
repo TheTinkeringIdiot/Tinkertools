@@ -1255,6 +1255,13 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   // Buff Management and NCU Tracking
   // ============================================================================
 
+  /** NCU cost of 999 indicates a hostile/special nano that consumes 0 NCU */
+  function getNcuCost(item: Item): number {
+    const ncuStat = item.stats?.find((stat) => stat.stat === 54);
+    const rawCost = ncuStat?.value || 0;
+    return rawCost === 999 ? 0 : rawCost;
+  }
+
   /**
    * Get current NCU usage from active buffs
    */
@@ -1264,9 +1271,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     }
 
     return activeProfile.value.buffs.reduce((total, buff) => {
-      // NCU cost is stored in stat 54
-      const ncuStat = buff.stats?.find((stat) => stat.stat === 54);
-      return total + (ncuStat?.value || 0);
+      return total + getNcuCost(buff);
     }, 0);
   });
 
@@ -1304,10 +1309,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       return false;
     }
 
-    // Get NCU cost from stat 54
-    const ncuStat = item.stats?.find((stat) => stat.stat === 54);
-    const ncuCost = ncuStat?.value || 0;
-
+    const ncuCost = getNcuCost(item);
     return ncuCost <= availableNCU.value;
   }
 
@@ -1351,8 +1353,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     }
 
     // Check NCU requirements
-    const ncuStat = item.stats?.find((stat) => stat.stat === 54);
-    const ncuCost = ncuStat?.value || 0;
+    const ncuCost = getNcuCost(item);
 
     if (ncuCost > availableNCU.value) {
       const errorMsg = `Requires ${ncuCost} NCU, but only ${availableNCU.value} available`;
