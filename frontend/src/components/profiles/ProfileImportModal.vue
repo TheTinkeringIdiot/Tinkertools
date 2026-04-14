@@ -513,6 +513,11 @@ function onFileClear() {
 }
 
 function detectFormat(data: string): string {
+  // PRK server export check (not JSON, must be before JSON.parse)
+  if (data.trimStart().startsWith('PRK1:')) {
+    return 'PRK Server Export';
+  }
+
   try {
     const parsed = JSON.parse(data);
 
