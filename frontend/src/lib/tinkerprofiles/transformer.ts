@@ -25,6 +25,8 @@ import { skillService } from '@/services/skill-service';
 import type { SkillId } from '@/types/skills';
 import { SKILL_COST_FACTORS } from '@/services/game-data';
 import { normalizeProfessionToId, normalizeBreedToId } from '@/services/game-utils';
+import { isPRKFormat, decodePRK } from './prk-decoder';
+import type { PRKPayload } from './prk-decoder';
 
 export class ProfileTransformer {
   // ============================================================================
@@ -83,6 +85,10 @@ export class ProfileTransformer {
 
         case 'aosetups':
           profile = await this.importFromAOSetups(data, result);
+          break;
+
+        case 'prk':
+          profile = await this.importFromPRK(data, result);
           break;
 
         default:
@@ -853,6 +859,306 @@ export class ProfileTransformer {
   }
 
   // ============================================================================
+  // PRK Server Export Import
+  // ============================================================================
+
+  private async importFromPRK(
+    data: string,
+    result: ProfileImportResult
+  ): Promise<TinkerProfile> {
+    const payload = decodePRK(data);
+    result.metadata.migrated = true;
+
+    const profile = createDefaultProfile(payload.n);
+    profile.version = '4.0.0';
+
+    // Character basics
+    profile.Character.Level = payload.l;
+    profile.Character.Profession = payload.p;
+    profile.Character.Breed = payload.b;
+    profile.Character.AlienLevel = payload.al;
+
+    // Faction: server side values (1=Omni-Tek, 2=Clan, 3=Neutral)
+    const factionMap: Record<number, string> = { 1: 'Omni-Tek', 2: 'Clan', 3: 'Neutral' };
+    profile.Character.Faction = factionMap[payload.f] ?? 'Neutral';
+
+    // Skills: set base values, zero computed fields (Tinkertools recalculates)
+    for (const [statIdStr, baseValue] of Object.entries(payload.s)) {
+      const statId = Number(statIdStr);
+      if (profile.skills[statId]) {
+        profile.skills[statId].base = baseValue;
+        profile.skills[statId].pointsFromIp = 0;
+        profile.skills[statId].ipSpent = 0;
+        profile.skills[statId].trickle = 0;
+        profile.skills[statId].equipmentBonus = 0;
+        profile.skills[statId].perkBonus = 0;
+        profile.skills[statId].buffBonus = 0;
+        profile.skills[statId].total = baseValue;
+      } else {
+        profile.skills[statId] = {
+          base: baseValue,
+          trickle: 0,
+          ipSpent: 0,
+          pointsFromIp: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          total: baseValue,
+        };
+      }
+    }
+
+    // Equipment — batch fetch all items, then map to slots
+    await this.mapPRKEquipment(payload, profile, result);
+
+    // Perks — batch lookup, set as legacy array, then migrate
+    if (payload.pk.length > 0) {
+      await this.mapPRKPerks(payload.pk, profile, result);
+    }
+
+    // Active nanos -> buffs
+    if (payload.na.length > 0) {
+      await this.mapPRKNanos(payload.na, profile, result);
+    }
+
+    result.warnings.push('Profile imported from PRK server export');
+    return profile;
+  }
+
+  // Slot mappings for PRK export format
+  private static readonly PRK_WEAPON_SLOTS: Record<number, keyof TinkerProfile['Weapons']> = {
+    1: 'HUD1', 15: 'HUD2', 2: 'HUD3',
+    3: 'UTILS1', 4: 'UTILS2', 5: 'UTILS3',
+    6: 'RHand', 8: 'LHand',
+    9: 'NCU1', 10: 'NCU2', 11: 'NCU3', 12: 'NCU4', 13: 'NCU5', 14: 'NCU6',
+  };
+
+  private static readonly PRK_ARMOR_SLOTS: Record<number, keyof TinkerProfile['Clothing']> = {
+    1: 'Neck', 2: 'Head', 3: 'Back',
+    4: 'RightShoulder', 5: 'Body', 6: 'LeftShoulder',
+    7: 'RightArm', 8: 'Hands', 9: 'LeftArm',
+    10: 'RightWrist', 11: 'Legs', 12: 'LeftWrist',
+    13: 'RightFinger', 14: 'Feet', 15: 'LeftFinger',
+  };
+
+  private static readonly PRK_IMPLANT_SLOTS: Record<number, string> = {
+    1: '2', 2: '4', 3: '8', 4: '16', 5: '32', 6: '64',
+    7: '128', 8: '256', 9: '512', 10: '1024', 11: '2048', 12: '4096', 13: '8192',
+  };
+
+  private async mapPRKEquipment(
+    payload: PRKPayload,
+    profile: TinkerProfile,
+    result: ProfileImportResult
+  ): Promise<void> {
+    // Collect all item requests from equipment, armor, and implants
+    const allItems = [
+      ...payload.e.map(i => ({ aoid: i.id, targetQl: i.ql, source: 'weapon' as const, slot: i.sl })),
+      ...payload.a.map(i => ({ aoid: i.id, targetQl: i.ql, source: 'armor' as const, slot: i.sl })),
+      ...payload.i.map(i => ({ aoid: i.id, targetQl: i.ql, source: 'implant' as const, slot: i.sl })),
+    ];
+
+    if (allItems.length === 0) return;
+
+    // Batch fetch all items
+    const fetchRequests = allItems.map(i => ({ aoid: i.aoid, targetQl: i.targetQl }));
+    const itemMap = await this.fetchItems(fetchRequests);
+
+    // Helper to create a fallback item when fetch fails
+    const createFallback = (aoid: number, ql: number): Item => ({
+      id: aoid,
+      aoid: aoid,
+      name: `Item ${aoid} (fetch failed)`,
+      ql: ql,
+      description: undefined,
+      item_class: undefined,
+      is_nano: false,
+      stats: [],
+      spell_data: [],
+      actions: [],
+      attack_stats: [],
+      defense_stats: [],
+      sources: [],
+    } as Item);
+
+    // Map items to their profile slots
+    for (const entry of allItems) {
+      const key = `${entry.aoid}:${entry.targetQl}`;
+      const item = itemMap.get(key);
+
+      if (entry.source === 'weapon') {
+        const slot = ProfileTransformer.PRK_WEAPON_SLOTS[entry.slot];
+        if (slot) {
+          if (item) {
+            profile.Weapons[slot] = item;
+          } else {
+            profile.Weapons[slot] = createFallback(entry.aoid, entry.targetQl);
+            result.warnings.push(`Failed to fetch weapon item AOID ${entry.aoid}`);
+          }
+        } else {
+          result.warnings.push(`Unknown PRK weapon slot: ${entry.slot}`);
+        }
+      } else if (entry.source === 'armor') {
+        const slot = ProfileTransformer.PRK_ARMOR_SLOTS[entry.slot];
+        if (slot) {
+          if (item) {
+            profile.Clothing[slot] = item;
+          } else {
+            profile.Clothing[slot] = createFallback(entry.aoid, entry.targetQl);
+            result.warnings.push(`Failed to fetch armor item AOID ${entry.aoid}`);
+          }
+        } else {
+          result.warnings.push(`Unknown PRK armor slot: ${entry.slot}`);
+        }
+      } else if (entry.source === 'implant') {
+        const slotKey = ProfileTransformer.PRK_IMPLANT_SLOTS[entry.slot];
+        if (slotKey) {
+          const slotNum = Number(slotKey);
+          if (item) {
+            // Extend item with implant-specific fields (clusters resolved by Tinkertools)
+            const implant: ImplantWithClusters = {
+              ...item,
+              slot: slotNum,
+              type: 'implant',
+            };
+            profile.Implants[slotKey] = implant;
+          } else {
+            const fallback = createFallback(entry.aoid, entry.targetQl);
+            const implant: ImplantWithClusters = {
+              ...fallback,
+              slot: slotNum,
+              type: 'implant',
+            };
+            profile.Implants[slotKey] = implant;
+            result.warnings.push(`Failed to fetch implant item AOID ${entry.aoid}`);
+          }
+        } else {
+          result.warnings.push(`Unknown PRK implant slot: ${entry.slot}`);
+        }
+      }
+    }
+  }
+
+  private async mapPRKPerks(
+    perkAoids: number[],
+    profile: TinkerProfile,
+    result: ProfileImportResult
+  ): Promise<void> {
+    const legacyPerks: any[] = [];
+    const BATCH_SIZE = 100;
+    const chunks: number[][] = [];
+    for (let i = 0; i < perkAoids.length; i += BATCH_SIZE) {
+      chunks.push(perkAoids.slice(i, i + BATCH_SIZE));
+    }
+
+    try {
+      const batchResponses = await Promise.all(
+        chunks.map((chunk) => apiClient.batchLookupPerks(chunk))
+      );
+
+      for (const batchResponse of batchResponses) {
+        for (const perkResult of batchResponse.results) {
+          if (perkResult.success && perkResult.perk) {
+            const perkDetails = perkResult.perk;
+
+            // Extract base perk name (without level suffix)
+            let baseName = perkDetails.perk_name || perkDetails.name;
+            if (baseName && perkDetails.perk_counter > 1) {
+              const nameParts = baseName.split(' ');
+              if (
+                nameParts.length > 1 &&
+                nameParts[nameParts.length - 1] === perkDetails.perk_counter.toString()
+              ) {
+                baseName = nameParts.slice(0, -1).join(' ');
+              }
+            }
+
+            legacyPerks.push({
+              aoid: perkResult.aoid,
+              name: baseName,
+              level: perkDetails.perk_counter || perkDetails.counter || 1,
+              type: perkDetails.perk_type || perkDetails.type || 'SL',
+              item: perkDetails,
+            });
+          } else {
+            legacyPerks.push({
+              aoid: perkResult.aoid,
+              name: `Unknown Perk (${perkResult.aoid})`,
+              level: 1,
+              type: 'SL',
+            });
+            if (perkResult.error) {
+              result.warnings.push(
+                `Could not find perk with AOID ${perkResult.aoid}: ${perkResult.error}`
+              );
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[ProfileTransformer] PRK batch perk lookup failed:', error);
+      for (const aoid of perkAoids) {
+        legacyPerks.push({
+          aoid,
+          name: `Unknown Perk (${aoid})`,
+          level: 1,
+          type: 'SL',
+        });
+      }
+      result.warnings.push('Batch perk lookup failed - perks added as placeholders');
+    }
+
+    // Set as legacy array format, will be migrated by migrateProfilePerks
+    (profile as any).PerksAndResearch = legacyPerks;
+    result.warnings.push(`Imported ${legacyPerks.length} perks from PRK export`);
+
+    // Migrate to structured PerkSystem
+    const migrated = this.migrateProfilePerks(profile);
+    profile.PerksAndResearch = migrated.PerksAndResearch;
+  }
+
+  private async mapPRKNanos(
+    nanoAoids: number[],
+    profile: TinkerProfile,
+    result: ProfileImportResult
+  ): Promise<void> {
+    const fetchRequests = nanoAoids.map(aoid => ({ aoid, targetQl: undefined }));
+    const itemMap = await this.fetchItems(fetchRequests);
+
+    const buffs: Item[] = [];
+    for (const aoid of nanoAoids) {
+      const key = `${aoid}:base`;
+      const item = itemMap.get(key);
+      if (item) {
+        buffs.push(item);
+      } else {
+        // Create a minimal fallback for unfetchable nanos
+        buffs.push({
+          id: aoid,
+          aoid: aoid,
+          name: `Nano ${aoid} (fetch failed)`,
+          ql: 1,
+          description: undefined,
+          item_class: undefined,
+          is_nano: true,
+          stats: [],
+          spell_data: [],
+          actions: [],
+          attack_stats: [],
+          defense_stats: [],
+          sources: [],
+        } as Item);
+        result.warnings.push(`Failed to fetch nano AOID ${aoid}`);
+      }
+    }
+
+    if (buffs.length > 0) {
+      profile.buffs = buffs;
+      result.warnings.push(`Imported ${buffs.length} active nanos as buffs`);
+    }
+  }
+
+  // ============================================================================
   // Item Fetching Utilities
   // ============================================================================
 
@@ -935,6 +1241,11 @@ export class ProfileTransformer {
   // ============================================================================
 
   private detectFormat(data: string): string {
+    // PRK format check before JSON parsing (PRK strings aren't JSON)
+    if (isPRKFormat(data)) {
+      return 'prk';
+    }
+
     try {
       const parsed = JSON.parse(data);
 
