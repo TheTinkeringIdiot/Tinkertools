@@ -882,13 +882,17 @@ export class ProfileTransformer {
     const factionMap: Record<number, string> = { 1: 'Omni-Tek', 2: 'Clan', 3: 'Neutral' };
     profile.Character.Faction = factionMap[payload.f] ?? 'Neutral';
 
-    // Skills: set base values, zero computed fields (Tinkertools recalculates)
+    // Skills: server BaseValue = breed base + IP-purchased points.
+    // Split into base (breed default, already set by createDefaultProfile) and pointsFromIp.
+    // IP tracking recalculation will recompute total = base + trickle + pointsFromIp + bonuses.
     for (const [statIdStr, baseValue] of Object.entries(payload.s)) {
       const statId = Number(statIdStr);
       if (profile.skills[statId]) {
-        profile.skills[statId].base = baseValue;
-        profile.skills[statId].pointsFromIp = 0;
-        profile.skills[statId].ipSpent = 0;
+        // Keep the breed default base, calculate IP portion as the difference
+        const breedBase = profile.skills[statId].base;
+        const ipPoints = Math.max(0, baseValue - breedBase);
+        profile.skills[statId].pointsFromIp = ipPoints;
+        profile.skills[statId].ipSpent = 0; // Will be recalculated by IP tracker
         profile.skills[statId].trickle = 0;
         profile.skills[statId].equipmentBonus = 0;
         profile.skills[statId].perkBonus = 0;
@@ -896,10 +900,10 @@ export class ProfileTransformer {
         profile.skills[statId].total = baseValue;
       } else {
         profile.skills[statId] = {
-          base: baseValue,
+          base: 0,
           trickle: 0,
           ipSpent: 0,
-          pointsFromIp: 0,
+          pointsFromIp: baseValue,
           equipmentBonus: 0,
           perkBonus: 0,
           buffBonus: 0,
