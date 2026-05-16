@@ -1126,17 +1126,29 @@ export class ProfileTransformer {
     profile: TinkerProfile,
     result: ProfileImportResult
   ): Promise<void> {
-    const fetchRequests = nanoAoids.map(aoid => ({ aoid, targetQl: undefined }));
-    const itemMap = await this.fetchItems(fetchRequests);
+    if (nanoAoids.length === 0) return;
+
+    // Nanos are not interpolated - fetch each at its actual QL via the
+    // single-item endpoint (in parallel). Avoids the batch/interpolate path,
+    // which forces ql=1 on nanos and uses a key shape that doesn't match here.
+    const fetchPromises = nanoAoids.map(async aoid => {
+      try {
+        const response = await apiClient.getItem(aoid);
+        return { aoid, item: response.data ?? null };
+      } catch (error) {
+        console.warn(`[ProfileTransformer] Failed to fetch nano AOID ${aoid}:`, error);
+        return { aoid, item: null };
+      }
+    });
+
+    const fetched = await Promise.all(fetchPromises);
 
     const buffs: Item[] = [];
-    for (const aoid of nanoAoids) {
-      const key = `${aoid}:base`;
-      const item = itemMap.get(key);
+    for (const { aoid, item } of fetched) {
       if (item) {
         buffs.push(item);
       } else {
-        // Create a minimal fallback for unfetchable nanos
+        // Minimal fallback for unfetchable nanos
         buffs.push({
           id: aoid,
           aoid: aoid,
