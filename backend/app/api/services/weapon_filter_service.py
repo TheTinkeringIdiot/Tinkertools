@@ -88,12 +88,11 @@ class WeaponFilterService:
                 ])
             )
 
-        # Only include items with at least one requirement (excludes unequippable items)
-        query = query.join(
-            Action, Item.id == Action.item_id
-        ).join(
-            ActionCriteria, Action.id == ActionCriteria.action_id
-        )
+        # NOTE: Do not INNER JOIN Action/ActionCriteria here. Items with no
+        # action criteria (e.g. the "Martial Arts Item" templates, which have
+        # zero wield requirements) would be incorrectly dropped. The NOT IN
+        # subqueries below already handle exclusion of items whose requirements
+        # don't match the character.
 
         # OPTIMIZED: Use subqueries materialized once + NOT IN for exclusions
         # Much faster than multiple correlated NOT EXISTS subqueries that scan tables repeatedly
