@@ -121,6 +121,82 @@ export function interpolateWeapon(
   return null;
 }
 
+/**
+ * Interpolate a weapon to a specific target QL (no requirement checking)
+ *
+ * Unlike interpolateWeapon() which finds the highest equipable QL, this
+ * targets an exact QL. Used for items whose effective QL is computed from
+ * a non-standard formula (e.g. Martial Arts Item, where QL is derived from
+ * the character's MA skill rather than from the templates' own QLs).
+ *
+ * The target QL is clamped to [loQL, hiQL].
+ *
+ * @param loWeapon - Low-QL template
+ * @param hiWeapon - High-QL template
+ * @param targetQL - Desired final QL (will be clamped to template range)
+ * @returns Interpolated weapon at the (clamped) target QL
+ */
+export function interpolateWeaponToQL(
+  loWeapon: WeaponCandidate,
+  hiWeapon: WeaponCandidate,
+  targetQL: number
+): WeaponCandidate {
+  const loQL = loWeapon.ql || 1;
+  const hiQL = hiWeapon.ql || 1;
+  const qlDelta = hiQL - loQL;
+
+  const clampedQL = Math.max(loQL, Math.min(hiQL, targetQL));
+  const offset = clampedQL - loQL;
+
+  // Degenerate cases: no delta, or target is at the low endpoint
+  if (qlDelta <= 0 || offset <= 0) {
+    return {
+      ...loWeapon,
+      ql: clampedQL,
+      interpolatedQL: clampedQL,
+      equipable: true,
+    };
+  }
+
+  // Target is exactly at the high endpoint
+  if (offset >= qlDelta) {
+    return {
+      ...hiWeapon,
+      ql: clampedQL,
+      interpolatedQL: clampedQL,
+      equipable: true,
+    };
+  }
+
+  const loStats = extractWeaponStatsForInterpolation(loWeapon);
+  const hiStats = extractWeaponStatsForInterpolation(hiWeapon);
+
+  const minDmgDelta = (hiStats.minDamage - loStats.minDamage) / qlDelta;
+  const maxDmgDelta = (hiStats.maxDamage - loStats.maxDamage) / qlDelta;
+  const critDmgDelta = (hiStats.critBonus - loStats.critBonus) / qlDelta;
+
+  let arCapDelta = 0;
+  if (loStats.arCap !== null && hiStats.arCap !== null) {
+    arCapDelta = (hiStats.arCap - loStats.arCap) / qlDelta;
+  }
+
+  return {
+    ...loWeapon,
+    ql: clampedQL,
+    interpolatedQL: clampedQL,
+    equipable: true,
+    stats: interpolateStats(
+      loWeapon.stats,
+      offset,
+      minDmgDelta,
+      maxDmgDelta,
+      critDmgDelta,
+      arCapDelta,
+      loStats
+    ),
+  };
+}
+
 // ============================================================================
 // Stat Extraction & Interpolation
 // ============================================================================

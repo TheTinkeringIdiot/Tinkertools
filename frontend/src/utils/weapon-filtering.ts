@@ -14,7 +14,107 @@
 
 import type { WeaponCandidate, FiteInputState } from '@/types/weapon-analysis';
 import { checkRequirements } from './weapon-requirements';
-import { interpolateWeapon, sortWeaponsByQL } from './weapon-interpolation';
+import { interpolateWeapon, interpolateWeaponToQL, sortWeaponsByQL } from './weapon-interpolation';
+
+// ============================================================================
+// Martial Arts Item Template Selection
+// ============================================================================
+
+/**
+ * Martial Arts Item families and tiers.
+ *
+ * The "Martial Arts Item" represents a character's unarmed combat. The client
+ * (PlayerCharacter.cs:184-259) selects one of three template families based on
+ * profession, then picks an MA-skill tier within that family. Each tier
+ * specifies a (low_aoid, high_aoid) template pair and a QL formula derived
+ * from the character's Martial Arts skill.
+ *
+ * Family 1: Martial Artist (profession 2)
+ * Family 2: Shade (profession 15)
+ * Family 3: Generic fallback (all other professions)
+ */
+interface MATier {
+  /** MA skill upper bound (exclusive); use Infinity for the last tier */
+  maxSkill: number;
+  lowAoid: number;
+  highAoid: number;
+  /** Value subtracted from MA skill before dividing by 2 to compute QL */
+  qlOffset: number;
+}
+
+const MA_TIERS: Record<1 | 2 | 3, MATier[]> = {
+  // Family 1: Martial Artist
+  1: [
+    { maxSkill: 200,      lowAoid: 211352, highAoid: 211353, qlOffset: 0 },
+    { maxSkill: 1000,     lowAoid: 211353, highAoid: 211354, qlOffset: 0 },
+    { maxSkill: 2000,     lowAoid: 211357, highAoid: 211358, qlOffset: 1000 },
+    { maxSkill: Infinity, lowAoid: 211363, highAoid: 211364, qlOffset: 2000 },
+  ],
+  // Family 2: Shade
+  2: [
+    { maxSkill: 200,      lowAoid: 211349, highAoid: 211350, qlOffset: 0 },
+    { maxSkill: 1000,     lowAoid: 211350, highAoid: 211351, qlOffset: 0 },
+    { maxSkill: 2000,     lowAoid: 211359, highAoid: 211360, qlOffset: 1000 },
+    { maxSkill: Infinity, lowAoid: 211365, highAoid: 211366, qlOffset: 2000 },
+  ],
+  // Family 3: Generic fallback
+  3: [
+    { maxSkill: 200,      lowAoid: 43712,  highAoid: 144745, qlOffset: 0 },
+    { maxSkill: 1000,     lowAoid: 144745, highAoid: 43713,  qlOffset: 0 },
+    { maxSkill: 2000,     lowAoid: 211355, highAoid: 211356, qlOffset: 1000 },
+    { maxSkill: Infinity, lowAoid: 211361, highAoid: 211362, qlOffset: 2000 },
+  ],
+};
+
+function getMAFamily(profession: number): 1 | 2 | 3 {
+  if (profession === 2) return 1;   // Martial Artist
+  if (profession === 15) return 2;  // Shade
+  return 3;                          // Everyone else (including profession 0 = "Any")
+}
+
+function getMATier(family: 1 | 2 | 3, maSkill: number): MATier {
+  const tiers = MA_TIERS[family];
+  for (const tier of tiers) {
+    if (maSkill < tier.maxSkill) return tier;
+  }
+  return tiers[tiers.length - 1];
+}
+
+/**
+ * Select the single Martial Arts Item appropriate for the character.
+ *
+ * Picks the correct template family for the profession, the correct tier
+ * for the current MA skill, and interpolates between the tier's low/high
+ * templates to the QL computed from the family's formula.
+ *
+ * Martial Arts Items have no wield requirements, so equipability is implicit.
+ *
+ * @param candidates - All Martial Arts Item variants returned by the backend
+ * @param state - Character state (uses profession and weapon skill 100)
+ * @returns Single interpolated Martial Arts Item, or null if templates missing
+ */
+export function selectMartialArtsItem(
+  candidates: WeaponCandidate[],
+  state: FiteInputState
+): WeaponCandidate | null {
+  const profession = state.characterStats.profession;
+  const maSkill = state.weaponSkills[100] || 0;
+
+  const family = getMAFamily(profession);
+  const tier = getMATier(family, maSkill);
+
+  // QL is computed from MA skill, floored at 1
+  const targetQL = Math.max(1, Math.floor((maSkill - tier.qlOffset) / 2));
+
+  const lowTpl = candidates.find((w) => w.aoid === tier.lowAoid);
+  const highTpl = candidates.find((w) => w.aoid === tier.highAoid);
+
+  if (!lowTpl || !highTpl) {
+    return null;
+  }
+
+  return interpolateWeaponToQL(lowTpl, highTpl, targetQL);
+}
 
 // ============================================================================
 // Main Equipable Weapons Filter
@@ -52,9 +152,16 @@ export function getEquipableWeapons(
     // Get all weapons with same name
     let sameWeapons = weapons.filter((w) => w.name === weapon.name);
 
-    // Special handling for Martial Arts Items (profession-specific)
+    // Special handling for Martial Arts Item: profession + MA-skill drive
+    // template selection and QL is computed from MA skill rather than
+    // resolved by the generic equipability search.
     if (weapon.name === 'Martial Arts Item') {
-      sameWeapons = filterMartialArtsItemsByProfession(sameWeapons, state);
+      processedNames.add(weapon.name);
+      const selected = selectMartialArtsItem(sameWeapons, state);
+      if (selected) {
+        equipableWeapons.push(selected);
+      }
+      continue;
     }
 
     // If only one weapon variant, check if equipable
@@ -91,57 +198,6 @@ export function getEquipableWeapons(
   }
 
   return equipableWeapons;
-}
-
-/**
- * Filter Martial Arts Items by profession
- *
- * Port of legacy code lines 462-467
- *
- * Martial Arts Items have profession-specific variants.
- * Filter to only those matching the character's profession.
- * For profession 0 ("Any"), use profession 1 (Soldier) items.
- *
- * @param martialArtsItems - All Martial Arts Item variants
- * @param state - Character state
- * @returns Filtered variants for this profession
- */
-function filterMartialArtsItemsByProfession(
-  martialArtsItems: WeaponCandidate[],
-  state: FiteInputState
-): WeaponCandidate[] {
-  const profession = state.characterStats.profession;
-
-  // Profession 0 = "Any", use profession 1 (Soldier) items
-  const targetProfession = profession === 0 ? 1 : profession;
-
-  return martialArtsItems.filter((weapon) => {
-    // Find WIELD actions (action=8)
-    const wearActions = weapon.actions?.filter((a) => a.action === 8) || [];
-
-    // Check if any WEAR action has profession requirement
-    for (const action of wearActions) {
-      const criteria = action.criteria || [];
-
-      // Find profession criteria (stat 60)
-      const profCriteria = criteria.filter((c) => c.value1 === 60);
-
-      if (profCriteria.length === 0) {
-        // No profession requirement, include it
-        return true;
-      }
-
-      // Check if any profession criterion matches
-      for (const criterion of profCriteria) {
-        if (criterion.value2 === targetProfession) {
-          return true;
-        }
-      }
-    }
-
-    // No matching profession requirement found
-    return false;
-  });
 }
 
 // ============================================================================
