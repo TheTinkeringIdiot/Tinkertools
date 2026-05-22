@@ -113,22 +113,38 @@ const filteredWeapons = computed(() => {
 
 /**
  * Fetch weapons from backend based on current input state
- * Sends top 3 weapon skills to backend for filtering
+ *
+ * Sends the character's TRAINED weapon skills (skill spend > 0) to the
+ * backend. Untrained skills are excluded even if their base/trickle value
+ * is high - otherwise high-level characters would see weapons for skills
+ * they never actually use (e.g. a Martial Artist seeing rocket launchers
+ * because Heavy Weapons base happens to exceed other untrained skills).
+ *
+ * The backend caps the list at 3 skills; if more than 3 weapon skills are
+ * trained we send the 3 highest by total value.
  */
 async function fetchWeapons() {
   if (!activeProfile.value) return;
 
   loading.value = true;
   try {
-    // Get top 3 weapon skills
+    const profile = activeProfile.value;
     const weaponSkills = inputState.value.weaponSkills;
-    const top3 = Object.entries(weaponSkills)
+
+    // Filter to skills the character has actually trained (IP spent on them)
+    const trained = Object.entries(weaponSkills).filter(
+      ([skill_id]) => (profile.skills[Number(skill_id)]?.ipSpent ?? 0) > 0
+    );
+
+    const top3 = trained
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
       .map(([skill_id, value]) => ({ skill_id: Number(skill_id), value }));
 
     if (top3.length === 0) {
-      console.warn('[TinkerFite] No weapon skills found, cannot fetch weapons');
+      console.warn(
+        '[TinkerFite] No trained weapon skills found (no IP spent on any weapon skill); cannot fetch weapons'
+      );
       weapons.value = [];
       return;
     }
