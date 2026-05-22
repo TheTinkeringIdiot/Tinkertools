@@ -131,9 +131,15 @@ async function fetchWeapons() {
     const profile = activeProfile.value;
     const weaponSkills = inputState.value.weaponSkills;
 
-    // Filter to skills the character has actually trained (IP spent on them)
+    // Filter to skills the character has actually trained.
+    //
+    // Use pointsFromIp (the IP-purchased skill points) rather than ipSpent
+    // (the IP-cost field): pointsFromIp is populated for both natively
+    // created and PRK-imported profiles, while ipSpent is only incrementally
+    // tracked when the user trains a skill inside this app - imported
+    // profiles leave it at 0.
     const trained = Object.entries(weaponSkills).filter(
-      ([skill_id]) => (profile.skills[Number(skill_id)]?.ipSpent ?? 0) > 0
+      ([skill_id]) => (profile.skills[Number(skill_id)]?.pointsFromIp ?? 0) > 0
     );
 
     const top3 = trained
