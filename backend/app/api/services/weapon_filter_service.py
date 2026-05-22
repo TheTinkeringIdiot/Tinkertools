@@ -34,6 +34,19 @@ class WeaponFilterService:
     # Expansion stat
     EXPANSION_STAT = 389
 
+    # Player-equippable items that legitimately have no wield action criteria.
+    # These are the "Martial Arts Item" (unarmed combat) templates; the client
+    # selects one based on profession + MA skill rather than via wield
+    # requirements. See client PlayerCharacter.cs:184-259.
+    MARTIAL_ARTS_ITEM_AOIDS = (
+        # Family 1: Martial Artist (profession 2)
+        211352, 211353, 211354, 211357, 211358, 211363, 211364,
+        # Family 2: Shade (profession 15)
+        211349, 211350, 211351, 211359, 211360, 211365, 211366,
+        # Family 3: Generic fallback (all other professions)
+        43712, 43713, 144745, 211355, 211356, 211361, 211362,
+    )
+
     def __init__(self, db: Session):
         self.db = db
 
@@ -88,11 +101,23 @@ class WeaponFilterService:
                 ])
             )
 
-        # NOTE: Do not INNER JOIN Action/ActionCriteria here. Items with no
-        # action criteria (e.g. the "Martial Arts Item" templates, which have
-        # zero wield requirements) would be incorrectly dropped. The NOT IN
-        # subqueries below already handle exclusion of items whose requirements
-        # don't match the character.
+        # Restrict to player-equippable items: must have at least one
+        # action criterion (acts as a coarse exclusion for NPC mob weapons,
+        # quest props, and other items that aren't real player weapons),
+        # OR be an explicitly allow-listed Martial Arts Item template
+        # (those have no wield criteria but are player-equippable).
+        items_with_action_criteria = select(Item.id).select_from(Item).join(
+            Action, Item.id == Action.item_id
+        ).join(
+            ActionCriteria, Action.id == ActionCriteria.action_id
+        ).scalar_subquery()
+
+        query = query.filter(
+            or_(
+                Item.id.in_(items_with_action_criteria),
+                Item.aoid.in_(self.MARTIAL_ARTS_ITEM_AOIDS),
+            )
+        )
 
         # OPTIMIZED: Use subqueries materialized once + NOT IN for exclusions
         # Much faster than multiple correlated NOT EXISTS subqueries that scan tables repeatedly
