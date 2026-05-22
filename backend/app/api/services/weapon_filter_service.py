@@ -5,7 +5,7 @@ Service for filtering weapons based on character stats and requirements.
 import logging
 from typing import List, Optional
 from sqlalchemy.orm import Session, joinedload, selectinload
-from sqlalchemy import and_, or_, select, BigInteger, Integer, func
+from sqlalchemy import and_, or_, select, exists, BigInteger, Integer, func
 
 from app.models import (
     Item, ItemStats, StatValue, AttackDefense, AttackDefenseAttack, AttackDefenseDefense,
@@ -106,15 +106,22 @@ class WeaponFilterService:
         # quest props, and other items that aren't real player weapons),
         # OR be an explicitly allow-listed Martial Arts Item template
         # (those have no wield criteria but are player-equippable).
-        items_with_action_criteria = select(Item.id).select_from(Item).join(
-            Action, Item.id == Action.item_id
-        ).join(
-            ActionCriteria, Action.id == ActionCriteria.action_id
-        ).scalar_subquery()
+        #
+        # Use EXISTS rather than IN(subquery): with the OR clause, the IN
+        # form forces Postgres into a poor plan that times out, while
+        # correlated EXISTS short-circuits per row using the idx_actions_item_action
+        # and idx_action_criteria_covering indexes (~35ms standalone).
+        has_action_criteria = (
+            select(1)
+            .select_from(Action)
+            .join(ActionCriteria, Action.id == ActionCriteria.action_id)
+            .where(Action.item_id == Item.id)
+            .exists()
+        )
 
         query = query.filter(
             or_(
-                Item.id.in_(items_with_action_criteria),
+                has_action_criteria,
                 Item.aoid.in_(self.MARTIAL_ARTS_ITEM_AOIDS),
             )
         )
