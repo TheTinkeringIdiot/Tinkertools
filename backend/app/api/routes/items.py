@@ -36,157 +36,17 @@ from app.api.schemas import (
     PaginatedResponse
 )
 from app.core.decorators import cached_response, performance_monitor
+from app.api.services.item_filter_service import (
+    apply_common_item_filters,
+    apply_stat_filters,
+    build_stat_modifier_subquery,
+    item_detail_load_options,
+)
 
 router = APIRouter(prefix="/items", tags=["items"])
 
 # Set up logging for performance monitoring
 logger = logging.getLogger(__name__)
-
-# Spell IDs that modify stats and their parameter field names
-# 53045: "Modify Stat" - permanent stat modification, uses 'Stat' field
-# 53012: "Modify Stat" - variant, uses 'Stat' field
-# 53014: "Modify Stat for Duration" - temporary buff, uses 'Stat' field
-# 53026: "Set Skill" - sets stat to value, uses 'Skill' field
-STAT_MODIFY_SPELLS = [
-    (53045, 'Stat'),
-    (53012, 'Stat'),
-    (53014, 'Stat'),
-    (53026, 'Skill'),
-]
-
-
-def build_stat_modifier_subquery(db: Session, stat_ids: list, operator: str = None, value: int = None):
-    """
-    Build a subquery to find items that modify specific stats.
-
-    Handles multiple spell types that can modify stats:
-    - 53045/53012/53014: Modify Stat spells (param: 'Stat')
-    - 53026: Set Skill spells (param: 'Skill')
-
-    Args:
-        db: Database session
-        stat_ids: List of stat IDs to search for
-        operator: Optional operator for value comparison ('>=', '<=', '==', '!=')
-        value: Optional value to compare against (requires operator)
-
-    Returns:
-        Subquery of Item.id values matching the criteria
-    """
-    subqueries = []
-
-    for spell_id, param_field in STAT_MODIFY_SPELLS:
-        stat_accessor = Spell.spell_params.op('->>')(param_field).cast(Integer)
-        amount_accessor = Spell.spell_params.op('->>')(
-            'Amount'
-        ).cast(Integer)
-
-        subq = db.query(Item.id.distinct())\
-            .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
-            .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
-            .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
-            .join(Spell, SpellDataSpells.spell_id == Spell.id)\
-            .filter(Spell.spell_id == spell_id)\
-            .filter(stat_accessor.in_(stat_ids))
-
-        # Apply value comparison if specified
-        if operator and value is not None:
-            if operator == '>=':
-                subq = subq.filter(amount_accessor >= value)
-            elif operator == '<=':
-                subq = subq.filter(amount_accessor <= value)
-            elif operator == '==':
-                subq = subq.filter(amount_accessor == value)
-            elif operator == '!=':
-                subq = subq.filter(amount_accessor != value)
-
-        subqueries.append(subq)
-
-    # Combine all subqueries with UNION
-    if len(subqueries) == 1:
-        return subqueries[0]
-
-    combined = subqueries[0].union(*subqueries[1:])
-    return combined
-
-
-def apply_stat_filters(query, stat_filters: str, db: Session):
-    """
-    Apply stat filters to the query.
-    Format: 'function:stat:operator:value' separated by commas
-    Example: 'requires:16:>=:500,modifies:124:>=:20'
-    """
-    if not stat_filters:
-        return query
-    
-    try:
-        filters = []
-        for filter_str in stat_filters.split(','):
-            parts = filter_str.strip().split(':')
-            if len(parts) != 4:
-                logger.warning(f"Invalid stat filter format: {filter_str}")
-                continue
-            
-            function, stat_str, operator, value_str = parts
-            
-            # Validate function
-            if function not in ['requires', 'modifies']:
-                logger.warning(f"Invalid stat filter function: {function}")
-                continue
-            
-            # Validate operator
-            if operator not in ['==', '<=', '>=', '!=']:
-                logger.warning(f"Invalid stat filter operator: {operator}")
-                continue
-            
-            try:
-                stat_id = int(stat_str)
-                value = int(value_str)
-            except ValueError:
-                logger.warning(f"Invalid stat ID or value in filter: {filter_str}")
-                continue
-            
-            filters.append((function, stat_id, operator, value))
-        
-        if not filters:
-            return query
-        
-        # Apply each filter
-        for function, stat_id, operator, value in filters:
-            if function == 'requires':
-                # Look for requirement criteria in actions
-                subquery = db.query(Item.id.distinct())\
-                    .join(Action, Item.id == Action.item_id)\
-                    .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
-                    .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
-                    .filter(Criterion.value1 == stat_id)
-                
-                # Apply operator to the requirement value
-                if operator == '>=':
-                    subquery = subquery.filter(Criterion.value2 >= value)
-                elif operator == '<=':
-                    subquery = subquery.filter(Criterion.value2 <= value)
-                elif operator == '==':
-                    subquery = subquery.filter(Criterion.value2 == value)
-                elif operator == '!=':
-                    subquery = subquery.filter(Criterion.value2 != value)
-                
-                query = query.filter(Item.id.in_(subquery))
-                
-            elif function == 'modifies':
-                # Look for stat modification spells (handles multiple spell types)
-                subquery = build_stat_modifier_subquery(db, [stat_id], operator, value)
-
-                query = query.filter(Item.id.in_(subquery))
-        
-        # Use distinct to avoid duplicates from joins
-        query = query.distinct()
-        
-    except Exception as e:
-        logger.error(f"Error applying stat filters: {e}")
-        # Return original query if there's an error parsing filters
-        return query
-    
-    return query
 
 
 def build_item_detail(item: Item, db: Session) -> ItemDetail:
@@ -509,94 +369,21 @@ def get_items(
     if is_nano is not None:
         query = query.filter(Item.is_nano == is_nano)
     
-    # Apply advanced search filters using subqueries (avoids repeated unaliased joins)
-    # Equipment slot filter (stat 298 - EquippedIn)
-    if slot is not None and slot > 0:
-        slot_subquery = db.query(ItemStats.item_id)\
-            .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
-            .filter(StatValue.stat == 298, StatValue.value.op('&')(1 << slot) > 0)
-        query = query.filter(Item.id.in_(slot_subquery))
-    
-    # Requirement filters using subqueries
-    if breed is not None and breed > 0:
-        breed_subquery = db.query(Action.item_id)\
-            .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
-            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
-            .filter(Criterion.value1 == 4, Criterion.value2 == breed)
-        query = query.filter(Item.id.in_(breed_subquery))
-    
-    if gender is not None and gender > 0:
-        gender_subquery = db.query(Action.item_id)\
-            .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
-            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
-            .filter(Criterion.value1 == 59, Criterion.value2 == gender)
-        query = query.filter(Item.id.in_(gender_subquery))
-    
-    if faction is not None and faction > 0:
-        faction_subquery = db.query(Action.item_id)\
-            .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
-            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
-            .filter(Criterion.value1 == 33, Criterion.value2 == faction)
-        query = query.filter(Item.id.in_(faction_subquery))
-    
-    # Handle profession filtering: Both Profession (stat 60) and VisualProfession (stat 368) are valid
-    if profession is not None and profession > 0:
-        prof_subquery = db.query(Action.item_id)\
-            .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
-            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
-            .filter(
-                Action.action == 3,
-                or_(
-                    and_(Criterion.value1 == 60, Criterion.value2 == profession),
-                    and_(Criterion.value1 == 368, Criterion.value2 == profession)
-                )
-            )
-        query = query.filter(Item.id.in_(prof_subquery))
-    
-    # Froob friendly filter (exclude items with expansion requirements)
-    if froob_friendly is True:
-        stats_subquery = db.query(ItemStats.item_id)\
-            .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
-            .filter(StatValue.stat == 389)
-        criteria_subquery = db.query(Action.item_id)\
-            .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
-            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
-            .filter(Criterion.value1 == 389)
-        query = query.filter(~Item.id.in_(stats_subquery), ~Item.id.in_(criteria_subquery))
-    
-    # NoDrop filter (stat 0 - ITEM_NONE_FLAG)
-    if nodrop is not None:
-        if nodrop:
-            nodrop_subquery = db.query(ItemStats.item_id)\
-                .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
-                .filter(StatValue.stat == 0, StatValue.value.op('&')(16384) > 0)
-            query = query.filter(Item.id.in_(nodrop_subquery))
-        else:
-            nodrop_subquery = db.query(ItemStats.item_id)\
-                .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
-                .filter(StatValue.stat == 0, StatValue.value.op('&')(16384) > 0)
-            query = query.filter(~Item.id.in_(nodrop_subquery))
-    
-    # Stat bonus filters - find items that modify specific stats
-    if stat_bonuses:
-        try:
-            bonus_stat_ids = [int(stat_id.strip()) for stat_id in stat_bonuses.split(',') if stat_id.strip()]
-            if bonus_stat_ids:
-                stat_bonus_subquery = build_stat_modifier_subquery(db, bonus_stat_ids)
-                query = query.filter(Item.id.in_(stat_bonus_subquery))
-        except ValueError:
-            logger.warning(f"Invalid stat_bonuses parameter: {stat_bonuses}")
-    
-    # Apply stat filters
-    query = apply_stat_filters(query, stat_filters, db)
-    
-    # Strain filter (stat 75 - NanoStrain)
-    if strain is not None and strain > 0:
-        strain_subquery = db.query(ItemStats.item_id)\
-            .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
-            .filter(StatValue.stat == 75, StatValue.value == strain)
-        query = query.filter(Item.id.in_(strain_subquery))
-    
+    # Apply the advanced filters shared across item endpoints
+    query = apply_common_item_filters(
+        query, db,
+        slot=slot,
+        breed=breed,
+        gender=gender,
+        faction=faction,
+        profession=profession,
+        froob_friendly=froob_friendly,
+        nodrop=nodrop,
+        stat_bonuses=stat_bonuses,
+        stat_filters=stat_filters,
+        strain=strain,
+    )
+
     # Get total count on lightweight query (no relationship loading)
     total = query.count()
     
@@ -604,23 +391,9 @@ def get_items(
     pages = math.ceil(total / page_size) if total > 0 else 1
     offset = (page - 1) * page_size
     
-    # Load relationships only for the paginated result set using selectinload
-    items = query.options(
-        selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
-        selectinload(Item.item_spell_data).selectinload(ItemSpellData.spell_data)
-            .selectinload(SpellData.spell_data_spells).selectinload(SpellDataSpells.spell)
-            .selectinload(Spell.spell_criteria).selectinload(SpellCriterion.criterion),
-        selectinload(Item.actions).selectinload(Action.action_criteria)
-            .selectinload(ActionCriteria.criterion),
-        selectinload(Item.item_sources).selectinload(ItemSource.source)
-            .selectinload(Source.source_type),
-        selectinload(Item.attack_defense)
-            .selectinload(AttackDefense.attack_stats)
-            .selectinload(AttackDefenseAttack.stat_value),
-        selectinload(Item.attack_defense)
-            .selectinload(AttackDefense.defense_stats)
-            .selectinload(AttackDefenseDefense.stat_value)
-    ).offset(offset).limit(page_size).all()
+    # Load relationships only for the paginated result set
+    items = query.options(*item_detail_load_options())\
+        .offset(offset).limit(page_size).all()
     
     # Build detailed response items in bulk
     detailed_items = build_item_details_bulk(items, db)
@@ -710,8 +483,12 @@ def search_items(
         if weapons:
             query = query.filter(Item.atkdef_id.isnot(None)).distinct()
     else:
-        # Use PostgreSQL full-text search for fuzzy/stemmed matching
-        search_query = q.replace(' ', ' & ')
+        # Use PostgreSQL full-text search for fuzzy/stemmed matching.
+        # websearch_to_tsquery safely parses raw user input: it never raises
+        # tsquery syntax errors (unlike to_tsquery, which 500s on inputs
+        # containing quotes, parentheses, ':', '!', etc.), ANDs bare terms,
+        # and supports "quoted phrases", OR, and -exclusion for free.
+        ts_query = func.websearch_to_tsquery('english', q)
         
         # Build full-text search expression based on requested fields
         search_expression_parts = []
@@ -731,9 +508,7 @@ def search_items(
         
         # Build base query WITHOUT relationship loading
         query = db.query(Item).filter(
-            func.to_tsvector('english', search_expression).op('@@')(
-                func.to_tsquery('english', search_query)
-            )
+            func.to_tsvector('english', search_expression).op('@@')(ts_query)
         )
         
         # Apply weapons filter
@@ -744,107 +519,39 @@ def search_items(
             query = query.order_by(
                 func.ts_rank(
                     func.to_tsvector('english', search_expression),
-                    func.to_tsquery('english', search_query)
+                    ts_query
                 ).desc()
             )
     
-    # Apply advanced search filters using subqueries (avoids repeated unaliased joins)
+    # Quality level range (endpoint-specific: validated 1-999 here)
     if min_ql is not None:
         query = query.filter(Item.ql >= min_ql)
     if max_ql is not None:
         query = query.filter(Item.ql <= max_ql)
-    
-    # Item class filter (stat 76)
+
+    # Item class filter (stat 76) - search uses the stat subquery rather
+    # than the Item.item_class column used by get_items
     if item_class is not None and item_class > 0:
         item_class_subquery = db.query(ItemStats.item_id)\
             .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
             .filter(StatValue.stat == 76, StatValue.value == item_class)
         query = query.filter(Item.id.in_(item_class_subquery))
-    
-    # Equipment slot filter (stat 298 - EquippedIn)
-    if slot is not None and slot > 0:
-        slot_subquery = db.query(ItemStats.item_id)\
-            .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
-            .filter(StatValue.stat == 298, StatValue.value.op('&')(1 << slot) > 0)
-        query = query.filter(Item.id.in_(slot_subquery))
-    
-    # Requirement filters using subqueries
-    if breed is not None and breed > 0:
-        breed_subquery = db.query(Action.item_id)\
-            .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
-            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
-            .filter(Criterion.value1 == 4, Criterion.value2 == breed)
-        query = query.filter(Item.id.in_(breed_subquery))
-    
-    if gender is not None and gender > 0:
-        gender_subquery = db.query(Action.item_id)\
-            .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
-            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
-            .filter(Criterion.value1 == 59, Criterion.value2 == gender)
-        query = query.filter(Item.id.in_(gender_subquery))
-    
-    if faction is not None and faction > 0:
-        faction_subquery = db.query(Action.item_id)\
-            .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
-            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
-            .filter(Criterion.value1 == 33, Criterion.value2 == faction)
-        query = query.filter(Item.id.in_(faction_subquery))
-    
-    # Handle profession filtering
-    if profession is not None and profession > 0:
-        prof_subquery = db.query(Action.item_id)\
-            .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
-            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
-            .filter(
-                Action.action == 3,
-                or_(
-                    and_(Criterion.value1 == 60, Criterion.value2 == profession),
-                    and_(Criterion.value1 == 368, Criterion.value2 == profession)
-                )
-            )
-        query = query.filter(Item.id.in_(prof_subquery))
-    
-    # Froob friendly filter
-    if froob_friendly is True:
-        stats_subquery = db.query(ItemStats.item_id)\
-            .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
-            .filter(StatValue.stat == 389)
-        criteria_subquery = db.query(Action.item_id)\
-            .join(ActionCriteria, Action.id == ActionCriteria.action_id)\
-            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)\
-            .filter(Criterion.value1 == 389)
-        query = query.filter(~Item.id.in_(stats_subquery), ~Item.id.in_(criteria_subquery))
-    
-    # NoDrop filter
-    if nodrop is not None:
-        nodrop_subquery = db.query(ItemStats.item_id)\
-            .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
-            .filter(StatValue.stat == 0, StatValue.value.op('&')(16384) > 0)
-        if nodrop:
-            query = query.filter(Item.id.in_(nodrop_subquery))
-        else:
-            query = query.filter(~Item.id.in_(nodrop_subquery))
-    
-    # Stat bonus filters
-    if stat_bonuses:
-        try:
-            bonus_stat_ids = [int(stat_id.strip()) for stat_id in stat_bonuses.split(',') if stat_id.strip()]
-            if bonus_stat_ids:
-                stat_bonus_subquery = build_stat_modifier_subquery(db, bonus_stat_ids)
-                query = query.filter(Item.id.in_(stat_bonus_subquery))
-        except ValueError:
-            logger.warning(f"Invalid stat_bonuses parameter: {stat_bonuses}")
-    
-    # Apply stat filters
-    query = apply_stat_filters(query, stat_filters, db)
-    
-    # Strain filter (stat 75 - NanoStrain)
-    if strain is not None and strain > 0:
-        strain_subquery = db.query(ItemStats.item_id)\
-            .join(StatValue, ItemStats.stat_value_id == StatValue.id)\
-            .filter(StatValue.stat == 75, StatValue.value == strain)
-        query = query.filter(Item.id.in_(strain_subquery))
-    
+
+    # Apply the advanced filters shared across item endpoints
+    query = apply_common_item_filters(
+        query, db,
+        slot=slot,
+        breed=breed,
+        gender=gender,
+        faction=faction,
+        profession=profession,
+        froob_friendly=froob_friendly,
+        nodrop=nodrop,
+        stat_bonuses=stat_bonuses,
+        stat_filters=stat_filters,
+        strain=strain,
+    )
+
     # Get total count on lightweight query (no relationship loading)
     total = query.count()
     
@@ -852,23 +559,9 @@ def search_items(
     pages = math.ceil(total / page_size) if total > 0 else 1
     offset = (page - 1) * page_size
     
-    # Load relationships only for the paginated result set using selectinload
-    items = query.options(
-        selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
-        selectinload(Item.item_spell_data).selectinload(ItemSpellData.spell_data)
-            .selectinload(SpellData.spell_data_spells).selectinload(SpellDataSpells.spell)
-            .selectinload(Spell.spell_criteria).selectinload(SpellCriterion.criterion),
-        selectinload(Item.actions).selectinload(Action.action_criteria)
-            .selectinload(ActionCriteria.criterion),
-        selectinload(Item.item_sources).selectinload(ItemSource.source)
-            .selectinload(Source.source_type),
-        selectinload(Item.attack_defense)
-            .selectinload(AttackDefense.attack_stats)
-            .selectinload(AttackDefenseAttack.stat_value),
-        selectinload(Item.attack_defense)
-            .selectinload(AttackDefense.defense_stats)
-            .selectinload(AttackDefenseDefense.stat_value)
-    ).offset(offset).limit(page_size).all()
+    # Load relationships only for the paginated result set
+    items = query.options(*item_detail_load_options())\
+        .offset(offset).limit(page_size).all()
     
     # Build detailed response items in bulk
     detailed_items = build_item_details_bulk(items, db)
@@ -972,23 +665,9 @@ def filter_items_advanced(
     pages = math.ceil(total / page_size) if total > 0 else 1
     offset = (page - 1) * page_size
     
-    # Load relationships only for the paginated result set using selectinload
-    items = query.options(
-        selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
-        selectinload(Item.item_spell_data).selectinload(ItemSpellData.spell_data)
-            .selectinload(SpellData.spell_data_spells).selectinload(SpellDataSpells.spell)
-            .selectinload(Spell.spell_criteria).selectinload(SpellCriterion.criterion),
-        selectinload(Item.actions).selectinload(Action.action_criteria)
-            .selectinload(ActionCriteria.criterion),
-        selectinload(Item.item_sources).selectinload(ItemSource.source)
-            .selectinload(Source.source_type),
-        selectinload(Item.attack_defense)
-            .selectinload(AttackDefense.attack_stats)
-            .selectinload(AttackDefenseAttack.stat_value),
-        selectinload(Item.attack_defense)
-            .selectinload(AttackDefense.defense_stats)
-            .selectinload(AttackDefenseDefense.stat_value)
-    ).offset(offset).limit(page_size).all()
+    # Load relationships only for the paginated result set
+    items = query.options(*item_detail_load_options())\
+        .offset(offset).limit(page_size).all()
     
     # Build detailed response items in bulk
     detailed_items = build_item_details_bulk(items, db)
