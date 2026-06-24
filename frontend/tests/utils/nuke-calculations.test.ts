@@ -358,16 +358,20 @@ describe('Casting Calculations', () => {
   });
 
   describe('calculateRechargeTime', () => {
-    it('should use same two-tier formula as cast time', () => {
-      // Same test cases as cast time
-      expect(calculateRechargeTime(500, 1200)).toBe(0.0); // 500 - 600 = 0
-
-      // 1800 init on 2000cs recharge
-      expect(calculateRechargeTime(2000, 1800)).toBe(10.0); // 2000 - 1000 = 1000cs
+    it('should NOT apply NanoInit reduction to recharge time', () => {
+      // Recharge is returned unchanged (NanoInit only affects cast time)
+      expect(calculateRechargeTime(2000)).toBe(20.0);
+      expect(calculateRechargeTime(500)).toBe(5.0);
     });
 
-    it('should never go below 0 recharge time', () => {
-      expect(calculateRechargeTime(100, 5000)).toBe(0.0);
+    it('should clamp to the default 100cs (1.00s) minimum', () => {
+      expect(calculateRechargeTime(80)).toBe(1.0);
+      expect(calculateRechargeTime(100)).toBe(1.0);
+    });
+
+    it('should clamp to an explicit rechargeDelayCap (stat 524)', () => {
+      expect(calculateRechargeTime(80, 50)).toBe(0.8); // above 50cs cap
+      expect(calculateRechargeTime(30, 50)).toBe(0.5); // clamped to 50cs cap
     });
   });
 

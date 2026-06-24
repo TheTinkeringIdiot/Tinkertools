@@ -218,10 +218,9 @@ const tableData = computed(() => {
 
     // Calculate modified recharge time (in seconds)
     // nano.rechargeTime is in centiseconds, convert to seconds for calculations
-    // Pass rechargeDelayCap (stat 524) to enforce minimum recharge time
+    // NanoInit does NOT affect recharge; only the rechargeDelayCap (stat 524) clamp applies
     const rechargeTime = calculateRechargeTime(
       nano.rechargeTime,
-      characterStats.nanoInit,
       nano.rechargeDelayCap
     );
 

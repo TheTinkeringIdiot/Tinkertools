@@ -75,51 +75,42 @@ export function calculateCastTime(
 }
 
 /**
- * Calculate modified recharge time based on Nano Init skill
+ * Calculate modified recharge time
  *
- * Uses the same two-tier scaling formula as cast time:
- * - Below 1200 init: 1:2 ratio (init/2 reduction)
- * - Above 1200 init: Additional 1:6 ratio ((init-1200)/6 reduction)
+ * NanoInit (Nano Initiative) does NOT affect recharge time in Anarchy Online —
+ * it only reduces cast/attack time (see {@link calculateCastTime}). Recharge is a
+ * separate phase, so the base recharge is returned unchanged apart from the hard
+ * minimum clamp.
  *
  * Hard minimum (RechargeDelayCap):
  * - If stat 524 exists: use its value as minimum (can be < 100cs)
  * - If stat 524 not present: use default 100cs (1.00 second) minimum
  *
  * @param baseRecharge - Base recharge time in centiseconds (from database)
- * @param nanoInit - Character's Nano Init skill value
  * @param rechargeDelayCap - RechargeDelayCap from stat 524, or undefined for default 1.00s minimum
  * @returns Modified recharge time in seconds with 2 decimal precision
  *
  * @example
- * // Nano with 500cs base recharge, 1200 init, no cap stat
- * calculateRechargeTime(500, 1200) // Returns 1.00 (500 - 600 = -100cs, clamped to 100cs default)
+ * // Nano with 500cs base recharge, no cap stat
+ * calculateRechargeTime(500) // Returns 5.00
  *
  * @example
- * // Nano with 800cs base recharge, 1800 init, 150cs cap from stat 524
- * calculateRechargeTime(800, 1800, 150) // Returns 1.50 (800 - 1000 = -200cs, clamped to 150cs cap)
+ * // Nano with 80cs base recharge, no cap stat (clamped to 100cs default)
+ * calculateRechargeTime(80) // Returns 1.00
  *
  * @example
- * // Nano with 300cs base recharge, 2000 init, 50cs cap from stat 524
- * calculateRechargeTime(300, 2000, 50) // Returns 0.50 (capped at 50cs from stat 524)
+ * // Nano with 80cs base recharge, 50cs cap from stat 524
+ * calculateRechargeTime(80, 50) // Returns 0.80 (above 50cs cap)
  */
 export function calculateRechargeTime(
   baseRecharge: number,
-  nanoInit: number,
   rechargeDelayCap?: number
 ): number {
-  // Two-tier reduction calculation (same as cast time)
-  const firstTierReduction = Math.floor(nanoInit / 2);
-  const secondTierReduction = Math.floor(Math.max(0, nanoInit - 1200) / 6);
-  const totalReduction = firstTierReduction + secondTierReduction;
-
-  // Apply reduction
-  const reducedRechargeCs = baseRecharge - totalReduction;
-
   // Determine effective cap: use stat 524 if present, otherwise default 100cs (1.00s)
   const effectiveCap = rechargeDelayCap !== undefined ? rechargeDelayCap : DEFAULT_DELAY_CAP_CS;
 
-  // Apply hard minimum
-  const modifiedRechargeCs = Math.max(effectiveCap, reducedRechargeCs);
+  // Apply hard minimum (no NanoInit reduction — recharge is not affected by NanoInit)
+  const modifiedRechargeCs = Math.max(effectiveCap, baseRecharge);
 
   // Convert centiseconds to seconds
   return centisecondsToSeconds(modifiedRechargeCs);
