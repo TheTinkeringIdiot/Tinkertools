@@ -203,7 +203,7 @@ export interface CharacterStats {
   /** Psychic ability (affects nano regen tick speed) */
   psychic: number;
 
-  /** Nano Init skill (reduces cast time and recharge time) */
+  /** Nano Init skill (reduces cast time only; does not affect recharge time) */
   nanoInit: number;
 
   /** Max Nano skill (total nano pool size) */
