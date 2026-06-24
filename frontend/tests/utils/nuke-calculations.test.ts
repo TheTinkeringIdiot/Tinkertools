@@ -313,8 +313,8 @@ describe('Casting Calculations', () => {
   describe('calculateCastTime - two-tier scaling', () => {
     it('should apply 1:2 ratio below 1200 init', () => {
       // 600 init = 300cs reduction
-      // 300cs base - 300cs = 0cs = 0.00s
-      expect(calculateCastTime(300, 600)).toBe(0.0);
+      // 300cs base - 300cs = 0cs, clamped to 100cs default cap = 1.00s
+      expect(calculateCastTime(300, 600)).toBe(1.0);
 
       // 400 init = 200cs reduction
       // 500cs base - 200cs = 300cs = 3.00s
@@ -327,12 +327,12 @@ describe('Casting Calculations', () => {
       expect(calculateCastTime(1000, 1200)).toBe(4.0);
 
       // 1800 init: floor(1800/2) + floor(600/6) = 900 + 100 = 1000cs reduction
-      // 1000cs - 1000cs = 0cs = 0.00s
-      expect(calculateCastTime(1000, 1800)).toBe(0.0);
+      // 1000cs - 1000cs = 0cs, clamped to 100cs default cap = 1.00s
+      expect(calculateCastTime(1000, 1800)).toBe(1.0);
 
       // 1806 init: floor(1806/2) + floor(606/6) = 903 + 101 = 1004cs reduction
-      // 1000cs - 1004cs = 0cs (clamped to 0) = 0.00s
-      expect(calculateCastTime(1000, 1806)).toBe(0.0);
+      // 1000cs - 1004cs = -4cs, clamped to 100cs default cap = 1.00s
+      expect(calculateCastTime(1000, 1806)).toBe(1.0);
     });
 
     it('should use Math.floor for both tiers', () => {
@@ -346,14 +346,19 @@ describe('Casting Calculations', () => {
       expect(calculateCastTime(1000, 1206)).toBe(3.96); // 1000 - 604 = 396cs
     });
 
-    it('should never go below 0 cast time', () => {
-      expect(calculateCastTime(100, 5000)).toBe(0.0);
-      expect(calculateCastTime(0, 1000)).toBe(0.0);
+    it('should never go below the delay cap', () => {
+      // No cap stat: clamped to 100cs default cap = 1.00s
+      expect(calculateCastTime(100, 5000)).toBe(1.0);
+      expect(calculateCastTime(0, 1000)).toBe(1.0);
+
+      // Explicit cap (stat 523) can drop below the default floor
+      expect(calculateCastTime(100, 5000, 0)).toBe(0.0);
+      expect(calculateCastTime(500, 5000, 50)).toBe(0.5);
     });
 
     it('should handle legacy TinkerNukes examples', () => {
-      // Example: 300cs base, 1200 init
-      expect(calculateCastTime(300, 1200)).toBe(0.0); // 300 - 600 = 0
+      // Example: 300cs base, 1200 init -> 300 - 600 = -300cs, clamped to 100cs = 1.00s
+      expect(calculateCastTime(300, 1200)).toBe(1.0);
     });
   });
 
@@ -875,13 +880,13 @@ describe('Legacy TinkerNukes Validation', () => {
   it('should validate cast time two-tier scaling', () => {
     // Legacy example: 300cs base, 600 init
     // Reduction: floor(600/2) = 300
-    // Result: 300 - 300 = 0cs = 0.00s
-    expect(calculateCastTime(300, 600)).toBe(0.0);
+    // Result: 300 - 300 = 0cs, clamped to 100cs default cap = 1.00s
+    expect(calculateCastTime(300, 600)).toBe(1.0);
 
     // Legacy example: 1000cs base, 1800 init
     // Reduction: floor(1800/2) + floor(600/6) = 900 + 100 = 1000
-    // Result: 1000 - 1000 = 0cs = 0.00s
-    expect(calculateCastTime(1000, 1800)).toBe(0.0);
+    // Result: 1000 - 1000 = 0cs, clamped to 100cs default cap = 1.00s
+    expect(calculateCastTime(1000, 1800)).toBe(1.0);
   });
 
   it('should validate nano regen tick speed formula', () => {
