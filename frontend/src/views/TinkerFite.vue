@@ -145,7 +145,12 @@ async function fetchWeapons() {
     const top3 = trained
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
-      .map(([skill_id, value]) => ({ skill_id: Number(skill_id), value: Math.round(value) }));
+      // Clamp to an integer >= 0: skill totals can be fractional (percentage
+      // perk/buff bonuses) or deeply negative (large equipment debuffs, e.g. an
+      // item granting -4000 to a skill). The backend schema requires
+      // `value >= 0`, and an effective negative skill can't meet any positive
+      // weapon requirement, so 0 is the correct floor.
+      .map(([skill_id, value]) => ({ skill_id: Number(skill_id), value: Math.max(0, Math.round(value)) }));
 
     if (top3.length === 0) {
       console.warn(
