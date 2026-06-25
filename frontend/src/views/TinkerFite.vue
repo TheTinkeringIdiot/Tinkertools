@@ -145,7 +145,7 @@ async function fetchWeapons() {
     const top3 = trained
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
-      .map(([skill_id, value]) => ({ skill_id: Number(skill_id), value }));
+      .map(([skill_id, value]) => ({ skill_id: Number(skill_id), value: Math.round(value) }));
 
     if (top3.length === 0) {
       console.warn(
