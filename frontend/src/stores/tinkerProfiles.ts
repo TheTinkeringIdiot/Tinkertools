@@ -13,6 +13,7 @@ import {
   type ProfileMetadata,
   type ProfileExportFormat,
   type ProfileImportResult,
+  type ProfileImportOptions,
   type ProfileValidationResult,
   type TinkerProfilesConfig,
 } from '@/lib/tinkerprofiles';
@@ -461,7 +462,11 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   /**
    * Import a profile
    */
-  async function importProfile(data: string, sourceFormat?: string): Promise<ProfileImportResult> {
+  async function importProfile(
+    data: string,
+    sourceFormat?: string,
+    options: ProfileImportOptions = {}
+  ): Promise<ProfileImportResult> {
     if (!profileManager) {
       throw new Error('Profile manager not initialized');
     }
@@ -470,7 +475,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     error.value = null;
 
     try {
-      const result = await profileManager.importProfile(data, sourceFormat);
+      const result = await profileManager.importProfile(data, sourceFormat, options);
 
       if (!result.success) {
         error.value = `Import failed: ${result.errors.join(', ')}`;
@@ -483,6 +488,20 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     } finally {
       loading.value = false;
     }
+  }
+
+  /**
+   * Parse import data without saving, for pre-import inspection
+   */
+  async function previewImport(
+    data: string,
+    sourceFormat?: string
+  ): Promise<ProfileImportResult> {
+    if (!profileManager) {
+      throw new Error('Profile manager not initialized');
+    }
+
+    return profileManager.previewImport(data, sourceFormat);
   }
 
   /**
@@ -518,6 +537,9 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
       const profiles = exportData.profiles as TinkerProfile[];
       const existingProfiles = profileMetadata.value.map((p) => p.name.toLowerCase());
+      const existingIdsByName = new Map(
+        profileMetadata.value.map((p) => [p.name.toLowerCase(), p.id])
+      );
 
       const result: BulkImportResult = {
         totalProfiles: profiles.length,
@@ -546,6 +568,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
         try {
           // Check for duplicates
           const isDuplicate = existingProfiles.includes(profileResult.profileName.toLowerCase());
+          let updateExistingId: string | undefined;
 
           if (isDuplicate) {
             if (options.skipDuplicates) {
@@ -553,7 +576,9 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
               result.skippedCount++;
               result.results.push(profileResult);
               continue;
-            } else if (!options.overwriteExisting) {
+            } else if (options.overwriteExisting) {
+              updateExistingId = existingIdsByName.get(profileResult.profileName.toLowerCase());
+            } else {
               // Generate unique name
               let counter = 1;
               let newName = `${profileResult.profileName} (${counter})`;
@@ -569,7 +594,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
           // Import the individual profile
           const profileJson = JSON.stringify(profile);
-          const importResult = await importProfile(profileJson);
+          const importResult = await importProfile(profileJson, undefined, { updateExistingId });
 
           if (importResult.success && importResult.profile) {
             profileResult.success = true;
@@ -1566,6 +1591,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     exportProfile,
     exportAllProfiles,
     importProfile,
+    previewImport,
     importAllProfiles,
     validateProfile,
     searchProfiles,
