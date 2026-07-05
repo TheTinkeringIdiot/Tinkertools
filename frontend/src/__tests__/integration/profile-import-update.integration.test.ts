@@ -67,4 +67,34 @@ describe('Profile import update (integration)', () => {
     expect(matches[0].id).toBe(id);
     expect(matches[0].level).toBe(42);
   });
+
+  it('bulk import with overwriteExisting dedupes same-name profiles within the batch', async () => {
+    // Build two batch entries with the same name; no pre-existing profile of that name.
+    const templateId = await store.createProfile('Template');
+    const template = JSON.parse(await store.exportProfile(templateId, 'json'));
+    await store.deleteProfile(templateId);
+
+    const first = structuredClone(template);
+    first.Character.Name = 'Twin';
+    first.Character.Level = 10;
+
+    const second = structuredClone(template);
+    second.Character.Name = 'Twin';
+    second.Character.Level = 99;
+
+    const bulkData = JSON.stringify({
+      version: '1.0',
+      profileCount: 2,
+      profiles: [first, second],
+    });
+
+    const result = await store.importAllProfiles(bulkData, { overwriteExisting: true });
+    await store.loadProfiles();
+
+    expect(result.successCount).toBe(2);
+    const matches = store.profileMetadata.filter((p) => p.name === 'Twin');
+    expect(matches).toHaveLength(1);
+    // The later batch entry wins
+    expect(matches[0].level).toBe(99);
+  });
 });

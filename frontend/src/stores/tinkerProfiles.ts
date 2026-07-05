@@ -604,6 +604,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
             // Add to existing profiles list to prevent duplicates within this batch
             existingProfiles.push(profileResult.profileName.toLowerCase());
+            existingIdsByName.set(profileResult.profileName.toLowerCase(), importResult.profile.id);
           } else {
             profileResult.error = importResult.errors.join(', ');
             result.failureCount++;
