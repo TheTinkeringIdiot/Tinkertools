@@ -17,6 +17,7 @@ export type {
   ProfileMetadata,
   ProfileExportFormat,
   ProfileImportResult,
+  ProfileImportOptions,
   BulkImportResult,
   ProfileValidationResult,
   ProfileStorageOptions,
