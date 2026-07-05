@@ -549,6 +549,7 @@ function validateAOSetupsUrl(url: string): void {
 function onFileSelect(event: any) {
   const file = event.files[0];
   if (file) {
+    clearDuplicatePrompt();
     selectedFile.value = file;
 
     // Read file content to detect format
@@ -567,6 +568,7 @@ function onFileSelect(event: any) {
 function onFileClear() {
   selectedFile.value = null;
   detectedFormat.value = null;
+  clearDuplicatePrompt();
 }
 
 function detectFormat(data: string): string {
@@ -963,6 +965,7 @@ watch(
 watch(
   () => aosetupsUrl.value,
   (newUrl) => {
+    clearDuplicatePrompt();
     validateAOSetupsUrl(newUrl);
   }
 );
