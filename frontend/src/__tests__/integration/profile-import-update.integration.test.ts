@@ -96,5 +96,23 @@ describe('Profile import update (integration)', () => {
     expect(matches).toHaveLength(1);
     // The later batch entry wins
     expect(matches[0].level).toBe(99);
+    // The surviving profile keeps the id assigned to the first batch entry.
+    expect(matches[0].id).toBe(result.results[0].profileId);
+  });
+
+  it('importProfile with updateExistingId refreshes the active profile without re-activating', async () => {
+    const id = await store.createProfile('ActiveOne');
+    await store.setActiveProfile(id);
+
+    const exported = JSON.parse(await store.exportProfile(id, 'json'));
+    exported.Character.Level = 150;
+
+    const result = await store.importProfile(JSON.stringify(exported), undefined, {
+      updateExistingId: id,
+    });
+
+    expect(result.success).toBe(true);
+    expect(store.activeProfile?.id).toBe(id);
+    expect(store.activeProfile?.Character.Level).toBe(150);
   });
 });

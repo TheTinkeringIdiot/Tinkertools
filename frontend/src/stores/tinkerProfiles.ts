@@ -143,6 +143,14 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       await refreshMetadata();
     });
 
+    profileManager.on('profile:imported', async ({ profile }) => {
+      profiles.value.set(profile.id, profile);
+      if (activeProfileId.value === profile.id) {
+        activeProfile.value = profile;
+      }
+      await refreshMetadata();
+    });
+
     profileManager.on('profile:deleted', async ({ profileId }) => {
       profiles.value.delete(profileId);
       if (activeProfileId.value === profileId) {
