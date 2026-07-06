@@ -11,6 +11,7 @@ import type {
   ProfileMetadata,
   ProfileExportFormat,
   ProfileImportResult,
+  ProfileImportOptions,
   ProfileValidationResult,
   ProfileStorageOptions,
   ProfileEvents,
@@ -580,9 +581,34 @@ export class TinkerProfilesManager {
   }
 
   /**
+   * Parse and validate import data without saving
+   */
+  async previewImport(data: string, sourceFormat?: string): Promise<ProfileImportResult> {
+    const result = await this.transformer.importProfile(data, sourceFormat);
+
+    if (result.success && result.profile) {
+      const validation = this.validator.validateProfile(result.profile);
+
+      if (!validation.valid && this.config.validation.strictMode) {
+        result.success = false;
+        result.errors.push(...validation.errors);
+        return result;
+      }
+
+      result.warnings.push(...validation.warnings);
+    }
+
+    return result;
+  }
+
+  /**
    * Import a profile
    */
-  async importProfile(data: string, sourceFormat?: string): Promise<ProfileImportResult> {
+  async importProfile(
+    data: string,
+    sourceFormat?: string,
+    options: ProfileImportOptions = {}
+  ): Promise<ProfileImportResult> {
     const result = await this.transformer.importProfile(data, sourceFormat);
 
     if (result.success && result.profile) {
@@ -597,6 +623,18 @@ export class TinkerProfilesManager {
         }
 
         result.warnings.push(...validation.warnings);
+
+        if (options.updateExistingId) {
+          const existing = await this.loadProfile(options.updateExistingId);
+          if (!existing) {
+            result.success = false;
+            result.errors.push(`Profile to update not found: ${options.updateExistingId}`);
+            return result;
+          }
+          result.profile.id = existing.id;
+          result.profile.created = existing.created;
+          result.profile.updated = new Date().toISOString();
+        }
 
         // Save the imported profile
         await this.storage.saveProfile(result.profile);

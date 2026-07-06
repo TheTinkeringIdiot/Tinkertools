@@ -135,6 +135,53 @@ Modal for importing profiles from various formats
         </div>
       </div>
 
+      <!-- Duplicate Profile Prompt -->
+      <div v-if="showDuplicatePrompt" class="field">
+        <div
+          class="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg space-y-3"
+        >
+          <div class="flex items-center gap-2">
+            <i class="pi pi-exclamation-triangle text-amber-600 dark:text-amber-400"></i>
+            <span class="text-amber-700 dark:text-amber-300 font-medium">
+              A profile named "{{ duplicateMatches[0].name }}" already exists
+            </span>
+          </div>
+          <div class="space-y-2">
+            <div class="flex items-center">
+              <RadioButton
+                id="duplicate-update"
+                v-model="duplicateChoice"
+                name="duplicateChoice"
+                value="update"
+              />
+              <label for="duplicate-update" class="ml-2 text-surface-900 dark:text-surface-50">
+                Update the existing profile
+              </label>
+            </div>
+            <div v-if="duplicateChoice === 'update' && duplicateMatches.length > 1" class="ml-6">
+              <Dropdown
+                v-model="updateTargetId"
+                :options="duplicateMatches"
+                option-value="id"
+                :option-label="(p: ProfileMetadata) => `${p.name} (Level ${p.level} ${p.profession})`"
+                class="w-full"
+              />
+            </div>
+            <div class="flex items-center">
+              <RadioButton
+                id="duplicate-new"
+                v-model="duplicateChoice"
+                name="duplicateChoice"
+                value="new"
+              />
+              <label for="duplicate-new" class="ml-2 text-surface-900 dark:text-surface-50">
+                Create a new profile
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Import Options -->
       <div v-if="hasData" class="field">
         <label class="font-semibold text-surface-900 dark:text-surface-50 mb-3 block">
@@ -381,7 +428,7 @@ Modal for importing profiles from various formats
             !hasData || importing || (detectedFormat && detectedFormat.includes('Unsupported'))
           "
           :loading="importing"
-          @click="importProfile"
+          @click="onImportClick"
         />
       </div>
     </div>
@@ -399,8 +446,9 @@ import ProgressBar from 'primevue/progressbar';
 import ProgressSpinner from 'primevue/progressspinner';
 import RadioButton from 'primevue/radiobutton';
 import Textarea from 'primevue/textarea';
+import Dropdown from 'primevue/dropdown';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
-import type { ProfileImportResult, BulkImportResult } from '@/lib/tinkerprofiles';
+import type { ProfileImportResult, BulkImportResult, ProfileMetadata } from '@/lib/tinkerprofiles';
 
 interface ImportProgress {
   phase: 'parsing' | 'skills' | 'equipment' | 'perks' | 'validation' | 'saving';
@@ -436,6 +484,15 @@ const importProgress = ref<ImportProgress | null>(null);
 const importResult = ref<ProfileImportResult | null>(null);
 const bulkImportResult = ref<BulkImportResult | null>(null);
 const isBulkImport = ref(false);
+
+const pendingImportData = ref<string | null>(null);
+const duplicateMatches = ref<ProfileMetadata[]>([]);
+const duplicateChoice = ref<'update' | 'new'>('update');
+const updateTargetId = ref<string | null>(null);
+
+const showDuplicatePrompt = computed(
+  () => pendingImportData.value !== null && duplicateMatches.value.length > 0
+);
 
 const importOptions = reactive({
   setAsActive: true,
@@ -492,6 +549,7 @@ function validateAOSetupsUrl(url: string): void {
 function onFileSelect(event: any) {
   const file = event.files[0];
   if (file) {
+    clearDuplicatePrompt();
     selectedFile.value = file;
 
     // Read file content to detect format
@@ -510,6 +568,7 @@ function onFileSelect(event: any) {
 function onFileClear() {
   selectedFile.value = null;
   detectedFormat.value = null;
+  clearDuplicatePrompt();
 }
 
 function detectFormat(data: string): string {
@@ -708,57 +767,26 @@ Visit the TinkerProfiles page to create a new profile or use the AOSetups import
         }
       }
 
-      // Show equipment fetch progress
-      importProgress.value = {
-        phase: 'equipment',
-        current: 0,
-        total: 1,
-        message: 'Fetching equipment from database...'
-      };
+      const preview = await profilesStore.previewImport(data);
+      if (!preview.success || !preview.profile) {
+        importResult.value = preview;
+        return;
+      }
 
-      const result = await profilesStore.importProfile(data);
-      importResult.value = result;
-
-      // Console log the complete import result
-      console.log(
-        `[${importMethod.value === 'aosetups' ? 'AOSetups' : importMethod.value} Import] Complete import result:`,
-        result
+      const importName = preview.profile.Character.Name.toLowerCase();
+      const matches = profilesStore.profileMetadata.filter(
+        (p) => p.name.toLowerCase() === importName
       );
 
-      if (result.success) {
-        console.log(
-          `[${importMethod.value === 'aosetups' ? 'AOSetups' : importMethod.value} Import] Import successful!`,
-          {
-            profileName: result.profile?.Character?.Name,
-            profileId: result.profile?.id,
-            warnings: result.warnings,
-          }
-        );
-
-        // Set as active if requested
-        if (importOptions.setAsActive && result.profile) {
-          await profilesStore.setActiveProfile(result.profile.id);
-          console.log(
-            `[${importMethod.value === 'aosetups' ? 'AOSetups' : importMethod.value} Import] Set as active profile`
-          );
-        }
-
-        emit('imported', result);
-
-        // Close dialog after a delay to show success message
-        setTimeout(() => {
-          emit('update:visible', false);
-        }, 2000);
-      } else {
-        console.error(
-          `[${importMethod.value === 'aosetups' ? 'AOSetups' : importMethod.value} Import] Import failed with errors:`,
-          result.errors
-        );
-        console.warn(
-          `[${importMethod.value === 'aosetups' ? 'AOSetups' : importMethod.value} Import] Import warnings:`,
-          result.warnings
-        );
+      if (matches.length > 0) {
+        pendingImportData.value = data;
+        duplicateMatches.value = [...matches];
+        duplicateChoice.value = 'update';
+        updateTargetId.value = matches[0].id;
+        return;
       }
+
+      await commitSingleImport(data, undefined);
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Import failed';
@@ -814,6 +842,92 @@ Visit the TinkerProfiles page to create a new profile or use the AOSetups import
   }
 }
 
+async function commitSingleImport(data: string, updateExistingId: string | undefined) {
+  importing.value = true;
+  importResult.value = null;
+  importProgress.value = {
+    phase: 'equipment',
+    current: 0,
+    total: 1,
+    message: 'Fetching equipment from database...',
+  };
+
+  try {
+    const result = await profilesStore.importProfile(data, undefined, { updateExistingId });
+    importResult.value = result;
+
+    // Console log the complete import result
+    console.log(
+      `[${importMethod.value === 'aosetups' ? 'AOSetups' : importMethod.value} Import] Complete import result:`,
+      result
+    );
+
+    if (result.success) {
+      console.log(
+        `[${importMethod.value === 'aosetups' ? 'AOSetups' : importMethod.value} Import] Import successful!`,
+        {
+          profileName: result.profile?.Character?.Name,
+          profileId: result.profile?.id,
+          warnings: result.warnings,
+        }
+      );
+
+      if (importOptions.setAsActive && result.profile) {
+        await profilesStore.setActiveProfile(result.profile.id);
+        console.log(
+          `[${importMethod.value === 'aosetups' ? 'AOSetups' : importMethod.value} Import] Set as active profile`
+        );
+      }
+
+      emit('imported', result);
+
+      // Close dialog after a delay to show success message
+      setTimeout(() => {
+        emit('update:visible', false);
+      }, 2000);
+    } else {
+      console.error(
+        `[${importMethod.value === 'aosetups' ? 'AOSetups' : importMethod.value} Import] Import failed with errors:`,
+        result.errors
+      );
+      console.warn(
+        `[${importMethod.value === 'aosetups' ? 'AOSetups' : importMethod.value} Import] Import warnings:`,
+        result.warnings
+      );
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Import failed';
+    importResult.value = {
+      success: false,
+      errors: [errorMessage],
+      warnings: [],
+      metadata: { source: 'unknown', migrated: false },
+    };
+  } finally {
+    importing.value = false;
+    importProgress.value = null;
+  }
+}
+
+async function onImportClick() {
+  if (showDuplicatePrompt.value && pendingImportData.value) {
+    const data = pendingImportData.value;
+    const updateExistingId =
+      duplicateChoice.value === 'update' ? (updateTargetId.value ?? undefined) : undefined;
+    clearDuplicatePrompt();
+    await commitSingleImport(data, updateExistingId);
+    return;
+  }
+  await importProfile();
+}
+
+function clearDuplicatePrompt() {
+  pendingImportData.value = null;
+  duplicateMatches.value = [];
+  duplicateChoice.value = 'update';
+  updateTargetId.value = null;
+}
+
 function cancel() {
   emit('update:visible', false);
   resetForm();
@@ -834,12 +948,14 @@ function resetForm() {
   importOptions.validate = true;
   importOptions.skipDuplicates = false;
   importOptions.overwriteExisting = false;
+  clearDuplicatePrompt();
 }
 
 // Watchers
 watch(
   () => importText.value,
   (newText) => {
+    clearDuplicatePrompt();
     if (newText.trim()) {
       detectedFormat.value = detectFormat(newText);
       updateBulkImportFlag(newText);
@@ -854,6 +970,7 @@ watch(
 watch(
   () => aosetupsUrl.value,
   (newUrl) => {
+    clearDuplicatePrompt();
     validateAOSetupsUrl(newUrl);
   }
 );
@@ -870,6 +987,7 @@ watch(
     importResult.value = null;
     bulkImportResult.value = null;
     isBulkImport.value = false;
+    clearDuplicatePrompt();
   }
 );
 

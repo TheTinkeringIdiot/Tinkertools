@@ -202,6 +202,12 @@ export interface ProfileImportResult {
   };
 }
 
+/** Options for importing a profile */
+export interface ProfileImportOptions {
+  /** Overwrite this existing profile in place (preserves its id and created date) */
+  updateExistingId?: string;
+}
+
 /** Bulk import result for multiple profiles */
 export interface BulkImportResult {
   totalProfiles: number;
