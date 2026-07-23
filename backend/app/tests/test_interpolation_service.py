@@ -783,17 +783,285 @@ class TestInterpolationRangesSimplified:
         mock_item.name = "Single Item"
         mock_item.description = "Test description"
         mock_item.is_nano = False
-        
+
         # Mock the query to return the base item
         mock_db.query.return_value.filter.return_value.first.return_value = mock_item
-        
+
         # Mock single variant
         variant1 = Mock(spec=Item)
         variants = [variant1]
-        
+
         with patch.object(service, '_find_item_variants') as mock_find:
             mock_find.return_value = variants
-            
+
             result = service.is_item_interpolatable(12345)
-            
+
             assert result is False
+
+    # ============================================================================
+    # Chain Item Tests (NCU Belts, etc.)
+    # ============================================================================
+
+    def test_is_chain_item_belt_component(self, service):
+        """Test chain item detection for Belt Component items."""
+        mock_item = Mock(spec=Item)
+        mock_item.name = "Belt Component Platform 1"
+
+        result = service._is_chain_item(mock_item)
+        assert result is True
+
+    def test_is_chain_item_non_chain(self, service):
+        """Test chain item detection for non-chain items."""
+        mock_item = Mock(spec=Item)
+        mock_item.name = "Regular Weapon QL 100"
+
+        result = service._is_chain_item(mock_item)
+        assert result is False
+
+    def test_find_chain_variants(self, service, mock_db):
+        """Test finding chain variants for a chain item."""
+        # Mock the base item
+        base_item = Mock(spec=Item)
+        base_item.name = "Belt Component Platform 1"
+
+        # Create mock chain items
+        belt1 = Mock(spec=Item)
+        belt1.name = "Belt Component Platform 1"
+        belt1.ql = 100
+        belt1.aoid = 1
+        belt1.item_stats = []
+        belt1.item_spell_data = []
+        belt1.actions = []
+
+        belt2 = Mock(spec=Item)
+        belt2.name = "Belt Component Platform 2"
+        belt2.ql = 100
+        belt2.aoid = 2
+        belt2.item_stats = []
+        belt2.item_spell_data = []
+        belt2.actions = []
+
+        belt3 = Mock(spec=Item)
+        belt3.name = "Belt Component Platform 3"
+        belt3.ql = 100
+        belt3.aoid = 3
+        belt3.item_stats = []
+        belt3.item_spell_data = []
+        belt3.actions = []
+
+        # Mock the query chain
+        mock_query = Mock()
+        mock_options = Mock()
+        mock_filter = Mock()
+        mock_order = Mock()
+
+        mock_db.query.return_value = mock_query
+        mock_query.options.return_value = mock_options
+        mock_options.filter.return_value = mock_filter
+        mock_filter.order_by.return_value = mock_order
+        mock_order.all.return_value = [belt1, belt2, belt3]
+
+        result = service._find_chain_variants(base_item)
+
+        assert len(result) == 3
+        assert result[0].aoid == 1
+        assert result[1].aoid == 2
+        assert result[2].aoid == 3
+
+    def test_select_best_chain_item_within_range(self, service):
+        """Test selecting the best chain item when target QL is within range."""
+        belt1 = Mock(spec=Item)
+        belt1.ql = 100
+        belt1.aoid = 1
+
+        belt2 = Mock(spec=Item)
+        belt2.ql = 150
+        belt2.aoid = 2
+
+        belt3 = Mock(spec=Item)
+        belt3.ql = 200
+        belt3.aoid = 3
+
+        chain_items = [belt1, belt2, belt3]
+
+        # Test selecting at different QL levels
+        result = service._select_best_chain_item(chain_items, 125)
+        assert result.aoid == 1
+
+        result = service._select_best_chain_item(chain_items, 150)
+        assert result.aoid == 2
+
+        result = service._select_best_chain_item(chain_items, 175)
+        assert result.aoid == 2
+
+        result = service._select_best_chain_item(chain_items, 200)
+        assert result.aoid == 3
+
+        result = service._select_best_chain_item(chain_items, 250)
+        assert result.aoid == 3
+
+    def test_select_best_chain_item_below_minimum(self, service):
+        """Test selecting best chain item when target QL is below all items."""
+        belt1 = Mock(spec=Item)
+        belt1.ql = 100
+        belt1.aoid = 1
+
+        belt2 = Mock(spec=Item)
+        belt2.ql = 200
+        belt2.aoid = 2
+
+        chain_items = [belt1, belt2]
+
+        result = service._select_best_chain_item(chain_items, 50)
+        assert result.aoid == 1  # Should select the first item
+
+    def test_select_best_chain_item_empty_list(self, service):
+        """Test selecting best chain item from empty list."""
+        result = service._select_best_chain_item([], 100)
+        assert result is None
+
+    def test_interpolate_chain_item(self, service, mock_db):
+        """Test interpolation of chain items returns best matching item."""
+        # Mock the base item
+        base_item = Mock(spec=Item)
+        base_item.aoid = 1
+        base_item.name = "Belt Component Platform 1"
+        base_item.ql = 100
+        base_item.is_nano = False
+        base_item.description = "Belt"
+        base_item.item_class = 1
+        base_item.atkdef_id = None
+        base_item.animation_mesh_id = None
+        base_item.item_stats = []
+        base_item.item_spell_data = []
+        base_item.actions = []
+
+        # Create mock chain items
+        belt1 = Mock(spec=Item)
+        belt1.aoid = 1
+        belt1.name = "Belt Component Platform 1"
+        belt1.ql = 100
+        belt1.is_nano = False
+        belt1.description = "Belt"
+        belt1.item_class = 1
+        belt1.atkdef_id = None
+        belt1.animation_mesh_id = None
+        belt1.item_stats = []
+        belt1.item_spell_data = []
+        belt1.actions = []
+
+        belt2 = Mock(spec=Item)
+        belt2.aoid = 2
+        belt2.name = "Belt Component Platform 2"
+        belt2.ql = 100
+        belt2.is_nano = False
+        belt2.description = "Belt"
+        belt2.item_class = 1
+        belt2.atkdef_id = None
+        belt2.animation_mesh_id = None
+        belt2.item_stats = []
+        belt2.item_spell_data = []
+        belt2.actions = []
+
+        belt3 = Mock(spec=Item)
+        belt3.aoid = 3
+        belt3.name = "Belt Component Platform 3"
+        belt3.ql = 150
+        belt3.is_nano = False
+        belt3.description = "Belt"
+        belt3.item_class = 1
+        belt3.atkdef_id = None
+        belt3.animation_mesh_id = None
+        belt3.item_stats = []
+        belt3.item_spell_data = []
+        belt3.actions = []
+
+        # Mock the initial query to get the base item
+        mock_db.query.return_value.filter.return_value.first.return_value = base_item
+
+        with patch.object(service, '_is_chain_item', return_value=True):
+            with patch.object(service, '_find_chain_variants', return_value=[belt1, belt2, belt3]):
+                with patch.object(service, '_create_non_interpolated_item') as mock_create:
+                    mock_create.return_value = Mock()
+
+                    # Request QL 125 should select belt2 (QL 100)
+                    service.interpolate_item(1, 125)
+
+                    # Should have called _create_non_interpolated_item with belt2 and QL 125
+                    mock_create.assert_called_once()
+                    args = mock_create.call_args
+                    assert args[0][0].aoid == 2  # belt2 was selected
+                    assert args[0][1] == 125  # target QL is 125
+
+    def test_get_interpolation_ranges_chain_item(self, service, mock_db):
+        """Test getting interpolation ranges for chain items."""
+        # Mock the base item
+        base_item = Mock(spec=Item)
+        base_item.name = "Belt Component Platform 1"
+
+        # Create mock chain items
+        belt1 = Mock(spec=Item)
+        belt1.name = "Belt Component Platform 1"
+        belt1.ql = 100
+        belt1.aoid = 1
+
+        belt2 = Mock(spec=Item)
+        belt2.name = "Belt Component Platform 2"
+        belt2.ql = 100
+        belt2.aoid = 2
+
+        belt3 = Mock(spec=Item)
+        belt3.name = "Belt Component Platform 3"
+        belt3.ql = 150
+        belt3.aoid = 3
+
+        # Mock the initial query to get the base item
+        mock_db.query.return_value.filter.return_value.first.return_value = base_item
+
+        with patch.object(service, '_is_chain_item', return_value=True):
+            with patch.object(service, '_find_chain_variants', return_value=[belt1, belt2, belt3]):
+                result = service.get_interpolation_ranges(1)
+
+                assert len(result) == 3
+                # Check that all ranges are non-interpolatable (chain items don't interpolate)
+                for r in result:
+                    assert r['interpolatable'] is False
+                    assert 'chain_tier' in r
+
+                # Check the QLs
+                assert result[0]['min_ql'] == 100
+                assert result[1]['min_ql'] == 100
+                assert result[2]['min_ql'] == 150
+
+    def test_is_item_interpolatable_chain_single(self, service, mock_db):
+        """Test is_item_interpolatable for chain item with single tier."""
+        mock_item = Mock(spec=Item)
+        mock_item.name = "Belt Component Platform 1"
+        mock_item.is_nano = False
+
+        mock_db.query.return_value.filter.return_value.first.return_value = mock_item
+
+        with patch.object(service, '_is_chain_item', return_value=True):
+            with patch.object(service, '_find_chain_variants', return_value=[mock_item]):
+                result = service.is_item_interpolatable(1)
+                assert result is False  # Single chain item is not interpolatable
+
+    def test_is_item_interpolatable_chain_multiple(self, service, mock_db):
+        """Test is_item_interpolatable for chain item with multiple tiers."""
+        mock_item = Mock(spec=Item)
+        mock_item.name = "Belt Component Platform 1"
+        mock_item.is_nano = False
+
+        mock_db.query.return_value.filter.return_value.first.return_value = mock_item
+
+        belt1 = Mock(spec=Item)
+        belt1.aoid = 1
+        belt2 = Mock(spec=Item)
+        belt2.aoid = 2
+        belt3 = Mock(spec=Item)
+        belt3.aoid = 3
+
+        with patch.object(service, '_is_chain_item', return_value=True):
+            with patch.object(service, '_find_chain_variants', return_value=[belt1, belt2, belt3]):
+                result = service.is_item_interpolatable(1)
+                assert result is True  # Multiple chain items are interpolatable

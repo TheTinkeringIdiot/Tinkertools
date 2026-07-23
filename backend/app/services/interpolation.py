@@ -4,9 +4,13 @@ Item Interpolation Service for TinkerTools.
 This service implements the core interpolation logic from the legacy InterpItem.py,
 allowing calculation of item stats, spells, and criteria at specific quality levels
 between discrete database entries.
+
+Also handles chain-based items (like NCU belts) that don't interpolate traditionally
+but instead represent discrete progression steps.
 """
 
 from typing import List, Optional, Dict, Any, Tuple
+import re
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_
 
@@ -17,9 +21,9 @@ from app.models.spell import Spell, SpellCriterion
 from app.models.spell_data import SpellData, SpellDataSpells
 from app.models.action import Action, ActionCriteria
 from app.models.interpolated_item import (
-    InterpolatedItem, 
-    InterpolatedAction, 
-    InterpolatedSpellData, 
+    InterpolatedItem,
+    InterpolatedAction,
+    InterpolatedSpellData,
     InterpolatedSpell
 )
 
@@ -27,8 +31,18 @@ from app.models.interpolated_item import (
 class InterpolationService:
     """
     Service for interpolating item data at specific quality levels.
+
+    Handles two types of items:
+    1. Traditional items with QL variants (same name/description, different QLs)
+    2. Chain items (e.g., NCU belts) where each item in the chain is a separate progression step
     """
-    
+
+    # Chain item patterns: items that don't interpolate within themselves but represent
+    # discrete steps in a progression chain (like Belt Component Platform 1, 2, 3...)
+    CHAIN_ITEM_PATTERNS = [
+        r'Belt Component Platform',  # NCU belt progression chain
+    ]
+
     # Stats that should be interpolated (from legacy INTERP_STATS)
     INTERP_STATS = {
         1, 2, 3, 8, 16, 17, 18, 19, 20, 21, 22, 27, 29, 36, 37, 54, 61, 71, 74, 90, 91, 92, 93, 94, 95, 96, 97, 100, 101, 102, 103, 104, 105,
@@ -49,14 +63,94 @@ class InterpolationService:
     def __init__(self, db: Session):
         self.db = db
 
+    def _is_chain_item(self, item: Item) -> bool:
+        """
+        Check if an item is part of a chain progression (like NCU belts).
+
+        Chain items don't interpolate within themselves; instead, each item in the
+        chain is a discrete progression step that should be selected based on target QL.
+
+        Args:
+            item: The item to check
+
+        Returns:
+            True if the item is part of a chain, False otherwise
+        """
+        for pattern in self.CHAIN_ITEM_PATTERNS:
+            if re.search(pattern, item.name):
+                return True
+        return False
+
+    def _find_chain_variants(self, base_item: Item) -> List[Item]:
+        """
+        Find all items in a chain progression for a base chain item.
+
+        For chain items, this extracts the base pattern (e.g., "Belt Component Platform")
+        and finds all items matching that pattern, ordered by name/aoid.
+
+        Args:
+            base_item: A chain item to find variants for
+
+        Returns:
+            List of chain items ordered by progression, or empty list if no pattern match
+        """
+        for pattern in self.CHAIN_ITEM_PATTERNS:
+            match = re.search(pattern, base_item.name)
+            if match:
+                # Find all items matching this chain pattern using LIKE
+                search_pattern = f"{pattern}%"
+                chain_items = (self.db.query(Item)
+                              .options(
+                                  joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
+                                  joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
+                                      .joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell),
+                                  joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion)
+                              )
+                              .filter(Item.name.ilike(search_pattern))
+                              .order_by(Item.name, Item.aoid)
+                              .all())
+                return chain_items
+        return []
+
+    def _select_best_chain_item(self, chain_items: List[Item], target_ql: int) -> Optional[Item]:
+        """
+        Select the best chain item for a target QL.
+
+        For chain items, we select the highest-tier item that doesn't exceed the target QL.
+        If no such item exists, we select the first item in the chain.
+
+        Args:
+            chain_items: List of items in the chain, ordered by progression
+            target_ql: Target QL for selection
+
+        Returns:
+            The best chain item, or None if chain_items is empty
+        """
+        if not chain_items:
+            return None
+
+        # Find the highest-tier item that doesn't exceed target QL
+        best_item = chain_items[0]
+        for item in chain_items:
+            if item.ql and target_ql >= item.ql:
+                best_item = item
+            elif item.ql and item.ql > target_ql:
+                break
+
+        return best_item
+
     def interpolate_item(self, aoid: int, target_ql: int) -> Optional[InterpolatedItem]:
         """
         Main interpolation function that creates an interpolated item at the target QL.
-        
+
+        Handles two types of items:
+        1. Traditional QL variants (same name/description, different QLs) - interpolates stats
+        2. Chain items (like NCU belts) - selects best item from progression chain
+
         Args:
             aoid: Anarchy Online ID of the item
             target_ql: Target quality level for interpolation
-            
+
         Returns:
             InterpolatedItem or None if item not found
         """
@@ -65,9 +159,20 @@ class InterpolationService:
         if not base_item:
             return None
 
-        # Find all variants of this item by name and description
+        # Check if this is a chain item (like NCU belts)
+        if self._is_chain_item(base_item):
+            chain_items = self._find_chain_variants(base_item)
+            if chain_items:
+                # Select the best item from the chain for this QL
+                selected_item = self._select_best_chain_item(chain_items, target_ql)
+                if selected_item:
+                    return self._create_non_interpolated_item(selected_item, target_ql)
+            # Fall through if no chain found
+            return self._create_non_interpolated_item(base_item, target_ql)
+
+        # Find all variants of this item by name and description (traditional QL variants)
         item_variants = self._find_item_variants(base_item.name, base_item.description)
-        
+
         if not item_variants:
             return None
 
@@ -80,7 +185,7 @@ class InterpolationService:
 
         # Find the appropriate low and high items for interpolation
         lo_item, hi_item = self._find_interpolation_bounds(item_variants, target_ql)
-        
+
         if not lo_item:
             return None
 
@@ -90,13 +195,13 @@ class InterpolationService:
     def get_interpolation_ranges(self, aoid: int) -> Optional[List[Dict[str, Any]]]:
         """
         Get interpolation ranges for an item.
-        
-        If an item has multiple variants, it creates ranges between consecutive
-        variants that allow interpolation between them.
-        
+
+        For traditional QL variants: creates ranges between consecutive variants for interpolation.
+        For chain items: returns discrete tiers (not interpolatable).
+
         Args:
             aoid: Anarchy Online ID of the item
-            
+
         Returns:
             List of range dicts with min_ql, max_ql, interpolatable flags or None if item not found
         """
@@ -104,10 +209,26 @@ class InterpolationService:
         if not base_item:
             return None
 
+        # Check if this is a chain item
+        if self._is_chain_item(base_item):
+            chain_items = self._find_chain_variants(base_item)
+            if chain_items:
+                # For chain items, return each tier as a non-interpolatable range
+                ranges = []
+                for item in chain_items:
+                    ranges.append({
+                        "min_ql": item.ql if item.ql else 1,
+                        "max_ql": item.ql if item.ql else 1,
+                        "interpolatable": False,
+                        "base_aoid": item.aoid,
+                        "chain_tier": item.name  # Include tier identifier
+                    })
+                return ranges if ranges else None
+
         item_variants = self._find_item_variants(base_item.name, base_item.description)
         if not item_variants:
             return None
-        
+
         # If only one variant, return single non-interpolatable range
         if len(item_variants) == 1:
             return [{
@@ -116,11 +237,11 @@ class InterpolationService:
                 "interpolatable": False,
                 "base_aoid": item_variants[0].aoid
             }]
-        
+
         # Create ranges between consecutive variants
         # All ranges with multiple variants are interpolatable
         ranges = []
-        
+
         for i in range(len(item_variants)):
             if i < len(item_variants) - 1:
                 # Create interpolatable range between current and next variant
@@ -139,7 +260,7 @@ class InterpolationService:
                         "interpolatable": False,
                         "base_aoid": item_variants[i].aoid
                     })
-        
+
         return ranges
 
     def get_interpolation_range(self, aoid: int) -> Optional[Tuple[int, int]]:
@@ -161,12 +282,15 @@ class InterpolationService:
     def is_item_interpolatable(self, aoid: int) -> bool:
         """
         Check if an item can be interpolated (has multiple QL variants).
-        
+
+        Chain items are considered "interpolatable" in the sense that they can be
+        selected from a progression chain, though interpolation happens differently.
+
         Args:
             aoid: Anarchy Online ID of the item
-            
+
         Returns:
-            True if item can be interpolated, False otherwise
+            True if item can be interpolated or selected from a chain, False otherwise
         """
         base_item = self.db.query(Item).filter(Item.aoid == aoid).first()
         if not base_item:
@@ -174,6 +298,11 @@ class InterpolationService:
 
         if base_item.is_nano or 'Control Point' in base_item.name:
             return False
+
+        # Check if this is a chain item with multiple tiers
+        if self._is_chain_item(base_item):
+            chain_items = self._find_chain_variants(base_item)
+            return len(chain_items) > 1
 
         item_variants = self._find_item_variants(base_item.name, base_item.description)
         return len(item_variants) > 1
