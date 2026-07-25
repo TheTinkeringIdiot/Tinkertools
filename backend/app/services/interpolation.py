@@ -17,11 +17,12 @@ from app.models.spell import Spell, SpellCriterion
 from app.models.spell_data import SpellData, SpellDataSpells
 from app.models.action import Action, ActionCriteria
 from app.models.interpolated_item import (
-    InterpolatedItem, 
-    InterpolatedAction, 
-    InterpolatedSpellData, 
+    InterpolatedItem,
+    InterpolatedAction,
+    InterpolatedSpellData,
     InterpolatedSpell
 )
+from app.services.interpolation_chains import get_chain_for_aoid
 
 
 class InterpolationService:
@@ -65,8 +66,8 @@ class InterpolationService:
         if not base_item:
             return None
 
-        # Find all variants of this item by name and description
-        item_variants = self._find_item_variants(base_item.name, base_item.description)
+        # Find all variants that form this item's interpolation line
+        item_variants = self._find_item_variants(base_item)
         
         if not item_variants:
             return None
@@ -104,7 +105,7 @@ class InterpolationService:
         if not base_item:
             return None
 
-        item_variants = self._find_item_variants(base_item.name, base_item.description)
+        item_variants = self._find_item_variants(base_item)
         if not item_variants:
             return None
         
@@ -175,13 +176,13 @@ class InterpolationService:
         if base_item.is_nano or 'Control Point' in base_item.name:
             return False
 
-        item_variants = self._find_item_variants(base_item.name, base_item.description)
+        item_variants = self._find_item_variants(base_item)
         return len(item_variants) > 1
 
-    def _find_item_variants(self, name: str, description: str) -> List[Item]:
+    def _variant_query(self):
         """
-        Find all items with the same name and description, ordered by QL.
-        Uses eager loading to prevent N+1 queries during interpolation.
+        Base query for loading item variants with the relationships needed for
+        interpolation eagerly loaded, to prevent N+1 queries.
         """
         return (self.db.query(Item)
                 .options(
@@ -189,8 +190,29 @@ class InterpolationService:
                     joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
                         .joinedload(SpellData.spell_data_spells).joinedload(SpellDataSpells.spell),
                     joinedload(Item.actions).joinedload(Action.action_criteria).joinedload(ActionCriteria.criterion)
-                )
-                .filter(and_(Item.name == name, Item.description == description))
+                ))
+
+    def _find_item_variants(self, base_item: Item) -> List[Item]:
+        """
+        Find all variants of an item that form a single interpolation line,
+        ordered by QL.
+
+        If the item belongs to an explicitly registered chain (see
+        ``interpolation_chains``), its variants are the members of that chain --
+        this covers item lines whose name changes across QL tiers. Otherwise the
+        variants are all items sharing the same name and description.
+
+        Uses eager loading to prevent N+1 queries during interpolation.
+        """
+        chain_aoids = get_chain_for_aoid(base_item.aoid)
+        if chain_aoids:
+            variant_filter = Item.aoid.in_(chain_aoids)
+        else:
+            variant_filter = and_(Item.name == base_item.name,
+                                  Item.description == base_item.description)
+
+        return (self._variant_query()
+                .filter(variant_filter)
                 .order_by(Item.ql, Item.aoid)
                 .all())
 

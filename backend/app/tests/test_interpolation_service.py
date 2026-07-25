@@ -120,22 +120,31 @@ class TestInterpolationService:
         assert result == 133
 
     def test_find_item_variants(self, service, mock_db):
-        """Test finding item variants by name and description."""
-        # Mock database query
+        """Test finding item variants by name and description (non-chained item)."""
+        base_item = Mock(spec=Item)
+        base_item.aoid = 12345
+        base_item.name = "Test Weapon"
+        base_item.description = "A test weapon"
+
+        # The variant query chains query(Item).options(...).filter(...).order_by(...).all()
         mock_query = Mock()
+        mock_options = Mock()
         mock_filter = Mock()
         mock_order = Mock()
-        
+
         mock_db.query.return_value = mock_query
-        mock_query.filter.return_value = mock_filter
+        mock_query.options.return_value = mock_options
+        mock_options.filter.return_value = mock_filter
         mock_filter.order_by.return_value = mock_order
         mock_order.all.return_value = ['item1', 'item2', 'item3']
-        
-        result = service._find_item_variants("Test Weapon", "A test weapon")
-        
+
+        # No registered chain -> falls back to name+description grouping.
+        with patch('app.services.interpolation.get_chain_for_aoid', return_value=None):
+            result = service._find_item_variants(base_item)
+
         assert result == ['item1', 'item2', 'item3']
         mock_db.query.assert_called_once()
-        mock_query.filter.assert_called_once()
+        mock_options.filter.assert_called_once()
         mock_filter.order_by.assert_called_once()
 
     def test_find_interpolation_bounds(self, service):
