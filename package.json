@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@primeuix/themes": "^1.2.3",
-    "axios": "^1.6.0",
+    "axios": "^1.18.0",
     "dayjs": "1.11.11",
     "fuse.js": "7.0.0",
     "idb-keyval": "^6.2.2",
