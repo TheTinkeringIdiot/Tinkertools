@@ -265,6 +265,7 @@ export const SKILL_CATEGORIES: Record<string, string[]> = {
     'Shotgun',
     'Assault Rif',
     'Multi Ranged',
+    'Ranged Energy',
   ],
   'Ranged Specials': ['Fling Shot', 'Sharp Obj', 'Bow Spc Att', 'Burst', 'Full Auto', 'Aimed Shot'],
   'Melee Weapons': [

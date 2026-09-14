@@ -40,6 +40,7 @@ export const SKILL_REGISTRY: Record<string, number> = {
   Shotgun: 115, // Shotgun in STAT enum
   'Assault Rif': 116, // AssaultRifle in STAT enum
   'Multi Ranged': 134, // MultiRanged in STAT enum
+  'Ranged Energy': 133, // RangedEnergy in STAT enum
 
   // Ranged Specials
   'Fling Shot': 150,
@@ -139,7 +140,6 @@ export const SKILL_REGISTRY: Record<string, number> = {
   // Misc Stats
   'Max Health': 1, // MaxHealth in STAT enum
   'Max NCU': 181, // MaxNCU in STAT enum
-  'Ranged Energy': 133, // RangedEnergy in STAT enum
   'Add All Offense': 276, // AddAllOffense in STAT enum
   'Add All Defense': 277, // AddAllDefense in STAT enum
   'Add All Off.': 276, // AddAllOffense (abbreviated format)

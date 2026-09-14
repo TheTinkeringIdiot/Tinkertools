@@ -100,6 +100,7 @@ export const DEFAULT_SKILLS = {
     Shotgun: { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Assault Rif': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
     'Multi Ranged': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
+    'Ranged Energy': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
   },
   'Ranged Specials': {
     'Fling Shot': { value: BASE_SKILL, ipSpent: 0, pointFromIp: 0, cap: undefined },
