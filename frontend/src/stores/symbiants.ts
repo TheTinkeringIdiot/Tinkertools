@@ -8,6 +8,7 @@ import { defineStore } from 'pinia';
 import { ref, computed, readonly } from 'vue';
 import type { Symbiant, UserFriendlyError, Mob } from '../types/api';
 import { apiClient } from '../services/api-client';
+import { toUserFriendlyError } from '../services/error-message';
 import { enrichSymbiant } from '../utils/symbiantHelpers';
 import { get, set, del } from 'idb-keyval';
 import {
@@ -252,8 +253,8 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
       }
 
       return allSymbiantsData;
-    } catch (err: any) {
-      error.value = err;
+    } catch (err) {
+      error.value = toUserFriendlyError(err);
       throw err;
     } finally {
       loading.value = false;
@@ -283,8 +284,8 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
       } else {
         throw new Error('Symbiant not found');
       }
-    } catch (err: any) {
-      error.value = err;
+    } catch (err) {
+      error.value = toUserFriendlyError(err);
       return null;
     } finally {
       loading.value = false;
@@ -296,17 +297,6 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
    */
   function getSymbiantByAoid(aoid: number): Symbiant | null {
     return allSymbiants.value.find((symbiant) => symbiant.aoid === aoid) || null;
-  }
-
-  /**
-   * Get symbiants that would be useful for a character build
-   */
-  function getSymbiantsForBuild(
-    targetStats: Array<{ stat: number; priority: 'high' | 'medium' | 'low' }>
-  ): Symbiant[] {
-    // This would need more complex logic based on symbiant stat bonuses
-    // For now, return all symbiants as we don't have stat bonus data in the basic model
-    return allSymbiants.value;
   }
 
   /**
@@ -735,7 +725,6 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     searchSymbiants,
     getSymbiant,
     getSymbiantByAoid,
-    getSymbiantsForBuild,
     getSymbiantsByTier,
     clearError,
     clearCache,

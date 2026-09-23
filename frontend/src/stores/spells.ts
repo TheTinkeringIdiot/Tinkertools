@@ -7,8 +7,16 @@
 
 import { defineStore } from 'pinia';
 import { ref, computed, readonly } from 'vue';
-import type { Spell, SpellSearchQuery, PaginatedResponse, UserFriendlyError } from '../types/api';
+import type {
+  Spell,
+  SpellSearchQuery,
+  PaginatedResponse,
+  PaginationInfo,
+  JsonValue,
+  UserFriendlyError,
+} from '../types/api';
 import { apiClient } from '../services/api-client';
+import { toUserFriendlyError } from '../services/error-message';
 
 export const useSpellsStore = defineStore('spells', () => {
   // ============================================================================
@@ -19,7 +27,7 @@ export const useSpellsStore = defineStore('spells', () => {
   const searchResults = ref<{
     query: SpellSearchQuery | null;
     results: Spell[];
-    pagination: any;
+    pagination: Omit<PaginationInfo, 'offset'>;
     timestamp: number;
   } | null>(null);
   const loading = ref(false);
@@ -105,8 +113,8 @@ export const useSpellsStore = defineStore('spells', () => {
       } else {
         throw new Error('Search failed');
       }
-    } catch (err: any) {
-      error.value = err;
+    } catch (err) {
+      error.value = toUserFriendlyError(err);
       throw err;
     } finally {
       loading.value = false;
@@ -135,8 +143,8 @@ export const useSpellsStore = defineStore('spells', () => {
       } else {
         throw new Error(response.error?.message || 'Spell not found');
       }
-    } catch (err: any) {
-      error.value = err;
+    } catch (err) {
+      error.value = toUserFriendlyError(err);
       return null;
     } finally {
       loading.value = false;
@@ -153,7 +161,7 @@ export const useSpellsStore = defineStore('spells', () => {
   /**
    * Get spells with specific parameters
    */
-  function getSpellsWithParams(paramFilter: Record<string, any>): Spell[] {
+  function getSpellsWithParams(paramFilter: Record<string, JsonValue>): Spell[] {
     return allSpells.value.filter((spell) => {
       if (!spell.spell_params) return false;
 

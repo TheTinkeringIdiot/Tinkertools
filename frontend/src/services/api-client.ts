@@ -510,6 +510,9 @@ class TinkerToolsApiClient {
       // Backend returns ImplantLookupResponse with item in 'item' field
       return response.data;
     } catch (error) {
+      // Let a cancellation through as-is: callers abort superseded lookups
+      // and must be able to tell that apart from a failure
+      if (asRequestError(error).code === 'ERR_CANCELED') throw error;
       throw this.handleError(error);
     }
   }

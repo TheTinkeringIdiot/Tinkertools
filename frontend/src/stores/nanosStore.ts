@@ -2,14 +2,65 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { apiClient } from '@/services/api-client';
 import { versionKey, adoptLegacyKey } from '@/services/version-keys';
+import { errorMessage } from '@/services/error-message';
 import type {
   NanoProgram,
   NanoFilters,
-  NanosState,
   NanoPreferences,
   NanoSearchRequest,
-  NanoApiResponse,
+  NanoSchool,
+  CastingRequirement,
+  NanoEffect,
+  EffectDuration,
+  TargetingData,
 } from '@/types/nano';
+
+/** A nano program as the /nanos endpoints return it */
+interface BackendNanoProgram {
+  id: number;
+  aoid: number;
+  name: string;
+  ql: number;
+  description?: string;
+  school: NanoSchool;
+  strain: string;
+  profession?: string;
+  level: number;
+  casting_requirements?: CastingRequirement[];
+  casting_time?: number;
+  recharge_time?: number;
+  memory_usage?: number;
+  nano_point_cost?: number;
+  effects?: NanoEffect[];
+  duration?: EffectDuration;
+  targeting?: TargetingData;
+  source_location?: string;
+  acquisition_method?: string;
+}
+
+function toNanoProgram(item: BackendNanoProgram): NanoProgram {
+  return {
+    id: item.id,
+    aoid: item.aoid,
+    name: item.name,
+    qualityLevel: item.ql,
+    description: item.description,
+    school: item.school,
+    strain: item.strain,
+    profession: item.profession,
+    level: item.level,
+    castingRequirements: item.casting_requirements || [],
+    castingTime: item.casting_time,
+    rechargeTime: item.recharge_time,
+    memoryUsage: item.memory_usage,
+    nanoPointCost: item.nano_point_cost,
+    effects: item.effects || [],
+    duration: item.duration,
+    targeting: item.targeting,
+    sourceLocation: item.source_location,
+    acquisitionMethod: item.acquisition_method,
+  };
+}
 
 /**
  * Per-version keys: the nano list is server data and favorites are AOID-keyed,
@@ -194,38 +245,17 @@ export const useNanosStore = defineStore('nanos', () => {
         params.append('school', searchRequest.filters.schools[0]); // Backend supports one school filter
       }
 
-      const data = await apiClient.getPaginated<any>(`/nanos?${params}`);
+      const data = await apiClient.getPaginated<BackendNanoProgram>(`/nanos?${params}`);
 
       // Map backend response to frontend format
-      nanos.value = data.items.map((item: any) => ({
-        id: item.id,
-        aoid: item.aoid,
-        name: item.name,
-        ql: item.ql,
-        qualityLevel: item.ql, // Map ql to qualityLevel for compatibility
-        description: item.description,
-        school: item.school,
-        strain: item.strain,
-        profession: item.profession,
-        level: item.level,
-        castingRequirements: item.casting_requirements || [],
-        castingTime: item.casting_time,
-        rechargeTime: item.recharge_time,
-        memoryUsage: item.memory_usage,
-        nanoPointCost: item.nano_point_cost,
-        effects: item.effects || [],
-        duration: item.duration,
-        targeting: item.targeting,
-        sourceLocation: item.source_location,
-        acquisitionMethod: item.acquisition_method,
-      }));
+      nanos.value = data.items.map(toNanoProgram);
 
       totalCount.value = data.total;
 
       // Save to localStorage for persistence
       saveNanosToStorage();
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to fetch nanos';
+      error.value = errorMessage(err) || 'Failed to fetch nanos';
       console.error('Failed to fetch nanos:', err);
 
       // Fallback to cached data if available
@@ -237,8 +267,12 @@ export const useNanosStore = defineStore('nanos', () => {
 
   const searchNanos = async (
     query: string,
+    // The search endpoint takes only the text query; callers pass their UI
+    // filters too, which are applied client-side.
+    /* eslint-disable @typescript-eslint/no-unused-vars -- see above */
     schools?: string[],
     fields?: string[]
+    /* eslint-enable @typescript-eslint/no-unused-vars */
   ): Promise<void> => {
     loading.value = true;
     error.value = null;
@@ -250,31 +284,10 @@ export const useNanosStore = defineStore('nanos', () => {
         params.append('q', query.trim());
         params.append('page_size', '200');
 
-        const data = await apiClient.getPaginated<any>(`/nanos/search?${params}`);
+        const data = await apiClient.getPaginated<BackendNanoProgram>(`/nanos/search?${params}`);
 
         // Map backend response to frontend format
-        nanos.value = data.items.map((item: any) => ({
-          id: item.id,
-          aoid: item.aoid,
-          name: item.name,
-          ql: item.ql,
-          qualityLevel: item.ql,
-          description: item.description,
-          school: item.school,
-          strain: item.strain,
-          profession: item.profession,
-          level: item.level,
-          castingRequirements: item.casting_requirements || [],
-          castingTime: item.casting_time,
-          rechargeTime: item.recharge_time,
-          memoryUsage: item.memory_usage,
-          nanoPointCost: item.nano_point_cost,
-          effects: item.effects || [],
-          duration: item.duration,
-          targeting: item.targeting,
-          sourceLocation: item.source_location,
-          acquisitionMethod: item.acquisition_method,
-        }));
+        nanos.value = data.items.map(toNanoProgram);
 
         totalCount.value = data.total;
       } else {
@@ -289,7 +302,7 @@ export const useNanosStore = defineStore('nanos', () => {
         saveSearchHistory();
       }
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to search nanos';
+      error.value = errorMessage(err) || 'Failed to search nanos';
       console.error('Failed to search nanos:', err);
     } finally {
       loading.value = false;
@@ -588,134 +601,3 @@ export const useNanosStore = defineStore('nanos', () => {
     resetForVersionChange,
   };
 });
-
-// Mock API function - replace with actual API implementation
-async function mockFetchNanos(request?: NanoSearchRequest): Promise<NanoApiResponse> {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 500));
-
-  // Mock data - in real implementation, this would come from the backend API
-  const mockNanos: NanoProgram[] = [
-    {
-      id: 1,
-      name: 'Superior Heal',
-      school: 'Biological Metamorphosis',
-      strain: 'Heal Delta',
-      description: 'Heals target for a large amount of health over time.',
-      level: 125,
-      qualityLevel: 175,
-      profession: 'Doctor',
-      nanoPointCost: 450,
-      castingTime: 3,
-      rechargeTime: 5,
-      memoryUsage: 85,
-      sourceLocation: 'Omni-Tek Shop',
-      acquisitionMethod: 'Purchase',
-      castingRequirements: [
-        { type: 'skill', requirement: 'Biological Metamorphosis', value: 750, critical: true },
-        { type: 'skill', requirement: 'Nano Programming', value: 600, critical: true },
-        { type: 'level', requirement: 'level', value: 125, critical: true },
-      ],
-      effects: [
-        {
-          type: 'heal',
-          value: 1250,
-          modifier: 'add',
-          stackable: false,
-          conditions: [],
-        },
-      ],
-      duration: { type: 'instant' },
-      targeting: { type: 'team', range: 30 },
-    },
-    {
-      id: 2,
-      name: 'Matter Armor',
-      school: 'Matter Creation',
-      strain: 'Protection Alpha',
-      description: 'Creates protective armor around the target.',
-      level: 100,
-      qualityLevel: 150,
-      nanoPointCost: 350,
-      castingTime: 4,
-      rechargeTime: 8,
-      memoryUsage: 75,
-      sourceLocation: 'Mission Terminal',
-      acquisitionMethod: 'Mission Reward',
-      castingRequirements: [
-        { type: 'skill', requirement: 'Matter Creation', value: 650, critical: true },
-        { type: 'skill', requirement: 'Nano Programming', value: 550, critical: true },
-        { type: 'level', requirement: 'level', value: 100, critical: true },
-      ],
-      effects: [
-        {
-          type: 'protection',
-          statId: 'AC',
-          value: 200,
-          modifier: 'add',
-          stackable: false,
-          conditions: [],
-        },
-      ],
-      duration: { type: 'duration', value: 1800 },
-      targeting: { type: 'self' },
-    },
-    {
-      id: 3,
-      name: 'Summon Pet',
-      school: 'Matter Creation',
-      strain: 'Summon Beta',
-      description: 'Summons a loyal pet to assist in combat.',
-      level: 75,
-      qualityLevel: 125,
-      profession: 'Meta-Physicist',
-      nanoPointCost: 500,
-      castingTime: 6,
-      rechargeTime: 2,
-      memoryUsage: 120,
-      sourceLocation: 'Temple of Three Winds',
-      acquisitionMethod: 'Quest',
-      castingRequirements: [
-        { type: 'skill', requirement: 'Matter Creation', value: 500, critical: true },
-        { type: 'skill', requirement: 'Nano Programming', value: 450, critical: true },
-        { type: 'level', requirement: 'level', value: 75, critical: true },
-      ],
-      effects: [
-        {
-          type: 'summon',
-          value: 1,
-          modifier: 'set',
-          stackable: false,
-          conditions: [],
-        },
-      ],
-      duration: { type: 'duration', value: 3600 },
-      targeting: { type: 'self' },
-    },
-  ];
-
-  let filteredData = mockNanos;
-
-  // Apply query filter
-  if (request?.query) {
-    const query = request.query.toLowerCase();
-    filteredData = filteredData.filter(
-      (nano) =>
-        nano.name.toLowerCase().includes(query) ||
-        nano.description?.toLowerCase().includes(query) ||
-        nano.school.toLowerCase().includes(query)
-    );
-  }
-
-  // Apply school filter
-  if (request?.filters?.schools && request.filters.schools.length > 0) {
-    filteredData = filteredData.filter((nano) => request.filters!.schools!.includes(nano.school));
-  }
-
-  return {
-    data: filteredData,
-    total: filteredData.length,
-    page: request?.page || 0,
-    size: request?.size || filteredData.length,
-  };
-}

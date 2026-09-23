@@ -17,10 +17,10 @@ import type {
   SymbiantItem,
 } from '../types/api';
 import { isSymbiant } from '../types/api';
+import type { ImplantWithClusters } from '../lib/tinkerprofiles';
 import { apiClient } from '../services/api-client';
 import { versionKey } from '../services/version-keys';
 import { useTinkerProfilesStore } from './tinkerProfiles';
-import { useSymbiantsStore } from './symbiants';
 import { equipmentBonusCalculator } from '../services/equipment-bonus-calculator';
 import { getCriteriaRequirements } from '../services/action-criteria';
 import { useToast } from 'primevue/usetoast';
@@ -59,7 +59,7 @@ interface DebouncedLookup {
  * Returns stat IDs for each cluster using skillService to resolve variations
  */
 function parseImplantClusters(
-  item: any
+  item: Pick<Item, 'description'>
 ): { shiny: number | null; bright: number | null; faded: number | null } | null {
   const description = item.description;
   if (!description) return null;
@@ -84,7 +84,7 @@ function parseImplantClusters(
         // Resolve cluster name to stat ID
         const skillId = skillService.resolveId(rawName);
         clusters.faded = skillId;
-      } catch (err) {
+      } catch {
         console.error(`❌ [CLUSTER LOOKUP FAILED] Faded: "${rawName}"`);
         failedClusters.push(`Faded: "${rawName}"`);
         // Don't set fallback - leave as null
@@ -99,7 +99,7 @@ function parseImplantClusters(
         // Resolve cluster name to stat ID
         const skillId = skillService.resolveId(rawName);
         clusters.bright = skillId;
-      } catch (err) {
+      } catch {
         console.error(`❌ [CLUSTER LOOKUP FAILED] Bright: "${rawName}"`);
         failedClusters.push(`Bright: "${rawName}"`);
         // Don't set fallback - leave as null
@@ -114,7 +114,7 @@ function parseImplantClusters(
         // Resolve cluster name to stat ID
         const skillId = skillService.resolveId(rawName);
         clusters.shiny = skillId;
-      } catch (err) {
+      } catch {
         console.error(`❌ [CLUSTER LOOKUP FAILED] Shiny: "${rawName}"`);
         failedClusters.push(`Shiny: "${rawName}"`);
         // Don't set fallback - leave as null
@@ -444,24 +444,21 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
 
         // Check for symbiant using type guard (checks for family/slot_id properties)
         // Also check type field for backwards compatibility
-        const isSymbiantItem =
-          isSymbiant(item as unknown as Item | SymbiantItem) ||
-          ('type' in item && item.type === 'symbiant');
+        const isSymbiantItem = isSymbiant(item) || ('type' in item && item.type === 'symbiant');
 
         if (isSymbiantItem) {
-          // Load as symbiant - store basic data now, enrich with full item data later
-          const symbiantData = item as unknown as SymbiantItem;
+          // Load as symbiant: profiles store the full symbiant Item
           loadedConfiguration[slotBitflag] = {
             type: 'symbiant',
             slotBitflag,
-            ql: symbiantData.ql || 200,
-            symbiant: JSON.parse(JSON.stringify(symbiantData)) as SymbiantItem,
+            ql: item.ql || 200,
+            symbiant: JSON.parse(JSON.stringify(item)) as Item,
             item: null,
             shiny: null,
             bright: null,
             faded: null,
           };
-          console.log(`[TinkerPlants] Slot ${slotBitflag}: loaded symbiant ${symbiantData.name}`);
+          console.log(`[TinkerPlants] Slot ${slotBitflag}: loaded symbiant ${item.name}`);
         } else {
           // Load as implant (existing cluster parsing logic)
           const clusters = parseImplantClusters(item);
@@ -472,7 +469,7 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
               shiny: clusters.shiny,
               bright: clusters.bright,
               faded: clusters.faded,
-              ql: (item as any).ql || 200,
+              ql: item.ql || 200,
               slotBitflag,
               item: JSON.parse(JSON.stringify(item)) as Item,
               symbiant: null,
@@ -494,7 +491,7 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
 
       // Auto-recalculate bonuses and requirements
       recalculate();
-    } catch (err: any) {
+    } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to load configuration';
       toast.add({
         severity: 'error',
@@ -531,14 +528,14 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
       error.value = null;
 
       // Convert currentConfiguration to unified profile.Implants format (ImplantWithClusters)
-      const implantsToSave: Record<string, any> = {};
+      const implantsToSave: Record<string, ImplantWithClusters> = {};
 
       for (const [slotBitflag, selection] of Object.entries(currentConfiguration.value)) {
         const slotNumber = parseInt(slotBitflag, 10);
 
         if (selection.type === 'implant' && selection.item) {
           // Transform Item to ImplantWithClusters format
-          const clusters: any = {};
+          const clusters: NonNullable<ImplantWithClusters['clusters']> = {};
           if (selection.shiny !== null && selection.shiny !== undefined) {
             clusters.Shiny = {
               stat: selection.shiny,
@@ -565,7 +562,7 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
             clusters: Object.keys(clusters).length > 0 ? clusters : undefined,
           };
         } else if (selection.type === 'symbiant' && selection.symbiant) {
-          // Transform SymbiantItem to ImplantWithClusters format
+          // Transform the symbiant Item to ImplantWithClusters format
           implantsToSave[slotBitflag] = {
             ...toRaw(selection.symbiant),
             slot: slotNumber,
@@ -594,7 +591,7 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
         Object.keys(implantsToSave).length,
         'items'
       );
-    } catch (err: any) {
+    } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to save configuration';
       toast.add({
         severity: 'error',
@@ -655,8 +652,6 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
    * @param type - Equipment type ('implant' or 'symbiant')
    */
   function setSlotType(slotBitflag: string, type: 'implant' | 'symbiant'): void {
-    const existing = currentConfiguration.value[slotBitflag];
-
     if (type === 'symbiant') {
       // Switching to symbiant: clear implant-specific data
       updateSlot(slotBitflag, {
@@ -920,9 +915,9 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
         });
         selection.item = null;
       }
-    } catch (err: any) {
+    } catch (err) {
       // Ignore abort errors (expected when user makes rapid changes)
-      if (err.name === 'AbortError' || err.name === 'CanceledError') {
+      if (err instanceof Error && (err.name === 'AbortError' || err.name === 'CanceledError')) {
         console.log('[TinkerPlants] Request cancelled for slot:', slotBitflag);
         return;
       }
@@ -964,8 +959,9 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
     }
 
     // Set new timer (300ms debounce - balances responsiveness with batching)
+    // lookupImplantForSlot reports its own failures (toast + error state)
     const timer = window.setTimeout(() => {
-      lookupImplantForSlot(slotBitflag);
+      void lookupImplantForSlot(slotBitflag);
       debouncedLookups.value.delete(slotBitflag);
     }, 300);
 

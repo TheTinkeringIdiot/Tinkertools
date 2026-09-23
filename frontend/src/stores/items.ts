@@ -13,8 +13,10 @@ import type {
   ItemFilterRequest,
   PaginatedResponse,
   UserFriendlyError,
+  PaginationInfo,
 } from '../types/api';
 import { apiClient } from '../services/api-client';
+import { toUserFriendlyError } from '../services/error-message';
 
 interface ItemsState {
   // Data
@@ -22,7 +24,7 @@ interface ItemsState {
   searchResults: {
     query: ItemSearchQuery | null;
     results: Item[];
-    pagination: any;
+    pagination: PaginationInfo;
     timestamp: number;
   } | null;
 
@@ -123,8 +125,8 @@ export const useItemsStore = defineStore('items', () => {
       } else {
         throw new Error('Search failed');
       }
-    } catch (err: any) {
-      error.value = err;
+    } catch (err) {
+      error.value = toUserFriendlyError(err);
       throw err;
     } finally {
       loading.value = false;
@@ -153,8 +155,8 @@ export const useItemsStore = defineStore('items', () => {
       } else {
         throw new Error(response.error?.message || 'Item not found');
       }
-    } catch (err: any) {
-      error.value = err;
+    } catch (err) {
+      error.value = toUserFriendlyError(err);
       return null;
     } finally {
       loading.value = false;
@@ -206,8 +208,8 @@ export const useItemsStore = defineStore('items', () => {
         } else {
           throw new Error(response.error?.message || 'Items fetch failed');
         }
-      } catch (err: any) {
-        error.value = err;
+      } catch (err) {
+        error.value = toUserFriendlyError(err);
         throw err;
       } finally {
         loading.value = false;
@@ -239,8 +241,8 @@ export const useItemsStore = defineStore('items', () => {
       } else {
         throw new Error('Filter failed');
       }
-    } catch (err: any) {
-      error.value = err;
+    } catch (err) {
+      error.value = toUserFriendlyError(err);
       throw err;
     } finally {
       loading.value = false;

@@ -324,7 +324,7 @@ export interface SymbiantItem {
  * Type guard to distinguish symbiants from implants
  * Symbiants have family/slot_id, implants have item_class/icon_id
  */
-export function isSymbiant(item: Item | SymbiantItem): item is SymbiantItem {
+export function isSymbiant(item: object): item is SymbiantItem {
   return 'family' in item && 'slot_id' in item;
 }
 
@@ -664,8 +664,11 @@ export interface ImplantSelection {
   slotBitflag: string;
   /** Full implant item data from API (null if not yet loaded, implants only) */
   item: Item | null;
-  /** Symbiant item data (symbiants only) */
-  symbiant?: SymbiantItem | null;
+  /**
+   * Symbiant item data (symbiants only). setSymbiant() swaps the SymbiantItem
+   * it is given for the full Item, and profiles store that Item.
+   */
+  symbiant?: Item | null;
 }
 
 /** Request format for implant lookup API */

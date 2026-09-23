@@ -91,7 +91,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * stored in profiles. Interpolated spell data and actions carry no database
  * IDs, so they are numbered by position to keep them distinguishable.
  */
-function interpolatedToItem(item: InterpolatedItem): Item {
+export function interpolatedToItem(item: InterpolatedItem): Item {
   return {
     id: item.id,
     aoid: item.aoid,
