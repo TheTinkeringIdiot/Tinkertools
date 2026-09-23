@@ -3,8 +3,7 @@ ItemDetail - Detailed item view with complete information
 Shows all item data with profile compatibility and comparison options
 -->
 <template>
-  <!-- Page Mode (when accessed via direct URL) -->
-  <div v-if="!isModal" class="item-detail-page p-6 max-w-7xl mx-auto">
+  <div class="item-detail-page p-6 max-w-7xl mx-auto">
     <div class="mb-6 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <Button
@@ -271,7 +270,7 @@ Shows all item data with profile compatibility and comparison options
       <!-- Weapon Statistics (for weapons only) -->
       <WeaponStats
         v-if="item && item.item_class && isWeapon(item.item_class)"
-        :item="displayedItem"
+        :item="displayedItem ?? item"
         :profile="profile"
         :show-compatibility="showCompatibility"
         :attack-stats="item.attack_stats"
@@ -281,11 +280,9 @@ Shows all item data with profile compatibility and comparison options
       <!-- Nano Statistics (for nanos only) -->
       <NanoStatistics
         v-if="item && item.is_nano"
-        :item="displayedItem"
+        :item="displayedItem ?? item"
         :profile="profile"
         :show-compatibility="showCompatibility"
-        :skill-requirements="item.skill_requirements"
-        :skill-bonuses="item.skill_bonuses"
         :attack-stats="item.attack_stats"
         :defense-stats="item.defense_stats"
       />
@@ -303,7 +300,7 @@ Shows all item data with profile compatibility and comparison options
             </div>
 
             <ActionRequirements
-              :actions="displayedItem.actions"
+              :actions="displayedItem?.actions ?? []"
               :character-stats="characterStats"
               :expanded="true"
               :show-oe-breakpoints="canWear"
@@ -329,280 +326,10 @@ Shows all item data with profile compatibility and comparison options
     </div>
   </div>
 
-  <!-- Modal Dialog Mode (when opened from items list) -->
-  <Dialog
-    v-else
-    v-model:visible="isVisible"
-    modal
-    :header="item?.name || 'Item Details'"
-    :style="{ width: '95vw', maxWidth: '1200px', height: '90vh' }"
-    :maximizable="true"
-    class="item-detail-dialog"
-    @hide="onClose"
-  >
-    <template #header>
-      <div class="flex items-center gap-3 w-full">
-        <div class="flex items-center gap-2 flex-1">
-          <h2 class="text-xl font-bold">{{ item?.name || 'Loading...' }}</h2>
-          <Badge v-if="displayedItem && currentQl" :value="`QL ${currentQl}`" severity="info" />
-          <Badge v-if="item?.is_nano" value="Nano" severity="success" />
-        </div>
-
-        <!-- Header Actions -->
-        <div v-if="item" class="flex items-center gap-2">
-          <Button
-            v-if="canEquip"
-            icon="pi pi-shield"
-            label="Equip"
-            severity="success"
-            @click="showEquipDialog"
-          />
-          <Button
-            v-if="item.is_nano && profilesStore.hasActiveProfile"
-            icon="pi pi-sparkles"
-            label="Cast Buff"
-            severity="primary"
-            @click="castBuff"
-          />
-          <Button
-            icon="pi pi-clone"
-            label="Compare"
-            severity="primary"
-            outlined
-            @click="addToComparison"
-          />
-          <Button
-            v-tooltip.bottom="'Share Item'"
-            icon="pi pi-share-alt"
-            severity="secondary"
-            outlined
-            @click="shareItem"
-          />
-        </div>
-      </div>
-    </template>
-
-    <!-- Shared Item Content in Modal -->
-    <div v-if="loading" class="flex items-center justify-center h-96">
-      <ProgressSpinner />
-    </div>
-
-    <div v-else-if="error" class="text-center py-16">
-      <i class="pi pi-exclamation-triangle text-4xl text-red-500 mb-4"></i>
-      <h3 class="text-lg font-medium text-surface-600 dark:text-surface-400 mb-2">
-        Failed to Load Item
-      </h3>
-      <p class="text-surface-500 dark:text-surface-500 mb-4">{{ error }}</p>
-      <Button label="Retry" @click="loadItem" />
-    </div>
-
-    <div v-else-if="item" class="space-y-6 max-h-[70vh] overflow-y-auto">
-      <!-- Item Flags and Advanced View Toggle -->
-      <div
-        class="flex items-center justify-between p-4 bg-surface-50 dark:bg-surface-900 rounded-lg border border-surface-200 dark:border-surface-700"
-      >
-        <!-- Item Flags (left side) -->
-        <div class="flex items-center gap-2 flex-wrap">
-          <Tag
-            v-for="flag in displayItemFlags"
-            :key="flag.name"
-            :value="flag.name"
-            :severity="flag.severity"
-            :class="[
-              'outline-tag',
-              flag.severity === 'danger' ? 'outline-tag-danger' : 'outline-tag-secondary',
-            ]"
-          />
-          <span
-            v-if="displayItemFlags.length === 0"
-            class="text-sm text-surface-500 dark:text-surface-400 italic"
-          >
-            No special properties
-          </span>
-        </div>
-
-        <!-- Advanced View Toggle (right side) -->
-        <div class="flex items-center gap-2">
-          <label for="advanced-view-toggle" class="text-sm text-surface-700 dark:text-surface-300">
-            Advanced view
-          </label>
-          <InputSwitch id="advanced-view-toggle" v-model="advancedView" />
-        </div>
-      </div>
-
-      <!-- Item Overview -->
-      <div class="grid grid-cols-1 lg:grid-cols-4 gap-3">
-        <!-- Item Slots Display and Basic Info -->
-        <div class="lg:col-span-1">
-          <Card>
-            <template #content>
-              <div class="space-y-4">
-                <!-- Item Slots Display or Icon -->
-                <ItemSlotsDisplay :item="item" />
-              </div>
-            </template>
-          </Card>
-        </div>
-
-        <!-- Item Description -->
-        <div class="lg:col-span-2">
-          <Card>
-            <template #content>
-              <div class="description-component">
-                <!-- Header -->
-                <div class="flex items-center justify-between mb-3">
-                  <div class="flex items-center gap-2">
-                    <i class="pi pi-file-edit text-gray-500"></i>
-                    <h3 class="text-base font-semibold">Description</h3>
-                  </div>
-                </div>
-
-                <div v-if="item.description">
-                  <p class="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                    {{ item.description }}
-                  </p>
-                </div>
-                <div v-else class="text-sm text-surface-500 dark:text-surface-400 italic">
-                  No description available
-                </div>
-              </div>
-            </template>
-          </Card>
-        </div>
-
-        <!-- You can help! -->
-        <div class="lg:col-span-1">
-          <Card>
-            <template #content>
-              <div class="help-component">
-                <!-- Header -->
-                <div class="flex items-center justify-between mb-3">
-                  <div class="flex items-center gap-2">
-                    <i class="pi pi-lightbulb text-yellow-500"></i>
-                    <h3 class="text-base font-semibold">You can help!</h3>
-                  </div>
-                </div>
-
-                <div class="text-sm text-surface-600 dark:text-surface-400">
-                  <p class="mb-4 leading-relaxed">
-                    TinkerItems and the other TinkerTools are a player-run project. Your kind help
-                    keeping them online and ad-free is GREATLY appreciated!
-                  </p>
-                  <div class="flex items-center gap-2">
-                    <a
-                      href="https://patreon.com/tinkeringidiot"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="hover:opacity-80 transition-opacity flex-1"
-                    >
-                      <img
-                        src="https://cdn.tinkeringidiot.com/static/image/patreon_name.png"
-                        alt="Support on Patreon"
-                        class="h-10 w-full object-fill"
-                      />
-                    </a>
-                    <a
-                      href="https://discord.gg/a7baGx76un"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="hover:opacity-80 transition-opacity flex-1"
-                    >
-                      <img
-                        src="https://cdn.tinkeringidiot.com/static/image/discord_logo.svg"
-                        alt="Join Discord"
-                        class="h-10 w-full object-fill"
-                      />
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </template>
-          </Card>
-        </div>
-      </div>
-
-      <!-- Weapon Statistics (for weapons only) -->
-      <WeaponStats
-        v-if="item && item.item_class && isWeapon(item.item_class)"
-        :item="displayedItem"
-        :profile="profile"
-        :show-compatibility="showCompatibility"
-        :attack-stats="item.attack_stats"
-        :defense-stats="item.defense_stats"
-      />
-
-      <!-- Nano Statistics (for nanos only) -->
-      <NanoStatistics
-        v-if="item && item.is_nano"
-        :item="displayedItem"
-        :profile="profile"
-        :show-compatibility="showCompatibility"
-        :skill-requirements="item.skill_requirements"
-        :skill-bonuses="item.skill_bonuses"
-        :attack-stats="item.attack_stats"
-        :defense-stats="item.defense_stats"
-      />
-
-      <!-- Actions and Usage -->
-      <Card v-if="item.actions?.length">
-        <template #content>
-          <div class="actions-requirements-component">
-            <!-- Header with Requirements Badge -->
-            <div class="flex items-center justify-between mb-3">
-              <div class="flex items-center gap-2">
-                <i class="pi pi-key text-blue-500"></i>
-                <h3 class="text-base font-semibold">Requirements</h3>
-              </div>
-            </div>
-
-            <ActionRequirements
-              :actions="displayedItem.actions"
-              :character-stats="characterStats"
-              :expanded="true"
-              :show-oe-breakpoints="canWear"
-            />
-          </div>
-        </template>
-      </Card>
-
-      <!-- Spell Data Effects (for items with spell_data) -->
-      <SpellDataDisplay
-        v-if="displayedItem && displayedItem.spell_data && displayedItem.spell_data.length > 0"
-        :spell-data="displayedItem.spell_data"
-        :profile="profile"
-        :show-hidden="false"
-        :advanced-view="advancedView"
-      />
-
-      <!-- Raw Stats (only visible in advanced view) -->
-      <RawStats v-if="item && item.stats" v-show="advancedView" :stats="item.stats" />
-
-      <!-- Item Sources -->
-      <ItemSources v-if="item && item.sources && item.sources.length > 0" :sources="item.sources" />
-    </div>
-
-    <template #footer>
-      <div class="flex items-center justify-between">
-        <div class="text-xs text-surface-500 dark:text-surface-400">
-          Item ID: {{ item?.id }} | AOID: {{ item?.aoid }}
-        </div>
-        <div class="flex gap-2">
-          <Button label="Close" severity="secondary" @click="onClose" />
-          <Button
-            v-if="item"
-            label="Add to Comparison"
-            icon="pi pi-clone"
-            @click="addToComparison"
-          />
-        </div>
-      </div>
-    </template>
-  </Dialog>
-
   <!-- Equip Slot Selector Dialog -->
   <EquipSlotSelector
     v-model:visible="equipDialogVisible"
-    :item="displayedItem || item"
+    :item="displayedItem"
     :profile="profile"
     :valid-slots="validSlots"
     @confirm="handleEquipItem"
@@ -612,28 +339,23 @@ Shows all item data with profile compatibility and comparison options
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router';
 import { useItemsStore } from '@/stores/items';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import {
-  getItemIconUrl,
   isWeapon,
   getDisplayItemFlags,
   getDisplayCanFlags,
   getItemCanFlags,
-  getProfessionId,
-  getBreedId,
-  getStatId,
   getItemSlotInfo,
 } from '@/services/game-utils';
-import { mapProfileToStats, getProfileStat } from '@/utils/profile-stats-mapper';
-import type { Item, TinkerProfile, InterpolatedItem, InterpolationInfo } from '@/types/api';
+import { mapProfileToStats } from '@/utils/profile-stats-mapper';
+import type { Item, InterpolatedItem } from '@/types/api';
 
 // Import new components
 import WeaponStats from '@/components/items/WeaponStats.vue';
 import NanoStatistics from '@/components/items/NanoStatistics.vue';
 import SpellDataDisplay from '@/components/items/SpellDataDisplay.vue';
-import ItemAttributes from '@/components/items/ItemAttributes.vue';
 import ItemSlotsDisplay from '@/components/items/ItemSlotsDisplay.vue';
 import ActionRequirements from '@/components/ActionRequirements.vue';
 import RawStats from '@/components/items/RawStats.vue';
@@ -659,12 +381,9 @@ const props = defineProps<{
 }>();
 
 // State
-const isVisible = ref(true);
 const item = ref<Item | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
-const showAllStats = ref(false);
-const iconLoadError = ref(false);
 const advancedView = ref(false);
 const equipDialogVisible = ref(false);
 const validSlots = ref<string[]>([]);
@@ -681,9 +400,7 @@ const compareWithCurrent = ref(false);
 const currentVersionItem = ref<Item | null>(null);
 
 // Interpolation state
-const interpolationInfo = ref<InterpolationInfo | null>(null);
 const interpolatedItem = ref<InterpolatedItem | null>(null);
-const isInterpolating = ref(false);
 const interpolationError = ref<string | null>(null);
 
 // Current QL for interpolation (from query param or item's base QL)
@@ -747,35 +464,6 @@ const characterStats = computed(() => {
   return mapProfileToStats(profile.value);
 });
 
-// Determine if we're in modal mode (opened from items list) or page mode (direct URL)
-const isModal = computed(() => {
-  // If there's an ID prop passed from parent, we're in modal mode
-  // If we're accessing via route and no prop, we're in page mode
-  // For now, let's default to page mode for direct URL access
-  return false; // Always use page mode for now
-});
-
-const hasSpecialEffects = computed(
-  () => item.value?.spell_data && item.value.spell_data.length > 0
-);
-
-const itemIconUrl = computed(() => {
-  if (iconLoadError.value || !item.value?.stats) return null;
-  return getItemIconUrl(item.value.stats);
-});
-
-const displayedStats = computed(() => {
-  if (!item.value?.stats) return [];
-
-  if (showAllStats.value) {
-    return item.value.stats.filter((stat) => stat.value !== 0);
-  } else {
-    return item.value.stats
-      .filter((stat) => stat.value !== 0 && Math.abs(stat.value) > 5)
-      .slice(0, 9);
-  }
-});
-
 const displayItemFlags = computed(() => {
   if (!item.value?.stats) return [];
 
@@ -788,9 +476,42 @@ const displayItemFlags = computed(() => {
 });
 
 // Use interpolated item if available, otherwise use original item
-const displayedItem = computed(() => {
-  return interpolatedItem.value || item.value;
+const displayedItem = computed((): Item | null => {
+  if (!item.value) return null;
+  return interpolatedItem.value
+    ? withInterpolation(item.value, interpolatedItem.value)
+    : item.value;
 });
+
+/**
+ * The item at its interpolated QL. Interpolation returns only the QL-dependent
+ * data; the rest (attack/defense stats, sources, ...) comes from the base item,
+ * as do the record ids interpolated spells and actions do not carry.
+ */
+function withInterpolation(base: Item, interpolated: InterpolatedItem): Item {
+  return {
+    ...base,
+    id: interpolated.id,
+    aoid: interpolated.aoid ?? base.aoid,
+    name: interpolated.name,
+    ql: interpolated.ql ?? base.ql,
+    description: interpolated.description ?? base.description,
+    stats: interpolated.stats,
+    spell_data: interpolated.spell_data.map((data, i) => ({
+      ...data,
+      id: base.spell_data[i]?.id ?? -(i + 1),
+      spells: data.spells.map((spell, j) => ({
+        ...spell,
+        id: base.spell_data[i]?.spells[j]?.id ?? -(j + 1),
+      })),
+    })),
+    actions: interpolated.actions.map((action, i) => ({
+      ...action,
+      id: base.actions[i]?.id ?? -(i + 1),
+      item_id: interpolated.id,
+    })),
+  };
+}
 
 // Check if item can be equipped (is equippable and profile meets requirements)
 const canEquip = computed(() => {
@@ -851,9 +572,9 @@ async function loadItem() {
         }
       }
     }
-  } catch (err: any) {
+  } catch (err) {
     item.value = null;
-    error.value = err.message || 'Failed to load item';
+    error.value = (err instanceof Error && err.message) || 'Failed to load item';
   } finally {
     loading.value = false;
   }
@@ -891,23 +612,23 @@ async function loadCurrentVersionItem() {
 }
 
 /** Selecting a patch point peeks at it; selecting the browsing version exits. */
-function onHistorySelect(slug: string) {
-  const query: Record<string, any> = { ...route.query };
+async function onHistorySelect(slug: string) {
+  const query: LocationQueryRaw = { ...route.query };
   if (!slug || slug === currentVersion.value) {
     delete query.as;
   } else {
     query.as = slug;
   }
-  router.replace({ name: 'ItemDetail', params: { ...route.params }, query });
+  await router.replace({ name: 'ItemDetail', params: { ...route.params }, query });
 }
 
-function exitPeek() {
-  onHistorySelect(currentVersion.value || '');
+async function exitPeek() {
+  await onHistorySelect(currentVersion.value || '');
 }
 
-function viewFirstSeen() {
+async function viewFirstSeen() {
   const slug = revisions.value?.first_seen_in;
-  if (slug) onHistorySelect(slug);
+  if (slug) await onHistorySelect(slug);
 }
 
 async function toggleCompare() {
@@ -917,18 +638,13 @@ async function toggleCompare() {
   }
 }
 
-function onClose() {
-  isVisible.value = false;
-  router.push({ name: 'TinkerItems' });
-}
-
-function goBack() {
+async function goBack() {
   // Try to go back in browser history
   // If there's no history or we came from outside the app, fall back to items page
   if (window.history.length > 1 && document.referrer.includes(window.location.origin)) {
     router.go(-1);
   } else {
-    router.push({ name: 'TinkerItems' });
+    await router.push({ name: 'TinkerItems' });
   }
 }
 
@@ -937,7 +653,7 @@ function addToComparison() {
   console.log('Add to comparison:', item.value?.id);
 }
 
-function shareItem() {
+async function shareItem() {
   if (!item.value) return;
 
   // A shared link must open the same game version, and the same peek.
@@ -950,17 +666,35 @@ function shareItem() {
   }`;
 
   if (navigator.share) {
-    navigator.share({
-      title: item.value.name,
-      text: item.value.description,
-      url,
-    });
-  } else {
-    navigator.clipboard.writeText(url);
+    try {
+      await navigator.share({
+        title: item.value.name,
+        text: item.value.description,
+        url,
+      });
+    } catch (err) {
+      // Dismissing the share sheet rejects with AbortError; that is not a failure
+      if (!(err instanceof DOMException && err.name === 'AbortError')) {
+        console.error('Failed to share item:', err);
+      }
+    }
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(url);
     toast.add({
       severity: 'success',
       summary: 'Link Copied',
       detail: 'Item URL copied to clipboard',
+      life: 3000,
+    });
+  } catch (err) {
+    console.error('Failed to copy item link:', err);
+    toast.add({
+      severity: 'error',
+      summary: 'Copy Failed',
+      detail: 'Could not copy the item URL to the clipboard',
       life: 3000,
     });
   }
@@ -1009,7 +743,7 @@ async function castBuff() {
 
   try {
     // Cast to Item type to handle both interpolated and regular items
-    await profilesStore.castBuff(displayedItem.value as Item);
+    await profilesStore.castBuff(displayedItem.value);
     toast.add({
       severity: 'success',
       summary: 'Buff Cast',
@@ -1027,74 +761,6 @@ async function castBuff() {
   }
 }
 
-function getCharacterStat(statId: number): number {
-  if (!profile.value) return 0;
-
-  // Use the profile stats mapper utility
-  return getProfileStat(profile.value, statId);
-}
-
-// Utility functions
-const statNames: Record<number, string> = {
-  16: 'Strength',
-  17: 'Agility',
-  18: 'Stamina',
-  19: 'Intelligence',
-  20: 'Sense',
-  21: 'Psychic',
-  102: '1H Blunt',
-  103: '1H Edged',
-  105: '2H Edged',
-  109: '2H Blunt',
-  133: 'Ranged Energy',
-  161: 'Computer Literacy',
-};
-
-const itemClassNames: Record<number, string> = {
-  1: '1H Blunt Weapon',
-  2: '1H Edged Weapon',
-  3: '2H Blunt Weapon',
-  4: '2H Edged Weapon',
-  5: 'Ranged Weapon',
-  6: 'Body Armor',
-  7: 'Head Armor',
-  8: 'Arm Armor',
-  9: 'Leg Armor',
-  10: 'Foot Armor',
-  15: 'Implant',
-  20: 'Utility Item',
-};
-
-function getStatName(statId: number): string {
-  return statNames[statId] || `Stat ${statId}`;
-}
-
-function getItemClassName(classId: number): string {
-  return itemClassNames[classId] || `Class ${classId}`;
-}
-
-function getTradeableText(): string {
-  return 'Unknown'; // Would need actual property from item data
-}
-
-function getDroppableText(): string {
-  return 'Unknown'; // Would need actual property from item data
-}
-
-function getEffectTrigger(event: number): string {
-  const triggers: Record<number, string> = {
-    0: 'On Use',
-    5: 'On Hit',
-    14: 'When Equipped',
-    15: 'Passive',
-  };
-  return triggers[event] || `Event ${event}`;
-}
-
-function onIconError() {
-  iconLoadError.value = true;
-}
-
 // Interpolation methods
 function handleInterpolatedItem(interpolated: InterpolatedItem | null) {
   interpolatedItem.value = interpolated;
@@ -1110,19 +776,18 @@ onMounted(async () => {
   if (!profilesStore.hasProfiles) {
     await profilesStore.loadProfiles();
   }
-  loadItem();
-  loadRevisions();
+  // Both record their own failures
+  await Promise.all([loadItem(), loadRevisions()]);
 });
 
 // Watch for route changes
 watch(
   () => route.params.aoid,
-  () => {
+  async () => {
     if (route.name === 'ItemDetail') {
       compareWithCurrent.value = false;
       currentVersionItem.value = null;
-      loadItem();
-      loadRevisions();
+      await Promise.all([loadItem(), loadRevisions()]);
     }
   }
 );
@@ -1130,11 +795,11 @@ watch(
 // Peeking at another snapshot reloads the item from that version
 watch(
   () => route.query.as,
-  () => {
+  async () => {
     if (route.name !== 'ItemDetail') return;
     compareWithCurrent.value = false;
     currentVersionItem.value = null;
-    loadItem();
+    await loadItem();
   }
 );
 
@@ -1156,10 +821,6 @@ defineExpose({
 </script>
 
 <style scoped>
-.item-detail-dialog :deep(.p-dialog-content) {
-  padding: 1.5rem;
-}
-
 .font-mono {
   font-family: 'Courier New', 'Monaco', 'Lucida Console', monospace;
 }

@@ -292,10 +292,11 @@ function onInputStateUpdate(newState: FiteInputState) {
 /**
  * Update weapons: clear cache and refetch
  */
-function handleUpdateWeapons() {
-  clearWeaponCache();
+async function handleUpdateWeapons() {
+  // Wait for the IndexedDB entries to go too, or the refetch can be served from them
+  await clearWeaponCache();
   console.log('[TinkerFite] Updating weapons: cache cleared, refetching weapons');
-  fetchWeapons();
+  await fetchWeapons();
 }
 
 // ============================================================================
@@ -305,7 +306,7 @@ function handleUpdateWeapons() {
 /**
  * On mount: Populate from profile and fetch weapons
  */
-onMounted(() => {
+onMounted(async () => {
   console.log('[TinkerFite] Component mounted');
 
   // One-time cleanup of legacy LocalStorage weapon cache
@@ -313,7 +314,7 @@ onMounted(() => {
 
   populateFromProfile();
   if (activeProfile.value) {
-    fetchWeapons();
+    await fetchWeapons();
   }
 });
 </script>

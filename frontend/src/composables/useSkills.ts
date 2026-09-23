@@ -221,7 +221,7 @@ export function useSkills(options: UseSkillsOptions = {}) {
         case 'short_value':
           return `${shortName}: ${skill.total}`;
 
-        case 'breakdown':
+        case 'breakdown': {
           const components = [];
           if (skill.base > 0) components.push(`Base: ${skill.base}`);
           if (skill.trickle > 0) components.push(`Trickle: ${skill.trickle}`);
@@ -234,6 +234,7 @@ export function useSkills(options: UseSkillsOptions = {}) {
             components.push(`Buffs: ${skill.buffBonus > 0 ? '+' : ''}${skill.buffBonus}`);
 
           return `${name}: ${skill.total} (${components.join(', ')})`;
+        }
 
         default:
           return `${name}: ${skill.total}`;

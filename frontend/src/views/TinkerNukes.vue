@@ -51,7 +51,7 @@ Task 4.4: Complete view integration
     <div class="p-4 border-b border-surface-200 dark:border-surface-700">
       <NukeInputForm
         :input-state="inputState"
-        :active-profile="activeProfile as TinkerProfile | null"
+        :active-profile="activeProfile"
         @update:input-state="onInputStateUpdate"
       />
     </div>
@@ -122,13 +122,7 @@ import NukeInputForm from '@/components/nukes/NukeInputForm.vue';
 import NukeTable from '@/components/nukes/NukeTable.vue';
 
 // Import types from Task 3.4
-import type {
-  OffensiveNano,
-  NukeInputState,
-  CharacterStats,
-  DamageModifiers,
-  BuffPresets,
-} from '@/types/offensive-nano';
+import type { OffensiveNano, NukeInputState } from '@/types/offensive-nano';
 
 // Import service from Task 4.1
 import { fetchOffensiveNanos, buildOffensiveNano } from '@/services/offensive-nano-service';
@@ -137,7 +131,6 @@ import { fetchOffensiveNanos, buildOffensiveNano } from '@/services/offensive-na
 import { filterByCharacterProfile, applyNanoFilters } from '@/utils/nuke-filtering';
 import type { Character } from '@/utils/stat-calculations';
 import { convertInputStateToCharacter } from '@/utils/input-to-character';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 
 // ============================================================================
 // Store and Router
@@ -145,6 +138,9 @@ import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 
 const profileStore = useTinkerProfilesStore();
 const router = useRouter();
+
+/** Profession ID of the Nanotechnician, the only profession this tool serves */
+const NANOTECHNICIAN = 11;
 
 // ============================================================================
 // Reactive State
@@ -273,8 +269,8 @@ function onInputStateUpdate(newState: NukeInputState): void {
  * Handle nano row click from NukeTable
  * Navigate to the item detail page for this nano
  */
-function onNanoSelected(nanoId: number): void {
-  router.push({ name: 'ItemDetail', params: { aoid: nanoId.toString() } });
+async function onNanoSelected(nanoId: number): Promise<void> {
+  await router.push({ name: 'ItemDetail', params: { aoid: nanoId.toString() } });
 }
 
 /**
@@ -301,7 +297,7 @@ onMounted(async () => {
 
   try {
     // Fetch offensive nanos for Nanotechnician (profession ID 11)
-    const items = await fetchOffensiveNanos(11);
+    const items = await fetchOffensiveNanos(NANOTECHNICIAN);
 
     // Transform ItemDetail[] into OffensiveNano[]
     offensiveNanos.value = items
@@ -333,8 +329,8 @@ onMounted(async () => {
 watch(
   () => profileStore.activeProfile,
   (newProfile, oldProfile) => {
-    // Only react if profile actually changed
-    if (newProfile?.Character.Name === oldProfile?.Character.Name) {
+    // Only react if profile actually changed (not a recalculated copy of the same one)
+    if (newProfile?.id === oldProfile?.id) {
       return;
     }
 
@@ -348,7 +344,7 @@ watch(
         `[TinkerNukes] Profile switched to: ${newProfile.Character.Name} (${profession})`
       );
 
-      if (profession !== 'Nanotechnician') {
+      if (newProfile.Character.Profession !== NANOTECHNICIAN) {
         console.warn(
           '[TinkerNukes] Active profile is not Nanotechnician, fields will reset to defaults'
         );
@@ -362,33 +358,6 @@ watch(
   },
   { immediate: false }
 );
-
-// ============================================================================
-// Expose for Tests
-// ============================================================================
-
-defineExpose({
-  loading,
-  offensiveNanos,
-  activeProfile,
-  inputState,
-  searchQuery,
-  selectedSchoolId,
-  minQL,
-  maxQL,
-  filteredNanos,
-  currentSkills: computed(() => {
-    const skills: Record<number, number> = {};
-    skills[130] = inputState.value.characterStats.matterCreation;
-    skills[127] = inputState.value.characterStats.matterMeta;
-    skills[128] = inputState.value.characterStats.bioMeta;
-    skills[129] = inputState.value.characterStats.psychModi;
-    skills[122] = inputState.value.characterStats.sensoryImp;
-    skills[131] = inputState.value.characterStats.timeSpace;
-    return skills;
-  }),
-  schoolFilterOptions,
-});
 </script>
 
 <style scoped>

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import {
   useActionDisplay,
   useCriteriaDisplay,
@@ -75,7 +75,7 @@ describe('useActionCriteria composables', () => {
         hasRequirements: true,
         description: 'Wield: Requirements',
         criteria: [],
-        expression: null,
+        rawCriteria: [],
       },
       {
         id: 2,
@@ -84,7 +84,7 @@ describe('useActionCriteria composables', () => {
         hasRequirements: false,
         description: 'Get: No requirements',
         criteria: [],
-        expression: null,
+        rawCriteria: [],
       },
       {
         id: 3,
@@ -93,7 +93,7 @@ describe('useActionCriteria composables', () => {
         hasRequirements: true,
         description: 'Attack: Requirements',
         criteria: [],
-        expression: null,
+        rawCriteria: [],
       },
     ];
 
@@ -263,24 +263,25 @@ describe('useActionCriteria composables', () => {
       const criteria = ref(mockCriteria);
       const { expression } = useCriteriaDisplay(criteria);
 
-      expect(parseCriteriaExpression).toHaveBeenCalledWith(mockCriteria);
+      // Computeds are lazy: read the value before checking how it was derived
       expect(expression.value?.description).toBe('(Pistol ≥ 357 AND Level ≥ 151)');
+      expect(parseCriteriaExpression).toHaveBeenCalledWith(mockCriteria);
     });
 
     it('should format text from expression', () => {
       const criteria = ref(mockCriteria);
       const { formattedText } = useCriteriaDisplay(criteria);
 
-      expect(formatCriteriaText).toHaveBeenCalled();
       expect(formattedText.value).toBe('(Pistol ≥ 357 AND Level ≥ 151)');
+      expect(formatCriteriaText).toHaveBeenCalled();
     });
 
     it('should get requirements', () => {
       const criteria = ref(mockCriteria);
       const { requirements } = useCriteriaDisplay(criteria);
 
-      expect(getCriteriaRequirements).toHaveBeenCalledWith(mockCriteria);
       expect(requirements.value).toHaveLength(2);
+      expect(getCriteriaRequirements).toHaveBeenCalledWith(mockCriteria);
     });
 
     it('should generate simplified text for single requirement', () => {
@@ -341,7 +342,7 @@ describe('useActionCriteria composables', () => {
       hasRequirements: true,
       description: 'Wield: Requirements',
       criteria: [],
-      expression: null,
+      rawCriteria: [],
     };
 
     beforeEach(() => {
@@ -464,7 +465,7 @@ describe('useActionCriteria composables', () => {
         hasRequirements: false,
         description: 'Wield: No requirements',
         criteria: [],
-        expression: null,
+        rawCriteria: [],
       });
 
       const result = useItemActions(actions, characterStats);

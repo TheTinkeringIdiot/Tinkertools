@@ -178,7 +178,8 @@ async function browse(version: GameVersion): Promise<void> {
   await switchVersion(version.slug);
 }
 
-onMounted(() => {
-  ensureVersionsLoaded();
+onMounted(async () => {
+  // Never rejects: a failed load is recorded as registryFailed
+  await ensureVersionsLoaded();
 });
 </script>

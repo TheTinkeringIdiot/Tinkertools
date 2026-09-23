@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
+import { useRouter, useRoute, type LocationQueryRaw } from 'vue-router';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { useSymbiantsStore } from '@/stores/symbiants';
 import { usePocketBossStore } from '@/stores/pocketBossStore';
@@ -59,9 +59,6 @@ const minLevel = ref<number>(1);
 const maxLevel = ref<number>(220);
 const bossLevelRange = ref<[number, number]>([1, 220]); // Local state for slider
 const bossViewMode = ref<'grid' | 'list'>('list');
-
-// Loading State
-const loading = ref<boolean>(false);
 
 // Debounce timer for search
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -154,10 +151,6 @@ const filteredSymbiants = computed(() => {
   return result;
 });
 
-const displayedSymbiantCount = computed(() => {
-  return filteredSymbiants.value.length;
-});
-
 const filteredBosses = computed(() => pocketBossStore.filteredPocketBosses);
 const playfields = computed(() => pocketBossStore.playfields);
 const levelRange = computed(() => pocketBossStore.levelRange);
@@ -167,63 +160,9 @@ const comparisonCount = computed(() => symbiantsStore.getComparisonCount());
 const hasComparisons = computed(() => comparisonCount.value > 0);
 
 // Methods
-let debugCount = 0;
-function checkSymbiantRequirements(symbiant: SymbiantItem): boolean {
-  const shouldLog = debugCount === 0;
-
-  if (shouldLog) {
-    console.log('🔍 Checking symbiant:', symbiant.name, 'ID:', symbiant.id);
-  }
-
-  if (!characterStats.value) {
-    if (shouldLog) console.log('❌ No character stats');
-    return true;
-  }
-
-  if (shouldLog) {
-    console.log('📊 Character stats:', characterStats.value);
-    console.log('📊 Profession stat (60):', characterStats.value[60]);
-  }
-
-  if (!symbiant.actions || symbiant.actions.length === 0) {
-    if (shouldLog) console.log('✅ No actions, returning true');
-    return true;
-  }
-
-  const action = symbiant.actions[0];
-  if (shouldLog) {
-    console.log('📋 Action criteria count:', action.criteria?.length);
-  }
-
-  const parsedAction = parseAction(action);
-  if (shouldLog) {
-    console.log('🔨 Parsed action:', parsedAction);
-  }
-
-  const result = checkActionRequirements(parsedAction, characterStats.value);
-  if (shouldLog) {
-    console.log('✅ Can perform?', result.canPerform, 'Unmet:', result.unmetRequirements.length);
-
-    if (!result.canPerform && result.unmetRequirements.length > 0) {
-      console.log('❌ Unmet requirements:');
-      result.unmetRequirements.forEach((req) => {
-        console.log(`  - Stat ${req.stat}: need ${req.required}, have ${req.current}`);
-      });
-    }
-  }
-
-  debugCount++;
-  return result.canPerform;
-}
-
-async function fetchSymbiants() {
-  await symbiantsStore.loadAllSymbiants();
-  // Computed property (filteredSymbiants) handles filtering
-}
-
-function updateFilters() {
+async function updateFilters() {
   // No page reset needed
-  updateURL();
+  await updateURL();
 }
 
 function onSearchInput() {
@@ -232,11 +171,11 @@ function onSearchInput() {
   }
 
   searchDebounceTimer = setTimeout(() => {
-    updateFilters();
+    updateFilters().catch((error) => console.error('[FindGear] Failed to update URL:', error));
   }, 300);
 }
 
-function clearFilters() {
+async function clearFilters() {
   familyFilter.value = null;
   slotFilter.value = null;
   minQL.value = 1;
@@ -247,23 +186,23 @@ function clearFilters() {
   symbiantLevelRange.value = [1, 220];
   searchText.value = '';
   profileToggle.value = false;
-  updateFilters();
+  await updateFilters();
 }
 
-function applyQlFilter() {
+async function applyQlFilter() {
   minQL.value = qlRange.value[0];
   maxQL.value = qlRange.value[1];
-  updateFilters();
+  await updateFilters();
 }
 
-function applyLevelFilter() {
+async function applyLevelFilter() {
   symbiantMinLevel.value = symbiantLevelRange.value[0];
   symbiantMaxLevel.value = symbiantLevelRange.value[1];
-  updateFilters();
+  await updateFilters();
 }
 
-function updateURL() {
-  const query: any = {};
+async function updateURL() {
+  const query: LocationQueryRaw = {};
 
   if (familyFilter.value) query.family = familyFilter.value;
   if (slotFilter.value) query.slot = slotFilter.value.toString();
@@ -275,7 +214,7 @@ function updateURL() {
   if (profileToggle.value) query.profile = 'true';
 
   // Named route: the version param is inherited from the current route.
-  router.push({ name: 'TinkerPocket', query });
+  await router.push({ name: 'TinkerPocket', query });
 }
 
 function readURLParams() {
@@ -333,8 +272,8 @@ function readURLParams() {
   }
 }
 
-function navigateToItem(aoid: number) {
-  router.push({ name: 'ItemDetail', params: { aoid: aoid.toString() } });
+async function navigateToItem(aoid: number) {
+  await router.push({ name: 'ItemDetail', params: { aoid: aoid.toString() } });
 }
 
 function handleAddToComparison(symbiant: SymbiantItem) {
@@ -406,9 +345,9 @@ function clearBossFilters() {
   pocketBossStore.clearFilters();
 }
 
-function navigateToBoss(bossId: number) {
+async function navigateToBoss(bossId: number) {
   // Pass current tab to preserve it when returning from boss detail
-  router.push({
+  await router.push({
     name: 'BossDetail',
     params: { id: bossId.toString() },
     query: { returnTab: props.view },
@@ -474,7 +413,7 @@ watch(
 // Watch for profile changes to auto-set max level
 watch(
   () => activeProfile.value,
-  (newProfile, oldProfile) => {
+  async (newProfile, oldProfile) => {
     if (props.view !== 'symbiants') return;
 
     // Only update if profile actually changed (not just a reference change)
@@ -486,12 +425,12 @@ watch(
       symbiantMaxLevel.value = newLevel;
       symbiantLevelRange.value[1] = newLevel;
       // Trigger update
-      applyLevelFilter();
+      await applyLevelFilter();
     } else if (!newProfile && oldProfile) {
       // Profile was cleared, reset to max
       symbiantMaxLevel.value = 220;
       symbiantLevelRange.value[1] = 220;
-      applyLevelFilter();
+      await applyLevelFilter();
     }
   },
   { immediate: false }
@@ -839,8 +778,9 @@ watch(
 
       <!-- Boss List/Grid -->
       <DataView
-        :value="filteredBosses as any"
-        :layout="bossViewMode as any"
+        :value="filteredBosses"
+        :layout="bossViewMode"
+        data-key="id"
         :paginator="true"
         :rows="20"
         :rows-per-page-options="[10, 20, 50]"

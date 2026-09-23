@@ -151,7 +151,7 @@ Grid-based implant selection following the legacy TinkerPlants format
 
                   <!-- Grid Rows -->
                   <div
-                    v-for="(slot, index) in implantSlots"
+                    v-for="slot in implantSlots"
                     :key="slot.id"
                     class="tinker-plants-grid gap-0 border-b border-surface-200 dark:border-surface-700 last:border-b-0"
                     :class="{ 'opacity-75': isSlotLoading(slot.id) }"
@@ -446,7 +446,7 @@ Grid-based implant selection following the legacy TinkerPlants format
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive, watch } from 'vue';
+import { ref, computed, onMounted, reactive, watch, type DeepReadonly } from 'vue';
 import { useAccessibility } from '@/composables/useAccessibility';
 import { useTinkerPlantsStore } from '@/stores/tinkerPlants';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
@@ -455,6 +455,8 @@ import { equipmentBonusCalculator } from '@/services/equipment-bonus-calculator'
 import { IMP_SKILLS, IMPLANT_SLOT } from '@/services/game-data';
 import { skillService } from '@/services/skill-service';
 import type { SymbiantItem } from '@/types/api';
+import type { AutoCompleteCompleteEvent } from 'primevue/autocomplete';
+import type { InputNumberInputEvent } from 'primevue/inputnumber';
 import Badge from 'primevue/badge';
 import Button from 'primevue/button';
 import Dropdown from 'primevue/dropdown';
@@ -504,7 +506,7 @@ const selectedClusterInfo = ref<{
 const slotType = reactive<Record<string, 'Implant' | 'Symbiant'>>({});
 
 // Symbiant autocomplete suggestions state
-const symbiantSuggestions = ref<Record<string, any[]>>({});
+const symbiantSuggestions = ref<Record<string, SymbiantItem[]>>({});
 
 // Computed loading from store
 const loading = computed(() => tinkerPlantsStore.loading);
@@ -623,11 +625,6 @@ const hasAnySymbiants = computed(() => {
 // Show results automatically when there are configured implants OR symbiants
 const showResults = computed(() => hasAnyImplants.value || hasAnySymbiants.value);
 
-const calculatedBonuses = computed(() => {
-  // Get bonuses from store calculation
-  return tinkerPlantsStore.calculatedBonuses || {};
-});
-
 /**
  * Compute per-implant bonuses for BonusDisplay component
  * Builds a mapping of slot bitflag -> stat bonuses
@@ -636,7 +633,7 @@ const perImplantBonuses = computed(() => {
   const bonusesBySlot: Record<string, Record<number, number>> = {};
 
   // Get the current configuration
-  const config = tinkerPlantsStore.currentConfiguration as Record<string, any>;
+  const config = tinkerPlantsStore.currentConfiguration;
 
   // Iterate through current configuration to extract bonuses per slot
   for (const [slotBitflag, selection] of Object.entries(config)) {
@@ -708,7 +705,7 @@ const isSlotHighlighted = (slotName: string, columnType: string): boolean => {
  * Get symbiants available for a specific slot
  * Filters by slot_id bitflag
  */
-const getSymbiantsForSlot = (slotId: string): any[] => {
+const getSymbiantsForSlot = (slotId: string): SymbiantItem[] => {
   const mapping = slotMapping[slotId as keyof typeof slotMapping];
   if (!mapping) return [];
 
@@ -721,7 +718,7 @@ const getSymbiantsForSlot = (slotId: string): any[] => {
  * Search symbiants for autocomplete
  * Filters by slot and search query
  */
-const searchSymbiants = (event: any, slotId: string) => {
+const searchSymbiants = (event: AutoCompleteCompleteEvent, slotId: string) => {
   const query = event.query.toLowerCase();
   const availableSymbiants = getSymbiantsForSlot(slotId);
 
@@ -741,7 +738,7 @@ const searchSymbiants = (event: any, slotId: string) => {
 /**
  * Get selected symbiant for a slot
  */
-const getSelectedSymbiant = (slotId: string): any | null => {
+const getSelectedSymbiant = (slotId: string): DeepReadonly<SymbiantItem> | null => {
   const mapping = slotMapping[slotId as keyof typeof slotMapping];
   if (!mapping) return null;
 
@@ -772,7 +769,7 @@ const onSlotTypeChange = (slotId: string, newType: 'Implant' | 'Symbiant') => {
 /**
  * Handle symbiant selection for a slot
  */
-const onSymbiantSelected = async (slotId: string, symbiant: any | null) => {
+const onSymbiantSelected = async (slotId: string, symbiant: SymbiantItem | null) => {
   const mapping = slotMapping[slotId as keyof typeof slotMapping];
   if (!mapping) {
     console.error(`No mapping found for slot: ${slotId}`);
@@ -781,8 +778,8 @@ const onSymbiantSelected = async (slotId: string, symbiant: any | null) => {
 
   const slotBitflag = mapping.bitflag;
 
-  // Update store with selected symbiant (cast to SymbiantItem for store)
-  await tinkerPlantsStore.setSymbiant(slotBitflag, symbiant as SymbiantItem | null);
+  // Update store with selected symbiant
+  await tinkerPlantsStore.setSymbiant(slotBitflag, symbiant);
 
   if (symbiant) {
     announce(`${symbiant.name} selected for ${slotId} slot`);
@@ -856,9 +853,9 @@ const onQLComplete = (slotId: string) => {
   }
 };
 
-const onGlobalQLChange = (event: any) => {
-  const newQL = event.value;
-  if (newQL !== null && newQL !== undefined) {
+const onGlobalQLChange = (event: InputNumberInputEvent) => {
+  const newQL = Number(event.value);
+  if (event.value !== undefined && event.value !== '' && !Number.isNaN(newQL)) {
     // Ensure the value is within valid bounds before applying to all fields
     const clampedQL = Math.max(1, Math.min(300, newQL));
 
@@ -947,18 +944,18 @@ const handleSave = async () => {
  * Called after operations that modify the store (load, revert, etc.)
  */
 const syncImplantSelectionsFromStore = () => {
-  const config = tinkerPlantsStore.currentConfiguration as Record<string, any>;
+  const config = tinkerPlantsStore.currentConfiguration;
   for (const [slotBitflag, selection] of Object.entries(config)) {
     // Find the slot name for this bitflag
     const slotEntry = Object.entries(slotMapping).find(
-      ([_, mapping]) => mapping.bitflag === slotBitflag
+      ([, mapping]) => mapping.bitflag === slotBitflag
     );
     if (slotEntry) {
       const slotName = slotEntry[0];
       implantSelections[slotName] = {
-        shiny: selection.shiny,
-        bright: selection.bright,
-        faded: selection.faded,
+        shiny: selection.shiny ?? null,
+        bright: selection.bright ?? null,
+        faded: selection.faded ?? null,
         ql: selection.ql,
       };
       // Sync slot type

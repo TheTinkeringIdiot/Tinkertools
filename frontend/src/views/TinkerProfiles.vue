@@ -308,7 +308,6 @@ import ProfileCreateModal from '@/components/profiles/ProfileCreateModal.vue';
 import ProfileImportModal from '@/components/profiles/ProfileImportModal.vue';
 import type { ProfileMetadata } from '@/lib/tinkerprofiles';
 import { ANARCHY_PROFESSIONS, ANARCHY_BREEDS } from '@/lib/tinkerprofiles';
-import { skillService } from '@/services/skill-service';
 
 const router = useRouter();
 const profilesStore = useTinkerProfilesStore();
@@ -384,8 +383,8 @@ function clearFilters() {
   selectedBreed.value = null;
 }
 
-function viewProfileDetails(profile: ProfileMetadata) {
-  router.push({
+async function viewProfileDetails(profile: ProfileMetadata) {
+  await router.push({
     name: 'TinkerProfileDetail',
     params: { profileId: profile.id },
   });
@@ -467,15 +466,15 @@ async function deleteProfile(profile: ProfileMetadata) {
   }
 }
 
-function handleProfileCreated() {
+async function handleProfileCreated() {
   showCreateModal.value = false;
-  refreshProfiles();
+  await refreshProfiles();
 }
 
-function handleProfileImported() {
+async function handleProfileImported() {
   // Don't close modal here - let it show success/warnings for 2 seconds
   // The modal handles its own closing via setTimeout
-  refreshProfiles();
+  await refreshProfiles();
 }
 
 function formatDate(dateString: string): string {
@@ -487,8 +486,8 @@ function formatDate(dateString: string): string {
 }
 
 // Lifecycle
-onMounted(() => {
-  refreshProfiles();
+onMounted(async () => {
+  await refreshProfiles();
 });
 </script>
 
