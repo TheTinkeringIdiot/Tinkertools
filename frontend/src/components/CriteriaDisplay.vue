@@ -147,14 +147,7 @@ const showExpanded = ref(false);
 
 const criteriaRef = computed(() => props.criteria);
 
-const {
-  displayCriteria,
-  statRequirements,
-  logicalOperators,
-  expression,
-  formattedText,
-  groupedRequirements,
-} = useCriteriaDisplay(criteriaRef);
+const { displayCriteria, statRequirements } = useCriteriaDisplay(criteriaRef);
 
 // ============================================================================
 // Computed Properties
@@ -168,10 +161,6 @@ const stateRequirements = computed(() => {
   return displayCriteria.value.filter(
     (c) => !c.isStatRequirement && !c.isLogicalOperator && !c.isSeparator
   );
-});
-
-const hasLogicalOperators = computed(() => {
-  return logicalOperators.value.length > 0;
 });
 
 const allRequirementsMet = computed(() => {

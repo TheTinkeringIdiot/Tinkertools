@@ -78,7 +78,6 @@ Provides a hierarchical view of nano programs grouped by their nano schools
                   option-label="label"
                   option-value="value"
                   class="w-32"
-                  @change="updateSort"
                 />
               </div>
             </div>
@@ -180,11 +179,6 @@ import type {
 } from '@/types/nano';
 
 // Types
-interface SchoolWithNanos {
-  name: string;
-  nanos: NanoProgram[];
-}
-
 interface StrainWithNanos {
   name: string;
   nanos: NanoProgram[];
@@ -261,7 +255,7 @@ const schoolsWithNanos = computed(() => {
 
   // Convert to array and filter out empty schools
   return Array.from(schoolMap.entries())
-    .filter(([_, nanos]) => nanos.length > 0)
+    .filter(([, nanos]) => nanos.length > 0)
     .map(([name, nanos]) => ({ name, nanos }));
 });
 
@@ -367,13 +361,14 @@ const getSortedNanos = (nanos: NanoProgram[]): NanoProgram[] => {
         return (a.nanoPointCost || 0) - (b.nanoPointCost || 0);
       case 'memoryUsage':
         return (a.memoryUsage || 0) - (b.memoryUsage || 0);
-      case 'compatibility':
+      case 'compatibility': {
         if (!props.showCompatibility || !props.activeProfile) {
           return a.name.localeCompare(b.name);
         }
         const aInfo = getCompatibilityInfo(a);
         const bInfo = getCompatibilityInfo(b);
         return (bInfo?.compatibilityScore || 0) - (aInfo?.compatibilityScore || 0);
+      }
       default:
         return a.name.localeCompare(b.name);
     }
@@ -406,7 +401,7 @@ const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null =
   // Check each requirement
   for (const req of requirements) {
     switch (req.type) {
-      case 'skill':
+      case 'skill': {
         const skill = req.requirement as string;
         const currentSkill = profile.skills[skill] || 0;
         if (currentSkill < req.value) {
@@ -419,8 +414,9 @@ const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null =
           });
         }
         break;
+      }
 
-      case 'stat':
+      case 'stat': {
         const stat = req.requirement as string;
         const currentStat = profile.stats[stat] || 0;
         if (currentStat < req.value) {
@@ -433,6 +429,7 @@ const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null =
           });
         }
         break;
+      }
 
       case 'level':
         if (profile.level < req.value) {
@@ -485,11 +482,6 @@ const toggleSchool = (schoolName: string) => {
   } catch (error) {
     console.warn('Failed to save expanded state:', error);
   }
-};
-
-const updateSort = () => {
-  // Force reactivity update
-  sortBy.value = sortBy.value;
 };
 
 const handleNanoSelect = (nano: NanoProgram) => {

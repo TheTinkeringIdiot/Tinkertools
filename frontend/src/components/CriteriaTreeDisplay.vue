@@ -96,6 +96,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  characterStats: null,
   showSummary: true,
   showEvaluation: true,
   collapsible: false,

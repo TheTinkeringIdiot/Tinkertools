@@ -54,7 +54,6 @@ import { RouterLink } from 'vue-router';
 import type { DisplayCriterion } from '../services/action-criteria';
 import type { CharacterStats } from '../composables/useActionCriteria';
 import {
-  getStatName,
   getProfessionName,
   getBreedName,
   getGenderName,
@@ -99,19 +98,6 @@ watch(
   },
   { immediate: true }
 );
-
-const functionDescription = computed(() => {
-  if (!props.criterion.isFunctionOperator) return '';
-
-  const name = resolvedName.value || `Nano ${props.criterion.referenceAoid}`;
-
-  switch (props.criterion.functionType) {
-    case 'CheckNcu':
-      return `Not running: ${name}`;
-    default:
-      return props.criterion.description;
-  }
-});
 
 const functionPrefix = computed(() => {
   if (!props.criterion.isFunctionOperator) return '';
@@ -191,24 +177,19 @@ const formattedValue = computed(() => {
   // Special formatting for certain stats
   switch (props.criterion.stat) {
     case 60: // Profession
-      const professionName = getProfessionName(value);
-      return professionName || value.toString();
+      return getProfessionName(value) || value.toString();
 
     case 368: // VisualProfession
-      const visualProfessionName = getProfessionName(value);
-      return visualProfessionName || value.toString();
+      return getProfessionName(value) || value.toString();
 
     case 4: // Breed
-      const breedName = getBreedName(value);
-      return breedName || value.toString();
+      return getBreedName(value) || value.toString();
 
     case 59: // Gender
-      const genderName = getGenderName(value);
-      return genderName || value.toString();
+      return getGenderName(value) || value.toString();
 
     case 455: // NPCFamily
-      const npcFamilyName = getNPCFamilyName(value);
-      return npcFamilyName || value.toString();
+      return getNPCFamilyName(value) || value.toString();
 
     case 54: // Level
       return value.toString();

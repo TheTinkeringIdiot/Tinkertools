@@ -85,7 +85,6 @@ import { RouterLink } from 'vue-router';
 import type { CriteriaTreeNode } from '../services/action-criteria';
 import type { CharacterStats } from '../composables/useActionCriteria';
 import {
-  getStatName,
   getProfessionName,
   getBreedName,
   getGenderName,
@@ -108,6 +107,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  characterStats: null,
   level: 0,
   showConnector: true,
   showGroupLabel: true,
@@ -131,19 +131,6 @@ watch(
   },
   { immediate: true }
 );
-
-const functionDescription = computed(() => {
-  if (!props.node.criterion?.isFunctionOperator) return '';
-
-  const name = resolvedName.value || `Nano ${props.node.criterion.referenceAoid}`;
-
-  switch (props.node.criterion.functionType) {
-    case 'CheckNcu':
-      return `Not running: ${name}`;
-    default:
-      return props.node.criterion.description;
-  }
-});
 
 const functionPrefix = computed(() => {
   if (!props.node.criterion?.isFunctionOperator) return '';
@@ -233,19 +220,6 @@ const formattedValue = computed(() => {
       return getNPCFamilyName(value) || value.toString();
     default:
       return value.toString();
-  }
-});
-
-const statusIcon = computed(() => {
-  switch (props.node.status) {
-    case 'met':
-      return '✓';
-    case 'unmet':
-      return '✗';
-    case 'partial':
-      return '◐';
-    default:
-      return '?';
   }
 });
 

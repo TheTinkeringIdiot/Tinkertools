@@ -96,7 +96,7 @@ Displays nano programs in a scrollable list with compatibility indicators
 import { ref, computed, watch, onMounted } from 'vue';
 import Badge from 'primevue/badge';
 import Dropdown from 'primevue/dropdown';
-import Paginator from 'primevue/paginator';
+import Paginator, { type PageState } from 'primevue/paginator';
 import ProgressSpinner from 'primevue/progressspinner';
 import ToggleButton from 'primevue/togglebutton';
 
@@ -161,7 +161,7 @@ const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null =
   // Check each requirement
   for (const req of requirements) {
     switch (req.type) {
-      case 'skill':
+      case 'skill': {
         const skill = req.requirement as string;
         const currentSkill = profile.skills[skill] || 0;
         if (currentSkill < req.value) {
@@ -174,8 +174,9 @@ const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null =
           });
         }
         break;
+      }
 
-      case 'stat':
+      case 'stat': {
         const stat = req.requirement as string;
         const currentStat = profile.stats[stat] || 0;
         if (currentStat < req.value) {
@@ -188,6 +189,7 @@ const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null =
           });
         }
         break;
+      }
 
       case 'level':
         if (profile.level < req.value) {
@@ -234,7 +236,7 @@ const handleFavorite = (nanoId: number, isFavorite: boolean) => {
   emit('favorite', nanoId, isFavorite);
 };
 
-const handlePageChange = (event: any) => {
+const handlePageChange = (event: PageState) => {
   currentPage.value = Math.floor(event.first / itemsPerPage.value);
   first.value = event.first;
   emit('page-change', currentPage.value + 1);
