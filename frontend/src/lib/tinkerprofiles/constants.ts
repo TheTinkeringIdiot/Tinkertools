@@ -350,7 +350,7 @@ export function createDefaultSkillsV4(breed: string | number): {
 
     let baseValue = 5; // Default for trainable skills
 
-    if (category === 'Abilities') {
+    if (category === 'Attributes') {
       // For abilities, use breed-specific values from ip-calculator
       baseValue = getBreedInitValue(breedId, Number(skillId));
     } else if (category === 'Misc' || category === 'ACs') {
