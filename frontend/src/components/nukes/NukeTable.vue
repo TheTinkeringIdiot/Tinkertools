@@ -11,7 +11,7 @@
     class="nuke-table"
     data-keyboard-nav-container
     role="table"
-    :aria-label="`Table showing ${tableData.length} offensive nano programs. Use arrow keys to navigate, Enter to select.`"
+    :aria-label="`Table showing ${tableData.length} offensive nano programs`"
     @row-click="onRowClick"
   >
     <!-- Name Column - Not sortable, clickable link -->
@@ -340,16 +340,6 @@ function getModifierStatFromDamageType(damageType: string): number {
 
   return damageTypeMap[damageType] || 96; // Default to poison if unknown
 }
-
-// ============================================================================
-// Expose for Tests
-// ============================================================================
-
-defineExpose({
-  defaultSortField,
-  defaultSortOrder,
-  tableData,
-});
 </script>
 
 <style scoped>
