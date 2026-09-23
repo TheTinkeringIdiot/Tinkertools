@@ -170,7 +170,8 @@ const isTargetQlValid = computed(() => {
   );
 });
 
-const interpolatedItem = ref<any>(null);
+/** The interpolated item currently shown in place of the original, if any. */
+const interpolatedItem = ref<InterpolatedItem | null>(null);
 
 const interpolationStatus = computed(() => {
   if (!props.item) return 'idle';
@@ -237,6 +238,7 @@ async function handleQlChange(): Promise<void> {
       : await apiClient.interpolateItem(itemAoid.value, localTargetQl.value);
 
     if (interpolated.success && interpolated.item) {
+      interpolatedItem.value = interpolated.item;
       emit('item-update', interpolated.item);
 
       // Update URL query param
@@ -265,6 +267,7 @@ function debouncedQlChange(): void {
 
 function resetToOriginal(): void {
   localTargetQl.value = typeof props.item === 'object' ? props.item?.ql || null : null;
+  interpolatedItem.value = null;
   emit('item-update', null);
 
   // Remove QL from URL
@@ -279,6 +282,7 @@ function resetToOriginal(): void {
 watch(
   () => props.item,
   async () => {
+    interpolatedItem.value = null;
     if (!props.item) return;
 
     // Load interpolation info
