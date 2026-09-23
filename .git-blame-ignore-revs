@@ -1,3 +1,7 @@
 # Bulk formatting commits, skipped by `git blame` (git config blame.ignoreRevsFile .git-blame-ignore-revs)
 # style(backend): format app/ with Black
 2b4f929f00dacbbcadfd192f5fd31ac2f26aa60d
+# style(frontend): format with Prettier
+9869d07465d78ab238f963e167b7647a68ed7a37
+# style(frontend): apply ESLint auto-fixes
+7da499121221219c91414817490ce7362d92ae15
