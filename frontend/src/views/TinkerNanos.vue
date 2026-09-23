@@ -55,6 +55,7 @@ Browse nano programs by profession or search across all nanos
         <NanoSearch
           v-model="searchQuery"
           :total-results="filteredNanos.length"
+          :schools="nanosStore.filters.schools"
           @search="handleSearch"
         />
       </div>
@@ -209,9 +210,8 @@ async function handleSearch(query: string, schools: string[], fields: string[]) 
   loading.value = true;
   try {
     searchQuery.value = query;
-    if (schools.length > 0) {
-      nanosStore.setFilters({ schools });
-    }
+    // Deselecting every school chip must clear the school filter too
+    nanosStore.setFilters({ schools: [...schools] });
     await nanosStore.searchNanos(query, schools, fields);
   } finally {
     loading.value = false;

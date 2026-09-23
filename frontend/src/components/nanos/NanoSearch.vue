@@ -37,9 +37,9 @@ Supports text search with nano school filtering and quick filters
       </label>
       <div class="flex flex-wrap gap-2">
         <Chip
-          v-for="school in nanoSchools"
+          v-for="school in NANO_SCHOOLS"
           :key="school"
-          :label="getSchoolShortName(school)"
+          :label="school"
           :class="[
             'cursor-pointer transition-all',
             selectedSchools.includes(school)
@@ -161,6 +161,7 @@ import Chip from 'primevue/chip';
 import IconField from 'primevue/iconfield';
 import InputIcon from 'primevue/inputicon';
 import InputText from 'primevue/inputtext';
+import { NANO_SCHOOLS } from './nano-schools';
 
 // Types
 interface SearchField {
@@ -180,10 +181,13 @@ const props = withDefaults(
   defineProps<{
     modelValue?: string;
     totalResults?: number;
+    /** The school filter in force, which filter presets and "clear" also change */
+    schools?: string[];
   }>(),
   {
     modelValue: '',
     totalResults: 0,
+    schools: () => [],
   }
 );
 
@@ -195,20 +199,10 @@ const emit = defineEmits<{
 
 // Reactive state
 const searchQuery = ref(props.modelValue);
-const selectedSchools = ref<string[]>([]);
+const selectedSchools = ref<string[]>([...props.schools]);
 const selectedFields = ref<string[]>(['name', 'description']);
 const showAdvanced = ref(false);
 const recentSearches = ref<string[]>([]);
-
-// Nano schools from the design document
-const nanoSchools = [
-  'Matter Metamorphosis',
-  'Biological Metamorphosis',
-  'Psychological Modifications',
-  'Matter Creation',
-  'Time and Space',
-  'Sensory Improvement',
-];
 
 const searchFields: SearchField[] = [
   { value: 'name', label: 'Name' },
@@ -219,36 +213,32 @@ const searchFields: SearchField[] = [
   { value: 'requirements', label: 'Requirements' },
 ];
 
+// The search endpoint matches the query as one phrase, so each preset searches
+// a single term, narrowed by the school most such nanos belong to
 const searchPresets: SearchPreset[] = [
   {
-    name: 'Stat Buffs',
-    query: 'boost strength agility',
-    schools: ['Matter Metamorphosis', 'Biological Metamorphosis'],
-    fields: ['name', 'description', 'effects'],
-  },
-  {
     name: 'Healing',
-    query: 'heal health',
-    schools: ['Biological Metamorphosis'],
-    fields: ['name', 'description', 'effects'],
+    query: 'heal',
+    schools: ['Medical'],
+    fields: ['name', 'description'],
   },
   {
-    name: 'Damage',
-    query: 'damage hurt nuke',
-    schools: ['Matter Creation', 'Psychological Modifications'],
-    fields: ['name', 'description', 'effects'],
-  },
-  {
-    name: 'Transport',
-    query: 'teleport recall gate',
-    schools: ['Time and Space'],
-    fields: ['name', 'description', 'effects'],
+    name: 'Shields',
+    query: 'shield',
+    schools: ['Protection'],
+    fields: ['name', 'description'],
   },
   {
     name: 'Summons',
-    query: 'summon pet companion',
-    schools: ['Matter Creation'],
-    fields: ['name', 'description', 'effects'],
+    query: 'summon',
+    schools: ['Space'],
+    fields: ['name', 'description'],
+  },
+  {
+    name: 'Teleports',
+    query: 'teleport',
+    schools: [],
+    fields: ['name', 'description'],
   },
 ];
 
@@ -274,18 +264,6 @@ const searchStats = computed(() => {
 });
 
 // Methods
-const getSchoolShortName = (school: string): string => {
-  const shortNames: Record<string, string> = {
-    'Matter Metamorphosis': 'MM',
-    'Biological Metamorphosis': 'BM',
-    'Psychological Modifications': 'PM',
-    'Matter Creation': 'MC',
-    'Time and Space': 'TS',
-    'Sensory Improvement': 'SI',
-  };
-  return shortNames[school] || school;
-};
-
 const toggleSchool = (school: string) => {
   const index = selectedSchools.value.indexOf(school);
   if (index > -1) {
@@ -381,6 +359,14 @@ watch(
     if (newValue !== searchQuery.value) {
       searchQuery.value = newValue;
     }
+  }
+);
+
+// The chips show the school filter however it was set
+watch(
+  () => props.schools,
+  (schools) => {
+    selectedSchools.value = [...schools];
   }
 );
 

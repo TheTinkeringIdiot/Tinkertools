@@ -33,6 +33,7 @@ interface BackendNano {
   description: string;
   school: string | null;
   strain: string;
+  professions: string[];
   level: number | null;
   memory_usage: number | null;
 }
@@ -42,8 +43,9 @@ function backendNano(overrides: Partial<BackendNano> & Pick<BackendNano, 'id' | 
     aoid: 10000 + overrides.id,
     ql: 100,
     description: '',
-    school: 'Matter Creation',
+    school: 'Combat',
     strain: 'Test Strain',
+    professions: [],
     level: 100,
     memory_usage: 20,
     ...overrides,
@@ -54,35 +56,35 @@ const NANOS: BackendNano[] = [
   backendNano({
     id: 1,
     name: 'Superior Heal',
-    school: 'Biological Metamorphosis',
+    school: 'Medical',
     description: 'Heals target for a large amount of health.',
     level: 125,
   }),
   backendNano({
     id: 2,
     name: 'Minor Heal',
-    school: 'Biological Metamorphosis',
+    school: 'Medical',
     description: 'Basic healing nano.',
     level: 25,
   }),
   backendNano({
     id: 3,
     name: 'Matter Armor',
-    school: 'Matter Creation',
+    school: 'Protection',
     description: 'Creates protective matter armor.',
     level: 100,
   }),
   backendNano({
     id: 4,
     name: 'Teleport',
-    school: 'Time and Space',
+    school: 'Space',
     description: 'Teleports the caster.',
     level: 150,
   }),
   backendNano({
     id: 5,
     name: 'Mending Aura',
-    // The backend has no school, level or memory usage for some nanos
+    // Nanos without a Use action have no school or level; no nano has memory usage yet
     school: null,
     description: 'Slowly heals the whole team.',
     level: null,
@@ -196,9 +198,9 @@ describe('Nano Search Workflow', () => {
   it('filters results by school chip', async () => {
     await enterSearchMode();
 
-    const bioChip = wrapper.findAll('.p-chip').find((chip) => chip.text() === 'BM');
-    expect(bioChip).toBeDefined();
-    await bioChip!.trigger('click');
+    const medicalChip = wrapper.findAll('.p-chip').find((chip) => chip.text() === 'Medical');
+    expect(medicalChip).toBeDefined();
+    await medicalChip!.trigger('click');
     await flushPromises();
 
     expect(nanoNames().sort()).toEqual(['Minor Heal', 'Superior Heal']);
@@ -239,8 +241,8 @@ describe('Nano Search Workflow', () => {
   it('clears the search and filters', async () => {
     await enterSearchMode();
 
-    const bioChip = wrapper.findAll('.p-chip').find((chip) => chip.text() === 'BM');
-    await bioChip!.trigger('click');
+    const medicalChip = wrapper.findAll('.p-chip').find((chip) => chip.text() === 'Medical');
+    await medicalChip!.trigger('click');
     await flushPromises();
     expect(nanoNames()).toHaveLength(2);
 

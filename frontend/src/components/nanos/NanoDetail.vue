@@ -15,8 +15,8 @@ Displays comprehensive nano information including effects, requirements, and com
       <!-- Header Information -->
       <div class="flex items-start gap-4 pb-4 border-b border-surface-200 dark:border-surface-700">
         <Avatar
-          :label="nano.school ? getSchoolShortName(nano.school) : 'N'"
-          :class="schoolAvatarClass"
+          :label="schoolInitials(nano.school)"
+          :class="avatarClass"
           size="xlarge"
           shape="circle"
         />
@@ -397,6 +397,7 @@ import TabPanel from 'primevue/tabpanel';
 
 import CriteriaDisplay from '@/components/CriteriaDisplay.vue';
 import { getNanoCompatibility, getNanoUseAction } from './nano-compatibility';
+import { schoolAvatarClass, schoolInitials } from './nano-schools';
 import { mapProfileToStats } from '@/utils/profile-stats-mapper';
 import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import type { NanoProgram, NanoEffect, EffectDuration, TargetingData } from '@/types/nano';
@@ -427,19 +428,7 @@ const emit = defineEmits<{
 const isFavorite = ref(false);
 
 // Computed
-const schoolAvatarClass = computed(() => {
-  if (!props.nano) return 'bg-surface-500 text-white';
-
-  const schoolColors: Record<string, string> = {
-    'Matter Metamorphosis': 'bg-red-500 text-white',
-    'Biological Metamorphosis': 'bg-green-500 text-white',
-    'Psychological Modifications': 'bg-purple-500 text-white',
-    'Matter Creation': 'bg-blue-500 text-white',
-    'Time and Space': 'bg-yellow-500 text-white',
-    'Sensory Improvement': 'bg-indigo-500 text-white',
-  };
-  return (props.nano.school && schoolColors[props.nano.school]) || 'bg-surface-500 text-white';
-});
+const avatarClass = computed(() => schoolAvatarClass(props.nano?.school));
 
 const useAction = computed(() => (props.nano ? getNanoUseAction(props.nano) : undefined));
 
@@ -485,18 +474,6 @@ const compatibilityScoreSeverity = computed(() => {
 });
 
 // Methods
-const getSchoolShortName = (school: string): string => {
-  const shortNames: Record<string, string> = {
-    'Matter Metamorphosis': 'MM',
-    'Biological Metamorphosis': 'BM',
-    'Psychological Modifications': 'PM',
-    'Matter Creation': 'MC',
-    'Time and Space': 'TS',
-    'Sensory Improvement': 'SI',
-  };
-  return shortNames[school] || school.charAt(0);
-};
-
 const formatTime = (seconds: number): string => {
   if (seconds < 60) {
     return `${seconds}s`;

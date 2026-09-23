@@ -1,11 +1,13 @@
 /**
- * TinkerNanos Compatibility Integration Tests
+ * TinkerNanos Integration Tests
  *
- * The TinkerNanos search view with its "Show Compatibility" switch and the
- * compatibility filters, driven through the real widgets. Real profiles and
- * nanos stores, router and PrimeVue; only the API client is mocked.
+ * The TinkerNanos search view with its school, profession and level filters,
+ * its "Show Compatibility" switch and the compatibility filters, driven
+ * through the real widgets. Real profiles and nanos stores, router and
+ * PrimeVue; only the API client is mocked.
  *
  * Covers:
+ * - School chips and filter presets on the NanoSchool stat; profession and level filters
  * - The switch: off by default, disabled without an active profile, remembered
  * - Castable / uncastable states for a real v4 profile
  * - "Fully Castable", "Meets Skill Requirements" and skill-gap filters
@@ -34,6 +36,7 @@ import { versionedPath } from '@/composables/useGameVersion';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import TinkerNanos from '@/views/TinkerNanos.vue';
 import type { Action } from '@/types/api';
+import type { NanoSchoolName } from '@/types/nano';
 
 // Stat IDs used by the criteria below
 const STAT = {
@@ -78,26 +81,43 @@ const SOLDIER_STARTER_USE: Array<[number, number, number]> = [
 ];
 
 /** A nano program as the /nanos endpoints return it (snake_case, with actions) */
-function backendNano(id: number, name: string, ql: number, actions: Action[]) {
+function backendNano(
+  id: number,
+  name: string,
+  ql: number,
+  actions: Action[],
+  derived: { school: NanoSchoolName; professions: string[]; level: number }
+) {
   return {
     id,
     aoid: 1000 + id,
     name,
     ql,
     description: null,
-    school: null,
     strain: null,
-    professions: [],
-    level: null,
     actions,
     effects: [],
+    ...derived,
   };
 }
 
+// School, professions and level as the backend derives them from the Use action
 const NANOS = [
-  backendNano(1, 'Alleysweeper', 36, [createNanoUseAction(ALLEYSWEEPER_USE, 1)]),
-  backendNano(2, 'Minor Suppressor', 1, [createNanoUseAction(MINOR_SUPPRESSOR_USE, 2)]),
-  backendNano(3, 'Soldier Starter', 1, [createNanoUseAction(SOLDIER_STARTER_USE, 3)]),
+  backendNano(1, 'Alleysweeper', 36, [createNanoUseAction(ALLEYSWEEPER_USE, 1)], {
+    school: 'Combat',
+    professions: ['Soldier'],
+    level: 25,
+  }),
+  backendNano(2, 'Minor Suppressor', 1, [createNanoUseAction(MINOR_SUPPRESSOR_USE, 2)], {
+    school: 'Psi',
+    professions: ['Agent'],
+    level: 1,
+  }),
+  backendNano(3, 'Soldier Starter', 1, [createNanoUseAction(SOLDIER_STARTER_USE, 3)], {
+    school: 'Protection',
+    professions: ['Soldier'],
+    level: 1,
+  }),
 ];
 
 describe('TinkerNanos Compatibility Integration', () => {
@@ -196,6 +216,89 @@ describe('TinkerNanos Compatibility Integration', () => {
       })
     );
   }
+
+  function schoolChip(school: string) {
+    const chip = wrapper
+      .find('.nano-search')
+      .findAll('.p-chip')
+      .find((candidate) => candidate.text().trim() === school);
+    if (!chip) throw new Error(`No ${school} chip`);
+    return chip;
+  }
+
+  const chipSelected = (school: string) => schoolChip(school).classes().includes('bg-primary-100');
+
+  describe('school, profession and level filters', () => {
+    it('offers the five NanoSchool values as school chips', async () => {
+      await openNanoSearch();
+
+      const chips = wrapper
+        .find('.nano-search')
+        .findAll('.p-chip')
+        .map((chip) => chip.text().trim());
+      expect(chips).toEqual(['Combat', 'Medical', 'Protection', 'Psi', 'Space']);
+    });
+
+    it('a school chip narrows the list to that school, and clears again', async () => {
+      await openNanoSearch();
+
+      await schoolChip('Combat').trigger('click');
+      await flushPromises();
+      expect(shownNanos()).toEqual(['Alleysweeper']);
+      expect(chipSelected('Combat')).toBe(true);
+
+      await schoolChip('Combat').trigger('click');
+      await flushPromises();
+      expect(shownNanos()).toHaveLength(3);
+    });
+
+    it('a school preset selects its school chip, and Clear All Filters resets both', async () => {
+      await openNanoSearch();
+
+      await clickButton(wrapper, 'Nukes');
+      expect(shownNanos()).toEqual(['Alleysweeper']);
+      expect(chipSelected('Combat')).toBe(true);
+
+      await clickButton(wrapper, 'Clear All Filters');
+      expect(shownNanos()).toHaveLength(3);
+      expect(chipSelected('Combat')).toBe(false);
+    });
+
+    it('filters by the professions that can cast a nano', async () => {
+      await openNanoSearch();
+
+      const professionSelect = wrapper
+        .findAll('.p-multiselect')
+        .find((select) => select.text().includes('All Professions'));
+      if (!professionSelect) throw new Error('No profession filter');
+      await professionSelect.trigger('click');
+      await flushPromises();
+      const agent = document.body.querySelector<HTMLElement>('li[aria-label="Agent"]');
+      expect(agent).not.toBeNull();
+      agent?.click();
+      await flushPromises();
+
+      expect(shownNanos()).toEqual(['Minor Suppressor']);
+    });
+
+    it('filters by the level that can cast a nano', async () => {
+      await openNanoSearch();
+
+      await clickButton(wrapper, 'Low Level');
+      expect(shownNanos()).toEqual(['Alleysweeper', 'Minor Suppressor', 'Soldier Starter']);
+
+      await clickButton(wrapper, 'High Level');
+      expect(shownNanos()).toEqual([]);
+    });
+
+    it('shows school and professions on each nano', async () => {
+      await openNanoSearch();
+
+      const card = wrapper.findAll('.nano-card').find((c) => c.text().includes('Alleysweeper'));
+      expect(card?.text()).toContain('Combat');
+      expect(card?.text()).toContain('Soldier');
+    });
+  });
 
   describe('the Show Compatibility switch', () => {
     it('is off and disabled, with an explanation, when no profile is active', async () => {

@@ -368,6 +368,7 @@ const emit = defineEmits<{
 
 // Reactive state
 const filters = ref<NanoFilters>({ ...props.modelValue });
+const selectedSchools = ref<string[]>([]);
 const selectedQualityLevels = ref<number[]>([]);
 const selectedProfessions = ref<string[]>([]);
 const selectedStrains = ref<string[]>([]);
@@ -443,26 +444,25 @@ const sortOptions: SortOption[] = [
   { label: 'Compatibility Score', value: 'compatibility' },
 ];
 
+// Presets use what the /nanos endpoints send: school, level. Nanos carry no
+// effect, duration or memory data yet, so presets on those would match nothing.
 const filterPresets: FilterPreset[] = [
-  {
-    name: 'Buffs',
-    filters: {
-      effectTypes: ['stat_boost', 'protection'],
-      durationType: ['long', 'very_long'],
-    },
-  },
   {
     name: 'Heals',
     filters: {
-      effectTypes: ['heal'],
-      schools: ['Biological Metamorphosis'],
+      schools: ['Medical'],
     },
   },
   {
     name: 'Nukes',
     filters: {
-      effectTypes: ['damage'],
-      schools: ['Matter Creation', 'Psychological Modifications'],
+      schools: ['Combat'],
+    },
+  },
+  {
+    name: 'Shields',
+    filters: {
+      schools: ['Protection'],
     },
   },
   {
@@ -477,17 +477,12 @@ const filterPresets: FilterPreset[] = [
       levelRange: [150, 220],
     },
   },
-  {
-    name: 'Low Memory',
-    filters: {
-      memoryUsageRange: [0, 200],
-    },
-  },
 ];
 
 // Computed
 const hasActiveFilters = computed(() => {
   return (
+    selectedSchools.value.length > 0 ||
     selectedQualityLevels.value.length > 0 ||
     selectedProfessions.value.length > 0 ||
     selectedStrains.value.length > 0 ||
@@ -520,8 +515,8 @@ const toggleEffectType = (effectType: string) => {
 const updateFilters = () => {
   const newFilters: NanoFilters = {
     ...filters.value,
-    // Schools are chosen in the search component: pass them through untouched
-    schools: [...(props.modelValue.schools ?? [])],
+    // Chosen with the search component's chips, or by a preset
+    schools: [...selectedSchools.value],
     qualityLevels: [...selectedQualityLevels.value],
     professions: [...selectedProfessions.value],
     strains: [...selectedStrains.value],
@@ -544,6 +539,7 @@ const updateFilters = () => {
 };
 
 const clearAllFilters = () => {
+  selectedSchools.value = [];
   selectedQualityLevels.value = [];
   selectedProfessions.value = [];
   selectedStrains.value = [];
@@ -567,6 +563,9 @@ const applyPreset = (preset: FilterPreset) => {
   clearAllFilters();
 
   // Apply preset filters
+  if (preset.filters.schools) {
+    selectedSchools.value = [...preset.filters.schools];
+  }
   if (preset.filters.qualityLevels) {
     selectedQualityLevels.value = [...preset.filters.qualityLevels];
   }
@@ -595,6 +594,7 @@ const applyPreset = (preset: FilterPreset) => {
 // Watch for changes to emit updates
 watch(
   [
+    selectedSchools,
     selectedQualityLevels,
     selectedProfessions,
     selectedStrains,
@@ -629,6 +629,7 @@ watch(
     filters.value = { ...newValue };
 
     // Update local state to match (copies: toggleEffectType edits its array in place)
+    selectedSchools.value = [...(newValue.schools || [])];
     selectedQualityLevels.value = [...(newValue.qualityLevels || [])];
     selectedProfessions.value = [...(newValue.professions || [])];
     selectedStrains.value = [...(newValue.strains || [])];

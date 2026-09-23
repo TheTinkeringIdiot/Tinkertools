@@ -12,8 +12,8 @@ Shows nano information with compatibility indicators and quick actions
       <div class="flex items-center gap-3 p-4 pb-0">
         <div class="flex-shrink-0">
           <Avatar
-            :label="nano.school?.charAt(0) || 'N'"
-            :class="schoolAvatarClass"
+            :label="schoolInitials(nano.school)"
+            :class="avatarClass"
             size="large"
             shape="circle"
           />
@@ -25,11 +25,7 @@ Shows nano information with compatibility indicators and quick actions
                 {{ nano.name }}
               </h3>
               <div class="flex items-center gap-2 mt-1">
-                <Badge
-                  v-if="nano.school"
-                  :value="getSchoolShortName(nano.school)"
-                  severity="info"
-                />
+                <Badge v-if="nano.school" :value="nano.school" severity="info" />
                 <Badge :value="`QL ${nano.qualityLevel}`" severity="secondary" />
                 <Badge v-if="nano.level" :value="`Lvl ${nano.level}`" severity="secondary" />
               </div>
@@ -65,8 +61,8 @@ Shows nano information with compatibility indicators and quick actions
         <div v-if="compact" class="flex items-center gap-3">
           <div class="flex-shrink-0">
             <Avatar
-              :label="nano.school?.charAt(0) || 'N'"
-              :class="schoolAvatarClass"
+              :label="schoolInitials(nano.school)"
+              :class="avatarClass"
               size="normal"
               shape="circle"
             />
@@ -79,11 +75,7 @@ Shows nano information with compatibility indicators and quick actions
                   {{ nano.name }}
                 </h4>
                 <div class="flex items-center gap-2 mt-1">
-                  <Badge
-                    v-if="nano.school"
-                    :value="getSchoolShortName(nano.school)"
-                    severity="info"
-                  />
+                  <Badge v-if="nano.school" :value="nano.school" severity="info" />
                   <Badge :value="`QL ${nano.qualityLevel}`" severity="secondary" />
                   <Badge v-if="nano.strain" :value="nano.strain" severity="warning" />
                 </div>
@@ -250,6 +242,7 @@ import Chip from 'primevue/chip';
 import type { DisplayCriterion } from '@/services/action-criteria';
 import type { NanoProgram, NanoCompatibilityInfo, NanoEffect } from '@/types/nano';
 import { getNanoRequirements } from './nano-compatibility';
+import { schoolAvatarClass, schoolInitials } from './nano-schools';
 
 // Props
 const props = withDefaults(
@@ -278,17 +271,7 @@ const isFavorite = ref(false);
 // Computed
 const requirements = computed(() => getNanoRequirements(props.nano));
 
-const schoolAvatarClass = computed(() => {
-  const schoolColors: Record<string, string> = {
-    'Matter Metamorphosis': 'bg-red-500 text-white',
-    'Biological Metamorphosis': 'bg-green-500 text-white',
-    'Psychological Modifications': 'bg-purple-500 text-white',
-    'Matter Creation': 'bg-blue-500 text-white',
-    'Time and Space': 'bg-yellow-500 text-white',
-    'Sensory Improvement': 'bg-indigo-500 text-white',
-  };
-  return (props.nano.school && schoolColors[props.nano.school]) || 'bg-surface-500 text-white';
-});
+const avatarClass = computed(() => schoolAvatarClass(props.nano.school));
 
 const compatibilityBorderClass = computed(() => {
   if (!props.showCompatibility || !props.compatibilityInfo) {
@@ -328,18 +311,6 @@ const compatibilityTooltip = computed(() => {
 });
 
 // Methods
-const getSchoolShortName = (school: string): string => {
-  const shortNames: Record<string, string> = {
-    'Matter Metamorphosis': 'MM',
-    'Biological Metamorphosis': 'BM',
-    'Psychological Modifications': 'PM',
-    'Matter Creation': 'MC',
-    'Time and Space': 'TS',
-    'Sensory Improvement': 'SI',
-  };
-  return shortNames[school] || school;
-};
-
 const formatTime = (seconds: number): string => {
   if (seconds < 60) {
     return `${seconds}s`;
