@@ -20,7 +20,9 @@ export interface NanoCreationOptions {
   name?: string;
   ql?: number;
   school?: NanoSchoolName | null;
-  strain?: string;
+  /** NanoStrain ID (stat 75) */
+  strainId?: number | null;
+  strain?: string | null;
   nanoPointCost?: number;
   memoryUsage?: number;
   castingTime?: number;
@@ -48,6 +50,7 @@ export function createTestNano(options: NanoCreationOptions = {}): NanoProgram {
     name = 'Test Nano',
     ql = 100,
     school = 'Combat',
+    strainId = 9000,
     strain = 'TestStrain',
     nanoPointCost = 50,
     memoryUsage = 20,
@@ -63,6 +66,7 @@ export function createTestNano(options: NanoCreationOptions = {}): NanoProgram {
     aoid,
     name,
     school,
+    strainId,
     strain,
     nanoPointCost,
     memoryUsage,
@@ -88,6 +92,7 @@ export const mockNano1: NanoProgram = {
   aoid: 12345,
   name: 'Iron Circle',
   school: 'Protection',
+  strainId: 9001,
   strain: 'IronCircle',
   nanoPointCost: 100,
   memoryUsage: 25,
@@ -108,6 +113,7 @@ export const mockNano2: NanoProgram = {
   aoid: 12346,
   name: 'Greater Fortification',
   school: 'Protection',
+  strainId: 9002,
   strain: 'Fortification',
   nanoPointCost: 120,
   memoryUsage: 30,
@@ -129,6 +135,7 @@ export const mockNanoHighPriority: NanoProgram = {
   aoid: 12350,
   name: 'Iron Circle Superior',
   school: 'Protection',
+  strainId: 9001,
   strain: 'IronCircle', // Same strain as mockNano1
   nanoPointCost: 150,
   memoryUsage: 35,
@@ -150,6 +157,7 @@ export const mockNanoLowPriority: NanoProgram = {
   aoid: 12340,
   name: 'Iron Circle Basic',
   school: 'Protection',
+  strainId: 9001,
   strain: 'IronCircle', // Same strain as mockNano1
   nanoPointCost: 80,
   memoryUsage: 20,
@@ -171,6 +179,7 @@ export const mockNanoHighNCU: NanoProgram = {
   aoid: 99999,
   name: 'Massive Buff',
   school: 'Combat',
+  strainId: 9003,
   strain: 'MassiveBuff',
   nanoPointCost: 200,
   memoryUsage: 1100, // Almost fills NCU
@@ -329,24 +338,25 @@ export function fitsInNCU(nanos: NanoProgram[], ncuLimit: number): boolean {
 /**
  * Get all unique strains from a set of nanos
  */
-export function getUniqueStrains(nanos: NanoProgram[]): string[] {
-  return [...new Set(nanos.map((n) => n.strain))];
+export function getUniqueStrains(nanos: NanoProgram[]): number[] {
+  return [...new Set(nanos.map((n) => n.strainId).filter((id): id is number => id !== null))];
 }
 
 /**
  * Find strain conflicts in a set of nanos
  */
-export function findStrainConflicts(nanos: NanoProgram[]): Map<string, NanoProgram[]> {
-  const strainMap = new Map<string, NanoProgram[]>();
+export function findStrainConflicts(nanos: NanoProgram[]): Map<number, NanoProgram[]> {
+  const strainMap = new Map<number, NanoProgram[]>();
 
   nanos.forEach((nano) => {
-    const existing = strainMap.get(nano.strain) || [];
+    if (nano.strainId === null) return;
+    const existing = strainMap.get(nano.strainId) || [];
     existing.push(nano);
-    strainMap.set(nano.strain, existing);
+    strainMap.set(nano.strainId, existing);
   });
 
   // Filter to only strains with conflicts (more than 1 nano)
-  const conflicts = new Map<string, NanoProgram[]>();
+  const conflicts = new Map<number, NanoProgram[]>();
   strainMap.forEach((nanoList, strain) => {
     if (nanoList.length > 1) {
       conflicts.set(strain, nanoList);

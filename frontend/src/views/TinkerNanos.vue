@@ -66,7 +66,7 @@ Browse nano programs by profession or search across all nanos
           v-model="filters"
           :show-compatibility="showCompatibility"
           :active-profile="activeProfile"
-          :available-strains="nanosStore.availableStrains"
+          :strain-options="nanosStore.strainOptions"
           @filter-change="handleFilterChange"
         />
         <Button
@@ -201,7 +201,7 @@ const nanoCount = computed(() =>
 async function toggleSearchMode() {
   isSearchMode.value = !isSearchMode.value;
   if (isSearchMode.value) {
-    await nanosStore.loadNanos(1);
+    await Promise.all([nanosStore.loadNanos(1), nanosStore.loadStrainOptions()]);
   }
 }
 
@@ -243,6 +243,14 @@ watch(
   () => nanosStore.requestKey,
   () => {
     if (isSearchMode.value) void nanosStore.loadNanos(1);
+  }
+);
+
+// The strain picker offers the strains the other filters leave
+watch(
+  () => nanosStore.strainRequestKey,
+  () => {
+    if (isSearchMode.value) void nanosStore.loadStrainOptions();
   }
 );
 

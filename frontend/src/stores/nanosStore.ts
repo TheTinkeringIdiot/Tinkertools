@@ -15,6 +15,7 @@ import type {
   NanoPreferences,
   NanoSchoolName,
   NanoSortField,
+  NanoStrainOption,
   NanoEffect,
   EffectDuration,
   TargetingData,
@@ -29,7 +30,9 @@ interface BackendNanoProgram {
   ql: number;
   description?: string;
   school: NanoSchoolName | null;
-  strain: string;
+  /** Absent from responses of backends that predate it */
+  strain_id?: number | null;
+  strain: string | null;
   /** Absent from responses of backends that predate it */
   professions?: string[];
   level: number | null;
@@ -53,7 +56,8 @@ function toNanoProgram(item: BackendNanoProgram): NanoProgram {
     qualityLevel: item.ql,
     description: item.description,
     school: item.school ?? null,
-    strain: item.strain,
+    strainId: item.strain_id ?? null,
+    strain: item.strain ?? null,
     professions: item.professions ?? [],
     level: item.level ?? null,
     actions: item.actions ?? [],
@@ -128,7 +132,7 @@ const SERVER_SORT_FIELDS: Record<Exclude<NanoSortField, 'compatibility'>, string
 export function defaultNanoFilters(): NanoFilters {
   return {
     schools: [],
-    strains: [],
+    strainIds: [],
     professions: [],
     qlRange: [MIN_QL, MAX_QL],
     levelRange: [MIN_LEVEL, MAX_LEVEL],
@@ -143,13 +147,16 @@ export function defaultNanoFilters(): NanoFilters {
 const isStringList = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((entry) => typeof entry === 'string');
 
+const isNumberList = (value: unknown): value is number[] =>
+  Array.isArray(value) && value.every((entry) => typeof entry === 'number');
+
 const isRange = (value: unknown): value is [number, number] =>
   Array.isArray(value) && value.length === 2 && value.every((n) => typeof n === 'number');
 
 /**
  * Filters as saved by any earlier version: fields that no longer exist (effect
- * types, durations, targets, memory and nano point ranges, QL checkboxes) are
- * dropped, and anything malformed falls back to its default.
+ * types, durations, targets, memory and nano point ranges, QL checkboxes,
+ * strain names) are dropped, and anything malformed falls back to its default.
  */
 export function restoreNanoFilters(saved: unknown): NanoFilters {
   const filters = defaultNanoFilters();
@@ -157,7 +164,7 @@ export function restoreNanoFilters(saved: unknown): NanoFilters {
   const value = saved as Record<string, unknown>;
 
   if (isStringList(value.schools)) filters.schools = value.schools;
-  if (isStringList(value.strains)) filters.strains = value.strains;
+  if (isNumberList(value.strainIds)) filters.strainIds = value.strainIds;
   if (isStringList(value.professions)) filters.professions = value.professions;
   if (isRange(value.qlRange)) filters.qlRange = value.qlRange;
   if (isRange(value.levelRange)) filters.levelRange = value.levelRange;
@@ -177,15 +184,15 @@ export function restoreNanoFilters(saved: unknown): NanoFilters {
 }
 
 /**
- * The /nanos (or, with a text query, /nanos/search) query for the server-side
- * filters and sort, without paging. Full ranges are left out.
+ * The text query and every server-side filter but strain, as /nanos/strains
+ * takes them: it lists the strains the other filters leave. Full ranges are
+ * left out.
  */
-export function nanoQueryParams(filters: NanoFilters, query: string): URLSearchParams {
+export function nanoStrainQueryParams(filters: NanoFilters, query: string): URLSearchParams {
   const params = new URLSearchParams();
   if (query.trim()) params.append('q', query.trim());
   filters.schools.forEach((school) => params.append('school', school));
   filters.professions.forEach((profession) => params.append('profession', profession));
-  filters.strains.forEach((strain) => params.append('strain', strain));
 
   const [qlMin, qlMax] = filters.qlRange;
   if (qlMin > MIN_QL) params.append('ql_min', String(qlMin));
@@ -194,6 +201,16 @@ export function nanoQueryParams(filters: NanoFilters, query: string): URLSearchP
   const [levelMin, levelMax] = filters.levelRange;
   if (levelMin > MIN_LEVEL) params.append('level_min', String(levelMin));
   if (levelMax < MAX_LEVEL) params.append('level_max', String(levelMax));
+  return params;
+}
+
+/**
+ * The /nanos (or, with a text query, /nanos/search) query for the server-side
+ * filters and sort, without paging
+ */
+export function nanoQueryParams(filters: NanoFilters, query: string): URLSearchParams {
+  const params = nanoStrainQueryParams(filters, query);
+  filters.strainIds.forEach((strainId) => params.append('strain', String(strainId)));
 
   if (filters.sortBy !== 'compatibility') {
     params.append('sort_by', SERVER_SORT_FIELDS[filters.sortBy]);
@@ -362,10 +379,13 @@ export const useNanosStore = defineStore('nanos', () => {
     return Array.from(schools).sort();
   });
 
-  const availableStrains = computed(() => {
-    const strains = new Set(nanos.value.map((nano) => nano.strain).filter(Boolean));
-    return Array.from(strains).sort();
-  });
+  /** The strains the filters but strain leave, for the strain picker */
+  const strainOptions = ref<NanoStrainOption[]>([]);
+
+  /** What /nanos/strains is asked for; a change means reloading the strains */
+  const strainRequestKey = computed(() =>
+    nanoStrainQueryParams(filters.value, searchQuery.value).toString()
+  );
 
   const availableProfessions = computed(() => {
     const professions = new Set(nanos.value.flatMap((nano) => nano.professions));
@@ -443,6 +463,25 @@ export const useNanosStore = defineStore('nanos', () => {
       loadNanosFromStorage();
     } finally {
       if (request === requestSequence) loading.value = false;
+    }
+  };
+
+  let strainRequestSequence = 0;
+
+  /** Load the strains for the strain picker; a failure just leaves it empty */
+  const loadStrainOptions = async (): Promise<void> => {
+    const request = ++strainRequestSequence;
+    const params = nanoStrainQueryParams(filters.value, searchQuery.value);
+    try {
+      const response = await apiClient.get<{ strains: NanoStrainOption[] }>(
+        `/nanos/strains?${params}`
+      );
+      if (request !== strainRequestSequence) return;
+      strainOptions.value = response.data?.strains ?? [];
+    } catch (err) {
+      if (request !== strainRequestSequence) return;
+      console.warn('Failed to load nano strains:', err);
+      strainOptions.value = [];
     }
   };
 
@@ -747,12 +786,14 @@ export const useNanosStore = defineStore('nanos', () => {
     resultCount,
     favoriteNanos,
     availableSchools,
-    availableStrains,
+    strainOptions: strainOptions as Readonly<typeof strainOptions>,
+    strainRequestKey,
     availableProfessions,
 
     // Actions
     loadNanos,
     fetchNanos,
+    loadStrainOptions,
     setPage,
     setSearchQuery,
     searchNanos,

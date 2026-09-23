@@ -24,7 +24,8 @@ import type { Item } from './api';
  * Offensive Nano Program extending base NanoProgram
  * Includes damage-specific fields for calculation and display
  */
-export interface OffensiveNano extends Omit<NanoProgram, 'school' | 'professions' | 'level'> {
+export interface OffensiveNano
+  extends Omit<NanoProgram, 'school' | 'professions' | 'level' | 'strainId'> {
   /** The nano skill the nano is cast with (MC, TS...), not the NanoSchool stat */
   school: NanoSchool;
 

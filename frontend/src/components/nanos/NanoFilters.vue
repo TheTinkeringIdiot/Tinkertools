@@ -33,22 +33,26 @@ filters check the active profile client-side
       />
     </div>
 
-    <!-- Strain Filter -->
-    <div v-if="availableStrains.length > 0" class="space-y-2">
-      <label class="text-sm font-medium text-surface-700 dark:text-surface-300">
+    <!-- Strain Filter: the strains the other filters leave, from the server -->
+    <div class="space-y-2">
+      <label for="strain-filter" class="text-sm font-medium text-surface-700 dark:text-surface-300">
         Nano Strain
       </label>
-      <div class="space-y-2 max-h-40 overflow-y-auto">
-        <div v-for="strain in availableStrains" :key="strain" class="flex items-center gap-2">
-          <Checkbox v-model="selectedStrains" :input-id="`strain-${strain}`" :value="strain" />
-          <label
-            :for="`strain-${strain}`"
-            class="text-xs text-surface-700 dark:text-surface-300 cursor-pointer"
-          >
-            {{ strain }}
-          </label>
-        </div>
-      </div>
+      <MultiSelect
+        v-model="selectedStrainIds"
+        input-id="strain-filter"
+        :options="strainChoices"
+        option-label="label"
+        option-value="id"
+        filter
+        filter-placeholder="Find a strain"
+        reset-filter-on-hide
+        placeholder="All Strains"
+        class="w-full"
+        :max-selected-labels="1"
+        selected-items-label="{0} strains selected"
+        data-testid="strain-filter"
+      />
     </div>
 
     <!-- Quality Level Filter -->
@@ -206,7 +210,7 @@ import MultiSelect from 'primevue/multiselect';
 import Slider from 'primevue/slider';
 
 import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
-import type { NanoFilters, NanoSortField } from '@/types/nano';
+import type { NanoFilters, NanoSortField, NanoStrainOption } from '@/types/nano';
 import {
   COMPATIBILITY_FETCH_CAP,
   MAX_LEVEL,
@@ -238,12 +242,13 @@ const props = withDefaults(
     modelValue: NanoFilters;
     showCompatibility?: boolean;
     activeProfile?: ReadonlyTinkerProfile | null;
-    availableStrains?: string[];
+    /** The strains to offer, as /nanos/strains lists them */
+    strainOptions?: readonly NanoStrainOption[];
   }>(),
   {
     showCompatibility: false,
     activeProfile: null,
-    availableStrains: () => [],
+    strainOptions: () => [],
   }
 );
 
@@ -256,7 +261,7 @@ const emit = defineEmits<{
 // Reactive state
 const selectedSchools = ref<string[]>([]);
 const selectedProfessions = ref<string[]>([]);
-const selectedStrains = ref<string[]>([]);
+const selectedStrainIds = ref<number[]>([]);
 const qlRange = ref<[number, number]>([MIN_QL, MAX_QL]);
 const levelRange = ref<[number, number]>([MIN_LEVEL, MAX_LEVEL]);
 const skillCompatible = ref(false);
@@ -337,11 +342,20 @@ const filterPresets: FilterPreset[] = [
 ];
 
 // Computed
+
+/** Strain picker entries: the name (or the ID of an unnamed strain) and its count */
+const strainChoices = computed(() =>
+  props.strainOptions.map((option) => ({
+    id: option.id,
+    label: `${option.name ?? `Strain ${option.id}`} (${option.count})`,
+  }))
+);
+
 const hasActiveFilters = computed(() => {
   return (
     selectedSchools.value.length > 0 ||
     selectedProfessions.value.length > 0 ||
-    selectedStrains.value.length > 0 ||
+    selectedStrainIds.value.length > 0 ||
     qlRange.value[0] !== MIN_QL ||
     qlRange.value[1] !== MAX_QL ||
     levelRange.value[0] !== MIN_LEVEL ||
@@ -360,7 +374,7 @@ const updateFilters = () => {
     // Chosen with the search component's chips, or by a preset
     schools: [...selectedSchools.value],
     professions: [...selectedProfessions.value],
-    strains: [...selectedStrains.value],
+    strainIds: [...selectedStrainIds.value],
     qlRange: [...qlRange.value],
     levelRange: [...levelRange.value],
     skillGapThreshold: skillGapThreshold.value,
@@ -382,7 +396,7 @@ const showFilters = (value: NanoFilters) => {
   // Copies, so the controls never edit the parent's arrays
   selectedSchools.value = [...value.schools];
   selectedProfessions.value = [...value.professions];
-  selectedStrains.value = [...value.strains];
+  selectedStrainIds.value = [...value.strainIds];
   qlRange.value = [...value.qlRange];
   levelRange.value = [...value.levelRange];
   skillCompatible.value = value.skillCompatible;
@@ -414,7 +428,7 @@ watch(
   [
     selectedSchools,
     selectedProfessions,
-    selectedStrains,
+    selectedStrainIds,
     skillCompatible,
     castable,
     skillGapThreshold,

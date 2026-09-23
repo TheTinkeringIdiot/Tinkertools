@@ -5,10 +5,11 @@
  * what the user then sees.
  *
  * Mirrors backend/app/api/routes/nanos.py:
- * - school, profession and strain repeat and match any of their values
+ * - school, profession and strain (NanoStrain IDs) repeat and match any value
  * - profession also matches nanos anyone can cast (no professions, a level)
  * - level_min / level_max leave out nanos without a level
- * - /nanos sorts by sort_by (nulls last) and sort_desc; /nanos/search by id
+ * - both sort by sort_by (nulls last) and sort_desc, with id as the tie-break
+ * - /nanos/strains counts the strains of what the other filters match
  */
 
 import { vi } from 'vitest';
@@ -23,6 +24,7 @@ export interface BackendNano {
   ql: number;
   description: string | null;
   school: NanoSchoolName | null;
+  strain_id: number | null;
   strain: string | null;
   professions: string[];
   level: number | null;
@@ -38,6 +40,7 @@ export function backendNano(
     ql: 1,
     description: null,
     school: null,
+    strain_id: null,
     strain: null,
     professions: [],
     level: 1,
@@ -56,23 +59,16 @@ function compareNullsLast(a: number | null, b: number | null): number {
   return a - b;
 }
 
-/** Answer one request URL (path plus query, as the store sends it) */
-export function answerNanoRequest(
-  nanos: BackendNano[],
-  url: string
-): PaginatedResponse<BackendNano> {
-  const [path, queryString] = url.split('?');
-  const query = new URLSearchParams(queryString);
+/** The nanos every filter but strain matches (q only when given) */
+function matchFilters(nanos: BackendNano[], query: URLSearchParams): BackendNano[] {
   let result = [...nanos];
 
-  if (path === '/nanos/search') {
-    const q = (query.get('q') ?? '').toLowerCase();
+  const q = (query.get('q') ?? '').toLowerCase();
+  if (q) {
     result = result.filter(
       (nano) =>
         nano.name.toLowerCase().includes(q) || (nano.description ?? '').toLowerCase().includes(q)
     );
-  } else if (path !== '/nanos') {
-    throw new Error(`Unexpected nano request ${url}`);
   }
 
   const schools = lower(query.getAll('school'));
@@ -87,10 +83,6 @@ export function answerNanoRequest(
         : lower(nano.professions).some((profession) => professions.includes(profession))
     );
   }
-  const strains = query.getAll('strain');
-  if (strains.length > 0) {
-    result = result.filter((nano) => nano.strain !== null && strains.includes(nano.strain));
-  }
   const qlMin = query.get('ql_min');
   if (qlMin) result = result.filter((nano) => nano.ql >= Number(qlMin));
   const qlMax = query.get('ql_max');
@@ -99,27 +91,43 @@ export function answerNanoRequest(
   if (levelMin) result = result.filter((nano) => nano.level !== null && nano.level >= +levelMin);
   const levelMax = query.get('level_max');
   if (levelMax) result = result.filter((nano) => nano.level !== null && nano.level <= +levelMax);
+  return result;
+}
 
-  if (path === '/nanos') {
-    const descending = query.get('sort_desc') === 'true';
-    const sortBy = query.get('sort_by') ?? 'name';
-    const direction = descending ? -1 : 1;
-    result.sort((a, b) => {
-      let comparison: number;
-      if (sortBy === 'level') {
-        // Nulls last in both directions
-        if (a.level === null || b.level === null) return compareNullsLast(a.level, b.level);
-        comparison = (a.level - b.level) * direction;
-      } else if (sortBy === 'ql') {
-        comparison = (a.ql - b.ql) * direction;
-      } else {
-        comparison = a.name.localeCompare(b.name) * direction;
-      }
-      return comparison || a.id - b.id;
-    });
-  } else {
-    result.sort((a, b) => a.id - b.id);
+/** Answer one /nanos or /nanos/search request URL (path plus query) */
+export function answerNanoRequest(
+  nanos: BackendNano[],
+  url: string
+): PaginatedResponse<BackendNano> {
+  const [path, queryString] = url.split('?');
+  const query = new URLSearchParams(queryString);
+  if (path !== '/nanos' && path !== '/nanos/search') {
+    throw new Error(`Unexpected nano request ${url}`);
   }
+  if (path === '/nanos/search' && !query.get('q')) throw new Error('/nanos/search needs q');
+
+  let result = matchFilters(nanos, query);
+  const strains = query.getAll('strain').map(Number);
+  if (strains.length > 0) {
+    result = result.filter((nano) => nano.strain_id !== null && strains.includes(nano.strain_id));
+  }
+
+  const descending = query.get('sort_desc') === 'true';
+  const sortBy = query.get('sort_by') ?? 'name';
+  const direction = descending ? -1 : 1;
+  result.sort((a, b) => {
+    let comparison: number;
+    if (sortBy === 'level') {
+      // Nulls last in both directions
+      if (a.level === null || b.level === null) return compareNullsLast(a.level, b.level);
+      comparison = (a.level - b.level) * direction;
+    } else if (sortBy === 'ql') {
+      comparison = (a.ql - b.ql) * direction;
+    } else {
+      comparison = a.name.localeCompare(b.name) * direction;
+    }
+    return comparison || a.id - b.id;
+  });
 
   const page = Number(query.get('page') ?? 1);
   const pageSize = Number(query.get('page_size') ?? 50);
@@ -136,20 +144,53 @@ export function answerNanoRequest(
   };
 }
 
+/** Answer a /nanos/strains request URL */
+export function answerStrainRequest(nanos: BackendNano[], url: string): NanoStrainsResponse {
+  const query = new URLSearchParams(url.split('?')[1]);
+  const counts = new Map<number, { id: number; name: string | null; count: number }>();
+  for (const nano of matchFilters(nanos, query)) {
+    if (nano.strain_id === null) continue;
+    const entry = counts.get(nano.strain_id) ?? {
+      id: nano.strain_id,
+      name: nano.strain,
+      count: 0,
+    };
+    entry.count += 1;
+    counts.set(nano.strain_id, entry);
+  }
+  const strains = [...counts.values()].sort(
+    (a, b) =>
+      Number(a.name === null) - Number(b.name === null) ||
+      (a.name ?? '').localeCompare(b.name ?? '') ||
+      a.id - b.id
+  );
+  return { strains };
+}
+
+interface NanoStrainsResponse {
+  strains: { id: number; name: string | null; count: number }[];
+}
+
+type MockedApi = Pick<typeof import('@/services/api-client').apiClient, 'getPaginated' | 'get'>;
+
 /**
- * Make the mocked apiClient.getPaginated answer nano requests from `nanos`.
- * getPaginated is generic over the item type; the fake always answers with
- * backend nanos.
+ * Make the mocked API client answer nano requests from `nanos`: getPaginated
+ * the /nanos endpoints, get /nanos/strains. Both are generic over the
+ * response type; the fake always answers with backend nanos and strains.
  */
-export function serveNanos(
-  getPaginated: typeof import('@/services/api-client').apiClient.getPaginated,
-  nanos: BackendNano[]
-): void {
-  vi.mocked(getPaginated).mockImplementation(<T>(url: string) =>
+export function serveNanos(api: MockedApi, nanos: BackendNano[]): void {
+  vi.mocked(api.getPaginated).mockImplementation(<T>(url: string) =>
     Promise.resolve(
       answerNanoRequest(nanos, url) as PaginatedResponse<unknown> as PaginatedResponse<T>
     )
   );
+  vi.mocked(api.get).mockImplementation(<T>(url: string) => {
+    if (!url.startsWith('/nanos/strains')) return Promise.reject(new Error(`Unexpected ${url}`));
+    return Promise.resolve({
+      success: true,
+      data: answerStrainRequest(nanos, url) as unknown as T,
+    });
+  });
 }
 
 /** The query of every nano request made so far, in order */

@@ -73,7 +73,7 @@ describe('Nano Search Workflow', () => {
   beforeEach(async () => {
     ({ pinia } = await setupIntegrationTest());
 
-    serveNanos(apiClient.getPaginated, NANOS);
+    serveNanos(apiClient, NANOS);
 
     wrapper = mount(TinkerNanos, {
       global: {

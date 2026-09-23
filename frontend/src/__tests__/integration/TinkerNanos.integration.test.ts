@@ -90,6 +90,8 @@ const NANOS: BackendNano[] = [
     school: 'Combat',
     professions: ['Soldier'],
     level: 25,
+    strain_id: 101,
+    strain: 'Street Sweeping',
   }),
   backendNano({
     id: 2,
@@ -98,6 +100,8 @@ const NANOS: BackendNano[] = [
     school: 'Psi',
     professions: ['Agent'],
     level: 1,
+    strain_id: 102,
+    strain: 'Suppression',
   }),
   backendNano({
     id: 3,
@@ -106,6 +110,8 @@ const NANOS: BackendNano[] = [
     school: 'Protection',
     professions: ['Soldier'],
     level: 1,
+    strain_id: 101,
+    strain: 'Street Sweeping',
   }),
 ];
 
@@ -119,7 +125,7 @@ describe('TinkerNanos Compatibility Integration', () => {
     profileStore = useTinkerProfilesStore();
     await profileStore.loadProfiles();
 
-    serveNanos(context.mockApi.getPaginated, NANOS);
+    serveNanos(context.mockApi, NANOS);
   });
 
   afterEach(() => {
@@ -348,6 +354,8 @@ describe('TinkerNanos Compatibility Integration', () => {
       expect(request?.params.getAll('school')).toEqual(['Combat', 'Psi']);
       expect(request?.params.getAll('profession')).toEqual(['Soldier']);
       expect(request?.params.get('page')).toBe('1');
+      // The search endpoint sorts too
+      expect(request?.params.get('sort_by')).toBe('name');
       expect(shownNanos()).toEqual(['Alleysweeper']);
 
       await clickButton(wrapper, 'Low Level');
@@ -356,8 +364,46 @@ describe('TinkerNanos Compatibility Integration', () => {
       expect(levelRequest?.params.has('level_min')).toBe(false);
     });
 
+    it('offers the strains the other filters leave, and filters by strain ID', async () => {
+      await openNanoSearch();
+      /** Open the strain picker and read its options; it stays open */
+      const strainOptions = async () => {
+        if (!document.body.querySelector('.p-multiselect-panel')) {
+          await wrapper.find('[data-testid="strain-filter"]').trigger('click');
+          await flushPromises();
+        }
+        return Array.from(
+          document.body.querySelectorAll<HTMLElement>('.p-multiselect-panel li[role="option"]')
+        ).map((option) => option.getAttribute('aria-label'));
+      };
+
+      expect(await strainOptions()).toEqual(['Street Sweeping (2)', 'Suppression (1)']);
+
+      document.body.querySelector<HTMLElement>('li[aria-label="Street Sweeping (2)"]')?.click();
+      await flushPromises();
+
+      expect(lastRequest()?.params.getAll('strain')).toEqual(['101']);
+      expect(shownNanos()).toEqual(['Alleysweeper', 'Soldier Starter']);
+
+      // Narrowing by school narrows the strain list, whatever strain is picked
+      await schoolChip('Psi').trigger('click');
+      await flushPromises();
+      const strainCalls = vi.mocked(context.mockApi.get).mock.calls.map(([url]) => String(url));
+      expect(strainCalls[strainCalls.length - 1]).toBe('/nanos/strains?school=Psi');
+      expect(await strainOptions()).toEqual(['Suppression (1)']);
+      expect(shownNanos()).toEqual([]);
+    });
+
+    it('has no advanced search options', async () => {
+      await openNanoSearch();
+
+      expect(wrapper.text()).not.toContain('Advanced Search');
+      expect(wrapper.text()).not.toContain('Search In');
+      expect(wrapper.text()).not.toContain('Use quotes for exact matches');
+    });
+
     it('pages through the server total', async () => {
-      serveNanos(context.mockApi.getPaginated, manyNanos(60));
+      serveNanos(context.mockApi, manyNanos(60));
       await openNanoSearch();
 
       expect(headerCount()).toContain('60 nanos');
@@ -392,7 +438,7 @@ describe('TinkerNanos Compatibility Integration', () => {
 
   describe('compatibility filters over every page', () => {
     it('fetches every page of the server result and filters all of it', async () => {
-      serveNanos(context.mockApi.getPaginated, manyNanos(450));
+      serveNanos(context.mockApi, manyNanos(450));
       await activateProfile('Sarge', PROFESSION.SOLDIER, 60, 150, 200);
       await openNanoSearch();
       expect(headerCount()).toContain('450 nanos');
@@ -413,7 +459,7 @@ describe('TinkerNanos Compatibility Integration', () => {
     });
 
     it('asks to narrow the filters when too many nanos match', async () => {
-      serveNanos(context.mockApi.getPaginated, manyNanos(COMPATIBILITY_FETCH_CAP + 500));
+      serveNanos(context.mockApi, manyNanos(COMPATIBILITY_FETCH_CAP + 500));
       await activateProfile('Sarge', PROFESSION.SOLDIER, 60, 150, 200);
       await openNanoSearch();
       await toggleCompatibility();

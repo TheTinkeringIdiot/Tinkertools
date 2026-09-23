@@ -9,7 +9,10 @@ export interface NanoProgram {
   icon?: string;
   /** The game's NanoSchool stat (405); null when the nano has none */
   school: NanoSchoolName | null;
-  strain: string;
+  /** The NanoStrain stat (75): nanos of one strain don't stack; null when it has none */
+  strainId: number | null;
+  /** strainId's name, for display; null when it has none or the ID is unnamed */
+  strain: string | null;
   description?: string;
 
   // The nano item's actions; the Use action's criteria are its casting requirements
@@ -96,7 +99,8 @@ export interface TargetingData {
 export interface NanoFilters {
   /** NanoSchool names; a nano in any of them matches */
   schools: string[];
-  strains: string[];
+  /** NanoStrain IDs; a nano of any of them matches */
+  strainIds: number[];
   /** Profession names; a nano any of them can cast matches */
   professions: string[];
   qlRange: [number, number];
@@ -107,6 +111,14 @@ export interface NanoFilters {
   castable: boolean;
   sortBy: NanoSortField;
   sortDescending: boolean;
+}
+
+/** A strain among the nanos some filters match, from GET /nanos/strains */
+export interface NanoStrainOption {
+  id: number;
+  name: string | null;
+  /** Nanos of this strain the filters match */
+  count: number;
 }
 
 /** name, qualityLevel and level sort on the server; compatibility client-side */

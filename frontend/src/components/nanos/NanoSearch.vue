@@ -51,16 +51,21 @@ Supports text search with nano school filtering and quick filters
       </div>
     </div>
 
-    <!-- Advanced Search Toggle -->
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <Checkbox v-model="showAdvanced" input-id="show-advanced" binary />
-        <label
-          for="show-advanced"
-          class="text-sm text-surface-700 dark:text-surface-300 cursor-pointer"
-        >
-          Advanced Search
-        </label>
+    <!-- Quick Search Presets -->
+    <div class="flex items-center justify-between gap-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-sm font-medium text-surface-700 dark:text-surface-300">
+          Quick Searches:
+        </span>
+        <Button
+          v-for="preset in searchPresets"
+          :key="preset.name"
+          :label="preset.name"
+          size="small"
+          severity="secondary"
+          outlined
+          @click="applyPreset(preset)"
+        />
       </div>
 
       <!-- Search Stats -->
@@ -68,70 +73,6 @@ Supports text search with nano school filtering and quick filters
         {{ searchStats }}
       </div>
     </div>
-
-    <!-- Advanced Search Options -->
-    <Transition name="slide-down">
-      <div
-        v-if="showAdvanced"
-        class="space-y-3 pt-2 border-t border-surface-200 dark:border-surface-700"
-      >
-        <!-- Search in Fields -->
-        <div>
-          <label class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2 block">
-            Search In:
-          </label>
-          <div class="flex flex-wrap gap-2">
-            <div v-for="field in searchFields" :key="field.value" class="flex items-center gap-2">
-              <Checkbox
-                v-model="selectedFields"
-                :input-id="`field-${field.value}`"
-                :value="field.value"
-              />
-              <label
-                :for="`field-${field.value}`"
-                class="text-sm text-surface-700 dark:text-surface-300 cursor-pointer"
-              >
-                {{ field.label }}
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <!-- Quick Search Presets -->
-        <div>
-          <label class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2 block">
-            Quick Searches:
-          </label>
-          <div class="flex flex-wrap gap-2">
-            <Button
-              v-for="preset in searchPresets"
-              :key="preset.name"
-              :label="preset.name"
-              size="small"
-              severity="secondary"
-              outlined
-              @click="applyPreset(preset)"
-            />
-          </div>
-        </div>
-
-        <!-- Search Modifiers -->
-        <div class="flex items-center gap-4 text-xs text-surface-600 dark:text-surface-400">
-          <div class="flex items-center gap-1">
-            <i class="pi pi-info-circle"></i>
-            <span>Use quotes for exact matches</span>
-          </div>
-          <div class="flex items-center gap-1">
-            <i class="pi pi-plus"></i>
-            <span>Use + to require terms</span>
-          </div>
-          <div class="flex items-center gap-1">
-            <i class="pi pi-minus"></i>
-            <span>Use - to exclude terms</span>
-          </div>
-        </div>
-      </div>
-    </Transition>
 
     <!-- Recent Searches -->
     <div v-if="recentSearches.length > 0" class="space-y-2">
@@ -156,7 +97,6 @@ Supports text search with nano school filtering and quick filters
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import Button from 'primevue/button';
-import Checkbox from 'primevue/checkbox';
 import Chip from 'primevue/chip';
 import IconField from 'primevue/iconfield';
 import InputIcon from 'primevue/inputicon';
@@ -164,16 +104,10 @@ import InputText from 'primevue/inputtext';
 import { NANO_SCHOOLS } from './nano-schools';
 
 // Types
-interface SearchField {
-  value: string;
-  label: string;
-}
-
 interface SearchPreset {
   name: string;
   query: string;
   schools: string[];
-  fields: string[];
 }
 
 // Props
@@ -193,25 +127,14 @@ const props = withDefaults(
 
 // Emits
 const emit = defineEmits<{
-  search: [query: string, schools: string[], fields: string[]];
+  search: [query: string, schools: string[]];
   'update:modelValue': [value: string];
 }>();
 
 // Reactive state
 const searchQuery = ref(props.modelValue);
 const selectedSchools = ref<string[]>([...props.schools]);
-const selectedFields = ref<string[]>(['name', 'description']);
-const showAdvanced = ref(false);
 const recentSearches = ref<string[]>([]);
-
-const searchFields: SearchField[] = [
-  { value: 'name', label: 'Name' },
-  { value: 'description', label: 'Description' },
-  { value: 'school', label: 'School' },
-  { value: 'strain', label: 'Strain' },
-  { value: 'effects', label: 'Effects' },
-  { value: 'requirements', label: 'Requirements' },
-];
 
 // The search endpoint matches the query as one phrase, so each preset searches
 // a single term, narrowed by the school most such nanos belong to
@@ -220,25 +143,21 @@ const searchPresets: SearchPreset[] = [
     name: 'Healing',
     query: 'heal',
     schools: ['Medical'],
-    fields: ['name', 'description'],
   },
   {
     name: 'Shields',
     query: 'shield',
     schools: ['Protection'],
-    fields: ['name', 'description'],
   },
   {
     name: 'Summons',
     query: 'summon',
     schools: ['Space'],
-    fields: ['name', 'description'],
   },
   {
     name: 'Teleports',
     query: 'teleport',
     schools: [],
-    fields: ['name', 'description'],
   },
 ];
 
@@ -284,7 +203,7 @@ const handleSearch = () => {
 };
 
 const performSearch = () => {
-  emit('search', searchQuery.value, selectedSchools.value, selectedFields.value);
+  emit('search', searchQuery.value, selectedSchools.value);
 };
 
 const clearSearch = () => {
@@ -297,7 +216,6 @@ const clearSearch = () => {
 const applyPreset = (preset: SearchPreset) => {
   searchQuery.value = preset.query;
   selectedSchools.value = [...preset.schools];
-  selectedFields.value = [...preset.fields];
   emit('update:modelValue', searchQuery.value);
   performSearch();
   saveRecentSearch();
@@ -373,38 +291,5 @@ watch(
 // Lifecycle
 onMounted(() => {
   loadRecentSearches();
-
-  // Initialize selected fields with defaults
-  if (selectedFields.value.length === 0) {
-    selectedFields.value = ['name', 'description'];
-  }
 });
-
-// Watch for changes to trigger search
-watch(
-  [selectedFields],
-  () => {
-    if (searchQuery.value.trim() || selectedSchools.value.length > 0) {
-      performSearch();
-    }
-  },
-  { deep: true }
-);
 </script>
-
-<style scoped>
-.slide-down-enter-active,
-.slide-down-leave-active {
-  transition: all 0.3s ease;
-  max-height: 400px;
-  opacity: 1;
-}
-
-.slide-down-enter-from,
-.slide-down-leave-to {
-  max-height: 0;
-  opacity: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-</style>

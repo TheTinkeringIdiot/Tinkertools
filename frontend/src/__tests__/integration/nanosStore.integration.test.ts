@@ -167,6 +167,7 @@ describe('NanosStore school, profession and level', () => {
     store.setFilters({
       schools: ['Medical', 'Psi'],
       professions: ['Doctor', 'Nano-Technician'],
+      strainIds: [16, 0],
       qlRange: [50, 400],
       levelRange: [1, 100],
       sortBy: 'level',
@@ -180,6 +181,7 @@ describe('NanosStore school, profession and level', () => {
       profession: ['Doctor', 'Nano-Technician'],
       ql_min: '50',
       level_max: '100',
+      strain: ['16', '0'],
       sort_by: 'level',
       sort_desc: 'true',
       page: '3',
@@ -219,6 +221,7 @@ describe('NanosStore school, profession and level', () => {
       'tinkertools_nano_filters',
       JSON.stringify({
         schools: ['Medical'],
+        strains: ['Iron Circle'],
         qualityLevels: [100],
         effectTypes: ['heal'],
         durationType: ['long'],
