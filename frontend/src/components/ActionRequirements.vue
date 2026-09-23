@@ -11,8 +11,8 @@
           <h4 class="font-semibold text-primary">{{ primaryAction.actionName }}</h4>
           <Tag
             v-if="characterStats"
-            :severity="getRequirementSeverity(primaryActionEvaluation?.canPerform || null)"
-            :value="primaryActionEvaluation?.canPerform ? 'Can Use' : 'Cannot Use'"
+            :severity="getRequirementSeverity(canPerform(primaryAction))"
+            :value="canPerform(primaryAction) ? 'Can Use' : 'Cannot Use'"
           />
         </div>
 
@@ -32,7 +32,7 @@
       <div v-if="otherActions.length > 0" class="other-actions">
         <Accordion v-model:activeIndex="expandedActions" multiple>
           <AccordionTab
-            v-for="(action, index) in otherActions"
+            v-for="action in otherActions"
             :key="action.id"
             :header="getActionHeader(action)"
           >
@@ -95,6 +95,7 @@ import Tag from 'primevue/tag';
 import CriteriaDisplay from './CriteriaDisplay.vue';
 import { useItemActions } from '../composables/useActionCriteria';
 import type { Action } from '../types/api';
+import type { ParsedAction } from '../services/action-criteria';
 import type { CharacterStats } from '../composables/useActionCriteria';
 
 // ============================================================================
@@ -124,7 +125,7 @@ const characterStatsRef = computed(() => props.characterStats);
 const {
   parsedActions,
   primaryAction,
-  primaryActionEvaluation,
+  actionEvaluations,
   canUseItem,
   minimumRequirements,
   getRequirementSeverity,
@@ -149,19 +150,24 @@ const otherActions = computed(() => {
 // Methods
 // ============================================================================
 
-function getActionHeader(action: any): string {
+/** Whether the character can perform the action; null without a character. */
+function canPerform(action: ParsedAction): boolean | null {
+  return actionEvaluations.value.find((e) => e.action.id === action.id)?.canPerform ?? null;
+}
+
+function getActionHeader(action: ParsedAction): string {
   let header = action.actionName;
 
   if (props.characterStats && action.hasRequirements) {
     // Add evaluation result to header
-    const evaluation = action.canPerform;
+    const evaluation = canPerform(action);
     if (evaluation !== null) {
       header += evaluation ? ' ✓' : ' ✗';
     }
   }
 
   if (action.hasRequirements) {
-    const reqCount = action.criteria.filter((c: any) => c.isStatRequirement).length;
+    const reqCount = action.criteria.filter((c) => c.isStatRequirement).length;
     header += ` (${reqCount} requirement${reqCount !== 1 ? 's' : ''})`;
   }
 
