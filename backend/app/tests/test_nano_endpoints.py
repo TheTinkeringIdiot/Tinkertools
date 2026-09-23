@@ -394,6 +394,109 @@ def test_get_nanos_combined_filters_intersect(client):
     assert {n["id"] for n in both} == doctor & medical
 
 
+def _python_strain(name):
+    """Strain as the endpoints read it, computed independently in Python."""
+    return name.split(" - ")[-1].strip(" \t\r\n") if " - " in name else None
+
+
+def test_get_nanos_several_strains_match_any(client, db_session):
+    """Repeated strain params match nanos with any of those strains."""
+    strains = Counter(
+        _python_strain(name)
+        for (name,) in db_session.query(Item.name).filter(Item.is_nano.is_(True))
+    )
+    del strains[None]
+    (first, _), (second, _) = strains.most_common(2)
+    expected = {
+        item_id
+        for item_id, name in db_session.query(Item.id, Item.name).filter(
+            Item.is_nano.is_(True)
+        )
+        if _python_strain(name) in (first, second)
+    }
+    nanos = _all_filtered(client, {"strain": [first, second]})
+    assert {nano["id"] for nano in nanos} == expected
+    assert {nano["strain"] for nano in nanos} == {first, second}
+
+
+def test_get_nano_strains_counts_the_filtered_nanos(client, db_session):
+    """/nanos/strains lists each strain of the filtered nanos with its count."""
+    medical = {row[0] for row in db_session.execute(text(SCHOOL_SQL), {"values": [2]})}
+    expected = Counter(
+        _python_strain(name)
+        for item_id, name in db_session.query(Item.id, Item.name).filter(
+            Item.is_nano.is_(True)
+        )
+        if item_id in medical
+    )
+    del expected[None]
+    expected.pop("", None)
+
+    data = client.get("/api/v1/nanos/strains", params={"school": "Medical"}).json()
+    got = [(row["strain"], row["count"]) for row in data["strains"]]
+    assert dict(got) == dict(expected)
+    assert [strain for strain, _ in got] == sorted(strain for strain, _ in got)
+
+    # Consistent with /nanos: a strain's count is that filter's total, and the
+    # strain filter itself is ignored so the other strains stay listed
+    strain, count = got[0]
+    listed = client.get(
+        "/api/v1/nanos", params={"school": "Medical", "strain": strain}
+    ).json()
+    assert listed["total"] == count
+    ignoring = client.get(
+        "/api/v1/nanos/strains", params={"school": "Medical", "strain": strain}
+    ).json()
+    assert ignoring == data
+
+
+def test_get_nano_strains_with_search_text(client):
+    """With q, /nanos/strains covers the /nanos/search result set."""
+    data = client.get("/api/v1/nanos/strains", params={"q": "heal"}).json()
+    total = sum(row["count"] for row in data["strains"])
+    found = client.get("/api/v1/nanos/search", params={"q": "heal"}).json()
+    with_strain = client.get(
+        "/api/v1/nanos/search",
+        params={"q": "heal", "strain": [row["strain"] for row in data["strains"]]},
+    ).json()
+    assert 0 < total == with_strain["total"] <= found["total"]
+
+
+def test_search_nanos_sorts_like_the_list(client, db_session):
+    """/nanos/search takes sort_by and sort_desc, stable across pages."""
+    for sort_by in ("name", "ql", "level"):
+        for sort_desc in (False, True):
+            params = {"q": "heal", "sort_by": sort_by, "sort_desc": sort_desc}
+            first = client.get(
+                "/api/v1/nanos/search", params={**params, "page_size": 20}
+            ).json()
+            second = client.get(
+                "/api/v1/nanos/search", params={**params, "page_size": 20, "page": 2}
+            ).json()
+            nanos = first["items"] + second["items"]
+            assert len({nano["id"] for nano in nanos}) == len(nanos)
+            if sort_by == "name":
+                # Name order is the database collation's, so ask it
+                expected = [
+                    row[0]
+                    for row in db_session.execute(
+                        text(
+                            "SELECT id FROM items WHERE is_nano AND "
+                            "(name ILIKE '%heal%' OR description ILIKE '%heal%') "
+                            f"ORDER BY name {'DESC' if sort_desc else 'ASC'}, id "
+                            "LIMIT 40"
+                        )
+                    )
+                ]
+                assert [nano["id"] for nano in nanos] == expected, sort_desc
+            else:
+                values = [nano[sort_by] for nano in nanos if nano[sort_by] is not None]
+                assert values == sorted(values, reverse=sort_desc), (
+                    sort_by,
+                    sort_desc,
+                )
+
+
 def test_get_nanos_unknown_school_or_profession_matches_nothing(client):
     """A school or profession name the game doesn't have filters to nothing."""
     for params in (

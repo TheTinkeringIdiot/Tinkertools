@@ -111,6 +111,21 @@ class NanoProgramWithSpells(NanoProgram):
     )
 
 
+class NanoStrainCount(BaseModel):
+    """A strain and how many nanos in the filtered set have it."""
+
+    strain: str = Field(..., description="Strain name")
+    count: int = Field(..., description="Number of matching nanos with this strain")
+
+
+class NanoStrainsResponse(BaseModel):
+    """Distinct strains of the nanos matching a set of filters."""
+
+    strains: List[NanoStrainCount] = Field(
+        default_factory=list, description="Strains, sorted by name"
+    )
+
+
 class NanoItemDetail(ItemDetail):
     """ItemDetail of a nano, with the same school, professions and level as
     NanoProgram."""
