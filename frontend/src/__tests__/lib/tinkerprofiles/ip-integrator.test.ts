@@ -15,7 +15,13 @@ import {
 import { createDefaultProfile } from '@/lib/tinkerprofiles/constants';
 import { skillService } from '@/services/skill-service';
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
-import { SKILL_ID, PROFESSION } from '@/__tests__/helpers';
+import {
+  SKILL_ID,
+  PROFESSION,
+  createTestItem,
+  createSpell,
+  createSpellData,
+} from '@/__tests__/helpers';
 
 describe('IP Integrator - Bug Fixes and Data Flow', () => {
   let testProfile: TinkerProfile;
@@ -125,7 +131,7 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
       // Weighted = 50*1.0 = 50
       // Expected improvements: round(((50 - 5) * 2) + 5) = round(95) = 95
       // Total cap = 5 + trickle + 95 should be much higher than 13
-      expect((bodyDev as any).cap).toBeGreaterThan(50);
+      expect(bodyDev.cap).toBeGreaterThan(50);
     });
 
     it('should update both caps and trickle-down values', () => {
@@ -137,7 +143,7 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
 
       // Check that both caps and trickle-down were updated
       const bodyDevId = skillService.resolveId('Body Dev.');
-      const bodyDev = testProfile.skills[bodyDevId] as any; // Cast to any for dynamic properties
+      const bodyDev = testProfile.skills[bodyDevId];
       expect(bodyDev.cap).toBeDefined();
       expect(bodyDev.trickle).toBeDefined();
       expect(bodyDev.total).toBeDefined();
@@ -301,27 +307,17 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
     it('should apply equipment bonuses to abilities', () => {
       // Mock equipment that boosts Strength
       testProfile.Weapons = {
-        'Right Hand': {
+        'Right Hand': createTestItem({
           id: 1,
           aoid: 12345,
           name: 'Test Weapon',
           spell_data: [
-            {
+            createSpellData({
               event: 2, // Wield event
-              spells: [
-                {
-                  spell_id: 53045,
-                  nano_crystal: null,
-                  nano_school: 0,
-                  spell_params: {
-                    Stat: 16,
-                    Amount: 10,
-                  },
-                },
-              ],
-            },
+              spells: [createSpell({ spell_id: 53045, spell_params: { Stat: 16, Amount: 10 } })],
+            }),
           ],
-        } as any,
+        }),
       };
 
       updateProfileSkillInfo(testProfile);
@@ -336,27 +332,17 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
     it('should include equipment bonuses in trickle-down calculations', () => {
       // Setup: Give Stamina a +20 equipment bonus
       testProfile.Clothing = {
-        Body: {
+        Body: createTestItem({
           id: 2,
           aoid: 54321,
           name: 'Test Armor',
           spell_data: [
-            {
+            createSpellData({
               event: 14, // Wear event
-              spells: [
-                {
-                  spell_id: 53045,
-                  nano_crystal: null,
-                  nano_school: 0,
-                  spell_params: {
-                    Stat: 18,
-                    Amount: 20,
-                  },
-                },
-              ],
-            },
+              spells: [createSpell({ spell_id: 53045, spell_params: { Stat: 18, Amount: 20 } })],
+            }),
           ],
-        } as any,
+        }),
       };
 
       // Set base Stamina to 30 using v4.0.0 structure
@@ -380,37 +366,23 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
       // Setup equipment with multiple ability bonuses
       testProfile.Implants = {
         Head: {
-          id: 3,
-          aoid: 11111,
-          name: 'Test Implant',
+          ...createTestItem({
+            id: 3,
+            aoid: 11111,
+            name: 'Test Implant',
+            spell_data: [
+              createSpellData({
+                event: 14, // Wear event
+                spells: [
+                  createSpell({ spell_id: 53045, spell_params: { Stat: 19, Amount: 15 } }),
+                  createSpell({ spell_id: 53045, spell_params: { Stat: 21, Amount: 8 } }),
+                ],
+              }),
+            ],
+          }),
           type: 'implant',
           slot: 1,
-          spell_data: [
-            {
-              event: 14, // Wear event
-              spells: [
-                {
-                  spell_id: 53045,
-                  nano_crystal: null,
-                  nano_school: 0,
-                  spell_params: {
-                    Stat: 19,
-                    Amount: 15,
-                  },
-                },
-                {
-                  spell_id: 53045,
-                  nano_crystal: null,
-                  nano_school: 0,
-                  spell_params: {
-                    Stat: 21,
-                    Amount: 8,
-                  },
-                },
-              ],
-            },
-          ],
-        } as any,
+        },
       };
 
       updateProfileSkillInfo(testProfile);
@@ -454,30 +426,3 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
     });
   });
 });
-
-// Test utilities (Note: These are duplicates of helpers - should import from @/__tests__/helpers instead)
-// Keeping for backwards compatibility with this test file only
-function createTestProfile(overrides: Partial<TinkerProfile> = {}): TinkerProfile {
-  const profile = createDefaultProfile('Test', 'Solitus');
-  return { ...profile, ...overrides };
-}
-
-function setProfileAbilities(profile: TinkerProfile, abilities: number[]): void {
-  const abilityIds = [
-    SKILL_ID.STRENGTH,
-    SKILL_ID.AGILITY,
-    SKILL_ID.STAMINA,
-    SKILL_ID.INTELLIGENCE,
-    SKILL_ID.SENSE,
-    SKILL_ID.PSYCHIC,
-  ];
-  abilityIds.forEach((skillId, index) => {
-    if (abilities[index] !== undefined) {
-      const skill = profile.skills[skillId];
-      if (skill) {
-        skill.total = abilities[index];
-        skill.pointsFromIp = Math.max(0, abilities[index] - 6); // Assuming 6 is breed base
-      }
-    }
-  });
-}

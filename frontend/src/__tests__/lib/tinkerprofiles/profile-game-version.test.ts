@@ -27,7 +27,8 @@ import {
 import { STORAGE_KEYS } from '@/lib/tinkerprofiles/constants';
 import { currentVersion, versions, setCurrentVersion } from '@/composables/useGameVersion';
 import type { GameVersion } from '@/types/game-version';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { TinkerProfile, VersionFlaggedItem } from '@/lib/tinkerprofiles/types';
+import type { InterpolatedItem } from '@/types/api';
 import { createTestProfile } from '../../helpers/profile-fixtures';
 import { createTestItem } from '../../helpers/item-fixtures';
 import { apiClient } from '@/services/api-client';
@@ -88,7 +89,7 @@ beforeEach(() => {
 describe('profile game version tagging', () => {
   it('stamps a profile that has no game version', () => {
     const profile = createTestProfile();
-    delete (profile as any).gameVersion;
+    delete profile.gameVersion;
 
     expect(stampGameVersion(profile, AO_LIVE)).toBe(true);
     expect(profile.gameVersion).toBe(AO_LIVE);
@@ -108,7 +109,7 @@ describe('profile game version tagging', () => {
 
     const storage = new ProfileStorage();
     const profile = createTestProfile({ id: 'legacy-1', name: 'Legacy' });
-    delete (profile as any).gameVersion;
+    delete profile.gameVersion;
 
     // Written the way the old code wrote it: no gameVersion anywhere.
     localStorage.setItem(`${STORAGE_KEYS.PROFILE_PREFIX}legacy-1`, JSON.stringify(profile));
@@ -131,7 +132,7 @@ describe('profile game version tagging', () => {
 
     const storage = new ProfileStorage();
     const profile = createTestProfile({ id: 'legacy-2', name: 'Legacy' });
-    delete (profile as any).gameVersion;
+    delete profile.gameVersion;
     localStorage.setItem(`${STORAGE_KEYS.PROFILE_PREFIX}legacy-2`, JSON.stringify(profile));
     localStorage.setItem(STORAGE_KEYS.PROFILE_INDEX, JSON.stringify(['legacy-2']));
 
@@ -308,8 +309,8 @@ describe('active profile per game version', () => {
       seen.push([next, previous]);
     });
 
-    setCurrentVersion(AO_LIVE); // first set: no previous, no notification
-    setCurrentVersion(PRK);
+    await setCurrentVersion(AO_LIVE); // first set: no previous, no notification
+    await setCurrentVersion(PRK);
 
     expect(seen).toEqual([[PRK, AO_LIVE]]);
     stop();
@@ -322,30 +323,42 @@ describe('active profile per game version', () => {
 
 /** Build a batch-interpolate response where only `present` AOIDs resolve. */
 function mockBatchResolution(present: Record<number, string>) {
-  (apiClient.batchInterpolateItems as any).mockImplementation(
-    async (requests: Array<{ aoid: number; targetQl: number }>) => ({
-      results: requests.map((req) =>
-        present[req.aoid]
-          ? {
-              aoid: req.aoid,
-              target_ql: req.targetQl,
-              success: true,
-              item: createTestItem({
-                id: req.aoid * 10,
-                aoid: req.aoid,
-                name: present[req.aoid],
-                ql: req.targetQl,
-              }),
-            }
-          : {
-              aoid: req.aoid,
-              target_ql: req.targetQl,
-              success: false,
-              error: 'Item not found',
-            }
-      ),
-    })
-  );
+  vi.mocked(apiClient.batchInterpolateItems).mockImplementation(async (requests) => ({
+    success: true,
+    errors: [],
+    results: requests.map((req) =>
+      present[req.aoid]
+        ? {
+            aoid: req.aoid,
+            target_ql: req.targetQl,
+            success: true,
+            item: interpolatedItem(req.aoid, present[req.aoid], req.targetQl),
+            error: null,
+          }
+        : {
+            aoid: req.aoid,
+            target_ql: req.targetQl,
+            success: false,
+            item: null,
+            error: 'Item not found',
+          }
+    ),
+  }));
+}
+
+function interpolatedItem(aoid: number, name: string, ql: number): InterpolatedItem {
+  return {
+    id: aoid * 10,
+    aoid,
+    name,
+    ql,
+    is_nano: false,
+    interpolating: false,
+    target_ql: ql,
+    stats: [],
+    spell_data: [],
+    actions: [],
+  };
 }
 
 function profileWithEquipment(): TinkerProfile {
@@ -359,7 +372,7 @@ function profileWithEquipment(): TinkerProfile {
     slot: 2,
     type: 'implant',
     clusters: { Shiny: { stat: 112, skillName: 'Pistol' } },
-  } as any;
+  };
   profile.buffs = [createTestItem({ id: 4, aoid: 1004, name: 'Old Buff', ql: 50 })];
   profile.PerksAndResearch.perks = [
     {
@@ -413,12 +426,12 @@ describe('buildVersionCopy', () => {
     mockBatchResolution({ 1001: 'x', 1002: 'x', 1003: 'New Implant', 1004: 'x', 1005: 'x' });
 
     const result = await buildVersionCopy(profileWithEquipment(), AO_LIVE);
-    const implant = result.profile.Implants['2'] as any;
+    const implant = result.profile.Implants['2'];
 
-    expect(implant.name).toBe('New Implant');
-    expect(implant.slot).toBe(2);
-    expect(implant.type).toBe('implant');
-    expect(implant.clusters.Shiny.skillName).toBe('Pistol');
+    expect(implant?.name).toBe('New Implant');
+    expect(implant?.slot).toBe(2);
+    expect(implant?.type).toBe('implant');
+    expect(implant?.clusters?.Shiny?.skillName).toBe('Pistol');
   });
 
   it('flags items the target version does not have and lists them', async () => {
@@ -435,9 +448,10 @@ describe('buildVersionCopy', () => {
     expect(result.missing.map((m) => m.where)).toContain('Perk');
 
     // The old snapshots survive, flagged rather than dropped.
-    expect((result.profile.Clothing.Head as any).name).toBe('Old Helmet');
-    expect((result.profile.Clothing.Head as any).missingInVersion).toBe(true);
-    expect((result.profile.Weapons.RHand as any).missingInVersion).toBeUndefined();
+    const helmet = result.profile.Clothing.Head as VersionFlaggedItem;
+    expect(helmet.name).toBe('Old Helmet');
+    expect(helmet.missingInVersion).toBe(true);
+    expect((result.profile.Weapons.RHand as VersionFlaggedItem).missingInVersion).toBeUndefined();
   });
 
   it('never touches the source profile', async () => {
@@ -449,7 +463,7 @@ describe('buildVersionCopy', () => {
 
     expect(source.gameVersion).toBe(PRK);
     expect(source.Weapons.RHand?.name).toBe('Old Rifle');
-    expect((source.Clothing.Head as any).missingInVersion).toBeUndefined();
+    expect((source.Clothing.Head as VersionFlaggedItem).missingInVersion).toBeUndefined();
   });
 
   it('asks for each distinct aoid and ql only once', async () => {
@@ -462,14 +476,14 @@ describe('buildVersionCopy', () => {
 
     const result = await buildVersionCopy(source, AO_LIVE);
 
-    const requests = (apiClient.batchInterpolateItems as any).mock.calls[0][0];
+    const requests = vi.mocked(apiClient.batchInterpolateItems).mock.calls[0][0];
     expect(requests).toHaveLength(1);
     expect(result.updated).toBe(2);
   });
 
   it('fails instead of flagging everything missing when the request fails', async () => {
     currentVersion.value = AO_LIVE;
-    (apiClient.batchInterpolateItems as any).mockRejectedValue(
+    vi.mocked(apiClient.batchInterpolateItems).mockRejectedValue(
       new Error('500 Internal Server Error')
     );
 
@@ -481,25 +495,31 @@ describe('buildVersionCopy', () => {
   it('carries weapon attack and defense stats from the target version', async () => {
     currentVersion.value = AO_LIVE;
     mockBatchResolution({ 1001: 'New Rifle', 1002: 'x', 1003: 'x', 1004: 'x', 1005: 'x' });
-    (apiClient.getItem as any).mockResolvedValue({
+    vi.mocked(apiClient.getItem).mockResolvedValue({
       success: true,
       data: createTestItem({
         aoid: 1001,
         name: 'New Rifle',
         attack_stats: [{ id: 1, stat: 133, value: 100 }],
         defense_stats: [{ id: 2, stat: 51, value: 100 }],
-      } as any),
+      }),
     });
 
     const source = profileWithEquipment();
-    (source.Weapons.RHand as any).attack_stats = [{ id: 9, stat: 133, value: 50 }];
+    source.Weapons.RHand = createTestItem({
+      id: 1,
+      aoid: 1001,
+      name: 'Old Rifle',
+      ql: 200,
+      attack_stats: [{ id: 9, stat: 133, value: 50 }],
+    });
 
     const result = await buildVersionCopy(source, AO_LIVE, new ProfileTransformer());
-    const rifle = result.profile.Weapons.RHand as any;
+    const rifle = result.profile.Weapons.RHand;
 
     expect(apiClient.getItem).toHaveBeenCalledWith(1001, { gameVersion: AO_LIVE });
-    expect(rifle.attack_stats).toEqual([{ id: 1, stat: 133, value: 100 }]);
-    expect(rifle.defense_stats).toEqual([{ id: 2, stat: 51, value: 100 }]);
+    expect(rifle?.attack_stats).toEqual([{ id: 1, stat: 133, value: 100 }]);
+    expect(rifle?.defense_stats).toEqual([{ id: 2, stat: 51, value: 100 }]);
   });
 
   it('skips cluster-built implants that carry no aoid', async () => {
@@ -516,10 +536,12 @@ describe('buildVersionCopy', () => {
       stats: [],
       spell_data: [],
       actions: [],
+      attack_stats: [],
+      defense_stats: [],
       slot: 4,
       type: 'implant',
       clusters: { Shiny: { stat: 112, skillName: 'Pistol' } },
-    } as any;
+    };
 
     const result = await buildVersionCopy(source, AO_LIVE);
 

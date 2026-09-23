@@ -6,26 +6,26 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { nextTick } from 'vue';
+import type { Component } from 'vue';
 import {
   setupIntegrationTest,
   mountForIntegration,
   waitForUpdates,
-  clickAndWait,
-  typeAndWait,
   type IntegrationTestContext,
 } from '../helpers/integration-test-utils';
-import {
-  createTestProfile,
-  createFreshProfile,
-  BREED,
-  PROFESSION,
-} from '../helpers/profile-fixtures';
+import { createTestProfile, BREED, PROFESSION } from '../helpers/profile-fixtures';
 import { SKILL_ID } from '../helpers/skill-fixtures';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { apiClient } from '@/services/api-client';
 import { currentVersion, versions } from '@/composables/useGameVersion';
 import type { GameVersion } from '@/types/game-version';
+import type {
+  BatchInterpolateItemResult,
+  BatchInterpolationResponse,
+  InterpolatedItem,
+} from '@/types/api';
+import type { VersionFlaggedItem } from '@/lib/tinkerprofiles/types';
+import { createTestItem } from '../helpers/item-fixtures';
 import ProfileCreateModal from '@/components/profiles/ProfileCreateModal.vue';
 import ProfileDropdown from '@/components/profiles/ProfileDropdown.vue';
 import CharacterInfoPanel from '@/components/profiles/CharacterInfoPanel.vue';
@@ -45,6 +45,24 @@ vi.mock('@/services/api-client', () => {
   };
 });
 
+function batchResponse(results: BatchInterpolateItemResult[]): BatchInterpolationResponse {
+  return { success: true, results, errors: [] };
+}
+
+function interpolatedItem(
+  item: Pick<InterpolatedItem, 'id' | 'aoid' | 'name' | 'ql'>
+): InterpolatedItem {
+  return {
+    ...item,
+    is_nano: false,
+    interpolating: false,
+    target_ql: item.ql,
+    stats: [],
+    spell_data: [],
+    actions: [],
+  };
+}
+
 describe('Profile Management Integration', () => {
   let context: IntegrationTestContext;
 
@@ -59,38 +77,57 @@ describe('Profile Management Integration', () => {
   // ============================================================================
 
   describe('Profile Creation', () => {
-    // TODO: These UI component tests require proper PrimeVue component rendering
-    // The core profile creation functionality is tested through store API tests
-    it.skip('creates profile through modal form with valid data', async () => {
-      const store = useTinkerProfilesStore();
+    // PrimeVue's Dialog teleports out of the wrapper and its Dropdown/InputNumber
+    // are not native form controls; swap in native stand-ins with the same
+    // v-model contract so the form can be driven like a user would.
+    const formStubs: Record<string, Component> = {
+      Dialog: {
+        props: { visible: Boolean },
+        template: '<div v-if="visible"><slot /></div>',
+      },
+      Dropdown: {
+        props: {
+          modelValue: { type: String, default: '' },
+          options: { type: Array, default: () => [] },
+        },
+        emits: ['update:modelValue'],
+        template:
+          '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)">' +
+          '<option v-for="option in options" :key="option" :value="option">{{ option }}</option>' +
+          '</select>',
+      },
+      InputNumber: {
+        props: { modelValue: { type: Number, default: null } },
+        emits: ['update:modelValue'],
+        template:
+          '<input type="number" :value="modelValue" @input="$emit(\'update:modelValue\', Number($event.target.value))" />',
+      },
+    };
 
-      const wrapper = mountForIntegration(ProfileCreateModal, {
+    function mountCreateModal() {
+      return mountForIntegration(ProfileCreateModal, {
         pinia: context.pinia,
         props: { visible: true },
+        stubs: formStubs,
       });
+    }
 
+    it('creates profile through modal form with valid data', async () => {
+      const store = useTinkerProfilesStore();
+
+      const wrapper = mountCreateModal();
       await waitForUpdates(wrapper);
 
       // Fill in form fields
-      const nameInput = wrapper.find('#profile-name');
-      await nameInput.setValue('TestCharacter');
-      await waitForUpdates(wrapper);
-
-      const professionDropdown = wrapper.find('#profession');
-      await professionDropdown.setValue('Soldier');
-      await waitForUpdates(wrapper);
-
-      const levelInput = wrapper.find('#level');
-      await levelInput.setValue(100);
-      await waitForUpdates(wrapper);
-
-      const breedDropdown = wrapper.find('#breed');
-      await breedDropdown.setValue('Atrox');
+      await wrapper.find('#profile-name').setValue('TestCharacter');
+      await wrapper.find('#profession').setValue('Soldier');
+      await wrapper.find('#level').setValue(100);
+      await wrapper.find('#breed').setValue('Atrox');
       await waitForUpdates(wrapper);
 
       // Submit form
-      await wrapper.find('form').trigger('submit.prevent');
-      await waitForUpdates(wrapper);
+      await wrapper.find('form').trigger('submit');
+      await waitForUpdates(wrapper, 50);
 
       // Verify profile was created
       const metadata = store.profileMetadata;
@@ -98,104 +135,77 @@ describe('Profile Management Integration', () => {
       expect(metadata[0].name).toBe('TestCharacter');
       expect(metadata[0].profession).toBe('Soldier');
       expect(metadata[0].level).toBe(100);
+      expect(wrapper.emitted('created')?.[0]).toEqual([metadata[0].id]);
 
       // Verify it persisted to localStorage (individual profile key)
       const profileId = metadata[0].id;
-      const profileKey = `tinkertools_profile_${profileId}`;
-      const storedData = context.mockLocalStorage.getItem(profileKey);
+      const storedData = context.mockLocalStorage.getItem(`tinkertools_profile_${profileId}`);
       expect(storedData).toBeTruthy();
 
       const storedProfile = JSON.parse(storedData!);
-      expect(storedProfile).toBeDefined();
       expect(storedProfile.Character.Name).toBe('TestCharacter');
+      expect(storedProfile.Character.Profession).toBe(PROFESSION.SOLDIER);
+      expect(storedProfile.Character.Breed).toBe(BREED.ATROX);
     });
 
-    it.skip('validates required fields before creating profile', async () => {
-      const wrapper = mountForIntegration(ProfileCreateModal, {
-        pinia: context.pinia,
-        props: { visible: true },
-      });
-
-      await waitForUpdates(wrapper);
-
-      // Try to submit without filling name
-      await wrapper.find('form').trigger('submit.prevent');
-      await waitForUpdates(wrapper);
-
-      // Should show validation error
-      const errorMsg = wrapper.find('small.text-red-500');
-      expect(errorMsg.exists()).toBe(true);
-
-      // Store should not have any profiles
+    it('validates required fields before creating profile', async () => {
       const store = useTinkerProfilesStore();
+
+      const wrapper = mountCreateModal();
+      await waitForUpdates(wrapper);
+
+      // The submit button stays disabled while the name is empty
+      const submit = wrapper.find('button[type="submit"]');
+      expect(submit.attributes('disabled')).toBeDefined();
+
+      // An invalid name is rejected with a message
+      await wrapper.find('#profile-name').setValue('1BadName');
+      await wrapper.find('form').trigger('submit');
+      await waitForUpdates(wrapper);
+
+      expect(wrapper.find('small.text-red-500').text()).toContain('must start with a letter');
       expect(store.profileMetadata.length).toBe(0);
     });
 
-    it.skip('sets newly created profile as active when checkbox is checked', async () => {
+    it('sets newly created profile as active when checkbox is checked', async () => {
       const store = useTinkerProfilesStore();
 
-      const wrapper = mountForIntegration(ProfileCreateModal, {
-        pinia: context.pinia,
-        props: { visible: true },
-      });
-
+      const wrapper = mountCreateModal();
       await waitForUpdates(wrapper);
 
-      // Fill form
       await wrapper.find('#profile-name').setValue('ActiveCharacter');
-      await waitForUpdates(wrapper);
+      await wrapper.find('form').trigger('submit');
+      await waitForUpdates(wrapper, 50);
 
-      // Ensure "Set as active" checkbox is checked (default state)
-      const checkbox = wrapper.find('#set-active');
-      expect(checkbox.element).toBeDefined();
-
-      // Submit
-      await wrapper.find('form').trigger('submit.prevent');
-      await waitForUpdates(wrapper);
-
-      // Wait for async operations
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Verify profile is active
-      expect(store.activeProfileId).toBeTruthy();
+      // "Set as active" is checked by default
+      expect(store.activeProfileId).toBe(store.profileMetadata[0].id);
       expect(store.activeProfile?.Character.Name).toBe('ActiveCharacter');
     });
 
-    it.skip('creates profile with all optional fields filled', async () => {
+    it('creates profile with all optional fields filled', async () => {
       const store = useTinkerProfilesStore();
 
-      const wrapper = mountForIntegration(ProfileCreateModal, {
-        pinia: context.pinia,
-        props: { visible: true },
-      });
-
+      const wrapper = mountCreateModal();
       await waitForUpdates(wrapper);
 
-      // Fill all fields
       await wrapper.find('#profile-name').setValue('FullProfile');
-      await wrapper.find('#profession').setValue('Nano-Technician');
+      await wrapper.find('#profession').setValue('Nanotechnician');
       await wrapper.find('#level').setValue(220);
       await wrapper.find('#breed').setValue('Nanomage');
       await wrapper.find('#faction').setValue('Clan');
       await wrapper.find('#expansion').setValue('Lost Eden');
       await wrapper.find('#account-type').setValue('Paid');
-
       await waitForUpdates(wrapper);
 
-      // Submit
-      await wrapper.find('form').trigger('submit.prevent');
-      await waitForUpdates(wrapper);
+      await wrapper.find('form').trigger('submit');
+      await waitForUpdates(wrapper, 50);
 
-      // Wait for creation
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Verify all fields were saved
+      // Verify all fields were saved (profession and breed as numeric IDs)
       const profile = await store.loadProfile(store.profileMetadata[0].id);
-      expect(profile).toBeTruthy();
       expect(profile?.Character.Name).toBe('FullProfile');
-      expect(profile?.Character.Profession).toBe('Nano-Technician');
+      expect(profile?.Character.Profession).toBe(PROFESSION.NANO_TECHNICIAN);
       expect(profile?.Character.Level).toBe(220);
-      expect(profile?.Character.Breed).toBe('Nanomage');
+      expect(profile?.Character.Breed).toBe(BREED.NANOMAGE);
       expect(profile?.Character.Faction).toBe('Clan');
       expect(profile?.Character.Expansion).toBe('Lost Eden');
       expect(profile?.Character.AccountType).toBe('Paid');
@@ -284,10 +294,6 @@ describe('Profile Management Integration', () => {
       const profileId = await store.createProfile(profile.Character.Name, profile);
       await store.setActiveProfile(profileId);
       await waitForUpdates();
-
-      // Get initial rifle skill value
-      const initialProfile = await store.loadProfile(profileId);
-      const initialRifleTotal = initialProfile?.skills[SKILL_ID.ASSAULT_RIF]?.total || 0;
 
       // Modify strength (should affect rifle through trickle)
       const result = await store.modifyAbility(profileId, SKILL_ID.STRENGTH, 200);
@@ -396,6 +402,8 @@ describe('Profile Management Integration', () => {
 
       // Active profile should have changed or be null
       expect(store.activeProfileId).not.toBe(profileId1);
+      // The other profile is untouched
+      expect(store.profileMetadata.map((p) => p.id)).toEqual([profileId2]);
     });
 
     it('handles deletion of non-existent profile gracefully', async () => {
@@ -471,6 +479,9 @@ describe('Profile Management Integration', () => {
       // Should show both profiles as options
       const dropdown = wrapper.findComponent({ name: 'Dropdown' });
       expect(dropdown.exists()).toBe(true);
+      const options = dropdown.props('options') as Array<{ items: Array<{ value: string }> }>;
+      const optionIds = options.flatMap((group) => group.items.map((item) => item.value));
+      expect(optionIds).toEqual(expect.arrayContaining([profileId1, profileId2]));
 
       // Switch profile through store
       await store.setActiveProfile(profileId1);
@@ -561,27 +572,17 @@ describe('Profile Management Integration', () => {
       const mockedApiClient = vi.mocked(apiClient);
 
       // The transformer resolves equipment through the batch endpoint.
-      (mockedApiClient.batchInterpolateItems as any).mockResolvedValue({
-        results: [
+      mockedApiClient.batchInterpolateItems.mockResolvedValue(
+        batchResponse([
           {
             aoid: 246660,
             target_ql: 300,
             success: true,
-            item: {
-              id: 1,
-              aoid: 246660,
-              name: 'Test Item',
-              ql: 300,
-              description: 'Test',
-              item_class: 2,
-              is_nano: false,
-              stats: [],
-              spell_data: [],
-              actions: [],
-            },
+            item: interpolatedItem({ id: 1, aoid: 246660, name: 'Test Item', ql: 300 }),
+            error: null,
           },
-        ],
-      });
+        ])
+      );
 
       const aoSetupsData = JSON.stringify({
         character: {
@@ -877,7 +878,7 @@ describe('Profile Management Integration', () => {
 
       const mineId = await store.createProfile('Mine');
       const theirsId = await store.createProfile('Theirs');
-      await store.updateProfile(theirsId, { gameVersion: PRK } as any);
+      await store.updateProfile(theirsId, { gameVersion: PRK });
       await store.refreshMetadata();
       await waitForUpdates();
 
@@ -901,56 +902,41 @@ describe('Profile Management Integration', () => {
         gameVersion: PRK,
         Weapons: {
           ...source!.Weapons,
-          RHand: {
-            id: 1,
-            aoid: 2001,
-            name: 'PRK Rifle',
-            ql: 200,
-            is_nano: false,
-            stats: [],
-            spell_data: [],
-            actions: [],
-          },
+          RHand: createTestItem({ id: 1, aoid: 2001, name: 'PRK Rifle', ql: 200 }),
         },
         Clothing: {
           ...source!.Clothing,
-          Head: {
-            id: 2,
-            aoid: 2002,
-            name: 'PRK Helmet',
-            ql: 150,
-            is_nano: false,
-            stats: [],
-            spell_data: [],
-            actions: [],
-          },
+          Head: createTestItem({ id: 2, aoid: 2002, name: 'PRK Helmet', ql: 150 }),
         },
-      } as any);
+      });
       await waitForUpdates();
 
       // Live AO has the rifle but not the helmet.
-      (apiClient.batchInterpolateItems as any).mockImplementation(
-        async (requests: Array<{ aoid: number; targetQl: number }>) => ({
-          results: requests.map((req) =>
+      vi.mocked(apiClient.batchInterpolateItems).mockImplementation(async (requests) =>
+        batchResponse(
+          requests.map((req) =>
             req.aoid === 2001
               ? {
                   aoid: req.aoid,
                   target_ql: req.targetQl,
                   success: true,
-                  item: {
+                  item: interpolatedItem({
                     id: 99,
                     aoid: req.aoid,
                     name: 'Live Rifle',
                     ql: req.targetQl,
-                    is_nano: false,
-                    stats: [],
-                    spell_data: [],
-                    actions: [],
-                  },
+                  }),
+                  error: null,
                 }
-              : { aoid: req.aoid, target_ql: req.targetQl, success: false, error: 'not found' }
-          ),
-        })
+              : {
+                  aoid: req.aoid,
+                  target_ql: req.targetQl,
+                  success: false,
+                  item: null,
+                  error: 'not found',
+                }
+          )
+        )
       );
 
       const result = await store.copyProfileToCurrentVersion(sourceId);
@@ -964,8 +950,9 @@ describe('Profile Management Integration', () => {
       expect(result.profile.id).not.toBe(sourceId);
       expect(result.profile.gameVersion).toBe(AO_LIVE);
       expect(result.profile.Weapons.RHand?.name).toBe('Live Rifle');
-      expect((result.profile.Clothing.Head as any).name).toBe('PRK Helmet');
-      expect((result.profile.Clothing.Head as any).missingInVersion).toBe(true);
+      const helmet = result.profile.Clothing.Head as VersionFlaggedItem;
+      expect(helmet.name).toBe('PRK Helmet');
+      expect(helmet.missingInVersion).toBe(true);
 
       // The original is untouched and still belongs to PRK.
       const original = await store.loadProfile(sourceId);

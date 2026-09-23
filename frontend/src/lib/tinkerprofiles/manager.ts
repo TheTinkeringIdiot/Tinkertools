@@ -721,7 +721,11 @@ export class TinkerProfilesManager {
       };
     }
 
-    const result = this.validator.validateProfile(profile);
+    // The v4 validator, as createProfile uses: the legacy ProfileValidator
+    // expects the pre-v4 shape (Skills categories, profession names) and
+    // rejects every current profile.
+    const { validateProfile } = await import('./validation');
+    const result: ProfileValidationResult = { ...validateProfile(profile), suggestions: [] };
 
     if (!result.valid && this.config.events.enabled) {
       this.events.emit('validation:failed', { profileId, errors: result.errors });
