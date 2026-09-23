@@ -166,6 +166,11 @@ def test_on_target_criteria_do_not_restrict_the_caster():
     assert minimum_level(LEET_FRIEND) == 25
 
 
+def test_disguise_criteria_leave_visual_profession_unknown():
+    # True Profession (PRK): an Agent whose VisualProfession isn't Agent
+    assert castable_professions([(60, 5, 0), (368, 5, 24), AND]) == [5]
+
+
 def test_on_user_returns_to_the_caster():
     assert castable_professions(SPIRIT_SIPHON) == [15]
 

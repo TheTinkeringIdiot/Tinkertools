@@ -2,7 +2,7 @@
 Nano programs API endpoints with rich spell data.
 """
 
-from typing import Optional
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload, selectinload, aliased
 from sqlalchemy import and_, or_, desc, asc, false, func, Integer
@@ -95,29 +95,112 @@ def parse_nano_from_item_and_spells(item: Item) -> NanoProgram:
     return NanoProgram(**nano_data)
 
 
+SCHOOL_QUERY = Query(
+    None,
+    description="Filter by school; repeat for several (school=Medical&school=Psi). "
+    "One of Combat, Medical, Protection, Psi, Space, or its NanoSchool value 1-5",
+)
+PROFESSION_QUERY = Query(
+    None,
+    description="Filter by profession name (e.g. Doctor) or id; repeat for several. "
+    "Matches nanos castable by any of them: those whose Use action allows one of "
+    "them, plus those whose Use action allows every profession",
+)
+STRAIN_QUERY = Query(None, description="Filter by strain")
+LEVEL_MIN_QUERY = Query(
+    None, description="Minimum of the lowest level that can cast it"
+)
+LEVEL_MAX_QUERY = Query(
+    None, description="Maximum of the lowest level that can cast it"
+)
+QL_MIN_QUERY = Query(None, description="Minimum quality level")
+QL_MAX_QUERY = Query(None, description="Maximum quality level")
+
+
+def _known_ids(values: Optional[List[str]], lookup) -> Optional[List[int]]:
+    """Ids of the names in ``values`` that ``lookup`` knows; None if no filter."""
+    if not values:
+        return None
+    return sorted({i for i in (lookup(v) for v in values) if i is not None})
+
+
+def filter_nanos(
+    query,
+    school: Optional[List[str]] = None,
+    profession: Optional[List[str]] = None,
+    strain: Optional[str] = None,
+    level_min: Optional[int] = None,
+    level_max: Optional[int] = None,
+    ql_min: Optional[int] = None,
+    ql_max: Optional[int] = None,
+    join_properties: bool = False,
+):
+    """Apply the /nanos filters to a query over nano Items, in SQL.
+
+    Filtering before paginating keeps total, pages and page contents in
+    agreement. school, profession and level come from nano_properties, the
+    row derived_nano_fields() reports; strain mirrors
+    parse_nano_from_item_and_spells(). Names that aren't a school or profession
+    are ignored, and a filter of only unknown names matches nothing, like an
+    unknown strain. ``join_properties`` joins nano_properties (outer) even when
+    no filter needs it, for sorting on it.
+    """
+    if ql_min is not None:
+        query = query.filter(Item.ql >= ql_min)
+    if ql_max is not None:
+        query = query.filter(Item.ql <= ql_max)
+    if strain:
+        query = query.filter(
+            Item.name.like("% - %"),
+            func.btrim(func.regexp_replace(Item.name, "^.* - ", ""), " \t\r\n")
+            == strain,
+        )
+
+    schools = _known_ids(school, nano_properties.school_id)
+    professions = _known_ids(profession, nano_properties.profession_id)
+    if (
+        schools is not None
+        or professions is not None
+        or level_min is not None
+        or level_max is not None
+    ):
+        query = query.join(NanoProperties, NanoProperties.item_id == Item.id)
+    elif join_properties:
+        query = query.outerjoin(NanoProperties, NanoProperties.item_id == Item.id)
+
+    if schools is not None:
+        query = query.filter(NanoProperties.school.in_(schools) if schools else false())
+    if professions is not None:
+        # An empty list is "no restriction" only for nanos with a Use action;
+        # the rest (level NULL) are procs and effects nobody casts
+        unrestricted = and_(
+            NanoProperties.professions == [], NanoProperties.min_level.isnot(None)
+        )
+        query = query.filter(
+            or_(NanoProperties.professions.overlap(professions), unrestricted)
+            if professions
+            else false()
+        )
+    if level_min is not None:
+        query = query.filter(NanoProperties.min_level >= level_min)
+    if level_max is not None:
+        query = query.filter(NanoProperties.min_level <= level_max)
+    return query
+
+
 @router.get("", response_model=PaginatedResponse[NanoProgram])
 @cached_response("nanos_list")
 @performance_monitor
 def get_nanos(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page"),
-    school: Optional[str] = Query(
-        None, description="Filter by school: Combat, Medical, Protection, Psi, Space"
-    ),
-    strain: Optional[str] = Query(None, description="Filter by strain"),
-    profession: Optional[str] = Query(
-        None,
-        description="Filter to nanos whose Use action limits casting to a set of "
-        "professions that includes this one (name, e.g. Doctor, or id)",
-    ),
-    level_min: Optional[int] = Query(
-        None, description="Minimum of the lowest level that can cast it"
-    ),
-    level_max: Optional[int] = Query(
-        None, description="Maximum of the lowest level that can cast it"
-    ),
-    ql_min: Optional[int] = Query(None, description="Minimum quality level"),
-    ql_max: Optional[int] = Query(None, description="Maximum quality level"),
+    school: Optional[List[str]] = SCHOOL_QUERY,
+    strain: Optional[str] = STRAIN_QUERY,
+    profession: Optional[List[str]] = PROFESSION_QUERY,
+    level_min: Optional[int] = LEVEL_MIN_QUERY,
+    level_max: Optional[int] = LEVEL_MAX_QUERY,
+    ql_min: Optional[int] = QL_MIN_QUERY,
+    ql_max: Optional[int] = QL_MAX_QUERY,
     sort_by: str = Query("name", description="Sort by: name, ql, level"),
     sort_desc: bool = Query(False, description="Sort descending"),
     db: Session = Depends(get_db),
@@ -128,46 +211,17 @@ def get_nanos(
     # Build base query WITHOUT relationship loading (for filtering + counting)
     query = db.query(Item).filter(Item.is_nano.is_(True))
 
-    # Apply basic filters
-    if ql_min is not None:
-        query = query.filter(Item.ql >= ql_min)
-    if ql_max is not None:
-        query = query.filter(Item.ql <= ql_max)
-
-    # Derived-field filters run in SQL before paginating, so total, pages and
-    # page contents agree. They mirror parse_nano_from_item_and_spells():
-    # strain is the name's text after its last " - ".
-    if strain:
-        query = query.filter(
-            Item.name.like("% - %"),
-            func.btrim(func.regexp_replace(Item.name, "^.* - ", ""), " \t\r\n")
-            == strain,
-        )
-    # school, profession and level come from nano_properties, the same row
-    # derived_nano_fields() reports. A name that isn't a school or profession
-    # matches nothing, like an unknown strain.
-    if school or profession or level_min is not None or level_max is not None:
-        query = query.join(NanoProperties, NanoProperties.item_id == Item.id)
-    elif sort_by == "level":
-        query = query.outerjoin(NanoProperties, NanoProperties.item_id == Item.id)
-    if school:
-        school_value = nano_properties.school_id(school)
-        query = query.filter(
-            NanoProperties.school == school_value
-            if school_value is not None
-            else false()
-        )
-    if profession:
-        profession_value = nano_properties.profession_id(profession)
-        query = query.filter(
-            NanoProperties.professions.contains([profession_value])
-            if profession_value is not None
-            else false()
-        )
-    if level_min is not None:
-        query = query.filter(NanoProperties.min_level >= level_min)
-    if level_max is not None:
-        query = query.filter(NanoProperties.min_level <= level_max)
+    query = filter_nanos(
+        query,
+        school=school,
+        profession=profession,
+        strain=strain,
+        level_min=level_min,
+        level_max=level_max,
+        ql_min=ql_min,
+        ql_max=ql_max,
+        join_properties=sort_by == "level",
+    )
 
     # Get total count on lightweight query (no relationship loading)
     total = query.count()
@@ -236,10 +290,18 @@ def search_nanos(
     q: str = Query(..., min_length=1, description="Search query"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page"),
+    school: Optional[List[str]] = SCHOOL_QUERY,
+    strain: Optional[str] = STRAIN_QUERY,
+    profession: Optional[List[str]] = PROFESSION_QUERY,
+    level_min: Optional[int] = LEVEL_MIN_QUERY,
+    level_max: Optional[int] = LEVEL_MAX_QUERY,
+    ql_min: Optional[int] = QL_MIN_QUERY,
+    ql_max: Optional[int] = QL_MAX_QUERY,
     db: Session = Depends(get_db),
 ):
     """
-    Search nano programs by name or description.
+    Search nano programs by name or description, with the same filters as
+    GET /nanos.
     """
     search_term = f"%{q}%"
     # Build base query WITHOUT relationship loading
@@ -248,6 +310,16 @@ def search_nanos(
             Item.is_nano.is_(True),
             or_(Item.name.ilike(search_term), Item.description.ilike(search_term)),
         )
+    )
+    query = filter_nanos(
+        query,
+        school=school,
+        profession=profession,
+        strain=strain,
+        level_min=level_min,
+        level_max=level_max,
+        ql_min=ql_min,
+        ql_max=ql_max,
     )
 
     # Get total count on lightweight query

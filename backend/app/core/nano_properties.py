@@ -167,17 +167,29 @@ def evaluate(
     return result, True
 
 
-def _with_profession(profession: int) -> Dict[int, int]:
-    return {STAT_PROFESSION: profession, STAT_VISUAL_PROFESSION: profession}
+def _with_profession(profession: int, visual: bool = True) -> Dict[int, int]:
+    known = {STAT_PROFESSION: profession}
+    if visual:
+        known[STAT_VISUAL_PROFESSION] = profession
+    return known
 
 
 def castable_professions(criteria: Sequence[Criterion]) -> List[int]:
-    """Player professions that can satisfy the criteria; [] if unrestricted."""
-    allowed = [
-        profession
-        for profession in PROFESSIONS
-        if evaluate(criteria, _with_profession(profession))[0] is not False
-    ]
+    """Player professions that can satisfy the criteria; [] if unrestricted.
+
+    VisualProfession is taken to be the caster's own profession, which it is
+    unless an Agent is disguised. When that leaves no profession at all, the
+    criteria are about the disguise (True Profession: Profession == Agent and
+    VisualProfession != Agent), so VisualProfession is left unknown instead.
+    """
+    for visual in (True, False):
+        allowed = [
+            profession
+            for profession in PROFESSIONS
+            if evaluate(criteria, _with_profession(profession, visual))[0] is not False
+        ]
+        if allowed:
+            break
     return [] if len(allowed) == len(PROFESSIONS) else allowed
 
 
