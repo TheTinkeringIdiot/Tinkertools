@@ -1,28 +1,22 @@
 import { ref, nextTick } from 'vue';
 
 export function useAccessibility() {
-  const announceText = ref('');
   const isLoading = ref(false);
 
-  // Announce text to screen readers
+  // Announce text to screen readers through the app-wide AccessibilityAnnouncer live regions
   const announce = (message: string, priority: 'polite' | 'assertive' = 'polite') => {
-    announceText.value = message;
-    // Clear after announcement to allow re-announcements of the same message
-    setTimeout(() => {
-      announceText.value = '';
-    }, 1000);
+    window.dispatchEvent(new CustomEvent(`announce-${priority}`, { detail: { message } }));
   };
 
   // Focus management utilities
-  const focusElement = (selector: string | HTMLElement) => {
-    nextTick(() => {
-      const element =
-        typeof selector === 'string' ? (document.querySelector(selector) as HTMLElement) : selector;
+  const focusElement = async (selector: string | HTMLElement) => {
+    await nextTick();
+    const element =
+      typeof selector === 'string' ? document.querySelector<HTMLElement>(selector) : selector;
 
-      if (element && typeof element.focus === 'function') {
-        element.focus();
-      }
-    });
+    if (element && typeof element.focus === 'function') {
+      element.focus();
+    }
   };
 
   // Skip to main content
@@ -107,7 +101,6 @@ export function useAccessibility() {
 
   return {
     // State
-    announceText,
     isLoading,
 
     // Methods
