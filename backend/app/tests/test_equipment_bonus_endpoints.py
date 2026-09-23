@@ -291,16 +291,12 @@ class TestEquipmentBonusEndpoints:
         mock_service = Mock()
         mock_service_class.return_value = mock_service
 
-        # Mock different bonuses for different items
-        def mock_breakdown(item_id):
-            if item_id == 1:
-                return {16: 25, 19: 10}
-            elif item_id == 2:
-                return {20: 15}
-            else:
-                return {}
-
-        mock_service.get_item_bonus_breakdown.side_effect = mock_breakdown
+        # The endpoint fetches every item in one batch query; item 3 has no
+        # bonuses and is absent from the batch result
+        mock_service._get_item_bonuses_with_item_id.return_value = {
+            1: {16: 25, 19: 10},
+            2: {20: 15},
+        }
 
         # Make request
         response = client.post("/api/v1/equipment-bonuses/batch-items", json=[1, 2, 3])
@@ -320,8 +316,8 @@ class TestEquipmentBonusEndpoints:
         assert data[2]["item_id"] == 3
         assert data[2]["bonuses"] == {}
 
-        # Verify service calls
-        assert mock_service.get_item_bonus_breakdown.call_count == 3
+        # Verify all items were fetched in a single batch call
+        mock_service._get_item_bonuses_with_item_id.assert_called_once_with([1, 2, 3])
 
     @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
     def test_batch_item_bonus_details_single_item(self, mock_service_class, client):
@@ -329,7 +325,7 @@ class TestEquipmentBonusEndpoints:
         # Setup mock service
         mock_service = Mock()
         mock_service_class.return_value = mock_service
-        mock_service.get_item_bonus_breakdown.return_value = {16: 50}
+        mock_service._get_item_bonuses_with_item_id.return_value = {1: {16: 50}}
 
         # Make request
         response = client.post("/api/v1/equipment-bonuses/batch-items", json=[1])
@@ -378,7 +374,9 @@ class TestEquipmentBonusEndpoints:
         # Setup mock service to raise exception
         mock_service = Mock()
         mock_service_class.return_value = mock_service
-        mock_service.get_item_bonus_breakdown.side_effect = Exception("Database error")
+        mock_service._get_item_bonuses_with_item_id.side_effect = Exception(
+            "Database error"
+        )
 
         # Make request
         response = client.post("/api/v1/equipment-bonuses/batch-items", json=[1, 2])
