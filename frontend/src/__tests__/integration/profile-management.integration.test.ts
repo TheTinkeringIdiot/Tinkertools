@@ -7,6 +7,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Component } from 'vue';
+import type { VueWrapper } from '@vue/test-utils';
 import {
   setupIntegrationTest,
   mountForIntegration,
@@ -104,6 +105,13 @@ describe('Profile Management Integration', () => {
       },
     };
 
+    // Creation is async (it saves to storage and activates the profile); the
+    // modal emits `created` once it is done.
+    async function waitForProfileCreated(wrapper: VueWrapper) {
+      await vi.waitFor(() => expect(wrapper.emitted('created')).toHaveLength(1));
+      await waitForUpdates(wrapper);
+    }
+
     function mountCreateModal() {
       return mountForIntegration(ProfileCreateModal, {
         pinia: context.pinia,
@@ -127,7 +135,7 @@ describe('Profile Management Integration', () => {
 
       // Submit form
       await wrapper.find('form').trigger('submit');
-      await waitForUpdates(wrapper, 50);
+      await waitForProfileCreated(wrapper);
 
       // Verify profile was created
       const metadata = store.profileMetadata;
@@ -175,7 +183,7 @@ describe('Profile Management Integration', () => {
 
       await wrapper.find('#profile-name').setValue('ActiveCharacter');
       await wrapper.find('form').trigger('submit');
-      await waitForUpdates(wrapper, 50);
+      await waitForProfileCreated(wrapper);
 
       // "Set as active" is checked by default
       expect(store.activeProfileId).toBe(store.profileMetadata[0].id);
@@ -198,7 +206,7 @@ describe('Profile Management Integration', () => {
       await waitForUpdates(wrapper);
 
       await wrapper.find('form').trigger('submit');
-      await waitForUpdates(wrapper, 50);
+      await waitForProfileCreated(wrapper);
 
       // Verify all fields were saved (profession and breed as numeric IDs)
       const profile = await store.loadProfile(store.profileMetadata[0].id);
