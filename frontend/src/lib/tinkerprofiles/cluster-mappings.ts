@@ -245,7 +245,7 @@ const CLUSTER_NAME_TO_SKILL_NAME: Record<string, string> = {
 function buildClusterMapping() {
   const mapping: Record<number, { stat: number; skillName: string; longName: string }> = {};
 
-  for (const [altName, clusterId, effectTypeId, longName] of CLUSTER_DATA) {
+  for (const [, clusterId, , longName] of CLUSTER_DATA) {
     const id = clusterId as number;
     const name = longName as string;
 

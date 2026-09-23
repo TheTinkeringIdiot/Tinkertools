@@ -7,7 +7,7 @@
 import type { TinkerProfile, NanoCompatibleProfile, SkillData } from './types';
 import type { PerkSystem } from './perk-types';
 import { getBreedInitValue, calcHP, calcNP } from './ip-calculator';
-import { getBreedId, normalizeBreedToId, normalizeProfessionToId } from '../../services/game-utils';
+import { getBreedId, normalizeBreedToId } from '../../services/game-utils';
 import { skillService } from '../../services/skill-service';
 
 // Import BASE_SKILL constant from ip-calculator
@@ -331,19 +331,6 @@ function createDefaultPerkSystem(level: number = 1, alienLevel: number = 0): Per
 }
 
 /**
- * Get breed ID from breed name
- */
-function getBreedIdFromBreedName(breed: string): number {
-  const breedMap: Record<string, number> = {
-    Solitus: 1,
-    Opifex: 2,
-    Nanomage: 3,
-    Atrox: 4,
-  };
-  return breedMap[breed] || 1; // Default to Solitus
-}
-
-/**
  * Create default v4.0.0 skills map for a breed
  * Initializes all ~168 skills with appropriate base values
  */
@@ -414,8 +401,8 @@ export function createDefaultProfile(
     Character: {
       Name: name,
       Level: 1,
-      Profession: professionId as any, // Store as numeric ID
-      Breed: breedId as any, // Store as numeric ID
+      Profession: professionId, // Store as numeric ID
+      Breed: breedId, // Store as numeric ID
       Faction: 'Neutral',
       Expansion: 'Lost Eden',
       AccountType: 'Paid',

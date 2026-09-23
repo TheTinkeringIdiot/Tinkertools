@@ -6,13 +6,12 @@
  */
 
 import type { TinkerProfile, IPTracker, SkillData } from './types';
+import type { Item } from '@/types/api';
 import {
   accountTypeToExpansionBitflag,
   specializationLevelToBitflag,
 } from '@/utils/expansion-utils';
 import {
-  calcIP,
-  calcTitleLevel,
   calcTotalAbilityCost,
   calcTotalSkillCost,
   calcAllTrickleDown,
@@ -21,30 +20,20 @@ import {
   calcIPAnalysis,
   validateCharacterBuild,
   getBreedInitValue,
-  ABILITY_NAMES,
-  ABILITY_INDEX_TO_STAT_ID,
   type CharacterStats,
   type IPCalculationResult,
 } from './ip-calculator';
 
-import { getSkillId, getSkillName } from './skill-mappings';
 import { recalculateHealthAndNano } from '@/services/profile-update-service';
 import { calculateEquipmentBonuses } from '../../services/equipment-bonus-calculator';
 import { calculatePerkBonuses as calculatePerkBonusesService } from '../../services/perk-bonus-calculator';
 import { calculateNanoBonuses } from '../../services/nano-bonus-calculator';
-import { SKILL_PATTERNS } from '../../utils/skill-patterns';
 import { skillService } from '../../services/skill-service';
 import { SKILL_COST_FACTORS } from '../../services/game-data';
-import type { AnyPerkEntry } from './perk-types';
 
 // ============================================================================
 // Skill Classification Constants
 // ============================================================================
-
-/**
- * Attribute stat IDs (have breed base values, can be improved with IP)
- */
-const ATTRIBUTE_IDS = new Set([16, 17, 18, 19, 20, 21]);
 
 /**
  * Trainable skill IDs (have IP costs defined in game data)
@@ -227,7 +216,7 @@ function calculatePerkBonuses(profile: TinkerProfile): Record<number, number> {
 
   try {
     // Collect all equipped perks (both SL/AI perks and LE research)
-    const allPerkItems: any[] = [];
+    const allPerkItems: Item[] = [];
 
     // Add SL/AI perks that have item data
     if (profile.PerksAndResearch.perks && Array.isArray(profile.PerksAndResearch.perks)) {
@@ -430,9 +419,8 @@ export function updateProfileSkillInfo(
 
   // Update abilities (skill IDs 16-21)
   const abilityStatIds = [16, 17, 18, 19, 20, 21]; // Strength, Stamina, Agility, Sense, Intelligence, Psychic
-  const abilityIndexToStatId = [16, 18, 17, 20, 19, 21]; // Maps ABILITY_INDEX_TO_STAT_ID order
 
-  abilityStatIds.forEach((abilityStatId, index) => {
+  abilityStatIds.forEach((abilityStatId) => {
     const skillData = profile.skills[abilityStatId];
     if (skillData) {
       const breedInitValue = getBreedInitValue(characterStats.breed, abilityStatId);
@@ -780,7 +768,7 @@ export function validateProfileIP(profile: TinkerProfile): {
             `${skillName} is near its natural cap (${skillData.total}/${baseSkillCap})`
           );
         }
-      } catch (error) {
+      } catch {
         // Skip invalid skill IDs
       }
     }
@@ -866,7 +854,7 @@ export function modifySkill(
   let skillName: string;
   try {
     skillName = skillService.getName(skillId);
-  } catch (error) {
+  } catch {
     return {
       success: false,
       error: `Invalid skill ID: ${skillId}`,

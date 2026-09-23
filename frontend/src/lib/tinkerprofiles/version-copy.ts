@@ -13,7 +13,7 @@
 
 import { toRaw } from 'vue';
 import type { Item } from '@/types/api';
-import type { TinkerProfile, ImplantWithClusters } from './types';
+import type { TinkerProfile, ImplantWithClusters, VersionFlaggedItem } from './types';
 import { ProfileTransformer } from './transformer';
 import { gameVersionDisplayName } from './game-version';
 
@@ -214,7 +214,10 @@ export function describeCopyTarget(targetVersion: string): string {
   return gameVersionDisplayName(targetVersion);
 }
 
-function getSlotItem(profile: TinkerProfile, location: ItemLocation): any {
+function getSlotItem(
+  profile: TinkerProfile,
+  location: ItemLocation
+): VersionFlaggedItem | null | undefined {
   switch (location.kind) {
     case 'weapon':
       return profile.Weapons?.[location.slot];
@@ -229,7 +232,12 @@ function getSlotItem(profile: TinkerProfile, location: ItemLocation): any {
   }
 }
 
-function setSlotItem(profile: TinkerProfile, location: ItemLocation, value: any): void {
+/** Implant slots take an ImplantWithClusters; every other location a plain item. */
+function setSlotItem(
+  profile: TinkerProfile,
+  location: ItemLocation,
+  value: VersionFlaggedItem | ImplantWithClusters
+): void {
   switch (location.kind) {
     case 'weapon':
       profile.Weapons[location.slot] = value;
@@ -238,7 +246,7 @@ function setSlotItem(profile: TinkerProfile, location: ItemLocation, value: any)
       profile.Clothing[location.slot] = value;
       return;
     case 'implant':
-      profile.Implants[location.slot] = value;
+      if ('slot' in value && 'type' in value) profile.Implants[location.slot] = value;
       return;
     case 'buff':
       if (profile.buffs) profile.buffs[location.index] = value;
@@ -266,22 +274,21 @@ function flagMissing(profile: TinkerProfile, location: ItemLocation): void {
  * because this snapshot is now verified against the target version.
  */
 function applyResolvedItem(profile: TinkerProfile, location: ItemLocation, found: Item): void {
-  const existing = getSlotItem(profile, location);
+  // Drop the flag in case the resolved item carried one over
+  const resolved: VersionFlaggedItem = { ...found };
+  delete resolved.missingInVersion;
 
-  if (location.kind === 'implant' && existing) {
-    const previous = existing as ImplantWithClusters;
+  const previous = location.kind === 'implant' ? profile.Implants?.[location.slot] : null;
+  if (previous) {
     const merged: ImplantWithClusters = {
-      ...(found as any),
+      ...resolved,
       slot: previous.slot,
       type: previous.type,
       ...(previous.clusters ? { clusters: previous.clusters } : {}),
     };
-    delete (merged as any).missingInVersion;
     setSlotItem(profile, location, merged);
     return;
   }
 
-  const merged: any = { ...found };
-  delete merged.missingInVersion;
-  setSlotItem(profile, location, merged);
+  setSlotItem(profile, location, resolved);
 }

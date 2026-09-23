@@ -6,7 +6,7 @@
  */
 
 import type { TinkerProfile, ProfileStorageOptions, ProfileMetadata } from './types';
-import { STORAGE_KEYS, CURRENT_VERSION } from './constants';
+import { STORAGE_KEYS } from './constants';
 import { toRaw } from 'vue';
 import { getProfessionName, getBreedName } from '../../services/game-utils';
 import { currentGameVersion, stampGameVersion } from './game-version';
@@ -355,13 +355,13 @@ export class ProfileStorage {
   // Compression (Future Enhancement)
   // ============================================================================
 
-  private async compress(data: any): Promise<string> {
+  private async compress(data: TinkerProfile): Promise<string> {
     // For now, just return JSON string
     // In future, could implement actual compression
     return JSON.stringify(data);
   }
 
-  private async decompress(data: string): Promise<any> {
+  private async decompress(data: string): Promise<TinkerProfile> {
     // For now, just parse JSON
     // In future, could implement actual decompression
     return JSON.parse(data);
@@ -411,22 +411,6 @@ export class ProfileStorage {
       throw new Error(
         `Failed to update profile index: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
-    }
-  }
-
-  /**
-   * Save all profiles to storage (DEPRECATED - kept for backward compatibility)
-   */
-  private async saveAllProfiles(profiles: Map<string, TinkerProfile>): Promise<void> {
-    // This method is no longer used but kept to avoid breaking changes
-    // Individual profiles are now saved separately
-    console.warn(
-      '[ProfileStorage] saveAllProfiles is deprecated - profiles are now saved individually'
-    );
-
-    // Save each profile individually
-    for (const [id, profile] of Array.from(profiles.entries())) {
-      await this.saveProfile(profile);
     }
   }
 
@@ -534,7 +518,7 @@ export class ProfileStorage {
         total: 5 * 1024 * 1024, // 5MB typical localStorage limit
         profiles: profiles,
       };
-    } catch (error) {
+    } catch {
       return { used: 0, total: 0, profiles: 0 };
     }
   }
@@ -569,7 +553,7 @@ export class ProfileStorage {
 
       const index = JSON.parse(indexData);
       return index.length;
-    } catch (error) {
+    } catch {
       return 0;
     }
   }

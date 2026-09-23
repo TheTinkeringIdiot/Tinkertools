@@ -414,8 +414,6 @@ export function calcAbilityIPAdjustableRange(
     return 3;
   }
 
-  const tl = calcTitleLevel(level);
-
   let adjustableRange: number;
 
   if (level < 201) {
@@ -433,9 +431,7 @@ export function calcAbilityIPAdjustableRange(
         console.warn(`[calcAbilityIPAdjustableRange] Invalid rateData at costIndex ${costIndex}`);
         adjustableRange = 0;
       } else {
-        let cap: number;
-
-        cap = Math.min(
+        const cap = Math.min(
           level * 3 + breedBase,
           BREED_ABILITY_DATA.caps_pre201[breed]?.[abilityIndex]
         ); // Breed-specific pre-201 cap

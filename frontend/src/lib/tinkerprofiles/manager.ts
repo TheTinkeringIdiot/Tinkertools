@@ -12,7 +12,6 @@ import type {
   ProfileImportResult,
   ProfileImportOptions,
   ProfileValidationResult,
-  ProfileStorageOptions,
   ProfileEvents,
   TinkerProfilesConfig,
   ProfileSearchFilters,
@@ -23,7 +22,7 @@ import type {
 import { ProfileStorage } from './storage';
 import { ProfileValidator } from './validator';
 import { ProfileTransformer } from './transformer';
-import { createDefaultProfile, createDefaultNanoProfile } from './constants';
+import { createDefaultProfile } from './constants';
 import { currentGameVersion, stampGameVersion } from './game-version';
 import { buildVersionCopy, type ProfileVersionCopyResult } from './version-copy';
 import { ipIntegrator } from './ip-integrator';
@@ -200,7 +199,7 @@ export class TinkerProfilesManager {
       if (profile) {
         // Ensure IP tracking is initialized
         if (!profile.IPTracker) {
-          profile = await ipIntegrator.recalculateProfileIP(profile);
+          profile = ipIntegrator.recalculateProfileIP(profile);
           await this.storage.saveProfile(profile); // Save the updated profile
         }
 
@@ -244,26 +243,20 @@ export class TinkerProfilesManager {
         throw new Error('Profile not found');
       }
 
+      // Apply non-equipment updates as-is
+      const { Weapons, Clothing, Implants, ...otherUpdates } = updates;
+      let updated: TinkerProfile = { ...existing, ...otherUpdates };
+
       // Deep merge equipment updates to preserve other slots
-      let updated = { ...existing };
-
-      // Handle equipment updates specially to preserve other slots
-      if (updates.Weapons) {
-        updated.Weapons = { ...existing.Weapons, ...updates.Weapons };
+      if (Weapons) {
+        updated.Weapons = { ...existing.Weapons, ...Weapons };
       }
-      if (updates.Clothing) {
-        updated.Clothing = { ...existing.Clothing, ...updates.Clothing };
+      if (Clothing) {
+        updated.Clothing = { ...existing.Clothing, ...Clothing };
       }
-      if (updates.Implants) {
-        updated.Implants = { ...existing.Implants, ...updates.Implants };
+      if (Implants) {
+        updated.Implants = { ...existing.Implants, ...Implants };
       }
-
-      // Apply other updates
-      Object.keys(updates).forEach((key) => {
-        if (key !== 'Weapons' && key !== 'Clothing' && key !== 'Implants') {
-          (updated as any)[key] = (updates as any)[key];
-        }
-      });
 
       updated.updated = new Date().toISOString();
 
@@ -277,7 +270,7 @@ export class TinkerProfilesManager {
 
       if (needsRecalc) {
         // Recalculate all stats including equipment bonuses, perk bonuses, etc
-        updated = await ipIntegrator.recalculateProfileIP(updated);
+        updated = ipIntegrator.recalculateProfileIP(updated);
       }
 
       // Validate the updated profile
@@ -428,7 +421,7 @@ export class TinkerProfilesManager {
     const copyResult = await buildVersionCopy(source, targetVersion, this.transformer);
 
     // Recompute IP, caps and bonuses against the newly resolved equipment.
-    const recalculated = await ipIntegrator.recalculateProfileIP(copyResult.profile);
+    const recalculated = ipIntegrator.recalculateProfileIP(copyResult.profile);
     Object.assign(copyResult.profile, recalculated);
     copyResult.profile.gameVersion = targetVersion;
 
@@ -505,7 +498,7 @@ export class TinkerProfilesManager {
     // Apply sorting
     if (sort) {
       filtered.sort((a, b) => {
-        let aVal: any, bVal: any;
+        let aVal: string | number, bVal: string | number;
 
         switch (sort.field) {
           case 'name':
@@ -521,12 +514,12 @@ export class TinkerProfilesManager {
             bVal = b.level;
             break;
           case 'created':
-            aVal = new Date(a.created);
-            bVal = new Date(b.created);
+            aVal = new Date(a.created).getTime();
+            bVal = new Date(b.created).getTime();
             break;
           case 'updated':
-            aVal = new Date(a.updated);
-            bVal = new Date(b.updated);
+            aVal = new Date(a.updated).getTime();
+            bVal = new Date(b.updated).getTime();
             break;
           default:
             return 0;
@@ -769,7 +762,7 @@ export class TinkerProfilesManager {
       throw new Error('Profile not found');
     }
 
-    const updatedProfile = await ipIntegrator.recalculateProfileIP(profile);
+    const updatedProfile = ipIntegrator.recalculateProfileIP(profile);
     await this.updateProfile(profileId, updatedProfile);
   }
 
@@ -810,7 +803,7 @@ export class TinkerProfilesManager {
       throw new Error('Profile not found');
     }
 
-    const result = await ipIntegrator.modifySkill(profile, skillId, newValue);
+    const result = ipIntegrator.modifySkill(profile, skillId, newValue);
 
     if (result.success && result.updatedProfile) {
       await this.updateProfile(profileId, result.updatedProfile);
@@ -838,7 +831,7 @@ export class TinkerProfilesManager {
       throw new Error('Profile not found');
     }
 
-    const result = await ipIntegrator.modifyAbility(profile, abilityId, newValue);
+    const result = ipIntegrator.modifyAbility(profile, abilityId, newValue);
 
     if (result.success && result.updatedProfile) {
       await this.updateProfile(profileId, result.updatedProfile);

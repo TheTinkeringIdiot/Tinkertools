@@ -5,19 +5,16 @@
  * for all three perk types: SL Perks, AI Perks, and LE Research
  */
 
-import type { TinkerProfile, IPTracker } from './types';
+import type { TinkerProfile } from './types';
 import type {
   PerkSystem,
   PerkEntry,
   ResearchEntry,
   PerkValidationResult,
   PerkEffectSummary,
-  PerkCharacterData,
   PerkPointCalculation,
   PerkChangeEvent,
   PerkInfo,
-  PerkEffect,
-  AnyPerkEntry,
 } from './perk-types';
 
 import { getBreedName, getProfessionName } from '../../services/game-utils';
@@ -462,9 +459,6 @@ export class PerkManager {
     }
 
     const effects: PerkEffectSummary = {};
-
-    // Process all equipped perks (both SL/AI and LE research)
-    const allPerks = [...profile.PerksAndResearch.perks, ...profile.PerksAndResearch.research];
 
     // TODO: This will need to be implemented once we have perk data in the database
     // For now, return empty effects
