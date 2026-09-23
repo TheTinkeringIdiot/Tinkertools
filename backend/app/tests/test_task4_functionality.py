@@ -25,6 +25,7 @@ class TestTask4Endpoints:
         mock_query = Mock()
         mock_query.options.return_value = mock_query
         mock_query.filter.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
         mock_query.distinct.return_value = mock_query
         mock_query.count.return_value = 0
         mock_query.offset.return_value = mock_query
@@ -264,6 +265,7 @@ class TestPaginationConsistency:
             if endpoint == "/api/v1/items":
                 mock_query.options.return_value = mock_query
             mock_query.filter.return_value = mock_query
+            mock_query.order_by.return_value = mock_query
             mock_query.distinct.return_value = mock_query
             mock_query.count.return_value = 10
             mock_query.offset.return_value = mock_query
@@ -379,6 +381,7 @@ class TestEndpointResponseStructure:
             if endpoint == "/api/v1/items":
                 mock_query.options.return_value = mock_query
             mock_query.filter.return_value = mock_query
+            mock_query.order_by.return_value = mock_query
             mock_query.distinct.return_value = mock_query
             mock_query.count.return_value = 1
             mock_query.offset.return_value = mock_query

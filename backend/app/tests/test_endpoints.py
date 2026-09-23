@@ -431,33 +431,35 @@ class TestItemListAndSearchEndpoints:
         self._assert_matches_db(items[pistol_mastery.aoid], pistol_mastery)
 
     def test_pagination(self, client, db_session, pistol_mastery):
-        """Test pagination functionality."""
+        """Test that search pages partition the full result set."""
+        # The term matches several items sharing a name ("Nano Can: Pistol
+        # Mastery"), so pages only partition cleanly with a unique sort order
         term = pistol_mastery.name
-        expected_total = (
-            db_session.query(Item)
-            .filter(
+        expected_ids = {
+            item_id
+            for (item_id,) in db_session.query(Item.id).filter(
                 or_(Item.name.ilike(f"%{term}%"), Item.description.ilike(f"%{term}%"))
             )
-            .count()
-        )
+        }
         page_size = 5
-        assert expected_total > page_size
+        expected_pages = math.ceil(len(expected_ids) / page_size)
+        assert expected_pages > 1
 
-        first = client.get(f"/api/v1/items/search?q={term}&page=1&page_size=5")
-        assert first.status_code == 200
-        data = first.json()
-        assert data["total"] == expected_total
-        assert data["pages"] == math.ceil(expected_total / page_size)
-        assert len(data["items"]) == page_size
-        assert data["has_next"] is True
-        assert data["has_prev"] is False
+        seen_ids = []
+        for page in range(1, expected_pages + 1):
+            response = client.get(
+                f"/api/v1/items/search?q={term}&page={page}&page_size={page_size}"
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["total"] == len(expected_ids)
+            assert data["pages"] == expected_pages
+            assert data["has_prev"] is (page > 1)
+            assert data["has_next"] is (page < expected_pages)
+            seen_ids.extend(item["id"] for item in data["items"])
 
-        second = client.get(f"/api/v1/items/search?q={term}&page=2&page_size=5")
-        assert second.status_code == 200
-        second_data = second.json()
-        assert second_data["has_prev"] is True
-        first_ids = {item["id"] for item in data["items"]}
-        assert first_ids.isdisjoint(item["id"] for item in second_data["items"])
+        assert len(seen_ids) == len(set(seen_ids))
+        assert set(seen_ids) == expected_ids
 
     def test_search_with_exact_match_parameter(self, client, pistol_mastery):
         """Test search with exact_match parameter."""

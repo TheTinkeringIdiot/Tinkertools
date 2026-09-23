@@ -443,9 +443,14 @@ def get_items(
     pages = math.ceil(total / page_size) if total > 0 else 1
     offset = (page - 1) * page_size
 
-    # Load relationships only for the paginated result set
+    # Load relationships only for the paginated result set. A unique ORDER BY
+    # keeps OFFSET pages from repeating or skipping rows.
     items = (
-        query.options(*item_detail_load_options()).offset(offset).limit(page_size).all()
+        query.order_by(Item.id)
+        .options(*item_detail_load_options())
+        .offset(offset)
+        .limit(page_size)
+        .all()
     )
 
     # Build detailed response items in bulk
@@ -559,7 +564,8 @@ def search_items(
         else:
             query = query.filter(or_(*search_conditions))
 
-        query = query.order_by(Item.name)
+        # Item.id breaks name ties so OFFSET pages never overlap
+        query = query.order_by(Item.name, Item.id)
 
         # Apply weapons filter
         if weapons:
@@ -596,13 +602,16 @@ def search_items(
         # Apply weapons filter
         if weapons:
             query = (
-                query.filter(Item.atkdef_id.isnot(None)).distinct().order_by(Item.name)
+                query.filter(Item.atkdef_id.isnot(None))
+                .distinct()
+                .order_by(Item.name, Item.id)
             )
         else:
             query = query.order_by(
                 func.ts_rank(
                     func.to_tsvector("english", search_expression), ts_query
-                ).desc()
+                ).desc(),
+                Item.id,
             )
 
     # Quality level range (endpoint-specific: validated 1-999 here)
@@ -739,9 +748,9 @@ def filter_items_advanced(
         sort_column = Item.name
 
     if sort_order == "desc":
-        query = query.order_by(sort_column.desc())
+        query = query.order_by(sort_column.desc(), Item.id)
     else:
-        query = query.order_by(sort_column.asc())
+        query = query.order_by(sort_column.asc(), Item.id)
 
     # Get total count on lightweight query (no relationship loading)
     total = query.count()
@@ -929,8 +938,8 @@ def get_items_with_stats(
     pages = math.ceil(total / page_size) if total > 0 else 1
     offset = (page - 1) * page_size
 
-    # Get items for current page
-    items = query.offset(offset).limit(page_size).all()
+    # Get items for current page (unique ORDER BY keeps OFFSET pages stable)
+    items = query.order_by(Item.id).offset(offset).limit(page_size).all()
 
     # Log performance metrics
     query_time = time.time() - start_time
