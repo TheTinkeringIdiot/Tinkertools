@@ -349,6 +349,7 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
+import Sidebar from 'primevue/sidebar';
 import type { Item, TinkerProfile } from '@/types/api';
 
 interface ComparisonScore {
