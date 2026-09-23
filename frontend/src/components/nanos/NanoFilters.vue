@@ -124,10 +124,13 @@ filters check the active profile client-side
         <div class="flex items-center gap-2">
           <Checkbox v-model="castable" input-id="fully-castable" binary />
           <label
+            v-tooltip.right="
+              'Nothing your profile can check stops it. Conditions it can\'t check (a nano not already running, a perk, the target...) are listed on the nano.'
+            "
             for="fully-castable"
             class="text-sm text-surface-700 dark:text-surface-300 cursor-pointer"
           >
-            Fully Castable (All Requirements)
+            Castable
           </label>
         </div>
       </div>

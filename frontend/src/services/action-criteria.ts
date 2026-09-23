@@ -50,6 +50,24 @@ export interface DisplayCriterion {
   modifierType?: 'target' | 'caster';
   isTargetRequirement?: boolean;
   isCasterRequirement?: boolean;
+  /**
+   * A condition on game state rather than a stat (fighting, flying, a perk
+   * trained, an item worn...): mostly not something a profile records
+   */
+  isConditionRequirement?: boolean;
+  /** The operator of a condition requirement */
+  conditionOperator?: number;
+}
+
+/** A requirement a character fails, as checkActionRequirements reports it */
+export interface UnmetRequirement {
+  stat: number;
+  statName: string;
+  required: number;
+  current: number;
+  operator: string;
+  /** Set when the requirement reads better as text than as stat, operator and value */
+  description?: string;
 }
 
 export interface CriteriaExpression {
@@ -118,9 +136,36 @@ const STATE_OPERATORS = {
 } as const;
 
 const MODIFIER_OPERATORS = {
-  18: 'target', // Next criterion applies to target, not caster
-  100: 'caster', // Next criterion applies to caster
+  18: 'target', // OnTarget: next criterion applies to target, not caster
+  110: 'target', // OnFightingTarget
+  19: 'caster', // OnSelf
+  26: 'caster', // OnUser
+  100: 'caster', // OnCaster: next criterion applies to caster
 } as const;
+
+/** Operators that compare a stat with a value; every other one is a condition */
+const STAT_OPERATORS = new Set([0, 1, 2, 22, 24, 107]);
+
+/** Conditions a player character never meets */
+const NEVER_MET_BY_PLAYERS = new Set([44, 122, 99]); // StateIsNpc, StateIsBossNpc, False
+
+/** Conditions always met */
+const ALWAYS_MET = new Set([98]); // True
+
+/** Whether a display criterion is a requirement (not an operator, modifier or separator) */
+function isRequirement(criterion: DisplayCriterion): boolean {
+  return (
+    criterion.isStatRequirement ||
+    !!criterion.isFunctionOperator ||
+    !!criterion.isConditionRequirement
+  );
+}
+
+/** "PerkNotLocked" -> "Perk not locked" */
+function humanizeOperatorName(name: string): string {
+  const words = name.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 // ============================================================================
 // Core Parsing Functions
@@ -173,8 +218,26 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
     };
   }
 
+  // State conditions (most carry no stat or value)
+  if (operator in STATE_OPERATORS) {
+    return {
+      id,
+      stat,
+      statName,
+      displayValue: value,
+      displayOperator: 'state',
+      displaySymbol: 'state',
+      description: STATE_OPERATORS[operator as keyof typeof STATE_OPERATORS],
+      isLogicalOperator: false,
+      isSeparator: false,
+      isStatRequirement: false,
+      isConditionRequirement: true,
+      conditionOperator: operator,
+    };
+  }
+
   // Check for logical operators (separators and logical ops)
-  if (stat === 0 && value === 0) {
+  if (stat === 0 && value === 0 && (operator in LOGICAL_OPERATORS || !(operator in OPERATOR))) {
     const isLogicalOp = operator in LOGICAL_OPERATORS;
     const isSeparator = operator === 4; // AND used as separator
 
@@ -194,22 +257,6 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
         : `Operator ${operator}`,
       isLogicalOperator: isLogicalOp,
       isSeparator,
-      isStatRequirement: false,
-    };
-  }
-
-  // Handle state operators
-  if (operator in STATE_OPERATORS) {
-    return {
-      id,
-      stat,
-      statName,
-      displayValue: value,
-      displayOperator: 'state',
-      displaySymbol: 'state',
-      description: STATE_OPERATORS[operator as keyof typeof STATE_OPERATORS],
-      isLogicalOperator: false,
-      isSeparator: false,
       isStatRequirement: false,
     };
   }
@@ -310,6 +357,27 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
     };
   }
 
+  // Any other known operator is a condition we can name but not evaluate
+  // (perks, items worn, quests, other state checks...)
+  if (!STAT_OPERATORS.has(operator)) {
+    const operatorName = OPERATOR[operator as keyof typeof OPERATOR] || `Operator ${operator}`;
+    const subject = stat !== 0 ? ` ${statName}` : '';
+    return {
+      id,
+      stat,
+      statName,
+      displayValue: value,
+      displayOperator: operatorName,
+      displaySymbol: 'condition',
+      description: `${humanizeOperatorName(operatorName)}${subject}${value !== 0 ? ` ${value}` : ''}`,
+      isLogicalOperator: false,
+      isSeparator: false,
+      isStatRequirement: false,
+      isConditionRequirement: true,
+      conditionOperator: operator,
+    };
+  }
+
   // Handle standard stat requirements with transformations
   let displayValue = value;
   let displayOperator = '=';
@@ -356,11 +424,6 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
       displaySymbol = 'lacks';
       description = `${statName} lacks ${getFlagNameFromValue(stat, value)}`;
       break;
-
-    default:
-      displayOperator = `Op${operator}`;
-      displaySymbol = `Op${operator}`;
-      description = `${statName} ${displaySymbol} ${displayValue}`;
   }
 
   return {
@@ -567,112 +630,117 @@ export function getCriteriaRequirements(criteria: Criterion[]): CriteriaRequirem
 }
 
 /**
- * Check if character meets action requirements
+ * Check if character meets action requirements.
+ *
+ * Requirements the character's stats can't decide (running nanos, perks,
+ * game state, requirements on the target) are neither met nor unmet: when
+ * nothing checked fails but one of them decides the outcome, the status is
+ * 'unknown' and they are listed as unverifiedRequirements.
  */
 export function checkActionRequirements(
   action: ParsedAction,
   characterStats: Record<number, number>
 ): {
   canPerform: boolean;
-  unmetRequirements: Array<{
-    stat: number;
-    statName: string;
-    required: number;
-    current: number;
-    operator: string;
-  }>;
+  status: 'met' | 'unmet' | 'unknown';
+  unmetRequirements: UnmetRequirement[];
+  unverifiedRequirements: DisplayCriterion[];
 } {
   // Handle empty criteria
   if (!action.rawCriteria || action.rawCriteria.length === 0) {
-    return { canPerform: true, unmetRequirements: [] };
+    return { canPerform: true, status: 'met', unmetRequirements: [], unverifiedRequirements: [] };
   }
 
   // Build and evaluate criteria tree
   const tree = buildCriteriaTree(action.rawCriteria, characterStats);
+  if (!tree) {
+    return { canPerform: true, status: 'met', unmetRequirements: [], unverifiedRequirements: [] };
+  }
 
-  // Tree evaluation result tells us if requirements are met
-  const canPerform = tree ? tree.status === 'met' : true;
+  const status = tree.status === 'met' ? 'met' : tree.status === 'unknown' ? 'unknown' : 'unmet';
 
-  // Collect unmet requirements from tree
-  const unmetRequirements = tree ? collectUnmetRequirements(tree, characterStats) : [];
-
-  return { canPerform, unmetRequirements };
+  return {
+    canPerform: status === 'met',
+    status,
+    unmetRequirements: status === 'unmet' ? collectUnmetRequirements(tree, characterStats) : [],
+    unverifiedRequirements: status === 'unknown' ? collectUnverifiedRequirements(tree) : [],
+  };
 }
 
-/**
- * Collect unmet requirements from criteria tree
- * Recursively traverses the tree and collects requirements with status 'unmet'
- */
-function collectUnmetRequirements(
-  node: CriteriaTreeNode,
-  characterStats: Record<number, number>
-): Array<{
-  stat: number;
-  statName: string;
-  required: number;
-  current: number;
-  operator: string;
-}> {
-  const unmetRequirements: Array<{
-    stat: number;
-    statName: string;
-    required: number;
-    current: number;
-    operator: string;
-  }> = [];
+/** The opposite of a stat comparison, for requirements under a NOT */
+const NEGATED_SYMBOL: Record<string, { symbol: string; offset: number }> = {
+  '=': { symbol: '≠', offset: 0 },
+  '≠': { symbol: '=', offset: 0 },
+  '≥': { symbol: '≤', offset: -1 },
+  '≤': { symbol: '≥', offset: 1 },
+  has: { symbol: 'lacks', offset: 0 },
+  lacks: { symbol: 'has', offset: 0 },
+};
 
-  // If this is an unmet requirement node, add it
-  if (node.type === 'requirement' && node.status === 'unmet' && node.criterion) {
-    const criterion = node.criterion;
-    const currentValue = characterStats[criterion.stat] || 0;
+/** A failed requirement as reported; negated when a NOT made it fail by holding */
+function toUnmetRequirement(
+  criterion: DisplayCriterion,
+  characterStats: Record<number, number>,
+  negated: boolean
+): UnmetRequirement {
+  const current = characterStats[criterion.stat] || 0;
 
-    unmetRequirements.push({
+  if (!criterion.isStatRequirement) {
+    return {
       stat: criterion.stat,
       statName: criterion.statName,
       required: criterion.displayValue,
-      current: currentValue,
+      current,
       operator: criterion.displaySymbol,
-    });
+      description: negated ? `Not: ${criterion.description}` : criterion.description,
+    };
   }
 
-  // Handle operator nodes
-  if (node.type === 'operator' && node.children) {
-    if (node.operator === 'OR') {
-      // For OR nodes, only collect unmet requirements if the entire OR group is unmet
-      if (node.status === 'unmet') {
-        // All children are unmet, collect all of them to show what options are available
-        for (const child of node.children) {
-          unmetRequirements.push(...collectUnmetRequirements(child, characterStats));
-        }
-      }
-      // If OR node is met, don't collect any requirements from it
-    } else if (node.operator === 'AND') {
-      // For AND nodes, collect all unmet children
-      for (const child of node.children) {
-        if (child.status === 'unmet' || child.status === 'partial') {
-          unmetRequirements.push(...collectUnmetRequirements(child, characterStats));
-        }
-      }
-    } else if (node.operator === 'NOT') {
-      // For NOT nodes, if the node is unmet, it means the negated condition failed
-      if (node.status === 'unmet' && node.children.length > 0) {
-        // The child is met (which makes the NOT unmet)
-        // We could show this differently, but for now just collect it
-        unmetRequirements.push(...collectUnmetRequirements(node.children[0], characterStats));
-      }
-    }
+  const negation = negated ? NEGATED_SYMBOL[criterion.displaySymbol] : undefined;
+  return {
+    stat: criterion.stat,
+    statName: criterion.statName,
+    required: criterion.displayValue + (negation?.offset ?? 0),
+    current,
+    operator: negation?.symbol ?? criterion.displaySymbol,
+  };
+}
+
+/**
+ * Collect the requirements that make the tree fail. Under a NOT, the
+ * requirements that hold are the ones that fail it, reported negated.
+ */
+function collectUnmetRequirements(
+  node: CriteriaTreeNode,
+  characterStats: Record<number, number>,
+  negated = false
+): UnmetRequirement[] {
+  const failed = (child: CriteriaTreeNode) =>
+    negated ? child.status === 'met' : child.status === 'unmet' || child.status === 'partial';
+
+  if (node.type === 'requirement') {
+    return node.criterion && failed(node)
+      ? [toUnmetRequirement(node.criterion, characterStats, negated)]
+      : [];
   }
 
-  // Handle group nodes
-  if (node.type === 'group' && node.children) {
-    for (const child of node.children) {
-      if (child.status === 'unmet' || child.status === 'partial') {
-        unmetRequirements.push(...collectUnmetRequirements(child, characterStats));
-      }
-    }
+  const children = node.children ?? [];
+  if (node.type === 'operator' && node.operator === 'NOT') {
+    return children.flatMap((child) => collectUnmetRequirements(child, characterStats, !negated));
   }
 
-  return unmetRequirements;
+  // AND and groups fail through their failed children; a failed OR through
+  // every alternative (each failed). Negated, the roles swap.
+  return children
+    .filter(failed)
+    .flatMap((child) => collectUnmetRequirements(child, characterStats, negated));
+}
+
+/** Collect the requirements that could not be checked but decide the outcome */
+function collectUnverifiedRequirements(node: CriteriaTreeNode): DisplayCriterion[] {
+  if (node.status !== 'unknown') return [];
+  if (node.type === 'requirement') return node.criterion ? [node.criterion] : [];
+  return (node.children ?? []).flatMap(collectUnverifiedRequirements);
 }
 
 /**
@@ -726,9 +794,7 @@ export function buildCriteriaTree(
 
   // Simple case: only stat requirements (all AND)
   // Include function operators as they are also requirements (e.g., CheckNcu)
-  const statRequirements = processedCriteria.filter(
-    (c) => c.isStatRequirement || c.isFunctionOperator
-  );
+  const statRequirements = processedCriteria.filter(isRequirement);
   const logicalOperators = processedCriteria.filter((c) => c.isLogicalOperator);
 
   if (logicalOperators.length === 0) {
@@ -765,7 +831,7 @@ function createSimpleRequirementsList(
     hasChildren: true,
     metCount,
     totalCount,
-    status: metCount === totalCount ? 'met' : metCount > 0 ? 'partial' : 'unmet',
+    status: allOfStatus(children, metCount),
   };
 }
 
@@ -784,7 +850,7 @@ function processCriteriaWithModifiers(criteria: DisplayCriterion[]): DisplayCrit
     }
 
     // Apply active modifier to this criterion
-    if (activeModifier && (criterion.isStatRequirement || criterion.isFunctionOperator)) {
+    if (activeModifier && isRequirement(criterion)) {
       const prefix = activeModifier === 'target' ? 'Target: ' : 'Caster: ';
       processed.push({
         ...criterion,
@@ -814,9 +880,7 @@ function buildTreeFromRPN(
   const processedCriteria = processCriteriaWithModifiers(displayCriteria);
 
   // Include function operators as requirements (after modifier processing)
-  const statRequirements = processedCriteria.filter(
-    (c) => c.isStatRequirement || c.isFunctionOperator
-  );
+  const statRequirements = processedCriteria.filter(isRequirement);
   const logicalOperators = processedCriteria.filter((c) => c.isLogicalOperator);
 
   // Special case: if all logical operators are AND and we have multiple stat requirements
@@ -827,7 +891,7 @@ function buildTreeFromRPN(
 
   // Use processed criteria (modifiers already applied)
   for (const criterion of processedCriteria) {
-    if (criterion.isStatRequirement || criterion.isFunctionOperator) {
+    if (isRequirement(criterion)) {
       // Push requirement node onto stack
       stack.push({
         type: 'requirement',
@@ -881,17 +945,15 @@ function consolidateNestedLogic(node: CriteriaTreeNode): CriteriaTreeNode {
       }
     }
 
-    // Check if any flattened child is met
-    const hasMetChild = flattenedChildren.some(
-      (c) => c.status === 'met' || (c.status === 'partial' && c.metCount && c.metCount > 0)
-    );
+    // A partly met alternative is not met: an OR holds when one alternative does
+    const status = anyOfStatus(flattenedChildren);
 
     return {
       ...node,
       children: flattenedChildren, // Use flattened children
-      metCount: hasMetChild ? 1 : 0,
+      metCount: status === 'met' ? 1 : 0,
       totalCount: 1, // Always 1 - represents the choice itself
-      status: hasMetChild ? 'met' : 'unmet',
+      status,
     };
   }
 
@@ -923,16 +985,14 @@ function consolidateNestedLogic(node: CriteriaTreeNode): CriteriaTreeNode {
       children: flattenedChildren,
       metCount,
       totalCount,
-      status: metCount === totalCount ? 'met' : metCount > 0 ? 'partial' : 'unmet',
+      status: allOfStatus(flattenedChildren, metCount),
     };
   }
 
   // For NOT operations, just update children but don't flatten
   if (node.type === 'operator' && node.operator === 'NOT') {
     const { metCount, totalCount } = calculateNodeStats(consolidatedChildren);
-    const childStatus = consolidatedChildren[0]?.status;
-    const status: 'met' | 'unmet' | 'partial' | 'unknown' =
-      childStatus === 'unmet' ? 'met' : childStatus === 'met' ? 'unmet' : 'unknown';
+    const status = notStatus(consolidatedChildren[0]?.status);
 
     return {
       ...node,
@@ -952,7 +1012,7 @@ function consolidateNestedLogic(node: CriteriaTreeNode): CriteriaTreeNode {
       children: consolidatedChildren,
       metCount,
       totalCount,
-      status: metCount === totalCount ? 'met' : metCount > 0 ? 'partial' : 'unmet',
+      status: allOfStatus(consolidatedChildren, metCount),
     };
   }
 
@@ -1002,10 +1062,7 @@ function createOperatorNode(
 
   if (operator === 'OR') {
     // OR represents a single choice among alternatives
-    const hasMetChild = children.some(
-      (c) => c.status === 'met' || (c.status === 'partial' && c.metCount && c.metCount > 0)
-    );
-    metCount = hasMetChild ? 1 : 0;
+    metCount = anyOfStatus(children) === 'met' ? 1 : 0;
     totalCount = 1;
   } else {
     // AND and other operators sum their children
@@ -1016,13 +1073,11 @@ function createOperatorNode(
 
   let status: 'met' | 'unmet' | 'partial' | 'unknown';
   if (operator === 'AND') {
-    status = metCount === totalCount ? 'met' : metCount > 0 ? 'partial' : 'unmet';
+    status = allOfStatus(children, metCount);
   } else if (operator === 'OR') {
-    status = metCount > 0 ? 'met' : 'unmet';
+    status = anyOfStatus(children);
   } else {
-    // NOT
-    const childStatus = children[0]?.status;
-    status = childStatus === 'unmet' ? 'met' : childStatus === 'met' ? 'unmet' : 'unknown';
+    status = notStatus(children[0]?.status);
   }
 
   return {
@@ -1044,9 +1099,18 @@ function evaluateCriterionStatus(
   criterion: DisplayCriterion,
   characterStats?: Record<number, number>
 ): 'met' | 'unmet' | 'unknown' {
-  if (!characterStats || !criterion.isStatRequirement) {
-    return 'unknown';
+  if (!characterStats) return 'unknown';
+
+  // A requirement on the target depends on what is targeted, not on the character
+  if (criterion.isTargetRequirement) return 'unknown';
+
+  if (criterion.isConditionRequirement && criterion.conditionOperator !== undefined) {
+    if (NEVER_MET_BY_PLAYERS.has(criterion.conditionOperator)) return 'unmet';
+    if (ALWAYS_MET.has(criterion.conditionOperator)) return 'met';
   }
+
+  // Running nanos, perks, items, game state: nothing a profile records
+  if (!criterion.isStatRequirement) return 'unknown';
 
   // Credits (stat 61) are a transient in-game resource not tracked in profiles — always treat as met
   if (criterion.stat === 61) {
@@ -1071,6 +1135,36 @@ function evaluateCriterionStatus(
     default:
       return 'unknown';
   }
+}
+
+/**
+ * Status of requirements that must all hold: met when every one is, failed
+ * ('unmet', or 'partial' when some are met) when any fails, and otherwise
+ * 'unknown' - nothing fails, but something could not be checked.
+ */
+function allOfStatus(
+  children: CriteriaTreeNode[],
+  metCount: number
+): 'met' | 'unmet' | 'partial' | 'unknown' {
+  if (children.every((child) => child.status === 'met')) return 'met';
+  if (children.some((child) => child.status === 'unmet' || child.status === 'partial')) {
+    return metCount > 0 ? 'partial' : 'unmet';
+  }
+  return 'unknown';
+}
+
+/** Status of a negation: a failed requirement (unmet, or partly met) makes it hold */
+function notStatus(childStatus: CriteriaTreeNode['status']): 'met' | 'unmet' | 'unknown' {
+  if (childStatus === 'unmet' || childStatus === 'partial') return 'met';
+  if (childStatus === 'met') return 'unmet';
+  return 'unknown';
+}
+
+/** Status of alternatives: met when one is, unknown when one might be, else unmet */
+function anyOfStatus(children: CriteriaTreeNode[]): 'met' | 'unmet' | 'unknown' {
+  if (children.some((child) => child.status === 'met')) return 'met';
+  if (children.some((child) => child.status === 'unknown')) return 'unknown';
+  return 'unmet';
 }
 
 /**

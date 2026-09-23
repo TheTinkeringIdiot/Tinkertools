@@ -217,9 +217,33 @@ Shows nano information with compatibility indicators and quick actions
                   Cannot Cast
                 </div>
                 <div class="text-xs text-orange-700 dark:text-orange-300">
-                  <div v-for="req in compatibilityInfo.unmetRequirements" :key="req.stat">
-                    {{ req.statName }} {{ req.operator }} {{ req.required }} (have
-                    {{ req.current }})
+                  <div v-for="(req, index) in compatibilityInfo.unmetRequirements" :key="index">
+                    {{ req.description ?? `${req.statName} ${req.operator} ${req.required}` }}
+                    <template v-if="!req.description">(have {{ req.current }})</template>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Requirements the profile can't check -->
+          <div
+            v-if="showCompatibility && compatibilityInfo?.castState === 'unverified'"
+            class="mt-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800"
+            data-testid="unverified-requirements"
+          >
+            <div class="flex items-start gap-2">
+              <i class="pi pi-question-circle text-blue-600 dark:text-blue-400 text-sm mt-0.5"></i>
+              <div class="flex-1">
+                <div class="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
+                  Castable if
+                </div>
+                <div class="text-xs text-blue-700 dark:text-blue-300">
+                  <div
+                    v-for="(requirement, index) in compatibilityInfo.unverifiedRequirements"
+                    :key="index"
+                  >
+                    {{ requirement }}
                   </div>
                 </div>
               </div>
@@ -278,7 +302,9 @@ const compatibilityBorderClass = computed(() => {
     return '';
   }
 
-  if (props.compatibilityInfo.canCast) {
+  if (props.compatibilityInfo.castState === 'unverified') {
+    return 'border-l-blue-500';
+  } else if (props.compatibilityInfo.canCast) {
     return 'border-l-green-500';
   } else if (props.compatibilityInfo.compatibilityScore >= 75) {
     return 'border-l-yellow-500';
@@ -290,7 +316,9 @@ const compatibilityBorderClass = computed(() => {
 const compatibilityIcon = computed(() => {
   if (!props.compatibilityInfo) return '';
 
-  if (props.compatibilityInfo.canCast) {
+  if (props.compatibilityInfo.castState === 'unverified') {
+    return 'pi pi-question-circle text-blue-500';
+  } else if (props.compatibilityInfo.canCast) {
     return 'pi pi-check-circle text-green-500';
   } else if (props.compatibilityInfo.compatibilityScore >= 75) {
     return 'pi pi-exclamation-triangle text-yellow-500';
@@ -302,7 +330,10 @@ const compatibilityIcon = computed(() => {
 const compatibilityTooltip = computed(() => {
   if (!props.compatibilityInfo) return '';
 
-  if (props.compatibilityInfo.canCast) {
+  if (props.compatibilityInfo.castState === 'unverified') {
+    const unverified = props.compatibilityInfo.unverifiedRequirements.length;
+    return `Castable if ${unverified} condition${unverified === 1 ? '' : 's'} your profile can't check hold${unverified === 1 ? 's' : ''}`;
+  } else if (props.compatibilityInfo.canCast) {
     return 'Can cast this nano';
   } else {
     const unmet = props.compatibilityInfo.unmetRequirements.length;

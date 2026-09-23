@@ -793,10 +793,11 @@ describe('action-criteria service', () => {
 
       const result = transformCriterionForDisplay(criterion);
 
-      expect(result.displayOperator).toBe('Op999');
-      expect(result.displaySymbol).toBe('Op999');
-      expect(result.description).toBe('Pistol Op999 356');
-      expect(result.isStatRequirement).toBe(true);
+      // Not a stat comparison it can evaluate: a named condition, left unverified
+      expect(result.displayOperator).toBe('Operator 999');
+      expect(result.description).toBe('Operator 999 Pistol 356');
+      expect(result.isStatRequirement).toBe(false);
+      expect(result.isConditionRequirement).toBe(true);
     });
 
     it('should handle empty action criteria', () => {

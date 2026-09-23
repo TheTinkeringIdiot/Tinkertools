@@ -348,4 +348,135 @@ describe('Nano Compatibility Integration', () => {
       wrapper.unmount();
     });
   });
+
+  /**
+   * Requirements a profile can't decide, from the real Use actions of
+   * ao-2024-02 nanos. None of these may read "cannot cast" without saying why.
+   */
+  describe('requirements the profile cannot decide', () => {
+    /** Access Notum Source (aoid 227302): NotRunningNano 209909 */
+    const ACCESS_NOTUM_SOURCE_USE: Array<[number, number, number]> = [[0, 209909, 101]];
+
+    /**
+     * Average Health Funnel (aoid 76727), a Trader nano: BM > 56 AND TS > 68
+     * AND Visual Profession = Trader AND (on the target) MaxHealth > 42
+     */
+    const AVERAGE_HEALTH_FUNNEL_USE: Array<[number, number, number]> = [
+      [SKILL_ID.BIO_METAMOR, 56, 2],
+      [SKILL_ID.TIME_SPACE, 68, 2],
+      [0, 0, 4],
+      [STAT.VISUAL_PROFESSION, PROFESSION.TRADER, 0],
+      [0, 0, 4],
+      [0, 0, 18],
+      [1, 42, 2],
+      [0, 0, 4],
+    ];
+
+    /** Mezz (aoid 223444): StateIsNpc */
+    const MEZZ_USE: Array<[number, number, number]> = [[0, 2, 44]];
+
+    /** Root and Snare Resistance (aoid 291385): NOT (stat 455 = 0) */
+    const ROOT_AND_SNARE_RESISTANCE_USE: Array<[number, number, number]> = [
+      [455, 0, 0],
+      [0, 0, 42],
+    ];
+
+    function nanoWith(name: string, aoid: number, use: Array<[number, number, number]>) {
+      return { ...alleysweeper, id: aoid, aoid, name, actions: [createNanoUseAction(use, aoid)] };
+    }
+
+    /** A Trader with BM and TS raised to the given values */
+    async function activateTrader(bioMetamor: number, timeSpace: number) {
+      const profile = createTestProfile({
+        name: `Trader ${bioMetamor}-${timeSpace}`,
+        profession: PROFESSION.TRADER,
+        level: 60,
+        skills: {
+          [SKILL_ID.BIO_METAMOR]: createTestSkillData({ pointsFromIp: 0 }),
+          [SKILL_ID.TIME_SPACE]: createTestSkillData({ pointsFromIp: 0 }),
+        },
+      });
+      const profileId = await profileStore.createProfile(profile.Character.Name, profile);
+      await profileStore.modifySkill(profileId, SKILL_ID.BIO_METAMOR, bioMetamor);
+      await profileStore.modifySkill(profileId, SKILL_ID.TIME_SPACE, timeSpace);
+      await profileStore.setActiveProfile(profileId);
+    }
+
+    it('leaves a nano unverified, not blocked, when only a running nano decides it', async () => {
+      await activateProfile(PROFESSION.SOLDIER, 60, 10, 10);
+      const nano = nanoWith('Access Notum Source', 227302, ACCESS_NOTUM_SOURCE_USE);
+
+      const info = getNanoCompatibility(nano, mapProfileToStats(activeProfile()));
+
+      expect(info).toMatchObject({
+        castState: 'unverified',
+        canCast: true,
+        compatibilityScore: 100,
+        unmetRequirements: [],
+        unverifiedRequirements: ['Not running: Nano 209909'],
+      });
+    });
+
+    it('checks the caster and leaves a requirement on the target unverified', async () => {
+      const nano = nanoWith('Average Health Funnel', 76727, AVERAGE_HEALTH_FUNNEL_USE);
+
+      await activateTrader(200, 200);
+      const skilled = getNanoCompatibility(nano, mapProfileToStats(activeProfile()));
+      expect(skilled.castState).toBe('unverified');
+      expect(skilled.unverifiedRequirements).toEqual(['Target: MaxHealth ≥ 43']);
+
+      // Short of TS, the caster's own requirement blocks it, whatever the target
+      await activateTrader(200, 10);
+      const unskilled = getNanoCompatibility(nano, mapProfileToStats(activeProfile()));
+      expect(unskilled.castState).toBe('blocked');
+      expect(unskilled.unmetRequirements.map((req) => req.stat)).toEqual([SKILL_ID.TIME_SPACE]);
+      expect(unskilled.unverifiedRequirements).toEqual([]);
+    });
+
+    it('blocks an NPC-only nano, saying why', async () => {
+      await activateProfile(PROFESSION.SOLDIER, 60, 10, 10);
+      const nano = nanoWith('Mezz', 223444, MEZZ_USE);
+
+      const info = getNanoCompatibility(nano, mapProfileToStats(activeProfile()));
+
+      expect(info.castState).toBe('blocked');
+      expect(info.unmetRequirements).toEqual([
+        expect.objectContaining({ description: 'Must be NPC' }),
+      ]);
+    });
+
+    it('reports the requirement a NOT fails on', async () => {
+      await activateProfile(PROFESSION.SOLDIER, 60, 10, 10);
+      const nano = nanoWith('Root and Snare Resistance', 291385, ROOT_AND_SNARE_RESISTANCE_USE);
+
+      const info = getNanoCompatibility(nano, mapProfileToStats(activeProfile()));
+
+      // NOT (stat 455 = 0) fails because stat 455 is 0: it must not be
+      expect(info.castState).toBe('blocked');
+      expect(info.unmetRequirements).toEqual([
+        expect.objectContaining({ stat: 455, operator: '≠', required: 0, current: 0 }),
+      ]);
+    });
+
+    it('NanoList shows what it could not check', async () => {
+      await activateProfile(PROFESSION.SOLDIER, 60, 10, 10);
+      const wrapper = mountForIntegration(NanoList, {
+        pinia: context.pinia,
+        props: {
+          nanos: [nanoWith('Access Notum Source', 227302, ACCESS_NOTUM_SOURCE_USE)],
+          showCompatibility: true,
+          activeProfile: profileStore.activeProfile,
+        },
+      });
+      await waitForUpdates(wrapper);
+
+      expect(wrapper.text()).not.toContain('Cannot Cast');
+      expect(wrapper.find('[data-testid="unverified-requirements"]').text()).toContain(
+        'Castable if'
+      );
+      expect(wrapper.text()).toContain('Not running: Nano 209909');
+
+      wrapper.unmount();
+    });
+  });
 });

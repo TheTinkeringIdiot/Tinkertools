@@ -349,7 +349,9 @@ describe('useActionCriteria composables', () => {
       vi.mocked(parseAction).mockReturnValue(mockParsedAction);
       vi.mocked(checkActionRequirements).mockReturnValue({
         canPerform: true,
+        status: 'met',
         unmetRequirements: [],
+        unverifiedRequirements: [],
       });
     });
 
@@ -399,6 +401,8 @@ describe('useActionCriteria composables', () => {
 
       vi.mocked(checkActionRequirements).mockReturnValue({
         canPerform: false,
+        status: 'unmet',
+        unverifiedRequirements: [],
         unmetRequirements: [
           { stat: 112, statName: 'Pistol', required: 357, current: 300, operator: '≥' },
         ],

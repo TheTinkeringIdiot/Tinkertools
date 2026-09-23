@@ -66,7 +66,13 @@ Displays comprehensive nano information including effects, requirements, and com
           <div class="flex-1">
             <div class="flex items-center justify-between mb-2">
               <h3 class="font-semibold">
-                {{ compatibilityInfo.canCast ? 'Can Cast' : 'Cannot Cast' }}
+                {{
+                  compatibilityInfo.castState === 'castable'
+                    ? 'Can Cast'
+                    : compatibilityInfo.castState === 'unverified'
+                      ? 'Can Cast, If...'
+                      : 'Cannot Cast'
+                }}
               </h3>
               <div class="flex items-center gap-2">
                 <span class="text-sm">Compatibility Score:</span>
@@ -81,9 +87,22 @@ Displays comprehensive nano information including effects, requirements, and com
             <div v-if="!compatibilityInfo.canCast" class="space-y-2 text-sm">
               <strong>Requirements Not Met:</strong>
               <ul class="list-disc list-inside ml-2 mt-1">
-                <li v-for="req in compatibilityInfo.unmetRequirements" :key="req.stat">
-                  {{ req.statName }} {{ req.operator }} {{ req.required }}
-                  <span class="text-red-600 dark:text-red-400">(have {{ req.current }})</span>
+                <li v-for="(req, index) in compatibilityInfo.unmetRequirements" :key="index">
+                  {{ req.description ?? `${req.statName} ${req.operator} ${req.required}` }}
+                  <span v-if="!req.description" class="text-red-600 dark:text-red-400"
+                    >(have {{ req.current }})</span
+                  >
+                </li>
+              </ul>
+            </div>
+            <div v-else-if="compatibilityInfo.castState === 'unverified'" class="space-y-2 text-sm">
+              <strong>Not Checkable From Your Profile:</strong>
+              <ul class="list-disc list-inside ml-2 mt-1">
+                <li
+                  v-for="(requirement, index) in compatibilityInfo.unverifiedRequirements"
+                  :key="index"
+                >
+                  {{ requirement }}
                 </li>
               </ul>
             </div>
@@ -444,7 +463,9 @@ const compatibilityInfo = computed(() =>
 const compatibilityPanelClass = computed(() => {
   if (!compatibilityInfo.value) return '';
 
-  if (compatibilityInfo.value.canCast) {
+  if (compatibilityInfo.value.castState === 'unverified') {
+    return 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800';
+  } else if (compatibilityInfo.value.canCast) {
     return 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800';
   } else if (compatibilityInfo.value.compatibilityScore >= 75) {
     return 'bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800';
@@ -456,7 +477,9 @@ const compatibilityPanelClass = computed(() => {
 const compatibilityIcon = computed(() => {
   if (!compatibilityInfo.value) return '';
 
-  if (compatibilityInfo.value.canCast) {
+  if (compatibilityInfo.value.castState === 'unverified') {
+    return 'pi pi-question-circle text-blue-600 dark:text-blue-400';
+  } else if (compatibilityInfo.value.canCast) {
     return 'pi pi-check-circle text-green-600 dark:text-green-400';
   } else if (compatibilityInfo.value.compatibilityScore >= 75) {
     return 'pi pi-exclamation-triangle text-yellow-600 dark:text-yellow-400';

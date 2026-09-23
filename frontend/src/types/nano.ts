@@ -126,12 +126,23 @@ export type NanoSortField = 'name' | 'qualityLevel' | 'level' | 'compatibility';
 
 // Compatibility analysis results
 export interface NanoCompatibilityInfo {
+  /**
+   * castable: every requirement is met. unverified: none the profile can
+   * check fails, but some it can't check (a running nano, a perk, the
+   * target...) decide it. blocked: a requirement fails.
+   */
+  castState: NanoCastState;
+  /** Nothing the profile can check stops it: castable or unverified */
   canCast: boolean;
   compatibilityScore: number; // 0-100
   unmetRequirements: UnmetNanoRequirement[];
+  /** Descriptions of the requirements that couldn't be checked, when unverified */
+  unverifiedRequirements: string[];
   memoryUsage: number;
   nanoPointCost: number;
 }
+
+export type NanoCastState = 'castable' | 'unverified' | 'blocked';
 
 /** A casting requirement the character does not meet, from checkActionRequirements */
 export interface UnmetNanoRequirement {
@@ -140,6 +151,8 @@ export interface UnmetNanoRequirement {
   required: number;
   current: number;
   operator: string;
+  /** Set for requirements that aren't a stat comparison, or read better as text */
+  description?: string;
 }
 
 // Nano lineup management
