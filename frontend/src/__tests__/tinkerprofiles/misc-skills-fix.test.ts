@@ -3,7 +3,29 @@ import { updateProfileWithIPTracking } from '@/lib/tinkerprofiles/ip-integrator'
 import { calculateEquipmentBonuses } from '@/services/equipment-bonus-calculator';
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import type { Item } from '@/types/api';
-import { BREED, PROFESSION } from '@/__tests__/helpers';
+import {
+  BREED,
+  PROFESSION,
+  createTestItem,
+  createSpellData,
+  createSpell,
+} from '@/__tests__/helpers';
+
+/** Item whose equip event applies "Modify {Stat} by {Amount}" (spell 53045) per bonus */
+function createBonusItem(name: string, bonuses: Array<[number, number]>, event = 14): Item {
+  return createTestItem({
+    name,
+    ql: 200,
+    spell_data: [
+      createSpellData({
+        event,
+        spells: bonuses.map(([stat, amount]) =>
+          createSpell({ spell_id: 53045, spell_params: { Stat: stat, Amount: amount } })
+        ),
+      }),
+    ],
+  });
+}
 
 describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
   let testProfile: TinkerProfile;
@@ -205,41 +227,15 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
   describe('Accumulation Bug Prevention', () => {
     it('should NOT accumulate bonuses when updateProfileWithIPTracking is called multiple times', () => {
       // Add equipment with Max NCU bonus
-      const equipmentWithBonus = {
-        id: 123456,
-        aoid: 123456,
-        name: 'Test NCU Equipment',
-        ql: 200,
-        is_nano: false,
-        stats: [],
-        spell_data: [
-          {
-            event: 14, // Wear event
-            spells: [
-              {
-                spell_id: 53045, // Modify Stat spell ID
-                spell_params: {
-                  Stat: 181, // Max NCU stat ID
-                  Amount: 50, // +50 Max NCU
-                },
-              },
-            ],
-          },
-        ],
-        actions: [],
-        attack_stats: [],
-        defense_stats: [],
-      } as any;
+      const equipmentWithBonus = createBonusItem('Test NCU Equipment', [[181, 50]]);
 
       testProfile.Clothing.Body = equipmentWithBonus;
 
-      // Debug: Check if calculateEquipmentBonuses is working
-      const bonuses = calculateEquipmentBonuses(testProfile);
-      console.log('Equipment bonuses calculated:', bonuses);
+      // The equipment bonus itself is computed once, not per recalculation
+      expect(calculateEquipmentBonuses(testProfile)[181]).toBe(50);
 
       // First call - should apply bonus correctly
       updateProfileWithIPTracking(testProfile);
-      console.log('Misc skill after update:', testProfile.skills[181]);
       expect(testProfile.skills[181].equipmentBonus).toBe(50);
       expect(testProfile.skills[181].total).toBe(50); // 0 base + 50 equipment
 
@@ -261,36 +257,14 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
 
     it('should maintain consistent values across multiple rapid recalculations', () => {
       // Add equipment with multiple damage modifiers
-      const weapon = {
-        id: 789012,
-        aoid: 789012,
-        name: 'Test Weapon',
-        ql: 200,
-        is_nano: false,
-        stats: [],
-        spell_data: [
-          {
-            event: 2, // Wield event
-            spells: [
-              {
-                spell_id: 53045,
-                spell_params: {
-                  Stat: 278, // Projectile Damage Modifier
-                  Amount: 25,
-                },
-              },
-              {
-                spell_id: 53045,
-                spell_params: {
-                  Stat: 279, // Melee Damage Modifier
-                  Amount: 30,
-                },
-              },
-            ],
-          },
-        ] as any,
-        actions: [],
-      } as any;
+      const weapon = createBonusItem(
+        'Test Weapon',
+        [
+          [278, 25], // Projectile Damage Modifier
+          [279, 30], // Melee Damage Modifier
+        ],
+        2
+      );
 
       testProfile.Weapons.RHand = weapon;
 
@@ -310,29 +284,7 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
   describe('Correct Bonus Separation', () => {
     it('should store equipment, perk, and buff bonuses separately', () => {
       // Add equipment bonus
-      const equipment = {
-        id: 111111,
-        aoid: 111111,
-        name: 'Test Equipment',
-        ql: 200,
-        is_nano: false,
-        stats: [],
-        spell_data: [
-          {
-            event: 14,
-            spells: [
-              {
-                spell_id: 53045,
-                spell_params: {
-                  Stat: 343, // HealDelta
-                  Amount: 20,
-                },
-              },
-            ],
-          },
-        ] as any,
-        actions: [],
-      } as any;
+      const equipment = createBonusItem('Test Equipment', [[343, 20]]);
 
       testProfile.Clothing.Body = equipment;
 
@@ -404,58 +356,14 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
   describe('Multiple Recalculation Scenarios', () => {
     it('should handle profile load → equipment change → recalculate correctly', () => {
       // Initial equipment
-      const initialEquipment = {
-        id: 111111,
-        aoid: 111111,
-        name: 'Initial Equipment',
-        ql: 200,
-        is_nano: false,
-        stats: [],
-        spell_data: [
-          {
-            event: 14,
-            spells: [
-              {
-                spell_id: 53045,
-                spell_params: {
-                  Stat: 181, // Max NCU
-                  Amount: 30,
-                },
-              },
-            ],
-          },
-        ] as any,
-        actions: [],
-      } as any;
+      const initialEquipment = createBonusItem('Initial Equipment', [[181, 30]]);
 
       testProfile.Clothing.Body = initialEquipment;
       updateProfileWithIPTracking(testProfile);
       expect(testProfile.skills[181].total).toBe(30); // Max NCU
 
       // Change equipment
-      const newEquipment = {
-        id: 222222,
-        aoid: 222222,
-        name: 'New Equipment',
-        ql: 200,
-        is_nano: false,
-        stats: [],
-        spell_data: [
-          {
-            event: 14,
-            spells: [
-              {
-                spell_id: 53045,
-                spell_params: {
-                  Stat: 181, // Max NCU
-                  Amount: 50, // Different bonus
-                },
-              },
-            ],
-          },
-        ] as any,
-        actions: [],
-      } as any;
+      const newEquipment = createBonusItem('New Equipment', [[181, 50]]);
 
       testProfile.Clothing.Body = newEquipment;
       updateProfileWithIPTracking(testProfile);
@@ -512,29 +420,7 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
       expect(testProfile.skills[181].total).toBe(0);
 
       // Add equipment
-      const equipment = {
-        id: 123456,
-        aoid: 123456,
-        name: 'NCU Equipment',
-        ql: 200,
-        is_nano: false,
-        stats: [],
-        spell_data: [
-          {
-            event: 14,
-            spells: [
-              {
-                spell_id: 53045,
-                spell_params: {
-                  Stat: 181, // Max NCU
-                  Amount: 40,
-                },
-              },
-            ],
-          },
-        ] as any,
-        actions: [],
-      } as any;
+      const equipment = createBonusItem('NCU Equipment', [[181, 40]]);
 
       testProfile.Clothing.Head = equipment;
       updateProfileWithIPTracking(testProfile);
@@ -545,29 +431,7 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
 
     it('should correctly decrease equipmentBonus when removing equipment', () => {
       // Add equipment first
-      const equipment = {
-        id: 123456,
-        aoid: 123456,
-        name: 'NCU Equipment',
-        ql: 200,
-        is_nano: false,
-        stats: [],
-        spell_data: [
-          {
-            event: 14,
-            spells: [
-              {
-                spell_id: 53045,
-                spell_params: {
-                  Stat: 181, // Max NCU
-                  Amount: 40,
-                },
-              },
-            ],
-          },
-        ] as any,
-        actions: [],
-      } as any;
+      const equipment = createBonusItem('NCU Equipment', [[181, 40]]);
 
       testProfile.Clothing.Head = equipment;
       updateProfileWithIPTracking(testProfile);
@@ -583,53 +447,9 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
 
     it('should handle multiple equipment pieces with same bonus type', () => {
       // Add multiple NCU items
-      const item1 = {
-        id: 111111,
-        aoid: 111111,
-        name: 'NCU Item 1',
-        ql: 200,
-        is_nano: false,
-        stats: [],
-        spell_data: [
-          {
-            event: 14,
-            spells: [
-              {
-                spell_id: 53045,
-                spell_params: {
-                  Stat: 181, // Max NCU
-                  Amount: 30,
-                },
-              },
-            ],
-          },
-        ] as any,
-        actions: [],
-      } as any;
+      const item1 = createBonusItem('NCU Item 1', [[181, 30]]);
 
-      const item2 = {
-        id: 222222,
-        aoid: 222222,
-        name: 'NCU Item 2',
-        ql: 200,
-        is_nano: false,
-        stats: [],
-        spell_data: [
-          {
-            event: 14,
-            spells: [
-              {
-                spell_id: 53045,
-                spell_params: {
-                  Stat: 181, // Max NCU
-                  Amount: 25,
-                },
-              },
-            ],
-          },
-        ] as any,
-        actions: [],
-      } as any;
+      const item2 = createBonusItem('NCU Item 2', [[181, 25]]);
 
       testProfile.Clothing.Body = item1;
       testProfile.Weapons.HUD1 = item2;
@@ -720,27 +540,13 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
 
     it('should maintain structure consistency across all Misc skills after updates', () => {
       // Add equipment that affects multiple skills
-      const multiSkillEquipment = {
-        id: 999999,
-        aoid: 999999,
-        name: 'Multi Bonus Equipment',
-        ql: 200,
-        is_nano: false,
-        stats: [],
-        spell_data: [
-          {
-            event: 14,
-            spells: [
-              { spell_id: 53045, spell_params: { Stat: 181, Amount: 30 } }, // Max NCU
-              { spell_id: 53045, spell_params: { Stat: 276, Amount: 15 } }, // Add All Off.
-              { spell_id: 53045, spell_params: { Stat: 277, Amount: 12 } }, // Add All Def.
-              { spell_id: 53045, spell_params: { Stat: 343, Amount: 25 } }, // HealDelta
-              { spell_id: 53045, spell_params: { Stat: 364, Amount: 20 } }, // NanoDelta
-            ],
-          },
-        ] as any,
-        actions: [],
-      } as any;
+      const multiSkillEquipment = createBonusItem('Multi Bonus Equipment', [
+        [181, 30],
+        [276, 15],
+        [277, 12],
+        [343, 25],
+        [364, 20],
+      ]);
 
       testProfile.Clothing.Body = multiSkillEquipment;
       updateProfileWithIPTracking(testProfile);
@@ -792,29 +598,7 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
   describe('Edge Cases and Error Conditions', () => {
     it('should handle missing equipment bonuses gracefully', () => {
       // Equipment with spell that doesn\'t affect any Misc skills
-      const irrelevantEquipment = {
-        id: 555555,
-        aoid: 555555,
-        name: 'Irrelevant Equipment',
-        ql: 200,
-        is_nano: false,
-        stats: [],
-        spell_data: [
-          {
-            event: 14,
-            spells: [
-              {
-                spell_id: 53045,
-                spell_params: {
-                  Stat: 16, // Strength (not a Misc skill)
-                  Amount: 50,
-                },
-              },
-            ],
-          },
-        ] as any,
-        actions: [],
-      } as any;
+      const irrelevantEquipment = createBonusItem('Irrelevant Equipment', [[16, 50]]);
 
       testProfile.Clothing.Hands = irrelevantEquipment;
       updateProfileWithIPTracking(testProfile);
@@ -831,10 +615,8 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
     it('should handle corrupted bonus data gracefully', () => {
       const skill = testProfile.skills[181]; // Max NCU
 
-      // Set invalid bonus values
-      (skill as any).equipmentBonus = null;
-      (skill as any).perkBonus = undefined;
-      (skill as any).buffBonus = 'invalid';
+      // Set invalid bonus values, as a corrupted stored profile might carry
+      Object.assign(skill, { equipmentBonus: null, perkBonus: undefined, buffBonus: 'invalid' });
 
       // Update should handle this gracefully
       expect(() => updateProfileWithIPTracking(testProfile)).not.toThrow();

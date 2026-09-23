@@ -6,20 +6,13 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { standardCleanup, BREED, SKILL_ID } from '@/__tests__/helpers';
+import { standardCleanup } from '@/__tests__/helpers';
 import { createDefaultProfile } from '@/lib/tinkerprofiles/constants';
 import {
   updateProfileSkillInfo,
   calculateProfileIP,
   updateProfileWithIPTracking,
 } from '@/lib/tinkerprofiles/ip-integrator';
-import {
-  calcSkillCap,
-  calcAbilityCapImprovements,
-  calcTrickleDown,
-} from '@/lib/tinkerprofiles/ip-calculator';
-import { STAT } from '@/services/game-data';
-import { skillService } from '@/services/skill-service';
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 
 describe('IP Calculation Workflow Integration', () => {
@@ -74,7 +67,7 @@ describe('IP Calculation Workflow Integration', () => {
 
     it('has no legacy Skills property', () => {
       const newProfile = createDefaultProfile('Test');
-      expect((newProfile as any).Skills).toBeUndefined();
+      expect(newProfile).not.toHaveProperty('Skills');
     });
   });
 
@@ -276,10 +269,10 @@ describe('IP Calculation Workflow Integration', () => {
   });
 
   describe('Profile Integration Scenarios', () => {
-    it('should work with updateProfileWithIPTracking', async () => {
+    it('should work with updateProfileWithIPTracking', () => {
       setAllAbilities(profile, 6);
 
-      const updatedProfile = await updateProfileWithIPTracking(profile);
+      const updatedProfile = updateProfileWithIPTracking(profile);
 
       expect(updatedProfile.IPTracker).toBeDefined();
       expect(updatedProfile.IPTracker!.totalUsed).toBe(0);
@@ -394,45 +387,3 @@ function setAllAbilities(profile: TinkerProfile, value: number): void {
     }
   });
 }
-
-function findSkillInProfile(profile: TinkerProfile, skillName: string): any {
-  try {
-    const skillId = skillService.resolveId(skillName);
-    return profile.skills[Number(skillId)] || null;
-  } catch (error) {
-    // Skill name not found
-    return null;
-  }
-}
-
-function getStatId(skillName: string): number {
-  try {
-    return Number(skillService.resolveId(skillName));
-  } catch (error) {
-    return 152; // Default to Body Dev skill ID
-  }
-}
-
-// Test data for different character builds
-const TEST_BUILDS = {
-  FRESH_SOLITUS: {
-    breed: 'Solitus',
-    level: 1,
-    abilities: [6, 6, 6, 6, 6, 6],
-  },
-  EARLY_ADVENTURER: {
-    breed: 'Solitus',
-    level: 25,
-    abilities: [12, 15, 18, 8, 10, 6],
-  },
-  HIGH_LEVEL_DOCTOR: {
-    breed: 'Nanomage',
-    level: 150,
-    abilities: [10, 15, 12, 80, 25, 60],
-  },
-  TWINK_ENFORCER: {
-    breed: 'Atrox',
-    level: 50,
-    abilities: [40, 12, 35, 8, 15, 6],
-  },
-};

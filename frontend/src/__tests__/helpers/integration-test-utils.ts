@@ -9,6 +9,7 @@ import { mount, VueWrapper } from '@vue/test-utils';
 import { createPinia, setActivePinia, type Pinia } from 'pinia';
 import { vi, expect, type Mocked } from 'vitest';
 import type { Component, App } from 'vue';
+import type { Router } from 'vue-router';
 import { createApp } from 'vue';
 import { mockPrimeVueComponents, createTestRouter } from './vue-test-utils';
 import PrimeVue from 'primevue/config';
@@ -108,9 +109,15 @@ export function mountForIntegration(
     pinia: Pinia;
     props?: Record<string, unknown>;
     stubs?: Record<string, boolean | Component>;
+    /**
+     * Router to install (default: a fresh createTestRouter()). Pass one that has
+     * already navigated (`await router.push(...)`) when the component renders
+     * named RouterLinks on mount: those need the `version` param in place.
+     */
+    router?: Router;
   }
 ): VueWrapper {
-  const router = createTestRouter();
+  const router = options.router ?? createTestRouter();
 
   return mount(component, {
     props: options.props,

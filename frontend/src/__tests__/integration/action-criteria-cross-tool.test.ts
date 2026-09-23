@@ -20,29 +20,14 @@
  * - TinkerNukes: Nano requirement checking (nuke-filtering.ts line 55)
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { setActivePinia, createPinia } from 'pinia';
-import { createApp } from 'vue';
-import PrimeVue from 'primevue/config';
-import ToastService from 'primevue/toastservice';
-import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
+import { describe, it, expect } from 'vitest';
 import { parseAction, checkActionRequirements } from '@/services/action-criteria';
 import { mapProfileToStats } from '@/utils/profile-stats-mapper';
 import { filterByCharacterProfile } from '@/utils/nuke-filtering';
 import type { Action, SymbiantItem } from '@/types/api';
 import type { OffensiveNano } from '@/types/offensive-nano';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
-import { BREED, PROFESSION } from '@/__tests__/helpers';
-
-// Mock localStorage for profile persistence
-global.localStorage = {
-  getItem: vi.fn(() => null),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
-  length: 0,
-  key: vi.fn(),
-} as any;
+import { BREED, PROFESSION, createTestProfile, createTestItem } from '@/__tests__/helpers';
+import { createTestNano } from '@/__tests__/helpers/nano-fixtures';
 
 /**
  * REGRESSION SCENARIO 1: Symbiant Profession OR Requirements
@@ -52,22 +37,6 @@ global.localStorage = {
  * (Soldier OR MartialArtist OR Engineer) AND Stamina>=300 AND Strength>=250
  */
 describe('TinkerPocket: Symbiant Requirements with OR Logic', () => {
-  let profileStore: ReturnType<typeof useTinkerProfilesStore>;
-
-  beforeEach(() => {
-    // Setup PrimeVue with ToastService BEFORE initializing Pinia/stores
-    const app = createApp({});
-    app.use(PrimeVue);
-    app.use(ToastService);
-
-    const pinia = createPinia();
-    app.use(pinia);
-    setActivePinia(pinia);
-
-    profileStore = useTinkerProfilesStore();
-    vi.clearAllMocks();
-  });
-
   it('should correctly filter symbiant with profession OR requirement', () => {
     // Symbiant: Artillery Eye (requires Soldier OR Enforcer)
     const symbiantAction: Action = {
@@ -185,22 +154,6 @@ describe('TinkerPocket: Symbiant Requirements with OR Logic', () => {
  * Nanos may have OR requirements for different schools or profession options.
  */
 describe('TinkerNukes: Nano Requirements with OR Logic', () => {
-  let profileStore: ReturnType<typeof useTinkerProfilesStore>;
-
-  beforeEach(() => {
-    // Setup PrimeVue with ToastService BEFORE initializing Pinia/stores
-    const app = createApp({});
-    app.use(PrimeVue);
-    app.use(ToastService);
-
-    const pinia = createPinia();
-    app.use(pinia);
-    setActivePinia(pinia);
-
-    profileStore = useTinkerProfilesStore();
-    vi.clearAllMocks();
-  });
-
   it('should correctly filter nano with profession OR requirement', () => {
     // Mock offensive nano with NT OR MP requirement
     const nanoAction: Action = {
@@ -239,11 +192,9 @@ describe('TinkerNukes: Nano Requirements with OR Logic', () => {
 
   it('should filter nanos by character profile (nuke-filtering.ts pattern)', () => {
     // Mock OffensiveNano structure
-    const mockNano: Partial<OffensiveNano> = {
-      id: 1,
-      name: 'Test Nuke',
-      qualityLevel: 200,
-      item: {
+    const mockNano: OffensiveNano = {
+      ...createTestNano({ id: 1, aoid: 67890, name: 'Test Nuke', ql: 200 }),
+      item: createTestItem({
         id: 1,
         aoid: 67890,
         name: 'Test Nuke',
@@ -261,7 +212,16 @@ describe('TinkerNukes: Nano Requirements with OR Logic', () => {
             ],
           },
         ],
-      } as any,
+      }),
+      minDamage: 800,
+      maxDamage: 1200,
+      midDamage: 1000,
+      damageType: 'energy',
+      tickCount: 1,
+      tickInterval: 0,
+      castTime: 200,
+      rechargeTime: 400,
+      nanoPointCost: 50,
     };
 
     // Create mock character with correct profession and skills
@@ -273,7 +233,7 @@ describe('TinkerNukes: Nano Requirements with OR Logic', () => {
     };
 
     // Filter should include nano for NT
-    const filtered = filterByCharacterProfile([mockNano as OffensiveNano], ntCharacter);
+    const filtered = filterByCharacterProfile([mockNano], ntCharacter);
     expect(filtered).toHaveLength(1);
     expect(filtered[0].id).toBe(1);
 
@@ -284,7 +244,7 @@ describe('TinkerNukes: Nano Requirements with OR Logic', () => {
       level: 220,
       breed: 1,
     };
-    const filteredSoldier = filterByCharacterProfile([mockNano as OffensiveNano], soldierCharacter);
+    const filteredSoldier = filterByCharacterProfile([mockNano], soldierCharacter);
     expect(filteredSoldier).toHaveLength(0);
   });
 
@@ -334,45 +294,22 @@ describe('TinkerNukes: Nano Requirements with OR Logic', () => {
  * Ensures TinkerPocket changes don't break TinkerNukes profile integration.
  */
 describe('Cross-Tool: Shared Profile State', () => {
-  let profileStore: ReturnType<typeof useTinkerProfilesStore>;
-
-  beforeEach(() => {
-    // Setup PrimeVue with ToastService BEFORE initializing Pinia/stores
-    const app = createApp({});
-    app.use(PrimeVue);
-    app.use(ToastService);
-
-    const pinia = createPinia();
-    app.use(pinia);
-    setActivePinia(pinia);
-
-    profileStore = useTinkerProfilesStore();
-    vi.clearAllMocks();
-  });
-
   it('should correctly map profile to stats for both symbiant and nano filtering', () => {
     // Create mock profile matching TinkerProfile v4.0.0 structure
-    const mockProfile: Partial<TinkerProfile> = {
-      Character: {
-        Name: 'TestChar',
-        Profession: PROFESSION.NANO_TECHNICIAN,
-        Level: 200,
-        Breed: BREED.OPIFEX,
-        Gender: 'Male',
-        MaxHealth: 5000,
-        MaxNano: 8000,
-        AccountType: 'Paid',
-        Specialization: 0,
-      },
+    const mockProfile = createTestProfile({
+      name: 'TestChar',
+      profession: PROFESSION.NANO_TECHNICIAN,
+      level: 200,
+      breed: BREED.OPIFEX,
       skills: {
         130: { total: 850 }, // Matter Creation
         17: { total: 500 }, // Stamina
         355: { total: 0 }, // WornItem
       },
-    } as any;
+    });
 
     // Map profile to stats (used by both tools)
-    const stats = mapProfileToStats(mockProfile as TinkerProfile);
+    const stats = mapProfileToStats(mockProfile);
 
     // Verify stats include all required fields
     expect(stats[60]).toBe(11); // Profession
@@ -415,27 +352,20 @@ describe('Cross-Tool: Shared Profile State', () => {
    * from the same profile. A change to mapProfileToStats should work for both.
    */
   it('should provide consistent stats mapping for cross-tool requirement checks', () => {
-    const profile: Partial<TinkerProfile> = {
-      Character: {
-        Name: 'MultiToolChar',
-        Profession: PROFESSION.SOLDIER,
-        Level: 150,
-        Breed: BREED.SOLITUS,
-        Gender: 'Male',
-        MaxHealth: 4000,
-        MaxNano: 3000,
-        AccountType: 'Paid',
-        Specialization: 0,
-      },
+    const profile = createTestProfile({
+      name: 'MultiToolChar',
+      profession: PROFESSION.SOLDIER,
+      level: 150,
+      breed: BREED.SOLITUS,
       skills: {
         17: { total: 400 }, // Stamina
         18: { total: 350 }, // Strength
         112: { total: 500 }, // Pistol
         355: { total: 0 }, // WornItem
       },
-    } as any;
+    });
 
-    const stats = mapProfileToStats(profile as TinkerProfile);
+    const stats = mapProfileToStats(profile);
 
     // Verify all stats present
     expect(stats[60]).toBe(1); // Profession
