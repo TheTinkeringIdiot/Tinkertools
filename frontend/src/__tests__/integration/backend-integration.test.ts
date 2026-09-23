@@ -46,7 +46,7 @@ describe.skipIf(!BACKEND_AVAILABLE)('Backend Integration Tests', () => {
     const firstNano = store.nanos[0];
     expect(firstNano).toHaveProperty('id');
     expect(firstNano).toHaveProperty('name');
-    expect(firstNano).toHaveProperty('ql', firstNano.qualityLevel); // qualityLevel mirrors ql
+    expect(firstNano.qualityLevel).toEqual(expect.any(Number)); // mapped from the backend's ql
     expect(firstNano).toHaveProperty('school');
     expect(firstNano).toHaveProperty('actions');
     expect(Array.isArray(firstNano.actions)).toBe(true);
@@ -118,7 +118,7 @@ describe.skipIf(!BACKEND_AVAILABLE)('Backend Integration Tests', () => {
     }
 
     // qualityLevel should be mapped from ql
-    expect(nano).toHaveProperty('ql', nano.qualityLevel);
+    expect(nano.qualityLevel).toEqual(expect.any(Number)); // mapped from the backend's ql
   }, 10000);
 
   it('gets nano statistics from backend', async () => {

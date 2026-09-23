@@ -61,7 +61,8 @@ describe.skipIf(!BACKEND_AVAILABLE)('TinkerNanos Backend Integration', () => {
     expect(nanosStore.error).toBeNull();
     expect(nanosStore.totalCount).toBeGreaterThan(0);
     expect(wrapper.findAll('.nano-card').length).toBeGreaterThan(0);
-    expect(wrapper.text()).toContain(`${nanosStore.nanos.length} nanos`);
+    // The header counts the server total; the list shows its first page
+    expect(wrapper.text()).toContain(`${nanosStore.totalCount} nanos`);
   }, 15000);
 
   it('searches nanos by name through the backend', async () => {
@@ -71,6 +72,18 @@ describe.skipIf(!BACKEND_AVAILABLE)('TinkerNanos Backend Integration', () => {
     await input.setValue('heal');
     await input.trigger('keyup.enter');
     await expect.poll(() => useNanosStore().searchHistory).toContain('heal');
+    // The search loads once the query reaches the store: wait for its results
+    const isSearchResult = (nano: { name: string; description?: string }) =>
+      `${nano.name} ${nano.description ?? ''}`.toLowerCase().includes('heal');
+    await expect
+      .poll(
+        () => {
+          const store = useNanosStore();
+          return !store.loading && store.nanos.length > 0 && store.nanos.every(isSearchResult);
+        },
+        { timeout: 10000 }
+      )
+      .toBe(true);
     await flushPromises();
 
     const names = wrapper.findAll('.nano-card h3').map((heading) => heading.text());

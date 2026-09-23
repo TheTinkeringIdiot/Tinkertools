@@ -284,12 +284,19 @@ describe.skipIf(!BACKEND_AVAILABLE)('NanosStore with backend', () => {
 
   it('applies filters correctly with real data', async () => {
     await store.fetchNanos();
+    const everyNano = store.totalCount;
     expect(store.nanos.length).toBeGreaterThan(1);
 
-    store.setFilters({ sortBy: 'name', sortDescending: false });
+    // The server filters: every nano of the page is Medical, and fewer match
+    store.setFilters({ schools: ['Medical'], levelRange: [1, 100] });
+    await store.fetchNanos();
 
-    const names = store.filteredNanos.map((nano) => nano.name);
-    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+    expect(store.totalCount).toBeGreaterThan(0);
+    expect(store.totalCount).toBeLessThan(everyNano);
+    for (const nano of store.nanos) {
+      expect(nano.school).toBe('Medical');
+      expect(nano.level).toBeLessThanOrEqual(100);
+    }
   }, 10000);
 
   it('computes available schools correctly with real data', async () => {
