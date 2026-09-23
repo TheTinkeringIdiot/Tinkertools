@@ -8,7 +8,13 @@ validating full pipeline from database to response without mocks.
 import math
 from collections import Counter
 
-from app.models import Item
+from app.models import (
+    Action,
+    Item,
+    ItemSpellData,
+    SpellCriterion,
+    SpellDataSpells,
+)
 
 # ============================================================================
 # GET /api/v1/nanos - List nanos with pagination
@@ -48,11 +54,12 @@ def test_get_nanos_returns_nano_program_structure(client):
     assert "name" in nano
     assert "ql" in nano
     assert "description" in nano
-    assert "casting_requirements" in nano
+    assert "actions" in nano
     assert "effects" in nano
     assert "school" in nano
     assert "strain" in nano
-    assert isinstance(nano["casting_requirements"], list)
+    assert isinstance(nano["actions"], list)
+    assert "casting_requirements" not in nano
 
 
 def test_get_nanos_pagination(client):
@@ -388,18 +395,102 @@ def test_get_nano_detail_includes_spells_and_criteria(client, db_session):
     assert isinstance(data["raw_criteria"], list)
 
 
-def test_get_nano_casting_requirements(client, db_session):
-    """Test that nano detail includes casting requirements."""
-    # Get a real nano
-    real_nano = db_session.query(Item).filter(Item.is_nano.is_(True)).first()
-    assert real_nano is not None
+def _nano_with_use_and_spell_criteria(db_session):
+    """A nano whose Use action and whose spells both carry criteria."""
+    use_action_items = (
+        db_session.query(Action.item_id)
+        .filter(Action.action == 3, Action.action_criteria.any())
+        .subquery()
+    )
+    spell_criteria_items = (
+        db_session.query(ItemSpellData.item_id)
+        .join(
+            SpellDataSpells,
+            SpellDataSpells.spell_data_id == ItemSpellData.spell_data_id,
+        )
+        .join(SpellCriterion, SpellCriterion.spell_id == SpellDataSpells.spell_id)
+        .subquery()
+    )
+    return (
+        db_session.query(Item)
+        .filter(
+            Item.is_nano.is_(True),
+            Item.id.in_(db_session.query(use_action_items.c.item_id)),
+            Item.id.in_(db_session.query(spell_criteria_items.c.item_id)),
+        )
+        .order_by(Item.id)
+        .first()
+    )
 
-    response = client.get(f"/api/v1/nanos/{real_nano.id}")
+
+def _expected_actions(item):
+    """The item's actions as the API serializes them, criteria in order."""
+    return sorted(
+        (
+            action.action,
+            [(c.value1, c.value2, c.operator) for c in action.criteria],
+        )
+        for action in item.actions
+    )
+
+
+def _response_actions(nano):
+    return sorted(
+        (
+            action["action"],
+            [(c["value1"], c["value2"], c["operator"]) for c in action["criteria"]],
+        )
+        for action in nano["actions"]
+    )
+
+
+def test_get_nano_returns_use_action_criteria(client, db_session):
+    """Casting requirements come from the nano's actions, not its spell criteria."""
+    nano = _nano_with_use_and_spell_criteria(db_session)
+    assert nano is not None
+
+    response = client.get(f"/api/v1/nanos/{nano.id}")
 
     assert response.status_code == 200
     data = response.json()
-    assert "casting_requirements" in data
-    assert isinstance(data["casting_requirements"], list)
+    assert "casting_requirements" not in data
+    assert _response_actions(data) == _expected_actions(nano)
+    use_actions = [a for a in data["actions"] if a["action"] == 3]
+    assert len(use_actions) == 1
+    assert len(use_actions[0]["criteria"]) > 0
+
+
+def test_list_and_search_nanos_return_actions(client, db_session):
+    """The list and search endpoints return the same actions as the database."""
+    nano = _nano_with_use_and_spell_criteria(db_session)
+    assert nano is not None
+    expected = _expected_actions(nano)
+
+    listed = client.get(
+        f"/api/v1/nanos?ql_min={nano.ql}&ql_max={nano.ql}&page_size=200"
+    )
+    assert listed.status_code == 200
+    # The filter may match more than one page; walk them until the nano turns up
+    pages = listed.json()["pages"]
+    found = [n for n in listed.json()["items"] if n["id"] == nano.id]
+    page = 2
+    while not found and page <= pages:
+        next_page = client.get(
+            f"/api/v1/nanos?ql_min={nano.ql}&ql_max={nano.ql}"
+            f"&page_size=200&page={page}"
+        )
+        found = [n for n in next_page.json()["items"] if n["id"] == nano.id]
+        page += 1
+    assert len(found) == 1
+    assert _response_actions(found[0]) == expected
+
+    searched = client.get(
+        "/api/v1/nanos/search", params={"q": nano.name, "page_size": 200}
+    )
+    assert searched.status_code == 200
+    matches = [n for n in searched.json()["items"] if n["id"] == nano.id]
+    assert len(matches) == 1
+    assert _response_actions(matches[0]) == expected
 
 
 def test_get_nano_not_found(client):
@@ -694,7 +785,7 @@ def test_nano_response_structure_consistency(client, db_session):
     assert "aoid" in detail_data
     assert "name" in detail_data
     assert "ql" in detail_data
-    assert "casting_requirements" in detail_data
+    assert "actions" in detail_data
 
 
 def test_nano_endpoints_with_real_high_ql_nano(client, db_session):

@@ -4,18 +4,8 @@ Nano program response schemas with rich spell data.
 
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
+from app.api.schemas.action import ActionResponse
 from app.api.schemas.spell import SpellResponse
-
-
-class CastingRequirement(BaseModel):
-    """Represents a casting requirement for a nano program."""
-
-    type: str = Field(..., description="Type of requirement (skill, stat, level)")
-    requirement: str = Field(..., description="Name of the skill, stat, or 'level'")
-    value: int = Field(..., description="Required value")
-    critical: bool = Field(
-        default=True, description="Whether this is a critical requirement"
-    )
 
 
 class NanoEffect(BaseModel):
@@ -70,8 +60,10 @@ class NanoProgram(BaseModel):
     level: Optional[int] = Field(None, description="Required level")
 
     # Casting information
-    casting_requirements: List[CastingRequirement] = Field(
-        default_factory=list, description="Requirements to cast this nano"
+    actions: List[ActionResponse] = Field(
+        default_factory=list,
+        description="Actions with criteria; the Use action's criteria are the "
+        "requirements to cast this nano",
     )
     casting_time: Optional[int] = Field(None, description="Time to cast in seconds")
     recharge_time: Optional[int] = Field(None, description="Recharge time in seconds")

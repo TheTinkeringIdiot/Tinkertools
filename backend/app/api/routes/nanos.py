@@ -28,35 +28,11 @@ from app.api.schemas.nano import (
     NanoProgram,
     NanoProgramWithSpells,
     NanoStatsResponse,
-    CastingRequirement,
 )
 from app.core.decorators import cached_response, performance_monitor
 
 router = APIRouter(prefix="/nanos", tags=["nanos"])
 logger = logging.getLogger(__name__)
-
-# Mapping from criterion values to readable skill names
-# NOTE: These are Anarchy Online skill IDs, not nano school IDs
-SKILL_MAPPING = {
-    17: "Matter Metamorphosis",
-    118: "Biological Metamorphosis",
-    122: "Psychological Modifications",
-    130: "Matter Creation",
-    144: "Time and Space",
-    151: "Sensory Improvement",
-    157: "Nano Programming",
-    # TODO: Add complete skill mapping when available
-}
-
-STAT_MAPPING = {
-    16: "Strength",
-    17: "Stamina",
-    18: "Agility",
-    19: "Sense",
-    20: "Intelligence",
-    21: "Psychic",
-    # Add more stat mappings as needed
-}
 
 # Profession mapping (if available in data)
 PROFESSION_MAPPING = {
@@ -87,7 +63,9 @@ def parse_nano_from_item_and_spells(item: Item) -> NanoProgram:
         "name": item.name,
         "ql": item.ql,
         "description": item.description,
-        "casting_requirements": [],
+        # What it takes to cast the nano is the criteria of its actions (the
+        # Use action), not its spells' criteria, which gate individual effects.
+        "actions": list(item.actions),
         "effects": [],
         "school": None,
         "strain": None,
@@ -106,32 +84,6 @@ def parse_nano_from_item_and_spells(item: Item) -> NanoProgram:
     # Extract data from associated spells
     for spell_data in item.spell_data:
         for spell in spell_data.spells:
-            # Extract casting requirements from criteria
-            for criterion in spell.criteria:
-                req_type = "unknown"
-                req_name = "Unknown"
-
-                # Determine if this is a skill, stat, or level requirement
-                if criterion.value1 in SKILL_MAPPING:
-                    req_type = "skill"
-                    req_name = SKILL_MAPPING[criterion.value1]
-                elif criterion.value1 in STAT_MAPPING:
-                    req_type = "stat"
-                    req_name = STAT_MAPPING[criterion.value1]
-                elif criterion.value1 == 54:  # Common level requirement ID
-                    req_type = "level"
-                    req_name = "level"
-
-                if req_type != "unknown":
-                    nano_data["casting_requirements"].append(
-                        CastingRequirement(
-                            type=req_type,
-                            requirement=req_name,
-                            value=criterion.value2,
-                            critical=True,
-                        )
-                    )
-
             # Extract basic spell properties
             if spell.tick_count and not nano_data["casting_time"]:
                 nano_data["casting_time"] = spell.tick_count
