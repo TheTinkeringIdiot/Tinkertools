@@ -216,18 +216,7 @@ const searchPerformed = ref(false);
 const revisionCounts = ref<Record<number, number>>({});
 
 // Items composable with default options
-const {
-  performSearch: searchItems,
-  totalItems,
-  pagination,
-  hasResults,
-  clearSearch: resetSearch,
-  error: searchError,
-} = useItems({
-  autoSearch: false,
-  debounceMs: 300,
-  defaultQuery: { limit: 24, sort: 'name', sort_order: 'asc' },
-});
+const { performSearch: searchItems, totalItems, pagination, clearSearch: resetSearch } = useItems();
 
 // Computed Properties
 const compatibilityProfile = computed(() =>
@@ -453,23 +442,6 @@ onMounted(() => {
   // Header search bar shortcut: /items?search=<term>
   if (urlSearchTerm.value.trim()) {
     searchFromUrl(urlSearchTerm.value.trim());
-    return;
-  }
-
-  // Check for itemId and ql query parameters (from equipment navigation)
-  const itemIdParam = route.query.itemId;
-  const qlParam = route.query.ql;
-
-  if (itemIdParam && qlParam) {
-    // Create a search query for the specific item and QL
-    const itemQuery: ItemSearchQuery = {
-      aoid: parseInt(itemIdParam as string),
-      min_ql: parseInt(qlParam as string),
-      max_ql: parseInt(qlParam as string),
-    };
-
-    // Trigger the advanced search
-    performAdvancedSearch(itemQuery);
     return;
   }
 
