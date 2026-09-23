@@ -10,7 +10,6 @@ import { ref, computed, readonly } from 'vue';
 import type {
   Item,
   ItemSearchQuery,
-  ItemFilterRequest,
   PaginatedResponse,
   UserFriendlyError,
   PaginationInfo,
@@ -221,35 +220,6 @@ export const useItemsStore = defineStore('items', () => {
   }
 
   /**
-   * Filter items with advanced criteria
-   */
-  async function filterItems(filter: ItemFilterRequest): Promise<Item[]> {
-    loading.value = true;
-    error.value = null;
-
-    try {
-      const response: PaginatedResponse<Item> = await apiClient.filterItems(filter);
-
-      if (response.items) {
-        // Store individual items in cache
-        response.items.forEach((item) => {
-          items.value.set(item.id, item);
-        });
-
-        lastFetch.value = Date.now();
-        return response.items;
-      } else {
-        throw new Error('Filter failed');
-      }
-    } catch (err) {
-      error.value = toUserFriendlyError(err);
-      throw err;
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  /**
    * Get items with specific stat requirements
    */
   function getItemsWithStats(
@@ -360,7 +330,6 @@ export const useItemsStore = defineStore('items', () => {
     getItem,
     getItemFromCache,
     getItems,
-    filterItems,
     getItemsWithStats,
     clearSearch,
     clearError,

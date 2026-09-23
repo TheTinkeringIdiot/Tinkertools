@@ -11,7 +11,6 @@ import { API_ROOT } from '../../services/api-config';
 import { setCurrentVersion } from '../../composables/useGameVersion';
 import { TEST_VERSION, TEST_ALT_VERSION } from '../helpers/version-fixtures';
 import type { Item, Spell, ApiResponse } from '../../types/api';
-import { createTestProfile } from '../helpers/profile-fixtures';
 
 type RequestInterceptor = (config: InternalAxiosRequestConfig) => InternalAxiosRequestConfig;
 type ResponseErrorInterceptor = (error: unknown) => Promise<unknown>;
@@ -192,26 +191,6 @@ describe('API Client', () => {
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/items/1', undefined);
     });
 
-    it('should handle item compatibility check', async () => {
-      const compatibilityRequest = {
-        profile: createTestProfile(),
-        item_ids: [1, 2, 3],
-        check_type: 'equip' as const,
-      };
-
-      mockAxiosInstance.post.mockResolvedValue({
-        data: { success: true, data: [] },
-      });
-
-      await apiClient.checkItemCompatibility(compatibilityRequest);
-
-      expect(mockAxiosInstance.post).toHaveBeenCalledWith(
-        '/items/compatibility',
-        compatibilityRequest,
-        undefined
-      );
-    });
-
     it('should batch multiple item requests', async () => {
       const itemIds = [1, 2, 3];
       mockAxiosInstance.post.mockResolvedValue({
@@ -352,26 +331,6 @@ describe('API Client', () => {
 
       await expect(onError()(error)).rejects.toBe(error);
       expect(mockAxiosInstance).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('Health Check', () => {
-    it('should perform health check', async () => {
-      const healthResponse = {
-        success: true,
-        data: {
-          status: 'healthy',
-          timestamp: '2024-01-01T00:00:00Z',
-        },
-      };
-
-      mockAxiosInstance.get.mockResolvedValue({ data: healthResponse });
-
-      const result = await apiClient.healthCheck();
-
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/health', undefined);
-      expect(result.success).toBe(true);
-      expect(result.data?.status).toBe('healthy');
     });
   });
 });

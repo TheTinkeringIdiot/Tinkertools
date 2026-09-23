@@ -21,9 +21,6 @@ import type {
   SymbiantSearchQuery,
   MobSearchQuery,
   MobDropsQuery,
-  ItemFilterRequest,
-  ItemCompatibilityRequest,
-  ItemCompatibilityResult,
   UserFriendlyError,
   ApiError,
   InterpolationRequest,
@@ -481,16 +478,6 @@ class TinkerToolsApiClient {
     return this.batchManager.batchItems(ids).then((data) => ({ success: true, data }));
   }
 
-  async filterItems(filter: ItemFilterRequest): Promise<PaginatedResponse<Item>> {
-    return this.postPaginated<Item>('/items/filter', filter);
-  }
-
-  async checkItemCompatibility(
-    request: ItemCompatibilityRequest
-  ): Promise<ApiResponse<ItemCompatibilityResult[]>> {
-    return this.post<ItemCompatibilityResult[]>('/items/compatibility', request);
-  }
-
   // ============================================================================
   // Implant API
   // ============================================================================
@@ -798,10 +785,6 @@ class TinkerToolsApiClient {
       aoids: aoids.slice(0, 500),
     });
     return (response.data as ItemRevisionsBatchResponse) ?? { items: {} };
-  }
-
-  async healthCheck(): Promise<ApiResponse<{ status: string; timestamp: string }>> {
-    return this.get<{ status: string; timestamp: string }>('/health');
   }
 
   // ============================================================================

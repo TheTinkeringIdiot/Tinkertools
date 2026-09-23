@@ -466,15 +466,6 @@ export interface StatRequirement {
   value: number;
 }
 
-export interface ItemFilterRequest {
-  stat_requirements?: StatRequirement[];
-  item_class?: number[];
-  ql_range?: [number, number];
-  is_nano?: boolean;
-  has_attack_defense?: boolean;
-  has_spell_data?: boolean;
-}
-
 export interface ItemFilters {
   // Basic type filters
   isNano?: boolean;
@@ -510,19 +501,6 @@ export interface PaginationInfo {
   total: number;
   hasNext: boolean;
   hasPrev: boolean;
-}
-
-export interface ItemCompatibilityRequest {
-  profile: TinkerProfile;
-  item_ids: number[];
-  check_type: 'equip' | 'use' | 'cast';
-}
-
-export interface ItemCompatibilityResult {
-  item_id: number;
-  compatible: boolean;
-  missing_requirements?: StatRequirement[];
-  suggestions?: string[];
 }
 
 // ============================================================================
