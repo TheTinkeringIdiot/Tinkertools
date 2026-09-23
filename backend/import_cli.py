@@ -29,6 +29,7 @@ Usage:
     python import_cli.py register --version ao --set-default
     python import_cli.py adopt-public --version ao   # one-time public -> gv_ao move
     python import_cli.py drop-version --version old-snapshot --yes
+    python import_cli.py nano-properties --version ao  # rebuild nano school/profession/level
 
     # Validate files exist
     python import_cli.py validate
@@ -265,12 +266,45 @@ def populate_item_revisions(slug: str) -> int:
     return count
 
 
+def populate_nano_properties(slug: str) -> int:
+    """Rebuild ``nano_properties`` (school, professions, min level) for one version.
+
+    Derived from the nanos' stats and Use action criteria already in the
+    schema, so it runs after every import and can be re-run on its own.
+
+    Returns:
+        Number of nanos written.
+    """
+    from app.core.database import session_for_version
+    from app.core.nano_properties import populate
+
+    logger.info(f"Deriving nano properties for version '{slug}'...")
+    with session_for_version(slug) as db:
+        count = populate(db)
+        db.commit()
+    logger.info(f"Wrote nano_properties for {count} nanos in version '{slug}'")
+    return count
+
+
 def finalize_version(args, runner, features: dict, client_build: Optional[str] = None) -> bool:
-    """Register the version, then rebuild its cross-version revision index."""
+    """Register the version, derive its nano properties (school, professions,
+    level) and rebuild its cross-version revision index.
+
+    Every import path ends here (single datasets, ``all`` and ``all --csv-mode``),
+    so a freshly imported version always has its nano_properties filled.
+    """
     slug = version_slug(args)
 
     if not register_version_from_args(args, runner, features, client_build):
         return False
+
+    ok = True
+    try:
+        populate_nano_properties(slug)
+    except Exception as e:
+        logger.error(f"Failed to derive nano properties for '{slug}': {e}. "
+                     f"Re-run: python import_cli.py nano-properties --version {slug}")
+        ok = False
 
     try:
         rows = populate_item_revisions(slug)
@@ -279,10 +313,11 @@ def finalize_version(args, runner, features: dict, client_build: Optional[str] =
                 "No item_revisions rows written: the items in this schema carry no "
                 "content hashes. Re-import the version to build its change history."
             )
-        return True
     except Exception as e:
         logger.error(f"Failed to populate item_revisions for '{slug}': {e}")
-        return False
+        ok = False
+
+    return ok
 
 
 def create_database_indexes(slug: str):
@@ -668,7 +703,7 @@ def import_all_csv_mode(args, runner=None):
         logger.info("=== Phase 5: Version registry ===")
         features = build_features(args, nanos=True, items=True)
         if not finalize_version(args, runner, features, client_build):
-            logger.warning("Version registration failed, but data import succeeded")
+            logger.warning("Version finalization failed, but data import succeeded")
 
         # === SUMMARY ===
         total_time = (transform_stats['total_time']
@@ -766,7 +801,7 @@ def import_all(args):
         except FileNotFoundError:
             client_build = None
     if not finalize_version(args, runner, build_features(args), client_build):
-        logger.warning("Version registration failed, but data import succeeded")
+        logger.warning("Version finalization failed, but data import succeeded")
 
     if success:
         logger.info("All imports completed successfully!")
@@ -802,7 +837,7 @@ def import_single_dataset(args, importer_func, features: dict, reads_items: bool
             client_build = None
 
     if not finalize_version(args, runner, features, client_build):
-        logger.warning("Version registration failed, but data import succeeded")
+        logger.warning("Version finalization failed, but data import succeeded")
 
     return True
 
@@ -888,9 +923,10 @@ def adopt_public(args) -> bool:
         return False
 
     try:
+        populate_nano_properties(slug)
         rows = populate_item_revisions(slug)
     except Exception as e:
-        logger.error(f"Failed to populate item_revisions: {e}")
+        logger.error(f"Failed to populate nano_properties or item_revisions: {e}")
         return False
 
     if rows == 0:
@@ -901,6 +937,32 @@ def adopt_public(args) -> bool:
         )
 
     return True
+
+
+def nano_properties_command(args) -> bool:
+    """Apply pending migrations to an existing version schema and rebuild its
+    nano_properties table, without re-importing anything."""
+    from app.core.migration_runner import MigrationRunner
+    from app.core.versions import registry, schema_name_for
+
+    slug = version_slug(args)
+    schema = schema_name_for(slug)
+
+    try:
+        runner = MigrationRunner(db_url=getattr(args, 'database_url', None))
+        if schema not in runner.list_version_schemas():
+            logger.error(f"No schema {schema} for version '{slug}'; import it first")
+            return False
+        runner.run_global_migrations()
+        runner.run_migrations(schema)
+        registry.invalidate()
+        populate_nano_properties(slug)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to rebuild nano properties for '{slug}': {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return False
 
 
 def drop_version(args) -> bool:
@@ -971,7 +1033,7 @@ def validate_files(args=None):
 # ---------------------------------------------------------------------------
 
 DATA_COMMANDS = {"symbiants", "items", "nanos", "all"}
-REGISTRY_COMMANDS = {"versions", "register", "adopt-public", "drop-version"}
+REGISTRY_COMMANDS = {"versions", "register", "adopt-public", "drop-version", "nano-properties"}
 
 
 def main():
@@ -996,6 +1058,7 @@ Examples:
   python import_cli.py register --version ao --set-default --display-name "Anarchy Online (Live)"
   python import_cli.py adopt-public --version ao   # move existing public tables into gv_ao
   python import_cli.py drop-version --version ao-15.0 --yes
+  python import_cli.py nano-properties --version ao   # migrate + rebuild nano school/profession/level
 
 Game Versions:
   Each version lives in its own PostgreSQL schema, gv_<slug>. --clear rebuilds only
@@ -1246,6 +1309,8 @@ Environment:
             success = adopt_public(args)
         elif args.command == "drop-version":
             success = drop_version(args)
+        elif args.command == "nano-properties":
+            success = nano_properties_command(args)
     except KeyboardInterrupt:
         logger.info("\nImport interrupted by user")
         sys.exit(1)

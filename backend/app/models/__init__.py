@@ -11,6 +11,7 @@ from .animation_mesh import AnimationMesh
 from .shop_hash import ShopHash
 from .item import Item, ItemStats, ItemSpellData, ItemShopHash
 from .perk import Perk
+from .nano_properties import NanoProperties
 from .action import Action, ActionCriteria
 from .mob import Mob
 from .symbiant_item import SymbiantItem
@@ -35,6 +36,7 @@ __all__ = [
     "ItemSpellData",
     "ItemShopHash",
     "Perk",
+    "NanoProperties",
     "Action",
     "ActionCriteria",
     "Mob",

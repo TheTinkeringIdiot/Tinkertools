@@ -52,6 +52,11 @@ class Item(Base):
     perk = relationship(
         "Perk", back_populates="item", uselist=False, cascade="all, delete-orphan"
     )
+    # Written by the importer with SQL (app/core/nano_properties.py), and the
+    # database cascades deletes, so the ORM only reads it.
+    nano_properties = relationship(
+        "NanoProperties", back_populates="item", uselist=False, viewonly=True
+    )
 
     # Access related data directly
     @property

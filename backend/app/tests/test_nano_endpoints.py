@@ -8,6 +8,8 @@ validating full pipeline from database to response without mocks.
 import math
 from collections import Counter
 
+from sqlalchemy import text
+
 from app.models import (
     Action,
     Item,
@@ -196,21 +198,180 @@ def test_get_nanos_strain_filter_pages_sum_to_total(client, db_session):
     assert set(ids) == ids_by_strain[strain]
 
 
-def test_get_nanos_unpopulated_field_filters_match_nothing(client):
-    """School, profession and level are never parsed, so filters on them are empty."""
-    for params in (
-        "school=Matter Creation",
-        "profession=Doctor",
-        "level_min=1",
-        "level_max=220",
-    ):
-        response = client.get(f"/api/v1/nanos?{params}")
+# Independent SQL for the derived filters. Each reads the raw stats and Use
+# criteria, not nano_properties. Profession and level are only answerable by a
+# join for Use criteria without OR, NOT or target modifiers, so those two are
+# compared on that subset of nanos; every nano the API returns must also carry
+# the value it was filtered on.
+SCHOOL_SQL = """
+    SELECT i.id FROM items i
+    JOIN item_stats ist ON ist.item_id = i.id
+    JOIN stat_values sv ON sv.id = ist.stat_value_id
+    WHERE i.is_nano AND sv.stat = 405 AND sv.value = :value
+"""
+
+SIMPLE_USE_ACTIONS_SQL = """
+    SELECT a.id, a.item_id FROM actions a
+    JOIN items i ON i.id = a.item_id AND i.is_nano
+    WHERE a.action = 3
+      AND NOT EXISTS (
+        SELECT 1 FROM action_criteria ac JOIN criteria c ON c.id = ac.criterion_id
+        WHERE ac.action_id = a.id AND c.operator IN (3, 42, 18, 19, 21, 26)
+      )
+"""
+
+SIMPLE_PROFESSION_SQL = f"""
+    SELECT DISTINCT s.item_id FROM ({SIMPLE_USE_ACTIONS_SQL}) s
+    JOIN action_criteria ac ON ac.action_id = s.id
+    JOIN criteria c ON c.id = ac.criterion_id
+    WHERE c.value1 IN (60, 368) AND c.operator = 0 AND c.value2 = :profession
+      AND NOT EXISTS (
+        SELECT 1 FROM action_criteria ac2 JOIN criteria c2 ON c2.id = ac2.criterion_id
+        WHERE ac2.action_id = s.id AND c2.value1 IN (60, 368)
+          AND NOT (c2.operator = 0 AND c2.value2 = :profession)
+      )
+"""
+
+# Lowest level = 1 + the largest "Level > n" (operator 2), for Use criteria
+# whose only level criteria are of that form
+SIMPLE_LEVEL_SQL = f"""
+    SELECT s.item_id,
+           COALESCE(MAX(c.value2) FILTER (WHERE c.value1 = 54) + 1, 1) AS level
+    FROM ({SIMPLE_USE_ACTIONS_SQL}) s
+    LEFT JOIN action_criteria ac ON ac.action_id = s.id
+    LEFT JOIN criteria c ON c.id = ac.criterion_id
+    GROUP BY s.item_id
+    HAVING bool_and(c.value1 IS DISTINCT FROM 54 OR c.operator = 2)
+"""
+
+
+def _simple_ids(db_session):
+    return {row[1] for row in db_session.execute(text(SIMPLE_USE_ACTIONS_SQL))}
+
+
+def _all_filtered(client, params, page_size=200):
+    """Every nano a filtered /nanos query returns, checking pages add up."""
+    nanos = []
+    page = 1
+    while True:
+        response = client.get(
+            "/api/v1/nanos", params={**params, "page": page, "page_size": page_size}
+        )
         assert response.status_code == 200
         data = response.json()
+        assert data["pages"] == max(1, math.ceil(data["total"] / page_size))
+        nanos.extend(data["items"])
+        if not data["has_next"]:
+            break
+        page += 1
+    assert len(nanos) == data["total"]
+    assert len({nano["id"] for nano in nanos}) == len(nanos)
+    return nanos
+
+
+def test_get_nanos_school_filter_matches_nano_school_stat(client, db_session):
+    """school=Medical returns exactly the nanos whose NanoSchool stat is 2."""
+    expected = {row[0] for row in db_session.execute(text(SCHOOL_SQL), {"value": 2})}
+    assert expected
+
+    nanos = _all_filtered(client, {"school": "Medical"})
+    assert {nano["id"] for nano in nanos} == expected
+    assert all(nano["school"] == "Medical" for nano in nanos)
+
+
+def test_get_nanos_profession_filter_matches_use_criteria(client, db_session):
+    """profession=Doctor (or its id) returns the nanos only Doctors can cast."""
+    nanos = _all_filtered(client, {"profession": "Doctor"})
+    ids = {nano["id"] for nano in nanos}
+    assert ids
+    assert all("Doctor" in nano["professions"] for nano in nanos)
+
+    simple = _simple_ids(db_session)
+    expected = {
+        row[0]
+        for row in db_session.execute(text(SIMPLE_PROFESSION_SQL), {"profession": 10})
+    }
+    assert expected
+    assert ids & simple == expected
+
+    by_id = client.get("/api/v1/nanos", params={"profession": "10"}).json()
+    assert by_id["total"] == len(ids)
+
+
+def test_get_nanos_level_filter_matches_use_criteria(client, db_session):
+    """level_min/level_max bound the lowest level that can cast the nano."""
+    nanos = _all_filtered(client, {"level_min": 150, "level_max": 200})
+    assert nanos
+    assert all(150 <= nano["level"] <= 200 for nano in nanos)
+
+    simple = _simple_ids(db_session)
+    expected = {
+        item_id
+        for item_id, level in db_session.execute(text(SIMPLE_LEVEL_SQL))
+        if 150 <= level <= 200
+    }
+    assert expected
+    assert {nano["id"] for nano in nanos} & simple == expected
+
+
+def test_get_nanos_combined_filters_intersect(client):
+    """Filters combine with AND, and totals stay consistent."""
+    doctor = {n["id"] for n in _all_filtered(client, {"profession": "Doctor"})}
+    medical = {n["id"] for n in _all_filtered(client, {"school": "Medical"})}
+    both = _all_filtered(client, {"profession": "Doctor", "school": "Medical"})
+    assert {n["id"] for n in both} == doctor & medical
+
+
+def test_get_nanos_unknown_school_or_profession_matches_nothing(client):
+    """A school or profession name the game doesn't have filters to nothing."""
+    for params in ("school=Matter Creation", "profession=Monster"):
+        data = client.get(f"/api/v1/nanos?{params}").json()
         assert data["items"] == []
         assert data["total"] == 0
         assert data["pages"] == 1
         assert data["has_next"] is False
+
+
+def test_get_nanos_sort_by_level(client):
+    """sort_by=level orders by the lowest casting level, unknown levels last."""
+    for params in ({"level_min": 1}, {}):
+        data = client.get(
+            "/api/v1/nanos",
+            params={**params, "sort_by": "level", "sort_desc": True},
+        ).json()
+        levels = [nano["level"] for nano in data["items"]]
+        assert None not in levels
+        assert levels == sorted(levels, reverse=True)
+
+    # Without a level filter, nanos with no Use action (level null) come last
+    first = client.get("/api/v1/nanos", params={"sort_by": "level"}).json()
+    last = client.get(
+        "/api/v1/nanos", params={"sort_by": "level", "page": first["pages"]}
+    ).json()
+    assert first["items"][0]["level"] == 1
+    assert last["items"][-1]["level"] is None
+
+
+def test_known_nanos_have_expected_derived_fields(client, db_session):
+    """Well-known nanos read back with the school, professions and level the game gives them."""
+    expected = {
+        218168: ("Combat", ["Nano-Technician"], 220),  # Izgimmer's Ultimatum
+        28650: ("Medical", ["Doctor"], 1),  # Complete Healing
+        235281: ("Psi", ["Trader"], 145),  # Umbral Wrangler (Major), the Trader nano
+        235248: ("Psi", [], 125),  # Umbral Wrangler (Major), any profession
+    }
+    for aoid, (school, professions, level) in expected.items():
+        item = (
+            db_session.query(Item)
+            .filter(Item.is_nano.is_(True), Item.aoid == aoid)
+            .one()
+        )
+        nano = client.get(f"/api/v1/nanos/{item.id}").json()
+        assert (nano["school"], nano["professions"], nano["level"]) == (
+            school,
+            professions,
+            level,
+        ), aoid
 
 
 def test_get_nanos_invalid_page(client):
@@ -562,6 +723,26 @@ def test_get_nanos_by_profession_returns_item_detail(client):
         assert "actions" in item
         assert "is_nano" in item
         assert item["is_nano"] is True
+
+
+def test_profession_and_search_endpoints_return_derived_fields(client, db_session):
+    """/nanos/profession/{id} and /nanos/search carry school, professions, level."""
+    items = client.get("/api/v1/nanos/profession/11").json()["items"]
+    assert items
+    for item in items:
+        assert {"school", "professions", "level"} <= item.keys()
+    # That endpoint matches any caster Profession == NT criterion; the derived
+    # list agrees wherever the Use criteria have no OR, NOT or target modifier
+    simple = _simple_ids(db_session)
+    assert all(
+        "Nano-Technician" in item["professions"]
+        for item in items
+        if item["id"] in simple
+    )
+
+    found = client.get("/api/v1/nanos/search?q=Izgimmer").json()["items"]
+    assert any(nano["professions"] == ["Nano-Technician"] for nano in found)
+    assert all({"school", "professions", "level"} <= nano.keys() for nano in found)
 
 
 def test_get_nanos_by_profession_all(client):

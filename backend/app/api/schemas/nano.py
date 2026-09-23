@@ -5,6 +5,7 @@ Nano program response schemas with rich spell data.
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from app.api.schemas.action import ActionResponse
+from app.api.schemas.item import ItemDetail
 from app.api.schemas.spell import SpellResponse
 
 
@@ -49,15 +50,25 @@ class NanoProgram(BaseModel):
     ql: int = Field(..., description="Quality level")
     description: Optional[str] = Field(None, description="Nano description")
 
-    # Nano-specific properties (derived from spell data)
+    # Nano-specific properties (app/core/nano_properties.py)
     school: Optional[str] = Field(
-        None, description="Nano school (Matter Creation, etc.)"
+        None,
+        description="Nano school from the NanoSchool stat: Combat, Medical, "
+        "Protection, Psi or Space",
     )
     strain: Optional[str] = Field(
         None, description="Nano strain for conflict detection"
     )
-    profession: Optional[str] = Field(None, description="Required profession")
-    level: Optional[int] = Field(None, description="Required level")
+    professions: List[str] = Field(
+        default_factory=list,
+        description="Professions that can cast it; empty when the Use action "
+        "does not restrict the profession",
+    )
+    level: Optional[int] = Field(
+        None,
+        description="Lowest character level that can cast it (1 when the Use "
+        "action asks for no level); null when it has no Use action",
+    )
 
     # Casting information
     actions: List[ActionResponse] = Field(
@@ -97,6 +108,20 @@ class NanoProgramWithSpells(NanoProgram):
     )
     raw_criteria: List[Dict[str, Any]] = Field(
         default_factory=list, description="Raw spell criteria data"
+    )
+
+
+class NanoItemDetail(ItemDetail):
+    """ItemDetail of a nano, with the same school, professions and level as
+    NanoProgram."""
+
+    school: Optional[str] = Field(None, description="Nano school (NanoSchool stat)")
+    professions: List[str] = Field(
+        default_factory=list,
+        description="Professions that can cast it; empty when unrestricted",
+    )
+    level: Optional[int] = Field(
+        None, description="Lowest character level that can cast it"
     )
 
 

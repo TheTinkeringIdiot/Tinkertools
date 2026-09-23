@@ -22,35 +22,33 @@ from app.models import (
     Criterion,
     Action,
     ActionCriteria,
+    NanoProperties,
 )
 from app.api.schemas import PaginatedResponse, ItemDetail
 from app.api.schemas.nano import (
+    NanoItemDetail,
     NanoProgram,
     NanoProgramWithSpells,
     NanoStatsResponse,
 )
+from app.core import nano_properties
 from app.core.decorators import cached_response, performance_monitor
 
 router = APIRouter(prefix="/nanos", tags=["nanos"])
 logger = logging.getLogger(__name__)
 
-# Profession mapping (if available in data)
-PROFESSION_MAPPING = {
-    # These would need to be determined from actual data
-    1: "Soldier",
-    2: "Martial Artist",
-    3: "Engineer",
-    4: "Fixers",
-    5: "Agent",
-    6: "Adventurer",
-    7: "Trader",
-    8: "Bureaucrat",
-    9: "Enforcer",
-    10: "Doctor",
-    11: "Nano-Technician",
-    12: "Meta-Physicist",
-    # Add more as needed
-}
+
+def derived_nano_fields(item: Item) -> dict:
+    """school, professions and level of a nano, from its nano_properties row
+    (see app/core/nano_properties.py for what each one means)."""
+    props = item.nano_properties
+    if props is None:
+        return {"school": None, "professions": [], "level": None}
+    return {
+        "school": nano_properties.school_name(props.school),
+        "professions": nano_properties.profession_names(props.professions),
+        "level": props.min_level,
+    }
 
 
 def parse_nano_from_item_and_spells(item: Item) -> NanoProgram:
@@ -67,10 +65,8 @@ def parse_nano_from_item_and_spells(item: Item) -> NanoProgram:
         # Use action), not its spells' criteria, which gate individual effects.
         "actions": list(item.actions),
         "effects": [],
-        "school": None,
         "strain": None,
-        "profession": None,
-        "level": None,
+        **derived_nano_fields(item),
         "casting_time": None,
         "recharge_time": None,
         "memory_usage": None,
@@ -90,11 +86,6 @@ def parse_nano_from_item_and_spells(item: Item) -> NanoProgram:
             if spell.tick_interval and not nano_data["recharge_time"]:
                 nano_data["recharge_time"] = spell.tick_interval
 
-    # TODO: Extract actual nano school from spell data
-    # Nano schools are integers that need proper mapping
-    # For now, leave school as None until we get the proper school integer->name mapping
-    nano_data["school"] = None
-
     # Extract strain from name patterns (many AO nanos have strain in name)
     if " - " in item.name:
         parts = item.name.split(" - ")
@@ -110,11 +101,21 @@ def parse_nano_from_item_and_spells(item: Item) -> NanoProgram:
 def get_nanos(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page"),
-    school: Optional[str] = Query(None, description="Filter by school"),
+    school: Optional[str] = Query(
+        None, description="Filter by school: Combat, Medical, Protection, Psi, Space"
+    ),
     strain: Optional[str] = Query(None, description="Filter by strain"),
-    profession: Optional[str] = Query(None, description="Filter by profession"),
-    level_min: Optional[int] = Query(None, description="Minimum level"),
-    level_max: Optional[int] = Query(None, description="Maximum level"),
+    profession: Optional[str] = Query(
+        None,
+        description="Filter to nanos whose Use action limits casting to a set of "
+        "professions that includes this one (name, e.g. Doctor, or id)",
+    ),
+    level_min: Optional[int] = Query(
+        None, description="Minimum of the lowest level that can cast it"
+    ),
+    level_max: Optional[int] = Query(
+        None, description="Maximum of the lowest level that can cast it"
+    ),
     ql_min: Optional[int] = Query(None, description="Minimum quality level"),
     ql_max: Optional[int] = Query(None, description="Maximum quality level"),
     sort_by: str = Query("name", description="Sort by: name, ql, level"),
@@ -142,10 +143,31 @@ def get_nanos(
             func.btrim(func.regexp_replace(Item.name, "^.* - ", ""), " \t\r\n")
             == strain,
         )
-    # The parser never fills in school, profession or level (see the TODOs
-    # there), so no nano can match a filter on them.
-    if school or profession or level_min or level_max:
-        query = query.filter(false())
+    # school, profession and level come from nano_properties, the same row
+    # derived_nano_fields() reports. A name that isn't a school or profession
+    # matches nothing, like an unknown strain.
+    if school or profession or level_min is not None or level_max is not None:
+        query = query.join(NanoProperties, NanoProperties.item_id == Item.id)
+    elif sort_by == "level":
+        query = query.outerjoin(NanoProperties, NanoProperties.item_id == Item.id)
+    if school:
+        school_value = nano_properties.school_id(school)
+        query = query.filter(
+            NanoProperties.school == school_value
+            if school_value is not None
+            else false()
+        )
+    if profession:
+        profession_value = nano_properties.profession_id(profession)
+        query = query.filter(
+            NanoProperties.professions.contains([profession_value])
+            if profession_value is not None
+            else false()
+        )
+    if level_min is not None:
+        query = query.filter(NanoProperties.min_level >= level_min)
+    if level_max is not None:
+        query = query.filter(NanoProperties.min_level <= level_max)
 
     # Get total count on lightweight query (no relationship loading)
     total = query.count()
@@ -155,6 +177,12 @@ def get_nanos(
         query = query.order_by(desc(Item.name) if sort_desc else asc(Item.name))
     elif sort_by == "ql":
         query = query.order_by(desc(Item.ql) if sort_desc else asc(Item.ql))
+    elif sort_by == "level":
+        # Nanos without a level (no Use action) sort last either way
+        level = NanoProperties.min_level
+        query = query.order_by(
+            level.desc().nulls_last() if sort_desc else level.asc().nulls_last()
+        )
     else:
         query = query.order_by(desc(Item.name) if sort_desc else asc(Item.name))
     query = query.order_by(Item.id)
@@ -174,6 +202,7 @@ def get_nanos(
             selectinload(Item.actions)
             .selectinload(Action.action_criteria)
             .selectinload(ActionCriteria.criterion),
+            selectinload(Item.nano_properties),
         )
         .offset(offset)
         .limit(page_size)
@@ -241,6 +270,7 @@ def search_nanos(
             selectinload(Item.actions)
             .selectinload(Action.action_criteria)
             .selectinload(ActionCriteria.criterion),
+            selectinload(Item.nano_properties),
         )
         .offset(offset)
         .limit(page_size)
@@ -289,6 +319,7 @@ def get_nano_stats(db: Session = Depends(get_db)):
             selectinload(Item.actions)
             .selectinload(Action.action_criteria)
             .selectinload(ActionCriteria.criterion),
+            selectinload(Item.nano_properties),
         )
         .all()
     )
@@ -306,8 +337,7 @@ def get_nano_stats(db: Session = Depends(get_db)):
                 schools.add(nano.school)
             if nano.strain:
                 strains.add(nano.strain)
-            if nano.profession:
-                professions.add(nano.profession)
+            professions.update(nano.professions)
             if nano.level:
                 levels.append(nano.level)
             quality_levels.append(nano.ql)
@@ -348,6 +378,7 @@ def get_nano(nano_id: int, db: Session = Depends(get_db)):
             joinedload(Item.actions)
             .joinedload(Action.action_criteria)
             .joinedload(ActionCriteria.criterion),
+            joinedload(Item.nano_properties),
         )
         .first()
     )
@@ -382,7 +413,9 @@ def get_nano(nano_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Failed to process nano data")
 
 
-@router.get("/profession/{profession_id}", response_model=PaginatedResponse[ItemDetail])
+@router.get(
+    "/profession/{profession_id}", response_model=PaginatedResponse[NanoItemDetail]
+)
 @cached_response("nanos_profession", ttl=3600)  # Cache for 1 hour
 @performance_monitor
 def get_nanos_by_profession(
@@ -505,6 +538,7 @@ def get_nanos_by_profession(
             selectinload(Item.actions)
             .selectinload(Action.action_criteria)
             .selectinload(ActionCriteria.criterion),
+            selectinload(Item.nano_properties),
             # Skip source loading if not critical for performance
             # selectinload(Item.item_sources).selectinload(ItemSource.source)
             #     .selectinload(Source.source_type)
@@ -536,7 +570,7 @@ def get_nanos_by_profession(
         sources = []  # Disabled for performance - can be loaded separately if needed
 
         detailed_items.append(
-            ItemDetail(
+            NanoItemDetail(
                 id=item.id,
                 aoid=item.aoid,
                 name=item.name,
@@ -550,10 +584,11 @@ def get_nanos_by_profession(
                 defense_stats=[],  # Nanos don't have defense stats
                 actions=actions,
                 sources=sources,
+                **derived_nano_fields(item),
             )
         )
 
-    return PaginatedResponse[ItemDetail](
+    return PaginatedResponse[NanoItemDetail](
         items=detailed_items,
         total=total,  # Now accurate count from DB filtering
         page=page,
