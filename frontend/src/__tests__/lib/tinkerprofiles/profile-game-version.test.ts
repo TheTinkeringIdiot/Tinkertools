@@ -418,7 +418,7 @@ describe('buildVersionCopy', () => {
     expect(result.profile.Clothing.Head?.name).toBe('New Helmet');
     expect(result.profile.Implants['2']?.name).toBe('New Implant');
     expect(result.profile.buffs?.[0].name).toBe('New Buff');
-    expect(result.profile.PerksAndResearch.perks[0].item.name).toBe('New Perk');
+    expect(result.profile.PerksAndResearch.perks[0].item?.name).toBe('New Perk');
   });
 
   it('keeps implant slot and clusters across the swap', async () => {

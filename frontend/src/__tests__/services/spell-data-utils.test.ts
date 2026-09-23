@@ -44,7 +44,7 @@ describe('spell-data-utils', () => {
       spell_id: 53002, // Known format in SPELL_FORMATS
       spell_format: 'Old format string', // Should be ignored
       spell_params: {
-        Stat: 'Intelligence',
+        Stat: 19, // Intelligence: the backend sends stat IDs
         MinValue: 10,
         MaxValue: 20,
         TickCount: 1,
@@ -107,7 +107,7 @@ describe('spell-data-utils', () => {
         tick_count: 5,
         tick_interval: 200,
         spell_params: {
-          Stat: 'Intelligence',
+          Stat: 19, // Intelligence
           MinValue: 10,
           MaxValue: 20,
         },
