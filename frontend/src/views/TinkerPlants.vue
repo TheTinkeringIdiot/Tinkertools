@@ -948,22 +948,19 @@ const handleSave = async () => {
  */
 const syncImplantSelectionsFromStore = () => {
   const config = tinkerPlantsStore.currentConfiguration as Record<string, any>;
-  for (const [slotBitflag, selection] of Object.entries(config)) {
-    // Find the slot name for this bitflag
-    const slotEntry = Object.entries(slotMapping).find(
-      ([_, mapping]) => mapping.bitflag === slotBitflag
-    );
-    if (slotEntry) {
-      const slotName = slotEntry[0];
-      implantSelections[slotName] = {
-        shiny: selection.shiny,
-        bright: selection.bright,
-        faded: selection.faded,
-        ql: selection.ql,
-      };
-      // Sync slot type
-      slotType[slotName] = selection.type === 'symbiant' ? 'Symbiant' : 'Implant';
-    }
+  for (const [slotName, mapping] of Object.entries(slotMapping)) {
+    const selection = config[mapping.bitflag];
+    // A slot absent from the store is empty: clear it rather than keep stale picks
+    implantSelections[slotName] = selection
+      ? {
+          shiny: selection.shiny,
+          bright: selection.bright,
+          faded: selection.faded,
+          ql: selection.ql,
+        }
+      : { shiny: null, bright: null, faded: null, ql: qualityLevel.value };
+    // Sync slot type
+    slotType[slotName] = selection?.type === 'symbiant' ? 'Symbiant' : 'Implant';
   }
 };
 

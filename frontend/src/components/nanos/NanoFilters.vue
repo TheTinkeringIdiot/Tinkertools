@@ -510,7 +510,8 @@ const toggleEffectType = (effectType: string) => {
 const updateFilters = () => {
   const newFilters: NanoFilters = {
     ...filters.value,
-    schools: [], // This is handled by the search component
+    // Schools are chosen in the search component: pass them through untouched
+    schools: [...(props.modelValue.schools ?? [])],
     qualityLevels: [...selectedQualityLevels.value],
     professions: [...selectedProfessions.value],
     strains: [...selectedStrains.value],
@@ -525,6 +526,9 @@ const updateFilters = () => {
     sortDescending: sortDescending.value,
   };
 
+  // Syncing local state from modelValue re-runs this; echoing an unchanged
+  // value back would bounce between parent and child forever.
+  if (JSON.stringify(newFilters) === JSON.stringify(props.modelValue)) return;
   emit('update:modelValue', newFilters);
   emit('filter-change', newFilters);
 };

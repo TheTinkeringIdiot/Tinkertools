@@ -7,20 +7,13 @@
  * Strategy: Skip when backend not available (Option B)
  */
 
-import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import { usePocketBossStore } from '@/stores/pocketBossStore';
 import { isBackendAvailable } from '../helpers/backend-check';
 
-// Check backend availability before running tests
-let BACKEND_AVAILABLE = false;
-
-beforeAll(async () => {
-  BACKEND_AVAILABLE = await isBackendAvailable();
-  if (!BACKEND_AVAILABLE) {
-    console.warn('Backend not available - skipping pocket boss integration tests');
-  }
-});
+// Top-level await: skipIf is evaluated while tests are collected.
+const BACKEND_AVAILABLE = await isBackendAvailable();
 
 describe.skipIf(!BACKEND_AVAILABLE)('PocketBossStore Integration Tests', () => {
   beforeEach(() => {
@@ -68,10 +61,15 @@ describe.skipIf(!BACKEND_AVAILABLE)('PocketBossStore Integration Tests', () => {
     const store = usePocketBossStore();
     await store.fetchPocketBosses();
 
+    const levels = store.pocketBosses
+      .map((boss) => boss.level)
+      .filter((level): level is number => level !== null);
+    expect(levels.length).toBeGreaterThan(0);
+
     const levelRange = store.levelRange;
-    expect(levelRange.min).toBeGreaterThan(0);
+    expect(levelRange).toEqual({ min: Math.min(...levels), max: Math.max(...levels) });
     expect(levelRange.max).toBeGreaterThan(levelRange.min);
-    expect(levelRange.max).toBeLessThanOrEqual(300); // Adjusted for real game data
+    expect(levelRange.max).toBeLessThanOrEqual(300);
   });
 
   it('filters bosses correctly with real data', async () => {
@@ -112,7 +110,7 @@ describe.skipIf(!BACKEND_AVAILABLE)('PocketBossStore Integration Tests', () => {
       const matchesName = boss.name.toLowerCase().includes(searchTerm);
       const matchesLocation = boss.location?.toLowerCase().includes(searchTerm);
       const matchesPlayfield = boss.playfield?.toLowerCase().includes(searchTerm);
-      const matchesMobs = boss.mobs?.toLowerCase().includes(searchTerm);
+      const matchesMobs = boss.mob_names?.some((mob) => mob.toLowerCase().includes(searchTerm));
 
       expect(matchesName || matchesLocation || matchesPlayfield || matchesMobs).toBe(true);
     });

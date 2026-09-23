@@ -1,48 +1,31 @@
 /**
- * NanosStore Unit Tests
+ * NanosStore Integration Tests
  *
- * UNIT TEST - Uses mocks, not real backend
- * Strategy: Already uses mocks correctly
- *
- * Note: This file is named "integration" but actually uses mocks.
- * It tests store logic in isolation, not real API integration.
+ * State, favorites and preferences run against the real store with no network.
+ * The data-loading tests talk to the real backend and are skipped when it is
+ * not running.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import { useNanosStore } from '@/stores/nanosStore';
+import { apiClient } from '@/services/api-client';
+import { versionKey } from '@/services/version-keys';
+import { isBackendAvailable } from '../helpers/backend-check';
 
-// Simple localStorage mock that doesn't cause issues
-global.localStorage = {
-  getItem: vi.fn(() => null),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
-  length: 0,
-  key: vi.fn(),
-} as any;
+// Top-level await: skipIf is evaluated while tests are collected.
+const BACKEND_AVAILABLE = await isBackendAvailable();
 
-// Mock global fetch for unit tests
-global.fetch = vi.fn().mockResolvedValue({
-  ok: true,
-  status: 200,
-  json: async () => ({
-    items: [],
-    total: 0,
-    page: 1,
-    page_size: 50,
-    pages: 0,
-  }),
-  text: async () => '{"items": [], "total": 0}',
-} as any);
-
-describe('NanosStore Unit Tests', () => {
+describe('NanosStore', () => {
   let store: ReturnType<typeof useNanosStore>;
 
   beforeEach(() => {
     setActivePinia(createPinia());
     store = useNanosStore();
-    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('initializes with correct default state', () => {
@@ -52,6 +35,61 @@ describe('NanosStore Unit Tests', () => {
     expect(store.totalCount).toBe(0);
   });
 
+  it('manages favorites and persists them per game version', () => {
+    const nanoId = 42;
+
+    store.addToFavorites(nanoId);
+    expect(store.favorites).toContain(nanoId);
+    expect(localStorage.setItem).toHaveBeenCalledWith(
+      versionKey('tinkertools_nano_favorites'),
+      JSON.stringify([nanoId])
+    );
+
+    store.removeFromFavorites(nanoId);
+    expect(store.favorites).not.toContain(nanoId);
+
+    store.toggleFavorite(nanoId);
+    expect(store.favorites).toContain(nanoId);
+
+    store.toggleFavorite(nanoId);
+    expect(store.favorites).not.toContain(nanoId);
+  });
+
+  it('handles errors gracefully', async () => {
+    vi.spyOn(apiClient, 'getPaginated').mockRejectedValue(new Error('Network error'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await store.fetchNanos();
+
+    expect(store.loading).toBe(false);
+    expect(store.error).toBe('Network error');
+    expect(store.nanos).toEqual([]);
+  });
+
+  it('persists preferences to localStorage', () => {
+    store.updatePreferences({
+      defaultView: 'list',
+      compactCards: false,
+      itemsPerPage: 25,
+    });
+
+    expect(store.preferences.defaultView).toBe('list');
+    expect(store.preferences.compactCards).toBe(false);
+    expect(localStorage.setItem).toHaveBeenCalledWith(
+      'tinkertools_nano_preferences',
+      expect.any(String)
+    );
+  });
+});
+
+describe.skipIf(!BACKEND_AVAILABLE)('NanosStore with backend', () => {
+  let store: ReturnType<typeof useNanosStore>;
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    store = useNanosStore();
+  });
+
   it('fetches real nano data from backend', async () => {
     expect(store.loading).toBe(false);
 
@@ -59,92 +97,45 @@ describe('NanosStore Unit Tests', () => {
     const fetchPromise = store.fetchNanos();
     expect(store.loading).toBe(true);
 
-    // Wait for completion
     await fetchPromise;
 
-    // Verify results
     expect(store.loading).toBe(false);
     expect(store.error).toBe(null);
     expect(store.nanos.length).toBeGreaterThan(0);
     expect(store.totalCount).toBeGreaterThan(0);
 
-    // Verify nano structure
     const firstNano = store.nanos[0];
-    expect(firstNano).toHaveProperty('id');
-    expect(firstNano).toHaveProperty('name');
-    expect(firstNano).toHaveProperty('aoid');
-    expect(firstNano).toHaveProperty('ql');
-    expect(firstNano).toHaveProperty('is_nano');
-    expect(firstNano.is_nano).toBe(true);
+    expect(typeof firstNano.id).toBe('number');
+    expect(typeof firstNano.aoid).toBe('number');
+    expect(typeof firstNano.name).toBe('string');
+    expect(typeof firstNano.qualityLevel).toBe('number');
   }, 10000);
 
   it('handles search with real data', async () => {
-    // First fetch data
-    await store.fetchNanos();
-    expect(store.nanos.length).toBeGreaterThan(0);
-
-    // Test search functionality
     await store.searchNanos('heal', [], ['name']);
 
-    // Should have added to search history
+    expect(store.error).toBe(null);
+    expect(store.nanos.length).toBeGreaterThan(0);
     expect(store.searchHistory).toContain('heal');
-    expect(store.searchHistory.length).toBeGreaterThanOrEqual(1);
-
-    // Should not be loading after search completes
     expect(store.loading).toBe(false);
   }, 10000);
 
   it('applies filters correctly with real data', async () => {
-    // First fetch data
     await store.fetchNanos();
-    expect(store.nanos.length).toBeGreaterThan(0);
+    expect(store.nanos.length).toBeGreaterThan(1);
 
-    // Test filtering
     store.setFilters({ sortBy: 'name', sortDescending: false });
 
-    const filteredNanos = store.filteredNanos;
-    expect(Array.isArray(filteredNanos)).toBe(true);
-
-    // Test sorting is applied
-    if (filteredNanos.length > 1) {
-      const firstTwo = filteredNanos.slice(0, 2);
-      expect(firstTwo[0].name.localeCompare(firstTwo[1].name)).toBeLessThanOrEqual(0);
-    }
-  }, 10000);
-
-  it('manages favorites correctly', async () => {
-    // First fetch data to have some nanos
-    await store.fetchNanos();
-    expect(store.nanos.length).toBeGreaterThan(0);
-
-    const nanoId = store.nanos[0].id;
-
-    // Add to favorites
-    store.addToFavorites(nanoId);
-    expect(store.favorites).toContain(nanoId);
-    expect(localStorage.setItem).toHaveBeenCalled();
-
-    // Remove from favorites
-    store.removeFromFavorites(nanoId);
-    expect(store.favorites).not.toContain(nanoId);
-
-    // Toggle favorites
-    store.toggleFavorite(nanoId);
-    expect(store.favorites).toContain(nanoId);
-
-    store.toggleFavorite(nanoId);
-    expect(store.favorites).not.toContain(nanoId);
+    const names = store.filteredNanos.map((nano) => nano.name);
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
   }, 10000);
 
   it('computes available schools correctly with real data', async () => {
     await store.fetchNanos();
 
     const schools = store.availableSchools;
-    expect(Array.isArray(schools)).toBe(true);
-
-    // Should have at least some schools from real data
-    // Note: Real nano data might not have school field, so just test structure
     expect(schools.every((school) => typeof school === 'string')).toBe(true);
+    expect(schools).toEqual([...schools].sort());
   }, 10000);
 
   it('gets nano by id correctly', async () => {
@@ -154,40 +145,7 @@ describe('NanosStore Unit Tests', () => {
     const firstNano = store.nanos[0];
     const foundNano = store.getNanoById(firstNano.id);
 
-    expect(foundNano).toBeDefined();
     expect(foundNano?.id).toBe(firstNano.id);
     expect(foundNano?.name).toBe(firstNano.name);
   }, 10000);
-
-  it('handles errors gracefully', async () => {
-    // Mock fetch to fail
-    const originalFetch = global.fetch;
-    global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
-
-    await store.fetchNanos();
-
-    // Should handle error gracefully
-    expect(store.loading).toBe(false);
-    expect(store.nanos).toEqual([]);
-
-    // Restore fetch
-    global.fetch = originalFetch;
-  }, 10000);
-
-  it('persists preferences to localStorage', () => {
-    const newPrefs = {
-      defaultView: 'list' as const,
-      compactCards: false,
-      itemsPerPage: 25,
-    };
-
-    store.updatePreferences(newPrefs);
-
-    expect(store.preferences.defaultView).toBe('list');
-    expect(store.preferences.compactCards).toBe(false);
-    expect(localStorage.setItem).toHaveBeenCalledWith(
-      'tinkertools_nano_preferences',
-      expect.any(String)
-    );
-  });
 });

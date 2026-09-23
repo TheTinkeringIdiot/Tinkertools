@@ -21,31 +21,20 @@ vi.mock('primevue/usetoast', () => ({
     removeAllGroups: vi.fn(),
   }),
 }));
-import {
-  setupIntegrationTest,
-  mountForIntegration,
-  waitForUpdates,
-} from '../helpers/integration-test-utils';
+import { setupIntegrationTest, waitForUpdates } from '../helpers/integration-test-utils';
 import {
   createNanoWithRequirements,
   createCastingRequirement,
   createTestNano,
 } from '../helpers/nano-fixtures';
-import {
-  createTestProfile,
-  PROFESSION,
-  BREED,
-  setProfileSkills,
-} from '../helpers/profile-fixtures';
+import { createTestProfile, PROFESSION } from '../helpers/profile-fixtures';
 import { createTestSkillData, SKILL_ID } from '../helpers/skill-fixtures';
 import { createTestItem, createSpell, createSpellData } from '../helpers/item-fixtures';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { useNanosStore } from '@/stores/nanosStore';
 import type { NanoProgram } from '@/types/nano';
-import type { IntegrationTestContext } from '../helpers/integration-test-utils';
 
 describe('Nano Compatibility Integration', () => {
-  let context: IntegrationTestContext;
   let profileStore: ReturnType<typeof useTinkerProfilesStore>;
   let nanoStore: ReturnType<typeof useNanosStore>;
 
@@ -56,7 +45,7 @@ describe('Nano Compatibility Integration', () => {
   let multiReqNano: NanoProgram;
 
   beforeEach(async () => {
-    context = await setupIntegrationTest();
+    await setupIntegrationTest();
     profileStore = useTinkerProfilesStore();
     nanoStore = useNanosStore();
 
@@ -777,10 +766,6 @@ describe('Nano Compatibility Integration', () => {
       const noReqNano = createTestNano({
         name: 'No Requirements Nano',
         castingRequirements: [],
-      });
-
-      const profile = createTestProfile({
-        name: 'Any Character',
       });
 
       // No requirements means always castable

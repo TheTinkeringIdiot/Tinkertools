@@ -255,7 +255,7 @@ export interface SymbiantItem {
   name: string;
   ql: number;
   slot_id: number;
-  family: 'Artillery' | 'Control' | 'Extermination' | 'Infantry' | 'Support';
+  family: 'Artillery' | 'Control' | 'Extermination' | 'Infantry' | 'Support' | null;
   actions: Action[];
   spell_data?: SpellData[];
 }
