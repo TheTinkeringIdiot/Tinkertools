@@ -109,7 +109,13 @@ import PerkTable from './PerkTable.vue';
 import PerkPointsSummary from './PerkPointsSummary.vue';
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import { calculatePerkPointsDetailed } from '@/services/perk-calculator';
-import type { PerkCharacterData, PerkEntry, ResearchEntry } from '@/lib/tinkerprofiles/perk-types';
+import type {
+  PerkCharacterData,
+  PerkEntry,
+  PerkSystem,
+  ResearchEntry,
+} from '@/lib/tinkerprofiles/perk-types';
+import { getBreedName, getProfessionName } from '@/services/game-utils';
 
 // Props
 const props = defineProps<{
@@ -121,8 +127,8 @@ const characterData = computed(
   (): PerkCharacterData => ({
     level: props.profile.Character?.Level || 1,
     alienLevel: props.profile.Character?.AlienLevel || 0,
-    profession: props.profile.Character?.Profession || 'Adventurer',
-    breed: props.profile.Character?.Breed || 'Solitus',
+    profession: getProfessionName(props.profile.Character?.Profession || 6), // Default to Adventurer
+    breed: getBreedName(props.profile.Character?.Breed || 1), // Default to Solitus
     expansion: 'SL', // Default expansion
   })
 );
@@ -132,55 +138,34 @@ const pointCalculation = computed(() => {
   return calculatePerkPointsDetailed(characterData.value);
 });
 
+// Older stored profiles may lack the perk system entirely
+const perkSystem = computed((): PerkSystem | undefined => props.profile.PerksAndResearch);
+
 // Extract perks from profile
 const slPerks = computed((): PerkEntry[] => {
-  const perkSystem = props.profile.PerksAndResearch as any;
-  if (!perkSystem || typeof perkSystem !== 'object' || !Array.isArray(perkSystem.perks)) {
-    return [];
-  }
-  return perkSystem.perks.filter((perk: any) => perk.type === 'SL') as PerkEntry[];
+  const perks = perkSystem.value?.perks;
+  return Array.isArray(perks) ? perks.filter((perk) => perk.type === 'SL') : [];
 });
 
 const aiPerks = computed((): PerkEntry[] => {
-  const perkSystem = props.profile.PerksAndResearch as any;
-  if (!perkSystem || typeof perkSystem !== 'object' || !Array.isArray(perkSystem.perks)) {
-    return [];
-  }
-  return perkSystem.perks.filter((perk: any) => perk.type === 'AI') as PerkEntry[];
+  const perks = perkSystem.value?.perks;
+  return Array.isArray(perks) ? perks.filter((perk) => perk.type === 'AI') : [];
 });
 
 const lePerks = computed((): ResearchEntry[] => {
-  const perkSystem = props.profile.PerksAndResearch as any;
-  if (!perkSystem || typeof perkSystem !== 'object' || !Array.isArray(perkSystem.research)) {
-    return [];
-  }
-  return perkSystem.research as ResearchEntry[];
+  const research = perkSystem.value?.research;
+  return Array.isArray(research) ? research : [];
 });
 
 // SL Perks data
 const maxSLPoints = computed(() => pointCalculation.value.standardPoints.total);
-const slPointsUsed = computed(() => {
-  const perkSystem = props.profile.PerksAndResearch as any;
-  if (!perkSystem || typeof perkSystem !== 'object' || !perkSystem.standardPerkPoints) {
-    return 0;
-  }
-  return perkSystem.standardPerkPoints.spent || 0;
-});
-const slPointsRemaining = computed(() => maxSLPoints.value - slPointsUsed.value);
+const slPointsUsed = computed(() => perkSystem.value?.standardPerkPoints?.spent || 0);
 const slPerkCount = computed(() => slPerks.value.length);
 
 // AI Perks data
 const maxAIPoints = computed(() => pointCalculation.value.aiPoints.total);
-const aiPointsUsed = computed(() => {
-  const perkSystem = props.profile.PerksAndResearch as any;
-  if (!perkSystem || typeof perkSystem !== 'object' || !perkSystem.aiPerkPoints) {
-    return 0;
-  }
-  return perkSystem.aiPerkPoints.spent || 0;
-});
-const aiPointsRemaining = computed(() => maxAIPoints.value - aiPointsUsed.value);
+const aiPointsUsed = computed(() => perkSystem.value?.aiPerkPoints?.spent || 0);
 const aiPerkCount = computed(() => aiPerks.value.length);
-const hasAILevel = computed(() => characterData.value.alienLevel > 0);
 
 // LE Research data
 const researchCount = computed(() => lePerks.value.length);

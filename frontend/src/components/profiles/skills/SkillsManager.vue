@@ -80,7 +80,7 @@ Interactive skill categories with expandable panels and sliders with IP calculat
 import { computed, ref, onMounted, provide, toRef } from 'vue';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
 import { useSkills } from '@/composables/useSkills';
-import { skillService } from '@/services/skill-service';
+import type { SkillData } from '@/types/skills';
 import SkillCategory from './SkillCategory.vue';
 import Checkbox from 'primevue/checkbox';
 
@@ -92,7 +92,7 @@ const props = defineProps<{
 // Emits
 const emit = defineEmits<{
   'skill-changed': [category: string, skillId: number, newValue: number];
-  'ability-changed': [abilityName: string, newValue: number];
+  'ability-changed': [abilityId: number, newValue: number];
 }>();
 
 // Provide profile for AC calculation in child components
@@ -133,18 +133,18 @@ const coreAbilities = computed(() => {
 });
 
 const breed = computed(() => {
-  return props.profile.Character?.Breed || 'Solitus';
+  return props.profile.Character?.Breed || 1; // Default to Solitus
 });
 
 const profession = computed(() => {
-  return props.profile.Character?.Profession || 'Adventurer';
+  return props.profile.Character?.Profession || 6; // Default to Adventurer
 });
 
 // Helper function to get skills for a category as ID-based object
-function getCategorySkills(category: string): Record<string, any> {
+function getCategorySkills(category: string): Record<string, SkillData> {
   try {
     const skillTuples = getSkillsByCategory(category);
-    const skillsById: Record<string, any> = {};
+    const skillsById: Record<string, SkillData> = {};
 
     for (const [skillId, skillData] of skillTuples) {
       skillsById[skillId.toString()] = skillData;
@@ -167,17 +167,9 @@ const filteredMiscSkills = computed(() => {
     return miscSkillsById;
   } else {
     // Filter out skills with value of 0
-    const filtered: Record<string, any> = {};
+    const filtered: Record<string, SkillData> = {};
     Object.entries(miscSkillsById).forEach(([skillId, skillData]) => {
-      // Handle SkillData objects which have multiple bonus properties
-      let value = 0;
-      if (typeof skillData === 'number') {
-        value = skillData;
-      } else if (skillData && typeof skillData === 'object') {
-        // Use the total value from SkillData
-        value = skillData.total || 0;
-      }
-      if (value > 0) {
+      if ((skillData.total || 0) > 0) {
         filtered[skillId] = skillData;
       }
     });
@@ -202,7 +194,7 @@ const skillCategories = computed(() => {
   ];
 
   // Create ordered categories object
-  const orderedCategories: Record<string, any> = {};
+  const orderedCategories: Record<string, Record<string, SkillData>> = {};
 
   categoryOrder.forEach((categoryName) => {
     if (categoryName !== 'Attributes') {
@@ -243,14 +235,12 @@ function getCategoryIcon(categoryName: string): string {
   return iconMap[categoryName] || 'pi pi-cog';
 }
 
-function handleAbilityChange(abilityName: string, newValue: number) {
-  emit('ability-changed', abilityName, newValue);
+function handleAbilityChange(abilityId: number, newValue: number) {
+  emit('ability-changed', abilityId, newValue);
 }
 
-function handleSkillChange(category: string, skillId: string, newValue: number) {
-  // Emit the skill ID as a number for the parent component
-  const numericSkillId = parseInt(skillId, 10);
-  emit('skill-changed', category, numericSkillId, newValue);
+function handleSkillChange(category: string, skillId: number, newValue: number) {
+  emit('skill-changed', category, skillId, newValue);
 }
 
 function isReadOnlyCategory(categoryName: string): boolean {

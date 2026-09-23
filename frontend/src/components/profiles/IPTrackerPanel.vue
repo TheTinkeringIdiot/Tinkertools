@@ -178,7 +178,7 @@ const props = defineProps<{
 }>();
 
 // Emits
-const emit = defineEmits<{
+defineEmits<{
   'initialize-ip': [];
 }>();
 
@@ -191,29 +191,6 @@ const titleLevel = computed(() => {
   } catch {
     return 1;
   }
-});
-
-const circumference = computed(() => 2 * Math.PI * 52); // radius = 52
-
-const ipUsagePercent = computed(() => {
-  if (!ipTracker.value || ipTracker.value.totalAvailable === 0) return 0;
-  return (ipTracker.value.totalUsed / ipTracker.value.totalAvailable) * 100;
-});
-
-const progressOffset = computed(() => {
-  if (!ipTracker.value) return circumference.value;
-  const progress = ipUsagePercent.value / 100;
-  return circumference.value - progress * circumference.value;
-});
-
-const progressColor = computed(() => {
-  if (!ipTracker.value) return 'text-surface-300';
-
-  const usage = ipUsagePercent.value;
-  if (usage <= 50) return 'text-green-500'; // Low usage - green
-  if (usage <= 75) return 'text-blue-500'; // Medium usage - blue
-  if (usage <= 90) return 'text-orange-500'; // High usage - orange
-  return 'text-red-500'; // Very high usage - red
 });
 
 const remainingColor = computed(() => {
@@ -230,7 +207,7 @@ const topSkillCategories = computed(() => {
 
   // Sort skill categories by IP spent and take top 5
   const sorted = Object.entries(ipTracker.value.breakdown.skillCategories)
-    .filter(([_, ipSpent]) => ipSpent > 0)
+    .filter(([, ipSpent]) => ipSpent > 0)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 5);
 

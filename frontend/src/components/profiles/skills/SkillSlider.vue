@@ -142,23 +142,19 @@ import { ref, computed, watch } from 'vue';
 import InputNumber from 'primevue/inputnumber';
 import Slider from 'primevue/slider';
 import Button from 'primevue/button';
-import {
-  calcIP,
-  getBreedInitValue,
-  ABILITY_INDEX_TO_STAT_ID,
-} from '@/lib/tinkerprofiles/ip-calculator';
+import { getBreedInitValue, STAT_ID_TO_ABILITY_INDEX } from '@/lib/tinkerprofiles/ip-calculator';
 import { SKILL_COST_FACTORS, BREED_ABILITY_DATA } from '@/services/game-data';
-import type { SkillWithIP, MiscSkill } from '@/lib/tinkerprofiles/types';
-import { calculateSingleACValue } from '@/utils/ac-calculator';
-import { inject } from 'vue';
-import type { TinkerProfile } from '@/lib/tinkerprofiles';
+import type { SkillData } from '@/lib/tinkerprofiles/types';
 import { skillService } from '@/services/skill-service';
 import type { SkillId } from '@/types/skills';
+
+// ip-integrator also stores the skill's current cap on each entry
+type SkillDataWithCap = SkillData & { cap?: number };
 
 // Props
 const props = defineProps<{
   skillId: SkillId | number;
-  skillData: SkillWithIP | MiscSkill | null;
+  skillData: SkillDataWithCap | null;
   isAbility?: boolean;
   isReadOnly?: boolean;
   category: string;
@@ -166,13 +162,10 @@ const props = defineProps<{
   profession?: number;
 }>();
 
-// Inject the profile for AC calculation
-const profile = inject<TinkerProfile>('profile');
-
 // Emits
 const emit = defineEmits<{
-  'skill-changed': [category: string, skillId: SkillId | number, newValue: number];
-  'ability-changed': [skillId: SkillId | number, newValue: number];
+  'skill-changed': [category: string, skillId: number, newValue: number];
+  'ability-changed': [skillId: number, newValue: number];
 }>();
 
 // Computed properties for skill information
@@ -184,18 +177,8 @@ const skillName = computed(() => {
   }
 });
 
-// Helper functions
-const getAbilityIndex = (abilityName: string): number => {
-  const abilityMap: Record<string, number> = {
-    Strength: 0,
-    Agility: 1,
-    Stamina: 2,
-    Intelligence: 3,
-    Sense: 4,
-    Psychic: 5,
-  };
-  return abilityMap[abilityName] ?? -1;
-};
+// 0-based ability index (Strength..Psychic) for breed data lookups, -1 if not an ability
+const abilityIndex = computed(() => STAT_ID_TO_ABILITY_INDEX[Number(props.skillId)] ?? -1);
 
 // State
 // Initialize slider value properly for both abilities and skills
@@ -212,15 +195,15 @@ const isUserInteracting = ref(false);
 const isProgrammaticUpdate = ref(false);
 
 // Computed
+// Abilities: breed starting value plus bonuses (no IP spent)
+const abilityMinValue = computed(() => {
+  const breedBase = getBreedInitValue(props.breed ?? 1, Number(props.skillId)); // Default to Solitus
+  return breedBase + equipmentBonus.value + perkBonus.value + buffBonus.value;
+});
+
 const minValue = computed(() => {
-  if (props.isAbility && props.breed !== undefined) {
-    const breedId = props.breed;
-    const abilityIndex = getAbilityIndex(skillName.value);
-    if (abilityIndex !== -1) {
-      const abilityStatId = ABILITY_INDEX_TO_STAT_ID[abilityIndex];
-      const breedBase = getBreedInitValue(breedId, abilityStatId);
-      return breedBase + equipmentBonus.value + perkBonus.value + buffBonus.value;
-    }
+  if (props.isAbility) {
+    return abilityMinValue.value;
   }
   // For skills: slider minimum is base + trickle + bonuses (no IP spent)
   return (
@@ -238,13 +221,13 @@ const isMiscSkill = computed(() => props.category === 'Misc');
 // Core skill value components
 const baseValue = computed(() => {
   if (props.isAbility) {
-    return minValue.value;
+    return abilityMinValue.value;
   } else if (props.category === 'ACs') {
     // ACs have no base value, only bonuses
     return 0;
   } else if (isMiscSkill.value) {
-    // Misc skills use baseValue directly from the MiscSkill object
-    return (props.skillData as MiscSkill)?.baseValue || 0;
+    // Misc skills carry their base value in the skill data
+    return props.skillData?.base || 0;
   } else {
     // Regular skills have a base value of 5
     return 5;
@@ -317,48 +300,12 @@ const totalValue = computed(() => {
   }
 });
 
-// Value breakdown tooltip
-const valueBreakdown = computed(() => {
-  if (props.isAbility) {
-    const breedBase = minValue.value;
-    const improvements = Math.max(0, totalValue.value - breedBase);
-    return `Breed Base: ${breedBase} + Improvements: ${improvements} = ${totalValue.value}`;
-  } else if (isMiscSkill.value) {
-    // Misc skills only show base + bonuses (no trickle-down or IP)
-    return `Base: ${baseValue.value} + Equipment: ${equipmentBonus.value} + Perks: ${perkBonus.value} + Buffs: ${buffBonus.value} = ${totalValue.value}`;
-  } else {
-    return `Base: ${baseValue.value} + Trickle-down: ${trickleDownBonus.value} + IP: ${ipContribution.value} = ${totalValue.value}`;
-  }
-});
-
-const showBreakdown = computed(() => {
-  if (props.isAbility) {
-    return false;
-  }
-
-  if (isMiscSkill.value) {
-    // For Misc skills, show breakdown if any bonuses are present
-    return equipmentBonus.value !== 0 || perkBonus.value !== 0 || buffBonus.value !== 0;
-  }
-
-  // For regular skills, show breakdown if any components are present
-  return (
-    trickleDownBonus.value > 0 ||
-    ipContribution.value > 0 ||
-    equipmentBonus.value !== 0 ||
-    perkBonus.value !== 0 ||
-    buffBonus.value !== 0
-  );
-});
-
 // Simple tooltip content for PrimeVue v-tooltip directive
 const simpleTooltipContent = computed(() => {
   if (props.isAbility) {
     // Calculate raw breed base without any bonuses
     const breedId = props.breed ?? 1; // Default to Solitus
-    const abilityIndex = getAbilityIndex(skillName.value);
-    const abilityStatId = abilityIndex !== -1 ? ABILITY_INDEX_TO_STAT_ID[abilityIndex] : 0;
-    const breedBase = getBreedInitValue(breedId, abilityStatId);
+    const breedBase = getBreedInitValue(breedId, Number(props.skillId));
 
     const improvements = props.skillData?.pointsFromIp || 0; // Get IP points directly from skillData
     const equipBonus = equipmentBonus.value;
@@ -469,7 +416,7 @@ const ipCost = computed(() => {
   if (props.isAbility || isMiscSkill.value) {
     return 0; // Abilities and Misc don't track IP
   }
-  return (props.skillData as SkillWithIP)?.ipSpent || 0;
+  return props.skillData?.ipSpent || 0;
 });
 
 const showCapInfo = computed(() => {
@@ -494,9 +441,8 @@ const costFactor = computed(() => {
   if (props.isAbility && props.breed !== undefined) {
     // For abilities: use breed-based cost factors
     const breedId = props.breed;
-    const abilityIndex = getAbilityIndex(skillName.value);
-    if (abilityIndex !== -1) {
-      return BREED_ABILITY_DATA.cost_factors[breedId]?.[abilityIndex] || null;
+    if (abilityIndex.value !== -1) {
+      return BREED_ABILITY_DATA.cost_factors[breedId]?.[abilityIndex.value] || null;
     }
   } else if (!props.isAbility && props.profession !== undefined) {
     // For skills: use profession-based cost factors with skillId
@@ -524,7 +470,7 @@ const costFactorColor = computed(() => {
 });
 
 // Methods
-function onSliderChanged(newValue: number | null) {
+function onSliderChanged() {
   // This is called when the user releases the slider (slideend event)
   // We use the current sliderValue which has been updated during dragging
 
@@ -599,39 +545,17 @@ function onInputChanged(newValue: number | null) {
 function setToMax() {
   if (props.isAbility) {
     sliderValue.value = maxValue.value;
-    onSliderChanged(maxValue.value);
+    onSliderChanged();
   } else {
     // For skills: set input to max total value, which will calculate the IP portion
     onInputChanged(maxTotalValue.value);
   }
 }
 
-// Watch for profile prop changes to set programmatic update flag
-watch(
-  () => props.profile,
-  (newProfile, oldProfile) => {
-    // When profile changes (like when switching active profile), set the flag
-    if (newProfile && oldProfile && newProfile.id !== oldProfile.id) {
-      isProgrammaticUpdate.value = true;
-      // Keep flag set longer when profile switches
-      setTimeout(() => {
-        isProgrammaticUpdate.value = false;
-      }, 100);
-    }
-  },
-  { immediate: false }
-);
-
 // Watchers
-// For abilities: watch the total field, for skills: watch the total field too (not pointFromIp)
-// For ACs: watch the skillData itself since it's a number
+// Watch the total field for abilities, skills and ACs alike (not pointsFromIp)
 watch(
-  () => {
-    if (props.category === 'ACs') {
-      return props.skillData; // AC values are simple numbers
-    }
-    return props.skillData?.total; // Other skills have a total property
-  },
+  () => props.skillData?.total,
   (newValue, oldValue) => {
     // Always update on initial load (oldValue is undefined) or when not interacting
     const isInitialLoad = oldValue === undefined;
@@ -730,7 +654,7 @@ watch(
 watch(minValue, (newMinValue) => {
   if (sliderValue.value < newMinValue) {
     sliderValue.value = newMinValue;
-    onSliderChanged(newMinValue);
+    onSliderChanged();
   }
 });
 

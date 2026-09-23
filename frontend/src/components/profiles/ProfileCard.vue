@@ -29,7 +29,6 @@ Shows profile information in a compact, action-friendly card format
               <Badge
                 :value="`Level ${profile.level}`"
                 :severity="getLevelSeverity(profile.level)"
-                size="small"
               />
               <span class="text-sm text-surface-600 dark:text-surface-400">
                 {{ profile.profession }}
@@ -40,7 +39,7 @@ Shows profile information in a compact, action-friendly card format
 
         <div class="flex flex-col items-end gap-1">
           <!-- Active Badge -->
-          <Badge v-if="isActive" value="Active" severity="success" size="small" />
+          <Badge v-if="isActive" value="Active" severity="success" />
 
           <!-- Built against another game version -->
           <span

@@ -176,7 +176,7 @@ import { normalizeProfessionToId, normalizeBreedToId } from '@/services/game-uti
 import { gameVersionDisplayName } from '@/lib/tinkerprofiles/game-version';
 
 // Props & Emits
-const props = defineProps<{
+defineProps<{
   visible: boolean;
 }>();
 
@@ -244,7 +244,7 @@ async function createProfile() {
   try {
     // Create v4.0.0 profile with ID-based skill structure
     // CRITICAL: Convert profession and breed to numeric IDs for validation
-    // Note: Partial Character is merged with defaults in ProfileManager.createProfile()
+    // MaxHealth/MaxNano are recalculated from skills by ProfileManager.createProfile()
     const profileId = await profilesStore.createProfile(formData.name.trim(), {
       Character: {
         Name: formData.name.trim(),
@@ -254,8 +254,10 @@ async function createProfile() {
         Faction: formData.faction,
         Expansion: formData.expansion,
         AccountType: formData.accountType,
+        MaxHealth: 0,
+        MaxNano: 0,
       },
-    } as any);
+    });
 
     if (formData.setAsActive) {
       await profilesStore.setActiveProfile(profileId);

@@ -41,7 +41,7 @@ Shows active buff nanos with their icons, names, NCU costs and removal options
           <div class="flex items-center justify-center">
             <img
               v-if="getBuffIconUrl(data)"
-              :src="getBuffIconUrl(data)"
+              :src="getBuffIconUrl(data) ?? undefined"
               :alt="`${data.name} icon`"
               class="buff-icon"
               @error="onIconError"
@@ -122,22 +122,21 @@ Shows active buff nanos with their icons, names, NCU costs and removal options
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
 import type { Item, StatValue } from '@/types/api';
-import { getItemIconUrl } from '@/services/game-utils';
+import { getItemIconUrl, getStatName } from '@/services/game-utils';
 
 // Props
-const props = defineProps<{
+defineProps<{
   buffs: Item[];
   currentNCU: number;
   maxNCU: number;
 }>();
 
 // Emits
-const emit = defineEmits<{
+defineEmits<{
   'remove-buff': [buff: Item];
   'remove-all-buffs': [];
 }>();
@@ -220,7 +219,7 @@ function getBuffEffects(buff: Item): string[] {
             // Spell ID 53014: Modify AC
             // Spell ID 53175: Modify Max Health/Nano
             if (spellId && [53045, 53012, 53014, 53175].includes(spellId)) {
-              const effect = parseSpellEffect(spell.spell_params, spellId);
+              const effect = parseSpellEffect(spell.spell_params);
               if (effect) {
                 effects.push(effect);
               }
@@ -237,68 +236,16 @@ function getBuffEffects(buff: Item): string[] {
   }
 }
 
-function parseSpellEffect(spellParams: Record<string, any>, spellId: number): string | null {
-  try {
-    if (!spellParams || typeof spellParams !== 'object') {
-      return null;
-    }
+function parseSpellEffect(spellParams: Record<string, unknown>): string | null {
+  // Stat modification spells carry the stat ID and amount as Stat / Amount
+  const statId = Number(spellParams.Stat);
+  const amount = Number(spellParams.Amount);
+  if (spellParams.Stat === undefined || spellParams.Amount === undefined) return null;
+  if (isNaN(statId) || isNaN(amount)) return null;
 
-    // Common spell parameter keys for stat modifications
-    const statId = spellParams.stat || spellParams.stat_id || spellParams[0];
-    const amount = spellParams.amount || spellParams.value || spellParams[1];
-
-    if (typeof statId === 'number' && typeof amount === 'number') {
-      const skillName = getSkillNameFromStatId(statId);
-      if (skillName) {
-        const sign = amount >= 0 ? '+' : '';
-        return `${skillName}: ${sign}${amount}`;
-      }
-    }
-
-    return null;
-  } catch (error) {
-    console.warn('Error parsing spell effect:', error);
-    return null;
-  }
-}
-
-function getSkillNameFromStatId(statId: number): string | null {
-  // Map common stat IDs to skill names
-  // This is a simplified mapping - a full implementation would use game-data.ts
-  const statMap: Record<number, string> = {
-    // Abilities
-    17: 'Strength',
-    19: 'Stamina',
-    18: 'Agility',
-    20: 'Intelligence',
-    21: 'Sense',
-    22: 'Psychic',
-
-    // Common skills
-    16: 'Matter Metamorphosis',
-    11: 'Time and Space',
-    15: 'Biological Metamorphosis',
-    12: 'Sensory Improvement',
-    13: 'Matter Creation',
-    14: 'Psychological Modifications',
-
-    // Body & Defense
-    53: 'Body Development',
-    57: 'Duck-Exp',
-    58: 'Dodge-Ranged',
-    59: 'Evade-ClsC',
-
-    // Trade & Repair
-    71: 'Computer Literacy',
-    72: 'Psychology',
-    78: 'Chemistry',
-
-    // Combat & Healing
-    124: 'First Aid',
-    125: 'Treatment',
-  };
-
-  return statMap[statId] || `Stat ${statId}`;
+  const statName = getStatName(statId) ?? `Stat ${statId}`;
+  const sign = amount >= 0 ? '+' : '';
+  return `${statName}: ${sign}${amount}`;
 }
 
 function onIconError() {

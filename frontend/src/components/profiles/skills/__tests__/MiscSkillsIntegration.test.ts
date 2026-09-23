@@ -69,7 +69,7 @@ const tooltipDirective = {
 // Mock the console to check for errors
 const consoleErrors: string[] = [];
 const originalConsoleError = console.error;
-console.error = (...args: any[]) => {
+console.error = (...args: unknown[]) => {
   consoleErrors.push(args.join(' '));
   originalConsoleError(...args);
 };
@@ -624,7 +624,7 @@ describe('Misc Skills Integration Tests', () => {
         total: 85,
       });
 
-      const wrapper = mount(SkillSlider, {
+      mount(SkillSlider, {
         props: {
           skillId: toSkillId(SKILL_ID.CONCEALMENT),
           skillName: 'Concealment',
@@ -683,12 +683,12 @@ describe('Misc Skills Integration Tests', () => {
     });
 
     it('should handle missing or malformed skill data gracefully', () => {
-      // Test with undefined skill data
+      // Test with missing (null) skill data
       const wrapper = mount(SkillSlider, {
         props: {
           skillId: toSkillId(SKILL_ID.MAX_NCU),
           skillName: 'Test Skill',
-          skillData: undefined,
+          skillData: null,
           isAbility: false,
           isReadOnly: true,
           category: 'Misc',
