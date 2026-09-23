@@ -2,8 +2,7 @@ import { test, expect } from '@playwright/test';
 import { ProfilePage } from '../pages/ProfilePage';
 import { EquipmentPage } from '../pages/EquipmentPage';
 import { NanoPage } from '../pages/NanoPage';
-import { testProfiles } from '../fixtures/test-data';
-import { clearLocalStorage, waitForPageReady, getLocalStorageItem } from '../utils/helpers';
+import { clearLocalStorage, waitForPageReady, getStoredProfiles } from '../utils/helpers';
 
 /**
  * E2E Test: Nano Compatibility
@@ -44,7 +43,7 @@ test.describe('Nano Compatibility', () => {
     await profilePage.createProfile('LowLevelChar', 50, 'Nano-Technician');
 
     // Get profile ID
-    const profiles = await getLocalStorageItem(page, 'tinkertools_profiles');
+    const profiles = await getStoredProfiles(page);
     profileId = profiles[0].id;
 
     // Navigate to nanos page
@@ -69,7 +68,7 @@ test.describe('Nano Compatibility', () => {
 
     await profilePage.createProfile('HighLevelNT', 220, 'Nano-Technician');
 
-    const profiles = await getLocalStorageItem(page, 'tinkertools_profiles');
+    const profiles = await getStoredProfiles(page);
     profileId = profiles[0].id;
 
     // Navigate to nanos page
@@ -94,7 +93,7 @@ test.describe('Nano Compatibility', () => {
 
     await profilePage.createProfile('MidLevelDoc', 100, 'Doctor');
 
-    const profiles = await getLocalStorageItem(page, 'tinkertools_profiles');
+    const profiles = await getStoredProfiles(page);
     profileId = profiles[0].id;
 
     // Navigate to nanos page and search for a nano just out of reach
@@ -102,9 +101,6 @@ test.describe('Nano Compatibility', () => {
     await waitForPageReady(page);
 
     await nanoPage.searchByName('Superior First Aid');
-
-    // Check initial compatibility (should be incompatible)
-    const initialStatus = await nanoPage.getNanoCompatibilityStatus('Superior First Aid');
 
     // Navigate to equipment page to add buffs
     await equipmentPage.gotoProfile(profileId);
@@ -192,7 +188,7 @@ test.describe('Nano Compatibility', () => {
 
     await profilePage.createProfile('EquipTest', 150, 'Meta-Physicist');
 
-    const profiles = await getLocalStorageItem(page, 'tinkertools_profiles');
+    const profiles = await getStoredProfiles(page);
     profileId = profiles[0].id;
 
     // Check initial nano compatibility
@@ -259,7 +255,7 @@ test.describe('Nano Compatibility', () => {
 
     await profilePage.createProfile('PersistTest', 100, 'Doctor');
 
-    const profiles = await getLocalStorageItem(page, 'tinkertools_profiles');
+    const profiles = await getStoredProfiles(page);
     profileId = profiles[0].id;
 
     // Add buffs

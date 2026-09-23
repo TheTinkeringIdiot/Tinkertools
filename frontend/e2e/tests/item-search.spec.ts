@@ -27,7 +27,7 @@ test.describe('Item Search & Filter', () => {
     await waitForPageReady(page);
   });
 
-  test('should search for item by name', async ({ page }) => {
+  test('should search for item by name', async () => {
     // Search for a common item
     await itemPage.searchByName('Combined Commando');
 

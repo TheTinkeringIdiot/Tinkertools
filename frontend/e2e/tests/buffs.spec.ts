@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { ProfilePage } from '../pages/ProfilePage';
 import { EquipmentPage } from '../pages/EquipmentPage';
 import { testProfiles } from '../fixtures/test-data';
-import { clearLocalStorage, waitForPageReady, getLocalStorageItem } from '../utils/helpers';
+import { clearLocalStorage, waitForPageReady, getStoredProfiles } from '../utils/helpers';
 
 /**
  * E2E Test: Buff Management
@@ -37,8 +37,8 @@ test.describe('Buff Management', () => {
     await profilePage.createProfile(name, level, profession);
 
     // Get the profile ID from localStorage
-    const profiles = await getLocalStorageItem(page, 'tinkertools_profiles');
-    profileId = profiles && profiles.length > 0 ? profiles[0].id : '1';
+    const profiles = await getStoredProfiles(page);
+    profileId = profiles.length > 0 ? profiles[0].id : '1';
 
     // Navigate to profile equipment page
     await equipmentPage.gotoProfile(profileId);

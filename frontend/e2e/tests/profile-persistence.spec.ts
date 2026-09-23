@@ -2,7 +2,13 @@ import { test, expect } from '@playwright/test';
 import { ProfilePage } from '../pages/ProfilePage';
 import { EquipmentPage } from '../pages/EquipmentPage';
 import { testProfiles } from '../fixtures/test-data';
-import { clearLocalStorage, waitForPageReady, getLocalStorageItem } from '../utils/helpers';
+import {
+  clearLocalStorage,
+  waitForPageReady,
+  getStoredProfiles,
+  getLocalStorageItem,
+  type StoredProfile,
+} from '../utils/helpers';
 
 /**
  * E2E Test: Profile Persistence
@@ -52,7 +58,7 @@ test.describe('Profile Persistence', () => {
     expect(await profilePage.hasProfile(name)).toBe(true);
 
     // Verify profile data in localStorage
-    const profiles = await getLocalStorageItem(page, 'tinkertools_profiles');
+    const profiles = await getStoredProfiles(page);
     expect(profiles).toBeTruthy();
     expect(profiles.length).toBeGreaterThan(0);
     expect(profiles[0].name).toBe(name);
@@ -69,7 +75,7 @@ test.describe('Profile Persistence', () => {
     await profilePage.createProfile(name, level, profession);
 
     // Get profile ID
-    const profiles = await getLocalStorageItem(page, 'tinkertools_profiles');
+    const profiles = await getStoredProfiles(page);
     const profileId = profiles[0].id;
 
     // Navigate to equipment page
@@ -96,9 +102,12 @@ test.describe('Profile Persistence', () => {
     expect(await equipmentPage.isItemEquipped('chest')).toBe(true);
 
     // Verify equipment data in localStorage
-    const updatedProfiles = await getLocalStorageItem(page, `tinkertools_profile_${profileId}`);
+    const updatedProfiles = await getLocalStorageItem<StoredProfile>(
+      page,
+      `tinkertools_profile_${profileId}`
+    );
     expect(updatedProfiles).toBeTruthy();
-    expect(updatedProfiles.equipment).toBeTruthy();
+    expect(updatedProfiles?.equipment).toBeTruthy();
   });
 
   test('should persist buffs across page reload', async ({ page }) => {
@@ -110,7 +119,7 @@ test.describe('Profile Persistence', () => {
     await profilePage.createProfile(name, level, profession);
 
     // Get profile ID
-    const profiles = await getLocalStorageItem(page, 'tinkertools_profiles');
+    const profiles = await getStoredProfiles(page);
     const profileId = profiles[0].id;
 
     // Navigate to equipment page
@@ -137,9 +146,12 @@ test.describe('Profile Persistence', () => {
     expect(await equipmentPage.hasBuff('Composite Attribute')).toBe(true);
 
     // Verify buff data in localStorage
-    const updatedProfiles = await getLocalStorageItem(page, `tinkertools_profile_${profileId}`);
+    const updatedProfiles = await getLocalStorageItem<StoredProfile>(
+      page,
+      `tinkertools_profile_${profileId}`
+    );
     expect(updatedProfiles).toBeTruthy();
-    expect(updatedProfiles.buffs).toBeTruthy();
+    expect(updatedProfiles?.buffs).toBeTruthy();
   });
 
   test('should persist complete profile state (equipment + buffs)', async ({ page }) => {
@@ -151,7 +163,7 @@ test.describe('Profile Persistence', () => {
     await profilePage.createProfile(name, level, profession);
 
     // Get profile ID
-    const profiles = await getLocalStorageItem(page, 'tinkertools_profiles');
+    const profiles = await getStoredProfiles(page);
     const profileId = profiles[0].id;
 
     // Navigate to equipment page
@@ -199,7 +211,7 @@ test.describe('Profile Persistence', () => {
     const { name, level, profession } = testProfiles.trader;
     await profilePage.createProfile(name, level, profession);
 
-    const profiles = await getLocalStorageItem(page, 'tinkertools_profiles');
+    const profiles = await getStoredProfiles(page);
     const profileId = profiles[0].id;
 
     // Add some equipment
@@ -253,11 +265,12 @@ test.describe('Profile Persistence', () => {
     expect(await profilePage.hasProfile(testProfiles.doctor.name)).toBe(true);
 
     // Get profile IDs
-    const profiles = await getLocalStorageItem(page, 'tinkertools_profiles');
+    const profiles = await getStoredProfiles(page);
     expect(profiles.length).toBe(2);
 
-    const enforcerId = profiles.find((p: any) => p.name === testProfiles.enforcer.name)?.id;
-    const doctorId = profiles.find((p: any) => p.name === testProfiles.doctor.name)?.id;
+    const enforcerId = profiles.find((p) => p.name === testProfiles.enforcer.name)?.id;
+    const doctorId = profiles.find((p) => p.name === testProfiles.doctor.name)?.id;
+    if (!enforcerId || !doctorId) throw new Error('Stored profiles are missing an ID');
 
     // Equip different items to each profile
     await equipmentPage.gotoProfile(enforcerId);
