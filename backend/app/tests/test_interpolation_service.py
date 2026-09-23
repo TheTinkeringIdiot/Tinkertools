@@ -7,6 +7,7 @@ interpolation, criteria interpolation, and quality level range handling.
 
 import pytest
 from unittest.mock import Mock, patch
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.services.interpolation import InterpolationService
@@ -125,24 +126,31 @@ class TestInterpolationService:
         result = interpolated.interpolate_value(100, 200)
         assert result == 133
 
-    def test_find_item_variants(self, service, mock_db):
+    def test_find_item_variants(self, db_session):
         """Test finding item variants by name and description."""
-        # Mock database query
-        mock_query = Mock()
-        mock_filter = Mock()
-        mock_order = Mock()
+        # Any named item sharing its name and description with other QLs
+        name, description = (
+            db_session.query(Item.name, Item.description)
+            .filter(Item.name != "")
+            .group_by(Item.name, Item.description)
+            .having(func.count() > 2)
+            .order_by(Item.name, Item.description)
+            .first()
+        )
+        expected = (
+            db_session.query(Item.aoid)
+            .filter(Item.name == name, Item.description == description)
+            .order_by(Item.ql, Item.aoid)
+            .all()
+        )
 
-        mock_db.query.return_value = mock_query
-        mock_query.filter.return_value = mock_filter
-        mock_filter.order_by.return_value = mock_order
-        mock_order.all.return_value = ["item1", "item2", "item3"]
+        result = InterpolationService(db_session)._find_item_variants(name, description)
 
-        result = service._find_item_variants("Test Weapon", "A test weapon")
-
-        assert result == ["item1", "item2", "item3"]
-        mock_db.query.assert_called_once()
-        mock_query.filter.assert_called_once()
-        mock_filter.order_by.assert_called_once()
+        assert [item.aoid for item in result] == [aoid for (aoid,) in expected]
+        assert all(item.name == name for item in result)
+        assert all(item.description == description for item in result)
+        qls = [item.ql for item in result]
+        assert qls == sorted(qls)
 
     def test_find_interpolation_bounds(self, service):
         """Test finding the correct low and high items for interpolation."""
