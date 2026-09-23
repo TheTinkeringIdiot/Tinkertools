@@ -839,8 +839,9 @@ watch(
 
       <!-- Boss List/Grid -->
       <DataView
-        :value="filteredBosses as any"
-        :layout="bossViewMode as any"
+        :value="filteredBosses"
+        :layout="bossViewMode"
+        data-key="id"
         :paginator="true"
         :rows="20"
         :rows-per-page-options="[10, 20, 50]"

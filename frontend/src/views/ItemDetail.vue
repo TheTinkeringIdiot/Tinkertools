@@ -271,7 +271,7 @@ Shows all item data with profile compatibility and comparison options
       <!-- Weapon Statistics (for weapons only) -->
       <WeaponStats
         v-if="item && item.item_class && isWeapon(item.item_class)"
-        :item="displayedItem"
+        :item="displayedItem ?? item"
         :profile="profile"
         :show-compatibility="showCompatibility"
         :attack-stats="item.attack_stats"
@@ -281,11 +281,9 @@ Shows all item data with profile compatibility and comparison options
       <!-- Nano Statistics (for nanos only) -->
       <NanoStatistics
         v-if="item && item.is_nano"
-        :item="displayedItem"
+        :item="displayedItem ?? item"
         :profile="profile"
         :show-compatibility="showCompatibility"
-        :skill-requirements="item.skill_requirements"
-        :skill-bonuses="item.skill_bonuses"
         :attack-stats="item.attack_stats"
         :defense-stats="item.defense_stats"
       />
@@ -303,7 +301,7 @@ Shows all item data with profile compatibility and comparison options
             </div>
 
             <ActionRequirements
-              :actions="displayedItem.actions"
+              :actions="displayedItem?.actions ?? []"
               :character-stats="characterStats"
               :expanded="true"
               :show-oe-breakpoints="canWear"
@@ -524,7 +522,7 @@ Shows all item data with profile compatibility and comparison options
       <!-- Weapon Statistics (for weapons only) -->
       <WeaponStats
         v-if="item && item.item_class && isWeapon(item.item_class)"
-        :item="displayedItem"
+        :item="displayedItem ?? item"
         :profile="profile"
         :show-compatibility="showCompatibility"
         :attack-stats="item.attack_stats"
@@ -534,11 +532,9 @@ Shows all item data with profile compatibility and comparison options
       <!-- Nano Statistics (for nanos only) -->
       <NanoStatistics
         v-if="item && item.is_nano"
-        :item="displayedItem"
+        :item="displayedItem ?? item"
         :profile="profile"
         :show-compatibility="showCompatibility"
-        :skill-requirements="item.skill_requirements"
-        :skill-bonuses="item.skill_bonuses"
         :attack-stats="item.attack_stats"
         :defense-stats="item.defense_stats"
       />
@@ -556,7 +552,7 @@ Shows all item data with profile compatibility and comparison options
             </div>
 
             <ActionRequirements
-              :actions="displayedItem.actions"
+              :actions="displayedItem?.actions ?? []"
               :character-stats="characterStats"
               :expanded="true"
               :show-oe-breakpoints="canWear"
@@ -602,7 +598,7 @@ Shows all item data with profile compatibility and comparison options
   <!-- Equip Slot Selector Dialog -->
   <EquipSlotSelector
     v-model:visible="equipDialogVisible"
-    :item="displayedItem || item"
+    :item="displayedItem"
     :profile="profile"
     :valid-slots="validSlots"
     @confirm="handleEquipItem"
@@ -788,9 +784,42 @@ const displayItemFlags = computed(() => {
 });
 
 // Use interpolated item if available, otherwise use original item
-const displayedItem = computed(() => {
-  return interpolatedItem.value || item.value;
+const displayedItem = computed((): Item | null => {
+  if (!item.value) return null;
+  return interpolatedItem.value
+    ? withInterpolation(item.value, interpolatedItem.value)
+    : item.value;
 });
+
+/**
+ * The item at its interpolated QL. Interpolation returns only the QL-dependent
+ * data; the rest (attack/defense stats, sources, ...) comes from the base item,
+ * as do the record ids interpolated spells and actions do not carry.
+ */
+function withInterpolation(base: Item, interpolated: InterpolatedItem): Item {
+  return {
+    ...base,
+    id: interpolated.id,
+    aoid: interpolated.aoid ?? base.aoid,
+    name: interpolated.name,
+    ql: interpolated.ql ?? base.ql,
+    description: interpolated.description ?? base.description,
+    stats: interpolated.stats,
+    spell_data: interpolated.spell_data.map((data, i) => ({
+      ...data,
+      id: base.spell_data[i]?.id ?? -(i + 1),
+      spells: data.spells.map((spell, j) => ({
+        ...spell,
+        id: base.spell_data[i]?.spells[j]?.id ?? -(j + 1),
+      })),
+    })),
+    actions: interpolated.actions.map((action, i) => ({
+      ...action,
+      id: base.actions[i]?.id ?? -(i + 1),
+      item_id: interpolated.id,
+    })),
+  };
+}
 
 // Check if item can be equipped (is equippable and profile meets requirements)
 const canEquip = computed(() => {
@@ -1009,7 +1038,7 @@ async function castBuff() {
 
   try {
     // Cast to Item type to handle both interpolated and regular items
-    await profilesStore.castBuff(displayedItem.value as Item);
+    await profilesStore.castBuff(displayedItem.value);
     toast.add({
       severity: 'success',
       summary: 'Buff Cast',
