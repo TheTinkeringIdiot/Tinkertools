@@ -15,7 +15,7 @@ Browse nano programs by profession or search across all nanos
             TinkerNanos
           </h1>
           <Badge v-if="selectedProfessionName" :value="selectedProfessionName" severity="info" />
-          <Badge :value="`${filteredNanos.length} nanos`" severity="secondary" />
+          <Badge :value="`${nanoCount} nanos`" severity="secondary" />
         </div>
         <div class="flex items-center gap-4">
           <!-- Compatibility Toggle: checks the nanos against the active profile -->
@@ -54,7 +54,7 @@ Browse nano programs by profession or search across all nanos
       <div class="p-4 border-b border-surface-200 dark:border-surface-700">
         <NanoSearch
           v-model="searchQuery"
-          :total-results="filteredNanos.length"
+          :total-results="nanoCount"
           :schools="nanosStore.filters.schools"
           @search="handleSearch"
         />
@@ -80,14 +80,29 @@ Browse nano programs by profession or search across all nanos
 
       <!-- Results -->
       <div class="flex-1 overflow-auto">
-        <ProgressSpinner v-if="loading" class="flex justify-center p-8" />
+        <!-- Too many matches to check them all against the profile -->
+        <Message
+          v-if="nanosStore.compatibilityOverflow !== null"
+          severity="warn"
+          :closable="false"
+          class="m-4"
+          data-testid="compatibility-overflow"
+        >
+          {{ nanosStore.compatibilityOverflow.toLocaleString() }} nanos match your filters, more
+          than the {{ COMPATIBILITY_FETCH_CAP.toLocaleString() }} the compatibility filters can
+          check. Narrow the list by profession, school or level to use them.
+        </Message>
         <NanoList
           v-else
-          :nanos="filteredNanos"
-          :loading="loading"
+          :nanos="nanosStore.filteredNanos"
+          :loading="nanosStore.loading"
           :show-compatibility="showCompatibility"
           :active-profile="activeProfile"
+          :total-records="nanosStore.needsAllResults ? null : nanosStore.totalCount"
+          :page="nanosStore.page"
+          :rows="nanosStore.pageSize"
           @nano-select="handleNanoSelect"
+          @page-change="handlePageChange"
         />
       </div>
     </div>
@@ -106,7 +121,7 @@ Browse nano programs by profession or search across all nanos
       <div class="flex-1">
         <ProfessionNanoDisplay
           :selected-profession="nanosStore.selectedProfession"
-          :loading="loading"
+          :loading="nanosStore.loading"
         />
       </div>
     </div>
@@ -127,7 +142,7 @@ import { ref, computed, watch } from 'vue';
 import Badge from 'primevue/badge';
 import Button from 'primevue/button';
 import InputSwitch from 'primevue/inputswitch';
-import ProgressSpinner from 'primevue/progressspinner';
+import Message from 'primevue/message';
 import ProfessionList from '@/components/nanos/ProfessionList.vue';
 import ProfessionNanoDisplay from '@/components/nanos/ProfessionNanoDisplay.vue';
 import NanoSearch from '@/components/nanos/NanoSearch.vue';
@@ -135,7 +150,7 @@ import NanoFilters from '@/components/nanos/NanoFilters.vue';
 import NanoList from '@/components/nanos/NanoList.vue';
 import NanoDetail from '@/components/nanos/NanoDetail.vue';
 import { PROFESSION } from '@/services/game-data';
-import { useNanosStore } from '@/stores/nanosStore';
+import { COMPATIBILITY_FETCH_CAP, useNanosStore } from '@/stores/nanosStore';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import type { NanoProgram, NanoFilters as NanoFilterState } from '@/types/nano';
 
@@ -144,7 +159,6 @@ const nanosStore = useNanosStore();
 const profilesStore = useTinkerProfilesStore();
 
 // Local state
-const loading = ref(false);
 const isSearchMode = ref(false);
 const searchQuery = ref('');
 const showNanoDetail = ref(false);
@@ -175,47 +189,31 @@ const compatibilityTooltip = computed(() =>
 /** The profile compatibility is shown for, as the store evaluates it */
 const activeProfile = computed(() => nanosStore.compatibilityProfile);
 
-const filteredNanos = computed(() => {
-  if (!isSearchMode.value) {
-    return nanosStore.nanos as unknown as NanoProgram[];
-  }
-
-  let result = nanosStore.filteredNanos as unknown as NanoProgram[];
-
-  // Apply text search if present
-  if (searchQuery.value.trim()) {
-    const query = searchQuery.value.toLowerCase();
-    result = result.filter(
-      (nano) =>
-        nano.name.toLowerCase().includes(query) ||
-        nano.description?.toLowerCase().includes(query) ||
-        // Not every nano has a school (the backend sends null)
-        nano.school?.toLowerCase().includes(query)
-    );
-  }
-
-  return result;
-});
+/**
+ * The header count: every nano the filters match, server-side or, while the
+ * compatibility filters run, after them
+ */
+const nanoCount = computed(() =>
+  isSearchMode.value ? nanosStore.resultCount : nanosStore.nanos.length
+);
 
 // Methods
 async function toggleSearchMode() {
   isSearchMode.value = !isSearchMode.value;
   if (isSearchMode.value) {
-    // Load all nanos when entering search mode
-    await nanosStore.fetchNanos();
+    await nanosStore.loadNanos(1);
   }
 }
 
-async function handleSearch(query: string, schools: string[], fields: string[]) {
-  loading.value = true;
-  try {
-    searchQuery.value = query;
-    // Deselecting every school chip must clear the school filter too
-    nanosStore.setFilters({ schools: [...schools] });
-    await nanosStore.searchNanos(query, schools, fields);
-  } finally {
-    loading.value = false;
-  }
+function handleSearch(query: string, schools: string[]) {
+  // Both go to the server; the requestKey watcher reloads
+  nanosStore.setSearchQuery(query);
+  // Deselecting every school chip must clear the school filter too
+  nanosStore.setFilters({ schools: [...schools] });
+}
+
+function handlePageChange(page: number, rows: number) {
+  void nanosStore.setPage(page, rows);
 }
 
 function handleFilterChange(newFilters: NanoFilterState) {
@@ -225,6 +223,7 @@ function handleFilterChange(newFilters: NanoFilterState) {
 
 function clearAllFilters() {
   searchQuery.value = '';
+  nanosStore.setSearchQuery('');
   nanosStore.clearFilters();
   filters.value = nanosStore.filters;
 }
@@ -238,6 +237,14 @@ function onProfessionSelected(professionId: number) {
   console.log('Profession selected:', professionId);
   nanosStore.setSelectedProfession(professionId);
 }
+
+// A change to what the server is asked for reloads from the first page
+watch(
+  () => nanosStore.requestKey,
+  () => {
+    if (isSearchMode.value) void nanosStore.loadNanos(1);
+  }
+);
 
 // Watch for filter changes in store
 watch(

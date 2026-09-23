@@ -112,18 +112,31 @@ const props = withDefaults(
     loading?: boolean;
     showCompatibility?: boolean;
     activeProfile?: ReadonlyTinkerProfile | null;
+    /**
+     * Set when the server pages the results: nanos is then the current page,
+     * this the size of the whole result set, and page changes are emitted
+     * for the parent to load
+     */
+    totalRecords?: number | null;
+    /** The server page shown (1-based), with totalRecords */
+    page?: number;
+    /** The server page size, with totalRecords */
+    rows?: number;
   }>(),
   {
     loading: false,
     showCompatibility: false,
     activeProfile: null,
+    totalRecords: null,
+    page: 1,
+    rows: 25,
   }
 );
 
 // Emits
 const emit = defineEmits<{
   'nano-select': [nano: NanoProgram];
-  'page-change': [page: number];
+  'page-change': [page: number, rows: number];
   favorite: [nanoId: number, isFavorite: boolean];
 }>();
 
@@ -136,7 +149,8 @@ const first = ref(0);
 const itemsPerPageOptions = [10, 25, 50, 100];
 
 // Computed
-const totalNanos = computed(() => props.nanos.length);
+const serverPaged = computed(() => props.totalRecords !== null);
+const totalNanos = computed(() => props.totalRecords ?? props.nanos.length);
 
 const totalPages = computed(() => Math.ceil(totalNanos.value / itemsPerPage.value));
 
@@ -146,6 +160,7 @@ const characterStats = computed(() =>
 );
 
 const paginatedNanos = computed(() => {
+  if (serverPaged.value) return props.nanos;
   const start = currentPage.value * itemsPerPage.value;
   const end = start + itemsPerPage.value;
   return props.nanos.slice(start, end);
@@ -164,9 +179,14 @@ const handleFavorite = (nanoId: number, isFavorite: boolean) => {
 };
 
 const handlePageChange = (event: PageState) => {
-  currentPage.value = Math.floor(event.first / itemsPerPage.value);
-  first.value = event.first;
-  emit('page-change', currentPage.value + 1);
+  if (serverPaged.value) {
+    itemsPerPage.value = event.rows;
+    emit('page-change', event.page + 1, event.rows);
+  } else {
+    currentPage.value = Math.floor(event.first / itemsPerPage.value);
+    first.value = event.first;
+    emit('page-change', currentPage.value + 1, itemsPerPage.value);
+  }
 
   // Scroll to top of list
   const listElement = document.querySelector('.nano-list .overflow-auto');
@@ -179,6 +199,7 @@ const handleItemsPerPageChange = () => {
   // Reset to first page when changing items per page
   currentPage.value = 0;
   first.value = 0;
+  if (serverPaged.value) emit('page-change', 1, itemsPerPage.value);
 };
 
 // Load preferences
@@ -189,6 +210,9 @@ const loadPreferences = () => {
       const parsed = JSON.parse(preferences);
       compactView.value = parsed.compactView || false;
       itemsPerPage.value = parsed.itemsPerPage || 25;
+      if (serverPaged.value && itemsPerPage.value !== props.rows) {
+        emit('page-change', 1, itemsPerPage.value);
+      }
     }
   } catch (error) {
     console.warn('Failed to load nano list preferences:', error);
@@ -212,14 +236,26 @@ watch([compactView, itemsPerPage], () => {
   savePreferences();
 });
 
-// Reset pagination when nanos change
+// Reset pagination when nanos change (the parent pages server results itself)
 watch(
   () => props.nanos,
   () => {
+    if (serverPaged.value) return;
     currentPage.value = 0;
     first.value = 0;
   },
   { flush: 'post' }
+);
+
+// Server paging: the paginator follows the page the parent loaded
+watch(
+  () => [serverPaged.value, props.page, props.rows] as const,
+  ([server, page, rows]) => {
+    if (!server) return;
+    itemsPerPage.value = rows;
+    first.value = (page - 1) * rows;
+  },
+  { immediate: true }
 );
 
 // Lifecycle

@@ -88,23 +88,29 @@ export interface TargetingData {
 }
 
 // Nano filtering types
+/**
+ * TinkerNanos search filters. School, profession, strain, QL and level go to
+ * the /nanos endpoints; the compatibility filters (skillCompatible, castable,
+ * skillGapThreshold) run client-side against the active profile.
+ */
 export interface NanoFilters {
+  /** NanoSchool names; a nano in any of them matches */
   schools: string[];
   strains: string[];
+  /** Profession names; a nano any of them can cast matches */
   professions: string[];
-  qualityLevels: number[];
-  effectTypes?: string[];
-  durationType?: string[];
-  targetTypes?: string[];
-  levelRange?: [number, number];
-  memoryUsageRange?: [number, number];
-  nanoPointRange?: [number, number];
-  skillGapThreshold?: number | null;
+  qlRange: [number, number];
+  /** Lowest casting level; the full range filters nothing */
+  levelRange: [number, number];
+  skillGapThreshold: number | null;
   skillCompatible: boolean;
   castable: boolean;
-  sortBy?: string;
-  sortDescending?: boolean;
+  sortBy: NanoSortField;
+  sortDescending: boolean;
 }
+
+/** name, qualityLevel and level sort on the server; compatibility client-side */
+export type NanoSortField = 'name' | 'qualityLevel' | 'level' | 'compatibility';
 
 // Compatibility analysis results
 export interface NanoCompatibilityInfo {
@@ -326,14 +332,4 @@ export interface NanoApiResponse {
   page: number;
   size: number;
   facets?: SearchFacets;
-}
-
-export interface NanoSearchRequest {
-  query?: string;
-  filters?: Partial<NanoFilters>;
-  page?: number;
-  size?: number;
-  sort?: string;
-  includeCompatibility?: boolean;
-  profileId?: string;
 }

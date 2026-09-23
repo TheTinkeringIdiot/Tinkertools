@@ -1,6 +1,7 @@
 <!--
-NanoFilters - Advanced filtering component for nano programs
-Supports filtering by school, strain, profession, quality level, and skill compatibility
+NanoFilters - Filtering component for nano programs
+Profession, strain, QL and level filter on the server; the compatibility
+filters check the active profile client-side
 -->
 <template>
   <div class="nano-filters p-4 space-y-4">
@@ -19,28 +20,6 @@ Supports filtering by school, strain, profession, quality level, and skill compa
       />
     </div>
 
-    <!-- Quality Level Filter -->
-    <div class="space-y-2">
-      <label class="text-sm font-medium text-surface-700 dark:text-surface-300">
-        Quality Level
-      </label>
-      <div class="flex flex-wrap gap-2">
-        <div v-for="quality in qualityLevels" :key="quality" class="flex items-center gap-2">
-          <Checkbox
-            v-model="selectedQualityLevels"
-            :input-id="`quality-${quality}`"
-            :value="quality"
-          />
-          <label
-            :for="`quality-${quality}`"
-            class="text-sm text-surface-700 dark:text-surface-300 cursor-pointer"
-          >
-            QL {{ quality }}
-          </label>
-        </div>
-      </div>
-    </div>
-
     <!-- Profession Filter -->
     <div class="space-y-2">
       <label class="text-sm font-medium text-surface-700 dark:text-surface-300"> Profession </label>
@@ -55,7 +34,7 @@ Supports filtering by school, strain, profession, quality level, and skill compa
     </div>
 
     <!-- Strain Filter -->
-    <div class="space-y-2">
+    <div v-if="availableStrains.length > 0" class="space-y-2">
       <label class="text-sm font-medium text-surface-700 dark:text-surface-300">
         Nano Strain
       </label>
@@ -72,24 +51,24 @@ Supports filtering by school, strain, profession, quality level, and skill compa
       </div>
     </div>
 
-    <!-- Effect Type Filter -->
+    <!-- Quality Level Filter -->
     <div class="space-y-2">
       <label class="text-sm font-medium text-surface-700 dark:text-surface-300">
-        Effect Type
+        Quality Level
       </label>
-      <div class="flex flex-wrap gap-2">
-        <Chip
-          v-for="effectType in effectTypes"
-          :key="effectType.value"
-          :label="effectType.label"
-          :class="[
-            'cursor-pointer transition-all',
-            selectedEffectTypes.includes(effectType.value)
-              ? 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 border-primary-200 dark:border-primary-800'
-              : 'bg-surface-100 dark:bg-surface-800 text-surface-700 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700',
-          ]"
-          @click="toggleEffectType(effectType.value)"
+      <div class="px-2">
+        <Slider
+          v-model="qlRange"
+          :min="MIN_QL"
+          :max="MAX_QL"
+          :range="true"
+          :step="1"
+          class="w-full"
         />
+        <div class="flex justify-between text-xs text-surface-500 dark:text-surface-400 mt-1">
+          <span>{{ qlRange[0] }}</span>
+          <span>{{ qlRange[1] }}</span>
+        </div>
       </div>
     </div>
 
@@ -99,7 +78,14 @@ Supports filtering by school, strain, profession, quality level, and skill compa
         Level Range
       </label>
       <div class="px-2">
-        <Slider v-model="levelRange" :min="1" :max="220" :range="true" :step="1" class="w-full" />
+        <Slider
+          v-model="levelRange"
+          :min="MIN_LEVEL"
+          :max="MAX_LEVEL"
+          :range="true"
+          :step="1"
+          class="w-full"
+        />
         <div class="flex justify-between text-xs text-surface-500 dark:text-surface-400 mt-1">
           <span>{{ levelRange[0] }}</span>
           <span>{{ levelRange[1] }}</span>
@@ -119,7 +105,7 @@ Supports filtering by school, strain, profession, quality level, and skill compa
       <!-- Skill Requirements -->
       <div class="space-y-2">
         <div class="flex items-center gap-2">
-          <Checkbox v-model="filters.skillCompatible" input-id="skill-compatible" binary />
+          <Checkbox v-model="skillCompatible" input-id="skill-compatible" binary />
           <label
             v-tooltip.right="
               'Your skills and abilities are high enough; other requirements (profession, level...) are not checked'
@@ -132,7 +118,7 @@ Supports filtering by school, strain, profession, quality level, and skill compa
         </div>
 
         <div class="flex items-center gap-2">
-          <Checkbox v-model="filters.castable" input-id="fully-castable" binary />
+          <Checkbox v-model="castable" input-id="fully-castable" binary />
           <label
             for="fully-castable"
             class="text-sm text-surface-700 dark:text-surface-300 cursor-pointer"
@@ -163,26 +149,10 @@ Supports filtering by school, strain, profession, quality level, and skill compa
         </p>
       </div>
 
-      <!-- Memory Usage Filter -->
-      <div class="space-y-2">
-        <label class="text-sm font-medium text-surface-700 dark:text-surface-300">
-          Memory Usage
-        </label>
-        <div class="px-2">
-          <Slider
-            v-model="memoryUsageRange"
-            :min="0"
-            :max="1000"
-            :range="true"
-            :step="10"
-            class="w-full"
-          />
-          <div class="flex justify-between text-xs text-surface-500 dark:text-surface-400 mt-1">
-            <span>{{ memoryUsageRange[0] }}mb</span>
-            <span>{{ memoryUsageRange[1] }}mb</span>
-          </div>
-        </div>
-      </div>
+      <p class="text-xs text-surface-500 dark:text-surface-400">
+        These filters check every nano the other filters match, up to
+        {{ COMPATIBILITY_FETCH_CAP.toLocaleString() }}.
+      </p>
     </div>
 
     <!-- Sorting Options -->
@@ -207,86 +177,6 @@ Supports filtering by school, strain, profession, quality level, and skill compa
       </div>
     </div>
 
-    <!-- Advanced Filters Toggle -->
-    <div class="pt-4 border-t border-surface-200 dark:border-surface-700">
-      <Button
-        :label="showAdvancedFilters ? 'Hide Advanced' : 'Show Advanced'"
-        :icon="showAdvancedFilters ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
-        severity="secondary"
-        text
-        size="small"
-        class="w-full"
-        @click="showAdvancedFilters = !showAdvancedFilters"
-      />
-    </div>
-
-    <!-- Advanced Filters -->
-    <Transition name="slide-down">
-      <div v-if="showAdvancedFilters" class="space-y-4 pt-2">
-        <!-- Nano Point Cost -->
-        <div class="space-y-2">
-          <label class="text-sm font-medium text-surface-700 dark:text-surface-300">
-            Nano Point Cost
-          </label>
-          <div class="px-2">
-            <Slider
-              v-model="nanoPointRange"
-              :min="0"
-              :max="2000"
-              :range="true"
-              :step="50"
-              class="w-full"
-            />
-            <div class="flex justify-between text-xs text-surface-500 dark:text-surface-400 mt-1">
-              <span>{{ nanoPointRange[0] }}</span>
-              <span>{{ nanoPointRange[1] }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Duration Filter -->
-        <div class="space-y-2">
-          <label class="text-sm font-medium text-surface-700 dark:text-surface-300">
-            Effect Duration
-          </label>
-          <div class="flex flex-wrap gap-2">
-            <div
-              v-for="duration in durationTypes"
-              :key="duration.value"
-              class="flex items-center gap-2"
-            >
-              <Checkbox
-                v-model="selectedDurations"
-                :input-id="`duration-${duration.value}`"
-                :value="duration.value"
-              />
-              <label
-                :for="`duration-${duration.value}`"
-                class="text-sm text-surface-700 dark:text-surface-300 cursor-pointer"
-              >
-                {{ duration.label }}
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <!-- Target Type Filter -->
-        <div class="space-y-2">
-          <label class="text-sm font-medium text-surface-700 dark:text-surface-300">
-            Target Type
-          </label>
-          <MultiSelect
-            v-model="selectedTargetTypes"
-            :options="targetTypes"
-            placeholder="All Targets"
-            class="w-full"
-            :max-selected-labels="2"
-            selected-items-label="{0} targets selected"
-          />
-        </div>
-      </div>
-    </Transition>
-
     <!-- Filter Presets -->
     <div class="space-y-2 pt-4 border-t border-surface-200 dark:border-surface-700">
       <label class="text-sm font-medium text-surface-700 dark:text-surface-300">
@@ -308,16 +198,23 @@ Supports filtering by school, strain, profession, quality level, and skill compa
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import Button from 'primevue/button';
 import Checkbox from 'primevue/checkbox';
-import Chip from 'primevue/chip';
 import Dropdown from 'primevue/dropdown';
 import MultiSelect from 'primevue/multiselect';
 import Slider from 'primevue/slider';
 
 import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
-import type { NanoFilters } from '@/types/nano';
+import type { NanoFilters, NanoSortField } from '@/types/nano';
+import {
+  COMPATIBILITY_FETCH_CAP,
+  MAX_LEVEL,
+  MAX_QL,
+  MIN_LEVEL,
+  MIN_QL,
+  defaultNanoFilters,
+} from '@/stores/nanosStore';
 
 // Types
 interface FilterPreset {
@@ -332,17 +229,7 @@ interface SkillGapOption {
 
 interface SortOption {
   label: string;
-  value: string;
-}
-
-interface EffectType {
-  label: string;
-  value: string;
-}
-
-interface DurationType {
-  label: string;
-  value: string;
+  value: NanoSortField;
 }
 
 // Props
@@ -367,25 +254,18 @@ const emit = defineEmits<{
 }>();
 
 // Reactive state
-const filters = ref<NanoFilters>({ ...props.modelValue });
 const selectedSchools = ref<string[]>([]);
-const selectedQualityLevels = ref<number[]>([]);
 const selectedProfessions = ref<string[]>([]);
 const selectedStrains = ref<string[]>([]);
-const selectedEffectTypes = ref<string[]>([]);
-const selectedDurations = ref<string[]>([]);
-const selectedTargetTypes = ref<string[]>([]);
-const levelRange = ref<[number, number]>([1, 220]);
-const memoryUsageRange = ref<[number, number]>([0, 1000]);
-const nanoPointRange = ref<[number, number]>([0, 2000]);
+const qlRange = ref<[number, number]>([MIN_QL, MAX_QL]);
+const levelRange = ref<[number, number]>([MIN_LEVEL, MAX_LEVEL]);
+const skillCompatible = ref(false);
+const castable = ref(false);
 const skillGapThreshold = ref<number | null>(null);
-const sortBy = ref('name');
+const sortBy = ref<NanoSortField>('name');
 const sortDescending = ref(false);
-const showAdvancedFilters = ref(false);
 
 // Static options
-const qualityLevels = [1, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300];
-
 const professions = [
   'Adventurer',
   'Agent',
@@ -403,28 +283,6 @@ const professions = [
   'Shade',
 ];
 
-const effectTypes: EffectType[] = [
-  { label: 'Stat Boost', value: 'stat_boost' },
-  { label: 'Heal', value: 'heal' },
-  { label: 'Damage', value: 'damage' },
-  { label: 'Protection', value: 'protection' },
-  { label: 'Teleport', value: 'teleport' },
-  { label: 'Summon', value: 'summon' },
-  { label: 'Debuff', value: 'debuff' },
-  { label: 'Utility', value: 'utility' },
-];
-
-const durationTypes: DurationType[] = [
-  { label: 'Instant', value: 'instant' },
-  { label: 'Short (< 1 min)', value: 'short' },
-  { label: 'Medium (1-5 min)', value: 'medium' },
-  { label: 'Long (5-15 min)', value: 'long' },
-  { label: 'Very Long (> 15 min)', value: 'very_long' },
-  { label: 'Permanent', value: 'permanent' },
-];
-
-const targetTypes = ['Self', 'Team Member', 'Enemy', 'Area', 'Item', 'Pet'];
-
 const skillGapOptions: SkillGapOption[] = [
   { label: 'No Gap (Castable)', value: 0 },
   { label: 'Within 50 points', value: 50 },
@@ -434,18 +292,17 @@ const skillGapOptions: SkillGapOption[] = [
   { label: 'Any Skill Gap', value: 9999 },
 ];
 
-const sortOptions: SortOption[] = [
+// Compatibility sorts client-side, so it is offered only with compatibility on
+const sortOptions = computed<SortOption[]>(() => [
   { label: 'Name', value: 'name' },
   { label: 'Level', value: 'level' },
   { label: 'Quality Level', value: 'qualityLevel' },
-  { label: 'School', value: 'school' },
-  { label: 'Nano Point Cost', value: 'nanoPointCost' },
-  { label: 'Memory Usage', value: 'memoryUsage' },
-  { label: 'Compatibility Score', value: 'compatibility' },
-];
+  ...(props.showCompatibility && props.activeProfile
+    ? [{ label: 'Compatibility Score', value: 'compatibility' as const }]
+    : []),
+]);
 
-// Presets use what the /nanos endpoints send: school, level. Nanos carry no
-// effect, duration or memory data yet, so presets on those would match nothing.
+// Presets use what the /nanos endpoints send: school, level
 const filterPresets: FilterPreset[] = [
   {
     name: 'Heals',
@@ -483,50 +340,32 @@ const filterPresets: FilterPreset[] = [
 const hasActiveFilters = computed(() => {
   return (
     selectedSchools.value.length > 0 ||
-    selectedQualityLevels.value.length > 0 ||
     selectedProfessions.value.length > 0 ||
     selectedStrains.value.length > 0 ||
-    selectedEffectTypes.value.length > 0 ||
-    selectedDurations.value.length > 0 ||
-    selectedTargetTypes.value.length > 0 ||
-    levelRange.value[0] !== 1 ||
-    levelRange.value[1] !== 220 ||
-    memoryUsageRange.value[0] !== 0 ||
-    memoryUsageRange.value[1] !== 1000 ||
-    nanoPointRange.value[0] !== 0 ||
-    nanoPointRange.value[1] !== 2000 ||
-    filters.value.skillCompatible ||
-    filters.value.castable ||
+    qlRange.value[0] !== MIN_QL ||
+    qlRange.value[1] !== MAX_QL ||
+    levelRange.value[0] !== MIN_LEVEL ||
+    levelRange.value[1] !== MAX_LEVEL ||
+    skillCompatible.value ||
+    castable.value ||
     skillGapThreshold.value !== null
   );
 });
 
 // Methods
-const toggleEffectType = (effectType: string) => {
-  const index = selectedEffectTypes.value.indexOf(effectType);
-  if (index > -1) {
-    selectedEffectTypes.value.splice(index, 1);
-  } else {
-    selectedEffectTypes.value.push(effectType);
-  }
-  updateFilters();
-};
-
 const updateFilters = () => {
   const newFilters: NanoFilters = {
-    ...filters.value,
+    // Spread first so the keys keep modelValue's order for the comparison below
+    ...props.modelValue,
     // Chosen with the search component's chips, or by a preset
     schools: [...selectedSchools.value],
-    qualityLevels: [...selectedQualityLevels.value],
     professions: [...selectedProfessions.value],
     strains: [...selectedStrains.value],
-    effectTypes: [...selectedEffectTypes.value],
-    durationType: [...selectedDurations.value],
-    targetTypes: [...selectedTargetTypes.value],
-    levelRange: [...levelRange.value] as [number, number],
-    memoryUsageRange: [...memoryUsageRange.value] as [number, number],
-    nanoPointRange: [...nanoPointRange.value] as [number, number],
+    qlRange: [...qlRange.value],
+    levelRange: [...levelRange.value],
     skillGapThreshold: skillGapThreshold.value,
+    skillCompatible: skillCompatible.value,
+    castable: castable.value,
     sortBy: sortBy.value,
     sortDescending: sortDescending.value,
   };
@@ -538,72 +377,46 @@ const updateFilters = () => {
   emit('filter-change', newFilters);
 };
 
-const clearAllFilters = () => {
-  selectedSchools.value = [];
-  selectedQualityLevels.value = [];
-  selectedProfessions.value = [];
-  selectedStrains.value = [];
-  selectedEffectTypes.value = [];
-  selectedDurations.value = [];
-  selectedTargetTypes.value = [];
-  levelRange.value = [1, 220];
-  memoryUsageRange.value = [0, 1000];
-  nanoPointRange.value = [0, 2000];
-  skillGapThreshold.value = null;
-  filters.value.skillCompatible = false;
-  filters.value.castable = false;
-  sortBy.value = 'name';
-  sortDescending.value = false;
+/** Mirror a set of filters into the controls */
+const showFilters = (value: NanoFilters) => {
+  // Copies, so the controls never edit the parent's arrays
+  selectedSchools.value = [...value.schools];
+  selectedProfessions.value = [...value.professions];
+  selectedStrains.value = [...value.strains];
+  qlRange.value = [...value.qlRange];
+  levelRange.value = [...value.levelRange];
+  skillCompatible.value = value.skillCompatible;
+  castable.value = value.castable;
+  // 0 ("no gap") is a threshold, not a missing one
+  skillGapThreshold.value = value.skillGapThreshold ?? null;
+  sortBy.value = value.sortBy;
+  sortDescending.value = value.sortDescending;
+};
 
+const clearAllFilters = () => {
+  showFilters(defaultNanoFilters());
   updateFilters();
 };
 
 const applyPreset = (preset: FilterPreset) => {
-  // Reset filters first
-  clearAllFilters();
-
-  // Apply preset filters
-  if (preset.filters.schools) {
-    selectedSchools.value = [...preset.filters.schools];
-  }
-  if (preset.filters.qualityLevels) {
-    selectedQualityLevels.value = [...preset.filters.qualityLevels];
-  }
-  if (preset.filters.professions) {
-    selectedProfessions.value = [...preset.filters.professions];
-  }
-  if (preset.filters.strains) {
-    selectedStrains.value = [...preset.filters.strains];
-  }
-  if (preset.filters.effectTypes) {
-    selectedEffectTypes.value = [...preset.filters.effectTypes];
-  }
-  if (preset.filters.durationType) {
-    selectedDurations.value = [...preset.filters.durationType];
-  }
-  if (preset.filters.levelRange) {
-    levelRange.value = [...preset.filters.levelRange] as [number, number];
-  }
-  if (preset.filters.memoryUsageRange) {
-    memoryUsageRange.value = [...preset.filters.memoryUsageRange] as [number, number];
-  }
-
+  // A preset replaces the filters, keeping the sort
+  showFilters({
+    ...defaultNanoFilters(),
+    sortBy: sortBy.value,
+    sortDescending: sortDescending.value,
+    ...preset.filters,
+  });
   updateFilters();
 };
 
-// Watch for changes to emit updates
+// Every change to a control but a slider applies at once
 watch(
   [
     selectedSchools,
-    selectedQualityLevels,
     selectedProfessions,
     selectedStrains,
-    selectedEffectTypes,
-    selectedDurations,
-    selectedTargetTypes,
-    levelRange,
-    memoryUsageRange,
-    nanoPointRange,
+    skillCompatible,
+    castable,
     skillGapThreshold,
     sortBy,
     sortDescending,
@@ -614,61 +427,24 @@ watch(
   { deep: true }
 );
 
+// Sliders apply once they settle: each step would otherwise query the server
+const SLIDER_SETTLE_MS = 300;
+let sliderTimer: ReturnType<typeof setTimeout> | undefined;
 watch(
-  () => filters.value,
+  [qlRange, levelRange],
   () => {
-    updateFilters();
+    clearTimeout(sliderTimer);
+    sliderTimer = setTimeout(updateFilters, SLIDER_SETTLE_MS);
   },
   { deep: true }
 );
+onBeforeUnmount(() => clearTimeout(sliderTimer));
 
 // Mirror modelValue, including on mount: filters restored from storage must show
-watch(
-  () => props.modelValue,
-  (newValue) => {
-    filters.value = { ...newValue };
+watch(() => props.modelValue, showFilters, { deep: true, immediate: true });
 
-    // Update local state to match (copies: toggleEffectType edits its array in place)
-    selectedSchools.value = [...(newValue.schools || [])];
-    selectedQualityLevels.value = [...(newValue.qualityLevels || [])];
-    selectedProfessions.value = [...(newValue.professions || [])];
-    selectedStrains.value = [...(newValue.strains || [])];
-    selectedEffectTypes.value = [...(newValue.effectTypes || [])];
-    selectedDurations.value = [...(newValue.durationType || [])];
-    selectedTargetTypes.value = [...(newValue.targetTypes || [])];
-
-    if (newValue.levelRange) {
-      levelRange.value = [...newValue.levelRange] as [number, number];
-    }
-    if (newValue.memoryUsageRange) {
-      memoryUsageRange.value = [...newValue.memoryUsageRange] as [number, number];
-    }
-    if (newValue.nanoPointRange) {
-      nanoPointRange.value = [...newValue.nanoPointRange] as [number, number];
-    }
-
-    // 0 ("no gap") is a threshold, not a missing one
-    skillGapThreshold.value = newValue.skillGapThreshold ?? null;
-    sortBy.value = newValue.sortBy || 'name';
-    sortDescending.value = newValue.sortDescending || false;
-  },
-  { deep: true, immediate: true }
-);
+// Compatibility sorting leaves with the compatibility filters
+watch(sortOptions, (options) => {
+  if (!options.some((option) => option.value === sortBy.value)) sortBy.value = 'name';
+});
 </script>
-
-<style scoped>
-.slide-down-enter-active,
-.slide-down-leave-active {
-  transition: all 0.3s ease;
-  max-height: 600px;
-  opacity: 1;
-}
-
-.slide-down-enter-from,
-.slide-down-leave-to {
-  max-height: 0;
-  opacity: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-</style>

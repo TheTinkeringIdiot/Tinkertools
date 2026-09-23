@@ -2,9 +2,8 @@
  * Nano Search Workflow
  *
  * TinkerNanos in search mode, mounted with its real child components and a
- * real nanos store; only the API client is mocked. The mocked backend answers
- * `/nanos` with every nano and `/nanos/search?q=` with the nanos whose name or
- * description contains the query, the way the real search endpoint does.
+ * real nanos store; only the API client is mocked, answered by a fake of the
+ * /nanos endpoints that filters and pages like the real ones.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -21,102 +20,51 @@ import { apiClient } from '@/services/api-client';
 import { useNanosStore } from '@/stores/nanosStore';
 import { setupIntegrationTest } from '../helpers/integration-test-utils';
 import { createTestRouter } from '../helpers/vue-test-utils';
+import { backendNano, serveNanos, type BackendNano } from '../helpers/nano-backend';
 import type { Pinia } from 'pinia';
-import type { PaginatedResponse } from '@/types/api';
 
-/** A nano as the backend's /nanos endpoints return it (snake_case). */
-interface BackendNano {
-  id: number;
-  aoid: number;
-  name: string;
-  ql: number;
-  description: string;
-  school: string | null;
-  strain: string;
-  professions: string[];
-  level: number | null;
-  memory_usage: number | null;
-}
-
-function backendNano(overrides: Partial<BackendNano> & Pick<BackendNano, 'id' | 'name'>) {
-  return {
-    aoid: 10000 + overrides.id,
-    ql: 100,
-    description: '',
-    school: 'Combat',
-    strain: 'Test Strain',
-    professions: [],
-    level: 100,
-    memory_usage: 20,
-    ...overrides,
-  };
-}
+/** Defaults for this workflow's nanos: a school, a level, anyone can cast */
+const workflowNano = (fields: Partial<BackendNano> & Pick<BackendNano, 'id' | 'name'>) =>
+  backendNano({ ql: 100, school: 'Combat', level: 100, description: '', ...fields });
 
 const NANOS: BackendNano[] = [
-  backendNano({
+  workflowNano({
     id: 1,
     name: 'Superior Heal',
     school: 'Medical',
     description: 'Heals target for a large amount of health.',
     level: 125,
   }),
-  backendNano({
+  workflowNano({
     id: 2,
     name: 'Minor Heal',
     school: 'Medical',
     description: 'Basic healing nano.',
     level: 25,
   }),
-  backendNano({
+  workflowNano({
     id: 3,
     name: 'Matter Armor',
     school: 'Protection',
     description: 'Creates protective matter armor.',
     level: 100,
   }),
-  backendNano({
+  workflowNano({
     id: 4,
     name: 'Teleport',
     school: 'Space',
     description: 'Teleports the caster.',
     level: 150,
   }),
-  backendNano({
+  workflowNano({
     id: 5,
     name: 'Mending Aura',
-    // Nanos without a Use action have no school or level; no nano has memory usage yet
+    // Nanos without a Use action have no school or level
     school: null,
     description: 'Slowly heals the whole team.',
     level: null,
-    memory_usage: null,
   }),
 ];
-
-function page(items: BackendNano[]): PaginatedResponse<BackendNano> {
-  return {
-    items,
-    total: items.length,
-    page: 1,
-    page_size: 200,
-    pages: 1,
-    has_next: false,
-    has_prev: false,
-  };
-}
-
-/** The mocked backend: `/nanos` lists everything, `/nanos/search` matches text. */
-function nanoBackend(url: string): PaginatedResponse<BackendNano> {
-  const [path, query] = url.split('?');
-  if (path === '/nanos/search') {
-    const q = (new URLSearchParams(query).get('q') ?? '').toLowerCase();
-    return page(
-      NANOS.filter(
-        (nano) => nano.name.toLowerCase().includes(q) || nano.description.toLowerCase().includes(q)
-      )
-    );
-  }
-  return page(NANOS);
-}
 
 describe('Nano Search Workflow', () => {
   let pinia: Pinia;
@@ -125,11 +73,7 @@ describe('Nano Search Workflow', () => {
   beforeEach(async () => {
     ({ pinia } = await setupIntegrationTest());
 
-    // getPaginated is generic over the item type and the store asks for <any>;
-    // the fake backend always answers with backend nanos.
-    vi.mocked(apiClient.getPaginated).mockImplementation(<T>(url: string) =>
-      Promise.resolve(nanoBackend(url) as PaginatedResponse<unknown> as PaginatedResponse<T>)
-    );
+    serveNanos(apiClient.getPaginated, NANOS);
 
     wrapper = mount(TinkerNanos, {
       global: {

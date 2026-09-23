@@ -13,13 +13,13 @@ import type {
   NanoCompatibilityInfo,
   NanoFilters,
   NanoPreferences,
-  NanoSearchRequest,
   NanoSchoolName,
+  NanoSortField,
   NanoEffect,
   EffectDuration,
   TargetingData,
 } from '@/types/nano';
-import type { Action } from '@/types/api';
+import type { Action, PaginatedResponse } from '@/types/api';
 
 /** A nano program as the /nanos endpoints return it */
 interface BackendNanoProgram {
@@ -98,8 +98,109 @@ export function meetsNanoSkillRequirements(info: NanoCompatibilityInfo): boolean
 }
 
 /** The level range the level filter spans (NanoFilters' slider) */
-const MIN_LEVEL = 1;
-const MAX_LEVEL = 220;
+export const MIN_LEVEL = 1;
+export const MAX_LEVEL = 220;
+
+/** The QL range the QL filter spans; nano QLs run up to 390 */
+export const MIN_QL = 1;
+export const MAX_QL = 400;
+
+/** Nanos per page when the server pages the results */
+export const DEFAULT_PAGE_SIZE = 25;
+
+/** The largest page the /nanos endpoints serve */
+const MAX_PAGE_SIZE = 200;
+
+/**
+ * Most nanos the compatibility filters fetch. They run client-side over every
+ * nano the server filters match, so beyond this the user narrows those first.
+ * A profession alone matches at most about 2,000 nanos (Nano-Technician, 2,019
+ * in ao-2024-02); at roughly 550 bytes a nano the cap is about 1.4 MB.
+ */
+export const COMPATIBILITY_FETCH_CAP = 2500;
+
+const SERVER_SORT_FIELDS: Record<Exclude<NanoSortField, 'compatibility'>, string> = {
+  name: 'name',
+  qualityLevel: 'ql',
+  level: 'level',
+};
+
+export function defaultNanoFilters(): NanoFilters {
+  return {
+    schools: [],
+    strains: [],
+    professions: [],
+    qlRange: [MIN_QL, MAX_QL],
+    levelRange: [MIN_LEVEL, MAX_LEVEL],
+    skillGapThreshold: null,
+    skillCompatible: false,
+    castable: false,
+    sortBy: 'name',
+    sortDescending: false,
+  };
+}
+
+const isStringList = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+
+const isRange = (value: unknown): value is [number, number] =>
+  Array.isArray(value) && value.length === 2 && value.every((n) => typeof n === 'number');
+
+/**
+ * Filters as saved by any earlier version: fields that no longer exist (effect
+ * types, durations, targets, memory and nano point ranges, QL checkboxes) are
+ * dropped, and anything malformed falls back to its default.
+ */
+export function restoreNanoFilters(saved: unknown): NanoFilters {
+  const filters = defaultNanoFilters();
+  if (!saved || typeof saved !== 'object') return filters;
+  const value = saved as Record<string, unknown>;
+
+  if (isStringList(value.schools)) filters.schools = value.schools;
+  if (isStringList(value.strains)) filters.strains = value.strains;
+  if (isStringList(value.professions)) filters.professions = value.professions;
+  if (isRange(value.qlRange)) filters.qlRange = value.qlRange;
+  if (isRange(value.levelRange)) filters.levelRange = value.levelRange;
+  if (typeof value.skillGapThreshold === 'number') {
+    filters.skillGapThreshold = value.skillGapThreshold;
+  }
+  if (typeof value.skillCompatible === 'boolean') filters.skillCompatible = value.skillCompatible;
+  if (typeof value.castable === 'boolean') filters.castable = value.castable;
+  if (
+    typeof value.sortBy === 'string' &&
+    (value.sortBy === 'compatibility' || value.sortBy in SERVER_SORT_FIELDS)
+  ) {
+    filters.sortBy = value.sortBy as NanoSortField;
+  }
+  if (typeof value.sortDescending === 'boolean') filters.sortDescending = value.sortDescending;
+  return filters;
+}
+
+/**
+ * The /nanos (or, with a text query, /nanos/search) query for the server-side
+ * filters and sort, without paging. Full ranges are left out.
+ */
+export function nanoQueryParams(filters: NanoFilters, query: string): URLSearchParams {
+  const params = new URLSearchParams();
+  if (query.trim()) params.append('q', query.trim());
+  filters.schools.forEach((school) => params.append('school', school));
+  filters.professions.forEach((profession) => params.append('profession', profession));
+  filters.strains.forEach((strain) => params.append('strain', strain));
+
+  const [qlMin, qlMax] = filters.qlRange;
+  if (qlMin > MIN_QL) params.append('ql_min', String(qlMin));
+  if (qlMax < MAX_QL) params.append('ql_max', String(qlMax));
+
+  const [levelMin, levelMax] = filters.levelRange;
+  if (levelMin > MIN_LEVEL) params.append('level_min', String(levelMin));
+  if (levelMax < MAX_LEVEL) params.append('level_max', String(levelMax));
+
+  if (filters.sortBy !== 'compatibility') {
+    params.append('sort_by', SERVER_SORT_FIELDS[filters.sortBy]);
+    if (filters.sortDescending) params.append('sort_desc', 'true');
+  }
+  return params;
+}
 
 /**
  * Per-version keys: the nano list is server data and favorites are AOID-keyed,
@@ -119,32 +220,29 @@ const SELECTED_PROFESSION_KEY = 'tinkertools_nano_selected_profession';
 
 export const useNanosStore = defineStore('nanos', () => {
   // State
+
+  /** The nanos loaded: one server page, or every match while compatibility filters */
   const nanos = ref<NanoProgram[]>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
+  /** How many nanos the server filters match */
   const totalCount = ref(0);
+  /** The server page loaded (1-based), while the server pages the results */
+  const page = ref(1);
+  const pageSize = ref(DEFAULT_PAGE_SIZE);
+  /** The text query sent to /nanos/search; empty lists /nanos */
+  const searchQuery = ref('');
+  /**
+   * How many nanos matched when there were too many to fetch for the
+   * compatibility filters (over COMPATIBILITY_FETCH_CAP); null otherwise
+   */
+  const compatibilityOverflow = ref<number | null>(null);
   const selectedNano = ref<NanoProgram | null>(null);
   const selectedProfession = ref<number | null>(null);
   const favorites = ref<number[]>([]);
   const searchHistory = ref<string[]>([]);
 
-  const filters = ref<NanoFilters>({
-    schools: [],
-    strains: [],
-    professions: [],
-    qualityLevels: [],
-    effectTypes: [],
-    durationType: [],
-    targetTypes: [],
-    levelRange: [MIN_LEVEL, MAX_LEVEL],
-    memoryUsageRange: [0, 1000],
-    nanoPointRange: [0, 2000],
-    skillGapThreshold: null,
-    skillCompatible: false,
-    castable: false,
-    sortBy: 'name',
-    sortDescending: false,
-  });
+  const filters = ref<NanoFilters>(defaultNanoFilters());
 
   const preferences = ref<NanoPreferences>({
     defaultView: 'school',
@@ -181,134 +279,63 @@ export const useNanosStore = defineStore('nanos', () => {
     );
   });
 
+  /**
+   * Whether the results need every nano the server filters match: a
+   * compatibility filter or sort is in force, and those run client-side.
+   */
+  const needsAllResults = computed(
+    () =>
+      compatibilityProfile.value !== null &&
+      (filters.value.castable ||
+        filters.value.skillCompatible ||
+        filters.value.skillGapThreshold !== null ||
+        filters.value.sortBy === 'compatibility')
+  );
+
+  /** What the server is asked for; a change means reloading from page 1 */
+  const requestKey = computed(() =>
+    JSON.stringify({
+      query: nanoQueryParams(filters.value, searchQuery.value).toString(),
+      all: needsAllResults.value,
+      pageSize: pageSize.value,
+    })
+  );
+
+  /**
+   * The nanos to show. The server has already filtered and sorted them; the
+   * compatibility filters and sort are applied here, over every match.
+   */
   const filteredNanos = computed(() => {
+    const compatibility = nanoCompatibility.value;
+    if (!needsAllResults.value || !compatibility) return nanos.value;
+
+    const infoOf = (nano: NanoProgram) => compatibility.get(nano.id);
     let result = [...nanos.value];
 
-    // Apply school filter
-    if (filters.value.schools.length > 0) {
-      result = result.filter(
-        (nano) => nano.school !== null && filters.value.schools.includes(nano.school)
-      );
+    if (filters.value.castable) {
+      result = result.filter((nano) => infoOf(nano)?.canCast);
     }
 
-    // Apply strain filter
-    if (filters.value.strains.length > 0) {
-      result = result.filter((nano) => filters.value.strains.includes(nano.strain));
-    }
-
-    // Apply profession filter; nanos any profession can cast always pass
-    if (filters.value.professions.length > 0) {
-      result = result.filter(
-        (nano) =>
-          nano.professions.length === 0 ||
-          nano.professions.some((profession) => filters.value.professions.includes(profession))
-      );
-    }
-
-    // Apply quality level filter
-    if (filters.value.qualityLevels.length > 0) {
-      result = result.filter((nano) => filters.value.qualityLevels.includes(nano.qualityLevel));
-    }
-
-    // Apply effect type filter
-    if (filters.value.effectTypes && filters.value.effectTypes.length > 0) {
-      result = result.filter((nano) =>
-        nano.effects?.some((effect) => filters.value.effectTypes!.includes(effect.type))
-      );
-    }
-
-    // Apply level range filter. The full range filters nothing; a narrowed one
-    // also drops nanos without a level (no Use action, so not player-castable).
-    if (filters.value.levelRange) {
-      const [minLevel, maxLevel] = filters.value.levelRange;
-      if (minLevel > MIN_LEVEL || maxLevel < MAX_LEVEL) {
-        result = result.filter(
-          (nano) => nano.level !== null && nano.level >= minLevel && nano.level <= maxLevel
-        );
-      }
-    }
-
-    // Apply memory usage filter
-    if (filters.value.memoryUsageRange) {
-      const [minMemory, maxMemory] = filters.value.memoryUsageRange;
+    if (filters.value.skillCompatible) {
       result = result.filter((nano) => {
-        const memory = nano.memoryUsage || 0;
-        return memory >= minMemory && memory <= maxMemory;
+        const info = infoOf(nano);
+        return !!info && meetsNanoSkillRequirements(info);
       });
     }
 
-    // Apply nano point cost filter
-    if (filters.value.nanoPointRange) {
-      const [minNP, maxNP] = filters.value.nanoPointRange;
+    const threshold = filters.value.skillGapThreshold;
+    if (threshold !== null) {
       result = result.filter((nano) => {
-        const np = nano.nanoPointCost || 0;
-        return np >= minNP && np <= maxNP;
+        const info = infoOf(nano);
+        const gap = info ? nanoSkillGap(info) : null;
+        return gap !== null && gap <= threshold;
       });
     }
 
-    // Apply compatibility filters, while compatibility is shown
-    const compatibility = nanoCompatibility.value;
-    if (compatibility) {
-      const infoOf = (nano: NanoProgram) => compatibility.get(nano.id);
-
-      if (filters.value.castable) {
-        result = result.filter((nano) => infoOf(nano)?.canCast);
-      }
-
-      if (filters.value.skillCompatible) {
-        result = result.filter((nano) => {
-          const info = infoOf(nano);
-          return !!info && meetsNanoSkillRequirements(info);
-        });
-      }
-
-      const threshold = filters.value.skillGapThreshold;
-      if (threshold != null) {
-        result = result.filter((nano) => {
-          const info = infoOf(nano);
-          const gap = info ? nanoSkillGap(info) : null;
-          return gap !== null && gap <= threshold;
-        });
-      }
-    }
-
-    // Apply sorting
-    if (filters.value.sortBy) {
+    if (filters.value.sortBy === 'compatibility') {
+      const score = (nano: NanoProgram) => infoOf(nano)?.compatibilityScore ?? 0;
       result.sort((a, b) => {
-        let comparison = 0;
-
-        switch (filters.value.sortBy) {
-          case 'name':
-            comparison = a.name.localeCompare(b.name);
-            break;
-          case 'level':
-            // Nanos without a level sort after every level
-            comparison =
-              (a.level ?? Number.MAX_SAFE_INTEGER) - (b.level ?? Number.MAX_SAFE_INTEGER);
-            break;
-          case 'qualityLevel':
-            comparison = a.qualityLevel - b.qualityLevel;
-            break;
-          case 'school':
-            comparison = (a.school ?? '').localeCompare(b.school ?? '');
-            break;
-          case 'nanoPointCost':
-            comparison = (a.nanoPointCost || 0) - (b.nanoPointCost || 0);
-            break;
-          case 'memoryUsage':
-            comparison = (a.memoryUsage || 0) - (b.memoryUsage || 0);
-            break;
-          case 'compatibility': {
-            // Without compatibility every score is 0, so this sorts by name
-            const score = (nano: NanoProgram) =>
-              compatibility?.get(nano.id)?.compatibilityScore ?? 0;
-            comparison = score(a) - score(b) || a.name.localeCompare(b.name);
-            break;
-          }
-          default:
-            comparison = a.name.localeCompare(b.name);
-        }
-
+        const comparison = score(a) - score(b) || a.name.localeCompare(b.name);
         return filters.value.sortDescending ? -comparison : comparison;
       });
     }
@@ -316,12 +343,17 @@ export const useNanosStore = defineStore('nanos', () => {
     return result;
   });
 
+  /** How many nanos the current filters match, compatibility filters included */
+  const resultCount = computed(() => {
+    if (compatibilityOverflow.value !== null) return compatibilityOverflow.value;
+    return needsAllResults.value ? filteredNanos.value.length : totalCount.value;
+  });
+
   const favoriteNanos = computed(() => {
     return nanos.value.filter((nano) => favorites.value.includes(nano.id));
   });
 
   const availableSchools = computed(() => {
-    // The backend sends school: null for nanos it has no school for.
     const schools = new Set(
       nanos.value
         .map((nano) => nano.school)
@@ -341,85 +373,109 @@ export const useNanosStore = defineStore('nanos', () => {
   });
 
   // Actions
-  const fetchNanos = async (searchRequest?: NanoSearchRequest): Promise<void> => {
+
+  /** Responses to a superseded request are dropped */
+  let requestSequence = 0;
+
+  const getNanoPage = (
+    path: string,
+    params: URLSearchParams,
+    pageNumber: number,
+    size: number
+  ): Promise<PaginatedResponse<BackendNanoProgram>> => {
+    const query = new URLSearchParams(params);
+    query.append('page', String(pageNumber));
+    query.append('page_size', String(size));
+    return apiClient.getPaginated<BackendNanoProgram>(`${path}?${query}`);
+  };
+
+  /**
+   * Load the nanos matching the filters and text query. Normally that is one
+   * server page; while a compatibility filter is on it is every match, unless
+   * there are more than COMPATIBILITY_FETCH_CAP of them.
+   */
+  const loadNanos = async (pageNumber = 1): Promise<void> => {
+    const request = ++requestSequence;
     loading.value = true;
     error.value = null;
+    // The list shows the spinner meanwhile, not a stale "too many" message
+    compatibilityOverflow.value = null;
+
+    const path = searchQuery.value.trim() ? '/nanos/search' : '/nanos';
+    const params = nanoQueryParams(filters.value, searchQuery.value);
 
     try {
-      // Call the real nano API endpoint
-      const params = new URLSearchParams();
+      if (needsAllResults.value) {
+        const first = await getNanoPage(path, params, 1, MAX_PAGE_SIZE);
+        if (request !== requestSequence) return;
 
-      // Add pagination
-      params.append('page', '1');
-      params.append('page_size', '200'); // Get more items for frontend filtering
-
-      // Add basic filters that the backend supports
-      if (searchRequest?.filters?.schools?.length) {
-        params.append('school', searchRequest.filters.schools[0]); // Backend supports one school filter
+        if (first.total > COMPATIBILITY_FETCH_CAP) {
+          nanos.value = [];
+          compatibilityOverflow.value = first.total;
+        } else {
+          const rest = await Promise.all(
+            Array.from({ length: first.pages - 1 }, (_, index) =>
+              getNanoPage(path, params, index + 2, MAX_PAGE_SIZE)
+            )
+          );
+          if (request !== requestSequence) return;
+          nanos.value = [first, ...rest].flatMap((data) => data.items.map(toNanoProgram));
+          compatibilityOverflow.value = null;
+        }
+        totalCount.value = first.total;
+        page.value = 1;
+      } else {
+        const data = await getNanoPage(path, params, pageNumber, pageSize.value);
+        if (request !== requestSequence) return;
+        nanos.value = data.items.map(toNanoProgram);
+        totalCount.value = data.total;
+        page.value = pageNumber;
+        compatibilityOverflow.value = null;
       }
 
-      const data = await apiClient.getPaginated<BackendNanoProgram>(`/nanos?${params}`);
-
-      // Map backend response to frontend format
-      nanos.value = data.items.map(toNanoProgram);
-
-      totalCount.value = data.total;
-
-      // Save to localStorage for persistence
       saveNanosToStorage();
     } catch (err) {
+      if (request !== requestSequence) return;
       error.value = errorMessage(err) || 'Failed to fetch nanos';
       console.error('Failed to fetch nanos:', err);
 
       // Fallback to cached data if available
       loadNanosFromStorage();
     } finally {
-      loading.value = false;
+      if (request === requestSequence) loading.value = false;
     }
   };
 
-  const searchNanos = async (
-    query: string,
-    // The search endpoint takes only the text query; callers pass their UI
-    // filters too, which are applied client-side.
-    /* eslint-disable @typescript-eslint/no-unused-vars -- see above */
-    schools?: string[],
-    fields?: string[]
-    /* eslint-enable @typescript-eslint/no-unused-vars */
-  ): Promise<void> => {
-    loading.value = true;
-    error.value = null;
+  /** Load the first page of the current filters and query */
+  const fetchNanos = (): Promise<void> => loadNanos(1);
 
-    try {
-      // Use the search endpoint if we have a query, otherwise use regular fetch
-      if (query.trim()) {
-        const params = new URLSearchParams();
-        params.append('q', query.trim());
-        params.append('page_size', '200');
-
-        const data = await apiClient.getPaginated<BackendNanoProgram>(`/nanos/search?${params}`);
-
-        // Map backend response to frontend format
-        nanos.value = data.items.map(toNanoProgram);
-
-        totalCount.value = data.total;
-      } else {
-        // No search query, fetch all nanos
-        await fetchNanos();
-      }
-
-      // Add to search history
-      if (query.trim() && !searchHistory.value.includes(query.trim())) {
-        searchHistory.value.unshift(query.trim());
-        searchHistory.value = searchHistory.value.slice(0, 10); // Keep only 10 recent searches
-        saveSearchHistory();
-      }
-    } catch (err) {
-      error.value = errorMessage(err) || 'Failed to search nanos';
-      console.error('Failed to search nanos:', err);
-    } finally {
-      loading.value = false;
+  /**
+   * Show another page. While every match is loaded for the compatibility
+   * filters the list pages them itself, so this only records the page size.
+   */
+  const setPage = async (pageNumber: number, size: number = pageSize.value): Promise<void> => {
+    if (size !== pageSize.value) {
+      pageSize.value = size;
+      pageNumber = 1;
     }
+    if (!needsAllResults.value) await loadNanos(pageNumber);
+  };
+
+  /** Set the text query; loading is up to the caller */
+  const setSearchQuery = (query: string): void => {
+    searchQuery.value = query;
+    const term = query.trim();
+    if (term && !searchHistory.value.includes(term)) {
+      searchHistory.value.unshift(term);
+      searchHistory.value = searchHistory.value.slice(0, 10); // Keep only 10 recent searches
+      saveSearchHistory();
+    }
+  };
+
+  /** Search by text (and the current filters), from the first page */
+  const searchNanos = async (query: string): Promise<void> => {
+    setSearchQuery(query);
+    await loadNanos(1);
   };
 
   const setFilters = (newFilters: Partial<NanoFilters>): void => {
@@ -428,23 +484,7 @@ export const useNanosStore = defineStore('nanos', () => {
   };
 
   const clearFilters = (): void => {
-    filters.value = {
-      schools: [],
-      strains: [],
-      professions: [],
-      qualityLevels: [],
-      effectTypes: [],
-      durationType: [],
-      targetTypes: [],
-      levelRange: [MIN_LEVEL, MAX_LEVEL],
-      memoryUsageRange: [0, 1000],
-      nanoPointRange: [0, 2000],
-      skillGapThreshold: null,
-      skillCompatible: false,
-      castable: false,
-      sortBy: 'name',
-      sortDescending: false,
-    };
+    filters.value = defaultNanoFilters();
     saveFilters();
   };
 
@@ -569,7 +609,7 @@ export const useNanosStore = defineStore('nanos', () => {
     try {
       const saved = localStorage.getItem(FILTERS_KEY);
       if (saved) {
-        filters.value = { ...filters.value, ...JSON.parse(saved) };
+        filters.value = restoreNanoFilters(JSON.parse(saved));
       }
     } catch (error) {
       console.warn('Failed to load filters:', error);
@@ -669,6 +709,8 @@ export const useNanosStore = defineStore('nanos', () => {
   const resetForVersionChange = (): void => {
     nanos.value = [];
     totalCount.value = 0;
+    page.value = 1;
+    compatibilityOverflow.value = null;
     selectedNano.value = null;
     error.value = null;
     favorites.value = [];
@@ -685,6 +727,10 @@ export const useNanosStore = defineStore('nanos', () => {
     loading: loading as Readonly<typeof loading>,
     error: error as Readonly<typeof error>,
     totalCount: totalCount as Readonly<typeof totalCount>,
+    page: page as Readonly<typeof page>,
+    pageSize: pageSize as Readonly<typeof pageSize>,
+    searchQuery: searchQuery as Readonly<typeof searchQuery>,
+    compatibilityOverflow: compatibilityOverflow as Readonly<typeof compatibilityOverflow>,
     selectedNano: selectedNano as Readonly<typeof selectedNano>,
     selectedProfession: selectedProfession as Readonly<typeof selectedProfession>,
     favorites: favorites as Readonly<typeof favorites>,
@@ -695,14 +741,20 @@ export const useNanosStore = defineStore('nanos', () => {
     // Getters
     compatibilityProfile,
     nanoCompatibility,
+    needsAllResults,
+    requestKey,
     filteredNanos,
+    resultCount,
     favoriteNanos,
     availableSchools,
     availableStrains,
     availableProfessions,
 
     // Actions
+    loadNanos,
     fetchNanos,
+    setPage,
+    setSearchQuery,
     searchNanos,
     setFilters,
     clearFilters,

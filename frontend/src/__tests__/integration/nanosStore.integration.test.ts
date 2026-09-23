@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
-import { useNanosStore } from '@/stores/nanosStore';
+import { defaultNanoFilters, useNanosStore } from '@/stores/nanosStore';
 import { apiClient } from '@/services/api-client';
 import { versionKey } from '@/services/version-keys';
 import { isBackendAvailable } from '../helpers/backend-check';
@@ -147,34 +147,97 @@ describe('NanosStore school, profession and level', () => {
     expect(store.getNanoById(5)?.professions).toEqual([]);
   });
 
-  it('filters by school', () => {
-    store.setFilters({ schools: ['Protection'] });
+  /** The URL of the last request */
+  function lastUrl(): string {
+    const calls = vi.mocked(apiClient.getPaginated).mock.calls;
+    return String(calls[calls.length - 1]?.[0]);
+  }
 
-    expect(names()).toEqual(['General Buff', 'Zealot Buff']);
+  /** The query of the last request, as an object (repeated keys as arrays) */
+  function lastQuery(): Record<string, string | string[]> {
+    const query: Record<string, string | string[]> = {};
+    new URLSearchParams(lastUrl().split('?')[1]).forEach((value, key) => {
+      const existing = query[key];
+      query[key] = existing === undefined ? value : [existing, value].flat();
+    });
+    return query;
+  }
+
+  it('sends school, profession, QL and level filters and the sort to the server', async () => {
+    store.setFilters({
+      schools: ['Medical', 'Psi'],
+      professions: ['Doctor', 'Nano-Technician'],
+      qlRange: [50, 400],
+      levelRange: [1, 100],
+      sortBy: 'level',
+      sortDescending: true,
+    });
+    await store.loadNanos(3);
+
+    expect(lastUrl()).toMatch(/^\/nanos\?/);
+    expect(lastQuery()).toEqual({
+      school: ['Medical', 'Psi'],
+      profession: ['Doctor', 'Nano-Technician'],
+      ql_min: '50',
+      level_max: '100',
+      sort_by: 'level',
+      sort_desc: 'true',
+      page: '3',
+      page_size: '25',
+    });
   });
 
-  it('keeps nanos any of the chosen professions can cast, and unrestricted ones', () => {
-    store.setFilters({ professions: ['Keeper'] });
+  it('searches text on the search endpoint with the same filters', async () => {
+    store.setFilters({ schools: ['Medical'] });
+    await store.searchNanos('heal');
 
-    expect(names()).toEqual(['General Buff', 'NPC Proc', 'Zealot Buff']);
+    expect(lastUrl()).toMatch(/^\/nanos\/search\?/);
+    expect(lastQuery()).toMatchObject({ q: 'heal', school: 'Medical', page: '1' });
+    expect(store.searchHistory).toContain('heal');
   });
 
-  it('filters by level range, leaving out nanos that have no level', () => {
-    store.setFilters({ levelRange: [40, 100] });
+  it('shows the server page as loaded and counts the server total', async () => {
+    vi.mocked(apiClient.getPaginated).mockResolvedValue({
+      items: [nanoItem(9, 'Only One', { school: 'Space', professions: [], level: 5 })],
+      total: 1234,
+      page: 2,
+      page_size: 25,
+      pages: 50,
+      has_next: true,
+      has_prev: true,
+    });
+    await store.loadNanos(2);
 
-    expect(names()).toEqual(['Doctor Heal']);
+    expect(names()).toEqual(['Only One']);
+    expect(store.totalCount).toBe(1234);
+    expect(store.resultCount).toBe(1234);
+    expect(store.page).toBe(2);
   });
 
-  it('keeps every nano, level or not, over the full level range', () => {
-    store.setFilters({ levelRange: [1, 220] });
+  it('restores saved filters, dropping fields that no longer exist', () => {
+    localStorage.setItem(
+      'tinkertools_nano_filters',
+      JSON.stringify({
+        schools: ['Medical'],
+        qualityLevels: [100],
+        effectTypes: ['heal'],
+        durationType: ['long'],
+        targetTypes: ['Self'],
+        memoryUsageRange: [0, 200],
+        nanoPointRange: [0, 500],
+        levelRange: [10, 60],
+        sortBy: 'memoryUsage',
+        castable: 'yes',
+      })
+    );
+    setActivePinia(createPinia());
+    const restored = useNanosStore().filters;
 
-    expect(names()).toEqual(['Doctor Heal', 'General Buff', 'NPC Proc', 'Zealot Buff']);
-  });
-
-  it('sorts by level with nanos that have no level last', () => {
-    store.setFilters({ sortBy: 'level' });
-
-    expect(names()).toEqual(['General Buff', 'Doctor Heal', 'Zealot Buff', 'NPC Proc']);
+    expect(restored).toEqual({
+      ...defaultNanoFilters(),
+      schools: ['Medical'],
+      levelRange: [10, 60],
+    });
   });
 });
 
@@ -208,7 +271,7 @@ describe.skipIf(!BACKEND_AVAILABLE)('NanosStore with backend', () => {
   }, 10000);
 
   it('handles search with real data', async () => {
-    await store.searchNanos('heal', [], ['name']);
+    await store.searchNanos('heal');
 
     expect(store.error).toBe(null);
     expect(store.nanos.length).toBeGreaterThan(0);

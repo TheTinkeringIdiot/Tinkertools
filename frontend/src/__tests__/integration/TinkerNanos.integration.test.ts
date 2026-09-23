@@ -35,8 +35,8 @@ import { createTestSkillData, SKILL_ID } from '../helpers/skill-fixtures';
 import { versionedPath } from '@/composables/useGameVersion';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import TinkerNanos from '@/views/TinkerNanos.vue';
-import type { Action } from '@/types/api';
-import type { NanoSchoolName } from '@/types/nano';
+import { COMPATIBILITY_FETCH_CAP } from '@/stores/nanosStore';
+import { backendNano, nanoRequests, serveNanos, type BackendNano } from '../helpers/nano-backend';
 
 // Stat IDs used by the criteria below
 const STAT = {
@@ -80,40 +80,29 @@ const SOLDIER_STARTER_USE: Array<[number, number, number]> = [
   [0, 0, 4],
 ];
 
-/** A nano program as the /nanos endpoints return it (snake_case, with actions) */
-function backendNano(
-  id: number,
-  name: string,
-  ql: number,
-  actions: Action[],
-  derived: { school: NanoSchoolName; professions: string[]; level: number }
-) {
-  return {
-    id,
-    aoid: 1000 + id,
-    name,
-    ql,
-    description: null,
-    strain: null,
-    actions,
-    effects: [],
-    ...derived,
-  };
-}
-
 // School, professions and level as the backend derives them from the Use action
-const NANOS = [
-  backendNano(1, 'Alleysweeper', 36, [createNanoUseAction(ALLEYSWEEPER_USE, 1)], {
+const NANOS: BackendNano[] = [
+  backendNano({
+    id: 1,
+    name: 'Alleysweeper',
+    ql: 36,
+    actions: [createNanoUseAction(ALLEYSWEEPER_USE, 1)],
     school: 'Combat',
     professions: ['Soldier'],
     level: 25,
   }),
-  backendNano(2, 'Minor Suppressor', 1, [createNanoUseAction(MINOR_SUPPRESSOR_USE, 2)], {
+  backendNano({
+    id: 2,
+    name: 'Minor Suppressor',
+    actions: [createNanoUseAction(MINOR_SUPPRESSOR_USE, 2)],
     school: 'Psi',
     professions: ['Agent'],
     level: 1,
   }),
-  backendNano(3, 'Soldier Starter', 1, [createNanoUseAction(SOLDIER_STARTER_USE, 3)], {
+  backendNano({
+    id: 3,
+    name: 'Soldier Starter',
+    actions: [createNanoUseAction(SOLDIER_STARTER_USE, 3)],
     school: 'Protection',
     professions: ['Soldier'],
     level: 1,
@@ -130,15 +119,7 @@ describe('TinkerNanos Compatibility Integration', () => {
     profileStore = useTinkerProfilesStore();
     await profileStore.loadProfiles();
 
-    context.mockApi.getPaginated.mockResolvedValue({
-      items: NANOS,
-      total: NANOS.length,
-      page: 1,
-      page_size: 200,
-      pages: 1,
-      has_next: false,
-      has_prev: false,
-    });
+    serveNanos(context.mockApi.getPaginated, NANOS);
   });
 
   afterEach(() => {
@@ -297,6 +278,169 @@ describe('TinkerNanos Compatibility Integration', () => {
       const card = wrapper.findAll('.nano-card').find((c) => c.text().includes('Alleysweeper'));
       expect(card?.text()).toContain('Combat');
       expect(card?.text()).toContain('Soldier');
+    });
+  });
+
+  /** The parameters of the last nano request */
+  const lastRequest = () => {
+    const requests = nanoRequests(context.mockApi.getPaginated);
+    return requests[requests.length - 1];
+  };
+
+  const headerCount = () => wrapper.find('h1').element.parentElement?.textContent ?? '';
+
+  /** Many castable-by-anyone nanos; every third one needs a Soldier */
+  function manyNanos(count: number): BackendNano[] {
+    return Array.from({ length: count }, (_, index) =>
+      backendNano({
+        id: 1000 + index,
+        name: `Bulk Nano ${String(index).padStart(4, '0')}`,
+        school: 'Medical',
+        professions: index % 3 === 0 ? ['Soldier'] : ['Doctor'],
+        actions: [
+          createNanoUseAction(
+            [[STAT.PROFESSION, index % 3 === 0 ? PROFESSION.SOLDIER : PROFESSION.DOCTOR, 0]],
+            1000 + index
+          ),
+        ],
+      })
+    );
+  }
+
+  async function goToPage(label: 'Next Page' | 'Previous Page') {
+    // jsdom has no scrolling; NanoList scrolls the list back to the top
+    Element.prototype.scrollTo ??= () => {};
+    await wrapper.find(`button[aria-label="${label}"]`).trigger('click');
+    await flushPromises();
+  }
+
+  describe('server-side filtering and paging', () => {
+    it('asks the server for the first page, sorted by name', async () => {
+      await openNanoSearch();
+
+      const request = lastRequest();
+      expect(request?.path).toBe('/nanos');
+      expect(request?.params.toString()).toBe('sort_by=name&page=1&page_size=25');
+    });
+
+    it('sends the school, profession and level filters and the text query', async () => {
+      await openNanoSearch();
+
+      await schoolChip('Combat').trigger('click');
+      await flushPromises();
+      await schoolChip('Psi').trigger('click');
+      await flushPromises();
+      const professionSelect = wrapper
+        .findAll('.p-multiselect')
+        .find((select) => select.text().includes('All Professions'));
+      await professionSelect?.trigger('click');
+      await flushPromises();
+      document.body.querySelector<HTMLElement>('li[aria-label="Soldier"]')?.click();
+      await flushPromises();
+      const input = wrapper.find('.nano-search input.p-inputtext');
+      await input.setValue('sweep');
+      await input.trigger('keyup.enter');
+      await flushPromises();
+
+      const request = lastRequest();
+      expect(request?.path).toBe('/nanos/search');
+      expect(request?.params.get('q')).toBe('sweep');
+      expect(request?.params.getAll('school')).toEqual(['Combat', 'Psi']);
+      expect(request?.params.getAll('profession')).toEqual(['Soldier']);
+      expect(request?.params.get('page')).toBe('1');
+      expect(shownNanos()).toEqual(['Alleysweeper']);
+
+      await clickButton(wrapper, 'Low Level');
+      const levelRequest = lastRequest();
+      expect(levelRequest?.params.get('level_max')).toBe('50');
+      expect(levelRequest?.params.has('level_min')).toBe(false);
+    });
+
+    it('pages through the server total', async () => {
+      serveNanos(context.mockApi.getPaginated, manyNanos(60));
+      await openNanoSearch();
+
+      expect(headerCount()).toContain('60 nanos');
+      expect(shownNanos()).toHaveLength(25);
+      expect(shownNanos()[0]).toBe('Bulk Nano 0000');
+
+      await goToPage('Next Page');
+
+      expect(lastRequest()?.params.get('page')).toBe('2');
+      expect(shownNanos()[0]).toBe('Bulk Nano 0025');
+      expect(wrapper.text()).toContain('Showing 26 to 50 of 60 nanos');
+
+      await goToPage('Next Page');
+      expect(shownNanos()).toHaveLength(10);
+    });
+
+    it('sorts on the server', async () => {
+      await openNanoSearch();
+      const sortDropdown = wrapper
+        .findAll('.p-dropdown')
+        .find((dropdown) => shownOption(dropdown) === 'Name');
+      if (!sortDropdown) throw new Error('No sort dropdown');
+
+      await chooseOption(sortDropdown, 'Level');
+      await checkFilter('sort-desc');
+
+      expect(lastRequest()?.params.get('sort_by')).toBe('level');
+      expect(lastRequest()?.params.get('sort_desc')).toBe('true');
+      expect(shownNanos()[0]).toBe('Alleysweeper');
+    });
+  });
+
+  describe('compatibility filters over every page', () => {
+    it('fetches every page of the server result and filters all of it', async () => {
+      serveNanos(context.mockApi.getPaginated, manyNanos(450));
+      await activateProfile('Sarge', PROFESSION.SOLDIER, 60, 150, 200);
+      await openNanoSearch();
+      expect(headerCount()).toContain('450 nanos');
+      await toggleCompatibility();
+      context.mockApi.getPaginated.mockClear();
+
+      await checkFilter('fully-castable');
+
+      const requests = nanoRequests(context.mockApi.getPaginated);
+      expect(requests.map((r) => [r.params.get('page'), r.params.get('page_size')])).toEqual([
+        ['1', '200'],
+        ['2', '200'],
+        ['3', '200'],
+      ]);
+      // Every third bulk nano is a Soldier nano: 150 of 450
+      expect(headerCount()).toContain('150 nanos');
+      expect(wrapper.text()).toContain('Showing 1 to 25 of 150 nanos');
+    });
+
+    it('asks to narrow the filters when too many nanos match', async () => {
+      serveNanos(context.mockApi.getPaginated, manyNanos(COMPATIBILITY_FETCH_CAP + 500));
+      await activateProfile('Sarge', PROFESSION.SOLDIER, 60, 150, 200);
+      await openNanoSearch();
+      await toggleCompatibility();
+      context.mockApi.getPaginated.mockClear();
+
+      await checkFilter('fully-castable');
+
+      // One request finds the total over the cap; nothing more is fetched
+      expect(nanoRequests(context.mockApi.getPaginated)).toHaveLength(1);
+      const message = wrapper.find('[data-testid="compatibility-overflow"]');
+      expect(message.text()).toContain(
+        `${(COMPATIBILITY_FETCH_CAP + 500).toLocaleString()} nanos match your filters`
+      );
+      expect(message.text()).toContain('Narrow the list by profession, school or level');
+      expect(shownNanos()).toEqual([]);
+
+      // Narrowed to Soldier nanos (a third) the filter runs over all of them
+      const professionSelect = wrapper
+        .findAll('.p-multiselect')
+        .find((select) => select.text().includes('All Professions'));
+      await professionSelect?.trigger('click');
+      await flushPromises();
+      document.body.querySelector<HTMLElement>('li[aria-label="Soldier"]')?.click();
+      await flushPromises();
+
+      expect(wrapper.find('[data-testid="compatibility-overflow"]').exists()).toBe(false);
+      expect(headerCount()).toContain(`${(COMPATIBILITY_FETCH_CAP + 500) / 3} nanos`);
     });
   });
 
