@@ -11,15 +11,15 @@ Shows available slots for an item and allows user to choose where to equip it
           <img
             v-if="iconUrl"
             :src="iconUrl"
-            :alt="item.name"
+            :alt="item?.name"
             class="w-10 h-10 object-contain"
             @error="onIconError"
           />
           <i v-else class="pi pi-box text-2xl text-surface-400"></i>
           <div>
-            <div class="font-medium">{{ item.name }}</div>
+            <div class="font-medium">{{ item?.name }}</div>
             <div class="text-sm text-surface-600 dark:text-surface-400">
-              QL {{ item.ql }} {{ itemTypeName }}
+              QL {{ item?.ql }} {{ itemTypeName }}
             </div>
           </div>
         </div>
@@ -101,13 +101,14 @@ import Dialog from 'primevue/dialog';
 import Button from 'primevue/button';
 import Badge from 'primevue/badge';
 import Message from 'primevue/message';
+import type { Item } from '@/types/api';
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import { getItemIconUrl } from '@/services/game-utils';
 
 // Props
 interface Props {
   visible: boolean;
-  item: any; // Item to equip
+  item: Pick<Item, 'name' | 'ql' | 'stats' | 'item_class'> | null; // Item to equip
   profile: TinkerProfile | null;
   validSlots?: string[]; // Optional list of valid slots for this item
 }
@@ -155,7 +156,7 @@ const availableSlots = computed(() => {
     name: string;
     displayName: string;
     occupied: boolean;
-    currentItem: any;
+    currentItem: Pick<Item, 'name' | 'ql'>;
   }> = [];
 
   // If validSlots are provided (from stat 298), use them directly

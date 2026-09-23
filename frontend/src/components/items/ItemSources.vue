@@ -30,7 +30,7 @@ Shows where items can be obtained (crystals, NPCs, missions, etc.)
               <div class="flex-shrink-0">
                 <img
                   v-if="getSourceItemIconUrl(source)"
-                  :src="getSourceItemIconUrl(source)"
+                  :src="getSourceItemIconUrl(source) ?? undefined"
                   :alt="source.source.name"
                   class="w-8 h-8 rounded border border-surface-200 dark:border-surface-600 bg-surface-100 dark:bg-surface-800"
                   @error="onIconError($event)"
@@ -133,16 +133,6 @@ function getSourceIcon(sourceType?: string): string {
   }
 }
 
-function formatSourceType(sourceType?: string): string {
-  if (!sourceType) return 'Unknown';
-
-  // Convert snake_case or lowercase to proper case
-  return sourceType
-    .split('_')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-}
-
 function formatDropRate(dropRate: number): string {
   return dropRate.toFixed(1);
 }
@@ -195,7 +185,9 @@ function onIconError(event: Event) {
 function navigateToSourceItem(source: ItemSource) {
   const route = getSourceNavigationRoute(source);
   if (route !== '#') {
-    router.push(route);
+    router.push(route).catch((error: unknown) => {
+      console.error('Failed to navigate to source:', error);
+    });
   }
 }
 </script>

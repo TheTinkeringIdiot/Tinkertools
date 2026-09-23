@@ -27,15 +27,6 @@ Shows tradeable status, drop restrictions, special flags, and other item propert
               <Tag :value="categoryName" severity="info" />
             </div>
 
-            <!-- Item Type -->
-            <div
-              v-if="item.item_type"
-              class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded"
-            >
-              <span class="text-sm text-surface-600 dark:text-surface-400">Type</span>
-              <span class="font-medium">{{ item.item_type }}</span>
-            </div>
-
             <!-- Nano Program -->
             <div
               class="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-900 rounded"
@@ -179,14 +170,14 @@ Shows tradeable status, drop restrictions, special flags, and other item propert
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Item } from '@/types/api';
-import { getItemCategoryName, getItemClassName, isWeapon } from '@/services/game-utils';
+import { getItemCategoryName, getItemSlotInfo, isWeapon } from '@/services/game-utils';
 
 const props = defineProps<{
   item: Item;
 }>();
 
 // Computed Properties
-const categoryName = computed(() => getItemCategoryName(props.item.item_class));
+const categoryName = computed(() => getItemCategoryName(props.item.item_class ?? 0));
 
 const tradeableStatus = computed(() => {
   // This would need to be determined from item flags/stats when available
@@ -208,11 +199,11 @@ const specialFlags = computed(() => {
     flags.push({ name: 'Nano Program', severity: 'success' });
   }
 
-  if (isWeapon(props.item.item_class)) {
+  if (isWeapon(props.item.item_class ?? 0)) {
     flags.push({ name: 'Weapon', severity: 'warning' });
   }
 
-  if (props.item.ql >= 200) {
+  if ((props.item.ql ?? 0) >= 200) {
     flags.push({ name: 'High QL', severity: 'info' });
   }
 
@@ -226,29 +217,8 @@ const specialFlags = computed(() => {
 });
 
 const equipmentSlots = computed(() => {
-  const slots: string[] = [];
-
-  // Map item class to equipment slots
-  const slotMap: Record<number, string> = {
-    1: 'Right Hand', // 1H Blunt
-    2: 'Right Hand', // 1H Edged
-    3: 'Both Hands', // 2H Blunt
-    4: 'Both Hands', // 2H Edged
-    5: 'Right Hand', // Ranged
-    6: 'Body', // Body Armor
-    7: 'Head', // Head Armor
-    8: 'Arms', // Arm Armor
-    9: 'Legs', // Leg Armor
-    10: 'Feet', // Foot Armor
-    15: 'Implant Slot', // Implant
-  };
-
-  const slot = slotMap[props.item.item_class];
-  if (slot) {
-    slots.push(slot);
-  }
-
-  return slots;
+  // Slots come from the item's Slot stat (298) bitflags, e.g. 'RightHand' -> 'Right Hand'
+  return getItemSlotInfo(props.item).slots.map((slot) => slot.replace(/([a-z])([A-Z])/g, '$1 $2'));
 });
 
 const isMultiWieldable = computed(() => {

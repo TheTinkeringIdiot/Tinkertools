@@ -79,13 +79,9 @@ Provides full-text search with auto-complete and search suggestions
                 @click="selectSuggestion(suggestion)"
               >
                 <i :class="getSuggestionIcon(suggestion.type)" class="text-surface-400 text-xs"></i>
+                <!-- eslint-disable-next-line vue/no-v-html -- highlightMatch HTML-escapes all text -->
                 <span class="text-sm" v-html="highlightMatch(suggestion.text, searchQuery)"></span>
-                <Badge
-                  v-if="suggestion.count"
-                  :value="suggestion.count"
-                  size="small"
-                  severity="secondary"
-                />
+                <Badge v-if="suggestion.count" :value="suggestion.count" severity="secondary" />
               </div>
             </div>
           </div>
@@ -122,7 +118,7 @@ Provides full-text search with auto-complete and search suggestions
 
       <div v-if="profile" class="text-xs text-surface-500 dark:text-surface-400">
         <i class="pi pi-user mr-1"></i>
-        Character: {{ profile.name }}
+        Character: {{ profile.Character.Name }}
       </div>
     </div>
 
@@ -217,7 +213,8 @@ Provides full-text search with auto-complete and search suggestions
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue';
-import type { TinkerProfile } from '@/types/api';
+import type { ItemSearchQuery } from '@/types/api';
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 
 interface SearchSuggestion {
   text: string;
@@ -228,13 +225,13 @@ interface SearchSuggestion {
 interface QuickFilter {
   label: string;
   query: string;
-  filters?: Record<string, any>;
+  filters?: Partial<ItemSearchQuery>;
 }
 
 interface SavedSearch {
   name: string;
   query: string;
-  filters: Record<string, any>;
+  filters: Partial<ItemSearchQuery>;
   timestamp: number;
 }
 
@@ -294,7 +291,7 @@ const hasError = computed(() => false); // Would integrate with validation
 const canSaveSearch = computed(() => searchQuery.value.trim().length > 0 && hasSearched.value);
 
 // Methods
-let searchTimeout: NodeJS.Timeout | null = null;
+let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
 function onSearchInput() {
   emit('update:query', searchQuery.value);
@@ -314,22 +311,21 @@ function onSearchInput() {
   }
 }
 
-async function loadSuggestions() {
+function loadSuggestions() {
   if (searchQuery.value.trim().length < 2) {
     suggestions.value = [];
     return;
   }
 
-  try {
-    // Mock suggestions - would integrate with backend API
-    suggestions.value = [
-      { text: 'Implant', type: 'category', count: 150 },
-      { text: 'Viral', type: 'item', count: 23 },
-      { text: 'Bio-Communal', type: 'item', count: 8 },
-    ].filter((s) => s.text.toLowerCase().includes(searchQuery.value.toLowerCase()));
-  } catch (error) {
-    console.error('Failed to load suggestions:', error);
-  }
+  // Mock suggestions - would integrate with backend API
+  const mockSuggestions: SearchSuggestion[] = [
+    { text: 'Implant', type: 'category', count: 150 },
+    { text: 'Viral', type: 'item', count: 23 },
+    { text: 'Bio-Communal', type: 'item', count: 8 },
+  ];
+  suggestions.value = mockSuggestions.filter((s) =>
+    s.text.toLowerCase().includes(searchQuery.value.toLowerCase())
+  );
 }
 
 function performSearch() {
@@ -361,27 +357,30 @@ function clearSearch() {
   emit('clear');
 }
 
-function selectSuggestion(suggestion: SearchSuggestion) {
+async function selectSuggestion(suggestion: SearchSuggestion) {
   searchQuery.value = suggestion.text;
   emit('update:query', searchQuery.value);
   showSuggestions.value = false;
-  nextTick(() => performSearch());
+  await nextTick();
+  performSearch();
 }
 
-function selectRecentSearch(search: string) {
+async function selectRecentSearch(search: string) {
   searchQuery.value = search;
   emit('update:query', searchQuery.value);
   showSuggestions.value = false;
-  nextTick(() => performSearch());
+  await nextTick();
+  performSearch();
 }
 
-function selectQuickFilter(filter: QuickFilter) {
+async function selectQuickFilter(filter: QuickFilter) {
   if (filter.query) {
     searchQuery.value = filter.query;
     emit('update:query', searchQuery.value);
   }
   showSuggestions.value = false;
-  nextTick(() => performSearch());
+  await nextTick();
+  performSearch();
 }
 
 function hideSuggestions() {
@@ -411,11 +410,6 @@ function getSuggestionIcon(type: string): string {
 }
 
 function highlightMatch(text: string, query: string): string {
-  if (!query.trim()) return text;
-
-  // Escape regex metacharacters to prevent regex injection
-  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
   // Helper to escape HTML entities
   const escapeHtml = (str: string): string => {
     const htmlEscapeMap: Record<string, string> = {
@@ -427,6 +421,12 @@ function highlightMatch(text: string, query: string): string {
     };
     return str.replace(/[<>&"']/g, (char) => htmlEscapeMap[char]);
   };
+
+  // Result is rendered with v-html, so the no-query case must be escaped too
+  if (!query.trim()) return escapeHtml(text);
+
+  // Escape regex metacharacters to prevent regex injection
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   // Find all matches and build result with escaped HTML
   const regex = new RegExp(`(${escapedQuery})`, 'gi');
@@ -460,11 +460,12 @@ function saveCurrentSearch() {
   saveSavedSearches();
 }
 
-function loadSavedSearch(search: SavedSearch) {
+async function loadSavedSearch(search: SavedSearch) {
   searchQuery.value = search.query;
   emit('update:query', searchQuery.value);
   showSuggestions.value = false;
-  nextTick(() => performSearch());
+  await nextTick();
+  performSearch();
 }
 
 // Persistence

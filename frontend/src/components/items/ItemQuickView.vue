@@ -53,11 +53,11 @@ Shows essential item information in a compact format
     </div>
 
     <!-- Requirements -->
-    <div v-if="showCompatibility && item.requirements?.length">
+    <div v-if="showCompatibility && requirements.length">
       <h4 class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Requirements</h4>
       <div class="grid grid-cols-2 gap-2">
         <div
-          v-for="req in item.requirements.slice(0, 4)"
+          v-for="req in requirements.slice(0, 4)"
           :key="req.stat"
           class="flex justify-between text-sm p-2 rounded"
           :class="{
@@ -97,9 +97,12 @@ Shows essential item information in a compact format
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { Item, TinkerProfile, ItemRequirement } from '@/types/api';
+import type { Item } from '@/types/api';
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import { getItemIconUrl } from '@/services/game-utils';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
+import { mapProfileToStats } from '@/utils/profile-stats-mapper';
+import { getItemRequirements, type ItemStatRequirement } from './item-requirements';
 
 const props = defineProps<{
   item: Item;
@@ -141,11 +144,15 @@ const keyStats = computed(() => {
     }));
 });
 
+const requirements = computed(() => getItemRequirements(props.item));
+
+// Profile stats keyed by stat ID (covers level, attributes and skills)
+const profileStats = computed(() => (props.profile ? mapProfileToStats(props.profile) : null));
+
 // Methods
-function canMeetRequirement(requirement: ItemRequirement): boolean {
-  if (!props.profile) return false;
-  const skillData = props.profile.skills?.[requirement.stat];
-  const characterStat = skillData?.total || 0;
+function canMeetRequirement(requirement: ItemStatRequirement): boolean {
+  if (!profileStats.value) return false;
+  const characterStat = profileStats.value[requirement.stat] || 0;
   return characterStat >= requirement.value;
 }
 

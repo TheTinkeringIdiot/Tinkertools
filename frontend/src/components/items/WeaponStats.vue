@@ -73,7 +73,7 @@ Shows essential weapon information in a dense, scannable table format
               <div v-if="weaponStats.initiativeType" class="stat-pair">
                 <span class="stat-name">Initiative</span>
                 <span class="stat-val val-speed">{{
-                  getStatName(weaponStats.initiativeType).replace('Init', '')
+                  getStatName(weaponStats.initiativeType)?.replace('Init', '')
                 }}</span>
               </div>
             </div>
@@ -165,16 +165,12 @@ Shows essential weapon information in a dense, scannable table format
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Item, TinkerProfile, ItemRequirement } from '@/types/api';
+import type { Item } from '@/types/api';
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import {
   getWeaponStats,
-  getDamageTypeName,
-  formatAttackTime,
-  formatRechargeTime,
   calculateWeaponDPS,
   isWeapon,
-  getWeaponSpecialSkills,
-  formatWeaponRange,
   getStatName,
   getAmmoTypeName,
   getWeaponSpecialAttacks,
@@ -189,17 +185,11 @@ const props = defineProps<{
 }>();
 
 // Computed Properties
-const isWeaponItem = computed(() => isWeapon(props.item.item_class));
+const isWeaponItem = computed(() => isWeapon(props.item.item_class ?? 0));
 
 const weaponStats = computed(() => {
   if (!props.item.stats) return {};
   return getWeaponStats(props.item.stats);
-});
-
-const averageDamage = computed(() => {
-  const { minDamage, maxDamage } = weaponStats.value;
-  if (!minDamage || !maxDamage) return 0;
-  return (minDamage + maxDamage) / 2;
 });
 
 const dps = computed(() => {
@@ -208,49 +198,9 @@ const dps = computed(() => {
   return calculateWeaponDPS(minDamage, maxDamage, attackSpeed);
 });
 
-const attacksPerSecond = computed(() => {
-  const { attackSpeed } = weaponStats.value;
-  if (!attackSpeed) return 0;
-  return 1000 / attackSpeed;
-});
-
-const damageTypeName = computed(() => {
-  const { damageType } = weaponStats.value;
-  return damageType ? getDamageTypeName(damageType) : null;
-});
-
-const specialSkills = computed(() => {
-  if (!props.item.stats) return [];
-  return getWeaponSpecialSkills(props.item.stats);
-});
-
 const specialAttacks = computed(() => {
   if (!props.item.stats) return [];
   return getWeaponSpecialAttacks(props.item.stats);
-});
-
-const weaponSkillRequirements = computed(() => {
-  if (!props.item.requirements) return [];
-
-  // Filter for weapon-related skill requirements
-  const weaponSkillIds = [
-    100,
-    101,
-    102,
-    103,
-    104,
-    105,
-    106,
-    107,
-    108, // Combat skills
-    148,
-    150,
-    134,
-    133,
-    119, // Special attack skills
-  ];
-
-  return props.item.requirements.filter((req) => weaponSkillIds.includes(req.stat));
 });
 
 const hasAttackDefenseStats = computed(() => {
@@ -279,27 +229,6 @@ const defenseStatsFormatted = computed(() => {
 });
 
 // Methods
-function canMeetRequirement(requirement: ItemRequirement): boolean {
-  if (!props.profile) return false;
-  const characterStat = props.profile.stats?.[requirement.stat] || 0;
-  return characterStat >= requirement.value;
-}
-
-function getCharacterStat(statId: number): number {
-  return props.profile?.stats?.[statId] || 0;
-}
-
-function formatSkillRequirement(statId: number, value: number): string {
-  // Some weapon skills are displayed as percentages
-  const percentageSkills = [100, 101, 102, 103, 104, 105, 106, 107, 108]; // Combat skills
-
-  if (percentageSkills.includes(statId)) {
-    return `${value}%`;
-  }
-
-  return value.toString();
-}
-
 function formatCentisecondsToSeconds(centiseconds: number): string {
   // Convert centiseconds to seconds with 2 decimal places
   const seconds = centiseconds / 100;

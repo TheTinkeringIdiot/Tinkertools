@@ -634,7 +634,12 @@ async function restoreSearchState() {
   if (storedQuery.max_ql) searchForm.value.max_ql = storedQuery.max_ql;
 
   // Restore item class and slot
-  if (storedQuery.item_class) searchForm.value.item_class = storedQuery.item_class;
+  // The query type allows an array of classes; this form only ever sets a single one
+  if (storedQuery.item_class) {
+    searchForm.value.item_class = Array.isArray(storedQuery.item_class)
+      ? storedQuery.item_class[0]
+      : storedQuery.item_class;
+  }
   if (storedQuery.slot) searchForm.value.slot = storedQuery.slot;
 
   // Restore requirements
@@ -682,14 +687,14 @@ async function restoreSearchState() {
   // Additional DOM sync for checkboxes after component re-render
   await nextTick();
   if (storedQuery.froob_friendly) {
-    const froobCheckbox = document.querySelector('#froob-friendly');
+    const froobCheckbox = document.querySelector<HTMLInputElement>('#froob-friendly');
     if (froobCheckbox && !froobCheckbox.checked) {
       froobCheckbox.checked = true;
       console.log('Manually synced froob checkbox to DOM');
     }
   }
   if (storedQuery.nodrop) {
-    const nodropCheckbox = document.querySelector('#nodrop');
+    const nodropCheckbox = document.querySelector<HTMLInputElement>('#nodrop');
     if (nodropCheckbox && !nodropCheckbox.checked) {
       nodropCheckbox.checked = true;
       console.log('Manually synced nodrop checkbox to DOM');

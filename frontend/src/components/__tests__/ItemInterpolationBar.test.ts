@@ -84,6 +84,8 @@ const mockInterpolatedItem: InterpolatedItem = {
   ql_delta: 75,
   ql_delta_full: 99,
   stats: [{ id: 1, stat: 1, value: 125 }],
+  spell_data: [],
+  actions: [],
 };
 
 function infoResponse(info: InterpolationInfo): ApiResponse<InterpolationInfo> {
@@ -300,7 +302,8 @@ describe('ItemInterpolationBar', () => {
       await flushPromises();
 
       expect(bar.findComponent(InputNumber).props('modelValue')).toBe(150);
-      expect(bar.emitted('item-update')?.at(-1)).toEqual([null]);
+      const itemUpdates = bar.emitted('item-update') ?? [];
+      expect(itemUpdates[itemUpdates.length - 1]).toEqual([null]);
       expect(router.currentRoute.value.query.ql).toBeUndefined();
       expect(bar.text()).toContain('Original');
     });

@@ -105,7 +105,7 @@ const gridCells = computed(() => {
   }> = [];
 
   // Determine grid dimensions and position function
-  let rows: number, cols: number, getPositionFn: Function;
+  let rows: number, cols: number, getPositionFn: (slotName: string) => { row: number; col: number };
 
   switch (props.slotType) {
     case 'weapon':
@@ -277,15 +277,19 @@ function navigateToItem(item: Item | SymbiantItem) {
   // Navigate to ItemDetail page for the specific item at the equipped QL
   if (!item.aoid) return;
 
-  router.push({
-    name: 'ItemDetail',
-    params: {
-      aoid: item.aoid.toString(),
-    },
-    query: {
-      ql: item.ql?.toString() || '1',
-    },
-  });
+  router
+    .push({
+      name: 'ItemDetail',
+      params: {
+        aoid: item.aoid.toString(),
+      },
+      query: {
+        ql: item.ql?.toString() || '1',
+      },
+    })
+    .catch((error: unknown) => {
+      console.error('Failed to navigate to item:', error);
+    });
 }
 
 async function handleUnequip(slotName: string | null, item: Item | SymbiantItem) {
