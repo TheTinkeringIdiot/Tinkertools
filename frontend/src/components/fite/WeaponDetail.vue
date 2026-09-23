@@ -120,8 +120,8 @@ interface Emits {
   (e: 'hide'): void;
 }
 
-const props = defineProps<Props>();
-const emit = defineEmits<Emits>();
+defineProps<Props>();
+defineEmits<Emits>();
 
 const getStatName = (statId: number): string => {
   return SKILL_NAMES[statId] || `Stat ${statId}`;

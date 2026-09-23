@@ -167,7 +167,12 @@ const sortOptions = [
   { id: 'usability', name: 'Usability' },
 ];
 
-const quickFilters = [
+interface QuickFilter {
+  name: string;
+  filters: Partial<WeaponFilters>;
+}
+
+const quickFilters: QuickFilter[] = [
   {
     name: 'Rifles',
     filters: { weaponTypes: [1] }, // Assuming weapon type 1 is rifles
@@ -226,7 +231,7 @@ const updateFilters = () => {
   emit('update:filters', { ...localFilters.value });
 };
 
-const applyQuickFilter = (quickFilter: any) => {
+const applyQuickFilter = (quickFilter: QuickFilter) => {
   // Apply the quick filter settings
   Object.assign(localFilters.value, quickFilter.filters);
   updateFilters();

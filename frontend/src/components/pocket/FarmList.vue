@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import { useSymbiantsStore } from '@/stores/symbiants';
 import Card from 'primevue/card';
 import Button from 'primevue/button';
@@ -15,7 +15,6 @@ import { useConfirm } from 'primevue/useconfirm';
 
 const symbiantsStore = useSymbiantsStore();
 const route = useRoute();
-const router = useRouter();
 const toast = useToast();
 const confirm = useConfirm();
 
@@ -97,7 +96,7 @@ async function handleCopyShareUrl() {
       detail: 'Farm list URL copied to clipboard',
       life: 2000,
     });
-  } catch (error) {
+  } catch {
     toast.add({
       severity: 'error',
       summary: 'Error',

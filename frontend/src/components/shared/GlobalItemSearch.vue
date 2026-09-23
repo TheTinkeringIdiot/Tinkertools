@@ -77,7 +77,7 @@ watch(
 function submit(): void {
   const search = term.value.trim();
   if (!search) return;
-  router.push({ name: 'TinkerItems', query: { search } });
+  void router.push({ name: 'TinkerItems', query: { search } });
 }
 
 function clear(): void {

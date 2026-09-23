@@ -198,7 +198,6 @@ Visual character representation with symbiant slots
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import Button from 'primevue/button';
 
 import SymbiantSlot from './SymbiantSlot.vue';

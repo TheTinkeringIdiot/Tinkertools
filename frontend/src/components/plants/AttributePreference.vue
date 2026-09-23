@@ -30,10 +30,11 @@ Allows users to select a preferred attribute for implant filtering
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, watch, onMounted } from 'vue';
 import { useTinkerPlantsStore } from '@/stores/tinkerPlants';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import Dropdown from 'primevue/dropdown';
+import type { DropdownChangeEvent } from 'primevue/dropdown';
 
 // Store access
 const tinkerPlantsStore = useTinkerPlantsStore();
@@ -65,8 +66,8 @@ const determineDefaultAttribute = (): string | null => {
 /**
  * Handle attribute selection change
  */
-const handleAttributeChange = (event: any) => {
-  const newAttribute = event.value;
+const handleAttributeChange = (event: DropdownChangeEvent) => {
+  const newAttribute: string | null = event.value;
 
   // Update store (allow null for "None")
   tinkerPlantsStore.setAttributePreference(newAttribute);

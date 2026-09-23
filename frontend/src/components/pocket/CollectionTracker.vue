@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import type { DeepReadonly } from 'vue';
 import { useSymbiantsStore } from '@/stores/symbiants';
 import { usePocketBossStore } from '@/stores/pocketBossStore';
 import { versionKey, adoptLegacyKey } from '@/services/version-keys';
@@ -14,10 +15,11 @@ import Column from 'primevue/column';
 import Tag from 'primevue/tag';
 import ConfirmDialog from 'primevue/confirmdialog';
 import { useConfirm } from 'primevue/useconfirm';
-import type { Symbiant, PocketBoss } from '@/types/api';
+import { getImplantSlotNameFromBitflag } from '@/services/game-utils';
+import type { Mob, Symbiant } from '@/types/api';
 
 interface CollectionItem {
-  symbiant: Symbiant;
+  symbiant: DeepReadonly<Symbiant>;
   collected: boolean;
   notes?: string;
 }
@@ -34,13 +36,13 @@ const symbiantStore = useSymbiantsStore();
 const pocketBossStore = usePocketBossStore();
 
 // Safely handle confirmation service (may not be available in tests)
-let confirm: any = null;
+let confirm: Pick<ReturnType<typeof useConfirm>, 'require'>;
 try {
   confirm = useConfirm();
 } catch {
   // Fallback for test environments or when ConfirmationService is not provided
   confirm = {
-    require: () => Promise.resolve(true),
+    require: () => {},
   };
 }
 
@@ -59,7 +61,7 @@ const showNewGoalForm = ref(false);
 
 // Computed properties
 const availableSlots = computed(() => {
-  const slots = new Set(Array.from(symbiantStore.symbiants.values()).map((s) => s.slot));
+  const slots = new Set(Array.from(symbiantStore.symbiants.values()).map((s) => getSlotName(s)));
   return Array.from(slots).sort();
 });
 
@@ -68,7 +70,7 @@ const filteredSymbiants = computed(() => {
 
   // Apply slot filter
   if (selectedSlot.value) {
-    result = result.filter((s) => s.slot === selectedSlot.value);
+    result = result.filter((s) => getSlotName(s) === selectedSlot.value);
   }
 
   // Apply search filter
@@ -77,19 +79,21 @@ const filteredSymbiants = computed(() => {
     result = result.filter(
       (s) =>
         s.name.toLowerCase().includes(search) ||
-        s.slot.toLowerCase().includes(search) ||
+        getSlotName(s).toLowerCase().includes(search) ||
         s.family?.toLowerCase().includes(search)
     );
   }
 
   // Apply collection filter
   if (showOnlyUncollected.value) {
-    result = result.filter((s) => !getCollectionItem(s.id).collected);
+    result = result.filter((s) => !getCollectionItem(s.id)?.collected);
   }
 
   return result.sort((a, b) => {
     // Sort by slot first, then by QL, then by name
-    if (a.slot !== b.slot) return a.slot.localeCompare(b.slot);
+    const aSlot = getSlotName(a);
+    const bSlot = getSlotName(b);
+    if (aSlot !== bSlot) return aSlot.localeCompare(bSlot);
     if (a.ql !== b.ql) return b.ql - a.ql;
     return a.name.localeCompare(b.name);
   });
@@ -103,13 +107,12 @@ const collectionStats = computed(() => {
   const bySlot: Record<string, { total: number; collected: number; percentage: number }> = {};
 
   for (const symbiant of symbiantStore.symbiants.values()) {
-    if (!bySlot[symbiant.slot]) {
-      bySlot[symbiant.slot] = { total: 0, collected: 0, percentage: 0 };
-    }
-    bySlot[symbiant.slot].total++;
+    const slot = getSlotName(symbiant);
+    bySlot[slot] ??= { total: 0, collected: 0, percentage: 0 };
+    bySlot[slot].total++;
     const collectionItem = getCollectionItem(symbiant.id);
     if (collectionItem?.collected) {
-      bySlot[symbiant.slot].collected++;
+      bySlot[slot].collected++;
     }
   }
 
@@ -154,21 +157,28 @@ function toggleCollection(symbiantId: number) {
   }
 }
 
-function getDropSources(symbiant: Symbiant): PocketBoss[] {
+function getSlotName(symbiant: Pick<Symbiant, 'slot_id'>): string {
+  return getImplantSlotNameFromBitflag(symbiant.slot_id);
+}
+
+function getDropSources(symbiant: Pick<Symbiant, 'id'>): Mob[] {
   return pocketBossStore.getPocketBossesBySymbiant(symbiant.id);
 }
 
 function getSlotIcon(slot: string): string {
   const iconMap: Record<string, string> = {
     Head: 'pi-user',
-    Eye: 'pi-eye',
-    Ear: 'pi-volume-up',
+    Eyes: 'pi-eye',
+    Ears: 'pi-volume-up',
     Chest: 'pi-shield',
-    Arm: 'pi-stop',
-    Wrist: 'pi-circle',
-    Hand: 'pi-hand-paper',
+    'Right Arm': 'pi-stop',
+    'Left Arm': 'pi-stop',
+    'Right Wrist': 'pi-circle',
+    'Left Wrist': 'pi-circle',
+    'Right Hand': 'pi-hand-paper',
+    'Left Hand': 'pi-hand-paper',
     Waist: 'pi-minus',
-    Leg: 'pi-sort-down',
+    Legs: 'pi-sort-down',
     Feet: 'pi-step-forward',
   };
   return iconMap[slot] || 'pi-circle';
@@ -221,7 +231,7 @@ function deleteCollectionGoal(goalId: string) {
 
 function getGoalProgress(goal: CollectionGoal) {
   const total = goal.targetSymbiants.length;
-  const collected = goal.targetSymbiants.filter((id) => getCollectionItem(id).collected).length;
+  const collected = goal.targetSymbiants.filter((id) => getCollectionItem(id)?.collected).length;
   return {
     total,
     collected,
@@ -578,7 +588,7 @@ defineExpose({
           paginator
           :rows="25"
           :rows-per-page-options="[10, 25, 50, 100]"
-          sort-field="slot"
+          sort-field="slot_id"
           :sort-order="1"
           show-gridlines
           striped-rows
@@ -594,7 +604,7 @@ defineExpose({
           <Column header="Collected" class="min-w-[80px]">
             <template #body="{ data }">
               <Checkbox
-                :model-value="getCollectionItem(data.id).collected"
+                :model-value="getCollectionItem(data.id)?.collected ?? false"
                 binary
                 @update:model-value="toggleCollection(data.id)"
               />
@@ -604,7 +614,7 @@ defineExpose({
           <Column field="name" header="Symbiant" sortable class="min-w-[250px]">
             <template #body="{ data }">
               <div class="flex items-center gap-2">
-                <i :class="`pi ${getSlotIcon(data.slot)} text-primary-500`"></i>
+                <i :class="`pi ${getSlotIcon(getSlotName(data))} text-primary-500`"></i>
                 <div>
                   <div class="font-medium">{{ data.name }}</div>
                   <div class="text-sm text-surface-600 dark:text-surface-400">
@@ -615,9 +625,9 @@ defineExpose({
             </template>
           </Column>
 
-          <Column field="slot" header="Slot" sortable class="min-w-[100px]">
+          <Column field="slot_id" header="Slot" sortable class="min-w-[100px]">
             <template #body="{ data }">
-              {{ data.slot }}
+              {{ getSlotName(data) }}
             </template>
           </Column>
 

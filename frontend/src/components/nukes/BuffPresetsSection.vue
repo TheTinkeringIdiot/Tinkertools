@@ -314,7 +314,7 @@ function populateFromProfile(): void {
     // Try AOID matching first
     if (buff.aoid) {
       const crunchcomLevel = Object.entries(CRUNCHCOM_AOID_MAP).find(
-        ([_, aoid]) => aoid === buff.aoid
+        ([, aoid]) => aoid === buff.aoid
       )?.[0];
       if (crunchcomLevel) {
         newLevels.crunchcom = Number(crunchcomLevel);
@@ -322,7 +322,7 @@ function populateFromProfile(): void {
       }
 
       const humidityLevel = Object.entries(HUMIDITY_AOID_MAP).find(
-        ([_, aoid]) => aoid === buff.aoid
+        ([, aoid]) => aoid === buff.aoid
       )?.[0];
       if (humidityLevel) {
         newLevels.humidity = Number(humidityLevel);

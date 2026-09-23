@@ -67,13 +67,11 @@ Load, delete, and organize saved builds
               :key="statId"
               :value="`${formatStatName(statId)}: ${value}`"
               severity="info"
-              size="small"
             />
             <Badge
               v-if="Object.keys(build.totalStats).length > 6"
               :value="`+${Object.keys(build.totalStats).length - 6} more`"
               severity="secondary"
-              size="small"
             />
           </div>
         </div>
@@ -124,7 +122,7 @@ interface Props {
   builds: CharacterBuild[];
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 
 interface Emits {
   (e: 'load-build', build: CharacterBuild): void;

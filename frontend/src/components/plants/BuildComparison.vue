@@ -98,7 +98,7 @@ interface Emits {
   (e: 'delete-build', buildId: string): void;
 }
 
-const emit = defineEmits<Emits>();
+defineEmits<Emits>();
 
 const comparedStats = computed(() => {
   const allStats = new Set<string>();

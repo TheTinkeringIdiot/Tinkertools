@@ -142,7 +142,7 @@ Shows current stats and allows input for character building
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, watch, onMounted } from 'vue';
 import Button from 'primevue/button';
 import InputNumber from 'primevue/inputnumber';
 

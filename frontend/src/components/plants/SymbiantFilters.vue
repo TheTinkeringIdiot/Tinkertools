@@ -16,7 +16,6 @@ Provides filtering by family, slot, quality level, and stat bonuses
                 v-if="selectedFamilies.length > 0"
                 :value="selectedFamilies.length"
                 severity="info"
-                size="small"
               />
             </div>
           </template>
@@ -57,7 +56,6 @@ Provides filtering by family, slot, quality level, and stat bonuses
                 v-if="selectedSlots.length > 0"
                 :value="selectedSlots.length"
                 severity="info"
-                size="small"
               />
             </div>
           </template>
@@ -80,7 +78,7 @@ Provides filtering by family, slot, quality level, and stat bonuses
                 {{ formatSlotName(slot) }}
               </label>
               <span class="text-xs text-surface-500 dark:text-surface-400">
-                {{ getSlotCount(slot) }}
+                {{ getSlotCount() }}
               </span>
             </div>
           </div>
@@ -96,7 +94,6 @@ Provides filtering by family, slot, quality level, and stat bonuses
                 v-if="selectedQualityLevels.length > 0"
                 :value="selectedQualityLevels.length"
                 severity="info"
-                size="small"
               />
             </div>
           </template>
@@ -142,7 +139,7 @@ Provides filtering by family, slot, quality level, and stat bonuses
                 <Checkbox v-model="selectedQualityLevels" :input-id="`ql-${ql}`" :value="ql" />
                 <label :for="`ql-${ql}`" class="text-sm flex-1 cursor-pointer"> QL {{ ql }} </label>
                 <span class="text-xs text-surface-500 dark:text-surface-400">
-                  {{ getQualityCount(ql) }}
+                  {{ getQualityCount() }}
                 </span>
               </div>
             </div>
@@ -159,7 +156,6 @@ Provides filtering by family, slot, quality level, and stat bonuses
                 v-if="selectedStatBonuses.length > 0"
                 :value="selectedStatBonuses.length"
                 severity="info"
-                size="small"
               />
             </div>
           </template>
@@ -331,12 +327,12 @@ const getFamilyCount = (family: string): number => {
   return mockCounts[family] || 0;
 };
 
-const getSlotCount = (slot: string): number => {
+const getSlotCount = (): number => {
   // Mock count for demonstration
   return Math.floor(Math.random() * 20) + 5;
 };
 
-const getQualityCount = (ql: number): number => {
+const getQualityCount = (): number => {
   // Mock count for demonstration
   return Math.floor(Math.random() * 10) + 1;
 };

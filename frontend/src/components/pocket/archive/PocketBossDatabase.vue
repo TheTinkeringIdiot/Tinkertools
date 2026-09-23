@@ -9,12 +9,13 @@ import Button from 'primevue/button';
 import DataView from 'primevue/dataview';
 import Tag from 'primevue/tag';
 import Dialog from 'primevue/dialog';
-import type { PocketBoss } from '@/types/api';
+import { getImplantSlotNameFromBitflag } from '@/services/game-utils';
+import type { Mob, MobWithDrops, SymbiantItem } from '@/types/api';
 
 const pocketBossStore = usePocketBossStore();
 
 // Local state
-const selectedBoss = ref<PocketBoss | null>(null);
+const selectedBoss = ref<Mob | null>(null);
 const showBossDetails = ref(false);
 const viewMode = ref<'grid' | 'list'>('grid');
 
@@ -55,19 +56,32 @@ function clearAllFilters() {
   pocketBossStore.clearFilters();
 }
 
-function showDetails(boss: PocketBoss) {
+function showDetails(boss: Mob) {
   selectedBoss.value = boss;
   showBossDetails.value = true;
 }
 
-function getSeverity(level: number): 'success' | 'info' | 'warning' | 'danger' {
-  if (level < 50) return 'success';
+function getSeverity(level: number | null): 'success' | 'info' | 'warning' | 'danger' {
+  if (level === null || level < 50) return 'success';
   if (level < 100) return 'info';
   if (level < 150) return 'warning';
   return 'danger';
 }
 
-function formatLocation(boss: PocketBoss): string {
+function hasDrops(boss: Mob): boss is MobWithDrops {
+  return 'dropped_items' in boss && Array.isArray(boss.dropped_items);
+}
+
+// Store bosses carry no embedded drops; only a MobWithDrops payload has them
+function getBossDrops(boss: Mob): SymbiantItem[] {
+  return hasDrops(boss) ? boss.dropped_items : [];
+}
+
+function formatMobs(boss: Mob): string {
+  return boss.mob_names.join(', ');
+}
+
+function formatLocation(boss: Mob): string {
   const parts = [];
   if (boss.playfield) parts.push(boss.playfield);
   if (boss.location) parts.push(boss.location);
@@ -169,6 +183,7 @@ defineExpose({
     <!-- Boss List/Grid -->
     <DataView
       :value="bosses"
+      data-key="id"
       :layout="viewMode"
       paginator
       :rows="20"
@@ -208,16 +223,18 @@ defineExpose({
                 </div>
 
                 <!-- Mobs -->
-                <div v-if="boss.mobs" class="text-sm">
+                <div v-if="boss.mob_names?.length" class="text-sm">
                   <span class="font-medium text-surface-700 dark:text-surface-300">Mobs:</span>
-                  <span class="text-surface-600 dark:text-surface-400 ml-1">{{ boss.mobs }}</span>
+                  <span class="text-surface-600 dark:text-surface-400 ml-1">{{
+                    formatMobs(boss)
+                  }}</span>
                 </div>
 
                 <!-- Symbiant Count -->
                 <div class="flex items-center justify-between text-sm">
                   <span class="text-surface-600 dark:text-surface-400">
-                    {{ boss.dropped_symbiants?.length || 0 }} symbiant{{
-                      (boss.dropped_symbiants?.length || 0) !== 1 ? 's' : ''
+                    {{ getBossDrops(boss).length }} symbiant{{
+                      getBossDrops(boss).length !== 1 ? 's' : ''
                     }}
                   </span>
                   <i class="pi pi-arrow-right text-primary-500"></i>
@@ -247,14 +264,16 @@ defineExpose({
                     </h3>
                     <p class="text-sm text-surface-600 dark:text-surface-400 truncate">
                       {{ formatLocation(boss) }}
-                      <span v-if="boss.mobs" class="ml-2">• {{ boss.mobs }}</span>
+                      <span v-if="boss.mob_names?.length" class="ml-2"
+                        >• {{ formatMobs(boss) }}</span
+                      >
                     </p>
                   </div>
 
                   <div class="flex items-center gap-4">
                     <Tag :value="`Level ${boss.level}`" :severity="getSeverity(boss.level)" />
                     <span class="text-sm text-surface-600 dark:text-surface-400">
-                      {{ boss.dropped_symbiants?.length || 0 }} symbiants
+                      {{ getBossDrops(boss).length }} symbiants
                     </span>
                     <i class="pi pi-arrow-right text-primary-500"></i>
                   </div>
@@ -307,20 +326,20 @@ defineExpose({
             </div>
           </div>
 
-          <div v-if="selectedBoss.mobs">
+          <div v-if="selectedBoss.mob_names?.length">
             <h3 class="text-lg font-semibold mb-3">Encounter</h3>
-            <p class="text-surface-700 dark:text-surface-300">{{ selectedBoss.mobs }}</p>
+            <p class="text-surface-700 dark:text-surface-300">{{ formatMobs(selectedBoss) }}</p>
           </div>
         </div>
 
         <!-- Dropped Symbiants -->
-        <div v-if="selectedBoss.dropped_symbiants?.length">
+        <div v-if="getBossDrops(selectedBoss).length">
           <h3 class="text-lg font-semibold mb-3">
-            Dropped Symbiants ({{ selectedBoss.dropped_symbiants.length }})
+            Dropped Symbiants ({{ getBossDrops(selectedBoss).length }})
           </h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div
-              v-for="symbiant in selectedBoss.dropped_symbiants"
+              v-for="symbiant in getBossDrops(selectedBoss)"
               :key="symbiant.id"
               class="p-3 border border-surface-200 dark:border-surface-700 rounded-lg"
             >
@@ -330,7 +349,7 @@ defineExpose({
                     {{ symbiant.name }}
                   </h4>
                   <p class="text-sm text-surface-600 dark:text-surface-400">
-                    {{ symbiant.slot }} • QL {{ symbiant.ql }}
+                    {{ getImplantSlotNameFromBitflag(symbiant.slot_id) }} • QL {{ symbiant.ql }}
                   </p>
                 </div>
                 <Tag :value="`QL ${symbiant.ql}`" severity="info" />
