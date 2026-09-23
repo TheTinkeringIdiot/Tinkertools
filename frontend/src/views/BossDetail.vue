@@ -9,7 +9,7 @@ import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Tag from 'primevue/tag';
 import Button from 'primevue/button';
-import type { Mob, SymbiantItem } from '@/types/api';
+import type { Mob, SymbiantItem, UserFriendlyError } from '@/types/api';
 
 const route = useRoute();
 const router = useRouter();
@@ -44,8 +44,8 @@ function formatLocation(): string {
   return parts.join(' - ') || 'Unknown Location';
 }
 
-function navigateToItem(aoid: number) {
-  router.push({ name: 'ItemDetail', params: { aoid: aoid.toString() } });
+async function navigateToItem(aoid: number) {
+  await router.push({ name: 'ItemDetail', params: { aoid: aoid.toString() } });
 }
 
 function formatMinimumLevel(symbiant: SymbiantItem): string {
@@ -58,10 +58,10 @@ function formatMinimumLevel(symbiant: SymbiantItem): string {
   }
 }
 
-function goBack() {
+async function goBack() {
   // Return to the tab the user was on when they navigated here
   const returnTab = route.query.returnTab as string;
-  router.push({
+  await router.push({
     name: 'TinkerPocket',
     query: returnTab ? { tab: returnTab } : {},
   });
@@ -105,20 +105,17 @@ async function fetchBossData() {
 
     boss.value = bossResponse.data;
     drops.value = dropsResponse.data || [];
-  } catch (err: any) {
+  } catch (err) {
     console.error('Failed to fetch boss data:', err);
-    if (err.response?.status === 404) {
-      error.value = 'Boss not found';
-    } else {
-      error.value = err.message || 'Failed to load boss data';
-    }
+    // apiClient rethrows failures as UserFriendlyError objects, not Errors
+    error.value = (err as Partial<UserFriendlyError> | null)?.message || 'Failed to load boss data';
   } finally {
     loading.value = false;
   }
 }
 
-onMounted(() => {
-  fetchBossData();
+onMounted(async () => {
+  await fetchBossData();
 });
 </script>
 
