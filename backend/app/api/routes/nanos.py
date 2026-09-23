@@ -5,7 +5,7 @@ Nano programs API endpoints with rich spell data.
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload, selectinload, aliased
-from sqlalchemy import and_, or_, desc, asc, Integer
+from sqlalchemy import and_, or_, desc, asc, false, func, Integer
 import math
 import logging
 
@@ -181,6 +181,20 @@ def get_nanos(
     if ql_max is not None:
         query = query.filter(Item.ql <= ql_max)
 
+    # Derived-field filters run in SQL before paginating, so total, pages and
+    # page contents agree. They mirror parse_nano_from_item_and_spells():
+    # strain is the name's text after its last " - ".
+    if strain:
+        query = query.filter(
+            Item.name.like("% - %"),
+            func.btrim(func.regexp_replace(Item.name, "^.* - ", ""), " \t\r\n")
+            == strain,
+        )
+    # The parser never fills in school, profession or level (see the TODOs
+    # there), so no nano can match a filter on them.
+    if school or profession or level_min or level_max:
+        query = query.filter(false())
+
     # Get total count on lightweight query (no relationship loading)
     total = query.count()
 
@@ -218,28 +232,14 @@ def get_nanos(
     nanos = []
     for item in items:
         try:
-            nano = parse_nano_from_item_and_spells(item)
-
-            # Apply advanced filters after parsing
-            if school and nano.school != school:
-                continue
-            if strain and nano.strain != strain:
-                continue
-            if profession and nano.profession != profession:
-                continue
-            if level_min and (nano.level is None or nano.level < level_min):
-                continue
-            if level_max and (nano.level is None or nano.level > level_max):
-                continue
-
-            nanos.append(nano)
+            nanos.append(parse_nano_from_item_and_spells(item))
         except Exception as e:
             logger.warning(f"Failed to parse nano {item.id}: {e}")
             continue
 
     return PaginatedResponse[NanoProgram](
         items=nanos,
-        total=len(nanos),  # Note: This is approximate due to filtering after query
+        total=total,
         page=page,
         page_size=page_size,
         pages=pages,

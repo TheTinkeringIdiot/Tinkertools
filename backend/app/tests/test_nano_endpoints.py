@@ -5,6 +5,9 @@ Tests all 7 nano endpoints against actual Anarchy Online game data,
 validating full pipeline from database to response without mocks.
 """
 
+import math
+from collections import Counter
+
 from app.models import Item
 
 # ============================================================================
@@ -144,6 +147,63 @@ def test_get_nanos_sort_by_ql_desc(client):
     data = response.json()
     qls = [nano["ql"] for nano in data["items"]]
     assert qls == sorted(qls, reverse=True)
+
+
+def test_get_nanos_strain_filter_pages_sum_to_total(client, db_session):
+    """Test a strain-filtered list pages cleanly: pages add up to total."""
+    # Strain is the text after a nano name's last " - "; pick the most common
+    strains = Counter()
+    ids_by_strain = {}
+    for item_id, name in db_session.query(Item.id, Item.name).filter(
+        Item.is_nano.is_(True)
+    ):
+        if " - " in name:
+            strain = name.split(" - ")[-1].strip()
+            strains[strain] += 1
+            ids_by_strain.setdefault(strain, set()).add(item_id)
+    strain, count = strains.most_common(1)[0]
+    page_size = 3
+    assert count > page_size
+
+    ids = []
+    page = 1
+    while True:
+        response = client.get(
+            "/api/v1/nanos",
+            params={"strain": strain, "page": page, "page_size": page_size},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == count
+        assert data["pages"] == math.ceil(count / page_size)
+        if page < data["pages"]:
+            assert len(data["items"]) == page_size
+        assert all(nano["strain"] == strain for nano in data["items"])
+        ids.extend(nano["id"] for nano in data["items"])
+        if not data["has_next"]:
+            break
+        page += 1
+
+    assert page == data["pages"]
+    assert len(ids) == count
+    assert set(ids) == ids_by_strain[strain]
+
+
+def test_get_nanos_unpopulated_field_filters_match_nothing(client):
+    """School, profession and level are never parsed, so filters on them are empty."""
+    for params in (
+        "school=Matter Creation",
+        "profession=Doctor",
+        "level_min=1",
+        "level_max=220",
+    ):
+        response = client.get(f"/api/v1/nanos?{params}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["items"] == []
+        assert data["total"] == 0
+        assert data["pages"] == 1
+        assert data["has_next"] is False
 
 
 def test_get_nanos_invalid_page(client):

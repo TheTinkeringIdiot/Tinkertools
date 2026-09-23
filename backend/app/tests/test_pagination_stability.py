@@ -84,10 +84,9 @@ def test_nanos_list_pages_partition(client, db_session):
     ]
     assert len(expected) > 20
 
-    # The list reports its post-filter page size as total, so only the page
-    # partition is checked here
-    ids, _total = _walk(client, f"/api/v1/nanos?ql_min={ql}&ql_max={ql}", page_size=20)
+    ids, total = _walk(client, f"/api/v1/nanos?ql_min={ql}&ql_max={ql}", page_size=20)
 
+    assert total == len(expected)
     _assert_partition(ids, expected)
 
 
