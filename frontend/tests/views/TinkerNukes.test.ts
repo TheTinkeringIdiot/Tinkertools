@@ -1,1061 +1,323 @@
 /**
  * TinkerNukes View Integration Tests
  *
- * Tests the main TinkerNukes view component that orchestrates form and table.
- * Validates:
- * - Profile switch clears table and updates form
- * - Non-Nanotechnician profile shows empty state
- * - Manual skills mode works without active profile
- * - Search and filter functionality updates table
- * - Integration between NukeInputForm and NukeTable
- * - Navigation to nano detail pages
- * - Accessibility and user experience
+ * Mounts the real view with its real form and table, a real TinkerProfiles
+ * store, and only the network mocked (the offensive nano endpoint via fetch).
+ * Covers what a user sees:
+ * - Offensive nanos load and list, with a result count
+ * - Only nanos the character can cast are listed; raising a skill reveals more
+ * - An active Nanotechnician profile fills the form and unlocks its nanos
+ * - Switching profile clears the search filter
+ * - Search narrows the list
+ * - Clicking a nano opens its item page in the current game version
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { nextTick } from 'vue';
-import { VueWrapper, flushPromises } from '@vue/test-utils';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
+import { createPinia, setActivePinia, type Pinia } from 'pinia';
+import type { Router } from 'vue-router';
 import PrimeVue from 'primevue/config';
+import ToastService from 'primevue/toastservice';
+import Tooltip from 'primevue/tooltip';
 import TinkerNukes from '@/views/TinkerNukes.vue';
-import { setActivePinia } from 'pinia';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { Item } from '@/types/api';
 import {
-  mountWithContext,
-  standardCleanup,
+  createNanoTechProfile,
   createTestProfile,
   PROFESSION,
+  SKILL_ID,
 } from '@/__tests__/helpers';
-
-// Mock the offensive nano service
-vi.mock('@/services/offensive-nano-service', () => ({
-  fetchOffensiveNanos: vi.fn(() =>
-    Promise.resolve([
-      {
-        id: 1001,
-        name: 'Viral Bomb',
-        ql: 250,
-        spell_data: [],
-        stats: [],
-        is_nano: true,
-      },
-      {
-        id: 1002,
-        name: 'Corrosive Cloud',
-        ql: 260,
-        spell_data: [],
-        stats: [],
-        is_nano: true,
-      },
-      {
-        id: 1003,
-        name: 'Energy Blast',
-        ql: 300,
-        spell_data: [],
-        stats: [],
-        is_nano: true,
-      },
-    ])
-  ),
-  buildOffensiveNano: vi.fn((item) => ({
-    id: item.id,
-    name: item.name,
-    school: 'Matter Creation',
-    strain: '1',
-    description: 'Test nano',
-    level: 200,
-    qualityLevel: item.ql,
-    castingRequirements: [],
-    minDamage: 800,
-    maxDamage: 1200,
-    midDamage: 1000,
-    damageType: 'poison',
-    tickCount: 1,
-    tickInterval: 0,
-    castingTime: 300,
-    rechargeTime: 2000,
-    nanoPointCost: 500,
-  })),
-}));
-
-// Mock child components to isolate TinkerNukes behavior
-vi.mock('@/components/nukes/NukeInputForm.vue', () => ({
-  default: {
-    name: 'NukeInputForm',
-    template: '<div data-test="nuke-input-form"><slot></slot></div>',
-    props: ['inputState', 'activeProfile'],
-    emits: ['update:inputState'],
-  },
-}));
-
-vi.mock('@/components/nukes/NukeTable.vue', () => ({
-  default: {
-    name: 'NukeTable',
-    template: '<div data-test="nuke-table">{{ nanos.length }} nanos</div>',
-    props: ['nanos', 'inputState', 'searchQuery', 'loading'],
-    emits: ['nano-selected'],
-  },
-}));
+import { createTestRouter } from '@/__tests__/helpers/vue-test-utils';
+import { TEST_VERSION } from '@/__tests__/helpers/version-fixtures';
 
 // ============================================================================
-// Test Fixtures
+// Fixtures
 // ============================================================================
 
-const createNanotechProfile = (name = 'TestNano'): TinkerProfile =>
-  createTestProfile({
+/** Stat 130 (Matter Creation); criterion operator 2 is "greater than". */
+const MATTER_CREATION = SKILL_ID.MATTER_CREATION;
+const GREATER_THAN = 2;
+
+/** An offensive nano whose only casting requirement is Matter Creation >= `mcRequired`. */
+function offensiveNanoItem(aoid: number, name: string, mcRequired: number): Item {
+  return {
+    id: aoid,
+    aoid,
     name,
-    profession: PROFESSION.NANO_TECHNICIAN,
-    breed: 3,
-    level: 220,
-    skills: {
-      21: { total: 800 },
-      149: { total: 1200 },
-      221: { total: 5000 },
-      126: { total: 2500 },
-      127: { total: 2500 },
-      128: { total: 2500 },
-      129: { total: 2500 },
-      130: { total: 2500 },
-      131: { total: 2500 },
-    },
-  });
+    ql: 200,
+    description: `${name} description`,
+    item_class: 0,
+    is_nano: true,
+    stats: [
+      { id: 1, stat: 294, value: 100 }, // Cast time
+      { id: 2, stat: 210, value: 200 }, // Recharge time
+      { id: 3, stat: 407, value: 50 }, // Nano point cost
+    ],
+    spell_data: [
+      {
+        id: aoid,
+        spells: [
+          {
+            id: aoid,
+            target: 3,
+            spell_id: 53002, // Hit target for damage
+            spell_params: { MinValue: -500, MaxValue: -900, ModifierStat: 93 },
+            criteria: [],
+          },
+        ],
+      },
+    ],
+    actions: [
+      {
+        id: aoid,
+        action: 3,
+        item_id: aoid,
+        criteria: [
+          { id: aoid, value1: MATTER_CREATION, value2: mcRequired - 1, operator: GREATER_THAN },
+        ],
+      },
+    ],
+    attack_stats: [],
+    defense_stats: [],
+  };
+}
 
-const createNonNanotechProfile = (name = 'TestDoc'): TinkerProfile =>
-  createTestProfile({
-    name,
-    profession: PROFESSION.DOCTOR,
-    breed: 1,
-    level: 220,
-    skills: {
-      21: { total: 500 },
-    },
-  });
+const BEGINNER_NANO = offensiveNanoItem(1001, 'Viral Bomb', 1);
+const MID_NANO = offensiveNanoItem(1002, 'Corrosive Cloud', 1);
+const ADVANCED_NANO = offensiveNanoItem(1003, 'Energy Blast', 100);
 
 // ============================================================================
-// Test Suite
+// Setup
 // ============================================================================
+
+const fetchMock = vi.fn<typeof fetch>();
+
+function respondWithNanos(items: Item[]): void {
+  fetchMock.mockResolvedValue(
+    new Response(JSON.stringify({ items, total: items.length }), { status: 200 })
+  );
+}
 
 describe('TinkerNukes View', () => {
-  let wrapper: VueWrapper<any>;
+  let pinia: Pinia;
+  let wrapper: VueWrapper;
+  let router: Router;
+
+  /** Mounts the view the way main.ts does, once the router has a versioned location. */
+  async function mountView(): Promise<void> {
+    router = createTestRouter();
+    await router.isReady();
+    wrapper = mount(TinkerNukes, {
+      global: {
+        plugins: [PrimeVue, ToastService, pinia, router],
+        directives: { tooltip: Tooltip },
+      },
+    });
+    await flushPromises();
+  }
+
+  const resultCount = () => wrapper.text().match(/(\d+) nanos? found/)?.[1];
+  const listedNames = () => wrapper.findAll('tbody tr a').map((link) => link.text().trim());
+  const searchInput = () => wrapper.find('input[placeholder="Search nanos..."]');
+
+  beforeEach(() => {
+    localStorage.clear();
+    pinia = createPinia();
+    setActivePinia(pinia);
+    vi.stubGlobal('fetch', fetchMock);
+    respondWithNanos([BEGINNER_NANO, MID_NANO, ADVANCED_NANO]);
+  });
 
   afterEach(() => {
-    standardCleanup();
     wrapper?.unmount();
+    vi.unstubAllGlobals();
+    fetchMock.mockReset();
   });
 
   // ==========================================================================
-  // Component Mounting & Structure Tests
+  // Loading
   // ==========================================================================
 
-  describe('Component Structure', () => {
-    it('should render the view with header, form, filters, and table', async () => {
-      wrapper = mountWithContext(TinkerNukes, {
-        global: {
-          plugins: [PrimeVue],
-        },
-      });
+  describe('loading nanos', () => {
+    it('shows the TinkerNukes header and the NT-only badge', async () => {
+      await mountView();
 
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="nuke-input-form"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="nuke-table"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain('TinkerNukes');
-    });
-
-    it('should display NT Only badge in header', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
+      expect(wrapper.find('h1').text()).toContain('TinkerNukes');
       expect(wrapper.text()).toContain('NT Only');
     });
 
-    it('should show nano count badge when nanos are loaded', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
+    it('requests Nanotechnician offensive nanos for the current game version', async () => {
+      await mountView();
 
-      await flushPromises();
-
-      // Wait for nanos to load
-      await wrapper.vm.$nextTick();
-
-      const text = wrapper.text();
-      expect(text).toContain('nanos'); // Badge or count display
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const url = String(fetchMock.mock.calls[0][0]);
+      expect(url).toContain(`/nanos/offensive/${PROFESSION.NANO_TECHNICIAN}`);
+      expect(url).toContain(TEST_VERSION);
     });
 
-    it('should have accessible heading structure', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
+    it('lists only the nanos a fresh character can cast', async () => {
+      await mountView();
 
-      await flushPromises();
-
-      const h1 = wrapper.find('h1');
-      expect(h1.exists()).toBe(true);
-      expect(h1.text()).toContain('TinkerNukes');
-    });
-  });
-
-  // ==========================================================================
-  // Data Loading Tests
-  // ==========================================================================
-
-  describe('Data Loading', () => {
-    it('should fetch offensive nanos on mount', async () => {
-      const { fetchOffensiveNanos } = await import('@/services/offensive-nano-service');
-
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      expect(fetchOffensiveNanos).toHaveBeenCalledWith(11); // Profession ID 11
+      expect(listedNames()).toEqual(expect.arrayContaining(['Viral Bomb', 'Corrosive Cloud']));
+      expect(listedNames()).not.toContain('Energy Blast');
+      expect(resultCount()).toBe('2');
     });
 
-    it('should display loading state while fetching nanos', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      // Check loading state before promise resolves
-      expect(wrapper.vm.loading).toBe(true);
-
-      await flushPromises();
-
-      // Loading should complete
-      expect(wrapper.vm.loading).toBe(false);
-    });
-
-    it('should store fetched nanos in component state', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      expect(wrapper.vm.offensiveNanos).toBeDefined();
-      expect(wrapper.vm.offensiveNanos.length).toBeGreaterThan(0);
-    });
-
-    it('should handle fetch errors gracefully', async () => {
-      const { fetchOffensiveNanos } = await import('@/services/offensive-nano-service');
-      vi.mocked(fetchOffensiveNanos).mockRejectedValueOnce(new Error('Network error'));
-
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      expect(consoleSpy).toHaveBeenCalled();
-      expect(wrapper.vm.loading).toBe(false);
-
-      consoleSpy.mockRestore();
-    });
-  });
-
-  // ==========================================================================
-  // Profile Integration Tests
-  // ==========================================================================
-
-  describe('Profile Integration', () => {
-    it('should access active profile from TinkerProfiles store', async () => {
-      const profile = createNanotechProfile();
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Access store from wrapper's Pinia instance
-      const pinia = wrapper.vm.$pinia;
-      setActivePinia(pinia);
-      const profileStore = useTinkerProfilesStore();
-      profileStore.initialize();
-      profileStore.activeProfile = profile;
-
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.activeProfile).toBe(profile);
-    });
-
-    it('should display active profile info in header', async () => {
-      const profile = createNanotechProfile('TestNanoChar');
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Access store from wrapper\'s Pinia instance
-      const pinia = wrapper.vm.$pinia;
-      setActivePinia(pinia);
-      const profileStore = useTinkerProfilesStore();
-      profileStore.initialize();
-      profileStore.activeProfile = profile;
-
-      await flushPromises();
-
-      expect(wrapper.text()).toContain('TestNanoChar');
-      expect(wrapper.text()).toContain('Nanotechnician');
-    });
-
-    it('should not crash when no active profile', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Access store from wrapper\'s Pinia instance
-      const pinia = wrapper.vm.$pinia;
-      setActivePinia(pinia);
-      const profileStore = useTinkerProfilesStore();
-      profileStore.initialize();
-      profileStore.activeProfile = null;
-
-      await flushPromises();
-
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  // ==========================================================================
-  // Profile Switching Tests (FR-10)
-  // ==========================================================================
-
-  describe('Profile Switching', () => {
-    it('should clear table filters when profile switches', async () => {
-      const profile1 = createNanotechProfile('Profile1');
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Access store from wrapper\'s Pinia instance
-      const pinia = wrapper.vm.$pinia;
-      setActivePinia(pinia);
-      const profileStore = useTinkerProfilesStore();
-      profileStore.initialize();
-      profileStore.activeProfile = profile1;
-
-      await flushPromises();
-
-      // Set some filters
-      wrapper.vm.searchQuery = 'Viral';
-      wrapper.vm.selectedSchoolId = 126;
-      wrapper.vm.minQL = 100;
-      wrapper.vm.maxQL = 200;
-
-      await wrapper.vm.$nextTick();
-
-      // Switch profile
-      const profile2 = createNanotechProfile('Profile2');
-      profileStore.activeProfile = profile2;
-
-      await wrapper.vm.$nextTick();
-
-      // Filters should be cleared
-      expect(wrapper.vm.searchQuery).toBe('');
-      expect(wrapper.vm.selectedSchoolId).toBeNull();
-      expect(wrapper.vm.minQL).toBeUndefined();
-      expect(wrapper.vm.maxQL).toBeUndefined();
-    });
-
-    it('should update input form when profile switches', async () => {
-      const profile1 = createNanotechProfile('Profile1');
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Access store from wrapper\'s Pinia instance
-      const pinia = wrapper.vm.$pinia;
-      setActivePinia(pinia);
-      const profileStore = useTinkerProfilesStore();
-      profileStore.initialize();
-      profileStore.activeProfile = profile1;
-
-      await flushPromises();
-
-      const formComponent = wrapper.findComponent({ name: 'NukeInputForm' });
-      expect(formComponent.props('activeProfile')).toBe(profile1);
-
-      // Switch profile
-      const profile2 = createNanotechProfile('Profile2');
-      profileStore.activeProfile = profile2;
-
-      await wrapper.vm.$nextTick();
-
-      expect(formComponent.props('activeProfile')).toBe(profile2);
-    });
-
-    it('should log profile switch in console', async () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-      const profile1 = createNanotechProfile('Profile1');
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Access store from wrapper\'s Pinia instance
-      const pinia = wrapper.vm.$pinia;
-      setActivePinia(pinia);
-      const profileStore = useTinkerProfilesStore();
-      profileStore.initialize();
-      profileStore.activeProfile = profile1;
-
-      await flushPromises();
-
-      const profile2 = createNanotechProfile('Profile2');
-      profileStore.activeProfile = profile2;
-
-      await wrapper.vm.$nextTick();
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Profile switched to: Profile2')
-      );
-
-      consoleSpy.mockRestore();
-    });
-  });
-
-  // ==========================================================================
-  // Non-Nanotechnician Profile Tests
-  // ==========================================================================
-
-  describe('Non-Nanotechnician Profile', () => {
-    it('should warn when active profile is not Nanotechnician', async () => {
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      const docProfile = createNonNanotechProfile();
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Access store from wrapper\'s Pinia instance
-      const pinia = wrapper.vm.$pinia;
-      setActivePinia(pinia);
-      const profileStore = useTinkerProfilesStore();
-      profileStore.initialize();
-      profileStore.activeProfile = docProfile;
-
-      await flushPromises();
-
-      // Switch from null to Doctor
-      await wrapper.vm.$nextTick();
-
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('not Nanotechnician'));
-
-      consoleSpy.mockRestore();
-    });
-
-    it('should still display nanos but form shows defaults', async () => {
-      const docProfile = createNonNanotechProfile();
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Access store from wrapper\'s Pinia instance
-      const pinia = wrapper.vm.$pinia;
-      setActivePinia(pinia);
-      const profileStore = useTinkerProfilesStore();
-      profileStore.initialize();
-      profileStore.activeProfile = docProfile;
-
-      await flushPromises();
-
-      // Table should still exist with nanos
-      const tableComponent = wrapper.findComponent({ name: 'NukeTable' });
-      expect(tableComponent.exists()).toBe(true);
-
-      // Form should receive non-NT profile
-      const formComponent = wrapper.findComponent({ name: 'NukeInputForm' });
-      expect(formComponent.props('activeProfile')).toBe(docProfile);
-    });
-
-    it('should show profession name in header even for non-NT', async () => {
-      const docProfile = createNonNanotechProfile('TestDoctor');
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Access store from wrapper\'s Pinia instance
-      const pinia = wrapper.vm.$pinia;
-      setActivePinia(pinia);
-      const profileStore = useTinkerProfilesStore();
-      profileStore.initialize();
-      profileStore.activeProfile = docProfile;
-
-      await flushPromises();
-
-      expect(wrapper.text()).toContain('TestDoctor');
-      expect(wrapper.text()).toContain('Doctor');
-    });
-  });
-
-  // ==========================================================================
-  // Manual Skills Mode (No Profile)
-  // ==========================================================================
-
-  describe('Manual Skills Mode', () => {
-    it('should work without active profile', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Access store from wrapper\'s Pinia instance
-      const pinia = wrapper.vm.$pinia;
-      setActivePinia(pinia);
-      const profileStore = useTinkerProfilesStore();
-      profileStore.initialize();
-      profileStore.activeProfile = null;
-
-      await flushPromises();
-
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm.activeProfile).toBeNull();
-
-      // Form and table should still render
-      expect(wrapper.find('[data-test="nuke-input-form"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="nuke-table"]').exists()).toBe(true);
-    });
-
-    it('should allow manual input state updates without profile', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Access store from wrapper\'s Pinia instance
-      const pinia = wrapper.vm.$pinia;
-      setActivePinia(pinia);
-      const profileStore = useTinkerProfilesStore();
-      profileStore.initialize();
-      profileStore.activeProfile = null;
-
-      await flushPromises();
-
-      const formComponent = wrapper.findComponent({ name: 'NukeInputForm' });
-
-      // Simulate form updating input state
-      const newInputState = {
-        ...wrapper.vm.inputState,
-        characterStats: {
-          ...wrapper.vm.inputState.characterStats,
-          psychic: 999,
-        },
-      };
-
-      await formComponent.vm.$emit('update:inputState', newInputState);
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.inputState.characterStats.psychic).toBe(999);
-    });
-
-    it('should filter nanos based on manual skill values', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Access store from wrapper\'s Pinia instance
-      const pinia = wrapper.vm.$pinia;
-      setActivePinia(pinia);
-      const profileStore = useTinkerProfilesStore();
-      profileStore.initialize();
-      profileStore.activeProfile = null;
-
-      await flushPromises();
-
-      // Update manual skills
-      wrapper.vm.inputState.characterStats.matterCreation = 3000;
-
-      await wrapper.vm.$nextTick();
-
-      // filteredNanos should use manual skills
-      expect(wrapper.vm.currentSkills[126]).toBe(3000);
-    });
-
-    it('should calculate table metrics using manual values', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Access store from wrapper\'s Pinia instance
-      const pinia = wrapper.vm.$pinia;
-      setActivePinia(pinia);
-      const profileStore = useTinkerProfilesStore();
-      profileStore.initialize();
-      profileStore.activeProfile = null;
-
-      await flushPromises();
-
-      const tableComponent = wrapper.findComponent({ name: 'NukeTable' });
-
-      // Table should receive input state
-      expect(tableComponent.props('inputState')).toEqual(wrapper.vm.inputState);
-    });
-  });
-
-  // ==========================================================================
-  // Search and Filter Tests
-  // ==========================================================================
-
-  describe('Search and Filtering', () => {
-    it('should filter nanos by search query', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      const allNanos = wrapper.vm.filteredNanos.length;
-
-      // Apply search filter
-      wrapper.vm.searchQuery = 'Viral';
-      await wrapper.vm.$nextTick();
-
-      // Should filter results
-      const filteredCount = wrapper.vm.filteredNanos.length;
-      expect(filteredCount).toBeLessThanOrEqual(allNanos);
-    });
-
-    it('should filter by nano school dropdown', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Select Matter Creation (skill ID 126)
-      wrapper.vm.selectedSchoolId = 126;
-      await wrapper.vm.$nextTick();
-
-      // filteredNanos should be filtered by school
-      expect(wrapper.vm.selectedSchoolId).toBe(126);
-    });
-
-    it('should filter by QL range', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Set QL range
-      wrapper.vm.minQL = 100;
-      wrapper.vm.maxQL = 200;
-      await wrapper.vm.$nextTick();
-
-      // Filters should be applied
-      expect(wrapper.vm.minQL).toBe(100);
-      expect(wrapper.vm.maxQL).toBe(200);
-    });
-
-    it('should update table when filters change', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      const tableComponent = wrapper.findComponent({ name: 'NukeTable' });
-      const initialNanos = tableComponent.props('nanos').length;
-
-      // Apply filter
-      wrapper.vm.searchQuery = 'NonExistent';
-      await wrapper.vm.$nextTick();
-
-      // Table should receive filtered nanos
-      const filteredNanos = tableComponent.props('nanos').length;
-      expect(filteredNanos).toBeLessThanOrEqual(initialNanos);
-    });
-
-    it('should show results count after filtering', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      const count = wrapper.vm.filteredNanos.length;
-      expect(wrapper.text()).toContain(`${count} nano`);
-    });
-
-    it('should clear school filter when clear button clicked', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      wrapper.vm.selectedSchoolId = 126;
-      await wrapper.vm.$nextTick();
-
-      // Clear filter
-      wrapper.vm.selectedSchoolId = null;
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.selectedSchoolId).toBeNull();
-    });
-  });
-
-  // ==========================================================================
-  // Skill-Based Filtering Tests
-  // ==========================================================================
-
-  describe('Skill-Based Filtering', () => {
-    it('should filter nanos by character skill requirements', async () => {
-      const profile = createNanotechProfile();
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Access store from wrapper\'s Pinia instance
-      const pinia = wrapper.vm.$pinia;
-      setActivePinia(pinia);
-      const profileStore = useTinkerProfilesStore();
-      profileStore.initialize();
-      profileStore.activeProfile = profile;
-
-      await flushPromises();
-
-      // currentSkills should reflect profile skills
-      expect(wrapper.vm.currentSkills[126]).toBe(2500); // Matter Creation
-      expect(wrapper.vm.currentSkills[127]).toBe(2500); // Matter Meta
-    });
-
-    it('should use manual skills when no profile', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Access store from wrapper\'s Pinia instance
-      const pinia = wrapper.vm.$pinia;
-      setActivePinia(pinia);
-      const profileStore = useTinkerProfilesStore();
-      profileStore.initialize();
-      profileStore.activeProfile = null;
-
-      await flushPromises();
-
-      // Should use default values from inputState
-      expect(wrapper.vm.currentSkills[126]).toBe(1);
-      expect(wrapper.vm.currentSkills[127]).toBe(1);
-    });
-
-    it('should update filtered nanos when skills change', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Access store from wrapper\'s Pinia instance
-      const pinia = wrapper.vm.$pinia;
-      setActivePinia(pinia);
-      const profileStore = useTinkerProfilesStore();
-      profileStore.initialize();
-      profileStore.activeProfile = null;
-
-      await flushPromises();
-
-      const initialCount = wrapper.vm.filteredNanos.length;
-
-      // Increase skill
-      wrapper.vm.inputState.characterStats.matterCreation = 3000;
-      await wrapper.vm.$nextTick();
-
-      // Filtered nanos should potentially change
-      expect(wrapper.vm.filteredNanos.length).toBeGreaterThanOrEqual(0);
-    });
-  });
-
-  // ==========================================================================
-  // Navigation Tests
-  // ==========================================================================
-
-  describe('Navigation', () => {
-    it('should navigate to nano detail page on nano selection', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      const router = wrapper.vm.$router;
-      const pushSpy = vi.spyOn(router, 'push');
-
-      // Simulate nano selection from table
-      const tableComponent = wrapper.findComponent({ name: 'NukeTable' });
-      await tableComponent.vm.$emit('nano-selected', 1001);
-
-      expect(pushSpy).toHaveBeenCalledWith('/items/1001');
-    });
-
-    it('should handle navigation with different nano IDs', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      const router = wrapper.vm.$router;
-      const pushSpy = vi.spyOn(router, 'push');
-
-      const tableComponent = wrapper.findComponent({ name: 'NukeTable' });
-
-      await tableComponent.vm.$emit('nano-selected', 2500);
-      expect(pushSpy).toHaveBeenCalledWith('/items/2500');
-
-      await tableComponent.vm.$emit('nano-selected', 3000);
-      expect(pushSpy).toHaveBeenCalledWith('/items/3000');
-    });
-  });
-
-  // ==========================================================================
-  // Input State Management Tests
-  // ==========================================================================
-
-  describe('Input State Management', () => {
-    it('should initialize with default input state', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      expect(wrapper.vm.inputState).toBeDefined();
-      expect(wrapper.vm.inputState.characterStats.breed).toBe(1);
-      expect(wrapper.vm.inputState.characterStats.psychic).toBe(6);
-    });
-
-    it('should update input state from form emissions', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      const formComponent = wrapper.findComponent({ name: 'NukeInputForm' });
-
-      const newState = {
-        ...wrapper.vm.inputState,
-        characterStats: {
-          ...wrapper.vm.inputState.characterStats,
-          nanoInit: 1500,
-        },
-      };
-
-      await formComponent.vm.$emit('update:inputState', newState);
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.vm.inputState.characterStats.nanoInit).toBe(1500);
-    });
-
-    it('should pass input state to table for calculations', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      const tableComponent = wrapper.findComponent({ name: 'NukeTable' });
-
-      expect(tableComponent.props('inputState')).toEqual(wrapper.vm.inputState);
-    });
-  });
-
-  // ==========================================================================
-  // School Filter Options Tests
-  // ==========================================================================
-
-  describe('School Filter Options', () => {
-    it('should provide all 6 nano schools in dropdown', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      const schoolOptions = wrapper.vm.schoolFilterOptions;
-
-      expect(schoolOptions.length).toBe(6);
-      expect(schoolOptions[0].label).toBe('Matter Creation');
-      expect(schoolOptions[0].value).toBe(126);
-      expect(schoolOptions[5].label).toBe('Time and Space');
-      expect(schoolOptions[5].value).toBe(131);
-    });
-
-    it('should map school IDs correctly', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      const schoolOptions = wrapper.vm.schoolFilterOptions;
-
-      const schoolIds = schoolOptions.map((opt: any) => opt.value);
-      expect(schoolIds).toEqual([126, 127, 128, 129, 130, 131]);
-    });
-  });
-
-  // ==========================================================================
-  // Accessibility Tests
-  // ==========================================================================
-
-  describe('Accessibility', () => {
-    it('should have proper heading hierarchy', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      const h1 = wrapper.find('h1');
-      expect(h1.exists()).toBe(true);
-    });
-
-    it('should provide ARIA labels for badges', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // NT Only badge should have aria-label
-      const badges = wrapper.findAllComponents({ name: 'Badge' });
-      expect(badges.length).toBeGreaterThan(0);
-    });
-
-    it('should announce nano count for screen readers', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      const count = wrapper.vm.filteredNanos.length;
-      expect(wrapper.text()).toContain(`${count}`);
-    });
-
-    it('should have semantic HTML structure', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Should have main content areas
-      expect(wrapper.find('h1').exists()).toBe(true);
-      expect(wrapper.find('[data-test="nuke-input-form"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="nuke-table"]').exists()).toBe(true);
-    });
-
-    it('should support keyboard navigation in filters', async () => {
-      wrapper = mountWithContext(TinkerNukes, {
-        global: { plugins: [PrimeVue] },
-        attachTo: document.body,
-      });
-
-      await flushPromises();
-
-      const searchInput = wrapper.find('input[placeholder*="Search"]');
-      if (searchInput.exists()) {
-        expect(searchInput.element.tagName).toBe('INPUT');
-      }
-
-      wrapper.unmount();
-    });
-  });
-
-  // ==========================================================================
-  // Edge Cases & Error Handling
-  // ==========================================================================
-
-  describe('Edge Cases', () => {
-    it('should handle empty nanos array gracefully', async () => {
-      const { fetchOffensiveNanos } = await import('@/services/offensive-nano-service');
-      vi.mocked(fetchOffensiveNanos).mockResolvedValueOnce([]);
-
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      expect(wrapper.vm.offensiveNanos.length).toBe(0);
-      expect(wrapper.vm.filteredNanos.length).toBe(0);
-    });
-
-    it('should handle rapid filter changes', async () => {
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Rapid filter changes
-      wrapper.vm.searchQuery = 'A';
-      wrapper.vm.searchQuery = 'AB';
-      wrapper.vm.searchQuery = 'ABC';
-      wrapper.vm.selectedSchoolId = 126;
-      wrapper.vm.selectedSchoolId = 127;
-      await wrapper.vm.$nextTick();
-
-      // Should not crash
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should handle profile with missing Character object', async () => {
-      const incompleteProfile = {
-        skills: { 21: { total: 100 } },
-      } as any;
-
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Access store from wrapper\'s Pinia instance
-      const pinia = wrapper.vm.$pinia;
-      setActivePinia(pinia);
-      const profileStore = useTinkerProfilesStore();
-      profileStore.initialize();
-      profileStore.activeProfile = incompleteProfile;
-
-      await flushPromises();
-
-      // Should not crash
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should handle undefined breed gracefully', async () => {
-      const profile = createNanotechProfile();
-      profile.Character.Breed = undefined as any;
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      // Access store from wrapper\'s Pinia instance
-      const pinia = wrapper.vm.$pinia;
-      setActivePinia(pinia);
-      const profileStore = useTinkerProfilesStore();
-      profileStore.initialize();
-      profileStore.activeProfile = profile;
-
-      await flushPromises();
-
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  // ==========================================================================
-  // Console Logging Tests
-  // ==========================================================================
-
-  describe('Console Logging', () => {
-    it('should log nano load count on successful fetch', async () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Loaded'));
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('offensive nanos'));
-
-      consoleSpy.mockRestore();
-    });
-
-    it('should log error on fetch failure', async () => {
-      const { fetchOffensiveNanos } = await import('@/services/offensive-nano-service');
-      vi.mocked(fetchOffensiveNanos).mockRejectedValueOnce(new Error('Test error'));
-
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
-
-      await flushPromises();
-
-      expect(consoleSpy).toHaveBeenCalledWith(
+    it('shows an empty list when the request fails', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      fetchMock.mockRejectedValue(new Error('Network error'));
+
+      await mountView();
+
+      expect(resultCount()).toBe('0');
+      expect(listedNames()).toEqual([]);
+      expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining('Failed to fetch offensive nanos'),
         expect.any(Error)
       );
-
-      consoleSpy.mockRestore();
+      errorSpy.mockRestore();
     });
 
-    it('should log when no active profile', async () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    it('shows an empty list when no offensive nanos exist', async () => {
+      respondWithNanos([]);
 
-      wrapper = mountWithContext(TinkerNukes, { global: { plugins: [PrimeVue] } });
+      await mountView();
 
+      expect(resultCount()).toBe('0');
+      expect(listedNames()).toEqual([]);
+    });
+  });
+
+  // ==========================================================================
+  // Manual skills
+  // ==========================================================================
+
+  describe('manual skill entry', () => {
+    it('reveals nanos once Matter Creation meets their requirement', async () => {
+      await mountView();
+      expect(listedNames()).not.toContain('Energy Blast');
+
+      // The field's input sits beside its label (the label targets the wrapper span)
+      const label = wrapper.findAll('label').find((l) => l.text() === 'Matter Creation');
+      const matterCreation = label!.element.parentElement!.querySelector('input')!;
+      matterCreation.value = '150';
+      matterCreation.dispatchEvent(new Event('input'));
+      matterCreation.dispatchEvent(new Event('blur'));
+
+      await vi.waitFor(() => expect(listedNames()).toContain('Energy Blast'));
+      expect(resultCount()).toBe('3');
+    });
+  });
+
+  // ==========================================================================
+  // Profiles
+  // ==========================================================================
+
+  describe('active profile', () => {
+    async function activateProfile(profile: ReturnType<typeof createTestProfile>) {
+      const store = useTinkerProfilesStore();
+      const profileId = await store.createProfile(profile.Character.Name, profile);
+      await store.setActiveProfile(profileId);
+      await flushPromises();
+      return store;
+    }
+
+    it('shows the active profile name, profession and level in the header', async () => {
+      await mountView();
+
+      await activateProfile(createNanoTechProfile({ name: 'Nanomancer', level: 180 }));
+
+      const header = wrapper.text();
+      expect(header).toContain('Active Profile:');
+      expect(header).toContain('Nanomancer');
+      expect(header).toContain('NanoTechnician');
+      expect(header).toContain('180');
+    });
+
+    it("fills the form from a Nanotechnician's skills and unlocks their nanos", async () => {
+      await mountView();
+      expect(listedNames()).not.toContain('Energy Blast');
+
+      const store = await activateProfile(createNanoTechProfile({ name: 'Nanomancer' }));
+      const profileMatterCreation = store.activeProfile?.skills[MATTER_CREATION]?.total ?? 0;
+      expect(profileMatterCreation).toBeGreaterThanOrEqual(100);
+
+      await vi.waitFor(() => expect(listedNames()).toContain('Energy Blast'));
+      expect(resultCount()).toBe('3');
+    });
+
+    it('keeps default skills for a profile that is not a Nanotechnician', async () => {
+      await mountView();
+
+      await activateProfile(
+        createTestProfile({
+          name: 'Healbot',
+          profession: PROFESSION.DOCTOR,
+          skills: { [MATTER_CREATION]: { total: 2000 } },
+        })
+      );
+
+      expect(wrapper.text()).toContain('Healbot');
+      expect(wrapper.text()).toContain('Doctor');
+      // Give the form's debounced update time to land before checking it changed nothing
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await flushPromises();
+      expect(listedNames()).not.toContain('Energy Blast');
+    });
+
+    it('clears the search filter when the profile changes', async () => {
+      await mountView();
+      await activateProfile(createNanoTechProfile({ name: 'First' }));
+
+      await searchInput().setValue('Viral');
+      await vi.waitFor(() => expect(resultCount()).toBe('1'));
+
+      await activateProfile(createNanoTechProfile({ name: 'Second' }));
+
+      expect((searchInput().element as HTMLInputElement).value).toBe('');
+      await vi.waitFor(() => expect(resultCount()).toBe('3'));
+    });
+  });
+
+  // ==========================================================================
+  // Search
+  // ==========================================================================
+
+  describe('search', () => {
+    it('narrows the list to nanos whose name matches', async () => {
+      await mountView();
+
+      await searchInput().setValue('viral');
+
+      expect(resultCount()).toBe('1');
+      expect(listedNames()).toEqual(['Viral Bomb']);
+    });
+
+    it('shows no nanos when nothing matches', async () => {
+      await mountView();
+
+      await searchInput().setValue('NonExistent');
+
+      expect(resultCount()).toBe('0');
+      expect(listedNames()).toEqual([]);
+    });
+  });
+
+  // ==========================================================================
+  // Navigation
+  // ==========================================================================
+
+  describe('navigation', () => {
+    it('opens the item page for a clicked nano in the current game version', async () => {
+      await mountView();
+
+      const row = wrapper.findAll('tbody tr').find((tr) => tr.text().includes('Corrosive Cloud'));
+      expect(row).toBeDefined();
+      await row!.trigger('click');
       await flushPromises();
 
-      // Access store from wrapper\'s Pinia instance
-      const pinia = wrapper.vm.$pinia;
-      setActivePinia(pinia);
-      const profileStore = useTinkerProfilesStore();
-      profileStore.initialize();
-      profileStore.activeProfile = null;
-
-      await flushPromises();
-
-      // Trigger profile watcher by setting to non-null then null
-      const tempProfile = createNanotechProfile();
-      profileStore.activeProfile = tempProfile;
-      await wrapper.vm.$nextTick();
-
-      profileStore.activeProfile = null;
-      await wrapper.vm.$nextTick();
-
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('No active profile'));
-
-      consoleSpy.mockRestore();
+      expect(router.currentRoute.value.fullPath).toBe(`/${TEST_VERSION}/items/1002`);
     });
   });
 });
