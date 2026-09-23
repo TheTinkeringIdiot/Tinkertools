@@ -1,23 +1,31 @@
 /**
- * Unit tests for CriterionChip component
+ * CriterionChip Component Tests
  *
- * Tests the component for displaying individual criterion requirements as chips
+ * Renders the real chip for each kind of criterion and checks what the user
+ * sees: the requirement text, readable names for enum and flag values, the
+ * character's current value, met/unmet colouring, OE breakpoints, and links to
+ * the nanos referenced by function operators. Only the API client is mocked.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mountWithContext, standardCleanup } from '@/__tests__/helpers';
+import { mount, flushPromises } from '@vue/test-utils';
+import { createTestRouter, standardCleanup } from '@/__tests__/helpers';
 import CriterionChip from '../CriterionChip.vue';
-import type { DisplayCriterion, CharacterStats } from '../../composables/useActionCriteria';
+import type { DisplayCriterion } from '../../services/action-criteria';
+import type { CharacterStats } from '../../composables/useActionCriteria';
+import { clearNanoNameCache } from '../../composables/useNanoNameResolver';
 
-// Mock the isRequirementMet utility function
-vi.mock('../../composables/useActionCriteria', () => ({
-  isRequirementMet: vi.fn(),
-}));
+vi.mock('@/services/api-client', () => {
+  const client = { getItem: vi.fn() };
+  return { default: client, apiClient: client };
+});
 
-import { isRequirementMet } from '../../composables/useActionCriteria';
+import apiClient from '@/services/api-client';
 
-describe('CriterionChip', () => {
-  const mockCriterion: DisplayCriterion = {
+const mockGetItem = vi.mocked(apiClient.getItem);
+
+function statCriterion(overrides: Partial<DisplayCriterion> = {}): DisplayCriterion {
+  return {
     id: 1,
     stat: 112,
     statName: 'Pistol',
@@ -28,580 +36,308 @@ describe('CriterionChip', () => {
     isLogicalOperator: false,
     isSeparator: false,
     isStatRequirement: true,
+    ...overrides,
   };
+}
 
-  const characterStats: CharacterStats = {
-    112: 400, // Pistol: 400
-  };
+function mountChip(props: {
+  criterion: DisplayCriterion;
+  characterStats?: CharacterStats | null;
+  showStatus?: boolean;
+  showOeBreakpoints?: boolean;
+  size?: 'small' | 'normal' | 'large';
+}) {
+  return mount(CriterionChip, { props, global: { plugins: [router] } });
+}
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(isRequirementMet).mockReturnValue(true);
+/** Rendered text with whitespace runs collapsed, as the browser displays it. */
+function visibleText(wrapper: ReturnType<typeof mountChip>): string {
+  return wrapper.text().replace(/\s+/g, ' ');
+}
+
+let router: ReturnType<typeof createTestRouter>;
+
+describe('CriterionChip', () => {
+  beforeEach(async () => {
+    clearNanoNameCache();
+    // Function-operator chips link to named routes, which inherit `version`.
+    router = createTestRouter();
+    await router.isReady();
   });
 
   afterEach(() => {
     standardCleanup();
   });
 
-  describe('component rendering', () => {
-    it('should render without errors', () => {
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-        },
-      });
+  describe('stat requirements', () => {
+    it('shows stat name, operator and required value', () => {
+      const wrapper = mountChip({ criterion: statCriterion() });
 
-      expect(wrapper.exists()).toBe(true);
+      expect(wrapper.text()).toBe('Pistol ≥ 357');
     });
 
-    it('should display criterion description', () => {
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-        },
-      });
+    it("shows the character's current value next to the requirement", () => {
+      const wrapper = mountChip({ criterion: statCriterion(), characterStats: { 112: 400 } });
 
       expect(wrapper.text()).toContain('Pistol ≥ 357');
+      expect(wrapper.find('.status').text()).toBe('(400)');
     });
 
-    it('should render as PrimeVue Tag component', () => {
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-        },
-      });
+    it('shows 0 as the current value when the character lacks the stat', () => {
+      const wrapper = mountChip({ criterion: statCriterion(), characterStats: { 17: 50 } });
 
-      const tag = wrapper.findComponent({ name: 'Tag' });
-      expect(tag.exists()).toBe(true);
-      expect(tag.props('value')).toContain('Pistol ≥ 357');
-    });
-  });
-
-  describe('requirement status display', () => {
-    it('should show success status when requirement is met', () => {
-      vi.mocked(isRequirementMet).mockReturnValue(true);
-
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-          characterStats,
-        },
-      });
-
-      const tag = wrapper.findComponent({ name: 'Tag' });
-      expect(tag.props('severity')).toBe('success');
-      expect(tag.props('icon')).toBe('pi pi-check');
+      expect(wrapper.find('.status').text()).toBe('(0)');
+      expect(wrapper.classes()).toContain('requirement-unmet');
     });
 
-    it('should show danger status when requirement is not met', () => {
-      vi.mocked(isRequirementMet).mockReturnValue(false);
-
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-          characterStats: { 112: 300 }, // Too low
-        },
+    it('hides the current value when showStatus is false', () => {
+      const wrapper = mountChip({
+        criterion: statCriterion(),
+        characterStats: { 112: 400 },
+        showStatus: false,
       });
 
-      const tag = wrapper.findComponent({ name: 'Tag' });
-      expect(tag.props('severity')).toBe('danger');
-      expect(tag.props('icon')).toBe('pi pi-times');
+      expect(wrapper.find('.status').exists()).toBe(false);
     });
 
-    it('should show secondary status when requirement cannot be evaluated', () => {
-      vi.mocked(isRequirementMet).mockReturnValue(null);
+    it('is neutral when no character is selected', () => {
+      const wrapper = mountChip({ criterion: statCriterion() });
 
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-          characterStats,
-        },
-      });
-
-      const tag = wrapper.findComponent({ name: 'Tag' });
-      expect(tag.props('severity')).toBe('secondary');
-      expect(tag.props('icon')).toBe('pi pi-question');
-    });
-
-    it('should show secondary status when no character stats provided', () => {
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-        },
-      });
-
-      const tag = wrapper.findComponent({ name: 'Tag' });
-      expect(tag.props('severity')).toBe('secondary');
-      expect(tag.props('icon')).toBe('pi pi-question');
+      expect(wrapper.classes()).toContain('requirement-neutral');
+      expect(wrapper.find('.status').exists()).toBe(false);
     });
   });
 
-  describe('different criterion types', () => {
-    it('should handle equality requirements', () => {
-      const equalCriterion: DisplayCriterion = {
-        ...mockCriterion,
-        displaySymbol: '=',
-        displayValue: 8,
-        description: 'Profession = Bureaucrat',
-      };
-
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: equalCriterion,
-          characterStats: { 112: 8 },
-        },
+  describe('met / unmet evaluation', () => {
+    it.each([
+      ['≥', 357, 400, true],
+      ['≥', 357, 357, true],
+      ['≥', 357, 356, false],
+      ['≤', 199, 150, true],
+      ['≤', 199, 200, false],
+      ['=', 8, 8, true],
+      ['=', 8, 5, false],
+      ['≠', 5, 8, true],
+      ['≠', 5, 5, false],
+    ])('%s %i with current %i is met: %s', (symbol, required, current, met) => {
+      const wrapper = mountChip({
+        criterion: statCriterion({ displaySymbol: symbol, displayValue: required }),
+        characterStats: { 112: current },
       });
 
-      expect(wrapper.text()).toContain('Profession = Bureaucrat');
+      expect(wrapper.classes()).toContain(met ? 'requirement-met' : 'requirement-unmet');
+      expect(wrapper.find('.status').classes()).toContain(met ? 'status-met' : 'status-unmet');
     });
 
-    it('should handle less than or equal requirements', () => {
-      const lessThanCriterion: DisplayCriterion = {
-        ...mockCriterion,
-        displaySymbol: '≤',
-        displayValue: 199,
-        description: 'Level ≤ 199',
-      };
+    it('evaluates "has" flag requirements bitwise', () => {
+      const criterion = statCriterion({ stat: 30, displaySymbol: 'has', displayValue: 4 });
 
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: lessThanCriterion,
-          characterStats: { 112: 150 },
-        },
-      });
-
-      expect(wrapper.text()).toContain('Level ≤ 199');
+      expect(mountChip({ criterion, characterStats: { 30: 4 | 1 } }).classes()).toContain(
+        'requirement-met'
+      );
+      expect(mountChip({ criterion, characterStats: { 30: 1 } }).classes()).toContain(
+        'requirement-unmet'
+      );
     });
 
-    it('should handle not equal requirements', () => {
-      const notEqualCriterion: DisplayCriterion = {
-        ...mockCriterion,
-        displaySymbol: '≠',
-        description: 'Profession ≠ Agent',
-      };
+    it('evaluates "lacks" flag requirements bitwise', () => {
+      const criterion = statCriterion({ stat: 30, displaySymbol: 'lacks', displayValue: 32 });
 
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: notEqualCriterion,
-        },
-      });
-
-      expect(wrapper.text()).toContain('Profession ≠ Agent');
+      expect(mountChip({ criterion, characterStats: { 30: 4 } }).classes()).toContain(
+        'requirement-met'
+      );
+      expect(mountChip({ criterion, characterStats: { 30: 32 | 4 } }).classes()).toContain(
+        'requirement-unmet'
+      );
     });
 
-    it('should handle bit flag requirements', () => {
-      const bitFlagCriterion: DisplayCriterion = {
-        ...mockCriterion,
-        displaySymbol: 'has',
-        description: 'Can flags has flag 64',
-      };
-
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: bitFlagCriterion,
-        },
+    it('marks requirements with an unrecognised operator as unknown', () => {
+      const wrapper = mountChip({
+        criterion: statCriterion({ displaySymbol: 'Op999' }),
+        characterStats: { 112: 400 },
       });
 
-      expect(wrapper.text()).toContain('Can flags has flag 64');
-    });
-
-    it('should handle bit not set requirements', () => {
-      const bitNotSetCriterion: DisplayCriterion = {
-        ...mockCriterion,
-        displaySymbol: 'lacks',
-        description: 'Can flags lacks flag 32',
-      };
-
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: bitNotSetCriterion,
-        },
-      });
-
-      expect(wrapper.text()).toContain('Can flags lacks flag 32');
-    });
-  });
-
-  describe('special stat types', () => {
-    it('should handle Level stat requirements', () => {
-      const levelCriterion: DisplayCriterion = {
-        ...mockCriterion,
-        stat: 54,
-        statName: 'Level',
-        description: 'Level ≥ 151',
-      };
-
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: levelCriterion,
-          characterStats: { 54: 200 },
-        },
-      });
-
-      expect(wrapper.text()).toContain('Level ≥ 151');
-    });
-
-    it('should handle Profession stat requirements', () => {
-      const professionCriterion: DisplayCriterion = {
-        ...mockCriterion,
-        stat: 60,
-        statName: 'Profession',
-        displaySymbol: '=',
-        displayValue: 8,
-        description: 'Profession = Bureaucrat',
-      };
-
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: professionCriterion,
-          characterStats: { 60: 8 },
-        },
-      });
-
-      expect(wrapper.text()).toContain('Profession = Bureaucrat');
-    });
-
-    it('should handle Breed stat requirements', () => {
-      const breedCriterion: DisplayCriterion = {
-        ...mockCriterion,
-        stat: 4,
-        statName: 'Breed',
-        displaySymbol: '=',
-        displayValue: 1,
-        description: 'Breed = Opifex',
-      };
-
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: breedCriterion,
-          characterStats: { 4: 1 },
-        },
-      });
-
-      expect(wrapper.text()).toContain('Breed = Opifex');
-    });
-
-    it('should handle Gender stat requirements', () => {
-      const genderCriterion: DisplayCriterion = {
-        ...mockCriterion,
-        stat: 59,
-        statName: 'Gender',
-        displaySymbol: '=',
-        displayValue: 1,
-        description: 'Gender = Female',
-      };
-
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: genderCriterion,
-          characterStats: { 59: 1 },
-        },
-      });
-
-      expect(wrapper.text()).toContain('Gender = Female');
-    });
-  });
-
-  describe('requirement evaluation', () => {
-    it('should evaluate requirement correctly with character stats', () => {
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-          characterStats,
-        },
-      });
-
-      // Component should show met status since characterStats[112] = 400 >= 357
-      expect(wrapper.vm.requirementMet).toBe(true);
-    });
-
-    it('should not evaluate requirement when no character stats provided', () => {
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-        },
-      });
-
-      // Should show secondary status when no stats
-      expect(wrapper.vm.requirementMet).toBeNull();
-    });
-
-    it('should handle character stats with missing required stat', () => {
-      const statsWithoutRequiredStat = { 54: 200 }; // Has Level but not Pistol
-
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-          characterStats: statsWithoutRequiredStat,
-        },
-      });
-
-      // Should evaluate as false since the required stat is missing (defaults to 0)
-      expect(wrapper.vm.requirementMet).toBe(false);
-    });
-  });
-
-  describe('visual indicators', () => {
-    it('should display check icon for met requirements', () => {
-      vi.mocked(isRequirementMet).mockReturnValue(true);
-
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-          characterStats,
-        },
-      });
-
-      const tag = wrapper.findComponent({ name: 'Tag' });
-      expect(tag.props('icon')).toBe('pi pi-check');
-    });
-
-    it('should display times icon for unmet requirements', () => {
-      vi.mocked(isRequirementMet).mockReturnValue(false);
-
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-          characterStats: { 112: 300 },
-        },
-      });
-
-      const tag = wrapper.findComponent({ name: 'Tag' });
-      expect(tag.props('icon')).toBe('pi pi-times');
-    });
-
-    it('should display question icon for unknown status', () => {
-      vi.mocked(isRequirementMet).mockReturnValue(null);
-
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-          characterStats,
-        },
-      });
-
-      const tag = wrapper.findComponent({ name: 'Tag' });
-      expect(tag.props('icon')).toBe('pi pi-question');
-    });
-
-    it('should apply success severity class', () => {
-      vi.mocked(isRequirementMet).mockReturnValue(true);
-
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-          characterStats,
-        },
-      });
-
-      const tag = wrapper.findComponent({ name: 'Tag' });
-      expect(tag.props('severity')).toBe('success');
-      expect(tag.element.className).toContain('p-tag-success');
-    });
-
-    it('should apply danger severity class', () => {
-      vi.mocked(isRequirementMet).mockReturnValue(false);
-
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-          characterStats: { 112: 300 },
-        },
-      });
-
-      const tag = wrapper.findComponent({ name: 'Tag' });
-      expect(tag.props('severity')).toBe('danger');
-      expect(tag.element.className).toContain('p-tag-danger');
-    });
-
-    it('should apply secondary severity class', () => {
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-        },
-      });
-
-      const tag = wrapper.findComponent({ name: 'Tag' });
-      expect(tag.props('severity')).toBe('secondary');
-      expect(tag.element.className).toContain('p-tag-secondary');
-    });
-  });
-
-  describe('logical operators handling', () => {
-    const logicalCriterion: DisplayCriterion = {
-      id: 2,
-      stat: 0,
-      statName: 'Logical',
-      displayValue: 0,
-      displaySymbol: 'AND',
-      displayOperator: 'AND',
-      description: 'AND',
-      isLogicalOperator: true,
-      isSeparator: true,
-      isStatRequirement: false,
-    };
-
-    it('should display logical operators without status indicators', () => {
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: logicalCriterion,
-          characterStats,
-        },
-      });
-
-      const tag = wrapper.findComponent({ name: 'Tag' });
-      expect(tag.props('value')).toBe('AND');
-      expect(tag.props('severity')).toBe('secondary');
-      expect(tag.props('icon')).toBeUndefined();
-    });
-
-    it('should not evaluate logical operators', () => {
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: logicalCriterion,
-          characterStats,
-        },
-      });
-
-      // Logical operators should not have requirement evaluation
-      expect(wrapper.vm.requirementMet).toBeNull();
-    });
-  });
-
-  describe('edge cases', () => {
-    it('should handle unknown operator gracefully', () => {
-      const unknownOperatorCriterion: DisplayCriterion = {
-        ...mockCriterion,
-        displaySymbol: 'Op999',
-        description: 'Pistol Op999 357',
-      };
-
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: unknownOperatorCriterion,
-        },
-      });
-
+      expect(wrapper.classes()).toContain('requirement-unknown');
       expect(wrapper.text()).toContain('Pistol Op999 357');
-      expect(wrapper.exists()).toBe(true);
     });
 
-    it('should handle empty description', () => {
-      const emptyCriterion: DisplayCriterion = {
-        ...mockCriterion,
-        description: '',
-      };
+    it('re-evaluates when the character stats change', async () => {
+      const wrapper = mountChip({ criterion: statCriterion(), characterStats: { 112: 100 } });
+      expect(wrapper.classes()).toContain('requirement-unmet');
 
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: emptyCriterion,
-        },
-      });
+      await wrapper.setProps({ characterStats: { 112: 500 } });
 
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should handle very long descriptions', () => {
-      const longDescriptionCriterion: DisplayCriterion = {
-        ...mockCriterion,
-        description:
-          'This is a very long description that might overflow the chip container and needs to be handled gracefully',
-      };
-
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: longDescriptionCriterion,
-        },
-      });
-
-      expect(wrapper.text()).toContain('This is a very long description');
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should handle malformed character stats', () => {
-      const malformedStats = { invalid: 'data' } as any;
-
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-          characterStats: malformedStats,
-        },
-      });
-
-      expect(wrapper.exists()).toBe(true);
-      // Should handle malformed stats gracefully
-      expect(wrapper.vm.currentValue).toBe(0);
+      expect(wrapper.classes()).toContain('requirement-met');
+      expect(wrapper.find('.status').text()).toBe('(500)');
     });
   });
 
-  describe('accessibility', () => {
-    it('should have appropriate ARIA attributes', () => {
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-          characterStats,
-        },
+  describe('value formatting', () => {
+    it.each([
+      [60, 'Profession', 8, 'Profession = Bureaucrat'],
+      [368, 'VisualProfession', 5, 'VisualProfession = Agent'],
+      [4, 'Breed', 2, 'Breed = Opifex'],
+      [59, 'Gender', 3, 'Gender = Female'],
+      [54, 'Level', 151, 'Level = 151'],
+    ])('stat %i (%s) = %i reads "%s"', (stat, statName, value, expected) => {
+      const wrapper = mountChip({
+        criterion: statCriterion({ stat, statName, displaySymbol: '=', displayValue: value }),
       });
 
-      const tag = wrapper.findComponent({ name: 'Tag' });
-      // PrimeVue Tag component should handle ARIA attributes
-      expect(tag.exists()).toBe(true);
+      expect(wrapper.text()).toBe(expected);
     });
 
-    it('should be focusable for keyboard navigation', () => {
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-          characterStats,
-        },
+    it('names Can flags in flag requirements', () => {
+      const wrapper = mountChip({
+        criterion: statCriterion({
+          stat: 30,
+          statName: 'Can',
+          displaySymbol: 'has',
+          displayValue: 64,
+        }),
       });
 
-      const tag = wrapper.findComponent({ name: 'Tag' });
-      // Verify the tag is rendered (PrimeVue handles focus behavior)
-      expect(tag.exists()).toBe(true);
+      expect(wrapper.text()).toBe('Can has TutorChip');
+    });
+
+    it('falls back to the bit value for flags it cannot name', () => {
+      const wrapper = mountChip({
+        criterion: statCriterion({ displaySymbol: 'lacks', displayValue: 32 }),
+      });
+
+      expect(wrapper.text()).toBe('Pistol lacks Flag 32');
     });
   });
 
-  describe('performance considerations', () => {
-    it('should not re-evaluate requirements unnecessarily', async () => {
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-          characterStats,
-        },
-      });
+  describe('OE breakpoints', () => {
+    it('shows 80/60/40/20% breakpoints for skills when enabled', () => {
+      const wrapper = mountChip({ criterion: statCriterion(), showOeBreakpoints: true });
 
-      // Get initial evaluation result
-      const initialResult = wrapper.vm.requirementMet;
-      expect(initialResult).toBe(true);
-
-      // Re-render with same props should not change result
-      await wrapper.setProps({ criterion: mockCriterion, characterStats });
-
-      // Vue's reactivity should maintain the same result
-      expect(wrapper.vm.requirementMet).toBe(initialResult);
+      expect(wrapper.find('.oe-breakpoints').text()).toBe('OE: 285/214/142/71');
     });
 
-    it('should handle frequent prop updates efficiently', async () => {
-      const wrapper = mountWithContext(CriterionChip, {
-        props: {
-          criterion: mockCriterion,
-          characterStats,
-        },
+    it('does not show breakpoints unless enabled', () => {
+      const wrapper = mountChip({ criterion: statCriterion() });
+
+      expect(wrapper.find('.oe-breakpoints').exists()).toBe(false);
+    });
+
+    it('does not show breakpoints for Treatment, which has no OE', () => {
+      const wrapper = mountChip({
+        criterion: statCriterion({ stat: 124, statName: 'Treatment' }),
+        showOeBreakpoints: true,
       });
 
-      // Update character stats multiple times
-      await wrapper.setProps({ characterStats: { 112: 350 } });
-      expect(wrapper.vm.requirementMet).toBe(false);
+      expect(wrapper.find('.oe-breakpoints').exists()).toBe(false);
+    });
 
-      await wrapper.setProps({ characterStats: { 112: 400 } });
-      expect(wrapper.vm.requirementMet).toBe(true);
+    it('does not show breakpoints for non-skill stats such as Level', () => {
+      const wrapper = mountChip({
+        criterion: statCriterion({ stat: 54, statName: 'Level' }),
+        showOeBreakpoints: true,
+      });
 
-      await wrapper.setProps({ characterStats: { 112: 450 } });
-      expect(wrapper.vm.requirementMet).toBe(true);
+      expect(wrapper.find('.oe-breakpoints').exists()).toBe(false);
+    });
+  });
 
-      // Should remain responsive
-      expect(wrapper.exists()).toBe(true);
+  describe('non-stat criteria', () => {
+    it('shows logical operators without any character status', () => {
+      const wrapper = mountChip({
+        criterion: statCriterion({
+          stat: 0,
+          statName: '',
+          displayValue: 0,
+          displaySymbol: 'AND',
+          displayOperator: 'AND',
+          description: 'AND',
+          isLogicalOperator: true,
+          isStatRequirement: false,
+        }),
+        characterStats: { 112: 400 },
+      });
+
+      expect(wrapper.text()).toBe('AND');
+      expect(wrapper.classes()).toContain('logical-operator-chip');
+      expect(wrapper.classes()).toContain('requirement-neutral');
+      expect(wrapper.find('.status').exists()).toBe(false);
+    });
+
+    it('shows state requirements by their description', () => {
+      const wrapper = mountChip({
+        criterion: statCriterion({
+          description: 'Must be in combat',
+          isStatRequirement: false,
+        }),
+      });
+
+      expect(wrapper.text()).toBe('Must be in combat');
+      expect(wrapper.classes()).toContain('state-requirement-chip');
+    });
+
+    it('links a running-nano requirement to the nano, using its resolved name', async () => {
+      mockGetItem.mockResolvedValue({
+        success: true,
+        data: { name: 'Composite Attribute Boost' },
+      } as Awaited<ReturnType<typeof apiClient.getItem>>);
+
+      const wrapper = mountChip({
+        criterion: statCriterion({
+          isStatRequirement: false,
+          isFunctionOperator: true,
+          functionType: 'CheckNcu',
+          referenceAoid: 95409,
+          description: 'Not running: Nano 95409',
+        }),
+      });
+      await flushPromises();
+
+      expect(mockGetItem).toHaveBeenCalledWith(95409);
+      const link = wrapper.find('a.function-link');
+      expect(link.text()).toBe('Composite Attribute Boost');
+      expect(link.attributes('href')).toContain('/items/95409');
+      expect(visibleText(wrapper)).toBe('Not running: Composite Attribute Boost');
+    });
+
+    it('falls back to "Nano <aoid>" when the name cannot be resolved', async () => {
+      mockGetItem.mockRejectedValue(new Error('offline'));
+
+      const wrapper = mountChip({
+        criterion: statCriterion({
+          isStatRequirement: false,
+          isFunctionOperator: true,
+          functionType: 'RunningNano',
+          referenceAoid: 12345,
+          description: 'Running: Nano 12345',
+        }),
+      });
+      await flushPromises();
+
+      expect(wrapper.find('a.function-link').text()).toBe('Nano 12345');
+      expect(visibleText(wrapper)).toBe('Running: Nano 12345');
+    });
+
+    it('shows a nano line requirement by line name without a link', () => {
+      const wrapper = mountChip({
+        criterion: statCriterion({
+          isStatRequirement: false,
+          isFunctionOperator: true,
+          functionType: 'NotRunningNanoLine',
+          description: 'Not running: Damage Shields',
+        }),
+      });
+
+      expect(wrapper.find('a').exists()).toBe(false);
+      expect(visibleText(wrapper)).toBe('Not running: Damage Shields');
+      expect(mockGetItem).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('size', () => {
+    it.each(['small', 'normal', 'large'] as const)('applies the %s size', (size) => {
+      const wrapper = mountChip({ criterion: statCriterion(), size });
+
+      expect(wrapper.classes()).toContain(`size-${size}`);
     });
   });
 });
