@@ -149,7 +149,9 @@ export function getCachedWeapons(cacheKey: string): Item[] | null {
 
   const responseTime = performance.now() - startTime;
   recordCacheHit(responseTime);
-  console.log(`[WeaponCache] Cache hit! (${Math.round(responseTime)}ms, ${entry.weapons.length} weapons)`);
+  console.log(
+    `[WeaponCache] Cache hit! (${Math.round(responseTime)}ms, ${entry.weapons.length} weapons)`
+  );
 
   return entry.weapons;
 }

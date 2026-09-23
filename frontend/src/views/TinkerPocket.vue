@@ -39,11 +39,14 @@ watch(activeTab, (newIndex) => {
 });
 
 // Sync tab when URL changes (browser back/forward)
-watch(() => route.query.tab, (newTab) => {
-  if (newTab && typeof newTab === 'string' && tabIndexMap[newTab] !== undefined) {
-    activeTab.value = tabIndexMap[newTab];
+watch(
+  () => route.query.tab,
+  (newTab) => {
+    if (newTab && typeof newTab === 'string' && tabIndexMap[newTab] !== undefined) {
+      activeTab.value = tabIndexMap[newTab];
+    }
   }
-});
+);
 
 // Expose for tests
 defineExpose({

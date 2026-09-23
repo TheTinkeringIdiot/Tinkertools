@@ -24,12 +24,14 @@ Successfully refactored TinkerTools frontend test suite with aggressive deletion
 **Reason**: Fragile, wrong level of testing
 
 Component tests using mocked stores and mocked Vue Test Utils were:
+
 - Breaking on every UI change (selectors, class names, structure)
 - Not catching real bugs (mocks don't match production behavior)
 - Providing false confidence (passing tests, broken production)
 - High maintenance cost (every UI change = rewrite tests)
 
 **Examples deleted**:
+
 - Profile component tests (ProfileCard, ProfileSelector, CharacterInfo)
 - Equipment component tests (EquipmentSlot, ItemTooltip, EquipmentGrid)
 - Nano component tests (NanoList, NanoFilter, NanoRequirements)
@@ -44,12 +46,14 @@ Component tests using mocked stores and mocked Vue Test Utils were:
 **Reason**: Same as component tests - fragile and wrong level
 
 View tests were just large component tests with more mocks. Same problems:
+
 - Brittle selectors
 - Complex mock setup
 - Not testing real integrations
 - Missing real bugs
 
 **Examples deleted**:
+
 - TinkerItems.test.ts
 - TinkerNanos.test.ts
 - TinkerPlants.test.ts
@@ -65,18 +69,20 @@ View tests were just large component tests with more mocks. Same problems:
 **Reason**: Wrong level - mocking stores defeats the purpose
 
 These tests mocked Pinia internals, making them useless:
+
 - Mock store state doesn't test real state management
 - Mock actions don't test real action logic
 - Mock getters don't test real computed values
 - Tests pass but production breaks
 
 **Examples deleted**:
-- src/__tests__/stores/profile.test.ts (~450 lines)
-- src/__tests__/stores/profilesStore.test.ts (~380 lines)
-- src/__tests__/stores/nanosStore.test.ts (~520 lines)
-- src/__tests__/stores/items.test.ts (~480 lines)
-- src/__tests__/stores/pocketBossStore.test.ts (~510 lines)
-- src/stores/__tests__/tinkerProfiles.buff.test.ts (~514 lines)
+
+- src/**tests**/stores/profile.test.ts (~450 lines)
+- src/**tests**/stores/profilesStore.test.ts (~380 lines)
+- src/**tests**/stores/nanosStore.test.ts (~520 lines)
+- src/**tests**/stores/items.test.ts (~480 lines)
+- src/**tests**/stores/pocketBossStore.test.ts (~510 lines)
+- src/stores/**tests**/tinkerProfiles.buff.test.ts (~514 lines)
 
 **Total**: ~2,854 lines of wrong-level tests
 
@@ -95,6 +101,7 @@ Composables like `useItems`, `useNanos`, `useProfiles` are just API wrappers. Te
 **Reason**: Data transformation tests that were too tightly coupled to implementation
 
 Tests for profile import/export, data migration, format conversion were:
+
 - Breaking on every format change
 - Not testing edge cases
 - Missing real-world import failures
@@ -108,11 +115,13 @@ Tests for profile import/export, data migration, format conversion were:
 **Why**: Pure functions, stable APIs, real value
 
 These test business logic with no external dependencies:
+
 - Calculation services (IP calculator, bonus calculator, weapon DPS)
 - Utility functions (game formulas, stat lookups, data parsing)
 - Pure transformers (data mapping, filtering, sorting)
 
 **Examples**:
+
 - `action-criteria.test.ts` - 39 tests for requirement checking
 - `perk-bonus-calculator.test.ts` - 36 tests for perk bonuses
 - `nano-bonus-calculator.test.ts` - 39 tests for nano bonuses
@@ -127,11 +136,13 @@ These test business logic with no external dependencies:
 **Why**: Test real Pinia stores with mocked API only
 
 These test actual state management logic:
+
 - Real Pinia stores (actual reactivity, actions, getters)
 - Real Vue components (actual rendering, events)
 - Mocked only external boundaries (API, localStorage, router)
 
 **Examples**:
+
 - `buff-management.integration.test.ts` - NCU tracking, nano strain conflicts
 - `equipment-interaction.integration.test.ts` - Equip/unequip with stat effects
 - `item-search-interaction.integration.test.ts` - Search filters, pagination
@@ -146,12 +157,14 @@ These test actual state management logic:
 **Why**: Test real user workflows in real browser
 
 These use Playwright to test complete workflows:
+
 - Real browser (Chromium, Firefox, Webkit)
 - Real backend (optionally - can mock)
 - Real user interactions (click, type, navigate)
 - Real rendering (CSS, animations, responsive)
 
 **Examples**:
+
 - `item-search-workflow.test.ts` - Search, filter, select, view details
 - `profile-management-workflow.test.ts` - Create, edit, delete, switch profiles
 - `nano-compatibility-workflow.test.ts` - Check requirements, filter nanos
@@ -164,6 +177,7 @@ These use Playwright to test complete workflows:
 **Why**: Only for truly reusable, isolated UI components
 
 Kept only for components with no external dependencies:
+
 - ActionRequirements.test.ts - Requirement chip display
 - CriteriaDisplay.test.ts - Criteria rendering
 - ItemInterpolationBar.test.ts - QL slider UI
@@ -179,6 +193,7 @@ Kept only for components with no external dependencies:
 **Root Cause**: `ip-integrator.ts` only extracted bonuses from `spell_data`, ignored `item.stats`
 
 **Fix**: Modified `parseItemSpells()` to extract bonuses from BOTH sources:
+
 ```typescript
 // Extract direct stat bonuses from item.stats
 if (item.stats && Array.isArray(item.stats)) {
@@ -202,6 +217,7 @@ if (item.stats && Array.isArray(item.stats)) {
 **Root Cause**: Test profiles had undefined `profile.skills[181]` (MaxNCU skill ID)
 
 **Fix**:
+
 1. Auto-initialize MaxNCU in profile fixtures: `Math.max(1200, level * 6)`
 2. Special case in ip-integrator to preserve MaxNCU base + bonuses separately
 
@@ -214,6 +230,7 @@ if (item.stats && Array.isArray(item.stats)) {
 **Root Cause**: Stores use `useToast()` but tests didn't setup PrimeVue
 
 **Fix**: Added PrimeVue + ToastService to test setup:
+
 ```typescript
 beforeEach(async () => {
   const app = createApp({});
@@ -236,6 +253,7 @@ beforeEach(async () => {
 **Root Cause**: Vitest doesn't mock `performance.now()` by default
 
 **Fix**: Added mock in test setup:
+
 ```typescript
 vi.spyOn(performance, 'now').mockReturnValue(0);
 ```
@@ -249,6 +267,7 @@ vi.spyOn(performance, 'now').mockReturnValue(0);
 **Root Cause**: Migrated from legacy combined format to individual profile keys
 
 **Fix**: Updated all tests to use:
+
 ```typescript
 const profileKey = `tinkertools_profile_${profileId}`;
 // NOT: const allProfiles = JSON.parse(localStorage.getItem('tinkertools_profiles'));
@@ -259,12 +278,14 @@ const profileKey = `tinkertools_profile_${profileId}`;
 ## Test Results
 
 ### Before Refactoring (September 2025)
+
 - Total Tests: ~1,500+
 - Passing: ~850 (57%)
 - Fragile component tests: ~500
 - Wrong-level store tests: ~150
 
 ### After Refactoring (November 2025)
+
 - Total Tests: 1,186
 - Passing: 793 (67%)
 - Stable service tests: ~400
@@ -298,12 +319,14 @@ const profileKey = `tinkertools_profile_${profileId}`;
 ### Short Term (1-2 weeks)
 
 1. **Fix Remaining Test Failures** (289 failing tests):
+
    - Component selector fragility (use data-testid)
    - localStorage key assumptions (create helper)
    - Async timing issues (better wait utilities)
    - Mock API wiring (fix vi.mock() placement)
 
 2. **Expand E2E Coverage** (15-20 workflows):
+
    - Complete item search workflow
    - Equipment workflow (equip, unequip, validate)
    - Nano management workflow (search, cast, track NCU)
@@ -318,12 +341,14 @@ const profileKey = `tinkertools_profile_${profileId}`;
 ### Long Term (as needed)
 
 1. **CI/CD Pipeline**:
+
    - Run unit tests on every commit (< 30s)
    - Run integration tests on every PR (< 2m)
    - Run E2E tests on merge to main (< 10m)
    - Run visual regression tests weekly
 
 2. **Performance Testing**:
+
    - Large dataset tests (1000+ items, profiles)
    - Stress tests (rapid clicks, concurrent requests)
    - Memory leak detection
@@ -340,17 +365,20 @@ const profileKey = `tinkertools_profile_${profileId}`;
 **Decision**: Delete component tests, write E2E tests instead
 
 **Rationale**:
+
 - Component tests are fragile (break on every UI change)
 - E2E tests are resilient (only break on real breakage)
 - E2E tests catch integration bugs
 - E2E tests validate real user experience
 
 **Trade-offs**:
+
 - Slower execution (browser startup overhead)
 - More complex setup (need backend, database)
 - Harder to debug (full stack involved)
 
 **Mitigation**:
+
 - Mock backend for faster E2E tests when possible
 - Use page object pattern for maintainability
 - Run E2E tests only on critical paths (not all scenarios)
@@ -360,15 +388,18 @@ const profileKey = `tinkertools_profile_${profileId}`;
 **Decision**: Never mock store internals, only mock external boundaries
 
 **Rationale**:
+
 - Mocking stores makes tests useless (not testing real code)
 - Real stores catch real bugs (state management, reactivity)
 - Real stores match production behavior
 
 **Trade-offs**:
+
 - More complex setup (need to initialize Pinia properly)
 - Slower tests (real reactivity overhead)
 
 **Mitigation**:
+
 - Reusable test utilities (`setupIntegrationTest()`)
 - Fixture factories for test data
 - Clear patterns documented
@@ -378,16 +409,19 @@ const profileKey = `tinkertools_profile_${profileId}`;
 **Decision**: Delete fragile tests rather than fix them
 
 **Rationale**:
+
 - Fragile tests provide false confidence
 - Fixing fragile tests is high effort, low value
 - Better to have no test than a bad test
 - Focus effort on valuable tests (E2E, integration)
 
 **Trade-offs**:
+
 - Temporary reduction in test coverage
 - Risk of missing bugs during transition
 
 **Mitigation**:
+
 - Prioritize E2E tests for critical workflows
 - Keep stable unit tests for business logic
 - Add integration tests for core features first
@@ -416,16 +450,16 @@ const profileKey = `tinkertools_profile_${profileId}`;
 
 ## Success Metrics
 
-| Metric                | Before               | After                | Change        |
-| --------------------- | -------------------- | -------------------- | ------------- |
-| Total Test Files      | ~100 files           | 55 files             | -45 files     |
-| Component Tests       | 31 files             | 7 files              | -77%          |
-| Store Tests           | 6 files (mocked)     | 13 files (real)      | +117% (real)  |
-| E2E Tests             | 0 files              | 8 files              | +∞            |
-| Fragile Tests         | ~500 tests           | ~50 tests            | -90%          |
-| Production Bugs Found | 0 (missed by mocks)  | 4 (caught by real)   | +∞            |
-| Pass Rate             | 57%                  | 67%                  | +10%          |
-| Test Pyramid Ratio    | Inverted (60/35/5)   | Correct (55/40/5)    | ✅ Fixed      |
+| Metric                | Before              | After              | Change       |
+| --------------------- | ------------------- | ------------------ | ------------ |
+| Total Test Files      | ~100 files          | 55 files           | -45 files    |
+| Component Tests       | 31 files            | 7 files            | -77%         |
+| Store Tests           | 6 files (mocked)    | 13 files (real)    | +117% (real) |
+| E2E Tests             | 0 files             | 8 files            | +∞           |
+| Fragile Tests         | ~500 tests          | ~50 tests          | -90%         |
+| Production Bugs Found | 0 (missed by mocks) | 4 (caught by real) | +∞           |
+| Pass Rate             | 57%                 | 67%                | +10%         |
+| Test Pyramid Ratio    | Inverted (60/35/5)  | Correct (55/40/5)  | ✅ Fixed     |
 
 ## Conclusion
 

@@ -78,7 +78,9 @@ describe('GlobalItemSearch', () => {
     await flushPromises();
 
     expect(router.currentRoute.value.name).toBe('TinkerNanos');
-    expect(wrapper.get('[data-testid="global-item-search-submit"]').attributes('disabled')).toBeDefined();
+    expect(
+      wrapper.get('[data-testid="global-item-search-submit"]').attributes('disabled')
+    ).toBeDefined();
     wrapper.unmount();
   });
 

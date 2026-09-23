@@ -60,7 +60,10 @@ export class ItemSearchPage {
   }
 
   async hasItem(itemName: string): Promise<boolean> {
-    return await this.page.getByText(itemName).isVisible({ timeout: 2000 }).catch(() => false);
+    return await this.page
+      .getByText(itemName)
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
   }
 
   async goToNextPage() {

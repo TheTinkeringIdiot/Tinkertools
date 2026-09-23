@@ -103,7 +103,10 @@ export async function waitForApiResponse(page: Page, urlPattern: string | RegExp
  * Check if element exists (without throwing if it doesn't)
  */
 export async function elementExists(page: Page, selector: string): Promise<boolean> {
-  return await page.locator(selector).isVisible({ timeout: 2000 }).catch(() => false);
+  return await page
+    .locator(selector)
+    .isVisible({ timeout: 2000 })
+    .catch(() => false);
 }
 
 /**

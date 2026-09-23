@@ -9,11 +9,7 @@ import { apiClient } from './api-client';
 import type { Item } from '@/types/api';
 import type { WeaponAnalyzeRequest } from '@/types/weapon-analysis';
 import { WEAPON_STAT_IDS } from '@/types/weapon-analysis';
-import {
-  generateCacheKey,
-  getCachedWeapons,
-  cacheWeapons,
-} from './indexed-db-weapon-cache';
+import { generateCacheKey, getCachedWeapons, cacheWeapons } from './indexed-db-weapon-cache';
 
 // ============================================================================
 // API Calls
@@ -61,7 +57,9 @@ export async function analyzeWeaponsWithCache(request: WeaponAnalyzeRequest): Pr
   const weapons = await analyzeWeapons(request);
 
   const responseTime = performance.now() - startTime;
-  console.log(`[WeaponService] Backend query: ${Math.round(responseTime)}ms, ${weapons.length} weapons`);
+  console.log(
+    `[WeaponService] Backend query: ${Math.round(responseTime)}ms, ${weapons.length} weapons`
+  );
 
   // Cache the result (no need to await, fire-and-forget)
   cacheWeapons(cacheKey, weapons);

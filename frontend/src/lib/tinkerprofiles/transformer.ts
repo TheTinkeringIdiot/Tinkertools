@@ -288,9 +288,7 @@ export class ProfileTransformer {
 
     // Map perks to PerksAndResearch (fetch details from backend via batch)
     if (aosetups.perks && Array.isArray(aosetups.perks)) {
-      const perkAoids = aosetups.perks
-        .filter((p: any) => p && p.aoid)
-        .map((p: any) => p.aoid);
+      const perkAoids = aosetups.perks.filter((p: any) => p && p.aoid).map((p: any) => p.aoid);
 
       console.log(`[ProfileTransformer] Fetching ${perkAoids.length} perks via batch endpoint...`);
 
@@ -722,7 +720,8 @@ export class ProfileTransformer {
             const mapping = getClusterMapping(clusterData.ClusterID);
             if (mapping) {
               // Capitalize position key to match backend requirements (Shiny, Bright, Faded)
-              const capitalizedPosition = position.charAt(0).toUpperCase() + position.slice(1).toLowerCase();
+              const capitalizedPosition =
+                position.charAt(0).toUpperCase() + position.slice(1).toLowerCase();
               clusters[capitalizedPosition] = mapping.stat;
               hasValidClusters = true;
             } else {
@@ -881,10 +880,7 @@ export class ProfileTransformer {
   // PRK Server Export Import
   // ============================================================================
 
-  private async importFromPRK(
-    data: string,
-    result: ProfileImportResult
-  ): Promise<TinkerProfile> {
+  private async importFromPRK(data: string, result: ProfileImportResult): Promise<TinkerProfile> {
     const payload = decodePRK(data);
     result.metadata.migrated = true;
 
@@ -961,23 +957,54 @@ export class ProfileTransformer {
 
   // Slot mappings for PRK export format
   private static readonly PRK_WEAPON_SLOTS: Record<number, keyof TinkerProfile['Weapons']> = {
-    1: 'HUD1', 15: 'HUD2', 2: 'HUD3',
-    3: 'UTILS1', 4: 'UTILS2', 5: 'UTILS3',
-    6: 'RHand', 8: 'LHand',
-    9: 'NCU1', 10: 'NCU2', 11: 'NCU3', 12: 'NCU4', 13: 'NCU5', 14: 'NCU6',
+    1: 'HUD1',
+    15: 'HUD2',
+    2: 'HUD3',
+    3: 'UTILS1',
+    4: 'UTILS2',
+    5: 'UTILS3',
+    6: 'RHand',
+    8: 'LHand',
+    9: 'NCU1',
+    10: 'NCU2',
+    11: 'NCU3',
+    12: 'NCU4',
+    13: 'NCU5',
+    14: 'NCU6',
   };
 
   private static readonly PRK_ARMOR_SLOTS: Record<number, keyof TinkerProfile['Clothing']> = {
-    1: 'Neck', 2: 'Head', 3: 'Back',
-    4: 'RightShoulder', 5: 'Body', 6: 'LeftShoulder',
-    7: 'RightArm', 8: 'Hands', 9: 'LeftArm',
-    10: 'RightWrist', 11: 'Legs', 12: 'LeftWrist',
-    13: 'RightFinger', 14: 'Feet', 15: 'LeftFinger',
+    1: 'Neck',
+    2: 'Head',
+    3: 'Back',
+    4: 'RightShoulder',
+    5: 'Body',
+    6: 'LeftShoulder',
+    7: 'RightArm',
+    8: 'Hands',
+    9: 'LeftArm',
+    10: 'RightWrist',
+    11: 'Legs',
+    12: 'LeftWrist',
+    13: 'RightFinger',
+    14: 'Feet',
+    15: 'LeftFinger',
   };
 
   private static readonly PRK_IMPLANT_SLOTS: Record<number, string> = {
-    1: '2', 2: '4', 3: '8', 4: '16', 5: '32', 6: '64',
-    7: '128', 8: '256', 9: '512', 10: '1024', 11: '2048', 12: '4096', 13: '8192',
+    1: '2',
+    2: '4',
+    3: '8',
+    4: '16',
+    5: '32',
+    6: '64',
+    7: '128',
+    8: '256',
+    9: '512',
+    10: '1024',
+    11: '2048',
+    12: '4096',
+    13: '8192',
   };
 
   private async mapPRKEquipment(
@@ -988,33 +1015,49 @@ export class ProfileTransformer {
   ): Promise<void> {
     // Collect all item requests from equipment, armor, and implants
     const allItems = [
-      ...payload.e.map(i => ({ aoid: i.id, targetQl: i.ql, source: 'weapon' as const, slot: i.sl })),
-      ...payload.a.map(i => ({ aoid: i.id, targetQl: i.ql, source: 'armor' as const, slot: i.sl })),
-      ...payload.i.map(i => ({ aoid: i.id, targetQl: i.ql, source: 'implant' as const, slot: i.sl })),
+      ...payload.e.map((i) => ({
+        aoid: i.id,
+        targetQl: i.ql,
+        source: 'weapon' as const,
+        slot: i.sl,
+      })),
+      ...payload.a.map((i) => ({
+        aoid: i.id,
+        targetQl: i.ql,
+        source: 'armor' as const,
+        slot: i.sl,
+      })),
+      ...payload.i.map((i) => ({
+        aoid: i.id,
+        targetQl: i.ql,
+        source: 'implant' as const,
+        slot: i.sl,
+      })),
     ];
 
     if (allItems.length === 0) return;
 
     // Batch fetch all items
-    const fetchRequests = allItems.map(i => ({ aoid: i.aoid, targetQl: i.targetQl }));
+    const fetchRequests = allItems.map((i) => ({ aoid: i.aoid, targetQl: i.targetQl }));
     const itemMap = await this.fetchItems(fetchRequests, undefined, gameVersion);
 
     // Helper to create a fallback item when fetch fails
-    const createFallback = (aoid: number, ql: number): Item => ({
-      id: aoid,
-      aoid: aoid,
-      name: `Item ${aoid} (fetch failed)`,
-      ql: ql,
-      description: undefined,
-      item_class: undefined,
-      is_nano: false,
-      stats: [],
-      spell_data: [],
-      actions: [],
-      attack_stats: [],
-      defense_stats: [],
-      sources: [],
-    } as Item);
+    const createFallback = (aoid: number, ql: number): Item =>
+      ({
+        id: aoid,
+        aoid: aoid,
+        name: `Item ${aoid} (fetch failed)`,
+        ql: ql,
+        description: undefined,
+        item_class: undefined,
+        is_nano: false,
+        stats: [],
+        spell_data: [],
+        actions: [],
+        attack_stats: [],
+        defense_stats: [],
+        sources: [],
+      }) as Item;
 
     // Map items to their profile slots
     for (const entry of allItems) {
@@ -1162,7 +1205,7 @@ export class ProfileTransformer {
     // Nanos are not interpolated - fetch each at its actual QL via the
     // single-item endpoint (in parallel). Avoids the batch/interpolate path,
     // which forces ql=1 on nanos and uses a key shape that doesn't match here.
-    const fetchPromises = nanoAoids.map(async aoid => {
+    const fetchPromises = nanoAoids.map(async (aoid) => {
       try {
         const response = await apiClient.getItem(aoid);
         return { aoid, item: response.data ?? null };
@@ -1246,7 +1289,9 @@ export class ProfileTransformer {
       Array.from(new Set(aoids)).map(async (aoid) => {
         const response = await apiClient.getItem(aoid, gameVersion ? { gameVersion } : undefined);
         if (!response.success || !response.data) {
-          throw new Error(`Could not load item ${aoid} from ${gameVersion ?? 'the current version'}`);
+          throw new Error(
+            `Could not load item ${aoid} from ${gameVersion ?? 'the current version'}`
+          );
         }
         stats.set(aoid, {
           attack_stats: response.data.attack_stats ?? [],
@@ -1274,9 +1319,9 @@ export class ProfileTransformer {
 
     try {
       // Use batch endpoint for all items at once
-      const batchRequest = itemRequests.map(req => ({
+      const batchRequest = itemRequests.map((req) => ({
         aoid: req.aoid,
-        targetQl: req.targetQl || 1
+        targetQl: req.targetQl || 1,
       }));
 
       // The api client scopes requests to the version being browsed. When the
@@ -1323,7 +1368,6 @@ export class ProfileTransformer {
 
       onProgress?.(itemRequests.length, itemRequests.length);
       console.log(`[ProfileTransformer] Batch fetch complete: ${itemMap.size} items processed`);
-
     } catch (error) {
       if (throwOnRequestError) throw error;
       console.error('[ProfileTransformer] Batch fetch failed, items will be null:', error);

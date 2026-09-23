@@ -19,7 +19,9 @@ Shows active buff nanos with their icons, names, NCU costs and removal options
         <div class="flex justify-between items-center">
           <div class="flex items-center gap-2">
             <i class="pi pi-sparkles text-primary-500" :aria-hidden="true"></i>
-            <span class="font-semibold text-surface-900 dark:text-surface-50"> Buffs ({{ currentNCU }} / {{ maxNCU }} NCU) </span>
+            <span class="font-semibold text-surface-900 dark:text-surface-50">
+              Buffs ({{ currentNCU }} / {{ maxNCU }} NCU)
+            </span>
           </div>
           <Button
             label="Remove All"
@@ -101,7 +103,10 @@ Shows active buff nanos with their icons, names, NCU costs and removal options
     </DataTable>
 
     <!-- Empty State -->
-    <div v-else class="bg-surface-50 dark:bg-surface-900 border-2 border-dashed border-surface-300 dark:border-surface-700 rounded-lg p-8 text-center">
+    <div
+      v-else
+      class="bg-surface-50 dark:bg-surface-900 border-2 border-dashed border-surface-300 dark:border-surface-700 rounded-lg p-8 text-center"
+    >
       <div class="mb-4">
         <i class="pi pi-sparkles text-6xl opacity-30" :aria-hidden="true"></i>
       </div>

@@ -67,9 +67,7 @@ Welcomes users and provides navigation to all six tools with AO-themed descripti
     </section>
 
     <!-- Footer Section -->
-    <section
-      class="footer-section border-t border-surface-200 dark:border-surface-700 py-8 mt-12"
-    >
+    <section class="footer-section border-t border-surface-200 dark:border-surface-700 py-8 mt-12">
       <div class="max-w-7xl mx-auto px-6">
         <!-- Community Links -->
         <div class="flex justify-center items-center gap-8 mb-6">
@@ -106,7 +104,8 @@ Welcomes users and provides navigation to all six tools with AO-themed descripti
         <div class="text-center text-sm text-surface-600 dark:text-surface-400">
           <p class="mb-2">Made by TinkeringIdiot with ❤️ for the Anarchy Online community</p>
           <p class="text-xs">
-            Anarchy Online © Funcom • TinkerTools is a fan-made project and is not affiliated or supported by Funcom or Project Rubi-Ka.
+            Anarchy Online © Funcom • TinkerTools is a fan-made project and is not affiliated or
+            supported by Funcom or Project Rubi-Ka.
           </p>
         </div>
       </div>
@@ -147,7 +146,7 @@ const tools = [
     name: 'TinkerFite',
     subtitle: 'Weapon Analytics',
     description:
-      'Compare DPS and optimize your combat loadout. Analyze weapon performance with your character\'s stats and skills.',
+      "Compare DPS and optimize your combat loadout. Analyze weapon performance with your character's stats and skills.",
     icon: 'pi pi-shield',
     routeName: 'TinkerFite',
   },
@@ -179,7 +178,9 @@ const tools = [
 }
 
 .tool-card {
-  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  transition:
+    transform 0.2s ease-in-out,
+    box-shadow 0.2s ease-in-out;
 }
 
 .tool-card:hover {

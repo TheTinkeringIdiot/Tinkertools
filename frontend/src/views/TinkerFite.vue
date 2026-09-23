@@ -11,7 +11,12 @@ import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { analyzeWeaponsWithCache } from '@/services/weapon-service';
 import { clearWeaponCache, clearLegacyLocalStorageCache } from '@/services/indexed-db-weapon-cache';
 import type { FiteInputState, WeaponCandidate } from '@/types/weapon-analysis';
-import { WEAPON_SKILL_IDS, SPECIAL_ATTACK_IDS, INITIATIVE_IDS, DAMAGE_MODIFIER_IDS } from '@/types/weapon-analysis';
+import {
+  WEAPON_SKILL_IDS,
+  SPECIAL_ATTACK_IDS,
+  INITIATIVE_IDS,
+  DAMAGE_MODIFIER_IDS,
+} from '@/types/weapon-analysis';
 import { getEquipableWeapons } from '@/utils/weapon-filtering';
 import { accountTypeToExpansionBitflag } from '@/utils/expansion-utils';
 import FiteInputForm from '@/components/fite/FiteInputForm.vue';
@@ -150,7 +155,10 @@ async function fetchWeapons() {
       // item granting -4000 to a skill). The backend schema requires
       // `value >= 0`, and an effective negative skill can't meet any positive
       // weapon requirement, so 0 is the correct floor.
-      .map(([skill_id, value]) => ({ skill_id: Number(skill_id), value: Math.max(0, Math.round(value)) }));
+      .map(([skill_id, value]) => ({
+        skill_id: Number(skill_id),
+        value: Math.max(0, Math.round(value)),
+      }));
 
     if (top3.length === 0) {
       console.warn(
@@ -390,11 +398,7 @@ onMounted(() => {
 
       <!-- Weapon Table -->
       <div class="p-4">
-        <FiteTable
-          :weapons="filteredWeapons"
-          :input-state="inputState"
-          :loading="loading"
-        />
+        <FiteTable :weapons="filteredWeapons" :input-state="inputState" :loading="loading" />
       </div>
     </div>
   </div>

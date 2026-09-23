@@ -469,7 +469,9 @@ describe('buildVersionCopy', () => {
 
   it('fails instead of flagging everything missing when the request fails', async () => {
     currentVersion.value = AO_LIVE;
-    (apiClient.batchInterpolateItems as any).mockRejectedValue(new Error('500 Internal Server Error'));
+    (apiClient.batchInterpolateItems as any).mockRejectedValue(
+      new Error('500 Internal Server Error')
+    );
 
     await expect(
       buildVersionCopy(profileWithEquipment(), AO_LIVE, new ProfileTransformer())

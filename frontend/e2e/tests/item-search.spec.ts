@@ -79,13 +79,13 @@ test.describe('Item Search & Filter', () => {
 
   test('should navigate to item details', async ({ page }) => {
     // Search for specific item
-    await itemPage.searchByName('Kyr\'Ozch Energy Rapier');
+    await itemPage.searchByName("Kyr'Ozch Energy Rapier");
 
     // Verify item appears
-    expect(await itemPage.hasItem('Kyr\'Ozch Energy Rapier')).toBe(true);
+    expect(await itemPage.hasItem("Kyr'Ozch Energy Rapier")).toBe(true);
 
     // Click on the item to view details
-    await itemPage.clickItemByName('Kyr\'Ozch Energy Rapier');
+    await itemPage.clickItemByName("Kyr'Ozch Energy Rapier");
 
     // Verify we're on the item detail page
     await expect(page).toHaveURL(/\/items\/\d+/);

@@ -23,12 +23,13 @@ import { skillService } from '@/services/skill-service';
 import type { SkillId } from '@/types/skills';
 import { getProfessionName } from '@/services/game-utils';
 import { useToast } from 'primevue/usetoast';
-import {
-  currentGameVersion,
-  gameVersionDisplayName,
-} from '@/lib/tinkerprofiles/game-version';
+import { currentGameVersion, gameVersionDisplayName } from '@/lib/tinkerprofiles/game-version';
 import type { ProfileVersionCopyResult } from '@/lib/tinkerprofiles/version-copy';
-import { currentVersion, legacyDataVersion, onGameVersionChange } from '@/composables/useGameVersion';
+import {
+  currentVersion,
+  legacyDataVersion,
+  onGameVersionChange,
+} from '@/composables/useGameVersion';
 
 // Types that may not be exported yet
 type NanoCompatibleProfile = any; // TODO: Add proper type when available
@@ -98,12 +99,16 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
   /** Profiles built against the version being browsed. Untagged (pre-version) profiles count as legacyDataVersion(). */
   const currentVersionProfiles = computed(() =>
-    profileMetadata.value.filter((p) => (p.gameVersion ?? legacyDataVersion()) === gameVersion.value)
+    profileMetadata.value.filter(
+      (p) => (p.gameVersion ?? legacyDataVersion()) === gameVersion.value
+    )
   );
 
   /** Profiles built against some other game version. */
   const otherVersionProfiles = computed(() =>
-    profileMetadata.value.filter((p) => (p.gameVersion ?? legacyDataVersion()) !== gameVersion.value)
+    profileMetadata.value.filter(
+      (p) => (p.gameVersion ?? legacyDataVersion()) !== gameVersion.value
+    )
   );
 
   function optionFor(profile: ProfileMetadata, otherVersion: boolean) {
@@ -669,10 +674,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   /**
    * Parse import data without saving, for pre-import inspection
    */
-  async function previewImport(
-    data: string,
-    sourceFormat?: string
-  ): Promise<ProfileImportResult> {
+  async function previewImport(data: string, sourceFormat?: string): Promise<ProfileImportResult> {
     if (!profileManager) {
       throw new Error('Profile manager not initialized');
     }

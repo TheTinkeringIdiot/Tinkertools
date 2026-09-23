@@ -9,9 +9,7 @@ Inputs (2 fields):
   <div
     class="bg-surface-0 dark:bg-surface-950 rounded-lg shadow-md dark:shadow-none border border-surface-200 dark:border-surface-700 p-6"
   >
-    <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4">
-      Combat Bonuses
-    </h3>
+    <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50 mb-4">Combat Bonuses</h3>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       <!-- Add All Offense (276) -->
@@ -57,8 +55,8 @@ Inputs (2 fields):
     >
       <i class="pi pi-info-circle mr-2"></i>
       <strong>Note:</strong> Add Damage is automatically calculated from your damage modifiers
-      (Projectile, Melee, Energy, Chemical, Radiation, Cold, Fire, Poison, Nano) and will be
-      applied based on the weapon's damage type.
+      (Projectile, Melee, Energy, Chemical, Radiation, Cold, Fire, Poison, Nano) and will be applied
+      based on the weapon's damage type.
     </div>
   </div>
 </template>

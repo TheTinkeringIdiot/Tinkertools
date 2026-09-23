@@ -180,12 +180,14 @@ Grid-based implant selection following the legacy TinkerPlants format
                     </div>
 
                     <!-- Type Toggle -->
-                    <div class="p-2 border-r border-surface-200 dark:border-surface-700 flex items-center justify-center">
+                    <div
+                      class="p-2 border-r border-surface-200 dark:border-surface-700 flex items-center justify-center"
+                    >
                       <SelectButton
                         v-model="slotType[slot.id]"
                         :options="[
                           { label: 'I', value: 'Implant' },
-                          { label: 'S', value: 'Symbiant' }
+                          { label: 'S', value: 'Symbiant' },
                         ]"
                         option-label="label"
                         option-value="value"
@@ -268,7 +270,10 @@ Grid-based implant selection following the legacy TinkerPlants format
 
                     <!-- Symbiant Mode: Symbiant Selector -->
                     <template v-else>
-                      <div class="p-2 border-r border-surface-200 dark:border-surface-700 flex items-stretch" style="grid-column: 3 / 6;">
+                      <div
+                        class="p-2 border-r border-surface-200 dark:border-surface-700 flex items-stretch"
+                        style="grid-column: 3 / 6"
+                      >
                         <AutoComplete
                           :id="`${slot.id}-symbiant`"
                           :model-value="getSelectedSymbiant(slot.id)"
@@ -709,9 +714,7 @@ const getSymbiantsForSlot = (slotId: string): any[] => {
 
   const slotBitflag = parseInt(mapping.bitflag, 10);
 
-  return symbiantsStore.allSymbiants.filter(
-    (symbiant) => symbiant.slot_id === slotBitflag
-  );
+  return symbiantsStore.allSymbiants.filter((symbiant) => symbiant.slot_id === slotBitflag);
 };
 
 /**
@@ -763,9 +766,7 @@ const onSlotTypeChange = (slotId: string, newType: 'Implant' | 'Symbiant') => {
   // Update store with new type
   tinkerPlantsStore.setSlotType(slotBitflag, newType === 'Symbiant' ? 'symbiant' : 'implant');
 
-  announce(
-    `${slotId} slot switched to ${newType} mode`
-  );
+  announce(`${slotId} slot switched to ${newType} mode`);
 };
 
 /**

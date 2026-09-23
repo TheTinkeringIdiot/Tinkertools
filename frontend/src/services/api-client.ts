@@ -446,7 +446,10 @@ class TinkerToolsApiClient {
   }
 
   async getItem(aoid: number, options?: { gameVersion?: string }): Promise<ApiResponse<Item>> {
-    return this.get<Item>(`/items/${aoid}`, options?.gameVersion ? { gameVersion: options.gameVersion } : undefined);
+    return this.get<Item>(
+      `/items/${aoid}`,
+      options?.gameVersion ? { gameVersion: options.gameVersion } : undefined
+    );
   }
 
   async getItems(ids: number[]): Promise<ApiResponse<Item[]>> {
@@ -482,11 +485,9 @@ class TinkerToolsApiClient {
   ): Promise<ImplantLookupResponse> {
     try {
       const request = { slot, ql, clusters };
-      const response = await this.client.post<ImplantLookupResponse>(
-        '/implants/lookup',
-        request,
-        { signal }
-      );
+      const response = await this.client.post<ImplantLookupResponse>('/implants/lookup', request, {
+        signal,
+      });
 
       // Backend returns ImplantLookupResponse with item in 'item' field
       return response.data;
@@ -558,10 +559,9 @@ class TinkerToolsApiClient {
 
   async batchLookupPerks(aoids: number[]): Promise<BatchPerkLookupResponse> {
     try {
-      const response = await this.client.post<BatchPerkLookupResponse>(
-        '/perks/batch/lookup',
-        { aoids }
-      );
+      const response = await this.client.post<BatchPerkLookupResponse>('/perks/batch/lookup', {
+        aoids,
+      });
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -641,7 +641,7 @@ class TinkerToolsApiClient {
       const response = await this.client.post<BatchInterpolationResponse>(
         '/items/batch/interpolate',
         {
-          items: requests.map(r => ({ aoid: r.aoid, target_ql: r.targetQl }))
+          items: requests.map((r) => ({ aoid: r.aoid, target_ql: r.targetQl })),
         }
       );
       return response.data;
@@ -675,7 +675,9 @@ class TinkerToolsApiClient {
   // Symbiants API
   // ============================================================================
 
-  async searchSymbiants(query?: SymbiantSearchQuery & { page?: number; limit?: number }): Promise<PaginatedResponse<SymbiantItem>> {
+  async searchSymbiants(
+    query?: SymbiantSearchQuery & { page?: number; limit?: number }
+  ): Promise<PaginatedResponse<SymbiantItem>> {
     const params = new URLSearchParams();
 
     if (query?.page) params.append('page', query.page.toString());

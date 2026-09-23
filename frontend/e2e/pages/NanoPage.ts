@@ -58,18 +58,29 @@ export class NanoPage {
   }
 
   async hasNano(nanoName: string): Promise<boolean> {
-    return await this.page.getByText(nanoName).isVisible({ timeout: 2000 }).catch(() => false);
+    return await this.page
+      .getByText(nanoName)
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
   }
 
   /**
    * Check if a nano is marked as compatible (green) or incompatible (red)
    */
-  async getNanoCompatibilityStatus(nanoName: string): Promise<'compatible' | 'incompatible' | 'unknown'> {
+  async getNanoCompatibilityStatus(
+    nanoName: string
+  ): Promise<'compatible' | 'incompatible' | 'unknown'> {
     const nanoCard = this.page.locator('[data-testid="nano-card"]', { hasText: nanoName }).first();
 
     // Check for compatibility indicator classes/colors
-    const isCompatible = await nanoCard.locator('[data-testid="compatibility-indicator"].compatible, .text-green-500, .bg-green-100').isVisible({ timeout: 1000 }).catch(() => false);
-    const isIncompatible = await nanoCard.locator('[data-testid="compatibility-indicator"].incompatible, .text-red-500, .bg-red-100').isVisible({ timeout: 1000 }).catch(() => false);
+    const isCompatible = await nanoCard
+      .locator('[data-testid="compatibility-indicator"].compatible, .text-green-500, .bg-green-100')
+      .isVisible({ timeout: 1000 })
+      .catch(() => false);
+    const isIncompatible = await nanoCard
+      .locator('[data-testid="compatibility-indicator"].incompatible, .text-red-500, .bg-red-100')
+      .isVisible({ timeout: 1000 })
+      .catch(() => false);
 
     if (isCompatible) return 'compatible';
     if (isIncompatible) return 'incompatible';
@@ -82,6 +93,6 @@ export class NanoPage {
   async getNanoRequirements(nanoName: string): Promise<string> {
     const nanoCard = this.page.locator('[data-testid="nano-card"]', { hasText: nanoName }).first();
     const requirementsSection = nanoCard.locator('[data-testid="nano-requirements"]');
-    return await requirementsSection.textContent() || '';
+    return (await requirementsSection.textContent()) || '';
   }
 }

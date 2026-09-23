@@ -94,10 +94,7 @@ Inputs (7 fields):
 
       <!-- Critical Increase -->
       <div class="flex flex-col">
-        <label
-          for="crit"
-          class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-1"
-        >
+        <label for="crit" class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
           Critical Increase
         </label>
         <InputNumber
@@ -132,10 +129,7 @@ Inputs (7 fields):
 
       <!-- Aggdef Slider -->
       <div class="flex flex-col md:col-span-2 lg:col-span-3">
-        <label
-          for="aggdef"
-          class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-1"
-        >
+        <label for="aggdef" class="text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
           Agg/Def Slider: {{ localStats.aggdef }}
         </label>
         <Slider

@@ -97,7 +97,10 @@ const emit = defineEmits<{
 
 // Provide profile for AC calculation in child components
 // IMPORTANT: Provide computed ref to ensure reactivity when profile prop changes
-provide('profile', computed(() => props.profile));
+provide(
+  'profile',
+  computed(() => props.profile)
+);
 
 // Use skills composable for skill operations with the viewed profile
 // Don't pass profile in options - rely on injection for reactivity

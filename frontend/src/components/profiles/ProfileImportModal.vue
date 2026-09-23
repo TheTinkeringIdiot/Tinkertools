@@ -163,7 +163,9 @@ Modal for importing profiles from various formats
                 v-model="updateTargetId"
                 :options="duplicateMatches"
                 option-value="id"
-                :option-label="(p: ProfileMetadata) => `${p.name} (Level ${p.level} ${p.profession})`"
+                :option-label="
+                  (p: ProfileMetadata) => `${p.name} (Level ${p.level} ${p.profession})`
+                "
                 class="w-full"
               />
             </div>
@@ -229,7 +231,9 @@ Modal for importing profiles from various formats
 
       <!-- Import Progress -->
       <div v-if="importing && importProgress" class="field">
-        <div class="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+        <div
+          class="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg"
+        >
           <div class="flex items-center gap-3">
             <ProgressSpinner style="width: 24px; height: 24px" strokeWidth="4" />
             <div class="flex-1">
@@ -243,7 +247,10 @@ Modal for importing profiles from various formats
                 style="height: 6px"
                 class="mt-2"
               />
-              <div v-if="importProgress.total > 1" class="text-xs text-blue-600 dark:text-blue-400 mt-1">
+              <div
+                v-if="importProgress.total > 1"
+                class="text-xs text-blue-600 dark:text-blue-400 mt-1"
+              >
                 {{ importProgress.current }} / {{ importProgress.total }}
               </div>
             </div>
@@ -653,7 +660,7 @@ async function importProfile() {
     phase: 'parsing',
     current: 0,
     total: 1,
-    message: 'Parsing profile data...'
+    message: 'Parsing profile data...',
   };
 
   try {

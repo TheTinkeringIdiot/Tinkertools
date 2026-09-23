@@ -48,7 +48,10 @@ export function useSkills(options: UseSkillsOptions = {}) {
 
   // Try to inject profile from parent component (e.g., SkillsManager)
   // Support both direct profile injection and ComputedRef<TinkerProfile> injection
-  const injectedProfile = inject<TinkerProfile | ComputedRef<TinkerProfile> | null>('profile', null);
+  const injectedProfile = inject<TinkerProfile | ComputedRef<TinkerProfile> | null>(
+    'profile',
+    null
+  );
 
   // ============================================================================
   // Reactive Computed Properties

@@ -24,22 +24,157 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
       },
       skills: {
         // Attributes (IDs 16-21)
-        16: { base: 100, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 100 }, // Strength
-        17: { base: 100, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 100 }, // Agility
-        18: { base: 100, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 100 }, // Stamina
-        19: { base: 100, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 100 }, // Intelligence
-        20: { base: 100, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 100 }, // Sense
-        21: { base: 100, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 100 }, // Psychic
+        16: {
+          base: 100,
+          trickle: 0,
+          ipSpent: 0,
+          pointsFromIp: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          total: 100,
+        }, // Strength
+        17: {
+          base: 100,
+          trickle: 0,
+          ipSpent: 0,
+          pointsFromIp: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          total: 100,
+        }, // Agility
+        18: {
+          base: 100,
+          trickle: 0,
+          ipSpent: 0,
+          pointsFromIp: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          total: 100,
+        }, // Stamina
+        19: {
+          base: 100,
+          trickle: 0,
+          ipSpent: 0,
+          pointsFromIp: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          total: 100,
+        }, // Intelligence
+        20: {
+          base: 100,
+          trickle: 0,
+          ipSpent: 0,
+          pointsFromIp: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          total: 100,
+        }, // Sense
+        21: {
+          base: 100,
+          trickle: 0,
+          ipSpent: 0,
+          pointsFromIp: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          total: 100,
+        }, // Psychic
         // Misc skills - testing only the ones needed for tests
-        181: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 0 }, // Max NCU
-        278: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 0 }, // Add. Proj. Dam.
-        279: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 0 }, // Add. Melee Dam.
-        343: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 0 }, // HealDelta
-        364: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 0 }, // NanoDelta
-        276: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 0 }, // Add All Off.
-        277: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 0 }, // Add All Def.
-        280: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 0 }, // Add. Energy Dam.
-        379: { base: 0, trickle: 0, ipSpent: 0, pointsFromIp: 0, equipmentBonus: 0, perkBonus: 0, buffBonus: 0, total: 0 }, // CriticalIncrease
+        181: {
+          base: 0,
+          trickle: 0,
+          ipSpent: 0,
+          pointsFromIp: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          total: 0,
+        }, // Max NCU
+        278: {
+          base: 0,
+          trickle: 0,
+          ipSpent: 0,
+          pointsFromIp: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          total: 0,
+        }, // Add. Proj. Dam.
+        279: {
+          base: 0,
+          trickle: 0,
+          ipSpent: 0,
+          pointsFromIp: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          total: 0,
+        }, // Add. Melee Dam.
+        343: {
+          base: 0,
+          trickle: 0,
+          ipSpent: 0,
+          pointsFromIp: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          total: 0,
+        }, // HealDelta
+        364: {
+          base: 0,
+          trickle: 0,
+          ipSpent: 0,
+          pointsFromIp: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          total: 0,
+        }, // NanoDelta
+        276: {
+          base: 0,
+          trickle: 0,
+          ipSpent: 0,
+          pointsFromIp: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          total: 0,
+        }, // Add All Off.
+        277: {
+          base: 0,
+          trickle: 0,
+          ipSpent: 0,
+          pointsFromIp: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          total: 0,
+        }, // Add All Def.
+        280: {
+          base: 0,
+          trickle: 0,
+          ipSpent: 0,
+          pointsFromIp: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          total: 0,
+        }, // Add. Energy Dam.
+        379: {
+          base: 0,
+          trickle: 0,
+          ipSpent: 0,
+          pointsFromIp: 0,
+          equipmentBonus: 0,
+          perkBonus: 0,
+          buffBonus: 0,
+          total: 0,
+        }, // CriticalIncrease
       },
       Clothing: {},
       Weapons: {},
@@ -228,17 +363,35 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
 
       // Set equipment bonus
       skill.equipmentBonus = 25;
-      skill.total = skill.base + skill.trickle + skill.pointsFromIp + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
+      skill.total =
+        skill.base +
+        skill.trickle +
+        skill.pointsFromIp +
+        skill.equipmentBonus +
+        skill.perkBonus +
+        skill.buffBonus;
       expect(skill.total).toBe(25);
 
       // Set perk bonus independently
       skill.perkBonus = 10;
-      skill.total = skill.base + skill.trickle + skill.pointsFromIp + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
+      skill.total =
+        skill.base +
+        skill.trickle +
+        skill.pointsFromIp +
+        skill.equipmentBonus +
+        skill.perkBonus +
+        skill.buffBonus;
       expect(skill.total).toBe(35);
 
       // Set buff bonus independently
       skill.buffBonus = 5;
-      skill.total = skill.base + skill.trickle + skill.pointsFromIp + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
+      skill.total =
+        skill.base +
+        skill.trickle +
+        skill.pointsFromIp +
+        skill.equipmentBonus +
+        skill.perkBonus +
+        skill.buffBonus;
       expect(skill.total).toBe(40);
 
       // Verify individual values remain correct
@@ -323,12 +476,24 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
 
       // Simulate perk change
       skill.perkBonus = 20;
-      skill.total = skill.base + skill.trickle + skill.pointsFromIp + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
+      skill.total =
+        skill.base +
+        skill.trickle +
+        skill.pointsFromIp +
+        skill.equipmentBonus +
+        skill.perkBonus +
+        skill.buffBonus;
       expect(skill.total).toBe(20);
 
       // Simulate buff change
       skill.buffBonus = 15;
-      skill.total = skill.base + skill.trickle + skill.pointsFromIp + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
+      skill.total =
+        skill.base +
+        skill.trickle +
+        skill.pointsFromIp +
+        skill.equipmentBonus +
+        skill.perkBonus +
+        skill.buffBonus;
       expect(skill.total).toBe(35);
 
       // Recalculate - values should remain consistent
@@ -489,7 +654,13 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
       skill.buffBonus = 10;
 
       // Calculate value
-      skill.total = skill.base + skill.trickle + skill.pointsFromIp + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
+      skill.total =
+        skill.base +
+        skill.trickle +
+        skill.pointsFromIp +
+        skill.equipmentBonus +
+        skill.perkBonus +
+        skill.buffBonus;
 
       expect(skill.total).toBe(45); // 0 + 0 + 0 + 20 + 15 + 10
     });
@@ -510,7 +681,13 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
       skill.perkBonus = -5; // Negative perk bonus
       skill.buffBonus = 3;
 
-      skill.total = skill.base + skill.trickle + skill.pointsFromIp + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
+      skill.total =
+        skill.base +
+        skill.trickle +
+        skill.pointsFromIp +
+        skill.equipmentBonus +
+        skill.perkBonus +
+        skill.buffBonus;
 
       expect(skill.total).toBe(8); // 0 + 0 + 0 + 10 - 5 + 3
     });
@@ -587,7 +764,12 @@ describe('Misc Skills Fix - Accumulation Bug Prevention', () => {
 
         // Verify value calculation is correct
         const expectedValue =
-          skill.base + skill.trickle + skill.pointsFromIp + skill.equipmentBonus + skill.perkBonus + skill.buffBonus;
+          skill.base +
+          skill.trickle +
+          skill.pointsFromIp +
+          skill.equipmentBonus +
+          skill.perkBonus +
+          skill.buffBonus;
         expect(skill.total).toBe(expectedValue);
       });
     });

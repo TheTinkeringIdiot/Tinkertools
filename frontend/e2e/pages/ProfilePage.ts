@@ -78,6 +78,9 @@ export class ProfilePage {
   }
 
   async hasProfile(name: string): Promise<boolean> {
-    return await this.page.getByText(name).isVisible({ timeout: 2000 }).catch(() => false);
+    return await this.page
+      .getByText(name)
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
   }
 }

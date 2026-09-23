@@ -219,10 +219,7 @@ const tableData = computed(() => {
     // Calculate modified recharge time (in seconds)
     // nano.rechargeTime is in centiseconds, convert to seconds for calculations
     // NanoInit does NOT affect recharge; only the rechargeDelayCap (stat 524) clamp applies
-    const rechargeTime = calculateRechargeTime(
-      nano.rechargeTime,
-      nano.rechargeDelayCap
-    );
+    const rechargeTime = calculateRechargeTime(nano.rechargeTime, nano.rechargeDelayCap);
 
     // Calculate modified nano cost (with breed cap)
     const nanoCost = calculateNanoCost(

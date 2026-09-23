@@ -11,9 +11,7 @@
         ({{ currentValue }})
       </span>
       <!-- OE Breakpoints for skills/attributes -->
-      <span v-if="showOEBreakpointsComputed" class="oe-breakpoints">
-        OE: {{ oeBreakpoints }}
-      </span>
+      <span v-if="showOEBreakpointsComputed" class="oe-breakpoints"> OE: {{ oeBreakpoints }} </span>
     </div>
 
     <!-- State Requirement -->
@@ -37,7 +35,8 @@
           v-if="criterion.referenceAoid"
           :to="{ name: 'ItemDetail', params: { aoid: String(criterion.referenceAoid) } }"
           class="function-link"
-        >{{ resolvedName || `Nano ${criterion.referenceAoid}` }}</RouterLink>
+          >{{ resolvedName || `Nano ${criterion.referenceAoid}` }}</RouterLink
+        >
         <template v-else>{{ nanoLineName }}</template>
       </span>
     </div>

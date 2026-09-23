@@ -238,10 +238,7 @@ watch(
       </Card>
 
       <!-- Loading State -->
-      <div
-        v-if="symbiantsStore.farmListLoading"
-        class="flex justify-center items-center py-12"
-      >
+      <div v-if="symbiantsStore.farmListLoading" class="flex justify-center items-center py-12">
         <i class="pi pi-spin pi-spinner text-4xl text-primary-500"></i>
       </div>
 
@@ -351,12 +348,7 @@ watch(
         </p>
         <InputText v-model="shareUrl" readonly class="w-full" />
         <div class="flex justify-end gap-2">
-          <Button
-            label="Close"
-            severity="secondary"
-            outlined
-            @click="showShareDialog = false"
-          />
+          <Button label="Close" severity="secondary" outlined @click="showShareDialog = false" />
           <Button label="Copy to Clipboard" icon="pi pi-copy" @click="handleCopyShareUrl" />
         </div>
       </div>

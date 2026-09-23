@@ -5,9 +5,11 @@ This directory contains reusable mock implementations for common dependencies.
 ## Available Mocks
 
 ### `axios.ts`
+
 Complete mock of axios with interceptors and all HTTP methods.
 
 **Usage:**
+
 ```typescript
 import { vi } from 'vitest';
 
@@ -24,9 +26,11 @@ mockAxios.get.mockResolvedValue({ data: { ... }, status: 200 });
 ```
 
 ### `vue-router.ts`
+
 Complete mock of vue-router with all exports (createRouter, useRoute, useRouter, etc.)
 
 **Usage:**
+
 ```typescript
 import { vi } from 'vitest';
 
@@ -42,9 +46,11 @@ expect(mockRouterInstance.push).toHaveBeenCalledWith('/some-path');
 ```
 
 ### `api-client.ts`
+
 Mock of the TinkerTools API client with proper response structures.
 
 **Usage:**
+
 ```typescript
 import { vi } from 'vitest';
 
@@ -66,6 +72,7 @@ mockApiClient.getItem.mockResolvedValue({
 ## Best Practices
 
 ### 1. Mock at Test File Top
+
 Place mock calls **before** any imports that use those modules:
 
 ```typescript
@@ -81,6 +88,7 @@ import { useInterpolation } from '../useInterpolation';
 ```
 
 ### 2. Reset Mocks in beforeEach
+
 Always clear mock history between tests:
 
 ```typescript
@@ -90,6 +98,7 @@ beforeEach(() => {
 ```
 
 ### 3. Configure Mock Responses
+
 Set up specific responses for each test:
 
 ```typescript
@@ -100,6 +109,7 @@ it('should handle API error', async () => {
 ```
 
 ### 4. Assert on Mock Calls
+
 Verify mocks were called correctly:
 
 ```typescript
@@ -110,16 +120,21 @@ expect(mockApiClient.getItem).toHaveBeenCalledTimes(1);
 ## Common Issues
 
 ### "is not a function" errors
+
 Make sure the mock exports the method you're trying to call. Check the mock file to see what's available.
 
 ### Mock not being used
+
 Ensure `vi.mock()` is called **before** any imports that depend on that module.
 
 ### Mock calls not clearing
+
 Add `vi.clearAllMocks()` to your `beforeEach()` hook.
 
 ### Type errors with mocks
+
 Use type assertions when needed:
+
 ```typescript
 const mockGet = mockApiClient.getItem as Mock;
 mockGet.mockResolvedValue({ ... });
@@ -134,6 +149,7 @@ To add new methods to existing mocks:
 3. Document usage in this README
 
 Example:
+
 ```typescript
 // In api-client.ts
 export const mockApiClient = {

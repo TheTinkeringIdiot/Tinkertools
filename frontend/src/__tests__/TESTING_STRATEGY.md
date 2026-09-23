@@ -9,6 +9,7 @@ This document explains the testing strategy for the TinkerTools frontend, which 
 **Test the behavior users care about, not implementation details.**
 
 We follow a pragmatic test pyramid:
+
 - **55% Unit Tests** - Pure functions, calculators, business logic
 - **40% Integration Tests** - Real Pinia stores with mocked API
 - **5% E2E Tests** - Real browser testing critical user workflows
@@ -16,16 +17,19 @@ We follow a pragmatic test pyramid:
 ## What We Don't Test
 
 **Component Tests** - We aggressively deleted 31 component test files because:
+
 - Fragile selectors break on every UI change
 - Mocked stores don't catch real bugs
 - Provide false confidence (passing tests, broken production)
 - Better covered by E2E tests
 
 **Store Unit Tests** - We deleted 6 store test files that mocked Pinia internals because:
+
 - Mocking stores defeats the purpose (not testing real state management)
 - Better covered by integration tests with REAL stores
 
 **View Tests** - We deleted 8 view test files because:
+
 - Just large component tests with same fragility issues
 - Better covered by E2E workflow tests
 
@@ -38,6 +42,7 @@ Tests are categorized into three types with different strategies:
 These tests **use no mocks** and test pure business logic.
 
 **What to test**:
+
 - Calculation services (IP cost, bonus calculation, weapon DPS)
 - Utility functions (game formulas, stat lookups, data parsing)
 - Pure transformers (data mapping, filtering, sorting)
@@ -45,12 +50,14 @@ These tests **use no mocks** and test pure business logic.
 - Interpolation services
 
 **Why valuable**:
+
 - Fast execution (< 50ms per test)
 - No dependencies on external systems
 - Stable APIs (business logic rarely changes)
 - High confidence (pure functions = predictable)
 
 **Examples**:
+
 - `action-criteria.test.ts` - 39 tests for requirement checking
 - `perk-bonus-calculator.test.ts` - 36 tests for perk bonuses
 - `nano-bonus-calculator.test.ts` - 39 tests for nano bonuses
@@ -59,6 +66,7 @@ These tests **use no mocks** and test pure business logic.
 - `ip-integrator.test.ts` - Profile stat integration
 
 **Pattern**:
+
 ```typescript
 import { describe, it, expect } from 'vitest';
 import { calculateIPCost } from '@/services/ip-calculator';
@@ -78,6 +86,7 @@ describe('IP Calculator', () => {
 These tests use **real Pinia stores** with **mocked API client only**.
 
 **What to test**:
+
 - Profile CRUD operations (create, edit, delete, switch)
 - Equipment management (equip, unequip, stat effects)
 - Nano management (cast, remove, NCU tracking, strain conflicts)
@@ -86,12 +95,14 @@ These tests use **real Pinia stores** with **mocked API client only**.
 - Cross-tool workflows (equipment → stats → requirements)
 
 **Why valuable**:
+
 - Tests real state management logic (reactivity, actions, getters)
 - Tests real component integration (mounting, props, events)
 - Catches bugs mocked tests miss (equipment persistence, stat recalculation)
 - Fast enough for TDD (< 500ms per test)
 
 **Examples**:
+
 - `buff-management.integration.test.ts` - NCU tracking, nano strain conflicts
 - `equipment-interaction.integration.test.ts` - Equip/unequip with stat effects
 - `item-search-interaction.integration.test.ts` - Search filters, pagination
@@ -100,6 +111,7 @@ These tests use **real Pinia stores** with **mocked API client only**.
 - `ip-calculation-workflow.test.ts` - IP spending and recalculation
 
 **Pattern**:
+
 ```typescript
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createApp } from 'vue';
@@ -143,6 +155,7 @@ describe('Feature Integration Tests', () => {
 These tests use **Playwright** to test complete workflows in a **real browser**.
 
 **What to test**:
+
 - Critical user workflows (happy paths)
 - Cross-tool workflows (item → profile → nano)
 - Complex UI interactions (drag-drop, modals, multi-step forms)
@@ -150,18 +163,21 @@ These tests use **Playwright** to test complete workflows in a **real browser**.
 - Backend integration (optional - can mock)
 
 **Why valuable**:
+
 - Tests real user experience (browser, rendering, interactions)
 - Tests real integrations (frontend + backend)
 - Catches bugs integration tests miss (CSS, animations, responsive)
 - Validates accessibility (screen readers, keyboard nav)
 
 **Examples**:
+
 - `item-search-workflow.test.ts` - Search, filter, select, view details
 - `profile-management-workflow.test.ts` - Create, edit, delete, switch profiles
 - `nano-compatibility-workflow.test.ts` - Check requirements, filter nanos
 - `tinker-plants-workflow.test.ts` - Implant planning workflow
 
 **Pattern**:
+
 ```typescript
 import { test, expect } from '@playwright/test';
 
@@ -187,6 +203,7 @@ These tests **require a real backend** and should only run when the backend is a
 **Strategy**: Use `describe.skipIf(!BACKEND_AVAILABLE)` to skip entire test suites when backend is unavailable.
 
 **Files**:
+
 - `backend-integration.test.ts` - Explicitly tests backend integration
 - `pocketBossStore.integration.test.ts` - Tests real pocket boss API
 - `symbiantsStore.integration.test.ts` - Tests real symbiant API
@@ -194,6 +211,7 @@ These tests **require a real backend** and should only run when the backend is a
 - `pagination-integration.test.ts` - Tests real pagination behavior
 
 **Pattern**:
+
 ```typescript
 import { isBackendAvailable } from '../helpers/backend-check';
 
@@ -283,6 +301,7 @@ npx playwright test --ui
 ### Execution Behavior
 
 **When backend is NOT available**:
+
 - Backend integration tests: **Skipped** with warning message
 - Unit tests: **Run normally** (no external dependencies)
 - Integration tests: **Run normally** (use mocked API)
@@ -290,6 +309,7 @@ npx playwright test --ui
 - Total execution time: < 30 seconds
 
 **When backend IS available**:
+
 - Backend integration tests: **Run normally** against real backend
 - Unit tests: **Run normally** (no change)
 - Integration tests: **Run normally** (still use mocked API)
@@ -361,24 +381,28 @@ test('user can search for items', async ({ page }) => {
 ### E2E Best Practices
 
 1. **Use data-testid attributes** - Avoid brittle selectors
+
    ```html
    <button data-testid="search-button">Search</button>
    ```
 
 2. **Wait for network** - Use Playwright's auto-wait
+
    ```typescript
    await page.click('[data-testid="search-button"]');
-   await page.waitForResponse(resp => resp.url().includes('/api/items'));
+   await page.waitForResponse((resp) => resp.url().includes('/api/items'));
    ```
 
 3. **Mock backend when needed** - Fast E2E tests
+
    ```typescript
-   await page.route('**/api/items*', route => {
+   await page.route('**/api/items*', (route) => {
      route.fulfill({ json: mockItems });
    });
    ```
 
 4. **Test happy paths only** - E2E tests are expensive
+
    - Don't test every edge case in E2E
    - Cover edge cases in integration/unit tests
    - E2E tests validate critical user workflows
@@ -539,14 +563,14 @@ For full integration testing in CI:
 
 ## Summary
 
-| Test Type             | Files | Tests | Pass Rate | Backend Required | Execution Time |
-| --------------------- | ----- | ----- | --------- | ---------------- | -------------- |
-| Unit/Service Tests    | ~23   | ~400  | 95%       | No               | < 5s           |
-| Integration Tests     | ~13   | ~250  | 80%       | No (mocked API)  | < 10s          |
-| E2E Tests             | ~8    | ~80   | 60%       | Optional         | ~2-3 min       |
-| Backend API Tests     | ~3    | ~50   | Skipped   | Yes              | ~30s           |
-| Component Tests       | ~7    | ~100  | 70%       | No               | < 3s           |
-| **Total**             | **55**| **~900** | **~75%** | **Optional**    | **< 30s**     |
+| Test Type          | Files  | Tests    | Pass Rate | Backend Required | Execution Time |
+| ------------------ | ------ | -------- | --------- | ---------------- | -------------- |
+| Unit/Service Tests | ~23    | ~400     | 95%       | No               | < 5s           |
+| Integration Tests  | ~13    | ~250     | 80%       | No (mocked API)  | < 10s          |
+| E2E Tests          | ~8     | ~80      | 60%       | Optional         | ~2-3 min       |
+| Backend API Tests  | ~3     | ~50      | Skipped   | Yes              | ~30s           |
+| Component Tests    | ~7     | ~100     | 70%       | No               | < 3s           |
+| **Total**          | **55** | **~900** | **~75%**  | **Optional**     | **< 30s**      |
 
 **Key Benefits**:
 
@@ -951,13 +975,13 @@ await new Promise((resolve) => setTimeout(resolve, 100));
 
 ### Current Test Results (November 2025)
 
-| Suite                 | Type        | Tests | Pass Rate    | Status          |
-| --------------------- | ----------- | ----- | ------------ | --------------- |
-| Service Tests         | Unit        | ~400  | ~380 (95%)   | ✅ Excellent    |
-| Integration Tests     | Integration | ~250  | ~200 (80%)   | ✅ Good         |
-| E2E Tests             | E2E         | ~80   | ~48 (60%)    | ⚠️ In Progress  |
-| Component Tests       | Unit        | ~100  | ~70 (70%)    | ⚠️ Some Issues  |
-| Backend API Tests     | Integration | ~50   | Skipped      | ⏸️ Backend Only |
+| Suite             | Type        | Tests | Pass Rate  | Status          |
+| ----------------- | ----------- | ----- | ---------- | --------------- |
+| Service Tests     | Unit        | ~400  | ~380 (95%) | ✅ Excellent    |
+| Integration Tests | Integration | ~250  | ~200 (80%) | ✅ Good         |
+| E2E Tests         | E2E         | ~80   | ~48 (60%)  | ⚠️ In Progress  |
+| Component Tests   | Unit        | ~100  | ~70 (70%)  | ⚠️ Some Issues  |
+| Backend API Tests | Integration | ~50   | Skipped    | ⏸️ Backend Only |
 
 **Overall: ~700/~900 passing (~78%)**
 
@@ -1010,6 +1034,7 @@ Note: Some failures are expected during active development. Core functionality i
 ### When to Write Each Type of Test
 
 **Unit Test** - Pure function, no external dependencies
+
 ```typescript
 // ✅ Good: Pure calculation
 test('calculateIPCost', () => {
@@ -1023,6 +1048,7 @@ test('loadProfile', () => {
 ```
 
 **Integration Test** - Real stores, mocked API
+
 ```typescript
 // ✅ Good: Tests real store with mocked API
 test('create profile', async () => {
@@ -1039,6 +1065,7 @@ test('profile form', () => {
 ```
 
 **E2E Test** - Critical user workflow
+
 ```typescript
 // ✅ Good: Complete user workflow
 test('user creates and equips profile', async ({ page }) => {

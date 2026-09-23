@@ -12,31 +12,31 @@
  * - 60-second DPS sample
  */
 
-import type { WeaponCandidate, FiteInputState } from '@/types/weapon-analysis'
-import { WEAPON_STAT_IDS } from '@/types/weapon-analysis'
-import { calculateSpeeds, calculateCycleTime } from './weapon-speed-calculations'
+import type { WeaponCandidate, FiteInputState } from '@/types/weapon-analysis';
+import { WEAPON_STAT_IDS } from '@/types/weapon-analysis';
+import { calculateSpeeds, calculateCycleTime } from './weapon-speed-calculations';
 
-const SAMPLE_LENGTH = 60 // DPS sample in seconds
+const SAMPLE_LENGTH = 60; // DPS sample in seconds
 
 export interface DamageStats {
-  minDamage: number
-  avgDamage: number
-  maxDamage: number
-  critDamage: number
+  minDamage: number;
+  avgDamage: number;
+  maxDamage: number;
+  critDamage: number;
 }
 
 export interface Damage60sResult {
-  attackTime: number
-  rechargeTime: number
-  minDamage: number
-  avgDamage: number
-  maxDamage: number
-  critDamage: number
-  minDamage60s: number
-  avgDamage60s: number
-  maxDamage60s: number
-  numBasicAttacks: number
-  numCrits: number
+  attackTime: number;
+  rechargeTime: number;
+  minDamage: number;
+  avgDamage: number;
+  maxDamage: number;
+  critDamage: number;
+  minDamage60s: number;
+  avgDamage60s: number;
+  maxDamage60s: number;
+  numBasicAttacks: number;
+  numCrits: number;
 }
 
 /**
@@ -53,42 +53,42 @@ export interface Damage60sResult {
  *    - if atk_skill > 1000: ar_bonus += (atk_skill - 1000) / 1200
  */
 export function calculateARBonus(weapon: WeaponCandidate, state: FiteInputState): number {
-  const attackStats = weapon.attack_stats || []
+  const attackStats = weapon.attack_stats || [];
 
   // Sum attack skills weighted by percentages
-  let attackSkill = 0
+  let attackSkill = 0;
 
   for (const attackStat of attackStats) {
-    const skillId = attackStat.stat
-    const percentage = attackStat.value
-    const skillValue = state.weaponSkills[skillId] || 0
+    const skillId = attackStat.stat;
+    const percentage = attackStat.value;
+    const skillValue = state.weaponSkills[skillId] || 0;
 
-    attackSkill += Math.round(skillValue * (percentage / 100))
+    attackSkill += Math.round(skillValue * (percentage / 100));
   }
 
   // Add AAO bonus
-  const aao = state.combatBonuses.aao || 0
-  attackSkill += aao
+  const aao = state.combatBonuses.aao || 0;
+  attackSkill += aao;
 
   // Apply AR cap if weapon has one (e.g., MBS weapons)
   // In legacy, this is weapon.other['Attack rating cap']
   // In new schema, this is stat 538 (Max Beneficial Skill)
-  const arCap = weapon.stats?.find((s) => s.stat === WEAPON_STAT_IDS.AR_CAP)?.value
+  const arCap = weapon.stats?.find((s) => s.stat === WEAPON_STAT_IDS.AR_CAP)?.value;
   if (arCap !== undefined && attackSkill > arCap) {
-    attackSkill = arCap
+    attackSkill = arCap;
   }
 
   // Tiered AR bonus formula
   // ar_bonus = 1 + (min(atk_skill, 1000) / 400)
   // if atk_skill > 1000: ar_bonus += (atk_skill - 1000) / 1200
 
-  let arBonus = 1 + Math.min(attackSkill, 1000) / 400
+  let arBonus = 1 + Math.min(attackSkill, 1000) / 400;
 
   if (attackSkill > 1000) {
-    arBonus += (attackSkill - 1000) / 1200
+    arBonus += (attackSkill - 1000) / 1200;
   }
 
-  return arBonus
+  return arBonus;
 }
 
 /**
@@ -107,32 +107,32 @@ export function calculateBaseDamage(
   state: FiteInputState,
   arBonus: number
 ): DamageStats {
-  const stats = weapon.stats || []
+  const stats = weapon.stats || [];
 
-  const weaponMinDmg = stats.find((s) => s.stat === WEAPON_STAT_IDS.MIN_DAMAGE)?.value || 0
-  const weaponMaxDmg = stats.find((s) => s.stat === WEAPON_STAT_IDS.MAX_DAMAGE)?.value || 0
-  const weaponCritBonus = stats.find((s) => s.stat === WEAPON_STAT_IDS.CRITICAL_BONUS)?.value || 0
+  const weaponMinDmg = stats.find((s) => s.stat === WEAPON_STAT_IDS.MIN_DAMAGE)?.value || 0;
+  const weaponMaxDmg = stats.find((s) => s.stat === WEAPON_STAT_IDS.MAX_DAMAGE)?.value || 0;
+  const weaponCritBonus = stats.find((s) => s.stat === WEAPON_STAT_IDS.CRITICAL_BONUS)?.value || 0;
 
-  const addDamage = state.combatBonuses.addDamage || 0
-  const targetAC = state.characterStats.targetAC || 0
+  const addDamage = state.combatBonuses.addDamage || 0;
+  const targetAC = state.characterStats.targetAC || 0;
 
   // Calculate min damage
-  const minDamage = Math.round(weaponMinDmg * arBonus + addDamage)
+  const minDamage = Math.round(weaponMinDmg * arBonus + addDamage);
 
   // Calculate max damage (reduced by target AC / 10)
-  let maxDamage = Math.round(weaponMaxDmg * arBonus + addDamage - targetAC / 10)
-  if (maxDamage < minDamage) maxDamage = minDamage
+  let maxDamage = Math.round(weaponMaxDmg * arBonus + addDamage - targetAC / 10);
+  if (maxDamage < minDamage) maxDamage = minDamage;
 
   // Calculate average damage
-  const avgDamage = Math.round(minDamage + (maxDamage - minDamage) / 2)
+  const avgDamage = Math.round(minDamage + (maxDamage - minDamage) / 2);
 
   // Calculate crit damage
   let critDamage = Math.round(
     (weaponMaxDmg + weaponCritBonus) * arBonus + addDamage - targetAC / 10
-  )
-  if (critDamage < minDamage) critDamage = minDamage
+  );
+  if (critDamage < minDamage) critDamage = minDamage;
 
-  return { minDamage, avgDamage, maxDamage, critDamage }
+  return { minDamage, avgDamage, maxDamage, critDamage };
 }
 
 /**
@@ -148,46 +148,43 @@ export function calculateBaseDamage(
  * 5. Crit rate handling (100% crit = all crits)
  * 6. Total damage over 60s (min/avg/max)
  */
-export function calculateBaseDamage60s(weapon: WeaponCandidate, state: FiteInputState): Damage60sResult {
+export function calculateBaseDamage60s(
+  weapon: WeaponCandidate,
+  state: FiteInputState
+): Damage60sResult {
   // Calculate speeds
-  const speeds = calculateSpeeds(weapon, state)
-  const cycleTime = calculateCycleTime(speeds)
+  const speeds = calculateSpeeds(weapon, state);
+  const cycleTime = calculateCycleTime(speeds);
 
   // Calculate number of basic attacks in sample window
-  const numBasicAttacks = Math.floor(SAMPLE_LENGTH / cycleTime)
+  const numBasicAttacks = Math.floor(SAMPLE_LENGTH / cycleTime);
 
   // Calculate AR bonus
-  const arBonus = calculateARBonus(weapon, state)
+  const arBonus = calculateARBonus(weapon, state);
 
   // Calculate damage
-  const damage = calculateBaseDamage(weapon, state, arBonus)
+  const damage = calculateBaseDamage(weapon, state, arBonus);
 
   // Handle crits
-  const critRate = (state.characterStats.crit || 0) / 100
-  let numCrits: number
-  let numRegular: number
+  const critRate = (state.characterStats.crit || 0) / 100;
+  let numCrits: number;
+  let numRegular: number;
 
   if (critRate >= 1.0) {
     // 100% crit rate: all attacks are crits
-    numCrits = numBasicAttacks
-    numRegular = 0
+    numCrits = numBasicAttacks;
+    numRegular = 0;
   } else {
-    numCrits = Math.floor(numBasicAttacks * critRate)
-    numRegular = numBasicAttacks - numCrits
+    numCrits = Math.floor(numBasicAttacks * critRate);
+    numRegular = numBasicAttacks - numCrits;
   }
 
   // Calculate total damage over 60s
-  const minDamage60s = Math.round(
-    damage.minDamage * numRegular + damage.critDamage * numCrits
-  )
+  const minDamage60s = Math.round(damage.minDamage * numRegular + damage.critDamage * numCrits);
 
-  const avgDamage60s = Math.round(
-    damage.avgDamage * numRegular + damage.critDamage * numCrits
-  )
+  const avgDamage60s = Math.round(damage.avgDamage * numRegular + damage.critDamage * numCrits);
 
-  const maxDamage60s = Math.round(
-    damage.maxDamage * numRegular + damage.critDamage * numCrits
-  )
+  const maxDamage60s = Math.round(damage.maxDamage * numRegular + damage.critDamage * numCrits);
 
   return {
     attackTime: speeds.attackTime,
@@ -200,15 +197,15 @@ export function calculateBaseDamage60s(weapon: WeaponCandidate, state: FiteInput
     avgDamage60s,
     maxDamage60s,
     numBasicAttacks: numRegular,
-    numCrits
-  }
+    numCrits,
+  };
 }
 
 /**
  * Convert total damage over 60s to DPS
  */
 export function convertToDPS(totalDamage60s: number): number {
-  return Math.round(totalDamage60s / SAMPLE_LENGTH)
+  return Math.round(totalDamage60s / SAMPLE_LENGTH);
 }
 
 /**
@@ -216,6 +213,6 @@ export function convertToDPS(totalDamage60s: number): number {
  * Returns the average DPS for a weapon
  */
 export function calculateWeaponDPS(weapon: WeaponCandidate, state: FiteInputState): number {
-  const result = calculateBaseDamage60s(weapon, state)
-  return convertToDPS(result.avgDamage60s)
+  const result = calculateBaseDamage60s(weapon, state);
+  return convertToDPS(result.avgDamage60s);
 }

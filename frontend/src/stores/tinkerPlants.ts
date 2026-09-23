@@ -712,7 +712,9 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
           enrichedSymbiant = fullItemResponse.data;
         } else {
           // Fallback: convert minimal symbiant to Item structure
-          console.warn(`Could not fetch full item data for symbiant ${symbiant.aoid}, using minimal data`);
+          console.warn(
+            `Could not fetch full item data for symbiant ${symbiant.aoid}, using minimal data`
+          );
           enrichedSymbiant = {
             id: symbiant.id,
             aoid: symbiant.aoid,
@@ -1042,7 +1044,9 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
     const hasProfile = !!profile;
 
     if (!hasProfile) {
-      console.info('[TinkerPlants] No active profile - calculating requirements without comparison');
+      console.info(
+        '[TinkerPlants] No active profile - calculating requirements without comparison'
+      );
     }
 
     // Use Map to track max requirement per stat (deduplication)
@@ -1101,9 +1105,7 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
           for (const req of actionRequirements) {
             const statId = req.stat;
             const requiredValue = req.exactValue || req.minValue || 0;
-            const currentValue = hasProfile
-              ? (profile?.skills?.[statId]?.total || 0)
-              : undefined;
+            const currentValue = hasProfile ? profile?.skills?.[statId]?.total || 0 : undefined;
 
             // Track max Treatment requirement (stat 124)
             if (statId === 124 && requiredValue > maxTreatmentRequired) {

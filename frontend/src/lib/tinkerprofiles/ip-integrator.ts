@@ -1064,9 +1064,7 @@ export function modifyAbility(
  * Recalculate profile with updated perk bonuses
  * Use this when perks change to ensure all skill/ability values are updated
  */
-export function recalculateProfileWithPerkChanges(
-  profile: TinkerProfile
-): TinkerProfile {
+export function recalculateProfileWithPerkChanges(profile: TinkerProfile): TinkerProfile {
   return recalculateProfileIP(profile);
 }
 

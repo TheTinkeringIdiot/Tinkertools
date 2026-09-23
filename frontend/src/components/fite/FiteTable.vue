@@ -158,8 +158,15 @@ import Column from 'primevue/column';
 import Badge from 'primevue/badge';
 import type { WeaponCandidate, FiteInputState } from '@/types/weapon-analysis';
 import { WEAPON_STAT_IDS, DAMAGE_TYPES } from '@/types/weapon-analysis';
-import { calculateBaseDamage60s, convertToDPS, calculateARBonus } from '@/utils/weapon-damage-calculations';
-import { calculateAllSpecialAttacks, getWeaponSpecialAttacks } from '@/utils/weapon-special-attacks';
+import {
+  calculateBaseDamage60s,
+  convertToDPS,
+  calculateARBonus,
+} from '@/utils/weapon-damage-calculations';
+import {
+  calculateAllSpecialAttacks,
+  getWeaponSpecialAttacks,
+} from '@/utils/weapon-special-attacks';
 
 // Props
 interface Props {

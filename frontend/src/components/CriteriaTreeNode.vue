@@ -16,7 +16,8 @@
               v-if="node.criterion.referenceAoid"
               :to="{ name: 'ItemDetail', params: { aoid: String(node.criterion.referenceAoid) } }"
               class="function-link"
-            >{{ resolvedName || `Nano ${node.criterion.referenceAoid}` }}</RouterLink>
+              >{{ resolvedName || `Nano ${node.criterion.referenceAoid}` }}</RouterLink
+            >
           </span>
         </div>
         <!-- Standard Stat Requirement -->

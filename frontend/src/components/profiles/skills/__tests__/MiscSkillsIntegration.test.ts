@@ -21,7 +21,14 @@ import StatBreakdownTooltip from '@/components/profiles/skills/StatBreakdownTool
 import SkillsManager from '@/components/profiles/skills/SkillsManager.vue';
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import type { SkillId } from '@/types/skills';
-import { SKILL_ID, MISC_SKILL_ID, createTestProfile, PROFESSION, BREED, createTestSkillData } from '@/__tests__/helpers';
+import {
+  SKILL_ID,
+  MISC_SKILL_ID,
+  createTestProfile,
+  PROFESSION,
+  BREED,
+  createTestSkillData,
+} from '@/__tests__/helpers';
 
 // Mock PrimeVue components
 vi.mock('primevue/slider', () => ({
@@ -226,7 +233,7 @@ describe('Misc Skills Integration Tests', () => {
     it('should maintain read-only behavior for Misc skills', () => {
       const skillData = createTestSkillData({
         base: 0,
-        
+
         equipmentBonus: 50,
         perkBonus: 0,
         buffBonus: 0,
@@ -259,7 +266,7 @@ describe('Misc Skills Integration Tests', () => {
     it('should show equipment bonus indicator for Misc skills with bonuses', () => {
       const skillData = createTestSkillData({
         base: 0,
-        
+
         equipmentBonus: 75,
         perkBonus: 0,
         buffBonus: 0,
@@ -293,7 +300,7 @@ describe('Misc Skills Integration Tests', () => {
     it('should show tooltip breakdowns for Misc skills', () => {
       const skillData = createTestSkillData({
         base: 0,
-        
+
         equipmentBonus: 50,
         perkBonus: 25,
         buffBonus: 10,
@@ -335,7 +342,7 @@ describe('Misc Skills Integration Tests', () => {
     it('should NOT show IP or trickle-down rows for Misc skills', () => {
       const skillData = createTestSkillData({
         base: 0,
-        
+
         equipmentBonus: 30,
         perkBonus: 0,
         buffBonus: 0,
@@ -377,7 +384,7 @@ describe('Misc Skills Integration Tests', () => {
     it('should use correct color coding for bonuses', () => {
       const skillData = createTestSkillData({
         base: 0,
-        
+
         equipmentBonus: 40,
         perkBonus: 20,
         buffBonus: 5,
@@ -560,7 +567,7 @@ describe('Misc Skills Integration Tests', () => {
     it('should update display when bonuses change', async () => {
       const skillData = createTestSkillData({
         base: 0,
-        
+
         equipmentBonus: 50,
         perkBonus: 0,
         buffBonus: 0,
@@ -696,7 +703,7 @@ describe('Misc Skills Integration Tests', () => {
     it('should not generate type errors or warnings', async () => {
       const skillData = createTestSkillData({
         base: 0,
-        
+
         equipmentBonus: 50,
         perkBonus: 25,
         buffBonus: 10,
@@ -729,7 +736,7 @@ describe('Misc Skills Integration Tests', () => {
     it('should mount and unmount components cleanly', async () => {
       const skillData = createTestSkillData({
         base: 0,
-        
+
         equipmentBonus: 0,
         perkBonus: 0,
         buffBonus: 0,

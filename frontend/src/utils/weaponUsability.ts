@@ -5,12 +5,7 @@
  * Extracted from fiteStore.ts for reuse without store dependency.
  */
 
-import type {
-  Weapon,
-  CharacterSkills,
-  WeaponUsability,
-  WeaponRequirement,
-} from '@/types/weapon';
+import type { Weapon, CharacterSkills, WeaponUsability, WeaponRequirement } from '@/types/weapon';
 import { SKILL_NAMES } from '@/types/weapon';
 
 /**
@@ -19,10 +14,7 @@ import { SKILL_NAMES } from '@/types/weapon';
  * @param skills - Character's skill values (stat ID → value)
  * @returns Usability result with requirements breakdown
  */
-export function checkWeaponUsability(
-  weapon: Weapon,
-  skills: CharacterSkills
-): WeaponUsability {
+export function checkWeaponUsability(weapon: Weapon, skills: CharacterSkills): WeaponUsability {
   const requirements: WeaponRequirement[] = [];
   const missingRequirements: WeaponRequirement[] = [];
 

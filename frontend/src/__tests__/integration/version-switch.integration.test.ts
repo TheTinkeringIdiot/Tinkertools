@@ -21,7 +21,10 @@ vi.mock('@/services/api-client');
 import { createApp } from 'vue';
 import PrimeVue from 'primevue/config';
 import ToastService from 'primevue/toastservice';
-import { setupIntegrationTest, type IntegrationTestContext } from '../helpers/integration-test-utils';
+import {
+  setupIntegrationTest,
+  type IntegrationTestContext,
+} from '../helpers/integration-test-utils';
 import { TEST_VERSION, TEST_ALT_VERSION } from '../helpers/version-fixtures';
 import {
   setCurrentVersion,
@@ -231,7 +234,10 @@ describe('Game version switch', () => {
     it('keeps favorites and farm lists of the version being left', async () => {
       const nanosStore = useNanosStore();
       nanosStore.addToFavorites(101);
-      localStorage.setItem(versionKey(FARM_LIST_BASE, TEST_VERSION), JSON.stringify({ aoids: [5] }));
+      localStorage.setItem(
+        versionKey(FARM_LIST_BASE, TEST_VERSION),
+        JSON.stringify({ aoids: [5] })
+      );
 
       await setCurrentVersion(TEST_ALT_VERSION);
       await handleGameVersionChange(TEST_ALT_VERSION, TEST_VERSION);
@@ -248,7 +254,10 @@ describe('Game version switch', () => {
 
     it("reuses the new version's persisted nano cache and drops the old one", async () => {
       const altNanos = { data: [sampleNano(7, 'PRK Nano')], totalCount: 1, timestamp: Date.now() };
-      localStorage.setItem(versionKey(NANOS_CACHE_BASE, TEST_ALT_VERSION), JSON.stringify(altNanos));
+      localStorage.setItem(
+        versionKey(NANOS_CACHE_BASE, TEST_ALT_VERSION),
+        JSON.stringify(altNanos)
+      );
       localStorage.setItem(
         versionKey(NANOS_CACHE_BASE, TEST_VERSION),
         JSON.stringify({ ...altNanos, data: [sampleNano(8, 'AO Nano')] })

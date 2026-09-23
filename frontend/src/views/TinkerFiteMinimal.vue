@@ -355,9 +355,7 @@ const loadWeapons = async () => {
 
   try {
     // Get items with attack/defense data (these are more likely to be weapons)
-    const response = await fetch(
-      `${apiBase()}/items?has_attack_defense=true&page_size=100`
-    );
+    const response = await fetch(`${apiBase()}/items?has_attack_defense=true&page_size=100`);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }

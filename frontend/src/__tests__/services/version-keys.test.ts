@@ -35,9 +35,7 @@ describe('version-keys', () => {
 
   describe('key construction', () => {
     it('appends the active version to a base key', () => {
-      expect(versionKey('tinkertools_nanos_cache')).toBe(
-        `tinkertools_nanos_cache:${TEST_VERSION}`
-      );
+      expect(versionKey('tinkertools_nanos_cache')).toBe(`tinkertools_nanos_cache:${TEST_VERSION}`);
     });
 
     it('accepts an explicit slug', () => {

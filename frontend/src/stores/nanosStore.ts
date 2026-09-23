@@ -1,10 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { apiClient } from '@/services/api-client';
-import {
-  versionKey,
-  adoptLegacyKey,
-} from '@/services/version-keys';
+import { versionKey, adoptLegacyKey } from '@/services/version-keys';
 import type {
   NanoProgram,
   NanoFilters,
@@ -489,10 +486,7 @@ export const useNanosStore = defineStore('nanos', () => {
 
   const saveSelectedProfession = (): void => {
     try {
-      localStorage.setItem(
-        SELECTED_PROFESSION_KEY,
-        JSON.stringify(selectedProfession.value)
-      );
+      localStorage.setItem(SELECTED_PROFESSION_KEY, JSON.stringify(selectedProfession.value));
     } catch (error) {
       console.warn('Failed to save selected profession:', error);
     }

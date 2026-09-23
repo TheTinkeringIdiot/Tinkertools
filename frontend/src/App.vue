@@ -122,7 +122,9 @@ const menuItems = computed<MenuItem[]>(() =>
 
             <!-- Theme Toggle -->
             <div class="flex items-center gap-2">
-              <span class="text-xs text-surface-500 dark:text-surface-400 font-medium hidden xl:inline">
+              <span
+                class="text-xs text-surface-500 dark:text-surface-400 font-medium hidden xl:inline"
+              >
                 {{ currentThemeText }} Mode
               </span>
               <Button

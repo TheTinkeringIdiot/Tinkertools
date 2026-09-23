@@ -177,7 +177,12 @@ Shows item requirements organized by category with compatibility checking
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Item, TinkerProfile } from '@/types/api';
-import { getStatName, getProfessionName, getBreedName, getExpansionName } from '@/services/game-utils';
+import {
+  getStatName,
+  getProfessionName,
+  getBreedName,
+  getExpansionName,
+} from '@/services/game-utils';
 import { mapProfileToStats, profileMeetsRequirement } from '@/utils/profile-stats-mapper';
 import type { Criterion } from '@/types/api';
 

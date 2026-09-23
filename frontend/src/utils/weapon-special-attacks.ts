@@ -15,23 +15,23 @@
  * 8. Dimach - Not implemented (legacy pass)
  */
 
-import type { WeaponCandidate, FiteInputState } from '@/types/weapon-analysis'
-import type { DamageStats } from './weapon-damage-calculations'
-import { WEAPON_STAT_IDS, SPECIAL_ATTACK_IDS } from '@/types/weapon-analysis'
-import { CANFLAG, isFlagSet } from '@/utils/flag-operations'
+import type { WeaponCandidate, FiteInputState } from '@/types/weapon-analysis';
+import type { DamageStats } from './weapon-damage-calculations';
+import { WEAPON_STAT_IDS, SPECIAL_ATTACK_IDS } from '@/types/weapon-analysis';
+import { CANFLAG, isFlagSet } from '@/utils/flag-operations';
 
-const SAMPLE_LENGTH = 60 // DPS sample in seconds
+const SAMPLE_LENGTH = 60; // DPS sample in seconds
 
 export interface SpecialAttackResult {
-  flingShot: number
-  burst: number
-  fullAuto: number
-  aimedShot: number
-  fastAttack: number
-  brawl: number
-  sneakAttack: number
-  dimach: number
-  total: number
+  flingShot: number;
+  burst: number;
+  fullAuto: number;
+  aimedShot: number;
+  fastAttack: number;
+  brawl: number;
+  sneakAttack: number;
+  dimach: number;
+  total: number;
 }
 
 /**
@@ -48,22 +48,22 @@ export function calculateFlingShotDamage(
   state: FiteInputState,
   baseDamage: DamageStats
 ): number {
-  const stats = weapon.stats || []
-  const attackTime = stats.find((s) => s.stat === WEAPON_STAT_IDS.ATTACK_DELAY)?.value || 100
-  const flingShotSkill = state.specialAttacks[SPECIAL_ATTACK_IDS.FLING_SHOT] || 0
+  const stats = weapon.stats || [];
+  const attackTime = stats.find((s) => s.stat === WEAPON_STAT_IDS.ATTACK_DELAY)?.value || 100;
+  const flingShotSkill = state.specialAttacks[SPECIAL_ATTACK_IDS.FLING_SHOT] || 0;
 
   // Cycle cap: 6 + (attack_time / 100) seconds
-  const cycleCap = Math.floor(6 + attackTime / 100)
+  const cycleCap = Math.floor(6 + attackTime / 100);
 
   // Cycle time: 16 * (attack_time / 100) - (skill / 100)
-  let cycleTime = Math.floor(16 * (attackTime / 100) - flingShotSkill / 100)
-  if (cycleTime < cycleCap) cycleTime = cycleCap
+  let cycleTime = Math.floor(16 * (attackTime / 100) - flingShotSkill / 100);
+  if (cycleTime < cycleCap) cycleTime = cycleCap;
 
   // Number of fling shots in 60s sample
-  const numAttacks = Math.floor(SAMPLE_LENGTH / cycleTime)
+  const numAttacks = Math.floor(SAMPLE_LENGTH / cycleTime);
 
   // Damage per fling shot = base average damage
-  return Math.round(baseDamage.avgDamage * numAttacks)
+  return Math.round(baseDamage.avgDamage * numAttacks);
 }
 
 /**
@@ -80,24 +80,24 @@ export function calculateBurstDamage(
   state: FiteInputState,
   baseDamage: DamageStats
 ): number {
-  const stats = weapon.stats || []
-  const attackTime = stats.find((s) => s.stat === WEAPON_STAT_IDS.ATTACK_DELAY)?.value || 100
-  const rechargeTime = stats.find((s) => s.stat === WEAPON_STAT_IDS.RECHARGE_DELAY)?.value || 100
-  const burstCycle = stats.find((s) => s.stat === WEAPON_STAT_IDS.BURST_RECHARGE)?.value || 0
-  const burstSkill = state.specialAttacks[SPECIAL_ATTACK_IDS.BURST] || 0
+  const stats = weapon.stats || [];
+  const attackTime = stats.find((s) => s.stat === WEAPON_STAT_IDS.ATTACK_DELAY)?.value || 100;
+  const rechargeTime = stats.find((s) => s.stat === WEAPON_STAT_IDS.RECHARGE_DELAY)?.value || 100;
+  const burstCycle = stats.find((s) => s.stat === WEAPON_STAT_IDS.BURST_RECHARGE)?.value || 0;
+  const burstSkill = state.specialAttacks[SPECIAL_ATTACK_IDS.BURST] || 0;
 
   // Cycle cap: 8 + (attack_time / 100) seconds
-  const cycleCap = Math.floor(8 + attackTime / 100)
+  const cycleCap = Math.floor(8 + attackTime / 100);
 
   // Cycle time: (rech_time / 100) * 20 + (burst_cycle / 100) - (skill / 25)
-  let cycleTime = Math.floor((rechargeTime / 100) * 20 + burstCycle / 100 - burstSkill / 25)
-  if (cycleTime < cycleCap) cycleTime = cycleCap
+  let cycleTime = Math.floor((rechargeTime / 100) * 20 + burstCycle / 100 - burstSkill / 25);
+  if (cycleTime < cycleCap) cycleTime = cycleCap;
 
   // Number of bursts in 60s sample
-  const numAttacks = Math.floor(SAMPLE_LENGTH / cycleTime)
+  const numAttacks = Math.floor(SAMPLE_LENGTH / cycleTime);
 
   // Each burst fires 3 shots
-  return Math.round(baseDamage.avgDamage * 3 * numAttacks)
+  return Math.round(baseDamage.avgDamage * 3 * numAttacks);
 }
 
 /**
@@ -115,32 +115,32 @@ export function calculateFullAutoDamage(
   state: FiteInputState,
   baseDamage: DamageStats
 ): number {
-  const stats = weapon.stats || []
-  const attackTime = stats.find((s) => s.stat === WEAPON_STAT_IDS.ATTACK_DELAY)?.value || 100
-  const rechargeTime = stats.find((s) => s.stat === WEAPON_STAT_IDS.RECHARGE_DELAY)?.value || 100
-  const faCycle = stats.find((s) => s.stat === WEAPON_STAT_IDS.FULL_AUTO_RECHARGE)?.value || 1000
-  const clipSize = stats.find((s) => s.stat === WEAPON_STAT_IDS.CLIP_SIZE)?.value || 0
-  const faSkill = state.specialAttacks[SPECIAL_ATTACK_IDS.FULL_AUTO] || 0
+  const stats = weapon.stats || [];
+  const attackTime = stats.find((s) => s.stat === WEAPON_STAT_IDS.ATTACK_DELAY)?.value || 100;
+  const rechargeTime = stats.find((s) => s.stat === WEAPON_STAT_IDS.RECHARGE_DELAY)?.value || 100;
+  const faCycle = stats.find((s) => s.stat === WEAPON_STAT_IDS.FULL_AUTO_RECHARGE)?.value || 1000;
+  const clipSize = stats.find((s) => s.stat === WEAPON_STAT_IDS.CLIP_SIZE)?.value || 0;
+  const faSkill = state.specialAttacks[SPECIAL_ATTACK_IDS.FULL_AUTO] || 0;
 
   // Cycle cap: 10 + (attack_time / 100) seconds
-  const cycleCap = Math.floor(10 + attackTime / 100)
+  const cycleCap = Math.floor(10 + attackTime / 100);
 
   // Cycle time: ((rech_time / 100) * 40) + (fa_cycle / 100) - (skill / 25) + (attack_time / 100)
   let cycleTime = Math.floor(
     (rechargeTime / 100) * 40 + faCycle / 100 - faSkill / 25 + attackTime / 100
-  )
-  if (cycleTime < cycleCap) cycleTime = cycleCap
+  );
+  if (cycleTime < cycleCap) cycleTime = cycleCap;
 
   // Number of rounds = clip size (all rounds fired)
-  const numRounds = clipSize
+  const numRounds = clipSize;
 
   // Calculate FA damage with tiered caps
-  const faDamage = calculateFADamageCaps(baseDamage.avgDamage, numRounds)
+  const faDamage = calculateFADamageCaps(baseDamage.avgDamage, numRounds);
 
   // Number of FAs in 60s sample
-  const numAttacks = Math.floor(SAMPLE_LENGTH / cycleTime)
+  const numAttacks = Math.floor(SAMPLE_LENGTH / cycleTime);
 
-  return Math.round(faDamage * numAttacks)
+  return Math.round(faDamage * numAttacks);
 }
 
 /**
@@ -157,41 +157,41 @@ export function calculateFullAutoDamage(
  * - Hard cap at 15,000
  */
 function calculateFADamageCaps(damagePerRound: number, numRounds: number): number {
-  let faDamage = damagePerRound * numRounds
+  let faDamage = damagePerRound * numRounds;
 
   if (faDamage > 10000) {
-    let remain = Math.round((faDamage - 10000) / 2)
-    faDamage = 10000
+    let remain = Math.round((faDamage - 10000) / 2);
+    faDamage = 10000;
 
     if (remain > 1500) {
-      remain = Math.round((remain - 1500) / 2)
-      faDamage = 11500
+      remain = Math.round((remain - 1500) / 2);
+      faDamage = 11500;
 
       if (remain > 1500) {
-        remain = Math.round((remain - 1500) / 2)
-        faDamage = 13000
+        remain = Math.round((remain - 1500) / 2);
+        faDamage = 13000;
 
         if (remain > 1500) {
-          remain = Math.round((remain - 1500) / 2)
-          faDamage = 14500
+          remain = Math.round((remain - 1500) / 2);
+          faDamage = 14500;
 
           if (remain > 500) {
-            faDamage = 15000
+            faDamage = 15000;
           } else {
-            faDamage += remain
+            faDamage += remain;
           }
         } else {
-          faDamage += remain
+          faDamage += remain;
         }
       } else {
-        faDamage += remain
+        faDamage += remain;
       }
     } else {
-      faDamage += remain
+      faDamage += remain;
     }
   }
 
-  return faDamage
+  return faDamage;
 }
 
 /**
@@ -209,21 +209,21 @@ export function calculateAimedShotDamage(
   baseDamage: DamageStats,
   arBonus: number
 ): number {
-  const stats = weapon.stats || []
-  const weaponMaxDmg = stats.find((s) => s.stat === WEAPON_STAT_IDS.MAX_DAMAGE)?.value || 0
-  const addDamage = state.combatBonuses.addDamage || 0
-  const aimedShotSkill = state.specialAttacks[SPECIAL_ATTACK_IDS.AIMED_SHOT] || 0
+  const stats = weapon.stats || [];
+  const weaponMaxDmg = stats.find((s) => s.stat === WEAPON_STAT_IDS.MAX_DAMAGE)?.value || 0;
+  const addDamage = state.combatBonuses.addDamage || 0;
+  const aimedShotSkill = state.specialAttacks[SPECIAL_ATTACK_IDS.AIMED_SHOT] || 0;
 
   // Aimed shot only fires once per fight (PvE rules)
   // Damage: (weapon_max * ar_bonus + add_dmg) * (skill / 95)
-  let asDamage = Math.round(weaponMaxDmg * arBonus + addDamage)
-  const asBonus = aimedShotSkill / 95
-  asDamage = Math.round(asDamage * asBonus)
+  let asDamage = Math.round(weaponMaxDmg * arBonus + addDamage);
+  const asBonus = aimedShotSkill / 95;
+  asDamage = Math.round(asDamage * asBonus);
 
   // 13k damage cap
-  if (asDamage > 13000) asDamage = 13000
+  if (asDamage > 13000) asDamage = 13000;
 
-  return asDamage
+  return asDamage;
 }
 
 /**
@@ -240,21 +240,21 @@ export function calculateFastAttackDamage(
   state: FiteInputState,
   baseDamage: DamageStats
 ): number {
-  const stats = weapon.stats || []
-  const attackTime = stats.find((s) => s.stat === WEAPON_STAT_IDS.ATTACK_DELAY)?.value || 100
-  const fastAttackSkill = state.specialAttacks[SPECIAL_ATTACK_IDS.FAST_ATTACK] || 0
+  const stats = weapon.stats || [];
+  const attackTime = stats.find((s) => s.stat === WEAPON_STAT_IDS.ATTACK_DELAY)?.value || 100;
+  const fastAttackSkill = state.specialAttacks[SPECIAL_ATTACK_IDS.FAST_ATTACK] || 0;
 
   // Cycle cap: 6 + (attack_time / 100) seconds
-  const cycleCap = Math.floor(6 + attackTime / 100)
+  const cycleCap = Math.floor(6 + attackTime / 100);
 
   // Cycle time: (attack_time / 100) * 15 - (skill / 100)
-  let cycleTime = Math.floor((attackTime / 100) * 15 - fastAttackSkill / 100)
-  if (cycleTime < cycleCap) cycleTime = cycleCap
+  let cycleTime = Math.floor((attackTime / 100) * 15 - fastAttackSkill / 100);
+  if (cycleTime < cycleCap) cycleTime = cycleCap;
 
   // Number of fast attacks in 60s sample
-  const numAttacks = Math.floor(SAMPLE_LENGTH / cycleTime)
+  const numAttacks = Math.floor(SAMPLE_LENGTH / cycleTime);
 
-  return Math.round(baseDamage.avgDamage * numAttacks)
+  return Math.round(baseDamage.avgDamage * numAttacks);
 }
 
 /**
@@ -279,8 +279,8 @@ export function calculateBrawlDamage(
 ): number {
   // Brawl requires fetching "Brawl Item" weapons from API
   // This needs to be implemented when API supports item lookup by name
-  console.warn('Brawl damage calculation not yet implemented - requires Brawl Item lookup')
-  return 0
+  console.warn('Brawl damage calculation not yet implemented - requires Brawl Item lookup');
+  return 0;
 }
 
 /**
@@ -297,16 +297,16 @@ export function calculateSneakAttackDamage(
   state: FiteInputState,
   baseDamage: DamageStats
 ): number {
-  const sneakAttackSkill = state.specialAttacks[SPECIAL_ATTACK_IDS.SNEAK_ATTACK] || 0
+  const sneakAttackSkill = state.specialAttacks[SPECIAL_ATTACK_IDS.SNEAK_ATTACK] || 0;
 
   // Sneak attack only fires once per fight (PvE rules)
-  const sneakBonus = Math.round(sneakAttackSkill / 95)
-  let sneakDamage = Math.round(baseDamage.avgDamage * sneakBonus)
+  const sneakBonus = Math.round(sneakAttackSkill / 95);
+  let sneakDamage = Math.round(baseDamage.avgDamage * sneakBonus);
 
   // 13k damage cap
-  if (sneakDamage > 13000) sneakDamage = 13000
+  if (sneakDamage > 13000) sneakDamage = 13000;
 
-  return sneakDamage
+  return sneakDamage;
 }
 
 /**
@@ -316,12 +316,9 @@ export function calculateSneakAttackDamage(
  *
  * Not implemented in legacy (pass)
  */
-export function calculateDimachDamage(
-  weapon: WeaponCandidate,
-  state: FiteInputState
-): number {
+export function calculateDimachDamage(weapon: WeaponCandidate, state: FiteInputState): number {
   // Dimach not implemented in legacy
-  return 0
+  return 0;
 }
 
 /**
@@ -349,52 +346,52 @@ export function calculateDimachDamage(
  * - 1 = CANFLAG.Carry
  */
 export function getWeaponSpecialAttacks(weapon: WeaponCandidate): string[] {
-  const specialAttacks: string[] = []
-  const stats = weapon.stats || []
+  const specialAttacks: string[] = [];
+  const stats = weapon.stats || [];
 
   // Get CAN flag value (stat 30)
-  const canFlagStat = stats.find(s => s.stat === WEAPON_STAT_IDS.CAN_FLAGS)
+  const canFlagStat = stats.find((s) => s.stat === WEAPON_STAT_IDS.CAN_FLAGS);
   if (!canFlagStat) {
-    return specialAttacks
+    return specialAttacks;
   }
 
-  const canFlags = canFlagStat.value
+  const canFlags = canFlagStat.value;
 
   // Check each special attack bit flag
   // Note: Lowercase letters in "Aimed shot", "Fast attack", "Sneak attack" match legacy
   if (isFlagSet(canFlags, CANFLAG.FlingShot)) {
-    specialAttacks.push('Fling Shot')
+    specialAttacks.push('Fling Shot');
   }
 
   if (isFlagSet(canFlags, CANFLAG.Burst)) {
-    specialAttacks.push('Burst')
+    specialAttacks.push('Burst');
   }
 
   if (isFlagSet(canFlags, CANFLAG.FullAuto)) {
-    specialAttacks.push('Full Auto')
+    specialAttacks.push('Full Auto');
   }
 
   if (isFlagSet(canFlags, CANFLAG.AimedShot)) {
-    specialAttacks.push('Aimed shot')
+    specialAttacks.push('Aimed shot');
   }
 
   if (isFlagSet(canFlags, CANFLAG.FastAttack)) {
-    specialAttacks.push('Fast attack')
+    specialAttacks.push('Fast attack');
   }
 
   if (isFlagSet(canFlags, CANFLAG.Brawl)) {
-    specialAttacks.push('Brawl')
+    specialAttacks.push('Brawl');
   }
 
   if (isFlagSet(canFlags, CANFLAG.SneakAttack)) {
-    specialAttacks.push('Sneak attack')
+    specialAttacks.push('Sneak attack');
   }
 
   if (isFlagSet(canFlags, CANFLAG.Dimach)) {
-    specialAttacks.push('Dimach')
+    specialAttacks.push('Dimach');
   }
 
-  return specialAttacks
+  return specialAttacks;
 }
 
 /**
@@ -422,51 +419,52 @@ export function calculateAllSpecialAttacks(
   arBonus: number
 ): SpecialAttackResult {
   // Check which special attacks this weapon supports
-  const specialProps = getWeaponSpecialAttacks(weapon)
+  const specialProps = getWeaponSpecialAttacks(weapon);
 
-  let flingShot = 0
-  let burst = 0
-  let fullAuto = 0
-  let aimedShot = 0
-  let fastAttack = 0
-  let brawl = 0
-  let sneakAttack = 0
-  let dimach = 0
+  let flingShot = 0;
+  let burst = 0;
+  let fullAuto = 0;
+  let aimedShot = 0;
+  let fastAttack = 0;
+  let brawl = 0;
+  let sneakAttack = 0;
+  let dimach = 0;
 
   // Calculate damage for each special attack the weapon supports
   if (specialProps.includes('Fling Shot')) {
-    flingShot = calculateFlingShotDamage(weapon, state, baseDamage)
+    flingShot = calculateFlingShotDamage(weapon, state, baseDamage);
   }
 
   if (specialProps.includes('Burst')) {
-    burst = calculateBurstDamage(weapon, state, baseDamage)
+    burst = calculateBurstDamage(weapon, state, baseDamage);
   }
 
   if (specialProps.includes('Full Auto')) {
-    fullAuto = calculateFullAutoDamage(weapon, state, baseDamage)
+    fullAuto = calculateFullAutoDamage(weapon, state, baseDamage);
   }
 
   if (specialProps.includes('Aimed shot')) {
-    aimedShot = calculateAimedShotDamage(weapon, state, baseDamage, arBonus)
+    aimedShot = calculateAimedShotDamage(weapon, state, baseDamage, arBonus);
   }
 
   if (specialProps.includes('Fast attack')) {
-    fastAttack = calculateFastAttackDamage(weapon, state, baseDamage)
+    fastAttack = calculateFastAttackDamage(weapon, state, baseDamage);
   }
 
   if (specialProps.includes('Brawl')) {
-    brawl = calculateBrawlDamage(weapon, state, arBonus)
+    brawl = calculateBrawlDamage(weapon, state, arBonus);
   }
 
   if (specialProps.includes('Sneak attack')) {
-    sneakAttack = calculateSneakAttackDamage(weapon, state, baseDamage)
+    sneakAttack = calculateSneakAttackDamage(weapon, state, baseDamage);
   }
 
   if (specialProps.includes('Dimach')) {
-    dimach = calculateDimachDamage(weapon, state)
+    dimach = calculateDimachDamage(weapon, state);
   }
 
-  const total = flingShot + burst + fullAuto + aimedShot + fastAttack + brawl + sneakAttack + dimach
+  const total =
+    flingShot + burst + fullAuto + aimedShot + fastAttack + brawl + sneakAttack + dimach;
 
   return {
     flingShot,
@@ -477,6 +475,6 @@ export function calculateAllSpecialAttacks(
     brawl,
     sneakAttack,
     dimach,
-    total
-  }
+    total,
+  };
 }

@@ -10,12 +10,7 @@
  * ('4.0.0') and is unaffected by any of this.
  */
 
-import {
-  currentVersion,
-  versions,
-  getVersion,
-  resolveVersion,
-} from '@/composables/useGameVersion';
+import { currentVersion, versions, getVersion, resolveVersion } from '@/composables/useGameVersion';
 import type { TinkerProfile } from './types';
 
 /** Where an imported profile came from; decides which version it is tagged with. */

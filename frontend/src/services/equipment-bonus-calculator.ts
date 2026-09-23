@@ -256,7 +256,12 @@ export class EquipmentBonusCalculator {
       this.processEquipmentSlotsWithErrorHandling(profile.Weapons, 'Weapons', allBonuses, result);
       this.processEquipmentSlotsWithErrorHandling(profile.Clothing, 'Clothing', allBonuses, result);
       this.processEquipmentSlotsWithErrorHandling(profile.Implants, 'Implants', allBonuses, result);
-      this.processEquipmentSlotsWithErrorHandling(profile.Symbiants, 'Symbiants', allBonuses, result);
+      this.processEquipmentSlotsWithErrorHandling(
+        profile.Symbiants,
+        'Symbiants',
+        allBonuses,
+        result
+      );
 
       // Aggregate bonuses by skill ID with error handling
       try {

@@ -112,11 +112,13 @@ describe.skipIf(!BACKEND_AVAILABLE)('SymbiantsStore Integration Tests', () => {
       expect(store.symbiantsCount).toBeGreaterThan(0);
 
       // Should have progress logs
-      const progressLogs = logs.filter(log => log.includes('Loaded') && log.includes('symbiants'));
+      const progressLogs = logs.filter(
+        (log) => log.includes('Loaded') && log.includes('symbiants')
+      );
       expect(progressLogs.length).toBeGreaterThan(0);
 
       // Verify chunked loading happened
-      const startLog = logs.find(log => log.includes('Starting chunked symbiant load'));
+      const startLog = logs.find((log) => log.includes('Starting chunked symbiant load'));
       expect(startLog).toBeTruthy();
     } finally {
       console.log = originalLog;
@@ -168,7 +170,7 @@ describe.skipIf(!BACKEND_AVAILABLE)('SymbiantsStore Integration Tests', () => {
       expect(store.symbiantsCount).toBe(firstCount);
 
       // Should have cache hit log
-      const cacheLog = logs.find(log => log.includes('Loading from IndexedDB cache'));
+      const cacheLog = logs.find((log) => log.includes('Loading from IndexedDB cache'));
       expect(cacheLog).toBeTruthy();
     } finally {
       console.log = originalLog;

@@ -152,7 +152,9 @@ export async function getCachedWeapons(cacheKey: string): Promise<Item[] | null>
 
   const responseTime = performance.now() - startTime;
   await recordCacheHit(responseTime);
-  console.log(`[WeaponCache] Cache hit! (${Math.round(responseTime)}ms, ${entry.weapons.length} weapons)`);
+  console.log(
+    `[WeaponCache] Cache hit! (${Math.round(responseTime)}ms, ${entry.weapons.length} weapons)`
+  );
 
   return entry.weapons;
 }
@@ -197,8 +199,8 @@ export async function clearWeaponCache(): Promise<void> {
   // Clear IndexedDB entries
   try {
     const allKeys = await keys();
-    const cacheKeys = allKeys.filter((key) =>
-      typeof key === 'string' && key.startsWith(storagePrefix())
+    const cacheKeys = allKeys.filter(
+      (key) => typeof key === 'string' && key.startsWith(storagePrefix())
     );
 
     await Promise.all(cacheKeys.map((key) => del(key)));
@@ -232,8 +234,8 @@ async function enforceMaxEntries(): Promise<void> {
   try {
     // Get all cache entries from IndexedDB
     const allKeys = await keys();
-    const cacheKeys = allKeys.filter((key) =>
-      typeof key === 'string' && key.startsWith(storagePrefix())
+    const cacheKeys = allKeys.filter(
+      (key) => typeof key === 'string' && key.startsWith(storagePrefix())
     );
 
     // If under limit, nothing to do
@@ -381,8 +383,8 @@ export async function getCacheStats(): Promise<{
 
   try {
     const allKeys = await keys();
-    const cacheKeys = allKeys.filter((key) =>
-      typeof key === 'string' && key.startsWith(storagePrefix())
+    const cacheKeys = allKeys.filter(
+      (key) => typeof key === 'string' && key.startsWith(storagePrefix())
     );
 
     for (const key of cacheKeys) {

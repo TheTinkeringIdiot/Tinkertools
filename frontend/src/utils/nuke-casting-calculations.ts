@@ -102,10 +102,7 @@ export function calculateCastTime(
  * // Nano with 80cs base recharge, 50cs cap from stat 524
  * calculateRechargeTime(80, 50) // Returns 0.80 (above 50cs cap)
  */
-export function calculateRechargeTime(
-  baseRecharge: number,
-  rechargeDelayCap?: number
-): number {
+export function calculateRechargeTime(baseRecharge: number, rechargeDelayCap?: number): number {
   // Determine effective cap: use stat 524 if present, otherwise default 100cs (1.00s)
   const effectiveCap = rechargeDelayCap !== undefined ? rechargeDelayCap : DEFAULT_DELAY_CAP_CS;
 

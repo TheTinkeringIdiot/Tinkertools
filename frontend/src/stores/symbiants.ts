@@ -159,7 +159,9 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
         if (cached && cached.data && cached.version === 1 && cacheMatchesVersion) {
           const age = Date.now() - cached.timestamp;
           if (age < cacheExpiry) {
-            console.log(`[SymbiantsStore] Loading from IndexedDB cache (age: ${Math.round(age / 1000)}s)`);
+            console.log(
+              `[SymbiantsStore] Loading from IndexedDB cache (age: ${Math.round(age / 1000)}s)`
+            );
 
             // Populate Pinia store from cached data
             symbiants.value.clear();
@@ -170,7 +172,9 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
 
             return cached.data;
           } else {
-            console.log(`[SymbiantsStore] IndexedDB cache expired (age: ${Math.round(age / 1000)}s)`);
+            console.log(
+              `[SymbiantsStore] IndexedDB cache expired (age: ${Math.round(age / 1000)}s)`
+            );
           }
         }
       } catch (err) {
@@ -208,7 +212,9 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
           totalCount.value = response.total;
 
           // Show progress
-          console.log(`[SymbiantsStore] Loaded ${allSymbiantsData.length}/${response.total} symbiants...`);
+          console.log(
+            `[SymbiantsStore] Loaded ${allSymbiantsData.length}/${response.total} symbiants...`
+          );
 
           // Check if there are more pages
           hasMore = response.has_next;
@@ -545,7 +551,12 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
       for (const aoid of farmListAoids.value) {
         // Look up symbiant by AOID to get internal ID for API call
         const symbiant = getSymbiantByAoid(aoid);
-        console.log('[FarmList] Processing AOID:', aoid, '-> symbiant:', symbiant?.name || 'NOT FOUND');
+        console.log(
+          '[FarmList] Processing AOID:',
+          aoid,
+          '-> symbiant:',
+          symbiant?.name || 'NOT FOUND'
+        );
 
         if (!symbiant) continue;
 

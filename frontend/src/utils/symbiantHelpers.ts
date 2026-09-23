@@ -21,12 +21,19 @@ export function getSymbiantQL(symbiant: Symbiant): number {
   return 50 + ((symbiant.id || 0) % 251);
 }
 
-export function getSymbiantFamily(symbiant: Symbiant): 'Artillery' | 'Control' | 'Extermination' | 'Infantry' | 'Support' {
+export function getSymbiantFamily(
+  symbiant: Symbiant
+): 'Artillery' | 'Control' | 'Extermination' | 'Infantry' | 'Support' {
   if (symbiant.family) return symbiant.family;
 
   // Generate placeholder families
-  const families: Array<'Artillery' | 'Control' | 'Extermination' | 'Infantry' | 'Support'> =
-    ['Artillery', 'Control', 'Extermination', 'Infantry', 'Support'];
+  const families: Array<'Artillery' | 'Control' | 'Extermination' | 'Infantry' | 'Support'> = [
+    'Artillery',
+    'Control',
+    'Extermination',
+    'Infantry',
+    'Support',
+  ];
   const index = (symbiant.id || 0) % families.length;
   return families[index];
 }

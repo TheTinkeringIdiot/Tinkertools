@@ -27,7 +27,7 @@ export const testProfiles = {
 
 export const testItems = {
   weapon: {
-    name: 'Kyr\'Ozch Energy Rapier',
+    name: "Kyr'Ozch Energy Rapier",
     aoid: 275634,
   },
   armor: {
@@ -68,12 +68,7 @@ export const professions = [
   'Trader',
 ];
 
-export const breeds = [
-  'Atrox',
-  'Nanomage',
-  'Opifex',
-  'Solitus',
-];
+export const breeds = ['Atrox', 'Nanomage', 'Opifex', 'Solitus'];
 
 export const equipmentSlots = [
   'head',

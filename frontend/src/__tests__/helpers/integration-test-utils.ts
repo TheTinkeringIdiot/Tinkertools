@@ -69,12 +69,12 @@ export async function setupIntegrationTest(): Promise<IntegrationTestContext> {
   // PrimeVue + ToastService FIRST, then Pinia
   // This ensures components that use stores can also use PrimeVue components
   const app = createApp({});
-  app.use(PrimeVue);            // ← FIRST: UI framework
-  app.use(ToastService);        // ← SECOND: Toast notifications
+  app.use(PrimeVue); // ← FIRST: UI framework
+  app.use(ToastService); // ← SECOND: Toast notifications
   app.use(ConfirmationService); // ← THEN: confirm dialogs (useConfirm)
 
   const pinia = createPinia();
-  app.use(pinia);           // ← THIRD: State management
+  app.use(pinia); // ← THIRD: State management
   setActivePinia(pinia);
 
   const mockApi = await getMockApiClient();

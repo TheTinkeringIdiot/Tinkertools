@@ -93,7 +93,9 @@ export const mockApiClient = {
   getStatValues: vi.fn(() => createPaginatedResponse([])),
 
   // Health
-  healthCheck: vi.fn(() => createSuccessResponse({ status: 'ok', timestamp: new Date().toISOString() })),
+  healthCheck: vi.fn(() =>
+    createSuccessResponse({ status: 'ok', timestamp: new Date().toISOString() })
+  ),
 };
 
 // Export as both named and default
