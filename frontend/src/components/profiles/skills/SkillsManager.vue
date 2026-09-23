@@ -48,11 +48,11 @@ Interactive skill categories with expandable panels and sliders with IP calculat
           </div>
         </div>
 
-        <!-- Misc Category -->
+        <!-- Misc Category (zero values filtered per the toggle) -->
         <SkillCategory
           :title="categoryName"
           :icon="getCategoryIcon(categoryName)"
-          :skills="getCategorySkills(categoryName)"
+          :skills="skills"
           :is-read-only="isReadOnlyCategory(categoryName)"
           :breed="breed"
           :profession="profession"
@@ -102,9 +102,10 @@ provide(
   computed(() => props.profile)
 );
 
-// Use skills composable for skill operations with the viewed profile
-// Don't pass profile in options - rely on injection for reactivity
-const { getSkillsByCategory } = useSkills();
+// Use skills composable for skill operations with the viewed profile. Pass the
+// prop explicitly: inject() cannot see this component's own provide(), so
+// relying on injection here would silently fall back to the active profile.
+const { getSkillsByCategory } = useSkills({ profile: toRef(props, 'profile') });
 
 // State for Misc skills zero-value toggle
 const showZeroMiscSkills = ref(false);
