@@ -39,6 +39,8 @@ import { useItemsStore } from '@/stores/items';
 import { useNanosStore } from '@/stores/nanosStore';
 import { usePocketBossStore } from '@/stores/pocketBossStore';
 import type { NanoProgram } from '@/types/nano';
+import type { Mob } from '@/types/api';
+import { createTestNano } from '../helpers/nano-fixtures';
 
 const NANOS_CACHE_BASE = 'tinkertools_nanos_cache';
 const FAVORITES_BASE = 'tinkertools_nano_favorites';
@@ -47,7 +49,19 @@ const NANO_FILTERS_KEY = 'tinkertools_nano_filters';
 const FARM_LIST_BASE = 'tinkertools-farm-list';
 
 function sampleNano(id: number, name: string): NanoProgram {
-  return { id, name, school: 'Matter Creation', strain: 'Test Strain' } as NanoProgram;
+  return createTestNano({ id, name, school: 'Matter Creation', strain: 'Test Strain' });
+}
+
+function samplePocketBoss(id: number, name: string): Mob {
+  return {
+    id,
+    name,
+    level: 100,
+    playfield: 'Nascense',
+    location: '',
+    mob_names: [],
+    is_pocket_boss: true,
+  };
 }
 
 /**
@@ -74,12 +88,12 @@ describe('Game version switch', () => {
     context = await setupIntegrationTest();
     app.use(context.pinia);
 
-    setCurrentVersion(TEST_VERSION);
+    await setCurrentVersion(TEST_VERSION);
     localStorage.clear();
   });
 
-  afterEach(() => {
-    setCurrentVersion(TEST_VERSION);
+  afterEach(async () => {
+    await setCurrentVersion(TEST_VERSION);
   });
 
   describe('cache key namespacing', () => {
@@ -97,7 +111,7 @@ describe('Game version switch', () => {
         name: 'From AO',
       });
 
-      setCurrentVersion(TEST_ALT_VERSION);
+      await setCurrentVersion(TEST_ALT_VERSION);
 
       expect(await cacheManager.getCachedApiResponse('/items/1', { ql: 200 })).toBeNull();
     });
@@ -118,7 +132,7 @@ describe('Game version switch', () => {
       const pocketBossStore = usePocketBossStore();
 
       nanosStore.nanos.push(sampleNano(1, 'Superior Heal'));
-      pocketBossStore.pocketBosses.push({ id: 1, name: 'Test Boss' } as any);
+      pocketBossStore.pocketBosses.push(samplePocketBoss(1, 'Test Boss'));
       await cacheManager.set('offline_items', [{ id: 1 }]);
 
       expect(nanosStore.nanos.length).toBe(1);
@@ -152,7 +166,7 @@ describe('Game version switch', () => {
   describe('purgeOtherVersionCaches', () => {
     it('removes cached API responses belonging to other versions', async () => {
       await cacheManager.cacheApiResponse('/items/1', {}, { name: 'From AO' });
-      setCurrentVersion(TEST_ALT_VERSION);
+      await setCurrentVersion(TEST_ALT_VERSION);
       await cacheManager.cacheApiResponse('/items/1', {}, { name: 'From PRK' });
 
       expect(storedKeys('tinkertools_cache_').length).toBe(2);
@@ -207,10 +221,10 @@ describe('Game version switch', () => {
 
       try {
         // Already on TEST_VERSION from beforeEach: setting it again is a no-op.
-        setCurrentVersion(TEST_VERSION);
+        await setCurrentVersion(TEST_VERSION);
         expect(listener).not.toHaveBeenCalled();
 
-        setCurrentVersion(TEST_ALT_VERSION);
+        await setCurrentVersion(TEST_ALT_VERSION);
         await vi.waitFor(() => expect(listener).toHaveBeenCalledTimes(1));
         expect(listener).toHaveBeenCalledWith(TEST_ALT_VERSION, TEST_VERSION);
       } finally {
@@ -225,7 +239,7 @@ describe('Game version switch', () => {
       const unregister = onGameVersionChange(listener);
 
       try {
-        setCurrentVersion(TEST_VERSION);
+        await setCurrentVersion(TEST_VERSION);
         expect(listener).not.toHaveBeenCalled();
       } finally {
         unregister();

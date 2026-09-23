@@ -7,24 +7,46 @@
  * Strategy: Skip when backend not available (Option B)
  */
 
-import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
-import { useSymbiantsStore } from '@/stores/symbiants';
-import { isBackendAvailable } from '../helpers/backend-check';
 
-// Check backend availability before running tests
-let BACKEND_AVAILABLE = false;
-
-beforeAll(async () => {
-  BACKEND_AVAILABLE = await isBackendAvailable();
-  if (!BACKEND_AVAILABLE) {
-    console.warn('Backend not available - skipping symbiants integration tests');
-  }
+// jsdom has no IndexedDB: back idb-keyval with an in-memory map so the store's
+// persistent cache behaves as it does in a browser.
+vi.mock('idb-keyval', () => {
+  const entries = new Map<IDBValidKey, unknown>();
+  return {
+    get: vi.fn((key: IDBValidKey) => Promise.resolve(entries.get(key))),
+    set: vi.fn((key: IDBValidKey, value: unknown) => {
+      entries.set(key, value);
+      return Promise.resolve();
+    }),
+    del: vi.fn((key: IDBValidKey) => {
+      entries.delete(key);
+      return Promise.resolve();
+    }),
+    keys: vi.fn(() => Promise.resolve(Array.from(entries.keys()))),
+  };
 });
 
+import { useSymbiantsStore } from '@/stores/symbiants';
+import { apiClient } from '@/services/api-client';
+
+// Symbiant slot ids are implant-slot bit flags, eye (2) through feet (8192).
+const IMPLANT_SLOT_FLAGS = Array.from({ length: 13 }, (_, i) => 2 ** (i + 1));
+import { isBackendAvailable } from '../helpers/backend-check';
+
+// Top-level await: skipIf is evaluated while tests are collected.
+const BACKEND_AVAILABLE = await isBackendAvailable();
+
 describe.skipIf(!BACKEND_AVAILABLE)('SymbiantsStore Integration Tests', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     setActivePinia(createPinia());
+    // Every test starts from an empty IndexedDB cache
+    await useSymbiantsStore().clearCache();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('fetches real symbiants from the API', async () => {
@@ -65,9 +87,8 @@ describe.skipIf(!BACKEND_AVAILABLE)('SymbiantsStore Integration Tests', () => {
       expect(symbiant.name).toBeTruthy();
       expect(symbiant.name.length).toBeGreaterThan(0);
 
-      // Should have valid slot_id
-      expect(symbiant.slot_id).toBeGreaterThanOrEqual(0);
-      expect(symbiant.slot_id).toBeLessThan(10);
+      // Should occupy exactly one implant slot
+      expect(IMPLANT_SLOT_FLAGS).toContain(symbiant.slot_id);
 
       // Should have reasonable QL values
       expect(symbiant.ql).toBeGreaterThanOrEqual(1);
@@ -96,33 +117,15 @@ describe.skipIf(!BACKEND_AVAILABLE)('SymbiantsStore Integration Tests', () => {
 
   it('loads all symbiants in chunks with progress', async () => {
     const store = useSymbiantsStore();
+    const searchSpy = vi.spyOn(apiClient, 'searchSymbiants');
 
-    // Capture console logs to verify progress
-    const logs: string[] = [];
-    const originalLog = console.log;
-    console.log = (...args: any[]) => {
-      logs.push(args.join(' '));
-      originalLog(...args);
-    };
+    await store.loadAllSymbiants();
 
-    try {
-      await store.loadAllSymbiants();
-
-      // Should have loaded all symbiants
-      expect(store.symbiantsCount).toBeGreaterThan(0);
-
-      // Should have progress logs
-      const progressLogs = logs.filter(
-        (log) => log.includes('Loaded') && log.includes('symbiants')
-      );
-      expect(progressLogs.length).toBeGreaterThan(0);
-
-      // Verify chunked loading happened
-      const startLog = logs.find((log) => log.includes('Starting chunked symbiant load'));
-      expect(startLog).toBeTruthy();
-    } finally {
-      console.log = originalLog;
-    }
+    // More symbiants exist than fit in one 100-item page
+    expect(store.symbiantsCount).toBeGreaterThan(100);
+    expect(searchSpy.mock.calls.length).toBeGreaterThan(1);
+    expect(store.loadedCount).toBe(store.totalCount);
+    expect(store.loadingProgress).toBe(100);
   }, 60000); // Extended timeout for full load
 
   it('maintains consistent enrichment for same symbiant', async () => {
@@ -145,35 +148,21 @@ describe.skipIf(!BACKEND_AVAILABLE)('SymbiantsStore Integration Tests', () => {
   }, 30000);
 
   it('uses IndexedDB cache on subsequent loads', async () => {
-    const store = useSymbiantsStore();
+    const firstStore = useSymbiantsStore();
 
     // First load from API
-    await store.loadAllSymbiants();
-    const firstCount = store.symbiantsCount;
+    await firstStore.loadAllSymbiants();
+    const firstCount = firstStore.symbiantsCount;
     expect(firstCount).toBeGreaterThan(0);
 
-    // Clear memory cache
-    await store.clearCache();
+    // A new session: empty in-memory store, same IndexedDB
+    setActivePinia(createPinia());
+    const store = useSymbiantsStore();
+    const searchSpy = vi.spyOn(apiClient, 'searchSymbiants');
 
-    // Second load should use IndexedDB cache
-    const logs: string[] = [];
-    const originalLog = console.log;
-    console.log = (...args: any[]) => {
-      logs.push(args.join(' '));
-      originalLog(...args);
-    };
+    await store.loadAllSymbiants();
 
-    try {
-      await store.loadAllSymbiants();
-
-      // Should have same count
-      expect(store.symbiantsCount).toBe(firstCount);
-
-      // Should have cache hit log
-      const cacheLog = logs.find((log) => log.includes('Loading from IndexedDB cache'));
-      expect(cacheLog).toBeTruthy();
-    } finally {
-      console.log = originalLog;
-    }
+    expect(store.symbiantsCount).toBe(firstCount);
+    expect(searchSpy).not.toHaveBeenCalled();
   }, 60000);
 });

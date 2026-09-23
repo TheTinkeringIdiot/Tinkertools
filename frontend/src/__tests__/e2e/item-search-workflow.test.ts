@@ -1,484 +1,270 @@
 /**
- * E2E Tests for Item Search Workflow
+ * Item Search Workflow Tests
  *
- * Tests critical user workflows for searching and browsing items
+ * End-to-end user workflows through TinkerItems: arriving from other tools
+ * via links, browsing results in both layouts, comparing items, casting a
+ * nano on the active character and opening an item. Real stores, router and
+ * PrimeVue widgets; only the API client is mocked.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+// IMPORTANT: Mock API client BEFORE importing any stores
+vi.mock('@/services/api-client');
+
+import { mount, flushPromises, type VueWrapper } from '@vue/test-utils';
+import type { Router } from 'vue-router';
 import {
-  mountWithContext,
-  flushPromises,
-  wait,
-  standardCleanup,
-  createTestProfile,
-  PROFESSION,
-  BREED,
-} from '@/__tests__/helpers';
-import TinkerItems from '../../views/TinkerItems.vue';
-import type { Item } from '../../types/api';
+  setupIntegrationTest,
+  type IntegrationTestContext,
+} from '../helpers/integration-test-utils';
+import { createTestRouter } from '../helpers/vue-test-utils';
+import { appGlobals } from '../helpers/app-globals';
+import { itemSearchForm } from '../helpers/item-search-page';
+import {
+  createArmorItem,
+  createSpell,
+  createSpellData,
+  createStatValue,
+  createTestItem,
+  createWeaponItem,
+} from '../helpers/item-fixtures';
+import { createTestProfile } from '../helpers/profile-fixtures';
+import { TEST_VERSION } from '../helpers/version-fixtures';
+import { versionedPath } from '@/composables/useGameVersion';
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
+import TinkerItems from '@/views/TinkerItems.vue';
+import type { Item, PaginatedResponse } from '@/types/api';
 
-// Mock the API client
-vi.mock('../../services/api-client', () => ({
-  apiClient: {
-    get: vi.fn(),
-    post: vi.fn(),
-    put: vi.fn(),
-    delete: vi.fn(),
-  },
-}));
-
-// Mock stores with realistic implementations
-vi.mock('../../stores/items', () => ({
-  useItemsStore: () => ({
-    searchItems: vi.fn(),
-    getItem: vi.fn(),
-    currentPagination: { page: 1, limit: 25, total: 100 },
-    clearSearch: vi.fn(),
-  }),
-}));
-
-vi.mock('../../stores/profile', () => ({
-  useProfileStore: () => ({
-    profiles: [],
-    activeProfile: null,
-    hasActiveProfile: false,
-    preferences: { favoriteItems: [] },
-    addFavoriteItem: vi.fn(),
-    removeFavoriteItem: vi.fn(),
-  }),
-}));
-
-const mockItems: Item[] = [
-  {
-    id: 1,
-    aoid: 12345,
-    name: 'Superior Combat Armor',
-    ql: 200,
-    description: 'High-quality body armor',
-    item_class: 6,
-    is_nano: false,
-    stats: [{ stat: 16, value: 50 }],
-    requirements: [{ stat: 16, value: 300 }],
-    spell_data: [],
-    actions: [],
-    attack_defense: null,
-    animation_mesh: null,
-  },
-  {
-    id: 2,
-    aoid: 54321,
-    name: 'Advanced Healing Nano',
-    ql: 180,
-    description: 'Powerful healing program',
-    item_class: 20,
-    is_nano: true,
-    stats: [],
-    requirements: [{ stat: 19, value: 400 }],
-    spell_data: [{ name: 'Heal', description: 'Restores health' }],
-    actions: [],
-    attack_defense: null,
-    animation_mesh: null,
-  },
-];
-
-const mockProfile = createTestProfile({
-  name: 'Test Character',
-  Character: {
-    Level: 200,
-    Profession: PROFESSION.ENGINEER,
-  },
+const cellScanner = createTestItem({ id: 1, aoid: 5001, name: 'Cell Scanner', ql: 50 });
+const combatArmor = createArmorItem({ id: 2, aoid: 5002, name: 'Combat Armor', ql: 150 });
+const rifle = createWeaponItem({ id: 3, aoid: 5003, name: 'Assault Rifle', ql: 200 });
+const ironCircle = createTestItem({
+  id: 4,
+  aoid: 5004,
+  name: 'Iron Circle',
+  ql: 60,
+  is_nano: true,
+  stats: [
+    createStatValue(54, 20), // NCU cost
+    createStatValue(75, 1000), // NanoStrain
+  ],
 });
 
-describe('Item Search Workflow E2E', () => {
-  let wrapper: any;
+/** A deck item whose Wear effect gives the character NCU (MaxNCU, stat 181). */
+const ncuMemory = createTestItem({
+  name: 'NCU Memory',
+  spell_data: [
+    createSpellData({
+      event: 14, // Wear
+      spells: [createSpell({ spell_id: 53045, spell_params: { Stat: 181, Amount: 100 } })],
+    }),
+  ],
+});
+
+function results(items: Item[]): PaginatedResponse<Item> {
+  return {
+    items,
+    total: items.length,
+    page: 1,
+    page_size: 24,
+    pages: 1,
+    has_next: false,
+    has_prev: false,
+  };
+}
+
+describe('Item Search Workflow', () => {
+  let context: IntegrationTestContext;
+  let router: Router;
+  let wrapper: VueWrapper;
+
+  /** Open TinkerItems at `path` (relative to the version root), as a link would. */
+  async function openItems(path = '/items') {
+    router = createTestRouter();
+    await router.push(versionedPath(path));
+    await router.isReady();
+
+    wrapper = mount(TinkerItems, {
+      global: appGlobals(context.pinia, router),
+      attachTo: document.body,
+    });
+    await flushPromises();
+    return itemSearchForm(wrapper);
+  }
+
+  function lastQuery() {
+    const calls = context.mockApi.searchItems.mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    return calls[calls.length - 1][0];
+  }
+
+  /** Result names in the list layout. */
+  function listRows(): string[] {
+    return wrapper.findAll('.item-list .space-y-2 h3').map((heading) => heading.text());
+  }
+
+  /** Header button by its PrimeVue icon class. */
+  function iconButton(icon: string) {
+    const button = wrapper.find(`button:has(.${icon})`);
+    expect(button.exists()).toBe(true);
+    return button;
+  }
 
   beforeEach(async () => {
-    // Mock successful API responses
-    const mockSearchItems = vi.fn().mockResolvedValue(mockItems);
-
-    wrapper = mountWithContext(TinkerItems, {
-      global: {
-        stubs: {
-          'router-link': true,
-          'router-view': true,
-        },
-      },
-    });
-
-    await flushPromises();
+    context = await setupIntegrationTest();
+    context.mockApi.searchItems.mockResolvedValue(results([cellScanner, combatArmor, rifle]));
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
-    standardCleanup();
+    wrapper.unmount();
   });
 
-  describe('Basic Item Search', () => {
-    it('should allow user to search for items by text', async () => {
-      // User enters search term
-      const searchInput = wrapper.find('input[type="text"]');
-      expect(searchInput.exists()).toBe(true);
+  describe('Arriving from a link', () => {
+    it('runs the header search term and shows it in the search box', async () => {
+      context.mockApi.searchItems.mockResolvedValue(results([cellScanner]));
 
-      await searchInput.setValue('armor');
-      await searchInput.trigger('keydown.enter');
+      const form = await openItems('/items?search=Cell%20Scanner');
 
-      // Should trigger search
+      expect(lastQuery()).toMatchObject({
+        search: 'Cell Scanner',
+        exact_match: false,
+        search_fields: ['name'],
+      });
+      expect(form.nameInput().element.value).toBe('Cell Scanner');
+      expect(wrapper.text()).toContain('1 items found');
+      expect(wrapper.text()).toContain('Cell Scanner');
+    });
+
+    it('runs a new header search while already on the page', async () => {
+      await openItems('/items?search=Cell');
+
+      context.mockApi.searchItems.mockResolvedValue(results([rifle]));
+      await router.push(versionedPath('/items?search=Rifle'));
       await flushPromises();
-      await wait(100);
 
-      // Verify search was performed
-      expect(wrapper.text()).toContain('armor');
+      expect(lastQuery()).toMatchObject({ search: 'Rifle' });
+      expect(wrapper.text()).toContain('Assault Rifle');
+      expect(wrapper.text()).not.toContain('Cell Scanner');
     });
 
-    it('should display search results in grid view by default', async () => {
-      // Should show items in grid layout
-      const gridView = wrapper.find('.grid');
-      if (gridView.exists()) {
-        expect(gridView.exists()).toBe(true);
-      }
+    it('finds the exact item and QL linked from equipment', async () => {
+      context.mockApi.searchItems.mockResolvedValue(results([combatArmor]));
+
+      await openItems('/items?itemId=5002&ql=150');
+
+      expect(lastQuery()).toMatchObject({ aoid: 5002, min_ql: 150, max_ql: 150 });
+      expect(wrapper.text()).toContain('Combat Armor');
     });
 
-    it('should allow switching between grid and list view', async () => {
-      // Find view mode toggle buttons
-      const viewButtons = wrapper.findAll('button');
-      const listButton = viewButtons.find(
-        (btn) => btn.text().includes('List') || btn.attributes('aria-label')?.includes('list')
+    it('lists the nanos of a strain linked from TinkerNanos', async () => {
+      context.mockApi.searchItems.mockResolvedValue(results([ironCircle]));
+
+      await openItems('/items?strain=1000&is_nano=true');
+
+      expect(lastQuery()).toMatchObject({ strain: 1000, is_nano: true });
+      expect(lastQuery().search).toBeUndefined();
+      expect(wrapper.text()).toContain('Iron Circle');
+    });
+  });
+
+  describe('Browsing results', () => {
+    it('switches between the list and grid layouts', async () => {
+      const form = await openItems();
+      await form.typeName('a');
+      await form.search();
+
+      // List layout is the default
+      expect(listRows()).toEqual(['Cell Scanner', 'Combat Armor', 'Assault Rifle']);
+      expect(wrapper.findAll('.item-card')).toHaveLength(0);
+
+      await iconButton('pi-th-large').trigger('click');
+      expect(wrapper.findAll('.item-card')).toHaveLength(3);
+      expect(listRows()).toHaveLength(0);
+
+      await iconButton('pi-list').trigger('click');
+      expect(listRows()).toHaveLength(3);
+    });
+
+    it('opens the item page in the current game version', async () => {
+      const form = await openItems();
+      await form.typeName('rifle');
+      await form.search();
+
+      const row = wrapper
+        .findAll('.item-list .cursor-pointer')
+        .find((candidate) => candidate.text().includes('Assault Rifle'));
+      await row!.trigger('click');
+      await flushPromises();
+
+      expect(router.currentRoute.value.name).toBe('ItemDetail');
+      expect(router.currentRoute.value.path).toBe(`/${TEST_VERSION}/items/${rifle.aoid}`);
+    });
+  });
+
+  describe('Comparing items', () => {
+    it('collects up to three distinct items in the comparison panel', async () => {
+      const extra = createWeaponItem({ id: 9, aoid: 5009, name: 'Spare Rifle', ql: 10 });
+      context.mockApi.searchItems.mockResolvedValue(
+        results([cellScanner, combatArmor, rifle, extra])
       );
+      const form = await openItems();
+      await form.typeName('a');
+      await form.search();
 
-      if (listButton) {
-        await listButton.trigger('click');
-        await flushPromises();
+      expect(wrapper.text()).not.toContain('Item Comparison');
 
-        // Should switch to list view
-        const listView = wrapper.find('.space-y-2');
-        expect(listView.exists()).toBe(true);
-      }
+      const compareButtons = wrapper.findAll('.item-list button:has(.pi-clone)');
+      expect(compareButtons).toHaveLength(4);
+      await compareButtons[0].trigger('click');
+      await compareButtons[0].trigger('click'); // the same item again is ignored
+      await compareButtons[1].trigger('click');
+      await compareButtons[2].trigger('click');
+      await compareButtons[3].trigger('click'); // a fourth item does not fit
+      await flushPromises();
+
+      const panel = document.body.querySelector('.item-comparison-sidebar');
+      expect(panel).not.toBeNull();
+      expect(panel!.textContent).toContain('Item Comparison');
+      expect(panel!.textContent).toContain('Cell Scanner');
+      expect(panel!.textContent).toContain('Combat Armor');
+      expect(panel!.textContent).toContain('Assault Rifle');
+      expect(panel!.textContent).not.toContain('Spare Rifle');
     });
   });
 
-  describe('Profile Integration Workflow', () => {
-    it('should allow user to select a profile and show compatibility', async () => {
-      // Mock profile store with active profile
-      const profileStore = {
-        profiles: [mockProfile],
-        activeProfile: mockProfile,
-        hasActiveProfile: true,
-        preferences: { favoriteItems: [] },
-      };
-
-      wrapper = mountWithContext(TinkerItems, {
-        global: {
-          provide: {
-            profileStore,
-          },
-          stubs: {
-            'router-link': true,
-            'router-view': true,
-          },
-        },
+  describe('Casting nanos on the active character', () => {
+    it('adds a cast nano to the active profile buffs', async () => {
+      const store = useTinkerProfilesStore();
+      const profile = createTestProfile({ name: 'Caster', level: 100 });
+      const profileId = await store.createProfile('Caster', {
+        ...profile,
+        Weapons: { ...profile.Weapons, NCU1: ncuMemory },
+        buffs: [],
       });
+      await store.setActiveProfile(profileId);
 
+      context.mockApi.searchItems.mockResolvedValue(results([ironCircle]));
+      const form = await openItems();
+      await form.typeName('Iron Circle');
+      await form.search();
+
+      const castButton = wrapper.find('.item-list button:has(.pi-sparkles)');
+      expect(castButton.exists()).toBe(true);
+      await castButton.trigger('click');
       await flushPromises();
 
-      // Should show profile selection
-      const profileDropdown = wrapper.find('select');
-      if (profileDropdown.exists()) {
-        await profileDropdown.setValue(mockProfile.id);
-        await flushPromises();
-      }
-
-      // Should show compatibility toggle
-      const compatibilityToggle = wrapper.find('input[type="checkbox"]');
-      if (compatibilityToggle.exists()) {
-        await compatibilityToggle.setChecked(true);
-        await flushPromises();
-
-        // Should display compatibility indicators
-        expect(wrapper.vm).toBeTruthy();
-      }
+      expect(store.activeProfile?.buffs?.map((buff) => buff.name)).toEqual(['Iron Circle']);
     });
 
-    it('should filter items based on profile compatibility when enabled', async () => {
-      // Set up with profile and compatibility enabled
-      wrapper.vm.selectedProfile = mockProfile;
-      wrapper.vm.showCompatibility = true;
-      await flushPromises();
+    it('offers no cast button without an active character', async () => {
+      context.mockApi.searchItems.mockResolvedValue(results([ironCircle]));
+      const form = await openItems();
+      await form.typeName('Iron Circle');
+      await form.search();
 
-      // Perform search
-      const searchInput = wrapper.find('input[type="text"]');
-      if (searchInput.exists()) {
-        await searchInput.setValue('armor');
-        await searchInput.trigger('keydown.enter');
-        await flushPromises();
-      }
-
-      // Should show compatibility status
-      expect(wrapper.vm.showCompatibility).toBe(true);
-    });
-  });
-
-  describe('Advanced Filtering Workflow', () => {
-    it('should allow user to apply item type filters', async () => {
-      // Open filters section
-      const filtersSection = wrapper.find('.filters');
-      if (filtersSection.exists()) {
-        // Apply armor filter
-        const armorFilter = wrapper.find('input[value="6"]'); // Armor class
-        if (armorFilter.exists()) {
-          await armorFilter.setChecked(true);
-          await flushPromises();
-        }
-      }
-
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should allow user to set quality level range', async () => {
-      // Find QL range inputs
-      const qlInputs = wrapper.findAll('input[type="number"]');
-      if (qlInputs.length >= 2) {
-        await qlInputs[0].setValue('100'); // Min QL
-        await qlInputs[1].setValue('250'); // Max QL
-        await flushPromises();
-      }
-
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should allow user to filter by nano items only', async () => {
-      // Find nano filter checkbox
-      const nanoFilter = wrapper.find('input[id*="nano"]');
-      if (nanoFilter.exists()) {
-        await nanoFilter.setChecked(true);
-        await flushPromises();
-      }
-
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe('Item Interaction Workflow', () => {
-    it('should allow user to view item details', async () => {
-      // Mock items in results
-      wrapper.vm.searchResults = mockItems;
-      await flushPromises();
-
-      // Click on an item
-      const itemCard = wrapper.find('.item-card');
-      if (itemCard.exists()) {
-        await itemCard.trigger('click');
-        await flushPromises();
-
-        // Should open item detail view
-        expect(wrapper.emitted('item-click')).toBeTruthy();
-      }
-    });
-
-    it('should allow user to add items to favorites', async () => {
-      // Mock items in results
-      wrapper.vm.searchResults = mockItems;
-      await flushPromises();
-
-      // Find and click favorite button
-      const favoriteButton = wrapper.find('button[class*="pi-heart"]');
-      if (favoriteButton.exists()) {
-        await favoriteButton.trigger('click');
-        await flushPromises();
-
-        expect(wrapper.emitted('item-favorite')).toBeTruthy();
-      }
-    });
-
-    it('should allow user to compare items', async () => {
-      // Mock items in results
-      wrapper.vm.searchResults = mockItems;
-      await flushPromises();
-
-      // Find and click compare button
-      const compareButton = wrapper.find('button[class*="pi-clone"]');
-      if (compareButton.exists()) {
-        await compareButton.trigger('click');
-        await flushPromises();
-
-        expect(wrapper.emitted('item-compare')).toBeTruthy();
-      }
-    });
-  });
-
-  describe('Search History and Persistence', () => {
-    beforeEach(() => {
-      // Mock localStorage
-      Object.defineProperty(window, 'localStorage', {
-        value: {
-          getItem: vi.fn(() => JSON.stringify(['armor', 'weapon'])),
-          setItem: vi.fn(),
-          removeItem: vi.fn(),
-          clear: vi.fn(),
-        },
-        writable: true,
-      });
-    });
-
-    it('should save search queries to history', async () => {
-      const searchInput = wrapper.find('input[type="text"]');
-      if (searchInput.exists()) {
-        await searchInput.setValue('new search');
-        await searchInput.trigger('keydown.enter');
-        await flushPromises();
-
-        // Should save to localStorage
-        expect(localStorage.setItem).toHaveBeenCalledWith(
-          expect.stringContaining('recentSearches'),
-          expect.stringContaining('new search')
-        );
-      }
-    });
-
-    it('should show recent searches when input is focused', async () => {
-      const searchInput = wrapper.find('input[type="text"]');
-      if (searchInput.exists()) {
-        await searchInput.trigger('focus');
-        await flushPromises();
-
-        // Should show recent searches
-        const suggestions = wrapper.find('.suggestions');
-        expect(suggestions.exists()).toBe(true);
-      }
-    });
-  });
-
-  describe('Pagination Workflow', () => {
-    it('should allow user to navigate through pages', async () => {
-      // Mock pagination data
-      wrapper.vm.pagination = { page: 1, limit: 25, total: 100 };
-      await flushPromises();
-
-      // Find next page button
-      const buttons = wrapper.findAll('button');
-      const nextButton = buttons.find((btn) => btn.text().includes('Next'));
-      if (nextButton) {
-        await nextButton.trigger('click');
-        await flushPromises();
-
-        expect(wrapper.emitted('page-change')).toBeTruthy();
-      }
-    });
-
-    it('should allow user to change items per page', async () => {
-      // Find page size dropdown
-      const pageSizeSelect = wrapper.find('select[class*="rows"]');
-      if (pageSizeSelect.exists()) {
-        await pageSizeSelect.setValue('50');
-        await flushPromises();
-
-        expect(wrapper.emitted('page-size-change')).toBeTruthy();
-      }
-    });
-  });
-
-  describe('Responsive Behavior', () => {
-    it('should adapt to mobile viewport', async () => {
-      // Simulate mobile viewport
-      Object.defineProperty(window, 'innerWidth', {
-        writable: true,
-        configurable: true,
-        value: 375,
-      });
-
-      window.dispatchEvent(new Event('resize'));
-      await flushPromises();
-
-      // Should show mobile-optimized layout
-      const mobileControls = wrapper.find('.md\\:hidden');
-      expect(mobileControls.exists()).toBe(true);
-    });
-
-    it('should maintain functionality on tablet', async () => {
-      // Simulate tablet viewport
-      Object.defineProperty(window, 'innerWidth', {
-        writable: true,
-        configurable: true,
-        value: 768,
-      });
-
-      window.dispatchEvent(new Event('resize'));
-      await flushPromises();
-
-      // Should maintain core functionality
-      const searchInput = wrapper.find('input[type="text"]');
-      expect(searchInput.exists()).toBe(true);
-    });
-  });
-
-  describe('Error Handling', () => {
-    it('should handle search errors gracefully', async () => {
-      // Mock API error
-      const mockError = new Error('Search failed');
-      vi.mocked(wrapper.vm.performSearch).mockRejectedValue(mockError);
-
-      const searchInput = wrapper.find('input[type="text"]');
-      if (searchInput.exists()) {
-        await searchInput.setValue('error test');
-        await searchInput.trigger('keydown.enter');
-        await flushPromises();
-      }
-
-      // Should show error message
-      expect(wrapper.text()).toContain('Search failed') || expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should handle empty search results', async () => {
-      // Mock empty results
-      wrapper.vm.searchResults = [];
-      wrapper.vm.searchPerformed = true;
-      await flushPromises();
-
-      // Should show empty state
-      expect(wrapper.text()).toContain('No items found') || expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe('Performance Testing', () => {
-    it('should handle large result sets efficiently', async () => {
-      // Mock large dataset
-      const largeDataset = Array.from({ length: 1000 }, (_, i) => ({
-        ...mockItems[0],
-        id: i + 1,
-        name: `Item ${i + 1}`,
-      }));
-
-      wrapper.vm.searchResults = largeDataset.slice(0, 25); // Paginated
-      await flushPromises();
-
-      // Should render without performance issues
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should debounce search input effectively', async () => {
-      vi.useFakeTimers();
-
-      const searchInput = wrapper.find('input[type="text"]');
-      if (searchInput.exists()) {
-        // Type multiple characters quickly
-        await searchInput.setValue('a');
-        await searchInput.setValue('ar');
-        await searchInput.setValue('arm');
-        await searchInput.setValue('armor');
-
-        // Should not trigger search immediately
-        expect(wrapper.vm.isSearching).toBeFalsy();
-
-        // Advance timers
-        vi.advanceTimersByTime(500);
-        await flushPromises();
-
-        // Now should have triggered search
-        expect(wrapper.exists()).toBe(true);
-      }
-
-      vi.useRealTimers();
+      expect(wrapper.text()).toContain('Iron Circle');
+      expect(wrapper.find('.item-list button:has(.pi-sparkles)').exists()).toBe(false);
     });
   });
 });

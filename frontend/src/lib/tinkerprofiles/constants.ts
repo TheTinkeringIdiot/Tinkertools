@@ -6,7 +6,7 @@
 
 import type { TinkerProfile, NanoCompatibleProfile, SkillData } from './types';
 import type { PerkSystem } from './perk-types';
-import { getBreedInitValue, calcHP, calcNP } from './ip-calculator';
+import { getBreedInitValue, calcHP, calcNP, ABILITY_INDEX_TO_STAT_ID } from './ip-calculator';
 import { getBreedId, normalizeBreedToId, normalizeProfessionToId } from '../../services/game-utils';
 import { skillService } from '../../services/skill-service';
 
@@ -361,7 +361,7 @@ export function createDefaultSkillsV4(breed: string): { [skillId: number]: Skill
 
     let baseValue = 5; // Default for trainable skills
 
-    if (category === 'Abilities') {
+    if (category === 'Attributes') {
       // For abilities, use breed-specific values from ip-calculator
       baseValue = getBreedInitValue(breedId, Number(skillId));
     } else if (category === 'Misc' || category === 'ACs') {
@@ -463,12 +463,13 @@ export function createDefaultNanoProfile(
       Treatment: BASE_SKILL,
     },
     stats: {
-      Strength: getBreedInitValue(breedId, 0),
-      Agility: getBreedInitValue(breedId, 1),
-      Stamina: getBreedInitValue(breedId, 2),
-      Intelligence: getBreedInitValue(breedId, 3),
-      Sense: getBreedInitValue(breedId, 4),
-      Psychic: getBreedInitValue(breedId, 5),
+      // getBreedInitValue takes stat IDs (16-21), not ability indexes
+      Strength: getBreedInitValue(breedId, ABILITY_INDEX_TO_STAT_ID[0]),
+      Agility: getBreedInitValue(breedId, ABILITY_INDEX_TO_STAT_ID[1]),
+      Stamina: getBreedInitValue(breedId, ABILITY_INDEX_TO_STAT_ID[2]),
+      Intelligence: getBreedInitValue(breedId, ABILITY_INDEX_TO_STAT_ID[3]),
+      Sense: getBreedInitValue(breedId, ABILITY_INDEX_TO_STAT_ID[4]),
+      Psychic: getBreedInitValue(breedId, ABILITY_INDEX_TO_STAT_ID[5]),
     },
     activeNanos: [],
     memoryCapacity: 500,

@@ -3,6 +3,10 @@
  *
  * Integration tests for buff management covering NCU tracking, NanoStrain conflict
  * resolution, and buff stacking. Tests through real components and store interactions.
+ *
+ * MaxNCU (stat 181) has no base value in Anarchy Online: it comes entirely from
+ * equipment (NCU memory in the NCU1-6 deck slots) and buffs. Each test character
+ * therefore wears an NCU memory that sets its capacity.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -10,7 +14,14 @@ import { nextTick } from 'vue';
 import { createPinia, setActivePinia } from 'pinia';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import type { Item } from '@/types/api';
-import { BREED, PROFESSION } from '@/__tests__/helpers';
+import {
+  BREED,
+  PROFESSION,
+  createTestProfile,
+  createTestItem,
+  createSpellData,
+  createSpell,
+} from '@/__tests__/helpers';
 
 // Mock PrimeVue Toast
 const mockToast = {
@@ -25,6 +36,47 @@ describe('Buff Management Integration', () => {
   let pinia: ReturnType<typeof createPinia>;
   let store: ReturnType<typeof useTinkerProfilesStore>;
   let profileId: string;
+
+  // NCU memory: a deck item whose Wear effect modifies MaxNCU (stat 181)
+  const ncuMemory = (amount: number): Item =>
+    createTestItem({
+      name: `NCU Memory (+${amount})`,
+      spell_data: [
+        createSpellData({
+          event: 14, // Wear
+          spells: [createSpell({ spell_id: 53045, spell_params: { Stat: 181, Amount: amount } })],
+        }),
+      ],
+    });
+
+  // Create a stored character whose only NCU source is an equipped NCU memory
+  const createCharacter = async (
+    name: string,
+    options: { level: number; profession: number; breed: number; maxNCU: number }
+  ): Promise<string> => {
+    const profile = createTestProfile({
+      name,
+      level: options.level,
+      profession: options.profession,
+      breed: options.breed,
+    });
+    return store.createProfile(name, {
+      ...profile,
+      Weapons: { ...profile.Weapons, NCU1: ncuMemory(options.maxNCU) },
+      buffs: [],
+    });
+  };
+
+  // Swap the active character's NCU memory for one of a different size
+  const equipNcuMemory = async (amount: number): Promise<void> => {
+    const profile = await store.loadProfile(profileId);
+    expect(profile).toBeDefined();
+    await store.updateProfile(profileId, {
+      Weapons: { ...profile!.Weapons, NCU1: ncuMemory(amount) },
+    });
+    await store.setActiveProfile(profileId);
+    await nextTick();
+  };
 
   // Test buff items with different NCU costs and strains
   const createBuffItem = (overrides: Partial<Item> = {}): Item => ({
@@ -108,42 +160,13 @@ describe('Buff Management Integration', () => {
     setActivePinia(pinia);
     store = useTinkerProfilesStore();
 
-    // Create a test profile with MaxNCU skill set
-    const testProfile = {
-      Character: {
-        Name: 'Test Character',
-        Level: 200,
-        Profession: PROFESSION.ADVENTURER,
-        Breed: BREED.SOLITUS,
-        Faction: 'Neutral',
-        Expansion: 'Shadow Lands',
-        AccountType: 'Paid',
-        MaxHealth: 2000,
-        MaxNano: 1000,
-      },
-      Skills: {},
-      skills: {
-        // MaxNCU is skill ID 181 - set proper structure for IP integrator
-        181: {
-          base: 1200, // Base value that won't be overwritten
-          trickle: 0,
-          pointsFromIp: 0,
-          equipmentBonus: 0,
-          perkBonus: 0,
-          buffBonus: 0,
-          ipSpent: 0,
-          cap: 2000,
-          total: 1200,
-        },
-      },
-      Clothing: {},
-      Weapons: {},
-      Implants: {},
-      buffs: [], // Start with no buffs
-    };
-
-    // Create profile using the store's createProfile method (omit PerksAndResearch - will be created automatically)
-    profileId = await store.createProfile('Test Character', testProfile);
+    // Level 200 adventurer wearing a 2400 NCU memory
+    profileId = await createCharacter('Test Character', {
+      level: 200,
+      profession: PROFESSION.ADVENTURER,
+      breed: BREED.SOLITUS,
+      maxNCU: 2400,
+    });
 
     // Set as active profile (this triggers IP recalculation)
     await store.setActiveProfile(profileId);
@@ -159,8 +182,8 @@ describe('Buff Management Integration', () => {
       expect(store.activeProfile).toBeDefined();
       expect(store.activeProfile?.Character.Name).toBe('Test Character');
 
-      // MaxNCU for level 200 character = 1200 + (200 * 6) = 2400
-      const expectedMaxNCU = 1200 + 200 * 6;
+      // MaxNCU comes from the equipped 2400 NCU memory
+      const expectedMaxNCU = 2400;
       expect(store.maxNCU).toBe(expectedMaxNCU);
 
       // Initial state - no buffs
@@ -191,8 +214,7 @@ describe('Buff Management Integration', () => {
     });
 
     it('should cast multiple buffs and accumulate NCU correctly', async () => {
-      // MaxNCU for level 200 character = 1200 + (200 * 6) = 2400
-      const expectedMaxNCU = 1200 + 200 * 6;
+      const expectedMaxNCU = 2400;
 
       // Cast first buff
       await store.castBuff(buffLowNCU);
@@ -215,26 +237,9 @@ describe('Buff Management Integration', () => {
     });
 
     it('should reject buff when NCU is full and show error', async () => {
-      // Create a level 1 character to get minimal MaxNCU
-      // Level 1 MaxNCU = 1200 + (1 * 6) = 1206
-      // With buffLowNCU (25) + buffMediumNCU (30) = 55 NCU used
-      // Available = 1206 - 55 = 1151 NCU
-      // buffHighNCU requires 1100 NCU, which would still fit!
-      // So we need to create a character where MaxNCU < 1100 + 55 = 1155
-      // That would require a negative level, which isn't possible.
-      // Instead, let's test by filling the NCU completely with smaller buffs first
-
-      // Set to level 1 for minimal MaxNCU
-      const profile = await store.loadProfile(profileId);
-      if (profile) {
-        profile.Character.Level = 1;
-        await store.updateProfile(profileId, profile);
-        await store.setActiveProfile(profileId); // Reload with new MaxNCU
-      }
-      await nextTick();
-
-      const expectedMaxNCU = 1200 + 1 * 6; // 1206
-      expect(store.maxNCU).toBe(expectedMaxNCU);
+      // Swap to a 1200 NCU memory so the 1100 NCU buff nearly fills it
+      await equipNcuMemory(1200);
+      expect(store.maxNCU).toBe(1200);
 
       // Cast the high NCU buff first to consume most NCU
       await store.castBuff(buffHighNCU);
@@ -245,15 +250,13 @@ describe('Buff Management Integration', () => {
       expect(buffCountBefore).toBe(1);
       expect(ncuBeforeCast).toBe(1100);
 
-      // Now try to cast buffMediumNCU which requires 30 NCU
-      // Available = 1206 - 1100 = 106 NCU, so this should succeed
-      // Let's try buffHighNCU again (same strain, so it might replace or fail)
-      // Actually, let's create a new buff that requires more than available
+      // Only 1200 - 1100 = 100 NCU left: a 200 NCU buff must be rejected
+      expect(store.availableNCU).toBe(100);
       const buffTooLarge = createBuffItem({
         id: 9999,
         name: 'Too Large Buff',
         stats: [
-          { id: 1, stat: 54, value: 200 }, // Requires 200 NCU, but only 106 available
+          { id: 1, stat: 54, value: 200 }, // Requires 200 NCU, but only 100 available
           { id: 2, stat: 75, value: 9999 }, // Unique strain
           { id: 3, stat: 551, value: 100 },
         ],
@@ -279,24 +282,30 @@ describe('Buff Management Integration', () => {
     });
 
     it('should calculate canCastBuff correctly based on available NCU', async () => {
-      // Temporarily set character to level 1 to test with low MaxNCU
-      // Level 1 MaxNCU = 1200 + (1 * 6) = 1206
-      const profile = await store.loadProfile(profileId);
-      if (profile) {
-        profile.Character.Level = 1;
-        await store.updateProfile(profileId, profile);
-        await store.setActiveProfile(profileId); // Reload with new MaxNCU
-      }
+      await equipNcuMemory(1200);
+      expect(store.maxNCU).toBe(1200);
+
+      // Both fit into an empty 1200 NCU
+      expect(store.canCastBuff(buffLowNCU)).toBe(true); // 25 NCU
+      expect(store.canCastBuff(buffHighNCU)).toBe(true); // 1100 NCU
+
+      // With 1100 used, only 100 NCU remain
+      await store.castBuff(buffHighNCU);
       await nextTick();
-
-      const expectedMaxNCU = 1200 + 1 * 6; // 1206
-      expect(store.maxNCU).toBe(expectedMaxNCU);
-
-      // With MaxNCU of 1206, should be able to cast low NCU buff (25 NCU)
       expect(store.canCastBuff(buffLowNCU)).toBe(true);
-      // But not high NCU buff (1100 NCU) - while technically possible, let's check
-      // Actually 1100 < 1206, so it should be castable
-      expect(store.canCastBuff(buffHighNCU)).toBe(true);
+      expect(
+        store.canCastBuff(
+          createBuffItem({
+            id: 1007,
+            name: 'Wide Buff',
+            stats: [
+              { id: 1, stat: 54, value: 101 },
+              { id: 2, stat: 75, value: 7000 },
+              { id: 3, stat: 551, value: 100 },
+            ],
+          })
+        )
+      ).toBe(false);
     });
   });
 
@@ -418,8 +427,8 @@ describe('Buff Management Integration', () => {
       expect(profile?.buffs?.[0].id).toBe(buffMediumNCU.id);
 
       // Verify NCU decreased
-      // MaxNCU for level 200 = 2400, with 30 NCU used = 2370 available
-      const expectedMaxNCU = 1200 + 200 * 6;
+      // MaxNCU 2400, with 30 NCU used = 2370 available
+      const expectedMaxNCU = 2400;
       expect(store.currentNCU).toBe(30);
       expect(store.availableNCU).toBe(expectedMaxNCU - 30); // 2370
 
@@ -450,8 +459,7 @@ describe('Buff Management Integration', () => {
       expect(profile?.buffs?.length).toBe(0);
 
       // Verify NCU reset
-      // MaxNCU for level 200 = 2400
-      const expectedMaxNCU = 1200 + 200 * 6;
+      const expectedMaxNCU = 2400;
       expect(store.currentNCU).toBe(0);
       expect(store.availableNCU).toBe(expectedMaxNCU); // 2400
 
@@ -493,48 +501,13 @@ describe('Buff Management Integration', () => {
 
   describe('Profile Switching', () => {
     it('should show correct buffs for each profile after switching', async () => {
-      // Create second profile
-      const profile2Data = {
-        Character: {
-          Name: 'Second Character',
-          Level: 150,
-          Profession: PROFESSION.DOCTOR,
-          Breed: BREED.ATROX,
-          Faction: 'Clan',
-          Expansion: 'Shadow Lands',
-          AccountType: 'Paid',
-          MaxHealth: 1500,
-          MaxNano: 800,
-        },
-        Skills: {},
-        skills: {
-          181: {
-            base: 1000,
-            trickle: 0,
-            pointsFromIp: 0,
-            equipmentBonus: 0,
-            perkBonus: 0,
-            buffBonus: 0,
-            ipSpent: 0,
-            cap: 2000,
-            total: 1000,
-          },
-        },
-        Clothing: {},
-        Weapons: {},
-        Implants: {},
-        buffs: [],
-      };
-
-      const profileId2 = await store.createProfile('Second Character', profile2Data);
-
-      // Fix MaxNCU after creation
-      const prof2 = await store.loadProfile(profileId2);
-      if (prof2 && prof2.skills && prof2.skills[181]) {
-        prof2.skills[181].base = 1000;
-        prof2.skills[181].total = 1000;
-        await store.updateProfile(profileId2, prof2);
-      }
+      // Create a second character with its own NCU memory
+      const profileId2 = await createCharacter('Second Character', {
+        level: 150,
+        profession: PROFESSION.DOCTOR,
+        breed: BREED.ATROX,
+        maxNCU: 2100,
+      });
 
       // Cast buff on first profile
       await store.setActiveProfile(profileId);
@@ -551,8 +524,8 @@ describe('Buff Management Integration', () => {
       await nextTick();
 
       // Verify second profile has no buffs
-      // MaxNCU for level 150 character = 1200 + (150 * 6) = 2100
-      const expectedMaxNCU2 = 1200 + 150 * 6;
+      // Second character wears a 2100 NCU memory
+      const expectedMaxNCU2 = 2100;
       expect(store.activeProfile?.buffs?.length).toBe(0);
       expect(store.currentNCU).toBe(0);
       expect(store.maxNCU).toBe(expectedMaxNCU2); // 2100
@@ -576,48 +549,13 @@ describe('Buff Management Integration', () => {
     });
 
     it('should not leak buffs between profiles', async () => {
-      // Create second profile
-      const profile2Data = {
-        Character: {
-          Name: 'Isolated Profile',
-          Level: 100,
-          Profession: PROFESSION.ENFORCER,
-          Breed: BREED.NANOMAGE,
-          Faction: 'Neutral',
-          Expansion: 'Shadow Lands',
-          AccountType: 'Paid',
-          MaxHealth: 1000,
-          MaxNano: 500,
-        },
-        Skills: {},
-        skills: {
-          181: {
-            base: 800,
-            trickle: 0,
-            pointsFromIp: 0,
-            equipmentBonus: 0,
-            perkBonus: 0,
-            buffBonus: 0,
-            ipSpent: 0,
-            cap: 2000,
-            total: 800,
-          },
-        },
-        Clothing: {},
-        Weapons: {},
-        Implants: {},
-        buffs: [],
-      };
-
-      const profileId2 = await store.createProfile('Isolated Profile', profile2Data);
-
-      // Fix MaxNCU after creation
-      const prof2 = await store.loadProfile(profileId2);
-      if (prof2 && prof2.skills && prof2.skills[181]) {
-        prof2.skills[181].base = 800;
-        prof2.skills[181].total = 800;
-        await store.updateProfile(profileId2, prof2);
-      }
+      // Create a second character with its own NCU memory
+      const profileId2 = await createCharacter('Isolated Profile', {
+        level: 100,
+        profession: PROFESSION.ENFORCER,
+        breed: BREED.NANOMAGE,
+        maxNCU: 1800,
+      });
 
       // Cast multiple buffs on first profile
       await store.setActiveProfile(profileId);
@@ -627,8 +565,8 @@ describe('Buff Management Integration', () => {
       await store.castBuff(buffMediumNCU);
       await nextTick();
 
-      const profile1BuffCount = store.activeProfile?.buffs?.length || 0;
       const profile1BuffIds = store.activeProfile?.buffs?.map((b) => b.id) || [];
+      expect(profile1BuffIds).toHaveLength(2);
 
       // Switch to second profile
       await store.setActiveProfile(profileId2);
@@ -645,51 +583,16 @@ describe('Buff Management Integration', () => {
     });
 
     it('should maintain NCU calculations correctly per profile', async () => {
-      // Create profile with different MaxNCU
-      const profile2Data = {
-        Character: {
-          Name: 'Low NCU Character',
-          Level: 50,
-          Profession: PROFESSION.SOLDIER,
-          Breed: BREED.SOLITUS,
-          Faction: 'Omni',
-          Expansion: 'Shadow Lands',
-          AccountType: 'Paid',
-          MaxHealth: 800,
-          MaxNano: 300,
-        },
-        Skills: {},
-        skills: {
-          181: {
-            base: 500,
-            trickle: 0,
-            pointsFromIp: 0,
-            equipmentBonus: 0,
-            perkBonus: 0,
-            buffBonus: 0,
-            ipSpent: 0,
-            cap: 2000,
-            total: 500,
-          },
-        },
-        Clothing: {},
-        Weapons: {},
-        Implants: {},
-        buffs: [],
-      };
+      // Create a second character with its own NCU memory
+      const profileId2 = await createCharacter('Low NCU Character', {
+        level: 50,
+        profession: PROFESSION.SOLDIER,
+        breed: BREED.SOLITUS,
+        maxNCU: 1500,
+      });
 
-      const profileId2 = await store.createProfile('Low NCU Character', profile2Data);
-
-      // Fix MaxNCU after creation
-      const prof2 = await store.loadProfile(profileId2);
-      if (prof2 && prof2.skills && prof2.skills[181]) {
-        prof2.skills[181].base = 500;
-        prof2.skills[181].total = 500;
-        await store.updateProfile(profileId2, prof2);
-      }
-
-      // Profile 1 (level 200) has MaxNCU = 1200 + (200 * 6) = 2400
-      const expectedMaxNCU1 = 1200 + 200 * 6;
+      // Profile 1 wears a 2400 NCU memory
+      const expectedMaxNCU1 = 2400;
       await store.setActiveProfile(profileId);
       await nextTick();
       expect(store.maxNCU).toBe(expectedMaxNCU1); // 2400
@@ -698,8 +601,8 @@ describe('Buff Management Integration', () => {
       await nextTick();
       expect(store.availableNCU).toBe(expectedMaxNCU1 - 25); // 2375
 
-      // Switch to profile 2 (level 50) with MaxNCU = 1200 + (50 * 6) = 1500
-      const expectedMaxNCU2 = 1200 + 50 * 6;
+      // Switch to profile 2, which wears a 1500 NCU memory
+      const expectedMaxNCU2 = 1500;
       await store.setActiveProfile(profileId2);
       await nextTick();
       expect(store.maxNCU).toBe(expectedMaxNCU2); // 1500

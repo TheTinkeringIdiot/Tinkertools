@@ -56,6 +56,9 @@ export interface SkillData {
    * Stored to prevent recalculation overhead and ensure consistency
    */
   total: number;
+
+  /** Maximum reachable value including bonuses; computed by the IP integrator */
+  cap?: number;
 }
 
 /** Comprehensive IP tracking information */

@@ -21,7 +21,7 @@ import {
 import { createWeaponItem } from '../helpers/item-fixtures';
 import TinkerItems from '@/views/TinkerItems.vue';
 import AdvancedItemSearch from '@/components/items/AdvancedItemSearch.vue';
-import type { Item, PaginatedResponse } from '@/types/api';
+import type { Item } from '@/types/api';
 
 describe('TinkerItems revision badge', () => {
   let context: IntegrationTestContext;
@@ -40,11 +40,12 @@ describe('TinkerItems revision badge', () => {
       total: items.length,
       page: 1,
       page_size: 24,
+      pages: 1,
       has_next: false,
       has_prev: false,
-    } as PaginatedResponse<Item>);
+    });
 
-    context.mockApi.batchItemRevisions = vi.fn().mockResolvedValue({
+    context.mockApi.batchItemRevisions.mockResolvedValue({
       items: {
         1001: {
           aoid: 1001,
@@ -58,9 +59,11 @@ describe('TinkerItems revision badge', () => {
   });
 
   async function search(wrapper: ReturnType<typeof mountForIntegration>) {
-    const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
-    (advancedSearch.vm as any).searchForm.search = 'rifle';
-    (advancedSearch.vm as any).performSearch();
+    const searchInput = wrapper
+      .findComponent(AdvancedItemSearch)
+      .find('input[placeholder="Search for items..."]');
+    await searchInput.setValue('rifle');
+    await searchInput.trigger('keydown.enter');
     await waitForUpdates(wrapper, 100);
   }
 
@@ -81,7 +84,7 @@ describe('TinkerItems revision badge', () => {
   });
 
   it('still shows results when the revisions batch fails', async () => {
-    context.mockApi.batchItemRevisions = vi.fn().mockRejectedValue(new Error('offline'));
+    context.mockApi.batchItemRevisions.mockRejectedValue(new Error('offline'));
 
     const wrapper = mountForIntegration(TinkerItems, { pinia: context.pinia });
     await waitForUpdates(wrapper);

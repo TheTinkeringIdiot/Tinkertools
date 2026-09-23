@@ -3,7 +3,7 @@
  *
  * The header search bar is a shortcut into TinkerItems: Enter navigates to the
  * items route with ?search=<term>, inheriting the game version segment from
- * the current route. Uses a real memory router shaped like the app router.
+ * the current route. Uses the shared test router, shaped like the app router.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -12,30 +12,10 @@ vi.mock('@/services/api-client');
 
 import { mount, flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
-import { createRouter, createMemoryHistory, type Router } from 'vue-router';
-import { defineComponent, h } from 'vue';
+import type { Router } from 'vue-router';
 import PrimeVue from 'primevue/config';
 import GlobalItemSearch from '@/components/shared/GlobalItemSearch.vue';
-
-const Stub = defineComponent({ render: () => h('div') });
-const Layout = defineComponent({ render: () => h('router-view') });
-
-function makeRouter(): Router {
-  return createRouter({
-    history: createMemoryHistory(),
-    routes: [
-      {
-        path: '/:version([a-z0-9][a-z0-9.-]{0,39})',
-        component: Layout,
-        children: [
-          { path: '', name: 'Home', component: Stub },
-          { path: 'items', name: 'TinkerItems', component: Stub },
-          { path: 'nanos', name: 'TinkerNanos', component: Stub },
-        ],
-      },
-    ],
-  });
-}
+import { createTestRouter } from '../helpers/vue-test-utils';
 
 async function mountAt(router: Router, path: string) {
   await router.push(path);
@@ -53,7 +33,8 @@ describe('GlobalItemSearch', () => {
 
   beforeEach(() => {
     setActivePinia(createPinia());
-    router = makeRouter();
+    // Shaped like the app router: every tool is a child of /:version
+    router = createTestRouter();
   });
 
   it('navigates to TinkerItems with the term and keeps the version segment', async () => {

@@ -5,12 +5,23 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import axios from 'axios';
+import axios, { type InternalAxiosRequestConfig } from 'axios';
 import { apiClient } from '../../services/api-client';
 import { API_ROOT } from '../../services/api-config';
 import { setCurrentVersion } from '../../composables/useGameVersion';
 import { TEST_VERSION, TEST_ALT_VERSION } from '../helpers/version-fixtures';
-import type { Item, Spell, ApiResponse } from '../../types/api';
+import type { Item, Spell, ApiResponse, TinkerProfile, SkillWithIP } from '../../types/api';
+
+type RequestInterceptor = (config: InternalAxiosRequestConfig) => InternalAxiosRequestConfig;
+type ResponseErrorInterceptor = (error: unknown) => Promise<unknown>;
+
+/** Request config fields the retry interceptor reads and writes. */
+interface RetryConfig {
+  url?: string;
+  headers?: Record<string, string>;
+  _retry?: boolean;
+  _retryCount: number;
+}
 
 /**
  * The client is constructed at module import, so the axios mock has to exist
@@ -20,33 +31,35 @@ import type { Item, Spell, ApiResponse } from '../../types/api';
  * The interceptors registered during that construction are captured here,
  * because the global beforeEach clears mock call records before any test runs.
  */
-const mockAxiosInstance = vi.hoisted(() => {
+const mockAxiosInstance = vi.hoisted(() =>
   // Callable: the retry path invokes the instance directly as `this.client(config)`.
-  const instance: any = vi.fn();
-  instance.get = vi.fn();
-  instance.post = vi.fn();
-  instance.put = vi.fn();
-  instance.delete = vi.fn();
-  instance.interceptors = {
-    request: { use: vi.fn() },
-    response: { use: vi.fn() },
-  };
-  return instance;
-});
+  Object.assign(vi.fn(), {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+    interceptors: {
+      request: { use: vi.fn() },
+      response: { use: vi.fn() },
+    },
+  })
+);
 
 const registeredInterceptors = vi.hoisted(() => ({
-  request: [] as Array<(config: any) => any>,
-  response: [] as Array<(response: any) => any>,
-  responseError: [] as Array<(error: any) => any>,
+  request: [] as RequestInterceptor[],
+  response: [] as Array<(response: unknown) => unknown>,
+  responseError: [] as ResponseErrorInterceptor[],
 }));
 
 vi.mock('axios', () => {
-  mockAxiosInstance.interceptors.request.use.mockImplementation((onFulfilled: any) => {
-    registeredInterceptors.request.push(onFulfilled);
-    return 0;
-  });
+  mockAxiosInstance.interceptors.request.use.mockImplementation(
+    (onFulfilled: RequestInterceptor) => {
+      registeredInterceptors.request.push(onFulfilled);
+      return 0;
+    }
+  );
   mockAxiosInstance.interceptors.response.use.mockImplementation(
-    (onFulfilled: any, onRejected: any) => {
+    (onFulfilled: (response: unknown) => unknown, onRejected: ResponseErrorInterceptor) => {
       registeredInterceptors.response.push(onFulfilled);
       registeredInterceptors.responseError.push(onRejected);
       return 0;
@@ -64,6 +77,9 @@ vi.mock('axios', () => {
 
 const mockedAxios = vi.mocked(axios);
 
+// The real classes, for building configs and errors the client must handle.
+const { AxiosError, AxiosHeaders } = await vi.importActual<typeof import('axios')>('axios');
+
 // Mock data
 const mockItem: Item = {
   id: 1,
@@ -76,9 +92,52 @@ const mockItem: Item = {
   stats: [],
   spell_data: [],
   actions: [],
-  attack_defense: null,
-  animation_mesh: null,
+  attack_stats: [],
+  defense_stats: [],
 };
+
+/** The legacy profile shape the compatibility endpoint is declared with. */
+function legacyProfile(): TinkerProfile {
+  const skill = (value: number): SkillWithIP => ({ value, ipSpent: 0, pointFromIp: 0 });
+  return {
+    Character: {
+      Name: 'Tester',
+      Level: 200,
+      Profession: 'Soldier',
+      Breed: 'Solitus',
+      Faction: 'Neutral',
+      Expansion: 'Lost Eden',
+      AccountType: 'Paid',
+      MaxHealth: 1000,
+      MaxNano: 500,
+    },
+    Skills: {
+      Attributes: {
+        Intelligence: skill(10),
+        Psychic: skill(10),
+        Sense: skill(10),
+        Stamina: skill(10),
+        Strength: skill(10),
+        Agility: skill(10),
+      },
+      'Body & Defense': {},
+      ACs: {},
+      'Ranged Weapons': {},
+      'Ranged Specials': {},
+      'Melee Weapons': {},
+      'Melee Specials': {},
+      'Nanos & Casting': {},
+      Exploring: {},
+      'Trade & Repair': {},
+      'Combat & Healing': {},
+      Misc: {},
+    },
+    Weapons: {},
+    Clothing: {},
+    Implants: {},
+    PerksAndResearch: [],
+  };
+}
 
 const mockApiResponse: ApiResponse<Item> = {
   success: true,
@@ -94,12 +153,8 @@ const mockApiResponse: ApiResponse<Item> = {
 const createCallArgs = mockedAxios.create.mock.calls[0]?.[0];
 
 describe('API Client', () => {
-  beforeEach(() => {
-    mockedAxios.create.mockReturnValue(mockAxiosInstance as any);
-  });
-
-  afterEach(() => {
-    setCurrentVersion(TEST_VERSION);
+  afterEach(async () => {
+    await setCurrentVersion(TEST_VERSION);
   });
 
   describe('Initialization', () => {
@@ -122,28 +177,28 @@ describe('API Client', () => {
   });
 
   describe('Game Version Scoping', () => {
-    function runRequestInterceptor(config: Record<string, any> = {}) {
-      return registeredInterceptors.request[0]({ headers: {}, ...config });
+    function runRequestInterceptor(config: Partial<InternalAxiosRequestConfig> = {}) {
+      return registeredInterceptors.request[0]({ headers: new AxiosHeaders(), ...config });
     }
 
-    it('scopes the base URL to the active game version', () => {
-      setCurrentVersion(TEST_VERSION);
+    it('scopes the base URL to the active game version', async () => {
+      await setCurrentVersion(TEST_VERSION);
 
       const config = runRequestInterceptor();
 
       expect(config.baseURL).toBe(`${API_ROOT}/${TEST_VERSION}`);
     });
 
-    it('follows the version when it changes, without rebuilding the client', () => {
-      setCurrentVersion(TEST_ALT_VERSION);
+    it('follows the version when it changes, without rebuilding the client', async () => {
+      await setCurrentVersion(TEST_ALT_VERSION);
 
       const config = runRequestInterceptor();
 
       expect(config.baseURL).toBe(`${API_ROOT}/${TEST_ALT_VERSION}`);
     });
 
-    it('lets a single request override the version', () => {
-      setCurrentVersion(TEST_VERSION);
+    it('lets a single request override the version', async () => {
+      await setCurrentVersion(TEST_VERSION);
 
       const config = runRequestInterceptor({ gameVersion: TEST_ALT_VERSION });
 
@@ -181,7 +236,7 @@ describe('API Client', () => {
 
     it('should handle item compatibility check', async () => {
       const compatibilityRequest = {
-        profile: {} as any,
+        profile: legacyProfile(),
         item_ids: [1, 2, 3],
         check_type: 'equip' as const,
       };
@@ -258,18 +313,15 @@ describe('API Client', () => {
 
   describe('Error Handling', () => {
     it('should handle network errors', async () => {
-      const networkError = new Error('Network Error');
-      networkError.code = 'NETWORK_ERROR';
+      mockAxiosInstance.get.mockRejectedValue(
+        new AxiosError('Network Error', AxiosError.ERR_NETWORK)
+      );
 
-      mockAxiosInstance.get.mockRejectedValue(networkError);
-
-      try {
-        await apiClient.getItem(1);
-      } catch (error: any) {
-        expect(error.type).toBe('error');
-        expect(error.title).toBe('Network Error');
-        expect(error.recoverable).toBe(true);
-      }
+      await expect(apiClient.getItem(1)).rejects.toMatchObject({
+        type: 'error',
+        title: 'Network Error',
+        recoverable: true,
+      });
     });
 
     it('should handle API error responses', async () => {
@@ -286,28 +338,23 @@ describe('API Client', () => {
 
       mockAxiosInstance.get.mockRejectedValue(apiError);
 
-      try {
-        await apiClient.getItem(999);
-      } catch (error: any) {
-        expect(error.type).toBe('info');
-        expect(error.title).toBe('Not Found');
-        expect(error.recoverable).toBe(true);
-      }
+      await expect(apiClient.getItem(999)).rejects.toMatchObject({
+        type: 'info',
+        title: 'Not Found',
+        recoverable: true,
+      });
     });
 
     it('should handle timeout errors', async () => {
-      const timeoutError = new Error('timeout of 30000ms exceeded');
-      timeoutError.code = 'ECONNABORTED';
+      mockAxiosInstance.get.mockRejectedValue(
+        new AxiosError('timeout of 30000ms exceeded', AxiosError.ECONNABORTED)
+      );
 
-      mockAxiosInstance.get.mockRejectedValue(timeoutError);
-
-      try {
-        await apiClient.getItem(1);
-      } catch (error: any) {
-        expect(error.type).toBe('warning');
-        expect(error.title).toBe('Request Timeout');
-        expect(error.recoverable).toBe(true);
-      }
+      await expect(apiClient.getItem(1)).rejects.toMatchObject({
+        type: 'warning',
+        title: 'Request Timeout',
+        recoverable: true,
+      });
     });
   });
 
@@ -319,7 +366,7 @@ describe('API Client', () => {
     it('should retry a 5xx response with exponential backoff', async () => {
       vi.useFakeTimers();
       try {
-        const config: any = { url: '/items/1', headers: {}, _retryCount: 0 };
+        const config: RetryConfig = { url: '/items/1', headers: {}, _retryCount: 0 };
         mockAxiosInstance.mockResolvedValueOnce({ data: mockApiResponse });
 
         const pending = onError()({ response: { status: 500 }, config });

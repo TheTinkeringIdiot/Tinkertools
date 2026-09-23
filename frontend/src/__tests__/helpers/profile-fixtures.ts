@@ -466,14 +466,15 @@ export function createProfileWithAbilities(
 /**
  * Validate profile has proper v4.0.0 structure (helper for migration tests)
  */
-export function isValidV4Profile(profile: any): profile is TinkerProfile {
+export function isValidV4Profile(profile: unknown): profile is TinkerProfile {
+  if (typeof profile !== 'object' || profile === null) return false;
+  const candidate = profile as Partial<TinkerProfile>;
   return (
-    profile &&
-    profile.version === '4.0.0' &&
-    typeof profile.Character?.Breed === 'number' &&
-    typeof profile.Character?.Profession === 'number' &&
-    typeof profile.skills === 'object' &&
+    candidate.version === '4.0.0' &&
+    typeof candidate.Character?.Breed === 'number' &&
+    typeof candidate.Character?.Profession === 'number' &&
+    typeof candidate.skills === 'object' &&
     // Check at least one skill is numeric ID
-    Object.keys(profile.skills).some((key) => !isNaN(Number(key)))
+    Object.keys(candidate.skills).some((key) => !isNaN(Number(key)))
   );
 }

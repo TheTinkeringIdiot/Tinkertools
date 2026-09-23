@@ -163,7 +163,8 @@ const filteredNanos = computed(() => {
       (nano) =>
         nano.name.toLowerCase().includes(query) ||
         nano.description?.toLowerCase().includes(query) ||
-        nano.school.toLowerCase().includes(query)
+        // Not every nano has a school (the backend sends null)
+        nano.school?.toLowerCase().includes(query)
     );
   }
 

@@ -108,19 +108,19 @@ function stubRouter() {
 }
 
 /** Registry order is the backend's sort_order, already sorted by the composable. */
-function setRegistry(list: GameVersion[], currentSlug: string) {
+async function setRegistry(list: GameVersion[], currentSlug: string) {
   versionRegistry.value = list;
   currentVersion.value = null;
-  setCurrentVersion(currentSlug);
+  await setCurrentVersion(currentSlug);
   useGameVersion().defaultVersion.value = list.find((v) => v.is_default)?.slug ?? null;
 }
 
 describe('GameVersionSelector', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     setActivePinia(createPinia());
     routerMock.replace.mockClear();
     mockToast.add.mockClear();
-    setRegistry([LIVE, OLD, PRK], 'ao-2024-02');
+    await setRegistry([LIVE, OLD, PRK], 'ao-2024-02');
   });
 
   it('shows the current version and its build on the pill', () => {
@@ -205,15 +205,15 @@ describe('VersionSnapshotBanner', () => {
     sessionStorage.clear();
   });
 
-  it('stays hidden on the default version', () => {
-    setRegistry([LIVE, OLD], 'ao-2024-02');
+  it('stays hidden on the default version', async () => {
+    await setRegistry([LIVE, OLD], 'ao-2024-02');
     const wrapper = mount(VersionSnapshotBanner, { global: { plugins: [PrimeVue] } });
 
     expect(wrapper.find('[data-testid="version-snapshot-banner"]').exists()).toBe(false);
   });
 
-  it('names the snapshot and the data it does not carry', () => {
-    setRegistry([LIVE, OLD], 'ao-2003-06');
+  it('names the snapshot and the data it does not carry', async () => {
+    await setRegistry([LIVE, OLD], 'ao-2003-06');
     const wrapper = mount(VersionSnapshotBanner, { global: { plugins: [PrimeVue] } });
 
     const banner = wrapper.find('[data-testid="version-snapshot-banner"]');
@@ -226,7 +226,7 @@ describe('VersionSnapshotBanner', () => {
   });
 
   it('stays dismissed for the rest of the session', async () => {
-    setRegistry([LIVE, OLD], 'ao-2003-06');
+    await setRegistry([LIVE, OLD], 'ao-2003-06');
     const wrapper = mount(VersionSnapshotBanner, { global: { plugins: [PrimeVue] } });
 
     await wrapper.find('[data-testid="version-banner-dismiss"]').trigger('click');
@@ -264,8 +264,8 @@ describe('App navigation tool gating', () => {
     return (menubar.props('model') as Array<{ label: string }>).map((entry) => entry.label);
   }
 
-  it('shows every tool on a full version', () => {
-    setRegistry([LIVE], 'ao-2024-02');
+  it('shows every tool on a full version', async () => {
+    await setRegistry([LIVE], 'ao-2024-02');
     const labels = menuLabels(mountApp());
 
     expect(labels).toContain('TinkerPocket');
@@ -274,8 +274,8 @@ describe('App navigation tool gating', () => {
     expect(labels).toContain('TinkerPlants');
   });
 
-  it('hides tools the version has no data for', () => {
-    setRegistry(
+  it('hides tools the version has no data for', async () => {
+    await setRegistry(
       [
         makeVersion({
           ...OLD,
@@ -295,10 +295,10 @@ describe('App navigation tool gating', () => {
     expect(labels).toContain('TinkerFite');
   });
 
-  it('shows everything when the version is not in the registry', () => {
+  it('shows everything when the version is not in the registry', async () => {
     versionRegistry.value = [];
     currentVersion.value = null;
-    setCurrentVersion('unknown-snapshot');
+    await setCurrentVersion('unknown-snapshot');
     const labels = menuLabels(mountApp());
 
     expect(labels).toContain('TinkerPocket');

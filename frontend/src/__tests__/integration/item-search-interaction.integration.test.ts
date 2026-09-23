@@ -1,938 +1,415 @@
 /**
  * Item Search Interaction Integration Tests
  *
- * Tests item search and filtering functionality through actual UI components
- * with real store integration. Mocks only external API calls.
+ * TinkerItems searched the way a user does it: filling in the search sidebar,
+ * using the quick searches, paging and sorting results. Real stores, router
+ * and PrimeVue widgets; only the API client is mocked.
  *
  * Covers:
- * - Basic search with text queries
- * - Advanced filtering (QL, profession, item class)
- * - Filter combinations and clearing
- * - Search + filter interactions
- * - Results display and pagination
- * - Stat bonus filtering
+ * - Text search, from the Search button and the Enter key
+ * - Quality level, item class and stat bonus filters, alone and combined
+ * - Clearing the form
+ * - Quick searches on the landing state
+ * - Results display, empty state, loading and errors
+ * - Pagination and sorting
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // IMPORTANT: Mock API client BEFORE importing any stores
 vi.mock('@/services/api-client');
 
+import { mount, flushPromises, type VueWrapper } from '@vue/test-utils';
+import type { Router } from 'vue-router';
 import {
   setupIntegrationTest,
-  mountForIntegration,
-  waitForUpdates,
   type IntegrationTestContext,
 } from '../helpers/integration-test-utils';
+import { createTestRouter } from '../helpers/vue-test-utils';
+import { appGlobals } from '../helpers/app-globals';
+import { chooseOption, clickButton, findButton, itemSearchForm } from '../helpers/item-search-page';
 import {
-  createTestItem,
-  createWeaponItem,
   createArmorItem,
   createImplantItem,
   createNanoItem,
   createStatValue,
+  createWeaponItem,
 } from '../helpers/item-fixtures';
 import { SKILL_ID } from '../helpers/skill-fixtures';
-import { useItemsStore } from '@/stores/items';
+import { TEST_VERSION } from '../helpers/version-fixtures';
+import { versionedPath } from '@/composables/useGameVersion';
 import TinkerItems from '@/views/TinkerItems.vue';
-import AdvancedItemSearch from '@/components/items/AdvancedItemSearch.vue';
 import type { Item, PaginatedResponse } from '@/types/api';
 
-// Mock PrimeVue Toast
-const mockToast = {
-  add: vi.fn(),
-  remove: vi.fn(),
-  removeGroup: vi.fn(),
-  removeAllGroups: vi.fn(),
-};
+const rifle100 = createWeaponItem({ id: 1, aoid: 1001, name: 'Assault Rifle', ql: 100 });
+const rifle200 = createWeaponItem({ id: 2, aoid: 1002, name: 'Superior Assault Rifle', ql: 200 });
+const combatArmor = createArmorItem({ id: 3, aoid: 2001, name: 'Combat Armor', ql: 150 });
+const lightArmor = createArmorItem({ id: 4, aoid: 2002, name: 'Light Armor', ql: 50 });
+const traderImplant = createImplantItem({
+  id: 5,
+  aoid: 3001,
+  name: 'Trader Implant',
+  ql: 180,
+  item_class: 3,
+  stats: [createStatValue(SKILL_ID.INTELLIGENCE, 20)],
+});
+const strengthImplant = createImplantItem({
+  id: 6,
+  aoid: 3002,
+  name: 'Strength Implant',
+  ql: 75,
+  item_class: 3,
+  stats: [createStatValue(SKILL_ID.STRENGTH, 15)],
+});
+const combatNano = createNanoItem({ id: 7, aoid: 4001, name: 'Combat Nano', ql: 120 });
+const buffNano = createNanoItem({ id: 8, aoid: 4002, name: 'Buff Nano', ql: 250 });
 
-vi.mock('primevue/usetoast', () => ({
-  useToast: () => mockToast,
-}));
+const allItems = [
+  rifle100,
+  rifle200,
+  combatArmor,
+  lightArmor,
+  traderImplant,
+  strengthImplant,
+  combatNano,
+  buffNano,
+];
+
+function results(
+  items: Item[],
+  { total = items.length, page = 1, pageSize = 24 } = {}
+): PaginatedResponse<Item> {
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  return {
+    items,
+    total,
+    page,
+    page_size: pageSize,
+    pages,
+    has_next: page < pages,
+    has_prev: page > 1,
+  };
+}
 
 describe('Item Search Interaction Integration', () => {
   let context: IntegrationTestContext;
-  let testItems: Item[];
+  let router: Router;
+  let wrapper: VueWrapper;
+
+  async function mountTinkerItems() {
+    router = createTestRouter();
+    await router.push(versionedPath('/items'));
+    await router.isReady();
+
+    wrapper = mount(TinkerItems, {
+      global: appGlobals(context.pinia, router),
+      attachTo: document.body,
+    });
+    await flushPromises();
+    return itemSearchForm(wrapper);
+  }
+
+  function lastQuery() {
+    const calls = context.mockApi.searchItems.mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    return calls[calls.length - 1][0];
+  }
+
+  /** Names of the result rows, in display order. */
+  function shownItems(): string[] {
+    return wrapper.findAll('.item-list h3').map((heading) => heading.text());
+  }
 
   beforeEach(async () => {
     context = await setupIntegrationTest();
+    context.mockApi.searchItems.mockResolvedValue(results(allItems));
+  });
 
-    // Create diverse test items for filtering
-    testItems = [
-      // Weapons
-      createWeaponItem({
-        aoid: 1001,
-        name: 'Assault Rifle QL100',
-        ql: 100,
-        item_class: 1,
-        stats: [
-          createStatValue(SKILL_ID.ASSAULT_RIF, 20),
-          createStatValue(SKILL_ID.RANGED_INIT, 10),
-        ],
-      }),
-      createWeaponItem({
-        aoid: 1002,
-        name: 'Assault Rifle QL200',
-        ql: 200,
-        item_class: 1,
-        stats: [
-          createStatValue(SKILL_ID.ASSAULT_RIF, 50),
-          createStatValue(SKILL_ID.RANGED_INIT, 25),
-        ],
-      }),
-
-      // Armor
-      createArmorItem({
-        aoid: 2001,
-        name: 'Combat Armor QL150',
-        ql: 150,
-        item_class: 2,
-        stats: [
-          createStatValue(SKILL_ID.PROJECTILE_AC, 500),
-          createStatValue(SKILL_ID.MELEE_AC, 400),
-        ],
-      }),
-      createArmorItem({
-        aoid: 2002,
-        name: 'Light Armor QL50',
-        ql: 50,
-        item_class: 2,
-        stats: [
-          createStatValue(SKILL_ID.PROJECTILE_AC, 200),
-          createStatValue(SKILL_ID.DODGE_RNG, 10),
-        ],
-      }),
-
-      // Implants
-      createImplantItem({
-        aoid: 3001,
-        name: 'Trader Implant QL180',
-        ql: 180,
-        item_class: 3,
-        stats: [
-          createStatValue(SKILL_ID.INTELLIGENCE, 20),
-          createStatValue(SKILL_ID.COMPUTER_LITERACY, 80),
-        ],
-      }),
-      createImplantItem({
-        aoid: 3002,
-        name: 'Strength Implant QL75',
-        ql: 75,
-        item_class: 3,
-        stats: [createStatValue(SKILL_ID.STRENGTH, 15), createStatValue(SKILL_ID.BODY_DEV, 30)],
-      }),
-
-      // Nanos
-      createNanoItem({
-        aoid: 4001,
-        name: 'Combat Nano QL120',
-        ql: 120,
-        is_nano: true,
-      }),
-      createNanoItem({
-        aoid: 4002,
-        name: 'Buff Nano QL250',
-        ql: 250,
-        is_nano: true,
-      }),
-    ];
-
-    // Setup default mock API response
-    context.mockApi.searchItems.mockResolvedValue({
-      items: testItems,
-      total: testItems.length,
-      page: 1,
-      page_size: 24,
-      has_next: false,
-      has_prev: false,
-    } as PaginatedResponse<Item>);
+  afterEach(() => {
+    wrapper.unmount();
   });
 
   describe('Basic Search', () => {
-    it('should filter items when user types search query', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
+    it('searches by name and lists the matching items', async () => {
+      const form = await mountTinkerItems();
+      context.mockApi.searchItems.mockResolvedValue(results([rifle100, rifle200]));
 
-      await waitForUpdates(wrapper);
+      await form.typeName('rifle');
+      await form.search();
 
-      // Find the advanced search component
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
-      expect(advancedSearch.exists()).toBe(true);
-
-      // Mock filtered results
-      const filteredItems = testItems.filter((item) => item.name.toLowerCase().includes('rifle'));
-      context.mockApi.searchItems.mockResolvedValue({
-        items: filteredItems,
-        total: filteredItems.length,
+      expect(lastQuery()).toMatchObject({
+        search: 'rifle',
+        exact_match: false,
+        search_fields: ['name'],
         page: 1,
-        page_size: 24,
-        has_next: false,
-        has_prev: false,
+        limit: 24,
       });
-
-      // Use the component API to set search query and trigger search
-      advancedSearch.vm.searchForm.search = 'rifle';
-      advancedSearch.vm.performSearch();
-      await waitForUpdates(wrapper, 100);
-
-      // Verify API was called with search query
-      expect(context.mockApi.searchItems).toHaveBeenCalledWith(
-        expect.objectContaining({
-          search: 'rifle',
-        })
-      );
-
-      // Verify results are displayed
-      const itemsStore = useItemsStore();
-      expect(itemsStore.currentSearchResults).toHaveLength(2);
-      expect(
-        itemsStore.currentSearchResults.every((item) => item.name.toLowerCase().includes('rifle'))
-      ).toBe(true);
+      expect(shownItems()).toEqual(['Assault Rifle', 'Superior Assault Rifle']);
+      expect(wrapper.text()).toContain('2 items found');
     });
 
-    it('should show all items when search is cleared', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
+    it('searches when the user presses Enter', async () => {
+      const form = await mountTinkerItems();
 
-      await waitForUpdates(wrapper);
+      await form.typeName('armor');
+      await form.pressEnter();
 
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
-
-      // First, perform a search
-      advancedSearch.vm.searchForm.search = 'rifle';
-      advancedSearch.vm.performSearch();
-      await waitForUpdates(wrapper, 100);
-
-      // Now clear the search
-      advancedSearch.vm.clearAll();
-      await waitForUpdates(wrapper, 100);
-
-      // Verify search was cleared
-      expect(advancedSearch.vm.searchForm.search).toBe('');
-      expect(advancedSearch.vm.hasSearched).toBe(false);
+      expect(lastQuery()).toMatchObject({ search: 'armor' });
     });
 
-    it('should perform case-insensitive search', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
+    it('returns to the landing state when the search is cleared', async () => {
+      const form = await mountTinkerItems();
 
-      await waitForUpdates(wrapper);
+      await form.typeName('rifle');
+      await form.search();
+      expect(shownItems().length).toBeGreaterThan(0);
 
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
+      await form.clear();
 
-      // Mock results for case-insensitive search
-      const filteredItems = testItems.filter((item) => item.name.toLowerCase().includes('armor'));
-      context.mockApi.searchItems.mockResolvedValue({
-        items: filteredItems,
-        total: filteredItems.length,
-        page: 1,
-        page_size: 24,
-        has_next: false,
-        has_prev: false,
-      });
-
-      // Search with mixed case
-      advancedSearch.vm.searchForm.search = 'ARMOR';
-      advancedSearch.vm.performSearch();
-      await waitForUpdates(wrapper, 100);
-
-      // Verify results match
-      const itemsStore = useItemsStore();
-      expect(itemsStore.currentSearchResults).toHaveLength(2);
-      expect(
-        itemsStore.currentSearchResults.every((item) => item.name.toLowerCase().includes('armor'))
-      ).toBe(true);
+      expect(form.nameInput().element.value).toBe('');
+      expect(shownItems()).toEqual([]);
+      expect(wrapper.text()).toContain('Search the Item Database');
+      expect(wrapper.text()).toContain('Enter search terms or browse categories');
     });
   });
 
   describe('Quality Level Filtering', () => {
-    it('should filter items by QL range', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
+    it('sends a typed QL range', async () => {
+      const form = await mountTinkerItems();
 
-      await waitForUpdates(wrapper);
+      await form.setMinQL(100);
+      await form.setMaxQL(200);
+      await form.search();
 
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
-
-      // Mock filtered results for QL 100-200
-      const filteredItems = testItems.filter((item) => item.ql >= 100 && item.ql <= 200);
-      context.mockApi.searchItems.mockResolvedValue({
-        items: filteredItems,
-        total: filteredItems.length,
-        page: 1,
-        page_size: 24,
-        has_next: false,
-        has_prev: false,
-      });
-
-      // Set QL range
-      advancedSearch.vm.searchForm.min_ql = 100;
-      advancedSearch.vm.searchForm.max_ql = 200;
-      await waitForUpdates(wrapper);
-
-      // Trigger search
-      advancedSearch.vm.performSearch();
-      await waitForUpdates(wrapper, 100);
-
-      // Verify API was called with QL filters
-      expect(context.mockApi.searchItems).toHaveBeenCalledWith(
-        expect.objectContaining({
-          min_ql: 100,
-          max_ql: 200,
-        })
-      );
-
-      // Verify results are in range
-      const itemsStore = useItemsStore();
-      expect(
-        itemsStore.currentSearchResults.every((item) => item.ql >= 100 && item.ql <= 200)
-      ).toBe(true);
+      expect(lastQuery()).toMatchObject({ min_ql: 100, max_ql: 200 });
     });
 
-    it('should use quick QL range buttons', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
+    it('sends the range picked with a quick QL button', async () => {
+      const form = await mountTinkerItems();
 
-      await waitForUpdates(wrapper);
+      await form.quickQL('201-300');
+      await form.search();
 
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
-
-      // Use setQLRange method (simulates clicking quick button)
-      advancedSearch.vm.setQLRange(201, 300);
-      await waitForUpdates(wrapper);
-
-      // Verify QL range was set
-      expect(advancedSearch.vm.searchForm.min_ql).toBe(201);
-      expect(advancedSearch.vm.searchForm.max_ql).toBe(300);
+      expect(lastQuery()).toMatchObject({ min_ql: 201, max_ql: 300 });
     });
   });
 
   describe('Item Class Filtering', () => {
-    it('should filter by item class', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
+    it('sends the chosen item class', async () => {
+      const form = await mountTinkerItems();
+      context.mockApi.searchItems.mockResolvedValue(results([rifle100, rifle200]));
 
-      await waitForUpdates(wrapper);
+      await form.choose('Item Class', 'Weapon');
+      await form.search();
 
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
-
-      // Mock filtered results for weapons (class 1)
-      const filteredItems = testItems.filter((item) => item.item_class === 1);
-      context.mockApi.searchItems.mockResolvedValue({
-        items: filteredItems,
-        total: filteredItems.length,
-        page: 1,
-        page_size: 24,
-        has_next: false,
-        has_prev: false,
-      });
-
-      // Set item class
-      advancedSearch.vm.searchForm.item_class = 1;
-      await waitForUpdates(wrapper);
-
-      // Trigger search
-      advancedSearch.vm.performSearch();
-      await waitForUpdates(wrapper, 100);
-
-      // Verify API was called with item class filter
-      expect(context.mockApi.searchItems).toHaveBeenCalledWith(
-        expect.objectContaining({
-          item_class: 1,
-        })
-      );
-
-      // Verify results match class
-      const itemsStore = useItemsStore();
-      expect(itemsStore.currentSearchResults.every((item) => item.item_class === 1)).toBe(true);
-    });
-
-    it('should filter nano programs', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
-
-      await waitForUpdates(wrapper);
-
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
-
-      // Mock filtered results for nanos
-      const filteredItems = testItems.filter((item) => item.is_nano);
-      context.mockApi.searchItems.mockResolvedValue({
-        items: filteredItems,
-        total: filteredItems.length,
-        page: 1,
-        page_size: 24,
-        has_next: false,
-        has_prev: false,
-      });
-
-      // Set nano filter - note: this would come from checkbox interaction in real usage
-      // For the test, we directly set the form value
-      // @ts-ignore - accessing internal form state for testing
-      advancedSearch.vm.searchForm.is_nano = true;
-      await waitForUpdates(wrapper);
-
-      // Trigger search
-      advancedSearch.vm.performSearch();
-      await waitForUpdates(wrapper, 100);
-
-      // Verify only nanos returned
-      const itemsStore = useItemsStore();
-      expect(itemsStore.currentSearchResults.every((item) => item.is_nano)).toBe(true);
+      expect(lastQuery()).toMatchObject({ item_class: 1 });
+      expect(shownItems()).toEqual(['Assault Rifle', 'Superior Assault Rifle']);
     });
   });
 
   describe('Multiple Filter Combination', () => {
-    it('should combine search query with QL filter', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
+    it('combines name, item class and QL range in one search', async () => {
+      const form = await mountTinkerItems();
+      context.mockApi.searchItems.mockResolvedValue(results([rifle200]));
+
+      await form.typeName('rifle');
+      await form.choose('Item Class', 'Weapon');
+      await form.setMinQL(150);
+      await form.setMaxQL(250);
+      await form.search();
+
+      expect(lastQuery()).toMatchObject({
+        search: 'rifle',
+        item_class: 1,
+        min_ql: 150,
+        max_ql: 250,
       });
-
-      await waitForUpdates(wrapper);
-
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
-
-      // Mock filtered results: armor with QL >= 100
-      const filteredItems = testItems.filter(
-        (item) => item.name.toLowerCase().includes('armor') && item.ql >= 100
-      );
-      context.mockApi.searchItems.mockResolvedValue({
-        items: filteredItems,
-        total: filteredItems.length,
-        page: 1,
-        page_size: 24,
-        has_next: false,
-        has_prev: false,
-      });
-
-      // Set search query and min QL
-      advancedSearch.vm.searchForm.search = 'armor';
-      advancedSearch.vm.searchForm.min_ql = 100;
-      await waitForUpdates(wrapper);
-
-      // Trigger search
-      advancedSearch.vm.performSearch();
-      await waitForUpdates(wrapper, 100);
-
-      // Verify API was called with both filters
-      expect(context.mockApi.searchItems).toHaveBeenCalledWith(
-        expect.objectContaining({
-          search: 'armor',
-          min_ql: 100,
-        })
-      );
-
-      // Verify results match both criteria
-      const itemsStore = useItemsStore();
-      expect(itemsStore.currentSearchResults).toHaveLength(1);
-      expect(itemsStore.currentSearchResults[0].name).toBe('Combat Armor QL150');
+      expect(shownItems()).toEqual(['Superior Assault Rifle']);
     });
 
-    it('should combine item class with QL range', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
+    it('keeps the other filters when one filter changes', async () => {
+      const form = await mountTinkerItems();
 
-      await waitForUpdates(wrapper);
+      await form.setMinQL(100);
+      await form.setMaxQL(200);
+      await form.choose('Item Class', 'Armor');
+      await form.choose('Item Class', 'Implant');
+      await form.search();
 
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
-
-      // Mock filtered results: implants with QL 50-100
-      const filteredItems = testItems.filter(
-        (item) => item.item_class === 3 && item.ql >= 50 && item.ql <= 100
-      );
-      context.mockApi.searchItems.mockResolvedValue({
-        items: filteredItems,
-        total: filteredItems.length,
-        page: 1,
-        page_size: 24,
-        has_next: false,
-        has_prev: false,
-      });
-
-      // Set item class and QL range
-      advancedSearch.vm.searchForm.item_class = 3;
-      advancedSearch.vm.searchForm.min_ql = 50;
-      advancedSearch.vm.searchForm.max_ql = 100;
-      await waitForUpdates(wrapper);
-
-      // Trigger search
-      advancedSearch.vm.performSearch();
-      await waitForUpdates(wrapper, 100);
-
-      // Verify API was called with combined filters
-      expect(context.mockApi.searchItems).toHaveBeenCalledWith(
-        expect.objectContaining({
-          item_class: 3,
-          min_ql: 50,
-          max_ql: 100,
-        })
-      );
-
-      // Verify results
-      const itemsStore = useItemsStore();
-      expect(itemsStore.currentSearchResults).toHaveLength(1);
-      expect(itemsStore.currentSearchResults[0].name).toBe('Strength Implant QL75');
-    });
-
-    it('should handle complex multi-filter search', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
-
-      await waitForUpdates(wrapper);
-
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
-
-      // Mock filtered results: weapons named "rifle", QL 150-250
-      const filteredItems = testItems.filter(
-        (item) =>
-          item.name.toLowerCase().includes('rifle') &&
-          item.item_class === 1 &&
-          item.ql >= 150 &&
-          item.ql <= 250
-      );
-      context.mockApi.searchItems.mockResolvedValue({
-        items: filteredItems,
-        total: filteredItems.length,
-        page: 1,
-        page_size: 24,
-        has_next: false,
-        has_prev: false,
-      });
-
-      // Set all filters
-      advancedSearch.vm.searchForm.search = 'rifle';
-      advancedSearch.vm.searchForm.item_class = 1;
-      advancedSearch.vm.searchForm.min_ql = 150;
-      advancedSearch.vm.searchForm.max_ql = 250;
-      await waitForUpdates(wrapper);
-
-      // Trigger search
-      advancedSearch.vm.performSearch();
-      await waitForUpdates(wrapper, 100);
-
-      // Verify all filters applied
-      expect(context.mockApi.searchItems).toHaveBeenCalledWith(
-        expect.objectContaining({
-          search: 'rifle',
-          item_class: 1,
-          min_ql: 150,
-          max_ql: 250,
-        })
-      );
-
-      // Verify results
-      const itemsStore = useItemsStore();
-      expect(itemsStore.currentSearchResults).toHaveLength(1);
-      expect(itemsStore.currentSearchResults[0].name).toBe('Assault Rifle QL200');
-    });
-  });
-
-  describe('Filter Clearing', () => {
-    it('should clear all filters with clear button', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
-
-      await waitForUpdates(wrapper);
-
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
-
-      // Set multiple filters
-      advancedSearch.vm.searchForm.search = 'armor';
-      advancedSearch.vm.searchForm.min_ql = 100;
-      advancedSearch.vm.searchForm.item_class = 2;
-      await waitForUpdates(wrapper);
-
-      // Click clear button
-      advancedSearch.vm.clearAll();
-      await waitForUpdates(wrapper);
-
-      // Verify all filters were cleared
-      expect(advancedSearch.vm.searchForm.search).toBe('');
-      expect(advancedSearch.vm.searchForm.min_ql).toBeUndefined();
-      expect(advancedSearch.vm.searchForm.max_ql).toBeUndefined();
-      expect(advancedSearch.vm.searchForm.item_class).toBeUndefined();
-      expect(advancedSearch.vm.hasSearched).toBe(false);
-    });
-
-    it('should maintain other filters when changing one filter', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
-
-      await waitForUpdates(wrapper);
-
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
-
-      // Set multiple filters
-      advancedSearch.vm.searchForm.min_ql = 100;
-      advancedSearch.vm.searchForm.max_ql = 200;
-      advancedSearch.vm.searchForm.item_class = 2;
-      await waitForUpdates(wrapper);
-
-      // Change only the item class
-      advancedSearch.vm.searchForm.item_class = 3;
-      await waitForUpdates(wrapper);
-
-      // Verify QL filters remain
-      expect(advancedSearch.vm.searchForm.min_ql).toBe(100);
-      expect(advancedSearch.vm.searchForm.max_ql).toBe(200);
-      expect(advancedSearch.vm.searchForm.item_class).toBe(3);
+      expect(lastQuery()).toMatchObject({ min_ql: 100, max_ql: 200, item_class: 3 });
     });
   });
 
   describe('Stat Bonus Filtering', () => {
-    it('should filter items by stat bonuses', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
+    it('sends the ticked stat bonuses', async () => {
+      const form = await mountTinkerItems();
+      context.mockApi.searchItems.mockResolvedValue(results([traderImplant, strengthImplant]));
 
-      await waitForUpdates(wrapper);
+      await form.tick('Strength');
+      await form.tick('Intelligence');
+      await form.search();
 
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
-
-      // Mock filtered results: items with Intelligence bonus
-      const filteredItems = testItems.filter((item) =>
-        item.stats.some((stat) => stat.stat === SKILL_ID.INTELLIGENCE)
-      );
-      context.mockApi.searchItems.mockResolvedValue({
-        items: filteredItems,
-        total: filteredItems.length,
-        page: 1,
-        page_size: 24,
-        has_next: false,
-        has_prev: false,
-      });
-
-      // Select Intelligence stat bonus
-      advancedSearch.vm.selectedStatBonuses = [SKILL_ID.INTELLIGENCE];
-      await waitForUpdates(wrapper);
-
-      // Trigger search
-      advancedSearch.vm.performSearch();
-      await waitForUpdates(wrapper, 100);
-
-      // Verify API was called with stat bonus filter
-      expect(context.mockApi.searchItems).toHaveBeenCalledWith(
-        expect.objectContaining({
-          stat_bonuses: [SKILL_ID.INTELLIGENCE],
-        })
-      );
-
-      // Verify results have Intelligence bonus
-      const itemsStore = useItemsStore();
-      expect(itemsStore.currentSearchResults).toHaveLength(1);
-      expect(itemsStore.currentSearchResults[0].name).toBe('Trader Implant QL180');
+      expect(lastQuery().stat_bonuses).toEqual([SKILL_ID.STRENGTH, SKILL_ID.INTELLIGENCE]);
+      expect(shownItems()).toEqual(['Trader Implant', 'Strength Implant']);
     });
+  });
 
-    it('should filter by multiple stat bonuses', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
+  describe('Quick Searches', () => {
+    it.each([
+      { button: 'Weapons', query: { item_class: 1 } },
+      { button: 'Implants', query: { item_class: 3 } },
+      { button: 'Nano Programs', query: { is_nano: true } },
+      { button: 'High QL Items', query: { min_ql: 200, sort: 'ql', sort_order: 'desc' } },
+    ])('"$button" runs its preset search', async ({ button, query }) => {
+      await mountTinkerItems();
 
-      await waitForUpdates(wrapper);
+      await clickButton(wrapper, button);
 
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
-
-      // Mock filtered results: items with Strength OR Intelligence
-      const filteredItems = testItems.filter((item) =>
-        item.stats.some(
-          (stat) => stat.stat === SKILL_ID.STRENGTH || stat.stat === SKILL_ID.INTELLIGENCE
-        )
-      );
-      context.mockApi.searchItems.mockResolvedValue({
-        items: filteredItems,
-        total: filteredItems.length,
-        page: 1,
-        page_size: 24,
-        has_next: false,
-        has_prev: false,
-      });
-
-      // Select multiple stat bonuses
-      advancedSearch.vm.selectedStatBonuses = [SKILL_ID.STRENGTH, SKILL_ID.INTELLIGENCE];
-      await waitForUpdates(wrapper);
-
-      // Trigger search
-      advancedSearch.vm.performSearch();
-      await waitForUpdates(wrapper, 100);
-
-      // Verify API was called with multiple stat bonuses
-      expect(context.mockApi.searchItems).toHaveBeenCalledWith(
-        expect.objectContaining({
-          stat_bonuses: expect.arrayContaining([SKILL_ID.STRENGTH, SKILL_ID.INTELLIGENCE]),
-        })
-      );
-
-      // Verify results
-      const itemsStore = useItemsStore();
-      expect(itemsStore.currentSearchResults).toHaveLength(2);
+      expect(lastQuery()).toMatchObject(query);
+      expect(shownItems()).toHaveLength(allItems.length);
     });
   });
 
   describe('Results Display', () => {
-    it('should display items with correct information', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
+    it('shows each result with its quality level and the total count', async () => {
+      const form = await mountTinkerItems();
 
-      await waitForUpdates(wrapper);
+      await form.typeName('a');
+      await form.search();
 
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
-
-      // Trigger search to display results
-      advancedSearch.vm.performSearch();
-      await waitForUpdates(wrapper, 100);
-
-      // Verify items are displayed
-      const itemsStore = useItemsStore();
-      expect(itemsStore.currentSearchResults).toHaveLength(testItems.length);
-
-      // Check that each item has expected properties
-      itemsStore.currentSearchResults.forEach((item) => {
-        expect(item).toHaveProperty('aoid');
-        expect(item).toHaveProperty('name');
-        expect(item).toHaveProperty('ql');
-        expect(item).toHaveProperty('stats');
-      });
+      expect(shownItems()).toEqual(allItems.map((item) => item.name));
+      const firstRow = wrapper.findAll('.item-list .cursor-pointer')[0];
+      expect(firstRow.text()).toContain('QL 100');
+      expect(wrapper.text()).toContain(`${allItems.length} items found`);
     });
 
-    it('should show empty state when no results', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
+    it('shows the empty state when nothing matches', async () => {
+      const form = await mountTinkerItems();
+      context.mockApi.searchItems.mockResolvedValue(results([]));
 
-      await waitForUpdates(wrapper);
+      await form.typeName('nonexistent');
+      await form.search();
 
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
-
-      // Mock empty results
-      context.mockApi.searchItems.mockResolvedValue({
-        items: [],
-        total: 0,
-        page: 1,
-        page_size: 24,
-        has_next: false,
-        has_prev: false,
-      });
-
-      // Search for non-existent item
-      advancedSearch.vm.searchForm.search = 'nonexistent';
-      advancedSearch.vm.performSearch();
-      await waitForUpdates(wrapper, 100);
-
-      // Verify empty results
-      const itemsStore = useItemsStore();
-      expect(itemsStore.currentSearchResults).toHaveLength(0);
+      expect(shownItems()).toEqual([]);
+      expect(wrapper.text()).toContain('No items found');
+      expect(wrapper.text()).toContain('0 items found');
     });
 
-    it('should display result count', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
+    it('opens the item page, in the current game version, when a result is clicked', async () => {
+      const form = await mountTinkerItems();
 
-      await waitForUpdates(wrapper);
+      await form.typeName('rifle');
+      await form.search();
+      await wrapper.findAll('.item-list .cursor-pointer')[0].trigger('click');
+      await flushPromises();
 
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
-
-      // Trigger search
-      advancedSearch.vm.performSearch();
-      await waitForUpdates(wrapper, 100);
-
-      // Verify result count is displayed - component should show it in text
-      expect(advancedSearch.text()).toContain(`${testItems.length} items found`);
+      expect(router.currentRoute.value.path).toBe(`/${TEST_VERSION}/items/${rifle100.aoid}`);
     });
   });
 
   describe('Pagination', () => {
-    it('should handle paginated results', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
+    const page1 = allItems.slice(0, 4);
+    const page2 = allItems.slice(4, 8);
 
-      await waitForUpdates(wrapper);
+    it('shows which slice of the results is on screen', async () => {
+      const form = await mountTinkerItems();
+      context.mockApi.searchItems.mockResolvedValue(results(page1, { total: 8, pageSize: 4 }));
 
-      // Mock paginated results
-      const firstPageItems = testItems.slice(0, 4);
-      context.mockApi.searchItems.mockResolvedValue({
-        items: firstPageItems,
-        total: testItems.length,
-        page: 1,
-        page_size: 4,
-        has_next: true,
-        has_prev: false,
-      });
+      await form.typeName('a');
+      await form.search();
 
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
-      advancedSearch.vm.performSearch();
-      await waitForUpdates(wrapper, 100);
-
-      // Verify first page results
-      const itemsStore = useItemsStore();
-      expect(itemsStore.currentSearchResults).toHaveLength(4);
-      expect(itemsStore.currentPagination?.total).toBe(testItems.length);
-      expect(itemsStore.currentPagination?.hasNext).toBe(true);
+      expect(shownItems()).toEqual(page1.map((item) => item.name));
+      expect(wrapper.text()).toContain('Showing 1-4 of 8 items');
     });
 
-    it('should load next page when pagination changes', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
+    it('fetches the next page of the same search', async () => {
+      const form = await mountTinkerItems();
+      context.mockApi.searchItems.mockResolvedValue(results(page1, { total: 8, pageSize: 4 }));
+      await form.typeName('a');
+      await form.search();
 
-      await waitForUpdates(wrapper);
-
-      // Mock first page
-      const firstPageItems = testItems.slice(0, 4);
-      context.mockApi.searchItems.mockResolvedValue({
-        items: firstPageItems,
-        total: testItems.length,
-        page: 1,
-        page_size: 4,
-        has_next: true,
-        has_prev: false,
-      });
-
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
-      advancedSearch.vm.performSearch();
-      await waitForUpdates(wrapper, 100);
-
-      // Mock second page
-      const secondPageItems = testItems.slice(4, 8);
-      context.mockApi.searchItems.mockResolvedValue({
-        items: secondPageItems,
-        total: testItems.length,
-        page: 2,
-        page_size: 4,
-        has_next: false,
-        has_prev: true,
-      });
-
-      // Simulate page change (would normally come from ItemList pagination component)
-      const itemsStore = useItemsStore();
-      await itemsStore.searchItems({
-        page: 2,
-        limit: 4,
-      });
-      await waitForUpdates(wrapper, 100);
-
-      // Verify page 2 API call
-      expect(context.mockApi.searchItems).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          page: 2,
-          limit: 4,
-        })
+      context.mockApi.searchItems.mockResolvedValue(
+        results(page2, { total: 8, page: 2, pageSize: 4 })
       );
+      await wrapper.find('button[aria-label="Next Page"]').trigger('click');
+      await flushPromises();
 
-      // Verify second page results
-      expect(itemsStore.currentSearchResults).toHaveLength(4);
-      expect(itemsStore.currentPagination?.page).toBe(2);
+      expect(lastQuery()).toMatchObject({ search: 'a', page: 2, limit: 4 });
+      expect(shownItems()).toEqual(page2.map((item) => item.name));
+      expect(wrapper.text()).toContain('Showing 5-8 of 8 items');
+    });
+  });
+
+  describe('Sorting', () => {
+    it('re-runs the search in the chosen order', async () => {
+      const form = await mountTinkerItems();
+      await form.typeName('rifle');
+      await form.search();
+
+      const sortDropdown = wrapper
+        .findAll('.p-dropdown')
+        .find(
+          (dropdown) => !wrapper.find('.advanced-item-search').element.contains(dropdown.element)
+        );
+      expect(sortDropdown).toBeDefined();
+      await chooseOption(sortDropdown!, 'Quality Level (High)');
+
+      expect(lastQuery()).toMatchObject({ search: 'rifle', sort: 'ql', sort_order: 'desc' });
     });
   });
 
   describe('Search State Management', () => {
-    it('should show loading state during search', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
-
-      await waitForUpdates(wrapper);
-
-      // Mock slow API response
-      let resolveSearch: any;
+    it('shows a spinner while the search is running', async () => {
+      const form = await mountTinkerItems();
+      let finish: (value: PaginatedResponse<Item>) => void = () => {};
       context.mockApi.searchItems.mockReturnValue(
         new Promise((resolve) => {
-          resolveSearch = resolve;
+          finish = resolve;
         })
       );
 
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
-      advancedSearch.vm.performSearch();
-      await waitForUpdates(wrapper);
+      await form.typeName('rifle');
+      await findButton(wrapper, 'Search').trigger('click');
+      await flushPromises();
 
-      // Verify loading state
-      const itemsStore = useItemsStore();
-      expect(itemsStore.loading).toBe(true);
+      expect(wrapper.find('.p-progress-spinner').exists()).toBe(true);
 
-      // Resolve the search
-      resolveSearch({
-        items: testItems,
-        total: testItems.length,
-        page: 1,
-        page_size: 24,
-        has_next: false,
-        has_prev: false,
-      });
-      await waitForUpdates(wrapper, 100);
+      finish(results([rifle100]));
+      await flushPromises();
 
-      // Verify loading cleared
-      expect(itemsStore.loading).toBe(false);
+      expect(wrapper.find('.p-progress-spinner').exists()).toBe(false);
+      expect(shownItems()).toEqual(['Assault Rifle']);
     });
 
-    it('should maintain search state across component updates', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
+    it('keeps the search criteria in the store for the next visit', async () => {
+      const form = await mountTinkerItems();
 
-      await waitForUpdates(wrapper);
+      await form.typeName('rifle');
+      await form.setMinQL(100);
+      await form.search();
+      wrapper.unmount();
 
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
+      const revisited = await mountTinkerItems();
 
-      // Perform search
-      advancedSearch.vm.searchForm.search = 'rifle';
-      advancedSearch.vm.searchForm.min_ql = 100;
-      advancedSearch.vm.performSearch();
-      await waitForUpdates(wrapper, 100);
-
-      // Verify search state persists
-      const itemsStore = useItemsStore();
-      expect(itemsStore.currentSearchQuery).toMatchObject({
-        search: 'rifle',
-        min_ql: 100,
-      });
-
-      // Force re-render
-      await wrapper.vm.$forceUpdate();
-      await waitForUpdates(wrapper);
-
-      // Verify state still present
-      expect(itemsStore.currentSearchQuery).toMatchObject({
-        search: 'rifle',
-        min_ql: 100,
-      });
+      expect(revisited.nameInput().element.value).toBe('rifle');
+      expect(revisited.qlInputs()[0].element.value).toBe('100');
+      expect(shownItems()).toEqual(allItems.map((item) => item.name));
     });
 
-    it('should handle search errors gracefully', async () => {
-      const wrapper = mountForIntegration(TinkerItems, {
-        pinia: context.pinia,
-      });
-
-      await waitForUpdates(wrapper);
-
-      // Mock API error
+    it('recovers from a failed search', async () => {
+      const form = await mountTinkerItems();
       context.mockApi.searchItems.mockRejectedValue(new Error('Network error'));
 
-      const advancedSearch = wrapper.findComponent(AdvancedItemSearch);
+      await form.typeName('rifle');
+      await form.search();
 
-      try {
-        advancedSearch.vm.performSearch();
-        await waitForUpdates(wrapper, 100);
-      } catch (error) {
-        // Error expected
-      }
+      expect(wrapper.find('.p-progress-spinner').exists()).toBe(false);
+      expect(wrapper.text()).toContain('No items found');
 
-      // Verify error state
-      const itemsStore = useItemsStore();
-      expect(itemsStore.loading).toBe(false);
-      // Note: Error handling behavior may vary - this test checks loading is cleared
+      context.mockApi.searchItems.mockResolvedValue(results([rifle100]));
+      await form.search();
+
+      expect(shownItems()).toEqual(['Assault Rifle']);
     });
   });
 });

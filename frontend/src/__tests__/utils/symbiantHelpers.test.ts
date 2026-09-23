@@ -43,7 +43,7 @@ describe('symbiantHelpers', () => {
         name: '',
         ql: 100,
         slot_id: 1,
-        family: 'Artillery',
+        family: null, // the API sends null for symbiants without a family
         actions: [],
       };
       expect(getSymbiantDisplayName(symbiant)).toBe('Symbiant 12345');
@@ -56,7 +56,7 @@ describe('symbiantHelpers', () => {
         name: '',
         ql: 100,
         slot_id: 1,
-        family: 'Artillery',
+        family: null, // the API sends null for symbiants without a family
         actions: [],
       };
       expect(getSymbiantDisplayName(symbiant)).toBe('Symbiant 1');
@@ -99,9 +99,9 @@ describe('symbiantHelpers', () => {
       expect(getSymbiantSlotId(symbiant1)).toBe(getSymbiantSlotId(symbiant2));
     });
 
-    it('generates different slot_ids for different IDs', () => {
-      const symbiant1: Symbiant = {
-        id: 1,
+    it('keeps a slot_id of 0 rather than generating one', () => {
+      const symbiant: Symbiant = {
+        id: 7,
         aoid: 100,
         name: 'Test',
         ql: 100,
@@ -109,16 +109,7 @@ describe('symbiantHelpers', () => {
         family: 'Artillery',
         actions: [],
       };
-      const symbiant2: Symbiant = {
-        id: 2,
-        aoid: 100,
-        name: 'Test',
-        ql: 100,
-        slot_id: 0,
-        family: 'Artillery',
-        actions: [],
-      };
-      expect(getSymbiantSlotId(symbiant1)).not.toBe(getSymbiantSlotId(symbiant2));
+      expect(getSymbiantSlotId(symbiant)).toBe(0);
     });
 
     it('generates valid slot_id values (0-9)', () => {

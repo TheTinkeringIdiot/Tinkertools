@@ -2,477 +2,217 @@
  * TinkerItems Full Integration Tests
  *
  * TRUE INTEGRATION TEST - Requires real backend
- * Tests the complete TinkerItems application with real API calls
- * to ensure proper integration between frontend and backend
+ * Runs the real API client, items store and TinkerItems view against a live
+ * backend (scoped to the test game version), to catch contract drift between
+ * frontend and backend.
  *
- * Strategy: Skip when backend not available (Option B)
+ * Skipped when the backend is not available.
  */
 
-import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'vitest';
-import { mount } from '@vue/test-utils';
-import { createPinia, setActivePinia } from 'pinia';
-import { nextTick } from 'vue';
-import PrimeVue from 'primevue/config';
-import Button from 'primevue/button';
-import InputText from 'primevue/inputtext';
-import InputNumber from 'primevue/inputnumber';
-import Dropdown from 'primevue/dropdown';
-import Checkbox from 'primevue/checkbox';
-import TinkerItems from '../../views/TinkerItems.vue';
-import { useItemsStore } from '../../stores/items';
-import type { ItemSearchQuery } from '../../types/api';
-import { isBackendAvailable, getBackendUrl } from '../helpers/backend-check';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mount, flushPromises, type VueWrapper } from '@vue/test-utils';
+import { createPinia, setActivePinia, type Pinia } from 'pinia';
+import TinkerItems from '@/views/TinkerItems.vue';
+import { apiClient } from '@/services/api-client';
+import { useItemsStore } from '@/stores/items';
+import { versionedPath } from '@/composables/useGameVersion';
+import type { Criterion } from '@/types/api';
+import { isBackendAvailable } from '../helpers/backend-check';
+import { appGlobals } from '../helpers/app-globals';
+import { createTestRouter } from '../helpers/vue-test-utils';
+import { itemSearchForm } from '../helpers/item-search-page';
 
-// Real backend URL for integration testing
-const BACKEND_URL = getBackendUrl() + '/api/v1';
+// Top-level await: describe.skipIf reads this while tests are collected.
+const BACKEND_AVAILABLE = await isBackendAvailable();
 
-// Check backend availability before running tests
-let BACKEND_AVAILABLE = false;
+/** Otek Slicer: an interpolatable weapon with several QL ranges. */
+const OTEK_SLICER = 262759;
 
-beforeAll(async () => {
-  BACKEND_AVAILABLE = await isBackendAvailable();
-  if (!BACKEND_AVAILABLE) {
-    console.warn('Backend not available - skipping TinkerItems integration tests');
-  }
-});
+/** The criterion values of an item's first action that has requirements. */
+function firstRequirementValues(item: { actions: { criteria: Criterion[] }[] }): number[] {
+  const action = item.actions.find((candidate) => candidate.criteria.length > 0);
+  return action ? action.criteria.map((criterion) => criterion.value2) : [];
+}
 
 describe.skipIf(!BACKEND_AVAILABLE)('TinkerItems Full Integration', () => {
-  let wrapper: any;
-  let itemsStore: any;
+  let pinia: Pinia;
 
   beforeEach(() => {
-    setActivePinia(createPinia());
-    itemsStore = useItemsStore();
+    pinia = createPinia();
+    setActivePinia(pinia);
   });
 
-  afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
-  });
-
-  const createWrapper = (props = {}) => {
-    return mount(TinkerItems, {
-      props: {
-        ...props,
-      },
-      global: {
-        plugins: [PrimeVue],
-        components: {
-          Button,
-          InputText,
-          InputNumber,
-          Dropdown,
-          Checkbox,
-        },
-      },
-    });
-  };
-
-  describe('Backend API Integration', () => {
-    it('should successfully perform a basic item search', async () => {
-      // Test a real API call
-      const params = new URLSearchParams({
-        q: 'implant',
-        exact_match: 'false',
-        search_fields: 'name,description',
-        page_size: '5',
+  describe('Item search API', () => {
+    it('finds items by name', async () => {
+      const response = await apiClient.searchItems({
+        search: 'implant',
+        exact_match: false,
+        search_fields: ['name', 'description'],
+        limit: 5,
       });
 
-      const response = await fetch(`${BACKEND_URL}/items/search?${params}`);
-
-      expect(response.ok).toBe(true);
-      const data = await response.json();
-
-      expect(data).toHaveProperty('items');
-      expect(data).toHaveProperty('total');
-      expect(Array.isArray(data.items)).toBe(true);
-      expect(typeof data.total).toBe('number');
-
-      if (data.items.length > 0) {
-        const firstItem = data.items[0];
-        expect(firstItem).toHaveProperty('aoid');
-        expect(firstItem).toHaveProperty('name');
-        expect(firstItem).toHaveProperty('ql');
+      expect(response.total).toBeGreaterThan(0);
+      expect(response.items.length).toBeGreaterThan(0);
+      expect(response.items.length).toBeLessThanOrEqual(5);
+      for (const item of response.items) {
+        expect(item.aoid).toEqual(expect.any(Number));
+        expect(item.name).toEqual(expect.any(String));
+        expect(item.ql).toEqual(expect.any(Number));
       }
-    }, 10000);
+    });
 
-    it('should handle advanced search with multiple filters', async () => {
-      const params = new URLSearchParams({
-        q: 'weapon',
-        min_ql: '100',
-        max_ql: '200',
-        item_class: '1', // Weapon
-        froob_friendly: 'true',
-        page_size: '5',
+    it('applies quality level and item class filters', async () => {
+      const response = await apiClient.searchItems({
+        search: 'rifle',
+        min_ql: 100,
+        max_ql: 200,
+        item_class: 1, // Weapon
+        limit: 10,
       });
 
-      const response = await fetch(`${BACKEND_URL}/items/search?${params}`);
-
-      expect(response.ok).toBe(true);
-      const data = await response.json();
-
-      expect(data).toHaveProperty('items');
-      expect(data).toHaveProperty('total');
-      expect(Array.isArray(data.items)).toBe(true);
-
-      // Verify that returned items match the filters
-      data.items.forEach((item: any) => {
+      expect(response.items.length).toBeGreaterThan(0);
+      for (const item of response.items) {
         expect(item.ql).toBeGreaterThanOrEqual(100);
         expect(item.ql).toBeLessThanOrEqual(200);
-        expect(item.item_class).toBe(1); // Should be weapons
-      });
-    }, 10000);
-
-    it('should handle stat bonus filtering', async () => {
-      const params = new URLSearchParams({
-        q: 'implant',
-        stat_bonuses: '16,17', // Strength and Agility
-        page_size: '5',
-      });
-
-      const response = await fetch(`${BACKEND_URL}/items/search?${params}`);
-
-      expect(response.ok).toBe(true);
-      const data = await response.json();
-
-      expect(data).toHaveProperty('items');
-      expect(Array.isArray(data.items)).toBe(true);
-
-      // Items should have stat bonuses for Strength (16) or Agility (17)
-      if (data.items.length > 0) {
-        data.items.forEach((item: any) => {
-          expect(item).toHaveProperty('stats');
-          expect(Array.isArray(item.stats)).toBe(true);
-        });
+        expect(item.item_class).toBe(1);
       }
-    }, 10000);
-
-    it('should handle empty search results gracefully', async () => {
-      const params = new URLSearchParams({
-        q: 'nonexistentitem12345randomstring',
-      });
-
-      const response = await fetch(`${BACKEND_URL}/items/search?${params}`);
-
-      expect(response.ok).toBe(true);
-      const data = await response.json();
-
-      expect(data).toHaveProperty('items');
-      expect(data).toHaveProperty('total');
-      expect(data.items).toEqual([]);
-      expect(data.total).toBe(0);
-    }, 10000);
-
-    it('should validate API response structure for different item types', async () => {
-      // Test different item classes
-      const itemClasses = [1, 2, 3]; // Weapon, Armor, Implant
-
-      for (const itemClass of itemClasses) {
-        const params = new URLSearchParams({
-          q: 'item', // Required parameter
-          item_class: itemClass.toString(),
-          min_ql: '1',
-          max_ql: '50',
-          page_size: '3',
-        });
-
-        const response = await fetch(`${BACKEND_URL}/items/search?${params}`);
-
-        expect(response.ok).toBe(true);
-        const data = await response.json();
-
-        expect(data).toHaveProperty('items');
-        expect(Array.isArray(data.items)).toBe(true);
-
-        if (data.items.length > 0) {
-          const item = data.items[0];
-          expect(item).toHaveProperty('aoid');
-          expect(item).toHaveProperty('name');
-          expect(item).toHaveProperty('ql');
-          expect(item).toHaveProperty('item_class');
-          expect(item.item_class).toBe(itemClass);
-        }
-      }
-    }, 15000);
-  });
-
-  describe('Store Integration', () => {
-    it('should integrate with items store for search operations', async () => {
-      // Test store directly
-      const searchQuery: ItemSearchQuery = {
-        q: 'nano',
-        exact_match: false,
-        search_fields: 'name',
-      };
-
-      const results = await itemsStore.searchItems(searchQuery);
-
-      expect(results).toBeDefined();
-      expect(Array.isArray(results)).toBe(true);
-      expect(itemsStore.loading).toBe(false);
-      expect(itemsStore.currentSearchResults).toBeDefined();
-      expect(Array.isArray(itemsStore.currentSearchResults)).toBe(true);
-    }, 10000);
-
-    it('should handle store loading states correctly', async () => {
-      const searchQuery: ItemSearchQuery = {
-        q: 'test',
-        exact_match: false,
-      };
-
-      // Start search (should set loading to true)
-      const searchPromise = itemsStore.searchItems(searchQuery);
-
-      // Loading should be true during the request
-      expect(itemsStore.loading).toBe(true);
-
-      // Wait for completion
-      await searchPromise;
-
-      // Loading should be false after completion
-      expect(itemsStore.loading).toBe(false);
-    }, 10000);
-
-    it('should handle store error states', async () => {
-      // Test with an invalid query to trigger error
-      const searchQuery: ItemSearchQuery = {
-        q: '', // Empty query should cause error
-        exact_match: false,
-      };
-
-      try {
-        await itemsStore.searchItems(searchQuery);
-      } catch (error) {
-        expect(error).toBeDefined();
-      }
-
-      expect(itemsStore.loading).toBe(false);
-    }, 10000);
-  });
-
-  describe('Component and API Integration', () => {
-    it('should successfully mount TinkerItems and interact with backend', async () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.exists()).toBe(true);
-
-      // Wait for initial load
-      await nextTick();
-
-      // The component should mount successfully
-      expect(wrapper.vm).toBeTruthy();
     });
 
-    it('should handle component state management', async () => {
-      wrapper = createWrapper();
-      await nextTick();
+    it.each([
+      { itemClass: 1, name: 'weapons' },
+      { itemClass: 2, name: 'armor' },
+      { itemClass: 3, name: 'implants' },
+    ])('returns only $name for item class $itemClass', async ({ itemClass }) => {
+      const response = await apiClient.searchItems({
+        search: 'a',
+        item_class: itemClass,
+        limit: 5,
+      });
 
-      // Verify the component has mounted and has access to store
-      expect(wrapper.vm).toBeTruthy();
-      expect(itemsStore).toBeDefined();
-      expect(itemsStore.loading).toBe(false);
-    }, 10000);
+      expect(response.items.length).toBeGreaterThan(0);
+      for (const item of response.items) {
+        expect(item.item_class).toBe(itemClass);
+      }
+    });
+
+    it('returns an empty page for a term that matches nothing', async () => {
+      const response = await apiClient.searchItems({ search: 'nonexistentitem12345randomstring' });
+
+      expect(response.items).toEqual([]);
+      expect(response.total).toBe(0);
+    });
+
+    it('serves consecutive pages of a large result set', async () => {
+      const page1 = await apiClient.searchItems({ search: 'implant', page: 1, limit: 10 });
+      expect(page1.total).toBeGreaterThan(10);
+      expect(page1.items).toHaveLength(10);
+
+      const page2 = await apiClient.searchItems({ search: 'implant', page: 2, limit: 10 });
+      expect(page2.page).toBe(2);
+      expect(page2.items.length).toBeGreaterThan(0);
+      const page1Ids = page1.items.map((item) => item.id);
+      expect(page2.items.some((item) => page1Ids.includes(item.id))).toBe(false);
+    });
+
+    it('answers a search within the 5 second budget', async () => {
+      const start = performance.now();
+      await apiClient.searchItems({ search: 'weapon', limit: 10 });
+      expect(performance.now() - start).toBeLessThan(5000);
+    });
   });
 
-  describe('Performance Integration', () => {
-    it('should complete search requests within reasonable time', async () => {
-      const startTime = performance.now();
+  describe('Items store', () => {
+    it('caches search results and pagination', async () => {
+      const store = useItemsStore();
 
-      const params = new URLSearchParams({
-        q: 'weapon',
-        exact_match: 'false',
-        page_size: '10',
-      });
+      const items = await store.searchItems({ search: 'nano', search_fields: ['name'] });
 
-      const response = await fetch(`${BACKEND_URL}/items/search?${params}`);
+      expect(items.length).toBeGreaterThan(0);
+      expect(store.currentSearchResults).toEqual(items);
+      expect(store.currentPagination.total).toBeGreaterThanOrEqual(items.length);
+      expect(store.loading).toBe(false);
+    });
 
-      const endTime = performance.now();
-      const duration = endTime - startTime;
+    it('is loading only while a search is in flight', async () => {
+      const store = useItemsStore();
 
-      expect(response.ok).toBe(true);
-      expect(duration).toBeLessThan(5000); // Should complete within 5 seconds
-    }, 10000);
+      const search = store.searchItems({ search: 'test' });
+      expect(store.loading).toBe(true);
 
-    it('should handle pagination correctly', async () => {
-      const params = new URLSearchParams({
-        q: 'implant',
-        exact_match: 'false',
-        page: '1',
-        page_size: '10',
-      });
-
-      const response = await fetch(`${BACKEND_URL}/items/search?${params}`);
-
-      expect(response.ok).toBe(true);
-      const data = await response.json();
-
-      expect(data).toHaveProperty('items');
-      expect(data).toHaveProperty('total');
-      expect(data.items.length).toBeLessThanOrEqual(10);
-
-      if (data.total > 10) {
-        // Test second page
-        const page2Params = new URLSearchParams({
-          q: 'implant',
-          exact_match: 'false',
-          page: '2',
-          page_size: '10',
-        });
-        const page2Response = await fetch(`${BACKEND_URL}/items/search?${page2Params}`);
-
-        expect(page2Response.ok).toBe(true);
-        const page2Data = await page2Response.json();
-        expect(page2Data.items.length).toBeGreaterThan(0);
-      }
-    }, 10000);
+      await search;
+      expect(store.loading).toBe(false);
+    });
   });
 
-  describe('Item Interpolation Integration', () => {
-    it('should successfully interpolate an item with real backend', async () => {
-      // Use a known interpolatable item - Otek Slicer
-      const otekSlicerAoid = 262759; // Base QL 100-199 range
-      const targetQl = 150;
+  describe('TinkerItems view', () => {
+    let wrapper: VueWrapper;
 
-      const response = await fetch(
-        `${BACKEND_URL}/items/${otekSlicerAoid}/interpolate?target_ql=${targetQl}`
-      );
+    afterEach(() => {
+      wrapper.unmount();
+    });
 
-      expect(response.ok).toBe(true);
-      const data = await response.json();
-
-      expect(data).toHaveProperty('success');
-      expect(data.success).toBe(true);
-      expect(data).toHaveProperty('item');
-
-      const interpolatedItem = data.item;
-      expect(interpolatedItem.aoid).toBe(otekSlicerAoid);
-      expect(interpolatedItem.ql).toBe(targetQl);
-      expect(interpolatedItem).toHaveProperty('interpolating');
-      expect(interpolatedItem.interpolating).toBe(true);
-      expect(interpolatedItem).toHaveProperty('target_ql');
-      expect(interpolatedItem.target_ql).toBe(targetQl);
-
-      // Verify that stats are interpolated
-      expect(Array.isArray(interpolatedItem.stats)).toBe(true);
-      expect(Array.isArray(interpolatedItem.actions)).toBe(true);
-
-      console.log('Interpolation successful:', {
-        name: interpolatedItem.name,
-        originalQl: 100,
-        targetQl: interpolatedItem.ql,
-        statsCount: interpolatedItem.stats.length,
-        actionsCount: interpolatedItem.actions.length,
+    it('shows real results for a search typed into the sidebar', async () => {
+      const router = createTestRouter();
+      await router.push(versionedPath('/items'));
+      await router.isReady();
+      wrapper = mount(TinkerItems, {
+        global: appGlobals(pinia, router),
+        attachTo: document.body,
       });
-    }, 10000);
+      await flushPromises();
+      const form = itemSearchForm(wrapper);
 
-    it('should get interpolation ranges for multi-range items', async () => {
-      // Otek Slicer has multiple QL ranges
-      const otekSlicerAoid = 262759;
+      await form.typeName('Otek Slicer');
+      await form.search();
+      await vi.waitFor(() => expect(wrapper.text()).toMatch(/[1-9]\d* items found/));
 
-      const response = await fetch(`${BACKEND_URL}/items/${otekSlicerAoid}/interpolation-info`);
+      const names = wrapper.findAll('.item-list .space-y-2 h3').map((h) => h.text());
+      expect(names.length).toBeGreaterThan(0);
+      expect(names.every((name) => /otek slicer/i.test(name))).toBe(true);
+    });
+  });
 
-      expect(response.ok).toBe(true);
-      const data = await response.json();
+  describe('Item interpolation', () => {
+    it('interpolates an item to a requested quality level', async () => {
+      const response = await apiClient.interpolateItem(OTEK_SLICER, 150);
 
-      expect(data).toHaveProperty('success');
-      expect(data.success).toBe(true);
-      expect(data).toHaveProperty('ranges');
-      expect(Array.isArray(data.ranges)).toBe(true);
-      expect(data.ranges.length).toBeGreaterThan(1); // Multiple ranges
+      expect(response.success).toBe(true);
+      expect(response.item?.aoid).toBe(OTEK_SLICER);
+      expect(response.item?.ql).toBe(150);
+      expect(response.item?.interpolating).toBe(true);
+      expect(response.item?.target_ql).toBe(150);
+      expect(response.item?.stats.length).toBeGreaterThan(0);
+      expect(response.item?.actions.length).toBeGreaterThan(0);
+    });
 
-      // Verify range structure
-      data.ranges.forEach((range: any) => {
-        expect(range).toHaveProperty('min_ql');
-        expect(range).toHaveProperty('max_ql');
-        expect(range).toHaveProperty('base_aoid');
-        expect(typeof range.min_ql).toBe('number');
-        expect(typeof range.max_ql).toBe('number');
-        expect(typeof range.base_aoid).toBe('number');
-      });
+    it('reports every QL range of a multi-range item', async () => {
+      const response = await apiClient.getInterpolationInfo(OTEK_SLICER);
 
-      console.log(
-        'Interpolation ranges:',
-        data.ranges.map((r: any) => `QL ${r.min_ql}-${r.max_ql} (base: ${r.base_aoid})`)
-      );
-    }, 10000);
-
-    it('should test range transition interpolation', async () => {
-      // Test interpolating across different ranges
-      const ranges = [
-        { aoid: 262759, ql: 150 }, // 100-199 range
-        { aoid: 262760, ql: 250 }, // 200-299 range
-        { aoid: 262761, ql: 350 }, // 300+ range
-      ];
-
-      for (const { aoid, ql } of ranges) {
-        const response = await fetch(`${BACKEND_URL}/items/${aoid}/interpolate?target_ql=${ql}`);
-
-        if (response.ok) {
-          const data = await response.json();
-
-          expect(data.success).toBe(true);
-          expect(data.item.ql).toBe(ql);
-          expect(data.item.aoid).toBe(aoid);
-
-          console.log(`Range test successful: ${data.item.name} QL ${ql}`);
-        }
+      expect(response.success).toBe(true);
+      const ranges = response.data?.ranges ?? [];
+      expect(ranges.length).toBeGreaterThan(1);
+      for (const range of ranges) {
+        expect(range.min_ql).toEqual(expect.any(Number));
+        expect(range.max_ql).toEqual(expect.any(Number));
+        expect(range.base_aoid).toEqual(expect.any(Number));
+        expect(range.max_ql).toBeGreaterThanOrEqual(range.min_ql);
       }
-    }, 15000);
+    });
 
-    it('should handle interpolation errors gracefully', async () => {
-      // Test with invalid QL
-      const response = await fetch(`${BACKEND_URL}/items/262759/interpolate?target_ql=9999`);
+    it('rejects a quality level outside the item range', async () => {
+      await expect(apiClient.interpolateItem(OTEK_SLICER, 9999)).rejects.toBeDefined();
+    });
 
-      expect(response.ok).toBe(false);
-      // Backend should return 400 for invalid QL
-    }, 10000);
+    it('scales requirements with quality level', async () => {
+      const base = await apiClient.getItem(OTEK_SLICER);
+      const interpolated = await apiClient.interpolateItem(OTEK_SLICER, 150);
 
-    it('should test requirement interpolation', async () => {
-      // Test that requirements change with interpolation
-      const otekSlicerAoid = 262759;
-      const lowQl = 100;
-      const highQl = 150;
-
-      // Get base item
-      const baseResponse = await fetch(`${BACKEND_URL}/items/${otekSlicerAoid}`);
-      expect(baseResponse.ok).toBe(true);
-      const baseItem = await baseResponse.json();
-
-      // Get interpolated item
-      const interpResponse = await fetch(
-        `${BACKEND_URL}/items/${otekSlicerAoid}/interpolate?target_ql=${highQl}`
-      );
-      expect(interpResponse.ok).toBe(true);
-      const interpData = await interpResponse.json();
-
-      if (interpData.success) {
-        const interpolatedItem = interpData.item;
-
-        // Compare requirements - they should be different
-        if (baseItem.actions && interpolatedItem.actions) {
-          const baseRequirements = baseItem.actions.filter((a: any) => a.criteria?.length > 0);
-          const interpRequirements = interpolatedItem.actions.filter(
-            (a: any) => a.criteria?.length > 0
-          );
-
-          if (baseRequirements.length > 0 && interpRequirements.length > 0) {
-            // Requirements should be different for different QLs
-            const baseFirstCriterion = baseRequirements[0].criteria[0];
-            const interpFirstCriterion = interpRequirements[0].criteria[0];
-
-            if (baseFirstCriterion && interpFirstCriterion) {
-              expect(baseFirstCriterion.value2).not.toBe(interpFirstCriterion.value2);
-              console.log('Requirements interpolated correctly:', {
-                baseQl: baseItem.ql,
-                interpQl: interpolatedItem.ql,
-                baseReq: baseFirstCriterion.value2,
-                interpReq: interpFirstCriterion.value2,
-              });
-            }
-          }
-        }
-      }
-    }, 10000);
+      expect(base.data).toBeDefined();
+      expect(interpolated.item).toBeDefined();
+      const baseRequirements = firstRequirementValues(base.data!);
+      const scaledRequirements = firstRequirementValues(interpolated.item!);
+      expect(baseRequirements.length).toBeGreaterThan(0);
+      expect(scaledRequirements).not.toEqual(baseRequirements);
+    });
   });
 });

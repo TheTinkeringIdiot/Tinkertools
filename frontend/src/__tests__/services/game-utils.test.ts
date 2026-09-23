@@ -17,8 +17,9 @@ import type { StatValue } from '@/types/api';
 describe('Equipment Slot Position Functions', () => {
   describe('getWeaponSlotPosition', () => {
     it('should return correct positions for valid weapon slots', () => {
-      expect(getWeaponSlotPosition('RightHand')).toEqual({ row: 3, col: 3 });
-      expect(getWeaponSlotPosition('LeftHand')).toEqual({ row: 3, col: 1 });
+      // The item slot grid mirrors the character: right hand on the left (2801544)
+      expect(getWeaponSlotPosition('RightHand')).toEqual({ row: 3, col: 1 });
+      expect(getWeaponSlotPosition('LeftHand')).toEqual({ row: 3, col: 3 });
       expect(getWeaponSlotPosition('Hud1')).toEqual({ row: 1, col: 1 });
     });
 
@@ -29,7 +30,7 @@ describe('Equipment Slot Position Functions', () => {
 
     it('should handle case sensitivity', () => {
       expect(getWeaponSlotPosition('righthand')).toEqual({ row: 1, col: 1 }); // Case sensitive
-      expect(getWeaponSlotPosition('RightHand')).toEqual({ row: 3, col: 3 });
+      expect(getWeaponSlotPosition('RightHand')).toEqual({ row: 3, col: 1 });
     });
   });
 

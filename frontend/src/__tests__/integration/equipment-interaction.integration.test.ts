@@ -10,25 +10,20 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // Mock API client before importing stores
 vi.mock('@/services/api-client');
 
-import {
-  setupIntegrationTest,
-  mountForIntegration,
-  waitForUpdates,
-  waitForStatRecalculation,
-} from '../helpers/integration-test-utils';
+import { setupIntegrationTest, waitForStatRecalculation } from '../helpers/integration-test-utils';
 import {
   createTestItem,
   createWeaponItem,
   createArmorItem,
   createImplantItem,
-  createStatValue,
   createItemWithRequirements,
   createSpellData,
   createSpell,
 } from '../helpers/item-fixtures';
 import { SKILL_ID } from '../helpers/skill-fixtures';
+import { createTestProfile, BREED, PROFESSION } from '../helpers/profile-fixtures';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
-import type { Item, TinkerProfile } from '@/types/api';
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import type { IntegrationTestContext } from '../helpers/integration-test-utils';
 
 describe('Equipment Interaction Integration', () => {
@@ -50,26 +45,16 @@ describe('Equipment Interaction Integration', () => {
 
     store = useTinkerProfilesStore();
 
-    // Create a test profile for equipment testing
-    const profileId = await store.createProfile('Test Character', {
-      Character: {
-        Name: 'Test Character',
-        Level: 100,
-        Profession: 3, // Soldier
-        Breed: 1, // Solitus
-        Faction: 'Clan',
-        Expansion: 'Shadow Lands',
-        AccountType: 'Paid',
-        MaxHealth: 1000,
-        MaxNano: 500,
-      },
-      Skills: {},
-      Clothing: {},
-      Weapons: {},
-      Implants: {},
-      PerksAndResearch: [],
-      buffs: [],
-    } as Partial<TinkerProfile>);
+    // Create a test profile for equipment testing; the store supplies the
+    // full default skill set, so take only the character data from the fixture
+    const { Character } = createTestProfile({
+      name: 'Test Character',
+      level: 100,
+      profession: PROFESSION.ENGINEER,
+      breed: BREED.SOLITUS,
+      faction: 'Clan',
+    });
+    const profileId = await store.createProfile('Test Character', { Character });
 
     // Load the profile
     testProfile = (await store.loadProfile(profileId))!;

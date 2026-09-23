@@ -361,6 +361,7 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
+import Sidebar from 'primevue/sidebar';
 import type { Item } from '@/types/api';
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import { getItemClassName } from '@/services/game-utils';

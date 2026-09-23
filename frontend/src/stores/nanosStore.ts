@@ -101,7 +101,10 @@ export const useNanosStore = defineStore('nanos', () => {
     // Apply level range filter
     if (filters.value.levelRange) {
       const [minLevel, maxLevel] = filters.value.levelRange;
-      result = result.filter((nano) => nano.level >= minLevel && nano.level <= maxLevel);
+      // A nano whose level the backend does not know (null) is not ruled out
+      result = result.filter(
+        (nano) => nano.level == null || (nano.level >= minLevel && nano.level <= maxLevel)
+      );
     }
 
     // Apply memory usage filter
@@ -162,7 +165,8 @@ export const useNanosStore = defineStore('nanos', () => {
   });
 
   const availableSchools = computed(() => {
-    const schools = new Set(nanos.value.map((nano) => nano.school));
+    // The backend sends school: null for nanos it has no school for.
+    const schools = new Set(nanos.value.map((nano) => nano.school).filter(Boolean));
     return Array.from(schools).sort();
   });
 

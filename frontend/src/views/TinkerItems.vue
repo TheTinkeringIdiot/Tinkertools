@@ -162,7 +162,7 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
             :revision-counts="revisionCounts"
             @item-click="onItemClick"
             @item-compare="onItemCompare"
-            @item-cast-buff="onItemCastBuff"
+            @cast-buff="onItemCastBuff"
             @page-change="onPageChange"
           />
         </div>

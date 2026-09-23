@@ -6,10 +6,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { calculateSpeeds, calculateCycleTime } from '@/utils/weapon-speed-calculations';
+import { calculateSpeeds } from '@/utils/weapon-speed-calculations';
 import {
   calculateARBonus,
-  calculateBaseDamage,
   calculateBaseDamage60s,
   convertToDPS,
 } from '@/utils/weapon-damage-calculations';

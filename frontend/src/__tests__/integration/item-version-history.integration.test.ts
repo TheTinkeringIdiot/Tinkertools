@@ -31,7 +31,7 @@ import {
 import type { GameVersion, ItemRevisionsResponse } from '@/types/game-version';
 import type { Item } from '@/types/api';
 
-const mockApi = apiClient as any;
+const mockApi = vi.mocked(apiClient);
 
 const LIVE: GameVersion = {
   slug: 'ao-2024-02',
@@ -142,11 +142,11 @@ describe('ItemDetail version history', () => {
 
     versionRegistry.value = [LIVE, OLD];
     currentVersion.value = null;
-    setCurrentVersion('ao-2024-02');
+    await setCurrentVersion('ao-2024-02');
     useGameVersion().defaultVersion.value = 'ao-2024-02';
 
-    mockApi.getItem = vi.fn(async () => ({ success: true, data: makeItem() }));
-    mockApi.getItemRevisions = vi.fn(async () => REVISIONS);
+    mockApi.getItem.mockResolvedValue({ success: true, data: makeItem() });
+    mockApi.getItemRevisions.mockResolvedValue(REVISIONS);
 
     router = makeRouter();
     await router.push('/ao-2024-02/items/24562');
@@ -221,14 +221,14 @@ describe('ItemDetail version history', () => {
   });
 
   it('offers the first snapshot that has an item missing from this version', async () => {
-    mockApi.getItem = vi.fn(async () => ({ success: false, data: null }));
-    mockApi.getItemRevisions = vi.fn(async () => ({
+    mockApi.getItem.mockResolvedValue({ success: false });
+    mockApi.getItemRevisions.mockResolvedValue({
       ...REVISIONS,
       present_in: ['ao-2019-11'],
       first_seen_in: 'ao-2019-11',
       missing_in: ['ao-2024-02'],
       revisions: [REVISIONS.revisions[0]],
-    }));
+    });
 
     const wrapper = await mountItemDetail(router, pinia);
 
@@ -244,13 +244,13 @@ describe('ItemDetail version history', () => {
   });
 
   it('hides the history control when the item has a single patch point', async () => {
-    mockApi.getItemRevisions = vi.fn(async () => ({
+    mockApi.getItemRevisions.mockResolvedValue({
       ...REVISIONS,
       present_in: ['ao-2024-02'],
       first_seen_in: 'ao-2024-02',
       revisions: [REVISIONS.revisions[1]],
       missing_in: [],
-    }));
+    });
 
     const wrapper = await mountItemDetail(router, pinia);
 
@@ -258,9 +258,7 @@ describe('ItemDetail version history', () => {
   });
 
   it('keeps the page usable when the revisions endpoint fails', async () => {
-    mockApi.getItemRevisions = vi.fn(async () => {
-      throw new Error('revisions unavailable');
-    });
+    mockApi.getItemRevisions.mockRejectedValue(new Error('revisions unavailable'));
 
     const wrapper = await mountItemDetail(router, pinia);
 
