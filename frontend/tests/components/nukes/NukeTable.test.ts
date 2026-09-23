@@ -20,6 +20,7 @@ import NukeTable from '@/components/nukes/NukeTable.vue';
 import type { OffensiveNano, NukeInputState } from '@/types/offensive-nano';
 import type { Item } from '@/types/api';
 import { createTestRouter } from '@/__tests__/helpers';
+import { TEST_VERSION } from '@/__tests__/helpers/version-fixtures';
 
 // ============================================================================
 // Test Fixtures
@@ -160,7 +161,7 @@ describe('NukeTable', () => {
   beforeEach(async () => {
     // Nano names link to the named ItemDetail route, which inherits `version`.
     router = createTestRouter();
-    await router.isReady();
+    await router.push(`/${TEST_VERSION}/`);
   });
 
   afterEach(() => {

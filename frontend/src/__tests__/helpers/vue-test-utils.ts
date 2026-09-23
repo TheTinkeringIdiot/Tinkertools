@@ -96,7 +96,10 @@ export function createTestPinia(): Pinia {
  * Every app route lives under a `/:version` parent, so the test router mirrors
  * that shape: named routes resolve only if the `version` param can be
  * inherited, and components that build versioned paths need a version in the
- * current location. The router starts at `/<TEST_VERSION>/`.
+ * current location. The history starts at `/<TEST_VERSION>/`, but the router
+ * only navigates there when installed, so `router.isReady()` never settles on
+ * an uninstalled router. A test that mounts components rendering named links
+ * must `await router.push(...)` first.
  *
  * Pass `routes` to replace the default child set; they are mounted as children
  * of the version parent, so give them relative paths ('items', not '/items').

@@ -107,7 +107,7 @@ describe('TinkerNukes View', () => {
   /** Mounts the view the way main.ts does, once the router has a versioned location. */
   async function mountView(): Promise<void> {
     router = createTestRouter();
-    await router.isReady();
+    await router.push(`/${TEST_VERSION}/`);
     wrapper = mount(TinkerNukes, {
       global: {
         plugins: [PrimeVue, ToastService, pinia, router],

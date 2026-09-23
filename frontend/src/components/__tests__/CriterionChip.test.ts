@@ -10,6 +10,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createTestRouter, standardCleanup } from '@/__tests__/helpers';
+import { TEST_VERSION } from '@/__tests__/helpers/version-fixtures';
 import CriterionChip from '../CriterionChip.vue';
 import type { DisplayCriterion } from '../../services/action-criteria';
 import type { CharacterStats } from '../../composables/useActionCriteria';
@@ -62,7 +63,7 @@ describe('CriterionChip', () => {
     clearNanoNameCache();
     // Function-operator chips link to named routes, which inherit `version`.
     router = createTestRouter();
-    await router.isReady();
+    await router.push(`/${TEST_VERSION}/`);
   });
 
   afterEach(() => {
