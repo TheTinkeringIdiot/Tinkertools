@@ -13,7 +13,7 @@ import type {
   ProfileImportResult,
   ImplantWithClusters,
 } from './types';
-import type { Item, InterpolatedItem, BatchInterpolationResponse } from '@/types/api';
+import type { Item, InterpolatedItem } from '@/types/api';
 import { createDefaultProfile } from './constants';
 import type { PerkSystem, PerkEntry, ResearchEntry } from './perk-types';
 import { getClusterMapping, getSlotPosition } from './cluster-mappings';
@@ -1409,14 +1409,10 @@ export class ProfileTransformer {
       // The api client scopes requests to the version being browsed. When the
       // caller wants another version (PRK import, cross-version copy), route
       // this one request there instead.
-      const response =
-        gameVersion && gameVersion !== currentGameVersion()
-          ? ((await apiClient.post<BatchInterpolationResponse>(
-              '/items/batch/interpolate',
-              { items: batchRequest.map((r) => ({ aoid: r.aoid, target_ql: r.targetQl })) },
-              { gameVersion }
-            )) as unknown as Awaited<ReturnType<typeof apiClient.batchInterpolateItems>>)
-          : await apiClient.batchInterpolateItems(batchRequest);
+      const response = await apiClient.batchInterpolateItems(
+        batchRequest,
+        gameVersion ? { gameVersion } : undefined
+      );
 
       // Process results
       for (const result of response.results) {

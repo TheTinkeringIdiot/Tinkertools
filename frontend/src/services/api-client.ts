@@ -656,14 +656,16 @@ class TinkerToolsApiClient {
   }
 
   async batchInterpolateItems(
-    requests: Array<{ aoid: number; targetQl: number }>
+    requests: Array<{ aoid: number; targetQl: number }>,
+    options?: { gameVersion?: string }
   ): Promise<BatchInterpolationResponse> {
     try {
       const response = await this.client.post<BatchInterpolationResponse>(
         '/items/batch/interpolate',
         {
           items: requests.map((r) => ({ aoid: r.aoid, target_ql: r.targetQl })),
-        }
+        },
+        options?.gameVersion ? { gameVersion: options.gameVersion } : undefined
       );
       return response.data;
     } catch (error) {
