@@ -28,18 +28,15 @@ import {
   ARMOR_SLOT,
   IMPLANT_SLOT,
   WORN_ITEM,
-  WEAPON_TYPE,
   NPCFAMILY,
   SPECS,
-  EXPANSION_FLAG,
+  INTERP_STATS,
   type StatId,
   type StatName,
   type RequirementId,
   type RequirementName,
   type ProfessionId,
-  type ProfessionName,
   type BreedId,
-  type BreedName,
   type FactionId,
   type FactionName,
   type NanoSchoolId,
@@ -48,7 +45,7 @@ import {
   type NanoStrainName,
 } from './game-data';
 
-import type { Item, ItemSource } from '@/types/api';
+import type { Action, Item, ItemSource, StatValue } from '@/types/api';
 import { versionedPath } from '@/composables/useGameVersion';
 
 // ============================================================================
@@ -438,8 +435,6 @@ export function getAllNanoSchoolNames(): string[] {
  * Check if a stat should use interpolation
  */
 export function statNeedsInterpolation(statId: number): boolean {
-  // Import INTERP_STATS from game-data
-  const { INTERP_STATS } = require('./game-data');
   return INTERP_STATS.includes(statId);
 }
 
@@ -1232,12 +1227,15 @@ export function getItemCategoryName(itemClass: number): string {
 // Slot Functions
 // ============================================================================
 
+/** The parts of an item that its class and slots are read from */
+type ItemClassSource = Pick<Item, 'item_class'> & { stats?: StatValue[] };
+
 /**
  * Get item class from item stats or property
  */
-export function getItemClass(item: any): number {
+export function getItemClass(item: ItemClassSource): number {
   // First try the ItemClass stat (stat 76)
-  const itemClassStat = item.stats?.find((stat: any) => stat.stat === 76);
+  const itemClassStat = item.stats?.find((stat) => stat.stat === 76);
   if (itemClassStat) {
     return itemClassStat.value;
   }
@@ -1294,7 +1292,7 @@ export function parseImplantSlots(slotValue: number): string[] {
 /**
  * Get item slot information
  */
-export function getItemSlotInfo(item: any): {
+export function getItemSlotInfo(item: ItemClassSource | null | undefined): {
   type: 'weapon' | 'armor' | 'implant' | null;
   slots: string[];
   iconUrl: string | null;
@@ -1306,7 +1304,7 @@ export function getItemSlotInfo(item: any): {
   const iconUrl = getItemIconUrl(item.stats);
 
   // Get slot value from stat 298
-  const slotStat = item.stats?.find((stat: any) => stat.stat === 298);
+  const slotStat = item.stats?.find((stat) => stat.stat === 298);
   const slotValue = slotStat ? slotStat.value : 0;
 
   // Determine slot type based on which slot parser returns valid results
@@ -1517,12 +1515,16 @@ export function getFlagNameFromValue(statId: number, bitValue: number): string {
     return getExpansionName(bitValue);
   }
 
+  // Stat 455 (NPCFamily) is an enum value, and NPCFAMILY maps value -> name
+  if (statId === 455) {
+    return NPCFAMILY[bitValue as keyof typeof NPCFAMILY] ?? `Flag ${bitValue}`;
+  }
+
   // Map stat IDs to their corresponding flag constants
   const flagConstants: Record<number, Record<string, number>> = {
     30: CANFLAG, // Can flags
     182: SPECIALIZATION_FLAG, // Specialization flags
     355: WORN_ITEM, // WornItem flags
-    455: NPCFAMILY, // NPCFamily flags
     // Add more stat ID to flag mappings as needed
   };
 
@@ -1564,13 +1566,8 @@ import {
   getSkillCostFactor,
   getAbilityCostFactor,
   getBreedInitValue,
-  PROFESSION_NAMES,
-  BREED_NAMES,
-  ABILITY_NAMES,
-  SKILL_NAMES,
   type CharacterStats,
   type IPCalculationResult,
-  type SkillCap,
   type TrickleDownResult,
 } from '../lib/tinkerprofiles/ip-calculator';
 
@@ -1701,7 +1698,7 @@ export function calculateSkillCaps(
   profession: number,
   skillId: number,
   abilities: number[]
-): SkillCap {
+): number {
   return calcSkillCap(level, profession, skillId, abilities);
 }
 
@@ -1825,34 +1822,6 @@ export function getBreedSpecialization(breed: number): {
   }
 
   return specialization;
-}
-
-/**
- * Get recommended stat distribution for a breed/profession combination
- */
-export function getRecommendedStatDistribution(
-  breed: number,
-  profession: number,
-  level: number
-): {
-  primary: number[]; // Most important abilities
-  secondary: number[]; // Somewhat important abilities
-  tertiary: number[]; // Less important abilities
-} {
-  const breedSpec = getBreedSpecialization(breed);
-  const profSpec = getProfessionSpecialization(profession);
-
-  // This is a simplified recommendation system
-  // In practice, this would use more sophisticated analysis
-  const recommendation = {
-    primary: [...breedSpec.excellent],
-    secondary: [...breedSpec.average],
-    tertiary: [...breedSpec.poor],
-  };
-
-  // Adjust based on profession needs
-  // This would need more detailed profession analysis
-  return recommendation;
 }
 
 // ============================================================================
@@ -2058,7 +2027,6 @@ export const gameUtils = {
   formatSkillValue,
   getProfessionSpecialization,
   getBreedSpecialization,
-  getRecommendedStatDistribution,
 
   // Normalization functions
   normalizeProfessionToId,
@@ -2120,13 +2088,12 @@ export function getPrimarySource(item: Item): string | null {
 
   // Find the shortest name (usually the most descriptive)
   const shortestSource = item.sources.reduce((shortest, current) => {
-    // Handle both old format (current.source.name) and new format (current.source_name)
-    const currentName = current.source_name || current.source?.name || '';
-    const shortestName = shortest.source_name || shortest.source?.name || '';
+    const currentName = current.source?.name || '';
+    const shortestName = shortest.source?.name || '';
     return currentName.length < shortestName.length ? current : shortest;
   });
 
-  return shortestSource.source_name || shortestSource.source?.name || null;
+  return shortestSource.source?.name || null;
 }
 
 /**

@@ -29,7 +29,7 @@ export type {
   TinkerProfile,
   VersionFlaggedItem,
   ImplantWithClusters,
-  SkillWithIP,
+  SkillData,
   ProfileMetadata,
   ProfileExportFormat,
   ProfileImportResult,

@@ -347,14 +347,16 @@ function getBreedIdFromBreedName(breed: string): number {
  * Create default v4.0.0 skills map for a breed
  * Initializes all ~168 skills with appropriate base values
  */
-export function createDefaultSkillsV4(breed: string): { [skillId: number]: SkillData } {
+export function createDefaultSkillsV4(breed: string | number): {
+  [skillId: number]: SkillData;
+} {
   const skills: { [skillId: number]: SkillData } = {};
 
   // Get all skill IDs from SkillService
   const allSkillIds = skillService.getAllSkills();
 
   // Get breed ID for breed-specific ability lookup
-  const breedId = getBreedId(breed) || 1; // Default to Solitus
+  const breedId = normalizeBreedToId(breed); // Defaults to Solitus
 
   for (const skillId of allSkillIds) {
     const category = skillService.getCategory(Number(skillId));
@@ -389,7 +391,7 @@ export function createDefaultSkillsV4(breed: string): { [skillId: number]: Skill
  */
 export function createDefaultProfile(
   name: string = 'New Character',
-  breed: string = 'Solitus'
+  breed: string | number = 'Solitus'
 ): TinkerProfile {
   const now = new Date().toISOString();
 
@@ -422,7 +424,7 @@ export function createDefaultProfile(
       Specialization: 0,
     },
 
-    skills: createDefaultSkillsV4(breed),
+    skills: createDefaultSkillsV4(breedId),
 
     Weapons: structuredClone(DEFAULT_WEAPONS),
     Clothing: structuredClone(DEFAULT_CLOTHING),

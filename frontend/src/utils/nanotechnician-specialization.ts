@@ -18,7 +18,7 @@ import {
   ENHANCE_NANO_DAMAGE,
   ANCIENT_MATRIX,
   DAMAGE_TYPES,
-  type BreedId,
+  type NukesBreedId,
   type DeckId,
   type SpecId,
   type DamageTypeId,
@@ -29,7 +29,7 @@ import {
 // ============================================================================
 
 export interface NukesConfiguration {
-  breed: BreedId;
+  breed: NukesBreedId;
   level: number;
   mc: number;
   nano_init: number;
@@ -185,7 +185,7 @@ export function calculateSpecificDamageBonus(
 /**
  * Get breed name from ID
  */
-export function getBreedName(breedId: BreedId): string {
+export function getBreedName(breedId: NukesBreedId): string {
   return BREEDS[breedId];
 }
 

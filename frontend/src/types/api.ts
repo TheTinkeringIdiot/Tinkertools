@@ -5,6 +5,8 @@
  * following the patterns specified in docs/11_api_design_and_data_flow.md
  */
 
+import type { TinkerProfile } from '../lib/tinkerprofiles/types';
+
 // ============================================================================
 // Base API Types
 // ============================================================================
@@ -297,51 +299,11 @@ export interface StatBonus {
 // Character Profile Types (LocalStorage)
 // ============================================================================
 
-/** Skill entry with IP tracking */
-export interface SkillWithIP {
-  value: number;
-  ipSpent: number;
-  pointFromIp: number;
-}
-
-export interface TinkerProfile {
-  Character: {
-    Name: string;
-    Level: number;
-    Profession: string;
-    Breed: string;
-    Faction: string;
-    Expansion: string;
-    AccountType: string;
-    MaxHealth: number;
-    MaxNano: number;
-  };
-  Skills: {
-    Attributes: {
-      Intelligence: SkillWithIP;
-      Psychic: SkillWithIP;
-      Sense: SkillWithIP;
-      Stamina: SkillWithIP;
-      Strength: SkillWithIP;
-      Agility: SkillWithIP;
-    };
-    'Body & Defense': Record<string, SkillWithIP>;
-    ACs: Record<string, number>;
-    'Ranged Weapons': Record<string, SkillWithIP>;
-    'Ranged Specials': Record<string, SkillWithIP>;
-    'Melee Weapons': Record<string, SkillWithIP>;
-    'Melee Specials': Record<string, SkillWithIP>;
-    'Nanos & Casting': Record<string, SkillWithIP>;
-    Exploring: Record<string, SkillWithIP>;
-    'Trade & Repair': Record<string, SkillWithIP>;
-    'Combat & Healing': Record<string, SkillWithIP>;
-    Misc: Record<string, number>; // Misc doesn't use IP tracking
-  };
-  Weapons: Record<string, Item | null>;
-  Clothing: Record<string, Item | null>;
-  Implants: Record<string, Item | null>;
-  PerksAndResearch: any[];
-}
+/**
+ * Character profiles live in the TinkerProfiles library (v4, ID-keyed skills).
+ * Re-exported here for the many callers that import it alongside API types.
+ */
+export type { TinkerProfile };
 
 export interface UserPreferences {
   theme: 'light' | 'dark';

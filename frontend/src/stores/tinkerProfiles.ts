@@ -32,7 +32,6 @@ import {
 } from '@/composables/useGameVersion';
 
 // Types that may not be exported yet
-type NanoCompatibleProfile = any; // TODO: Add proper type when available
 type BulkImportResult = {
   totalProfiles: number;
   successCount: number;
@@ -547,32 +546,6 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   }
 
   // ============================================================================
-  // Profile Transformations
-  // ============================================================================
-
-  /**
-   * Get profile as nano-compatible format
-   */
-  async function getAsNanoCompatible(profileId: string): Promise<NanoCompatibleProfile | null> {
-    if (!profileManager) {
-      throw new Error('Profile manager not initialized');
-    }
-
-    return await profileManager.getAsNanoCompatible(profileId);
-  }
-
-  /**
-   * Create profile from nano-compatible format
-   */
-  async function createFromNanoCompatible(nanoProfile: NanoCompatibleProfile): Promise<string> {
-    if (!profileManager) {
-      throw new Error('Profile manager not initialized');
-    }
-
-    return await profileManager.createFromNanoCompatible(nanoProfile);
-  }
-
-  // ============================================================================
   // Import/Export Operations
   // ============================================================================
 
@@ -1050,7 +1023,11 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     // Update the equipment slot to null - create deep copy to avoid mutating original
     const updatedProfile = { ...plainProfile };
     // Deep copy the equipment category to ensure we don't mutate shared objects
-    updatedProfile[category] = { ...plainProfile[category], [slot]: null };
+    if (category === 'Implants') {
+      updatedProfile.Implants = { ...plainProfile.Implants, [slot]: null };
+    } else {
+      updatedProfile[category] = { ...plainProfile[category], [slot]: null };
+    }
 
     // Update the profile (triggers save and recalculation)
     await updateProfile(activeProfile.value.id, updatedProfile);
@@ -1770,8 +1747,6 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     setActiveProfile,
     clearActiveProfile,
     copyProfileToCurrentVersion,
-    getAsNanoCompatible,
-    createFromNanoCompatible,
     exportProfile,
     exportAllProfiles,
     importProfile,

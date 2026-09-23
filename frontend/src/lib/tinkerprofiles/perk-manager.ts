@@ -5,7 +5,7 @@
  * for all three perk types: SL Perks, AI Perks, and LE Research
  */
 
-import type { TinkerProfile, SkillWithIP, IPTracker } from './types';
+import type { TinkerProfile, IPTracker } from './types';
 import type {
   PerkSystem,
   PerkEntry,
@@ -20,7 +20,7 @@ import type {
   AnyPerkEntry,
 } from './perk-types';
 
-import { getBreedId, getProfessionId } from '../../services/game-utils';
+import { getBreedName, getProfessionName } from '../../services/game-utils';
 
 // ============================================================================
 // Perk Point Calculation Functions
@@ -120,15 +120,18 @@ function validatePerkRequirements(
 
   // Check profession restriction
   if (perkInfo.requirements.professions && perkInfo.requirements.professions.length > 0) {
-    if (!perkInfo.requirements.professions.includes(character.Profession)) {
-      errors.push(`Not available for ${character.Profession}`);
+    // Requirements list names; the profile stores numeric IDs
+    const professionName = getProfessionName(character.Profession);
+    if (!perkInfo.requirements.professions.includes(professionName)) {
+      errors.push(`Not available for ${professionName}`);
     }
   }
 
   // Check breed restriction
   if (perkInfo.requirements.breeds && perkInfo.requirements.breeds.length > 0) {
-    if (!perkInfo.requirements.breeds.includes(character.Breed)) {
-      errors.push(`Not available for ${character.Breed}`);
+    const breedName = getBreedName(character.Breed);
+    if (!perkInfo.requirements.breeds.includes(breedName)) {
+      errors.push(`Not available for ${breedName}`);
     }
   }
 
