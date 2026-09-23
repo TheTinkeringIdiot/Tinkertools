@@ -97,7 +97,6 @@ const createNano = (overrides: Partial<OffensiveNano> & Pick<OffensiveNano, 'id'
     strain: '1',
     level: 200,
     qualityLevel: 250,
-    castingRequirements: [],
     item: nanoItem(aoid, overrides.name),
     minDamage: 800,
     maxDamage: 1200,
