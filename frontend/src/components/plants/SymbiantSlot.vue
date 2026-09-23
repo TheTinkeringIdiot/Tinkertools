@@ -37,7 +37,6 @@ Represents a single equipable slot on the character
     <!-- Remove Button (on hover, if symbiant equipped) -->
     <Button
       v-if="symbiant"
-      @click.stop="onRemove"
       icon="pi pi-times"
       size="small"
       text
@@ -45,6 +44,7 @@ Represents a single equipable slot on the character
       severity="danger"
       class="absolute -top-2 -right-2 w-4 h-4 opacity-0 hover:opacity-100 transition-opacity"
       aria-label="Remove symbiant"
+      @click.stop="onRemove"
     />
   </div>
 </template>

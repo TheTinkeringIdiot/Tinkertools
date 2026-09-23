@@ -416,7 +416,7 @@ Displays comprehensive nano information including effects, requirements, and com
             @click="toggleFavorite"
           />
         </div>
-        <Button label="Close" @click="handleClose" autofocus />
+        <Button label="Close" autofocus @click="handleClose" />
       </div>
     </template>
   </Dialog>

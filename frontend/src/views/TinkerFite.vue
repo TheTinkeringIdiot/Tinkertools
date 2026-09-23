@@ -330,9 +330,9 @@ onMounted(() => {
           TinkerFite
         </h1>
         <Badge
+          v-if="filteredWeapons.length > 0"
           :value="filteredWeapons.length"
           severity="success"
-          v-if="filteredWeapons.length > 0"
           :aria-label="`${filteredWeapons.length} weapons found`"
         />
       </div>

@@ -193,8 +193,8 @@ Complete character management with skills, equipment, and IP tracking
                   <div class="mt-6">
                     <BuffTable
                       :buffs="profileData.buffs || []"
-                      :currentNCU="profilesStore.currentNCU"
-                      :maxNCU="profilesStore.maxNCU"
+                      :current-n-c-u="profilesStore.currentNCU"
+                      :max-n-c-u="profilesStore.maxNCU"
                       @remove-buff="handleRemoveBuff"
                       @remove-all-buffs="handleRemoveAllBuffs"
                     />

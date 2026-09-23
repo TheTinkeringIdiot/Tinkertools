@@ -42,8 +42,8 @@
                 Enter your character's skills to see which weapons you can use
               </p>
               <button
-                @click="quickSetup"
                 class="bg-primary-500 dark:bg-primary-600 text-white px-4 py-2 rounded hover:bg-primary-600 dark:hover:bg-primary-700 transition-colors"
+                @click="quickSetup"
               >
                 Quick Setup
               </button>
@@ -74,8 +74,8 @@
               </div>
 
               <button
-                @click="clearSkills"
                 class="w-full bg-red-500 dark:bg-red-600 text-white px-4 py-2 rounded hover:bg-red-600 dark:hover:bg-red-700 transition-colors text-sm"
+                @click="clearSkills"
               >
                 Clear Skills
               </button>
@@ -92,14 +92,14 @@
             <div class="flex gap-4">
               <input
                 v-model="searchQuery"
-                @keyup.enter="searchWeapons"
                 placeholder="Search weapons by name..."
                 class="flex-1 px-4 py-2 border border-surface-300 dark:border-surface-600 bg-surface-0 dark:bg-surface-900 text-surface-900 dark:text-surface-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400"
+                @keyup.enter="searchWeapons"
               />
               <button
-                @click="searchWeapons"
                 class="bg-primary-500 dark:bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-600 dark:hover:bg-primary-700 transition-colors"
                 :disabled="loading"
+                @click="searchWeapons"
               >
                 {{ loading ? 'Loading...' : 'Search' }}
               </button>
@@ -149,8 +149,8 @@
             <div v-else-if="error" class="p-8 text-center">
               <p class="text-red-800 dark:text-red-300">{{ error }}</p>
               <button
-                @click="loadWeapons"
                 class="mt-4 bg-primary-500 dark:bg-primary-600 text-white px-4 py-2 rounded hover:bg-primary-600 dark:hover:bg-primary-700 transition-colors"
+                @click="loadWeapons"
               >
                 Retry
               </button>

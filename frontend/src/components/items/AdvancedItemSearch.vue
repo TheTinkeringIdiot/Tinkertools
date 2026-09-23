@@ -17,17 +17,17 @@ Provides all advanced search capabilities including item class, slot, requiremen
           label="Search"
           icon="pi pi-search"
           size="small"
-          @click="performSearch"
           :loading="loading"
           :disabled="!hasSearchCriteria"
+          @click="performSearch"
         />
         <Button
           label="Clear"
           icon="pi pi-times"
           size="small"
           outlined
-          @click="clearAll"
           :disabled="!hasSearchCriteria"
+          @click="clearAll"
         />
       </div>
     </div>
@@ -306,8 +306,8 @@ Provides all advanced search capabilities including item class, slot, requiremen
           icon="pi pi-bookmark"
           size="small"
           text
-          @click="saveSearch"
           class="ml-2"
+          @click="saveSearch"
         />
       </div>
     </div>

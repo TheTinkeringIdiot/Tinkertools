@@ -26,12 +26,12 @@ PrimeVue DataTable with columns:
       :rows-per-page-options="[25, 50, 100]"
       striped-rows
       sortable
-      sortField="avgDPS"
-      :sortOrder="-1"
+      sort-field="avgDPS"
+      :sort-order="-1"
       responsive-layout="scroll"
-      @row-click="onRowClick"
       :empty-message="emptyMessage"
       class="p-datatable-sm"
+      @row-click="onRowClick"
     >
       <!-- Name Column -->
       <Column field="name" header="Name" :sortable="true" style="min-width: 200px">

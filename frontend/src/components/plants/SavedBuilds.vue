@@ -36,22 +36,22 @@ Load, delete, and organize saved builds
 
           <!-- Actions Menu -->
           <div class="flex items-center gap-2">
-            <Button @click="loadBuild(build)" label="Load" size="small" severity="primary" />
+            <Button label="Load" size="small" severity="primary" @click="loadBuild(build)" />
             <Button
-              @click="duplicateBuild(build)"
               icon="pi pi-copy"
               size="small"
               text
               severity="secondary"
               aria-label="Duplicate build"
+              @click="duplicateBuild(build)"
             />
             <Button
-              @click="deleteBuild(build.id)"
               icon="pi pi-trash"
               size="small"
               text
               severity="danger"
               aria-label="Delete build"
+              @click="deleteBuild(build.id)"
             />
           </div>
         </div>

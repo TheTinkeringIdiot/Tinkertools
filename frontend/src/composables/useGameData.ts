@@ -112,7 +112,7 @@ export function useGameData() {
     if (!activeCharacter.value) return null;
 
     const bonuses = professionBonuses.calculateCharacterBonuses(activeCharacter.value);
-    let totalStats = { ...activeCharacter.value.baseStats };
+    const totalStats = { ...activeCharacter.value.baseStats };
 
     // Apply breed and profession bonuses
     Object.entries(bonuses.totalBonuses).forEach(([stat, bonus]) => {

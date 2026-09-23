@@ -19,9 +19,9 @@ Task 4.4: Complete view integration
             TinkerNukes
           </h1>
           <Badge
+            v-if="filteredNanos.length > 0"
             :value="filteredNanos.length"
             severity="success"
-            v-if="filteredNanos.length > 0"
             :aria-label="`${filteredNanos.length} usable offensive nanos found`"
           />
           <Badge
@@ -74,7 +74,7 @@ Task 4.4: Complete view integration
             option-label="label"
             option-value="value"
             placeholder="All Schools"
-            showClear
+            show-clear
             class="w-48"
           />
 

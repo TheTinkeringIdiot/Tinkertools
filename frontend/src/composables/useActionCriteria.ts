@@ -258,7 +258,7 @@ export function useCriteriaEvaluation(
         if (!criterion.isStatRequirement) continue;
 
         const currentValue = characterStats.value[criterion.stat] || 0;
-        let requiredValue = criterion.displayValue;
+        const requiredValue = criterion.displayValue;
 
         // Only consider "greater than or equal" requirements for minimums
         if (criterion.displaySymbol === '≥') {

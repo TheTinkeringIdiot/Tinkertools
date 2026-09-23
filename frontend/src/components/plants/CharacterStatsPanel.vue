@@ -11,12 +11,12 @@ Shows current stats and allows input for character building
       </h3>
       <Button
         v-if="editable"
-        @click="resetStats"
         icon="pi pi-refresh"
         size="small"
         text
         severity="secondary"
         aria-label="Reset stats"
+        @click="resetStats"
       />
     </div>
 
@@ -43,8 +43,8 @@ Shows current stats and allows input for character building
           :min="1"
           :max="3000"
           :step="1"
-          showButtons
-          buttonLayout="horizontal"
+          show-buttons
+          button-layout="horizontal"
           :pt="{ input: 'w-16 text-center' }"
           @input="onStatChange"
         />
@@ -69,8 +69,8 @@ Shows current stats and allows input for character building
           :min="0"
           :max="3000"
           :step="1"
-          showButtons
-          buttonLayout="horizontal"
+          show-buttons
+          button-layout="horizontal"
           :pt="{ input: 'w-16 text-center' }"
           @input="onStatChange"
         />
@@ -93,8 +93,8 @@ Shows current stats and allows input for character building
           :min="0"
           :max="3000"
           :step="1"
-          showButtons
-          buttonLayout="horizontal"
+          show-buttons
+          button-layout="horizontal"
           :pt="{ input: 'w-16 text-center' }"
           @input="onStatChange"
         />
@@ -109,32 +109,32 @@ Shows current stats and allows input for character building
       <div class="text-xs text-surface-500 dark:text-surface-400 mb-2">Quick Presets:</div>
       <div class="flex flex-wrap gap-1">
         <Button
-          @click="applyPreset('newbie')"
           label="Newbie"
           size="small"
           text
           severity="secondary"
+          @click="applyPreset('newbie')"
         />
         <Button
-          @click="applyPreset('mid')"
           label="Mid Level"
           size="small"
           text
           severity="secondary"
+          @click="applyPreset('mid')"
         />
         <Button
-          @click="applyPreset('high')"
           label="High Level"
           size="small"
           text
           severity="secondary"
+          @click="applyPreset('high')"
         />
         <Button
-          @click="applyPreset('twink')"
           label="Twink"
           size="small"
           text
           severity="secondary"
+          @click="applyPreset('twink')"
         />
       </div>
     </div>

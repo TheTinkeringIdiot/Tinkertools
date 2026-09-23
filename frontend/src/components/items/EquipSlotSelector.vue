@@ -43,8 +43,8 @@ Shows available slots for an item and allows user to choose where to equip it
             >
               <input
                 :id="`slot-${slot.name}`"
-                type="radio"
                 v-model="selectedSlot"
+                type="radio"
                 :value="slot.name"
                 class="sr-only"
               />
@@ -85,11 +85,11 @@ Shows available slots for an item and allows user to choose where to equip it
     </div>
 
     <template #footer>
-      <Button label="Cancel" @click="cancel" text />
+      <Button label="Cancel" text @click="cancel" />
       <Button
         label="Equip Item"
-        @click="confirm"
         :disabled="!selectedSlot || availableSlots.length === 0"
+        @click="confirm"
       />
     </template>
   </Dialog>

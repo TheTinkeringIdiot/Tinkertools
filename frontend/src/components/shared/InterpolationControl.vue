@@ -17,11 +17,11 @@
           <Badge v-else-if="interpolationStatus === 'original'" value="Original" severity="info" />
           <Button
             v-if="showClearButton && interpolatedItem"
+            v-tooltip="'Reset to original'"
             icon="pi pi-refresh"
             size="small"
             severity="secondary"
             @click="resetToOriginal"
-            v-tooltip="'Reset to original'"
           />
         </div>
       </div>

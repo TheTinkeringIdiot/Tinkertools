@@ -60,20 +60,20 @@ Shows stat differences and recommendations
       <div class="mt-4 flex justify-between">
         <div class="flex gap-2">
           <Button
-            @click="exportComparison"
             label="Export"
             icon="pi pi-download"
             size="small"
             severity="secondary"
+            @click="exportComparison"
           />
         </div>
         <div class="flex gap-2">
           <Button
             v-for="build in builds.slice(0, 4)"
             :key="`load-${build.id}`"
-            @click="$emit('load-build', build)"
             :label="`Load ${build.name}`"
             size="small"
+            @click="$emit('load-build', build)"
           />
         </div>
       </div>

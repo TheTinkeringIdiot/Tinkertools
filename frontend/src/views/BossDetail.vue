@@ -135,8 +135,8 @@ onMounted(() => {
               icon="pi pi-arrow-left"
               text
               rounded
-              @click="goBack"
               class="text-surface-600 dark:text-surface-400"
+              @click="goBack"
             />
             <i class="pi pi-users text-2xl text-primary-500"></i>
             <h1 v-if="boss" class="text-3xl font-bold text-surface-900 dark:text-surface-50">
@@ -260,17 +260,17 @@ onMounted(() => {
               <div v-if="sortedDrops.length > 0">
                 <DataTable
                   :value="sortedDrops"
-                  stripedRows
+                  striped-rows
                   :paginator="sortedDrops.length > 10"
                   :rows="10"
-                  :rowsPerPageOptions="[10, 25, 50]"
+                  :rows-per-page-options="[10, 25, 50]"
                   class="p-datatable-sm"
                 >
                   <Column field="name" header="Symbiant Name">
                     <template #body="{ data }">
                       <a
-                        @click.prevent="navigateToItem(data.aoid)"
                         class="text-primary-500 hover:text-primary-600 cursor-pointer font-medium"
+                        @click.prevent="navigateToItem(data.aoid)"
                       >
                         {{ data.name }}
                       </a>

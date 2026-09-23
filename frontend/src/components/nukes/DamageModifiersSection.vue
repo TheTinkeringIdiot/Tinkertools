@@ -17,13 +17,13 @@
         </label>
         <InputNumber
           id="dnde"
+          v-tooltip="'Auto-calculated from buff dropdowns'"
           :model-value="directNanoDamageEfficiency"
           :min="0"
           :max="10000"
           suffix="%"
           disabled
           class="w-full opacity-75"
-          v-tooltip="'Auto-calculated from buff dropdowns'"
         />
         <span class="text-xs text-surface-500 dark:text-surface-400 mt-1">
           Auto-calculated from buffs
@@ -41,10 +41,10 @@
         <InputNumber
           id="projectile"
           v-model="localModifiers.projectile"
-          @update:model-value="updateModifier('projectile', $event)"
           :min="0"
           :max="10000"
           class="w-full"
+          @update:model-value="updateModifier('projectile', $event)"
         />
       </div>
 
@@ -59,10 +59,10 @@
         <InputNumber
           id="melee"
           v-model="localModifiers.melee"
-          @update:model-value="updateModifier('melee', $event)"
           :min="0"
           :max="10000"
           class="w-full"
+          @update:model-value="updateModifier('melee', $event)"
         />
       </div>
 
@@ -77,10 +77,10 @@
         <InputNumber
           id="energy"
           v-model="localModifiers.energy"
-          @update:model-value="updateModifier('energy', $event)"
           :min="0"
           :max="10000"
           class="w-full"
+          @update:model-value="updateModifier('energy', $event)"
         />
       </div>
 
@@ -95,10 +95,10 @@
         <InputNumber
           id="chemical"
           v-model="localModifiers.chemical"
-          @update:model-value="updateModifier('chemical', $event)"
           :min="0"
           :max="10000"
           class="w-full"
+          @update:model-value="updateModifier('chemical', $event)"
         />
       </div>
 
@@ -113,10 +113,10 @@
         <InputNumber
           id="radiation"
           v-model="localModifiers.radiation"
-          @update:model-value="updateModifier('radiation', $event)"
           :min="0"
           :max="10000"
           class="w-full"
+          @update:model-value="updateModifier('radiation', $event)"
         />
       </div>
 
@@ -131,10 +131,10 @@
         <InputNumber
           id="cold"
           v-model="localModifiers.cold"
-          @update:model-value="updateModifier('cold', $event)"
           :min="0"
           :max="10000"
           class="w-full"
+          @update:model-value="updateModifier('cold', $event)"
         />
       </div>
 
@@ -149,10 +149,10 @@
         <InputNumber
           id="nano"
           v-model="localModifiers.nano"
-          @update:model-value="updateModifier('nano', $event)"
           :min="0"
           :max="10000"
           class="w-full"
+          @update:model-value="updateModifier('nano', $event)"
         />
       </div>
 
@@ -167,10 +167,10 @@
         <InputNumber
           id="fire"
           v-model="localModifiers.fire"
-          @update:model-value="updateModifier('fire', $event)"
           :min="0"
           :max="10000"
           class="w-full"
+          @update:model-value="updateModifier('fire', $event)"
         />
       </div>
 
@@ -185,10 +185,10 @@
         <InputNumber
           id="poison"
           v-model="localModifiers.poison"
-          @update:model-value="updateModifier('poison', $event)"
           :min="0"
           :max="10000"
           class="w-full"
+          @update:model-value="updateModifier('poison', $event)"
         />
       </div>
 
@@ -203,10 +203,10 @@
         <InputNumber
           id="targetAC"
           v-model="localModifiers.targetAC"
-          @update:model-value="updateModifier('targetAC', $event)"
           :min="0"
           :max="10000"
           class="w-full"
+          @update:model-value="updateModifier('targetAC', $event)"
         />
       </div>
     </div>

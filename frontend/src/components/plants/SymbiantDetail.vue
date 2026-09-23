@@ -74,10 +74,10 @@ Shows complete symbiant information and build options
               </div>
             </div>
             <Button
-              @click="addToSlot(symbiant.slot)"
               :label="isSlotOccupied(symbiant.slot) ? 'Replace' : 'Add'"
               :severity="isSlotOccupied(symbiant.slot) ? 'warning' : 'primary'"
               size="small"
+              @click="addToSlot(symbiant.slot)"
             />
           </div>
 
@@ -90,11 +90,11 @@ Shows complete symbiant information and build options
               <Button
                 v-for="slot in alternativeSlots"
                 :key="slot"
-                @click="addToSlot(slot)"
                 :label="formatSlotName(slot)"
                 size="small"
                 text
                 severity="secondary"
+                @click="addToSlot(slot)"
               />
             </div>
           </div>
@@ -137,10 +137,10 @@ Shows complete symbiant information and build options
         <div>
           <Button
             v-if="showBuildOptions && symbiant"
-            @click="addToBuild"
             label="Add to Build"
             icon="pi pi-plus"
             :disabled="!symbiant.slot"
+            @click="addToBuild"
           />
         </div>
         <div class="flex gap-2">

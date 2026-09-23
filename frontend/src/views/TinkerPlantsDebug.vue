@@ -133,8 +133,8 @@ TinkerPlants Debug - Test version to identify CSS issues
                   v-if="loadCharacterStats"
                   :profile="null"
                   :editable="true"
-                  @stats-changed="handleStatsChange"
                   style="border border-surface-200 dark:border-surface-700;"
+                  @stats-changed="handleStatsChange"
                 />
                 <div v-else style="text-surface-600 dark:text-surface-400; font-style: italic;">
                   CharacterStatsPanel failed to load
@@ -162,8 +162,8 @@ TinkerPlants Debug - Test version to identify CSS issues
                 <SymbiantSearch
                   v-if="loadSymbiantSearch"
                   v-model="searchQuery"
-                  @search="handleSearch"
                   style="border border-surface-200 dark:border-surface-700;"
+                  @search="handleSearch"
                 />
                 <div v-else style="text-surface-600 dark:text-surface-400; font-style: italic;">
                   SymbiantSearch failed to load

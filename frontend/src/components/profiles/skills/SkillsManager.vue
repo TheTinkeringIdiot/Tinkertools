@@ -34,7 +34,7 @@ Interactive skill categories with expandable panels and sliders with IP calculat
             <div class="flex items-center gap-2">
               <Checkbox
                 v-model="showZeroMiscSkills"
-                inputId="show-zero-misc"
+                input-id="show-zero-misc"
                 binary
                 @change="toggleZeroMiscSkills"
               />

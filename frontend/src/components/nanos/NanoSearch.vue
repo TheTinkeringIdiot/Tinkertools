@@ -6,7 +6,7 @@ Supports text search with nano school filtering and quick filters
   <div class="nano-search p-4 space-y-4">
     <!-- Main Search Input -->
     <div class="relative">
-      <IconField iconPosition="left">
+      <IconField icon-position="left">
         <InputIcon class="pi pi-search" />
         <InputText
           v-model="searchQuery"
@@ -54,7 +54,7 @@ Supports text search with nano school filtering and quick filters
     <!-- Advanced Search Toggle -->
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <Checkbox v-model="showAdvanced" inputId="show-advanced" binary />
+        <Checkbox v-model="showAdvanced" input-id="show-advanced" binary />
         <label
           for="show-advanced"
           class="text-sm text-surface-700 dark:text-surface-300 cursor-pointer"
@@ -84,7 +84,7 @@ Supports text search with nano school filtering and quick filters
             <div v-for="field in searchFields" :key="field.value" class="flex items-center gap-2">
               <Checkbox
                 v-model="selectedFields"
-                :inputId="`field-${field.value}`"
+                :input-id="`field-${field.value}`"
                 :value="field.value"
               />
               <label

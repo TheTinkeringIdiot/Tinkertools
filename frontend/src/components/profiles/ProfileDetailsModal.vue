@@ -30,46 +30,46 @@ Modal for viewing and editing detailed profile information
         <div class="flex items-center gap-2">
           <Button
             v-if="!editing"
-            @click="startEditing"
             label="Edit Profile"
             icon="pi pi-pencil"
             size="small"
+            @click="startEditing"
           />
           <div v-else class="flex gap-2">
             <Button
-              @click="saveChanges"
               label="Save Changes"
               icon="pi pi-check"
               size="small"
               :loading="saving"
+              @click="saveChanges"
             />
             <Button
-              @click="cancelEditing"
               label="Cancel"
               icon="pi pi-times"
               size="small"
               severity="secondary"
               outlined
+              @click="cancelEditing"
             />
           </div>
         </div>
 
         <div class="flex items-center gap-2">
           <Button
-            @click="validateProfile"
             label="Validate"
             icon="pi pi-shield"
             size="small"
             severity="info"
             outlined
+            @click="validateProfile"
           />
           <Button
-            @click="exportProfile"
             label="Export"
             icon="pi pi-download"
             size="small"
             severity="secondary"
             outlined
+            @click="exportProfile"
           />
         </div>
       </div>

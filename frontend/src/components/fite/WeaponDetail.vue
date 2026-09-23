@@ -1,10 +1,10 @@
 <template>
   <Dialog
     :visible="visible"
-    @update:visible="$emit('hide')"
     :header="weapon?.name || 'Weapon Details'"
     :style="{ width: '800px' }"
     modal
+    @update:visible="$emit('hide')"
   >
     <div v-if="weapon" class="space-y-6">
       <!-- Weapon Overview -->
@@ -97,7 +97,7 @@
 
     <template #footer>
       <div class="flex justify-end space-x-2">
-        <Button @click="$emit('hide')" label="Close" severity="secondary" />
+        <Button label="Close" severity="secondary" @click="$emit('hide')" />
       </div>
     </template>
   </Dialog>

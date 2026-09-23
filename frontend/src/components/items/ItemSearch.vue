@@ -26,19 +26,19 @@ Provides full-text search with auto-complete and search suggestions
         <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
           <Button
             v-if="searchQuery"
+            v-tooltip.bottom="'Clear Search'"
             icon="pi pi-times"
             text
             rounded
             size="small"
             @click="clearSearch"
-            v-tooltip.bottom="'Clear Search'"
           />
           <Button
+            v-tooltip.bottom="'Search'"
             icon="pi pi-search"
             size="small"
             :loading="loading"
             @click="performSearch"
-            v-tooltip.bottom="'Search'"
           />
         </div>
 
@@ -166,7 +166,7 @@ Provides full-text search with auto-complete and search suggestions
         </div>
 
         <!-- Search modifiers -->
-        <div class="flex flex-wrap gap-2" v-if="profile">
+        <div v-if="profile" class="flex flex-wrap gap-2">
           <div class="flex items-center">
             <Checkbox v-model="compatibleOnly" input-id="compatible-only" />
             <label
@@ -204,12 +204,12 @@ Provides full-text search with auto-complete and search suggestions
     >
       <span>{{ searchStats.resultCount }} results in {{ searchStats.duration }}ms</span>
       <Button
+        v-if="canSaveSearch"
         label="Save Search"
         icon="pi pi-bookmark"
         size="small"
         text
         @click="saveCurrentSearch"
-        v-if="canSaveSearch"
       />
     </div>
   </div>

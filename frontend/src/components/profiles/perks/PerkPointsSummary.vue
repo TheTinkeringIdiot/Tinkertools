@@ -16,7 +16,7 @@ Shows point allocation for SL, AI, and LE perks in a space-efficient format
         <div class="flex items-center gap-2">
           <ProgressBar
             :value="slPercentage"
-            :showValue="false"
+            :show-value="false"
             class="w-24 h-2"
             :pt="{
               value: {
@@ -44,7 +44,7 @@ Shows point allocation for SL, AI, and LE perks in a space-efficient format
         <div class="flex items-center gap-2">
           <ProgressBar
             :value="aiPercentage"
-            :showValue="false"
+            :show-value="false"
             class="w-24 h-2"
             :pt="{
               value: {

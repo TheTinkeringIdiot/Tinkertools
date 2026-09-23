@@ -30,18 +30,18 @@ SkillService available for any future skill name displays.
             @click="showImportModal = true"
           />
           <Button
-            icon="pi pi-download"
-            label="Export All"
-            severity="secondary"
-            outlined
-            @click="exportAllProfiles"
-            :loading="loading"
-            :disabled="filteredProfiles.length === 0"
             v-tooltip.bottom="
               filteredProfiles.length === 0
                 ? 'No profiles to export'
                 : `Export all ${filteredProfiles.length} profiles`
             "
+            icon="pi pi-download"
+            label="Export All"
+            severity="secondary"
+            outlined
+            :loading="loading"
+            :disabled="filteredProfiles.length === 0"
+            @click="exportAllProfiles"
           />
         </div>
       </div>
@@ -79,20 +79,20 @@ SkillService available for any future skill name displays.
           class="flex items-center gap-1 border border-surface-200 dark:border-surface-700 rounded-lg p-1"
         >
           <Button
+            v-tooltip.bottom="'Grid View'"
             icon="pi pi-th-large"
             size="small"
             :severity="viewMode === 'grid' ? 'primary' : 'secondary'"
             :outlined="viewMode !== 'grid'"
             @click="viewMode = 'grid'"
-            v-tooltip.bottom="'Grid View'"
           />
           <Button
+            v-tooltip.bottom="'List View'"
             icon="pi pi-bars"
             size="small"
             :severity="viewMode === 'list' ? 'primary' : 'secondary'"
             :outlined="viewMode !== 'list'"
             @click="viewMode = 'list'"
-            v-tooltip.bottom="'List View'"
           />
         </div>
       </div>
@@ -112,13 +112,13 @@ SkillService available for any future skill name displays.
 
       <div class="flex items-center gap-2">
         <Button
+          v-tooltip.bottom="'Refresh Profiles'"
           icon="pi pi-refresh"
           severity="secondary"
           outlined
           size="small"
-          @click="refreshProfiles"
           :loading="loading"
-          v-tooltip.bottom="'Refresh Profiles'"
+          @click="refreshProfiles"
         />
       </div>
     </div>
@@ -232,45 +232,45 @@ SkillService available for any future skill name displays.
 
             <div class="flex items-center gap-2">
               <Button
+                v-tooltip.bottom="'View Details'"
                 icon="pi pi-eye"
                 size="small"
                 severity="secondary"
                 outlined
                 @click="viewProfileDetails(profile)"
-                v-tooltip.bottom="'View Details'"
               />
               <Button
                 v-if="profile.id !== activeProfileId"
+                v-tooltip.bottom="'Set Active'"
                 icon="pi pi-check"
                 size="small"
                 severity="success"
                 outlined
                 @click="setActiveProfile(profile)"
-                v-tooltip.bottom="'Set Active'"
               />
               <Button
+                v-tooltip.bottom="'Duplicate'"
                 icon="pi pi-clone"
                 size="small"
                 severity="secondary"
                 outlined
                 @click="duplicateProfile(profile)"
-                v-tooltip.bottom="'Duplicate'"
               />
               <Button
+                v-tooltip.bottom="'Export'"
                 icon="pi pi-download"
                 size="small"
                 severity="secondary"
                 outlined
                 @click="exportProfile(profile)"
-                v-tooltip.bottom="'Export'"
               />
               <Button
+                v-tooltip.bottom="'Delete'"
                 icon="pi pi-trash"
                 size="small"
                 severity="danger"
                 outlined
                 @click="deleteProfile(profile)"
-                v-tooltip.bottom="'Delete'"
               />
             </div>
           </div>

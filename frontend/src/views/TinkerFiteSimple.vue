@@ -31,9 +31,9 @@
             Test Backend Connection
           </h3>
           <button
-            @click="testBackend"
             class="bg-primary-500 dark:bg-primary-600 text-white px-4 py-2 rounded hover:bg-primary-600 dark:hover:bg-primary-700 transition-colors"
             :disabled="loading"
+            @click="testBackend"
           >
             {{ loading ? 'Testing...' : 'Test Weapon Data' }}
           </button>

@@ -77,12 +77,12 @@ Shows profile information in a compact, action-friendly card format
             Character Stats
           </span>
           <Button
+            v-tooltip.top="'View Full Details'"
             icon="pi pi-eye"
             size="small"
             severity="secondary"
             text
             @click="$emit('view-details', profile)"
-            v-tooltip.top="'View Full Details'"
           />
         </div>
 
@@ -113,35 +113,35 @@ Shows profile information in a compact, action-friendly card format
           label="View Details"
           icon="pi pi-eye"
           size="small"
-          @click="$emit('view-details', profile)"
           class="flex-1 mr-2"
+          @click="$emit('view-details', profile)"
         />
 
         <!-- Quick Actions Menu -->
         <div class="flex items-center gap-1">
           <Button
             v-if="!isActive"
+            v-tooltip.top="'Set as Active Profile'"
             icon="pi pi-check"
             size="small"
             severity="success"
             outlined
             @click="$emit('set-active', profile)"
-            v-tooltip.top="'Set as Active Profile'"
           />
 
           <!-- More Actions Menu -->
           <Button
+            ref="moreActionsButton"
+            v-tooltip.top="'More Actions'"
             icon="pi pi-ellipsis-v"
             size="small"
             severity="secondary"
             outlined
             @click="toggleActionsMenu"
-            ref="moreActionsButton"
-            v-tooltip.top="'More Actions'"
           />
 
           <!-- Actions Menu -->
-          <Menu :model="actionMenuItems" :popup="true" ref="actionsMenu" />
+          <Menu ref="actionsMenu" :model="actionMenuItems" :popup="true" />
         </div>
       </div>
     </div>

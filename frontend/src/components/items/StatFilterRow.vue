@@ -62,12 +62,12 @@ Allows users to configure a single stat filter with function, stat, operator, an
     <!-- Remove Button -->
     <div class="flex-shrink-0">
       <Button
+        v-tooltip.bottom="'Remove Filter'"
         icon="pi pi-times"
         severity="danger"
         size="small"
         outlined
         @click="$emit('remove')"
-        v-tooltip.bottom="'Remove Filter'"
       />
     </div>
   </div>

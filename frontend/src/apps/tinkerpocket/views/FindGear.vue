@@ -512,10 +512,10 @@ watch(
               <Dropdown
                 v-model="familyFilter"
                 :options="FAMILY_OPTIONS"
-                optionLabel="label"
-                optionValue="value"
+                option-label="label"
+                option-value="value"
                 placeholder="All Families"
-                showClear
+                show-clear
                 class="w-full border border-surface-300 dark:border-surface-600"
                 @change="updateFilters"
               />
@@ -527,10 +527,10 @@ watch(
               <Dropdown
                 v-model="slotFilter"
                 :options="SLOT_OPTIONS"
-                optionLabel="label"
-                optionValue="value"
+                option-label="label"
+                option-value="value"
                 placeholder="All Slots"
-                showClear
+                show-clear
                 class="w-full border border-surface-300 dark:border-surface-600"
                 @change="updateFilters"
               />
@@ -581,8 +581,8 @@ watch(
                 :range="true"
                 :min="1"
                 :max="300"
-                @slideend="applyQlFilter"
                 class="flex-1"
+                @slideend="applyQlFilter"
               />
               <span
                 class="text-sm text-surface-600 dark:text-surface-400 min-w-[2rem] text-center"
@@ -604,8 +604,8 @@ watch(
                 :range="true"
                 :min="1"
                 :max="220"
-                @slideend="applyLevelFilter"
                 class="flex-1"
+                @slideend="applyLevelFilter"
               />
               <span
                 class="text-sm text-surface-600 dark:text-surface-400 min-w-[2rem] text-center"
@@ -613,8 +613,8 @@ watch(
               >
               <i
                 v-if="activeProfile && symbiantMaxLevel === activeProfile.Character.Level"
-                class="pi pi-user text-primary-500"
                 v-tooltip="'Max level set from active profile'"
+                class="pi pi-user text-primary-500"
               ></i>
             </div>
           </div>
@@ -689,8 +689,8 @@ watch(
           <div
             v-for="symbiant in filteredSymbiants"
             :key="symbiant.id"
-            @click="navigateToItem(symbiant.aoid)"
             class="symbiant-card flex items-center gap-4 p-4 bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-lg cursor-pointer transition-all duration-200"
+            @click="navigateToItem(symbiant.aoid)"
           >
             <!-- Info -->
             <div class="flex-1 min-w-0">
@@ -714,21 +714,21 @@ watch(
             <div class="flex gap-1">
               <!-- Compare Button -->
               <Button
-                @click.stop="handleAddToComparison(symbiant)"
+                v-tooltip="isSymbiantInComparison(symbiant.id) ? 'In comparison' : 'Add to compare'"
                 :icon="isSymbiantInComparison(symbiant.id) ? 'pi pi-check' : 'pi pi-clone'"
                 :severity="isSymbiantInComparison(symbiant.id) ? 'success' : 'secondary'"
                 size="small"
                 outlined
-                v-tooltip="isSymbiantInComparison(symbiant.id) ? 'In comparison' : 'Add to compare'"
+                @click.stop="handleAddToComparison(symbiant)"
               />
               <!-- Farm List Button -->
               <Button
-                @click.stop="handleAddToFarmList(symbiant)"
+                v-tooltip="isSymbiantInFarmList(symbiant.aoid) ? 'In farm list' : 'Add to farm'"
                 :icon="isSymbiantInFarmList(symbiant.aoid) ? 'pi pi-check' : 'pi pi-list'"
                 :severity="isSymbiantInFarmList(symbiant.aoid) ? 'success' : 'secondary'"
                 size="small"
                 outlined
-                v-tooltip="isSymbiantInFarmList(symbiant.aoid) ? 'In farm list' : 'Add to farm'"
+                @click.stop="handleAddToFarmList(symbiant)"
               />
             </div>
           </div>
@@ -772,7 +772,7 @@ watch(
                 v-model="playfieldFilter"
                 :options="playfields"
                 placeholder="All Playfields"
-                showClear
+                show-clear
                 class="w-full border border-surface-300 dark:border-surface-600"
                 @change="updateBossFilters"
               />
@@ -791,8 +791,8 @@ watch(
                   :range="true"
                   :min="levelRange.min"
                   :max="levelRange.max"
-                  @slideend="applyBossLevelFilter"
                   class="flex-1"
+                  @slideend="applyBossLevelFilter"
                 />
                 <span
                   class="text-sm text-surface-600 dark:text-surface-400 min-w-[2rem] text-center"
@@ -821,16 +821,16 @@ watch(
 
             <div class="flex items-center gap-2">
               <Button
-                @click="bossViewMode = 'grid'"
                 :outlined="bossViewMode !== 'grid'"
                 icon="pi pi-th-large"
                 size="small"
+                @click="bossViewMode = 'grid'"
               />
               <Button
-                @click="bossViewMode = 'list'"
                 :outlined="bossViewMode !== 'list'"
                 icon="pi pi-list"
                 size="small"
+                @click="bossViewMode = 'list'"
               />
             </div>
           </div>
@@ -843,7 +843,7 @@ watch(
         :layout="bossViewMode as any"
         :paginator="true"
         :rows="20"
-        :rowsPerPageOptions="[10, 20, 50]"
+        :rows-per-page-options="[10, 20, 50]"
       >
         <template #empty>
           <div class="text-center py-12">

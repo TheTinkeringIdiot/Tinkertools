@@ -9,10 +9,10 @@ Shows active buff nanos with their icons, names, NCU costs and removal options
       v-if="buffs.length > 0"
       :value="buffs"
       :scrollable="true"
-      scrollHeight="flex"
+      scroll-height="flex"
       class="buff-data-table"
-      :rowHover="true"
-      :stripedRows="true"
+      :row-hover="true"
+      :striped-rows="true"
     >
       <!-- Custom header template with NCU info and Remove All button -->
       <template #header>
@@ -24,13 +24,13 @@ Shows active buff nanos with their icons, names, NCU costs and removal options
             </span>
           </div>
           <Button
+            v-tooltip.left="'Remove all active buffs'"
             label="Remove All"
             icon="pi pi-times"
             severity="danger"
             size="small"
             text
             @click="$emit('remove-all-buffs')"
-            v-tooltip.left="'Remove all active buffs'"
           />
         </div>
       </template>
@@ -55,8 +55,8 @@ Shows active buff nanos with their icons, names, NCU costs and removal options
       <Column field="name" header="Name" :sortable="true" class="min-w-48">
         <template #body="{ data }">
           <div
-            class="buff-name-container"
             v-tooltip="getBuffTooltip(data)"
+            class="buff-name-container"
             :tooltip-options="{
               showDelay: 500,
               hideDelay: 200,
@@ -88,14 +88,14 @@ Shows active buff nanos with their icons, names, NCU costs and removal options
         <template #body="{ data }">
           <div class="flex gap-2 justify-center">
             <Button
+              v-tooltip.top="'Remove buff'"
               icon="pi pi-times"
               size="small"
               severity="danger"
               rounded
               text
-              @click="$emit('remove-buff', data)"
-              v-tooltip.top="'Remove buff'"
               :aria-label="`Remove ${data.name}`"
+              @click="$emit('remove-buff', data)"
             />
           </div>
         </template>

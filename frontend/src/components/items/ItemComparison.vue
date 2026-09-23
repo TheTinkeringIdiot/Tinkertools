@@ -20,19 +20,19 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
 
         <div class="flex items-center gap-2">
           <Button
+            v-tooltip.bottom="'Refresh Data'"
             icon="pi pi-refresh"
             size="small"
             text
             @click="refreshComparison"
-            v-tooltip.bottom="'Refresh Data'"
           />
           <Button
+            v-tooltip.bottom="'Clear All'"
             icon="pi pi-trash"
             size="small"
             text
             severity="danger"
             @click="$emit('clear-all')"
-            v-tooltip.bottom="'Clear All'"
           />
         </div>
       </div>

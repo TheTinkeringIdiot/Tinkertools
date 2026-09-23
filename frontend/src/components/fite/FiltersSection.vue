@@ -29,7 +29,7 @@ Controls:
           option-label="label"
           option-value="value"
           placeholder="All Weapon Types"
-          showClear
+          show-clear
           class="w-56"
           @update:model-value="onWeaponTypeChange"
         />

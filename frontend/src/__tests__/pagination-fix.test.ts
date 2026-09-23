@@ -504,7 +504,7 @@ describe('Pagination Fix', () => {
       expect(result.pagination?.offset).toBe(0);
 
       // 3. Mount component with page 1 results
-      let wrapper = mount(ItemList, {
+      const wrapper = mount(ItemList, {
         props: {
           items: result.data || [],
           viewMode: 'grid',

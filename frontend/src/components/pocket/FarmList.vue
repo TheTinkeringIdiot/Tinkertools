@@ -213,7 +213,7 @@ watch(
                 {{ farmProgress.percentage }}%
               </span>
             </div>
-            <ProgressBar :value="farmProgress.percentage" :showValue="false" class="h-2" />
+            <ProgressBar :value="farmProgress.percentage" :show-value="false" class="h-2" />
           </div>
 
           <!-- Selected Symbiants Summary -->
@@ -264,9 +264,9 @@ watch(
                 <!-- Farmed Checkbox -->
                 <div class="pt-1">
                   <Checkbox
-                    :modelValue="entry.farmed"
-                    @update:modelValue="handleToggleBossFarmed(entry.boss.id)"
+                    :model-value="entry.farmed"
                     binary
+                    @update:model-value="handleToggleBossFarmed(entry.boss.id)"
                   />
                 </div>
 

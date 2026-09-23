@@ -50,11 +50,11 @@ Shows all item data with profile compatibility and comparison options
           @click="addToComparison"
         />
         <Button
+          v-tooltip.bottom="'Share Item'"
           icon="pi pi-share-alt"
           severity="secondary"
           outlined
           @click="shareItem"
-          v-tooltip.bottom="'Share Item'"
         />
       </div>
     </div>
@@ -372,11 +372,11 @@ Shows all item data with profile compatibility and comparison options
             @click="addToComparison"
           />
           <Button
+            v-tooltip.bottom="'Share Item'"
             icon="pi pi-share-alt"
             severity="secondary"
             outlined
             @click="shareItem"
-            v-tooltip.bottom="'Share Item'"
           />
         </div>
       </div>

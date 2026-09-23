@@ -25,7 +25,6 @@ Grid-based implant selection following the legacy TinkerPlants format
         <div class="flex flex-col sm:flex-row gap-3">
           <!-- Revert Button -->
           <Button
-            @click="handleRevert"
             label="Revert"
             icon="pi pi-refresh"
             size="small"
@@ -33,11 +32,11 @@ Grid-based implant selection following the legacy TinkerPlants format
             outlined
             :disabled="!tinkerPlantsStore.hasChanges"
             aria-label="Revert changes to last saved state"
+            @click="handleRevert"
           />
 
           <!-- Save Button -->
           <Button
-            @click="handleSave"
             label="Save"
             icon="pi pi-save"
             size="small"
@@ -45,8 +44,9 @@ Grid-based implant selection following the legacy TinkerPlants format
             outlined
             :disabled="!tinkerPlantsStore.hasChanges"
             :badge="tinkerPlantsStore.hasChanges ? '*' : undefined"
-            badgeSeverity="danger"
+            badge-severity="danger"
             aria-label="Save implant configuration to profile"
+            @click="handleSave"
           />
         </div>
       </div>
@@ -92,13 +92,13 @@ Grid-based implant selection following the legacy TinkerPlants format
 
                   <!-- Clear All Button -->
                   <Button
-                    @click="clearAllImplants"
                     label="Clear All"
                     icon="pi pi-trash"
                     size="small"
                     severity="secondary"
                     outlined
                     aria-label="Clear all selected implants"
+                    @click="clearAllImplants"
                   />
                 </div>
 
@@ -439,7 +439,7 @@ Grid-based implant selection following the legacy TinkerPlants format
       aria-label="Loading implant data"
     >
       <div class="bg-surface-0 dark:bg-surface-950 p-4 rounded-lg shadow-lg">
-        <LoadingSpinner size="medium" loadingText="Loading implant data..." showText />
+        <LoadingSpinner size="medium" loading-text="Loading implant data..." show-text />
       </div>
     </div>
   </div>

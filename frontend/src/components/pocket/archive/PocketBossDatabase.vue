@@ -95,9 +95,9 @@ defineExpose({
             <label class="font-medium text-sm">Search Bosses</label>
             <InputText
               v-model="searchQuery"
-              @input="updateSearch"
               placeholder="Search by name, location, or playfield..."
               class="w-full"
+              @input="updateSearch"
             />
           </div>
 
@@ -106,11 +106,11 @@ defineExpose({
             <label class="font-medium text-sm">Playfield</label>
             <Dropdown
               v-model="selectedPlayfield"
-              @change="updatePlayfield"
               :options="playfields"
               placeholder="All Playfields"
-              showClear
+              show-clear
               class="w-full"
+              @change="updatePlayfield"
             />
           </div>
 
@@ -121,12 +121,12 @@ defineExpose({
             </label>
             <Slider
               v-model="levelFilter"
-              @slideend="updateLevelRange"
               :min="levelRange.min"
               :max="levelRange.max"
               :step="5"
               range
               class="w-full"
+              @slideend="updateLevelRange"
             />
           </div>
         </div>
@@ -137,11 +137,11 @@ defineExpose({
         >
           <div class="flex items-center gap-2">
             <Button
-              @click="clearAllFilters"
               label="Clear Filters"
               icon="pi pi-filter-slash"
               outlined
               size="small"
+              @click="clearAllFilters"
             />
             <span class="text-sm text-surface-600 dark:text-surface-400">
               {{ bosses.length }} boss{{ bosses.length !== 1 ? 'es' : '' }} found
@@ -150,16 +150,16 @@ defineExpose({
 
           <div class="flex items-center gap-2">
             <Button
-              @click="viewMode = 'grid'"
               :class="{ 'p-button-outlined': viewMode !== 'grid' }"
               icon="pi pi-th-large"
               size="small"
+              @click="viewMode = 'grid'"
             />
             <Button
-              @click="viewMode = 'list'"
               :class="{ 'p-button-outlined': viewMode !== 'list' }"
               icon="pi pi-list"
               size="small"
+              @click="viewMode = 'list'"
             />
           </div>
         </div>
@@ -172,7 +172,7 @@ defineExpose({
       :layout="viewMode"
       paginator
       :rows="20"
-      :rowsPerPageOptions="[10, 20, 50]"
+      :rows-per-page-options="[10, 20, 50]"
     >
       <template #empty>
         <div class="text-center py-12">

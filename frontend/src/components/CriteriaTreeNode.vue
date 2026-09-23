@@ -54,7 +54,7 @@
 
       <!-- Group Node (implicit AND) -->
       <div v-else-if="node.type === 'group'" class="group-node">
-        <div class="group-label" v-if="showGroupLabel">
+        <div v-if="showGroupLabel" class="group-label">
           <span>All Required</span>
           <span v-if="node.totalCount" class="group-stats">
             ({{ node.metCount }}/{{ node.totalCount }} met)

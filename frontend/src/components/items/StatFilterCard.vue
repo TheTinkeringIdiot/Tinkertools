@@ -21,13 +21,13 @@ Shows a summary of the filter with remove option
 
     <!-- Remove Button -->
     <Button
+      v-tooltip.left="'Remove Filter'"
       icon="pi pi-times"
       size="small"
       text
       severity="danger"
-      @click="$emit('remove')"
-      v-tooltip.left="'Remove Filter'"
       class="flex-shrink-0 ml-2"
+      @click="$emit('remove')"
     />
   </div>
 </template>

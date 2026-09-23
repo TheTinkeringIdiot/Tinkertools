@@ -122,40 +122,40 @@ Shows items in grid or list view with pagination and compatibility indicators
                     <div v-if="showCompatibility" class="mr-2">
                       <i
                         v-if="getCompatibilityStatus(item) === 'compatible'"
-                        class="pi pi-check-circle text-green-500"
                         v-tooltip.bottom="'You can use this item'"
+                        class="pi pi-check-circle text-green-500"
                       ></i>
                       <i
                         v-else-if="getCompatibilityStatus(item) === 'incompatible'"
-                        class="pi pi-times-circle text-red-500"
                         v-tooltip.bottom="'You cannot use this item'"
+                        class="pi pi-times-circle text-red-500"
                       ></i>
                       <i
                         v-else
-                        class="pi pi-question-circle text-yellow-500"
                         v-tooltip.bottom="'Compatibility unknown'"
+                        class="pi pi-question-circle text-yellow-500"
                       ></i>
                     </div>
 
                     <!-- Compare Button -->
                     <Button
+                      v-tooltip.bottom="'Add to comparison'"
                       icon="pi pi-clone"
                       size="small"
                       text
                       :severity="isComparing(item.id) ? 'primary' : 'secondary'"
                       @click.stop="$emit('item-compare', item)"
-                      v-tooltip.bottom="'Add to comparison'"
                     />
 
                     <!-- Cast Buff Button (for nanos only) -->
                     <Button
                       v-if="item.is_nano && profilesStore.hasActiveProfile"
+                      v-tooltip.bottom="'Cast nano buff to active profile'"
                       icon="pi pi-sparkles"
                       size="small"
                       text
                       severity="primary"
                       @click.stop="$emit('cast-buff', item)"
-                      v-tooltip.bottom="'Cast nano buff to active profile'"
                     />
 
                     <!-- Quick Actions Menu -->

@@ -282,9 +282,9 @@ watch(
               v-if="hasSelection"
               label="Clear All"
               icon="pi pi-times"
-              @click="clearAll()"
               outlined
               size="small"
+              @click="clearAll()"
             />
           </div>
 
@@ -300,12 +300,12 @@ watch(
                   <div class="font-semibold">{{ selectedSymbiants[0].name }}</div>
                   <Button
                     icon="pi pi-times"
-                    @click="clearSymbiant(0)"
                     text
                     rounded
                     size="small"
                     severity="secondary"
                     class="-mt-1 -mr-1"
+                    @click="clearSymbiant(0)"
                   />
                 </div>
                 <div class="text-sm text-surface-600 dark:text-surface-400">
@@ -338,12 +338,12 @@ watch(
                   <div class="font-semibold">{{ selectedSymbiants[1].name }}</div>
                   <Button
                     icon="pi pi-times"
-                    @click="clearSymbiant(1)"
                     text
                     rounded
                     size="small"
                     severity="secondary"
                     class="-mt-1 -mr-1"
+                    @click="clearSymbiant(1)"
                   />
                 </div>
                 <div class="text-sm text-surface-600 dark:text-surface-400">
@@ -376,12 +376,12 @@ watch(
                   <div class="font-semibold">{{ selectedSymbiants[2].name }}</div>
                   <Button
                     icon="pi pi-times"
-                    @click="clearSymbiant(2)"
                     text
                     rounded
                     size="small"
                     severity="secondary"
                     class="-mt-1 -mr-1"
+                    @click="clearSymbiant(2)"
                   />
                 </div>
                 <div class="text-sm text-surface-600 dark:text-surface-400">
@@ -424,7 +424,7 @@ watch(
           </div>
         </template>
         <template #content>
-          <DataTable :value="requirementStats" stripedRows>
+          <DataTable :value="requirementStats" striped-rows>
             <Column field="statName" header="Stat" :style="{ width: '200px' }">
               <template #body="slotProps">
                 <span class="font-medium">{{ slotProps.data.statName }}</span>
@@ -456,7 +456,7 @@ watch(
           </div>
         </template>
         <template #content>
-          <DataTable :value="modifierStats" stripedRows>
+          <DataTable :value="modifierStats" striped-rows>
             <Column field="statName" header="Stat" :style="{ width: '200px' }">
               <template #body="slotProps">
                 <span class="font-medium">{{ slotProps.data.statName }}</span>

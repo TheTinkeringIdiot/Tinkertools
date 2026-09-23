@@ -20,14 +20,14 @@ Part of TinkerPlants Revamp - Task 3.4
       <AutoComplete
         v-model="searchQuery"
         :suggestions="filteredClusters"
-        @complete="onSearch"
-        @item-select="onClusterSelect"
         placeholder="Type cluster name (e.g., Rifle, Strength, Max NCU)..."
         input-id="cluster-search"
         class="flex-1"
         :min-length="1"
         complete-on-focus
         dropdown
+        @complete="onSearch"
+        @item-select="onClusterSelect"
       >
         <template #option="{ option }">
           <div class="flex items-center gap-2">
@@ -40,13 +40,13 @@ Part of TinkerPlants Revamp - Task 3.4
       <!-- Clear Button -->
       <Button
         v-if="selectedCluster"
+        v-tooltip.bottom="'Clear Selection'"
         icon="pi pi-times"
         text
         rounded
         size="small"
-        @click="resetSelection"
-        v-tooltip.bottom="'Clear Selection'"
         aria-label="Clear cluster selection"
+        @click="resetSelection"
       />
     </div>
   </div>

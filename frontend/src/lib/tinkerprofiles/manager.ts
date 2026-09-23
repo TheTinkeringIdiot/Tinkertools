@@ -499,7 +499,7 @@ export class TinkerProfilesManager {
   ): Promise<ProfileMetadata[]> {
     const allMetadata = await this.getProfileMetadata();
 
-    let filtered = allMetadata.filter((profile) => {
+    const filtered = allMetadata.filter((profile) => {
       // Name filter
       if (filters.name && !profile.name.toLowerCase().includes(filters.name.toLowerCase())) {
         return false;

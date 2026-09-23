@@ -181,17 +181,17 @@ function exportTableData() {
             />
             <Button
               v-if="searchQuery"
-              @click="clearSearch"
               icon="pi pi-times"
               outlined
               size="small"
+              @click="clearSearch"
             />
             <Button
-              @click="exportTableData"
               icon="pi pi-download"
               label="Export CSV"
               outlined
               size="small"
+              @click="exportTableData"
             />
           </div>
         </div>
@@ -373,11 +373,11 @@ function exportTableData() {
               :value="bossSymbiantTable"
               paginator
               :rows="25"
-              :rowsPerPageOptions="[10, 25, 50, 100]"
-              sortField="bossLevel"
-              :sortOrder="1"
-              showGridlines
-              stripedRows
+              :rows-per-page-options="[10, 25, 50, 100]"
+              sort-field="bossLevel"
+              :sort-order="1"
+              show-gridlines
+              striped-rows
               class="boss-symbiant-table"
               :loading="symbiantStore.loading || pocketBossStore.loading"
             >

@@ -4,15 +4,15 @@
     :loading="loading"
     paginator
     :rows="25"
-    :rowsPerPageOptions="[25, 50, 100]"
-    :sortField="defaultSortField"
-    :sortOrder="defaultSortOrder"
-    :globalFilter="searchQuery"
+    :rows-per-page-options="[25, 50, 100]"
+    :sort-field="defaultSortField"
+    :sort-order="defaultSortOrder"
+    :global-filter="searchQuery"
     class="nuke-table"
-    @row-click="onRowClick"
     data-keyboard-nav-container
     role="table"
     :aria-label="`Table showing ${tableData.length} offensive nano programs. Use arrow keys to navigate, Enter to select.`"
+    @row-click="onRowClick"
   >
     <!-- Name Column - Not sortable, clickable link -->
     <Column field="name" header="Nano" class="min-w-48">

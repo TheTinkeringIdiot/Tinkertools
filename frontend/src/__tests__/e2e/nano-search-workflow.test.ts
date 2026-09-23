@@ -621,7 +621,7 @@ describe('Nano Search Workflow', () => {
     await wrapper.vm.$nextTick();
     await wrapper.vm.$nextTick();
 
-    let nanoList = wrapper.findComponent({ name: 'NanoList' });
+    const nanoList = wrapper.findComponent({ name: 'NanoList' });
     expect(nanoList.exists()).toBe(true);
 
     // Switch to school view
@@ -629,7 +629,7 @@ describe('Nano Search Workflow', () => {
     await viewToggle.trigger('click');
     await wrapper.vm.$nextTick();
 
-    let schoolView = wrapper.findComponent({ name: 'NanoSchoolView' });
+    const schoolView = wrapper.findComponent({ name: 'NanoSchoolView' });
     expect(schoolView.exists()).toBe(true);
 
     // Both views should receive the same nano data

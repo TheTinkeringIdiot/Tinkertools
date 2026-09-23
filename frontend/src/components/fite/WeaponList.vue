@@ -9,26 +9,26 @@
         <div class="flex items-center space-x-2">
           <span class="text-sm text-surface-600 dark:text-surface-400">Sort by:</span>
           <Button
-            @click="$emit('sort', 'name', sortBy === 'name' ? !sortDescending : false)"
             :label="'Name'"
             :severity="sortBy === 'name' ? 'primary' : 'secondary'"
             size="small"
             text
+            @click="$emit('sort', 'name', sortBy === 'name' ? !sortDescending : false)"
           />
           <Button
-            @click="$emit('sort', 'ql', sortBy === 'ql' ? !sortDescending : false)"
             :label="'QL'"
             :severity="sortBy === 'ql' ? 'primary' : 'secondary'"
             size="small"
             text
+            @click="$emit('sort', 'ql', sortBy === 'ql' ? !sortDescending : false)"
           />
           <Button
             v-if="characterSkills && Object.keys(characterSkills).length > 0"
-            @click="$emit('sort', 'usability', sortBy === 'usability' ? !sortDescending : false)"
             :label="'Usability'"
             :severity="sortBy === 'usability' ? 'primary' : 'secondary'"
             size="small"
             text
+            @click="$emit('sort', 'usability', sortBy === 'usability' ? !sortDescending : false)"
           />
         </div>
       </div>
@@ -60,12 +60,12 @@
             </div>
             <div class="flex space-x-1 ml-2">
               <Button
-                @click.stop="$emit('compare', weapon)"
+                v-tooltip="'Add to comparison'"
                 icon="pi pi-balance-scale"
                 size="small"
                 severity="secondary"
                 text
-                v-tooltip="'Add to comparison'"
+                @click.stop="$emit('compare', weapon)"
               />
               <UsabilityBadge
                 v-if="characterSkills && Object.keys(characterSkills).length > 0"
@@ -111,18 +111,18 @@
         <div class="px-4 pb-4">
           <div class="flex space-x-2">
             <Button
-              @click.stop="$emit('select', weapon)"
               label="View Details"
               size="small"
               outlined
               class="flex-1"
+              @click.stop="$emit('select', weapon)"
             />
             <Button
-              @click.stop="$emit('compare', weapon)"
+              v-tooltip="'Add to comparison'"
               icon="pi pi-balance-scale"
               size="small"
               severity="secondary"
-              v-tooltip="'Add to comparison'"
+              @click.stop="$emit('compare', weapon)"
             />
           </div>
         </div>

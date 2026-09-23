@@ -18,13 +18,13 @@ Implements:
         Offensive Nano Parameters
       </h2>
       <Button
+        v-tooltip.bottom="'Clear manual edits and restore profile values'"
         label="Reset to Profile"
         icon="pi pi-refresh"
         severity="secondary"
         size="small"
         :disabled="!activeProfile"
         @click="resetToProfile"
-        v-tooltip.bottom="'Clear manual edits and restore profile values'"
       />
     </div>
 

@@ -40,8 +40,8 @@ Shows nanos organized by strain in decreasing QL order
             <label class="text-sm text-surface-600 dark:text-surface-400">Show Unusable:</label>
             <ToggleButton
               v-model="showUnusableNanos"
-              onLabel="Yes"
-              offLabel="No"
+              on-label="Yes"
+              off-label="No"
               class="w-20"
               severity="secondary"
             />

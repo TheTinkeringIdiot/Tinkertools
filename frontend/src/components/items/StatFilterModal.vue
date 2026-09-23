@@ -23,15 +23,15 @@ Provides a spacious interface for selecting function, stat, operator, and value
               :label="'Requires'"
               :outlined="localFilter.function !== 'requires'"
               :severity="localFilter.function === 'requires' ? 'primary' : 'secondary'"
-              @click="localFilter.function = 'requires'"
               class="w-full"
+              @click="localFilter.function = 'requires'"
             />
             <Button
               :label="'Modifies'"
               :outlined="localFilter.function !== 'modifies'"
               :severity="localFilter.function === 'modifies' ? 'primary' : 'secondary'"
-              @click="localFilter.function = 'modifies'"
               class="w-full"
+              @click="localFilter.function = 'modifies'"
             />
           </div>
           <div class="text-xs text-surface-500 dark:text-surface-400 mt-1">
@@ -69,8 +69,8 @@ Provides a spacious interface for selecting function, stat, operator, and value
               :label="op.label"
               :outlined="localFilter.operator !== op.value"
               :severity="localFilter.operator === op.value ? 'primary' : 'secondary'"
-              @click="localFilter.operator = op.value"
               class="w-full"
+              @click="localFilter.operator = op.value"
             />
           </div>
         </div>

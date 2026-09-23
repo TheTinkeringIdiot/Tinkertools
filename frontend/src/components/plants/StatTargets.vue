@@ -10,12 +10,12 @@ Allows users to set desired stat values for optimization
         Stat Targets
       </h3>
       <Button
-        @click="addTarget"
         icon="pi pi-plus"
         size="small"
         text
         severity="secondary"
         aria-label="Add target"
+        @click="addTarget"
       />
     </div>
 
@@ -25,7 +25,7 @@ Allows users to set desired stat values for optimization
     >
       <i class="pi pi-bullseye text-2xl mb-2 block"></i>
       <p class="text-sm">No stat targets set</p>
-      <Button @click="addTarget" label="Add First Target" size="small" text class="mt-2" />
+      <Button label="Add First Target" size="small" text class="mt-2" @click="addTarget" />
     </div>
 
     <div v-else class="space-y-3">
@@ -45,12 +45,12 @@ Allows users to set desired stat values for optimization
             @change="updateTarget(index)"
           />
           <Button
-            @click="removeTarget(index)"
             icon="pi pi-times"
             size="small"
             text
             severity="danger"
             aria-label="Remove target"
+            @click="removeTarget(index)"
           />
         </div>
 
@@ -61,7 +61,7 @@ Allows users to set desired stat values for optimization
             :max="3000"
             :step="1"
             placeholder="Target value"
-            showButtons
+            show-buttons
             @input="updateTarget(index)"
           />
         </div>

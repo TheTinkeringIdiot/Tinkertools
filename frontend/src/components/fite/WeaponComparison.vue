@@ -1,10 +1,10 @@
 <template>
   <Dialog
     :visible="visible"
-    @update:visible="$emit('hide')"
     header="Weapon Comparison"
     :style="{ width: '1200px' }"
     modal
+    @update:visible="$emit('hide')"
   >
     <div v-if="weapons.length === 0" class="text-center py-8">
       <div class="text-surface-400 dark:text-surface-500 mb-2">
@@ -36,12 +36,12 @@
                   </div>
                 </div>
                 <Button
-                  @click="$emit('remove', weapon.id)"
                   icon="pi pi-times"
                   size="small"
                   severity="danger"
                   text
                   class="ml-2"
+                  @click="$emit('remove', weapon.id)"
                 />
               </div>
             </th>
@@ -187,7 +187,7 @@
 
     <template #footer>
       <div class="flex justify-end space-x-2">
-        <Button @click="$emit('hide')" label="Close" severity="secondary" />
+        <Button label="Close" severity="secondary" @click="$emit('hide')" />
       </div>
     </template>
   </Dialog>

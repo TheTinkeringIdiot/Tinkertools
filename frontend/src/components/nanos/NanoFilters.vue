@@ -28,7 +28,7 @@ Supports filtering by school, strain, profession, quality level, and skill compa
         <div v-for="quality in qualityLevels" :key="quality" class="flex items-center gap-2">
           <Checkbox
             v-model="selectedQualityLevels"
-            :inputId="`quality-${quality}`"
+            :input-id="`quality-${quality}`"
             :value="quality"
           />
           <label
@@ -49,8 +49,8 @@ Supports filtering by school, strain, profession, quality level, and skill compa
         :options="professions"
         placeholder="All Professions"
         class="w-full"
-        :maxSelectedLabels="2"
-        selectedItemsLabel="{0} professions selected"
+        :max-selected-labels="2"
+        selected-items-label="{0} professions selected"
       />
     </div>
 
@@ -61,7 +61,7 @@ Supports filtering by school, strain, profession, quality level, and skill compa
       </label>
       <div class="space-y-2 max-h-40 overflow-y-auto">
         <div v-for="strain in availableStrains" :key="strain" class="flex items-center gap-2">
-          <Checkbox v-model="selectedStrains" :inputId="`strain-${strain}`" :value="strain" />
+          <Checkbox v-model="selectedStrains" :input-id="`strain-${strain}`" :value="strain" />
           <label
             :for="`strain-${strain}`"
             class="text-xs text-surface-700 dark:text-surface-300 cursor-pointer"
@@ -119,7 +119,7 @@ Supports filtering by school, strain, profession, quality level, and skill compa
       <!-- Skill Requirements -->
       <div class="space-y-2">
         <div class="flex items-center gap-2">
-          <Checkbox v-model="filters.skillCompatible" inputId="skill-compatible" binary />
+          <Checkbox v-model="filters.skillCompatible" input-id="skill-compatible" binary />
           <label
             for="skill-compatible"
             class="text-sm text-surface-700 dark:text-surface-300 cursor-pointer"
@@ -129,7 +129,7 @@ Supports filtering by school, strain, profession, quality level, and skill compa
         </div>
 
         <div class="flex items-center gap-2">
-          <Checkbox v-model="filters.castable" inputId="fully-castable" binary />
+          <Checkbox v-model="filters.castable" input-id="fully-castable" binary />
           <label
             for="fully-castable"
             class="text-sm text-surface-700 dark:text-surface-300 cursor-pointer"
@@ -188,7 +188,7 @@ Supports filtering by school, strain, profession, quality level, and skill compa
       />
 
       <div class="flex items-center gap-2">
-        <Checkbox v-model="sortDescending" inputId="sort-desc" binary />
+        <Checkbox v-model="sortDescending" input-id="sort-desc" binary />
         <label
           for="sort-desc"
           class="text-sm text-surface-700 dark:text-surface-300 cursor-pointer"
@@ -248,7 +248,7 @@ Supports filtering by school, strain, profession, quality level, and skill compa
             >
               <Checkbox
                 v-model="selectedDurations"
-                :inputId="`duration-${duration.value}`"
+                :input-id="`duration-${duration.value}`"
                 :value="duration.value"
               />
               <label
@@ -271,8 +271,8 @@ Supports filtering by school, strain, profession, quality level, and skill compa
             :options="targetTypes"
             placeholder="All Targets"
             class="w-full"
-            :maxSelectedLabels="2"
-            selectedItemsLabel="{0} targets selected"
+            :max-selected-labels="2"
+            selected-items-label="{0} targets selected"
           />
         </div>
       </div>

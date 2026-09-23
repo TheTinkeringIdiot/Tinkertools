@@ -6,7 +6,7 @@ Provides filtering by family, slot, quality level, and stat bonuses
   <div class="symbiant-filters flex flex-col h-full">
     <div class="flex-1 overflow-y-auto">
       <!-- Family Filters -->
-      <Accordion :activeIndex="[0]" multiple class="border-none">
+      <Accordion :active-index="[0]" multiple class="border-none">
         <AccordionTab header="Symbiant Families">
           <template #header>
             <div class="flex items-center gap-2">
@@ -24,19 +24,19 @@ Provides filtering by family, slot, quality level, and stat bonuses
           <div class="space-y-2">
             <div class="flex items-center gap-2 mb-3">
               <Button
-                @click="selectAllFamilies"
                 label="All"
                 size="small"
                 text
                 :severity="
                   selectedFamilies.length === availableFamilies.length ? 'primary' : 'secondary'
                 "
+                @click="selectAllFamilies"
               />
-              <Button @click="clearFamilies" label="None" size="small" text severity="secondary" />
+              <Button label="None" size="small" text severity="secondary" @click="clearFamilies" />
             </div>
 
             <div v-for="family in availableFamilies" :key="family" class="flex items-center gap-2">
-              <Checkbox v-model="selectedFamilies" :inputId="`family-${family}`" :value="family" />
+              <Checkbox v-model="selectedFamilies" :input-id="`family-${family}`" :value="family" />
               <label :for="`family-${family}`" class="text-sm flex-1 cursor-pointer">
                 {{ family }}
               </label>
@@ -65,17 +65,17 @@ Provides filtering by family, slot, quality level, and stat bonuses
           <div class="space-y-2">
             <div class="flex items-center gap-2 mb-3">
               <Button
-                @click="selectAllSlots"
                 label="All"
                 size="small"
                 text
                 :severity="selectedSlots.length === availableSlots.length ? 'primary' : 'secondary'"
+                @click="selectAllSlots"
               />
-              <Button @click="clearSlots" label="None" size="small" text severity="secondary" />
+              <Button label="None" size="small" text severity="secondary" @click="clearSlots" />
             </div>
 
             <div v-for="slot in availableSlots" :key="slot" class="flex items-center gap-2">
-              <Checkbox v-model="selectedSlots" :inputId="`slot-${slot}`" :value="slot" />
+              <Checkbox v-model="selectedSlots" :input-id="`slot-${slot}`" :value="slot" />
               <label :for="`slot-${slot}`" class="text-sm flex-1 cursor-pointer">
                 {{ formatSlotName(slot) }}
               </label>
@@ -104,7 +104,6 @@ Provides filtering by family, slot, quality level, and stat bonuses
           <div class="space-y-2">
             <div class="flex items-center gap-2 mb-3">
               <Button
-                @click="selectAllQuality"
                 label="All"
                 size="small"
                 text
@@ -113,8 +112,9 @@ Provides filtering by family, slot, quality level, and stat bonuses
                     ? 'primary'
                     : 'secondary'
                 "
+                @click="selectAllQuality"
               />
-              <Button @click="clearQuality" label="None" size="small" text severity="secondary" />
+              <Button label="None" size="small" text severity="secondary" @click="clearQuality" />
             </div>
 
             <!-- Quality Level Range Slider -->
@@ -131,15 +131,15 @@ Provides filtering by family, slot, quality level, and stat bonuses
                 :min="minQuality"
                 :max="maxQuality"
                 :step="5"
-                @change="updateQualityFromRange"
                 class="w-full"
+                @change="updateQualityFromRange"
               />
             </div>
 
             <!-- Individual Quality Checkboxes -->
             <div class="max-h-32 overflow-y-auto">
               <div v-for="ql in availableQualityLevels" :key="ql" class="flex items-center gap-2">
-                <Checkbox v-model="selectedQualityLevels" :inputId="`ql-${ql}`" :value="ql" />
+                <Checkbox v-model="selectedQualityLevels" :input-id="`ql-${ql}`" :value="ql" />
                 <label :for="`ql-${ql}`" class="text-sm flex-1 cursor-pointer"> QL {{ ql }} </label>
                 <span class="text-xs text-surface-500 dark:text-surface-400">
                   {{ getQualityCount(ql) }}
@@ -167,15 +167,15 @@ Provides filtering by family, slot, quality level, and stat bonuses
           <div class="space-y-2">
             <div class="flex items-center gap-2 mb-3">
               <Button
-                @click="selectAllStats"
                 label="All"
                 size="small"
                 text
                 :severity="
                   selectedStatBonuses.length === availableStats.length ? 'primary' : 'secondary'
                 "
+                @click="selectAllStats"
               />
-              <Button @click="clearStats" label="None" size="small" text severity="secondary" />
+              <Button label="None" size="small" text severity="secondary" @click="clearStats" />
             </div>
 
             <!-- Minimum stat value filter -->
@@ -191,15 +191,15 @@ Provides filtering by family, slot, quality level, and stat bonuses
                 :min="0"
                 :max="100"
                 :step="1"
-                @change="updateStatBonusFilter"
                 class="w-full"
+                @change="updateStatBonusFilter"
               />
             </div>
 
             <!-- Individual stat checkboxes -->
             <div class="max-h-48 overflow-y-auto">
               <div v-for="stat in availableStats" :key="stat" class="flex items-center gap-2">
-                <Checkbox v-model="selectedStatBonuses" :inputId="`stat-${stat}`" :value="stat" />
+                <Checkbox v-model="selectedStatBonuses" :input-id="`stat-${stat}`" :value="stat" />
                 <label :for="`stat-${stat}`" class="text-sm flex-1 cursor-pointer">
                   {{ formatStatName(stat) }}
                 </label>
@@ -215,13 +215,13 @@ Provides filtering by family, slot, quality level, and stat bonuses
       class="p-3 border-t border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-900"
     >
       <Button
-        @click="resetAllFilters"
         label="Reset All Filters"
         icon="pi pi-refresh"
         size="small"
         severity="secondary"
         text
         class="w-full"
+        @click="resetAllFilters"
       />
     </div>
   </div>

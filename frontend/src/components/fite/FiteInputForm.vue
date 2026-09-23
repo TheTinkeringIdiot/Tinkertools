@@ -20,23 +20,23 @@ Sections:
       </h2>
       <div class="flex gap-2">
         <Button
+          v-tooltip.bottom="'Fetch weapons from server with current parameters'"
           label="Update Weapons"
           icon="pi pi-sync"
           severity="primary"
           size="small"
           :disabled="!activeProfile"
-          @click="updateWeapons"
-          v-tooltip.bottom="'Fetch weapons from server with current parameters'"
           style="border: 2px solid #14b8a6"
+          @click="updateWeapons"
         />
         <Button
+          v-tooltip.bottom="'Clear manual edits and restore profile values'"
           label="Reset to Profile"
           icon="pi pi-refresh"
           severity="secondary"
           size="small"
           :disabled="!activeProfile"
           @click="resetToProfile"
-          v-tooltip.bottom="'Clear manual edits and restore profile values'"
         />
       </div>
     </div>

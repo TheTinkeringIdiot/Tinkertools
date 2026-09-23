@@ -32,7 +32,7 @@
         <span class="text-sm font-medium">
           {{ statRequirements.length }} requirement{{ statRequirements.length !== 1 ? 's' : '' }}
         </span>
-        <Button text size="small" @click="showExpanded = !showExpanded" class="text-xs">
+        <Button text size="small" class="text-xs" @click="showExpanded = !showExpanded">
           {{ showExpanded ? 'Hide' : 'Show' }}
         </Button>
       </div>

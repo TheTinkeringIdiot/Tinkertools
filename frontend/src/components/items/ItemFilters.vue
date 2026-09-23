@@ -9,13 +9,13 @@ Provides dynamic filtering with real-time results and profile-aware options
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-sm font-semibold text-surface-700 dark:text-surface-300">Filters</h3>
         <Button
+          v-if="hasActiveFilters"
+          v-tooltip.left="'Clear All Filters'"
           icon="pi pi-filter-slash"
           size="small"
           text
           severity="secondary"
           @click="clearAllFilters"
-          v-if="hasActiveFilters"
-          v-tooltip.left="'Clear All Filters'"
         />
       </div>
 
@@ -48,7 +48,7 @@ Provides dynamic filtering with real-time results and profile-aware options
     <!-- Filter Sections -->
     <div class="space-y-1">
       <!-- Item Type Filter -->
-      <Accordion :multiple="true" v-model:activeIndex="openSections">
+      <Accordion v-model:activeIndex="openSections" :multiple="true">
         <AccordionTab header="Item Type">
           <template #header>
             <div class="flex items-center gap-2">
@@ -136,8 +136,8 @@ Provides dynamic filtering with real-time results and profile-aware options
                 :max="300"
                 :step="1"
                 range
-                @change="updateQLFilter"
                 class="w-full"
+                @change="updateQLFilter"
               />
             </div>
 
@@ -353,8 +353,8 @@ Provides dynamic filtering with real-time results and profile-aware options
           label="Apply Filters"
           icon="pi pi-check"
           size="small"
-          @click="applyFilters"
           :disabled="!hasChanges"
+          @click="applyFilters"
         />
         <Button label="Reset" icon="pi pi-refresh" size="small" outlined @click="resetFilters" />
       </div>
@@ -363,11 +363,11 @@ Provides dynamic filtering with real-time results and profile-aware options
       <div v-if="hasActiveFilters" class="flex gap-2">
         <InputText v-model="presetName" placeholder="Preset name..." size="small" class="flex-1" />
         <Button
+          v-tooltip.bottom="'Save Filter Preset'"
           icon="pi pi-save"
           size="small"
-          @click="savePreset"
           :disabled="!presetName.trim()"
-          v-tooltip.bottom="'Save Filter Preset'"
+          @click="savePreset"
         />
       </div>
     </div>

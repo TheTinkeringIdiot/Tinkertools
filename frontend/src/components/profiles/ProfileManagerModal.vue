@@ -18,18 +18,18 @@ Modal dialog for managing all profiles - create, edit, delete, import, export
       >
         <div class="flex items-center gap-2">
           <Button
-            @click="showCreateModal = true"
             label="Create Profile"
             icon="pi pi-plus"
             size="small"
+            @click="showCreateModal = true"
           />
           <Button
-            @click="showImportModal = true"
             label="Import"
             icon="pi pi-upload"
             size="small"
             severity="secondary"
             outlined
+            @click="showImportModal = true"
           />
         </div>
 
@@ -38,13 +38,13 @@ Modal dialog for managing all profiles - create, edit, delete, import, export
             {{ profileMetadata.length }} profile{{ profileMetadata.length !== 1 ? 's' : '' }}
           </span>
           <Button
-            @click="refreshProfiles"
             icon="pi pi-refresh"
             size="small"
             severity="secondary"
             text
             :loading="loading"
             aria-label="Refresh profiles"
+            @click="refreshProfiles"
           />
         </div>
       </div>
@@ -69,7 +69,7 @@ Modal dialog for managing all profiles - create, edit, delete, import, export
           <p class="text-surface-500 dark:text-surface-400 mb-4">
             Create your first profile to get started
           </p>
-          <Button @click="showCreateModal = true" label="Create Profile" icon="pi pi-plus" />
+          <Button label="Create Profile" icon="pi pi-plus" @click="showCreateModal = true" />
         </div>
 
         <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -100,14 +100,14 @@ Modal dialog for managing all profiles - create, edit, delete, import, export
               <div class="flex items-center gap-1">
                 <Button
                   v-if="profile.id !== activeProfileId"
-                  @click="setActiveProfile(profile.id)"
                   icon="pi pi-check"
                   size="small"
                   severity="success"
+                  v-tooltip="'Set as active profile'"
                   text
                   rounded
                   aria-label="Set as active profile"
-                  v-tooltip="'Set as active profile'"
+                  @click="setActiveProfile(profile.id)"
                 />
                 <span
                   v-else
@@ -129,37 +129,37 @@ Modal dialog for managing all profiles - create, edit, delete, import, export
             <!-- Profile Actions -->
             <div class="flex gap-1">
               <Button
-                @click="viewProfile(profile)"
                 label="Details"
                 icon="pi pi-eye"
                 size="small"
                 severity="secondary"
                 outlined
                 class="flex-1"
+                @click="viewProfile(profile)"
               />
               <Button
-                @click="exportProfile(profile)"
+                v-tooltip="'Export profile'"
                 icon="pi pi-download"
                 size="small"
                 severity="secondary"
                 outlined
-                v-tooltip="'Export profile'"
+                @click="exportProfile(profile)"
               />
               <Button
-                @click="duplicateProfile(profile)"
+                v-tooltip="'Duplicate profile'"
                 icon="pi pi-copy"
                 size="small"
                 severity="secondary"
                 outlined
-                v-tooltip="'Duplicate profile'"
+                @click="duplicateProfile(profile)"
               />
               <Button
-                @click="confirmDeleteProfile(profile)"
+                v-tooltip="'Delete profile'"
                 icon="pi pi-trash"
                 size="small"
                 severity="danger"
                 outlined
-                v-tooltip="'Delete profile'"
+                @click="confirmDeleteProfile(profile)"
               />
             </div>
           </div>

@@ -8,7 +8,7 @@ Shows nano information with compatibility indicators and quick actions
     :class="[{ 'border-l-4': showCompatibility && compatibilityInfo }, compatibilityBorderClass]"
     @click="handleSelect"
   >
-    <template #header v-if="!compact">
+    <template v-if="!compact" #header>
       <div class="flex items-center gap-3 p-4 pb-0">
         <div class="flex-shrink-0">
           <Avatar

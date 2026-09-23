@@ -52,7 +52,7 @@ Modal for importing profiles from various formats
           mode="basic"
           name="profileFile"
           accept=".json,.txt"
-          :maxFileSize="1000000"
+          :max-file-size="1000000"
           :auto="false"
           choose-label="Choose File"
           class="w-full"
@@ -235,7 +235,7 @@ Modal for importing profiles from various formats
           class="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg"
         >
           <div class="flex items-center gap-3">
-            <ProgressSpinner style="width: 24px; height: 24px" strokeWidth="4" />
+            <ProgressSpinner style="width: 24px; height: 24px" stroke-width="4" />
             <div class="flex-1">
               <div class="text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
                 {{ importProgress.message }}
@@ -243,7 +243,7 @@ Modal for importing profiles from various formats
               <ProgressBar
                 v-if="importProgress.total > 1"
                 :value="Math.round((importProgress.current / importProgress.total) * 100)"
-                :showValue="false"
+                :show-value="false"
                 style="height: 6px"
                 class="mt-2"
               />

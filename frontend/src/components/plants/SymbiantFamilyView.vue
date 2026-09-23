@@ -22,13 +22,13 @@ Shows symbiants grouped by their family types
             </h3>
             <Badge :value="group.symbiants.length" severity="info" />
             <Button
-              @click="toggleFamily(group.family)"
               :icon="
                 expandedFamilies.includes(group.family) ? 'pi pi-chevron-up' : 'pi pi-chevron-down'
               "
               size="small"
               text
               severity="secondary"
+              @click="toggleFamily(group.family)"
             />
           </div>
 
@@ -40,8 +40,8 @@ Shows symbiants grouped by their family types
             <div
               v-for="symbiant in group.symbiants"
               :key="symbiant.id"
-              @click="selectSymbiant(symbiant)"
               class="symbiant-card p-3 bg-surface-0 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-lg hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md cursor-pointer transition-all"
+              @click="selectSymbiant(symbiant)"
             >
               <!-- Symbiant Header -->
               <div class="flex items-start justify-between mb-2">
@@ -64,12 +64,12 @@ Shows symbiants grouped by their family types
                 <div class="flex items-center gap-1">
                   <Button
                     v-if="buildMode"
-                    @click.stop="addToBuild(symbiant)"
                     icon="pi pi-plus"
                     size="small"
                     text
                     severity="primary"
                     aria-label="Add to build"
+                    @click.stop="addToBuild(symbiant)"
                   />
                 </div>
               </div>

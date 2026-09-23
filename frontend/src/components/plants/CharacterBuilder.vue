@@ -179,18 +179,18 @@ Visual character representation with symbiant slots
       <!-- Build Actions -->
       <div class="mt-6 flex justify-center gap-4">
         <Button
-          @click="optimizeBuild"
           label="Auto-Optimize"
           icon="pi pi-cog"
           severity="primary"
           :disabled="statTargets.length === 0"
+          @click="optimizeBuild"
         />
-        <Button @click="clearAllSlots" label="Clear All" icon="pi pi-trash" severity="secondary" />
+        <Button label="Clear All" icon="pi pi-trash" severity="secondary" @click="clearAllSlots" />
         <Button
-          @click="analyzeBuild"
           label="Analyze Build"
           icon="pi pi-chart-bar"
           severity="info"
+          @click="analyzeBuild"
         />
       </div>
     </div>

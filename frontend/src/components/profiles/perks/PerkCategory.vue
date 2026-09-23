@@ -52,8 +52,8 @@ Shows individual perk with all levels (1-10), current ownership, costs, and requ
             :label="`+${ownedLevel + 1}`"
             size="small"
             :disabled="!hasRequiredPoints"
-            @click.stop="onQuickAdd"
             class="quick-add-btn"
+            @click.stop="onQuickAdd"
           />
 
           <!-- Expand/Collapse Icon -->

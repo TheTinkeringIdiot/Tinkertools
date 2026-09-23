@@ -71,12 +71,12 @@
     <!-- Reset button -->
     <Button
       v-if="showResetButton && interpolatedItem"
+      v-tooltip="'Reset to original'"
       icon="pi pi-refresh"
       size="small"
       severity="secondary"
       outlined
       @click="resetToOriginal"
-      v-tooltip="'Reset to original'"
     />
   </div>
 </template>

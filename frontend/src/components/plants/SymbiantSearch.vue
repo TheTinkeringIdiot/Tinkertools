@@ -5,7 +5,7 @@ Provides text search with suggestions and quick filters
 <template>
   <div class="symbiant-search p-3">
     <div class="relative">
-      <IconField iconPosition="left">
+      <IconField icon-position="left">
         <InputIcon>
           <i class="pi pi-search"></i>
         </InputIcon>
@@ -21,13 +21,13 @@ Provides text search with suggestions and quick filters
       <!-- Clear search button -->
       <Button
         v-if="searchQuery.trim()"
-        @click="clearSearch"
         icon="pi pi-times"
         size="small"
         text
         rounded
         class="absolute right-2 top-1/2 transform -translate-y-1/2"
         aria-label="Clear search"
+        @click="clearSearch"
       />
     </div>
 
@@ -40,12 +40,12 @@ Provides text search with suggestions and quick filters
         <Button
           v-for="filter in quickFilters"
           :key="filter.value"
-          @click="applyQuickFilter(filter.value)"
           :label="filter.label"
           :severity="activeQuickFilter === filter.value ? 'primary' : 'secondary'"
           size="small"
           text
           class="text-xs"
+          @click="applyQuickFilter(filter.value)"
         />
       </div>
     </div>
@@ -58,8 +58,8 @@ Provides text search with suggestions and quick filters
       <div
         v-for="(suggestion, index) in suggestions"
         :key="index"
-        @click="applySuggestion(suggestion)"
         class="px-3 py-2 hover:bg-surface-50 dark:hover:bg-surface-800 cursor-pointer text-sm"
+        @click="applySuggestion(suggestion)"
       >
         <div class="font-medium">{{ suggestion.name }}</div>
         <div v-if="suggestion.type" class="text-xs text-surface-500 dark:text-surface-400">

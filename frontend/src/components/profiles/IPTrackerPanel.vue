@@ -10,7 +10,7 @@ Shows IP allocation, usage, and breakdown with visual indicators
       <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50">
         Improvement Points
       </h3>
-      <Badge :value="`TL${titleLevel}`" severity="info" v-tooltip.bottom="'Title Level'" />
+      <Badge v-tooltip.bottom="'Title Level'" :value="`TL${titleLevel}`" severity="info" />
     </div>
 
     <!-- IP Summary -->

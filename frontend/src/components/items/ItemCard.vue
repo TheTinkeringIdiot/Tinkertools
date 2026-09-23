@@ -41,22 +41,22 @@ Shows item info with compatibility status and quick actions
         <div v-if="showCompatibility" class="absolute top-2 right-2">
           <div
             v-if="isCompatible"
-            class="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center"
             v-tooltip.left="'You can use this item'"
+            class="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center"
           >
             <i class="pi pi-check text-white text-xs"></i>
           </div>
           <div
             v-else-if="item.requirements?.length"
-            class="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center"
             v-tooltip.left="'Requirements not met'"
+            class="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center"
           >
             <i class="pi pi-times text-white text-xs"></i>
           </div>
           <div
             v-else
-            class="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center"
             v-tooltip.left="'No requirements'"
+            class="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center"
           >
             <i class="pi pi-question text-white text-xs"></i>
           </div>
@@ -67,12 +67,12 @@ Shows item info with compatibility status and quick actions
           class="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
         >
           <Button
+            v-tooltip.bottom="'Quick View'"
             icon="pi pi-eye"
             size="small"
             rounded
             severity="secondary"
             @click.stop="$emit('quick-view', item)"
-            v-tooltip.bottom="'Quick View'"
           />
         </div>
       </div>
@@ -177,23 +177,23 @@ Shows item info with compatibility status and quick actions
         <div class="flex items-center gap-1">
           <!-- Compare Button -->
           <Button
+            v-tooltip.bottom="'Add to comparison'"
             icon="pi pi-clone"
             size="small"
             text
             :severity="isComparing ? 'primary' : 'secondary'"
             @click.stop="$emit('compare', item)"
-            v-tooltip.bottom="'Add to comparison'"
           />
 
           <!-- Cast Buff Button (for nanos only) -->
           <Button
             v-if="item.is_nano && profilesStore.hasActiveProfile"
+            v-tooltip.bottom="'Cast nano buff to active profile'"
             icon="pi pi-sparkles"
             size="small"
             text
             severity="primary"
             @click.stop="$emit('cast-buff', item)"
-            v-tooltip.bottom="'Cast nano buff to active profile'"
           />
         </div>
       </div>

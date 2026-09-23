@@ -61,7 +61,7 @@ Provides a hierarchical view of nano programs grouped by their nano schools
             <!-- Strain Organization Toggle -->
             <div class="flex items-center justify-between mb-4 px-4">
               <div class="flex items-center gap-2">
-                <Checkbox v-model="organizeByStrain" inputId="organize-by-strain" binary />
+                <Checkbox v-model="organizeByStrain" input-id="organize-by-strain" binary />
                 <label
                   for="organize-by-strain"
                   class="text-sm text-surface-700 dark:text-surface-300 cursor-pointer"

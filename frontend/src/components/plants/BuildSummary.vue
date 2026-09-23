@@ -42,12 +42,12 @@ Displays equipped symbiants and total stat bonuses
             <div class="text-xs text-surface-600 dark:text-surface-400">{{ symbiant.name }}</div>
           </div>
           <Button
-            @click="removeSymbiant(slot)"
             icon="pi pi-times"
             size="small"
             text
             severity="danger"
             aria-label="Remove symbiant"
+            @click="removeSymbiant(slot)"
           />
         </div>
       </div>

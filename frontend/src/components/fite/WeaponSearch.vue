@@ -3,18 +3,18 @@
     <div class="relative">
       <InputText
         v-model="searchQuery"
-        @keyup.enter="performSearch"
-        @input="onInput"
         placeholder="Search weapons by name or description..."
         class="w-full pr-10"
         :disabled="loading"
+        @keyup.enter="performSearch"
+        @input="onInput"
       />
       <Button
-        @click="performSearch"
         icon="pi pi-search"
         class="absolute right-1 top-1/2 transform -translate-y-1/2"
         text
         :loading="loading"
+        @click="performSearch"
       />
     </div>
 
@@ -26,8 +26,8 @@
       <div
         v-for="suggestion in suggestions"
         :key="suggestion.type + suggestion.text"
-        @click="applySuggestion(suggestion)"
         class="px-4 py-2 hover:bg-surface-50 dark:hover:bg-surface-900 cursor-pointer border-b border-surface-100 dark:border-surface-800 last:border-b-0"
+        @click="applySuggestion(suggestion)"
       >
         <div class="flex items-center justify-between">
           <span class="text-sm text-surface-900 dark:text-surface-50">{{ suggestion.text }}</span>
@@ -46,11 +46,11 @@
         <Button
           v-for="term in searchHistory.slice(0, 5)"
           :key="term"
-          @click="applyHistoryTerm(term)"
           :label="term"
           size="small"
           severity="secondary"
           outlined
+          @click="applyHistoryTerm(term)"
         />
       </div>
     </div>

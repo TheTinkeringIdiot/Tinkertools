@@ -398,11 +398,11 @@ defineExpose({
             class="flex flex-wrap items-center gap-3 pt-4 border-t border-surface-200 dark:border-surface-700"
           >
             <Button
-              @click="exportCollectionData"
               icon="pi pi-download"
               label="Export Collection"
               outlined
               size="small"
+              @click="exportCollectionData"
             />
             <label class="cursor-pointer">
               <Button
@@ -412,15 +412,15 @@ defineExpose({
                 size="small"
                 as="span"
               />
-              <input type="file" accept=".json" @change="importCollectionData" class="hidden" />
+              <input type="file" accept=".json" class="hidden" @change="importCollectionData" />
             </label>
             <Button
-              @click="resetCollection"
               icon="pi pi-trash"
               label="Reset Collection"
               severity="danger"
               outlined
               size="small"
+              @click="resetCollection"
             />
           </div>
         </div>
@@ -434,10 +434,10 @@ defineExpose({
           <div class="flex items-center justify-between">
             <h2 class="text-xl font-semibold">Collection Goals</h2>
             <Button
-              @click="showNewGoalForm = !showNewGoalForm"
               icon="pi pi-plus"
               label="New Goal"
               size="small"
+              @click="showNewGoalForm = !showNewGoalForm"
             />
           </div>
 
@@ -470,18 +470,18 @@ defineExpose({
                 </div>
                 <div class="flex items-center gap-2">
                   <Button
-                    @click="createCollectionGoal"
                     :disabled="!newGoalName.trim()"
                     icon="pi pi-check"
                     label="Create Goal"
                     size="small"
+                    @click="createCollectionGoal"
                   />
                   <Button
-                    @click="showNewGoalForm = false"
                     icon="pi pi-times"
                     label="Cancel"
                     outlined
                     size="small"
+                    @click="showNewGoalForm = false"
                   />
                 </div>
               </div>
@@ -503,11 +503,11 @@ defineExpose({
                   </p>
                 </div>
                 <Button
-                  @click="deleteCollectionGoal(goal.id)"
                   icon="pi pi-trash"
                   severity="danger"
                   outlined
                   size="small"
+                  @click="deleteCollectionGoal(goal.id)"
                 />
               </div>
               <div class="space-y-2">
@@ -547,23 +547,23 @@ defineExpose({
               v-model="selectedSlot"
               :options="availableSlots"
               placeholder="All Slots"
-              showClear
+              show-clear
               class="w-full"
             />
           </div>
           <div class="flex items-end">
             <div class="flex items-center">
-              <Checkbox v-model="showOnlyUncollected" inputId="uncollected" binary />
+              <Checkbox v-model="showOnlyUncollected" input-id="uncollected" binary />
               <label for="uncollected" class="ml-2">Show only uncollected</label>
             </div>
           </div>
           <div class="flex items-end">
             <Button
-              @click="clearFilters"
               icon="pi pi-filter-slash"
               label="Clear Filters"
               outlined
               size="small"
+              @click="clearFilters"
             />
           </div>
         </div>
@@ -577,11 +577,11 @@ defineExpose({
           :value="filteredSymbiants"
           paginator
           :rows="25"
-          :rowsPerPageOptions="[10, 25, 50, 100]"
-          sortField="slot"
-          :sortOrder="1"
-          showGridlines
-          stripedRows
+          :rows-per-page-options="[10, 25, 50, 100]"
+          sort-field="slot"
+          :sort-order="1"
+          show-gridlines
+          striped-rows
           class="collection-table"
         >
           <template #empty>
@@ -594,9 +594,9 @@ defineExpose({
           <Column header="Collected" class="min-w-[80px]">
             <template #body="{ data }">
               <Checkbox
-                :modelValue="getCollectionItem(data.id).collected"
-                @update:modelValue="toggleCollection(data.id)"
+                :model-value="getCollectionItem(data.id).collected"
                 binary
+                @update:model-value="toggleCollection(data.id)"
               />
             </template>
           </Column>

@@ -5,12 +5,12 @@
     <div class="flex items-center justify-between mb-4">
       <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50">Character Skills</h3>
       <Button
-        @click="loadFromProfile"
+        v-tooltip="'Load skills from TinkerProfile'"
         icon="pi pi-user"
         label="Load Profile"
         size="small"
         severity="secondary"
-        v-tooltip="'Load skills from TinkerProfile'"
+        @click="loadFromProfile"
       />
     </div>
 
@@ -21,7 +21,7 @@
       <p class="text-surface-600 dark:text-surface-400 mb-4">
         Enter your character's skills to see which weapons you can use
       </p>
-      <Button @click="showQuickSetup = true" label="Quick Setup" icon="pi pi-bolt" size="small" />
+      <Button label="Quick Setup" icon="pi pi-bolt" size="small" @click="showQuickSetup = true" />
     </div>
 
     <div v-else>
@@ -35,19 +35,19 @@
           </span>
           <div class="space-x-2">
             <Button
-              @click="showAllSkills = !showAllSkills"
               :label="showAllSkills ? 'Show Less' : 'Show All'"
               size="small"
               severity="secondary"
               text
+              @click="showAllSkills = !showAllSkills"
             />
             <Button
-              @click="clearAllSkills"
+              v-tooltip="'Clear all skills'"
               icon="pi pi-trash"
               size="small"
               severity="danger"
               text
-              v-tooltip="'Clear all skills'"
+              @click="clearAllSkills"
             />
           </div>
         </div>
@@ -69,19 +69,19 @@
           <div class="flex items-center space-x-2">
             <InputNumber
               v-model="skills[skillId]"
-              @update:model-value="updateSkill(skillId, $event)"
               :min="0"
               :max="3000"
               :step="1"
               class="w-20"
               size="small"
+              @update:model-value="updateSkill(skillId, $event)"
             />
             <Button
-              @click="removeSkill(skillId)"
               icon="pi pi-times"
               size="small"
               severity="danger"
               text
+              @click="removeSkill(skillId)"
             />
           </div>
         </div>
@@ -107,10 +107,10 @@
             class="w-24"
           />
           <Button
-            @click="addSkill"
+            v-tooltip="'Add skill'"
             icon="pi pi-plus"
             :disabled="!newSkillId || newSkillValue === null"
-            v-tooltip="'Add skill'"
+            @click="addSkill"
           />
         </div>
       </div>
@@ -162,8 +162,8 @@
 
       <template #footer>
         <div class="flex justify-end space-x-2">
-          <Button @click="showQuickSetup = false" label="Cancel" severity="secondary" />
-          <Button @click="applyQuickSetup" label="Apply" />
+          <Button label="Cancel" severity="secondary" @click="showQuickSetup = false" />
+          <Button label="Apply" @click="applyQuickSetup" />
         </div>
       </template>
     </Dialog>

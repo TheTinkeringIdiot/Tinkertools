@@ -132,8 +132,8 @@ const menuItems = computed<MenuItem[]>(() =>
                 :aria-label="themeLabel"
                 outlined
                 class="h-11 w-11"
-                @click="toggle"
                 :pt="{ root: 'transition-all duration-200 hover:scale-105' }"
+                @click="toggle"
               />
             </div>
           </div>

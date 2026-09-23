@@ -14,7 +14,7 @@ through the ip-integrator system for proper v4.0.0 profile updates.
     :closable="true"
     @hide="onCancel"
   >
-    <form @submit.prevent="onSave" class="space-y-4">
+    <form class="space-y-4" @submit.prevent="onSave">
       <!-- Character Name -->
       <div class="field">
         <label
@@ -213,8 +213,8 @@ through the ip-integrator system for proper v4.0.0 profile updates.
           label="Save Changes"
           severity="primary"
           :loading="saving"
-          @click="onSave"
           :disabled="!isFormValid"
+          @click="onSave"
         />
       </div>
     </template>

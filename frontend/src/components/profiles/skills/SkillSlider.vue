@@ -36,9 +36,9 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
           </span>
           <span
             v-if="hasEquipmentBonus"
+            v-tooltip.top="equipmentBonusTooltip"
             class="text-xs cursor-help equipment-bonus-indicator"
             :class="equipmentBonusColorClass"
-            v-tooltip.top="equipmentBonusTooltip"
           >
             <i class="pi pi-shield"></i>
             <span class="ml-1 font-medium equipment-bonus-value">
@@ -74,12 +74,12 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
       <!-- Input Number for precise entry with proper width -->
       <div
         v-if="costFactorColor"
+        v-tooltip.top="simpleTooltipContent"
         class="input-gradient-wrapper flex-shrink-0"
         :style="{
           '--gradient-color-primary': costFactorColor.primary,
           '--gradient-color-secondary': costFactorColor.secondary,
         }"
-        v-tooltip.top="simpleTooltipContent"
       >
         <InputNumber
           v-model="inputValue"
@@ -94,12 +94,12 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
       <InputNumber
         v-else
         v-model="inputValue"
+        v-tooltip.top="simpleTooltipContent"
         :min="props.isAbility ? minValue : baseValue + trickleDownBonus"
         :max="props.isAbility ? maxValue : maxTotalValue"
         :step="1"
         size="small"
         class="flex-shrink-0"
-        v-tooltip.top="simpleTooltipContent"
         @update:model-value="onInputChanged"
       />
 
@@ -109,9 +109,9 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
         size="small"
         severity="secondary"
         outlined
-        @click="setToMax"
         :disabled="props.isAbility ? sliderValue >= maxValue : inputValue >= maxTotalValue"
         class="flex-shrink-0 min-w-[3rem]"
+        @click="setToMax"
       />
     </div>
 
@@ -119,8 +119,8 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
     <div v-else class="flex items-center justify-center py-2">
       <div class="text-center">
         <div
-          class="text-lg font-bold text-surface-900 dark:text-surface-50 mb-1 cursor-help"
           v-tooltip.top="simpleTooltipContent"
+          class="text-lg font-bold text-surface-900 dark:text-surface-50 mb-1 cursor-help"
         >
           {{ totalValue }}
         </div>

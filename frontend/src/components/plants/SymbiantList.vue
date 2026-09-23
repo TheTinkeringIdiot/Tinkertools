@@ -20,11 +20,11 @@ Shows symbiants with search, filtering, and pagination
             class="w-32"
           />
           <Button
-            @click="toggleSortOrder"
             :icon="sortOrder === 'asc' ? 'pi pi-sort-up' : 'pi pi-sort-down'"
             size="small"
             text
             :aria-label="`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`"
+            @click="toggleSortOrder"
           />
         </div>
       </div>
@@ -41,8 +41,8 @@ Shows symbiants with search, filtering, and pagination
         <div
           v-for="symbiant in paginatedSymbiants"
           :key="symbiant.id"
-          @click="selectSymbiant(symbiant)"
           class="symbiant-card p-3 border border-surface-200 dark:border-surface-700 rounded hover:border-primary-300 dark:hover:border-primary-600 hover:bg-surface-50 dark:hover:bg-surface-800 cursor-pointer transition-all"
+          @click="selectSymbiant(symbiant)"
         >
           <div class="flex items-start justify-between">
             <!-- Symbiant Info -->
@@ -103,20 +103,20 @@ Shows symbiants with search, filtering, and pagination
             <div class="flex items-center gap-1 ml-3">
               <Button
                 v-if="buildMode"
-                @click.stop="addToBuild(symbiant)"
                 icon="pi pi-plus"
                 size="small"
                 text
                 severity="secondary"
                 aria-label="Add to build"
+                @click.stop="addToBuild(symbiant)"
               />
               <Button
-                @click.stop="viewDetails(symbiant)"
                 icon="pi pi-eye"
                 size="small"
                 text
                 severity="secondary"
                 aria-label="View details"
+                @click.stop="viewDetails(symbiant)"
               />
             </div>
           </div>
@@ -142,11 +142,11 @@ Shows symbiants with search, filtering, and pagination
     >
       <Paginator
         :rows="pageSize"
-        :totalRecords="sortedSymbiants.length"
+        :total-records="sortedSymbiants.length"
         :first="currentPage * pageSize"
-        @page="onPageChange"
         template="FirstPageLink PrevPageLink CurrentPageReport NextPageLink LastPageLink"
-        currentPageReportTemplate="Showing {first} to {last} of {totalRecords}"
+        current-page-report-template="Showing {first} to {last} of {totalRecords}"
+        @page="onPageChange"
       />
     </div>
   </div>

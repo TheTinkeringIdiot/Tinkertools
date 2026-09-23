@@ -27,7 +27,6 @@ being activated with stats from the wrong database.
       class="profile-selector"
       :class="{ 'profile-active': hasActiveProfile }"
       :loading="loading"
-      @change="onProfileChange"
       :pt="{
         root: { class: 'w-64 h-11 items-center' },
         input: {
@@ -36,6 +35,7 @@ being activated with stats from the wrong database.
             : 'text-surface-600 dark:text-surface-400',
         },
       }"
+      @change="onProfileChange"
     >
       <template #value="slotProps">
         <div v-if="slotProps.value" class="flex items-center gap-2">

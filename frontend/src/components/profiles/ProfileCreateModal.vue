@@ -10,7 +10,7 @@ Modal for creating new character profiles
     :style="{ width: '600px' }"
     @update:visible="$emit('update:visible', $event)"
   >
-    <form @submit.prevent="createProfile" class="space-y-4">
+    <form class="space-y-4" @submit.prevent="createProfile">
       <!-- Game version this profile will be built against -->
       <div
         class="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-400 bg-surface-50 dark:bg-surface-800 rounded px-3 py-2"

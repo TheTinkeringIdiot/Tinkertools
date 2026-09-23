@@ -14,7 +14,7 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
             <i class="pi pi-database mr-2"></i>
             TinkerItems
           </h1>
-          <Badge :value="totalItems" severity="info" v-if="totalItems > 0" />
+          <Badge v-if="totalItems > 0" :value="totalItems" severity="info" />
         </div>
 
         <!-- Display Options -->
@@ -39,20 +39,20 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
             class="flex items-center gap-1 border border-surface-300 dark:border-surface-600 rounded"
           >
             <Button
+              v-tooltip.bottom="'Grid View'"
               icon="pi pi-th-large"
               :severity="viewMode === 'grid' ? 'primary' : 'secondary'"
               :outlined="viewMode !== 'grid'"
               size="small"
               @click="viewMode = 'grid'"
-              v-tooltip.bottom="'Grid View'"
             />
             <Button
+              v-tooltip.bottom="'List View'"
               icon="pi pi-list"
               :severity="viewMode === 'list' ? 'primary' : 'secondary'"
               :outlined="viewMode !== 'list'"
               size="small"
               @click="viewMode = 'list'"
-              v-tooltip.bottom="'List View'"
             />
           </div>
         </div>
@@ -90,7 +90,7 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
             </div>
 
             <!-- Sorting and Actions -->
-            <div class="flex items-center gap-2" v-if="hasLocalResults">
+            <div v-if="hasLocalResults" class="flex items-center gap-2">
               <Dropdown
                 v-model="sortOption"
                 :options="sortOptions"
@@ -102,13 +102,13 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
               />
 
               <Button
+                v-tooltip.bottom="'Refresh Results'"
                 icon="pi pi-refresh"
                 severity="secondary"
                 outlined
                 size="small"
-                @click="refreshResults"
                 :loading="searchLoading"
-                v-tooltip.bottom="'Refresh Results'"
+                @click="refreshResults"
               />
             </div>
           </div>

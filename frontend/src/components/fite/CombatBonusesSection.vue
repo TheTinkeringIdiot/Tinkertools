@@ -36,8 +36,8 @@ Inputs (2 fields):
         >
           Add Damage
           <i
-            class="pi pi-info-circle ml-1 text-xs"
             v-tooltip.right="'Computed from highest damage modifier matching weapon type'"
+            class="pi pi-info-circle ml-1 text-xs"
           ></i>
         </label>
         <InputNumber

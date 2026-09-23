@@ -8,12 +8,12 @@
         >
         <MultiSelect
           v-model="localFilters.weaponTypes"
-          @update:model-value="updateFilters"
           :options="weaponTypeOptions"
           option-label="name"
           option-value="id"
           placeholder="All weapon types"
           class="w-full"
+          @update:model-value="updateFilters"
         />
       </div>
 
@@ -24,12 +24,12 @@
         >
         <MultiSelect
           v-model="localFilters.qualityLevels"
-          @update:model-value="updateFilters"
           :options="qualityLevelOptions"
           option-label="label"
           option-value="value"
           placeholder="All quality levels"
           class="w-full"
+          @update:model-value="updateFilters"
         />
       </div>
 
@@ -41,9 +41,9 @@
         <div class="flex items-center space-x-2 mt-2">
           <Checkbox
             v-model="localFilters.usableOnly"
-            @update:model-value="updateFilters"
             binary
             input-id="usable-only"
+            @update:model-value="updateFilters"
           />
           <label for="usable-only" class="text-sm">Show usable only</label>
         </div>
@@ -64,18 +64,18 @@
         <div class="space-y-2">
           <Dropdown
             v-model="localFilters.sortBy"
-            @update:model-value="updateFilters"
             :options="sortOptions"
             option-label="name"
             option-value="id"
             class="w-full"
+            @update:model-value="updateFilters"
           />
           <div class="flex items-center space-x-2">
             <Checkbox
               v-model="localFilters.sortDescending"
-              @update:model-value="updateFilters"
               binary
               input-id="sort-desc"
+              @update:model-value="updateFilters"
             />
             <label for="sort-desc" class="text-sm">Descending</label>
           </div>
@@ -92,11 +92,11 @@
         <Button
           v-for="quickFilter in quickFilters"
           :key="quickFilter.name"
-          @click="applyQuickFilter(quickFilter)"
           :label="quickFilter.name"
           size="small"
           severity="secondary"
           outlined
+          @click="applyQuickFilter(quickFilter)"
         />
       </div>
     </div>
@@ -107,7 +107,7 @@
         <span class="text-sm font-medium text-surface-700 dark:text-surface-300"
           >Active Filters</span
         >
-        <Button @click="clearAllFilters" label="Clear All" size="small" severity="danger" text />
+        <Button label="Clear All" size="small" severity="danger" text @click="clearAllFilters" />
       </div>
       <div class="flex flex-wrap gap-2">
         <span

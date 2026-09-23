@@ -156,7 +156,7 @@ defineExpose({
               v-model="selectedSlots"
               :options="availableSlots"
               placeholder="All Slots"
-              :maxSelectedLabels="2"
+              :max-selected-labels="2"
               class="w-full"
               display="chip"
             />
@@ -169,7 +169,7 @@ defineExpose({
               v-model="selectedQualities"
               :options="availableQualities"
               placeholder="All Qualities"
-              :maxSelectedLabels="2"
+              :max-selected-labels="2"
               class="w-full"
               display="chip"
             />
@@ -182,7 +182,7 @@ defineExpose({
               v-model="selectedFamily"
               :options="availableFamilies"
               placeholder="All Families"
-              showClear
+              show-clear
               class="w-full"
             />
           </div>
@@ -194,11 +194,11 @@ defineExpose({
         >
           <div class="flex items-center gap-2">
             <Button
-              @click="clearAllFilters"
               label="Clear Filters"
               icon="pi pi-filter-slash"
               outlined
               size="small"
+              @click="clearAllFilters"
             />
             <span class="text-sm text-surface-600 dark:text-surface-400">
               {{ symbiants.length }} symbiant{{ symbiants.length !== 1 ? 's' : '' }} found
@@ -207,16 +207,16 @@ defineExpose({
 
           <div class="flex items-center gap-2">
             <Button
-              @click="viewMode = 'grid'"
               :class="{ 'p-button-outlined': viewMode !== 'grid' }"
               icon="pi pi-th-large"
               size="small"
+              @click="viewMode = 'grid'"
             />
             <Button
-              @click="viewMode = 'list'"
               :class="{ 'p-button-outlined': viewMode !== 'list' }"
               icon="pi pi-list"
               size="small"
+              @click="viewMode = 'list'"
             />
           </div>
         </div>
@@ -229,7 +229,7 @@ defineExpose({
       :layout="viewMode"
       paginator
       :rows="24"
-      :rowsPerPageOptions="[12, 24, 48]"
+      :rows-per-page-options="[12, 24, 48]"
     >
       <template #empty>
         <div class="text-center py-12">
