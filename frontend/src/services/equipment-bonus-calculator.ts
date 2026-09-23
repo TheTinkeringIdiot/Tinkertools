@@ -14,7 +14,7 @@
  */
 
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
-import type { Item, SpellData, Spell, SymbiantItem } from '@/types/api';
+import type { Item, Spell, SymbiantItem } from '@/types/api';
 import { skillService } from './skill-service';
 import { STAT } from './game-data';
 
@@ -65,20 +65,20 @@ export interface CalculationResult {
  * Spell IDs that provide stat modifications for equipment bonuses
  * Based on research in spell-system.docs.md and existing codebase
  */
-export const STAT_BONUS_SPELL_IDS = [
+export const STAT_BONUS_SPELL_IDS: readonly number[] = [
   53045, // "Modify {Stat} by {Amount}" - primary stat bonus spell
   53012, // "Modify {Stat} by {Amount}" - alternative format
   53014, // "Modify {Stat} for {Duration}s by {Amount}" - timed bonus (some equipment uses this)
   53175, // "Modify {Stat} by {Amount}" - additional stat modifier format
   53139, // "Set flag {Stat} &{BitNum}" - WornItem flag setting spell
-] as const;
+];
 
 /**
  * Equipment events that provide stat bonuses
  * - 14: Wear (armor/jewelry effects)
  * - 2: Wield (weapon effects)
  */
-export const EQUIPMENT_EVENTS = [14, 2] as const;
+export const EQUIPMENT_EVENTS: readonly number[] = [14, 2];
 
 // ============================================================================
 // Performance Caching
@@ -303,7 +303,7 @@ export class EquipmentBonusCalculator {
     equipmentSlots: Record<string, Item | SymbiantItem | null>,
     bonuses: StatBonus[]
   ): void {
-    for (const [slotName, item] of Object.entries(equipmentSlots)) {
+    for (const item of Object.values(equipmentSlots)) {
       if (item) {
         const itemBonuses = this.parseItemSpells(item);
         bonuses.push(...itemBonuses);
@@ -401,7 +401,7 @@ export class EquipmentBonusCalculator {
 
     for (const spellData of item.spell_data) {
       // Only process equipment-related events (Wear=14, Wield=2)
-      if (!spellData.event || !EQUIPMENT_EVENTS.includes(spellData.event as any)) {
+      if (!spellData.event || !EQUIPMENT_EVENTS.includes(spellData.event)) {
         continue;
       }
 
@@ -492,11 +492,7 @@ export class EquipmentBonusCalculator {
 
         try {
           // Only process equipment-related events (Wear=14, Wield=2)
-          if (
-            !spellData ||
-            !spellData.event ||
-            !EQUIPMENT_EVENTS.includes(spellData.event as any)
-          ) {
+          if (!spellData || !spellData.event || !EQUIPMENT_EVENTS.includes(spellData.event)) {
             continue;
           }
 
@@ -575,7 +571,7 @@ export class EquipmentBonusCalculator {
    */
   private parseSpellForStatBonus(spell: Spell, itemName?: string): StatBonus | null {
     // Fast path: check spell_id first (most common rejection case)
-    if (!spell.spell_id || !STAT_BONUS_SPELL_IDS.includes(spell.spell_id as any)) {
+    if (!spell.spell_id || !STAT_BONUS_SPELL_IDS.includes(spell.spell_id)) {
       return null;
     }
 
@@ -681,7 +677,7 @@ export class EquipmentBonusCalculator {
         return result;
       }
 
-      if (!STAT_BONUS_SPELL_IDS.includes(spell.spell_id as any)) {
+      if (!STAT_BONUS_SPELL_IDS.includes(spell.spell_id)) {
         // Not an error - this spell doesn't modify stats
         return result;
       }

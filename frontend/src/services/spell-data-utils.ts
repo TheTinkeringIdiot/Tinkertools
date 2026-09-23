@@ -37,7 +37,7 @@ export interface FormattedSpellData {
 
 export interface FormattedParameter {
   key: string;
-  value: any;
+  value: unknown;
   displayValue: string;
   type: 'link' | 'percentage' | 'stat' | 'number' | 'text';
   linkUrl?: string;
@@ -93,7 +93,7 @@ export function getSpellFormat(spellId: number): string | undefined {
 /**
  * Format a spell parameter based on its type and key
  */
-export function formatSpellParameter(key: string, value: any): FormattedParameter {
+export function formatSpellParameter(key: string, value: unknown): FormattedParameter {
   const lowerKey = key.toLowerCase();
 
   // Handle NanoId, ItemId, and Proc parameters - create links
@@ -157,11 +157,11 @@ export function formatSpellParameter(key: string, value: any): FormattedParamete
 /**
  * Format all parameters for a spell
  */
-export function formatSpellParameters(spellParams: Record<string, any>): FormattedParameter[] {
+export function formatSpellParameters(spellParams: Record<string, unknown>): FormattedParameter[] {
   if (!spellParams) return [];
 
   return Object.entries(spellParams)
-    .filter(([key, value]) => value !== null && value !== undefined)
+    .filter(([, value]) => value !== null && value !== undefined)
     .map(([key, value]) => formatSpellParameter(key, value))
     .sort((a, b) => {
       // Sort by type priority: links first, then percentages, then stats, then others
@@ -180,7 +180,7 @@ export function formatSpellParameters(spellParams: Record<string, any>): Formatt
  * Interpolate spell format string with parameters
  * Handles {param} style placeholders and special formatting
  */
-export function interpolateSpellText(format: string, params: Record<string, any>): string {
+export function interpolateSpellText(format: string, params: Record<string, unknown>): string {
   if (!format) return '';
 
   let result = format;
@@ -203,7 +203,12 @@ export function interpolateSpellText(format: string, params: Record<string, any>
       ) {
         // For NanoID/ItemID/Proc, we'll return a placeholder that will be replaced with a link in the component
         return `[LINK:${value}]`;
-      } else if (paramName.toLowerCase() === 'item' && typeof value === 'object' && value?.Text) {
+      } else if (
+        paramName.toLowerCase() === 'item' &&
+        typeof value === 'object' &&
+        'Text' in value &&
+        value.Text
+      ) {
         // For Item objects, extract the Text field
         return String(value.Text);
       } else if (paramName.toLowerCase().includes('chance')) {
@@ -218,12 +223,12 @@ export function interpolateSpellText(format: string, params: Record<string, any>
         // For BitNum, resolve to flag name using the Stat parameter
         const statId = params.Stat || params.stat;
         if (statId !== undefined && statId !== null) {
-          return getFlagNameFromBit(statId, value);
+          return getFlagNameFromBit(Number(statId), value);
         }
         return `Bit ${value}`;
       } else if (paramName.toLowerCase() === 'value' && typeof value === 'number') {
         // For Value, check if Stat is a ProcNano stat (552-554) - if so, Value is a nano AOID
-        const statId = params.Stat || params.stat;
+        const statId = Number(params.Stat || params.stat);
         if (statId >= 552 && statId <= 554) {
           return `[LINK:${value}]`;
         }
@@ -235,11 +240,12 @@ export function interpolateSpellText(format: string, params: Record<string, any>
   });
 
   // Handle %s, %d, %f style placeholders with parameter array
-  if (params.params && Array.isArray(params.params)) {
+  const positionalParams = params.params;
+  if (Array.isArray(positionalParams)) {
     let paramIndex = 0;
     result = result.replace(/%[sdf]/g, () => {
-      if (paramIndex < params.params.length) {
-        return String(params.params[paramIndex++]);
+      if (paramIndex < positionalParams.length) {
+        return String(positionalParams[paramIndex++]);
       }
       return '%?';
     });
@@ -396,6 +402,7 @@ export function getEventColor(eventId: number): string {
 /**
  * Determine if spell data should be displayed in compact mode
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for SpellDataDisplay.vue, which passes the list
 export function shouldUseCompactMode(spellDataList: FormattedSpellData[]): boolean {
   // Always use table mode for consistency
   return false;

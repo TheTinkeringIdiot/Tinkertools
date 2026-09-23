@@ -16,12 +16,12 @@ import {
   parseItemForStatBonuses,
   parseItemForStatBonusesWithErrors,
   perkBonusCalculator,
-  STAT_BONUS_SPELL_IDS,
-  PERK_EVENTS,
-  type PerkStatBonus,
-  type PerkBonusError,
-  type PerkCalculationResult,
 } from '../perk-bonus-calculator';
+
+/** Deliberately malformed input, typed as whatever the code under test accepts */
+function malformed<T>(value: unknown): T {
+  return value as T;
+}
 
 describe('PerkBonusCalculator', () => {
   let calculator: PerkBonusCalculator;
@@ -353,20 +353,20 @@ describe('PerkBonusCalculator', () => {
     });
 
     it('should handle null/undefined perks array gracefully', () => {
-      expect(calculator.calculateBonuses(null as any)).toEqual({});
-      expect(calculator.calculateBonuses(undefined as any)).toEqual({});
+      expect(calculator.calculateBonuses(malformed(null))).toEqual({});
+      expect(calculator.calculateBonuses(malformed(undefined))).toEqual({});
 
-      const result = calculatePerkBonusesWithErrors(null as any);
+      const result = calculatePerkBonusesWithErrors(malformed(null));
       expect(result.success).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
       expect(result.bonuses).toEqual({});
     });
 
     it('should handle non-array perks input', () => {
-      const result = calculator.calculateBonuses('not an array' as any);
+      const result = calculator.calculateBonuses(malformed('not an array'));
       expect(result).toEqual({});
 
-      const detailedResult = calculatePerkBonusesWithErrors('not an array' as any);
+      const detailedResult = calculatePerkBonusesWithErrors(malformed('not an array'));
       expect(detailedResult.success).toBe(false);
       expect(detailedResult.errors).toEqual(
         expect.arrayContaining([
@@ -386,7 +386,7 @@ describe('PerkBonusCalculator', () => {
 
       const perksWithNull = [validPerk1, null, validPerk2];
 
-      const result = calculator.calculateBonuses(perksWithNull as any);
+      const result = calculator.calculateBonuses(malformed(perksWithNull));
       expect(result).toEqual({
         17: 20, // Assault Rifle - both valid perks contribute
       });
@@ -395,7 +395,7 @@ describe('PerkBonusCalculator', () => {
     it('should handle perks with missing spell_data', () => {
       const perkWithoutSpellData = createValidPerkItem('No Spell Data', 12345);
       // Explicitly remove spell_data
-      delete (perkWithoutSpellData as any).spell_data;
+      delete (perkWithoutSpellData as Partial<Item>).spell_data;
 
       const result = calculator.calculateBonuses([perkWithoutSpellData]);
       expect(result).toEqual({}); // No bonuses, but no crash
@@ -403,7 +403,7 @@ describe('PerkBonusCalculator', () => {
 
     it('should handle perks with invalid spell_data format', () => {
       const perkWithInvalidSpellData = createValidPerkItem('Invalid Spell Data', 12345);
-      perkWithInvalidSpellData.spell_data = 'not an array' as any;
+      perkWithInvalidSpellData.spell_data = malformed('not an array');
 
       const result = calculatePerkBonusesWithErrors([perkWithInvalidSpellData]);
       expect(result.bonuses).toEqual({});
@@ -419,7 +419,7 @@ describe('PerkBonusCalculator', () => {
 
     it('should handle spells with missing spell_id', () => {
       const invalidSpell = { spell_params: { Stat: 17, Amount: 10 } }; // Missing spell_id
-      const spellData = createValidSpellData([invalidSpell as any]);
+      const spellData = createValidSpellData([malformed(invalidSpell)]);
       const perk = createValidPerkItem('Missing Spell ID', 12345, [spellData]);
 
       const result = calculator.calculateBonuses([perk]);
@@ -512,7 +512,7 @@ describe('PerkBonusCalculator', () => {
       const validPerk = createValidPerkItem('Valid Perk', 11111, [validSpellData]);
 
       const invalidPerk = createValidPerkItem('Invalid Perk', 22222);
-      invalidPerk.spell_data = [{ invalid: 'data' } as any];
+      invalidPerk.spell_data = [malformed({ invalid: 'data' })];
 
       const anotherValidPerk = createValidPerkItem('Another Valid Perk', 33333, [validSpellData]);
 
@@ -548,7 +548,9 @@ describe('PerkBonusCalculator', () => {
 
       // Manually corrupt cache by accessing private members
       const cacheKey = String(perk.aoid);
-      (calculator as any).spellCache.cache.set(cacheKey, 'corrupted data');
+      (
+        calculator as unknown as { spellCache: { cache: Map<string, unknown> } }
+      ).spellCache.cache.set(cacheKey, 'corrupted data');
 
       // Should detect corruption and clear cache
       const result = calculator.parsePerkSpells(perk);
@@ -610,16 +612,16 @@ describe('PerkBonusCalculator', () => {
     });
 
     it('should handle errors in convenience functions gracefully', () => {
-      const result1 = calculatePerkBonuses(null as any);
+      const result1 = calculatePerkBonuses(malformed(null));
       expect(result1).toEqual({});
 
-      const result2 = parseItemForStatBonuses(null as any);
+      const result2 = parseItemForStatBonuses(malformed(null));
       expect(result2).toEqual([]);
 
-      const result3 = calculatePerkBonusesWithErrors(null as any);
+      const result3 = calculatePerkBonusesWithErrors(malformed(null));
       expect(result3.success).toBe(false);
 
-      const result4 = parseItemForStatBonusesWithErrors(null as any);
+      const result4 = parseItemForStatBonusesWithErrors(malformed(null));
       expect(result4.bonuses).toEqual([]);
       expect(result4.errors.length).toBeGreaterThan(0);
     });
@@ -675,7 +677,7 @@ describe('PerkBonusCalculator', () => {
     it('should provide comprehensive error reporting', () => {
       const invalidPerks: Item[] = [
         // null entry
-        null as any,
+        malformed(null),
         // Valid perk for comparison
         createValidPerkItem('Valid Perk', 10001, [
           createValidSpellData([createValidSpell(17, 10)]),

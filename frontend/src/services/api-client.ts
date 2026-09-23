@@ -87,29 +87,6 @@ function asRequestError(error: unknown): RequestErrorLike {
   return typeof error === 'object' && error !== null ? (error as RequestErrorLike) : {};
 }
 
-/** True for the errors the API client throws (see TinkerToolsApiClient.handleError) */
-export function isUserFriendlyError(error: unknown): error is UserFriendlyError {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'title' in error &&
-    'message' in error &&
-    'recoverable' in error
-  );
-}
-
-/** Normalise anything caught from an API call into a UserFriendlyError */
-export function toUserFriendlyError(error: unknown): UserFriendlyError {
-  if (isUserFriendlyError(error)) return error;
-  return {
-    type: 'error',
-    title: 'Unexpected Error',
-    message: error instanceof Error ? error.message : String(error),
-    action: 'Please try again or contact support',
-    recoverable: false,
-  };
-}
-
 class ApiErrorHandler {
   static handle(error: ApiError): UserFriendlyError {
     switch (error.code) {

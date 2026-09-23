@@ -17,7 +17,7 @@
  * - LRU caching optimized for nano items
  */
 
-import type { Item, SpellData, Spell } from '@/types/api';
+import type { Item, Spell } from '@/types/api';
 
 // ============================================================================
 // Type Definitions
@@ -70,19 +70,19 @@ export interface NanoCalculationResult {
  * Spell IDs that provide stat modifications for nano bonuses
  * Based on nano-programs-research.docs.md and existing spell analysis
  */
-export const STAT_BONUS_SPELL_IDS = [
+export const STAT_BONUS_SPELL_IDS: readonly number[] = [
   53045, // "Modify {Stat} by {Amount}" - primary stat bonus spell for skills
   53012, // "Modify {Stat} by {Amount}" - alternative skill format
   53014, // "Modify {Stat} for {Duration}s by {Amount}" - timed skill bonus
   53175, // "Modify {Stat} by {Amount}" - ability stat modifier format
-] as const;
+];
 
 /**
  * Nano events that provide stat bonuses
  * - 1: Cast (nanos trigger on cast)
  * - 14: Wear (some nanos use wear event like equipment)
  */
-export const NANO_EVENTS = [1, 14] as const;
+export const NANO_EVENTS: readonly number[] = [1, 14];
 
 // ============================================================================
 // Performance Caching
@@ -487,8 +487,6 @@ export class NanoBonusCalculator {
           type: 'error',
           message: 'Nano data has invalid format',
           details: `Nano is not an object: ${typeof nano}`,
-          nanoName: (nano as any)?.name,
-          nanoAoid: (nano as any)?.aoid,
           recoverable: true,
         });
         return result;
@@ -623,7 +621,7 @@ export class NanoBonusCalculator {
     nanoQl?: number
   ): NanoStatBonus | null {
     // Fast path: check spell_id first (most common rejection case)
-    if (!spell.spell_id || !STAT_BONUS_SPELL_IDS.includes(spell.spell_id as any)) {
+    if (!spell.spell_id || !STAT_BONUS_SPELL_IDS.includes(spell.spell_id)) {
       return null;
     }
 
@@ -708,7 +706,7 @@ export class NanoBonusCalculator {
         return result;
       }
 
-      if (!STAT_BONUS_SPELL_IDS.includes(spell.spell_id as any)) {
+      if (!STAT_BONUS_SPELL_IDS.includes(spell.spell_id)) {
         // Not an error - this spell doesn't modify stats
         return result;
       }

@@ -5,7 +5,7 @@
  * for the client-side interpolation functionality.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type {
   Item,
   InterpolatedItem,
@@ -32,12 +32,7 @@ vi.mock('../game-data', () => ({
 }));
 
 describe('InterpolationService', () => {
-  const mockApiClient = apiClient as {
-    interpolateItem: Mock;
-    getInterpolationInfo: Mock;
-    checkItemInterpolatable: Mock;
-    getInterpolationRange: Mock;
-  };
+  const mockApiClient = vi.mocked(apiClient);
 
   const sampleItem: Item = {
     id: 1,
@@ -55,6 +50,8 @@ describe('InterpolationService', () => {
     actions: [],
     attack_defense: undefined,
     animation_mesh: undefined,
+    attack_stats: [],
+    defense_stats: [],
   };
 
   const sampleInterpolatedItem: InterpolatedItem = {
@@ -82,6 +79,7 @@ describe('InterpolationService', () => {
   const sampleInterpolationInfo: InterpolationInfo = {
     aoid: 12345,
     interpolatable: true,
+    ranges: [{ min_ql: 100, max_ql: 200, interpolatable: true, base_aoid: 12345 }],
     min_ql: 100,
     max_ql: 200,
     ql_range: 101,
@@ -305,7 +303,7 @@ describe('InterpolationService', () => {
     it('should handle interpolation info failure', async () => {
       const mockResponse = {
         success: false,
-        data: null,
+        data: undefined,
       };
 
       mockApiClient.getInterpolationInfo.mockResolvedValue(mockResponse);
@@ -431,6 +429,8 @@ describe('InterpolationService', () => {
         stats: [],
         spell_data: [],
         actions: [],
+        attack_stats: [],
+        defense_stats: [],
       };
 
       const result = interpolationService.itemToInterpolatedItem(minimalItem);
@@ -455,6 +455,7 @@ describe('InterpolationService', () => {
                 tick_count: 5,
                 spell_id: 12345,
                 spell_params: { test: 'value' },
+                criteria: [],
               },
             ],
           },
@@ -524,7 +525,7 @@ describe('InterpolationService', () => {
     it('should handle malformed API responses', async () => {
       mockApiClient.interpolateItem.mockResolvedValue({
         success: true,
-        item: null, // Malformed response
+        item: undefined, // Malformed response: success without an item
       });
 
       const result = await interpolationService.interpolateItem(12345, 150);

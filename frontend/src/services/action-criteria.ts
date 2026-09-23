@@ -5,7 +5,7 @@
  * and criteria in an intuitive format for players.
  */
 
-import { TEMPLATE_ACTION, OPERATOR, STAT, PROFESSION, BREED, GENDER } from './game-data';
+import { TEMPLATE_ACTION, OPERATOR } from './game-data';
 import {
   getStatName,
   getProfessionName,
@@ -388,26 +388,32 @@ function formatStatDescription(stat: number, value: number, symbol: string): str
     case 54: // Level
       return `Level ${symbol} ${value}`;
 
-    case 60: // Profession
+    case 60: {
+      // Profession
       const professionName = getProfessionName(value);
       if (professionName && symbol === '=') {
         return `Profession = ${professionName}`;
       }
       return `Profession ${symbol} ${value}`;
+    }
 
-    case 4: // Breed
+    case 4: {
+      // Breed
       const breedName = getBreedName(value);
       if (breedName && symbol === '=') {
         return `Breed = ${breedName}`;
       }
       return `Breed ${symbol} ${value}`;
+    }
 
-    case 59: // Gender
+    case 59: {
+      // Gender
       const genderName = getGenderName(value);
       if (genderName && symbol === '=') {
         return `Gender = ${genderName}`;
       }
       return `Gender ${symbol} ${value}`;
+    }
 
     default:
       return `${statName} ${symbol} ${value}`;
@@ -502,10 +508,8 @@ export function parseAction(action: Action): ParsedAction {
 // Utility Functions
 // ============================================================================
 
-/**
- * Get all stat requirements from criteria (excluding logical operators)
- */
-export function getCriteriaRequirements(criteria: Criterion[]): Array<{
+/** A stat requirement collected from criteria */
+export interface CriteriaRequirement {
   stat: number;
   statName: string;
   minValue?: number;
@@ -513,8 +517,13 @@ export function getCriteriaRequirements(criteria: Criterion[]): Array<{
   exactValue?: number;
   mustHaveFlag?: number;
   mustLackFlag?: number;
-}> {
-  const requirements: Map<number, any> = new Map();
+}
+
+/**
+ * Get all stat requirements from criteria (excluding logical operators)
+ */
+export function getCriteriaRequirements(criteria: Criterion[]): CriteriaRequirement[] {
+  const requirements = new Map<number, CriteriaRequirement>();
 
   for (const criterion of criteria) {
     const display = transformCriterionForDisplay(criterion);
@@ -683,9 +692,7 @@ export function formatCriteriaText(expression: CriteriaExpression): string {
         return `NOT (${formatCriteriaText(expression.operands[0])})`;
       }
 
-      const left = formatCriteriaText(expression.operands[0]);
-      const right = formatCriteriaText(expression.operands[1]);
-      return `(${left} ${expression.operator} ${right})`;
+      return `(${formatCriteriaText(expression.operands[0])} ${expression.operator} ${formatCriteriaText(expression.operands[1])})`;
 
     case 'group':
       if (!expression.operands) return '';
