@@ -52,7 +52,6 @@ Displays nano programs in a scrollable list with compatibility indicators
             :nano="nano"
             :compact="compactView"
             :show-compatibility="showCompatibility"
-            :active-profile="activeProfile"
             :compatibility-info="getCompatibilityInfo(nano)"
             @select="handleNanoSelect"
             @favorite="handleFavorite"
@@ -101,7 +100,10 @@ import ProgressSpinner from 'primevue/progressspinner';
 import ToggleButton from 'primevue/togglebutton';
 
 import NanoCard from './NanoCard.vue';
-import type { NanoProgram, TinkerProfile, NanoCompatibilityInfo } from '@/types/nano';
+import { getNanoCompatibility } from './nano-compatibility';
+import { mapProfileToStats } from '@/utils/profile-stats-mapper';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { NanoProgram, NanoCompatibilityInfo } from '@/types/nano';
 
 // Props
 const props = withDefaults(
@@ -109,7 +111,7 @@ const props = withDefaults(
     nanos: NanoProgram[];
     loading?: boolean;
     showCompatibility?: boolean;
-    activeProfile?: TinkerProfile | null;
+    activeProfile?: ReadonlyTinkerProfile | null;
   }>(),
   {
     loading: false,
@@ -138,6 +140,11 @@ const totalNanos = computed(() => props.nanos.length);
 
 const totalPages = computed(() => Math.ceil(totalNanos.value / itemsPerPage.value));
 
+// The profile as a stat-ID map, built once for every card
+const characterStats = computed(() =>
+  props.showCompatibility && props.activeProfile ? mapProfileToStats(props.activeProfile) : null
+);
+
 const paginatedNanos = computed(() => {
   const start = currentPage.value * itemsPerPage.value;
   const end = start + itemsPerPage.value;
@@ -145,88 +152,8 @@ const paginatedNanos = computed(() => {
 });
 
 // Methods
-const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null => {
-  if (!props.showCompatibility || !props.activeProfile) {
-    return null;
-  }
-
-  const profile = props.activeProfile;
-  const requirements = nano.castingRequirements || [];
-
-  let canCast = true;
-  let skillDeficits: { skill: string; current: number; required: number; deficit: number }[] = [];
-  let statDeficits: { stat: string; current: number; required: number; deficit: number }[] = [];
-  let levelDeficit = 0;
-
-  // Check each requirement
-  for (const req of requirements) {
-    switch (req.type) {
-      case 'skill': {
-        const skill = req.requirement as string;
-        const currentSkill = profile.skills[skill] || 0;
-        if (currentSkill < req.value) {
-          canCast = false;
-          skillDeficits.push({
-            skill,
-            current: currentSkill,
-            required: req.value,
-            deficit: req.value - currentSkill,
-          });
-        }
-        break;
-      }
-
-      case 'stat': {
-        const stat = req.requirement as string;
-        const currentStat = profile.stats[stat] || 0;
-        if (currentStat < req.value) {
-          canCast = false;
-          statDeficits.push({
-            stat,
-            current: currentStat,
-            required: req.value,
-            deficit: req.value - currentStat,
-          });
-        }
-        break;
-      }
-
-      case 'level':
-        if (profile.level < req.value) {
-          canCast = false;
-          levelDeficit = req.value - profile.level;
-        }
-        break;
-    }
-  }
-
-  // Calculate compatibility score (0-100)
-  const totalRequirements = requirements.length;
-  const metRequirements =
-    totalRequirements - skillDeficits.length - statDeficits.length - (levelDeficit > 0 ? 1 : 0);
-  const compatibilityScore =
-    totalRequirements > 0 ? Math.round((metRequirements / totalRequirements) * 100) : 100;
-
-  // Calculate skill gap (average deficit across all skill requirements)
-  const allSkillReqs = requirements.filter((req) => req.type === 'skill');
-  let averageSkillGap = 0;
-
-  if (allSkillReqs.length > 0) {
-    const totalGap = skillDeficits.reduce((sum, deficit) => sum + deficit.deficit, 0);
-    averageSkillGap = Math.round(totalGap / allSkillReqs.length);
-  }
-
-  return {
-    canCast,
-    compatibilityScore,
-    averageSkillGap,
-    skillDeficits,
-    statDeficits,
-    levelDeficit,
-    memoryUsage: nano.memoryUsage || 0,
-    nanoPointCost: nano.nanoPointCost || 0,
-  };
-};
+const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null =>
+  characterStats.value ? getNanoCompatibility(nano, characterStats.value) : null;
 
 const handleNanoSelect = (nano: NanoProgram) => {
   emit('nano-select', nano);

@@ -48,14 +48,14 @@ describe.skipIf(!BACKEND_AVAILABLE)('Backend Integration Tests', () => {
     expect(firstNano).toHaveProperty('name');
     expect(firstNano).toHaveProperty('ql', firstNano.qualityLevel); // qualityLevel mirrors ql
     expect(firstNano).toHaveProperty('school');
-    expect(firstNano).toHaveProperty('castingRequirements');
-    expect(Array.isArray(firstNano.castingRequirements)).toBe(true);
+    expect(firstNano).toHaveProperty('actions');
+    expect(Array.isArray(firstNano.actions)).toBe(true);
 
     console.log('Sample nano data:', {
       name: firstNano.name,
       school: firstNano.school,
       ql: firstNano.qualityLevel,
-      castingRequirements: firstNano.castingRequirements?.length || 0,
+      actions: firstNano.actions?.length || 0,
     });
   }, 10000);
 

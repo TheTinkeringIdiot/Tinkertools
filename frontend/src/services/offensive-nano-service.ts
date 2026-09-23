@@ -249,7 +249,6 @@ export function buildOffensiveNano(item: ItemDetail): OffensiveNano | null {
     description: item.description || '',
     level: extractLevel(item),
     qualityLevel: item.ql || 0,
-    castingRequirements: [], // Legacy field, use item.actions instead
 
     // Offensive-specific fields
     minDamage,

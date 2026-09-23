@@ -7,7 +7,8 @@
  * @see /frontend/src/types/nano.ts - NanoProgram interface
  */
 
-import type { NanoProgram, NanoSchool, CastingRequirement } from '@/types/nano';
+import type { Action } from '@/types/api';
+import type { NanoProgram, NanoSchool } from '@/types/nano';
 
 // ============================================================================
 // Nano Creation Factory
@@ -26,7 +27,7 @@ export interface NanoCreationOptions {
   rechargeTime?: number;
   level?: number;
   profession?: string;
-  castingRequirements?: CastingRequirement[];
+  actions?: Action[];
 }
 
 /**
@@ -53,7 +54,7 @@ export function createTestNano(options: NanoCreationOptions = {}): NanoProgram {
     rechargeTime = 30,
     level = 100,
     profession = 'All',
-    castingRequirements = [],
+    actions = [],
   } = options;
 
   return {
@@ -69,7 +70,7 @@ export function createTestNano(options: NanoCreationOptions = {}): NanoProgram {
     level,
     qualityLevel: ql,
     profession,
-    castingRequirements,
+    actions,
     effects: [],
   };
 }
@@ -94,7 +95,7 @@ export const mockNano1: NanoProgram = {
   level: 150,
   qualityLevel: 200,
   profession: 'Adventurer',
-  castingRequirements: [],
+  actions: [],
   effects: [],
 };
 
@@ -114,7 +115,7 @@ export const mockNano2: NanoProgram = {
   level: 160,
   qualityLevel: 220,
   profession: 'Adventurer',
-  castingRequirements: [],
+  actions: [],
   effects: [],
 };
 
@@ -135,7 +136,7 @@ export const mockNanoHighPriority: NanoProgram = {
   level: 180,
   qualityLevel: 250,
   profession: 'Adventurer',
-  castingRequirements: [],
+  actions: [],
   effects: [],
 };
 
@@ -156,7 +157,7 @@ export const mockNanoLowPriority: NanoProgram = {
   level: 120,
   qualityLevel: 150,
   profession: 'Adventurer',
-  castingRequirements: [],
+  actions: [],
   effects: [],
 };
 
@@ -177,7 +178,7 @@ export const mockNanoHighNCU: NanoProgram = {
   level: 200,
   qualityLevel: 300,
   profession: 'All',
-  castingRequirements: [],
+  actions: [],
   effects: [],
 };
 
@@ -267,38 +268,29 @@ export function createPriorityTestSet(): NanoProgram[] {
 // ============================================================================
 
 /**
- * Create a casting requirement
+ * Create a nano's Use action (action 3), whose criteria are its casting
+ * requirements, from raw [value1, value2, operator] criteria as the /nanos
+ * endpoints return them
+ *
+ * @example
+ * // Matter Creation > 99 AND Time and Space > 99 (i.e. both >= 100)
+ * createNanoUseAction([[130, 99, 2], [131, 99, 2], [0, 0, 4]]);
  */
-export function createCastingRequirement(
-  type: 'skill' | 'stat' | 'level',
-  requirement: number | string,
-  value: number
-): CastingRequirement {
+export function createNanoUseAction(
+  criteria: Array<[value1: number, value2: number, operator: number]>,
+  itemId: number = 1
+): Action {
   return {
-    type,
-    requirement,
-    value,
-    operator: 'GreaterThan',
-    critical: true,
+    id: itemId,
+    action: 3,
+    item_id: itemId,
+    criteria: criteria.map(([value1, value2, operator], index) => ({
+      id: itemId * 100 + index,
+      value1,
+      value2,
+      operator,
+    })),
   };
-}
-
-/**
- * Create a nano with skill requirements
- * Accepts skill IDs (number) or skill names (string)
- */
-export function createNanoWithRequirements(
-  requirements: Array<[number | string, number]>,
-  options: Partial<NanoCreationOptions> = {}
-): NanoProgram {
-  const castingRequirements = requirements.map(([skill, value]) =>
-    createCastingRequirement('skill', skill, value)
-  );
-
-  return createTestNano({
-    castingRequirements,
-    ...options,
-  });
 }
 
 // ============================================================================

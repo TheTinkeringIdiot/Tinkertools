@@ -182,24 +182,18 @@ Shows nano information with compatibility indicators and quick actions
           </div>
 
           <!-- Casting Requirements -->
-          <div
-            v-if="nano.castingRequirements && nano.castingRequirements.length > 0"
-            class="space-y-2"
-          >
+          <div v-if="requirements.length > 0" class="space-y-2">
             <span class="text-sm font-medium text-surface-700 dark:text-surface-300"
               >Requirements:</span
             >
             <div class="space-y-1">
               <div
-                v-for="(req, index) in nano.castingRequirements.slice(
-                  0,
-                  showCompatibility ? 99 : 3
-                )"
-                :key="index"
+                v-for="req in requirements.slice(0, showCompatibility ? 99 : 3)"
+                :key="req.id"
                 class="flex items-center justify-between text-xs"
               >
                 <span class="text-surface-600 dark:text-surface-400">
-                  {{ formatRequirement(req) }}
+                  {{ req.description }}
                 </span>
                 <span
                   v-if="showCompatibility && compatibilityInfo"
@@ -209,10 +203,10 @@ Shows nano information with compatibility indicators and quick actions
                 </span>
               </div>
               <div
-                v-if="!showCompatibility && nano.castingRequirements.length > 3"
+                v-if="!showCompatibility && requirements.length > 3"
                 class="text-xs text-surface-500 dark:text-surface-400"
               >
-                +{{ nano.castingRequirements.length - 3 }} more requirements
+                +{{ requirements.length - 3 }} more requirements
               </div>
             </div>
           </div>
@@ -231,16 +225,9 @@ Shows nano information with compatibility indicators and quick actions
                   Cannot Cast
                 </div>
                 <div class="text-xs text-orange-700 dark:text-orange-300">
-                  <div v-if="compatibilityInfo.skillDeficits.length > 0">
-                    Skill gaps:
-                    {{
-                      compatibilityInfo.skillDeficits
-                        .map((d) => `${d.skill} (${d.deficit})`)
-                        .join(', ')
-                    }}
-                  </div>
-                  <div v-if="compatibilityInfo.levelDeficit > 0">
-                    Level gap: {{ compatibilityInfo.levelDeficit }} levels
+                  <div v-for="req in compatibilityInfo.unmetRequirements" :key="req.stat">
+                    {{ req.statName }} {{ req.operator }} {{ req.required }} (have
+                    {{ req.current }})
                   </div>
                 </div>
               </div>
@@ -260,13 +247,9 @@ import Button from 'primevue/button';
 import Card from 'primevue/card';
 import Chip from 'primevue/chip';
 
-import type {
-  NanoProgram,
-  NanoCompatibilityInfo,
-  CastingRequirement,
-  NanoEffect,
-  TinkerProfile,
-} from '@/types/nano';
+import type { DisplayCriterion } from '@/services/action-criteria';
+import type { NanoProgram, NanoCompatibilityInfo, NanoEffect } from '@/types/nano';
+import { getNanoRequirements } from './nano-compatibility';
 
 // Props
 const props = withDefaults(
@@ -274,13 +257,11 @@ const props = withDefaults(
     nano: NanoProgram;
     compact?: boolean;
     showCompatibility?: boolean;
-    activeProfile?: TinkerProfile | null;
     compatibilityInfo?: NanoCompatibilityInfo | null;
   }>(),
   {
     compact: false,
     showCompatibility: false,
-    activeProfile: null,
     compatibilityInfo: null,
   }
 );
@@ -295,6 +276,8 @@ const emit = defineEmits<{
 const isFavorite = ref(false);
 
 // Computed
+const requirements = computed(() => getNanoRequirements(props.nano));
+
 const schoolAvatarClass = computed(() => {
   const schoolColors: Record<string, string> = {
     'Matter Metamorphosis': 'bg-red-500 text-white',
@@ -339,14 +322,8 @@ const compatibilityTooltip = computed(() => {
   if (props.compatibilityInfo.canCast) {
     return 'Can cast this nano';
   } else {
-    const gaps = [];
-    if (props.compatibilityInfo.skillDeficits.length > 0) {
-      gaps.push(`${props.compatibilityInfo.skillDeficits.length} skill gaps`);
-    }
-    if (props.compatibilityInfo.levelDeficit > 0) {
-      gaps.push(`${props.compatibilityInfo.levelDeficit} level gap`);
-    }
-    return `Cannot cast: ${gaps.join(', ')}`;
+    const unmet = props.compatibilityInfo.unmetRequirements.length;
+    return `Cannot cast: ${unmet} unmet requirement${unmet === 1 ? '' : 's'}`;
   }
 });
 
@@ -392,64 +369,18 @@ const formatEffect = (effect: NanoEffect): string => {
   return typeLabels[effect.type] || effect.type;
 };
 
-const formatRequirement = (req: CastingRequirement): string => {
-  const capitalizeFirst = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
+const findUnmet = (req: DisplayCriterion) =>
+  props.compatibilityInfo?.unmetRequirements.find((unmet) => unmet.stat === req.stat);
 
-  switch (req.type) {
-    case 'skill':
-      return `${capitalizeFirst(req.requirement as string)}: ${req.value}`;
-    case 'stat':
-      return `${capitalizeFirst(req.requirement as string)}: ${req.value}`;
-    case 'level':
-      return `Level: ${req.value}`;
-    default:
-      return `${capitalizeFirst(req.requirement as string)}: ${req.value}`;
-  }
+const getRequirementStatus = (req: DisplayCriterion): string => {
+  const unmet = findUnmet(req);
+  return unmet ? `${unmet.current}/${unmet.required}` : '✓';
 };
 
-const getRequirementStatus = (req: CastingRequirement): string => {
-  if (!props.activeProfile || !props.compatibilityInfo) return '';
-
-  const profile = props.activeProfile;
-  let currentValue = 0;
-
-  switch (req.type) {
-    case 'skill':
-      currentValue = profile.skills[req.requirement as string] || 0;
-      break;
-    case 'stat':
-      currentValue = profile.stats[req.requirement as string] || 0;
-      break;
-    case 'level':
-      currentValue = profile.level;
-      break;
-  }
-
-  return currentValue >= req.value ? '✓' : `${currentValue}/${req.value}`;
-};
-
-const getRequirementStatusClass = (req: CastingRequirement): string => {
-  if (!props.activeProfile) return '';
-
-  const profile = props.activeProfile;
-  let currentValue = 0;
-
-  switch (req.type) {
-    case 'skill':
-      currentValue = profile.skills[req.requirement as string] || 0;
-      break;
-    case 'stat':
-      currentValue = profile.stats[req.requirement as string] || 0;
-      break;
-    case 'level':
-      currentValue = profile.level;
-      break;
-  }
-
-  return currentValue >= req.value
-    ? 'text-green-600 dark:text-green-400 font-medium'
-    : 'text-red-600 dark:text-red-400';
-};
+const getRequirementStatusClass = (req: DisplayCriterion): string =>
+  findUnmet(req)
+    ? 'text-red-600 dark:text-red-400'
+    : 'text-green-600 dark:text-green-400 font-medium';
 
 const handleSelect = () => {
   emit('select', props.nano);

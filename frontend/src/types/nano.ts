@@ -1,5 +1,7 @@
 // Nano-related TypeScript types for TinkerNanos application
 
+import type { Action } from './api';
+
 export interface NanoProgram {
   id: number;
   aoid?: number;
@@ -9,8 +11,8 @@ export interface NanoProgram {
   strain: string;
   description?: string;
 
-  // Casting requirements
-  castingRequirements?: CastingRequirement[];
+  // The nano item's actions; the Use action's criteria are its casting requirements
+  actions?: Action[];
   nanoPointCost?: number;
   castingTime?: number;
   rechargeTime?: number;
@@ -27,14 +29,6 @@ export interface NanoProgram {
   sourceLocation?: string;
   acquisitionMethod?: string;
   memoryUsage?: number;
-}
-
-export interface CastingRequirement {
-  type: 'skill' | 'stat' | 'nano' | 'item' | 'level';
-  requirement: number | string;
-  value: number;
-  operator?: string; // 'GreaterThan' | 'LessThan' | 'Equal' | etc.
-  critical?: boolean; // Must be met vs recommended
 }
 
 export interface NanoEffect {
@@ -102,43 +96,22 @@ export interface NanoFilters {
   sortDescending?: boolean;
 }
 
-// Character profile for compatibility checking
-export interface TinkerProfile {
-  id: string;
-  name: string;
-  profession: string;
-  level: number;
-  skills: Record<string, number>;
-  stats: Record<string, number>;
-  activeNanos?: number[];
-  memoryCapacity?: number;
-  nanoPoints?: number;
-}
-
 // Compatibility analysis results
 export interface NanoCompatibilityInfo {
   canCast: boolean;
   compatibilityScore: number; // 0-100
-  averageSkillGap: number;
-  skillDeficits: SkillDeficit[];
-  statDeficits: StatDeficit[];
-  levelDeficit: number;
+  unmetRequirements: UnmetNanoRequirement[];
   memoryUsage: number;
   nanoPointCost: number;
 }
 
-export interface SkillDeficit {
-  skill: string;
-  current: number;
+/** A casting requirement the character does not meet, from checkActionRequirements */
+export interface UnmetNanoRequirement {
+  stat: number;
+  statName: string;
   required: number;
-  deficit: number;
-}
-
-export interface StatDeficit {
-  stat: string;
   current: number;
-  required: number;
-  deficit: number;
+  operator: string;
 }
 
 // Nano lineup management
@@ -249,81 +222,7 @@ export interface FacetCount {
   count: number;
 }
 
-// Analysis and recommendations
-export interface NanoAnalysisResult {
-  character: TinkerProfile;
-  availableNanos: CastingAnalysis[];
-  effects: EffectAnalysis[];
-  interactions: EffectInteraction[];
-  recommendedLineups: NanoLineup[];
-  timestamp: Date;
-}
-
-export interface CastingAnalysis {
-  nanoId: number;
-  character: TinkerProfile;
-  analysis: CastingResult;
-  recommendations: CastingRecommendation[];
-  alternatives: AlternativeNano[];
-}
-
-export interface CastingResult {
-  canCast: boolean;
-  successRate: number;
-  requirements: RequirementCheck[];
-  resourceCosts: ResourceCost;
-  limitations: CastingLimitation[];
-  optimizations: CastingOptimization[];
-}
-
-export interface RequirementCheck {
-  requirement: CastingRequirement;
-  met: boolean;
-  currentValue: number;
-  shortfall: number;
-  timeToMeet?: number;
-}
-
-export interface ResourceCost {
-  nanoPoints: number;
-  nanoPointsPercentage: number;
-  castingTime: number;
-  rechargeTime: number;
-  opportunity: OpportunityCost;
-}
-
-export interface OpportunityCost {
-  alternativeNanos: number;
-  memoryUsage: number;
-  conflictingEffects: number;
-}
-
-export interface CastingLimitation {
-  type: string;
-  description: string;
-  severity: 'low' | 'medium' | 'high';
-}
-
-export interface CastingOptimization {
-  type: string;
-  description: string;
-  benefit: number;
-}
-
-export interface CastingRecommendation {
-  type: string;
-  description: string;
-  priority: number;
-  actionRequired: string;
-}
-
-export interface AlternativeNano {
-  nanoId: number;
-  similarity: number;
-  advantages: string[];
-  disadvantages: string[];
-}
-
+// Effect analysis
 export interface EffectAnalysis {
   effectId: string;
   effects: NanoEffect[];

@@ -307,7 +307,8 @@ import Dropdown from 'primevue/dropdown';
 import MultiSelect from 'primevue/multiselect';
 import Slider from 'primevue/slider';
 
-import type { NanoFilters, TinkerProfile } from '@/types/nano';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { NanoFilters } from '@/types/nano';
 
 // Types
 interface FilterPreset {
@@ -340,7 +341,7 @@ const props = withDefaults(
   defineProps<{
     modelValue: NanoFilters;
     showCompatibility?: boolean;
-    activeProfile?: TinkerProfile | null;
+    activeProfile?: ReadonlyTinkerProfile | null;
     availableStrains?: string[];
   }>(),
   {

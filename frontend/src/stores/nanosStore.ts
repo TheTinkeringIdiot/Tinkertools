@@ -9,11 +9,11 @@ import type {
   NanoPreferences,
   NanoSearchRequest,
   NanoSchool,
-  CastingRequirement,
   NanoEffect,
   EffectDuration,
   TargetingData,
 } from '@/types/nano';
+import type { Action } from '@/types/api';
 
 /** A nano program as the /nanos endpoints return it */
 interface BackendNanoProgram {
@@ -26,7 +26,7 @@ interface BackendNanoProgram {
   strain: string;
   profession?: string;
   level: number;
-  casting_requirements?: CastingRequirement[];
+  actions?: Action[];
   casting_time?: number;
   recharge_time?: number;
   memory_usage?: number;
@@ -49,7 +49,7 @@ function toNanoProgram(item: BackendNanoProgram): NanoProgram {
     strain: item.strain,
     profession: item.profession,
     level: item.level,
-    castingRequirements: item.casting_requirements || [],
+    actions: item.actions ?? [],
     castingTime: item.casting_time,
     rechargeTime: item.recharge_time,
     memoryUsage: item.memory_usage,

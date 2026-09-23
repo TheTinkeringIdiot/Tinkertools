@@ -58,55 +58,6 @@ export function filterByCharacterProfile(
 }
 
 // ============================================================================
-// Skill Requirement Filtering (Legacy - prefer filterByCharacterProfile)
-// ============================================================================
-
-/**
- * Filter nanos by skill requirements only
- *
- * Returns only nanos where ALL skill requirements are met.
- * Uses ID-based skill lookup for O(1) access performance.
- *
- * @deprecated Use filterByCharacterProfile for complete validation
- * @param nanos - Array of offensive nanos to filter
- * @param skills - Record mapping skill ID to current skill value
- * @returns Filtered array of nanos where all requirements are met
- *
- * @example
- * const skills = { 126: 850, 127: 600, 128: 400 }
- * const usableNanos = filterBySkillRequirements(allNanos, skills)
- */
-export function filterBySkillRequirements(
-  nanos: OffensiveNano[],
-  skills: Record<number, number>
-): OffensiveNano[] {
-  return nanos.filter((nano) => {
-    // No requirements means nano is always usable
-    if (!nano.castingRequirements || nano.castingRequirements.length === 0) {
-      return true;
-    }
-
-    // Check all skill requirements
-    return nano.castingRequirements.every((requirement) => {
-      // Only check skill requirements (ignore stat, level, etc.)
-      if (requirement.type !== 'skill') {
-        return true;
-      }
-
-      // Get skill ID from requirement
-      const skillId =
-        typeof requirement.requirement === 'number'
-          ? requirement.requirement
-          : parseInt(requirement.requirement as string, 10);
-
-      // Check if skill value meets requirement
-      const currentSkillValue = skills[skillId] ?? 0;
-      return currentSkillValue >= requirement.value;
-    });
-  });
-}
-
-// ============================================================================
 // School Filtering
 // ============================================================================
 
@@ -287,7 +238,6 @@ export function calculateUsabilityStatus(
  *   schoolId: 126,
  *   minQL: 100,
  *   maxQL: 200,
- *   skills: { 126: 850, 127: 600 },
  *   searchQuery: "nuke"
  * })
  */
@@ -297,7 +247,6 @@ export function applyNanoFilters(
     schoolId?: number | null;
     minQL?: number;
     maxQL?: number;
-    skills?: Record<number, number>;
     searchQuery?: string;
   }
 ): OffensiveNano[] {
@@ -311,11 +260,6 @@ export function applyNanoFilters(
   // Apply QL range filter
   if (options.minQL !== undefined && options.maxQL !== undefined) {
     filtered = filterByQLRange(filtered, options.minQL, options.maxQL);
-  }
-
-  // Apply skill requirements filter
-  if (options.skills) {
-    filtered = filterBySkillRequirements(filtered, options.skills);
   }
 
   // Apply name search

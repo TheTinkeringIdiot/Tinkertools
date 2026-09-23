@@ -91,19 +91,13 @@ Browse nano programs by profession or search across all nanos
     </div>
 
     <!-- Nano Detail Dialog -->
-    <Dialog
+    <NanoDetail
       v-model:visible="showNanoDetail"
-      :header="selectedNano?.name || 'Nano Details'"
-      :modal="true"
-      :style="{ width: '50vw' }"
-    >
-      <NanoDetail
-        :nano="selectedNano"
-        :active-profile="activeProfile"
-        :show-compatibility="showSkillCompatibility"
-        @close="showNanoDetail = false"
-      />
-    </Dialog>
+      :nano="selectedNano"
+      :active-profile="activeProfile"
+      :show-compatibility="showSkillCompatibility"
+      @close="showNanoDetail = false"
+    />
   </div>
 </template>
 
@@ -111,7 +105,6 @@ Browse nano programs by profession or search across all nanos
 import { ref, computed, watch } from 'vue';
 import Badge from 'primevue/badge';
 import Button from 'primevue/button';
-import Dialog from 'primevue/dialog';
 import ProgressSpinner from 'primevue/progressspinner';
 import ProfessionList from '@/components/nanos/ProfessionList.vue';
 import ProfessionNanoDisplay from '@/components/nanos/ProfessionNanoDisplay.vue';
