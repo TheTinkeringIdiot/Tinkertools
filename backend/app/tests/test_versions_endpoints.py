@@ -177,7 +177,9 @@ class TestListVersions:
         assert prk["features"] == {}
         assert "schema_name" not in prk
 
-    def test_marks_the_request_version_as_current(self, client, game_versions, patched_registry):
+    def test_marks_the_request_version_as_current(
+        self, client, game_versions, patched_registry
+    ):
         response = client.get("/api/v1/prk/versions")
         assert response.status_code == 200
 
@@ -251,7 +253,9 @@ class TestCurrentVersion:
         assert response.status_code == 200
         assert "X-Game-Version-Fallback" not in response.headers
 
-    def test_missing_registry_serves_any_slug_from_the_default(self, client, monkeypatch):
+    def test_missing_registry_serves_any_slug_from_the_default(
+        self, client, monkeypatch
+    ):
         # public.game_versions missing or empty: the frontend still prefixes a
         # slug, and the API must degrade to the default version, not 404.
         registry = versions_module.registry

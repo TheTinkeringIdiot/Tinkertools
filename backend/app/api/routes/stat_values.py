@@ -17,11 +17,7 @@ router = APIRouter(prefix="/stat-values", tags=["stat-values"])
 @router.get("", response_model=List[StatValueResponse])
 @cached_response("stats")
 @performance_monitor
-def get_stat_values(
-    skip: int = 0,
-    limit: int = 100,
-    db: Session = Depends(get_db)
-):
+def get_stat_values(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """
     Get list of stat values.
     """
@@ -37,8 +33,8 @@ def get_stat_value(stat_value_id: int, db: Session = Depends(get_db)):
     Get a specific stat value by ID.
     """
     stat_value = db.query(StatValue).filter(StatValue.id == stat_value_id).first()
-    
+
     if not stat_value:
         raise HTTPException(status_code=404, detail="Stat value not found")
-    
+
     return stat_value

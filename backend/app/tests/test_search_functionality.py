@@ -85,7 +85,9 @@ class TestItemSearch:
     def test_sorting_functionality(self, client):
         """Test sorting options."""
         # Sort by QL ascending
-        response = client.get("/api/v1/items/filter?sort_by=ql&sort_order=asc&page_size=10")
+        response = client.get(
+            "/api/v1/items/filter?sort_by=ql&sort_order=asc&page_size=10"
+        )
         assert response.status_code == 200
         data = response.json()
 
@@ -95,7 +97,9 @@ class TestItemSearch:
             assert qls == sorted(qls)
 
         # Sort by name descending
-        response = client.get("/api/v1/items/filter?sort_by=name&sort_order=desc&page_size=10")
+        response = client.get(
+            "/api/v1/items/filter?sort_by=name&sort_order=desc&page_size=10"
+        )
         assert response.status_code == 200
         data = response.json()
 
@@ -120,7 +124,9 @@ class TestStatBasedQueries:
 
     def test_multiple_stat_requirements(self, client):
         """Test multiple stat requirements with AND logic."""
-        response = client.get("/api/v1/items/with-stats?stat_requirements=16:>=50,17:>=50&logic=and")
+        response = client.get(
+            "/api/v1/items/with-stats?stat_requirements=16:>=50,17:>=50&logic=and"
+        )
         assert response.status_code in [200, 422]
 
         if response.status_code == 200:
@@ -129,7 +135,9 @@ class TestStatBasedQueries:
 
     def test_multiple_stat_requirements_or(self, client):
         """Test multiple stat requirements with OR logic."""
-        response = client.get("/api/v1/items/with-stats?stat_requirements=16:>=50,17:>=50&logic=or")
+        response = client.get(
+            "/api/v1/items/with-stats?stat_requirements=16:>=50,17:>=50&logic=or"
+        )
         assert response.status_code in [200, 422]
 
         if response.status_code == 200:
@@ -217,7 +225,9 @@ class TestPocketBossSearch:
 
     def test_boss_level_filtering(self, client):
         """Test filtering bosses by level."""
-        response = client.get("/api/v1/mobs?is_pocket_boss=true&min_level=100&max_level=200")
+        response = client.get(
+            "/api/v1/mobs?is_pocket_boss=true&min_level=100&max_level=200"
+        )
         assert response.status_code == 200
         data = response.json()
 
@@ -255,7 +265,9 @@ class TestPocketBossSearch:
         from app.tests.db_test_constants import MOB_ID_ADOBE_SUZERAIN
 
         # Get symbiant drops for a specific boss, filtered by family
-        response = client.get(f"/api/v1/mobs/{MOB_ID_ADOBE_SUZERAIN}/drops?family=Artillery")
+        response = client.get(
+            f"/api/v1/mobs/{MOB_ID_ADOBE_SUZERAIN}/drops?family=Artillery"
+        )
         assert response.status_code == 200
         data = response.json()
 
@@ -435,7 +447,9 @@ class TestPaginationAndEdgeCases:
 
     def test_invalid_stat_requirements_format(self, client):
         """Test invalid stat requirement formats are handled."""
-        response = client.get("/api/v1/items/with-stats?stat_requirements=invalid_format")
+        response = client.get(
+            "/api/v1/items/with-stats?stat_requirements=invalid_format"
+        )
         assert response.status_code in [200, 422, 400]
         # Should either handle gracefully (200) or return proper error code
 
@@ -445,16 +459,28 @@ class TestPaginationAndEdgeCases:
         endpoints = [
             "/api/v1/items",
             "/api/v1/spells",
-            "/api/v1/mobs?is_pocket_boss=true"
+            "/api/v1/mobs?is_pocket_boss=true",
         ]
 
         for endpoint in endpoints:
-            response = client.get(f"{endpoint}?page=1&page_size=5" if "?" not in endpoint else f"{endpoint}&page=1&page_size=5")
+            response = client.get(
+                f"{endpoint}?page=1&page_size=5"
+                if "?" not in endpoint
+                else f"{endpoint}&page=1&page_size=5"
+            )
             assert response.status_code == 200, f"Endpoint {endpoint} failed"
             data = response.json()
 
             # Check required pagination fields
-            required_fields = ["items", "total", "page", "page_size", "pages", "has_next", "has_prev"]
+            required_fields = [
+                "items",
+                "total",
+                "page",
+                "page_size",
+                "pages",
+                "has_next",
+                "has_prev",
+            ]
             for field in required_fields:
                 assert field in data, f"Missing {field} in {endpoint} response"
 
@@ -526,4 +552,3 @@ class TestRealDataValidation:
 
         response = client.get("/api/v1/mobs/99999999")
         assert response.status_code == 404
-

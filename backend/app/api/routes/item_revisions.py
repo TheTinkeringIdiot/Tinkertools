@@ -45,7 +45,9 @@ def _display_order(versions: Iterable[GameVersion]) -> List[GameVersion]:
     return sorted(versions, key=lambda v: (v.sort_order or 0, v.slug))
 
 
-def ancestry(versions_by_slug: Dict[str, GameVersion], slug: Optional[str]) -> List[str]:
+def ancestry(
+    versions_by_slug: Dict[str, GameVersion], slug: Optional[str]
+) -> List[str]:
     """Slugs from ``slug`` upward through ``parent_slug``, nearest first.
 
     Stops at an unknown slug (a disabled or deleted parent breaks the chain)
@@ -80,7 +82,9 @@ def compute_revision_points(
     carry no information for the history dropdown and are dropped.
     """
     versions_by_slug = {v.slug: v for v in versions}
-    rows_by_slug = {r.version_slug: r for r in rows if r.version_slug in versions_by_slug}
+    rows_by_slug = {
+        r.version_slug: r for r in rows if r.version_slug in versions_by_slug
+    }
 
     points: List[ItemRevisionPoint] = []
 
@@ -112,15 +116,17 @@ def compute_revision_points(
             if not changed:
                 continue
 
-        points.append(ItemRevisionPoint(
-            version_slug=version.slug,
-            display_name=version.display_name,
-            family=version.family,
-            snapshot_date=version.snapshot_date,
-            client_build=version.client_build,
-            changed=changed,
-            first_seen=first_seen,
-        ))
+        points.append(
+            ItemRevisionPoint(
+                version_slug=version.slug,
+                display_name=version.display_name,
+                family=version.family,
+                snapshot_date=version.snapshot_date,
+                client_build=version.client_build,
+                changed=changed,
+                first_seen=first_seen,
+            )
+        )
 
     return points
 
@@ -151,7 +157,10 @@ def _first_seen_in(
     if first_seen_slugs:
         return min(
             (p for p in points if p.first_seen),
-            key=lambda p: (len(ancestry(versions_by_slug, p.version_slug)), p.version_slug),
+            key=lambda p: (
+                len(ancestry(versions_by_slug, p.version_slug)),
+                p.version_slug,
+            ),
         ).version_slug
 
     return points[0].version_slug
@@ -185,9 +194,7 @@ def _enabled_versions(db: Session) -> List[GameVersion]:
 
 @router.post("/revisions/batch", response_model=ItemRevisionsBatchResponse)
 def get_item_revisions_batch(
-    payload: ItemRevisionsBatchRequest,
-    request: Request,
-    db: Session = Depends(get_db)
+    payload: ItemRevisionsBatchRequest, request: Request, db: Session = Depends(get_db)
 ):
     """
     Revision summaries for a page of items.
@@ -201,11 +208,7 @@ def get_item_revisions_batch(
     versions = _enabled_versions(db)
     versions_by_slug = {v.slug: v for v in versions}
 
-    rows = (
-        db.query(ItemRevision)
-        .filter(ItemRevision.aoid.in_(aoids))
-        .all()
-    )
+    rows = db.query(ItemRevision).filter(ItemRevision.aoid.in_(aoids)).all()
 
     rows_by_aoid: Dict[int, List[ItemRevision]] = {aoid: [] for aoid in aoids}
     for row in rows:
@@ -218,21 +221,17 @@ def get_item_revisions_batch(
         items[aoid] = ItemRevisionBatchEntry(
             aoid=aoid,
             revision_count=len(points),
-            latest_change_slug=_latest_change_slug(versions_by_slug, points, current_slug),
-            present_in_current=any(
-                r.version_slug == current_slug for r in aoid_rows
+            latest_change_slug=_latest_change_slug(
+                versions_by_slug, points, current_slug
             ),
+            present_in_current=any(r.version_slug == current_slug for r in aoid_rows),
         )
 
     return ItemRevisionsBatchResponse(items=items)
 
 
 @router.get("/{aoid}/revisions", response_model=ItemRevisionsResponse)
-def get_item_revisions(
-    aoid: int,
-    request: Request,
-    db: Session = Depends(get_db)
-):
+def get_item_revisions(aoid: int, request: Request, db: Session = Depends(get_db)):
     """
     Change history for one item across every enabled game version.
 
@@ -248,11 +247,7 @@ def get_item_revisions(
 
     versions_by_slug = {v.slug: v for v in versions}
 
-    rows = (
-        db.query(ItemRevision)
-        .filter(ItemRevision.aoid == aoid)
-        .all()
-    )
+    rows = db.query(ItemRevision).filter(ItemRevision.aoid == aoid).all()
     present = {r.version_slug for r in rows if r.version_slug in versions_by_slug}
 
     points = compute_revision_points(versions, rows)

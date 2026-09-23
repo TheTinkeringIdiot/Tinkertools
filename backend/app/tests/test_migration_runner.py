@@ -21,21 +21,27 @@ from app.core.versions import InvalidVersionSlug, schema_name_for, validate_sche
 
 
 class TestMigrationVersionParsing:
-    @pytest.mark.parametrize("filename,expected", [
-        ("000_create_migration_table.sql", "000"),
-        ("001_initial_schema.sql", "001"),
-        ("007_add_item_content_hashes.sql", "007"),
-        ("0012_something.sql", "0012"),
-        ("/abs/path/database/migrations/005_refactor_symbiant_system.sql", "005"),
-    ])
+    @pytest.mark.parametrize(
+        "filename,expected",
+        [
+            ("000_create_migration_table.sql", "000"),
+            ("001_initial_schema.sql", "001"),
+            ("007_add_item_content_hashes.sql", "007"),
+            ("0012_something.sql", "0012"),
+            ("/abs/path/database/migrations/005_refactor_symbiant_system.sql", "005"),
+        ],
+    )
     def test_version_is_the_leading_digits(self, filename, expected):
         assert migration_version(filename) == expected
 
-    @pytest.mark.parametrize("filename", [
-        "add_column.sql",
-        "_001_backwards.sql",
-        "readme.md",
-    ])
+    @pytest.mark.parametrize(
+        "filename",
+        [
+            "add_column.sql",
+            "_001_backwards.sql",
+            "readme.md",
+        ],
+    )
     def test_files_without_a_version_prefix_have_no_version(self, filename):
         assert migration_version(filename) is None
 
@@ -48,11 +54,14 @@ class TestMigrationVersionParsing:
         versions = [migration_version(f) for f in sorted(files)]
         assert versions == ["000", "001", "007"]
 
-    @pytest.mark.parametrize("filename,expected", [
-        ("007_add_item_content_hashes.sql", "add_item_content_hashes"),
-        ("001_initial_schema.sql", "initial_schema"),
-        ("000_create_migration_table.sql", "create_migration_table"),
-    ])
+    @pytest.mark.parametrize(
+        "filename,expected",
+        [
+            ("007_add_item_content_hashes.sql", "add_item_content_hashes"),
+            ("001_initial_schema.sql", "initial_schema"),
+            ("000_create_migration_table.sql", "create_migration_table"),
+        ],
+    )
     def test_name_drops_the_version_prefix(self, filename, expected):
         assert migration_name(filename) == expected
 
@@ -71,7 +80,13 @@ class TestStripPsqlDirectives:
 
 class TestAdoptionAllowlist:
     def test_only_allowlisted_tables_are_adopted(self):
-        existing = ["items", "perks", "django_migrations", "pg_stat_statements", "spells"]
+        existing = [
+            "items",
+            "perks",
+            "django_migrations",
+            "pg_stat_statements",
+            "spells",
+        ]
         assert adoptable_tables_present(existing) == ["spells", "items", "perks"]
 
     def test_absent_tables_are_skipped(self):
@@ -96,33 +111,42 @@ class TestAdoptionAllowlist:
 
 
 class TestSchemaNaming:
-    @pytest.mark.parametrize("slug,schema", [
-        ("ao", "gv_ao"),
-        ("prk", "gv_prk"),
-        ("ao-15.0", "gv_ao_15_0"),
-        ("ao-18.8.72", "gv_ao_18_8_72"),
-    ])
+    @pytest.mark.parametrize(
+        "slug,schema",
+        [
+            ("ao", "gv_ao"),
+            ("prk", "gv_prk"),
+            ("ao-15.0", "gv_ao_15_0"),
+            ("ao-18.8.72", "gv_ao_18_8_72"),
+        ],
+    )
     def test_slug_maps_to_schema(self, slug, schema):
         assert schema_name_for(slug) == schema
         assert validate_schema_name(schema) == schema
 
-    @pytest.mark.parametrize("slug", [
-        "AO",               # uppercase
-        "gv_ao; DROP",      # injection attempt
-        "-leading-dash",
-        "",
-        "a" * 41,           # too long
-    ])
+    @pytest.mark.parametrize(
+        "slug",
+        [
+            "AO",  # uppercase
+            "gv_ao; DROP",  # injection attempt
+            "-leading-dash",
+            "",
+            "a" * 41,  # too long
+        ],
+    )
     def test_invalid_slugs_are_rejected(self, slug):
         with pytest.raises(InvalidVersionSlug):
             schema_name_for(slug)
 
-    @pytest.mark.parametrize("schema", [
-        "public",
-        "gv_ao; DROP SCHEMA public",
-        "items",
-        "GV_AO",
-    ])
+    @pytest.mark.parametrize(
+        "schema",
+        [
+            "public",
+            "gv_ao; DROP SCHEMA public",
+            "items",
+            "GV_AO",
+        ],
+    )
     def test_invalid_schema_names_are_rejected(self, schema):
         with pytest.raises(InvalidVersionSlug):
             validate_schema_name(schema)

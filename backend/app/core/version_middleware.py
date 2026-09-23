@@ -52,7 +52,7 @@ class GameVersionMiddleware:
             for route in getattr(app, "routes", []) or []:
                 path = getattr(route, "path", "")
                 if path.startswith(self.prefix + "/"):
-                    segment = path[len(self.prefix) + 1:].split("/", 1)[0]
+                    segment = path[len(self.prefix) + 1 :].split("/", 1)[0]
                     if segment and not segment.startswith("{"):
                         segments.add(segment)
             self._route_segments = segments
@@ -68,7 +68,7 @@ class GameVersionMiddleware:
         fallback_from = None
 
         if path.startswith(self.prefix + "/"):
-            rest = path[len(self.prefix) + 1:]
+            rest = path[len(self.prefix) + 1 :]
             segment, _, tail = rest.partition("/")
             strip = False
             if segment and await run_in_threadpool(registry.is_version, segment):
@@ -118,13 +118,17 @@ class GameVersionMiddleware:
 
     @staticmethod
     async def _unknown_version(send: Send, segment: str) -> None:
-        body = json.dumps({"detail": f"Unknown game version '{segment}'"}).encode("utf-8")
-        await send({
-            "type": "http.response.start",
-            "status": 404,
-            "headers": [
-                (b"content-type", b"application/json"),
-                (b"content-length", str(len(body)).encode("ascii")),
-            ],
-        })
+        body = json.dumps({"detail": f"Unknown game version '{segment}'"}).encode(
+            "utf-8"
+        )
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 404,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"content-length", str(len(body)).encode("ascii")),
+                ],
+            }
+        )
         await send({"type": "http.response.body", "body": body})

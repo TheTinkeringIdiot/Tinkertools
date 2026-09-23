@@ -21,6 +21,7 @@ import time
 
 try:
     from psycopg2 import sql
+
     PSYCOPG2_AVAILABLE = True
 except ImportError:
     PSYCOPG2_AVAILABLE = False
@@ -36,45 +37,93 @@ class StreamingCSVLoader:
     # Format: (table_name, columns, has_id_sequence)
     LOAD_ORDER = [
         # Singleton tables first (no dependencies)
-        ('stat_values', ['id', 'stat', 'value'], True),
-        ('criteria', ['id', 'value1', 'value2', 'operator'], True),
-
+        ("stat_values", ["id", "stat", "value"], True),
+        ("criteria", ["id", "value1", "value2", "operator"], True),
         # Entity tables with no dependencies
-        ('attack_defense', ['id'], True),
-        ('animation_mesh', ['id', 'animation_id', 'mesh_id'], True),
-
+        ("attack_defense", ["id"], True),
+        ("animation_mesh", ["id", "animation_id", "mesh_id"], True),
         # Items table (references attack_defense, animation_mesh)
-        ('items', ['id', 'aoid', 'name', 'ql', 'item_class', 'description', 'is_nano',
-                   'animation_mesh_id', 'atkdef_id', 'content_hash', 'stats_hash',
-                   'spells_hash', 'actions_hash', 'text_hash'], True),
-
+        (
+            "items",
+            [
+                "id",
+                "aoid",
+                "name",
+                "ql",
+                "item_class",
+                "description",
+                "is_nano",
+                "animation_mesh_id",
+                "atkdef_id",
+                "content_hash",
+                "stats_hash",
+                "spells_hash",
+                "actions_hash",
+                "text_hash",
+            ],
+            True,
+        ),
         # Actions (references items)
-        ('actions', ['id', 'action', 'item_id'], True),
-
+        ("actions", ["id", "action", "item_id"], True),
         # SpellData (standalone)
-        ('spell_data', ['id', 'event'], True),
-
+        ("spell_data", ["id", "event"], True),
         # Spells (standalone) - column order must match CSV transformer output
-        ('spells', ['id', 'target', 'tick_count', 'tick_interval', 'spell_id', 'spell_format', 'spell_params'], True),
-
+        (
+            "spells",
+            [
+                "id",
+                "target",
+                "tick_count",
+                "tick_interval",
+                "spell_id",
+                "spell_format",
+                "spell_params",
+            ],
+            True,
+        ),
         # Perks (references items, no separate id - item_id is PK)
-        ('perks', ['item_id', 'name', 'perk_series', 'counter', 'type', 'level_required', 'ai_level_required', 'professions', 'breeds'], False),
-
+        (
+            "perks",
+            [
+                "item_id",
+                "name",
+                "perk_series",
+                "counter",
+                "type",
+                "level_required",
+                "ai_level_required",
+                "professions",
+                "breeds",
+            ],
+            False,
+        ),
         # === SYMBIANTS SECTION ===
         # Mobs (standalone pocket bosses)
-        ('mobs', ['id', 'name', 'level', 'playfield', 'location', 'mob_names', 'is_pocket_boss', 'metadata'], True),
+        (
+            "mobs",
+            [
+                "id",
+                "name",
+                "level",
+                "playfield",
+                "location",
+                "mob_names",
+                "is_pocket_boss",
+                "metadata",
+            ],
+            True,
+        ),
         # Sources (references mobs and source_types)
-        ('sources', ['id', 'source_type_id', 'source_id', 'name', 'metadata'], True),
+        ("sources", ["id", "source_type_id", "source_id", "name", "metadata"], True),
         # Note: item_sources handled separately (requires AOID resolution)
-
         # Junction tables (many-to-many relationships)
-        ('item_stats', ['item_id', 'stat_value_id'], False),
-        ('attack_defense_attack', ['attack_defense_id', 'stat_value_id'], False),
-        ('attack_defense_defense', ['attack_defense_id', 'stat_value_id'], False),
-        ('action_criteria', ['action_id', 'criterion_id', 'order_index'], False),
-        ('spell_criteria', ['spell_id', 'criterion_id'], False),
-        ('spell_data_spells', ['spell_data_id', 'spell_id'], False),
-        ('item_spell_data', ['item_id', 'spell_data_id'], False),
+        ("item_stats", ["item_id", "stat_value_id"], False),
+        ("attack_defense_attack", ["attack_defense_id", "stat_value_id"], False),
+        ("attack_defense_defense", ["attack_defense_id", "stat_value_id"], False),
+        ("action_criteria", ["action_id", "criterion_id", "order_index"], False),
+        ("spell_criteria", ["spell_id", "criterion_id"], False),
+        ("spell_data_spells", ["spell_data_id", "spell_id"], False),
+        ("item_spell_data", ["item_id", "spell_data_id"], False),
     ]
 
     def __init__(self, db_session: Session, csv_dir: str = "/tmp/tinkertools_import"):
@@ -92,10 +141,10 @@ class StreamingCSVLoader:
         self.csv_dir = Path(csv_dir)
         self.dropped_indexes: Dict[str, List[Tuple[str, str]]] = {}
         self.stats = {
-            'tables_loaded': 0,
-            'total_rows': 0,
-            'start_time': time.time(),
-            'errors': []
+            "tables_loaded": 0,
+            "total_rows": 0,
+            "start_time": time.time(),
+            "errors": [],
         }
 
     def load_all(self) -> Dict:
@@ -106,7 +155,7 @@ class StreamingCSVLoader:
             Statistics dictionary with load results
         """
         logger.info(f"Starting streaming CSV load from {self.csv_dir}")
-        self.stats['start_time'] = time.time()
+        self.stats["start_time"] = time.time()
 
         # Verify CSV directory exists
         if not self.csv_dir.exists():
@@ -122,19 +171,21 @@ class StreamingCSVLoader:
             csv_file = self.csv_dir / f"{table_name}.csv"
 
             if csv_file.exists():
-                rows_loaded = self._stream_csv_to_table(table_name, columns, csv_file, has_id_seq)
-                self.stats['tables_loaded'] += 1
-                self.stats['total_rows'] += rows_loaded
+                rows_loaded = self._stream_csv_to_table(
+                    table_name, columns, csv_file, has_id_seq
+                )
+                self.stats["tables_loaded"] += 1
+                self.stats["total_rows"] += rows_loaded
                 logger.info(f"Loaded {rows_loaded} rows into {table_name}")
             else:
                 logger.warning(f"CSV file not found (skipping): {csv_file}")
 
         # === SPECIAL HANDLING: ItemSources with AOID resolution ===
-        item_sources_csv = self.csv_dir / 'item_sources.csv'
+        item_sources_csv = self.csv_dir / "item_sources.csv"
         if item_sources_csv.exists():
             rows_loaded = self._load_item_sources_with_aoid_resolution(item_sources_csv)
-            self.stats['tables_loaded'] += 1
-            self.stats['total_rows'] += rows_loaded
+            self.stats["tables_loaded"] += 1
+            self.stats["total_rows"] += rows_loaded
             logger.info(f"Loaded {rows_loaded} rows into item_sources")
 
         # Rebuild indexes
@@ -143,10 +194,12 @@ class StreamingCSVLoader:
 
         # === POST-LOAD: Refresh materialized view ===
         try:
-            symbiant_items_exists = self.db.execute(text(
-                "SELECT EXISTS (SELECT 1 FROM pg_matviews "
-                "WHERE matviewname = 'symbiant_items' AND schemaname = current_schema())"
-            )).scalar()
+            symbiant_items_exists = self.db.execute(
+                text(
+                    "SELECT EXISTS (SELECT 1 FROM pg_matviews "
+                    "WHERE matviewname = 'symbiant_items' AND schemaname = current_schema())"
+                )
+            ).scalar()
 
             if symbiant_items_exists:
                 logger.info("Refreshing symbiant_items materialized view...")
@@ -157,18 +210,23 @@ class StreamingCSVLoader:
             logger.warning(f"Failed to refresh symbiant_items view: {e}")
 
         # Calculate final stats
-        elapsed = time.time() - self.stats['start_time']
-        self.stats['total_time'] = elapsed
-        self.stats['rows_per_second'] = self.stats['total_rows'] / elapsed if elapsed > 0 else 0
+        elapsed = time.time() - self.stats["start_time"]
+        self.stats["total_time"] = elapsed
+        self.stats["rows_per_second"] = (
+            self.stats["total_rows"] / elapsed if elapsed > 0 else 0
+        )
 
-        logger.info(f"Load complete: {self.stats['tables_loaded']} tables, "
-                   f"{self.stats['total_rows']} rows in {elapsed:.1f}s "
-                   f"({self.stats['rows_per_second']:.0f} rows/sec)")
+        logger.info(
+            f"Load complete: {self.stats['tables_loaded']} tables, "
+            f"{self.stats['total_rows']} rows in {elapsed:.1f}s "
+            f"({self.stats['rows_per_second']:.0f} rows/sec)"
+        )
 
         return self.stats
 
-    def _stream_csv_to_table(self, table_name: str, columns: List[str],
-                             csv_file: Path, has_id_sequence: bool) -> int:
+    def _stream_csv_to_table(
+        self, table_name: str, columns: List[str], csv_file: Path, has_id_sequence: bool
+    ) -> int:
         """
         Stream CSV file directly to database via COPY.
 
@@ -190,36 +248,39 @@ class StreamingCSVLoader:
 
         # Build COPY SQL statement (TEXT format with tab delimiter, \\N as NULL)
         copy_sql = sql.SQL("COPY {} ({}) FROM STDIN").format(
-            sql.Identifier(table_name),
-            sql.SQL(', ').join(map(sql.Identifier, columns))
+            sql.Identifier(table_name), sql.SQL(", ").join(map(sql.Identifier, columns))
         )
 
         # Stream file directly to database (no Python list building!)
         try:
-            with open(csv_file, 'r', encoding='utf-8') as f:
+            with open(csv_file, "r", encoding="utf-8") as f:
                 # Convert SQL object to string using cursor for proper context
                 sql_string = copy_sql.as_string(cursor)
                 cursor.copy_expert(sql_string, f)
 
             # Get row count
-            count_sql = sql.SQL("SELECT COUNT(*) FROM {}").format(sql.Identifier(table_name))
+            count_sql = sql.SQL("SELECT COUNT(*) FROM {}").format(
+                sql.Identifier(table_name)
+            )
             cursor.execute(count_sql.as_string(cursor))
             row_count = cursor.fetchone()[0]
 
             # Update sequence if table has auto-incrementing ID
-            if has_id_sequence and 'id' in columns:
+            if has_id_sequence and "id" in columns:
                 self._update_sequence(table_name)
 
             elapsed = time.time() - start
-            logger.info(f"Loaded {row_count} rows into {table_name} in {elapsed:.2f}s "
-                       f"({row_count/elapsed:.0f} rows/sec)")
+            logger.info(
+                f"Loaded {row_count} rows into {table_name} in {elapsed:.2f}s "
+                f"({row_count/elapsed:.0f} rows/sec)"
+            )
 
             return row_count
 
         except Exception as e:
             error_msg = f"Failed to load {table_name}: {e}"
             logger.error(error_msg)
-            self.stats['errors'].append(error_msg)
+            self.stats["errors"].append(error_msg)
             # Re-raise to trigger rollback
             raise
 
@@ -231,10 +292,12 @@ class StreamingCSVLoader:
             table_name: Table name (sequence name derived as {table}_id_seq)
         """
         try:
-            self.db.execute(text(
-                f"SELECT setval('{table_name}_id_seq', "
-                f"COALESCE((SELECT MAX(id) FROM {table_name}), 1), true)"
-            ))
+            self.db.execute(
+                text(
+                    f"SELECT setval('{table_name}_id_seq', "
+                    f"COALESCE((SELECT MAX(id) FROM {table_name}), 1), true)"
+                )
+            )
             logger.debug(f"Updated sequence for {table_name}")
         except Exception as e:
             logger.warning(f"Failed to update sequence for {table_name}: {e}")
@@ -253,7 +316,9 @@ class StreamingCSVLoader:
         start = time.time()
 
         # Build AOID -> item_id mapping
-        result = self.db.execute(text("SELECT id, aoid FROM items WHERE aoid IS NOT NULL"))
+        result = self.db.execute(
+            text("SELECT id, aoid FROM items WHERE aoid IS NOT NULL")
+        )
         aoid_to_id = {row[1]: row[0] for row in result}
         logger.info(f"Built AOID mapping for {len(aoid_to_id)} items")
 
@@ -261,15 +326,15 @@ class StreamingCSVLoader:
         resolved_rows = []
         skipped = 0
 
-        with open(csv_file, 'r', encoding='utf-8') as f:
+        with open(csv_file, "r", encoding="utf-8") as f:
             for line in f:
-                parts = line.strip().split('\t')
+                parts = line.strip().split("\t")
                 if len(parts) < 7:
                     skipped += 1
                     continue
 
                 aoid_str = parts[0]
-                if aoid_str == '\\N':
+                if aoid_str == "\\N":
                     skipped += 1
                     continue
 
@@ -288,20 +353,28 @@ class StreamingCSVLoader:
                 # Replace AOID with item_id
                 item_id = aoid_to_id[aoid]
                 resolved_row = [str(item_id)] + parts[1:]
-                resolved_rows.append('\t'.join(resolved_row))
+                resolved_rows.append("\t".join(resolved_row))
 
         logger.info(f"Resolved {len(resolved_rows)} item_sources, skipped {skipped}")
 
         # Stream to database via COPY
         import io
 
-        buffer = io.StringIO('\n'.join(resolved_rows))
+        buffer = io.StringIO("\n".join(resolved_rows))
         connection = self.db.connection().connection
         cursor = connection.cursor()
 
-        columns = ['item_id', 'source_id', 'drop_rate', 'min_ql', 'max_ql', 'conditions', 'metadata']
+        columns = [
+            "item_id",
+            "source_id",
+            "drop_rate",
+            "min_ql",
+            "max_ql",
+            "conditions",
+            "metadata",
+        ]
         copy_sql = sql.SQL("COPY item_sources ({}) FROM STDIN").format(
-            sql.SQL(', ').join(map(sql.Identifier, columns))
+            sql.SQL(", ").join(map(sql.Identifier, columns))
         )
 
         cursor.copy_expert(copy_sql.as_string(cursor), buffer)
@@ -385,7 +458,7 @@ class StreamingCSVLoader:
             except Exception as e:
                 error_msg = f"Failed to rebuild index {index_name}: {e}"
                 logger.error(error_msg)
-                self.stats['errors'].append(error_msg)
+                self.stats["errors"].append(error_msg)
 
 
 def load_csv_to_database(db_session: Session, csv_dir: str) -> Dict:

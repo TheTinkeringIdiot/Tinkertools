@@ -18,7 +18,7 @@ from app.api.schemas import (
     SpellDataResponse,
     ActionResponse,
     CriterionResponse,
-    SpellWithCriteria
+    SpellWithCriteria,
 )
 
 
@@ -28,6 +28,7 @@ class TestGeneralEndpoints:
     @pytest.fixture
     def client(self):
         """Create a test client with mocked database dependency."""
+
         def override_get_db():
             return Mock(spec=Session)
 
@@ -61,6 +62,7 @@ class TestItemEndpoints:
     @pytest.fixture
     def client(self):
         """Create a test client with mocked database dependency."""
+
         def override_get_db():
             return Mock(spec=Session)
 
@@ -80,9 +82,7 @@ class TestItemEndpoints:
             item_class=1,
             description="A test weapon",
             is_nano=False,
-            stats=[
-                StatValueResponse(id=1, stat=16, value=50)
-            ],
+            stats=[StatValueResponse(id=1, stat=16, value=50)],
             spell_data=[
                 SpellDataResponse(
                     id=1,
@@ -96,17 +96,13 @@ class TestItemEndpoints:
                             spell_id=98765,
                             spell_format="Increase {stat} by {value}",
                             spell_params={"stat": 96, "value": 15},
-                            criteria=[]
+                            criteria=[],
                         )
-                    ]
+                    ],
                 )
             ],
-            attack_stats=[
-                StatValueResponse(id=2, stat=100, value=200)
-            ],
-            defense_stats=[
-                StatValueResponse(id=3, stat=101, value=150)
-            ],
+            attack_stats=[StatValueResponse(id=2, stat=100, value=200)],
+            defense_stats=[StatValueResponse(id=3, stat=101, value=150)],
             actions=[
                 ActionResponse(
                     id=1,
@@ -114,10 +110,10 @@ class TestItemEndpoints:
                     item_id=1,
                     criteria=[
                         CriterionResponse(id=1, value1=16, value2=100, operator=1)
-                    ]
+                    ],
                 )
             ],
-            sources=[]
+            sources=[],
         )
 
     @pytest.fixture
@@ -133,7 +129,7 @@ class TestItemEndpoints:
             is_nano=False,
             stats=[
                 StatValueResponse(id=4, stat=16, value=50),  # Strength
-                StatValueResponse(id=5, stat=17, value=25)   # Intelligence
+                StatValueResponse(id=5, stat=17, value=25),  # Intelligence
             ],
             spell_data=[
                 SpellDataResponse(
@@ -148,17 +144,13 @@ class TestItemEndpoints:
                             spell_id=98765,
                             spell_format="Increase {stat} by {value}",
                             spell_params={"stat": 96, "value": 15},
-                            criteria=[]
+                            criteria=[],
                         )
-                    ]
+                    ],
                 )
             ],
-            attack_stats=[
-                StatValueResponse(id=6, stat=100, value=200)
-            ],
-            defense_stats=[
-                StatValueResponse(id=7, stat=101, value=150)
-            ],
+            attack_stats=[StatValueResponse(id=6, stat=100, value=200)],
+            defense_stats=[StatValueResponse(id=7, stat=101, value=150)],
             actions=[
                 ActionResponse(
                     id=2,
@@ -166,31 +158,34 @@ class TestItemEndpoints:
                     item_id=2,
                     criteria=[
                         CriterionResponse(id=2, value1=16, value2=100, operator=1)
-                    ]
+                    ],
                 )
             ],
-            sources=[]
+            sources=[],
         )
 
     # ============================================================================
     # GET /api/v1/items Tests
     # ============================================================================
 
-    @patch('app.api.routes.items.build_item_detail')
+    @patch("app.api.routes.items.build_item_detail")
     def test_get_items_empty(self, mock_build_item_detail, client):
         """Test getting items when no items match criteria."""
         # Mock database query to return empty list
-        with patch('app.core.database.get_db') as mock_get_db:
+        with patch("app.core.database.get_db") as mock_get_db:
             mock_db = Mock()
             mock_query = Mock()
             mock_query.options.return_value.count.return_value = 0
-            mock_query.options.return_value.offset.return_value.limit.return_value.all.return_value = []
+            mock_query.options.return_value.offset.return_value.limit.return_value.all.return_value = (
+                []
+            )
             mock_db.query.return_value = mock_query
             mock_get_db.return_value = mock_db
 
             # Override get_db for this test
             def override_get_db():
                 yield mock_db
+
             app.dependency_overrides[get_db] = override_get_db
 
             response = client.get("/api/v1/items")
@@ -204,8 +199,10 @@ class TestItemEndpoints:
             assert "total" in data
             assert "page" in data
 
-    @patch('app.api.routes.items.build_item_detail')
-    def test_get_item_by_aoid_success(self, mock_build_item_detail, client, mock_item_detail):
+    @patch("app.api.routes.items.build_item_detail")
+    def test_get_item_by_aoid_success(
+        self, mock_build_item_detail, client, mock_item_detail
+    ):
         """Test getting a specific item by AOID."""
         mock_build_item_detail.return_value = mock_item_detail
 
@@ -213,16 +210,19 @@ class TestItemEndpoints:
         mock_item = Mock()
         mock_item.aoid = 12345
 
-        with patch('app.core.database.get_db') as mock_get_db:
+        with patch("app.core.database.get_db") as mock_get_db:
             mock_db = Mock()
             mock_query = Mock()
-            mock_query.options.return_value.filter.return_value.first.return_value = mock_item
+            mock_query.options.return_value.filter.return_value.first.return_value = (
+                mock_item
+            )
             mock_db.query.return_value = mock_query
             mock_get_db.return_value = mock_db
 
             # Override get_db for this test
             def override_get_db():
                 yield mock_db
+
             app.dependency_overrides[get_db] = override_get_db
 
             response = client.get("/api/v1/items/12345")
@@ -251,16 +251,19 @@ class TestItemEndpoints:
     def test_get_item_not_found(self, client):
         """Test getting non-existent item."""
         # Mock the database query to return None
-        with patch('app.core.database.get_db') as mock_get_db:
+        with patch("app.core.database.get_db") as mock_get_db:
             mock_db = Mock()
             mock_query = Mock()
-            mock_query.options.return_value.filter.return_value.first.return_value = None
+            mock_query.options.return_value.filter.return_value.first.return_value = (
+                None
+            )
             mock_db.query.return_value = mock_query
             mock_get_db.return_value = mock_db
 
             # Override get_db for this test
             def override_get_db():
                 yield mock_db
+
             app.dependency_overrides[get_db] = override_get_db
 
             response = client.get("/api/v1/items/999")
@@ -271,8 +274,10 @@ class TestItemEndpoints:
             data = response.json()
             assert "error" in data
 
-    @patch('app.api.routes.items.build_item_detail')
-    def test_get_item_with_all_fields(self, mock_build_item_detail, client, mock_enhanced_item_detail):
+    @patch("app.api.routes.items.build_item_detail")
+    def test_get_item_with_all_fields(
+        self, mock_build_item_detail, client, mock_enhanced_item_detail
+    ):
         """Test getting an item with all fields populated."""
         mock_build_item_detail.return_value = mock_enhanced_item_detail
 
@@ -280,16 +285,19 @@ class TestItemEndpoints:
         mock_item = Mock()
         mock_item.aoid = 54321
 
-        with patch('app.core.database.get_db') as mock_get_db:
+        with patch("app.core.database.get_db") as mock_get_db:
             mock_db = Mock()
             mock_query = Mock()
-            mock_query.options.return_value.filter.return_value.first.return_value = mock_item
+            mock_query.options.return_value.filter.return_value.first.return_value = (
+                mock_item
+            )
             mock_db.query.return_value = mock_query
             mock_get_db.return_value = mock_db
 
             # Override get_db for this test
             def override_get_db():
                 yield mock_db
+
             app.dependency_overrides[get_db] = override_get_db
 
             response = client.get("/api/v1/items/54321")
@@ -345,8 +353,10 @@ class TestItemEndpoints:
     # GET /api/v1/items/search Tests
     # ============================================================================
 
-    @patch('app.api.routes.items.build_item_detail')
-    def test_search_items_success(self, mock_build_item_detail, client, mock_item_detail):
+    @patch("app.api.routes.items.build_item_detail")
+    def test_search_items_success(
+        self, mock_build_item_detail, client, mock_item_detail
+    ):
         """Test item search functionality."""
         mock_build_item_detail.return_value = mock_item_detail
 
@@ -355,17 +365,22 @@ class TestItemEndpoints:
         mock_item.aoid = 12345
         mock_item.name = "Test Weapon"
 
-        with patch('app.core.database.get_db') as mock_get_db:
+        with patch("app.core.database.get_db") as mock_get_db:
             mock_db = Mock()
             mock_query = Mock()
-            mock_query.options.return_value.filter.return_value.order_by.return_value.count.return_value = 1
-            mock_query.options.return_value.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = [mock_item]
+            mock_query.options.return_value.filter.return_value.order_by.return_value.count.return_value = (
+                1
+            )
+            mock_query.options.return_value.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = [
+                mock_item
+            ]
             mock_db.query.return_value = mock_query
             mock_get_db.return_value = mock_db
 
             # Override get_db for this test
             def override_get_db():
                 yield mock_db
+
             app.dependency_overrides[get_db] = override_get_db
 
             response = client.get("/api/v1/items/search?q=Test%20Weapon")
@@ -377,8 +392,10 @@ class TestItemEndpoints:
             assert "items" in data
             assert len(data["items"]) >= 0
 
-    @patch('app.api.routes.items.build_item_detail')
-    def test_search_items_returns_detailed_items(self, mock_build_item_detail, client, mock_enhanced_item_detail):
+    @patch("app.api.routes.items.build_item_detail")
+    def test_search_items_returns_detailed_items(
+        self, mock_build_item_detail, client, mock_enhanced_item_detail
+    ):
         """Test that the item search endpoint returns detailed item information."""
         mock_build_item_detail.return_value = mock_enhanced_item_detail
 
@@ -386,17 +403,22 @@ class TestItemEndpoints:
         mock_item = Mock()
         mock_item.aoid = 54321
 
-        with patch('app.core.database.get_db') as mock_get_db:
+        with patch("app.core.database.get_db") as mock_get_db:
             mock_db = Mock()
             mock_query = Mock()
-            mock_query.options.return_value.filter.return_value.order_by.return_value.count.return_value = 1
-            mock_query.options.return_value.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = [mock_item]
+            mock_query.options.return_value.filter.return_value.order_by.return_value.count.return_value = (
+                1
+            )
+            mock_query.options.return_value.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = [
+                mock_item
+            ]
             mock_db.query.return_value = mock_query
             mock_get_db.return_value = mock_db
 
             # Override get_db for this test
             def override_get_db():
                 yield mock_db
+
             app.dependency_overrides[get_db] = override_get_db
 
             response = client.get("/api/v1/items/search?q=Enhanced%20Test%20Weapon")
@@ -425,7 +447,7 @@ class TestItemEndpoints:
     # Pagination and Filtering Tests
     # ============================================================================
 
-    @patch('app.api.routes.items.build_item_detail')
+    @patch("app.api.routes.items.build_item_detail")
     def test_pagination(self, mock_build_item_detail, client, mock_item_detail):
         """Test pagination functionality."""
         # Create multiple mock items
@@ -438,23 +460,30 @@ class TestItemEndpoints:
 
         mock_build_item_detail.return_value = mock_item_detail
 
-        with patch('app.core.database.get_db') as mock_get_db:
+        with patch("app.core.database.get_db") as mock_get_db:
             mock_db = Mock()
             mock_query = Mock()
 
             # Mock first page
-            mock_query.options.return_value.filter.return_value.order_by.return_value.count.return_value = 10
-            mock_query.options.return_value.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = mock_items[:5]
+            mock_query.options.return_value.filter.return_value.order_by.return_value.count.return_value = (
+                10
+            )
+            mock_query.options.return_value.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = mock_items[
+                :5
+            ]
             mock_db.query.return_value = mock_query
             mock_get_db.return_value = mock_db
 
             # Override get_db for this test
             def override_get_db():
                 yield mock_db
+
             app.dependency_overrides[get_db] = override_get_db
 
             # Test first page
-            response = client.get("/api/v1/items/search?q=Pagination%20Test%20Item&page=1&page_size=5")
+            response = client.get(
+                "/api/v1/items/search?q=Pagination%20Test%20Item&page=1&page_size=5"
+            )
 
             app.dependency_overrides.clear()
 
@@ -479,15 +508,19 @@ class TestItemEndpoints:
 
     def test_get_items_with_filters(self, client):
         """Test item filtering with query parameters."""
-        with patch('app.core.database.get_db') as mock_get_db:
+        with patch("app.core.database.get_db") as mock_get_db:
             mock_db = Mock()
             mock_query = Mock()
 
             # Need to handle complex filter chain with multiple filter() calls
             # The actual query chain is: query.options().filter().filter().filter()...count()
             mock_filtered = Mock()
-            mock_filtered.filter = Mock(return_value=mock_filtered)  # Return self for chaining
-            mock_filtered.distinct = Mock(return_value=mock_filtered)  # Return self for chaining
+            mock_filtered.filter = Mock(
+                return_value=mock_filtered
+            )  # Return self for chaining
+            mock_filtered.distinct = Mock(
+                return_value=mock_filtered
+            )  # Return self for chaining
             mock_filtered.count.return_value = 0
             mock_filtered.offset.return_value.limit.return_value.all.return_value = []
 
@@ -500,6 +533,7 @@ class TestItemEndpoints:
             # Override get_db for this test
             def override_get_db():
                 yield mock_db
+
             app.dependency_overrides[get_db] = override_get_db
 
             response = client.get("/api/v1/items?item_class=1&min_ql=100&max_ql=200")
@@ -516,25 +550,32 @@ class TestItemEndpoints:
         response = client.get("/api/v1/items/search?q=")
         assert response.status_code == 422  # Validation error
 
-    @patch('app.api.routes.items.build_item_detail')
-    def test_search_with_exact_match_parameter(self, mock_build_item_detail, client, mock_item_detail):
+    @patch("app.api.routes.items.build_item_detail")
+    def test_search_with_exact_match_parameter(
+        self, mock_build_item_detail, client, mock_item_detail
+    ):
         """Test search with exact_match parameter."""
         mock_build_item_detail.return_value = mock_item_detail
 
         mock_item = Mock()
         mock_item.aoid = 12345
 
-        with patch('app.core.database.get_db') as mock_get_db:
+        with patch("app.core.database.get_db") as mock_get_db:
             mock_db = Mock()
             mock_query = Mock()
-            mock_query.options.return_value.filter.return_value.order_by.return_value.count.return_value = 1
-            mock_query.options.return_value.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = [mock_item]
+            mock_query.options.return_value.filter.return_value.order_by.return_value.count.return_value = (
+                1
+            )
+            mock_query.options.return_value.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = [
+                mock_item
+            ]
             mock_db.query.return_value = mock_query
             mock_get_db.return_value = mock_db
 
             # Override get_db for this test
             def override_get_db():
                 yield mock_db
+
             app.dependency_overrides[get_db] = override_get_db
 
             # Test with exact match
@@ -547,28 +588,37 @@ class TestItemEndpoints:
 
             app.dependency_overrides.clear()
 
-    @patch('app.api.routes.items.build_item_detail')
-    def test_get_items_returns_detailed_items(self, mock_build_item_detail, client, mock_enhanced_item_detail):
+    @patch("app.api.routes.items.build_item_detail")
+    def test_get_items_returns_detailed_items(
+        self, mock_build_item_detail, client, mock_enhanced_item_detail
+    ):
         """Test that the items list endpoint returns detailed item information."""
         mock_build_item_detail.return_value = mock_enhanced_item_detail
 
         mock_item = Mock()
         mock_item.aoid = 54321
 
-        with patch('app.core.database.get_db') as mock_get_db:
+        with patch("app.core.database.get_db") as mock_get_db:
             mock_db = Mock()
             mock_query = Mock()
-            mock_query.options.return_value.filter.return_value.order_by.return_value.count.return_value = 1
-            mock_query.options.return_value.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = [mock_item]
+            mock_query.options.return_value.filter.return_value.order_by.return_value.count.return_value = (
+                1
+            )
+            mock_query.options.return_value.filter.return_value.order_by.return_value.offset.return_value.limit.return_value.all.return_value = [
+                mock_item
+            ]
             # For simple listing (no search), no order_by in chain
             mock_query.options.return_value.count.return_value = 1
-            mock_query.options.return_value.offset.return_value.limit.return_value.all.return_value = [mock_item]
+            mock_query.options.return_value.offset.return_value.limit.return_value.all.return_value = [
+                mock_item
+            ]
             mock_db.query.return_value = mock_query
             mock_get_db.return_value = mock_db
 
             # Override get_db for this test
             def override_get_db():
                 yield mock_db
+
             app.dependency_overrides[get_db] = override_get_db
 
             response = client.get("/api/v1/items/search?q=Enhanced%20Test%20Weapon")

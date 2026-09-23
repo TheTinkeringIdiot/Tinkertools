@@ -155,19 +155,25 @@ class MigrationRunner:
 
     @staticmethod
     def _table_exists(conn: Connection, schema: str, table: str) -> bool:
-        return bool(conn.execute(
-            text(
-                "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
-                "WHERE table_schema = :schema AND table_name = :table)"
-            ),
-            {"schema": schema, "table": table},
-        ).scalar())
+        return bool(
+            conn.execute(
+                text(
+                    "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                    "WHERE table_schema = :schema AND table_name = :table)"
+                ),
+                {"schema": schema, "table": table},
+            ).scalar()
+        )
 
     @staticmethod
     def _applied_versions(conn: Connection, schema: str, table: str) -> set:
         if not MigrationRunner._table_exists(conn, schema, table):
             return set()
-        rows = conn.execute(text(f'SELECT version FROM "{schema}"."{table}"')).scalars().all()
+        rows = (
+            conn.execute(text(f'SELECT version FROM "{schema}"."{table}"'))
+            .scalars()
+            .all()
+        )
         return {str(v) for v in rows}
 
     def _pending_files(self, directory: Path, applied: set) -> List[Path]:
@@ -175,7 +181,9 @@ class MigrationRunner:
         for path in sorted(directory.glob("*.sql")):
             version = migration_version(path.name)
             if version is None:
-                logger.warning("Skipping migration file without a version prefix: %s", path.name)
+                logger.warning(
+                    "Skipping migration file without a version prefix: %s", path.name
+                )
                 continue
             if version in applied:
                 logger.debug("Migration %s already applied, skipping", path.name)
@@ -192,7 +200,9 @@ class MigrationRunner:
             Number of migration files executed.
         """
         if not self.global_migrations_dir.exists():
-            logger.warning("No global migrations directory: %s", self.global_migrations_dir)
+            logger.warning(
+                "No global migrations directory: %s", self.global_migrations_dir
+            )
             return 0
 
         executed = 0
@@ -257,7 +267,11 @@ class MigrationRunner:
             pending = self._pending_files(self.migrations_dir, applied)
 
             if not pending:
-                logger.info("Schema %s is up to date (%d migrations applied)", schema, len(applied))
+                logger.info(
+                    "Schema %s is up to date (%d migrations applied)",
+                    schema,
+                    len(applied),
+                )
                 return 0
 
             for path in pending:
@@ -279,7 +293,9 @@ class MigrationRunner:
                     logger.info("✓ Applied migration %s to %s", path.name, schema)
                 except Exception as exc:
                     conn.rollback()
-                    logger.error("Failed migration %s in %s: %s", path.name, schema, exc)
+                    logger.error(
+                        "Failed migration %s in %s: %s", path.name, schema, exc
+                    )
                     if "relation" in str(exc) and "does not exist" in str(exc):
                         logger.error(
                             "This may be a CREATE TABLE / CREATE INDEX ordering problem "
@@ -308,7 +324,9 @@ class MigrationRunner:
     def drop_version_schema(self, slug: str) -> str:
         """Drop a version's schema and everything in it."""
         schema = schema_name_for(slug)
-        logger.warning("Dropping schema %s (version '%s') and all its data", schema, slug)
+        logger.warning(
+            "Dropping schema %s (version '%s') and all its data", schema, slug
+        )
         with self.engine.connect() as conn:
             conn.execute(text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
         return schema
@@ -321,10 +339,16 @@ class MigrationRunner:
     def list_version_schemas(self) -> List[str]:
         """Every ``gv_*`` schema present in the database."""
         with self.engine.connect() as conn:
-            rows = conn.execute(text(
-                r"SELECT schema_name FROM information_schema.schemata "
-                r"WHERE schema_name LIKE 'gv\_%' ORDER BY schema_name"
-            )).scalars().all()
+            rows = (
+                conn.execute(
+                    text(
+                        r"SELECT schema_name FROM information_schema.schemata "
+                        r"WHERE schema_name LIKE 'gv\_%' ORDER BY schema_name"
+                    )
+                )
+                .scalars()
+                .all()
+            )
         return list(rows)
 
     def adopt_public_into_schema(self, slug: str) -> List[str]:
@@ -345,25 +369,43 @@ class MigrationRunner:
         with self.engine.connect() as conn:
             conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
 
-            existing = conn.execute(text(
-                "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
-            )).scalars().all()
+            existing = (
+                conn.execute(
+                    text(
+                        "SELECT table_name FROM information_schema.tables "
+                        "WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
+                    )
+                )
+                .scalars()
+                .all()
+            )
             for table in adoptable_tables_present(existing):
-                conn.execute(text(f'ALTER TABLE public."{table}" SET SCHEMA "{schema}"'))
+                conn.execute(
+                    text(f'ALTER TABLE public."{table}" SET SCHEMA "{schema}"')
+                )
                 moved.append(table)
                 logger.info("Moved table public.%s -> %s.%s", table, schema, table)
 
-            matviews = conn.execute(text(
-                "SELECT matviewname FROM pg_matviews WHERE schemaname = 'public'"
-            )).scalars().all()
+            matviews = (
+                conn.execute(
+                    text(
+                        "SELECT matviewname FROM pg_matviews WHERE schemaname = 'public'"
+                    )
+                )
+                .scalars()
+                .all()
+            )
             for matview in ADOPTABLE_MATVIEWS:
                 if matview in matviews:
                     conn.execute(
-                        text(f'ALTER MATERIALIZED VIEW public."{matview}" SET SCHEMA "{schema}"')
+                        text(
+                            f'ALTER MATERIALIZED VIEW public."{matview}" SET SCHEMA "{schema}"'
+                        )
                     )
                     moved.append(matview)
-                    logger.info("Moved matview public.%s -> %s.%s", matview, schema, matview)
+                    logger.info(
+                        "Moved matview public.%s -> %s.%s", matview, schema, matview
+                    )
 
         if not moved:
             logger.info("Nothing to adopt: no TinkerTools objects left in public")
@@ -404,7 +446,11 @@ class MigrationRunner:
             "family": family,
             "parent_slug": parent_slug,
             "client_build": client_build,
-            "snapshot_date": snapshot_date.isoformat() if isinstance(snapshot_date, date) else snapshot_date,
+            "snapshot_date": (
+                snapshot_date.isoformat()
+                if isinstance(snapshot_date, date)
+                else snapshot_date
+            ),
             "sort_order": sort_order,
             "enabled": enabled,
             "is_default": is_default,
@@ -425,8 +471,7 @@ class MigrationRunner:
                     )
 
                 conn.execute(
-                    text(
-                        """
+                    text("""
                         INSERT INTO public.game_versions (
                             slug, schema_name, display_name, family, parent_slug,
                             client_build, snapshot_date, sort_order, enabled,
@@ -449,8 +494,7 @@ class MigrationRunner:
                             features = EXCLUDED.features,
                             notes = EXCLUDED.notes,
                             updated_at = CURRENT_TIMESTAMP
-                        """
-                    ),
+                        """),
                     params,
                 )
                 conn.commit()
@@ -505,7 +549,8 @@ class MigrationRunner:
                 return 0
             try:
                 result = conn.execute(
-                    text("DELETE FROM public.game_versions WHERE slug = :slug"), {"slug": slug}
+                    text("DELETE FROM public.game_versions WHERE slug = :slug"),
+                    {"slug": slug},
                 )
                 conn.commit()
             except Exception:
@@ -518,15 +563,13 @@ class MigrationRunner:
         with self.engine.connect() as conn:
             if not self._table_exists(conn, "public", "game_versions"):
                 return []
-            rows = conn.execute(text(
-                """
+            rows = conn.execute(text("""
                 SELECT slug, schema_name, display_name, family, parent_slug,
                        client_build, snapshot_date, sort_order, enabled,
                        is_default, features, notes
                 FROM public.game_versions
                 ORDER BY sort_order, slug
-                """
-            )).mappings().all()
+                """)).mappings().all()
         return [dict(row) for row in rows]
 
     # -- verification ------------------------------------------------------
@@ -544,7 +587,9 @@ class MigrationRunner:
 
             if missing:
                 logger.error(
-                    "Schema %s is missing required tables: %s", schema_name, ", ".join(missing)
+                    "Schema %s is missing required tables: %s",
+                    schema_name,
+                    ", ".join(missing),
                 )
                 return False
 

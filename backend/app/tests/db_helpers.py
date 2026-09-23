@@ -30,7 +30,6 @@ from app.models import (
     StatValue,
 )
 
-
 # =============================================================================
 # Item Helpers
 # =============================================================================
@@ -208,9 +207,7 @@ async def get_perks_by_type(session: AsyncSession, perk_type: str) -> List[Perk]
         ai_perks = await get_perks_by_type(session, "AI")
     """
     result = await session.execute(
-        select(Perk)
-        .options(selectinload(Perk.item))
-        .where(Perk.type == perk_type)
+        select(Perk).options(selectinload(Perk.item)).where(Perk.type == perk_type)
     )
     return list(result.scalars().all())
 
@@ -471,9 +468,7 @@ async def get_sources_by_type(
     return list(result.scalars().all())
 
 
-async def get_item_sources(
-    session: AsyncSession, item_id: int
-) -> List[ItemSource]:
+async def get_item_sources(session: AsyncSession, item_id: int) -> List[ItemSource]:
     """
     Get all sources for a specific item.
 
@@ -492,9 +487,7 @@ async def get_item_sources(
     """
     result = await session.execute(
         select(ItemSource)
-        .options(
-            selectinload(ItemSource.source).selectinload(Source.source_type)
-        )
+        .options(selectinload(ItemSource.source).selectinload(Source.source_type))
         .where(ItemSource.item_id == item_id)
     )
     return list(result.scalars().all())

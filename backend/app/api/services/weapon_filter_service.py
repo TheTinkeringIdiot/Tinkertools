@@ -8,9 +8,23 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import and_, or_, select, exists, BigInteger, Integer, func
 
 from app.models import (
-    Item, ItemStats, StatValue, AttackDefense, AttackDefenseAttack, AttackDefenseDefense,
-    Action, ActionCriteria, Criterion, ItemSpellData, SpellData,
-    SpellDataSpells, Spell, SpellCriterion, ItemSource, Source, SourceType
+    Item,
+    ItemStats,
+    StatValue,
+    AttackDefense,
+    AttackDefenseAttack,
+    AttackDefenseDefense,
+    Action,
+    ActionCriteria,
+    Criterion,
+    ItemSpellData,
+    SpellData,
+    SpellDataSpells,
+    Spell,
+    SpellCriterion,
+    ItemSource,
+    Source,
+    SourceType,
 )
 from app.api.schemas import ItemDetail
 from app.api.schemas.weapon_analysis import WeaponAnalyzeRequest
@@ -40,11 +54,29 @@ class WeaponFilterService:
     # requirements. See client PlayerCharacter.cs:184-259.
     MARTIAL_ARTS_ITEM_AOIDS = (
         # Family 1: Martial Artist (profession 2)
-        211352, 211353, 211354, 211357, 211358, 211363, 211364,
+        211352,
+        211353,
+        211354,
+        211357,
+        211358,
+        211363,
+        211364,
         # Family 2: Shade (profession 15)
-        211349, 211350, 211351, 211359, 211360, 211365, 211366,
+        211349,
+        211350,
+        211351,
+        211359,
+        211360,
+        211365,
+        211366,
         # Family 3: Generic fallback (all other professions)
-        43712, 43713, 144745, 211355, 211356, 211361, 211362,
+        43712,
+        43713,
+        144745,
+        211355,
+        211356,
+        211361,
+        211362,
     )
 
     def __init__(self, db: Session):
@@ -72,14 +104,17 @@ class WeaponFilterService:
 
         # STAGE 1: Filter with minimal loading (only what's needed for filtering)
         # No QL filtering - return all QL variants for proper interpolation
-        query = self.db.query(Item).options(
-            # Only load attack stats (needed for weapon skill filtering)
-            joinedload(Item.attack_defense)
+        query = (
+            self.db.query(Item)
+            .options(
+                # Only load attack stats (needed for weapon skill filtering)
+                joinedload(Item.attack_defense)
                 .joinedload(AttackDefense.attack_stats)
                 .joinedload(AttackDefenseAttack.stat_value)
-        ).filter(
-            Item.atkdef_id.isnot(None),
-            Item.item_class == self.WEAPON_ITEM_CLASS
+            )
+            .filter(
+                Item.atkdef_id.isnot(None), Item.item_class == self.WEAPON_ITEM_CLASS
+            )
         )
 
         # Filter by weapon skill matching
@@ -88,17 +123,23 @@ class WeaponFilterService:
         # - OR contributes >= 50% to attack rating (50/50 split)
         if request.top_weapon_skills:
             # Optimize: Use single JOIN instead of 3 separate subqueries
-            query = query.join(
-                AttackDefense, Item.atkdef_id == AttackDefense.id
-            ).join(
-                AttackDefenseAttack, AttackDefense.id == AttackDefenseAttack.attack_defense_id
-            ).join(
-                StatValue, AttackDefenseAttack.stat_value_id == StatValue.id
-            ).filter(
-                or_(*[
-                    and_(StatValue.stat == skill.skill_id, StatValue.value >= 50)
-                    for skill in request.top_weapon_skills
-                ])
+            query = (
+                query.join(AttackDefense, Item.atkdef_id == AttackDefense.id)
+                .join(
+                    AttackDefenseAttack,
+                    AttackDefense.id == AttackDefenseAttack.attack_defense_id,
+                )
+                .join(StatValue, AttackDefenseAttack.stat_value_id == StatValue.id)
+                .filter(
+                    or_(
+                        *[
+                            and_(
+                                StatValue.stat == skill.skill_id, StatValue.value >= 50
+                            )
+                            for skill in request.top_weapon_skills
+                        ]
+                    )
+                )
             )
 
         # Restrict to player-equippable items: must have at least one
@@ -130,46 +171,53 @@ class WeaponFilterService:
         # Much faster than multiple correlated NOT EXISTS subqueries that scan tables repeatedly
 
         # Exclude items with NPC family requirements (NPC-only weapons)
-        npc_weapon_ids = select(Item.id).select_from(Item).join(
-            Action, Item.id == Action.item_id
-        ).join(
-            ActionCriteria, Action.id == ActionCriteria.action_id
-        ).join(
-            Criterion, ActionCriteria.criterion_id == Criterion.id
-        ).where(
-            Action.action == 8,  # Action type 8 = WIELD
-            Criterion.value1 == self.NPC_FAMILY_STAT
-        ).scalar_subquery()
+        npc_weapon_ids = (
+            select(Item.id)
+            .select_from(Item)
+            .join(Action, Item.id == Action.item_id)
+            .join(ActionCriteria, Action.id == ActionCriteria.action_id)
+            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
+            .where(
+                Action.action == 8,  # Action type 8 = WIELD
+                Criterion.value1 == self.NPC_FAMILY_STAT,
+            )
+            .scalar_subquery()
+        )
 
         query = query.filter(Item.id.not_in(npc_weapon_ids))
 
         # Apply faction filter if needed (side 0 = neutral can use all)
         if request.side > 0:
-            faction_restricted_ids = select(Item.id).select_from(Item).join(
-                ItemStats, ItemStats.item_id == Item.id
-            ).join(
-                StatValue, StatValue.id == ItemStats.stat_value_id
-            ).where(
-                StatValue.stat == self.FACTION_STAT,
-                StatValue.value != request.side,
-                StatValue.value != 0
-            ).scalar_subquery()
+            faction_restricted_ids = (
+                select(Item.id)
+                .select_from(Item)
+                .join(ItemStats, ItemStats.item_id == Item.id)
+                .join(StatValue, StatValue.id == ItemStats.stat_value_id)
+                .where(
+                    StatValue.stat == self.FACTION_STAT,
+                    StatValue.value != request.side,
+                    StatValue.value != 0,
+                )
+                .scalar_subquery()
+            )
 
             query = query.filter(Item.id.not_in(faction_restricted_ids))
 
         # Apply breed filter
-        breed_restricted_ids = select(Item.id).select_from(Item).join(
-            Action, Item.id == Action.item_id
-        ).join(
-            ActionCriteria, Action.id == ActionCriteria.action_id
-        ).join(
-            Criterion, ActionCriteria.criterion_id == Criterion.id
-        ).where(
-            Action.action == 8,  # Action type 8 = WIELD
-            Criterion.value1 == 4,  # Stat 4 = Breed
-            Criterion.value2 != request.breed_id,
-            Criterion.value2 != 0
-        ).scalar_subquery()
+        breed_restricted_ids = (
+            select(Item.id)
+            .select_from(Item)
+            .join(Action, Item.id == Action.item_id)
+            .join(ActionCriteria, Action.id == ActionCriteria.action_id)
+            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
+            .where(
+                Action.action == 8,  # Action type 8 = WIELD
+                Criterion.value1 == 4,  # Stat 4 = Breed
+                Criterion.value2 != request.breed_id,
+                Criterion.value2 != 0,
+            )
+            .scalar_subquery()
+        )
 
         query = query.filter(Item.id.not_in(breed_restricted_ids))
 
@@ -177,88 +225,94 @@ class WeaponFilterService:
         # Include items where: no profession requirement OR profession matches (handles OR logic correctly)
         if request.profession_id > 0:
             # Items with profession requirements
-            items_with_prof_req = select(Item.id).select_from(Item).join(
-                Action, Item.id == Action.item_id
-            ).join(
-                ActionCriteria, Action.id == ActionCriteria.action_id
-            ).join(
-                Criterion, ActionCriteria.criterion_id == Criterion.id
-            ).where(
-                Action.action == 8,
-                or_(
-                    Criterion.value1 == 60,   # Stat 60 = Profession
-                    Criterion.value1 == 368   # Stat 368 = VisualProfession
+            items_with_prof_req = (
+                select(Item.id)
+                .select_from(Item)
+                .join(Action, Item.id == Action.item_id)
+                .join(ActionCriteria, Action.id == ActionCriteria.action_id)
+                .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
+                .where(
+                    Action.action == 8,
+                    or_(
+                        Criterion.value1 == 60,  # Stat 60 = Profession
+                        Criterion.value1 == 368,  # Stat 368 = VisualProfession
+                    ),
                 )
-            ).scalar_subquery()
+                .scalar_subquery()
+            )
 
             # Items where profession matches (includes items with value2=0 for "any profession")
-            items_prof_match = select(Item.id).select_from(Item).join(
-                Action, Item.id == Action.item_id
-            ).join(
-                ActionCriteria, Action.id == ActionCriteria.action_id
-            ).join(
-                Criterion, ActionCriteria.criterion_id == Criterion.id
-            ).where(
-                Action.action == 8,
-                or_(
-                    Criterion.value1 == 60,
-                    Criterion.value1 == 368
-                ),
-                or_(
-                    Criterion.value2 == request.profession_id,
-                    Criterion.value2 == 0
+            items_prof_match = (
+                select(Item.id)
+                .select_from(Item)
+                .join(Action, Item.id == Action.item_id)
+                .join(ActionCriteria, Action.id == ActionCriteria.action_id)
+                .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
+                .where(
+                    Action.action == 8,
+                    or_(Criterion.value1 == 60, Criterion.value1 == 368),
+                    or_(
+                        Criterion.value2 == request.profession_id, Criterion.value2 == 0
+                    ),
                 )
-            ).scalar_subquery()
+                .scalar_subquery()
+            )
 
             # Include items without profession requirements OR with matching profession
             query = query.filter(
                 or_(
                     Item.id.not_in(items_with_prof_req),  # No profession requirement
-                    Item.id.in_(items_prof_match)          # Has matching profession
+                    Item.id.in_(items_prof_match),  # Has matching profession
                 )
             )
 
         # Apply expansion filter - Operator 22 (StatBitSet)
         # Exclude items requiring expansions character doesn't have
-        expansion_required_not_met = select(Item.id).select_from(Item).join(
-            Action, Item.id == Action.item_id
-        ).join(
-            ActionCriteria, Action.id == ActionCriteria.action_id
-        ).join(
-            Criterion, ActionCriteria.criterion_id == Criterion.id
-        ).where(
-            Action.action == 8,
-            Criterion.value1 == self.EXPANSION_STAT,
-            Criterion.operator == 22,
-            func.cast(
-                func.cast(request.expansion_bitflag, BigInteger).op('&')(
-                    func.cast(Criterion.value2, BigInteger)
-                ),
-                Integer
-            ) != Criterion.value2
-        ).scalar_subquery()
+        expansion_required_not_met = (
+            select(Item.id)
+            .select_from(Item)
+            .join(Action, Item.id == Action.item_id)
+            .join(ActionCriteria, Action.id == ActionCriteria.action_id)
+            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
+            .where(
+                Action.action == 8,
+                Criterion.value1 == self.EXPANSION_STAT,
+                Criterion.operator == 22,
+                func.cast(
+                    func.cast(request.expansion_bitflag, BigInteger).op("&")(
+                        func.cast(Criterion.value2, BigInteger)
+                    ),
+                    Integer,
+                )
+                != Criterion.value2,
+            )
+            .scalar_subquery()
+        )
 
         query = query.filter(Item.id.not_in(expansion_required_not_met))
 
         # Apply expansion filter - Operator 107 (StatBitNotSet)
         # Exclude items forbidden for character's expansions
-        expansion_forbidden = select(Item.id).select_from(Item).join(
-            Action, Item.id == Action.item_id
-        ).join(
-            ActionCriteria, Action.id == ActionCriteria.action_id
-        ).join(
-            Criterion, ActionCriteria.criterion_id == Criterion.id
-        ).where(
-            Action.action == 8,
-            Criterion.value1 == self.EXPANSION_STAT,
-            Criterion.operator == 107,
-            func.cast(
-                func.cast(request.expansion_bitflag, BigInteger).op('&')(
-                    func.cast(Criterion.value2, BigInteger)
-                ),
-                Integer
-            ) != 0
-        ).scalar_subquery()
+        expansion_forbidden = (
+            select(Item.id)
+            .select_from(Item)
+            .join(Action, Item.id == Action.item_id)
+            .join(ActionCriteria, Action.id == ActionCriteria.action_id)
+            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
+            .where(
+                Action.action == 8,
+                Criterion.value1 == self.EXPANSION_STAT,
+                Criterion.operator == 107,
+                func.cast(
+                    func.cast(request.expansion_bitflag, BigInteger).op("&")(
+                        func.cast(Criterion.value2, BigInteger)
+                    ),
+                    Integer,
+                )
+                != 0,
+            )
+            .scalar_subquery()
+        )
 
         query = query.filter(Item.id.not_in(expansion_forbidden))
 
@@ -280,23 +334,31 @@ class WeaponFilterService:
         # Stage 2: Load item details with all relationships
         # Use selectinload for large result sets (200-1000 weapons) to avoid Cartesian products
         # For smaller result sets or single-item lookups, joinedload would be more efficient
-        detailed_query = self.db.query(Item).options(
-            selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
-            selectinload(Item.item_spell_data).selectinload(ItemSpellData.spell_data)
-                .selectinload(SpellData.spell_data_spells).selectinload(SpellDataSpells.spell)
-                .selectinload(Spell.spell_criteria).selectinload(SpellCriterion.criterion),
-            selectinload(Item.actions).selectinload(Action.action_criteria)
+        detailed_query = (
+            self.db.query(Item)
+            .options(
+                selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
+                selectinload(Item.item_spell_data)
+                .selectinload(ItemSpellData.spell_data)
+                .selectinload(SpellData.spell_data_spells)
+                .selectinload(SpellDataSpells.spell)
+                .selectinload(Spell.spell_criteria)
+                .selectinload(SpellCriterion.criterion),
+                selectinload(Item.actions)
+                .selectinload(Action.action_criteria)
                 .selectinload(ActionCriteria.criterion),
-            selectinload(Item.attack_defense)
+                selectinload(Item.attack_defense)
                 .selectinload(AttackDefense.attack_stats)
                 .selectinload(AttackDefenseAttack.stat_value),
-            selectinload(Item.attack_defense)
+                selectinload(Item.attack_defense)
                 .selectinload(AttackDefense.defense_stats)
                 .selectinload(AttackDefenseDefense.stat_value),
-            selectinload(Item.item_sources)
+                selectinload(Item.item_sources)
                 .selectinload(ItemSource.source)
-                .selectinload(Source.source_type)
-        ).filter(Item.id.in_(item_ids))
+                .selectinload(Source.source_type),
+            )
+            .filter(Item.id.in_(item_ids))
+        )
 
         detailed_items_objs = detailed_query.all()
 

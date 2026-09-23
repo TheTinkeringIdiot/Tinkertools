@@ -35,6 +35,7 @@ class TestEquipmentBonusEndpoints:
 
     def setup_method(self):
         """Setup method to override database dependency."""
+
         def override_get_db():
             return Mock(spec=Session)
 
@@ -48,22 +49,21 @@ class TestEquipmentBonusEndpoints:
     # POST /equipment-bonuses/calculate Tests
     # ============================================================================
 
-    @patch('app.api.routes.equipment_bonuses.EquipmentBonusService')
+    @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
     def test_calculate_equipment_bonuses_success(self, mock_service_class, client):
         """Test successful equipment bonus calculation."""
         # Setup mock service
         mock_service = Mock()
         mock_service_class.return_value = mock_service
         mock_service.calculate_equipment_bonuses.return_value = {
-            16: 50,   # Strength +50
-            19: 25,   # Intelligence +25
-            124: 100  # Max Health +100
+            16: 50,  # Strength +50
+            19: 25,  # Intelligence +25
+            124: 100,  # Max Health +100
         }
 
         # Make request
         response = client.post(
-            "/api/v1/equipment-bonuses/calculate",
-            json={"item_ids": [1, 2, 3]}
+            "/api/v1/equipment-bonuses/calculate", json={"item_ids": [1, 2, 3]}
         )
 
         # Assertions
@@ -77,7 +77,7 @@ class TestEquipmentBonusEndpoints:
         # Verify service calls
         mock_service.calculate_equipment_bonuses.assert_called_once_with([1, 2, 3])
 
-    @patch('app.api.routes.equipment_bonuses.EquipmentBonusService')
+    @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
     def test_calculate_bonuses_with_implant_clusters(self, mock_service_class, client):
         """Test bonus calculation with implant clusters."""
         # Setup mock service
@@ -91,10 +91,8 @@ class TestEquipmentBonusEndpoints:
             "/api/v1/equipment-bonuses/calculate",
             json={
                 "item_ids": [1, 2],
-                "implant_clusters": {
-                    "head": {"intelligence": 19}
-                }
-            }
+                "implant_clusters": {"head": {"intelligence": 19}},
+            },
         )
 
         # Assertions
@@ -109,22 +107,21 @@ class TestEquipmentBonusEndpoints:
         mock_service.calculate_equipment_bonuses.assert_called_once_with([1, 2])
         mock_service.calculate_implant_cluster_bonuses.assert_called_once()
 
-    @patch('app.api.routes.equipment_bonuses.EquipmentBonusService')
+    @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
     def test_calculate_bonuses_merges_duplicate_stats(self, mock_service_class, client):
         """Test that duplicate stats from equipment and clusters are merged correctly."""
         # Setup mock service with overlapping stats
         mock_service = Mock()
         mock_service_class.return_value = mock_service
         mock_service.calculate_equipment_bonuses.return_value = {16: 50, 19: 25}
-        mock_service.calculate_implant_cluster_bonuses.return_value = {19: 15}  # Same stat
+        mock_service.calculate_implant_cluster_bonuses.return_value = {
+            19: 15
+        }  # Same stat
 
         # Make request
         response = client.post(
             "/api/v1/equipment-bonuses/calculate",
-            json={
-                "item_ids": [1],
-                "implant_clusters": {"head": {"intelligence": 19}}
-            }
+            json={"item_ids": [1], "implant_clusters": {"head": {"intelligence": 19}}},
         )
 
         # Assertions
@@ -134,7 +131,7 @@ class TestEquipmentBonusEndpoints:
         assert data["total_bonuses"]["19"] == 40
         assert data["total_bonuses"]["16"] == 50
 
-    @patch('app.api.routes.equipment_bonuses.EquipmentBonusService')
+    @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
     def test_calculate_bonuses_empty_result(self, mock_service_class, client):
         """Test bonus calculation when no bonuses are found."""
         # Setup mock service
@@ -144,8 +141,7 @@ class TestEquipmentBonusEndpoints:
 
         # Make request
         response = client.post(
-            "/api/v1/equipment-bonuses/calculate",
-            json={"item_ids": [1]}
+            "/api/v1/equipment-bonuses/calculate", json={"item_ids": [1]}
         )
 
         # Assertions
@@ -158,8 +154,7 @@ class TestEquipmentBonusEndpoints:
     def test_calculate_bonuses_empty_item_list(self, client):
         """Test bonus calculation with empty item list returns 400."""
         response = client.post(
-            "/api/v1/equipment-bonuses/calculate",
-            json={"item_ids": []}
+            "/api/v1/equipment-bonuses/calculate", json={"item_ids": []}
         )
 
         # Assertions
@@ -170,10 +165,7 @@ class TestEquipmentBonusEndpoints:
 
     def test_calculate_bonuses_missing_item_ids(self, client):
         """Test bonus calculation without item_ids field."""
-        response = client.post(
-            "/api/v1/equipment-bonuses/calculate",
-            json={}
-        )
+        response = client.post("/api/v1/equipment-bonuses/calculate", json={})
 
         # Assertions
         assert response.status_code == 422  # Validation error
@@ -183,8 +175,7 @@ class TestEquipmentBonusEndpoints:
     def test_calculate_bonuses_invalid_item_ids_type(self, client):
         """Test bonus calculation with invalid item_ids type."""
         response = client.post(
-            "/api/v1/equipment-bonuses/calculate",
-            json={"item_ids": "not a list"}
+            "/api/v1/equipment-bonuses/calculate", json={"item_ids": "not a list"}
         )
 
         # Assertions
@@ -193,25 +184,25 @@ class TestEquipmentBonusEndpoints:
     def test_calculate_bonuses_invalid_item_id_value(self, client):
         """Test bonus calculation with invalid item ID values."""
         response = client.post(
-            "/api/v1/equipment-bonuses/calculate",
-            json={"item_ids": [1, "invalid", 3]}
+            "/api/v1/equipment-bonuses/calculate", json={"item_ids": [1, "invalid", 3]}
         )
 
         # Assertions
         assert response.status_code == 422  # Validation error
 
-    @patch('app.api.routes.equipment_bonuses.EquipmentBonusService')
+    @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
     def test_calculate_bonuses_service_exception(self, mock_service_class, client):
         """Test handling of service exceptions."""
         # Setup mock service to raise exception
         mock_service = Mock()
         mock_service_class.return_value = mock_service
-        mock_service.calculate_equipment_bonuses.side_effect = Exception("Database error")
+        mock_service.calculate_equipment_bonuses.side_effect = Exception(
+            "Database error"
+        )
 
         # Make request
         response = client.post(
-            "/api/v1/equipment-bonuses/calculate",
-            json={"item_ids": [1, 2]}
+            "/api/v1/equipment-bonuses/calculate", json={"item_ids": [1, 2]}
         )
 
         # Assertions
@@ -224,7 +215,7 @@ class TestEquipmentBonusEndpoints:
     # GET /equipment-bonuses/item/{item_id} Tests
     # ============================================================================
 
-    @patch('app.api.routes.equipment_bonuses.EquipmentBonusService')
+    @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
     def test_get_item_bonus_detail_success(self, mock_service_class, client):
         """Test successful retrieval of item bonus details."""
         # Setup mock service
@@ -232,7 +223,7 @@ class TestEquipmentBonusEndpoints:
         mock_service_class.return_value = mock_service
         mock_service.get_item_bonus_breakdown.return_value = {
             16: 25,  # Strength +25
-            19: 10   # Intelligence +10
+            19: 10,  # Intelligence +10
         }
 
         # Make request
@@ -248,7 +239,7 @@ class TestEquipmentBonusEndpoints:
         # Verify service calls
         mock_service.get_item_bonus_breakdown.assert_called_once_with(12345)
 
-    @patch('app.api.routes.equipment_bonuses.EquipmentBonusService')
+    @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
     def test_get_item_bonus_detail_no_bonuses(self, mock_service_class, client):
         """Test item detail when item has no bonuses."""
         # Setup mock service
@@ -272,7 +263,7 @@ class TestEquipmentBonusEndpoints:
         # Assertions
         assert response.status_code == 422  # Validation error
 
-    @patch('app.api.routes.equipment_bonuses.EquipmentBonusService')
+    @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
     def test_get_item_bonus_detail_service_exception(self, mock_service_class, client):
         """Test handling of service exceptions in item detail."""
         # Setup mock service to raise exception
@@ -293,7 +284,7 @@ class TestEquipmentBonusEndpoints:
     # POST /equipment-bonuses/batch-items Tests
     # ============================================================================
 
-    @patch('app.api.routes.equipment_bonuses.EquipmentBonusService')
+    @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
     def test_batch_item_bonus_details_success(self, mock_service_class, client):
         """Test successful batch retrieval of item bonus details."""
         # Setup mock service
@@ -312,10 +303,7 @@ class TestEquipmentBonusEndpoints:
         mock_service.get_item_bonus_breakdown.side_effect = mock_breakdown
 
         # Make request
-        response = client.post(
-            "/api/v1/equipment-bonuses/batch-items",
-            json=[1, 2, 3]
-        )
+        response = client.post("/api/v1/equipment-bonuses/batch-items", json=[1, 2, 3])
 
         # Assertions
         assert response.status_code == 200
@@ -335,7 +323,7 @@ class TestEquipmentBonusEndpoints:
         # Verify service calls
         assert mock_service.get_item_bonus_breakdown.call_count == 3
 
-    @patch('app.api.routes.equipment_bonuses.EquipmentBonusService')
+    @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
     def test_batch_item_bonus_details_single_item(self, mock_service_class, client):
         """Test batch endpoint with single item."""
         # Setup mock service
@@ -344,10 +332,7 @@ class TestEquipmentBonusEndpoints:
         mock_service.get_item_bonus_breakdown.return_value = {16: 50}
 
         # Make request
-        response = client.post(
-            "/api/v1/equipment-bonuses/batch-items",
-            json=[1]
-        )
+        response = client.post("/api/v1/equipment-bonuses/batch-items", json=[1])
 
         # Assertions
         assert response.status_code == 200
@@ -359,10 +344,7 @@ class TestEquipmentBonusEndpoints:
 
     def test_batch_item_bonus_details_empty_list(self, client):
         """Test batch endpoint with empty item list."""
-        response = client.post(
-            "/api/v1/equipment-bonuses/batch-items",
-            json=[]
-        )
+        response = client.post("/api/v1/equipment-bonuses/batch-items", json=[])
 
         # Assertions
         assert response.status_code == 400
@@ -373,8 +355,7 @@ class TestEquipmentBonusEndpoints:
     def test_batch_item_bonus_details_invalid_json(self, client):
         """Test batch endpoint with invalid JSON."""
         response = client.post(
-            "/api/v1/equipment-bonuses/batch-items",
-            json={"invalid": "data"}
+            "/api/v1/equipment-bonuses/batch-items", json={"invalid": "data"}
         )
 
         # Assertions
@@ -383,15 +364,16 @@ class TestEquipmentBonusEndpoints:
     def test_batch_item_bonus_details_invalid_item_ids(self, client):
         """Test batch endpoint with invalid item ID types."""
         response = client.post(
-            "/api/v1/equipment-bonuses/batch-items",
-            json=[1, "invalid", 3]
+            "/api/v1/equipment-bonuses/batch-items", json=[1, "invalid", 3]
         )
 
         # Assertions
         assert response.status_code == 422  # Validation error
 
-    @patch('app.api.routes.equipment_bonuses.EquipmentBonusService')
-    def test_batch_item_bonus_details_service_exception(self, mock_service_class, client):
+    @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
+    def test_batch_item_bonus_details_service_exception(
+        self, mock_service_class, client
+    ):
         """Test handling of service exceptions in batch endpoint."""
         # Setup mock service to raise exception
         mock_service = Mock()
@@ -399,10 +381,7 @@ class TestEquipmentBonusEndpoints:
         mock_service.get_item_bonus_breakdown.side_effect = Exception("Database error")
 
         # Make request
-        response = client.post(
-            "/api/v1/equipment-bonuses/batch-items",
-            json=[1, 2]
-        )
+        response = client.post("/api/v1/equipment-bonuses/batch-items", json=[1, 2])
 
         # Assertions
         assert response.status_code == 500
@@ -414,7 +393,7 @@ class TestEquipmentBonusEndpoints:
     # Content Type and Header Tests
     # ============================================================================
 
-    @patch('app.api.routes.equipment_bonuses.EquipmentBonusService')
+    @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
     def test_response_content_type(self, mock_service_class, client):
         """Test that responses have correct content type."""
         mock_service = Mock()
@@ -422,8 +401,7 @@ class TestEquipmentBonusEndpoints:
         mock_service.calculate_equipment_bonuses.return_value = {16: 50}
 
         response = client.post(
-            "/api/v1/equipment-bonuses/calculate",
-            json={"item_ids": [1]}
+            "/api/v1/equipment-bonuses/calculate", json={"item_ids": [1]}
         )
 
         assert response.status_code == 200
@@ -433,8 +411,8 @@ class TestEquipmentBonusEndpoints:
     # Logging Tests
     # ============================================================================
 
-    @patch('app.api.routes.equipment_bonuses.logger')
-    @patch('app.api.routes.equipment_bonuses.EquipmentBonusService')
+    @patch("app.api.routes.equipment_bonuses.logger")
+    @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
     def test_calculate_bonuses_logging(self, mock_service_class, mock_logger, client):
         """Test that bonus calculations are properly logged."""
         mock_service = Mock()
@@ -442,8 +420,7 @@ class TestEquipmentBonusEndpoints:
         mock_service.calculate_equipment_bonuses.return_value = {16: 50}
 
         response = client.post(
-            "/api/v1/equipment-bonuses/calculate",
-            json={"item_ids": [1, 2, 3]}
+            "/api/v1/equipment-bonuses/calculate", json={"item_ids": [1, 2, 3]}
         )
 
         assert response.status_code == 200
@@ -452,8 +429,8 @@ class TestEquipmentBonusEndpoints:
         log_message = mock_logger.info.call_args[0][0]
         assert "3 items" in log_message
 
-    @patch('app.api.routes.equipment_bonuses.logger')
-    @patch('app.api.routes.equipment_bonuses.EquipmentBonusService')
+    @patch("app.api.routes.equipment_bonuses.logger")
+    @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
     def test_item_detail_logging(self, mock_service_class, mock_logger, client):
         """Test that item detail requests are properly logged."""
         mock_service = Mock()
@@ -468,8 +445,8 @@ class TestEquipmentBonusEndpoints:
         log_message = mock_logger.info.call_args[0][0]
         assert "12345" in log_message
 
-    @patch('app.api.routes.equipment_bonuses.logger')
-    @patch('app.api.routes.equipment_bonuses.EquipmentBonusService')
+    @patch("app.api.routes.equipment_bonuses.logger")
+    @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
     def test_error_logging(self, mock_service_class, mock_logger, client):
         """Test that errors are properly logged."""
         mock_service = Mock()
@@ -477,8 +454,7 @@ class TestEquipmentBonusEndpoints:
         mock_service.calculate_equipment_bonuses.side_effect = Exception("Test error")
 
         response = client.post(
-            "/api/v1/equipment-bonuses/calculate",
-            json={"item_ids": [1]}
+            "/api/v1/equipment-bonuses/calculate", json={"item_ids": [1]}
         )
 
         assert response.status_code == 500
@@ -491,7 +467,7 @@ class TestEquipmentBonusEndpoints:
     # Edge Cases and Boundary Tests
     # ============================================================================
 
-    @patch('app.api.routes.equipment_bonuses.EquipmentBonusService')
+    @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
     def test_large_item_list(self, mock_service_class, client):
         """Test bonus calculation with large number of items."""
         mock_service = Mock()
@@ -502,27 +478,25 @@ class TestEquipmentBonusEndpoints:
         item_ids = list(range(1, 101))
 
         response = client.post(
-            "/api/v1/equipment-bonuses/calculate",
-            json={"item_ids": item_ids}
+            "/api/v1/equipment-bonuses/calculate", json={"item_ids": item_ids}
         )
 
         assert response.status_code == 200
         data = response.json()
         assert data["item_count"] == 100
 
-    @patch('app.api.routes.equipment_bonuses.EquipmentBonusService')
+    @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
     def test_negative_bonus_values(self, mock_service_class, client):
         """Test that negative bonus values are handled correctly."""
         mock_service = Mock()
         mock_service_class.return_value = mock_service
         mock_service.calculate_equipment_bonuses.return_value = {
             16: -50,  # Negative bonus (debuff)
-            19: 25
+            19: 25,
         }
 
         response = client.post(
-            "/api/v1/equipment-bonuses/calculate",
-            json={"item_ids": [1]}
+            "/api/v1/equipment-bonuses/calculate", json={"item_ids": [1]}
         )
 
         assert response.status_code == 200
@@ -531,18 +505,15 @@ class TestEquipmentBonusEndpoints:
         assert data["total_bonuses"]["16"] == -50
         assert data["total_bonuses"]["19"] == 25
 
-    @patch('app.api.routes.equipment_bonuses.EquipmentBonusService')
+    @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
     def test_large_bonus_values(self, mock_service_class, client):
         """Test handling of large bonus values."""
         mock_service = Mock()
         mock_service_class.return_value = mock_service
-        mock_service.calculate_equipment_bonuses.return_value = {
-            16: 999999
-        }
+        mock_service.calculate_equipment_bonuses.return_value = {16: 999999}
 
         response = client.post(
-            "/api/v1/equipment-bonuses/calculate",
-            json={"item_ids": [1]}
+            "/api/v1/equipment-bonuses/calculate", json={"item_ids": [1]}
         )
 
         assert response.status_code == 200
@@ -550,7 +521,7 @@ class TestEquipmentBonusEndpoints:
         # JSON converts int keys to strings
         assert data["total_bonuses"]["16"] == 999999
 
-    @patch('app.api.routes.equipment_bonuses.EquipmentBonusService')
+    @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
     def test_many_different_stats(self, mock_service_class, client):
         """Test handling of many different stat bonuses."""
         mock_service = Mock()
@@ -561,8 +532,7 @@ class TestEquipmentBonusEndpoints:
         mock_service.calculate_equipment_bonuses.return_value = many_bonuses
 
         response = client.post(
-            "/api/v1/equipment-bonuses/calculate",
-            json={"item_ids": [1]}
+            "/api/v1/equipment-bonuses/calculate", json={"item_ids": [1]}
         )
 
         assert response.status_code == 200
@@ -576,7 +546,7 @@ class TestEquipmentBonusEndpoints:
     # Service Instance Tests
     # ============================================================================
 
-    @patch('app.api.routes.equipment_bonuses.EquipmentBonusService')
+    @patch("app.api.routes.equipment_bonuses.EquipmentBonusService")
     def test_service_instance_per_request(self, mock_service_class, client):
         """Test that each request gets its own service instance."""
         mock_service = Mock()
@@ -585,12 +555,10 @@ class TestEquipmentBonusEndpoints:
 
         # Make multiple requests
         response1 = client.post(
-            "/api/v1/equipment-bonuses/calculate",
-            json={"item_ids": [1]}
+            "/api/v1/equipment-bonuses/calculate", json={"item_ids": [1]}
         )
         response2 = client.post(
-            "/api/v1/equipment-bonuses/calculate",
-            json={"item_ids": [2]}
+            "/api/v1/equipment-bonuses/calculate", json={"item_ids": [2]}
         )
 
         assert response1.status_code == 200

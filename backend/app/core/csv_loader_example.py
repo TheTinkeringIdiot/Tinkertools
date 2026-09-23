@@ -50,9 +50,9 @@ def example_basic_usage(csv_dir: str):
         print(f"Load time: {stats['total_time']:.1f}s")
         print(f"Rows/sec: {stats['rows_per_second']:.0f}")
 
-        if stats['errors']:
+        if stats["errors"]:
             print(f"\nErrors ({len(stats['errors'])}):")
-            for error in stats['errors']:
+            for error in stats["errors"]:
                 print(f"  - {error}")
 
         # Commit transaction

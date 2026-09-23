@@ -33,7 +33,9 @@ SCHEMA_RE = re.compile(r"^gv_[a-z0-9_]{1,60}$")
 SCHEMA_PREFIX = "gv_"
 
 # Version slug for the current request (None outside a request).
-current_version: ContextVar[Optional[str]] = ContextVar("current_game_version", default=None)
+current_version: ContextVar[Optional[str]] = ContextVar(
+    "current_game_version", default=None
+)
 
 
 class InvalidVersionSlug(ValueError):
@@ -53,7 +55,9 @@ def schema_name_for(slug: str) -> str:
     validate_slug(slug)
     schema = SCHEMA_PREFIX + re.sub(r"[.-]", "_", slug)
     if not SCHEMA_RE.match(schema):
-        raise InvalidVersionSlug(f"Slug {slug!r} maps to invalid schema name {schema!r}")
+        raise InvalidVersionSlug(
+            f"Slug {slug!r} maps to invalid schema name {schema!r}"
+        )
     return schema
 
 
@@ -83,7 +87,11 @@ class VersionRegistry:
     """In-process cache of public.game_versions with a short TTL."""
 
     def __init__(self, ttl_seconds: Optional[int] = None):
-        self.ttl = ttl_seconds if ttl_seconds is not None else settings.GAME_VERSION_REGISTRY_TTL
+        self.ttl = (
+            ttl_seconds
+            if ttl_seconds is not None
+            else settings.GAME_VERSION_REGISTRY_TTL
+        )
         self._lock = threading.Lock()
         self._versions: Dict[str, GameVersion] = {}
         self._loaded_at: float = 0.0
@@ -105,18 +113,18 @@ class VersionRegistry:
 
         try:
             with engine.connect() as conn:
-                rows = conn.execute(text(
-                    """
+                rows = conn.execute(text("""
                     SELECT slug, schema_name, display_name, family, parent_slug,
                            client_build, snapshot_date, sort_order, enabled,
                            is_default, features, notes
                     FROM public.game_versions
                     ORDER BY sort_order, slug
-                    """
-                )).mappings().all()
+                    """)).mappings().all()
         except Exception as exc:  # table missing (pre-migration) or DB down
             if not self._warned_missing:
-                logger.warning("Game version registry unavailable, serving default only: %s", exc)
+                logger.warning(
+                    "Game version registry unavailable, serving default only: %s", exc
+                )
                 self._warned_missing = True
             self._versions = {}
             self._loaded_at = time.monotonic()

@@ -14,9 +14,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.models import Perk
 from app.services.perk_service import PerkService
-from app.api.schemas.perk import (
-    PerkValidationDetail, PerkSeries
-)
+from app.api.schemas.perk import PerkValidationDetail, PerkSeries
 
 
 @pytest.fixture
@@ -28,6 +26,7 @@ def client():
 # ============================================================================
 # GET /api/v1/perks - List Perks Tests
 # ============================================================================
+
 
 def test_get_perks_returns_valid_paginated_response(client):
     """Test that getting perks returns valid pagination structure."""
@@ -193,6 +192,7 @@ def test_get_perks_invalid_page_size(client):
 # GET /api/v1/perks/stats - Perk Statistics Tests
 # ============================================================================
 
+
 def test_get_perk_stats_returns_valid_structure(client):
     """Test that perk stats returns a valid response structure."""
     response = client.get("/api/v1/perks/stats")
@@ -241,6 +241,7 @@ def test_get_perk_stats_level_ranges(client):
 # GET /api/v1/perks/series - Perk Series Listing Tests
 # ============================================================================
 
+
 def test_get_perk_series_grouped_success(client):
     """Test successful retrieval of grouped perk series."""
     response = client.get("/api/v1/perks/series")
@@ -279,6 +280,7 @@ def test_get_perk_series_filter_by_type(client):
 # ============================================================================
 # GET /api/v1/perks/{perk_name} - Perk Series Detail Tests
 # ============================================================================
+
 
 def test_get_perk_series_accumulator(client):
     """Test retrieval of Accumulator perk series."""
@@ -326,9 +328,7 @@ def test_get_perk_series_not_found(client):
 def test_get_perk_series_detail_includes_levels(client, db_session):
     """Test that perk series detail includes all level information."""
     # Get a real perk series
-    real_perk = db_session.query(Perk).filter(
-        Perk.perk_series.isnot(None)
-    ).first()
+    real_perk = db_session.query(Perk).filter(Perk.perk_series.isnot(None)).first()
     assert real_perk is not None
 
     response = client.get(f"/api/v1/perks/{real_perk.perk_series}")
@@ -343,6 +343,7 @@ def test_get_perk_series_detail_includes_levels(client, db_session):
 # ============================================================================
 # GET /api/v1/perks/lookup/{aoid} - Perk Lookup Tests
 # ============================================================================
+
 
 def test_lookup_perk_by_aoid_accumulator(client):
     """Test successful perk lookup by AOID for Accumulator."""
@@ -390,11 +391,10 @@ def test_lookup_perk_multiple_aoids(client):
 # POST /api/v1/perks/calculate - Perk Calculation Tests (Strategic Mocks)
 # ============================================================================
 
-@patch.object(PerkService, 'get_perk_series')
-@patch.object(PerkService, 'calculate_perk_effects')
-def test_calculate_perk_effects_success(
-    mock_calc_effects, mock_get_series, client
-):
+
+@patch.object(PerkService, "get_perk_series")
+@patch.object(PerkService, "calculate_perk_effects")
+def test_calculate_perk_effects_success(mock_calc_effects, mock_get_series, client):
     """Test successful perk effect calculation."""
     mock_series = PerkSeries(
         name="Accumulator",
@@ -403,7 +403,7 @@ def test_calculate_perk_effects_success(
         breeds=[],
         levels=[],
         max_level=10,
-        total_point_cost=10
+        total_point_cost=10,
     )
     mock_get_series.return_value = mock_series
     mock_calc_effects.return_value = {}
@@ -412,7 +412,7 @@ def test_calculate_perk_effects_success(
         "character_level": 220,
         "ai_title_level": 5,
         "owned_perks": {},
-        "target_perks": {"Accumulator": 1}
+        "target_perks": {"Accumulator": 1},
     }
 
     response = client.post("/api/v1/perks/calculate", json=request_data)
@@ -431,32 +431,26 @@ def test_calculate_perk_effects_missing_fields(client):
     """Test calculation with missing required fields."""
     # Missing character_level
     response = client.post(
-        "/api/v1/perks/calculate",
-        json={"owned_perks": {}, "target_perks": {}}
+        "/api/v1/perks/calculate", json={"owned_perks": {}, "target_perks": {}}
     )
     assert response.status_code == 422
 
     # Missing owned_perks
     response = client.post(
-        "/api/v1/perks/calculate",
-        json={"character_level": 220, "target_perks": {}}
+        "/api/v1/perks/calculate", json={"character_level": 220, "target_perks": {}}
     )
     assert response.status_code == 422
 
 
 def test_calculate_perk_effects_invalid_level(client):
     """Test calculation with invalid character level."""
-    request_data = {
-        "character_level": 0,
-        "owned_perks": {},
-        "target_perks": {}
-    }
+    request_data = {"character_level": 0, "owned_perks": {}, "target_perks": {}}
 
     response = client.post("/api/v1/perks/calculate", json=request_data)
     assert response.status_code == 422
 
 
-@patch.object(PerkService, 'get_perk_series')
+@patch.object(PerkService, "get_perk_series")
 def test_calculate_perk_effects_sl_points(mock_get_series, client):
     """Test SL point calculation."""
     mock_series = PerkSeries(
@@ -466,14 +460,14 @@ def test_calculate_perk_effects_sl_points(mock_get_series, client):
         breeds=[],
         levels=[],
         max_level=10,
-        total_point_cost=10
+        total_point_cost=10,
     )
     mock_get_series.return_value = mock_series
 
     request_data = {
         "character_level": 35,
         "owned_perks": {},
-        "target_perks": {"Accumulator": 1}
+        "target_perks": {"Accumulator": 1},
     }
 
     response = client.post("/api/v1/perks/calculate", json=request_data)
@@ -484,7 +478,7 @@ def test_calculate_perk_effects_sl_points(mock_get_series, client):
     assert data["available_sl_points"] == 40
 
 
-@patch.object(PerkService, 'get_perk_series')
+@patch.object(PerkService, "get_perk_series")
 def test_calculate_perk_effects_ai_points(mock_get_series, client):
     """Test AI point calculation."""
     mock_series = PerkSeries(
@@ -494,7 +488,7 @@ def test_calculate_perk_effects_ai_points(mock_get_series, client):
         breeds=[],
         levels=[],
         max_level=10,
-        total_point_cost=10
+        total_point_cost=10,
     )
     mock_get_series.return_value = mock_series
 
@@ -502,7 +496,7 @@ def test_calculate_perk_effects_ai_points(mock_get_series, client):
         "character_level": 220,
         "ai_title_level": 15,
         "owned_perks": {},
-        "target_perks": {"Ancient Knowledge": 1}
+        "target_perks": {"Ancient Knowledge": 1},
     }
 
     response = client.post("/api/v1/perks/calculate", json=request_data)
@@ -517,7 +511,8 @@ def test_calculate_perk_effects_ai_points(mock_get_series, client):
 # GET /api/v1/perks/{perk_name}/validate - Validation Tests (Strategic Mocks)
 # ============================================================================
 
-@patch.object(PerkService, 'validate_perk_requirements')
+
+@patch.object(PerkService, "validate_perk_requirements")
 def test_validate_perk_requirements_success(mock_validate, client):
     """Test successful perk requirement validation."""
     mock_validate.return_value = PerkValidationDetail(
@@ -527,7 +522,7 @@ def test_validate_perk_requirements_success(mock_validate, client):
         required_level=10,
         required_professions=[],
         required_breeds=[],
-        prerequisite_perks=[]
+        prerequisite_perks=[],
     )
 
     response = client.get(
@@ -543,7 +538,7 @@ def test_validate_perk_requirements_success(mock_validate, client):
     assert data["valid"] is True
 
 
-@patch.object(PerkService, 'validate_perk_requirements')
+@patch.object(PerkService, "validate_perk_requirements")
 def test_validate_perk_requirements_invalid(mock_validate, client):
     """Test validation of unmet requirements."""
     mock_validate.return_value = PerkValidationDetail(
@@ -553,7 +548,7 @@ def test_validate_perk_requirements_invalid(mock_validate, client):
         required_level=50,
         required_professions=[],
         required_breeds=[],
-        prerequisite_perks=[]
+        prerequisite_perks=[],
     )
 
     response = client.get(
@@ -591,7 +586,7 @@ def test_validate_perk_missing_parameters(client):
     assert response.status_code == 422
 
 
-@patch.object(PerkService, 'validate_perk_requirements')
+@patch.object(PerkService, "validate_perk_requirements")
 def test_validate_perk_with_owned_perks(mock_validate, client):
     """Test validation with owned perks JSON."""
     mock_validate.return_value = PerkValidationDetail(
@@ -601,7 +596,7 @@ def test_validate_perk_with_owned_perks(mock_validate, client):
         required_level=10,
         required_professions=[],
         required_breeds=[],
-        prerequisite_perks=[]
+        prerequisite_perks=[],
     )
 
     owned_perks = json.dumps({"Accumulator": 1})
@@ -621,6 +616,7 @@ def test_validate_perk_with_owned_perks(mock_validate, client):
 # ============================================================================
 # Edge Cases and Integration Tests
 # ============================================================================
+
 
 def test_perk_response_consistency(client, db_session):
     """Test that perk responses have consistent structure across endpoints."""

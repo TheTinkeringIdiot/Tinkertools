@@ -5,7 +5,11 @@ Performance monitoring and optimization API endpoints.
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.indexes import create_performance_indexes, check_index_usage, analyze_slow_queries
+from app.core.indexes import (
+    create_performance_indexes,
+    check_index_usage,
+    analyze_slow_queries,
+)
 from app.core.cache import get_cache_stats
 import logging
 
@@ -23,11 +27,13 @@ def create_indexes(db: Session = Depends(get_db)):
         created_indexes = create_performance_indexes(db)
         return {
             "message": f"Successfully created {len(created_indexes)} performance indexes",
-            "created_indexes": created_indexes
+            "created_indexes": created_indexes,
         }
     except Exception as e:
         logger.error(f"Failed to create performance indexes: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to create indexes: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create indexes: {str(e)}"
+        )
 
 
 @router.get("/indexes/usage")
@@ -40,17 +46,16 @@ def get_index_usage(db: Session = Depends(get_db)):
         return usage_stats
     except Exception as e:
         logger.error(f"Failed to get index usage: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get index usage: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get index usage: {str(e)}"
+        )
 
 
 @router.get("/queries/slow")
-def get_slow_queries(
-    min_duration_ms: int = 500,
-    db: Session = Depends(get_db)
-):
+def get_slow_queries(min_duration_ms: int = 500, db: Session = Depends(get_db)):
     """
     Analyze slow queries using PostgreSQL's pg_stat_statements extension.
-    
+
     Args:
         min_duration_ms: Minimum query duration in milliseconds to include (default: 500ms)
     """
@@ -59,7 +64,9 @@ def get_slow_queries(
         return slow_queries
     except Exception as e:
         logger.error(f"Failed to analyze slow queries: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to analyze slow queries: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to analyze slow queries: {str(e)}"
+        )
 
 
 @router.get("/overview")
@@ -71,13 +78,15 @@ def get_performance_overview(db: Session = Depends(get_db)):
         overview = {
             "cache_stats": get_cache_stats(),
             "index_usage": check_index_usage(db),
-            "slow_queries": analyze_slow_queries(db, 500)
+            "slow_queries": analyze_slow_queries(db, 500),
         }
-        
+
         return overview
     except Exception as e:
         logger.error(f"Failed to get performance overview: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get performance overview: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get performance overview: {str(e)}"
+        )
 
 
 @router.get("/health")
@@ -91,8 +100,8 @@ def performance_health_check():
         "cache": "enabled",
         "monitoring_endpoints": [
             "/performance/overview",
-            "/performance/indexes/usage", 
+            "/performance/indexes/usage",
             "/performance/queries/slow",
-            "/cache/stats"
-        ]
+            "/cache/stats",
+        ],
     }

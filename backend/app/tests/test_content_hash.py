@@ -36,8 +36,10 @@ def make_record():
                 {"Stat": 155, "RawValue": 60},
             ],
         },
-        "AnimationMesh": {"Animation": {"Stat": 1, "RawValue": 2},
-                          "Mesh": {"Stat": 3, "RawValue": 4}},
+        "AnimationMesh": {
+            "Animation": {"Stat": 1, "RawValue": 2},
+            "Mesh": {"Stat": 3, "RawValue": 4},
+        },
         "ActionData": {
             "Actions": [
                 {
@@ -51,7 +53,10 @@ def make_record():
             ]
         },
         "SpellData": [
-            {"Event": 14, "Items": [{"SpellID": 53045, "SpellFormat": "{Stat} by {Amount}"}]}
+            {
+                "Event": 14,
+                "Items": [{"SpellID": 53045, "SpellFormat": "{Stat} by {Amount}"}],
+            }
         ],
     }
 
@@ -97,7 +102,8 @@ class TestStatOrdering:
         record = make_record()
         shuffled = make_record()
         shuffled["AttackDefenseData"]["Attack"] = list(
-            reversed(shuffled["AttackDefenseData"]["Attack"]))
+            reversed(shuffled["AttackDefenseData"]["Attack"])
+        )
         assert compute_item_hashes(shuffled) == compute_item_hashes(record)
 
     def test_normalize_sorts_on_stat_then_value(self):
@@ -107,11 +113,14 @@ class TestStatOrdering:
 
 
 class TestDumpMetadataIgnored:
-    @pytest.mark.parametrize("field,value", [
-        ("Version", 18087201),
-        ("DBType", 99),
-        ("__is_nano__", True),
-    ])
+    @pytest.mark.parametrize(
+        "field,value",
+        [
+            ("Version", 18087201),
+            ("DBType", 99),
+            ("__is_nano__", True),
+        ],
+    )
     def test_field_does_not_affect_hashes(self, field, value):
         record = make_record()
         changed = make_record()

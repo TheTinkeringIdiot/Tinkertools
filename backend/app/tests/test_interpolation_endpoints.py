@@ -52,11 +52,11 @@ class TestInterpolationEndpoints:
             ql_delta=50,
             ql_delta_full=100,
             stats=[
-                {'id': 1, 'stat': 1, 'value': 150},
-                {'id': 2, 'stat': 2, 'value': 75}
+                {"id": 1, "stat": 1, "value": 150},
+                {"id": 2, "stat": 2, "value": 75},
             ],
             spell_data=[],
-            actions=[]
+            actions=[],
         )
 
     @pytest.fixture
@@ -67,14 +67,15 @@ class TestInterpolationEndpoints:
             "interpolatable": True,
             "min_ql": 100,
             "max_ql": 200,
-            "ql_range": 101
+            "ql_range": 101,
         }
 
     def setup_method(self):
         """Setup method to override database dependency."""
+
         def override_get_db():
             return Mock(spec=Session)
-        
+
         app.dependency_overrides[get_db] = override_get_db
 
     def teardown_method(self):
@@ -85,15 +86,23 @@ class TestInterpolationEndpoints:
     # GET /items/{aoid}/interpolate Tests
     # ============================================================================
 
-    def test_interpolate_item_success(self, client, monkeypatch, sample_interpolated_item):
+    def test_interpolate_item_success(
+        self, client, monkeypatch, sample_interpolated_item
+    ):
         """Test successful item interpolation via GET endpoint."""
         # Setup mock service methods
         mock_interpolate = Mock(return_value=sample_interpolated_item)
         mock_get_range = Mock(return_value=(100, 200))
 
         # Patch the service methods
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.interpolate_item", mock_interpolate)
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.get_interpolation_range", mock_get_range)
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.interpolate_item",
+            mock_interpolate,
+        )
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.get_interpolation_range",
+            mock_get_range,
+        )
 
         # Make request
         response = client.get("/api/v1/items/12345/interpolate?target_ql=150")
@@ -116,7 +125,10 @@ class TestInterpolationEndpoints:
         """Test interpolation when item is not found."""
         # Setup mock service - endpoint catches 404 and returns success=False
         mock_interpolate = Mock(return_value=None)
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.interpolate_item", mock_interpolate)
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.interpolate_item",
+            mock_interpolate,
+        )
 
         # Make request
         response = client.get("/api/v1/items/99999/interpolate?target_ql=150")
@@ -131,7 +143,10 @@ class TestInterpolationEndpoints:
         """Test handling of service exceptions."""
         # Setup mock service to raise exception
         mock_interpolate = Mock(side_effect=Exception("Database error"))
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.interpolate_item", mock_interpolate)
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.interpolate_item",
+            mock_interpolate,
+        )
 
         # Make request
         response = client.get("/api/v1/items/12345/interpolate?target_ql=150")
@@ -169,11 +184,26 @@ class TestInterpolationEndpoints:
     def test_get_interpolation_info_success(self, client, monkeypatch):
         """Test successful retrieval of interpolation info."""
         # Setup mock service - endpoint uses get_interpolation_ranges
-        mock_ranges = Mock(return_value=[
-            {"min_ql": 100, "max_ql": 150, "interpolatable": True, "base_aoid": 12345},
-            {"min_ql": 150, "max_ql": 200, "interpolatable": True, "base_aoid": 12346}
-        ])
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.get_interpolation_ranges", mock_ranges)
+        mock_ranges = Mock(
+            return_value=[
+                {
+                    "min_ql": 100,
+                    "max_ql": 150,
+                    "interpolatable": True,
+                    "base_aoid": 12345,
+                },
+                {
+                    "min_ql": 150,
+                    "max_ql": 200,
+                    "interpolatable": True,
+                    "base_aoid": 12346,
+                },
+            ]
+        )
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.get_interpolation_ranges",
+            mock_ranges,
+        )
 
         # Make request
         response = client.get("/api/v1/items/12345/interpolation-info")
@@ -191,7 +221,10 @@ class TestInterpolationEndpoints:
         """Test interpolation info when item is not found."""
         # Setup mock service - This endpoint properly raises HTTPException for 404
         mock_ranges = Mock(return_value=None)
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.get_interpolation_ranges", mock_ranges)
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.get_interpolation_ranges",
+            mock_ranges,
+        )
 
         # Make request
         response = client.get("/api/v1/items/99999/interpolation-info")
@@ -204,10 +237,20 @@ class TestInterpolationEndpoints:
     def test_get_interpolation_info_not_interpolatable(self, client, monkeypatch):
         """Test interpolation info for non-interpolatable item."""
         # Setup mock service - single variant, not interpolatable
-        mock_ranges = Mock(return_value=[
-            {"min_ql": 100, "max_ql": 100, "interpolatable": False, "base_aoid": 12345}
-        ])
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.get_interpolation_ranges", mock_ranges)
+        mock_ranges = Mock(
+            return_value=[
+                {
+                    "min_ql": 100,
+                    "max_ql": 100,
+                    "interpolatable": False,
+                    "base_aoid": 12345,
+                }
+            ]
+        )
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.get_interpolation_ranges",
+            mock_ranges,
+        )
 
         # Make request
         response = client.get("/api/v1/items/12345/interpolation-info")
@@ -225,7 +268,10 @@ class TestInterpolationEndpoints:
         """Test handling of service exceptions in interpolation info."""
         # Setup mock service to raise exception
         mock_ranges = Mock(side_effect=Exception("Database error"))
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.get_interpolation_ranges", mock_ranges)
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.get_interpolation_ranges",
+            mock_ranges,
+        )
 
         # Make request
         response = client.get("/api/v1/items/12345/interpolation-info")
@@ -239,19 +285,26 @@ class TestInterpolationEndpoints:
     # POST /items/interpolate Tests
     # ============================================================================
 
-    def test_interpolate_item_post_success(self, client, monkeypatch, sample_interpolated_item):
+    def test_interpolate_item_post_success(
+        self, client, monkeypatch, sample_interpolated_item
+    ):
         """Test successful item interpolation via POST endpoint."""
         # Setup mock service methods
         mock_interpolate = Mock(return_value=sample_interpolated_item)
         mock_get_range = Mock(return_value=(100, 200))
 
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.interpolate_item", mock_interpolate)
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.get_interpolation_range", mock_get_range)
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.interpolate_item",
+            mock_interpolate,
+        )
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.get_interpolation_range",
+            mock_get_range,
+        )
 
         # Make request
         response = client.post(
-            "/api/v1/items/interpolate",
-            json={"aoid": 12345, "target_ql": 150}
+            "/api/v1/items/interpolate", json={"aoid": 12345, "target_ql": 150}
         )
 
         # Assertions
@@ -270,12 +323,14 @@ class TestInterpolationEndpoints:
         """Test POST interpolation when item is not found."""
         # Setup mock service - endpoint catches 404 and returns success=False
         mock_interpolate = Mock(return_value=None)
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.interpolate_item", mock_interpolate)
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.interpolate_item",
+            mock_interpolate,
+        )
 
         # Make request
         response = client.post(
-            "/api/v1/items/interpolate",
-            json={"aoid": 99999, "target_ql": 150}
+            "/api/v1/items/interpolate", json={"aoid": 99999, "target_ql": 150}
         )
 
         # Assertions - Endpoint catches exception and returns success=False
@@ -286,41 +341,30 @@ class TestInterpolationEndpoints:
 
     def test_interpolate_item_post_invalid_json(self, client):
         """Test POST interpolation with invalid JSON."""
-        response = client.post(
-            "/api/v1/items/interpolate",
-            json={"invalid": "data"}
-        )
+        response = client.post("/api/v1/items/interpolate", json={"invalid": "data"})
         assert response.status_code == 422  # Validation error
 
     def test_interpolate_item_post_missing_aoid(self, client):
         """Test POST interpolation with missing AOID."""
-        response = client.post(
-            "/api/v1/items/interpolate",
-            json={"target_ql": 150}
-        )
+        response = client.post("/api/v1/items/interpolate", json={"target_ql": 150})
         assert response.status_code == 422  # Validation error
 
     def test_interpolate_item_post_missing_target_ql(self, client):
         """Test POST interpolation with missing target_ql."""
-        response = client.post(
-            "/api/v1/items/interpolate",
-            json={"aoid": 12345}
-        )
+        response = client.post("/api/v1/items/interpolate", json={"aoid": 12345})
         assert response.status_code == 422  # Validation error
 
     def test_interpolate_item_post_invalid_ql_range(self, client):
         """Test POST interpolation with QL out of valid range."""
         # Test below minimum
         response = client.post(
-            "/api/v1/items/interpolate",
-            json={"aoid": 12345, "target_ql": 0}
+            "/api/v1/items/interpolate", json={"aoid": 12345, "target_ql": 0}
         )
         assert response.status_code == 422
 
         # Test above maximum
         response = client.post(
-            "/api/v1/items/interpolate",
-            json={"aoid": 12345, "target_ql": 501}
+            "/api/v1/items/interpolate", json={"aoid": 12345, "target_ql": 501}
         )
         assert response.status_code == 422
 
@@ -328,12 +372,14 @@ class TestInterpolationEndpoints:
         """Test handling of service exceptions in POST endpoint."""
         # Setup mock service to raise exception
         mock_interpolate = Mock(side_effect=Exception("Database error"))
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.interpolate_item", mock_interpolate)
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.interpolate_item",
+            mock_interpolate,
+        )
 
         # Make request
         response = client.post(
-            "/api/v1/items/interpolate",
-            json={"aoid": 12345, "target_ql": 150}
+            "/api/v1/items/interpolate", json={"aoid": 12345, "target_ql": 150}
         )
 
         # Assertions
@@ -355,8 +401,14 @@ class TestInterpolationEndpoints:
         # Setup mock service
         mock_interpolate = Mock(return_value=sample_interpolated_item)
         mock_get_range = Mock(return_value=(100, 200))
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.interpolate_item", mock_interpolate)
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.get_interpolation_range", mock_get_range)
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.interpolate_item",
+            mock_interpolate,
+        )
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.get_interpolation_range",
+            mock_get_range,
+        )
 
         # Make request
         response = client.get("/api/v1/items/12345/interpolate?target_ql=150")
@@ -376,8 +428,14 @@ class TestInterpolationEndpoints:
         # Setup mock service
         mock_interpolate = Mock(return_value=sample_interpolated_item)
         mock_get_range = Mock(return_value=(100, 200))
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.interpolate_item", mock_interpolate)
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.get_interpolation_range", mock_get_range)
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.interpolate_item",
+            mock_interpolate,
+        )
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.get_interpolation_range",
+            mock_get_range,
+        )
 
         # Make request - just verify it succeeds
         # Actual timing measurement is implementation detail
@@ -391,26 +449,41 @@ class TestInterpolationEndpoints:
     # Edge Cases and Boundary Tests
     # ============================================================================
 
-    def test_interpolate_minimum_ql(self, client, monkeypatch, sample_interpolated_item):
+    def test_interpolate_minimum_ql(
+        self, client, monkeypatch, sample_interpolated_item
+    ):
         """Test interpolation at minimum QL boundary."""
         mock_interpolate = Mock(return_value=sample_interpolated_item)
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.interpolate_item", mock_interpolate)
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.interpolate_item",
+            mock_interpolate,
+        )
 
         response = client.get("/api/v1/items/12345/interpolate?target_ql=1")
         assert response.status_code == 200
 
-    def test_interpolate_maximum_ql(self, client, monkeypatch, sample_interpolated_item):
+    def test_interpolate_maximum_ql(
+        self, client, monkeypatch, sample_interpolated_item
+    ):
         """Test interpolation at maximum QL boundary."""
         mock_interpolate = Mock(return_value=sample_interpolated_item)
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.interpolate_item", mock_interpolate)
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.interpolate_item",
+            mock_interpolate,
+        )
 
         response = client.get("/api/v1/items/12345/interpolate?target_ql=500")
         assert response.status_code == 200
 
-    def test_interpolate_large_aoid(self, client, monkeypatch, sample_interpolated_item):
+    def test_interpolate_large_aoid(
+        self, client, monkeypatch, sample_interpolated_item
+    ):
         """Test interpolation with large AOID values."""
         mock_interpolate = Mock(return_value=sample_interpolated_item)
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.interpolate_item", mock_interpolate)
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.interpolate_item",
+            mock_interpolate,
+        )
 
         response = client.get("/api/v1/items/999999999/interpolate?target_ql=150")
         assert response.status_code == 200
@@ -419,10 +492,15 @@ class TestInterpolationEndpoints:
     # Content Type and Header Tests
     # ============================================================================
 
-    def test_interpolation_response_headers(self, client, monkeypatch, sample_interpolated_item):
+    def test_interpolation_response_headers(
+        self, client, monkeypatch, sample_interpolated_item
+    ):
         """Test that interpolation responses have correct headers."""
         mock_interpolate = Mock(return_value=sample_interpolated_item)
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.interpolate_item", mock_interpolate)
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.interpolate_item",
+            mock_interpolate,
+        )
 
         response = client.get("/api/v1/items/12345/interpolate?target_ql=150")
 
@@ -435,7 +513,7 @@ class TestInterpolationEndpoints:
         response = client.post(
             "/api/v1/items/interpolate",
             data="invalid data",
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
         )
         # Should return validation error for malformed JSON
         assert response.status_code == 422
@@ -444,10 +522,15 @@ class TestInterpolationEndpoints:
     # Concurrent Request Tests
     # ============================================================================
 
-    def test_interpolation_service_instance_per_request(self, client, monkeypatch, sample_interpolated_item):
+    def test_interpolation_service_instance_per_request(
+        self, client, monkeypatch, sample_interpolated_item
+    ):
         """Test that each request gets its own service instance."""
         mock_interpolate = Mock(return_value=sample_interpolated_item)
-        monkeypatch.setattr("app.api.routes.items.InterpolationService.interpolate_item", mock_interpolate)
+        monkeypatch.setattr(
+            "app.api.routes.items.InterpolationService.interpolate_item",
+            mock_interpolate,
+        )
 
         # Make multiple requests
         response1 = client.get("/api/v1/items/12345/interpolate?target_ql=150")

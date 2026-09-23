@@ -15,52 +15,47 @@ class CacheService:
     """
     Thread-safe in-memory cache with TTL support.
     """
-    
+
     def __init__(self, default_ttl: int = 300):  # 5 minutes default
         self.default_ttl = default_ttl
         self.cache: Dict[str, Tuple[Any, float]] = {}  # key: (value, expiry_time)
         self.lock = threading.RLock()
-        self.stats = {
-            'hits': 0,
-            'misses': 0,
-            'evictions': 0,
-            'sets': 0
-        }
-    
+        self.stats = {"hits": 0, "misses": 0, "evictions": 0, "sets": 0}
+
     def _generate_key(self, prefix: str, **kwargs) -> str:
         """Generate a cache key from parameters."""
         # Create a consistent key from the parameters
         params = json.dumps(kwargs, sort_keys=True, default=str)
         key_hash = hashlib.md5(params.encode()).hexdigest()[:8]
         return f"{prefix}:{key_hash}"
-    
+
     def get(self, key: str) -> Optional[Any]:
         """Get a value from cache."""
         with self.lock:
             if key not in self.cache:
-                self.stats['misses'] += 1
+                self.stats["misses"] += 1
                 return None
-            
+
             value, expiry_time = self.cache[key]
-            
+
             # Check if expired
             if time.time() > expiry_time:
                 del self.cache[key]
-                self.stats['evictions'] += 1
-                self.stats['misses'] += 1
+                self.stats["evictions"] += 1
+                self.stats["misses"] += 1
                 return None
-            
-            self.stats['hits'] += 1
+
+            self.stats["hits"] += 1
             return value
-    
+
     def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
         """Set a value in cache with TTL."""
         with self.lock:
             ttl = ttl or self.default_ttl
             expiry_time = time.time() + ttl
             self.cache[key] = (value, expiry_time)
-            self.stats['sets'] += 1
-    
+            self.stats["sets"] += 1
+
     def delete(self, key: str) -> bool:
         """Delete a key from cache."""
         with self.lock:
@@ -68,39 +63,41 @@ class CacheService:
                 del self.cache[key]
                 return True
             return False
-    
+
     def clear(self) -> None:
         """Clear all cache entries."""
         with self.lock:
             self.cache.clear()
-    
+
     def get_stats(self) -> dict:
         """Get cache statistics."""
         with self.lock:
-            total_requests = self.stats['hits'] + self.stats['misses']
-            hit_rate = (self.stats['hits'] / total_requests * 100) if total_requests > 0 else 0
-            
+            total_requests = self.stats["hits"] + self.stats["misses"]
+            hit_rate = (
+                (self.stats["hits"] / total_requests * 100) if total_requests > 0 else 0
+            )
+
             return {
                 **self.stats,
-                'total_requests': total_requests,
-                'hit_rate_percent': round(hit_rate, 2),
-                'cache_size': len(self.cache)
+                "total_requests": total_requests,
+                "hit_rate_percent": round(hit_rate, 2),
+                "cache_size": len(self.cache),
             }
-    
+
     def cleanup_expired(self) -> int:
         """Remove expired entries and return count removed."""
         with self.lock:
             current_time = time.time()
             expired_keys = []
-            
+
             for key, (value, expiry_time) in self.cache.items():
                 if current_time > expiry_time:
                     expired_keys.append(key)
-            
+
             for key in expired_keys:
                 del self.cache[key]
-                self.stats['evictions'] += 1
-            
+                self.stats["evictions"] += 1
+
             return len(expired_keys)
 
 
@@ -130,10 +127,10 @@ def invalidate_cache_pattern(pattern: str) -> int:
         for key in cache_service.cache.keys():
             if key.startswith(pattern):
                 keys_to_delete.append(key)
-        
+
         for key in keys_to_delete:
             cache_service.delete(key)
-        
+
         return len(keys_to_delete)
 
 
@@ -144,12 +141,12 @@ def get_cache_stats() -> dict:
 
 # Cache TTL settings for different types of data
 CACHE_TTL = {
-    'items_list': 300,      # 5 minutes - item lists change infrequently
-    'item_detail': 600,     # 10 minutes - individual items rarely change
-    'spells_list': 600,     # 10 minutes - spells are static
-    'pocket_bosses': 1800,  # 30 minutes - boss info is very static
-    'symbiants': 1800,      # 30 minutes - symbiant info is very static
-    'search_results': 180,  # 3 minutes - search results can be cached briefly
-    'stats': 60,            # 1 minute - stats change more frequently
-    'weapons_analyze': 3600 # 1 hour - weapon analysis is static game data
+    "items_list": 300,  # 5 minutes - item lists change infrequently
+    "item_detail": 600,  # 10 minutes - individual items rarely change
+    "spells_list": 600,  # 10 minutes - spells are static
+    "pocket_bosses": 1800,  # 30 minutes - boss info is very static
+    "symbiants": 1800,  # 30 minutes - symbiant info is very static
+    "search_results": 180,  # 3 minutes - search results can be cached briefly
+    "stats": 60,  # 1 minute - stats change more frequently
+    "weapons_analyze": 3600,  # 1 hour - weapon analysis is static game data
 }

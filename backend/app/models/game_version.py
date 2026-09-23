@@ -8,7 +8,15 @@ for the authoritative DDL.
 """
 
 from sqlalchemy import (
-    Boolean, Column, Date, DateTime, ForeignKey, Integer, String, Text, func
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
@@ -19,8 +27,8 @@ from app.core.database import Base
 class GameVersion(Base):
     """One game data snapshot (live AO, PRK, a historical client build)."""
 
-    __tablename__ = 'game_versions'
-    __table_args__ = {'schema': 'public'}
+    __tablename__ = "game_versions"
+    __table_args__ = {"schema": "public"}
 
     slug = Column(String(40), primary_key=True)
     schema_name = Column(String(64), nullable=False, unique=True)
@@ -28,8 +36,8 @@ class GameVersion(Base):
     family = Column(String(20), nullable=False)
     parent_slug = Column(
         String(40),
-        ForeignKey('public.game_versions.slug', ondelete='SET NULL'),
-        nullable=True
+        ForeignKey("public.game_versions.slug", ondelete="SET NULL"),
+        nullable=True,
     )
     client_build = Column(String(40))
     snapshot_date = Column(Date)
@@ -42,15 +50,9 @@ class GameVersion(Base):
     updated_at = Column(DateTime, server_default=func.current_timestamp())
 
     # Lineage: the snapshot this one follows.
-    parent = relationship(
-        'GameVersion',
-        remote_side=[slug],
-        backref='children'
-    )
+    parent = relationship("GameVersion", remote_side=[slug], backref="children")
     item_revisions = relationship(
-        'ItemRevision',
-        back_populates='game_version',
-        cascade='all, delete-orphan'
+        "ItemRevision", back_populates="game_version", cascade="all, delete-orphan"
     )
 
     def __repr__(self):
@@ -64,14 +66,14 @@ class ItemRevision(Base):
     across a lineage yields the snapshots at which an item's definition changed.
     """
 
-    __tablename__ = 'item_revisions'
-    __table_args__ = {'schema': 'public'}
+    __tablename__ = "item_revisions"
+    __table_args__ = {"schema": "public"}
 
     aoid = Column(Integer, primary_key=True)
     version_slug = Column(
         String(40),
-        ForeignKey('public.game_versions.slug', ondelete='CASCADE'),
-        primary_key=True
+        ForeignKey("public.game_versions.slug", ondelete="CASCADE"),
+        primary_key=True,
     )
     content_hash = Column(String(40), nullable=False)
     stats_hash = Column(String(40), nullable=False)
@@ -80,7 +82,7 @@ class ItemRevision(Base):
     text_hash = Column(String(40), nullable=False)
     is_nano = Column(Boolean, nullable=False, default=False)
 
-    game_version = relationship('GameVersion', back_populates='item_revisions')
+    game_version = relationship("GameVersion", back_populates="item_revisions")
 
     def __repr__(self):
         return f"<ItemRevision(aoid={self.aoid}, version_slug='{self.version_slug}')>"

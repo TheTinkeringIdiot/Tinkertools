@@ -257,10 +257,7 @@ class TestPaginationConsistency:
     def test_pagination_parameters(self, client):
         """Test pagination parameters are handled correctly."""
         # Removed deprecated endpoints: pocket-bosses, symbiants
-        endpoints = [
-            "/api/v1/items",
-            "/api/v1/spells"
-        ]
+        endpoints = ["/api/v1/items", "/api/v1/spells"]
 
         for endpoint in endpoints:
             # Setup mock for each endpoint
@@ -289,7 +286,15 @@ class TestPaginationConsistency:
                 data = response.json()
 
                 # Check required fields
-                required_fields = ["items", "total", "page", "page_size", "pages", "has_next", "has_prev"]
+                required_fields = [
+                    "items",
+                    "total",
+                    "page",
+                    "page_size",
+                    "pages",
+                    "has_next",
+                    "has_prev",
+                ]
                 for field in required_fields:
                     assert field in data, f"Missing {field} in {endpoint} response"
 
@@ -342,7 +347,9 @@ class TestErrorHandling:
 
             try:
                 response = client.get(endpoint)
-                assert response.status_code == 404, f"Endpoint {endpoint} should return 404"
+                assert (
+                    response.status_code == 404
+                ), f"Endpoint {endpoint} should return 404"
                 data = response.json()
                 assert "error" in data or "detail" in data
             finally:
@@ -408,7 +415,7 @@ class TestEndpointResponseStructure:
         # Removed deprecated pocket-bosses endpoint
         search_endpoints = [
             "/api/v1/items/search?q=test",
-            "/api/v1/spells/search?q=test"
+            "/api/v1/spells/search?q=test",
         ]
 
         for endpoint in search_endpoints:

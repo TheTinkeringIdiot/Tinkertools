@@ -12,10 +12,26 @@ import math
 
 from app.core.database import get_db
 from app.models import (
-    SymbiantItem, Mob, Source, SourceType, ItemSource, Item, Action, ActionCriteria,
-    ItemSpellData, SpellData, SpellDataSpells, Spell, SpellCriterion, Criterion
+    SymbiantItem,
+    Mob,
+    Source,
+    SourceType,
+    ItemSource,
+    Item,
+    Action,
+    ActionCriteria,
+    ItemSpellData,
+    SpellData,
+    SpellDataSpells,
+    Spell,
+    SpellCriterion,
+    Criterion,
 )
-from app.api.schemas.symbiant import SymbiantResponse, SymbiantWithDropsResponse, MobDropInfo
+from app.api.schemas.symbiant import (
+    SymbiantResponse,
+    SymbiantWithDropsResponse,
+    MobDropInfo,
+)
 from app.api.schemas.action import ActionResponse
 from app.api.schemas.criterion import CriterionResponse
 from app.api.schemas.spell import SpellDataResponse, SpellWithCriteria
@@ -34,7 +50,7 @@ logger = logging.getLogger(__name__)
 def list_symbiants(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> PaginatedResponse[SymbiantResponse]:
     """
     List symbiants with pagination.
@@ -48,13 +64,8 @@ def list_symbiants(
     start_time = time.time()
 
     # Base query with ordering
-    base_query = (
-        db.query(SymbiantItem)
-        .order_by(
-            SymbiantItem.family.asc(),
-            SymbiantItem.ql.asc(),
-            SymbiantItem.name.asc()
-        )
+    base_query = db.query(SymbiantItem).order_by(
+        SymbiantItem.family.asc(), SymbiantItem.ql.asc(), SymbiantItem.name.asc()
     )
 
     # Get total count
@@ -81,7 +92,7 @@ def list_symbiants(
             .selectinload(SpellData.spell_data_spells)
             .selectinload(SpellDataSpells.spell)
             .selectinload(Spell.spell_criteria)
-            .selectinload(SpellCriterion.criterion)
+            .selectinload(SpellCriterion.criterion),
         )
     )
     items = {item.id: item for item in items_query.all()}
@@ -102,17 +113,19 @@ def list_symbiants(
                             id=ac.criterion.id,
                             value1=ac.criterion.value1,
                             value2=ac.criterion.value2,
-                            operator=ac.criterion.operator
+                            operator=ac.criterion.operator,
                         )
                         for ac in action.action_criteria
                     ]
 
-                    actions.append(ActionResponse(
-                        id=action.id,
-                        action=action.action,
-                        item_id=action.item_id,
-                        criteria=criteria
-                    ))
+                    actions.append(
+                        ActionResponse(
+                            id=action.id,
+                            action=action.action,
+                            item_id=action.item_id,
+                            criteria=criteria,
+                        )
+                    )
 
             # Build spell_data
             for isd in item.item_spell_data:
@@ -129,42 +142,50 @@ def list_symbiants(
                             id=sc.criterion.id,
                             value1=sc.criterion.value1,
                             value2=sc.criterion.value2,
-                            operator=sc.criterion.operator
+                            operator=sc.criterion.operator,
                         )
                         for sc in spell.spell_criteria
                     ]
 
-                    spells_with_criteria.append(SpellWithCriteria(
-                        id=spell.id,
-                        target=spell.target,
-                        tick_count=spell.tick_count,
-                        tick_interval=spell.tick_interval,
-                        spell_id=spell.spell_id,
-                        spell_format=spell.spell_format,
-                        spell_params=spell.spell_params or {},
-                        criteria=criteria
-                    ))
+                    spells_with_criteria.append(
+                        SpellWithCriteria(
+                            id=spell.id,
+                            target=spell.target,
+                            tick_count=spell.tick_count,
+                            tick_interval=spell.tick_interval,
+                            spell_id=spell.spell_id,
+                            spell_format=spell.spell_format,
+                            spell_params=spell.spell_params or {},
+                            criteria=criteria,
+                        )
+                    )
 
-                spell_data_list.append(SpellDataResponse(
-                    id=spell_data.id,
-                    event=spell_data.event,
-                    spells=spells_with_criteria
-                ))
+                spell_data_list.append(
+                    SpellDataResponse(
+                        id=spell_data.id,
+                        event=spell_data.event,
+                        spells=spells_with_criteria,
+                    )
+                )
 
-        symbiant_responses.append(SymbiantResponse(
-            id=symbiant.id,
-            aoid=symbiant.aoid,
-            name=symbiant.name,
-            ql=symbiant.ql,
-            slot_id=symbiant.slot_id,
-            family=symbiant.family,
-            spell_data=spell_data_list,
-            actions=actions
-        ))
+        symbiant_responses.append(
+            SymbiantResponse(
+                id=symbiant.id,
+                aoid=symbiant.aoid,
+                name=symbiant.name,
+                ql=symbiant.ql,
+                slot_id=symbiant.slot_id,
+                family=symbiant.family,
+                spell_data=spell_data_list,
+                actions=actions,
+            )
+        )
 
     # Log performance metrics
     query_time = time.time() - start_time
-    logger.info(f"Symbiant list query page={page} page_size={page_size} results={len(symbiant_responses)}/{total} time={query_time:.3f}s")
+    logger.info(
+        f"Symbiant list query page={page} page_size={page_size} results={len(symbiant_responses)}/{total} time={query_time:.3f}s"
+    )
 
     return PaginatedResponse[SymbiantResponse](
         items=symbiant_responses,
@@ -173,17 +194,14 @@ def list_symbiants(
         page_size=page_size,
         pages=pages,
         has_next=page < pages,
-        has_prev=page > 1
+        has_prev=page > 1,
     )
 
 
 @router.get("/{symbiant_id}/dropped-by", response_model=List[MobDropInfo])
 @cached_response("symbiant_sources")
 @performance_monitor
-def get_symbiant_sources(
-    symbiant_id: int,
-    db: Session = Depends(get_db)
-):
+def get_symbiant_sources(symbiant_id: int, db: Session = Depends(get_db)):
     """
     Get all pocket bosses that drop this symbiant.
 
@@ -203,9 +221,11 @@ def get_symbiant_sources(
         raise HTTPException(status_code=404, detail="Symbiant not found")
 
     # Get source_type_id for 'mob'
-    source_type = db.query(SourceType).filter(SourceType.name == 'mob').first()
+    source_type = db.query(SourceType).filter(SourceType.name == "mob").first()
     if not source_type:
-        raise HTTPException(status_code=500, detail="Source type 'mob' not found in database")
+        raise HTTPException(
+            status_code=500, detail="Source type 'mob' not found in database"
+        )
 
     # Query mobs via sources (only pocket bosses)
     query = (
@@ -216,7 +236,7 @@ def get_symbiant_sources(
             and_(
                 ItemSource.item_id == symbiant_id,
                 Source.source_type_id == source_type.id,
-                Mob.is_pocket_boss == True
+                Mob.is_pocket_boss == True,
             )
         )
     )
@@ -228,7 +248,9 @@ def get_symbiant_sources(
 
     # Log performance metrics
     query_time = time.time() - start_time
-    logger.info(f"Symbiant sources query symbiant_id={symbiant_id} results={len(mobs)} time={query_time:.3f}s")
+    logger.info(
+        f"Symbiant sources query symbiant_id={symbiant_id} results={len(mobs)} time={query_time:.3f}s"
+    )
 
     return [
         MobDropInfo(
@@ -237,7 +259,7 @@ def get_symbiant_sources(
             level=m.level,
             location=m.location,
             playfield=m.playfield,
-            is_pocket_boss=m.is_pocket_boss
+            is_pocket_boss=m.is_pocket_boss,
         )
         for m in mobs
     ]
@@ -268,7 +290,7 @@ def get_symbiant(symbiant_id: int, db: Session = Depends(get_db)):
             .joinedload(SpellData.spell_data_spells)
             .joinedload(SpellDataSpells.spell)
             .joinedload(Spell.spell_criteria)
-            .joinedload(SpellCriterion.criterion)
+            .joinedload(SpellCriterion.criterion),
         )
         .first()
     )
@@ -285,17 +307,19 @@ def get_symbiant(symbiant_id: int, db: Session = Depends(get_db)):
                         id=ac.criterion.id,
                         value1=ac.criterion.value1,
                         value2=ac.criterion.value2,
-                        operator=ac.criterion.operator
+                        operator=ac.criterion.operator,
                     )
                     for ac in action.action_criteria
                 ]
 
-                actions.append(ActionResponse(
-                    id=action.id,
-                    action=action.action,
-                    item_id=action.item_id,
-                    criteria=criteria
-                ))
+                actions.append(
+                    ActionResponse(
+                        id=action.id,
+                        action=action.action,
+                        item_id=action.item_id,
+                        criteria=criteria,
+                    )
+                )
 
         # Build spell_data
         for isd in item.item_spell_data:
@@ -312,27 +336,31 @@ def get_symbiant(symbiant_id: int, db: Session = Depends(get_db)):
                         id=sc.criterion.id,
                         value1=sc.criterion.value1,
                         value2=sc.criterion.value2,
-                        operator=sc.criterion.operator
+                        operator=sc.criterion.operator,
                     )
                     for sc in spell.spell_criteria
                 ]
 
-                spells_with_criteria.append(SpellWithCriteria(
-                    id=spell.id,
-                    target=spell.target,
-                    tick_count=spell.tick_count,
-                    tick_interval=spell.tick_interval,
-                    spell_id=spell.spell_id,
-                    spell_format=spell.spell_format,
-                    spell_params=spell.spell_params or {},
-                    criteria=criteria
-                ))
+                spells_with_criteria.append(
+                    SpellWithCriteria(
+                        id=spell.id,
+                        target=spell.target,
+                        tick_count=spell.tick_count,
+                        tick_interval=spell.tick_interval,
+                        spell_id=spell.spell_id,
+                        spell_format=spell.spell_format,
+                        spell_params=spell.spell_params or {},
+                        criteria=criteria,
+                    )
+                )
 
-            spell_data_list.append(SpellDataResponse(
-                id=spell_data.id,
-                event=spell_data.event,
-                spells=spells_with_criteria
-            ))
+            spell_data_list.append(
+                SpellDataResponse(
+                    id=spell_data.id,
+                    event=spell_data.event,
+                    spells=spells_with_criteria,
+                )
+            )
 
     return SymbiantResponse(
         id=symbiant.id,
@@ -342,5 +370,5 @@ def get_symbiant(symbiant_id: int, db: Session = Depends(get_db)):
         slot_id=symbiant.slot_id,
         family=symbiant.family,
         spell_data=spell_data_list,
-        actions=actions
+        actions=actions,
     )

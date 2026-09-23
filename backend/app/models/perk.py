@@ -8,9 +8,11 @@ from app.core.database import Base
 
 
 class Perk(Base):
-    __tablename__ = 'perks'
+    __tablename__ = "perks"
 
-    item_id = Column(Integer, ForeignKey('items.id', ondelete='CASCADE'), primary_key=True)
+    item_id = Column(
+        Integer, ForeignKey("items.id", ondelete="CASCADE"), primary_key=True
+    )
     name = Column(String(128), nullable=False)
     perk_series = Column(String(128), nullable=False)
     counter = Column(Integer, nullable=False)
@@ -21,7 +23,7 @@ class Perk(Base):
     breeds = Column(ARRAY(Integer), nullable=False)
 
     # Relationships
-    item = relationship('Item', back_populates='perk', uselist=False)
+    item = relationship("Item", back_populates="perk", uselist=False)
 
     def __repr__(self):
         return f"<Perk(item_id={self.item_id}, name='{self.name}', series='{self.perk_series}', counter={self.counter})>"

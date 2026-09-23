@@ -13,7 +13,7 @@ from app.api.schemas import (
     EquipmentBonusRequest,
     EquipmentBonusResponse,
     ItemBonusDetailResponse,
-    ErrorResponse
+    ErrorResponse,
 )
 from app.core.decorators import performance_monitor
 
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
     response_model=EquipmentBonusResponse,
     responses={
         400: {"model": ErrorResponse, "description": "Invalid request data"},
-        500: {"model": ErrorResponse, "description": "Internal server error"}
+        500: {"model": ErrorResponse, "description": "Internal server error"},
     },
     summary="Calculate equipment stat bonuses",
     description="""
@@ -43,20 +43,18 @@ logger = logging.getLogger(__name__)
 
     The response includes total bonuses aggregated by numeric STAT ID,
     along with counts for processed items and bonus stats.
-    """
+    """,
 )
 @performance_monitor
 def calculate_equipment_bonuses(
-    request: EquipmentBonusRequest,
-    db: Session = Depends(get_db)
+    request: EquipmentBonusRequest, db: Session = Depends(get_db)
 ) -> EquipmentBonusResponse:
     """Calculate equipment stat bonuses for equipped items."""
 
     try:
         if not request.item_ids:
             raise HTTPException(
-                status_code=400,
-                detail="At least one item ID must be provided"
+                status_code=400, detail="At least one item ID must be provided"
             )
 
         logger.info(f"Calculating bonuses for {len(request.item_ids)} items")
@@ -68,7 +66,9 @@ def calculate_equipment_bonuses(
 
         # Handle implant clusters if provided
         if request.implant_clusters:
-            cluster_bonuses = service.calculate_implant_cluster_bonuses(request.implant_clusters)
+            cluster_bonuses = service.calculate_implant_cluster_bonuses(
+                request.implant_clusters
+            )
 
             # Merge cluster bonuses with equipment bonuses
             for stat_id, amount in cluster_bonuses.items():
@@ -80,7 +80,7 @@ def calculate_equipment_bonuses(
         return EquipmentBonusResponse(
             total_bonuses=equipment_bonuses,
             item_count=len(request.item_ids),
-            bonus_count=len(equipment_bonuses)
+            bonus_count=len(equipment_bonuses),
         )
 
     except HTTPException:
@@ -89,7 +89,7 @@ def calculate_equipment_bonuses(
         logger.error(f"Error calculating equipment bonuses: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail="Internal server error while calculating equipment bonuses"
+            detail="Internal server error while calculating equipment bonuses",
         )
 
 
@@ -98,7 +98,7 @@ def calculate_equipment_bonuses(
     response_model=ItemBonusDetailResponse,
     responses={
         404: {"model": ErrorResponse, "description": "Item not found"},
-        500: {"model": ErrorResponse, "description": "Internal server error"}
+        500: {"model": ErrorResponse, "description": "Internal server error"},
     },
     summary="Get detailed bonus breakdown for a single item",
     description="""
@@ -107,12 +107,11 @@ def calculate_equipment_bonuses(
     This endpoint returns all stat bonuses provided by the specified item,
     useful for debugging equipment bonus calculations or displaying
     individual item contributions in the UI.
-    """
+    """,
 )
 @performance_monitor
 def get_item_bonus_detail(
-    item_id: int,
-    db: Session = Depends(get_db)
+    item_id: int, db: Session = Depends(get_db)
 ) -> ItemBonusDetailResponse:
     """Get detailed stat bonus breakdown for a single item."""
 
@@ -122,16 +121,13 @@ def get_item_bonus_detail(
         service = EquipmentBonusService(db)
         item_bonuses = service.get_item_bonus_breakdown(item_id)
 
-        return ItemBonusDetailResponse(
-            item_id=item_id,
-            bonuses=item_bonuses
-        )
+        return ItemBonusDetailResponse(item_id=item_id, bonuses=item_bonuses)
 
     except Exception as e:
         logger.error(f"Error getting item bonus detail: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail="Internal server error while getting item bonus detail"
+            detail="Internal server error while getting item bonus detail",
         )
 
 
@@ -140,7 +136,7 @@ def get_item_bonus_detail(
     response_model=List[ItemBonusDetailResponse],
     responses={
         400: {"model": ErrorResponse, "description": "Invalid request data"},
-        500: {"model": ErrorResponse, "description": "Internal server error"}
+        500: {"model": ErrorResponse, "description": "Internal server error"},
     },
     summary="Get bonus breakdown for multiple items",
     description="""
@@ -149,20 +145,18 @@ def get_item_bonus_detail(
     Returns a list of bonus breakdowns, one for each item in the request.
     Items with no bonuses will still be included in the response with
     an empty bonuses dictionary.
-    """
+    """,
 )
 @performance_monitor
 def get_batch_item_bonus_details(
-    item_ids: List[int],
-    db: Session = Depends(get_db)
+    item_ids: List[int], db: Session = Depends(get_db)
 ) -> List[ItemBonusDetailResponse]:
     """Get detailed stat bonus breakdown for multiple items."""
 
     try:
         if not item_ids:
             raise HTTPException(
-                status_code=400,
-                detail="At least one item ID must be provided"
+                status_code=400, detail="At least one item ID must be provided"
             )
 
         logger.info(f"Getting bonus details for {len(item_ids)} items")
@@ -174,8 +168,7 @@ def get_batch_item_bonus_details(
 
         results = [
             ItemBonusDetailResponse(
-                item_id=item_id,
-                bonuses=all_bonuses.get(item_id, {})
+                item_id=item_id, bonuses=all_bonuses.get(item_id, {})
             )
             for item_id in item_ids
         ]
@@ -188,5 +181,5 @@ def get_batch_item_bonus_details(
         logger.error(f"Error getting batch item bonus details: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail="Internal server error while getting batch item bonus details"
+            detail="Internal server error while getting batch item bonus details",
         )

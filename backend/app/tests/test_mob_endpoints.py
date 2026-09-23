@@ -22,10 +22,10 @@ from app.tests.db_test_constants import (
     ITEM_SYMBIANT_AHPTA_CONTROL_OCULAR,
 )
 
-
 # ============================================================================
 # GET /api/v1/mobs Tests
 # ============================================================================
+
 
 def test_list_mobs_empty(client, db_session):
     """Test listing mobs when database is empty (no mobs from fixtures)."""
@@ -137,6 +137,7 @@ def test_list_mobs_invalid_page_size(client):
 # GET /api/v1/mobs/{mob_id} Tests
 # ============================================================================
 
+
 def test_get_mob_by_id(client, db_session):
     """Test getting a specific mob by ID using real database mob."""
     mob = db_session.query(Mob).filter(Mob.id == MOB_ID_ADOBE_SUZERAIN).one()
@@ -172,6 +173,7 @@ def test_get_mob_invalid_id(client):
 # ============================================================================
 # GET /api/v1/mobs/{mob_id}/drops Tests
 # ============================================================================
+
 
 def test_get_mob_drops(client, db_session):
     """Test getting symbiant drops for a mob using real database data."""
@@ -269,6 +271,7 @@ def test_get_mob_drops_with_spell_data(client, db_session):
 # ============================================================================
 # Performance and Edge Cases
 # ============================================================================
+
 
 def test_mob_endpoints_performance_logging(client, db_session):
     """Test that mob endpoints log performance metrics."""

@@ -28,13 +28,15 @@ app = FastAPI(
     description="API for TinkerTools - Anarchy Online game data utilities",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
 )
 
 # CORS - Environment-based origin configuration
 # Development: Allow all origins for flexibility
 # Production: Restrict to configured origins
-origins = ["*"] if settings.APP_ENV == "development" else settings.CORS_ORIGINS.split(",")
+origins = (
+    ["*"] if settings.APP_ENV == "development" else settings.CORS_ORIGINS.split(",")
+)
 
 # Resolves /api/v1/<version>/... to the matching game version schema.
 # Added before CORS so CORS is the outermost layer.
@@ -48,16 +50,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Exception handlers
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     return JSONResponse(
         status_code=exc.status_code,
-        content={
-            "error": exc.detail,
-            "code": f"HTTP_{exc.status_code}"
-        }
+        content={"error": exc.detail, "code": f"HTTP_{exc.status_code}"},
     )
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -68,7 +69,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "type": error.get("type"),
             "loc": error.get("loc"),
             "msg": error.get("msg"),
-            "input": error.get("input")
+            "input": error.get("input"),
         }
         # Convert ctx ValueError to string if present
         if "ctx" in error and "error" in error["ctx"]:
@@ -80,19 +81,18 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={
             "error": "Validation error",
             "code": "VALIDATION_ERROR",
-            "details": errors
-        }
+            "details": errors,
+        },
     )
+
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
-        content={
-            "error": "Internal server error",
-            "code": "INTERNAL_ERROR"
-        }
+        content={"error": "Internal server error", "code": "INTERNAL_ERROR"},
     )
+
 
 # Include routers
 app.include_router(health_router, prefix="")
@@ -115,6 +115,7 @@ app.include_router(equipment_bonuses_router, prefix="/api/v1")
 app.include_router(perks_router, prefix="/api/v1")
 app.include_router(weapons_router, prefix="/api/v1")
 
+
 @app.get("/")
 async def root():
     """Root endpoint with API information."""
@@ -122,5 +123,5 @@ async def root():
         "name": "TinkerTools API",
         "version": "1.0.0",
         "documentation": "/docs",
-        "health": "/health"
+        "health": "/health",
     }

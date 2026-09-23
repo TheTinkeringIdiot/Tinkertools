@@ -18,9 +18,16 @@ import time
 from app.core.database import get_db
 from app.services.perk_service import PerkService
 from app.api.schemas.perk import (
-    PerkResponse, PerkDetail, PerkSeries, PerkSearchRequest,
-    PerkStatsResponse, PerkCalculationRequest, PerkCalculationResponse,
-    PerkValidationResponse, PerkSeriesResponse, PerkSeriesPerk
+    PerkResponse,
+    PerkDetail,
+    PerkSeries,
+    PerkSearchRequest,
+    PerkStatsResponse,
+    PerkCalculationRequest,
+    PerkCalculationResponse,
+    PerkValidationResponse,
+    PerkSeriesResponse,
+    PerkSeriesPerk,
 )
 from app.api.schemas import PaginatedResponse
 from app.core.decorators import cached_response, performance_monitor
@@ -31,13 +38,17 @@ logger = logging.getLogger(__name__)
 
 # Batch lookup schemas
 class BatchPerkLookupRequest(BaseModel):
-    aoids: List[int] = Field(..., max_length=100, description="List of perk AOIDs to lookup")
+    aoids: List[int] = Field(
+        ..., max_length=100, description="List of perk AOIDs to lookup"
+    )
+
 
 class BatchPerkResult(BaseModel):
     aoid: int
     success: bool
     perk: Optional[dict] = None
     error: Optional[str] = None
+
 
 class BatchPerkLookupResponse(BaseModel):
     success: bool
@@ -65,7 +76,7 @@ def _get_filtered_perks_from_service(
     character_breed: Optional[str] = None,
     ai_title_level: Optional[int] = None,
     available_sl_points: Optional[int] = None,
-    available_ai_points: Optional[int] = None
+    available_ai_points: Optional[int] = None,
 ) -> List[PerkResponse]:
     """
     Get filtered perks using efficient database queries.
@@ -78,9 +89,11 @@ def _get_filtered_perks_from_service(
     from sqlalchemy import and_, or_, func
 
     # Start with base query joining items with perks table
-    query = perk_service.db.query(Item)\
-        .join(Perk, Item.id == Perk.item_id)\
+    query = (
+        perk_service.db.query(Item)
+        .join(Perk, Item.id == Perk.item_id)
         .join(ItemSpellData, Item.id == ItemSpellData.item_id)
+    )
 
     # Apply basic filters using database queries
     if type:
@@ -90,7 +103,7 @@ def _get_filtered_perks_from_service(
         query = query.filter(Perk.perk_series == series)
 
     if search:
-        query = query.filter(Perk.name.ilike(f'%{search}%'))
+        query = query.filter(Perk.name.ilike(f"%{search}%"))
 
     # Apply level filtering
     if min_level is not None:
@@ -116,7 +129,7 @@ def _get_filtered_perks_from_service(
                 or_(
                     func.array_length(Perk.professions, 1).is_(None),
                     func.array_length(Perk.professions, 1) == 0,
-                    Perk.professions.contains([profession_id])
+                    Perk.professions.contains([profession_id]),
                 )
             )
 
@@ -134,16 +147,21 @@ def _get_filtered_perks_from_service(
                 or_(
                     func.array_length(Perk.breeds, 1).is_(None),
                     func.array_length(Perk.breeds, 1) == 0,
-                    Perk.breeds.contains([breed_id])
+                    Perk.breeds.contains([breed_id]),
                 )
             )
 
     # Execute query with proper loading of relationships
     from sqlalchemy.orm import joinedload
-    results = query.options(
-        joinedload(Item.perk),
-        joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data)
-    ).distinct().all()
+
+    results = (
+        query.options(
+            joinedload(Item.perk),
+            joinedload(Item.item_spell_data).joinedload(ItemSpellData.spell_data),
+        )
+        .distinct()
+        .all()
+    )
 
     # Convert to response objects with character compatibility checks
     perk_responses = []
@@ -171,7 +189,12 @@ def _get_filtered_perks_from_service(
 
         # Check point affordability
         if not perk_service._is_affordable(
-            perk.type, perk.counter, available_sl_points, available_ai_points, None, perk.name
+            perk.type,
+            perk.counter,
+            available_sl_points,
+            available_ai_points,
+            None,
+            perk.name,
         ):
             continue
 
@@ -197,7 +220,7 @@ def _get_filtered_perks_from_service(
             description=item.description,
             ql=item.ql,
             perk_series=perk.perk_series,
-            formatted_name=f"{perk.name} {perk.counter}"
+            formatted_name=f"{perk.name} {perk.counter}",
         )
         perk_responses.append(perk_response)
 
@@ -211,22 +234,36 @@ def get_perks(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page"),
     type: Optional[str] = Query(None, description="Filter by perk type (SL, AI, LE)"),
-    profession: Optional[str] = Query(None, description="Filter by required profession name or ID"),
-    breed: Optional[str] = Query(None, description="Filter by required breed name or ID"),
-    min_level: Optional[int] = Query(None, description="Minimum character level requirement"),
-    max_level: Optional[int] = Query(None, description="Maximum character level requirement"),
+    profession: Optional[str] = Query(
+        None, description="Filter by required profession name or ID"
+    ),
+    breed: Optional[str] = Query(
+        None, description="Filter by required breed name or ID"
+    ),
+    min_level: Optional[int] = Query(
+        None, description="Minimum character level requirement"
+    ),
+    max_level: Optional[int] = Query(
+        None, description="Maximum character level requirement"
+    ),
     ai_level: Optional[int] = Query(None, description="AI title level requirement"),
     series: Optional[str] = Query(None, description="Filter by perk series name"),
     search: Optional[str] = Query(None, description="Search by perk name"),
-    character_level: Optional[int] = Query(None, description="Character level for compatibility filtering"),
-    character_profession: Optional[str] = Query(None, description="Character profession for filtering"),
-    character_breed: Optional[str] = Query(None, description="Character breed for filtering"),
+    character_level: Optional[int] = Query(
+        None, description="Character level for compatibility filtering"
+    ),
+    character_profession: Optional[str] = Query(
+        None, description="Character profession for filtering"
+    ),
+    character_breed: Optional[str] = Query(
+        None, description="Character breed for filtering"
+    ),
     ai_title_level: Optional[int] = Query(None, description="Character AI title level"),
     available_sl_points: Optional[int] = Query(None, description="Available SL points"),
     available_ai_points: Optional[int] = Query(None, description="Available AI points"),
     sort_by: str = Query("name", description="Sort by: name, level, type, counter"),
     sort_desc: bool = Query(False, description="Sort descending"),
-    perk_service: PerkService = Depends(get_perk_service)
+    perk_service: PerkService = Depends(get_perk_service),
 ):
     """
     Get paginated list of perks with filtering and character compatibility checks.
@@ -242,7 +279,9 @@ def get_perks(
         - Filter by type: ?type=SL
         - Combined filters: ?series=Aimed Shot&profession=Agent&type=SL
     """
-    logger.info(f"Getting perks: page={page}, series={series}, profession={profession}, type={type}")
+    logger.info(
+        f"Getting perks: page={page}, series={series}, profession={profession}, type={type}"
+    )
 
     # Get filtered perks using database queries for better performance
     filtered_perks = _get_filtered_perks_from_service(
@@ -260,7 +299,7 @@ def get_perks(
         character_breed=character_breed,
         ai_title_level=ai_title_level,
         available_sl_points=available_sl_points,
-        available_ai_points=available_ai_points
+        available_ai_points=available_ai_points,
     )
 
     # Apply sorting
@@ -280,7 +319,7 @@ def get_perks(
     total = len(filtered_perks)
     pages = math.ceil(total / page_size) if total > 0 else 1
     offset = (page - 1) * page_size
-    paginated_perks = filtered_perks[offset:offset + page_size]
+    paginated_perks = filtered_perks[offset : offset + page_size]
 
     logger.info(f"Returning {len(paginated_perks)} perks (total: {total})")
 
@@ -291,7 +330,7 @@ def get_perks(
         page_size=page_size,
         pages=pages,
         has_next=page < pages,
-        has_prev=page > 1
+        has_prev=page > 1,
     )
 
 
@@ -302,7 +341,7 @@ def search_perks(
     request: PerkSearchRequest,
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page"),
-    perk_service: PerkService = Depends(get_perk_service)
+    perk_service: PerkService = Depends(get_perk_service),
 ):
     """
     Advanced perk search with comprehensive filtering options.
@@ -316,13 +355,15 @@ def search_perks(
     # Get available perks from service
     perks = perk_service.get_available_perks(
         character_level=request.character_level,
-        character_profession=request.character_professions[0] if request.character_professions else None,
+        character_profession=(
+            request.character_professions[0] if request.character_professions else None
+        ),
         character_breed=request.character_breed,
         ai_title_level=request.ai_title_level,
         perk_types=request.types,
         available_sl_points=request.available_sl_points,
         available_ai_points=request.available_ai_points,
-        owned_perks=request.owned_perks
+        owned_perks=request.owned_perks,
     )
 
     # Apply search filters
@@ -333,7 +374,9 @@ def search_perks(
             continue
 
         # Profession filter
-        if request.professions and not any(prof in perk.professions for prof in request.professions):
+        if request.professions and not any(
+            prof in perk.professions for prof in request.professions
+        ):
             continue
 
         # Breed filter
@@ -342,17 +385,30 @@ def search_perks(
 
         # Level range filter
         if request.level_range and len(request.level_range) == 2:
-            if perk.level < request.level_range[0] or perk.level > request.level_range[1]:
+            if (
+                perk.level < request.level_range[0]
+                or perk.level > request.level_range[1]
+            ):
                 continue
 
         # AI title range filter
-        if request.ai_title_range and len(request.ai_title_range) == 2 and perk.ai_title:
-            if perk.ai_title < request.ai_title_range[0] or perk.ai_title > request.ai_title_range[1]:
+        if (
+            request.ai_title_range
+            and len(request.ai_title_range) == 2
+            and perk.ai_title
+        ):
+            if (
+                perk.ai_title < request.ai_title_range[0]
+                or perk.ai_title > request.ai_title_range[1]
+            ):
                 continue
 
         # Counter range filter
         if request.counter_range and len(request.counter_range) == 2:
-            if perk.counter < request.counter_range[0] or perk.counter > request.counter_range[1]:
+            if (
+                perk.counter < request.counter_range[0]
+                or perk.counter > request.counter_range[1]
+            ):
                 continue
 
         filtered_perks.append(perk)
@@ -367,7 +423,9 @@ def search_perks(
         filtered_perks.sort(key=lambda p: p.type, reverse=reverse)
     elif request.sort_by == "cost":
         # Sort by cumulative cost (counter for SL/AI, 0 for LE)
-        filtered_perks.sort(key=lambda p: p.counter if p.type in ['SL', 'AI'] else 0, reverse=reverse)
+        filtered_perks.sort(
+            key=lambda p: p.counter if p.type in ["SL", "AI"] else 0, reverse=reverse
+        )
     else:
         filtered_perks.sort(key=lambda p: p.name, reverse=reverse)
 
@@ -375,9 +433,11 @@ def search_perks(
     total = len(filtered_perks)
     pages = math.ceil(total / page_size) if total > 0 else 1
     offset = (page - 1) * page_size
-    paginated_perks = filtered_perks[offset:offset + page_size]
+    paginated_perks = filtered_perks[offset : offset + page_size]
 
-    logger.info(f"Advanced search returning {len(paginated_perks)} perks (total: {total})")
+    logger.info(
+        f"Advanced search returning {len(paginated_perks)} perks (total: {total})"
+    )
 
     return PaginatedResponse[PerkResponse](
         items=paginated_perks,
@@ -386,16 +446,14 @@ def search_perks(
         page_size=page_size,
         pages=pages,
         has_next=page < pages,
-        has_prev=page > 1
+        has_prev=page > 1,
     )
 
 
 @router.get("/stats", response_model=PerkStatsResponse)
 @cached_response("perks_stats", ttl=3600)
 @performance_monitor
-def get_perk_stats(
-    perk_service: PerkService = Depends(get_perk_service)
-):
+def get_perk_stats(perk_service: PerkService = Depends(get_perk_service)):
     """
     Get statistics about available perks in the database.
 
@@ -425,8 +483,8 @@ def get_perk_stats(
 
         # Extract base perk name for series counting
         base_name = perk.name
-        if ' ' in perk.name and perk.name.split()[-1].isdigit():
-            base_name = ' '.join(perk.name.split()[:-1])
+        if " " in perk.name and perk.name.split()[-1].isdigit():
+            base_name = " ".join(perk.name.split()[:-1])
         series_names.add(base_name)
 
     level_range = [min(levels), max(levels)] if levels else [1, 220]
@@ -439,7 +497,7 @@ def get_perk_stats(
         professions=sorted(list(professions)),
         breeds=sorted(list(breeds)),
         level_range=level_range,
-        ai_title_range=ai_title_range
+        ai_title_range=ai_title_range,
     )
 
     logger.info(f"Perk stats: {stats.total_perks} perks, {stats.total_series} series")
@@ -450,10 +508,12 @@ def get_perk_stats(
 @cached_response("perks_series")
 @performance_monitor
 def get_perk_series_grouped(
-    profession: Optional[str] = Query(None, description="Filter by required profession"),
+    profession: Optional[str] = Query(
+        None, description="Filter by required profession"
+    ),
     breed: Optional[str] = Query(None, description="Filter by required breed"),
     type: Optional[str] = Query(None, description="Filter by perk type (SL, AI, LE)"),
-    perk_service: PerkService = Depends(get_perk_service)
+    perk_service: PerkService = Depends(get_perk_service),
 ):
     """
     Get perks grouped by series name.
@@ -461,7 +521,9 @@ def get_perk_series_grouped(
     Returns all perk series with their counters (1-10), showing profession/breed requirements,
     type information, and level requirements for each series.
     """
-    logger.info(f"Getting perk series grouped - profession: {profession}, breed: {breed}, type: {type}")
+    logger.info(
+        f"Getting perk series grouped - profession: {profession}, breed: {breed}, type: {type}"
+    )
 
     # Import Perk model here to avoid circular imports
     from app.models.perk import Perk
@@ -471,9 +533,11 @@ def get_perk_series_grouped(
     db = perk_service.db
 
     # Build base query to get all perks with their series
-    query = db.query(Perk.perk_series, Perk.type, Perk.professions, Perk.breeds)\
-        .join(Item, Perk.item_id == Item.id)\
+    query = (
+        db.query(Perk.perk_series, Perk.type, Perk.professions, Perk.breeds)
+        .join(Item, Perk.item_id == Item.id)
         .distinct(Perk.perk_series)
+    )
 
     # Apply filtering
     if profession:
@@ -484,7 +548,7 @@ def get_perk_series_grouped(
                 or_(
                     func.array_length(Perk.professions, 1).is_(None),
                     func.array_length(Perk.professions, 1) == 0,
-                    Perk.professions.contains([profession_id])
+                    Perk.professions.contains([profession_id]),
                 )
             )
 
@@ -496,7 +560,7 @@ def get_perk_series_grouped(
                 or_(
                     func.array_length(Perk.breeds, 1).is_(None),
                     func.array_length(Perk.breeds, 1) == 0,
-                    Perk.breeds.contains([breed_id])
+                    Perk.breeds.contains([breed_id]),
                 )
             )
 
@@ -510,15 +574,18 @@ def get_perk_series_grouped(
     series_names = [row[0] for row in series_results]
 
     # Load ALL perks for ALL matching series in a single query (eliminates N+1)
-    all_perks_query = db.query(Perk, Item.aoid)\
-        .join(Item, Perk.item_id == Item.id)\
-        .filter(Perk.perk_series.in_(series_names))\
+    all_perks_query = (
+        db.query(Perk, Item.aoid)
+        .join(Item, Perk.item_id == Item.id)
+        .filter(Perk.perk_series.in_(series_names))
         .order_by(Perk.perk_series, Perk.counter)
+    )
 
     all_perk_rows = all_perks_query.all()
 
     # Group perks by series name
     from collections import defaultdict
+
     perks_by_series = defaultdict(list)
     for perk, aoid in all_perk_rows:
         perks_by_series[perk.perk_series].append(
@@ -526,7 +593,9 @@ def get_perk_series_grouped(
                 counter=perk.counter,
                 aoid=aoid,
                 level_required=perk.level_required,
-                ai_level_required=perk.ai_level_required if perk.ai_level_required > 0 else None
+                ai_level_required=(
+                    perk.ai_level_required if perk.ai_level_required > 0 else None
+                ),
             )
         )
 
@@ -544,7 +613,7 @@ def get_perk_series_grouped(
             type=series_type,
             professions=profession_names,
             breeds=breed_names,
-            perks=perks_by_series.get(series_name, [])
+            perks=perks_by_series.get(series_name, []),
         )
         series_responses.append(series_response)
 
@@ -559,8 +628,7 @@ def get_perk_series_grouped(
 @cached_response("perk_series")
 @performance_monitor
 def get_perk_series(
-    perk_name: str,
-    perk_service: PerkService = Depends(get_perk_service)
+    perk_name: str, perk_service: PerkService = Depends(get_perk_service)
 ):
     """
     Get complete perk series with all levels (1-10) for a specific perk.
@@ -574,9 +642,13 @@ def get_perk_series(
     perk_series = perk_service.get_perk_series(perk_name)
 
     if not perk_series:
-        raise HTTPException(status_code=404, detail=f"Perk series '{perk_name}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Perk series '{perk_name}' not found"
+        )
 
-    logger.info(f"Found perk series '{perk_name}' with {len(perk_series.levels)} levels")
+    logger.info(
+        f"Found perk series '{perk_name}' with {len(perk_series.levels)} levels"
+    )
     return perk_series
 
 
@@ -584,7 +656,7 @@ def get_perk_series(
 @performance_monitor
 def calculate_perk_effects(
     request: PerkCalculationRequest,
-    perk_service: PerkService = Depends(get_perk_service)
+    perk_service: PerkService = Depends(get_perk_service),
 ):
     """
     Calculate total perk effects and point costs for a character build.
@@ -595,7 +667,9 @@ def calculate_perk_effects(
     - Aggregate stat effects from all owned perks
     - Affordability and requirement validation
     """
-    logger.info(f"Calculating perk effects for character level {request.character_level}")
+    logger.info(
+        f"Calculating perk effects for character level {request.character_level}"
+    )
 
     # Calculate available points
     # SL points: 2 per character level from 15+ (max 40 at level 35+)
@@ -620,9 +694,9 @@ def calculate_perk_effects(
             # Get perk series to determine type
             perk_series = perk_service.get_perk_series(perk_name)
             if perk_series:
-                if perk_series.type == 'SL':
+                if perk_series.type == "SL":
                     total_sl_cost += levels_to_buy
-                elif perk_series.type == 'AI':
+                elif perk_series.type == "AI":
                     total_ai_cost += levels_to_buy
                 # LE perks are free
 
@@ -650,10 +724,12 @@ def calculate_perk_effects(
         affordable=affordable,
         requirements_met=requirements_met,
         blocking_requirements=blocking_requirements,
-        perk_effects=perk_effects
+        perk_effects=perk_effects,
     )
 
-    logger.info(f"Calculated perk effects: SL={total_sl_cost}/{sl_points_available}, AI={total_ai_cost}/{ai_points_available}")
+    logger.info(
+        f"Calculated perk effects: SL={total_sl_cost}/{sl_points_available}, AI={total_ai_cost}/{ai_points_available}"
+    )
     return response
 
 
@@ -661,8 +737,7 @@ def calculate_perk_effects(
 @cached_response("perk_lookup")
 @performance_monitor
 def lookup_perk_by_aoid(
-    aoid: int,
-    perk_service: PerkService = Depends(get_perk_service)
+    aoid: int, perk_service: PerkService = Depends(get_perk_service)
 ):
     """
     Look up a perk by its AOID (Anarchy Online ID).
@@ -679,7 +754,9 @@ def lookup_perk_by_aoid(
         # Return a 404 with null body for easier handling in frontend
         return None
 
-    logger.info(f"Found perk: {perk_info['name']} (type: {perk_info.get('type', 'SL')}, level: {perk_info.get('counter', 1)})")
+    logger.info(
+        f"Found perk: {perk_info['name']} (type: {perk_info.get('type', 'SL')}, level: {perk_info.get('counter', 1)})"
+    )
     return perk_info
 
 
@@ -687,7 +764,7 @@ def lookup_perk_by_aoid(
 @performance_monitor
 def batch_lookup_perks(
     request: BatchPerkLookupRequest,
-    perk_service: PerkService = Depends(get_perk_service)
+    perk_service: PerkService = Depends(get_perk_service),
 ):
     """
     Look up multiple perks by their AOIDs in a single request.
@@ -708,26 +785,22 @@ def batch_lookup_perks(
     for aoid in request.aoids:
         perk_info = perk_info_map.get(aoid)
         if perk_info:
-            results.append(BatchPerkResult(
-                aoid=aoid,
-                success=True,
-                perk=perk_info
-            ))
+            results.append(BatchPerkResult(aoid=aoid, success=True, perk=perk_info))
         else:
-            results.append(BatchPerkResult(
-                aoid=aoid,
-                success=False,
-                error=f"Perk with AOID {aoid} not found"
-            ))
+            results.append(
+                BatchPerkResult(
+                    aoid=aoid, success=False, error=f"Perk with AOID {aoid} not found"
+                )
+            )
             errors.append(f"Perk {aoid} not found")
 
     query_time = time.time() - start_time
-    logger.info(f"Batch perk lookup: {len(request.aoids)} perks, {len(errors)} errors, time={query_time:.3f}s")
+    logger.info(
+        f"Batch perk lookup: {len(request.aoids)} perks, {len(errors)} errors, time={query_time:.3f}s"
+    )
 
     return BatchPerkLookupResponse(
-        success=len(errors) == 0,
-        results=results,
-        errors=errors
+        success=len(errors) == 0, results=results, errors=errors
     )
 
 
@@ -740,8 +813,10 @@ def validate_perk_requirements(
     character_profession: str = Query(..., description="Character profession"),
     character_breed: str = Query(..., description="Character breed"),
     ai_title_level: Optional[int] = Query(None, description="Character AI title level"),
-    owned_perks: Optional[str] = Query(None, description="JSON string of owned perks {name: level}"),
-    perk_service: PerkService = Depends(get_perk_service)
+    owned_perks: Optional[str] = Query(
+        None, description="JSON string of owned perks {name: level}"
+    ),
+    perk_service: PerkService = Depends(get_perk_service),
 ):
     """
     Validate if a character can purchase a specific perk level.
@@ -757,6 +832,7 @@ def validate_perk_requirements(
     if owned_perks:
         try:
             import json
+
             owned_perks_dict = json.loads(owned_perks)
         except (json.JSONDecodeError, ValueError):
             logger.warning(f"Invalid owned_perks JSON: {owned_perks}")
@@ -768,8 +844,10 @@ def validate_perk_requirements(
         character_profession=character_profession,
         character_breed=character_breed,
         ai_title_level=ai_title_level,
-        owned_perks=owned_perks_dict
+        owned_perks=owned_perks_dict,
     )
 
-    logger.info(f"Validation result: valid={validation.valid}, errors={len(validation.errors)}")
+    logger.info(
+        f"Validation result: valid={validation.valid}, errors={len(validation.errors)}"
+    )
     return validation

@@ -107,10 +107,14 @@ class EquipmentBonusService:
                     aggregated_bonuses[stat_id] += amount
 
         result = dict(aggregated_bonuses)
-        logger.info(f"Found bonuses for {len(result)} stats ({len(cached_items)} cached, {len(uncached_items)} fetched)")
+        logger.info(
+            f"Found bonuses for {len(result)} stats ({len(cached_items)} cached, {len(uncached_items)} fetched)"
+        )
         return result
 
-    def calculate_implant_cluster_bonuses(self, implant_clusters: Dict[str, Dict[str, int]]) -> Dict[int, int]:
+    def calculate_implant_cluster_bonuses(
+        self, implant_clusters: Dict[str, Dict[str, int]]
+    ) -> Dict[int, int]:
         """
         Calculate stat bonuses from implant clusters separately from base items.
 
@@ -120,7 +124,9 @@ class EquipmentBonusService:
         Returns:
             Dict mapping STAT IDs to total bonus amounts from implant clusters
         """
-        logger.info(f"Calculating implant cluster bonuses for {len(implant_clusters)} slots")
+        logger.info(
+            f"Calculating implant cluster bonuses for {len(implant_clusters)} slots"
+        )
 
         # For implant clusters, we already have the stat mappings
         # This method would be used if clusters provide additional bonuses
@@ -138,7 +144,9 @@ class EquipmentBonusService:
 
         return cluster_bonuses
 
-    def _extract_stat_bonuses_optimized(self, item_ids: List[int]) -> List[Tuple[int, int]]:
+    def _extract_stat_bonuses_optimized(
+        self, item_ids: List[int]
+    ) -> List[Tuple[int, int]]:
         """
         Extract stat ID and amount pairs from equipped items' spell data using optimized single query.
 
@@ -156,25 +164,35 @@ class EquipmentBonusService:
         # - Uses indexed event column for equipment events
         # - Performs JSONB extraction at database level
         # - Aggregates all spell data in single query
-        query = self.db.query(
-            Item.id.label('item_id'),
-            Spell.spell_params['Stat'].astext.cast(Integer).label('stat_id'),
-            Spell.spell_params['Amount'].astext.cast(Integer).label('amount'),
-            Spell.spell_id.label('spell_type')
-        ).select_from(Item)\
-         .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
-         .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
-         .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
-         .join(Spell, and_(
-             SpellDataSpells.spell_id == Spell.id,
-             Spell.spell_id.in_([self.MODIFY_STAT_SPELL_ID] + self.ADDITIONAL_BONUS_SPELL_IDS)
-         ))\
-         .filter(Item.id.in_(item_ids))\
-         .filter(SpellData.event.in_(self.EQUIPMENT_EVENTS))\
-         .filter(and_(
-             Spell.spell_params['Stat'].isnot(None),
-             Spell.spell_params['Amount'].isnot(None)
-         ))
+        query = (
+            self.db.query(
+                Item.id.label("item_id"),
+                Spell.spell_params["Stat"].astext.cast(Integer).label("stat_id"),
+                Spell.spell_params["Amount"].astext.cast(Integer).label("amount"),
+                Spell.spell_id.label("spell_type"),
+            )
+            .select_from(Item)
+            .join(ItemSpellData, Item.id == ItemSpellData.item_id)
+            .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)
+            .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)
+            .join(
+                Spell,
+                and_(
+                    SpellDataSpells.spell_id == Spell.id,
+                    Spell.spell_id.in_(
+                        [self.MODIFY_STAT_SPELL_ID] + self.ADDITIONAL_BONUS_SPELL_IDS
+                    ),
+                ),
+            )
+            .filter(Item.id.in_(item_ids))
+            .filter(SpellData.event.in_(self.EQUIPMENT_EVENTS))
+            .filter(
+                and_(
+                    Spell.spell_params["Stat"].isnot(None),
+                    Spell.spell_params["Amount"].isnot(None),
+                )
+            )
+        )
 
         results = query.all()
 
@@ -184,7 +202,9 @@ class EquipmentBonusService:
             if result.stat_id is not None and result.amount is not None:
                 stat_bonuses.append((result.stat_id, result.amount))
 
-        logger.debug(f"Extracted {len(stat_bonuses)} stat bonuses from {len(item_ids)} items")
+        logger.debug(
+            f"Extracted {len(stat_bonuses)} stat bonuses from {len(item_ids)} items"
+        )
         return stat_bonuses
 
     def _extract_stat_bonuses(self, item_ids: List[int]) -> List[tuple]:
@@ -224,8 +244,9 @@ class EquipmentBonusService:
 
         return item_bonuses
 
-
-    def _get_item_bonuses_with_item_id(self, item_ids: List[int]) -> Dict[int, Dict[int, int]]:
+    def _get_item_bonuses_with_item_id(
+        self, item_ids: List[int]
+    ) -> Dict[int, Dict[int, int]]:
         """
         Get bonuses grouped by item ID for caching purposes.
 
@@ -239,24 +260,34 @@ class EquipmentBonusService:
             return {}
 
         # Query that includes item_id in results for proper caching
-        query = self.db.query(
-            Item.id.label('item_id'),
-            Spell.spell_params['Stat'].astext.cast(Integer).label('stat_id'),
-            Spell.spell_params['Amount'].astext.cast(Integer).label('amount')
-        ).select_from(Item)\
-         .join(ItemSpellData, Item.id == ItemSpellData.item_id)\
-         .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)\
-         .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)\
-         .join(Spell, and_(
-             SpellDataSpells.spell_id == Spell.id,
-             Spell.spell_id.in_([self.MODIFY_STAT_SPELL_ID] + self.ADDITIONAL_BONUS_SPELL_IDS)
-         ))\
-         .filter(Item.id.in_(item_ids))\
-         .filter(SpellData.event.in_(self.EQUIPMENT_EVENTS))\
-         .filter(and_(
-             Spell.spell_params['Stat'].isnot(None),
-             Spell.spell_params['Amount'].isnot(None)
-         ))
+        query = (
+            self.db.query(
+                Item.id.label("item_id"),
+                Spell.spell_params["Stat"].astext.cast(Integer).label("stat_id"),
+                Spell.spell_params["Amount"].astext.cast(Integer).label("amount"),
+            )
+            .select_from(Item)
+            .join(ItemSpellData, Item.id == ItemSpellData.item_id)
+            .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)
+            .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)
+            .join(
+                Spell,
+                and_(
+                    SpellDataSpells.spell_id == Spell.id,
+                    Spell.spell_id.in_(
+                        [self.MODIFY_STAT_SPELL_ID] + self.ADDITIONAL_BONUS_SPELL_IDS
+                    ),
+                ),
+            )
+            .filter(Item.id.in_(item_ids))
+            .filter(SpellData.event.in_(self.EQUIPMENT_EVENTS))
+            .filter(
+                and_(
+                    Spell.spell_params["Stat"].isnot(None),
+                    Spell.spell_params["Amount"].isnot(None),
+                )
+            )
+        )
 
         results = query.all()
 
@@ -282,11 +313,14 @@ class EquipmentBonusService:
     def get_cache_stats(self) -> Dict[str, int]:
         """Get cache statistics for monitoring."""
         current_time = time.time()
-        valid_entries = sum(1 for _key, timestamp in self._cache_timestamps.items()
-                          if current_time - timestamp < self.CACHE_TTL)
+        valid_entries = sum(
+            1
+            for _key, timestamp in self._cache_timestamps.items()
+            if current_time - timestamp < self.CACHE_TTL
+        )
 
         return {
             "total_cached_items": len(self._item_bonus_cache),
             "valid_cached_items": valid_entries,
-            "expired_cached_items": len(self._item_bonus_cache) - valid_entries
+            "expired_cached_items": len(self._item_bonus_cache) - valid_entries,
         }

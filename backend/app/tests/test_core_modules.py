@@ -23,19 +23,15 @@ from app.core.cache import (
     cache_response,
     invalidate_cache_pattern,
     get_cache_stats,
-    CACHE_TTL
+    CACHE_TTL,
 )
-from app.core.decorators import (
-    cached_response,
-    performance_monitor,
-    log_query_params
-)
+from app.core.decorators import cached_response, performance_monitor, log_query_params
 from app.core.config import Settings, settings
-
 
 # ============================================================================
 # Cache Module Tests
 # ============================================================================
+
 
 class TestCacheService:
     """Test suite for CacheService class."""
@@ -49,10 +45,10 @@ class TestCacheService:
         """Test cache initializes with correct defaults."""
         assert cache.default_ttl == 10
         assert len(cache.cache) == 0
-        assert cache.stats['hits'] == 0
-        assert cache.stats['misses'] == 0
-        assert cache.stats['evictions'] == 0
-        assert cache.stats['sets'] == 0
+        assert cache.stats["hits"] == 0
+        assert cache.stats["misses"] == 0
+        assert cache.stats["evictions"] == 0
+        assert cache.stats["sets"] == 0
 
     def test_cache_set_and_get(self, cache):
         """Test basic cache set and get operations."""
@@ -60,16 +56,16 @@ class TestCacheService:
 
         result = cache.get("test_key")
         assert result == "test_value"
-        assert cache.stats['hits'] == 1
-        assert cache.stats['sets'] == 1
+        assert cache.stats["hits"] == 1
+        assert cache.stats["sets"] == 1
 
     def test_cache_miss(self, cache):
         """Test cache miss behavior."""
         result = cache.get("nonexistent_key")
 
         assert result is None
-        assert cache.stats['misses'] == 1
-        assert cache.stats['hits'] == 0
+        assert cache.stats["misses"] == 1
+        assert cache.stats["hits"] == 0
 
     def test_cache_ttl_expiration(self, cache):
         """Test that cached values expire after TTL."""
@@ -84,7 +80,7 @@ class TestCacheService:
         # Value should be expired
         result = cache.get("short_lived")
         assert result is None
-        assert cache.stats['evictions'] == 1
+        assert cache.stats["evictions"] == 1
 
     def test_cache_custom_ttl(self, cache):
         """Test setting custom TTL overrides default."""
@@ -138,20 +134,20 @@ class TestCacheService:
 
         stats = cache.get_stats()
 
-        assert stats['hits'] == 2
-        assert stats['misses'] == 1
-        assert stats['sets'] == 2
-        assert stats['total_requests'] == 3
-        assert stats['hit_rate_percent'] == pytest.approx(66.67, rel=0.01)
-        assert stats['cache_size'] == 2
+        assert stats["hits"] == 2
+        assert stats["misses"] == 1
+        assert stats["sets"] == 2
+        assert stats["total_requests"] == 3
+        assert stats["hit_rate_percent"] == pytest.approx(66.67, rel=0.01)
+        assert stats["cache_size"] == 2
 
     def test_cache_stats_no_requests(self, cache):
         """Test cache statistics with no requests."""
         stats = cache.get_stats()
 
-        assert stats['total_requests'] == 0
-        assert stats['hit_rate_percent'] == 0
-        assert stats['cache_size'] == 0
+        assert stats["total_requests"] == 0
+        assert stats["hit_rate_percent"] == 0
+        assert stats["cache_size"] == 0
 
     def test_cache_cleanup_expired(self, cache):
         """Test manual cleanup of expired entries."""
@@ -167,7 +163,7 @@ class TestCacheService:
 
         assert removed_count == 2
         assert cache.get("valid") == "value3"
-        assert cache.stats['evictions'] == 2
+        assert cache.stats["evictions"] == 2
 
     def test_generate_key_consistency(self, cache):
         """Test that key generation is consistent for same parameters."""
@@ -192,10 +188,9 @@ class TestCacheService:
 
     def test_generate_key_with_complex_types(self, cache):
         """Test key generation with complex parameter types."""
-        key1 = cache._generate_key("test",
-                                   list_param=[1, 2, 3],
-                                   dict_param={"a": "b"},
-                                   int_param=42)
+        key1 = cache._generate_key(
+            "test", list_param=[1, 2, 3], dict_param={"a": "b"}, int_param=42
+        )
 
         # Should not raise exception and should generate a key
         assert key1.startswith("test:")
@@ -255,7 +250,7 @@ class TestCacheService:
             "list": [1, 2, 3],
             "dict": {"key": "value"},
             "none": None,
-            "bool": True
+            "bool": True,
         }
 
         for key, value in test_data.items():
@@ -327,20 +322,20 @@ class TestCacheModuleFunctions:
 
         stats = get_cache_stats()
 
-        assert 'hits' in stats
-        assert 'misses' in stats
-        assert 'cache_size' in stats
-        assert stats['cache_size'] > 0
+        assert "hits" in stats
+        assert "misses" in stats
+        assert "cache_size" in stats
+        assert stats["cache_size"] > 0
 
     def test_cache_ttl_constants(self):
         """Test that CACHE_TTL constants are defined."""
-        assert 'items_list' in CACHE_TTL
-        assert 'item_detail' in CACHE_TTL
-        assert 'spells_list' in CACHE_TTL
-        assert 'pocket_bosses' in CACHE_TTL
-        assert 'symbiants' in CACHE_TTL
-        assert 'search_results' in CACHE_TTL
-        assert 'stats' in CACHE_TTL
+        assert "items_list" in CACHE_TTL
+        assert "item_detail" in CACHE_TTL
+        assert "spells_list" in CACHE_TTL
+        assert "pocket_bosses" in CACHE_TTL
+        assert "symbiants" in CACHE_TTL
+        assert "search_results" in CACHE_TTL
+        assert "stats" in CACHE_TTL
 
         # Verify they're all positive integers
         for ttl_value in CACHE_TTL.values():
@@ -351,6 +346,7 @@ class TestCacheModuleFunctions:
 # ============================================================================
 # Decorators Module Tests
 # ============================================================================
+
 
 class TestCachedResponseDecorator:
     """Test suite for cached_response decorator."""
@@ -424,6 +420,7 @@ class TestCachedResponseDecorator:
     @pytest.mark.asyncio
     async def test_custom_ttl(self):
         """Test that custom TTL is respected."""
+
         @cached_response("items_list", ttl=1)
         async def get_items():
             return {"items": []}
@@ -435,7 +432,7 @@ class TestCachedResponseDecorator:
         await get_items()
         stats_after = get_cache_stats()
 
-        assert stats_after['hits'] > stats_before['hits']
+        assert stats_after["hits"] > stats_before["hits"]
 
         # After TTL should not be cached
         time.sleep(1.1)
@@ -463,6 +460,7 @@ class TestCachedResponseDecorator:
 
     def test_default_ttl_from_cache_type(self):
         """Test that default TTL is used from CACHE_TTL when not specified."""
+
         @cached_response("items_list")
         def get_items():
             return {"items": []}
@@ -471,7 +469,7 @@ class TestCachedResponseDecorator:
 
         # Check that cache was set (can't easily verify TTL, but check it cached)
         stats = get_cache_stats()
-        assert stats['sets'] > 0
+        assert stats["sets"] > 0
 
 
 class TestPerformanceMonitorDecorator:
@@ -480,6 +478,7 @@ class TestPerformanceMonitorDecorator:
     @pytest.mark.asyncio
     async def test_async_function_normal_execution(self):
         """Test performance monitor with normal async function execution."""
+
         @performance_monitor
         async def fast_function():
             await asyncio.sleep(0.01)
@@ -491,6 +490,7 @@ class TestPerformanceMonitorDecorator:
     @pytest.mark.asyncio
     async def test_async_function_slow_query_logging(self, caplog):
         """Test that slow queries are logged for async functions."""
+
         @performance_monitor
         async def slow_function():
             await asyncio.sleep(0.6)
@@ -505,6 +505,7 @@ class TestPerformanceMonitorDecorator:
     @pytest.mark.asyncio
     async def test_async_function_moderate_query_logging(self, caplog):
         """Test that moderate queries are logged for async functions."""
+
         @performance_monitor
         async def moderate_function():
             await asyncio.sleep(0.3)
@@ -518,6 +519,7 @@ class TestPerformanceMonitorDecorator:
 
     def test_sync_function_normal_execution(self):
         """Test performance monitor with normal sync function execution."""
+
         @performance_monitor
         def fast_function():
             time.sleep(0.01)
@@ -528,6 +530,7 @@ class TestPerformanceMonitorDecorator:
 
     def test_sync_function_slow_query_logging(self, caplog):
         """Test that slow queries are logged for sync functions."""
+
         @performance_monitor
         def slow_function():
             time.sleep(0.6)
@@ -541,6 +544,7 @@ class TestPerformanceMonitorDecorator:
     @pytest.mark.asyncio
     async def test_async_function_error_handling(self, caplog):
         """Test that errors are logged with execution time for async functions."""
+
         @performance_monitor
         async def error_function():
             await asyncio.sleep(0.01)
@@ -551,10 +555,13 @@ class TestPerformanceMonitorDecorator:
                 await error_function()
 
         # Check that error was logged with timing
-        assert any("Error in error_function" in record.message for record in caplog.records)
+        assert any(
+            "Error in error_function" in record.message for record in caplog.records
+        )
 
     def test_sync_function_error_handling(self, caplog):
         """Test that errors are logged with execution time for sync functions."""
+
         @performance_monitor
         def error_function():
             time.sleep(0.01)
@@ -564,7 +571,9 @@ class TestPerformanceMonitorDecorator:
             with pytest.raises(ValueError, match="Test error"):
                 error_function()
 
-        assert any("Error in error_function" in record.message for record in caplog.records)
+        assert any(
+            "Error in error_function" in record.message for record in caplog.records
+        )
 
 
 class TestLogQueryParamsDecorator:
@@ -572,6 +581,7 @@ class TestLogQueryParamsDecorator:
 
     def test_logs_query_parameters(self, caplog):
         """Test that query parameters are logged."""
+
         @log_query_params
         def query_function(page: int = 1, limit: int = 10):
             return {"page": page, "limit": limit}
@@ -584,6 +594,7 @@ class TestLogQueryParamsDecorator:
 
     def test_excludes_sensitive_params(self, caplog):
         """Test that sensitive parameters are excluded from logs."""
+
         @log_query_params
         def query_function(page: int = 1, db=None, request=None):
             return {"page": page}
@@ -598,6 +609,7 @@ class TestLogQueryParamsDecorator:
 
     def test_returns_function_result(self):
         """Test that decorator returns function result correctly."""
+
         @log_query_params
         def query_function(value: int):
             return value * 2
@@ -643,6 +655,7 @@ class TestDecoratorComposition:
 # Config Module Tests
 # ============================================================================
 
+
 class TestSettingsClass:
     """Test suite for Settings configuration class."""
 
@@ -657,41 +670,51 @@ class TestSettingsClass:
 
     def test_settings_from_environment(self):
         """Test that Settings loads from environment variables."""
-        with patch.dict(os.environ, {
-            'DATABASE_URL': 'postgresql://test:test@localhost/testdb',
-            'APP_ENV': 'production',
-            'LOG_LEVEL': 'DEBUG'
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "DATABASE_URL": "postgresql://test:test@localhost/testdb",
+                "APP_ENV": "production",
+                "LOG_LEVEL": "DEBUG",
+            },
+        ):
             test_settings = Settings()
 
-            assert test_settings.DATABASE_URL == 'postgresql://test:test@localhost/testdb'
-            assert test_settings.APP_ENV == 'production'
-            assert test_settings.LOG_LEVEL == 'DEBUG'
+            assert (
+                test_settings.DATABASE_URL == "postgresql://test:test@localhost/testdb"
+            )
+            assert test_settings.APP_ENV == "production"
+            assert test_settings.LOG_LEVEL == "DEBUG"
 
     def test_database_url_can_be_set(self):
         """Test that DATABASE_URL can be set from environment."""
-        test_db_url = 'postgresql://testuser:testpass@testhost:5432/testdb'
-        with patch.dict(os.environ, {'DATABASE_URL': test_db_url}):
+        test_db_url = "postgresql://testuser:testpass@testhost:5432/testdb"
+        with patch.dict(os.environ, {"DATABASE_URL": test_db_url}):
             test_settings = Settings()
             assert test_settings.DATABASE_URL == test_db_url
 
     def test_cors_origins_custom(self):
         """Test setting custom CORS origins."""
-        with patch.dict(os.environ, {
-            'CORS_ORIGINS': 'http://example.com,http://localhost:3000'
-        }):
+        with patch.dict(
+            os.environ, {"CORS_ORIGINS": "http://example.com,http://localhost:3000"}
+        ):
             test_settings = Settings()
-            assert test_settings.CORS_ORIGINS == 'http://example.com,http://localhost:3000'
+            assert (
+                test_settings.CORS_ORIGINS == "http://example.com,http://localhost:3000"
+            )
 
     def test_settings_validation_types(self):
         """Test that Settings validates types correctly."""
-        with patch.dict(os.environ, {
-            'DATABASE_URL': 'postgresql://localhost/db',
-            'CORS_ORIGINS': 'http://localhost:5173',
-            'APP_ENV': 'development',
-            'LOG_LEVEL': 'INFO',
-            'REDIS_URL': 'redis://localhost:6379'
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "DATABASE_URL": "postgresql://localhost/db",
+                "CORS_ORIGINS": "http://localhost:5173",
+                "APP_ENV": "development",
+                "LOG_LEVEL": "INFO",
+                "REDIS_URL": "redis://localhost:6379",
+            },
+        ):
             test_settings = Settings()
 
             assert isinstance(test_settings.DATABASE_URL, str)
@@ -702,8 +725,8 @@ class TestSettingsClass:
 
     def test_settings_model_config(self):
         """Test that Settings has correct model configuration."""
-        assert Settings.model_config['env_file'] == '.env'
-        assert Settings.model_config['env_file_encoding'] == 'utf-8'
+        assert Settings.model_config["env_file"] == ".env"
+        assert Settings.model_config["env_file_encoding"] == "utf-8"
 
 
 class TestGlobalSettingsInstance:
@@ -720,11 +743,11 @@ class TestGlobalSettingsInstance:
         """Test that global settings instance has all required attributes."""
         from app.core.config import settings
 
-        assert hasattr(settings, 'DATABASE_URL')
-        assert hasattr(settings, 'CORS_ORIGINS')
-        assert hasattr(settings, 'APP_ENV')
-        assert hasattr(settings, 'LOG_LEVEL')
-        assert hasattr(settings, 'REDIS_URL')
+        assert hasattr(settings, "DATABASE_URL")
+        assert hasattr(settings, "CORS_ORIGINS")
+        assert hasattr(settings, "APP_ENV")
+        assert hasattr(settings, "LOG_LEVEL")
+        assert hasattr(settings, "REDIS_URL")
 
     def test_settings_singleton_behavior(self):
         """Test that importing settings returns the same instance."""
@@ -739,53 +762,51 @@ class TestConfigurationEdgeCases:
 
     def test_empty_environment_variables(self):
         """Test handling of empty string environment variables."""
-        with patch.dict(os.environ, {
-            'CORS_ORIGINS': '',
-            'APP_ENV': '',
-            'LOG_LEVEL': ''
-        }):
+        with patch.dict(
+            os.environ, {"CORS_ORIGINS": "", "APP_ENV": "", "LOG_LEVEL": ""}
+        ):
             test_settings = Settings()
 
             # Empty strings should be used as-is
-            assert test_settings.CORS_ORIGINS == ''
-            assert test_settings.APP_ENV == ''
-            assert test_settings.LOG_LEVEL == ''
+            assert test_settings.CORS_ORIGINS == ""
+            assert test_settings.APP_ENV == ""
+            assert test_settings.LOG_LEVEL == ""
 
     def test_database_url_parsing_format(self):
         """Test various DATABASE_URL formats are accepted."""
         test_urls = [
-            'postgresql://user:pass@localhost:5432/dbname',
-            'postgresql://user@localhost/dbname',
-            'postgresql+asyncpg://user:pass@localhost/dbname',
+            "postgresql://user:pass@localhost:5432/dbname",
+            "postgresql://user@localhost/dbname",
+            "postgresql+asyncpg://user:pass@localhost/dbname",
         ]
 
         for url in test_urls:
-            with patch.dict(os.environ, {'DATABASE_URL': url}):
+            with patch.dict(os.environ, {"DATABASE_URL": url}):
                 test_settings = Settings()
                 assert test_settings.DATABASE_URL == url
 
     def test_log_level_case_sensitivity(self):
         """Test that log levels work regardless of case."""
-        for level in ['DEBUG', 'debug', 'Debug', 'INFO', 'info']:
-            with patch.dict(os.environ, {'LOG_LEVEL': level}):
+        for level in ["DEBUG", "debug", "Debug", "INFO", "info"]:
+            with patch.dict(os.environ, {"LOG_LEVEL": level}):
                 test_settings = Settings()
                 assert test_settings.LOG_LEVEL == level
 
     def test_redis_url_with_password(self):
         """Test REDIS_URL with authentication."""
-        redis_url = 'redis://:password@localhost:6379/0'
-        with patch.dict(os.environ, {'REDIS_URL': redis_url}):
+        redis_url = "redis://:password@localhost:6379/0"
+        with patch.dict(os.environ, {"REDIS_URL": redis_url}):
             test_settings = Settings()
             assert test_settings.REDIS_URL == redis_url
 
     def test_multiple_cors_origins(self):
         """Test handling multiple CORS origins."""
-        origins = 'http://localhost:5173,http://localhost:3000,https://example.com'
-        with patch.dict(os.environ, {'CORS_ORIGINS': origins}):
+        origins = "http://localhost:5173,http://localhost:3000,https://example.com"
+        with patch.dict(os.environ, {"CORS_ORIGINS": origins}):
             test_settings = Settings()
             assert test_settings.CORS_ORIGINS == origins
 
             # Verify it can be split
-            origin_list = test_settings.CORS_ORIGINS.split(',')
+            origin_list = test_settings.CORS_ORIGINS.split(",")
             assert len(origin_list) == 3
-            assert 'http://localhost:5173' in origin_list
+            assert "http://localhost:5173" in origin_list

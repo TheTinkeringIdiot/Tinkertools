@@ -68,7 +68,8 @@ def _stat_sort_key(entry: Any):
 
 def _sorted_stats(entries: Iterable[Any]) -> List[Any]:
     entries = [
-        e for e in entries
+        e
+        for e in entries
         if not (isinstance(e, dict) and e.get("Stat") in IGNORED_STATS)
     ]
     try:

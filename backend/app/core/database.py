@@ -34,9 +34,10 @@ _default_max_overflow = 20
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,  # Verify connections before use
-    pool_size=_default_pool_size,        # Connection pool size
-    max_overflow=_default_max_overflow,     # Additional connections beyond pool_size
-    echo=os.getenv("SQL_DEBUG", "false").lower() == "true"  # Log SQL queries in debug mode
+    pool_size=_default_pool_size,  # Connection pool size
+    max_overflow=_default_max_overflow,  # Additional connections beyond pool_size
+    echo=os.getenv("SQL_DEBUG", "false").lower()
+    == "true",  # Log SQL queries in debug mode
 )
 
 # Create session factory
@@ -115,12 +116,14 @@ def create_tables():
     """
     Base.metadata.create_all(bind=engine)
 
+
 def drop_tables():
     """
     Drop all tables defined in the Base metadata.
     Used for testing cleanup.
     """
     Base.metadata.drop_all(bind=engine)
+
 
 def test_connection() -> bool:
     """
@@ -137,6 +140,7 @@ def test_connection() -> bool:
         print(f"Database connection failed: {e}")
         return False
 
+
 def get_table_count(slug: Optional[str] = None) -> int:
     """
     Number of tables in a game version's schema (default version if no slug).
@@ -146,9 +150,9 @@ def get_table_count(slug: Optional[str] = None) -> int:
     if not IS_POSTGRES:
         try:
             with engine.connect() as connection:
-                return connection.execute(text(
-                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table'"
-                )).scalar()
+                return connection.execute(
+                    text("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table'")
+                ).scalar()
         except Exception as e:
             print(f"Failed to get table count: {e}")
             return 0
@@ -168,6 +172,7 @@ def get_table_count(slug: Optional[str] = None) -> int:
     except Exception as e:
         print(f"Failed to get table count: {e}")
         return 0
+
 
 def get_database_info() -> dict:
     """
@@ -195,6 +200,7 @@ def get_database_info() -> dict:
         "default_game_version": registry.default_slug(),
         "game_versions": [v.slug for v in registry.all()],
     }
+
 
 # Database health check function
 def health_check() -> dict:
@@ -225,13 +231,13 @@ def health_check() -> dict:
             "pool_info": {
                 "size": engine.pool.size(),
                 "checked_out": engine.pool.checkedout(),
-                "overflow": engine.pool.overflow()
-            }
+                "overflow": engine.pool.overflow(),
+            },
         }
     except Exception as e:
         return {
             "status": "unhealthy",
             "error": str(e),
             "connection": "failed",
-            "schema": "unknown"
+            "schema": "unknown",
         }

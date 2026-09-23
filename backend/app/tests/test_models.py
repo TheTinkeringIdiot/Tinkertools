@@ -39,7 +39,7 @@ def test_item_initialization():
         ql=200,
         item_class=1,
         description="Test description",
-        is_nano=False
+        is_nano=False,
     )
 
     assert item.aoid == 12345
@@ -54,11 +54,7 @@ def test_item_repr():
     """Test Item __repr__ method."""
     from app.models import Item
 
-    item = Item(
-        aoid=12345,
-        name="Test Item",
-        ql=200
-    )
+    item = Item(aoid=12345, name="Test Item", ql=200)
     item.id = 1
 
     assert repr(item) == "<Item(id=1, aoid=12345, name='Test Item', ql=200)>"
@@ -92,7 +88,7 @@ def test_spell_initialization():
         target=1,
         spell_format="Test format",
         tick_count=5,
-        tick_interval=10
+        tick_interval=10,
     )
 
     assert spell.spell_id == 1001
@@ -135,11 +131,7 @@ def test_criterion_initialization():
     """Test Criterion model initialization."""
     from app.models import Criterion
 
-    criterion = Criterion(
-        value1=100,
-        value2=200,
-        operator=1
-    )
+    criterion = Criterion(value1=100, value2=200, operator=1)
 
     assert criterion.value1 == 100
     assert criterion.value2 == 200

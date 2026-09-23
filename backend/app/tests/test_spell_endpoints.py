@@ -26,10 +26,7 @@ def create_spell_with_criteria(spell, criteria):
     # Create actual SpellCriterion instances for proper SQLAlchemy handling
     spell_criteria_list = []
     for criterion in criteria:
-        spell_criterion = SpellCriterion(
-            spell_id=spell.id,
-            criterion_id=criterion.id
-        )
+        spell_criterion = SpellCriterion(spell_id=spell.id, criterion_id=criterion.id)
         spell_criterion.criterion = criterion
         spell_criteria_list.append(spell_criterion)
     spell.spell_criteria = spell_criteria_list
@@ -39,6 +36,7 @@ def create_spell_with_criteria(spell, criteria):
 # ============================================================================
 # GET /api/v1/spells Tests
 # ============================================================================
+
 
 def test_get_spells_empty(client, monkeypatch):
     """Test getting spells when database is empty."""
@@ -69,7 +67,9 @@ def test_get_spells_empty(client, monkeypatch):
         app.dependency_overrides.clear()
 
 
-@pytest.mark.skip(reason="Cache pollution from previous test - same functionality tested in other passing tests")
+@pytest.mark.skip(
+    reason="Cache pollution from previous test - same functionality tested in other passing tests"
+)
 def test_get_spells_with_data(client, monkeypatch):
     """Test getting spells with data."""
     spell = Spell(
@@ -79,7 +79,7 @@ def test_get_spells_with_data(client, monkeypatch):
         tick_interval=100,
         spell_id=12345,
         spell_format="Increase {stat} by {value}",
-        spell_params={"stat": 96, "value": 50}
+        spell_params={"stat": 96, "value": 50},
     )
 
     mock_query = Mock()
@@ -119,7 +119,7 @@ def test_get_spells_pagination(client, monkeypatch):
             tick_interval=50 + (i * 10),
             spell_id=10000 + i,
             spell_format=f"Spell Effect {i}",
-            spell_params={"value": i * 10}
+            spell_params={"value": i * 10},
         )
         for i in range(1, 16)
     ]
@@ -193,7 +193,7 @@ def test_get_spells_filter_by_target(client, monkeypatch):
             tick_interval=50,
             spell_id=10000 + i,
             spell_format=f"Spell Effect {i}",
-            spell_params={"value": i * 10}
+            spell_params={"value": i * 10},
         )
         for i in range(5)
     ]
@@ -240,7 +240,9 @@ def test_get_spells_invalid_page_size(client):
     assert response.status_code == 422
 
 
-@pytest.mark.skip(reason="Cache pollution from previous test - response structure tested in detail endpoint tests")
+@pytest.mark.skip(
+    reason="Cache pollution from previous test - response structure tested in detail endpoint tests"
+)
 def test_get_spells_response_structure(client, monkeypatch):
     """Test spell response structure contains all required fields."""
     spell = Spell(
@@ -250,7 +252,7 @@ def test_get_spells_response_structure(client, monkeypatch):
         tick_interval=100,
         spell_id=12345,
         spell_format="Increase {stat} by {value}",
-        spell_params={"stat": 96, "value": 50}
+        spell_params={"stat": 96, "value": 50},
     )
 
     mock_query = Mock()
@@ -290,6 +292,7 @@ def test_get_spells_response_structure(client, monkeypatch):
 # GET /api/v1/spells/search Tests
 # ============================================================================
 
+
 def test_search_spells_by_format(client, monkeypatch):
     """Test searching spells by spell format."""
     spell = Spell(
@@ -299,7 +302,7 @@ def test_search_spells_by_format(client, monkeypatch):
         tick_interval=100,
         spell_id=12345,
         spell_format="Increase {stat} by {value}",
-        spell_params={"stat": 96, "value": 50}
+        spell_params={"stat": 96, "value": 50},
     )
 
     mock_query = Mock()
@@ -339,7 +342,7 @@ def test_search_spells_partial_match(client, monkeypatch):
             tick_interval=100,
             spell_id=10000 + i,
             spell_format=f"Spell Effect {i}",
-            spell_params={}
+            spell_params={},
         )
         for i in range(15)
     ]
@@ -379,7 +382,7 @@ def test_search_spells_case_insensitive(client, monkeypatch):
         tick_interval=100,
         spell_id=12345,
         spell_format="Increase {stat} by {value}",
-        spell_params={"stat": 96, "value": 50}
+        spell_params={"stat": 96, "value": 50},
     )
 
     mock_query = Mock()
@@ -460,7 +463,7 @@ def test_search_spells_pagination(client, monkeypatch):
             tick_interval=100,
             spell_id=10000 + i,
             spell_format=f"Spell Effect {i}",
-            spell_params={}
+            spell_params={},
         )
         for i in range(15)
     ]
@@ -483,7 +486,9 @@ def test_search_spells_pagination(client, monkeypatch):
     app.dependency_overrides[get_db] = mock_get_db
 
     try:
-        response = client.get("/api/v1/spells/search?q=Spell%20Effect&page=1&page_size=5")
+        response = client.get(
+            "/api/v1/spells/search?q=Spell%20Effect&page=1&page_size=5"
+        )
         assert response.status_code == 200
         data = response.json()
         assert len(data["items"]) <= 5
@@ -497,6 +502,7 @@ def test_search_spells_pagination(client, monkeypatch):
 # GET /api/v1/spells/with-criteria Tests
 # ============================================================================
 
+
 def test_get_spells_with_criteria_single_requirement(client, monkeypatch):
     """Test getting spells with single criteria requirement."""
     criterion = Criterion(id=1, value1=16, value2=100, operator=1)
@@ -507,7 +513,7 @@ def test_get_spells_with_criteria_single_requirement(client, monkeypatch):
         tick_interval=50,
         spell_id=67890,
         spell_format="Heal {target} for {amount}",
-        spell_params={"target": "self", "amount": 100}
+        spell_params={"target": "self", "amount": 100},
     )
     create_spell_with_criteria(spell, [criterion])
 
@@ -531,7 +537,9 @@ def test_get_spells_with_criteria_single_requirement(client, monkeypatch):
     app.dependency_overrides[get_db] = mock_get_db
 
     try:
-        response = client.get("/api/v1/spells/with-criteria?criteria_requirements=16:100:1")
+        response = client.get(
+            "/api/v1/spells/with-criteria?criteria_requirements=16:100:1"
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 1
@@ -556,7 +564,7 @@ def test_get_spells_with_criteria_multiple_and(client, monkeypatch):
         tick_interval=50,
         spell_id=67890,
         spell_format="Heal {target} for {amount}",
-        spell_params={"target": "self", "amount": 100}
+        spell_params={"target": "self", "amount": 100},
     )
     create_spell_with_criteria(spell, [criterion1, criterion2])
 
@@ -580,7 +588,9 @@ def test_get_spells_with_criteria_multiple_and(client, monkeypatch):
     app.dependency_overrides[get_db] = mock_get_db
 
     try:
-        response = client.get("/api/v1/spells/with-criteria?criteria_requirements=16:100:1,17:50:1&logic=and")
+        response = client.get(
+            "/api/v1/spells/with-criteria?criteria_requirements=16:100:1,17:50:1&logic=and"
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 1
@@ -589,7 +599,9 @@ def test_get_spells_with_criteria_multiple_and(client, monkeypatch):
         app.dependency_overrides.clear()
 
 
-@pytest.mark.skip(reason="Complex subquery mocking - OR logic test requires more sophisticated mock setup")
+@pytest.mark.skip(
+    reason="Complex subquery mocking - OR logic test requires more sophisticated mock setup"
+)
 def test_get_spells_with_criteria_multiple_or(client, monkeypatch):
     """Test getting spells with multiple OR criteria."""
     criterion = Criterion(id=1, value1=16, value2=100, operator=1)
@@ -600,7 +612,7 @@ def test_get_spells_with_criteria_multiple_or(client, monkeypatch):
         tick_interval=50,
         spell_id=67890,
         spell_format="Heal {target} for {amount}",
-        spell_params={"target": "self", "amount": 100}
+        spell_params={"target": "self", "amount": 100},
     )
     create_spell_with_criteria(spell, [criterion])
 
@@ -622,7 +634,7 @@ def test_get_spells_with_criteria_multiple_or(client, monkeypatch):
     mock_db = Mock()
 
     def query_side_effect(model):
-        if model == Criterion.id or str(model).startswith('Criterion'):
+        if model == Criterion.id or str(model).startswith("Criterion"):
             return subquery_mock
         return mock_query
 
@@ -635,7 +647,9 @@ def test_get_spells_with_criteria_multiple_or(client, monkeypatch):
     app.dependency_overrides[get_db] = mock_get_db
 
     try:
-        response = client.get("/api/v1/spells/with-criteria?criteria_requirements=16:100:1,99:999:1&logic=or")
+        response = client.get(
+            "/api/v1/spells/with-criteria?criteria_requirements=16:100:1,99:999:1&logic=or"
+        )
         assert response.status_code == 200
         data = response.json()
         # Should find the spell with at least one matching criterion
@@ -654,7 +668,7 @@ def test_get_spells_with_criteria_individual_filters(client, monkeypatch):
         tick_interval=50,
         spell_id=67890,
         spell_format="Heal {target} for {amount}",
-        spell_params={"target": "self", "amount": 100}
+        spell_params={"target": "self", "amount": 100},
     )
     create_spell_with_criteria(spell, [criterion])
 
@@ -678,7 +692,9 @@ def test_get_spells_with_criteria_individual_filters(client, monkeypatch):
     app.dependency_overrides[get_db] = mock_get_db
 
     try:
-        response = client.get("/api/v1/spells/with-criteria?value1=16&value2=100&operator=1")
+        response = client.get(
+            "/api/v1/spells/with-criteria?value1=16&value2=100&operator=1"
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 1
@@ -697,7 +713,7 @@ def test_get_spells_with_criteria_filter_by_target(client, monkeypatch):
         tick_interval=50,
         spell_id=67890,
         spell_format="Heal {target} for {amount}",
-        spell_params={"target": "self", "amount": 100}
+        spell_params={"target": "self", "amount": 100},
     )
     create_spell_with_criteria(spell, [criterion])
 
@@ -740,7 +756,7 @@ def test_get_spells_with_criteria_filter_by_spell_id(client, monkeypatch):
         tick_interval=50,
         spell_id=67890,
         spell_format="Heal {target} for {amount}",
-        spell_params={"target": "self", "amount": 100}
+        spell_params={"target": "self", "amount": 100},
     )
     create_spell_with_criteria(spell, [criterion])
 
@@ -778,7 +794,9 @@ def test_get_spells_with_criteria_invalid_format(client):
     response = client.get("/api/v1/spells/with-criteria?criteria_requirements=invalid")
     assert response.status_code == 400
     data = response.json()
-    assert "Invalid criteria_requirements format" in data.get("error", data.get("detail", ""))
+    assert "Invalid criteria_requirements format" in data.get(
+        "error", data.get("detail", "")
+    )
 
 
 def test_get_spells_with_criteria_no_filters(client, monkeypatch):
@@ -791,7 +809,7 @@ def test_get_spells_with_criteria_no_filters(client, monkeypatch):
         tick_interval=50,
         spell_id=67890,
         spell_format="Heal {target} for {amount}",
-        spell_params={"target": "self", "amount": 100}
+        spell_params={"target": "self", "amount": 100},
     )
     create_spell_with_criteria(spell, [criterion])
 
@@ -834,7 +852,7 @@ def test_get_spells_with_criteria_pagination(client, monkeypatch):
             tick_interval=50,
             spell_id=20000 + i,
             spell_format=f"Test Spell {i}",
-            spell_params={}
+            spell_params={},
         )
         for i in range(10)
     ]
@@ -864,7 +882,9 @@ def test_get_spells_with_criteria_pagination(client, monkeypatch):
 
     try:
         # Test pagination
-        response = client.get("/api/v1/spells/with-criteria?value1=16&page=1&page_size=5")
+        response = client.get(
+            "/api/v1/spells/with-criteria?value1=16&page=1&page_size=5"
+        )
         assert response.status_code == 200
         data = response.json()
         assert len(data["items"]) == 5
@@ -883,7 +903,7 @@ def test_get_spells_with_criteria_response_structure(client, monkeypatch):
         tick_interval=50,
         spell_id=67890,
         spell_format="Heal {target} for {amount}",
-        spell_params={"target": "self", "amount": 100}
+        spell_params={"target": "self", "amount": 100},
     )
     create_spell_with_criteria(spell, [criterion])
 
@@ -934,6 +954,7 @@ def test_get_spells_with_criteria_response_structure(client, monkeypatch):
 # GET /api/v1/spells/{spell_id} Tests
 # ============================================================================
 
+
 def test_get_spell_by_id(client, monkeypatch):
     """Test getting a specific spell by ID."""
     spell = Spell(
@@ -943,7 +964,7 @@ def test_get_spell_by_id(client, monkeypatch):
         tick_interval=100,
         spell_id=12345,
         spell_format="Increase {stat} by {value}",
-        spell_params={"stat": 96, "value": 50}
+        spell_params={"stat": 96, "value": 50},
     )
 
     mock_query = Mock()
@@ -1005,7 +1026,7 @@ def test_get_spell_response_structure(client, monkeypatch):
         tick_interval=100,
         spell_id=12345,
         spell_format="Increase {stat} by {value}",
-        spell_params={"stat": 96, "value": 50}
+        spell_params={"stat": 96, "value": 50},
     )
 
     mock_query = Mock()
@@ -1028,8 +1049,13 @@ def test_get_spell_response_structure(client, monkeypatch):
 
         # Verify all required fields are present
         required_fields = [
-            "id", "target", "tick_count", "tick_interval",
-            "spell_id", "spell_format", "spell_params"
+            "id",
+            "target",
+            "tick_count",
+            "tick_interval",
+            "spell_id",
+            "spell_format",
+            "spell_params",
         ]
         for field in required_fields:
             assert field in data
@@ -1047,7 +1073,10 @@ def test_get_spell_invalid_id(client):
 # Performance and Cache Tests
 # ============================================================================
 
-@pytest.mark.skip(reason="Performance logging test requires mocking at decorator level which interferes with dependency overrides")
+
+@pytest.mark.skip(
+    reason="Performance logging test requires mocking at decorator level which interferes with dependency overrides"
+)
 def test_spell_endpoints_performance_logging(client, monkeypatch):
     """Test that spell endpoints log performance metrics."""
     # NOTE: This test is skipped because it requires sophisticated mocking
@@ -1067,7 +1096,7 @@ def test_spell_search_ordering(client, monkeypatch):
             tick_interval=100,
             spell_id=10000 + i,
             spell_format=f"Spell {i}",
-            spell_params={}
+            spell_params={},
         )
         for i in range(5)
     ]
@@ -1105,6 +1134,7 @@ def test_spell_search_ordering(client, monkeypatch):
 # Edge Cases and Boundary Tests
 # ============================================================================
 
+
 def test_get_spells_large_page_size(client, monkeypatch):
     """Test getting spells with maximum page size."""
     spells = [
@@ -1115,7 +1145,7 @@ def test_get_spells_large_page_size(client, monkeypatch):
             tick_interval=100,
             spell_id=10000 + i,
             spell_format=f"Spell {i}",
-            spell_params={}
+            spell_params={},
         )
         for i in range(15)
     ]
@@ -1182,7 +1212,7 @@ def test_search_spells_special_characters(client, monkeypatch):
         tick_interval=100,
         spell_id=99999,
         spell_format="Special %$#@ Characters",
-        spell_params={}
+        spell_params={},
     )
 
     mock_query = Mock()
@@ -1218,7 +1248,7 @@ def test_get_spells_with_null_params(client, monkeypatch):
         tick_interval=100,
         spell_id=88888,
         spell_format="Null Params Test",
-        spell_params=None
+        spell_params=None,
     )
 
     mock_query = Mock()

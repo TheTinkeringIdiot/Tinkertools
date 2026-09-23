@@ -184,9 +184,15 @@ SOURCE_TYPE_ID_VENDOR = 5  # "Vendors and shops that sell items"
 # =============================================================================
 
 # Item sources (nano crystals)
-SOURCE_ID_1H_BLUNT_NC = 160  # Source ID: 26464, "Nano Crystal (1H Blunt Weapon Expertise)"
-SOURCE_ID_1H_BLUNT_CORRODED = 161  # Source ID: 221375, "Badly Corroded Crystal (1H Blunt...)"
-SOURCE_ID_1H_BLUNT_INCOMP = 162  # Source ID: 26462, "Nano Crystal (1H Blunt Weapon Incompeten...)"
+SOURCE_ID_1H_BLUNT_NC = (
+    160  # Source ID: 26464, "Nano Crystal (1H Blunt Weapon Expertise)"
+)
+SOURCE_ID_1H_BLUNT_CORRODED = (
+    161  # Source ID: 221375, "Badly Corroded Crystal (1H Blunt...)"
+)
+SOURCE_ID_1H_BLUNT_INCOMP = (
+    162  # Source ID: 26462, "Nano Crystal (1H Blunt Weapon Incompeten...)"
+)
 
 # Mob sources (with item drops)
 SOURCE_ID_MOB_ADOBE_SUZERAIN = 1  # Source ID: 1171, 7 items dropped

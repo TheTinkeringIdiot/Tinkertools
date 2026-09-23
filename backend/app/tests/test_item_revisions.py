@@ -192,14 +192,34 @@ def revision_data(db_session):
     )
 
     rows = [
-        dict(slug="ao-18.7", schema_name="gv_ao_18_7", display_name="AO 18.7",
-             family="ao", parent_slug=None, sort_order=30, snapshot_date=date(2019, 11, 1)),
-        dict(slug="ao-18.8", schema_name="gv_ao_18_8", display_name="AO 18.8",
-             family="ao", parent_slug="ao-18.7", sort_order=20, is_default=True,
-             snapshot_date=date(2025, 6, 1)),
-        dict(slug="prk", schema_name="gv_prk", display_name="PRK",
-             family="prk", parent_slug="ao-18.8", sort_order=10,
-             snapshot_date=date(2026, 1, 15)),
+        dict(
+            slug="ao-18.7",
+            schema_name="gv_ao_18_7",
+            display_name="AO 18.7",
+            family="ao",
+            parent_slug=None,
+            sort_order=30,
+            snapshot_date=date(2019, 11, 1),
+        ),
+        dict(
+            slug="ao-18.8",
+            schema_name="gv_ao_18_8",
+            display_name="AO 18.8",
+            family="ao",
+            parent_slug="ao-18.7",
+            sort_order=20,
+            is_default=True,
+            snapshot_date=date(2025, 6, 1),
+        ),
+        dict(
+            slug="prk",
+            schema_name="gv_prk",
+            display_name="PRK",
+            family="prk",
+            parent_slug="ao-18.8",
+            sort_order=10,
+            snapshot_date=date(2026, 1, 15),
+        ),
     ]
     for row in rows:
         db_session.add(GameVersion(**row))
@@ -212,15 +232,17 @@ def revision_data(db_session):
         ("ao-18.7", 7, "x1", "x1", "x1", "x1"),
     ]
     for slug, aoid, stats, spells, actions, text_value in revisions:
-        db_session.add(ItemRevision(
-            aoid=aoid,
-            version_slug=slug,
-            content_hash=stats + spells + actions + text_value,
-            stats_hash=stats,
-            spells_hash=spells,
-            actions_hash=actions,
-            text_hash=text_value,
-        ))
+        db_session.add(
+            ItemRevision(
+                aoid=aoid,
+                version_slug=slug,
+                content_hash=stats + spells + actions + text_value,
+                stats_hash=stats,
+                spells_hash=spells,
+                actions_hash=actions,
+                text_hash=text_value,
+            )
+        )
     db_session.flush()
 
 
@@ -235,7 +257,10 @@ class TestItemRevisionsEndpoint:
         assert data["aoid"] == 4242
         assert data["present_in"] == ["prk", "ao-18.8", "ao-18.7"]
         assert only_fixture_slugs(data["missing_in"]) == []
-        assert [(r["version_slug"], r["changed"], r["first_seen"]) for r in data["revisions"]] == [
+        assert [
+            (r["version_slug"], r["changed"], r["first_seen"])
+            for r in data["revisions"]
+        ] == [
             ("prk", ["text"], False),
             ("ao-18.8", ["stats"], False),
             ("ao-18.7", [], True),
@@ -261,17 +286,29 @@ class TestItemRevisionsEndpoint:
         assert data["first_seen_in"] is None
         assert only_fixture_slugs(data["missing_in"]) == ["prk", "ao-18.8", "ao-18.7"]
 
-    def test_version_segment_does_not_change_the_rows(self, client, revision_data, monkeypatch):
+    def test_version_segment_does_not_change_the_rows(
+        self, client, revision_data, monkeypatch
+    ):
         import time
         from app.core import versions as versions_module
         from app.core.versions import GameVersion as GameVersionDC
 
         registry = versions_module.registry
-        monkeypatch.setattr(registry, "_versions", {
-            "prk": GameVersionDC(slug="prk", schema_name="gv_prk",
-                                 display_name="PRK", family="prk",
-                                 parent_slug="ao-18.8", sort_order=10)
-        }, raising=False)
+        monkeypatch.setattr(
+            registry,
+            "_versions",
+            {
+                "prk": GameVersionDC(
+                    slug="prk",
+                    schema_name="gv_prk",
+                    display_name="PRK",
+                    family="prk",
+                    parent_slug="ao-18.8",
+                    sort_order=10,
+                )
+            },
+            raising=False,
+        )
         monkeypatch.setattr(registry, "_loaded_at", time.monotonic(), raising=False)
 
         response = client.get("/api/v1/prk/items/4242/revisions")
@@ -291,12 +328,22 @@ class TestItemRevisionsBatchEndpoint:
         from app.core.versions import GameVersion as GameVersionDC
 
         registry = versions_module.registry
-        monkeypatch.setattr(registry, "_versions", {
-            "ao-18.8": GameVersionDC(slug="ao-18.8", schema_name="gv_ao_18_8",
-                                     display_name="AO 18.8", family="ao",
-                                     parent_slug="ao-18.7", sort_order=20,
-                                     is_default=True)
-        }, raising=False)
+        monkeypatch.setattr(
+            registry,
+            "_versions",
+            {
+                "ao-18.8": GameVersionDC(
+                    slug="ao-18.8",
+                    schema_name="gv_ao_18_8",
+                    display_name="AO 18.8",
+                    family="ao",
+                    parent_slug="ao-18.7",
+                    sort_order=20,
+                    is_default=True,
+                )
+            },
+            raising=False,
+        )
         monkeypatch.setattr(registry, "_loaded_at", time.monotonic(), raising=False)
 
         response = client.post(

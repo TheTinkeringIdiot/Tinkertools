@@ -19,25 +19,28 @@ from app.tests.fixtures.perk_fixtures import *
 from app.tests.fixtures.import_fixtures import *
 
 # Use PostgreSQL database from environment variable
-DATABASE_URL = os.getenv('DATABASE_URL')
+DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL environment variable must be set for testing")
 
 engine = create_engine(DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+
 # Tests run against one game version's schema: TEST_GAME_VERSION if set, else the
 # registry's default version, else the configured fallback. A schema that does
 # not exist is ignored by PostgreSQL, so this also works against a bare database.
 def _resolve_test_game_version() -> str:
-    explicit = os.getenv('TEST_GAME_VERSION')
+    explicit = os.getenv("TEST_GAME_VERSION")
     if explicit:
         return explicit
     try:
         with engine.connect() as conn:
-            default_slug = conn.execute(text(
-                "SELECT slug FROM public.game_versions WHERE is_default AND enabled LIMIT 1"
-            )).scalar()
+            default_slug = conn.execute(
+                text(
+                    "SELECT slug FROM public.game_versions WHERE is_default AND enabled LIMIT 1"
+                )
+            ).scalar()
         if default_slug:
             return default_slug
     except Exception:
@@ -91,6 +94,7 @@ def client(db_session):
     This ensures that data created in db_session is visible to the API endpoints
     called via the client, since they share the same database connection/transaction.
     """
+
     def override_get_db_with_session():
         """Override that yields the same db_session fixture."""
         yield db_session
@@ -114,9 +118,9 @@ def sample_stat_value(db_session):
     from app.tests.db_test_constants import STAT_ID_COMMON_1
 
     # Query real stat value instead of creating mock
-    stat_value = db_session.query(StatValue).filter(
-        StatValue.id == STAT_ID_COMMON_1
-    ).one()
+    stat_value = (
+        db_session.query(StatValue).filter(StatValue.id == STAT_ID_COMMON_1).one()
+    )
 
     return stat_value
 
@@ -133,9 +137,12 @@ def sample_item(db_session):
     from app.tests.db_test_constants import ITEM_CELL_SCANNER
 
     # Query real item with stats loaded instead of creating mock
-    item = db_session.query(Item).options(
-        selectinload(Item.item_stats).selectinload(ItemStats.stat_value)
-    ).filter(Item.aoid == ITEM_CELL_SCANNER).one()
+    item = (
+        db_session.query(Item)
+        .options(selectinload(Item.item_stats).selectinload(ItemStats.stat_value))
+        .filter(Item.aoid == ITEM_CELL_SCANNER)
+        .one()
+    )
 
     return item
 
@@ -156,10 +163,15 @@ def sample_symbiant(db_session):
     from app.tests.db_test_constants import ITEM_MID_LOW_QL
 
     # Query real symbiant item with all relationships loaded
-    item = db_session.query(Item).options(
-        selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
-        selectinload(Item.actions).selectinload(Action.action_criteria)
-    ).filter(Item.aoid == ITEM_MID_LOW_QL).one()
+    item = (
+        db_session.query(Item)
+        .options(
+            selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
+            selectinload(Item.actions).selectinload(Action.action_criteria),
+        )
+        .filter(Item.aoid == ITEM_MID_LOW_QL)
+        .one()
+    )
 
     return item
 
@@ -178,9 +190,7 @@ def sample_pocket_boss(db_session):
     from app.tests.db_test_constants import MOB_ID_ADOBE_SUZERAIN
 
     # Query real pocket boss instead of creating mock
-    boss = db_session.query(Mob).filter(
-        Mob.id == MOB_ID_ADOBE_SUZERAIN
-    ).one()
+    boss = db_session.query(Mob).filter(Mob.id == MOB_ID_ADOBE_SUZERAIN).one()
 
     return boss
 
@@ -192,17 +202,22 @@ def sample_item_with_all_fields(db_session):
     Uses "Pistol Mastery" (AOID: 29246, QL: 24, 26 stats, 29 sources) -
     a complex real item perfect for testing comprehensive relationships.
     """
-    from app.models import (
-        Item, ItemStats, ItemSource, Source, Action
-    )
+    from app.models import Item, ItemStats, ItemSource, Source, Action
     from sqlalchemy.orm import selectinload
     from app.tests.db_test_constants import ITEM_PISTOL_MASTERY
 
     # Query real item with all relationships loaded
-    item = db_session.query(Item).options(
-        selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
-        selectinload(Item.item_sources).selectinload(ItemSource.source).selectinload(Source.source_type),
-        selectinload(Item.actions).selectinload(Action.action_criteria)
-    ).filter(Item.aoid == ITEM_PISTOL_MASTERY).one()
+    item = (
+        db_session.query(Item)
+        .options(
+            selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
+            selectinload(Item.item_sources)
+            .selectinload(ItemSource.source)
+            .selectinload(Source.source_type),
+            selectinload(Item.actions).selectinload(Action.action_criteria),
+        )
+        .filter(Item.aoid == ITEM_PISTOL_MASTERY)
+        .one()
+    )
 
     return item

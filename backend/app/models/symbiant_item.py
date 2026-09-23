@@ -8,8 +8,8 @@ from app.core.database import Base
 
 
 class SymbiantItem(Base):
-    __tablename__ = 'symbiant_items'
-    __table_args__ = {'info': {'is_view': True}}  # Mark as materialized view
+    __tablename__ = "symbiant_items"
+    __table_args__ = {"info": {"is_view": True}}  # Mark as materialized view
 
     id = Column(Integer, primary_key=True)
     aoid = Column(Integer, index=True)

@@ -12,8 +12,20 @@ import logging
 
 from app.core.database import get_db
 from app.models import (
-    Mob, SymbiantItem, Source, SourceType, ItemSource, Item, Action, ActionCriteria,
-    ItemSpellData, SpellData, SpellDataSpells, Spell, SpellCriterion, Criterion
+    Mob,
+    SymbiantItem,
+    Source,
+    SourceType,
+    ItemSource,
+    Item,
+    Action,
+    ActionCriteria,
+    ItemSpellData,
+    SpellData,
+    SpellDataSpells,
+    Spell,
+    SpellCriterion,
+    Criterion,
 )
 from app.api.schemas.mob import MobResponse, MobDetail, SymbiantDropInfo
 from app.api.schemas.symbiant import SymbiantResponse
@@ -39,7 +51,7 @@ def list_mobs(
     max_level: Optional[int] = Query(None, description="Maximum mob level"),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=1000, description="Items per page"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     List all mobs with optional filtering.
@@ -77,7 +89,7 @@ def list_mobs(
     mobs = query.offset(offset).limit(page_size).all()
 
     # Get source_type_id for 'mob' to count symbiant drops
-    source_type = db.query(SourceType).filter(SourceType.name == 'mob').first()
+    source_type = db.query(SourceType).filter(SourceType.name == "mob").first()
 
     # Build drop counts for all mobs on current page
     symbiant_counts = {}
@@ -86,14 +98,13 @@ def list_mobs(
 
         # Query to count symbiant drops per mob
         drop_count_query = (
-            db.query(
-                Mob.id,
-                func.count(ItemSource.item_id).label('symbiant_count')
+            db.query(Mob.id, func.count(ItemSource.item_id).label("symbiant_count"))
+            .outerjoin(
+                Source,
+                and_(
+                    Source.source_id == Mob.id, Source.source_type_id == source_type.id
+                ),
             )
-            .outerjoin(Source, and_(
-                Source.source_id == Mob.id,
-                Source.source_type_id == source_type.id
-            ))
             .outerjoin(ItemSource, ItemSource.source_id == Source.id)
             .filter(Mob.id.in_(mob_ids))
             .group_by(Mob.id)
@@ -113,14 +124,16 @@ def list_mobs(
             location=mob.location,
             mob_names=mob.mob_names,
             is_pocket_boss=mob.is_pocket_boss,
-            symbiant_count=symbiant_counts.get(mob.id, 0)
+            symbiant_count=symbiant_counts.get(mob.id, 0),
         )
         for mob in mobs
     ]
 
     # Log performance metrics
     query_time = time.time() - start_time
-    logger.info(f"Mob list query is_pocket_boss={is_pocket_boss} playfield='{playfield}' level:{min_level}-{max_level} results={total} time={query_time:.3f}s")
+    logger.info(
+        f"Mob list query is_pocket_boss={is_pocket_boss} playfield='{playfield}' level:{min_level}-{max_level} results={total} time={query_time:.3f}s"
+    )
 
     return PaginatedResponse[MobResponse](
         items=mob_responses,
@@ -129,7 +142,7 @@ def list_mobs(
         page_size=page_size,
         pages=pages,
         has_next=page < pages,
-        has_prev=page > 1
+        has_prev=page > 1,
     )
 
 
@@ -139,7 +152,7 @@ def list_mobs(
 def get_mob_drops(
     mob_id: int,
     family: Optional[str] = Query(None, description="Filter by symbiant family"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get all symbiants dropped by this mob with actions for level extraction.
@@ -159,9 +172,11 @@ def get_mob_drops(
         raise HTTPException(status_code=404, detail="Mob not found")
 
     # Get source_type_id for 'mob'
-    source_type = db.query(SourceType).filter(SourceType.name == 'mob').first()
+    source_type = db.query(SourceType).filter(SourceType.name == "mob").first()
     if not source_type:
-        raise HTTPException(status_code=500, detail="Source type 'mob' not found in database")
+        raise HTTPException(
+            status_code=500, detail="Source type 'mob' not found in database"
+        )
 
     # Query symbiants via sources
     query = (
@@ -169,10 +184,7 @@ def get_mob_drops(
         .join(ItemSource, SymbiantItem.id == ItemSource.item_id)
         .join(Source, ItemSource.source_id == Source.id)
         .filter(
-            and_(
-                Source.source_id == mob_id,
-                Source.source_type_id == source_type.id
-            )
+            and_(Source.source_id == mob_id, Source.source_type_id == source_type.id)
         )
     )
 
@@ -199,7 +211,7 @@ def get_mob_drops(
             .joinedload(SpellData.spell_data_spells)
             .joinedload(SpellDataSpells.spell)
             .joinedload(Spell.spell_criteria)
-            .joinedload(SpellCriterion.criterion)
+            .joinedload(SpellCriterion.criterion),
         )
     )
     items = {item.id: item for item in items_query.all()}
@@ -220,17 +232,19 @@ def get_mob_drops(
                             id=ac.criterion.id,
                             value1=ac.criterion.value1,
                             value2=ac.criterion.value2,
-                            operator=ac.criterion.operator
+                            operator=ac.criterion.operator,
                         )
                         for ac in action.action_criteria
                     ]
 
-                    actions.append(ActionResponse(
-                        id=action.id,
-                        action=action.action,
-                        item_id=action.item_id,
-                        criteria=criteria
-                    ))
+                    actions.append(
+                        ActionResponse(
+                            id=action.id,
+                            action=action.action,
+                            item_id=action.item_id,
+                            criteria=criteria,
+                        )
+                    )
 
             # Build spell_data
             for isd in item.item_spell_data:
@@ -247,42 +261,50 @@ def get_mob_drops(
                             id=sc.criterion.id,
                             value1=sc.criterion.value1,
                             value2=sc.criterion.value2,
-                            operator=sc.criterion.operator
+                            operator=sc.criterion.operator,
                         )
                         for sc in spell.spell_criteria
                     ]
 
-                    spells_with_criteria.append(SpellWithCriteria(
-                        id=spell.id,
-                        target=spell.target,
-                        tick_count=spell.tick_count,
-                        tick_interval=spell.tick_interval,
-                        spell_id=spell.spell_id,
-                        spell_format=spell.spell_format,
-                        spell_params=spell.spell_params or {},
-                        criteria=criteria
-                    ))
+                    spells_with_criteria.append(
+                        SpellWithCriteria(
+                            id=spell.id,
+                            target=spell.target,
+                            tick_count=spell.tick_count,
+                            tick_interval=spell.tick_interval,
+                            spell_id=spell.spell_id,
+                            spell_format=spell.spell_format,
+                            spell_params=spell.spell_params or {},
+                            criteria=criteria,
+                        )
+                    )
 
-                spell_data_list.append(SpellDataResponse(
-                    id=spell_data.id,
-                    event=spell_data.event,
-                    spells=spells_with_criteria
-                ))
+                spell_data_list.append(
+                    SpellDataResponse(
+                        id=spell_data.id,
+                        event=spell_data.event,
+                        spells=spells_with_criteria,
+                    )
+                )
 
-        symbiant_responses.append(SymbiantResponse(
-            id=symbiant.id,
-            aoid=symbiant.aoid,
-            name=symbiant.name,
-            ql=symbiant.ql,
-            slot_id=symbiant.slot_id,
-            family=symbiant.family,
-            spell_data=spell_data_list,
-            actions=actions
-        ))
+        symbiant_responses.append(
+            SymbiantResponse(
+                id=symbiant.id,
+                aoid=symbiant.aoid,
+                name=symbiant.name,
+                ql=symbiant.ql,
+                slot_id=symbiant.slot_id,
+                family=symbiant.family,
+                spell_data=spell_data_list,
+                actions=actions,
+            )
+        )
 
     # Log performance metrics
     query_time = time.time() - start_time
-    logger.info(f"Mob drops query mob_id={mob_id} family='{family}' results={len(symbiants)} time={query_time:.3f}s")
+    logger.info(
+        f"Mob drops query mob_id={mob_id} family='{family}' results={len(symbiants)} time={query_time:.3f}s"
+    )
 
     return symbiant_responses
 
@@ -300,7 +322,7 @@ def get_mob(mob_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Mob not found")
 
     # Get source_type_id for 'mob' to count symbiant drops
-    source_type = db.query(SourceType).filter(SourceType.name == 'mob').first()
+    source_type = db.query(SourceType).filter(SourceType.name == "mob").first()
 
     # Count symbiant drops for this mob
     symbiant_count = 0
@@ -311,8 +333,7 @@ def get_mob(mob_id: int, db: Session = Depends(get_db)):
             .outerjoin(ItemSource, ItemSource.source_id == Source.id)
             .filter(
                 and_(
-                    Source.source_id == mob_id,
-                    Source.source_type_id == source_type.id
+                    Source.source_id == mob_id, Source.source_type_id == source_type.id
                 )
             )
             .scalar()
@@ -326,5 +347,5 @@ def get_mob(mob_id: int, db: Session = Depends(get_db)):
         location=mob.location,
         mob_names=mob.mob_names,
         is_pocket_boss=mob.is_pocket_boss,
-        symbiant_count=symbiant_count
+        symbiant_count=symbiant_count,
     )

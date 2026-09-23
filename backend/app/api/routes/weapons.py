@@ -20,10 +20,7 @@ logger = logging.getLogger(__name__)
 
 @router.post("/analyze", response_model=List[ItemDetail])
 @cached_response("weapons_analyze", ttl=3600)
-def analyze_weapons(
-    request: WeaponAnalyzeRequest,
-    db: Session = Depends(get_db)
-):
+def analyze_weapons(request: WeaponAnalyzeRequest, db: Session = Depends(get_db)):
     """
     Analyze weapons for a character and return equipable weapons.
 
@@ -68,6 +65,5 @@ def analyze_weapons(
     except Exception as e:
         logger.error(f"Weapon analysis failed: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to analyze weapons: {str(e)}"
+            status_code=500, detail=f"Failed to analyze weapons: {str(e)}"
         )

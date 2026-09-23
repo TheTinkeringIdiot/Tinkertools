@@ -23,6 +23,7 @@ def client():
 # GET /api/v1/nanos - List nanos with pagination
 # ============================================================================
 
+
 def test_get_nanos_returns_valid_paginated_response(client):
     """Test that getting nanos returns valid pagination structure."""
     response = client.get("/api/v1/nanos")
@@ -179,6 +180,7 @@ def test_get_nanos_page_size_too_large(client):
 # GET /api/v1/nanos/search - Search nanos
 # ============================================================================
 
+
 def test_search_nanos_by_name(client):
     """Test searching nanos by name with known nano."""
     response = client.get("/api/v1/nanos/search?q=Heat+Miser")
@@ -216,12 +218,17 @@ def test_search_nanos_partial_match(client):
     assert len(data["items"]) >= 1
     # Verify results contain partial match
     for nano in data["items"]:
-        assert "healing" in nano["name"].lower() or "healing" in (nano["description"] or "").lower()
+        assert (
+            "healing" in nano["name"].lower()
+            or "healing" in (nano["description"] or "").lower()
+        )
 
 
 def test_search_nanos_no_results(client):
     """Test searching nanos with no matches."""
-    response = client.get("/api/v1/nanos/search?q=XyZzZyYyXxNonexistentNanoName123456789")
+    response = client.get(
+        "/api/v1/nanos/search?q=XyZzZyYyXxNonexistentNanoName123456789"
+    )
 
     assert response.status_code == 200
     data = response.json()
@@ -250,6 +257,7 @@ def test_search_nanos_pagination(client):
 # ============================================================================
 # GET /api/v1/nanos/stats - Nano statistics
 # ============================================================================
+
 
 def test_get_nano_stats_returns_valid_structure(client):
     """Test that nano stats returns a valid response structure."""
@@ -297,6 +305,7 @@ def test_get_nano_stats_level_range(client):
 # ============================================================================
 # GET /api/v1/nanos/{nano_id} - Nano detail
 # ============================================================================
+
 
 def test_get_nano_by_id(client, db_session):
     """Test getting a specific nano by ID using real data."""
@@ -374,6 +383,7 @@ def test_get_non_nano_item(client, db_session):
 # GET /api/v1/nanos/profession/{profession_id} - Filter by profession
 # ============================================================================
 
+
 def test_get_nanos_by_profession_doctor(client):
     """Test getting nanos filtered by Doctor profession (id=6)."""
     response = client.get("/api/v1/nanos/profession/6")
@@ -450,7 +460,9 @@ def test_get_nanos_by_profession_pagination(client):
 
 def test_get_nanos_by_profession_sort_by_name(client):
     """Test sorting by name in profession endpoint."""
-    response = client.get("/api/v1/nanos/profession/0?sort=name&sort_order=asc&page_size=20")
+    response = client.get(
+        "/api/v1/nanos/profession/0?sort=name&sort_order=asc&page_size=20"
+    )
 
     assert response.status_code == 200
     data = response.json()
@@ -460,7 +472,9 @@ def test_get_nanos_by_profession_sort_by_name(client):
 
 def test_get_nanos_by_profession_sort_by_ql_desc(client):
     """Test sorting by QL descending in profession endpoint."""
-    response = client.get("/api/v1/nanos/profession/0?sort=ql&sort_order=desc&page_size=20")
+    response = client.get(
+        "/api/v1/nanos/profession/0?sort=ql&sort_order=desc&page_size=20"
+    )
 
     assert response.status_code == 200
     data = response.json()
@@ -471,6 +485,7 @@ def test_get_nanos_by_profession_sort_by_ql_desc(client):
 # ============================================================================
 # GET /api/v1/nanos/offensive/{profession_id} - Offensive nanos
 # ============================================================================
+
 
 def test_get_offensive_nanos_returns_valid_structure(client):
     """Test that offensive endpoint returns valid structure."""
@@ -507,19 +522,24 @@ def test_get_offensive_nanos_pagination(client):
 
 def test_get_offensive_nanos_sort_by_name(client):
     """Test sorting by name in offensive endpoint."""
-    response = client.get("/api/v1/nanos/offensive/0?sort=name&sort_order=asc&page_size=10")
+    response = client.get(
+        "/api/v1/nanos/offensive/0?sort=name&sort_order=asc&page_size=10"
+    )
     assert response.status_code == 200
 
 
 def test_get_offensive_nanos_sort_by_ql(client):
     """Test sorting by QL in offensive endpoint."""
-    response = client.get("/api/v1/nanos/offensive/0?sort=ql&sort_order=desc&page_size=10")
+    response = client.get(
+        "/api/v1/nanos/offensive/0?sort=ql&sort_order=desc&page_size=10"
+    )
     assert response.status_code == 200
 
 
 # ============================================================================
 # GET /api/v1/nanos/profession/{profession_id}/fast - Fast endpoint
 # ============================================================================
+
 
 def test_get_nanos_by_profession_fast(client):
     """Test fast nano endpoint by profession."""
@@ -573,7 +593,9 @@ def test_get_nanos_by_profession_fast_pagination(client):
 
 def test_get_nanos_by_profession_fast_sort_by_name(client):
     """Test sorting by name in fast endpoint."""
-    response = client.get("/api/v1/nanos/profession/0/fast?sort=name&sort_order=asc&page_size=20")
+    response = client.get(
+        "/api/v1/nanos/profession/0/fast?sort=name&sort_order=asc&page_size=20"
+    )
 
     assert response.status_code == 200
     data = response.json()
@@ -583,7 +605,9 @@ def test_get_nanos_by_profession_fast_sort_by_name(client):
 
 def test_get_nanos_by_profession_fast_sort_by_ql(client):
     """Test sorting by QL in fast endpoint."""
-    response = client.get("/api/v1/nanos/profession/0/fast?sort=ql&sort_order=desc&page_size=20")
+    response = client.get(
+        "/api/v1/nanos/profession/0/fast?sort=ql&sort_order=desc&page_size=20"
+    )
 
     assert response.status_code == 200
     data = response.json()
@@ -604,6 +628,7 @@ def test_get_nanos_by_profession_fast_all_professions(client):
 # ============================================================================
 # Edge Cases and Integration Tests
 # ============================================================================
+
 
 def test_nano_response_structure_consistency(client, db_session):
     """Test that nano responses have consistent structure across endpoints."""
@@ -627,10 +652,9 @@ def test_nano_response_structure_consistency(client, db_session):
 def test_nano_endpoints_with_real_high_ql_nano(client, db_session):
     """Test endpoints with high QL nano (QL 390)."""
     # Query for a high QL nano
-    high_ql_nano = db_session.query(Item).filter(
-        Item.is_nano == True,
-        Item.ql >= 390
-    ).first()
+    high_ql_nano = (
+        db_session.query(Item).filter(Item.is_nano == True, Item.ql >= 390).first()
+    )
 
     if high_ql_nano:
         response = client.get(f"/api/v1/nanos/{high_ql_nano.id}")

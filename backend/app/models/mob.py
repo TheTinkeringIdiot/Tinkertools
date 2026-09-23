@@ -9,7 +9,7 @@ from app.core.database import Base
 
 
 class Mob(Base):
-    __tablename__ = 'mobs'
+    __tablename__ = "mobs"
 
     id = Column(Integer, primary_key=True)
     name = Column(String(255), nullable=False, index=True)
@@ -18,8 +18,8 @@ class Mob(Base):
     location = Column(String(255))
     mob_names = Column(ARRAY(Text))  # Array of mob names in pocket
     is_pocket_boss = Column(Boolean, default=True, index=True)
-    mob_metadata = Column('metadata', JSONB)  # Column in DB is named 'metadata'
-    created_at = Column(TIMESTAMP, server_default=text('CURRENT_TIMESTAMP'))
+    mob_metadata = Column("metadata", JSONB)  # Column in DB is named 'metadata'
+    created_at = Column(TIMESTAMP, server_default=text("CURRENT_TIMESTAMP"))
 
     @property
     def dropped_items(self):
@@ -33,7 +33,7 @@ class Mob(Base):
             return []
 
         # Get source_type_id for 'mob'
-        source_type = session.query(SourceType).filter_by(name='mob').first()
+        source_type = session.query(SourceType).filter_by(name="mob").first()
         if not source_type:
             return []
 
