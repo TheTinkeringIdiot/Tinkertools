@@ -353,12 +353,12 @@ onMounted(() => {
         Please select or create a profile in TinkerProfiles to analyze weapons. Your character stats
         will be automatically populated from your profile.
       </p>
-      <a
-        href="/profiles"
+      <router-link
+        :to="{ name: 'TinkerProfiles' }"
         class="px-4 py-2 bg-primary-500 text-white rounded hover:bg-primary-600 transition-colors"
       >
         Go to TinkerProfiles
-      </a>
+      </router-link>
     </div>
 
     <!-- Content (Profile Loaded) -->

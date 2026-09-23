@@ -14,6 +14,7 @@ import type {
 } from '../../types/api';
 import interpolationService from '../interpolation-service';
 import { apiClient } from '../api-client';
+import { currentVersion } from '../../composables/useGameVersion';
 
 // Mock the API client
 vi.mock('../api-client', () => ({
@@ -395,8 +396,8 @@ describe('InterpolationService', () => {
     });
 
     it('should use cached info when available', () => {
-      // Manually set cached info
-      interpolationService['infoCache'].set(12345, {
+      // Manually set cached info. Info is cached per game version.
+      interpolationService['infoCache'].set(`${currentVersion.value}:12345`, {
         ...sampleInterpolationInfo,
         interpolatable: false,
       });

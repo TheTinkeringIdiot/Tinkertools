@@ -35,7 +35,7 @@
         {{ functionPrefix }}
         <RouterLink
           v-if="criterion.referenceAoid"
-          :to="`/items/${criterion.referenceAoid}`"
+          :to="{ name: 'ItemDetail', params: { aoid: String(criterion.referenceAoid) } }"
           class="function-link"
         >{{ resolvedName || `Nano ${criterion.referenceAoid}` }}</RouterLink>
         <template v-else>{{ nanoLineName }}</template>

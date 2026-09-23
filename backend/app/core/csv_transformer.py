@@ -18,6 +18,8 @@ from typing import Dict, Set, Tuple, Optional, Any, List
 import time
 from collections import defaultdict
 
+from app.core.content_hash import compute_item_hashes
+
 logger = logging.getLogger(__name__)
 
 
@@ -273,8 +275,12 @@ class StreamingCSVTransformer:
             animesh_id = self._process_animation_mesh(animesh_data, csv_writers)
             self.stats['animation_mesh'] += 1
 
+        # Content hashes of the raw record, for cross-version item history
+        hashes = compute_item_hashes(item_data)
+
         # Write item row WITH foreign keys
-        # items: id, aoid, name, ql, item_class, description, is_nano, animation_mesh_id, atkdef_id
+        # items: id, aoid, name, ql, item_class, description, is_nano,
+        #        animation_mesh_id, atkdef_id, content/stats/spells/actions/text hashes
         item_row = [
             item_id,
             aoid,
@@ -284,7 +290,12 @@ class StreamingCSVTransformer:
             item_data.get('Description', ''),
             item_is_nano,
             animesh_id,
-            atkdef_id
+            atkdef_id,
+            hashes['content_hash'],
+            hashes['stats_hash'],
+            hashes['spells_hash'],
+            hashes['actions_hash'],
+            hashes['text_hash'],
         ]
         self._write_csv_row(csv_writers['items'], item_row)
 

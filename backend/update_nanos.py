@@ -23,13 +23,18 @@ from typing import Dict, List, Set, Tuple
 load_dotenv()
 
 
+DEFAULT_CSV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "all_nanos_compacted.csv")
+
+
 class NanoDataUpdater:
-    def __init__(self):
+    def __init__(self, version_slug: str = None, csv_path: str = None):
         self.database_url = os.getenv('DATABASE_URL')
         if not self.database_url:
             raise ValueError("DATABASE_URL environment variable not set")
-        
-        self.csv_path = "/home/quigley/projects/Tinkertools/backend/all_nanos_compacted.csv"
+
+        self.csv_path = csv_path or DEFAULT_CSV_PATH
+        self.version_slug = version_slug
+        self.schema_name = None
         self.conn = None
         self.stats = {
             'nanos_processed': 0,
@@ -48,6 +53,14 @@ class NanoDataUpdater:
         print(f"Connecting to database...")
         self.conn = await asyncpg.connect(self.database_url)
         print("✓ Database connection established")
+
+        # Each game version lives in its own schema; point this connection at it.
+        import sys
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from app.core.versions import registry
+        self.schema_name = registry.schema_for(self.version_slug)
+        await self.conn.execute(f'SET search_path TO "{self.schema_name}", public')
+        print(f"✓ Using game version '{self.version_slug or registry.default_slug()}' (schema {self.schema_name})")
     
     async def disconnect(self):
         """Close database connection"""
@@ -345,7 +358,18 @@ class NanoDataUpdater:
 
 async def main():
     """Main entry point"""
-    updater = NanoDataUpdater()
+    import argparse
+    parser = argparse.ArgumentParser(
+        description="Link nano programs to their crystals and fill in strain/substrain stats "
+                    "from the curated CSV, for one game version."
+    )
+    parser.add_argument('--version', dest='version_slug', default=None,
+                        help="Game version slug (default: the registry's default version)")
+    parser.add_argument('--csv', dest='csv_path', default=None,
+                        help=f"Curated nano CSV (default: {DEFAULT_CSV_PATH})")
+    args = parser.parse_args()
+
+    updater = NanoDataUpdater(version_slug=args.version_slug, csv_path=args.csv_path)
     await updater.run()
 
 

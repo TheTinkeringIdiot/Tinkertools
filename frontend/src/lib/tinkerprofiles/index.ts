@@ -11,8 +11,24 @@ export { ProfileValidator } from './validator';
 export { ProfileStorage } from './storage';
 export { ProfileTransformer } from './transformer';
 
+export {
+  currentGameVersion,
+  gameVersionDisplayName,
+  firstVersionOfFamily,
+  familyOf,
+  versionForImport,
+  stampGameVersion,
+  profileMatchesVersion,
+} from './game-version';
+export type { ProfileImportSource, ImportVersionTarget } from './game-version';
+
+export { buildVersionCopy, buildSummary as buildVersionCopySummary } from './version-copy';
+export type { ProfileVersionCopyResult, MissingItemReport } from './version-copy';
+
 export type {
   TinkerProfile,
+  VersionFlaggedItem,
+  ImplantWithClusters,
   SkillWithIP,
   ProfileMetadata,
   ProfileExportFormat,

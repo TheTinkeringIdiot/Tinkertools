@@ -238,8 +238,16 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { apiBaseFor } from '@/services/api-config';
+import { currentVersion } from '@/composables/useGameVersion';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+/**
+ * Version-scoped API base. Read it per call, not once at module load: the user
+ * can switch game versions without a reload.
+ */
+function apiBase(): string {
+  return apiBaseFor(currentVersion.value);
+}
 
 // Types
 interface StatValue {
@@ -348,7 +356,7 @@ const loadWeapons = async () => {
   try {
     // Get items with attack/defense data (these are more likely to be weapons)
     const response = await fetch(
-      `${API_BASE_URL}/items?has_attack_defense=true&page_size=100`
+      `${apiBase()}/items?has_attack_defense=true&page_size=100`
     );
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -363,7 +371,7 @@ const loadWeapons = async () => {
     for (const item of data.items.slice(0, 50)) {
       // Limit for performance
       try {
-        const detailResponse = await fetch(`${API_BASE_URL}/items/${item.id}`);
+        const detailResponse = await fetch(`${apiBase()}/items/${item.id}`);
         if (detailResponse.ok) {
           const detailedItem = await detailResponse.json();
           if (isLikelyWeapon(detailedItem)) {
@@ -395,7 +403,7 @@ const searchWeapons = async () => {
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/items/search?q=${encodeURIComponent(searchQuery.value)}&weapons=true&page_size=50`
+      `${apiBase()}/items/search?q=${encodeURIComponent(searchQuery.value)}&weapons=true&page_size=50`
     );
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -416,7 +424,7 @@ const searchWeapons = async () => {
     for (const item of data.items.slice(0, 30)) {
       // Can handle more since they're already filtered to weapons
       try {
-        const detailResponse = await fetch(`${API_BASE_URL}/items/${item.id}`);
+        const detailResponse = await fetch(`${apiBase()}/items/${item.id}`);
         if (detailResponse.ok) {
           const detailedItem = await detailResponse.json();
           detailedWeapons.push(detailedItem); // No need to check isLikelyWeapon since backend filtered

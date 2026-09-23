@@ -23,6 +23,9 @@ import {
 } from '../helpers/profile-fixtures';
 import { SKILL_ID } from '../helpers/skill-fixtures';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
+import { apiClient } from '@/services/api-client';
+import { currentVersion, versions } from '@/composables/useGameVersion';
+import type { GameVersion } from '@/types/game-version';
 import ProfileCreateModal from '@/components/profiles/ProfileCreateModal.vue';
 import ProfileDropdown from '@/components/profiles/ProfileDropdown.vue';
 import CharacterInfoPanel from '@/components/profiles/CharacterInfoPanel.vue';
@@ -33,6 +36,8 @@ vi.mock('@/services/api-client', () => {
     interpolateItem: vi.fn(),
     getItem: vi.fn(),
     lookupImplant: vi.fn(),
+    batchInterpolateItems: vi.fn(async () => ({ results: [] })),
+    post: vi.fn(async () => ({ results: [] })),
   };
   return {
     default: mockClient,
@@ -555,22 +560,27 @@ describe('Profile Management Integration', () => {
       const { apiClient } = await import('@/services/api-client');
       const mockedApiClient = vi.mocked(apiClient);
 
-      // Mock item response
-      mockedApiClient.interpolateItem.mockResolvedValue({
-        success: true,
-        item: {
-          id: 1,
-          aoid: 246660,
-          name: 'Test Item',
-          ql: 300,
-          description: 'Test',
-          item_class: 2,
-          is_nano: false,
-          interpolating: false,
-          stats: [],
-          spell_data: [],
-          actions: [],
-        },
+      // The transformer resolves equipment through the batch endpoint.
+      (mockedApiClient.batchInterpolateItems as any).mockResolvedValue({
+        results: [
+          {
+            aoid: 246660,
+            target_ql: 300,
+            success: true,
+            item: {
+              id: 1,
+              aoid: 246660,
+              name: 'Test Item',
+              ql: 300,
+              description: 'Test',
+              item_class: 2,
+              is_nano: false,
+              stats: [],
+              spell_data: [],
+              actions: [],
+            },
+          },
+        ],
       });
 
       const aoSetupsData = JSON.stringify({
@@ -809,6 +819,164 @@ describe('Profile Management Integration', () => {
       const storedData = context.mockLocalStorage.getItem(profileKey);
       const storedProfile = JSON.parse(storedData!);
       expect(storedProfile.Character.Level).toBe(120);
+    });
+  });
+
+  // ============================================================================
+  // Game Versions
+  // ============================================================================
+
+  describe('Game Versions', () => {
+    const AO_LIVE = 'ao-2024-02';
+    const PRK = 'prk-2025-01';
+
+    function registryEntry(slug: string, display_name: string, family: string): GameVersion {
+      return {
+        slug,
+        display_name,
+        family,
+        parent_slug: null,
+        client_build: null,
+        snapshot_date: null,
+        sort_order: family === 'ao' ? 0 : 1,
+        enabled: true,
+        is_default: family === 'ao',
+        features: {},
+        notes: null,
+        is_current: false,
+      };
+    }
+
+    beforeEach(() => {
+      // The registry normally arrives from GET /versions; set it directly so the
+      // store sees two versions without a network round trip.
+      versions.value = [
+        registryEntry(AO_LIVE, 'Anarchy Online (Live)', 'ao'),
+        registryEntry(PRK, 'Project Rubi-Ka', 'prk'),
+      ];
+      currentVersion.value = AO_LIVE;
+    });
+
+    it('stamps a newly created profile with the version being browsed', async () => {
+      const store = useTinkerProfilesStore();
+
+      const profileId = await store.createProfile('VersionStamped');
+      await waitForUpdates();
+
+      const created = await store.loadProfile(profileId);
+      expect(created?.gameVersion).toBe(AO_LIVE);
+
+      const stored = JSON.parse(
+        context.mockLocalStorage.getItem(`tinkertools_profile_${profileId}`)!
+      );
+      expect(stored.gameVersion).toBe(AO_LIVE);
+    });
+
+    it('lists other versions separately in the dropdown options', async () => {
+      const store = useTinkerProfilesStore();
+
+      const mineId = await store.createProfile('Mine');
+      const theirsId = await store.createProfile('Theirs');
+      await store.updateProfile(theirsId, { gameVersion: PRK } as any);
+      await store.refreshMetadata();
+      await waitForUpdates();
+
+      expect(store.currentVersionProfiles.map((p) => p.id)).toEqual([mineId]);
+      expect(store.otherVersionProfiles.map((p) => p.id)).toEqual([theirsId]);
+
+      const groups = store.groupedProfileOptions;
+      expect(groups[0].label).toBe('Anarchy Online (Live)');
+      expect(groups[1].label).toBe('Other versions');
+      expect(groups[1].items[0].otherVersion).toBe(true);
+      expect(groups[1].items[0].versionLabel).toBe('Project Rubi-Ka');
+    });
+
+    it('copies a profile from another version, re-resolving its items', async () => {
+      const store = useTinkerProfilesStore();
+
+      // A PRK profile with two equipped items.
+      const sourceId = await store.createProfile('RubiKa');
+      const source = await store.loadProfile(sourceId);
+      await store.updateProfile(sourceId, {
+        gameVersion: PRK,
+        Weapons: {
+          ...source!.Weapons,
+          RHand: {
+            id: 1,
+            aoid: 2001,
+            name: 'PRK Rifle',
+            ql: 200,
+            is_nano: false,
+            stats: [],
+            spell_data: [],
+            actions: [],
+          },
+        },
+        Clothing: {
+          ...source!.Clothing,
+          Head: {
+            id: 2,
+            aoid: 2002,
+            name: 'PRK Helmet',
+            ql: 150,
+            is_nano: false,
+            stats: [],
+            spell_data: [],
+            actions: [],
+          },
+        },
+      } as any);
+      await waitForUpdates();
+
+      // Live AO has the rifle but not the helmet.
+      (apiClient.batchInterpolateItems as any).mockImplementation(
+        async (requests: Array<{ aoid: number; targetQl: number }>) => ({
+          results: requests.map((req) =>
+            req.aoid === 2001
+              ? {
+                  aoid: req.aoid,
+                  target_ql: req.targetQl,
+                  success: true,
+                  item: {
+                    id: 99,
+                    aoid: req.aoid,
+                    name: 'Live Rifle',
+                    ql: req.targetQl,
+                    is_nano: false,
+                    stats: [],
+                    spell_data: [],
+                    actions: [],
+                  },
+                }
+              : { aoid: req.aoid, target_ql: req.targetQl, success: false, error: 'not found' }
+          ),
+        })
+      );
+
+      const result = await store.copyProfileToCurrentVersion(sourceId);
+      await waitForUpdates();
+
+      expect(result.updated).toBe(1);
+      expect(result.summary).toBe('1 item updated · 1 not in this version');
+      expect(result.missing[0].aoid).toBe(2002);
+
+      // The copy is a new profile tagged for the current version.
+      expect(result.profile.id).not.toBe(sourceId);
+      expect(result.profile.gameVersion).toBe(AO_LIVE);
+      expect(result.profile.Weapons.RHand?.name).toBe('Live Rifle');
+      expect((result.profile.Clothing.Head as any).name).toBe('PRK Helmet');
+      expect((result.profile.Clothing.Head as any).missingInVersion).toBe(true);
+
+      // The original is untouched and still belongs to PRK.
+      const original = await store.loadProfile(sourceId);
+      expect(original?.gameVersion).toBe(PRK);
+      expect(original?.Weapons.RHand?.name).toBe('PRK Rifle');
+
+      // The copy becomes the active profile for the current version.
+      expect(store.activeProfileId).toBe(result.profile.id);
+      expect(context.mockLocalStorage.getItem(`tinkertools_active_profile:${AO_LIVE}`)).toBe(
+        result.profile.id
+      );
     });
   });
 });

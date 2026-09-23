@@ -45,7 +45,7 @@ function formatLocation(): string {
 }
 
 function navigateToItem(aoid: number) {
-  router.push(`/items/${aoid}`);
+  router.push({ name: 'ItemDetail', params: { aoid: aoid.toString() } });
 }
 
 function formatMinimumLevel(symbiant: SymbiantItem): string {
@@ -61,11 +61,10 @@ function formatMinimumLevel(symbiant: SymbiantItem): string {
 function goBack() {
   // Return to the tab the user was on when they navigated here
   const returnTab = route.query.returnTab as string;
-  if (returnTab) {
-    router.push(`/pocket?tab=${returnTab}`);
-  } else {
-    router.push('/pocket');
-  }
+  router.push({
+    name: 'TinkerPocket',
+    query: returnTab ? { tab: returnTab } : {},
+  });
 }
 
 async function shareLink() {

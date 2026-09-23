@@ -110,6 +110,11 @@ interface Props {
   initialQl?: number;
   /** Show reset button */
   showResetButton?: boolean;
+  /**
+   * Game version to interpolate against. Set while peeking at another
+   * snapshot (?as=<slug>); null means the version being browsed.
+   */
+  gameVersion?: string | null;
 }
 
 interface Emits {
@@ -121,6 +126,7 @@ const props = withDefaults(defineProps<Props>(), {
   item: null,
   initialQl: undefined,
   showResetButton: true,
+  gameVersion: null,
 });
 
 const emit = defineEmits<Emits>();
@@ -148,6 +154,7 @@ const {
 } = useInterpolation(ref(itemAoid.value), {
   autoLoad: true,
   debounceMs: 300,
+  gameVersion: computed(() => props.gameVersion),
 });
 
 const localTargetQl = ref<number | null>(props.initialQl || null);
@@ -214,7 +221,8 @@ async function handleQlChange(): Promise<void> {
   if (targetRange.base_aoid !== itemAoid.value) {
     // Navigate to the correct base item for this range
     await router.push({
-      path: `/items/${targetRange.base_aoid}`,
+      name: 'ItemDetail',
+      params: { aoid: targetRange.base_aoid.toString() },
       query: { ql: localTargetQl.value.toString() },
     });
     return;
@@ -222,7 +230,11 @@ async function handleQlChange(): Promise<void> {
 
   // Same range - interpolate the current item
   try {
-    const interpolated = await apiClient.interpolateItem(itemAoid.value, localTargetQl.value);
+    const interpolated = props.gameVersion
+      ? await apiClient.interpolateItem(itemAoid.value, localTargetQl.value, {
+          gameVersion: props.gameVersion,
+        })
+      : await apiClient.interpolateItem(itemAoid.value, localTargetQl.value);
 
     if (interpolated.success && interpolated.item) {
       emit('item-update', interpolated.item);
@@ -293,6 +305,20 @@ watch(
     }
   },
   { immediate: true }
+);
+
+// Interpolation ranges are per game version: reload them when the peek moves,
+// even if the item object itself did not change identity.
+watch(
+  () => props.gameVersion,
+  async () => {
+    if (!props.item) return;
+    if (typeof props.item === 'number') {
+      await setItem(props.item);
+    } else {
+      await setItemFromObject(props.item);
+    }
+  }
 );
 
 // ============================================================================

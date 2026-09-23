@@ -37,13 +37,29 @@ import type {
   BatchPerkLookupResponse,
 } from '../types/api';
 import { ErrorCodes } from '../types/api';
+import type {
+  GameVersionListResponse,
+  ItemRevisionsResponse,
+  ItemRevisionsBatchResponse,
+} from '../types/game-version';
+import { API_ROOT, apiBaseFor } from './api-config';
+import { currentVersion } from '../composables/useGameVersion';
+
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    /** Route this one request to a specific game version instead of the current one. */
+    gameVersion?: string;
+  }
+}
 
 // ============================================================================
 // Configuration
 // ============================================================================
 
 const API_CONFIG = {
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
+  // Root only. The selected game version is applied per request in the
+  // request interceptor (see apiBaseFor), so switching versions needs no new client.
+  baseURL: API_ROOT,
   timeout: 120000, // 120 seconds - increased for large dataset loads (symbiants ~900+ items, pocket bosses)
   retryAttempts: 3,
   retryDelay: 1000,
@@ -121,15 +137,20 @@ class BatchRequestManager {
   private pendingBatches = new Map<string, PendingBatch<any>>();
 
   async batchItems(itemIds: number[]): Promise<Item[]> {
-    return this.createBatch('items', itemIds, (ids) =>
+    return this.createBatch(this.keyFor('items'), itemIds, (ids) =>
       apiClient.post<Item[]>('/items/batch', { item_ids: ids })
     );
   }
 
   async batchSpells(spellIds: number[]): Promise<Spell[]> {
-    return this.createBatch('spells', spellIds, (ids) =>
+    return this.createBatch(this.keyFor('spells'), spellIds, (ids) =>
       apiClient.post<Spell[]>('/spells/batch', { spell_ids: ids })
     );
+  }
+
+  /** Batches must never mix game versions: the key carries the current version. */
+  private keyFor(resource: string): string {
+    return `${currentVersion.value ?? ''}:${resource}`;
   }
 
   private async createBatch<T>(
@@ -204,6 +225,10 @@ class TinkerToolsApiClient {
     // Request interceptor
     this.client.interceptors.request.use(
       (config) => {
+        // Scope the request to the selected game version, unless the caller
+        // asked for a specific one (e.g. peeking at an item in another snapshot).
+        config.baseURL = apiBaseFor(config.gameVersion ?? currentVersion.value);
+
         // Add request ID for tracking
         config.headers['X-Request-ID'] =
           `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -420,8 +445,8 @@ class TinkerToolsApiClient {
     }
   }
 
-  async getItem(aoid: number): Promise<ApiResponse<Item>> {
-    return this.get<Item>(`/items/${aoid}`);
+  async getItem(aoid: number, options?: { gameVersion?: string }): Promise<ApiResponse<Item>> {
+    return this.get<Item>(`/items/${aoid}`, options?.gameVersion ? { gameVersion: options.gameVersion } : undefined);
   }
 
   async getItems(ids: number[]): Promise<ApiResponse<Item[]>> {
@@ -547,13 +572,18 @@ class TinkerToolsApiClient {
   // Item Interpolation API
   // ============================================================================
 
-  async interpolateItem(aoid: number, targetQl: number): Promise<InterpolationResponse> {
+  async interpolateItem(
+    aoid: number,
+    targetQl: number,
+    options?: { gameVersion?: string }
+  ): Promise<InterpolationResponse> {
     try {
       const params = new URLSearchParams();
       params.append('target_ql', targetQl.toString());
 
       const response = await this.client.get<InterpolationResponse>(
-        `/items/${aoid}/interpolate?${params.toString()}`
+        `/items/${aoid}/interpolate?${params.toString()}`,
+        options?.gameVersion ? { gameVersion: options.gameVersion } : undefined
       );
       return response.data;
     } catch (error: any) {
@@ -570,8 +600,14 @@ class TinkerToolsApiClient {
     }
   }
 
-  async getInterpolationInfo(aoid: number): Promise<ApiResponse<InterpolationInfo>> {
-    return this.get<InterpolationInfo>(`/items/${aoid}/interpolation-info`);
+  async getInterpolationInfo(
+    aoid: number,
+    options?: { gameVersion?: string }
+  ): Promise<ApiResponse<InterpolationInfo>> {
+    return this.get<InterpolationInfo>(
+      `/items/${aoid}/interpolation-info`,
+      options?.gameVersion ? { gameVersion: options.gameVersion } : undefined
+    );
   }
 
   async checkItemInterpolatable(aoid: number): Promise<boolean> {
@@ -713,6 +749,28 @@ class TinkerToolsApiClient {
   // ============================================================================
   // Health Check
   // ============================================================================
+
+  // ============================================================================
+  // Game versions and item change history (cross-version endpoints)
+  // ============================================================================
+
+  async getGameVersions(): Promise<GameVersionListResponse> {
+    const response = await this.get<GameVersionListResponse>('/versions');
+    return response.data as GameVersionListResponse;
+  }
+
+  async getItemRevisions(aoid: number): Promise<ItemRevisionsResponse> {
+    const response = await this.get<ItemRevisionsResponse>(`/items/${aoid}/revisions`);
+    return response.data as ItemRevisionsResponse;
+  }
+
+  async batchItemRevisions(aoids: number[]): Promise<ItemRevisionsBatchResponse> {
+    if (aoids.length === 0) return { items: {} };
+    const response = await this.post<ItemRevisionsBatchResponse>('/items/revisions/batch', {
+      aoids: aoids.slice(0, 500),
+    });
+    return (response.data as ItemRevisionsBatchResponse) ?? { items: {} };
+  }
 
   async healthCheck(): Promise<ApiResponse<{ status: string; timestamp: string }>> {
     return this.get<{ status: string; timestamp: string }>('/health');

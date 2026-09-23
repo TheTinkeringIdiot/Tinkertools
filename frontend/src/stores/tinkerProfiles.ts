@@ -23,6 +23,12 @@ import { skillService } from '@/services/skill-service';
 import type { SkillId } from '@/types/skills';
 import { getProfessionName } from '@/services/game-utils';
 import { useToast } from 'primevue/usetoast';
+import {
+  currentGameVersion,
+  gameVersionDisplayName,
+} from '@/lib/tinkerprofiles/game-version';
+import type { ProfileVersionCopyResult } from '@/lib/tinkerprofiles/version-copy';
+import { currentVersion, legacyDataVersion, onGameVersionChange } from '@/composables/useGameVersion';
 
 // Types that may not be exported yet
 type NanoCompatibleProfile = any; // TODO: Add proper type when available
@@ -46,6 +52,15 @@ type BulkImportResult = {
   };
 };
 
+/**
+ * Unsubscribe for the game-version listener of the most recent store instance.
+ *
+ * The listener registry in useGameVersion is module-global, so a re-created
+ * store (a fresh Pinia in tests, a hot reload) must drop the old binding or the
+ * stale store would keep reacting to version switches.
+ */
+let disposeVersionListener: (() => void) | null = null;
+
 export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   // ============================================================================
   // State
@@ -65,6 +80,14 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   const loading = ref(false);
   const error = ref<string | null>(null);
 
+  /**
+   * Game version the app is browsing, as profiles see it.
+   *
+   * Mirrors useGameVersion's currentVersion but never null: before the router
+   * has validated a version segment, profiles still need a slug to tag with.
+   */
+  const gameVersion = computed(() => currentVersion.value ?? currentGameVersion());
+
   // ============================================================================
   // Computed Properties
   // ============================================================================
@@ -73,13 +96,58 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
   const hasActiveProfile = computed(() => activeProfile.value !== null);
 
-  const profileOptions = computed(() => [
-    { label: 'No Profile', value: null },
-    ...profileMetadata.value.map((profile) => ({
+  /** Profiles built against the version being browsed. Untagged (pre-version) profiles count as legacyDataVersion(). */
+  const currentVersionProfiles = computed(() =>
+    profileMetadata.value.filter((p) => (p.gameVersion ?? legacyDataVersion()) === gameVersion.value)
+  );
+
+  /** Profiles built against some other game version. */
+  const otherVersionProfiles = computed(() =>
+    profileMetadata.value.filter((p) => (p.gameVersion ?? legacyDataVersion()) !== gameVersion.value)
+  );
+
+  function optionFor(profile: ProfileMetadata, otherVersion: boolean) {
+    return {
       label: `${profile.name} (${profile.profession} ${profile.level})`,
       value: profile.id,
-    })),
+      gameVersion: profile.gameVersion,
+      /** True when selecting this profile requires copying it into the current version. */
+      otherVersion,
+      versionLabel: otherVersion ? gameVersionDisplayName(profile.gameVersion) : '',
+    };
+  }
+
+  /**
+   * Flat option list: current version's profiles first, then the rest.
+   * Options carry `otherVersion` so the dropdown can dim them and offer a copy.
+   */
+  const profileOptions = computed(() => [
+    { label: 'No Profile', value: null, otherVersion: false, versionLabel: '' },
+    ...currentVersionProfiles.value.map((p) => optionFor(p, false)),
+    ...otherVersionProfiles.value.map((p) => optionFor(p, true)),
   ]);
+
+  /** The same options as PrimeVue option groups, with other versions in a second group. */
+  const groupedProfileOptions = computed(() => {
+    const groups: Array<{ label: string; items: any[] }> = [
+      {
+        label: gameVersionDisplayName(gameVersion.value),
+        items: [
+          { label: 'No Profile', value: null, otherVersion: false, versionLabel: '' },
+          ...currentVersionProfiles.value.map((p) => optionFor(p, false)),
+        ],
+      },
+    ];
+
+    if (otherVersionProfiles.value.length > 0) {
+      groups.push({
+        label: 'Other versions',
+        items: otherVersionProfiles.value.map((p) => optionFor(p, true)),
+      });
+    }
+
+    return groups;
+  });
 
   const activeProfileName = computed(() => activeProfile.value?.Character.Name || '');
 
@@ -123,6 +191,38 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
     // Set up event listeners
     setupEventListeners();
+    setupVersionListener();
+  }
+
+  /**
+   * Swap the active profile when the browsed game version changes.
+   *
+   * Each version remembers its own active profile, so switching versions
+   * restores the last profile used there, or clears the selection when that
+   * version has none. Equip checks and every tool then only ever see a profile
+   * built against the database they are reading.
+   */
+  function setupVersionListener() {
+    disposeVersionListener?.();
+    disposeVersionListener = onGameVersionChange(async (next) => {
+      try {
+        const nextActiveId = profileManager.getActiveProfileId(next);
+
+        if (!nextActiveId) {
+          activeProfile.value = null;
+          activeProfileId.value = null;
+          cleanupEquipmentWatchers();
+          await refreshMetadata();
+          return;
+        }
+
+        await setActiveProfile(nextActiveId);
+      } catch (err) {
+        console.error('[tinkerProfiles] Failed to swap active profile on version change:', err);
+        activeProfile.value = null;
+        activeProfileId.value = null;
+      }
+    });
   }
 
   /**
@@ -385,6 +485,63 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   }
 
   // ============================================================================
+  // Cross-Version Copy
+  // ============================================================================
+
+  /**
+   * Copy a profile from another game version into the one being browsed.
+   *
+   * Moving a profile across versions is always a copy: the original keeps its
+   * own version and item snapshots. Every embedded item in the copy is
+   * re-resolved by AOID and QL against the current version; anything that
+   * version does not have stays as a flagged placeholder and is reported.
+   */
+  async function copyProfileToCurrentVersion(
+    profileId: string,
+    options: { setAsActive?: boolean } = {}
+  ): Promise<ProfileVersionCopyResult> {
+    if (!profileManager) {
+      throw new Error('Profile manager not initialized');
+    }
+
+    const target = gameVersion.value;
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const result = await profileManager.copyProfileToVersion(profileId, target);
+      await refreshMetadata();
+
+      if (options.setAsActive !== false) {
+        await setActiveProfile(result.profile.id);
+      }
+
+      toast.add({
+        severity: result.missing.length > 0 ? 'warn' : 'success',
+        summary: `Copied for ${gameVersionDisplayName(target)}`,
+        detail:
+          result.missing.length > 0
+            ? `${result.summary}: ${result.missing.map((m) => m.name).join(', ')}`
+            : result.summary,
+        life: result.missing.length > 0 ? 8000 : 4000,
+      });
+
+      return result;
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to copy profile';
+      toast.add({
+        severity: 'error',
+        summary: 'Copy failed',
+        detail: error.value,
+        life: 5000,
+      });
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  // ============================================================================
   // Profile Transformations
   // ============================================================================
 
@@ -487,6 +644,17 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
       if (!result.success) {
         error.value = `Import failed: ${result.errors.join(', ')}`;
+      }
+
+      // The import may have been tagged with a version other than the obvious
+      // one (no PRK database loaded, AOSetups while browsing PRK). Say so.
+      if (result.success && result.metadata.gameVersionWarning) {
+        toast.add({
+          severity: 'warn',
+          summary: 'Imported against another version',
+          detail: result.metadata.gameVersionWarning,
+          life: 8000,
+        });
       }
 
       return result;
@@ -1583,6 +1751,10 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     hasProfiles,
     hasActiveProfile,
     profileOptions,
+    groupedProfileOptions,
+    currentVersionProfiles,
+    otherVersionProfiles,
+    gameVersion,
     activeProfileName,
     activeProfileProfession,
     activeProfileLevel,
@@ -1595,6 +1767,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     loadProfile,
     setActiveProfile,
     clearActiveProfile,
+    copyProfileToCurrentVersion,
     getAsNanoCompatible,
     createFromNanoCompatible,
     exportProfile,

@@ -49,6 +49,7 @@ import {
 } from './game-data';
 
 import type { Item, ItemSource } from '@/types/api';
+import { versionedPath } from '@/composables/useGameVersion';
 
 // ============================================================================
 // ID to Name Translation Functions
@@ -2226,13 +2227,14 @@ export function getSourceNavigationRoute(source: ItemSource): string {
 
   if (!sourceId) return '#';
 
-  // Route based on source type
+  // Paths carry the game version segment: source ids are AOIDs, which only
+  // mean anything within one game database.
   switch (sourceType) {
     case 'mob':
-      return `/pocket/bosses/${sourceId}`;
+      return versionedPath(`/pocket/bosses/${sourceId}`);
     case 'item':
-      return `/items/${sourceId}`;
+      return versionedPath(`/items/${sourceId}`);
     default:
-      return `/items/${sourceId}`;
+      return versionedPath(`/items/${sourceId}`);
   }
 }

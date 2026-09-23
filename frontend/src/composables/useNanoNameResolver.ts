@@ -11,6 +11,16 @@ import apiClient from '@/services/api-client';
 const nameCache = new Map<number, string>();
 const pendingRequests = new Map<number, Promise<string>>();
 
+/**
+ * Drop every resolved name. Names come from the backend and are AOID-keyed, so
+ * they belong to one game version: call this whenever the version changes.
+ * Exported at module level so resetAllStores() can reach it without a component.
+ */
+export function clearNanoNameCache(): void {
+  nameCache.clear();
+  pendingRequests.clear();
+}
+
 export function useNanoNameResolver() {
   /**
    * Resolve a nano/item name from its aoid
@@ -54,17 +64,9 @@ export function useNanoNameResolver() {
     return nameCache.get(aoid);
   }
 
-  /**
-   * Clear the cache (useful for testing)
-   */
-  function clearCache(): void {
-    nameCache.clear();
-    pendingRequests.clear();
-  }
-
   return {
     resolveNanoName,
     getCachedName,
-    clearCache,
+    clearCache: clearNanoNameCache,
   };
 }

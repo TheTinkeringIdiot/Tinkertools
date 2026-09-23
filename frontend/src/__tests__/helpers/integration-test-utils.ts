@@ -13,6 +13,7 @@ import { createApp } from 'vue';
 import { mockPrimeVueComponents, createTestRouter } from './vue-test-utils';
 import PrimeVue from 'primevue/config';
 import ToastService from 'primevue/toastservice';
+import ConfirmationService from 'primevue/confirmationservice';
 
 // ============================================================================
 // API Client Mock Setup
@@ -68,8 +69,9 @@ export async function setupIntegrationTest(): Promise<IntegrationTestContext> {
   // PrimeVue + ToastService FIRST, then Pinia
   // This ensures components that use stores can also use PrimeVue components
   const app = createApp({});
-  app.use(PrimeVue);        // ← FIRST: UI framework
-  app.use(ToastService);    // ← SECOND: Toast notifications
+  app.use(PrimeVue);            // ← FIRST: UI framework
+  app.use(ToastService);        // ← SECOND: Toast notifications
+  app.use(ConfirmationService); // ← THEN: confirm dialogs (useConfirm)
 
   const pinia = createPinia();
   app.use(pinia);           // ← THIRD: State management
@@ -115,7 +117,8 @@ export function mountForIntegration(
   return mount(component, {
     props: options.props,
     global: {
-      plugins: [PrimeVue, ToastService, options.pinia, router],
+      // Same services main.ts installs: components may call useToast/useConfirm.
+      plugins: [PrimeVue, ToastService, ConfirmationService, options.pinia, router],
       components: mockPrimeVueComponents,
       stubs: {
         Toast: true,

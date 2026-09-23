@@ -59,8 +59,16 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import { apiBaseFor } from '@/services/api-config';
+import { currentVersion } from '@/composables/useGameVersion';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+/**
+ * Version-scoped API base. Read it per call, not once at module load: the user
+ * can switch game versions without a reload.
+ */
+function apiBase(): string {
+  return apiBaseFor(currentVersion.value);
+}
 
 const loading = ref(false);
 const backendResult = ref<string>('');
@@ -72,7 +80,7 @@ const testBackend = async () => {
   backendResult.value = '';
 
   try {
-    const response = await fetch(`${API_BASE_URL}/items?item_class=1&page_size=3`);
+    const response = await fetch(`${apiBase()}/items?item_class=1&page_size=3`);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }

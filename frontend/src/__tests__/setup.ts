@@ -9,6 +9,13 @@
  */
 
 import { vi, beforeEach } from 'vitest';
+import axios from 'axios';
+import {
+  ensureVersionsLoaded,
+  setCurrentVersion,
+  currentVersion,
+} from '@/composables/useGameVersion';
+import { TEST_VERSION, TEST_VERSION_REGISTRY } from './helpers/version-fixtures';
 
 // ============================================================================
 // Global Test Utilities
@@ -60,8 +67,34 @@ Object.defineProperty(global, 'localStorage', {
   configurable: true,
 });
 
+// ============================================================================
+// Game Version Registry
+// ============================================================================
+
+/**
+ * Seed the version registry so nothing reaches the network for `GET /versions`,
+ * and so cache keys and versioned route paths are deterministic.
+ *
+ * ensureVersionsLoaded() memoizes its promise for the lifetime of the module,
+ * and Vitest gives every test file a fresh module registry, so resolving it
+ * once here means no later call can trigger a real request.
+ */
+const versionsSpy = vi
+  .spyOn(axios, 'get')
+  .mockResolvedValue({ data: TEST_VERSION_REGISTRY } as any);
+
+await ensureVersionsLoaded();
+versionsSpy.mockRestore();
+
+setCurrentVersion(TEST_VERSION);
+
 // Clear localStorage before each test to prevent cross-test contamination
 beforeEach(() => {
   localStorageMock.clear();
   vi.clearAllMocks();
+
+  // A version-switch test may have left another version active.
+  if (currentVersion.value !== TEST_VERSION) {
+    setCurrentVersion(TEST_VERSION);
+  }
 });

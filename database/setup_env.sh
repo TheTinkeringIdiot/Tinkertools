@@ -38,10 +38,16 @@ parse_database_url() {
     DB_HOST=${HOST_PORT%:*}
     DB_PORT=${HOST_PORT#*:}
     
+    # Game version this invocation operates on. Each version's tables live in
+    # their own schema; public holds only the cross-version registry.
+    GAME_VERSION=${GAME_VERSION:-ao}
+    VERSION_SCHEMA="gv_$(echo "$GAME_VERSION" | tr '.-' '__')"
+
     echo "✅ Database configuration:"
     echo "   Host: $DB_HOST:$DB_PORT"
     echo "   Database: $DB_NAME"
     echo "   User: $DB_USER"
+    echo "   Game version: $GAME_VERSION (schema $VERSION_SCHEMA)"
 }
 
 # Function to check database connection
@@ -71,7 +77,7 @@ check_existing_schema() {
     # Count existing tables
     TABLE_COUNT=$(psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -c "
         SELECT COUNT(*) FROM information_schema.tables 
-        WHERE table_schema = 'public' AND table_type = 'BASE TABLE';
+        WHERE table_schema = '$VERSION_SCHEMA' AND table_type = 'BASE TABLE';
     " | xargs)
     
     echo "📊 Found $TABLE_COUNT existing tables"
@@ -88,40 +94,76 @@ check_existing_schema() {
 }
 
 # Function to run migrations
+#
+# Two sets of migrations:
+#   global_migrations/*.sql  -> public (registry tables, once per database)
+#   migrations/*.sql         -> gv_<GAME_VERSION> (one game version's tables)
+#
+# GAME_VERSION defaults to "ao", so the schema is gv_ao. Files are unqualified,
+# so search_path decides where they land. Files already recorded in the
+# tracking tables are skipped.
 run_migrations() {
-    echo "🔄 Running database migrations..."
-    
+    GAME_VERSION=${GAME_VERSION:-ao}
+    VERSION_SCHEMA="gv_$(echo "$GAME_VERSION" | tr '.-' '__')"
+
+    echo "🔄 Running database migrations (version '$GAME_VERSION' -> schema $VERSION_SCHEMA)..."
+
     export PGPASSWORD=$DB_PASSWORD
-    
-    # Check if migration table exists
-    MIGRATION_TABLE_EXISTS=$(psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -c "
-        SELECT EXISTS (
-            SELECT FROM information_schema.tables 
-            WHERE table_schema = 'public' AND table_name = 'schema_migrations'
-        );
-    " | xargs)
-    
-    if [ "$MIGRATION_TABLE_EXISTS" = "f" ]; then
-        echo "📝 Setting up migration tracking..."
-        psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/000_create_migration_table.sql
-    else
-        echo "📝 Migration tracking table already exists"
-    fi
-    
-    # Check if initial migration has been run
-    INITIAL_MIGRATION_EXISTS=$(psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -c "
-        SELECT EXISTS (
-            SELECT FROM schema_migrations WHERE version = '001'
-        );
-    " | xargs)
-    
-    if [ "$INITIAL_MIGRATION_EXISTS" = "f" ]; then
-        echo "🏗️ Creating database schema..."
-        psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/001_initial_schema.sql
-    else
-        echo "🏗️ Initial schema migration already applied"
-    fi
-    
+    PSQL="psql -v ON_ERROR_STOP=1 -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME"
+
+    # Is migration $3 already recorded in $1.$2? Prints "t" or "f".
+    migration_applied() {
+        local schema="$1" table="$2" version="$3"
+        local exists
+        exists=$($PSQL -t -c "
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.tables
+                WHERE table_schema = '$schema' AND table_name = '$table'
+            );
+        " 2>/dev/null | xargs)
+        if [ "$exists" != "t" ]; then
+            echo "f"
+            return
+        fi
+        $PSQL -t -c "
+            SELECT EXISTS (SELECT 1 FROM \"$schema\".\"$table\" WHERE version = '$version');
+        " 2>/dev/null | xargs
+    }
+
+    # --- global migrations (public) ---
+    for migration in $(ls -1 global_migrations/*.sql 2>/dev/null | sort); do
+        version=$(basename "$migration" | grep -o '^[0-9]\+')
+        APPLIED=$(migration_applied public global_migrations "$version")
+
+        if [ "$APPLIED" = "t" ]; then
+            echo "⏭️  Global migration $(basename "$migration") already applied"
+        else
+            echo "🌍 Applying global migration $(basename "$migration")..."
+            $PSQL -c "SET search_path TO public;" -f "$migration"
+        fi
+    done
+
+    # --- per-version migrations (gv_<slug>) ---
+    echo "🏗️ Ensuring schema $VERSION_SCHEMA exists..."
+    $PSQL -c "CREATE SCHEMA IF NOT EXISTS \"$VERSION_SCHEMA\";"
+
+    for migration in $(ls -1 migrations/*.sql 2>/dev/null | sort); do
+        version=$(basename "$migration" | grep -o '^[0-9]\+')
+        APPLIED=$(migration_applied "$VERSION_SCHEMA" schema_migrations "$version")
+
+        if [ "$APPLIED" = "t" ]; then
+            echo "⏭️  Migration $(basename "$migration") already applied to $VERSION_SCHEMA"
+        else
+            echo "📝 Applying $(basename "$migration") to $VERSION_SCHEMA..."
+            $PSQL -c "SET search_path TO \"$VERSION_SCHEMA\", public;" -f "$migration"
+            $PSQL -c "
+                INSERT INTO \"$VERSION_SCHEMA\".schema_migrations (version, name)
+                VALUES ('$version', '$(basename "$migration" .sql)')
+                ON CONFLICT (version) DO NOTHING;
+            " > /dev/null
+        fi
+    done
+
     echo "✅ Migrations completed successfully"
 }
 
@@ -133,7 +175,7 @@ seed_data() {
     
     # Check if sample data already exists
     ITEM_COUNT=$(psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -c "
-        SELECT COUNT(*) FROM items;
+        SET search_path TO $VERSION_SCHEMA, public; SELECT COUNT(*) FROM items;
     " | xargs)
     
     if [ "$ITEM_COUNT" -gt "0" ]; then
@@ -143,7 +185,7 @@ seed_data() {
     
     if [ -f "seeds/sample_data.sql" ]; then
         echo "🌱 Seeding sample data..."
-        psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f seeds/sample_data.sql
+        psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c "SET search_path TO $VERSION_SCHEMA, public;" -f seeds/sample_data.sql
         echo "✅ Sample data seeded successfully"
     else
         echo "⚠️  No sample data file found, skipping..."
@@ -159,18 +201,18 @@ verify_setup() {
     # Count tables
     TABLE_COUNT=$(psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -c "
         SELECT COUNT(*) FROM information_schema.tables 
-        WHERE table_schema = 'public' AND table_type = 'BASE TABLE';
+        WHERE table_schema = '$VERSION_SCHEMA' AND table_type = 'BASE TABLE';
     " | xargs)
     
     echo "📊 Found $TABLE_COUNT tables in database"
     
     # Count sample data
     ITEM_COUNT=$(psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -c "
-        SELECT COUNT(*) FROM items;
+        SET search_path TO $VERSION_SCHEMA, public; SELECT COUNT(*) FROM items;
     " | xargs)
     
     STAT_COUNT=$(psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -t -c "
-        SELECT COUNT(*) FROM stat_values;
+        SET search_path TO $VERSION_SCHEMA, public; SELECT COUNT(*) FROM stat_values;
     " | xargs)
     
     if [ "$TABLE_COUNT" -ge "20" ]; then
@@ -224,13 +266,14 @@ show_info() {
             schemaname,
             COUNT(*) as table_count
         FROM pg_tables 
-        WHERE schemaname = 'public'
+        WHERE schemaname = '$VERSION_SCHEMA'
         GROUP BY schemaname;
     "
     
     echo ""
     echo "Sample Data Counts:"
     psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c "
+        SET search_path TO $VERSION_SCHEMA, public;
         SELECT 'items' as table_name, COUNT(*) as count FROM items
         UNION ALL
         SELECT 'stat_values', COUNT(*) FROM stat_values
@@ -300,9 +343,15 @@ case "$1" in
         echo "Required Environment Variables:"
         echo "  DATABASE_URL     Full PostgreSQL URL (postgresql://user:pass@host:port/db)"
         echo ""
+        echo "Optional Environment Variables:"
+        echo "  GAME_VERSION     Game version slug to operate on (default: ao)."
+        echo "                   Its tables live in the schema gv_<slug>; public holds"
+        echo "                   only the cross-version registry."
+        echo ""
         echo "Example:"
         echo "  export DATABASE_URL=\"postgresql://user:pass@localhost:5432/tinkertools\""
         echo "  $0"
+        echo "  GAME_VERSION=prk $0 migrate"
         echo ""
         echo "Prerequisites:"
         echo "  - PostgreSQL database exists"

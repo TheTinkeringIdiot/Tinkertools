@@ -13,12 +13,20 @@
 import type { Item as ItemDetail, Spell } from '@/types/api';
 import type { OffensiveNano, DamageType } from '@/types/offensive-nano';
 import type { NanoSchool } from '@/types/nano';
+import { apiBaseFor } from '@/services/api-config';
+import { currentVersion } from '@/composables/useGameVersion';
 
 // ============================================================================
 // API Configuration
 // ============================================================================
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+/**
+ * Version-scoped API base. Read it per call, not once at module load: the user
+ * can switch game versions without a reload.
+ */
+function apiBase(): string {
+  return apiBaseFor(currentVersion.value);
+}
 
 // ============================================================================
 // Damage Type Mapping
@@ -53,7 +61,7 @@ const MODIFIER_STAT_TO_DAMAGE_TYPE: Record<number, DamageType> = {
 export async function fetchOffensiveNanos(professionId: number): Promise<ItemDetail[]> {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/nanos/offensive/${professionId}?page=1&page_size=1000`
+      `${apiBase()}/nanos/offensive/${professionId}?page=1&page_size=1000`
     );
 
     if (!response.ok) {

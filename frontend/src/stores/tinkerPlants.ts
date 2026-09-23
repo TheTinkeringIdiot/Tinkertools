@@ -18,6 +18,7 @@ import type {
 } from '../types/api';
 import { isSymbiant } from '../types/api';
 import { apiClient } from '../services/api-client';
+import { versionKey } from '../services/version-keys';
 import { useTinkerProfilesStore } from './tinkerProfiles';
 import { useSymbiantsStore } from './symbiants';
 import { equipmentBonusCalculator } from '../services/equipment-bonus-calculator';
@@ -773,9 +774,11 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
     ql: number,
     clusters: { shiny: number | null; bright: number | null; faded: number | null }
   ): string {
-    // Create a simple hash of cluster IDs
+    // Create a simple hash of cluster IDs. The cache is in-memory only and is
+    // cleared on version switch, but the slug keeps entries distinguishable if
+    // a lookup is in flight across the switch.
     const clusterStr = `${clusters.shiny || ''}_${clusters.bright || ''}_${clusters.faded || ''}`;
-    return `implant_${slotBitflag}_${ql}_${clusterStr}`;
+    return versionKey(`implant_${slotBitflag}_${ql}_${clusterStr}`);
   }
 
   /**

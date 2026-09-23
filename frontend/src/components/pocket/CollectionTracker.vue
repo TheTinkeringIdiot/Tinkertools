@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useSymbiantsStore } from '@/stores/symbiants';
 import { usePocketBossStore } from '@/stores/pocketBossStore';
+import { versionKey, adoptLegacyKey } from '@/services/version-keys';
 import Card from 'primevue/card';
 import Button from 'primevue/button';
 import Checkbox from 'primevue/checkbox';
@@ -44,6 +45,9 @@ try {
 }
 
 // Local state
+const COLLECTION_BASE = 'tinkertools-symbiant-collection';
+const COLLECTION_GOALS_BASE = 'tinkertools-collection-goals';
+
 const collectionData = ref<Record<number, CollectionItem>>({});
 const collectionGoals = ref<CollectionGoal[]>([]);
 const selectedSlot = ref<string | null>(null);
@@ -285,13 +289,17 @@ function resetCollection() {
   });
 }
 
-// Storage functions
+// Storage functions.
+// Both keys are keyed by symbiant id, so they describe one game version's
+// database and are namespaced by its slug. Pre-version data is adopted as the
+// current version's on first read so nobody loses collection progress.
 function saveCollectionData() {
-  localStorage.setItem('tinkertools-symbiant-collection', JSON.stringify(collectionData.value));
+  localStorage.setItem(versionKey(COLLECTION_BASE), JSON.stringify(collectionData.value));
 }
 
 function loadCollectionData() {
-  const saved = localStorage.getItem('tinkertools-symbiant-collection');
+  adoptLegacyKey(COLLECTION_BASE);
+  const saved = localStorage.getItem(versionKey(COLLECTION_BASE));
   if (saved) {
     try {
       collectionData.value = JSON.parse(saved);
@@ -302,11 +310,12 @@ function loadCollectionData() {
 }
 
 function saveCollectionGoals() {
-  localStorage.setItem('tinkertools-collection-goals', JSON.stringify(collectionGoals.value));
+  localStorage.setItem(versionKey(COLLECTION_GOALS_BASE), JSON.stringify(collectionGoals.value));
 }
 
 function loadCollectionGoals() {
-  const saved = localStorage.getItem('tinkertools-collection-goals');
+  adoptLegacyKey(COLLECTION_GOALS_BASE);
+  const saved = localStorage.getItem(versionKey(COLLECTION_GOALS_BASE));
   if (saved) {
     try {
       collectionGoals.value = JSON.parse(saved);

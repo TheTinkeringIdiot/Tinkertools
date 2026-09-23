@@ -14,6 +14,7 @@ import {
   formatSpellParameter,
 } from '../../services/spell-data-utils';
 import type { Spell } from '../../types/api';
+import { TEST_VERSION } from '../helpers/version-fixtures';
 
 describe('spell-data-utils', () => {
   describe('getSpellFormat', () => {
@@ -212,7 +213,9 @@ describe('spell-data-utils', () => {
 
       expect(result.type).toBe('link');
       expect(result.displayValue).toBe('Item 12345');
-      expect(result.linkUrl).toBe('/items/12345');
+      // AOID links carry the game version segment: an AOID only means
+      // something inside one game database.
+      expect(result.linkUrl).toBe(`/${TEST_VERSION}/items/12345`);
     });
 
     it('should format chance parameters as percentages', () => {

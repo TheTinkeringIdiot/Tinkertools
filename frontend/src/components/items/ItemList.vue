@@ -34,18 +34,28 @@ Shows items in grid or list view with pagination and compatibility indicators
         v-if="viewMode === 'grid'"
         class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6"
       >
-        <ItemCard
-          v-for="item in items"
-          :key="item.id"
-          :item="item"
-          :profile="compatibilityProfile"
-          :show-compatibility="showCompatibility"
-          :is-comparing="isComparing(item.id)"
-          @click="$emit('item-click', item)"
-          @compare="$emit('item-compare', item)"
-          @cast-buff="$emit('cast-buff', item)"
-          @quick-view="showQuickView(item)"
-        />
+        <div v-for="item in items" :key="item.id" class="relative">
+          <ItemCard
+            :item="item"
+            :profile="compatibilityProfile"
+            :show-compatibility="showCompatibility"
+            :is-comparing="isComparing(item.id)"
+            @click="$emit('item-click', item)"
+            @compare="$emit('item-compare', item)"
+            @cast-buff="$emit('cast-buff', item)"
+            @quick-view="showQuickView(item)"
+          />
+          <span
+            v-if="revisionCount(item) > 1"
+            class="absolute top-1 right-1 inline-flex items-center gap-1 rounded bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 text-xs text-surface-600 dark:text-surface-300"
+            data-testid="item-revision-badge"
+            :data-aoid="item.aoid"
+            :title="`Changed in ${revisionCount(item)} snapshots`"
+          >
+            <i class="pi pi-clock text-xs" aria-hidden="true"></i>
+            {{ revisionCount(item) }}
+          </span>
+        </div>
       </div>
 
       <!-- List View -->
@@ -83,6 +93,16 @@ Shows items in grid or list view with pagination and compatibility indicators
                       </h3>
                       <Badge :value="`QL ${item.ql}`" severity="info" size="small" />
                       <Badge v-if="item.is_nano" value="Nano" severity="success" size="small" />
+                      <span
+                        v-if="revisionCount(item) > 1"
+                        class="inline-flex items-center gap-1 rounded bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 text-xs text-surface-600 dark:text-surface-300"
+                        data-testid="item-revision-badge"
+                        :data-aoid="item.aoid"
+                        :title="`Changed in ${revisionCount(item)} snapshots`"
+                      >
+                        <i class="pi pi-clock text-xs" aria-hidden="true"></i>
+                        {{ revisionCount(item) }}
+                      </span>
                     </div>
 
                     <!-- Description -->
@@ -228,7 +248,16 @@ const props = defineProps<{
   pagination?: PaginationInfo;
   favoriteItems?: number[];
   comparisonItems?: number[];
+  /** AOID -> number of game snapshots the item's definition changed in. */
+  revisionCounts?: Record<number, number>;
 }>();
+
+/** Items that never changed across snapshots get no badge. */
+function revisionCount(item: Item): number {
+  const aoid = item.aoid;
+  if (!aoid || !props.revisionCounts) return 0;
+  return props.revisionCounts[aoid] || 0;
+}
 
 const emit = defineEmits<{
   'item-click': [item: Item];

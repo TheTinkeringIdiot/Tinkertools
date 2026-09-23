@@ -7,7 +7,7 @@ Handles [LINK:AOID] placeholders and converts them to router links with item nam
     <template v-for="(part, index) in textParts" :key="index">
       <router-link
         v-if="part.type === 'link'"
-        :to="`/items/${part.aoid}`"
+        :to="{ name: 'ItemDetail', params: { aoid: String(part.aoid) } }"
         class="spell-link"
         :title="`Navigate to ${part.itemName}`"
       >

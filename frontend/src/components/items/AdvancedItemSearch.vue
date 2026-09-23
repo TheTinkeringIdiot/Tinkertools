@@ -353,6 +353,8 @@ interface SearchFormData {
 const props = defineProps<{
   loading?: boolean;
   resultCount?: number;
+  /** Search term arriving via the URL (?search=); mirrored into the form without re-emitting. */
+  initialSearch?: string;
 }>();
 
 const emit = defineEmits<{
@@ -370,6 +372,16 @@ const searchForm = ref<SearchFormData>({
 const selectedStatBonuses = ref<number[]>([]);
 const statFilters = ref<StatFilter[]>([]);
 const hasSearched = ref(false);
+
+watch(
+  () => props.initialSearch,
+  (value) => {
+    if (typeof value !== 'string') return;
+    searchForm.value.search = value;
+    if (value.trim()) hasSearched.value = true;
+  },
+  { immediate: true }
+);
 const checkboxKey = ref(0); // Used to force checkbox re-render
 const showStatFilterModal = ref(false);
 

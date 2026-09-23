@@ -15,6 +15,7 @@ from functools import lru_cache
 from app.models.item import Item, ItemSpellData
 from app.models.spell_data import SpellData, SpellDataSpells
 from app.models.spell import Spell
+from app.core.versions import resolve_current_slug
 
 logger = logging.getLogger(__name__)
 
@@ -31,15 +32,32 @@ class EquipmentBonusService:
     # Events that represent equipment bonuses
     EQUIPMENT_EVENTS = [14, 2]  # Wear=14, Wield=2
 
-    # Cache for frequently equipped items (item_id -> {stat_id: amount})
-    _item_bonus_cache: Dict[int, Dict[int, int]] = {}
-    _cache_timestamps: Dict[int, float] = {}
+    # Cache for frequently equipped items ((version_slug, item_id) -> {stat_id: amount}).
+    # item_id is a per-schema serial, so the key must carry the game version.
+    _item_bonus_cache: Dict[Tuple[str, int], Dict[int, int]] = {}
+    _cache_timestamps: Dict[Tuple[str, int], float] = {}
 
     # Cache TTL in seconds (5 minutes for equipment bonuses)
     CACHE_TTL = 300
 
     def __init__(self, db: Session):
         self.db = db
+        self._version = resolve_current_slug()
+
+    def _cache_key(self, item_id: int) -> Tuple[str, int]:
+        return (self._version, item_id)
+
+    def _cached_bonuses(self, item_id: int, now: float) -> Optional[Dict[int, int]]:
+        key = self._cache_key(item_id)
+        timestamp = self._cache_timestamps.get(key)
+        if timestamp is None or now - timestamp >= self.CACHE_TTL:
+            return None
+        return self._item_bonus_cache.get(key)
+
+    def _store_bonuses(self, item_id: int, bonuses: Dict[int, int], now: float) -> None:
+        key = self._cache_key(item_id)
+        self._item_bonus_cache[key] = bonuses
+        self._cache_timestamps[key] = now
 
     def calculate_equipment_bonuses(self, item_ids: List[int]) -> Dict[int, int]:
         """
@@ -62,9 +80,7 @@ class EquipmentBonusService:
         current_time = time.time()
 
         for item_id in item_ids:
-            if (item_id in self._item_bonus_cache and
-                item_id in self._cache_timestamps and
-                current_time - self._cache_timestamps[item_id] < self.CACHE_TTL):
+            if self._cached_bonuses(item_id, current_time) is not None:
                 cached_items.append(item_id)
             else:
                 uncached_items.append(item_id)
@@ -72,7 +88,7 @@ class EquipmentBonusService:
         # Get bonuses from cache for cached items
         aggregated_bonuses = defaultdict(int)
         for item_id in cached_items:
-            item_bonuses = self._item_bonus_cache[item_id]
+            item_bonuses = self._cached_bonuses(item_id, current_time)
             for stat_id, amount in item_bonuses.items():
                 aggregated_bonuses[stat_id] += amount
 
@@ -83,8 +99,7 @@ class EquipmentBonusService:
             # Cache individual item bonuses for future use
             current_time = time.time()
             for item_id, bonuses in item_bonuses_dict.items():
-                self._item_bonus_cache[item_id] = bonuses
-                self._cache_timestamps[item_id] = current_time
+                self._store_bonuses(item_id, bonuses, current_time)
 
             # Aggregate uncached bonuses
             for item_id, bonuses in item_bonuses_dict.items():
@@ -191,10 +206,9 @@ class EquipmentBonusService:
         """
         # Check cache first
         current_time = time.time()
-        if (item_id in self._item_bonus_cache and
-            item_id in self._cache_timestamps and
-            current_time - self._cache_timestamps[item_id] < self.CACHE_TTL):
-            return self._item_bonus_cache[item_id].copy()
+        cached = self._cached_bonuses(item_id, current_time)
+        if cached is not None:
+            return cached.copy()
 
         stat_bonuses = self._extract_stat_bonuses_optimized([item_id])
 
@@ -206,8 +220,7 @@ class EquipmentBonusService:
                 item_bonuses[stat_id] = amount
 
         # Cache the result
-        self._item_bonus_cache[item_id] = item_bonuses.copy()
-        self._cache_timestamps[item_id] = current_time
+        self._store_bonuses(item_id, item_bonuses.copy(), current_time)
 
         return item_bonuses
 
@@ -269,7 +282,7 @@ class EquipmentBonusService:
     def get_cache_stats(self) -> Dict[str, int]:
         """Get cache statistics for monitoring."""
         current_time = time.time()
-        valid_entries = sum(1 for item_id, timestamp in self._cache_timestamps.items()
+        valid_entries = sum(1 for _key, timestamp in self._cache_timestamps.items()
                           if current_time - timestamp < self.CACHE_TTL)
 
         return {

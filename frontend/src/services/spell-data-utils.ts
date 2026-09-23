@@ -8,6 +8,7 @@
 import { TEMPLATE_EVENT, TARGET, SPELL_FORMATS } from './game-data';
 import { getStatName, getFlagNameFromBit } from './game-utils';
 import type { SpellData, Spell, Criterion } from '@/types/api';
+import { versionedPath } from '@/composables/useGameVersion';
 
 // ============================================================================
 // Type Definitions
@@ -102,7 +103,8 @@ export function formatSpellParameter(key: string, value: any): FormattedParamete
       value,
       displayValue: `Item ${value}`, // Will be replaced with actual item name in component
       type: 'link',
-      linkUrl: `/items/${value}`,
+      // AOID link, so it is only meaningful inside the current game version.
+      linkUrl: versionedPath(`/items/${value}`),
       color: 'text-blue-600',
     };
   }

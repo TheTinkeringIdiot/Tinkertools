@@ -40,6 +40,14 @@ Complete character management with skills, equipment, and IP tracking
                   {{ profileData.Character.Name }}
                 </h1>
                 <Badge v-if="isActiveProfile" value="Active" severity="success" />
+                <!-- Built against a different game database than the one being browsed -->
+                <span
+                  v-if="otherVersionLabel"
+                  class="text-xs italic text-surface-500 dark:text-surface-400"
+                  :title="`This profile's items came from ${otherVersionLabel}. Copy it from the profile dropdown to use it here.`"
+                >
+                  <i class="pi pi-database text-xs mr-1"></i>{{ otherVersionLabel }}
+                </span>
               </div>
               <div class="flex items-center gap-4 text-surface-600 dark:text-surface-400">
                 <span>{{ displayProfession }} Level {{ profileData.Character.Level }}</span>
@@ -308,6 +316,7 @@ import type { Item } from '@/types/api';
 import { skillService } from '@/services/skill-service';
 import type { SkillId } from '@/types/skills';
 import { getProfessionName, getBreedName } from '@/services/game-utils';
+import { gameVersionDisplayName } from '@/lib/tinkerprofiles/game-version';
 import { useToast } from 'primevue/usetoast';
 
 // Router
@@ -334,6 +343,13 @@ const skillsScrollContainer = ref<HTMLElement | null>(null); // Reference to ski
 
 // Computed
 const isActiveProfile = computed(() => profilesStore.activeProfileId === props.profileId);
+
+/** Version tag, shown only when this profile belongs to another game version. */
+const otherVersionLabel = computed(() => {
+  const slug = profileData.value?.gameVersion;
+  if (!slug || slug === profilesStore.gameVersion) return '';
+  return gameVersionDisplayName(slug);
+});
 
 const displayProfession = computed(() =>
   getProfessionName(profileData.value?.Character?.Profession || 0)

@@ -10,6 +10,12 @@ import type { Symbiant, UserFriendlyError, Mob } from '../types/api';
 import { apiClient } from '../services/api-client';
 import { enrichSymbiant } from '../utils/symbiantHelpers';
 import { get, set, del } from 'idb-keyval';
+import {
+  versionKey,
+  activeVersionSlug,
+  adoptLegacyKey,
+  adoptLegacyIdbKey,
+} from '../services/version-keys';
 
 // ============================================================================
 // Farm List Types
@@ -31,20 +37,25 @@ interface FarmProgressStorage {
   version: 1;
 }
 
-// LocalStorage keys
-const FARM_LIST_KEY = 'tinkertools-farm-list';
-const FARM_PROGRESS_KEY = 'tinkertools-farm-progress';
+// LocalStorage key bases. Farm lists hold AOIDs and farm progress holds boss
+// ids, so both are per game version; the slug is appended at read/write time.
+const FARM_LIST_BASE = 'tinkertools-farm-list';
+const FARM_PROGRESS_BASE = 'tinkertools-farm-progress';
 
 // ============================================================================
 // Cache Configuration
 // ============================================================================
 
-const SYMBIANTS_CACHE_KEY = 'tinkertools:symbiants:all';
+// IndexedDB cache of the full symbiant list: server data, so per game version.
+export const SYMBIANTS_CACHE_BASE = 'tinkertools:symbiants:all';
 
 interface SymbiantCacheEntry {
   data: Symbiant[];
   timestamp: number;
+  /** Entry schema version, unrelated to the game version below. */
   version: 1;
+  /** Game version this snapshot came from; absent on pre-version entries. */
+  gameVersion?: string;
 }
 
 export const useSymbiantsStore = defineStore('symbiants', () => {
@@ -140,8 +151,12 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     // Try to load from IndexedDB before API call
     if (!forceRefresh) {
       try {
-        const cached = await get<SymbiantCacheEntry>(SYMBIANTS_CACHE_KEY);
-        if (cached && cached.data && cached.version === 1) {
+        // A pre-version cache is this version's data: adopt rather than refetch.
+        await adoptLegacyIdbKey(SYMBIANTS_CACHE_BASE);
+        const cached = await get<SymbiantCacheEntry>(versionKey(SYMBIANTS_CACHE_BASE));
+        const cacheMatchesVersion =
+          !cached?.gameVersion || cached.gameVersion === activeVersionSlug();
+        if (cached && cached.data && cached.version === 1 && cacheMatchesVersion) {
           const age = Date.now() - cached.timestamp;
           if (age < cacheExpiry) {
             console.log(`[SymbiantsStore] Loading from IndexedDB cache (age: ${Math.round(age / 1000)}s)`);
@@ -222,8 +237,9 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
           data: allSymbiantsData,
           timestamp: Date.now(),
           version: 1,
+          gameVersion: activeVersionSlug(),
         };
-        await set(SYMBIANTS_CACHE_KEY, cacheEntry);
+        await set(versionKey(SYMBIANTS_CACHE_BASE), cacheEntry);
         console.log(`[SymbiantsStore] Cached ${allSymbiantsData.length} symbiants to IndexedDB`);
       } catch (err) {
         console.warn('[SymbiantsStore] Failed to write to IndexedDB:', err);
@@ -315,20 +331,39 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
   }
 
   /**
-   * Clear all cached data (including IndexedDB)
+   * Clear all cached data for the active game version (including IndexedDB).
+   * Farm list and progress are user data and survive.
    */
   async function clearCache(): Promise<void> {
     symbiants.value.clear();
     lastFetch.value = 0;
     error.value = null;
 
-    // Also clear IndexedDB cache
     try {
-      await del(SYMBIANTS_CACHE_KEY);
+      await del(versionKey(SYMBIANTS_CACHE_BASE));
       console.log('[SymbiantsStore] Cleared IndexedDB cache');
     } catch (err) {
       console.warn('[SymbiantsStore] Failed to clear IndexedDB cache:', err);
     }
+  }
+
+  /**
+   * Re-point the store at the game version just switched to: drop the old
+   * version's in-memory data and load this version's farm list and progress.
+   * Nothing persisted is deleted; the next load reads this version's
+   * IndexedDB snapshot, and other versions' snapshots are reclaimed by
+   * purgeOtherVersionCaches(). Farm lists of other versions are kept.
+   */
+  function resetForVersionChange(): void {
+    symbiants.value.clear();
+    lastFetch.value = 0;
+    error.value = null;
+    farmListAoids.value = [];
+    farmedBossIds.value = new Set();
+    aggregatedBosses.value.clear();
+    bossDropCache.value.clear();
+    loadFarmList();
+    loadFarmProgress();
   }
 
   /**
@@ -556,7 +591,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
       aoids: farmListAoids.value,
       version: 2,
     };
-    localStorage.setItem(FARM_LIST_KEY, JSON.stringify(data));
+    localStorage.setItem(versionKey(FARM_LIST_BASE), JSON.stringify(data));
   }
 
   /**
@@ -565,7 +600,8 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
    */
   function loadFarmList(): void {
     try {
-      const saved = localStorage.getItem(FARM_LIST_KEY);
+      adoptLegacyKey(FARM_LIST_BASE);
+      const saved = localStorage.getItem(versionKey(FARM_LIST_BASE));
       if (saved) {
         const data = JSON.parse(saved);
         // Check version - if old format, clear it
@@ -591,7 +627,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
       farmedBossIds: Array.from(farmedBossIds.value),
       version: 1,
     };
-    localStorage.setItem(FARM_PROGRESS_KEY, JSON.stringify(data));
+    localStorage.setItem(versionKey(FARM_PROGRESS_BASE), JSON.stringify(data));
   }
 
   /**
@@ -599,7 +635,8 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
    */
   function loadFarmProgress(): void {
     try {
-      const saved = localStorage.getItem(FARM_PROGRESS_KEY);
+      adoptLegacyKey(FARM_PROGRESS_BASE);
+      const saved = localStorage.getItem(versionKey(FARM_PROGRESS_BASE));
       if (saved) {
         const data: FarmProgressStorage = JSON.parse(saved);
         farmedBossIds.value = new Set(data.farmedBossIds || []);
@@ -691,6 +728,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     getSymbiantsByTier,
     clearError,
     clearCache,
+    resetForVersionChange,
     preloadSymbiants,
     // Comparison actions
     addToComparison,

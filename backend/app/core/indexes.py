@@ -233,8 +233,8 @@ def check_index_usage(db: Session) -> dict:
                 idx_scan as times_used,
                 idx_tup_read as tuples_read,
                 idx_tup_fetch as tuples_fetched
-            FROM pg_stat_user_indexes 
-            WHERE schemaname = 'public'
+            FROM pg_stat_user_indexes
+            WHERE schemaname = current_schema()
             ORDER BY idx_scan DESC;
         """)
         

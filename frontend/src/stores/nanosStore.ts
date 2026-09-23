@@ -1,6 +1,10 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { apiClient } from '@/services/api-client';
+import {
+  versionKey,
+  adoptLegacyKey,
+} from '@/services/version-keys';
 import type {
   NanoProgram,
   NanoFilters,
@@ -9,6 +13,22 @@ import type {
   NanoSearchRequest,
   NanoApiResponse,
 } from '@/types/nano';
+
+/**
+ * Per-version keys: the nano list is server data and favorites are AOID-keyed,
+ * so both mean something different in every game version.
+ */
+export const NANOS_CACHE_BASE = 'tinkertools_nanos_cache';
+const FAVORITES_BASE = 'tinkertools_nano_favorites';
+
+/**
+ * Global keys: filters, display preferences, free-text search history and the
+ * selected profession are UI state, identical in every version.
+ */
+const FILTERS_KEY = 'tinkertools_nano_filters';
+const PREFERENCES_KEY = 'tinkertools_nano_preferences';
+const SEARCH_HISTORY_KEY = 'tinkertools_nano_search_history';
+const SELECTED_PROFESSION_KEY = 'tinkertools_nano_selected_profession';
 
 export const useNanosStore = defineStore('nanos', () => {
   // State
@@ -360,7 +380,7 @@ export const useNanosStore = defineStore('nanos', () => {
   const saveNanosToStorage = (): void => {
     try {
       localStorage.setItem(
-        'tinkertools_nanos_cache',
+        versionKey(NANOS_CACHE_BASE),
         JSON.stringify({
           data: nanos.value,
           totalCount: totalCount.value,
@@ -374,7 +394,9 @@ export const useNanosStore = defineStore('nanos', () => {
 
   const loadNanosFromStorage = (): void => {
     try {
-      const cached = localStorage.getItem('tinkertools_nanos_cache');
+      // Adopt a pre-version cache as this version's data on first load.
+      adoptLegacyKey(NANOS_CACHE_BASE);
+      const cached = localStorage.getItem(versionKey(NANOS_CACHE_BASE));
       if (cached) {
         const parsed = JSON.parse(cached);
         // Only load if cached within last hour
@@ -390,7 +412,7 @@ export const useNanosStore = defineStore('nanos', () => {
 
   const saveFavorites = (): void => {
     try {
-      localStorage.setItem('tinkertools_nano_favorites', JSON.stringify(favorites.value));
+      localStorage.setItem(versionKey(FAVORITES_BASE), JSON.stringify(favorites.value));
     } catch (error) {
       console.warn('Failed to save favorites:', error);
     }
@@ -398,7 +420,8 @@ export const useNanosStore = defineStore('nanos', () => {
 
   const loadFavorites = (): void => {
     try {
-      const saved = localStorage.getItem('tinkertools_nano_favorites');
+      adoptLegacyKey(FAVORITES_BASE);
+      const saved = localStorage.getItem(versionKey(FAVORITES_BASE));
       if (saved) {
         favorites.value = JSON.parse(saved);
       }
@@ -409,7 +432,7 @@ export const useNanosStore = defineStore('nanos', () => {
 
   const saveFilters = (): void => {
     try {
-      localStorage.setItem('tinkertools_nano_filters', JSON.stringify(filters.value));
+      localStorage.setItem(FILTERS_KEY, JSON.stringify(filters.value));
     } catch (error) {
       console.warn('Failed to save filters:', error);
     }
@@ -417,7 +440,7 @@ export const useNanosStore = defineStore('nanos', () => {
 
   const loadFilters = (): void => {
     try {
-      const saved = localStorage.getItem('tinkertools_nano_filters');
+      const saved = localStorage.getItem(FILTERS_KEY);
       if (saved) {
         filters.value = { ...filters.value, ...JSON.parse(saved) };
       }
@@ -428,7 +451,7 @@ export const useNanosStore = defineStore('nanos', () => {
 
   const savePreferences = (): void => {
     try {
-      localStorage.setItem('tinkertools_nano_preferences', JSON.stringify(preferences.value));
+      localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences.value));
     } catch (error) {
       console.warn('Failed to save preferences:', error);
     }
@@ -436,7 +459,7 @@ export const useNanosStore = defineStore('nanos', () => {
 
   const loadPreferences = (): void => {
     try {
-      const saved = localStorage.getItem('tinkertools_nano_preferences');
+      const saved = localStorage.getItem(PREFERENCES_KEY);
       if (saved) {
         preferences.value = { ...preferences.value, ...JSON.parse(saved) };
       }
@@ -447,7 +470,7 @@ export const useNanosStore = defineStore('nanos', () => {
 
   const saveSearchHistory = (): void => {
     try {
-      localStorage.setItem('tinkertools_nano_search_history', JSON.stringify(searchHistory.value));
+      localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(searchHistory.value));
     } catch (error) {
       console.warn('Failed to save search history:', error);
     }
@@ -455,7 +478,7 @@ export const useNanosStore = defineStore('nanos', () => {
 
   const loadSearchHistory = (): void => {
     try {
-      const saved = localStorage.getItem('tinkertools_nano_search_history');
+      const saved = localStorage.getItem(SEARCH_HISTORY_KEY);
       if (saved) {
         searchHistory.value = JSON.parse(saved);
       }
@@ -467,7 +490,7 @@ export const useNanosStore = defineStore('nanos', () => {
   const saveSelectedProfession = (): void => {
     try {
       localStorage.setItem(
-        'tinkertools_nano_selected_profession',
+        SELECTED_PROFESSION_KEY,
         JSON.stringify(selectedProfession.value)
       );
     } catch (error) {
@@ -477,7 +500,7 @@ export const useNanosStore = defineStore('nanos', () => {
 
   const loadSelectedProfession = (): void => {
     try {
-      const saved = localStorage.getItem('tinkertools_nano_selected_profession');
+      const saved = localStorage.getItem(SELECTED_PROFESSION_KEY);
       if (saved) {
         selectedProfession.value = JSON.parse(saved);
       }
@@ -494,6 +517,39 @@ export const useNanosStore = defineStore('nanos', () => {
     loadPreferences();
     loadSearchHistory();
     loadSelectedProfession();
+  };
+
+  /**
+   * Drop the nano list and its persisted copy for the active game version.
+   * UI preferences, filters and favorites survive.
+   */
+  const clearCache = (): void => {
+    nanos.value = [];
+    totalCount.value = 0;
+    selectedNano.value = null;
+    error.value = null;
+
+    try {
+      localStorage.removeItem(versionKey(NANOS_CACHE_BASE));
+    } catch (err) {
+      console.warn('Failed to clear nano cache:', err);
+    }
+  };
+
+  /**
+   * Re-point the store at the game version just switched to: drop the old
+   * version's in-memory list, then load this version's persisted nano cache
+   * and favorites. Nothing persisted is deleted; other versions' nano caches
+   * are reclaimed by purgeOtherVersionCaches(), and their favorites are kept.
+   */
+  const resetForVersionChange = (): void => {
+    nanos.value = [];
+    totalCount.value = 0;
+    selectedNano.value = null;
+    error.value = null;
+    favorites.value = [];
+    loadNanosFromStorage();
+    loadFavorites();
   };
 
   // Call initialize immediately
@@ -534,6 +590,8 @@ export const useNanosStore = defineStore('nanos', () => {
     getNanosBySchool,
     getNanosByStrain,
     initialize,
+    clearCache,
+    resetForVersionChange,
   };
 });
 

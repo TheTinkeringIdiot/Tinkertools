@@ -12,6 +12,12 @@
 import { get, set, del, keys } from 'idb-keyval';
 import type { Item } from '@/types/api';
 import type { WeaponAnalyzeRequest } from '@/types/weapon-analysis';
+import {
+  versionKey,
+  versionPrefix,
+  purgeIdbOtherVersions,
+  purgeLocalStoragePrefix,
+} from './version-keys';
 
 // ============================================================================
 // Types
@@ -38,9 +44,26 @@ interface WeaponCacheMetrics {
 const CACHE_CONFIG = {
   TTL: 60 * 60 * 1000, // 1 hour (static game data)
   MAX_ENTRIES: 5, // Maximum cached profiles (LRU eviction)
-  STORAGE_PREFIX: 'tinkertools_weapon_cache_',
-  METRICS_KEY: 'tinkertools_weapon_cache_metrics',
+  /** Base of the key family; the game version slug is inserted after it. */
+  STORAGE_BASE: 'tinkertools_weapon_cache',
+  METRICS_BASE: 'tinkertools_weapon_metrics',
+  /** Pre-version key family in LocalStorage, cleaned up on init. */
+  LEGACY_STORAGE_PREFIX: 'tinkertools_weapon_cache_',
+  LEGACY_METRICS_KEY: 'tinkertools_weapon_cache_metrics',
 } as const;
+
+/**
+ * Cached weapons are server data, so every entry belongs to one game version:
+ * `tinkertools_weapon_cache:<slug>:<cacheKey>`. Scans (clear, LRU, stats) use
+ * this prefix and therefore stay inside the active version.
+ */
+function storagePrefix(): string {
+  return versionPrefix(CACHE_CONFIG.STORAGE_BASE);
+}
+
+function metricsKey(): string {
+  return versionKey(CACHE_CONFIG.METRICS_BASE);
+}
 
 // ============================================================================
 // In-Memory Cache
@@ -78,7 +101,7 @@ export function generateCacheKey(request: WeaponAnalyzeRequest): string {
  * @returns Storage key
  */
 function getStorageKey(cacheKey: string): string {
-  return `${CACHE_CONFIG.STORAGE_PREFIX}${cacheKey}`;
+  return `${storagePrefix()}${cacheKey}`;
 }
 
 // ============================================================================
@@ -175,7 +198,7 @@ export async function clearWeaponCache(): Promise<void> {
   try {
     const allKeys = await keys();
     const cacheKeys = allKeys.filter((key) =>
-      typeof key === 'string' && key.startsWith(CACHE_CONFIG.STORAGE_PREFIX)
+      typeof key === 'string' && key.startsWith(storagePrefix())
     );
 
     await Promise.all(cacheKeys.map((key) => del(key)));
@@ -210,7 +233,7 @@ async function enforceMaxEntries(): Promise<void> {
     // Get all cache entries from IndexedDB
     const allKeys = await keys();
     const cacheKeys = allKeys.filter((key) =>
-      typeof key === 'string' && key.startsWith(CACHE_CONFIG.STORAGE_PREFIX)
+      typeof key === 'string' && key.startsWith(storagePrefix())
     );
 
     // If under limit, nothing to do
@@ -241,7 +264,7 @@ async function enforceMaxEntries(): Promise<void> {
     const toRemove = entries.length - CACHE_CONFIG.MAX_ENTRIES;
     for (let i = 0; i < toRemove; i++) {
       const key = entries[i].key;
-      const cacheKey = key.replace(CACHE_CONFIG.STORAGE_PREFIX, '');
+      const cacheKey = key.replace(storagePrefix(), '');
       await evictEntry(cacheKey);
       console.log(`[WeaponCache] Evicted old entry: ${cacheKey}`);
     }
@@ -259,7 +282,7 @@ async function enforceMaxEntries(): Promise<void> {
  */
 async function loadMetrics(): Promise<WeaponCacheMetrics> {
   try {
-    const stored = await get<WeaponCacheMetrics>(CACHE_CONFIG.METRICS_KEY);
+    const stored = await get<WeaponCacheMetrics>(metricsKey());
     if (stored) {
       return stored;
     }
@@ -281,7 +304,7 @@ async function loadMetrics(): Promise<WeaponCacheMetrics> {
  */
 async function saveMetrics(metrics: WeaponCacheMetrics): Promise<void> {
   try {
-    await set(CACHE_CONFIG.METRICS_KEY, metrics);
+    await set(metricsKey(), metrics);
   } catch (error) {
     console.warn('[WeaponCache] Failed to save metrics:', error);
   }
@@ -359,7 +382,7 @@ export async function getCacheStats(): Promise<{
   try {
     const allKeys = await keys();
     const cacheKeys = allKeys.filter((key) =>
-      typeof key === 'string' && key.startsWith(CACHE_CONFIG.STORAGE_PREFIX)
+      typeof key === 'string' && key.startsWith(storagePrefix())
     );
 
     for (const key of cacheKeys) {
@@ -422,28 +445,29 @@ export async function logCacheStats(): Promise<void> {
  */
 export function clearLegacyLocalStorageCache(): void {
   try {
-    const keysToRemove: string[] = [];
+    // Pre-version keys used an underscore after the base; versioned keys use a
+    // colon, so this prefix matches only the old format.
+    let removed = purgeLocalStoragePrefix(CACHE_CONFIG.LEGACY_STORAGE_PREFIX);
 
-    // Find all weapon cache keys in LocalStorage
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith(CACHE_CONFIG.STORAGE_PREFIX)) {
-        keysToRemove.push(key);
-      }
+    if (localStorage.getItem(CACHE_CONFIG.LEGACY_METRICS_KEY) !== null) {
+      localStorage.removeItem(CACHE_CONFIG.LEGACY_METRICS_KEY);
+      removed++;
     }
 
-    // Also remove old metrics key
-    if (localStorage.getItem(CACHE_CONFIG.METRICS_KEY)) {
-      keysToRemove.push(CACHE_CONFIG.METRICS_KEY);
-    }
-
-    // Remove all old cache entries
-    keysToRemove.forEach((key) => localStorage.removeItem(key));
-
-    if (keysToRemove.length > 0) {
-      console.log(`[WeaponCache] Cleaned up ${keysToRemove.length} legacy LocalStorage entries`);
+    if (removed > 0) {
+      console.log(`[WeaponCache] Cleaned up ${removed} legacy LocalStorage entries`);
     }
   } catch (error) {
     console.warn('[WeaponCache] Failed to clear legacy LocalStorage cache:', error);
   }
+}
+
+/**
+ * Drop IndexedDB weapon entries belonging to other game versions. Weapon
+ * results are recomputable and TTL'd at an hour, so they are dropped rather
+ * than migrated.
+ */
+export async function purgeOtherVersionWeaponCaches(slug?: string): Promise<number> {
+  memoryCache.clear();
+  return purgeIdbOtherVersions(CACHE_CONFIG.STORAGE_BASE, slug);
 }

@@ -6,7 +6,7 @@
  * reactive interpolation state, caching, and error handling.
  */
 
-import { ref, computed, watch, onUnmounted, readonly } from 'vue';
+import { ref, computed, watch, onUnmounted, readonly, unref } from 'vue';
 import type { Ref } from 'vue';
 import type { Item, InterpolatedItem, InterpolationInfo } from '../types/api';
 import interpolationService from '../services/interpolation-service';
@@ -19,6 +19,11 @@ interface UseInterpolationOptions {
   autoLoad?: boolean;
   cacheResults?: boolean;
   debounceMs?: number;
+  /**
+   * Game version to interpolate against. Defaults to the browsing version;
+   * pass the peeked snapshot's slug when showing an item "as of" that version.
+   */
+  gameVersion?: Ref<string | null | undefined> | string | null;
 }
 
 interface InterpolationError {
@@ -36,6 +41,12 @@ export function useInterpolation(
   options: UseInterpolationOptions = {}
 ) {
   const { autoLoad = true, cacheResults = true, debounceMs = 300 } = options;
+
+  /** Resolved at call time so a peek that starts later is still honoured. */
+  function requestOptions(): { gameVersion?: string } | undefined {
+    const slug = unref(options.gameVersion);
+    return slug ? { gameVersion: slug } : undefined;
+  }
 
   // ============================================================================
   // Reactive State
@@ -113,7 +124,10 @@ export function useInterpolation(
     error.value = null;
 
     try {
-      const info = await interpolationService.getInterpolationInfo(currentAoid.value);
+      const request = requestOptions();
+      const info = request
+        ? await interpolationService.getInterpolationInfo(currentAoid.value, request)
+        : await interpolationService.getInterpolationInfo(currentAoid.value);
       interpolationInfo.value = info;
       return info !== null;
     } catch (err: any) {
@@ -150,7 +164,10 @@ export function useInterpolation(
         error.value = null;
 
         try {
-          const item = await interpolationService.interpolateItem(currentAoid.value!, ql);
+          const request = requestOptions();
+          const item = request
+            ? await interpolationService.interpolateItem(currentAoid.value!, ql, request)
+            : await interpolationService.interpolateItem(currentAoid.value!, ql);
           interpolatedItem.value = item;
           targetQl.value = ql;
           resolve(item);

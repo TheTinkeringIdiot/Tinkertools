@@ -25,7 +25,10 @@ from app.models import (
     SpellDataSpells, ItemSpellData, Perk, Mob, Source, SourceType, ItemSource
 )
 from app.core import perk_validator
+from app.core.config import settings
+from app.core.content_hash import compute_item_hashes
 from app.core.migration_runner import MigrationRunner
+from app.core.versions import schema_name_for
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +62,8 @@ class ImportStats:
 class DataImporter:
     """Main data import class."""
     
-    def __init__(self, db_url: str = None, chunk_size: int = 100, perks_file: str = None):
+    def __init__(self, db_url: str = None, chunk_size: int = 100, perks_file: str = None,
+                 version_slug: str = None, skip_perks: bool = False):
         self.chunk_size = chunk_size
         self.stats = ImportStats()
 
@@ -68,8 +72,15 @@ class DataImporter:
         if not self.db_url:
             raise ValueError("DATABASE_URL environment variable must be set or db_url parameter provided")
 
+        # Every session from this engine writes into the game version's schema.
+        self.version_slug = version_slug or settings.DEFAULT_GAME_VERSION
+        self.schema_name = schema_name_for(self.version_slug)
+
         # Create engine and session factory
-        self.engine = create_engine(self.db_url)
+        connect_args = {}
+        if self.db_url.startswith("postgres"):
+            connect_args["options"] = f"-csearch_path={self.schema_name},public"
+        self.engine = create_engine(self.db_url, connect_args=connect_args)
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
 
         # Store singleton objects to avoid repeated DB queries
@@ -79,9 +90,15 @@ class DataImporter:
 
         # Store perks file path
         self.perks_file = perks_file
+        self.skip_perks = skip_perks
 
-        # Load perk metadata during initialization
-        self.load_perk_metadata()
+        # Load perk metadata during initialization. Versions without perks
+        # (pre-Shadowlands clients, private servers) are imported with
+        # skip_perks and simply have no perks table content.
+        if skip_perks:
+            logger.info("Perk metadata disabled for this import")
+        else:
+            self.load_perk_metadata()
     
     def get_db_session(self) -> Session:
         """Get database session."""
@@ -170,12 +187,12 @@ class DataImporter:
             # Close current session as we'll be dropping tables
             db.close()
 
-            # Create migration runner and reset database
+            # Recreate this game version's schema from the migration files.
             runner = MigrationRunner(db_url=self.db_url)
-            success = runner.reset_database()
+            runner.reset_version_schema(self.version_slug)
 
-            if not success:
-                raise RuntimeError("Failed to reset database with migrations")
+            if not runner.verify_schema(self.schema_name):
+                raise RuntimeError(f"Failed to rebuild schema {self.schema_name} from migrations")
 
             # Clear caches since we dropped everything
             self._stat_value_cache.clear()
@@ -356,7 +373,11 @@ class DataImporter:
             item.description = item_data.get('Description', '')
             item.is_nano = is_nano
 
-            
+            # Content hashes of the raw record, for cross-version item history
+            for field, digest in compute_item_hashes(item_data).items():
+                setattr(item, field, digest)
+
+
             # Process StatValues to extract item_class and ql
             for sv_data in item_data.get('StatValues', []):
                 stat = sv_data.get('Stat')
@@ -660,9 +681,9 @@ class DataImporter:
         if full_reset:
             # Do the full reset outside of session context
             runner = MigrationRunner(db_url=self.db_url)
-            success = runner.reset_database()
-            if not success:
-                raise RuntimeError("Failed to reset database with migrations")
+            runner.reset_version_schema(self.version_slug)
+            if not runner.verify_schema(self.schema_name):
+                raise RuntimeError(f"Failed to rebuild schema {self.schema_name} from migrations")
             # Clear caches
             self._stat_value_cache.clear()
             self._criterion_cache.clear()

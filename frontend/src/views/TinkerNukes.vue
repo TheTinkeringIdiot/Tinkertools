@@ -271,10 +271,10 @@ function onInputStateUpdate(newState: NukeInputState): void {
 
 /**
  * Handle nano row click from NukeTable
- * Navigate to /items/:id detail page
+ * Navigate to the item detail page for this nano
  */
 function onNanoSelected(nanoId: number): void {
-  router.push(`/items/${nanoId}`);
+  router.push({ name: 'ItemDetail', params: { aoid: nanoId.toString() } });
 }
 
 /**

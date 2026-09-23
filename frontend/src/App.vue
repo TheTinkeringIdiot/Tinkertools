@@ -1,72 +1,86 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import Button from 'primevue/button';
 import Menubar from 'primevue/menubar';
 import Toast from 'primevue/toast';
 import { useTheme } from './composables/useTheme';
+import { useGameVersion } from './composables/useGameVersion';
 import AccessibilityAnnouncer from './components/shared/AccessibilityAnnouncer.vue';
 import ProfileDropdown from './components/profiles/ProfileDropdown.vue';
+import GlobalItemSearch from './components/shared/GlobalItemSearch.vue';
+import GameVersionSelector from './components/versions/GameVersionSelector.vue';
+import VersionSnapshotBanner from './components/versions/VersionSnapshotBanner.vue';
 import type { MenuItem } from 'primevue/menuitem';
 
 const router = useRouter();
 const route = useRoute();
-const { isDark, toggle, currentTheme } = useTheme();
+const { isDark, toggle } = useTheme();
+const { hasFeature } = useGameVersion();
 
 const themeIcon = computed(() => (isDark.value ? 'pi pi-sun' : 'pi pi-moon'));
 const themeLabel = computed(() => (isDark.value ? 'Switch to Light Mode' : 'Switch to Dark Mode'));
 const currentThemeText = computed(() => (isDark.value ? 'Dark' : 'Light'));
 
-const menuItems = computed<MenuItem[]>(() => [
-  {
-    label: 'Home',
-    icon: 'pi pi-home',
-    command: () => router.push('/'),
-    class: route.path === '/' ? 'router-link-active' : '',
-  },
+/**
+ * Every tool lives under the game version segment, so navigation goes through
+ * named routes: the `version` param is inherited from the current route.
+ * Active state is decided by route name, never by path prefix.
+ */
+interface ToolEntry {
+  label: string;
+  icon: string;
+  route: string;
+  /** Route names that also count as "inside" this tool. */
+  activeNames?: string[];
+  /** Registry feature this tool needs; unknown versions show everything. */
+  feature?: string;
+}
+
+const tools: ToolEntry[] = [
+  { label: 'Home', icon: 'pi pi-home', route: 'Home' },
   {
     label: 'TinkerProfiles',
     icon: 'pi pi-users',
-    command: () => router.push('/profiles'),
-    class: route.path.startsWith('/profiles') ? 'router-link-active' : '',
+    route: 'TinkerProfiles',
+    activeNames: ['TinkerProfileDetail'],
   },
   {
     label: 'TinkerItems',
     icon: 'pi pi-database',
-    command: () => router.push('/items'),
-    class: route.path.startsWith('/items') ? 'router-link-active' : '',
+    route: 'TinkerItems',
+    activeNames: ['ItemDetail'],
+    feature: 'items',
   },
-  {
-    label: 'TinkerNanos',
-    icon: 'pi pi-bolt',
-    command: () => router.push('/nanos'),
-    class: route.path.startsWith('/nanos') ? 'router-link-active' : '',
-  },
-  {
-    label: 'TinkerNukes',
-    icon: 'pi pi-sparkles',
-    command: () => router.push('/tinkernukes'),
-    class: route.path.startsWith('/tinkernukes') ? 'router-link-active' : '',
-  },
-  {
-    label: 'TinkerFite',
-    icon: 'pi pi-shield',
-    command: () => router.push('/fite'),
-    class: route.path.startsWith('/fite') ? 'router-link-active' : '',
-  },
-  {
-    label: 'TinkerPlants',
-    icon: 'pi pi-cog',
-    command: () => router.push('/plants'),
-    class: route.path.startsWith('/plants') ? 'router-link-active' : '',
-  },
+  { label: 'TinkerNanos', icon: 'pi pi-bolt', route: 'TinkerNanos', feature: 'nanos' },
+  { label: 'TinkerNukes', icon: 'pi pi-sparkles', route: 'TinkerNukes', feature: 'nanos' },
+  { label: 'TinkerFite', icon: 'pi pi-shield', route: 'TinkerFite' },
+  { label: 'TinkerPlants', icon: 'pi pi-cog', route: 'TinkerPlants', feature: 'items' },
   {
     label: 'TinkerPocket',
     icon: 'pi pi-map',
-    command: () => router.push('/pocket'),
-    class: route.path.startsWith('/pocket') ? 'router-link-active' : '',
+    route: 'TinkerPocket',
+    activeNames: ['BossDetail'],
+    feature: 'symbiants',
   },
-]);
+];
+
+function isActive(tool: ToolEntry): boolean {
+  const name = route.name as string | undefined;
+  if (!name) return false;
+  return name === tool.route || (tool.activeNames?.includes(name) ?? false);
+}
+
+const menuItems = computed<MenuItem[]>(() =>
+  tools
+    .filter((tool) => !tool.feature || hasFeature(tool.feature))
+    .map((tool) => ({
+      label: tool.label,
+      icon: tool.icon,
+      command: () => router.push({ name: tool.route }),
+      class: isActive(tool) ? 'router-link-active' : '',
+    }))
+);
 </script>
 
 <template>
@@ -78,7 +92,7 @@ const menuItems = computed<MenuItem[]>(() => [
       aria-label="Site header"
     >
       <div class="px-4 py-3">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-wrap items-center justify-between gap-y-3">
           <div class="flex items-center gap-3">
             <i class="pi pi-cog text-2xl text-primary-500" aria-hidden="true"></i>
             <h1 class="text-xl font-bold">TinkerTools</h1>
@@ -91,8 +105,16 @@ const menuItems = computed<MenuItem[]>(() => [
             </span>
           </div>
 
+          <!-- Global item search (shortcut to TinkerItems) -->
+          <div class="flex-1 min-w-[20rem] max-w-4xl mx-4 hidden md:block">
+            <GlobalItemSearch />
+          </div>
+
           <!-- Quick Actions -->
-          <div class="flex items-center gap-4">
+          <div class="flex items-center gap-3">
+            <!-- Game Version Selector -->
+            <GameVersionSelector />
+
             <!-- Profile Selector -->
             <div class="profile-selector-container">
               <ProfileDropdown />
@@ -100,14 +122,14 @@ const menuItems = computed<MenuItem[]>(() => [
 
             <!-- Theme Toggle -->
             <div class="flex items-center gap-2">
-              <span class="text-xs text-surface-500 dark:text-surface-400 font-medium">
+              <span class="text-xs text-surface-500 dark:text-surface-400 font-medium hidden xl:inline">
                 {{ currentThemeText }} Mode
               </span>
               <Button
                 :icon="themeIcon"
                 :aria-label="themeLabel"
                 outlined
-                size="small"
+                class="h-11 w-11"
                 @click="toggle"
                 :pt="{ root: 'transition-all duration-200 hover:scale-105' }"
               />
@@ -116,11 +138,18 @@ const menuItems = computed<MenuItem[]>(() => [
         </div>
       </div>
 
+      <div class="px-4 pb-3 md:hidden">
+        <GlobalItemSearch />
+      </div>
+
       <!-- Navigation Menu -->
       <nav role="navigation" aria-label="Main navigation">
         <Menubar :model="menuItems" class="border-0 bg-transparent" />
       </nav>
     </header>
+
+    <!-- Non-default snapshot notice -->
+    <VersionSnapshotBanner />
 
     <!-- Main Content -->
     <main id="main-content" class="min-h-0" role="main" aria-label="Main content" tabindex="-1">

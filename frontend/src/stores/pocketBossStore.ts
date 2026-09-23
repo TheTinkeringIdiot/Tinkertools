@@ -87,6 +87,15 @@ export const usePocketBossStore = defineStore('pocketBoss', () => {
     }
   }
 
+  /**
+   * Drop the in-memory boss list. Pocket bosses and their drops are server
+   * data, so nothing survives a game version switch.
+   */
+  function clearCache() {
+    pocketBosses.value = [];
+    error.value = null;
+  }
+
   function updateFilters(newFilters: Partial<PocketBossFilters>) {
     filters.value = { ...filters.value, ...newFilters };
   }
@@ -135,6 +144,7 @@ export const usePocketBossStore = defineStore('pocketBoss', () => {
 
     // Actions
     fetchPocketBosses,
+    clearCache,
     updateFilters,
     clearFilters,
     getPocketBossById,

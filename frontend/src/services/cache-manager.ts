@@ -5,6 +5,7 @@
  */
 
 import type { CacheEntry, CacheConfig } from '../types/api';
+import { versionKey, trailingVersionOf, activeVersionSlug } from './version-keys';
 
 // ============================================================================
 // Cache Configuration
@@ -255,6 +256,31 @@ export class CacheManager {
     }
   }
 
+  /**
+   * Drop every cached entry that belongs to a game version other than `slug`
+   * (default: the active one). Called on version switch so the other snapshot's
+   * responses do not sit in the quota until their TTL expires.
+   */
+  async purgeOtherVersions(slug?: string): Promise<number> {
+    const keep = slug ?? activeVersionSlug();
+    const doomed: string[] = [];
+
+    try {
+      for (let i = 0; i < this.storage.length; i++) {
+        const key = this.storage.key(i);
+        if (!key?.startsWith(this.keyPrefix)) continue;
+        const owner = trailingVersionOf(key);
+        if (owner !== null && owner !== keep) doomed.push(key);
+      }
+    } catch (err) {
+      console.warn('Cache version purge failed:', err);
+      return 0;
+    }
+
+    doomed.forEach((key) => this.storage.removeItem(key));
+    return doomed.length;
+  }
+
   // ============================================================================
   // Specialized Cache Operations
   // ============================================================================
@@ -461,15 +487,21 @@ export class CacheManager {
     return this.config.dynamicData.ttl;
   }
 
+  /**
+   * The game version slug is appended, never prefixed: getTTLForKey matches on
+   * substrings such as 'items' or 'search-results', and a leading slug would
+   * not break that, but a trailing one keeps the endpoint at the front of the
+   * key where it stays readable in DevTools.
+   */
   private generateApiKey(endpoint: string, params: Record<string, any>): string {
     const normalizedEndpoint = endpoint.replace(/^\/+|\/+$/g, '').replace(/\/+/g, '_');
     const paramsHash = this.hashParams(params);
-    return `api_${normalizedEndpoint}_${paramsHash}`;
+    return versionKey(`api_${normalizedEndpoint}_${paramsHash}`);
   }
 
   private generateSearchKey(query: any): string {
     const queryHash = this.hashParams(query);
-    return `search_${queryHash}`;
+    return versionKey(`search_${queryHash}`);
   }
 
   private hashParams(params: any): string {

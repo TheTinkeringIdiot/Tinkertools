@@ -30,8 +30,8 @@ Welcomes users and provides navigation to all six tools with AO-themed descripti
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <router-link
           v-for="tool in tools"
-          :key="tool.route"
-          :to="tool.route"
+          :key="tool.routeName"
+          :to="{ name: tool.routeName }"
           class="tool-card-link"
         >
           <Card class="tool-card h-full">
@@ -125,7 +125,7 @@ const tools = [
     description:
       'Manage character profiles across all dimensions. Create, import, and track your characters with comprehensive stat tracking.',
     icon: 'pi pi-users',
-    route: '/profiles',
+    routeName: 'TinkerProfiles',
   },
   {
     name: 'TinkerItems',
@@ -133,7 +133,7 @@ const tools = [
     description:
       'Search 120,000+ items from across Rubi-Ka. Advanced filtering, compatibility checking, and item comparison tools.',
     icon: 'pi pi-database',
-    route: '/items',
+    routeName: 'TinkerItems',
   },
   {
     name: 'TinkerNanos',
@@ -141,7 +141,7 @@ const tools = [
     description:
       'Browse and analyze nano programs by profession and school. Check strain compatibility and requirements.',
     icon: 'pi pi-bolt',
-    route: '/nanos',
+    routeName: 'TinkerNanos',
   },
   {
     name: 'TinkerFite',
@@ -149,7 +149,7 @@ const tools = [
     description:
       'Compare DPS and optimize your combat loadout. Analyze weapon performance with your character\'s stats and skills.',
     icon: 'pi pi-shield',
-    route: '/fite',
+    routeName: 'TinkerFite',
   },
   {
     name: 'TinkerPlants',
@@ -157,7 +157,7 @@ const tools = [
     description:
       'Design implant and symbiant configurations. Plan your augmentations and optimize stat distribution for your build.',
     icon: 'pi pi-cog',
-    route: '/plants',
+    routeName: 'TinkerPlants',
   },
   {
     name: 'TinkerPocket',
@@ -165,7 +165,7 @@ const tools = [
     description:
       'Track pocket bosses and manage your collections. Browse symbiants and plan your hunting strategy across dimensions.',
     icon: 'pi pi-map',
-    route: '/pocket',
+    routeName: 'TinkerPocket',
   },
 ];
 </script>

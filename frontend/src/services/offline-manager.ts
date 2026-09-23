@@ -6,6 +6,7 @@
 
 import { ref, computed } from 'vue';
 import { cacheManager } from './cache-manager';
+import { versionKey } from './version-keys';
 import { useAppStore } from '../stores/app';
 import type { Item, Spell, Symbiant, PocketBoss } from '../types/api';
 
@@ -39,14 +40,21 @@ class OfflineManager {
   private queuedOperations = ref<QueuedOperation[]>([]);
   private syncInProgress = ref(false);
 
-  private offlineDataKeys = {
-    items: 'offline_items',
-    spells: 'offline_spells',
-    symbiants: 'offline_symbiants',
-    pocketBosses: 'offline_pocket_bosses',
-    operations: 'offline_queued_operations',
-    lastSync: 'offline_last_sync',
-  };
+  /**
+   * Offline snapshots hold server data, so they belong to one game version.
+   * Read through the getter so the keys follow the active version; the slug is
+   * appended, keeping cache-manager's substring TTL matching intact.
+   */
+  private get offlineDataKeys() {
+    return {
+      items: versionKey('offline_items'),
+      spells: versionKey('offline_spells'),
+      symbiants: versionKey('offline_symbiants'),
+      pocketBosses: versionKey('offline_pocket_bosses'),
+      operations: versionKey('offline_queued_operations'),
+      lastSync: versionKey('offline_last_sync'),
+    };
+  }
 
   constructor() {
     this.setupOfflineDetection();

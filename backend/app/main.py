@@ -5,7 +5,10 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import settings
+from app.core.version_middleware import GameVersionMiddleware
 from app.api.routes.health import router as health_router
+from app.api.routes.versions import router as versions_router
+from app.api.routes.item_revisions import router as item_revisions_router
 from app.api.routes.items import router as items_router
 from app.api.routes.implants import router as implants_router
 from app.api.routes.nanos import router as nanos_router
@@ -32,6 +35,10 @@ app = FastAPI(
 # Development: Allow all origins for flexibility
 # Production: Restrict to configured origins
 origins = ["*"] if settings.APP_ENV == "development" else settings.CORS_ORIGINS.split(",")
+
+# Resolves /api/v1/<version>/... to the matching game version schema.
+# Added before CORS so CORS is the outermost layer.
+app.add_middleware(GameVersionMiddleware, api_prefix="/api/v1")
 
 app.add_middleware(
     CORSMiddleware,
@@ -89,6 +96,11 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 # Include routers
 app.include_router(health_router, prefix="")
+# Cross-version routers first: item_revisions owns /items/revisions/batch and
+# /items/{aoid}/revisions, which must not be captured by the /items/{aoid}
+# patterns in items_router.
+app.include_router(versions_router, prefix="/api/v1")
+app.include_router(item_revisions_router, prefix="/api/v1")
 app.include_router(items_router, prefix="/api/v1")
 app.include_router(implants_router, prefix="/api/v1")
 app.include_router(nanos_router, prefix="/api/v1")

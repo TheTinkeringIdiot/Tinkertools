@@ -19,7 +19,17 @@ class Item(Base):
     is_nano = Column(Boolean, default=False)
     animation_mesh_id = Column(Integer, ForeignKey('animation_mesh.id'))
     atkdef_id = Column(Integer, ForeignKey('attack_defense.id'))
-    
+
+    # Content hashes of the raw client record (migration 007). Computed by the
+    # importer (app/core/content_hash.py) and copied into
+    # public.item_revisions so item history can be answered across versions.
+    content_hash = Column(String(40))
+    stats_hash = Column(String(40))
+    spells_hash = Column(String(40))
+    actions_hash = Column(String(40))
+    text_hash = Column(String(40))
+
+
     # Relationships
     animation_mesh = relationship('AnimationMesh', back_populates='items')
     attack_defense = relationship('AttackDefense', back_populates='items', foreign_keys=[atkdef_id])

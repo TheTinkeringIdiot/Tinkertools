@@ -274,7 +274,8 @@ function updateURL() {
   if (searchText.value.trim()) query.search = searchText.value.trim();
   if (profileToggle.value) query.profile = 'true';
 
-  router.push({ path: '/pocket', query });
+  // Named route: the version param is inherited from the current route.
+  router.push({ name: 'TinkerPocket', query });
 }
 
 function readURLParams() {
@@ -333,7 +334,7 @@ function readURLParams() {
 }
 
 function navigateToItem(aoid: number) {
-  router.push(`/items/${aoid}`);
+  router.push({ name: 'ItemDetail', params: { aoid: aoid.toString() } });
 }
 
 function handleAddToComparison(symbiant: SymbiantItem) {
@@ -407,7 +408,11 @@ function clearBossFilters() {
 
 function navigateToBoss(bossId: number) {
   // Pass current tab to preserve it when returning from boss detail
-  router.push(`/pocket/bosses/${bossId}?returnTab=${props.view}`);
+  router.push({
+    name: 'BossDetail',
+    params: { id: bossId.toString() },
+    query: { returnTab: props.view },
+  });
 }
 
 function formatLocation(boss: Mob): string {
@@ -459,7 +464,8 @@ onMounted(async () => {
 watch(
   () => route.query,
   () => {
-    if (route.path === '/pocket') {
+    // Match on the route name: the path now carries a game version segment.
+    if (route.name === 'TinkerPocket') {
       readURLParams();
     }
   }

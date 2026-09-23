@@ -16,6 +16,7 @@ from .mob import Mob
 from .symbiant_item import SymbiantItem
 from .source import SourceType, Source, ItemSource
 from .application_cache import ApplicationCache
+from .game_version import GameVersion, ItemRevision
 
 __all__ = [
     'StatValue',
@@ -42,4 +43,6 @@ __all__ = [
     'Source',
     'ItemSource',
     'ApplicationCache',
+    'GameVersion',
+    'ItemRevision',
 ]

@@ -279,7 +279,13 @@ export const STORAGE_KEYS = {
   PROFILES: 'tinkertools_profiles', // Legacy - for migration only
   PROFILE_INDEX: 'tinkertools_profile_index', // List of profile IDs
   PROFILE_PREFIX: 'tinkertools_profile_', // Individual profile prefix
+  /**
+   * Legacy global active-profile key. Kept for one-time migration only: the
+   * active profile is now stored per game version under
+   * `tinkertools_active_profile:<version-slug>` (ACTIVE_PROFILE_PREFIX).
+   */
   ACTIVE_PROFILE: 'tinkertools_active_profile',
+  ACTIVE_PROFILE_PREFIX: 'tinkertools_active_profile:',
   PROFILE_METADATA: 'tinkertools_profile_metadata',
   PROFILE_PREFERENCES: 'tinkertools_profile_preferences',
   VERSION: 'tinkertools_profiles_version',
@@ -290,7 +296,7 @@ export const STORAGE_KEYS = {
 // ============================================================================
 
 export const CURRENT_VERSION = '4.0.0';
-export const SUPPORTED_VERSIONS = ['1.0.0', '1.1.0', '2.0.0'];
+export const SUPPORTED_VERSIONS = ['1.0.0', '1.1.0', '2.0.0', '3.0.0', '4.0.0'];
 
 // ============================================================================
 // Profile Factories

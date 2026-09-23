@@ -66,6 +66,7 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
         <AdvancedItemSearch
           :loading="searchLoading"
           :result-count="totalResults"
+          :initial-search="urlSearchTerm"
           @search="performAdvancedSearch"
           @clear="clearSearch"
         />
@@ -158,6 +159,7 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
             :show-compatibility="showCompatibility && profilesStore.hasActiveProfile"
             :loading="searchLoading"
             :pagination="pagination"
+            :revision-counts="revisionCounts"
             @item-click="onItemClick"
             @item-compare="onItemCompare"
             @item-cast-buff="onItemCastBuff"
@@ -180,12 +182,13 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useItems } from '@/composables/useItems';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { useItemsStore } from '@/stores/items';
 import { useToast } from 'primevue/usetoast';
+import { apiClient } from '@/services/api-client';
 import type { Item, ItemSearchQuery } from '@/types/api';
 
 // Components
@@ -209,6 +212,8 @@ const lastAdvancedSearchQuery = ref<ItemSearchQuery | null>(null);
 const sortOption = ref('relevance');
 const searchLoading = ref(false);
 const searchPerformed = ref(false);
+// AOID -> number of snapshots the item changed in, for the history badge
+const revisionCounts = ref<Record<number, number>>({});
 
 // Items composable with default options
 const {
@@ -271,10 +276,33 @@ async function performAdvancedSearch(query: ItemSearchQuery) {
 
     const results = await searchItems(searchQuery);
     searchResults.value = results;
+    // Fire and forget: the badge must never delay results.
+    void loadRevisionCounts(results);
   } catch (error) {
     console.error('Advanced search failed:', error);
   } finally {
     searchLoading.value = false;
+  }
+}
+
+/**
+ * One batch call per results page telling which rows changed across snapshots.
+ * A failure just means no badges.
+ */
+async function loadRevisionCounts(items: Item[]) {
+  revisionCounts.value = {};
+  const aoids = items.map((item) => item.aoid).filter((aoid): aoid is number => !!aoid);
+  if (aoids.length === 0) return;
+
+  try {
+    const response = await apiClient.batchItemRevisions(aoids);
+    const counts: Record<number, number> = {};
+    for (const [aoid, entry] of Object.entries(response?.items || {})) {
+      counts[Number(aoid)] = entry.revision_count;
+    }
+    revisionCounts.value = counts;
+  } catch {
+    revisionCounts.value = {};
   }
 }
 
@@ -402,7 +430,32 @@ function onPageChange(page: number, limit: number) {
 }
 
 // Initialize
+/** Term from the header search bar (?search=). */
+const urlSearchTerm = computed(() =>
+  typeof route.query.search === 'string' ? route.query.search : ''
+);
+
+function searchFromUrl(term: string): void {
+  searchQuery.value = term;
+  performAdvancedSearch({
+    search: term,
+    exact_match: false,
+    search_fields: ['name'],
+  });
+}
+
+// A new term from the header while already on this page (no remount).
+watch(urlSearchTerm, (term, previous) => {
+  if (term && term !== previous) searchFromUrl(term);
+});
+
 onMounted(() => {
+  // Header search bar shortcut: /items?search=<term>
+  if (urlSearchTerm.value.trim()) {
+    searchFromUrl(urlSearchTerm.value.trim());
+    return;
+  }
+
   // Check for itemId and ql query parameters (from equipment navigation)
   const itemIdParam = route.query.itemId;
   const qlParam = route.query.ql;
@@ -444,6 +497,7 @@ onMounted(() => {
     searchQuery.value = itemsStore.currentSearchQuery.search || '';
     searchPerformed.value = true;
     lastAdvancedSearchQuery.value = itemsStore.currentSearchQuery;
+    void loadRevisionCounts(searchResults.value);
     // Note: Filter restoration would need to be handled by AdvancedItemSearch component
     // when implementing state persistence
   }

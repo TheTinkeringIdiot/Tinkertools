@@ -5,11 +5,13 @@ Pytest configuration and fixtures for TinkerTools backend tests.
 import pytest
 import os
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 
 from app.main import app
 from app.core.database import Base, get_db
+from app.core.versions import schema_name_for
+from app.core.config import settings
 from app.models import *
 
 # Import all fixtures from fixture modules
@@ -24,11 +26,39 @@ if not DATABASE_URL:
 engine = create_engine(DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# Tests run against one game version's schema: TEST_GAME_VERSION if set, else the
+# registry's default version, else the configured fallback. A schema that does
+# not exist is ignored by PostgreSQL, so this also works against a bare database.
+def _resolve_test_game_version() -> str:
+    explicit = os.getenv('TEST_GAME_VERSION')
+    if explicit:
+        return explicit
+    try:
+        with engine.connect() as conn:
+            default_slug = conn.execute(text(
+                "SELECT slug FROM public.game_versions WHERE is_default AND enabled LIMIT 1"
+            )).scalar()
+        if default_slug:
+            return default_slug
+    except Exception:
+        pass
+    return settings.DEFAULT_GAME_VERSION
+
+
+TEST_GAME_VERSION = _resolve_test_game_version()
+TEST_SCHEMA = schema_name_for(TEST_GAME_VERSION)
+
+
+def _begin_test_transaction(connection):
+    transaction = connection.begin()
+    connection.execute(text(f'SET LOCAL search_path TO "{TEST_SCHEMA}", public'))
+    return transaction
+
 
 def override_get_db():
     """Override database dependency for testing with transaction rollback."""
     connection = engine.connect()
-    transaction = connection.begin()
+    transaction = _begin_test_transaction(connection)
     session = TestingSessionLocal(bind=connection)
 
     try:
@@ -43,7 +73,7 @@ def override_get_db():
 def db_session():
     """Create a new database session for a test with transaction rollback."""
     connection = engine.connect()
-    transaction = connection.begin()
+    transaction = _begin_test_transaction(connection)
     session = TestingSessionLocal(bind=connection)
 
     try:

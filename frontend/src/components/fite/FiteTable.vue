@@ -37,7 +37,7 @@ PrimeVue DataTable with columns:
       <Column field="name" header="Name" :sortable="true" style="min-width: 200px">
         <template #body="{ data }">
           <a
-            :href="`/items/${data.aoid}`"
+            :href="versionedPath(`/items/${data.aoid}`)"
             class="text-primary-500 hover:text-primary-600 font-semibold"
             @click.prevent="onWeaponClick(data.aoid)"
           >
@@ -152,6 +152,7 @@ PrimeVue DataTable with columns:
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
+import { versionedPath } from '@/composables/useGameVersion';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Badge from 'primevue/badge';
@@ -326,7 +327,7 @@ function getDamageTypeSeverity(damageType: number | undefined): string {
 function onRowClick(event: any) {
   const aoid = event.data.aoid;
   if (aoid) {
-    router.push(`/items/${aoid}`);
+    router.push({ name: 'ItemDetail', params: { aoid: aoid.toString() } });
   }
 }
 
@@ -334,7 +335,7 @@ function onRowClick(event: any) {
  * Handle weapon name click - navigate to item detail
  */
 function onWeaponClick(aoid: number) {
-  router.push(`/items/${aoid}`);
+  router.push({ name: 'ItemDetail', params: { aoid: aoid.toString() } });
 }
 </script>
 

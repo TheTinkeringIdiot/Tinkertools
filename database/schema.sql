@@ -1,6 +1,19 @@
 -- TinkerTools Database Schema
 -- PostgreSQL database schema for the TinkerTools suite
 -- Based on legacy Django models with performance optimizations
+--
+-- ############################################################################
+-- HISTORICAL REFERENCE ONLY -- DO NOT APPLY THIS FILE.
+--
+-- The source of truth for the schema is database/migrations/*.sql, applied per
+-- game version into the schema gv_<slug> by app/core/migration_runner.py (see
+-- `python import_cli.py --help`). Cross-version tables live in public and come
+-- from database/global_migrations/*.sql.
+--
+-- This file is a snapshot of an early version of the schema and is missing
+-- later migrations (perks, mobs, the symbiant_items materialized view, item
+-- content hashes). It is kept only to document the original design.
+-- ############################################################################
 
 -- ============================================================================
 -- Core Tables - Reusable Entities

@@ -38,8 +38,19 @@ Shows profile information in a compact, action-friendly card format
           </div>
         </div>
 
-        <!-- Active Badge -->
-        <Badge v-if="isActive" value="Active" severity="success" size="small" />
+        <div class="flex flex-col items-end gap-1">
+          <!-- Active Badge -->
+          <Badge v-if="isActive" value="Active" severity="success" size="small" />
+
+          <!-- Built against another game version -->
+          <span
+            v-if="otherVersionLabel"
+            class="text-xs italic text-surface-500 dark:text-surface-400 whitespace-nowrap"
+            :title="`Built against ${otherVersionLabel}. Selecting it offers a copy for the version you are browsing.`"
+          >
+            <i class="pi pi-database text-xs mr-1"></i>{{ otherVersionLabel }}
+          </span>
+        </div>
       </div>
 
       <!-- Character Details -->
@@ -144,6 +155,8 @@ import Badge from 'primevue/badge';
 import Menu from 'primevue/menu';
 import type { MenuItem } from 'primevue/menuitem';
 import type { ProfileMetadata } from '@/lib/tinkerprofiles';
+import { gameVersionDisplayName } from '@/lib/tinkerprofiles/game-version';
+import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 
 // Props
 const props = defineProps<{
@@ -164,7 +177,19 @@ const emit = defineEmits<{
 const moreActionsButton = ref();
 const actionsMenu = ref();
 
+const profilesStore = useTinkerProfilesStore();
+
 // Computed
+/**
+ * Version tag, shown only when the profile was built against a different game
+ * database than the one being browsed. Same-version profiles need no tag.
+ */
+const otherVersionLabel = computed(() => {
+  const slug = props.profile.gameVersion;
+  if (!slug || slug === profilesStore.gameVersion) return '';
+  return gameVersionDisplayName(slug);
+});
+
 const professionIcon = computed(() => {
   const iconMap: Record<string, string> = {
     Adventurer: 'pi pi-compass',

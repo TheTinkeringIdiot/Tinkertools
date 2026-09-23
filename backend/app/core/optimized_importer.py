@@ -30,6 +30,9 @@ from app.models import (
     SpellDataSpells, ItemSpellData, Perk
 )
 from app.core import perk_validator
+from app.core.config import settings
+from app.core.content_hash import compute_item_hashes
+from app.core.versions import schema_name_for
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +45,8 @@ class OptimizedImporter:
     _perk_cache_loaded = False
     _perks_file_path: Optional[str] = None
 
-    def __init__(self, db_url: str = None, batch_size: int = 5000, perks_file: str = None, ultra_mode: bool = False):
+    def __init__(self, db_url: str = None, batch_size: int = 5000, perks_file: str = None,
+                 ultra_mode: bool = False, version_slug: str = None, skip_perks: bool = False):
         """
         Initialize optimized importer.
 
@@ -51,6 +55,8 @@ class OptimizedImporter:
             batch_size: Number of items to process before committing (default 5000 for remote DBs)
             perks_file: Path to perks.json file (optional, uses default if not provided)
             ultra_mode: Enable all aggressive optimizations (40-60x speedup, data loss risk)
+            version_slug: Game version to import into; its schema (gv_<slug>) is
+                set as the search_path for every connection from this engine.
         """
         self.batch_size = batch_size
         self.db_url = db_url or os.getenv("DATABASE_URL")
@@ -58,6 +64,9 @@ class OptimizedImporter:
 
         if not self.db_url:
             raise ValueError("DATABASE_URL required")
+
+        self.version_slug = version_slug or settings.DEFAULT_GAME_VERSION
+        self.schema_name = schema_name_for(self.version_slug)
 
         # Set class-level perks file path for _load_perk_cache
         if perks_file:
@@ -67,11 +76,16 @@ class OptimizedImporter:
         pool_size = 20 if ultra_mode else 10
         max_overflow = 40 if ultra_mode else 20
 
+        connect_args = {}
+        if self.db_url.startswith("postgres"):
+            connect_args["options"] = f"-csearch_path={self.schema_name},public"
+
         self.engine = create_engine(
             self.db_url,
             pool_size=pool_size,
             max_overflow=max_overflow,
             pool_pre_ping=True,
+            connect_args=connect_args,
             # Note: executemany optimizations are psycopg2-specific
             # They'll be applied automatically if using PostgreSQL
         )
@@ -101,8 +115,15 @@ class OptimizedImporter:
         # Ultra mode: index management
         self._dropped_indexes = {}
 
-        # Load perk metadata once (class-level)
-        self._load_perk_cache()
+        # Load perk metadata once (class-level). Versions imported without
+        # perks get an empty cache, so no item is treated as a perk.
+        self.skip_perks = skip_perks
+        if skip_perks:
+            logger.info("Perk metadata disabled for this import")
+            OptimizedImporter._perk_data_cache = {}
+            OptimizedImporter._perk_cache_loaded = True
+        else:
+            self._load_perk_cache()
 
         # Statistics
         self.stats = {
@@ -347,6 +368,10 @@ class OptimizedImporter:
                     )
                     created_items.append(item)
                     self.stats['items_created'] += 1
+
+                # Content hashes of the raw record, for cross-version item history
+                for field, digest in compute_item_hashes(item_data).items():
+                    setattr(item, field, digest)
 
                 # Extract ql and item_class from StatValues
                 for sv_data in item_data.get('StatValues', []):
@@ -855,6 +880,7 @@ class OptimizedImporter:
             SELECT indexname, indexdef
             FROM pg_indexes
             WHERE tablename = '{table_name}'
+            AND schemaname = current_schema()
             AND indexname NOT LIKE '%pkey%'
             AND indexname NOT LIKE '%unique%'
         """))

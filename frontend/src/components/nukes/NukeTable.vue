@@ -19,7 +19,7 @@
       <template #body="{ data }">
         <div class="flex items-center gap-2">
           <router-link
-            :to="`/items/${data.aoid}`"
+            :to="{ name: 'ItemDetail', params: { aoid: String(data.aoid) } }"
             class="font-medium text-primary-500 hover:text-primary-600 hover:underline"
             @click.stop
           >

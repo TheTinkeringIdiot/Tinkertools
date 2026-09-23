@@ -44,7 +44,9 @@ class StreamingCSVLoader:
         ('animation_mesh', ['id', 'animation_id', 'mesh_id'], True),
 
         # Items table (references attack_defense, animation_mesh)
-        ('items', ['id', 'aoid', 'name', 'ql', 'item_class', 'description', 'is_nano', 'animation_mesh_id', 'atkdef_id'], True),
+        ('items', ['id', 'aoid', 'name', 'ql', 'item_class', 'description', 'is_nano',
+                   'animation_mesh_id', 'atkdef_id', 'content_hash', 'stats_hash',
+                   'spells_hash', 'actions_hash', 'text_hash'], True),
 
         # Actions (references items)
         ('actions', ['id', 'action', 'item_id'], True),
@@ -142,7 +144,8 @@ class StreamingCSVLoader:
         # === POST-LOAD: Refresh materialized view ===
         try:
             symbiant_items_exists = self.db.execute(text(
-                "SELECT EXISTS (SELECT 1 FROM pg_matviews WHERE matviewname = 'symbiant_items')"
+                "SELECT EXISTS (SELECT 1 FROM pg_matviews "
+                "WHERE matviewname = 'symbiant_items' AND schemaname = current_schema())"
             )).scalar()
 
             if symbiant_items_exists:
@@ -335,6 +338,7 @@ class StreamingCSVLoader:
             FROM pg_indexes i
             LEFT JOIN pg_constraint c ON i.indexname = c.conname
             WHERE i.tablename = '{table_name}'
+            AND i.schemaname = current_schema()
             AND i.indexname NOT LIKE '%_pkey'
             AND c.conname IS NULL  -- Exclude constraint-backed indexes
         """))

@@ -12,6 +12,7 @@ import { createPinia, setActivePinia, type Pinia } from 'pinia';
 import { createRouter, createMemoryHistory, type Router } from 'vue-router';
 import { vi } from 'vitest';
 import type { Component } from 'vue';
+import { TEST_VERSION } from './version-fixtures';
 
 // ============================================================================
 // Mount Options Interface
@@ -92,12 +93,62 @@ export function createTestPinia(): Pinia {
  * Create a test router with memory history
  * Useful for testing navigation without browser
  */
+/**
+ * Create a test router with memory history.
+ *
+ * Every app route lives under a `/:version` parent, so the test router mirrors
+ * that shape: named routes resolve only if the `version` param can be
+ * inherited, and components that build versioned paths need a version in the
+ * current location. The router starts at `/<TEST_VERSION>/`.
+ *
+ * Pass `routes` to replace the default child set; they are mounted as children
+ * of the version parent, so give them relative paths ('items', not '/items').
+ */
 export function createTestRouter(routes: any[] = []): Router {
-  return createRouter({
+  const children =
+    routes.length > 0
+      ? routes
+      : [
+          { path: '', name: 'Home', component: { template: '<div>Home</div>' } },
+          { path: 'items', name: 'TinkerItems', component: { template: '<div>Items</div>' } },
+          {
+            path: 'items/:aoid',
+            name: 'ItemDetail',
+            component: { template: '<div>Item</div>' },
+          },
+          { path: 'profiles', name: 'TinkerProfiles', component: { template: '<div>P</div>' } },
+          {
+            path: 'profiles/:profileId',
+            name: 'TinkerProfileDetail',
+            component: { template: '<div>PD</div>' },
+          },
+          { path: 'nanos', name: 'TinkerNanos', component: { template: '<div>N</div>' } },
+          { path: 'fite', name: 'TinkerFite', component: { template: '<div>F</div>' } },
+          { path: 'plants', name: 'TinkerPlants', component: { template: '<div>Pl</div>' } },
+          { path: 'pocket', name: 'TinkerPocket', component: { template: '<div>Po</div>' } },
+          {
+            path: 'pocket/bosses/:id',
+            name: 'BossDetail',
+            component: { template: '<div>B</div>' },
+          },
+          { path: 'tinkernukes', name: 'TinkerNukes', component: { template: '<div>Nu</div>' } },
+        ];
+
+  const router = createRouter({
     history: createMemoryHistory(),
-    routes:
-      routes.length > 0 ? routes : [{ path: '/', component: { template: '<div>Home</div>' } }],
+    routes: [
+      {
+        path: '/:version([a-z0-9][a-z0-9.-]{0,39})',
+        component: { template: '<router-view />' },
+        children,
+      },
+    ],
   });
+
+  // Give the router a current location so `version` is available to inherit.
+  router.push(`/${TEST_VERSION}/`);
+
+  return router;
 }
 
 // ============================================================================

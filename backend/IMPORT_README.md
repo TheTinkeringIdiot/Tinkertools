@@ -1,107 +1,191 @@
 # TinkerTools Data Import Utility
 
-A standalone utility for importing game data into the TinkerTools database. This utility is separate from the main FastAPI application and uses the `DATABASE_URL` environment variable to connect to any database.
+A standalone utility for importing game data into the TinkerTools database. It is separate from the main FastAPI application and uses the `DATABASE_URL` environment variable to connect to any database.
+
+## Game versions
+
+TinkerTools serves several snapshots of the game database side by side: live Anarchy Online, Project Rubi-Ka, and historical client builds. Each snapshot is a **game version** with a slug (`ao`, `prk`, `ao-15.0`) and lives in **its own PostgreSQL schema**, `gv_<slug>`, holding the complete table set.
+
+The `public` schema holds only cross-version tables:
+
+| table | purpose |
+|---|---|
+| `game_versions` | the registry: slug, display name, family, lineage, client build, feature flags |
+| `item_revisions` | one row per (item, version) with content hashes, used for "changed in patch X" |
+| `global_migrations` | tracking for `database/global_migrations/*.sql` |
+
+Every import command:
+
+1. applies pending global migrations to `public`,
+2. rebuilds (`--clear`) or migrates the version's own schema from `database/migrations/*.sql`,
+3. loads the data into that schema,
+4. upserts the version's registry row,
+5. rebuilds the version's rows in `public.item_revisions` from the per-item content hashes.
+
+Versions are independent: `--clear` on `prk` never touches `ao`.
 
 ## Requirements
 
 ### Data Files
-Place the following files in the `backend/` directory:
-- `items.json` (407MB) - Item data
-- `nanos.json` (44MB) - Nano program data  
-- `symbiants.csv` (208KB) - Symbiant data
+
+Default locations are under `backend/database/`; override any of them with a `--*-file` flag (both `~` and environment variables are expanded).
+
+- `items.json` (407 MB) - Item data
+- `nanos.json` (44 MB) - Nano program data
+- `symbiants.csv` (208 KB) - Curated mob and drop-source data (skip with `--no-symbiants`)
+- `perks.json` (411 KB) - Curated perk metadata (skip with `--no-perks`)
+
+Curated files are live-era Anarchy Online data. For a private server or an old client build, either supply that version's own copies or omit them with `--no-perks` / `--no-symbiants`; the registry then records the missing features and the UI hides the affected tools.
 
 ### Environment
-Set the database connection string:
+
 ```bash
 export DATABASE_URL="postgresql://aodbuser:password@localhost:5432/tinkertools"
 ```
 
-For production deployment, simply change the DATABASE_URL to point to your production database.
+For production deployment, change `DATABASE_URL` to point at the production database.
 
 ## Usage
 
-### Validate Files
-Check if all required data files are present:
+### Validate files
+
 ```bash
 python import_cli.py validate
+python import_cli.py validate --no-perks --no-symbiants   # only items and nanos
 ```
 
-### Import Individual Datasets
+### Import a whole version (recommended)
+
 ```bash
-# Import symbiants (smallest file, good for testing)
-python import_cli.py symbiants
-
-# Import items with custom chunk size
-python import_cli.py items --chunk-size 50
-
-# Import nanos
-python import_cli.py nanos
+python import_cli.py all --version ao --csv-mode --clear \
+    --items-file ~/ao-data/items.json \
+    --nanos-file ~/ao-data/nanos.json
 ```
 
-### Import All Data
-Import everything in optimal order (symbiants → items → nanos):
+`--csv-mode` transforms the JSON into CSV files and loads them with PostgreSQL `COPY`. It is roughly 55x faster than the ORM path and is the normal way to load a version.
+
+### Import a second version
+
 ```bash
-python import_cli.py all
+python import_cli.py all --version prk --csv-mode --clear \
+    --items-file ~/prk/items.json --nanos-file ~/prk/nanos.json \
+    --no-perks --no-symbiants \
+    --display-name "Project Rubi-Ka" --family prk --parent ao
 ```
 
-### Clear Existing Data
-Use the `--clear` flag to delete existing data before import:
+### Import individual datasets
+
 ```bash
-python import_cli.py all --clear
+python import_cli.py items --version ao --chunk-size 50
+python import_cli.py items --version ao --optimized
+python import_cli.py nanos --version ao
+python import_cli.py symbiants --version ao
 ```
-**⚠️ WARNING: This will delete all existing data!**
+
+### Registry commands
+
+```bash
+# Show every registered version, its schema, and what it has loaded
+python import_cli.py versions
+
+# Create or update a registry row without importing anything
+python import_cli.py register --version ao --set-default \
+    --display-name "Anarchy Online (Live)" --snapshot-date 2026-02-01
+
+# One-time transition: adopt an existing single-version install
+python import_cli.py adopt-public --version ao
+
+# Remove a version's schema and registry row
+python import_cli.py drop-version --version ao-15.0 --yes
+```
+
+`adopt-public` moves the TinkerTools tables that still sit in `public` into `gv_<slug>` with `ALTER TABLE ... SET SCHEMA` (indexes, sequences and the `symbiant_items` materialized view follow), then applies any missing migrations. Adopted items have no content hashes, so they contribute no `item_revisions` rows until the version is re-imported from its dump files.
 
 ## Options
 
-- `--clear` - Clear existing data before import (destructive!)
-- `--chunk-size N` - Process N items per chunk (default: 100)
-- `--database-url URL` - Override DATABASE_URL environment variable
+### Game version
 
-## Examples
+| option | meaning |
+|---|---|
+| `--version SLUG` | version to operate on; data lands in `gv_<slug>` (default: `DEFAULT_GAME_VERSION`, normally `ao`) |
+| `--display-name NAME` | name shown in the version selector (default: the slug) |
+| `--family NAME` | selector grouping (default: `prk` for slugs starting with `prk`, else `ao`) |
+| `--parent SLUG` | the snapshot this one follows; sets lineage for item history |
+| `--client-build STR` | client build (default: the `Version` field of the first item record) |
+| `--snapshot-date YYYY-MM-DD` | date of the dump |
+| `--sort-order N` | position in the version selector |
+| `--set-default` | serve this version for requests with no version segment |
+| `--disabled` | register the version but hide it from the API and selector |
+| `--notes TEXT` | provenance notes (client build, extractor, curated files used) |
+| `--no-perks` | import without perk metadata |
+| `--no-symbiants` | import without mobs, sources and symbiant drops |
+| `--yes` | confirm a destructive registry command (required by `drop-version`) |
 
-```bash
-# Development - import to local test database
-export DATABASE_URL="postgresql://aodbuser:password@localhost:5432/tinkertools"
-python import_cli.py all --clear
+### Import
 
-# Production - import to production database  
-export DATABASE_URL="postgresql://prod_user:prod_pass@prod-host:5432/tinkertools_prod"
-python import_cli.py all
+| option | meaning |
+|---|---|
+| `--clear` | drop and recreate this version's schema from the migrations first (destructive, this version only) |
+| `--csv-mode` | CSV + `COPY` pipeline, ~55x faster (`all` command only) |
+| `--optimized` | batched ORM importer, 10-20x faster than standard |
+| `--ultra` | experimental, 40-60x faster, data loss possible on crash; requires `--optimized --clear` |
+| `--chunk-size N` | items per chunk in standard mode (default: 100) |
+| `--batch-size N` | batch size for the optimized importer |
+| `--database-url URL` | override `DATABASE_URL` |
+| `--items-file`, `--nanos-file`, `--symbiants-file`, `--perks-file` | override default file locations |
 
-# Test with small chunks for memory-constrained environments
-python import_cli.py items --chunk-size 25
-```
+## Content hashes and item history
 
-## Performance Notes
+During import each raw record is hashed (`app/core/content_hash.py`):
 
-- **Symbiants**: ~1,000 records, imports in seconds
-- **Items**: ~18.7M records, large file processing in chunks
-- **Nanos**: ~2.1M records, medium processing time
-- **Memory Usage**: Controlled by chunk size (default 100 items/chunk)
+- `content_hash` over the whole normalized record,
+- `stats_hash`, `spells_hash`, `actions_hash`, `text_hash` over its parts.
 
-## Implementation Details
+`Version`, `DBType` and the internal nano marker are stripped, and `StatValues` plus the attack/defense stat lists are sorted, so two extractions of the same client hash identically. Criteria and spell arrays keep their order, because reordering them changes what the item requires or does.
+
+The hashes are stored on `items` (migration 007) and copied into `public.item_revisions` after each load. Comparing an AOID's hashes across versions in lineage order gives the patch points where the item changed, and which part of it changed.
+
+## Performance notes
+
+- **CSV mode**: full load of items + nanos in a few minutes; the fastest path.
+- **Optimized mode**: 10-20x standard, still ORM-based.
+- **Standard mode**: slowest, most conservative; useful for small or incremental loads.
+- **Memory usage**: controlled by `--chunk-size` in standard mode; CSV mode streams.
+
+## Implementation details
 
 The import utility:
-1. **Preprocesses singletons** - Extracts all StatValues and Criteria for bulk creation
-2. **Processes in chunks** - Handles large files without memory issues  
-3. **Uses transactions** - Each chunk is committed separately for reliability
-4. **Maintains relationships** - Properly handles foreign keys and many-to-many relationships
-5. **Provides progress tracking** - Logs progress and performance metrics
+
+1. **Prepares the schema** - global migrations, then this version's migrations
+2. **Preprocesses singletons** - extracts all StatValues and Criteria for bulk creation
+3. **Processes in chunks** - handles large files without memory issues
+4. **Uses transactions** - each chunk is committed separately for reliability
+5. **Maintains relationships** - handles foreign keys and many-to-many relationships
+6. **Hashes every record** - for cross-version item history
+7. **Registers the version** - registry row plus `item_revisions`
+8. **Provides progress tracking** - logs progress and performance metrics
 
 ## Troubleshooting
 
-### Import Fails
+### Import fails
 - Check `import.log` for detailed error messages
-- Verify DATABASE_URL is correct and database is accessible
-- Ensure sufficient disk space and memory
-- Try smaller `--chunk-size` for memory issues
+- Verify `DATABASE_URL` is correct and the database is accessible
+- Ensure sufficient disk space and memory (about 600 MB per version)
+- Try a smaller `--chunk-size` for memory issues
 
-### Performance Issues  
-- Use smaller chunk sizes: `--chunk-size 25`
+### Data went into the wrong schema
+- Confirm the slug: `python import_cli.py versions`
+- The API resolves a version through `public.game_versions`; a version with a schema but no registry row is invisible to it, and `versions` marks a registry row whose schema is missing as `NO SCHEMA`
+
+### No item history
+- `item_revisions` is empty for a version whose items predate migration 007; re-import that version
+
+### Performance issues
+- Prefer `--csv-mode` for a full load
 - Monitor database performance during import
-- Consider running during off-peak hours for production
+- Run during off-peak hours in production
 
-### Data Quality
+### Data quality
 - The utility validates data during import
-- Failed items are logged but don't stop the import
+- Failed items are logged but do not stop the import
 - Check logs for items that failed to import

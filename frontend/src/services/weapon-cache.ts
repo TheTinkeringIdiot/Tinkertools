@@ -8,6 +8,12 @@
 
 import type { Item } from '@/types/api';
 import type { WeaponAnalyzeRequest } from '@/types/weapon-analysis';
+import {
+  versionKey,
+  versionPrefix,
+  purgeOtherVersions,
+  purgeLocalStoragePrefix,
+} from './version-keys';
 
 // ============================================================================
 // Types
@@ -34,9 +40,25 @@ interface WeaponCacheMetrics {
 const CACHE_CONFIG = {
   TTL: 60 * 60 * 1000, // 1 hour (static game data)
   MAX_ENTRIES: 5, // Maximum cached profiles (LRU eviction)
-  STORAGE_PREFIX: 'tinkertools_weapon_cache_',
-  METRICS_KEY: 'tinkertools_weapon_cache_metrics',
+  /** Base of the key family; the game version slug is inserted after it. */
+  STORAGE_BASE: 'tinkertools_weapon_cache',
+  METRICS_BASE: 'tinkertools_weapon_metrics',
+  /** Pre-version key family, cleaned up once on first use. */
+  LEGACY_STORAGE_PREFIX: 'tinkertools_weapon_cache_',
 } as const;
+
+/**
+ * Cached weapons are server data, so every entry belongs to one game version:
+ * `tinkertools_weapon_cache:<slug>:<cacheKey>`. Scans (clear, LRU, stats) use
+ * this prefix and therefore stay inside the active version.
+ */
+function storagePrefix(): string {
+  return versionPrefix(CACHE_CONFIG.STORAGE_BASE);
+}
+
+function metricsKey(): string {
+  return versionKey(CACHE_CONFIG.METRICS_BASE);
+}
 
 // ============================================================================
 // In-Memory Cache
@@ -74,7 +96,7 @@ export function generateCacheKey(request: WeaponAnalyzeRequest): string {
  * @returns Storage key
  */
 function getStorageKey(cacheKey: string): string {
-  return `${CACHE_CONFIG.STORAGE_PREFIX}${cacheKey}`;
+  return `${storagePrefix()}${cacheKey}`;
 }
 
 // ============================================================================
@@ -163,6 +185,18 @@ export function cacheWeapons(cacheKey: string, weapons: Item[]): void {
 }
 
 /**
+ * Drop cached weapons belonging to other game versions, and the pre-version
+ * key family. Weapon results are recomputable and TTL'd at an hour, so old
+ * entries are dropped rather than migrated.
+ */
+export function purgeOtherVersionWeaponCaches(slug?: string): number {
+  memoryCache.clear();
+  const removed = purgeOtherVersions(CACHE_CONFIG.STORAGE_BASE, slug);
+  const legacy = purgeLocalStoragePrefix(CACHE_CONFIG.LEGACY_STORAGE_PREFIX);
+  return removed + legacy;
+}
+
+/**
  * Clear all cached weapons
  */
 export function clearWeaponCache(): void {
@@ -173,7 +207,7 @@ export function clearWeaponCache(): void {
   const keysToRemove: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.startsWith(CACHE_CONFIG.STORAGE_PREFIX)) {
+    if (key && key.startsWith(storagePrefix())) {
       keysToRemove.push(key);
     }
   }
@@ -203,7 +237,7 @@ function enforceMaxEntries(): void {
 
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.startsWith(CACHE_CONFIG.STORAGE_PREFIX)) {
+    if (key && key.startsWith(storagePrefix())) {
       const stored = localStorage.getItem(key);
       if (stored) {
         try {
@@ -229,7 +263,7 @@ function enforceMaxEntries(): void {
   const toRemove = entries.length - CACHE_CONFIG.MAX_ENTRIES;
   for (let i = 0; i < toRemove; i++) {
     const key = entries[i].key;
-    const cacheKey = key.replace(CACHE_CONFIG.STORAGE_PREFIX, '');
+    const cacheKey = key.replace(storagePrefix(), '');
     evictEntry(cacheKey);
     console.log(`[WeaponCache] Evicted old entry: ${cacheKey}`);
   }
@@ -243,7 +277,7 @@ function enforceMaxEntries(): void {
  * Load metrics from localStorage
  */
 function loadMetrics(): WeaponCacheMetrics {
-  const stored = localStorage.getItem(CACHE_CONFIG.METRICS_KEY);
+  const stored = localStorage.getItem(metricsKey());
   if (stored) {
     try {
       return JSON.parse(stored) as WeaponCacheMetrics;
@@ -266,7 +300,7 @@ function loadMetrics(): WeaponCacheMetrics {
  */
 function saveMetrics(metrics: WeaponCacheMetrics): void {
   try {
-    localStorage.setItem(CACHE_CONFIG.METRICS_KEY, JSON.stringify(metrics));
+    localStorage.setItem(metricsKey(), JSON.stringify(metrics));
   } catch (error) {
     console.warn('[WeaponCache] Failed to save metrics:', error);
   }
@@ -343,7 +377,7 @@ export function getCacheStats(): {
 
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.startsWith(CACHE_CONFIG.STORAGE_PREFIX)) {
+    if (key && key.startsWith(storagePrefix())) {
       const stored = localStorage.getItem(key);
       if (stored) {
         try {

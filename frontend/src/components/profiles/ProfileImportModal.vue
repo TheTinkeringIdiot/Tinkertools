@@ -448,6 +448,7 @@ import RadioButton from 'primevue/radiobutton';
 import Textarea from 'primevue/textarea';
 import Dropdown from 'primevue/dropdown';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
+import { API_ROOT } from '@/services/api-config';
 import type { ProfileImportResult, BulkImportResult, ProfileMetadata } from '@/lib/tinkerprofiles';
 
 interface ImportProgress {
@@ -456,8 +457,6 @@ interface ImportProgress {
   total: number;
   message: string;
 }
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
 // Props & Emits
 const props = defineProps<{
@@ -682,7 +681,10 @@ async function importProfile() {
       console.log('[AOSetups Import] Extracted profile ID:', profileId);
       console.log('[AOSetups Import] Fetching from backend proxy...');
 
-      const response = await fetch(`${API_BASE_URL}/aosetups/profile/${profileId}`);
+      // The AOSetups proxy is version-independent (it fetches an external site),
+      // so it lives at the API root rather than under a version segment. Build
+      // the URL from the shared config instead of hardcoding a base.
+      const response = await fetch(`${API_ROOT}/aosetups/profile/${profileId}`);
       if (!response.ok) {
         const error = `Failed to fetch profile: ${response.status} ${response.statusText}`;
         console.error('[AOSetups Import] Fetch error:', error);

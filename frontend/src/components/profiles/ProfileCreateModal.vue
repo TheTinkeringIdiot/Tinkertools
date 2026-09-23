@@ -11,6 +11,16 @@ Modal for creating new character profiles
     @update:visible="$emit('update:visible', $event)"
   >
     <form @submit.prevent="createProfile" class="space-y-4">
+      <!-- Game version this profile will be built against -->
+      <div
+        class="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-400 bg-surface-50 dark:bg-surface-800 rounded px-3 py-2"
+      >
+        <i class="pi pi-database text-xs"></i>
+        <span>
+          This profile is for <strong>{{ currentVersionLabel }}</strong>
+        </span>
+      </div>
+
       <!-- Character Name -->
       <div class="field">
         <label for="profile-name" class="font-semibold text-surface-900 dark:text-surface-50">
@@ -163,6 +173,7 @@ import {
   ACCOUNT_TYPES,
 } from '@/lib/tinkerprofiles';
 import { normalizeProfessionToId, normalizeBreedToId } from '@/services/game-utils';
+import { gameVersionDisplayName } from '@/lib/tinkerprofiles/game-version';
 
 // Props & Emits
 const props = defineProps<{
@@ -200,6 +211,9 @@ const expansionOptions = ANARCHY_EXPANSIONS.map((e) => e);
 const accountTypeOptions = ACCOUNT_TYPES.map((a) => a);
 
 // Computed
+/** New profiles are tagged with the version being browsed; say which one. */
+const currentVersionLabel = computed(() => gameVersionDisplayName(profilesStore.gameVersion));
+
 const isValid = computed(() => {
   return formData.name.trim().length > 0 && !errors.value.name;
 });

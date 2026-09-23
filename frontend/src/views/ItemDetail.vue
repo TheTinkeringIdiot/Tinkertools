@@ -17,6 +17,13 @@ Shows all item data with profile compatibility and comparison options
         <h1 class="text-2xl font-bold">{{ item?.name || 'Loading Item...' }}</h1>
         <Badge v-if="displayedItem && currentQl" :value="`QL ${currentQl}`" severity="info" />
         <Badge v-if="item?.is_nano" value="Nano" severity="success" />
+
+        <!-- Patch points at which this item changed -->
+        <ItemHistoryControl
+          :revisions="revisions"
+          :request-version="requestVersion"
+          @select="onHistorySelect"
+        />
       </div>
 
       <!-- Header Actions -->
@@ -52,9 +59,59 @@ Shows all item data with profile compatibility and comparison options
       </div>
     </div>
 
+    <!-- Peek: this item as it was in another snapshot -->
+    <div
+      v-if="peekVersion"
+      data-testid="item-peek-banner"
+      class="mb-4 flex flex-wrap items-center gap-3 rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950 px-4 py-2 text-sm text-amber-900 dark:text-amber-200"
+    >
+      <i class="pi pi-clock" aria-hidden="true"></i>
+      <span class="flex-1">
+        As of {{ peekLabel }}. Stats, requirements and interpolation come from that snapshot.
+      </span>
+      <div class="flex items-center gap-2">
+        <Button
+          :label="compareWithCurrent ? 'Hide comparison' : 'Compare with current'"
+          icon="pi pi-arrows-h"
+          size="small"
+          text
+          data-testid="item-compare-toggle"
+          @click="toggleCompare"
+        />
+        <Button
+          :label="`Back to ${currentVersionLabel}`"
+          icon="pi pi-arrow-left"
+          size="small"
+          outlined
+          data-testid="item-peek-exit"
+          @click="exitPeek"
+        />
+      </div>
+    </div>
+
     <!-- Shared Item Content -->
     <div v-if="loading" class="flex items-center justify-center h-96">
       <ProgressSpinner />
+    </div>
+
+    <div
+      v-else-if="missingInCurrent"
+      class="text-center py-16"
+      data-testid="item-missing-in-version"
+    >
+      <i class="pi pi-clock text-4xl text-amber-500 mb-4"></i>
+      <h3 class="text-lg font-medium text-surface-600 dark:text-surface-400 mb-2">
+        Not present in {{ currentVersionLabel }}
+      </h3>
+      <p class="text-surface-500 dark:text-surface-500 mb-4">
+        First appears in {{ firstSeenLabel }}
+      </p>
+      <Button
+        :label="`View in ${firstSeenLabel}`"
+        icon="pi pi-eye"
+        data-testid="item-missing-view"
+        @click="viewFirstSeen"
+      />
     </div>
 
     <div v-else-if="error" class="text-center py-16">
@@ -91,10 +148,12 @@ Shows all item data with profile compatibility and comparison options
           </span>
         </div>
 
-        <!-- Interpolation Controls (right-aligned) -->
+        <!-- Interpolation Controls (right-aligned). While peeking, they
+             interpolate against the peeked snapshot. -->
         <div class="flex-1 flex justify-end">
           <ItemInterpolationBar
             :item="item"
+            :game-version="peekVersion"
             :initial-ql="route.query.ql ? parseInt(route.query.ql as string) : undefined"
             @item-update="handleInterpolatedItem"
             @error="handleInterpolationError"
@@ -110,6 +169,14 @@ Shows all item data with profile compatibility and comparison options
         </div>
       </div>
 
+      <!-- Snapshot comparison (while peeking) -->
+      <ItemVersionDiff
+        v-if="showDiff"
+        :from-item="item"
+        :to-item="currentVersionItem"
+        :from-label="peekLabel"
+        :to-label="currentVersionLabel"
+      />
       <!-- Item Overview -->
       <div class="grid grid-cols-1 lg:grid-cols-4 gap-3">
         <!-- Item Slots Display and Basic Info -->
@@ -573,7 +640,12 @@ import RawStats from '@/components/items/RawStats.vue';
 import ItemSources from '@/components/items/ItemSources.vue';
 import ItemInterpolationBar from '@/components/items/ItemInterpolationBar.vue';
 import EquipSlotSelector from '@/components/items/EquipSlotSelector.vue';
+import ItemHistoryControl from '@/components/versions/ItemHistoryControl.vue';
+import ItemVersionDiff from '@/components/versions/ItemVersionDiff.vue';
 import { useToast } from 'primevue/usetoast';
+import { apiClient } from '@/services/api-client';
+import { useGameVersion } from '@/composables/useGameVersion';
+import type { ItemRevisionsResponse } from '@/types/game-version';
 
 const route = useRoute();
 const router = useRouter();
@@ -597,6 +669,17 @@ const advancedView = ref(false);
 const equipDialogVisible = ref(false);
 const validSlots = ref<string[]>([]);
 
+// Item change history across game versions
+const {
+  currentVersion,
+  current: currentGameVersion,
+  versions: gameVersions,
+  versionedPath,
+} = useGameVersion();
+const revisions = ref<ItemRevisionsResponse | null>(null);
+const compareWithCurrent = ref(false);
+const currentVersionItem = ref<Item | null>(null);
+
 // Interpolation state
 const interpolationInfo = ref<InterpolationInfo | null>(null);
 const interpolatedItem = ref<InterpolatedItem | null>(null);
@@ -608,6 +691,49 @@ const currentQl = computed(() => {
   const queryQl = route.query.ql ? parseInt(route.query.ql as string) : null;
   return queryQl || item.value?.ql || null;
 });
+
+// ============================================================================
+// Version peek (?as=<slug>): show this item as another snapshot defines it
+// ============================================================================
+
+const itemAoid = computed(() => props.aoid || (route.params.aoid as string) || '');
+
+/** Snapshot being peeked at, or null when viewing the browsing version. */
+const peekVersion = computed(() => {
+  const as = route.query.as;
+  if (typeof as !== 'string' || !as) return null;
+  return as === currentVersion.value ? null : as;
+});
+
+/** Version the displayed item was actually loaded from. */
+const requestVersion = computed(() => peekVersion.value || currentVersion.value);
+
+function versionLabel(slug: string | null | undefined): string {
+  if (!slug) return 'this version';
+  return (
+    gameVersions.value.find((version) => version.slug === slug)?.display_name ||
+    revisions.value?.revisions.find((point) => point.version_slug === slug)?.display_name ||
+    slug
+  );
+}
+
+const peekLabel = computed(() => versionLabel(peekVersion.value));
+const currentVersionLabel = computed(
+  () => currentGameVersion.value?.display_name || currentVersion.value || 'this version'
+);
+const firstSeenLabel = computed(() => versionLabel(revisions.value?.first_seen_in));
+
+/** The item is absent from the browsing version but exists in another one. */
+const missingInCurrent = computed(() => {
+  const history = revisions.value;
+  if (!history || peekVersion.value || item.value) return false;
+  if (!history.first_seen_in || !currentVersion.value) return false;
+  return !history.present_in.includes(currentVersion.value);
+});
+
+const showDiff = computed(
+  () => compareWithCurrent.value && !!peekVersion.value && !!currentVersionItem.value
+);
 
 // Computed
 const profile = computed(() => profilesStore.activeProfile);
@@ -688,8 +814,8 @@ const canWear = computed(() => {
 
 // Methods
 async function loadItem() {
-  const itemAoid = props.aoid || (route.params.aoid as string);
-  if (!itemAoid) return;
+  const aoidParam = itemAoid.value;
+  if (!aoidParam) return;
 
   loading.value = true;
   error.value = null;
@@ -698,28 +824,102 @@ async function loadItem() {
   interpolatedItem.value = null;
   interpolationError.value = null;
 
+  const aoid = parseInt(aoidParam);
+
   try {
-    const loadedItem = await itemsStore.getItem(parseInt(itemAoid));
-    if (loadedItem) {
-      item.value = loadedItem;
-    } else {
-      // Check if there's an error in the store
-      if (itemsStore.error) {
-        error.value = itemsStore.error.message || 'Failed to load item';
+    if (peekVersion.value) {
+      // Peeked snapshots are never written to the items store: the store holds
+      // the browsing version's data only.
+      const response = await apiClient.getItem(aoid, { gameVersion: peekVersion.value });
+      if (response.success && response.data) {
+        item.value = response.data;
       } else {
-        error.value = 'Item not found';
+        item.value = null;
+        error.value = 'Item not found in this snapshot';
+      }
+    } else {
+      const loadedItem = await itemsStore.getItem(aoid);
+      if (loadedItem) {
+        item.value = loadedItem;
+      } else {
+        item.value = null;
+        // Check if there's an error in the store
+        if (itemsStore.error) {
+          error.value = itemsStore.error.message || 'Failed to load item';
+        } else {
+          error.value = 'Item not found';
+        }
       }
     }
   } catch (err: any) {
+    item.value = null;
     error.value = err.message || 'Failed to load item';
   } finally {
     loading.value = false;
   }
 }
 
+/**
+ * Patch points for this item. Non-blocking: a failure simply hides the
+ * history control.
+ */
+async function loadRevisions() {
+  const aoidParam = itemAoid.value;
+  if (!aoidParam) {
+    revisions.value = null;
+    return;
+  }
+  try {
+    revisions.value = await apiClient.getItemRevisions(parseInt(aoidParam));
+  } catch {
+    revisions.value = null;
+  }
+}
+
+/** The item as the browsing version defines it, for the comparison table. */
+async function loadCurrentVersionItem() {
+  const aoidParam = itemAoid.value;
+  if (!aoidParam || !peekVersion.value) {
+    currentVersionItem.value = null;
+    return;
+  }
+  try {
+    currentVersionItem.value = await itemsStore.getItem(parseInt(aoidParam));
+  } catch {
+    currentVersionItem.value = null;
+  }
+}
+
+/** Selecting a patch point peeks at it; selecting the browsing version exits. */
+function onHistorySelect(slug: string) {
+  const query: Record<string, any> = { ...route.query };
+  if (!slug || slug === currentVersion.value) {
+    delete query.as;
+  } else {
+    query.as = slug;
+  }
+  router.replace({ name: 'ItemDetail', params: { ...route.params }, query });
+}
+
+function exitPeek() {
+  onHistorySelect(currentVersion.value || '');
+}
+
+function viewFirstSeen() {
+  const slug = revisions.value?.first_seen_in;
+  if (slug) onHistorySelect(slug);
+}
+
+async function toggleCompare() {
+  compareWithCurrent.value = !compareWithCurrent.value;
+  if (compareWithCurrent.value && !currentVersionItem.value) {
+    await loadCurrentVersionItem();
+  }
+}
+
 function onClose() {
   isVisible.value = false;
-  router.push('/items');
+  router.push({ name: 'TinkerItems' });
 }
 
 function goBack() {
@@ -728,7 +928,7 @@ function goBack() {
   if (window.history.length > 1 && document.referrer.includes(window.location.origin)) {
     router.go(-1);
   } else {
-    router.push('/items');
+    router.push({ name: 'TinkerItems' });
   }
 }
 
@@ -740,7 +940,14 @@ function addToComparison() {
 function shareItem() {
   if (!item.value) return;
 
-  const url = `${window.location.origin}/items/${item.value.aoid}`;
+  // A shared link must open the same game version, and the same peek.
+  const params = new URLSearchParams();
+  if (route.query.ql) params.set('ql', String(route.query.ql));
+  if (peekVersion.value) params.set('as', peekVersion.value);
+  const queryString = params.toString();
+  const url = `${window.location.origin}${versionedPath(`/items/${item.value.aoid}`)}${
+    queryString ? `?${queryString}` : ''
+  }`;
 
   if (navigator.share) {
     navigator.share({
@@ -904,6 +1111,7 @@ onMounted(async () => {
     await profilesStore.loadProfiles();
   }
   loadItem();
+  loadRevisions();
 });
 
 // Watch for route changes
@@ -911,8 +1119,22 @@ watch(
   () => route.params.aoid,
   () => {
     if (route.name === 'ItemDetail') {
+      compareWithCurrent.value = false;
+      currentVersionItem.value = null;
       loadItem();
+      loadRevisions();
     }
+  }
+);
+
+// Peeking at another snapshot reloads the item from that version
+watch(
+  () => route.query.as,
+  () => {
+    if (route.name !== 'ItemDetail') return;
+    compareWithCurrent.value = false;
+    currentVersionItem.value = null;
+    loadItem();
   }
 );
 
@@ -926,6 +1148,10 @@ defineExpose({
   interpolatedItem,
   displayedItem,
   interpolationError,
+  revisions,
+  peekVersion,
+  missingInCurrent,
+  compareWithCurrent,
 });
 </script>
 

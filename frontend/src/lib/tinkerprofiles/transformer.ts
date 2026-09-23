@@ -27,6 +27,7 @@ import { SKILL_COST_FACTORS } from '@/services/game-data';
 import { normalizeProfessionToId, normalizeBreedToId } from '@/services/game-utils';
 import { isPRKFormat, decodePRK } from './prk-decoder';
 import type { PRKPayload } from './prk-decoder';
+import { currentGameVersion, versionForImport } from './game-version';
 
 export class ProfileTransformer {
   // ============================================================================
@@ -127,6 +128,8 @@ export class ProfileTransformer {
       id: profile.id,
       created: profile.created,
       updated: profile.updated,
+      // Which game database the embedded item snapshots came from.
+      gameVersion: profile.gameVersion,
       Character: profile.Character,
       IPTracker: profile.IPTracker,
       skills: profile.skills, // Use numeric skill IDs as keys
@@ -151,6 +154,11 @@ export class ProfileTransformer {
       importedProfile.id = `profile_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       importedProfile.created = new Date().toISOString();
       importedProfile.updated = new Date().toISOString();
+
+      // Our own export carries the game version it was built against; keep it so
+      // the profile does not silently claim to match the version being browsed.
+      importedProfile.gameVersion = parsed.gameVersion ?? currentGameVersion();
+      result.metadata.gameVersion = importedProfile.gameVersion;
 
       // Normalize Character IDs (handles both legacy strings and numeric IDs)
       importedProfile.Character.Profession = normalizeProfessionToId(
@@ -188,6 +196,15 @@ export class ProfileTransformer {
     const aosetups = JSON.parse(data);
     result.metadata.migrated = true;
 
+    // AOSetups describes live Anarchy Online, so the profile belongs to an
+    // `ao`-family version even if another family is being browsed.
+    const target = versionForImport('aosetups');
+    result.metadata.gameVersion = target.slug;
+    if (target.warning) {
+      result.metadata.gameVersionWarning = target.warning;
+      result.warnings.push(target.warning);
+    }
+
     const profile = createDefaultProfile();
     console.log(
       `[ProfileTransformer] Created default profile with ${Object.keys(profile.skills).length} skills`
@@ -195,6 +212,7 @@ export class ProfileTransformer {
 
     // Ensure profile is v4.0.0 format with ID-based skills
     profile.version = '4.0.0';
+    profile.gameVersion = target.slug;
     // Keep all default skills - AOSetups will update the values for skills it includes
 
     // Map character data
@@ -266,7 +284,7 @@ export class ProfileTransformer {
     }
 
     // Map equipment (implants, weapons, clothing)
-    await this.mapAOSetupsEquipment(aosetups, profile, result);
+    await this.mapAOSetupsEquipment(aosetups, profile, result, undefined, target.slug);
 
     // Map perks to PerksAndResearch (fetch details from backend via batch)
     if (aosetups.perks && Array.isArray(aosetups.perks)) {
@@ -463,7 +481,8 @@ export class ProfileTransformer {
     aosetups: any,
     profile: TinkerProfile,
     result: ProfileImportResult,
-    onProgress?: (current: number, total: number) => void
+    onProgress?: (current: number, total: number) => void,
+    gameVersion?: string
   ): Promise<void> {
     // First pass: collect all item requests
     const itemRequests: Array<{ aoid: number; targetQl?: number }> = [];
@@ -547,7 +566,7 @@ export class ProfileTransformer {
     }
 
     // Fetch all items
-    const itemMap = await this.fetchItems(itemRequests, onProgress);
+    const itemMap = await this.fetchItems(itemRequests, onProgress, gameVersion);
 
     // Second pass: populate equipment with fetched items
     for (const placement of itemPlacement) {
@@ -869,8 +888,19 @@ export class ProfileTransformer {
     const payload = decodePRK(data);
     result.metadata.migrated = true;
 
+    // A PRK export describes a Project Rubi-Ka character: tag it with a PRK
+    // version and resolve its items there, falling back (with a warning) when
+    // no PRK database is loaded.
+    const target = versionForImport('prk');
+    result.metadata.gameVersion = target.slug;
+    if (target.warning) {
+      result.metadata.gameVersionWarning = target.warning;
+      result.warnings.push(target.warning);
+    }
+
     const profile = createDefaultProfile(payload.n);
     profile.version = '4.0.0';
+    profile.gameVersion = target.slug;
 
     // Character basics
     profile.Character.Level = payload.l;
@@ -913,7 +943,7 @@ export class ProfileTransformer {
     }
 
     // Equipment — batch fetch all items, then map to slots
-    await this.mapPRKEquipment(payload, profile, result);
+    await this.mapPRKEquipment(payload, profile, result, target.slug);
 
     // Perks — batch lookup, set as legacy array, then migrate
     if (payload.pk.length > 0) {
@@ -953,7 +983,8 @@ export class ProfileTransformer {
   private async mapPRKEquipment(
     payload: PRKPayload,
     profile: TinkerProfile,
-    result: ProfileImportResult
+    result: ProfileImportResult,
+    gameVersion?: string
   ): Promise<void> {
     // Collect all item requests from equipment, armor, and implants
     const allItems = [
@@ -966,7 +997,7 @@ export class ProfileTransformer {
 
     // Batch fetch all items
     const fetchRequests = allItems.map(i => ({ aoid: i.aoid, targetQl: i.targetQl }));
-    const itemMap = await this.fetchItems(fetchRequests);
+    const itemMap = await this.fetchItems(fetchRequests, undefined, gameVersion);
 
     // Helper to create a fallback item when fetch fails
     const createFallback = (aoid: number, ql: number): Item => ({
@@ -1184,9 +1215,53 @@ export class ProfileTransformer {
    * @param onProgress Optional callback for progress updates
    * @returns Promise<Map<string, Item | null>> - Map of "aoid:ql" to Item
    */
+  /**
+   * Resolve {aoid, targetQl} pairs into Item snapshots against a game version.
+   *
+   * Public wrapper over the batch fetch used by imports, so the cross-version
+   * copy flow re-resolves embedded items through exactly the same path.
+   *
+   * @param gameVersion Version slug to resolve against; the current one by default.
+   * @returns Map of "aoid:ql" to Item, with null for AOIDs the version does not have.
+   */
+  async resolveItems(
+    itemRequests: Array<{ aoid: number; targetQl?: number }>,
+    gameVersion?: string,
+    onProgress?: (current: number, total: number) => void
+  ): Promise<Map<string, Item | null>> {
+    // A copy must not read a failed request as "every item is missing".
+    return this.fetchItems(itemRequests, onProgress, gameVersion, true);
+  }
+
+  /**
+   * Attack/defense stats for weapons, which the batch interpolate endpoint does
+   * not return. Keyed by AOID. Throws when a request fails.
+   */
+  async fetchCombatStats(
+    aoids: number[],
+    gameVersion?: string
+  ): Promise<Map<number, Pick<Item, 'attack_stats' | 'defense_stats'>>> {
+    const stats = new Map<number, Pick<Item, 'attack_stats' | 'defense_stats'>>();
+    await Promise.all(
+      Array.from(new Set(aoids)).map(async (aoid) => {
+        const response = await apiClient.getItem(aoid, gameVersion ? { gameVersion } : undefined);
+        if (!response.success || !response.data) {
+          throw new Error(`Could not load item ${aoid} from ${gameVersion ?? 'the current version'}`);
+        }
+        stats.set(aoid, {
+          attack_stats: response.data.attack_stats ?? [],
+          defense_stats: response.data.defense_stats ?? [],
+        });
+      })
+    );
+    return stats;
+  }
+
   private async fetchItems(
     itemRequests: Array<{ aoid: number; targetQl?: number }>,
-    onProgress?: (current: number, total: number) => void
+    onProgress?: (current: number, total: number) => void,
+    gameVersion?: string,
+    throwOnRequestError = false
   ): Promise<Map<string, Item | null>> {
     const itemMap = new Map<string, Item | null>();
 
@@ -1204,7 +1279,17 @@ export class ProfileTransformer {
         targetQl: req.targetQl || 1
       }));
 
-      const response = await apiClient.batchInterpolateItems(batchRequest);
+      // The api client scopes requests to the version being browsed. When the
+      // caller wants another version (PRK import, cross-version copy), route
+      // this one request there instead.
+      const response =
+        gameVersion && gameVersion !== currentGameVersion()
+          ? ((await apiClient.post<any>(
+              '/items/batch/interpolate',
+              { items: batchRequest.map((r) => ({ aoid: r.aoid, target_ql: r.targetQl })) },
+              { gameVersion }
+            )) as unknown as Awaited<ReturnType<typeof apiClient.batchInterpolateItems>>)
+          : await apiClient.batchInterpolateItems(batchRequest);
 
       // Process results
       for (const result of response.results) {
@@ -1240,6 +1325,7 @@ export class ProfileTransformer {
       console.log(`[ProfileTransformer] Batch fetch complete: ${itemMap.size} items processed`);
 
     } catch (error) {
+      if (throwOnRequestError) throw error;
       console.error('[ProfileTransformer] Batch fetch failed, items will be null:', error);
       // Mark all items as failed
       for (const req of itemRequests) {

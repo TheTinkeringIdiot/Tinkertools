@@ -25,6 +25,8 @@ import { ProfileStorage } from './storage';
 import { ProfileValidator } from './validator';
 import { ProfileTransformer } from './transformer';
 import { createDefaultProfile, createDefaultNanoProfile } from './constants';
+import { currentGameVersion, stampGameVersion } from './game-version';
+import { buildVersionCopy, type ProfileVersionCopyResult } from './version-copy';
 import { ipIntegrator } from './ip-integrator';
 import { perkManager } from './perk-manager';
 import type {
@@ -170,6 +172,10 @@ export class TinkerProfilesManager {
         Object.assign(profile, initialData);
         profile.updated = new Date().toISOString();
       }
+
+      // New profiles belong to the version being browsed, unless the caller
+      // (an import, a cross-version copy) already decided otherwise.
+      stampGameVersion(profile);
 
       // Misc skills should already be in correct format for new profiles (Task 1.2 completed)
       // But apply migration as a safety net
@@ -395,7 +401,7 @@ export class TinkerProfilesManager {
   /**
    * Set the active profile
    */
-  async setActiveProfile(profileId: string | null): Promise<void> {
+  async setActiveProfile(profileId: string | null, versionSlug?: string): Promise<void> {
     try {
       if (profileId) {
         const profile = await this.loadProfile(profileId);
@@ -403,13 +409,18 @@ export class TinkerProfilesManager {
           throw new Error('Profile not found');
         }
 
-        await this.storage.setActiveProfile(profileId);
+        // Activate under the profile's own version, so a profile is never
+        // active in a version whose database it was not built against.
+        await this.storage.setActiveProfile(
+          profileId,
+          versionSlug ?? profile.gameVersion ?? currentGameVersion()
+        );
 
         if (this.config.events.enabled) {
           this.events.emit('profile:activated', { profile });
         }
       } else {
-        await this.storage.setActiveProfile(null);
+        await this.storage.setActiveProfile(null, versionSlug);
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Failed to set active profile';
@@ -426,15 +437,53 @@ export class TinkerProfilesManager {
   /**
    * Get the active profile
    */
-  async getActiveProfile(): Promise<TinkerProfile | null> {
-    return await this.storage.loadActiveProfile();
+  async getActiveProfile(versionSlug?: string): Promise<TinkerProfile | null> {
+    return await this.storage.loadActiveProfile(versionSlug);
   }
 
   /**
-   * Get the active profile ID
+   * Get the active profile ID for a game version (defaults to the current one)
    */
-  getActiveProfileId(): string | null {
-    return this.storage.getActiveProfileId();
+  getActiveProfileId(versionSlug?: string): string | null {
+    return this.storage.getActiveProfileId(versionSlug);
+  }
+
+  // ============================================================================
+  // Cross-Version Copy
+  // ============================================================================
+
+  /**
+   * Copy a profile into another game version.
+   *
+   * The original is untouched. The copy gets a new id, is tagged with the target
+   * version, and has every embedded item re-resolved by AOID and QL against that
+   * version's database. Items the version lacks stay as flagged placeholders and
+   * are listed in the result.
+   */
+  async copyProfileToVersion(
+    profileId: string,
+    targetVersion: string
+  ): Promise<ProfileVersionCopyResult> {
+    const source = await this.loadProfile(profileId);
+    if (!source) {
+      throw new Error('Profile not found');
+    }
+
+    const copyResult = await buildVersionCopy(source, targetVersion, this.transformer);
+
+    // Recompute IP, caps and bonuses against the newly resolved equipment.
+    const recalculated = await ipIntegrator.recalculateProfileIP(copyResult.profile);
+    Object.assign(copyResult.profile, recalculated);
+    copyResult.profile.gameVersion = targetVersion;
+
+    await this.storage.saveProfile(copyResult.profile);
+    this.invalidateCache();
+
+    if (this.config.events.enabled) {
+      this.events.emit('profile:created', { profile: copyResult.profile });
+    }
+
+    return copyResult;
   }
 
   // ============================================================================

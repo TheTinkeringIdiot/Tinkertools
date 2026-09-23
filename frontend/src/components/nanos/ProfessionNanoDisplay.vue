@@ -355,8 +355,16 @@ import { mapProfileToStats } from '@/utils/profile-stats-mapper';
 import { checkActionRequirements, parseAction } from '@/services/action-criteria';
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
+import { apiBaseFor } from '@/services/api-config';
+import { currentVersion } from '@/composables/useGameVersion';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+/**
+ * Version-scoped API base. Read it per call, not once at module load: the user
+ * can switch game versions without a reload.
+ */
+function apiBase(): string {
+  return apiBaseFor(currentVersion.value);
+}
 
 interface SubstrainGroup {
   substrain: number;
@@ -530,7 +538,7 @@ async function loadNanos() {
   }
 
   try {
-    const url = `${API_BASE_URL}/nanos/profession/${props.selectedProfession}?page_size=1000&sort=ql&sort_order=desc`;
+    const url = `${apiBase()}/nanos/profession/${props.selectedProfession}?page_size=1000&sort=ql&sort_order=desc`;
     console.log('Fetching from URL:', url);
 
     const response = await fetch(url);

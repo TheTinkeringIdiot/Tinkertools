@@ -35,6 +35,7 @@ import TriStateCheckbox from 'primevue/tristatecheckbox';
 
 // Import global theme management system (initializes immediately)
 import './composables/useTheme';
+import { onGameVersionChange } from './composables/useGameVersion';
 
 import 'primeicons/primeicons.css';
 import './styles/main.css';
@@ -49,6 +50,15 @@ app.use(ConfirmationService);
 app.use(ToastService);
 app.use(pinia);
 app.use(router);
+
+// Switching game versions invalidates everything derived from the old database.
+// Registered after Pinia is installed so the handler can resolve stores; it is
+// not called for the first version resolution, only for real switches.
+// The store barrel is imported lazily so it stays out of the initial chunk.
+onGameVersionChange(async (next, previous) => {
+  const { handleGameVersionChange } = await import('./stores');
+  await handleGameVersionChange(next, previous);
+});
 
 // Global PrimeVue component registration
 app.component('Accordion', Accordion);
