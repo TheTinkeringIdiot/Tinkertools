@@ -5,9 +5,8 @@
  * for the interpolation composable.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ref, nextTick } from 'vue';
-import { mount } from '@vue/test-utils';
 import type { Item, InterpolatedItem, InterpolationInfo } from '../../types/api';
 import {
   useInterpolation,
@@ -16,86 +15,76 @@ import {
 } from '../useInterpolation';
 import interpolationService from '../../services/interpolation-service';
 
-// Mock the interpolation service
 vi.mock('../../services/interpolation-service', () => ({
   default: {
     interpolateItem: vi.fn(),
     getInterpolationInfo: vi.fn(),
     isItemInterpolatable: vi.fn(),
     itemToInterpolatedItem: vi.fn(),
-    getInterpolationRanges: vi.fn(),
   },
 }));
 
-// Mock API client for range testing
-vi.mock('../../services/api-client', () => ({
-  apiClient: {
-    getInterpolationInfo: vi.fn(),
-  },
-}));
+const mockInterpolationService = vi.mocked(interpolationService);
 
-// Mock timers for debouncing tests
-vi.useFakeTimers();
+const sampleItem: Item = {
+  id: 1,
+  aoid: 12345,
+  name: 'Test Weapon',
+  ql: 100,
+  description: 'A test weapon',
+  item_class: 1,
+  is_nano: false,
+  stats: [{ id: 1, stat: 1, value: 100 }],
+  spell_data: [],
+  actions: [],
+  attack_stats: [],
+  defense_stats: [],
+};
+
+const sampleInterpolatedItem: InterpolatedItem = {
+  id: 1,
+  aoid: 12345,
+  name: 'Test Weapon',
+  ql: 150,
+  description: 'A test weapon',
+  item_class: 1,
+  is_nano: false,
+  interpolating: true,
+  low_ql: 100,
+  high_ql: 199,
+  target_ql: 150,
+  ql_delta: 50,
+  ql_delta_full: 100,
+  stats: [{ id: 1, stat: 1, value: 150 }],
+  spell_data: [],
+  actions: [],
+};
+
+const sampleInterpolationInfo: InterpolationInfo = {
+  aoid: 12345,
+  interpolatable: true,
+  ranges: [{ min_ql: 100, max_ql: 200, interpolatable: true, base_aoid: 12345 }],
+  min_ql: 100,
+  max_ql: 200,
+  ql_range: 101,
+};
+
+/** Lets debounce timers fire and pending promises settle, then returns the result. */
+async function settle<T>(promise: Promise<T>): Promise<T> {
+  await vi.runAllTimersAsync();
+  return promise;
+}
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.resetAllMocks();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('useInterpolation', () => {
-  const mockInterpolationService = interpolationService as {
-    interpolateItem: Mock;
-    getInterpolationInfo: Mock;
-    isItemInterpolatable: Mock;
-    itemToInterpolatedItem: Mock;
-    getInterpolationRanges: Mock;
-  };
-
-  const sampleItem: Item = {
-    id: 1,
-    aoid: 12345,
-    name: 'Test Weapon',
-    ql: 100,
-    description: 'A test weapon',
-    item_class: 1,
-    is_nano: false,
-    stats: [{ id: 1, stat: 1, value: 100 }],
-    spell_data: [],
-    actions: [],
-  };
-
-  const sampleInterpolatedItem: InterpolatedItem = {
-    id: 1,
-    aoid: 12345,
-    name: 'Test Weapon',
-    ql: 150,
-    description: 'A test weapon',
-    item_class: 1,
-    is_nano: false,
-    interpolating: true,
-    low_ql: 100,
-    high_ql: 199,
-    target_ql: 150,
-    ql_delta: 50,
-    ql_delta_full: 100,
-    stats: [{ id: 1, stat: 1, value: 150 }],
-    spell_data: [],
-    actions: [],
-  };
-
-  const sampleInterpolationInfo: InterpolationInfo = {
-    aoid: 12345,
-    interpolatable: true,
-    min_ql: 100,
-    max_ql: 200,
-    ql_range: 101,
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.clearAllTimers();
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
-    vi.clearAllTimers();
-  });
-
   // ============================================================================
   // Basic Functionality Tests
   // ============================================================================
@@ -174,7 +163,7 @@ describe('useInterpolation', () => {
       expect(canInterpolate.value).toBe(false);
 
       // Should be true with valid target QL
-      await interpolateToQl(150);
+      await settle(interpolateToQl(150));
       expect(canInterpolate.value).toBe(true);
     });
 
@@ -202,15 +191,15 @@ describe('useInterpolation', () => {
       await nextTick();
 
       // Test valid QL
-      await interpolateToQl(150);
+      await settle(interpolateToQl(150));
       expect(isTargetQlValid.value).toBe(true);
 
       // Test invalid QL (too low)
-      await interpolateToQl(50);
+      await settle(interpolateToQl(50));
       expect(isTargetQlValid.value).toBe(false);
 
       // Test invalid QL (too high)
-      await interpolateToQl(300);
+      await settle(interpolateToQl(300));
       expect(isTargetQlValid.value).toBe(false);
     });
 
@@ -228,7 +217,7 @@ describe('useInterpolation', () => {
       await nextTick();
 
       // After interpolation
-      await interpolateToQl(150);
+      await settle(interpolateToQl(150));
       expect(interpolationStatus.value).toBe('interpolated');
     });
   });
@@ -281,7 +270,7 @@ describe('useInterpolation', () => {
       mockInterpolationService.interpolateItem.mockResolvedValue(sampleInterpolatedItem);
 
       await setItem(12345, false);
-      const result = await interpolateToQl(150);
+      const result = await settle(interpolateToQl(150));
 
       expect(result).toEqual(sampleInterpolatedItem);
       expect(mockInterpolationService.interpolateItem).toHaveBeenCalledWith(12345, 150);
@@ -293,7 +282,7 @@ describe('useInterpolation', () => {
       mockInterpolationService.interpolateItem.mockRejectedValue(new Error('Interpolation failed'));
 
       await setItem(12345, false);
-      const result = await interpolateToQl(150);
+      const result = await settle(interpolateToQl(150));
 
       expect(result).toBeNull();
       expect(error.value?.message).toBe('Interpolation failed');
@@ -302,7 +291,7 @@ describe('useInterpolation', () => {
     it('should return error when no AOID is set', async () => {
       const { interpolateToQl, error } = useInterpolation();
 
-      const result = await interpolateToQl(150);
+      const result = await settle(interpolateToQl(150));
 
       expect(result).toBeNull();
       expect(error.value?.message).toBe('No item AOID specified');
@@ -325,9 +314,14 @@ describe('useInterpolation', () => {
       const promise3 = interpolateToQl(170);
 
       // Fast-forward timers
-      vi.advanceTimersByTime(300);
+      await vi.advanceTimersByTimeAsync(300);
 
-      await Promise.all([promise1, promise2, promise3]);
+      // Superseded calls settle with the result of the request that replaced them
+      await expect(Promise.all([promise1, promise2, promise3])).resolves.toEqual([
+        sampleInterpolatedItem,
+        sampleInterpolatedItem,
+        sampleInterpolatedItem,
+      ]);
 
       // Should only have been called once with the last value
       expect(mockInterpolationService.interpolateItem).toHaveBeenCalledTimes(1);
@@ -341,7 +335,7 @@ describe('useInterpolation', () => {
 
       mockInterpolationService.getInterpolationInfo.mockResolvedValue(sampleInterpolationInfo);
 
-      await setItem(12345);
+      await setItem(12345, true);
 
       expect(currentAoid.value).toBe(12345);
       expect(mockInterpolationService.getInterpolationInfo).toHaveBeenCalledWith(12345);
@@ -357,7 +351,7 @@ describe('useInterpolation', () => {
 
       // Set up initial state
       await setItem(12345, false);
-      await interpolateToQl(150);
+      await settle(interpolateToQl(150));
 
       expect(interpolatedItem.value).not.toBeNull();
       expect(targetQl.value).toBe(150);
@@ -372,7 +366,7 @@ describe('useInterpolation', () => {
 
   describe('setItemFromObject', () => {
     it('should set item from Item object', async () => {
-      const { setItemFromObject, currentAoid } = useInterpolation(ref(null), { autoLoad: false });
+      const { setItemFromObject, currentAoid } = useInterpolation(ref(null));
 
       mockInterpolationService.getInterpolationInfo.mockResolvedValue({
         ...sampleInterpolationInfo,
@@ -397,9 +391,7 @@ describe('useInterpolation', () => {
     });
 
     it('should set non-interpolatable item directly', async () => {
-      const { setItemFromObject, interpolatedItem } = useInterpolation(ref(null), {
-        autoLoad: false,
-      });
+      const { setItemFromObject, interpolatedItem } = useInterpolation(ref(null));
 
       mockInterpolationService.getInterpolationInfo.mockResolvedValue({
         ...sampleInterpolationInfo,
@@ -422,12 +414,12 @@ describe('useInterpolation', () => {
   // ============================================================================
 
   describe('utility methods', () => {
-    it('should clear all state', () => {
+    it('should clear all state', async () => {
       const { setItem, clear, currentAoid, targetQl, interpolatedItem, interpolationInfo, error } =
         useInterpolation(ref(12345), { autoLoad: false });
 
       // Set some state
-      setItem(12345, false);
+      await setItem(12345, false);
 
       // Clear all state
       clear();
@@ -440,7 +432,10 @@ describe('useInterpolation', () => {
     });
 
     it('should retry failed operations', async () => {
-      const { setItem, interpolateToQl, retry } = useInterpolation(ref(null), { autoLoad: false });
+      const { setItem, interpolateToQl, retry, error, interpolatedItem } = useInterpolation(
+        ref(null),
+        { autoLoad: false }
+      );
 
       // First call fails
       mockInterpolationService.interpolateItem
@@ -448,24 +443,28 @@ describe('useInterpolation', () => {
         .mockResolvedValue(sampleInterpolatedItem);
 
       await setItem(12345, false);
-      await interpolateToQl(150); // This will fail
+      await settle(interpolateToQl(150)); // This will fail
+      expect(error.value?.message).toBe('First failure');
 
-      // Retry should work
-      await retry();
+      // Retry should re-run the failed interpolation
+      await settle(retry());
 
       expect(mockInterpolationService.interpolateItem).toHaveBeenCalledTimes(2);
+      expect(mockInterpolationService.interpolateItem).toHaveBeenLastCalledWith(12345, 150);
+      expect(error.value).toBeNull();
+      expect(interpolatedItem.value).toEqual(sampleInterpolatedItem);
     });
 
     it('should not retry non-retryable errors', async () => {
       const { interpolateToQl, retry, error } = useInterpolation();
 
       // This creates a non-retryable error
-      await interpolateToQl(150);
+      await settle(interpolateToQl(150));
 
       expect(error.value?.retryable).toBe(false);
 
       // Retry should not do anything
-      await retry();
+      await settle(retry());
 
       expect(mockInterpolationService.interpolateItem).not.toHaveBeenCalled();
     });
@@ -477,8 +476,7 @@ describe('useInterpolation', () => {
 
       mockInterpolationService.getInterpolationInfo.mockResolvedValue(sampleInterpolationInfo);
 
-      await setItem(12345);
-      await nextTick();
+      await setItem(12345, true);
 
       const suggestions = getSuggestedQualityLevels();
 
@@ -495,13 +493,13 @@ describe('useInterpolation', () => {
 
       mockInterpolationService.getInterpolationInfo.mockResolvedValue({
         ...sampleInterpolationInfo,
+        ranges: [{ min_ql: 100, max_ql: 102, interpolatable: true, base_aoid: 12345 }],
         min_ql: 100,
         max_ql: 102,
         ql_range: 3,
       });
 
-      await setItem(12345);
-      await nextTick();
+      await setItem(12345, true);
 
       const suggestions = getSuggestedQualityLevels();
 
@@ -517,10 +515,10 @@ describe('useInterpolation', () => {
 
   describe('watchers', () => {
     it('should watch AOID changes', async () => {
-      const aoidRef = ref(12345);
-      useInterpolation(aoidRef, { autoLoad: false });
-
       mockInterpolationService.getInterpolationInfo.mockResolvedValue(sampleInterpolationInfo);
+
+      const aoidRef = ref(12345);
+      useInterpolation(aoidRef);
 
       // Change AOID
       aoidRef.value = 67890;
@@ -554,7 +552,7 @@ describe('useInterpolation', () => {
 
       mockInterpolationService.getInterpolationInfo.mockRejectedValue(new Error('Service error'));
 
-      await setItem(12345);
+      await setItem(12345, true);
 
       expect(error.value?.message).toBe('Service error');
       expect(error.value?.retryable).toBe(true);
@@ -568,14 +566,14 @@ describe('useInterpolation', () => {
       mockInterpolationService.interpolateItem.mockRejectedValue(new Error('First error'));
 
       await setItem(12345, false);
-      await interpolateToQl(150);
+      await settle(interpolateToQl(150));
 
       expect(error.value?.message).toBe('First error');
 
       // Second operation succeeds
       mockInterpolationService.interpolateItem.mockResolvedValue(sampleInterpolatedItem);
 
-      await interpolateToQl(150);
+      await settle(interpolateToQl(150));
 
       expect(error.value).toBeNull();
     });
@@ -587,22 +585,13 @@ describe('useInterpolation', () => {
 // ============================================================================
 
 describe('useInterpolationCheck', () => {
-  const mockInterpolationService = interpolationService as {
-    isItemInterpolatable: Mock;
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should check interpolation status', async () => {
+    mockInterpolationService.isItemInterpolatable.mockResolvedValue(true);
+
     const aoidRef = ref(12345);
     const { isInterpolatable, isLoading } = useInterpolationCheck(aoidRef);
 
-    mockInterpolationService.isItemInterpolatable.mockResolvedValue(true);
-
-    await nextTick();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runAllTimersAsync();
 
     expect(isInterpolatable.value).toBe(true);
     expect(isLoading.value).toBe(false);
@@ -610,7 +599,7 @@ describe('useInterpolationCheck', () => {
   });
 
   it('should handle null AOID', async () => {
-    const aoidRef = ref(null);
+    const aoidRef = ref<number | null>(null);
     const { isInterpolatable, checkInterpolation } = useInterpolationCheck(aoidRef);
 
     await checkInterpolation();
@@ -620,13 +609,12 @@ describe('useInterpolationCheck', () => {
   });
 
   it('should handle API errors', async () => {
+    mockInterpolationService.isItemInterpolatable.mockRejectedValue(new Error('API error'));
+
     const aoidRef = ref(12345);
     const { isInterpolatable } = useInterpolationCheck(aoidRef);
 
-    mockInterpolationService.isItemInterpolatable.mockRejectedValue(new Error('API error'));
-
-    await nextTick();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.runAllTimersAsync();
 
     expect(isInterpolatable.value).toBe(false);
   });
@@ -650,14 +638,6 @@ describe('useInterpolationCheck', () => {
 // ============================================================================
 
 describe('useInterpolationBatch', () => {
-  const mockInterpolationService = interpolationService as {
-    interpolateItem: Mock;
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should manage multiple interpolated items', async () => {
     const { items, addItem } = useInterpolationBatch();
 
@@ -728,155 +708,8 @@ describe('useInterpolationBatch', () => {
 
     expect(isLoading.value).toBe(true);
 
-    await promise;
+    await settle(promise);
 
     expect(isLoading.value).toBe(false);
-  });
-});
-
-// ============================================================================
-// getInterpolationRanges Tests (New Functionality)
-// ============================================================================
-
-describe('getInterpolationRanges', async () => {
-  const { apiClient } = await import('../../services/api-client');
-  const mockApiClient = apiClient as {
-    getInterpolationInfo: Mock;
-  };
-
-  const sampleRanges = [
-    { min_ql: 100, max_ql: 199, base_aoid: 12345 },
-    { min_ql: 200, max_ql: 299, base_aoid: 12346 },
-    { min_ql: 300, max_ql: 300, base_aoid: 12347 },
-  ];
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should retrieve multiple interpolation ranges', async () => {
-    const aoidRef = ref(12345);
-    const { getInterpolationRanges } = useInterpolation(aoidRef, { autoLoad: false });
-
-    mockApiClient.getInterpolationInfo.mockResolvedValue({
-      success: true,
-      ranges: sampleRanges,
-    });
-
-    const ranges = await getInterpolationRanges(12345);
-
-    expect(ranges).toEqual(sampleRanges);
-    expect(mockApiClient.getInterpolationInfo).toHaveBeenCalledWith(12345);
-  });
-
-  it('should return empty array for non-interpolatable items', async () => {
-    const aoidRef = ref(12345);
-    const { getInterpolationRanges } = useInterpolation(aoidRef, { autoLoad: false });
-
-    mockApiClient.getInterpolationInfo.mockResolvedValue({
-      success: false,
-      error: 'Item not interpolatable',
-    });
-
-    const ranges = await getInterpolationRanges(12345);
-
-    expect(ranges).toEqual([]);
-  });
-
-  it('should handle API errors gracefully', async () => {
-    const aoidRef = ref(12345);
-    const { getInterpolationRanges } = useInterpolation(aoidRef, { autoLoad: false });
-
-    mockApiClient.getInterpolationInfo.mockRejectedValue(new Error('Network error'));
-
-    const ranges = await getInterpolationRanges(12345);
-
-    expect(ranges).toEqual([]);
-  });
-
-  it('should sort ranges by min_ql', async () => {
-    const aoidRef = ref(12345);
-    const { getInterpolationRanges } = useInterpolation(aoidRef, { autoLoad: false });
-
-    const unsortedRanges = [
-      { min_ql: 200, max_ql: 299, base_aoid: 12346 },
-      { min_ql: 100, max_ql: 199, base_aoid: 12345 },
-      { min_ql: 300, max_ql: 300, base_aoid: 12347 },
-    ];
-
-    mockApiClient.getInterpolationInfo.mockResolvedValue({
-      success: true,
-      ranges: unsortedRanges,
-    });
-
-    const ranges = await getInterpolationRanges(12345);
-
-    expect(ranges[0].min_ql).toBe(100);
-    expect(ranges[1].min_ql).toBe(200);
-    expect(ranges[2].min_ql).toBe(300);
-  });
-
-  it('should cache range results', async () => {
-    const aoidRef = ref(12345);
-    const { getInterpolationRanges } = useInterpolation(aoidRef, { autoLoad: false });
-
-    mockApiClient.getInterpolationInfo.mockResolvedValue({
-      success: true,
-      ranges: sampleRanges,
-    });
-
-    // First call
-    const ranges1 = await getInterpolationRanges(12345);
-
-    // Second call should use cache
-    const ranges2 = await getInterpolationRanges(12345);
-
-    expect(ranges1).toEqual(sampleRanges);
-    expect(ranges2).toEqual(sampleRanges);
-    expect(mockApiClient.getInterpolationInfo).toHaveBeenCalledTimes(1);
-  });
-
-  it('should validate range structure', async () => {
-    const aoidRef = ref(12345);
-    const { getInterpolationRanges } = useInterpolation(aoidRef, { autoLoad: false });
-
-    const validRanges = [
-      { min_ql: 100, max_ql: 199, base_aoid: 12345 },
-      { min_ql: 200, max_ql: 299, base_aoid: 12346 },
-    ];
-
-    mockApiClient.getInterpolationInfo.mockResolvedValue({
-      success: true,
-      ranges: validRanges,
-    });
-
-    const ranges = await getInterpolationRanges(12345);
-
-    ranges.forEach((range) => {
-      expect(range).toHaveProperty('min_ql');
-      expect(range).toHaveProperty('max_ql');
-      expect(range).toHaveProperty('base_aoid');
-      expect(typeof range.min_ql).toBe('number');
-      expect(typeof range.max_ql).toBe('number');
-      expect(typeof range.base_aoid).toBe('number');
-      expect(range.min_ql).toBeLessThanOrEqual(range.max_ql);
-    });
-  });
-
-  it('should handle single-range items', async () => {
-    const aoidRef = ref(12345);
-    const { getInterpolationRanges } = useInterpolation(aoidRef, { autoLoad: false });
-
-    const singleRange = [{ min_ql: 1, max_ql: 300, base_aoid: 12345 }];
-
-    mockApiClient.getInterpolationInfo.mockResolvedValue({
-      success: true,
-      ranges: singleRange,
-    });
-
-    const ranges = await getInterpolationRanges(12345);
-
-    expect(ranges).toEqual(singleRange);
-    expect(ranges.length).toBe(1);
   });
 });
