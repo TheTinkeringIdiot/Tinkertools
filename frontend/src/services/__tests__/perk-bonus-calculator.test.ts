@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { Item, SpellData, Spell } from '../../types/api';
+import type { Item, SpellData, Spell, SpellParams } from '../../types/api';
 import {
   PerkBonusCalculator,
   calculatePerkBonuses,
@@ -461,10 +461,11 @@ describe('PerkBonusCalculator', () => {
       const spellWithInvalidParams: Spell = {
         id: Math.floor(Math.random() * 10000),
         spell_id: 53045,
+        // Malformed on purpose: the typed params are numbers
         spell_params: {
           Stat: 'not a number',
           Amount: 'also not a number',
-        },
+        } as unknown as SpellParams,
         criteria: [],
       };
       const spellData = createValidSpellData([spellWithInvalidParams]);

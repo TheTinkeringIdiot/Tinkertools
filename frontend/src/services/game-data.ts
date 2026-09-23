@@ -3130,7 +3130,10 @@ export const IMP_SLOTS = [
 /**
  * Complete implant skills mapping by slot and cluster type
  */
-export const IMP_SKILLS = {
+export const IMP_SKILLS: Record<
+  ImpSlotName,
+  Record<'Shiny' | 'Bright' | 'Faded', readonly string[]>
+> = {
   Eye: {
     Shiny: [
       'Aimed Shot',
@@ -3485,7 +3488,7 @@ export const IMP_SKILLS = {
     ],
     Faded: ['Add All Def.', 'Add All Off', 'Duck-Exp', 'Nano Delta'],
   },
-} as const;
+};
 
 /**
  * Cluster type slot indices

@@ -6,8 +6,6 @@
  */
 
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
-import { PROFESSION, BREED } from '@/services/game-data';
-import { skillService } from '@/services/skill-service';
 import { accountTypeToExpansionBitflag, specializationLevelToBitflag } from './expansion-utils';
 
 /**
@@ -24,25 +22,15 @@ export function mapProfileToStats(profile: TinkerProfile): Record<number, number
   // Level (stat ID 54)
   stats[54] = profile.Character.Level || 1;
 
-  // Breed (stat ID 4) - map breed name to ID
+  // Breed (stat ID 4) - Character stores the numeric breed ID
   if (profile.Character.Breed) {
-    for (const [id, name] of Object.entries(BREED)) {
-      if (name === profile.Character.Breed) {
-        stats[4] = parseInt(id);
-        break;
-      }
-    }
+    stats[4] = profile.Character.Breed;
   }
 
-  // Profession (stat ID 60) - map profession name to ID
+  // Profession (stat ID 60) - Character stores the numeric profession ID
   if (profile.Character.Profession) {
-    for (const [id, name] of Object.entries(PROFESSION)) {
-      if (name === profile.Character.Profession) {
-        stats[60] = parseInt(id);
-        stats[368] = parseInt(id); // VisualProfession (mirrors Profession)
-        break;
-      }
-    }
+    stats[60] = profile.Character.Profession;
+    stats[368] = profile.Character.Profession; // VisualProfession (mirrors Profession)
   }
 
   // MaxHealth and MaxNano (now in Character)
@@ -67,7 +55,7 @@ export function mapProfileToStats(profile: TinkerProfile): Record<number, number
 
       // Use the total value from the unified SkillData structure
       // This includes: base + trickle + pointsFromIp + equipmentBonus + perkBonus + buffBonus
-      stats[skillId] = (skillData as any)?.total || 1;
+      stats[skillId] = skillData?.total || 1;
     }
   }
 

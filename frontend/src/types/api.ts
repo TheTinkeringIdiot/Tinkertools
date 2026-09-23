@@ -17,7 +17,7 @@ export interface ApiResponse<T> {
   error?: {
     code: string;
     message: string;
-    details?: any;
+    details?: JsonValue;
   };
   meta?: {
     timestamp: string;
@@ -53,6 +53,46 @@ export interface Criterion {
   operator: number;
 }
 
+/**
+ * A value parsed from JSON. Deliberately not recursive: Vue's ref unwrapping
+ * and DeepReadonly recurse into recursive types without bound.
+ */
+export type JsonValue = string | number | boolean | null | object;
+
+/**
+ * Spell parameters: a JSON object whose keys depend on the spell format.
+ * The numeric parameters the frontend reads are typed; the rest are plain JSON.
+ */
+export interface SpellParams {
+  Stat?: number;
+  StatID?: number;
+  Amount?: number;
+  Value?: number;
+  MinValue?: number;
+  MaxValue?: number;
+  MinAmount?: number;
+  MaxAmount?: number;
+  ModifierStat?: number;
+  BitNum?: number;
+  School?: number;
+  NCU?: number;
+  NanoPoints?: number;
+  Level?: number;
+  Duration?: number;
+  StackingLine?: number;
+  AttackTime?: number;
+  RechargeTime?: number;
+  // Lower-case spellings seen in some records
+  stat?: number;
+  statId?: number;
+  amount?: number;
+  value?: number;
+  minValue?: number;
+  maxValue?: number;
+  modifierStat?: number;
+  [key: string]: JsonValue | undefined;
+}
+
 export interface Spell {
   id: number;
   target?: number;
@@ -61,7 +101,7 @@ export interface Spell {
   spell_id?: number;
   /** @deprecated Use spell_id to look up format from SPELL_FORMATS constant instead */
   spell_format?: string;
-  spell_params: Record<string, any>;
+  spell_params: SpellParams;
   criteria: Criterion[];
 }
 
@@ -101,7 +141,7 @@ export interface Source {
   source_type_id: number;
   source_id: number;
   name: string;
-  extra_data: Record<string, any>;
+  extra_data: Record<string, JsonValue>;
   source_type?: SourceType;
 }
 
@@ -111,7 +151,7 @@ export interface ItemSource {
   min_ql?: number;
   max_ql?: number;
   conditions?: string;
-  extra_data: Record<string, any>;
+  extra_data: Record<string, JsonValue>;
 }
 
 export interface Item {
@@ -138,7 +178,7 @@ export interface InterpolatedSpell {
   tick_interval?: number;
   spell_id?: number;
   spell_format?: string;
-  spell_params: Record<string, any>;
+  spell_params: SpellParams;
   criteria: Criterion[];
 }
 
@@ -238,10 +278,28 @@ export interface BatchPerkLookupRequest {
   aoids: number[];
 }
 
+/** A perk item from the perk lookup endpoints, with its perk metadata */
+export interface PerkLookupItem extends Item {
+  perk_name: string;
+  perk_counter: number;
+  perk_type: string;
+  perk_series?: string | null;
+  perk_professions: string[];
+  perk_breeds: string[];
+  perk_level_required: number;
+  perk_ai_level_required: number | null;
+  // Legacy aliases of the perk_* fields
+  counter: number;
+  type: string;
+  level: number;
+  ai_title: number | null;
+  formatted_name: string;
+}
+
 export interface BatchPerkResult {
   aoid: number;
   success: boolean;
-  perk: any | null;
+  perk: PerkLookupItem | null;
   error: string | null;
 }
 
@@ -278,7 +336,7 @@ export interface Mob {
   location: string;
   mob_names: string[];
   is_pocket_boss: boolean;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, JsonValue>;
   symbiant_count?: number;
 }
 
