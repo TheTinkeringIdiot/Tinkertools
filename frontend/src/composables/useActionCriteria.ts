@@ -181,6 +181,7 @@ export function useCriteriaEvaluation(
       return parsedActions.value.map((action) => ({
         action,
         canPerform: null,
+        status: null,
         unmetRequirements: [],
       }));
     }
@@ -190,6 +191,9 @@ export function useCriteriaEvaluation(
       return {
         action,
         canPerform: result.canPerform,
+        // 'unknown': nothing checkable fails, but conditions the profile doesn't
+        // record (a running nano, an item wielded...) decide it
+        status: result.status,
         unmetRequirements: result.unmetRequirements,
       };
     });

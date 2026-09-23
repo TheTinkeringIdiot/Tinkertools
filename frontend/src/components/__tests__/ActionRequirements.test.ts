@@ -7,12 +7,22 @@
  * follows new actions (e.g. after QL interpolation changes requirements).
  */
 
-import { describe, it, expect } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { describe, it, expect, vi } from 'vitest';
+import { mount, flushPromises } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
+import Tooltip from 'primevue/tooltip';
 import ActionRequirements from '../ActionRequirements.vue';
 import type { Action, Criterion } from '../../types/api';
 import type { CharacterStats } from '../../composables/useActionCriteria';
+import { createTestRouter } from '@/__tests__/helpers/vue-test-utils';
+import { TEST_VERSION } from '@/__tests__/helpers/version-fixtures';
+
+// Criteria that name a nano or item resolve its name through the API client
+vi.mock('@/services/api-client', () => {
+  const client = { getItem: vi.fn() };
+  return { default: client, apiClient: client };
+});
+import apiClient from '@/services/api-client';
 
 // TEMPLATE_ACTION ids
 const GET = 1;
@@ -44,7 +54,11 @@ function mountRequirements(
   },
   options: { attachTo?: HTMLElement } = {}
 ) {
-  return mount(ActionRequirements, { props, global: { plugins: [PrimeVue] }, ...options });
+  return mount(ActionRequirements, {
+    props,
+    global: { plugins: [PrimeVue], directives: { tooltip: Tooltip } },
+    ...options,
+  });
 }
 
 function primaryText(wrapper: ReturnType<typeof mountRequirements>): string {
@@ -100,6 +114,29 @@ describe('ActionRequirements', () => {
       const wrapper = mountRequirements({ actions: [action(1, WIELD)] });
 
       expect(primaryText(wrapper)).toBe('WieldNo requirements');
+    });
+
+    it('lists a condition the profile cannot check, and says use depends on it', async () => {
+      vi.mocked(apiClient.getItem).mockResolvedValue({
+        success: true,
+        data: { name: 'Affected by Access Notum Source' },
+      } as Awaited<ReturnType<typeof apiClient.getItem>>);
+      const router = createTestRouter();
+      await router.push(`/${TEST_VERSION}/`);
+
+      // Access Notum Source's Use action: NotRunningNano 209909, nothing else
+      const use = action(1, USE, [{ id: 1, value1: 0, value2: 209909, operator: 101 }]);
+      const wrapper = mount(ActionRequirements, {
+        props: { actions: [use], characterStats: { [LEVEL]: 60 } },
+        global: { plugins: [PrimeVue, router], directives: { tooltip: Tooltip } },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('.primary-action .p-tag').text()).toBe('Can Use If…');
+      expect(primaryText(wrapper)).not.toContain('No requirements');
+      expect(primaryText(wrapper).replace(/\s+/g, ' ')).toContain(
+        'Not running: Affected by Access Notum Source'
+      );
     });
 
     it('names unknown action types by number', () => {

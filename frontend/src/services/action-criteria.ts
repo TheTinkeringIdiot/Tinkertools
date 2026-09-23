@@ -44,7 +44,12 @@ export interface DisplayCriterion {
   // Function operator fields (CheckNcu, RunningNano, etc.)
   isFunctionOperator?: boolean;
   functionType?: string;
+  /** AOID of an item or nano the criterion names (a running nano, a wielded item...) */
   referenceAoid?: number;
+  /** How to phrase the reference before its name: "Not running", "Wielding"... */
+  referencePrefix?: string;
+  /** What the AOID is, for the fallback label while its name is unresolved */
+  referenceKind?: 'Item' | 'Nano';
   // Modifier fields
   isModifier?: boolean;
   modifierType?: 'target' | 'caster';
@@ -145,6 +150,21 @@ const MODIFIER_OPERATORS = {
 
 /** Operators that compare a stat with a value; every other one is a condition */
 const STAT_OPERATORS = new Set([0, 1, 2, 22, 24, 107]);
+
+/**
+ * Condition operators whose value is an item AOID (checked against the item
+ * database: every one resolves). OwnsNano/NotOwnsNano reference nano items.
+ */
+const ITEM_REFERENCE_OPERATORS: Record<number, { prefix: string; kind: 'Item' | 'Nano' }> = {
+  31: { prefix: 'Wearing', kind: 'Item' }, // ItemWorn
+  32: { prefix: 'Not wearing', kind: 'Item' }, // ItemNotWorn
+  33: { prefix: 'Wielding', kind: 'Item' }, // ItemWielded
+  34: { prefix: 'Not wielding', kind: 'Item' }, // ItemNotWielded
+  35: { prefix: 'Has nano', kind: 'Nano' }, // OwnsNano
+  36: { prefix: 'Does not have nano', kind: 'Nano' }, // NotOwnsNano
+  108: { prefix: 'Owns item', kind: 'Item' }, // OwnsItem
+  109: { prefix: 'Does not own item', kind: 'Item' }, // NotOwnsItem
+};
 
 /** Conditions a player character never meets */
 const NEVER_MET_BY_PLAYERS = new Set([44, 122, 99]); // StateIsNpc, StateIsBossNpc, False
@@ -278,6 +298,8 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
       isFunctionOperator: true,
       functionType: 'CheckNcu',
       referenceAoid: value,
+      referencePrefix: 'Not running',
+      referenceKind: 'Nano',
     };
   }
 
@@ -297,6 +319,8 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
       isFunctionOperator: true,
       functionType: 'RunningNano',
       referenceAoid: value,
+      referencePrefix: 'Running',
+      referenceKind: 'Nano',
     };
   }
 
@@ -335,6 +359,8 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
       isFunctionOperator: true,
       functionType: 'NotRunningNano',
       referenceAoid: value,
+      referencePrefix: 'Not running',
+      referenceKind: 'Nano',
     };
   }
 
@@ -357,8 +383,30 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
     };
   }
 
+  // Conditions on a specific item or nano, named by AOID
+  const itemReference = ITEM_REFERENCE_OPERATORS[operator];
+  if (itemReference) {
+    return {
+      id,
+      stat,
+      statName,
+      displayValue: value,
+      displayOperator: itemReference.prefix,
+      displaySymbol: 'condition',
+      description: `${itemReference.prefix}: ${itemReference.kind} ${value}`, // fallback until async resolved
+      isLogicalOperator: false,
+      isSeparator: false,
+      isStatRequirement: false,
+      isConditionRequirement: true,
+      conditionOperator: operator,
+      referenceAoid: value,
+      referencePrefix: itemReference.prefix,
+      referenceKind: itemReference.kind,
+    };
+  }
+
   // Any other known operator is a condition we can name but not evaluate
-  // (perks, items worn, quests, other state checks...)
+  // (perks, quests, other state checks...)
   if (!STAT_OPERATORS.has(operator)) {
     const operatorName = OPERATOR[operator as keyof typeof OPERATOR] || `Operator ${operator}`;
     const subject = stat !== 0 ? ` ${statName}` : '';
@@ -544,12 +592,22 @@ export function parseCriteriaExpression(criteria: Criterion[]): CriteriaExpressi
 /**
  * Parse a complete action with its criteria
  */
+/** A criterion that is itself something to meet, not an operator or modifier */
+export function isRequirementCriterion(criterion: DisplayCriterion): boolean {
+  return (
+    criterion.isStatRequirement ||
+    !!criterion.isFunctionOperator ||
+    !!criterion.isConditionRequirement
+  );
+}
+
 export function parseAction(action: Action): ParsedAction {
   const actionName =
     TEMPLATE_ACTION[action.action as keyof typeof TEMPLATE_ACTION] || `Action ${action.action}`;
   const criteria = action.criteria.map(transformCriterionForDisplay);
   const expression = parseCriteriaExpression(action.criteria);
-  const hasRequirements = criteria.some((c) => c.isStatRequirement);
+  // Stat requirements, and conditions on running nanos, items, perks, state...
+  const hasRequirements = criteria.some(isRequirementCriterion);
 
   const description = hasRequirements
     ? `${actionName}: ${expression?.description || 'Has requirements'}`

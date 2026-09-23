@@ -12,7 +12,10 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { createTestRouter, standardCleanup } from '@/__tests__/helpers';
 import { TEST_VERSION } from '@/__tests__/helpers/version-fixtures';
 import CriterionChip from '../CriterionChip.vue';
-import type { DisplayCriterion } from '../../services/action-criteria';
+import {
+  transformCriterionForDisplay,
+  type DisplayCriterion,
+} from '../../services/action-criteria';
 import type { CharacterStats } from '../../composables/useActionCriteria';
 import { clearNanoNameCache } from '../../composables/useNanoNameResolver';
 
@@ -49,6 +52,11 @@ function mountChip(props: {
   size?: 'small' | 'normal' | 'large';
 }) {
   return mount(CriterionChip, { props, global: { plugins: [router] } });
+}
+
+/** A criterion as the real parser turns a raw (value1, value2, operator) row into one */
+function parsed(value1: number, value2: number, operator: number): DisplayCriterion {
+  return transformCriterionForDisplay({ id: 1, value1, value2, operator });
 }
 
 /** Rendered text with whitespace runs collapsed, as the browser displays it. */
@@ -282,19 +290,12 @@ describe('CriterionChip', () => {
         data: { name: 'Composite Attribute Boost' },
       } as Awaited<ReturnType<typeof apiClient.getItem>>);
 
-      const wrapper = mountChip({
-        criterion: statCriterion({
-          isStatRequirement: false,
-          isFunctionOperator: true,
-          functionType: 'CheckNcu',
-          referenceAoid: 95409,
-          description: 'Not running: Nano 95409',
-        }),
-      });
+      // CheckNcu: the nano must not already be running
+      const wrapper = mountChip({ criterion: parsed(0, 95409, 127) });
       await flushPromises();
 
       expect(mockGetItem).toHaveBeenCalledWith(95409);
-      const link = wrapper.find('a.function-link');
+      const link = wrapper.find('a.criterion-reference-link');
       expect(link.text()).toBe('Composite Attribute Boost');
       expect(link.attributes('href')).toContain('/items/95409');
       expect(visibleText(wrapper)).toBe('Not running: Composite Attribute Boost');
@@ -303,19 +304,38 @@ describe('CriterionChip', () => {
     it('falls back to "Nano <aoid>" when the name cannot be resolved', async () => {
       mockGetItem.mockRejectedValue(new Error('offline'));
 
-      const wrapper = mountChip({
-        criterion: statCriterion({
-          isStatRequirement: false,
-          isFunctionOperator: true,
-          functionType: 'RunningNano',
-          referenceAoid: 12345,
-          description: 'Running: Nano 12345',
-        }),
-      });
+      const wrapper = mountChip({ criterion: parsed(0, 12345, 91) }); // RunningNano
       await flushPromises();
 
-      expect(wrapper.find('a.function-link').text()).toBe('Nano 12345');
+      expect(wrapper.find('a.criterion-reference-link').text()).toBe('Nano 12345');
       expect(visibleText(wrapper)).toBe('Running: Nano 12345');
+    });
+
+    it('names the item a wield condition refers to, and links to it', async () => {
+      mockGetItem.mockResolvedValue({
+        success: true,
+        data: { name: 'The Key to the Garden of Enel' },
+      } as Awaited<ReturnType<typeof apiClient.getItem>>);
+
+      // ItemWielded, from the Use criteria of Channel Notum Vein: Elysium
+      const wrapper = mountChip({ criterion: parsed(0, 226987, 33) });
+      await flushPromises();
+
+      const link = wrapper.find('a.criterion-reference-link');
+      expect(link.text()).toBe('The Key to the Garden of Enel');
+      expect(link.attributes('href')).toContain('/items/226987');
+      expect(visibleText(wrapper)).toBe('Wielding: The Key to the Garden of Enel');
+    });
+
+    it('falls back to "Item <aoid>" for an item it cannot resolve', async () => {
+      mockGetItem.mockResolvedValue({ success: false } as Awaited<
+        ReturnType<typeof apiClient.getItem>
+      >);
+
+      const wrapper = mountChip({ criterion: parsed(0, 290940, 108) }); // OwnsItem
+      await flushPromises();
+
+      expect(visibleText(wrapper)).toBe('Owns item: Item 290940');
     });
 
     it('shows a nano line requirement by line name without a link', () => {

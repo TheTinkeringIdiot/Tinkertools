@@ -57,7 +57,9 @@ export function getNanoCompatibility(
     unmetRequirements,
     // The same condition can appear in several alternatives
     unverifiedRequirements: [
-      ...new Set(unverifiedRequirements.map((criterion) => criterion.description)),
+      ...new Map(
+        unverifiedRequirements.map((criterion) => [criterion.description, criterion])
+      ).values(),
     ],
     memoryUsage: nano.memoryUsage || 0,
     nanoPointCost: nano.nanoPointCost || 0,

@@ -825,6 +825,39 @@ describe('action-criteria service', () => {
   });
 });
 
+describe('criteria that name an item or nano', () => {
+  // value2 is an item AOID for each of these operators (every one resolves in the item database)
+  it.each([
+    [31, 'Wearing', 'Item'],
+    [32, 'Not wearing', 'Item'],
+    [33, 'Wielding', 'Item'],
+    [34, 'Not wielding', 'Item'],
+    [35, 'Has nano', 'Nano'],
+    [36, 'Does not have nano', 'Nano'],
+    [108, 'Owns item', 'Item'],
+    [109, 'Does not own item', 'Item'],
+    [91, 'Running', 'Nano'],
+    [101, 'Not running', 'Nano'],
+    [127, 'Not running', 'Nano'],
+  ] as const)('operator %i reads "%s" and keeps the AOID', (operator, prefix, kind) => {
+    const criterion = transformCriterionForDisplay({ id: 1, value1: 0, value2: 226987, operator });
+
+    expect(criterion).toMatchObject({
+      referenceAoid: 226987,
+      referencePrefix: prefix,
+      referenceKind: kind,
+      description: `${prefix}: ${kind} 226987`,
+      isStatRequirement: false,
+    });
+  });
+
+  it('leaves perk conditions unnamed: their values are perk ids, not item AOIDs', () => {
+    const criterion = transformCriterionForDisplay({ id: 1, value1: 0, value2: 145, operator: 93 });
+
+    expect(criterion.referenceAoid).toBeUndefined();
+  });
+});
+
 describe('integration tests', () => {
   it('should handle real-world Dark Pistol example correctly', () => {
     const darkPistolAction: Action = {

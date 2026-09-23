@@ -11,8 +11,13 @@
           <h4 class="font-semibold text-primary">{{ primaryAction.actionName }}</h4>
           <Tag
             v-if="characterStats"
-            :severity="getRequirementSeverity(canPerform(primaryAction))"
-            :value="canPerform(primaryAction) ? 'Can Use' : 'Cannot Use'"
+            v-tooltip.top="
+              actionStatus(primaryAction) === 'unknown'
+                ? 'Depends on conditions your profile does not record'
+                : undefined
+            "
+            :severity="statusSeverity(actionStatus(primaryAction))"
+            :value="statusLabel(actionStatus(primaryAction))"
           />
         </div>
 
@@ -95,7 +100,7 @@ import Tag from 'primevue/tag';
 import CriteriaDisplay from './CriteriaDisplay.vue';
 import { useItemActions } from '../composables/useActionCriteria';
 import type { Action } from '../types/api';
-import type { ParsedAction } from '../services/action-criteria';
+import { isRequirementCriterion, type ParsedAction } from '../services/action-criteria';
 import type { CharacterStats } from '../composables/useActionCriteria';
 
 // ============================================================================
@@ -150,9 +155,20 @@ const otherActions = computed(() => {
 // Methods
 // ============================================================================
 
-/** Whether the character can perform the action; null without a character. */
-function canPerform(action: ParsedAction): boolean | null {
-  return actionEvaluations.value.find((e) => e.action.id === action.id)?.canPerform ?? null;
+/** met / unmet / unknown (can't be checked from the profile); null without a character */
+function actionStatus(action: ParsedAction): 'met' | 'unmet' | 'unknown' | null {
+  return actionEvaluations.value.find((e) => e.action.id === action.id)?.status ?? null;
+}
+
+function statusLabel(status: 'met' | 'unmet' | 'unknown' | null): string {
+  if (status === 'met') return 'Can Use';
+  if (status === 'unknown') return 'Can Use If…';
+  return 'Cannot Use';
+}
+
+function statusSeverity(status: 'met' | 'unmet' | 'unknown' | null): string {
+  if (status === 'unknown') return 'info';
+  return getRequirementSeverity(status === null ? null : status === 'met');
 }
 
 function getActionHeader(action: ParsedAction): string {
@@ -160,14 +176,14 @@ function getActionHeader(action: ParsedAction): string {
 
   if (props.characterStats && action.hasRequirements) {
     // Add evaluation result to header
-    const evaluation = canPerform(action);
-    if (evaluation !== null) {
-      header += evaluation ? ' ✓' : ' ✗';
+    const status = actionStatus(action);
+    if (status !== null) {
+      header += status === 'met' ? ' ✓' : status === 'unknown' ? ' ?' : ' ✗';
     }
   }
 
   if (action.hasRequirements) {
-    const reqCount = action.criteria.filter((c) => c.isStatRequirement).length;
+    const reqCount = action.criteria.filter(isRequirementCriterion).length;
     header += ` (${reqCount} requirement${reqCount !== 1 ? 's' : ''})`;
   }
 

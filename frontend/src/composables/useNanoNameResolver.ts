@@ -8,8 +8,9 @@
 import apiClient from '@/services/api-client';
 
 // Module-level cache shared across all component instances
-const nameCache = new Map<number, string>();
-const pendingRequests = new Map<number, Promise<string>>();
+// A null entry records a lookup that failed, so it is not retried every render.
+const nameCache = new Map<number, string | null>();
+const pendingRequests = new Map<number, Promise<string | null>>();
 
 /**
  * Drop every resolved name. Names come from the backend and are AOID-keyed, so
@@ -23,13 +24,14 @@ export function clearNanoNameCache(): void {
 
 export function useNanoNameResolver() {
   /**
-   * Resolve a nano/item name from its aoid
-   * Results are cached to avoid duplicate API calls
+   * Resolve a nano/item name from its aoid, or null when it can't be found.
+   * Results are cached to avoid duplicate API calls; callers supply their own
+   * fallback label, since only they know whether the aoid is a nano or an item.
    */
-  async function resolveNanoName(aoid: number): Promise<string> {
+  async function resolveNanoName(aoid: number): Promise<string | null> {
     // Check cache first
     if (nameCache.has(aoid)) {
-      return nameCache.get(aoid)!;
+      return nameCache.get(aoid) ?? null;
     }
 
     // Check if request is already in flight
@@ -41,13 +43,12 @@ export function useNanoNameResolver() {
     const request = (async () => {
       try {
         const response = await apiClient.getItem(aoid);
-        const name = response.data?.name || `Nano ${aoid}`;
+        const name = response.data?.name || null;
         nameCache.set(aoid, name);
         return name;
       } catch {
-        const fallback = `Nano ${aoid}`;
-        nameCache.set(aoid, fallback);
-        return fallback;
+        nameCache.set(aoid, null);
+        return null;
       } finally {
         pendingRequests.delete(aoid);
       }
@@ -60,7 +61,7 @@ export function useNanoNameResolver() {
   /**
    * Check if a name is already cached (for synchronous access)
    */
-  function getCachedName(aoid: number): string | undefined {
+  function getCachedName(aoid: number): string | null | undefined {
     return nameCache.get(aoid);
   }
 

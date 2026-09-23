@@ -240,10 +240,10 @@ Shows nano information with compatibility indicators and quick actions
                 </div>
                 <div class="text-xs text-blue-700 dark:text-blue-300">
                   <div
-                    v-for="(requirement, index) in compatibilityInfo.unverifiedRequirements"
-                    :key="index"
+                    v-for="requirement in compatibilityInfo.unverifiedRequirements"
+                    :key="requirement.description"
                   >
-                    {{ requirement }}
+                    <CriterionReference :criterion="requirement" />
                   </div>
                 </div>
               </div>
@@ -265,6 +265,7 @@ import Chip from 'primevue/chip';
 
 import type { DisplayCriterion } from '@/services/action-criteria';
 import type { NanoProgram, NanoCompatibilityInfo, NanoEffect } from '@/types/nano';
+import CriterionReference from '@/components/CriterionReference.vue';
 import { getNanoRequirements } from './nano-compatibility';
 import { schoolAvatarClass, schoolInitials } from './nano-schools';
 

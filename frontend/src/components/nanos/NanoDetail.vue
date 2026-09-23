@@ -99,10 +99,10 @@ Displays comprehensive nano information including effects, requirements, and com
               <strong>Not Checkable From Your Profile:</strong>
               <ul class="list-disc list-inside ml-2 mt-1">
                 <li
-                  v-for="(requirement, index) in compatibilityInfo.unverifiedRequirements"
-                  :key="index"
+                  v-for="requirement in compatibilityInfo.unverifiedRequirements"
+                  :key="requirement.description"
                 >
-                  {{ requirement }}
+                  <CriterionReference :criterion="requirement" />
                 </li>
               </ul>
             </div>
@@ -415,6 +415,7 @@ import TabView from 'primevue/tabview';
 import TabPanel from 'primevue/tabpanel';
 
 import CriteriaDisplay from '@/components/CriteriaDisplay.vue';
+import CriterionReference from '@/components/CriterionReference.vue';
 import { getNanoCompatibility, getNanoUseAction } from './nano-compatibility';
 import { schoolAvatarClass, schoolInitials } from './nano-schools';
 import { mapProfileToStats } from '@/utils/profile-stats-mapper';

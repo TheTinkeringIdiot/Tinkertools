@@ -10,15 +10,12 @@
         <!-- Function Operator (CheckNcu, etc.) -->
         <div v-if="node.criterion.isFunctionOperator" class="chip chip-function">
           <i class="pi pi-bolt function-icon"></i>
-          <span class="function-description">
-            {{ functionPrefix }}
-            <RouterLink
-              v-if="node.criterion.referenceAoid"
-              :to="{ name: 'ItemDetail', params: { aoid: String(node.criterion.referenceAoid) } }"
-              class="function-link"
-              >{{ resolvedName || `Nano ${node.criterion.referenceAoid}` }}</RouterLink
-            >
-          </span>
+          <CriterionReference :criterion="node.criterion" class="function-description" />
+        </div>
+        <!-- Condition on a named item or nano (wielding, owns nano...) -->
+        <div v-else-if="node.criterion.referenceAoid" class="chip chip-function">
+          <i class="pi pi-info-circle function-icon"></i>
+          <CriterionReference :criterion="node.criterion" class="function-description" />
         </div>
         <!-- Standard Stat Requirement -->
         <div v-else class="chip" :class="chipClasses">
@@ -80,8 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
-import { RouterLink } from 'vue-router';
+import { computed } from 'vue';
 import type { CriteriaTreeNode } from '../services/action-criteria';
 import type { CharacterStats } from '../composables/useActionCriteria';
 import {
@@ -91,7 +87,7 @@ import {
   getFlagNameFromValue,
   getNPCFamilyName,
 } from '../services/game-utils';
-import { useNanoNameResolver } from '../composables/useNanoNameResolver';
+import CriterionReference from './CriterionReference.vue';
 
 // ============================================================================
 // Props
@@ -112,35 +108,6 @@ const props = withDefaults(defineProps<Props>(), {
   showConnector: true,
   showGroupLabel: true,
   showOeBreakpoints: false,
-});
-
-// ============================================================================
-// Function Operator Name Resolution
-// ============================================================================
-
-const { resolveNanoName } = useNanoNameResolver();
-const resolvedName = ref<string | null>(null);
-
-// Async resolve nano name when function operator is detected
-watch(
-  () => props.node.criterion?.referenceAoid,
-  async (aoid) => {
-    if (aoid && props.node.criterion?.isFunctionOperator) {
-      resolvedName.value = await resolveNanoName(aoid);
-    }
-  },
-  { immediate: true }
-);
-
-const functionPrefix = computed(() => {
-  if (!props.node.criterion?.isFunctionOperator) return '';
-
-  switch (props.node.criterion.functionType) {
-    case 'CheckNcu':
-      return 'Not running: ';
-    default:
-      return '';
-  }
 });
 
 // ============================================================================
@@ -377,13 +344,13 @@ const oeBreakpoints = computed(() => {
   font-style: italic;
 }
 
-.chip-function .function-link {
+.chip-function :deep(.criterion-reference-link) {
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
-.chip-function .function-link:hover {
+.chip-function :deep(.criterion-reference-link):hover {
   color: #fff;
   text-decoration-thickness: 2px;
 }

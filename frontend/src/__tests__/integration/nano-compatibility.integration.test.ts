@@ -23,6 +23,8 @@ import {
   type IntegrationTestContext,
 } from '../helpers/integration-test-utils';
 import { createNanoUseAction } from '../helpers/nano-fixtures';
+import { createTestRouter } from '../helpers/vue-test-utils';
+import { TEST_VERSION } from '../helpers/version-fixtures';
 import { createTestProfile, PROFESSION } from '../helpers/profile-fixtures';
 import { createTestSkillData, SKILL_ID } from '../helpers/skill-fixtures';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
@@ -413,8 +415,15 @@ describe('Nano Compatibility Integration', () => {
         canCast: true,
         compatibilityScore: 100,
         unmetRequirements: [],
-        unverifiedRequirements: ['Not running: Nano 209909'],
       });
+      // Kept as a criterion, so the display can name the nano it refers to
+      expect(info.unverifiedRequirements).toEqual([
+        expect.objectContaining({
+          description: 'Not running: Nano 209909',
+          referenceAoid: 209909,
+          referencePrefix: 'Not running',
+        }),
+      ]);
     });
 
     it('checks the caster and leaves a requirement on the target unverified', async () => {
@@ -423,7 +432,9 @@ describe('Nano Compatibility Integration', () => {
       await activateTrader(200, 200);
       const skilled = getNanoCompatibility(nano, mapProfileToStats(activeProfile()));
       expect(skilled.castState).toBe('unverified');
-      expect(skilled.unverifiedRequirements).toEqual(['Target: MaxHealth ≥ 43']);
+      expect(skilled.unverifiedRequirements.map((req) => req.description)).toEqual([
+        'Target: MaxHealth ≥ 43',
+      ]);
 
       // Short of TS, the caster's own requirement blocks it, whatever the target
       await activateTrader(200, 10);
@@ -458,10 +469,18 @@ describe('Nano Compatibility Integration', () => {
       ]);
     });
 
-    it('NanoList shows what it could not check', async () => {
+    it('NanoList shows what it could not check, naming the nano it refers to', async () => {
+      context.mockApi.getItem.mockResolvedValue({
+        success: true,
+        data: { name: 'Affected by Access Notum Source' },
+      } as Awaited<ReturnType<typeof context.mockApi.getItem>>);
       await activateProfile(PROFESSION.SOLDIER, 60, 10, 10);
+      // The name links to the nano's page, a versioned route
+      const router = createTestRouter();
+      await router.push(`/${TEST_VERSION}/`);
       const wrapper = mountForIntegration(NanoList, {
         pinia: context.pinia,
+        router,
         props: {
           nanos: [nanoWith('Access Notum Source', 227302, ACCESS_NOTUM_SOURCE_USE)],
           showCompatibility: true,
@@ -474,7 +493,11 @@ describe('Nano Compatibility Integration', () => {
       expect(wrapper.find('[data-testid="unverified-requirements"]').text()).toContain(
         'Castable if'
       );
-      expect(wrapper.text()).toContain('Not running: Nano 209909');
+      expect(context.mockApi.getItem).toHaveBeenCalledWith(209909);
+      const unverified = wrapper.find('[data-testid="unverified-requirements"]');
+      expect(unverified.text().replace(/\s+/g, ' ')).toContain(
+        'Not running: Affected by Access Notum Source'
+      );
 
       wrapper.unmount();
     });

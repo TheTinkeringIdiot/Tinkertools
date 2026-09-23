@@ -1,6 +1,7 @@
 // Nano-related TypeScript types for TinkerNanos application
 
 import type { Action } from './api';
+import type { DisplayCriterion } from '@/services/action-criteria';
 
 export interface NanoProgram {
   id: number;
@@ -136,8 +137,8 @@ export interface NanoCompatibilityInfo {
   canCast: boolean;
   compatibilityScore: number; // 0-100
   unmetRequirements: UnmetNanoRequirement[];
-  /** Descriptions of the requirements that couldn't be checked, when unverified */
-  unverifiedRequirements: string[];
+  /** The requirements that couldn't be checked, when unverified (one per description) */
+  unverifiedRequirements: DisplayCriterion[];
   memoryUsage: number;
   nanoPointCost: number;
 }
