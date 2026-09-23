@@ -89,7 +89,7 @@ Modal for viewing and editing detailed profile information
                 <div class="field">
                   <label class="font-medium text-surface-900 dark:text-surface-50">Name</label>
                   <InputText
-                    v-if="editing"
+                    v-if="editing && editData"
                     v-model="editData.Character.Name"
                     class="w-full"
                     maxlength="50"
@@ -102,7 +102,7 @@ Modal for viewing and editing detailed profile information
                 <div class="field">
                   <label class="font-medium text-surface-900 dark:text-surface-50">Level</label>
                   <InputNumber
-                    v-if="editing"
+                    v-if="editing && editData"
                     v-model="editData.Character.Level"
                     :min="1"
                     :max="220"
@@ -118,7 +118,7 @@ Modal for viewing and editing detailed profile information
                     >Profession</label
                   >
                   <Dropdown
-                    v-if="editing"
+                    v-if="editing && editData"
                     v-model="editData.Character.Profession"
                     :options="professionOptions"
                     class="w-full"
@@ -131,7 +131,7 @@ Modal for viewing and editing detailed profile information
                 <div class="field">
                   <label class="font-medium text-surface-900 dark:text-surface-50">Breed</label>
                   <Dropdown
-                    v-if="editing"
+                    v-if="editing && editData"
                     v-model="editData.Character.Breed"
                     :options="breedOptions"
                     class="w-full"
@@ -151,7 +151,7 @@ Modal for viewing and editing detailed profile information
                 <div class="field">
                   <label class="font-medium text-surface-900 dark:text-surface-50">Faction</label>
                   <Dropdown
-                    v-if="editing"
+                    v-if="editing && editData"
                     v-model="editData.Character.Faction"
                     :options="factionOptions"
                     class="w-full"
@@ -164,7 +164,7 @@ Modal for viewing and editing detailed profile information
                 <div class="field">
                   <label class="font-medium text-surface-900 dark:text-surface-50">Expansion</label>
                   <Dropdown
-                    v-if="editing"
+                    v-if="editing && editData"
                     v-model="editData.Character.Expansion"
                     :options="expansionOptions"
                     class="w-full"
@@ -179,7 +179,7 @@ Modal for viewing and editing detailed profile information
                     >Account Type</label
                   >
                   <Dropdown
-                    v-if="editing"
+                    v-if="editing && editData"
                     v-model="editData.Character.AccountType"
                     :options="accountTypeOptions"
                     class="w-full"
@@ -204,21 +204,21 @@ Modal for viewing and editing detailed profile information
                   {{ categoryName }}
                 </h3>
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  <div v-for="(value, skillName) in category" :key="skillName" class="field">
+                  <div v-for="skill in category" :key="skill.id" class="field">
                     <label class="text-sm font-medium text-surface-600 dark:text-surface-400">
-                      {{ skillName }}
+                      {{ skill.name }}
                     </label>
                     <InputNumber
                       v-if="editing"
-                      v-model="getSkillValue(skillName)"
+                      :model-value="getSkillValue(skill.id)"
                       :min="0"
                       :max="9999"
                       class="w-full"
                       size="small"
-                      @update:model-value="updateSkillValue(skillName, $event)"
+                      @update:model-value="updateSkillValue(skill.id, $event)"
                     />
                     <p v-else class="text-sm text-surface-700 dark:text-surface-300">
-                      {{ value }}
+                      {{ skill.value }}
                     </p>
                   </div>
                 </div>
@@ -454,7 +454,7 @@ const displayableSkills = computed(() => {
   if (!profileData.value?.skills) return {};
 
   // Group skills by category for display
-  const skillsByCategory: Record<string, Record<string, number>> = {};
+  const skillsByCategory: Record<string, { id: SkillId; name: string; value: number }[]> = {};
 
   try {
     for (const [skillIdStr, skillData] of Object.entries(profileData.value.skills)) {
@@ -465,10 +465,14 @@ const displayableSkills = computed(() => {
       if (metadata.category === 'Misc') continue;
 
       if (!skillsByCategory[metadata.category]) {
-        skillsByCategory[metadata.category] = {};
+        skillsByCategory[metadata.category] = [];
       }
 
-      skillsByCategory[metadata.category][metadata.name] = skillData.total || 0;
+      skillsByCategory[metadata.category].push({
+        id: skillId,
+        name: metadata.name,
+        value: skillData.total || 0,
+      });
     }
   } catch (error) {
     console.error('Error building displayable skills:', error);
@@ -564,36 +568,26 @@ function formatDateTime(dateString: string): string {
 }
 
 // Skill value access helpers
-function getSkillValue(skillName: string): number {
-  if (!editData.value?.skills) return 0;
-
-  try {
-    const skillId = skillService.resolveId(skillName);
-    return editData.value.skills[skillId]?.total || 0;
-  } catch (error) {
-    console.error(`Failed to resolve skill name "${skillName}":`, error);
-    return 0;
-  }
+function getSkillValue(skillId: SkillId): number {
+  return editData.value?.skills[skillId]?.total || 0;
 }
 
-function updateSkillValue(skillName: string, value: number | null): void {
+function updateSkillValue(skillId: SkillId, value: number | null): void {
   if (!editData.value?.skills) return;
 
-  try {
-    const skillId = skillService.resolveId(skillName);
-    if (!editData.value.skills[skillId]) {
-      editData.value.skills[skillId] = {
-        base: 0,
-        total: 0,
-        equipmentBonus: 0,
-        perkBonus: 0,
-        buffBonus: 0,
-      };
-    }
-    editData.value.skills[skillId].total = value || 0;
-  } catch (error) {
-    console.error(`Failed to update skill "${skillName}":`, error);
+  if (!editData.value.skills[skillId]) {
+    editData.value.skills[skillId] = {
+      base: 0,
+      trickle: 0,
+      ipSpent: 0,
+      pointsFromIp: 0,
+      total: 0,
+      equipmentBonus: 0,
+      perkBonus: 0,
+      buffBonus: 0,
+    };
   }
+  editData.value.skills[skillId].total = value || 0;
 }
 
 // Watchers
@@ -601,7 +595,7 @@ watch(
   () => props.visible,
   (visible) => {
     if (visible && props.profile) {
-      loadProfileData();
+      void loadProfileData();
     } else {
       // Reset state when closing
       profileData.value = null;
@@ -615,7 +609,7 @@ watch(
   () => props.profile,
   (profile) => {
     if (profile && props.visible) {
-      loadProfileData();
+      void loadProfileData();
     }
   }
 );

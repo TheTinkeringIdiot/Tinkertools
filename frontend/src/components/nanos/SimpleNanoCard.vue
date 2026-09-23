@@ -16,8 +16,8 @@ Shows nano information from Item objects for profession-based display
               {{ nano.name }}
             </h4>
             <div class="flex items-center gap-2">
-              <Badge :value="`QL ${nano.ql || 1}`" severity="secondary" size="small" />
-              <Badge v-if="strainName" :value="strainName" severity="info" size="small" />
+              <Badge :value="`QL ${nano.ql || 1}`" severity="secondary" />
+              <Badge v-if="strainName" :value="strainName" severity="info" />
             </div>
           </div>
         </div>
