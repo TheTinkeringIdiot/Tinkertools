@@ -283,47 +283,65 @@ class TestPocketBossSearch:
 class TestSymbiantSearch:
     """Test symbiant search functionality."""
 
-    def test_symbiants_basic(self, client):
+    def test_symbiants_basic(self, client, db_session):
         """Test basic symbiants endpoint."""
+        from app.models import SymbiantItem
+
+        expected_total = db_session.query(SymbiantItem).count()
+        assert expected_total > 0
+
         response = client.get("/api/v1/symbiants")
         assert response.status_code == 200
         data = response.json()
 
-        # Symbiants endpoint returns List[SymbiantResponse], not paginated
-        assert isinstance(data, list)
-        assert len(data) > 0
+        # Symbiants endpoint is paginated (default page_size 50)
+        assert data["total"] == expected_total
+        assert data["page"] == 1
+        assert len(data["items"]) == min(data["page_size"], expected_total)
 
-        # Verify first symbiant has expected fields
-        if len(data) > 0:
-            symbiant = data[0]
-            assert "id" in symbiant
-            assert "family" in symbiant
-            assert "name" in symbiant
+        symbiant = data["items"][0]
+        assert "id" in symbiant
+        assert "family" in symbiant
+        assert "name" in symbiant
 
-    def test_symbiant_family_filtering(self, client):
-        """Test filtering symbiants by family (client-side filtering expected)."""
-        response = client.get("/api/v1/symbiants")
-        assert response.status_code == 200
-        data = response.json()
+    def test_symbiant_family_filtering(self, client, db_session):
+        """Test every family arrives intact across pages (client-side filtering)."""
+        from collections import Counter
 
-        assert isinstance(data, list)
-        # Find Artillery family symbiants (if any)
-        artillery_symbiants = [s for s in data if "Artillery" in s.get("family", "")]
-        assert len(artillery_symbiants) > 0
+        from sqlalchemy import func
+
+        from app.models import SymbiantItem
+
+        expected = dict(
+            db_session.query(SymbiantItem.family, func.count())
+            .group_by(SymbiantItem.family)
+            .all()
+        )
+        assert "Artillery" in expected
+
+        families = Counter()
+        page = 1
+        while True:
+            response = client.get(f"/api/v1/symbiants?page={page}&page_size=200")
+            assert response.status_code == 200
+            data = response.json()
+            families.update(s["family"] for s in data["items"])
+            if not data["has_next"]:
+                break
+            page += 1
+
+        assert dict(families) == expected
 
     def test_symbiant_ql_filtering(self, client):
         """Test symbiant QL filtering (client-side filtering expected)."""
-        # Note: The endpoint returns all symbiants for client-side filtering
         response = client.get("/api/v1/symbiants")
         assert response.status_code == 200
         data = response.json()
 
-        # Response should be a list
-        assert isinstance(data, list)
-        # Verify symbiants have QL field for client-side filtering
-        if len(data) > 0:
-            symbiant = data[0]
-            assert "ql" in symbiant
+        # Every symbiant needs a QL for client-side filtering
+        assert len(data["items"]) > 0
+        for symbiant in data["items"]:
+            assert isinstance(symbiant["ql"], int)
 
 
 class TestCacheAndPerformance:
@@ -456,11 +474,11 @@ class TestPaginationAndEdgeCases:
 
     def test_endpoint_response_structure(self, client):
         """Test that all paginated endpoints have consistent response structure."""
-        # Note: symbiants endpoint returns List[], not paginated, so excluded from this test
         endpoints = [
             "/api/v1/items",
             "/api/v1/spells",
             "/api/v1/mobs?is_pocket_boss=true",
+            "/api/v1/symbiants",
         ]
 
         for endpoint in endpoints:
@@ -509,13 +527,13 @@ class TestRealDataValidation:
 
     def test_get_specific_symbiant(self, client):
         """Test getting a specific symbiant by ID using real database data."""
-        # Get list to find a real ID (symbiants returns a list, not paginated)
-        response = client.get("/api/v1/symbiants")
+        # Get list to find a real ID
+        response = client.get("/api/v1/symbiants?page_size=1")
         assert response.status_code == 200
         data = response.json()
 
-        if len(data) > 0:
-            symbiant_id = data[0]["id"]
+        if data["total"] > 0:
+            symbiant_id = data["items"][0]["id"]
 
             # Get specific symbiant
             response = client.get(f"/api/v1/symbiants/{symbiant_id}")
