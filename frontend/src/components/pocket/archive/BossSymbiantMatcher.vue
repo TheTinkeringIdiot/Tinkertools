@@ -10,7 +10,8 @@ import Column from 'primevue/column';
 import Tag from 'primevue/tag';
 import TabView from 'primevue/tabview';
 import TabPanel from 'primevue/tabpanel';
-import type { PocketBoss, Symbiant } from '@/types/api';
+import { getImplantSlotNameFromBitflag } from '@/services/game-utils';
+import type { Mob, MobWithDrops, SymbiantItem } from '@/types/api';
 
 const pocketBossStore = usePocketBossStore();
 const symbiantStore = useSymbiantsStore();
@@ -29,10 +30,10 @@ const filteredBosses = computed(() => {
       boss.name.toLowerCase().includes(search) ||
       boss.playfield?.toLowerCase().includes(search) ||
       boss.location?.toLowerCase().includes(search) ||
-      boss.dropped_symbiants?.some(
+      getBossDrops(boss).some(
         (s) =>
           s.name.toLowerCase().includes(search) ||
-          s.slot.toLowerCase().includes(search) ||
+          getSlotName(s.slot_id).toLowerCase().includes(search) ||
           s.family?.toLowerCase().includes(search)
       )
   );
@@ -45,9 +46,9 @@ const filteredSymbiants = computed(() => {
   return Array.from(symbiantStore.symbiants.values()).filter(
     (symbiant) =>
       symbiant.name.toLowerCase().includes(search) ||
-      symbiant.slot.toLowerCase().includes(search) ||
+      getSlotName(symbiant.slot_id).toLowerCase().includes(search) ||
       symbiant.family?.toLowerCase().includes(search) ||
-      getDropSources(symbiant).some(
+      getDropSources(symbiant.id).some(
         (boss) =>
           boss.name.toLowerCase().includes(search) || boss.playfield?.toLowerCase().includes(search)
       )
@@ -57,7 +58,7 @@ const filteredSymbiants = computed(() => {
 const bossSymbiantTable = computed(() => {
   return filteredBosses.value
     .flatMap((boss) =>
-      (boss.dropped_symbiants || []).map((symbiant) => ({
+      getBossDrops(boss).map((symbiant) => ({
         bossId: boss.id,
         bossName: boss.name,
         bossLevel: boss.level,
@@ -65,31 +66,39 @@ const bossSymbiantTable = computed(() => {
         bossLocation: boss.location,
         symbiantId: symbiant.id,
         symbiantName: symbiant.name,
-        symbiantSlot: symbiant.slot,
+        symbiantSlot: getSlotName(symbiant.slot_id),
         symbiantQl: symbiant.ql,
         symbiantFamily: symbiant.family,
       }))
     )
     .sort((a, b) => {
       // Sort by boss level first, then by symbiant QL
-      if (a.bossLevel !== b.bossLevel) return a.bossLevel - b.bossLevel;
+      if (a.bossLevel !== b.bossLevel) return (a.bossLevel ?? 0) - (b.bossLevel ?? 0);
       if (a.symbiantQl !== b.symbiantQl) return b.symbiantQl - a.symbiantQl;
       return a.bossName.localeCompare(b.bossName);
     });
 });
 
 // Methods
-function getDropSources(symbiant: Symbiant): PocketBoss[] {
-  return pocketBossStore.getPocketBossesBySymbiant(symbiant.id);
+function hasDrops(boss: Mob): boss is MobWithDrops {
+  return 'dropped_items' in boss && Array.isArray(boss.dropped_items);
 }
 
-function getBossLevel(bossId: number): number {
-  const boss = pocketBossStore.getPocketBossById(bossId);
-  return boss?.level || 0;
+// Store bosses carry no embedded drops; only a MobWithDrops payload has them
+function getBossDrops(boss: Mob): SymbiantItem[] {
+  return hasDrops(boss) ? boss.dropped_items : [];
 }
 
-function getBossLevelSeverity(level: number): 'success' | 'info' | 'warning' | 'danger' {
-  if (level < 50) return 'success';
+function getSlotName(slotId: number): string {
+  return getImplantSlotNameFromBitflag(slotId);
+}
+
+function getDropSources(symbiantId: number): Mob[] {
+  return pocketBossStore.getPocketBossesBySymbiant(symbiantId);
+}
+
+function getBossLevelSeverity(level: number | null): 'success' | 'info' | 'warning' | 'danger' {
+  if (level === null || level < 50) return 'success';
   if (level < 100) return 'info';
   if (level < 150) return 'warning';
   return 'danger';
@@ -105,14 +114,17 @@ function getQualitySeverity(ql: number): 'success' | 'info' | 'warning' | 'dange
 function getSlotIcon(slot: string): string {
   const iconMap: Record<string, string> = {
     Head: 'pi-user',
-    Eye: 'pi-eye',
-    Ear: 'pi-volume-up',
+    Eyes: 'pi-eye',
+    Ears: 'pi-volume-up',
     Chest: 'pi-shield',
-    Arm: 'pi-stop',
-    Wrist: 'pi-circle',
-    Hand: 'pi-hand-paper',
+    'Right Arm': 'pi-stop',
+    'Left Arm': 'pi-stop',
+    'Right Wrist': 'pi-circle',
+    'Left Wrist': 'pi-circle',
+    'Right Hand': 'pi-hand-paper',
+    'Left Hand': 'pi-hand-paper',
     Waist: 'pi-minus',
-    Leg: 'pi-sort-down',
+    Legs: 'pi-sort-down',
     Feet: 'pi-step-forward',
   };
   return iconMap[slot] || 'pi-circle';
@@ -139,7 +151,7 @@ function exportTableData() {
       [
         `"${row.bossName}"`,
         row.bossLevel,
-        `"${row.bossPlayfield || ''} ${row.bossLocation || ''}".trim()`,
+        `"${`${row.bossPlayfield || ''} ${row.bossLocation || ''}`.trim()}"`,
         `"${row.symbiantName}"`,
         row.symbiantSlot,
         row.symbiantQl,
@@ -238,24 +250,26 @@ function exportTableData() {
                   </div>
 
                   <!-- Dropped Symbiants -->
-                  <div v-if="boss.dropped_symbiants?.length">
+                  <div v-if="getBossDrops(boss).length">
                     <h4 class="font-medium mb-2 text-surface-700 dark:text-surface-300">
-                      Dropped Symbiants ({{ boss.dropped_symbiants.length }})
+                      Dropped Symbiants ({{ getBossDrops(boss).length }})
                     </h4>
                     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                       <div
-                        v-for="symbiant in boss.dropped_symbiants"
+                        v-for="symbiant in getBossDrops(boss)"
                         :key="symbiant.id"
                         class="flex items-center justify-between p-3 border border-surface-200 dark:border-surface-700 rounded-lg"
                       >
                         <div class="flex items-center gap-3 min-w-0 flex-1">
-                          <i :class="`pi ${getSlotIcon(symbiant.slot)} text-primary-500`"></i>
+                          <i
+                            :class="`pi ${getSlotIcon(getSlotName(symbiant.slot_id))} text-primary-500`"
+                          ></i>
                           <div class="min-w-0">
                             <div class="font-medium text-surface-900 dark:text-surface-50 truncate">
                               {{ symbiant.name }}
                             </div>
                             <div class="text-sm text-surface-600 dark:text-surface-400">
-                              {{ symbiant.slot }}
+                              {{ getSlotName(symbiant.slot_id) }}
                               <span v-if="symbiant.family"> • {{ symbiant.family }}</span>
                             </div>
                           </div>
@@ -302,7 +316,9 @@ function exportTableData() {
                   <!-- Symbiant Header -->
                   <div class="flex items-start justify-between">
                     <div class="flex items-center gap-3">
-                      <i :class="`pi ${getSlotIcon(symbiant.slot)} text-xl text-primary-500`"></i>
+                      <i
+                        :class="`pi ${getSlotIcon(getSlotName(symbiant.slot_id))} text-xl text-primary-500`"
+                      ></i>
                       <div>
                         <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-50">
                           {{ symbiant.name }}
@@ -310,7 +326,7 @@ function exportTableData() {
                         <div
                           class="flex items-center gap-3 text-sm text-surface-600 dark:text-surface-400"
                         >
-                          <span>{{ symbiant.slot }}</span>
+                          <span>{{ getSlotName(symbiant.slot_id) }}</span>
                           <span v-if="symbiant.family">• {{ symbiant.family }}</span>
                         </div>
                       </div>
@@ -321,14 +337,14 @@ function exportTableData() {
                   <!-- Drop Sources -->
                   <div>
                     <h4 class="font-medium mb-2 text-surface-700 dark:text-surface-300">
-                      Drop Sources ({{ getDropSources(symbiant).length }})
+                      Drop Sources ({{ getDropSources(symbiant.id).length }})
                     </h4>
                     <div
-                      v-if="getDropSources(symbiant).length > 0"
+                      v-if="getDropSources(symbiant.id).length > 0"
                       class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"
                     >
                       <div
-                        v-for="boss in getDropSources(symbiant)"
+                        v-for="boss in getDropSources(symbiant.id)"
                         :key="boss.id"
                         class="flex items-center justify-between p-3 border border-surface-200 dark:border-surface-700 rounded-lg"
                       >

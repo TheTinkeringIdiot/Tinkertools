@@ -104,7 +104,7 @@ being activated with stats from the wrong database.
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { storeToRefs } from 'pinia';
-import Dropdown from 'primevue/dropdown';
+import Dropdown, { type DropdownChangeEvent } from 'primevue/dropdown';
 import ConfirmDialog from 'primevue/confirmdialog';
 import { useConfirm } from 'primevue/useconfirm';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
@@ -113,6 +113,14 @@ import { gameVersionDisplayName } from '@/lib/tinkerprofiles/game-version';
 // Store
 const profilesStore = useTinkerProfilesStore();
 const confirm = useConfirm();
+
+/** Shape of the options built by the store's groupedProfileOptions. */
+interface ProfileOption {
+  label: string;
+  value: string | null;
+  otherVersion: boolean;
+  versionLabel: string;
+}
 
 /** Confirmation group, so only this component's dialog answers its own prompts. */
 const CONFIRM_GROUP = 'profile-version-copy';
@@ -145,33 +153,34 @@ const dropdownPlaceholder = computed(() => {
 });
 
 // Methods
-function getProfileName(option: any): string {
+function getProfileName(option: ProfileOption): string {
   const match = option.label.match(/^(.+?) \(/);
   return match ? match[1] : option.label;
 }
 
-function getProfileDetails(option: any): string {
+function getProfileDetails(option: ProfileOption): string {
   const match = option.label.match(/\((.+)\)$/);
   return match ? match[1] : '';
 }
 
-function findOption(value: string | null): any {
+function findOption(value: string | null): ProfileOption | null {
   for (const group of groupedProfileOptions.value) {
-    const found = group.items.find((item: any) => item.value === value);
+    const items: ProfileOption[] = group.items;
+    const found = items.find((item) => item.value === value);
     if (found) return found;
   }
   return null;
 }
 
-async function onProfileChange(event: any) {
-  const value = event.value;
+async function onProfileChange(event: DropdownChangeEvent) {
+  const value = event.value as string | null;
   const option = findOption(value);
 
   // A profile from another version cannot be activated as-is: its item
   // snapshots came from a different database. Offer a copy instead.
-  if (option?.otherVersion) {
+  if (option?.otherVersion && option.value !== null) {
     selectedProfileId.value = profilesStore.activeProfileId;
-    confirmCopy(option);
+    confirmCopy(option, option.value);
     return;
   }
 
@@ -184,7 +193,7 @@ async function onProfileChange(event: any) {
   }
 }
 
-function confirmCopy(option: any) {
+function confirmCopy(option: ProfileOption, profileId: string) {
   confirm.require({
     group: CONFIRM_GROUP,
     header: 'Copy profile',
@@ -192,16 +201,20 @@ function confirmCopy(option: any) {
     icon: 'pi pi-clone',
     acceptLabel: 'Copy',
     rejectLabel: 'Cancel',
-    accept: async () => {
-      try {
-        await profilesStore.copyProfileToCurrentVersion(option.value);
-      } catch (error) {
-        console.error('Failed to copy profile for current version:', error);
-      } finally {
-        selectedProfileId.value = profilesStore.activeProfileId;
-      }
+    accept: () => {
+      void copyProfile(profileId);
     },
   });
+}
+
+async function copyProfile(profileId: string) {
+  try {
+    await profilesStore.copyProfileToCurrentVersion(profileId);
+  } catch (error) {
+    console.error('Failed to copy profile for current version:', error);
+  } finally {
+    selectedProfileId.value = profilesStore.activeProfileId;
+  }
 }
 
 // Watchers

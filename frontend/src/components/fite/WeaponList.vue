@@ -140,7 +140,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import Button from 'primevue/button';
 import WeaponRequirements from './WeaponRequirements.vue';
 import UsabilityBadge from './UsabilityBadge.vue';
@@ -160,8 +159,8 @@ interface Emits {
   (e: 'compare', weapon: Weapon): void;
 }
 
-const props = defineProps<Props>();
-const emit = defineEmits<Emits>();
+defineProps<Props>();
+defineEmits<Emits>();
 
 // Helper function to get stat name
 const getStatName = (statId: number): string => {

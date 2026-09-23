@@ -202,7 +202,7 @@ function updateUrl() {
   });
 }
 
-async function loadFromUrl() {
+function loadFromUrl() {
   const s1 = route.query.s1 ? parseInt(route.query.s1 as string) : null;
   const s2 = route.query.s2 ? parseInt(route.query.s2 as string) : null;
   const s3 = route.query.s3 ? parseInt(route.query.s3 as string) : null;
@@ -240,7 +240,7 @@ onMounted(async () => {
   // Priority: URL params > Store state
   if (route.query.s1 || route.query.s2 || route.query.s3) {
     // Load from URL
-    await loadFromUrl();
+    loadFromUrl();
   } else {
     // Load from store
     loadFromStore();

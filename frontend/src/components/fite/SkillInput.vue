@@ -56,7 +56,7 @@
       <!-- Skills List -->
       <div class="space-y-3">
         <div
-          v-for="[skillId, skillValue] in displayedSkills"
+          v-for="[skillId] in displayedSkills"
           :key="skillId"
           class="flex items-center justify-between p-3 border border-surface-200 dark:border-surface-700 rounded hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
         >
@@ -269,7 +269,8 @@ const removeSkill = (skillId: number) => {
 
 const addSkill = () => {
   if (newSkillId.value && newSkillValue.value !== null && newSkillValue.value > 0) {
-    skills.value[newSkillId.value] = newSkillValue.value;
+    const addedSkillId = newSkillId.value;
+    skills.value[addedSkillId] = newSkillValue.value;
     emit('update:skills', { ...skills.value });
 
     // Reset form
@@ -279,7 +280,7 @@ const addSkill = () => {
     toast.add({
       severity: 'success',
       summary: 'Skill Added',
-      detail: `${getSkillName(newSkillId.value)} added`,
+      detail: `${getSkillName(addedSkillId)} added`,
       life: 2000,
     });
   }

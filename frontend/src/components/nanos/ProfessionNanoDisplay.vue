@@ -189,7 +189,7 @@ Shows nanos organized by strain in decreasing QL order
                         <div class="w-7 h-7 flex items-center justify-center">
                           <img
                             v-if="getItemIconUrl(nano.stats || [])"
-                            :src="getItemIconUrl(nano.stats || [])"
+                            :src="getItemIconUrl(nano.stats || []) ?? undefined"
                             :alt="`${nano.name} icon`"
                             class="w-7 h-7 object-contain"
                             @error="handleIconError"
@@ -214,7 +214,7 @@ Shows nanos organized by strain in decreasing QL order
 
                       <!-- QL -->
                       <td class="px-3 py-4 text-center">
-                        <Badge :value="nano.ql || 1" severity="secondary" size="small" />
+                        <Badge :value="nano.ql || 1" severity="secondary" />
                       </td>
 
                       <!-- Spec -->
@@ -338,7 +338,6 @@ import Badge from 'primevue/badge';
 import Dropdown from 'primevue/dropdown';
 import ToggleButton from 'primevue/togglebutton';
 import ProgressSpinner from 'primevue/progressspinner';
-import SimpleNanoCard from '@/components/nanos/SimpleNanoCard.vue';
 // import NanoDetail from '@/components/nanos/NanoDetail.vue'
 import { PROFESSION, NANO_STRAIN, NANO_SUBSTRAINS } from '@/services/game-data';
 import {
@@ -353,7 +352,6 @@ import type { Item } from '@/types/api';
 import { ProfileStorage } from '@/lib/tinkerprofiles/storage';
 import { mapProfileToStats } from '@/utils/profile-stats-mapper';
 import { checkActionRequirements, parseAction } from '@/services/action-criteria';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { apiBaseFor } from '@/services/api-config';
 import { currentVersion } from '@/composables/useGameVersion';
@@ -398,11 +396,7 @@ const profileStore = useTinkerProfilesStore();
 
 // State
 const nanos = ref<Item[]>([]);
-const selectedNano = ref<Item | null>(null);
-const showNanoDetail = ref(false);
 const sortOrder = ref<'ql_desc' | 'ql_asc' | 'name_asc'>('ql_desc');
-const iconLoadErrors = ref<Set<number>>(new Set());
-const activeProfile = ref<TinkerProfile | null>(null);
 const characterStats = ref<Record<number, number> | null>(null);
 const showUnusableNanos = ref<boolean>(true);
 
@@ -563,19 +557,10 @@ function onSortChange() {
 
 function onNanoSelect(nano: Item) {
   // Navigate to item detail page
-  router.push({
+  void router.push({
     name: 'ItemDetail',
     params: { aoid: nano.aoid?.toString() || nano.id.toString() },
   });
-}
-
-function getSubstrainName(nano: Item): string | null {
-  // Find substrain stat (stat 1003)
-  const substrainStat = nano.stats.find((stat) => stat.stat === 1003);
-  if (!substrainStat) return null;
-
-  const substrainId = substrainStat.value;
-  return NANO_SUBSTRAINS[substrainId as keyof typeof NANO_SUBSTRAINS] || `Substrain ${substrainId}`;
 }
 
 function handleIconError(event: Event) {
@@ -604,8 +589,6 @@ async function loadActiveProfile() {
   try {
     const storage = new ProfileStorage();
     const profile = await storage.loadActiveProfile();
-    activeProfile.value = profile;
-
     if (profile) {
       characterStats.value = mapProfileToStats(profile);
       console.log('Active profile loaded for nano compatibility:', profile.Character.Name);
@@ -615,7 +598,6 @@ async function loadActiveProfile() {
     }
   } catch (error) {
     console.error('Failed to load active profile:', error);
-    activeProfile.value = null;
     characterStats.value = null;
   }
 }
@@ -660,8 +642,9 @@ function saveShowUnusablePreference(): void {
 watch(
   () => props.selectedProfession,
   () => {
-    loadNanos();
-    loadActiveProfile();
+    // Both loaders catch and log their own failures
+    void loadNanos();
+    void loadActiveProfile();
     loadShowUnusablePreference();
   },
   { immediate: true }
@@ -675,8 +658,6 @@ watch(showUnusableNanos, () => {
 watch(
   () => profileStore.activeProfile,
   (newProfile) => {
-    activeProfile.value = newProfile;
-
     if (newProfile) {
       characterStats.value = mapProfileToStats(newProfile);
       console.log(

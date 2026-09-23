@@ -54,11 +54,7 @@ Provides dynamic filtering with real-time results and profile-aware options
             <div class="flex items-center gap-2">
               <i class="pi pi-box text-sm"></i>
               <span>Item Type</span>
-              <Badge
-                v-if="getFilterCount('itemType')"
-                :value="getFilterCount('itemType')"
-                size="small"
-              />
+              <Badge v-if="getFilterCount('itemType')" :value="getFilterCount('itemType')" />
             </div>
           </template>
 
@@ -70,7 +66,7 @@ Provides dynamic filtering with real-time results and profile-aware options
                   v-model="tempFilters.isNano"
                   :indeterminate="tempFilters.isNano === null"
                   input-id="nano-items"
-                  @change="updateFilter('isNano')"
+                  @change="applyFilters()"
                 />
                 <label for="nano-items" class="ml-2 text-sm">Nano Programs</label>
               </div>
@@ -78,7 +74,7 @@ Provides dynamic filtering with real-time results and profile-aware options
                 <Checkbox
                   v-model="tempFilters.isWeapon"
                   input-id="weapons"
-                  @change="updateFilter('isWeapon')"
+                  @change="applyFilters()"
                 />
                 <label for="weapons" class="ml-2 text-sm">Weapons</label>
               </div>
@@ -99,7 +95,7 @@ Provides dynamic filtering with real-time results and profile-aware options
                     v-model="tempFilters.itemClasses"
                     :value="itemClass.value"
                     :input-id="`class-${itemClass.value}`"
-                    @change="updateFilter('itemClasses')"
+                    @change="applyFilters()"
                   />
                   <label :for="`class-${itemClass.value}`" class="ml-2 text-sm">
                     {{ itemClass.label }}
@@ -116,11 +112,7 @@ Provides dynamic filtering with real-time results and profile-aware options
             <div class="flex items-center gap-2">
               <i class="pi pi-star text-sm"></i>
               <span>Quality Level</span>
-              <Badge
-                v-if="hasQLFilter"
-                :value="`${tempFilters.minQL}-${tempFilters.maxQL}`"
-                size="small"
-              />
+              <Badge v-if="hasQLFilter" :value="`${tempFilters.minQL}-${tempFilters.maxQL}`" />
             </div>
           </template>
 
@@ -161,7 +153,7 @@ Provides dynamic filtering with real-time results and profile-aware options
               <div class="flex items-center gap-2 mb-2">
                 <i class="pi pi-user text-primary-600"></i>
                 <span class="text-sm font-medium text-primary-700 dark:text-primary-300">
-                  {{ profile.name }}'s Range
+                  {{ profile.Character.Name }}'s Range
                 </span>
               </div>
               <div class="text-xs text-primary-600 dark:text-primary-400 mb-2">
@@ -183,7 +175,7 @@ Provides dynamic filtering with real-time results and profile-aware options
             <div class="flex items-center gap-2">
               <i class="pi pi-chart-bar text-sm"></i>
               <span>Stat Requirements</span>
-              <Badge v-if="getFilterCount('stats')" :value="getFilterCount('stats')" size="small" />
+              <Badge v-if="getFilterCount('stats')" :value="getFilterCount('stats')" />
             </div>
           </template>
 
@@ -200,7 +192,7 @@ Provides dynamic filtering with real-time results and profile-aware options
                 option-value="value"
                 placeholder="Any Stats"
                 class="w-full"
-                @change="updateFilter('statFilterMode')"
+                @change="applyFilters()"
               />
             </div>
 
@@ -211,7 +203,7 @@ Provides dynamic filtering with real-time results and profile-aware options
                   v-model="tempFilters.selectedStats"
                   :value="stat.value"
                   :input-id="`stat-${stat.value}`"
-                  @change="updateFilter('selectedStats')"
+                  @change="applyFilters()"
                 />
                 <label :for="`stat-${stat.value}`" class="text-sm min-w-0 flex-1">
                   {{ stat.label }}
@@ -224,7 +216,7 @@ Provides dynamic filtering with real-time results and profile-aware options
                   placeholder="Min"
                   size="small"
                   class="w-16"
-                  @update:model-value="updateFilter('statMinValues')"
+                  @update:model-value="applyFilters()"
                 />
               </div>
             </div>
@@ -260,11 +252,7 @@ Provides dynamic filtering with real-time results and profile-aware options
             <div class="flex items-center gap-2">
               <i class="pi pi-cog text-sm"></i>
               <span>Properties</span>
-              <Badge
-                v-if="getFilterCount('properties')"
-                :value="getFilterCount('properties')"
-                size="small"
-              />
+              <Badge v-if="getFilterCount('properties')" :value="getFilterCount('properties')" />
             </div>
           </template>
 
@@ -272,37 +260,25 @@ Provides dynamic filtering with real-time results and profile-aware options
             <!-- Has Effects -->
             <div class="flex items-center justify-between">
               <label class="text-sm">Has Special Effects</label>
-              <TriStateCheckbox
-                v-model="tempFilters.hasEffects"
-                @change="updateFilter('hasEffects')"
-              />
+              <TriStateCheckbox v-model="tempFilters.hasEffects" @change="applyFilters()" />
             </div>
 
             <!-- Has Requirements -->
             <div class="flex items-center justify-between">
               <label class="text-sm">Has Requirements</label>
-              <TriStateCheckbox
-                v-model="tempFilters.hasRequirements"
-                @change="updateFilter('hasRequirements')"
-              />
+              <TriStateCheckbox v-model="tempFilters.hasRequirements" @change="applyFilters()" />
             </div>
 
             <!-- Tradeable -->
             <div class="flex items-center justify-between">
               <label class="text-sm">Tradeable</label>
-              <TriStateCheckbox
-                v-model="tempFilters.isTradeable"
-                @change="updateFilter('isTradeable')"
-              />
+              <TriStateCheckbox v-model="tempFilters.isTradeable" @change="applyFilters()" />
             </div>
 
             <!-- Droppable -->
             <div class="flex items-center justify-between">
               <label class="text-sm">Droppable</label>
-              <TriStateCheckbox
-                v-model="tempFilters.isDroppable"
-                @change="updateFilter('isDroppable')"
-              />
+              <TriStateCheckbox v-model="tempFilters.isDroppable" @change="applyFilters()" />
             </div>
           </div>
         </AccordionTab>
@@ -313,11 +289,7 @@ Provides dynamic filtering with real-time results and profile-aware options
             <div class="flex items-center gap-2">
               <i class="pi pi-map-marker text-sm"></i>
               <span>Source</span>
-              <Badge
-                v-if="getFilterCount('source')"
-                :value="getFilterCount('source')"
-                size="small"
-              />
+              <Badge v-if="getFilterCount('source')" :value="getFilterCount('source')" />
             </div>
           </template>
 
@@ -333,7 +305,7 @@ Provides dynamic filtering with real-time results and profile-aware options
                     v-model="tempFilters.sources"
                     :value="source.value"
                     :input-id="`source-${source.value}`"
-                    @change="updateFilter('sources')"
+                    @change="applyFilters()"
                   />
                   <label :for="`source-${source.value}`" class="ml-2 text-sm">
                     {{ source.label }}
@@ -376,7 +348,9 @@ Provides dynamic filtering with real-time results and profile-aware options
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
-import type { ItemFilters, TinkerProfile } from '@/types/api';
+import type { ItemFilters } from '@/types/api';
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import { mapProfileToStats } from '@/utils/profile-stats-mapper';
 
 interface FilterPreset {
   name: string;
@@ -387,7 +361,6 @@ const props = defineProps<{
   filters: ItemFilters;
   profile?: TinkerProfile | null;
   showCompatibility?: boolean;
-  searchResults?: any[];
 }>();
 
 const emit = defineEmits<{
@@ -490,19 +463,23 @@ const hasQLFilter = computed(
 const profileQLRange = computed(() => {
   if (!props.profile) return { min: 1, max: 300 };
 
-  const level = props.profile.level;
+  const level = props.profile.Character.Level;
   return {
     min: Math.max(1, level - 50),
     max: Math.min(300, level + 50),
   };
 });
 
+// Profile stats keyed by stat ID
+const profileStats = computed(() => (props.profile ? mapProfileToStats(props.profile) : null));
+
 const displayedCharacterStats = computed(() => {
-  if (!props.profile) return [];
+  const stats = profileStats.value;
+  if (!stats) return [];
 
   return commonStats.slice(0, 6).map((stat) => ({
     name: stat.label,
-    value: props.profile?.stats?.[stat.value] || 0,
+    value: stats[stat.value] || 0,
   }));
 });
 
@@ -548,13 +525,14 @@ function getFilterCount(category: string): number {
       );
     case 'stats':
       return tempFilters.value.selectedStats?.length || 0;
-    case 'properties':
+    case 'properties': {
       let count = 0;
       if (tempFilters.value.hasEffects !== null) count++;
       if (tempFilters.value.hasRequirements !== null) count++;
       if (tempFilters.value.isTradeable !== null) count++;
       if (tempFilters.value.isDroppable !== null) count++;
       return count;
+    }
     case 'source':
       return tempFilters.value.sources?.length || 0;
     default:
@@ -562,15 +540,10 @@ function getFilterCount(category: string): number {
   }
 }
 
-function updateFilter(filterKey: string) {
-  // Apply filter immediately for better UX
-  applyFilters();
-}
-
 function updateQLFilter() {
   tempFilters.value.minQL = qlRange.value[0];
   tempFilters.value.maxQL = qlRange.value[1];
-  updateFilter('qlRange');
+  applyFilters();
 }
 
 function setQLRange(min: number, max: number) {
@@ -579,19 +552,21 @@ function setQLRange(min: number, max: number) {
 }
 
 function useCharacterStats() {
-  if (!props.profile) return;
+  const stats = profileStats.value;
+  if (!stats) return;
 
   // Set stat requirements based on character's current stats
-  tempFilters.value.statFilterMode = 'can_meet';
-  tempFilters.value.selectedStats = commonStats.slice(0, 6).map((s) => s.value);
-  tempFilters.value.statMinValues = {};
-
+  const statMinValues: Record<number, number> = {};
   commonStats.slice(0, 6).forEach((stat) => {
-    const charStatValue = props.profile?.stats?.[stat.value] || 0;
-    tempFilters.value.statMinValues[stat.value] = Math.max(0, charStatValue - 100);
+    const charStatValue = stats[stat.value] || 0;
+    statMinValues[stat.value] = Math.max(0, charStatValue - 100);
   });
 
-  updateFilter('characterStats');
+  tempFilters.value.statFilterMode = 'can_meet';
+  tempFilters.value.selectedStats = commonStats.slice(0, 6).map((s) => s.value);
+  tempFilters.value.statMinValues = statMinValues;
+
+  applyFilters();
 }
 
 function applyPreset(preset: FilterPreset) {

@@ -143,7 +143,7 @@ const isVisible = computed({
 });
 
 // Options for dropdowns
-const operatorOptions = [
+const operatorOptions: Array<{ label: string; value: StatFilter['operator'] }> = [
   { label: '==', value: '==' },
   { label: '<=', value: '<=' },
   { label: '>=', value: '>=' },

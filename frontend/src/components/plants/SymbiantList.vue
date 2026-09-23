@@ -87,13 +87,11 @@ Shows symbiants with search, filtering, and pagination
                     :key="bonus.statId"
                     :value="`+${bonus.value} ${formatStatName(bonus.statId)}`"
                     severity="success"
-                    size="small"
                   />
                   <Badge
                     v-if="symbiant.statBonuses.length > 3"
                     :value="`+${symbiant.statBonuses.length - 3} more`"
                     severity="secondary"
-                    size="small"
                   />
                 </div>
               </div>
@@ -158,6 +156,7 @@ import Badge from 'primevue/badge';
 import Button from 'primevue/button';
 import Dropdown from 'primevue/dropdown';
 import Paginator from 'primevue/paginator';
+import type { PageState } from 'primevue/paginator';
 import ProgressSpinner from 'primevue/progressspinner';
 
 import type { PlantSymbiant } from '@/types/plants';
@@ -182,7 +181,7 @@ interface Emits {
 const emit = defineEmits<Emits>();
 
 // Reactive state
-const sortBy = ref('name');
+const sortBy = ref<'name' | 'family' | 'qualityLevel' | 'slot'>('name');
 const sortOrder = ref<'asc' | 'desc'>('asc');
 const currentPage = ref(0);
 const pageSize = ref(20);
@@ -197,16 +196,9 @@ const sortOptions = [
 // Computed
 const sortedSymbiants = computed(() => {
   const sorted = [...props.symbiants].sort((a, b) => {
-    let aValue: any = a[sortBy.value as keyof Symbiant];
-    let bValue: any = b[sortBy.value as keyof Symbiant];
-
-    // Handle null/undefined values
-    if (aValue == null) aValue = '';
-    if (bValue == null) bValue = '';
-
-    // Convert to string for comparison
-    aValue = String(aValue).toLowerCase();
-    bValue = String(bValue).toLowerCase();
+    // Treat null/undefined as empty, then compare as lowercase strings
+    const aValue = String(a[sortBy.value] ?? '').toLowerCase();
+    const bValue = String(b[sortBy.value] ?? '').toLowerCase();
 
     if (sortOrder.value === 'asc') {
       return aValue.localeCompare(bValue);
@@ -274,7 +266,7 @@ const toggleSortOrder = () => {
   sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
 };
 
-const onPageChange = (event: any) => {
+const onPageChange = (event: PageState) => {
   currentPage.value = event.page;
   emit('page-change', event.page);
 };

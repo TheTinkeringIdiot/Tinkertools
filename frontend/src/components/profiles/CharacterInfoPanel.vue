@@ -182,12 +182,7 @@ Shows character stats, health, nano, and other core information
 import { computed } from 'vue';
 import Badge from 'primevue/badge';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
-import {
-  calculateTitleLevel,
-  getBreedId,
-  getProfessionName,
-  getBreedName,
-} from '@/services/game-utils';
+import { calculateTitleLevel, getProfessionName, getBreedName } from '@/services/game-utils';
 import { getBreedInitValue } from '@/lib/tinkerprofiles/ip-calculator';
 import { skillService } from '@/services/skill-service';
 

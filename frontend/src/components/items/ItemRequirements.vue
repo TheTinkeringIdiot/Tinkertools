@@ -176,7 +176,8 @@ Shows item requirements organized by category with compatibility checking
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Item, TinkerProfile } from '@/types/api';
+import type { Item } from '@/types/api';
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import {
   getStatName,
   getProfessionName,

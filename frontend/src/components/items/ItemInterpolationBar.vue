@@ -20,7 +20,7 @@
     <div class="w-64">
       <div class="relative">
         <Slider
-          v-model="localTargetQl"
+          v-model="sliderValue"
           :min="qualityRange?.min || 1"
           :max="qualityRange?.max || 300"
           :step="1"
@@ -58,14 +58,8 @@
         v-if="interpolationStatus === 'interpolated'"
         value="Interpolated"
         severity="success"
-        size="small"
       />
-      <Badge
-        v-else-if="interpolationStatus === 'original'"
-        value="Original"
-        severity="info"
-        size="small"
-      />
+      <Badge v-else-if="interpolationStatus === 'original'" value="Original" severity="info" />
     </div>
 
     <!-- Reset button -->
@@ -86,12 +80,7 @@ import { ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useInterpolation } from '../../composables/useInterpolation';
 import { apiClient } from '../../services/api-client';
-import type {
-  Item,
-  InterpolatedItem,
-  InterpolationInfo,
-  InterpolationRange,
-} from '../../types/api';
+import type { Item, InterpolatedItem, InterpolationRange } from '../../types/api';
 
 // PrimeVue components
 import Button from 'primevue/button';
@@ -143,21 +132,22 @@ const itemAoid = computed(() => {
   return null;
 });
 
-const {
-  interpolationInfo,
-  isInterpolatable,
-  qualityRange,
-  interpolationRanges,
-  loadInterpolationInfo,
-  setItem,
-  setItemFromObject,
-} = useInterpolation(ref(itemAoid.value), {
-  autoLoad: true,
-  debounceMs: 300,
-  gameVersion: computed(() => props.gameVersion),
-});
+const { isInterpolatable, qualityRange, interpolationRanges, setItem, setItemFromObject } =
+  useInterpolation(ref(itemAoid.value), {
+    autoLoad: true,
+    debounceMs: 300,
+    gameVersion: computed(() => props.gameVersion),
+  });
 
 const localTargetQl = ref<number | null>(props.initialQl || null);
+
+/** Slider binding: the Slider can't show "no value" and emits number | number[] */
+const sliderValue = computed({
+  get: () => localTargetQl.value ?? qualityRange.value?.min ?? 1,
+  set: (value: number | number[]) => {
+    localTargetQl.value = Array.isArray(value) ? value[0] : value;
+  },
+});
 
 // ============================================================================
 // Computed Properties
@@ -170,7 +160,8 @@ const isTargetQlValid = computed(() => {
   );
 });
 
-const interpolatedItem = ref<any>(null);
+/** The interpolated item currently shown in place of the original, if any. */
+const interpolatedItem = ref<InterpolatedItem | null>(null);
 
 const interpolationStatus = computed(() => {
   if (!props.item) return 'idle';
@@ -217,19 +208,19 @@ async function handleQlChange(): Promise<void> {
     return;
   }
 
-  // Check if we need to navigate to a different base item
-  if (targetRange.base_aoid !== itemAoid.value) {
-    // Navigate to the correct base item for this range
-    await router.push({
-      name: 'ItemDetail',
-      params: { aoid: targetRange.base_aoid.toString() },
-      query: { ql: localTargetQl.value.toString() },
-    });
-    return;
-  }
-
-  // Same range - interpolate the current item
   try {
+    // Check if we need to navigate to a different base item
+    if (targetRange.base_aoid !== itemAoid.value) {
+      // Navigate to the correct base item for this range
+      await router.push({
+        name: 'ItemDetail',
+        params: { aoid: targetRange.base_aoid.toString() },
+        query: { ql: localTargetQl.value.toString() },
+      });
+      return;
+    }
+
+    // Same range - interpolate the current item
     const interpolated = props.gameVersion
       ? await apiClient.interpolateItem(itemAoid.value, localTargetQl.value, {
           gameVersion: props.gameVersion,
@@ -237,6 +228,7 @@ async function handleQlChange(): Promise<void> {
       : await apiClient.interpolateItem(itemAoid.value, localTargetQl.value);
 
     if (interpolated.success && interpolated.item) {
+      interpolatedItem.value = interpolated.item;
       emit('item-update', interpolated.item);
 
       // Update URL query param
@@ -247,29 +239,34 @@ async function handleQlChange(): Promise<void> {
     } else {
       emit('error', interpolated.error || 'Failed to interpolate item');
     }
-  } catch (err: any) {
-    emit('error', err.message || 'Failed to interpolate item');
+  } catch (err: unknown) {
+    emit('error', (err instanceof Error && err.message) || 'Failed to interpolate item');
   }
 }
 
 // Debounced version for input changes
-let debounceTimeout: NodeJS.Timeout | null = null;
+let debounceTimeout: ReturnType<typeof setTimeout> | null = null;
 function debouncedQlChange(): void {
   if (debounceTimeout) {
     clearTimeout(debounceTimeout);
   }
   debounceTimeout = setTimeout(() => {
-    handleQlChange();
+    // handleQlChange reports its own failures through the 'error' event
+    void handleQlChange();
   }, 500);
 }
 
 function resetToOriginal(): void {
   localTargetQl.value = typeof props.item === 'object' ? props.item?.ql || null : null;
+  interpolatedItem.value = null;
   emit('item-update', null);
 
   // Remove QL from URL
-  const { ql, ...queryWithoutQl } = route.query;
-  router.replace({ path: route.path, query: queryWithoutQl });
+  const queryWithoutQl = { ...route.query };
+  delete queryWithoutQl.ql;
+  router.replace({ path: route.path, query: queryWithoutQl }).catch((err: unknown) => {
+    console.error('Failed to update URL after QL reset:', err);
+  });
 }
 
 // ============================================================================
@@ -279,6 +276,7 @@ function resetToOriginal(): void {
 watch(
   () => props.item,
   async () => {
+    interpolatedItem.value = null;
     if (!props.item) return;
 
     // Load interpolation info

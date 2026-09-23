@@ -175,7 +175,7 @@ async function select(version: GameVersion): Promise<void> {
 
 function openVersionsPage(): void {
   close();
-  router.push({ name: 'GameVersions' });
+  void router.push({ name: 'GameVersions' });
 }
 
 function onDocumentClick(event: MouseEvent): void {

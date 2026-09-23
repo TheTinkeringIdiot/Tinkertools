@@ -68,15 +68,18 @@ import {
   getItemClass,
   getItemCategoryName,
 } from '@/services/game-utils';
+import type { Item } from '@/types/api';
 
 // Props
 interface Props {
-  item?: any;
+  item?: Item | null;
   slotType?: 'weapon' | 'armor' | 'implant';
   showLabels?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  item: null,
+  slotType: undefined,
   showLabels: false,
 });
 
@@ -107,7 +110,7 @@ const gridCells = computed(() => {
   }> = [];
 
   // Determine grid dimensions and position function
-  let rows: number, cols: number, getPositionFn: Function;
+  let rows: number, cols: number, getPositionFn: (slotName: string) => { row: number; col: number };
 
   switch (slotInfo.value.type) {
     case 'weapon':

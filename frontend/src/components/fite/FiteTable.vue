@@ -154,6 +154,7 @@ import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { versionedPath } from '@/composables/useGameVersion';
 import DataTable from 'primevue/datatable';
+import type { DataTableRowClickEvent } from 'primevue/datatable';
 import Column from 'primevue/column';
 import Badge from 'primevue/badge';
 import type { WeaponCandidate, FiteInputState } from '@/types/weapon-analysis';
@@ -295,10 +296,9 @@ function getDamageTypeSeverity(damageType: number | undefined): string {
   if (!damageType) return 'secondary';
 
   switch (damageType) {
-    // Enum values
+    // Enum values first, then AC stat IDs
     case DAMAGE_TYPES.MELEE:
     case DAMAGE_TYPES.FIRE:
-    // AC stat IDs
     case 91: // MeleeAC
     case 97: // FireAC
       return 'danger';
@@ -331,10 +331,10 @@ function getDamageTypeSeverity(damageType: number | undefined): string {
 /**
  * Handle row click - navigate to item detail
  */
-function onRowClick(event: any) {
+function onRowClick(event: DataTableRowClickEvent) {
   const aoid = event.data.aoid;
   if (aoid) {
-    router.push({ name: 'ItemDetail', params: { aoid: aoid.toString() } });
+    void router.push({ name: 'ItemDetail', params: { aoid: aoid.toString() } });
   }
 }
 
@@ -342,7 +342,7 @@ function onRowClick(event: any) {
  * Handle weapon name click - navigate to item detail
  */
 function onWeaponClick(aoid: number) {
-  router.push({ name: 'ItemDetail', params: { aoid: aoid.toString() } });
+  void router.push({ name: 'ItemDetail', params: { aoid: aoid.toString() } });
 }
 </script>
 

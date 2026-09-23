@@ -74,10 +74,10 @@ Shows items in grid or list view with pagination and compatibility indicators
               >
                 <img
                   v-if="getItemIconUrl(item)"
-                  :src="getItemIconUrl(item)"
+                  :src="getItemIconUrl(item) ?? undefined"
                   :alt="`${item.name} icon`"
                   class="w-10 h-10 object-contain"
-                  @error="(e) => handleIconError(e, item.id)"
+                  @error="handleIconError(item.id)"
                 />
                 <i v-else class="pi pi-box text-surface-400"></i>
               </div>
@@ -91,8 +91,8 @@ Shows items in grid or list view with pagination and compatibility indicators
                       <h3 class="font-semibold text-surface-900 dark:text-surface-50 truncate">
                         {{ item.name }}
                       </h3>
-                      <Badge :value="`QL ${item.ql}`" severity="info" size="small" />
-                      <Badge v-if="item.is_nano" value="Nano" severity="success" size="small" />
+                      <Badge :value="`QL ${item.ql}`" severity="info" />
+                      <Badge v-if="item.is_nano" value="Nano" severity="success" />
                       <span
                         v-if="revisionCount(item) > 1"
                         class="inline-flex items-center gap-1 rounded bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 text-xs text-surface-600 dark:text-surface-300"
@@ -231,9 +231,14 @@ Shows items in grid or list view with pagination and compatibility indicators
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import type { Item, TinkerProfile, PaginationInfo } from '@/types/api';
+import type { PageState } from 'primevue/paginator';
+import type { Item, PaginationInfo } from '@/types/api';
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import { getItemIconUrl as getItemIconUrlUtil } from '@/services/game-utils';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
+import { versionedPath } from '@/composables/useGameVersion';
+import { mapProfileToStats } from '@/utils/profile-stats-mapper';
+import { getItemRequirements } from './item-requirements';
 
 // Components (to be created)
 import ItemCard from './ItemCard.vue';
@@ -246,7 +251,6 @@ const props = defineProps<{
   showCompatibility?: boolean;
   loading?: boolean;
   pagination?: PaginationInfo;
-  favoriteItems?: number[];
   comparisonItems?: number[];
   /** AOID -> number of game snapshots the item's definition changed in. */
   revisionCounts?: Record<number, number>;
@@ -338,32 +342,27 @@ const itemMenuItems = ref([
 ]);
 
 // Computed
-const statNameMap = computed(() => ({
-  16: 'Strength',
-  17: 'Agility',
-  18: 'Stamina',
-  19: 'Intelligence',
-  20: 'Sense',
-  21: 'Psychic',
-  102: '1H Blunt',
-  103: '1H Edged',
-  105: '2H Edged',
-  109: '2H Blunt',
-  133: 'Ranged Energy',
-  161: 'Computer Literacy',
-}));
+// Profile stats keyed by stat ID, computed once for all list rows
+const profileStats = computed(() =>
+  props.compatibilityProfile ? mapProfileToStats(props.compatibilityProfile) : null
+);
 
 // Methods
-function isFavorite(itemId: number): boolean {
-  return props.favoriteItems?.includes(itemId) || false;
-}
-
 function isComparing(itemId: number): boolean {
   return props.comparisonItems?.includes(itemId) || false;
 }
 
-function getStatName(statId: number): string {
-  return statNameMap.value[statId] || `Stat ${statId}`;
+function getCompatibilityStatus(item: Item): 'compatible' | 'incompatible' | 'unknown' {
+  const stats = profileStats.value;
+  const requirements = getItemRequirements(item);
+  if (!stats || requirements.length === 0) return 'unknown';
+  return requirements.every((req) => (stats[req.stat] || 0) >= req.value)
+    ? 'compatible'
+    : 'incompatible';
+}
+
+function getItemUrl(item: Item): string {
+  return `${window.location.origin}${versionedPath(`/items/${item.aoid ?? item.id}`)}`;
 }
 
 function showQuickView(item: Item) {
@@ -384,26 +383,36 @@ function showItemMenu(event: MouseEvent, item: Item) {
 }
 
 function copyItemLink(item: Item) {
-  const url = `${window.location.origin}/items/${item.id}`;
-  navigator.clipboard.writeText(url).then(() => {
-    // Show success toast
-    console.log('Item link copied to clipboard');
-  });
+  navigator.clipboard
+    .writeText(getItemUrl(item))
+    .then(() => {
+      // Show success toast
+      console.log('Item link copied to clipboard');
+    })
+    .catch((error: unknown) => {
+      console.warn('Failed to copy item link:', error);
+    });
 }
 
 function shareItem(item: Item) {
   if (navigator.share) {
-    navigator.share({
-      title: item.name,
-      text: item.description,
-      url: `${window.location.origin}/items/${item.id}`,
-    });
+    navigator
+      .share({
+        title: item.name,
+        text: item.description,
+        url: getItemUrl(item),
+      })
+      .catch((error: unknown) => {
+        // AbortError just means the user dismissed the share sheet
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        console.warn('Failed to share item:', error);
+      });
   } else {
     copyItemLink(item);
   }
 }
 
-function onPageChange(event: any) {
+function onPageChange(event: PageState) {
   currentOffset.value = event.first;
   const page = Math.floor(event.first / event.rows) + 1;
   emit('page-change', page, event.rows);
@@ -414,7 +423,7 @@ function getItemIconUrl(item: Item): string | null {
   return getItemIconUrlUtil(item.stats || []);
 }
 
-function handleIconError(event: Event, itemId: number) {
+function handleIconError(itemId: number) {
   iconLoadErrors.value.add(itemId);
 }
 </script>

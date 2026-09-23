@@ -11,7 +11,7 @@
     class="nuke-table"
     data-keyboard-nav-container
     role="table"
-    :aria-label="`Table showing ${tableData.length} offensive nano programs. Use arrow keys to navigate, Enter to select.`"
+    :aria-label="`Table showing ${tableData.length} offensive nano programs`"
     @row-click="onRowClick"
   >
     <!-- Name Column - Not sortable, clickable link -->
@@ -131,6 +131,7 @@ import { computed } from 'vue';
 import { type OffensiveNano } from '@/types/offensive-nano';
 import type { NukeInputState } from '@/types/offensive-nano';
 import DataTable from 'primevue/datatable';
+import type { DataTableRowClickEvent } from 'primevue/datatable';
 import Column from 'primevue/column';
 
 // Import calculation utilities from Phase 2
@@ -156,8 +157,6 @@ import {
 import {
   calculateNanoRegen,
   CRUNCHCOM_COST_REDUCTION,
-  ENHANCE_NANO_DAMAGE,
-  ANCIENT_MATRIX_DAMAGE,
   type NanoRegenBuffs,
 } from '@/utils/nuke-regen-calculations';
 
@@ -313,7 +312,7 @@ const tableData = computed(() => {
 /**
  * Handle row click to navigate to nano detail page
  */
-function onRowClick(event: any) {
+function onRowClick(event: DataTableRowClickEvent) {
   const aoid = event.data.aoid;
   emit('nano-selected', aoid);
 }
@@ -340,16 +339,6 @@ function getModifierStatFromDamageType(damageType: string): number {
 
   return damageTypeMap[damageType] || 96; // Default to poison if unknown
 }
-
-// ============================================================================
-// Expose for Tests
-// ============================================================================
-
-defineExpose({
-  defaultSortField,
-  defaultSortOrder,
-  tableData,
-});
 </script>
 
 <style scoped>

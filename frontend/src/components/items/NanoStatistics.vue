@@ -30,7 +30,7 @@ Shows essential nano information in a dense, scannable table format
           <!-- Data Row -->
           <div class="stats-row data-row">
             <!-- Damage Column (only for damage-dealing nanos) -->
-            <div v-if="hasDamageRange" class="stat-group">
+            <div v-if="damageRange" class="stat-group">
               <div class="damage-display">
                 <div v-if="damageRange.minDamage" class="damage-stat">
                   <div class="damage-label">Min</div>
@@ -102,7 +102,7 @@ Shows essential nano information in a dense, scannable table format
               <div v-if="nanoStats.nanoSchool" class="stat-pair">
                 <span class="stat-name">School</span>
                 <span class="stat-val val-school">{{
-                  NANOSCHOOL[nanoStats.nanoSchool] || `School ${nanoStats.nanoSchool}`
+                  getNanoSchoolName(nanoStats.nanoSchool) || `School ${nanoStats.nanoSchool}`
                 }}</span>
               </div>
               <div v-if="nanoStats.nanoStrain" class="stat-pair">
@@ -114,7 +114,7 @@ Shows essential nano information in a dense, scannable table format
                   }"
                   class="stat-val val-strain clickable-link"
                 >
-                  {{ NANO_STRAIN[nanoStats.nanoStrain] || `Strain ${nanoStats.nanoStrain}` }}
+                  {{ getNanoStrainName(nanoStats.nanoStrain) || `Strain ${nanoStats.nanoStrain}` }}
                 </RouterLink>
               </div>
               <div v-if="nanoStats.stackingOrder" class="stat-pair">
@@ -232,9 +232,10 @@ Shows essential nano information in a dense, scannable table format
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Item, TinkerProfile, ItemRequirement } from '@/types/api';
+import type { Item } from '@/types/api';
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import { getStatName, getNanoSchoolName, getNanoStrainName } from '@/services/game-utils';
-import { NANOSCHOOL, NANO_STRAIN, SPELL_FORMATS } from '@/services/game-data';
+import { SPELL_FORMATS } from '@/services/game-data';
 
 const props = defineProps<{
   item: Item;
@@ -248,8 +249,7 @@ const props = defineProps<{
 
 // Computed Properties
 const isNanoItem = computed(() => {
-  // Check if item is a nano using the same logic as the template badge
-  return props.item.is_nano === true || props.item.type_name === 'Nano';
+  return props.item.is_nano === true;
 });
 
 const nanoStats = computed(() => {
@@ -321,7 +321,7 @@ const damageRange = computed(() => {
     for (const spellData of props.item.spell_data) {
       if (spellData.spells && Array.isArray(spellData.spells)) {
         for (const spell of spellData.spells) {
-          if (damageSpellIds.includes(spell.spell_id)) {
+          if (spell.spell_id !== undefined && damageSpellIds.includes(spell.spell_id)) {
             // Extract damage values - some spells use MinValue/MaxValue, others use MinAmount/MaxAmount
             const minDamage = Math.abs(
               spell.spell_params?.MinValue || spell.spell_params?.MinAmount || 0

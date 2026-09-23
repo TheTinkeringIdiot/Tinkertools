@@ -69,7 +69,7 @@ const tooltipDirective = {
 // Mock the console to check for errors
 const consoleErrors: string[] = [];
 const originalConsoleError = console.error;
-console.error = (...args: any[]) => {
+console.error = (...args: unknown[]) => {
   consoleErrors.push(args.join(' '));
   originalConsoleError(...args);
 };
@@ -80,16 +80,39 @@ const toSkillId = (id: number): SkillId => id as SkillId;
 let pinia: Pinia;
 
 describe('Misc Skills Integration Tests', () => {
-  // Helper to expand Misc category
+  const mountSkillsManager = async (profile: TinkerProfile) => {
+    const wrapper = mount(SkillsManager, {
+      props: { profile },
+      global: {
+        plugins: [pinia, PrimeVue, ToastService],
+        directives: { tooltip: tooltipDirective },
+      },
+    });
+    await nextTick();
+    await expandMiscCategory(wrapper);
+    return wrapper;
+  };
+
+  const miscCategory = (wrapper: VueWrapper) => {
+    const category = wrapper
+      .findAll('.skill-category')
+      .find((c) => c.find('.category-header h4').text() === 'Misc');
+    if (!category) throw new Error('Misc category not rendered');
+    return category;
+  };
+
+  // Expand the Misc category so its skills are rendered
   const expandMiscCategory = async (wrapper: VueWrapper) => {
-    const miscCategoryHeaders = wrapper.findAll('.category-header');
-    for (const header of miscCategoryHeaders) {
-      if (header.text().includes('Misc')) {
-        await header.trigger('click');
-        await nextTick();
-        return;
-      }
-    }
+    await miscCategory(wrapper).find('.category-header').trigger('click');
+  };
+
+  const miscSkillNames = (wrapper: VueWrapper): string[] =>
+    miscCategory(wrapper)
+      .findAll('.skill-info-row .truncate')
+      .map((name) => name.text());
+
+  const setShowZeroValues = async (wrapper: VueWrapper, show: boolean) => {
+    await wrapper.find('#show-zero-misc').setValue(show);
   };
 
   // Test profile factory with Misc skills
@@ -224,10 +247,10 @@ describe('Misc Skills Integration Tests', () => {
 
       await nextTick();
 
-      // Should display the calculated total value
-      const valueDisplay = wrapper.find('.skill-value-display');
-      expect(valueDisplay.exists()).toBe(true);
-      expect(valueDisplay.text()).toContain('175');
+      // Read-only skills show the calculated total instead of an editable value
+      expect(wrapper.find('.skill-value-display').exists()).toBe(false);
+      expect(wrapper.text()).toContain('175');
+      expect(wrapper.text()).toContain('Misc Skill (Read-Only)');
     });
 
     it('should maintain read-only behavior for Misc skills', () => {
@@ -414,12 +437,7 @@ describe('Misc Skills Integration Tests', () => {
         },
       });
 
-      // Check for color classes
-      const equipmentRow = wrapper.find('.breakdown-row:has(.text-blue-600)');
-      const perkRow = wrapper.find('.breakdown-row:has(.text-purple-600)');
-      const buffRow = wrapper.find('.breakdown-row:has(.text-amber-600)');
-
-      // Note: These selectors may not work in jsdom, so we check text content instead
+      // Each bonus source has its own colour
       expect(wrapper.html()).toContain('text-blue-600'); // Equipment bonus color
       expect(wrapper.html()).toContain('text-purple-600'); // Perk bonus color
       expect(wrapper.html()).toContain('text-amber-600'); // Buff bonus color
@@ -427,139 +445,45 @@ describe('Misc Skills Integration Tests', () => {
   });
 
   describe('Zero-Value Toggle Functionality', () => {
-    it('should show/hide zero-value Misc skills based on toggle', async () => {
-      const profile = createMiscSkillsProfile();
+    it('hides zero-value Misc skills by default', async () => {
+      const wrapper = await mountSkillsManager(createMiscSkillsProfile());
 
-      const wrapper = mount(SkillsManager, {
-        props: {
-          profile: profile,
-        },
-        global: {
-          plugins: [pinia, PrimeVue, ToastService],
-          directives: {
-            tooltip: tooltipDirective,
-          },
-        },
-      });
-
-      await nextTick();
-
-      // Expand Misc category to see skills
-      await expandMiscCategory(wrapper);
-
-      // By default, zero-value skills should be hidden
-      // Should show skills with values > 0
-      expect(wrapper.text()).toContain('Concealment');
-      expect(wrapper.text()).toContain('Psychology');
-      expect(wrapper.text()).toContain('Duck-Exp');
-
-      // Should not show zero-value skills
-      expect(wrapper.text()).not.toContain('Brawling');
-      expect(wrapper.text()).not.toContain('Swim');
+      const names = miscSkillNames(wrapper);
+      expect(names).toEqual(expect.arrayContaining(['HealDelta', 'NanoDelta', 'CriticalIncrease']));
+      expect(names).not.toContain('Add All Off.');
+      expect(names).not.toContain('Add All Def.');
     });
 
-    it('should toggle zero-value skills when button is clicked', async () => {
-      const profile = createMiscSkillsProfile();
+    it('shows the zero-value Misc skills once the toggle is checked, and hides them again', async () => {
+      const wrapper = await mountSkillsManager(createMiscSkillsProfile());
 
-      const wrapper = mount(SkillsManager, {
-        props: {
-          profile: profile,
-        },
-        global: {
-          plugins: [pinia, PrimeVue, ToastService],
-          directives: {
-            tooltip: tooltipDirective,
-          },
-        },
-      });
+      await setShowZeroValues(wrapper, true);
+      expect(miscSkillNames(wrapper)).toEqual(
+        expect.arrayContaining(['HealDelta', 'Add All Off.', 'Add All Def.'])
+      );
 
-      await nextTick();
-
-      // Expand Misc category to see skills
-      await expandMiscCategory(wrapper);
-
-      // Find and click the toggle button
-      const toggleButton =
-        wrapper.find('[data-testid="toggle-zero-misc"]') ||
-        wrapper.find('button:contains("Show Zero")');
-
-      const allButtons = wrapper.findAll('button');
-      const firstButton = allButtons.length > 0 ? allButtons[0] : null;
-
-      const buttonToClick = toggleButton && toggleButton.exists() ? toggleButton : firstButton;
-      if (buttonToClick && buttonToClick.exists()) {
-        await buttonToClick.trigger('click');
-        await nextTick();
-
-        // After toggle, should show zero-value skills
-        expect(wrapper.text()).toContain('Brawling');
-        expect(wrapper.text()).toContain('Swim');
-      }
+      await setShowZeroValues(wrapper, false);
+      expect(miscSkillNames(wrapper)).not.toContain('Add All Off.');
+      expect(miscSkillNames(wrapper)).toContain('HealDelta');
     });
 
-    it('should save toggle preference to localStorage', async () => {
-      const profile = createMiscSkillsProfile();
+    it('remembers the toggle in localStorage', async () => {
+      const wrapper = await mountSkillsManager(createMiscSkillsProfile());
 
-      const wrapper = mount(SkillsManager, {
-        props: {
-          profile: profile,
-        },
-        global: {
-          plugins: [pinia, PrimeVue, ToastService],
-          directives: {
-            tooltip: tooltipDirective,
-          },
-        },
-      });
+      await setShowZeroValues(wrapper, true);
 
-      await nextTick();
-
-      // Expand Misc category to see skills
-      await expandMiscCategory(wrapper);
-
-      // Find and click the toggle button
-      const toggleButton = wrapper.find('[data-testid="toggle-zero-misc"]');
-      const allButtons = wrapper.findAll('button');
-      const firstButton = allButtons.length > 0 ? allButtons[0] : null;
-
-      const buttonToClick = toggleButton && toggleButton.exists() ? toggleButton : firstButton;
-      if (buttonToClick && buttonToClick.exists()) {
-        await buttonToClick.trigger('click');
-        await nextTick();
-
-        // Check localStorage was updated
-        const savedPreference = localStorage.getItem('tinkertools_show_zero_misc_skills');
-        expect(savedPreference).toBeTruthy();
-      }
+      expect(localStorage.getItem('tinkertools_show_zero_misc_skills')).toBe('true');
     });
 
-    it('should load toggle preference from localStorage on mount', async () => {
-      // Set preference in localStorage before mounting
+    it('restores the toggle from localStorage on mount', async () => {
       localStorage.setItem('tinkertools_show_zero_misc_skills', 'true');
 
-      const profile = createMiscSkillsProfile();
+      const wrapper = await mountSkillsManager(createMiscSkillsProfile());
 
-      const wrapper = mount(SkillsManager, {
-        props: {
-          profile: profile,
-        },
-        global: {
-          plugins: [pinia, PrimeVue, ToastService],
-          directives: {
-            tooltip: tooltipDirective,
-          },
-        },
-      });
-
-      await nextTick();
-
-      // Expand Misc category to see skills
-      await expandMiscCategory(wrapper);
-
-      // Should show zero-value skills based on saved preference
-      expect(wrapper.text()).toContain('Concealment');
-      expect(wrapper.text()).toContain('Brawling');
-      expect(wrapper.text()).toContain('Swim');
+      expect((wrapper.find('#show-zero-misc').element as HTMLInputElement).checked).toBe(true);
+      expect(miscSkillNames(wrapper)).toEqual(
+        expect.arrayContaining(['HealDelta', 'Add All Off.', 'Add All Def.'])
+      );
     });
   });
 
@@ -663,39 +587,29 @@ describe('Misc Skills Integration Tests', () => {
       expect(wrapper.text()).toContain('+20');
     });
 
-    it('should update filtered display when toggle changes', async () => {
+    it('shows a Misc skill once a bonus lifts it above zero', async () => {
       const profile = createMiscSkillsProfile();
+      const wrapper = await mountSkillsManager(profile);
+      expect(miscSkillNames(wrapper)).not.toContain('Add All Off.');
 
-      const wrapper = mount(SkillsManager, {
-        props: {
-          profile: profile,
-        },
-        global: {
-          plugins: [pinia, PrimeVue, ToastService],
-          directives: {
-            tooltip: tooltipDirective,
+      await wrapper.setProps({
+        profile: {
+          ...profile,
+          skills: {
+            ...profile.skills,
+            [MISC_SKILL_ID.ADD_ALL_OFF]: createTestSkillData({
+              base: 0,
+              equipmentBonus: 100,
+              perkBonus: 0,
+              buffBonus: 0,
+              total: 100,
+            }),
           },
         },
       });
 
-      await nextTick();
-
-      // Expand Misc category to see skills
-      await expandMiscCategory(wrapper);
-
-      // Initially should not show zero-value skills
-      expect(wrapper.text()).toContain('Concealment');
-      expect(wrapper.text()).not.toContain('Brawling');
-
-      // Find toggle and click it
-      const buttons = wrapper.findAll('button');
-      if (buttons.length > 0) {
-        await buttons[0].trigger('click');
-        await nextTick();
-
-        // Should now show zero-value skills
-        expect(wrapper.text()).toContain('Brawling');
-      }
+      expect(miscSkillNames(wrapper)).toContain('Add All Off.');
+      expect(miscCategory(wrapper).text()).toContain('100');
     });
   });
 
@@ -710,7 +624,7 @@ describe('Misc Skills Integration Tests', () => {
         total: 85,
       });
 
-      const wrapper = mount(SkillSlider, {
+      mount(SkillSlider, {
         props: {
           skillId: toSkillId(SKILL_ID.CONCEALMENT),
           skillName: 'Concealment',
@@ -769,12 +683,12 @@ describe('Misc Skills Integration Tests', () => {
     });
 
     it('should handle missing or malformed skill data gracefully', () => {
-      // Test with undefined skill data
+      // Test with missing (null) skill data
       const wrapper = mount(SkillSlider, {
         props: {
           skillId: toSkillId(SKILL_ID.MAX_NCU),
           skillName: 'Test Skill',
-          skillData: undefined,
+          skillData: null,
           isAbility: false,
           isReadOnly: true,
           category: 'Misc',
@@ -794,83 +708,16 @@ describe('Misc Skills Integration Tests', () => {
   });
 
   describe('Integration Scenarios', () => {
-    it('should work with complete profile integration', async () => {
-      const profile = createMiscSkillsProfile();
+    it("shows the viewed profile's Misc values, not the active profile's", async () => {
+      // No profile is active in the store; everything shown must come from the prop.
+      const wrapper = await mountSkillsManager(createMiscSkillsProfile());
 
-      const wrapper = mount(SkillsManager, {
-        props: {
-          profile: profile,
-        },
-        global: {
-          plugins: [pinia, PrimeVue, ToastService],
-          directives: {
-            tooltip: tooltipDirective,
-          },
-        },
-      });
-
-      await nextTick();
-
-      // Expand Misc category to see skills
-      await expandMiscCategory(wrapper);
-
-      // Should display Misc skills correctly
-      expect(wrapper.text()).toContain('Misc');
-      expect(wrapper.text()).toContain('Concealment');
-      expect(wrapper.text()).toContain('Psychology');
-      expect(wrapper.text()).toContain('Duck-Exp');
-
-      // Should not show zero-value skills by default
-      expect(wrapper.text()).not.toContain('Brawling');
-      expect(wrapper.text()).not.toContain('Swim');
-
-      // No errors should occur
+      const misc = miscCategory(wrapper);
+      const healDelta = misc
+        .findAll('.skill-item')
+        .find((item) => item.text().includes('HealDelta'));
+      expect(healDelta?.text()).toContain('85');
       expect(consoleErrors).toEqual([]);
-    });
-
-    it('should handle dynamic profile updates', async () => {
-      const profile = createMiscSkillsProfile();
-
-      const wrapper = mount(SkillsManager, {
-        props: {
-          profile: profile,
-        },
-        global: {
-          plugins: [pinia, PrimeVue, ToastService],
-          directives: {
-            tooltip: tooltipDirective,
-          },
-        },
-      });
-
-      await nextTick();
-
-      // Expand Misc category to see skills
-      await expandMiscCategory(wrapper);
-
-      // Update profile with new skill values
-      const updatedProfile = {
-        ...profile,
-        skills: {
-          ...profile.skills,
-          [SKILL_ID.BRAWLING]: {
-            base: 0,
-            trickle: 0,
-            ipSpent: 0,
-            pointsFromIp: 0,
-            equipmentBonus: 100,
-            perkBonus: 0,
-            buffBonus: 0,
-            total: 100,
-          },
-        },
-      };
-
-      await wrapper.setProps({ profile: updatedProfile });
-      await nextTick();
-
-      // Should now show the updated Brawling skill (value > 0 makes it visible)
-      expect(wrapper.text()).toContain('Brawling');
     });
   });
 

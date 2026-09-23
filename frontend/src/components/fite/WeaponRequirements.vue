@@ -79,6 +79,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  characterSkills: undefined,
   compact: false,
 });
 const maxCompactItems = 3;

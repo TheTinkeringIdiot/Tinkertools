@@ -91,7 +91,7 @@
         </div>
 
         <Slider
-          v-model="localTargetQl"
+          v-model="sliderTargetQl"
           :min="qualityRange?.min || 1"
           :max="qualityRange?.max || 300"
           :step="1"
@@ -154,6 +154,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
+import type { DeepReadonly } from 'vue';
 import { useInterpolation } from '../../composables/useInterpolation';
 import type { Item, InterpolatedItem, InterpolationInfo } from '../../types/api';
 
@@ -185,10 +186,10 @@ interface Props {
 }
 
 interface Emits {
-  (e: 'interpolated', item: InterpolatedItem | null): void;
+  (e: 'interpolated', item: DeepReadonly<InterpolatedItem> | null): void;
   (e: 'qualityChanged', ql: number): void;
   (e: 'error', error: string): void;
-  (e: 'loaded', info: InterpolationInfo | null): void;
+  (e: 'loaded', info: DeepReadonly<InterpolationInfo> | null): void;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -239,6 +240,14 @@ const {
 
 const localTargetQl = ref<number | null>(props.initialQl || null);
 
+// Slider has no empty state; while no QL is chosen its handle sits at the minimum
+const sliderTargetQl = computed({
+  get: () => localTargetQl.value ?? qualityRange.value?.min ?? 1,
+  set: (value: number | number[]) => {
+    if (typeof value === 'number') localTargetQl.value = value;
+  },
+});
+
 // ============================================================================
 // Computed Properties
 // ============================================================================
@@ -276,14 +285,15 @@ async function onQualityLevelChange(): Promise<void> {
     const result = await interpolateToQl(localTargetQl.value);
     emit('interpolated', result);
     emit('qualityChanged', localTargetQl.value);
-  } catch (err: any) {
-    emit('error', err.message || 'Failed to interpolate item');
+  } catch (err) {
+    emit('error', (err instanceof Error && err.message) || 'Failed to interpolate item');
   }
 }
 
 function setQualityLevel(ql: number): void {
   localTargetQl.value = ql;
-  onQualityLevelChange();
+  // onQualityLevelChange reports its own failures through the 'error' emit
+  void onQualityLevelChange();
 }
 
 async function handleItemChange(): Promise<void> {
@@ -310,8 +320,8 @@ async function handleItemChange(): Promise<void> {
       // Default to minimum QL
       localTargetQl.value = qualityRange.value.min;
     }
-  } catch (err: any) {
-    emit('error', err.message || 'Failed to load item');
+  } catch (err) {
+    emit('error', (err instanceof Error && err.message) || 'Failed to load item');
   }
 }
 
@@ -337,7 +347,8 @@ watch(interpolatedItem, (newItem) => {
 
 onMounted(() => {
   if (props.item) {
-    handleItemChange();
+    // handleItemChange reports its own failures through the 'error' emit
+    void handleItemChange();
   }
 });
 

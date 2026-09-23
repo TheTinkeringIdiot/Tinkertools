@@ -438,6 +438,8 @@ import type {
   NanoCompatibilityInfo,
   CastingRequirement,
   NanoEffect,
+  EffectDuration,
+  TargetingData,
 } from '@/types/nano';
 
 // Props
@@ -495,7 +497,7 @@ const compatibilityInfo = computed((): NanoCompatibilityInfo | null => {
 
   for (const req of requirements) {
     switch (req.type) {
-      case 'skill':
+      case 'skill': {
         const skill = req.requirement as string;
         const currentSkill = profile.skills[skill] || 0;
         if (currentSkill < req.value) {
@@ -508,8 +510,9 @@ const compatibilityInfo = computed((): NanoCompatibilityInfo | null => {
           });
         }
         break;
+      }
 
-      case 'stat':
+      case 'stat': {
         const stat = req.requirement as string;
         const currentStat = profile.stats[stat] || 0;
         if (currentStat < req.value) {
@@ -522,6 +525,7 @@ const compatibilityInfo = computed((): NanoCompatibilityInfo | null => {
           });
         }
         break;
+      }
 
       case 'level':
         if (profile.level < req.value) {
@@ -617,15 +621,20 @@ const formatTime = (seconds: number): string => {
   }
 };
 
-const formatDuration = (duration: any): string => {
-  if (typeof duration === 'number') {
-    return formatTime(duration);
+const formatDuration = (duration: EffectDuration): string => {
+  switch (duration.type) {
+    case 'instant':
+      return 'Instant';
+    case 'permanent':
+      return 'Permanent';
+    default:
+      return duration.value !== undefined ? formatTime(duration.value) : 'Unknown';
   }
-  return duration?.toString() || 'Unknown';
 };
 
-const formatTargeting = (targeting: any): string => {
-  return targeting?.toString() || 'Unknown';
+const formatTargeting = (targeting: TargetingData): string => {
+  const target = targeting.type.charAt(0).toUpperCase() + targeting.type.slice(1);
+  return targeting.range !== undefined ? `${target} (${targeting.range}m)` : target;
 };
 
 const formatRequirement = (req: CastingRequirement): string => {

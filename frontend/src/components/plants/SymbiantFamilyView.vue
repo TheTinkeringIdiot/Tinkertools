@@ -52,11 +52,7 @@ Shows symbiants grouped by their family types
                   <div
                     class="flex items-center gap-2 text-xs text-surface-500 dark:text-surface-400"
                   >
-                    <Badge
-                      v-if="symbiant.qualityLevel"
-                      :value="`QL ${symbiant.qualityLevel}`"
-                      size="small"
-                    />
+                    <Badge v-if="symbiant.qualityLevel" :value="`QL ${symbiant.qualityLevel}`" />
                     <span v-if="symbiant.slot">{{ formatSlotName(symbiant.slot) }}</span>
                   </div>
                 </div>
@@ -93,13 +89,11 @@ Shows symbiants grouped by their family types
                     :key="bonus.statId"
                     :value="`+${bonus.value} ${formatStatName(bonus.statId)}`"
                     severity="success"
-                    size="small"
                   />
                   <Badge
                     v-if="symbiant.statBonuses.length > 4"
                     :value="`+${symbiant.statBonuses.length - 4} more`"
                     severity="secondary"
-                    size="small"
                   />
                 </div>
               </div>

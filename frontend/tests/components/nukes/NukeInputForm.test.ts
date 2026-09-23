@@ -2,21 +2,22 @@
  * NukeInputForm Component Integration Tests
  *
  * Tests the master form component for TinkerNukes input fields.
- * Validates:
- * - Auto-population from active profile
- * - Manual override persistence
- * - Reset to profile button functionality
+ * Validates the state the form hands its parent (update:inputState):
+ * - Auto-population from the active profile, and defaults otherwise
+ * - Re-population on profile switch and via the Reset to Profile button
  * - Buff dropdown updates to stat 536 (Direct Nano Damage Efficiency)
- * - Accessibility features (ARIA labels, keyboard navigation)
+ * - Debounced emission
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { nextTick } from 'vue';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
+import PrimeVue from 'primevue/config';
+import Tooltip from 'primevue/tooltip';
 import NukeInputForm from '@/components/nukes/NukeInputForm.vue';
 import type { NukeInputState } from '@/types/offensive-nano';
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import { createTestProfile, PROFESSION, BREED } from '@/__tests__/helpers';
 
 // Mock child section components to isolate NukeInputForm behavior
 vi.mock('@/components/nukes/CharacterStatsSection.vue', () => ({
@@ -53,6 +54,7 @@ vi.mock('@/components/nukes/BuffPresetsSection.vue', () => ({
 const createDefaultInputState = (): NukeInputState => ({
   characterStats: {
     breed: 1,
+    level: 1,
     psychic: 6,
     nanoInit: 1,
     maxNano: 1,
@@ -63,6 +65,7 @@ const createDefaultInputState = (): NukeInputState => ({
     psychModi: 1,
     sensoryImp: 1,
     timeSpace: 1,
+    spec: 0,
   },
   damageModifiers: {
     projectile: 0,
@@ -88,72 +91,96 @@ const createDefaultInputState = (): NukeInputState => ({
 });
 
 const createNanotechProfile = (): TinkerProfile =>
-  ({
-    Character: {
-      Name: 'TestNano',
-      Profession: 11, // Nanotechnician
-      Breed: 3, // Nanomage
-      Level: 220,
-      Gender: 'Female',
-      Faction: 'Clan',
-      Organization: 'Test Org',
-    },
+  createTestProfile({
+    name: 'TestNano',
+    profession: PROFESSION.NANO_TECHNICIAN,
+    breed: BREED.NANOMAGE,
+    level: 220,
     skills: {
       21: { total: 800 }, // Psychic
-      149: { total: 1200 }, // Nano Init
-      221: { total: 5000 }, // Max Nano
-      364: { total: 500 }, // Nano Delta
-      126: { total: 2500 }, // Matter Creation
-      127: { total: 2500 }, // Matter Meta
-      128: { total: 2500 }, // Bio Meta
-      129: { total: 2500 }, // Psych Modi
-      130: { total: 2500 }, // Sensory Imp
-      131: { total: 2500 }, // Time & Space
-      278: { total: 100 }, // Projectile damage
-      280: { total: 150 }, // Energy damage
-      315: { total: 200 }, // Nano damage
+      149: { total: 1200 }, // NanoInit
+      364: { total: 500 }, // NanoDelta
+      130: { total: 2501 }, // MaterialCreation
+      127: { total: 2502 }, // MaterialMetamorphose
+      128: { total: 2503 }, // BiologicalMetamorphose
+      129: { total: 2504 }, // PsychologicalModification
+      122: { total: 2505 }, // SensoryImprovement
+      131: { total: 2506 }, // SpaceTime
+      278: { total: 100 }, // Projectile damage modifier
+      280: { total: 150 }, // Energy damage modifier
+      315: { total: 200 }, // Nano damage modifier
       536: { total: 50 }, // Direct Nano Damage Efficiency
     },
-    abilities: {},
-    items: {},
-    symbiants: {},
-    perks: [],
-    buffs: [],
-    version: '4.0.0',
-  }) as any;
+  });
 
 const createNonNanotechProfile = (): TinkerProfile =>
-  ({
-    Character: {
-      Name: 'TestDoc',
-      Profession: 6, // Doctor
-      Breed: 1,
-      Level: 220,
-      Gender: 'Male',
-      Faction: 'Omni',
-      Organization: 'Test Org',
-    },
-    skills: {
-      21: { total: 500 },
-    },
-    abilities: {},
-    items: {},
-    symbiants: {},
-    perks: [],
-    buffs: [],
-    version: '4.0.0',
-  }) as any;
+  createTestProfile({
+    name: 'TestDoc',
+    profession: PROFESSION.DOCTOR,
+    breed: BREED.SOLITUS,
+    level: 220,
+    skills: { 21: { total: 500 } },
+  });
+
+/** A profile carrying only the given skills, bypassing the fixture defaults. */
+const withSkills = (profile: TinkerProfile, skills: TinkerProfile['skills']): TinkerProfile => ({
+  ...profile,
+  skills,
+});
 
 // ============================================================================
 // Test Suite
 // ============================================================================
 
+/** The form debounces its update:inputState emissions by 50ms. */
+const EMIT_DEBOUNCE_MS = 50;
+
 describe('NukeInputForm', () => {
-  let wrapper: VueWrapper<any>;
+  let wrapper: VueWrapper;
 
   beforeEach(() => {
     setActivePinia(createPinia());
+    vi.useFakeTimers();
   });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.useRealTimers();
+  });
+
+  function mountForm(
+    activeProfile: TinkerProfile | null,
+    inputState: NukeInputState = createDefaultInputState(),
+    options: { attachTo?: HTMLElement } = {}
+  ): VueWrapper {
+    wrapper = mount(NukeInputForm, {
+      props: { inputState, activeProfile },
+      global: { plugins: [PrimeVue], directives: { tooltip: Tooltip } },
+      ...options,
+    });
+    return wrapper;
+  }
+
+  /** Lets pending debounced emissions fire. */
+  async function settle(): Promise<void> {
+    await vi.advanceTimersByTimeAsync(EMIT_DEBOUNCE_MS + 10);
+  }
+
+  function emittedStates(): NukeInputState[] {
+    return (wrapper.emitted('update:inputState') ?? []).map(([state]) => state as NukeInputState);
+  }
+
+  /** The state the parent ends up with after the debounce settles. */
+  async function lastEmittedState(): Promise<NukeInputState> {
+    await settle();
+    const states = emittedStates();
+    expect(states.length).toBeGreaterThan(0);
+    return states[states.length - 1];
+  }
+
+  function resetButton() {
+    return wrapper.find('button');
+  }
 
   // ==========================================================================
   // Component Mounting & Structure Tests
@@ -161,53 +188,32 @@ describe('NukeInputForm', () => {
 
   describe('Component Structure', () => {
     it('should render the form with all three section components', () => {
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState: createDefaultInputState(),
-          activeProfile: null,
-        },
-      });
+      mountForm(null);
 
       expect(wrapper.find('[data-test="character-stats-section"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="damage-modifiers-section"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="buff-presets-section"]').exists()).toBe(true);
     });
 
-    it('should display the form header with title', () => {
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState: createDefaultInputState(),
-          activeProfile: null,
-        },
-      });
+    it('should label the sections', () => {
+      mountForm(null);
 
-      expect(wrapper.text()).toContain('Offensive Nano Parameters');
+      expect(wrapper.text()).toContain('Character Stats');
+      expect(wrapper.text()).toContain('Damage Modifiers');
+      expect(wrapper.text()).toContain('Buff Presets');
     });
 
-    it('should render Reset to Profile button', () => {
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState: createDefaultInputState(),
-          activeProfile: null,
-        },
-      });
+    it('should display the form header as a heading', () => {
+      mountForm(null);
 
-      const resetButton = wrapper.find('button');
-      expect(resetButton.exists()).toBe(true);
-      expect(resetButton.text()).toContain('Reset to Profile');
+      expect(wrapper.find('h2').text()).toBe('Offensive Nano Parameters');
     });
 
-    it('should have accessible ARIA labels on Reset button', () => {
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState: createDefaultInputState(),
-          activeProfile: null,
-        },
-      });
+    it('should render a native Reset to Profile button, so it is keyboard accessible', () => {
+      mountForm(null);
 
-      const resetButton = wrapper.find('button');
-      // PrimeVue Button adds aria-label via v-tooltip
-      expect(resetButton.attributes('data-pc-section')).toBe('root');
+      expect(resetButton().element.tagName).toBe('BUTTON');
+      expect(resetButton().text()).toContain('Reset to Profile');
     });
   });
 
@@ -217,115 +223,61 @@ describe('NukeInputForm', () => {
 
   describe('Auto-Population from Profile', () => {
     it('should auto-populate character stats when Nanotechnician profile is active', async () => {
-      const profile = createNanotechProfile();
-      const inputState = createDefaultInputState();
+      mountForm(createNanotechProfile());
 
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState,
-          activeProfile: profile,
-        },
+      const { characterStats } = await lastEmittedState();
+      expect(characterStats).toMatchObject({
+        breed: BREED.NANOMAGE,
+        level: 220,
+        psychic: 800,
+        nanoInit: 1200,
+        maxNano: 1000, // Character.MaxNano
+        nanoDelta: 500,
+        matterCreation: 2501,
+        matterMeta: 2502,
+        bioMeta: 2503,
+        psychModi: 2504,
+        sensoryImp: 2505,
+        timeSpace: 2506,
       });
-
-      // Wait for watcher to trigger
-      await wrapper.vm.$nextTick();
-
-      // Check emitted update event
-      const emittedUpdates = wrapper.emitted('update:inputState');
-      expect(emittedUpdates).toBeTruthy();
-
-      // Verify the emitted state has profile values
-      const lastEmit = emittedUpdates![emittedUpdates!.length - 1][0] as NukeInputState;
-      expect(lastEmit.characterStats.breed).toBe(3); // Nanomage
-      expect(lastEmit.characterStats.psychic).toBe(800);
-      expect(lastEmit.characterStats.nanoInit).toBe(1200);
-      expect(lastEmit.characterStats.matterCreation).toBe(2500);
     });
 
     it('should auto-populate damage modifiers from profile skills', async () => {
-      const profile = createNanotechProfile();
-      const inputState = createDefaultInputState();
+      mountForm(createNanotechProfile());
 
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState,
-          activeProfile: profile,
-        },
-      });
-
-      await wrapper.vm.$nextTick();
-
-      const emittedUpdates = wrapper.emitted('update:inputState');
-      const lastEmit = emittedUpdates![emittedUpdates!.length - 1][0] as NukeInputState;
-
-      expect(lastEmit.damageModifiers.projectile).toBe(100);
-      expect(lastEmit.damageModifiers.energy).toBe(150);
-      expect(lastEmit.damageModifiers.nano).toBe(200);
+      const { damageModifiers } = await lastEmittedState();
+      expect(damageModifiers.projectile).toBe(100);
+      expect(damageModifiers.energy).toBe(150);
+      expect(damageModifiers.nano).toBe(200);
+      expect(damageModifiers.melee).toBe(0);
+      expect(damageModifiers.targetAC).toBe(0);
     });
 
     it('should calculate initial stat 536 from profile base value', async () => {
-      const profile = createNanotechProfile();
-      const inputState = createDefaultInputState();
+      mountForm(createNanotechProfile());
 
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState,
-          activeProfile: profile,
-        },
-      });
-
-      await wrapper.vm.$nextTick();
-
-      const emittedUpdates = wrapper.emitted('update:inputState');
-      const lastEmit = emittedUpdates![emittedUpdates!.length - 1][0] as NukeInputState;
-
-      // Should be base value from profile (50) + 0 from buffs
-      expect(lastEmit.damageModifiers.directNanoDamageEfficiency).toBe(50);
+      // Base value from profile (50) + 0 from buffs
+      expect((await lastEmittedState()).damageModifiers.directNanoDamageEfficiency).toBe(50);
     });
 
     it('should reset to defaults when non-Nanotechnician profile is active', async () => {
-      const profile = createNonNanotechProfile();
-      const inputState = createDefaultInputState();
+      mountForm(createNonNanotechProfile());
 
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState,
-          activeProfile: profile,
-        },
-      });
-
-      await wrapper.vm.$nextTick();
-
-      const emittedUpdates = wrapper.emitted('update:inputState');
-      const lastEmit = emittedUpdates![emittedUpdates!.length - 1][0] as NukeInputState;
-
-      // Should be reset to default values
-      expect(lastEmit.characterStats.breed).toBe(1);
-      expect(lastEmit.characterStats.psychic).toBe(6);
-      expect(lastEmit.characterStats.nanoInit).toBe(1);
-      expect(lastEmit.damageModifiers.directNanoDamageEfficiency).toBe(0);
+      const state = await lastEmittedState();
+      expect(state.characterStats.breed).toBe(1);
+      expect(state.characterStats.psychic).toBe(6);
+      expect(state.characterStats.nanoInit).toBe(1);
+      expect(state.damageModifiers.directNanoDamageEfficiency).toBe(0);
     });
 
     it('should reset to defaults when no profile is active', async () => {
       const inputState = createDefaultInputState();
+      inputState.characterStats.psychic = 999;
+      mountForm(null, inputState);
 
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState,
-          activeProfile: null,
-        },
-      });
-
-      await wrapper.vm.$nextTick();
-
-      const emittedUpdates = wrapper.emitted('update:inputState');
-
-      // Should emit default state on mount
-      if (emittedUpdates && emittedUpdates.length > 0) {
-        const lastEmit = emittedUpdates[emittedUpdates.length - 1][0] as NukeInputState;
-        expect(lastEmit.characterStats.psychic).toBe(6);
-        expect(lastEmit.characterStats.nanoInit).toBe(1);
-      }
+      const state = await lastEmittedState();
+      expect(state.characterStats.psychic).toBe(6);
+      expect(state.characterStats.nanoInit).toBe(1);
     });
   });
 
@@ -336,60 +288,50 @@ describe('NukeInputForm', () => {
   describe('Profile Switching', () => {
     it('should update fields when switching from one profile to another', async () => {
       const profile1 = createNanotechProfile();
-      const profile2 = {
-        ...createNanotechProfile(),
-        Character: { ...profile1.Character, Name: 'TestNano2' },
-        skills: {
-          ...profile1.skills,
-          21: { total: 1000 }, // Different psychic value
-        },
-      };
-      const inputState = createDefaultInputState();
-
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState,
-          activeProfile: profile1,
-        },
+      const profile2 = withSkills(profile1, {
+        ...profile1.skills,
+        21: { ...profile1.skills[21], total: 1000 },
       });
+      mountForm(profile1);
+      await settle();
 
-      await wrapper.vm.$nextTick();
-
-      // Switch to profile2
       await wrapper.setProps({ activeProfile: profile2 });
-      await wrapper.vm.$nextTick();
 
-      const emittedUpdates = wrapper.emitted('update:inputState');
-      const lastEmit = emittedUpdates![emittedUpdates!.length - 1][0] as NukeInputState;
-
-      // Should have new profile's psychic value
-      expect(lastEmit.characterStats.psychic).toBe(1000);
+      expect((await lastEmittedState()).characterStats.psychic).toBe(1000);
     });
 
     it('should clear fields when switching to non-Nanotechnician', async () => {
+      mountForm(createNanotechProfile());
+      await settle();
+
+      await wrapper.setProps({ activeProfile: createNonNanotechProfile() });
+
+      const state = await lastEmittedState();
+      expect(state.characterStats.psychic).toBe(6);
+      expect(state.characterStats.nanoInit).toBe(1);
+    });
+
+    it('should populate when a Nanotechnician profile becomes active', async () => {
+      mountForm(null);
+      await settle();
+
+      await wrapper.setProps({ activeProfile: createNanotechProfile() });
+
+      expect((await lastEmittedState()).characterStats.psychic).toBe(800);
+    });
+
+    it('should settle on the last profile after rapid switches', async () => {
       const nanoProfile = createNanotechProfile();
-      const docProfile = createNonNanotechProfile();
-      const inputState = createDefaultInputState();
+      mountForm(nanoProfile);
 
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState,
-          activeProfile: nanoProfile,
-        },
-      });
+      await wrapper.setProps({ activeProfile: createNonNanotechProfile() });
+      await wrapper.setProps({ activeProfile: null });
+      await wrapper.setProps({ activeProfile: nanoProfile });
 
-      await wrapper.vm.$nextTick();
-
-      // Switch to Doctor profile
-      await wrapper.setProps({ activeProfile: docProfile });
-      await wrapper.vm.$nextTick();
-
-      const emittedUpdates = wrapper.emitted('update:inputState');
-      const lastEmit = emittedUpdates![emittedUpdates!.length - 1][0] as NukeInputState;
-
-      // Should be reset to defaults
-      expect(lastEmit.characterStats.psychic).toBe(6);
-      expect(lastEmit.characterStats.nanoInit).toBe(1);
+      const state = await lastEmittedState();
+      expect(state.characterStats.psychic).toBe(800);
+      // Debounced: the switches collapse into a single emission
+      expect(emittedStates()).toHaveLength(1);
     });
   });
 
@@ -399,80 +341,41 @@ describe('NukeInputForm', () => {
 
   describe('Reset to Profile Button', () => {
     it('should be disabled when no profile is active', () => {
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState: createDefaultInputState(),
-          activeProfile: null,
-        },
-      });
+      mountForm(null);
 
-      const resetButton = wrapper.find('button');
-      expect(resetButton.attributes('disabled')).toBeDefined();
+      expect(resetButton().attributes('disabled')).toBeDefined();
     });
 
     it('should be enabled when profile is active', () => {
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState: createDefaultInputState(),
-          activeProfile: createNanotechProfile(),
-        },
-      });
+      mountForm(createNanotechProfile());
 
-      const resetButton = wrapper.find('button');
-      expect(resetButton.attributes('disabled')).toBeUndefined();
+      expect(resetButton().attributes('disabled')).toBeUndefined();
     });
 
-    it('should re-populate from profile when clicked', async () => {
-      const profile = createNanotechProfile();
-      const inputState = createDefaultInputState();
+    it('should discard manual edits and re-populate from profile when clicked', async () => {
+      mountForm(createNanotechProfile());
+      await settle();
 
-      // Modify input state to simulate manual edits
-      inputState.characterStats.psychic = 999;
+      // User edits psychic in the Character Stats section
+      const edited = { ...(await lastEmittedState()).characterStats, psychic: 999 };
+      wrapper
+        .findComponent({ name: 'CharacterStatsSection' })
+        .vm.$emit('update:character-stats', edited);
+      expect((await lastEmittedState()).characterStats.psychic).toBe(999);
 
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState,
-          activeProfile: profile,
-        },
-      });
+      await resetButton().trigger('click');
 
-      await wrapper.vm.$nextTick();
-
-      // Clear previous emissions
-      wrapper.emitted('update:inputState');
-
-      // Click reset button
-      const resetButton = wrapper.find('button');
-      await resetButton.trigger('click');
-      await wrapper.vm.$nextTick();
-
-      const emittedUpdates = wrapper.emitted('update:inputState');
-      expect(emittedUpdates).toBeTruthy();
-
-      const lastEmit = emittedUpdates![emittedUpdates!.length - 1][0] as NukeInputState;
-
-      // Should be reset to profile value, not manual value
-      expect(lastEmit.characterStats.psychic).toBe(800);
+      expect((await lastEmittedState()).characterStats.psychic).toBe(800);
     });
 
-    it('should have keyboard navigation support', async () => {
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState: createDefaultInputState(),
-          activeProfile: createNanotechProfile(),
-        },
+    it('can receive keyboard focus', () => {
+      mountForm(createNanotechProfile(), createDefaultInputState(), {
+        attachTo: document.body,
       });
 
-      const resetButton = wrapper.find('button');
+      (resetButton().element as HTMLButtonElement).focus();
 
-      // Button should be focusable
-      expect(resetButton.attributes('type')).toBeTruthy();
-
-      // Simulate keyboard activation (Enter key)
-      await resetButton.trigger('keydown.enter');
-
-      // Should emit update event
-      expect(wrapper.emitted('update:inputState')).toBeTruthy();
+      expect(document.activeElement).toBe(resetButton().element);
     });
   });
 
@@ -481,98 +384,36 @@ describe('NukeInputForm', () => {
   // ==========================================================================
 
   describe('Buff Dropdown Updates to Stat 536', () => {
-    it('should update stat 536 when enhanceNanoDamage buff changes', async () => {
-      const profile = createNanotechProfile();
-      const inputState = createDefaultInputState();
+    async function selectBuffs(buffs: Partial<NukeInputState['buffPresets']>) {
+      mountForm(createNanotechProfile());
+      await settle();
 
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState,
-          activeProfile: profile,
-        },
+      wrapper.findComponent({ name: 'BuffPresetsSection' }).vm.$emit('update:buff-presets', {
+        ...createDefaultInputState().buffPresets,
+        ...buffs,
       });
 
-      await wrapper.vm.$nextTick();
+      return (await lastEmittedState()).damageModifiers.directNanoDamageEfficiency;
+    }
 
-      // Simulate buff change from BuffPresetsSection
-      const buffPresetsSection = wrapper.findComponent({ name: 'BuffPresetsSection' });
-
-      // Update enhanceNanoDamage to level 3 (adds 15% damage)
-      await buffPresetsSection.vm.$emit('update:buff-presets', {
-        ...inputState.buffPresets,
-        enhanceNanoDamage: 3,
-      });
-
-      await wrapper.vm.$nextTick();
-
-      const emittedUpdates = wrapper.emitted('update:inputState');
-      const lastEmit = emittedUpdates![emittedUpdates!.length - 1][0] as NukeInputState;
-
-      // Stat 536 should be recalculated
-      // Note: The actual value depends on ENHANCE_NANO_DAMAGE lookup table
-      expect(lastEmit.damageModifiers.directNanoDamageEfficiency).toBeGreaterThan(50);
+    it('should add the Enhance Nano Damage bonus to stat 536', async () => {
+      // Base 50 + ENHANCE_NANO_DAMAGE[3] (9)
+      expect(await selectBuffs({ enhanceNanoDamage: 3 })).toBe(59);
     });
 
-    it('should update stat 536 when ancientMatrix buff changes', async () => {
-      const profile = createNanotechProfile();
-      const inputState = createDefaultInputState();
-
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState,
-          activeProfile: profile,
-        },
-      });
-
-      await wrapper.vm.$nextTick();
-
-      // Simulate buff change from BuffPresetsSection
-      const buffPresetsSection = wrapper.findComponent({ name: 'BuffPresetsSection' });
-
-      // Update ancientMatrix to level 5
-      await buffPresetsSection.vm.$emit('update:buff-presets', {
-        ...inputState.buffPresets,
-        ancientMatrix: 5,
-      });
-
-      await wrapper.vm.$nextTick();
-
-      const emittedUpdates = wrapper.emitted('update:inputState');
-      const lastEmit = emittedUpdates![emittedUpdates!.length - 1][0] as NukeInputState;
-
-      // Stat 536 should be recalculated with ancient matrix bonus
-      expect(lastEmit.damageModifiers.directNanoDamageEfficiency).toBeGreaterThan(50);
+    it('should add the Ancient Matrix bonus to stat 536', async () => {
+      // Base 50 + ANCIENT_MATRIX_DAMAGE[5] (1.67)
+      expect(await selectBuffs({ ancientMatrix: 5 })).toBe(51.67);
     });
 
     it('should combine both buff bonuses when both are active', async () => {
-      const profile = createNanotechProfile();
-      const inputState = createDefaultInputState();
+      expect(await selectBuffs({ enhanceNanoDamage: 3, ancientMatrix: 5 })).toBe(60.67);
+    });
 
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState,
-          activeProfile: profile,
-        },
-      });
+    it('should pass the selected buffs on to the parent', async () => {
+      await selectBuffs({ enhanceNanoDamage: 3 });
 
-      await wrapper.vm.$nextTick();
-
-      // Simulate both buffs active
-      const buffPresetsSection = wrapper.findComponent({ name: 'BuffPresetsSection' });
-
-      await buffPresetsSection.vm.$emit('update:buff-presets', {
-        ...inputState.buffPresets,
-        enhanceNanoDamage: 3,
-        ancientMatrix: 5,
-      });
-
-      await wrapper.vm.$nextTick();
-
-      const emittedUpdates = wrapper.emitted('update:inputState');
-      const lastEmit = emittedUpdates![emittedUpdates!.length - 1][0] as NukeInputState;
-
-      // Stat 536 should be: base(50) + enhance + ancient
-      expect(lastEmit.damageModifiers.directNanoDamageEfficiency).toBeGreaterThan(50);
+      expect((await lastEmittedState()).buffPresets.enhanceNanoDamage).toBe(3);
     });
   });
 
@@ -581,110 +422,24 @@ describe('NukeInputForm', () => {
   // ==========================================================================
 
   describe('Debounced State Updates', () => {
-    it('should debounce update emissions by 50ms', async () => {
-      const profile = createNanotechProfile();
-      const inputState = createDefaultInputState();
+    it('should emit rapid edits once, after 50ms, with the latest values', async () => {
+      mountForm(createNanotechProfile());
+      await settle();
+      const emitCountBefore = emittedStates().length;
+      const section = wrapper.findComponent({ name: 'CharacterStatsSection' });
 
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState,
-          activeProfile: profile,
-        },
-      });
-
-      await wrapper.vm.$nextTick();
-
-      // Simulate rapid updates from character stats
-      const characterStatsSection = wrapper.findComponent({ name: 'CharacterStatsSection' });
-
-      const initialEmitCount = wrapper.emitted('update:inputState')?.length || 0;
-
-      // Emit 5 rapid updates
       for (let i = 0; i < 5; i++) {
-        await characterStatsSection.vm.$emit('update:character-stats', {
-          ...inputState.characterStats,
+        section.vm.$emit('update:character-stats', {
+          ...createDefaultInputState().characterStats,
           psychic: 800 + i,
         });
       }
+      await vi.advanceTimersByTimeAsync(EMIT_DEBOUNCE_MS - 1);
+      expect(emittedStates()).toHaveLength(emitCountBefore);
 
-      // Should not emit immediately
-      const afterEmitCount = wrapper.emitted('update:inputState')?.length || 0;
-      expect(afterEmitCount).toBe(initialEmitCount);
-
-      // Wait for debounce delay
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Should have emitted once after debounce
-      const finalEmitCount = wrapper.emitted('update:inputState')?.length || 0;
-      expect(finalEmitCount).toBeGreaterThan(initialEmitCount);
-    });
-  });
-
-  // ==========================================================================
-  // Accessibility Tests
-  // ==========================================================================
-
-  describe('Accessibility', () => {
-    it('should have semantic HTML structure with proper headings', () => {
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState: createDefaultInputState(),
-          activeProfile: null,
-        },
-      });
-
-      const heading = wrapper.find('h2');
-      expect(heading.exists()).toBe(true);
-      expect(heading.text()).toBe('Offensive Nano Parameters');
-    });
-
-    it('should provide tooltip on Reset button for screen readers', () => {
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState: createDefaultInputState(),
-          activeProfile: createNanotechProfile(),
-        },
-      });
-
-      const resetButton = wrapper.find('button');
-
-      // PrimeVue v-tooltip directive is applied
-      expect(resetButton.attributes('data-pc-name')).toBe('button');
-    });
-
-    it('should maintain focus management across sections', async () => {
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState: createDefaultInputState(),
-          activeProfile: createNanotechProfile(),
-        },
-        attachTo: document.body,
-      });
-
-      const resetButton = wrapper.find('button');
-
-      // Focus the button
-      resetButton.element.focus();
-      expect(document.activeElement).toBe(resetButton.element);
-
-      wrapper.unmount();
-    });
-
-    it('should announce state changes for screen readers', async () => {
-      const profile = createNanotechProfile();
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState: createDefaultInputState(),
-          activeProfile: null,
-        },
-      });
-
-      // Switch to active profile
-      await wrapper.setProps({ activeProfile: profile });
-      await wrapper.vm.$nextTick();
-
-      // Should emit update event that parent can announce
-      expect(wrapper.emitted('update:inputState')).toBeTruthy();
+      await settle();
+      expect(emittedStates()).toHaveLength(emitCountBefore + 1);
+      expect((await lastEmittedState()).characterStats.psychic).toBe(804);
     });
   });
 
@@ -693,72 +448,15 @@ describe('NukeInputForm', () => {
   // ==========================================================================
 
   describe('Edge Cases', () => {
-    it('should handle profile with missing skill data gracefully', async () => {
-      const incompleteProfile = {
-        ...createNanotechProfile(),
-        skills: {
-          21: { total: 100 }, // Only psychic
-        },
-      };
+    it('should fall back to minimum values for skills the profile lacks', async () => {
+      const profile = createNanotechProfile();
+      mountForm(withSkills(profile, { 21: { ...profile.skills[21], total: 100 } }));
 
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState: createDefaultInputState(),
-          activeProfile: incompleteProfile,
-        },
-      });
-
-      await wrapper.vm.$nextTick();
-
-      const emittedUpdates = wrapper.emitted('update:inputState');
-      const lastEmit = emittedUpdates![emittedUpdates!.length - 1][0] as NukeInputState;
-
-      // Should use fallback values (1) for missing skills
-      expect(lastEmit.characterStats.psychic).toBe(100);
-      expect(lastEmit.characterStats.nanoInit).toBe(1);
-      expect(lastEmit.characterStats.matterCreation).toBe(1);
-    });
-
-    it('should handle profile with no skills object', async () => {
-      const noSkillsProfile = {
-        ...createNanotechProfile(),
-        skills: undefined,
-      } as any;
-
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState: createDefaultInputState(),
-          activeProfile: noSkillsProfile,
-        },
-      });
-
-      await wrapper.vm.$nextTick();
-
-      // Should not crash, should reset to defaults
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it('should handle rapid profile switches without errors', async () => {
-      const profile1 = createNanotechProfile();
-      const profile2 = createNonNanotechProfile();
-      const profile3 = null;
-
-      wrapper = mount(NukeInputForm, {
-        props: {
-          inputState: createDefaultInputState(),
-          activeProfile: profile1,
-        },
-      });
-
-      // Rapid switches
-      await wrapper.setProps({ activeProfile: profile2 });
-      await wrapper.setProps({ activeProfile: profile3 });
-      await wrapper.setProps({ activeProfile: profile1 });
-      await wrapper.vm.$nextTick();
-
-      // Should not crash
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.emitted('update:inputState')).toBeTruthy();
+      const { characterStats, damageModifiers } = await lastEmittedState();
+      expect(characterStats.psychic).toBe(100);
+      expect(characterStats.nanoInit).toBe(1);
+      expect(characterStats.matterCreation).toBe(1);
+      expect(damageModifiers.directNanoDamageEfficiency).toBe(0);
     });
   });
 });

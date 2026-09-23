@@ -83,10 +83,9 @@ Shows nano information with compatibility indicators and quick actions
                     v-if="nano.school"
                     :value="getSchoolShortName(nano.school)"
                     severity="info"
-                    size="small"
                   />
-                  <Badge :value="`QL ${nano.qualityLevel}`" severity="secondary" size="small" />
-                  <Badge v-if="nano.strain" :value="nano.strain" severity="warning" size="small" />
+                  <Badge :value="`QL ${nano.qualityLevel}`" severity="secondary" />
+                  <Badge v-if="nano.strain" :value="nano.strain" severity="warning" />
                 </div>
               </div>
 

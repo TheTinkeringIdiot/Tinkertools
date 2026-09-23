@@ -65,7 +65,7 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
       <Slider
         v-model="sliderValue"
         :min="minValue"
-        :max="maxValue"
+        :max="maxTotalValue"
         :step="1"
         class="flex-1 min-w-[100px] max-w-none"
         @slideend="onSliderChanged"
@@ -82,9 +82,9 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
         }"
       >
         <InputNumber
-          v-model="inputValue"
-          :min="props.isAbility ? minValue : baseValue + trickleDownBonus"
-          :max="props.isAbility ? maxValue : maxTotalValue"
+          :model-value="inputValue"
+          :min="minValue"
+          :max="maxTotalValue"
           :step="1"
           size="small"
           class="gradient-input"
@@ -93,10 +93,10 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
       </div>
       <InputNumber
         v-else
-        v-model="inputValue"
         v-tooltip.top="simpleTooltipContent"
-        :min="props.isAbility ? minValue : baseValue + trickleDownBonus"
-        :max="props.isAbility ? maxValue : maxTotalValue"
+        :model-value="inputValue"
+        :min="minValue"
+        :max="maxTotalValue"
         :step="1"
         size="small"
         class="flex-shrink-0"
@@ -109,7 +109,7 @@ Shows skill name, current value, IP cost, and interactive slider for value adjus
         size="small"
         severity="secondary"
         outlined
-        :disabled="props.isAbility ? sliderValue >= maxValue : inputValue >= maxTotalValue"
+        :disabled="inputValue >= maxTotalValue"
         class="flex-shrink-0 min-w-[3rem]"
         @click="setToMax"
       />
@@ -142,23 +142,19 @@ import { ref, computed, watch } from 'vue';
 import InputNumber from 'primevue/inputnumber';
 import Slider from 'primevue/slider';
 import Button from 'primevue/button';
-import {
-  calcIP,
-  getBreedInitValue,
-  ABILITY_INDEX_TO_STAT_ID,
-} from '@/lib/tinkerprofiles/ip-calculator';
+import { getBreedInitValue, STAT_ID_TO_ABILITY_INDEX } from '@/lib/tinkerprofiles/ip-calculator';
 import { SKILL_COST_FACTORS, BREED_ABILITY_DATA } from '@/services/game-data';
-import type { SkillWithIP, MiscSkill } from '@/lib/tinkerprofiles/types';
-import { calculateSingleACValue } from '@/utils/ac-calculator';
-import { inject } from 'vue';
-import type { TinkerProfile } from '@/lib/tinkerprofiles';
+import type { SkillData } from '@/lib/tinkerprofiles/types';
 import { skillService } from '@/services/skill-service';
 import type { SkillId } from '@/types/skills';
+
+// ip-integrator also stores the skill's current cap on each entry
+type SkillDataWithCap = SkillData & { cap?: number };
 
 // Props
 const props = defineProps<{
   skillId: SkillId | number;
-  skillData: SkillWithIP | MiscSkill | null;
+  skillData: SkillDataWithCap | null;
   isAbility?: boolean;
   isReadOnly?: boolean;
   category: string;
@@ -166,13 +162,10 @@ const props = defineProps<{
   profession?: number;
 }>();
 
-// Inject the profile for AC calculation
-const profile = inject<TinkerProfile>('profile');
-
 // Emits
 const emit = defineEmits<{
-  'skill-changed': [category: string, skillId: SkillId | number, newValue: number];
-  'ability-changed': [skillId: SkillId | number, newValue: number];
+  'skill-changed': [category: string, skillId: number, newValue: number];
+  'ability-changed': [skillId: number, newValue: number];
 }>();
 
 // Computed properties for skill information
@@ -184,24 +177,13 @@ const skillName = computed(() => {
   }
 });
 
-// Helper functions
-const getAbilityIndex = (abilityName: string): number => {
-  const abilityMap: Record<string, number> = {
-    Strength: 0,
-    Agility: 1,
-    Stamina: 2,
-    Intelligence: 3,
-    Sense: 4,
-    Psychic: 5,
-  };
-  return abilityMap[abilityName] ?? -1;
-};
+// 0-based ability index (Strength..Psychic) for breed data lookups, -1 if not an ability
+const abilityIndex = computed(() => STAT_ID_TO_ABILITY_INDEX[Number(props.skillId)] ?? -1);
 
 // State
-// Initialize slider value properly for both abilities and skills
+// The slider and the input both hold the displayed total (bonuses included).
+// The profile store is sent the trained value instead: see emitTrainedValue.
 const sliderValue = ref(0);
-
-// Input field value - shows total skill value for display/editing
 const inputValue = ref(0);
 const trickleDownChanged = ref(false);
 const previousTrickleDown = ref(0);
@@ -212,15 +194,15 @@ const isUserInteracting = ref(false);
 const isProgrammaticUpdate = ref(false);
 
 // Computed
+// Abilities: breed starting value plus bonuses (no IP spent)
+const abilityMinValue = computed(() => {
+  const breedBase = getBreedInitValue(props.breed ?? 1, Number(props.skillId)); // Default to Solitus
+  return breedBase + equipmentBonus.value + perkBonus.value + buffBonus.value;
+});
+
 const minValue = computed(() => {
-  if (props.isAbility && props.breed !== undefined) {
-    const breedId = props.breed;
-    const abilityIndex = getAbilityIndex(skillName.value);
-    if (abilityIndex !== -1) {
-      const abilityStatId = ABILITY_INDEX_TO_STAT_ID[abilityIndex];
-      const breedBase = getBreedInitValue(breedId, abilityStatId);
-      return breedBase + equipmentBonus.value + perkBonus.value + buffBonus.value;
-    }
+  if (props.isAbility) {
+    return abilityMinValue.value;
   }
   // For skills: slider minimum is base + trickle + bonuses (no IP spent)
   return (
@@ -238,13 +220,13 @@ const isMiscSkill = computed(() => props.category === 'Misc');
 // Core skill value components
 const baseValue = computed(() => {
   if (props.isAbility) {
-    return minValue.value;
+    return abilityMinValue.value;
   } else if (props.category === 'ACs') {
     // ACs have no base value, only bonuses
     return 0;
   } else if (isMiscSkill.value) {
-    // Misc skills use baseValue directly from the MiscSkill object
-    return (props.skillData as MiscSkill)?.baseValue || 0;
+    // Misc skills carry their base value in the skill data
+    return props.skillData?.base || 0;
   } else {
     // Regular skills have a base value of 5
     return 5;
@@ -317,48 +299,12 @@ const totalValue = computed(() => {
   }
 });
 
-// Value breakdown tooltip
-const valueBreakdown = computed(() => {
-  if (props.isAbility) {
-    const breedBase = minValue.value;
-    const improvements = Math.max(0, totalValue.value - breedBase);
-    return `Breed Base: ${breedBase} + Improvements: ${improvements} = ${totalValue.value}`;
-  } else if (isMiscSkill.value) {
-    // Misc skills only show base + bonuses (no trickle-down or IP)
-    return `Base: ${baseValue.value} + Equipment: ${equipmentBonus.value} + Perks: ${perkBonus.value} + Buffs: ${buffBonus.value} = ${totalValue.value}`;
-  } else {
-    return `Base: ${baseValue.value} + Trickle-down: ${trickleDownBonus.value} + IP: ${ipContribution.value} = ${totalValue.value}`;
-  }
-});
-
-const showBreakdown = computed(() => {
-  if (props.isAbility) {
-    return false;
-  }
-
-  if (isMiscSkill.value) {
-    // For Misc skills, show breakdown if any bonuses are present
-    return equipmentBonus.value !== 0 || perkBonus.value !== 0 || buffBonus.value !== 0;
-  }
-
-  // For regular skills, show breakdown if any components are present
-  return (
-    trickleDownBonus.value > 0 ||
-    ipContribution.value > 0 ||
-    equipmentBonus.value !== 0 ||
-    perkBonus.value !== 0 ||
-    buffBonus.value !== 0
-  );
-});
-
 // Simple tooltip content for PrimeVue v-tooltip directive
 const simpleTooltipContent = computed(() => {
   if (props.isAbility) {
     // Calculate raw breed base without any bonuses
     const breedId = props.breed ?? 1; // Default to Solitus
-    const abilityIndex = getAbilityIndex(skillName.value);
-    const abilityStatId = abilityIndex !== -1 ? ABILITY_INDEX_TO_STAT_ID[abilityIndex] : 0;
-    const breedBase = getBreedInitValue(breedId, abilityStatId);
+    const breedBase = getBreedInitValue(breedId, Number(props.skillId));
 
     const improvements = props.skillData?.pointsFromIp || 0; // Get IP points directly from skillData
     const equipBonus = equipmentBonus.value;
@@ -442,34 +388,11 @@ const maxTotalValue = computed(() => {
   return props.skillData?.cap || 500; // Total skill cap from IP calculator
 });
 
-// Maximum IP that can be spent (for slider limits)
-const maxValue = computed(() => {
-  if (props.isAbility) {
-    // For abilities: use the skill cap directly
-    if (props.skillData?.cap !== undefined) {
-      return props.skillData.cap;
-    }
-    return 1000; // Default ability cap
-  }
-
-  // For skills: slider max is the amount of IP that can be spent
-  // This is the skill cap minus the effective base (base + trickle-down)
-  const skillCap = props.skillData?.cap || 500; // Default skill cap
-  const effectiveBase = baseValue.value + trickleDownBonus.value;
-
-  if (props.category === 'Misc') {
-    return 100; // Misc skills typically lower
-  }
-
-  // Max IP spendable is cap minus effective base
-  return Math.max(0, skillCap - effectiveBase);
-});
-
 const ipCost = computed(() => {
   if (props.isAbility || isMiscSkill.value) {
     return 0; // Abilities and Misc don't track IP
   }
-  return (props.skillData as SkillWithIP)?.ipSpent || 0;
+  return props.skillData?.ipSpent || 0;
 });
 
 const showCapInfo = computed(() => {
@@ -494,9 +417,8 @@ const costFactor = computed(() => {
   if (props.isAbility && props.breed !== undefined) {
     // For abilities: use breed-based cost factors
     const breedId = props.breed;
-    const abilityIndex = getAbilityIndex(skillName.value);
-    if (abilityIndex !== -1) {
-      return BREED_ABILITY_DATA.cost_factors[breedId]?.[abilityIndex] || null;
+    if (abilityIndex.value !== -1) {
+      return BREED_ABILITY_DATA.cost_factors[breedId]?.[abilityIndex.value] || null;
     }
   } else if (!props.isAbility && props.profession !== undefined) {
     // For skills: use profession-based cost factors with skillId
@@ -524,32 +446,38 @@ const costFactorColor = computed(() => {
 });
 
 // Methods
-function onSliderChanged(newValue: number | null) {
-  // This is called when the user releases the slider (slideend event)
-  // We use the current sliderValue which has been updated during dragging
+/** Equipment, perk and buff bonuses: shown in the total but never trained. */
+const bonusTotal = computed(() => equipmentBonus.value + perkBonus.value + buffBonus.value);
 
-  // Ignore programmatic updates from watchers (e.g., during profile loading)
+/**
+ * Emit a new displayed total as the trained value the store expects:
+ * modifyAbility takes breed base + IP, modifySkill takes 5 + trickle-down + IP.
+ * Neither includes bonuses, so they are subtracted here.
+ */
+function emitTrainedValue(displayedTotal: number) {
+  const trainedValue = displayedTotal - bonusTotal.value;
+  if (props.isAbility) {
+    emit('ability-changed', Number(props.skillId), trainedValue);
+  } else {
+    emit('skill-changed', props.category, Number(props.skillId), trainedValue);
+  }
+}
+
+function clampTotal(value: number): number {
+  return Math.max(minValue.value, Math.min(value, maxTotalValue.value));
+}
+
+function onSliderChanged() {
+  // Don't emit during programmatic updates (e.g. profile loading)
   if (isProgrammaticUpdate.value) {
     return;
   }
 
-  const valueToUse = sliderValue.value;
-
   isUserInteracting.value = true;
 
-  const clampedValue = Math.max(minValue.value, Math.min(valueToUse, maxValue.value));
-
-  // Update input value to reflect the change
-  if (props.isAbility) {
-    inputValue.value = clampedValue;
-    emit('ability-changed', props.skillId, clampedValue);
-  } else {
-    // For skills, the slider value represents IP improvements only
-    // The total skill value will be: base + trickle-down + IP improvements
-    const totalSkillValue = baseValue.value + trickleDownBonus.value + clampedValue;
-    inputValue.value = totalSkillValue;
-    emit('skill-changed', props.category, props.skillId, totalSkillValue);
-  }
+  const clampedTotal = clampTotal(sliderValue.value);
+  inputValue.value = clampedTotal;
+  emitTrainedValue(clampedTotal);
 
   // Reset interaction flag after a short delay
   setTimeout(() => {
@@ -560,35 +488,23 @@ function onSliderChanged(newValue: number | null) {
 function onInputChanged(newValue: number | null) {
   if (newValue === null || newValue === undefined) return;
 
-  // Ignore programmatic updates from watchers (e.g., during profile loading)
+  // Don't emit during programmatic updates (e.g. profile loading)
   if (isProgrammaticUpdate.value) {
     return;
   }
 
-  // Check if this looks like it came from the watcher setting inputValue equal to current total
-  // If inputValue is already at this value, it's likely a watcher update, not a user change
+  // Skip if the value didn't actually change (prevents duplicate emissions).
+  // The input is bound one-way, so inputValue still holds the previous value here.
   if (inputValue.value === newValue && !isUserInteracting.value) {
     return;
   }
 
-  // Mark as user interaction
   isUserInteracting.value = true;
 
-  if (props.isAbility) {
-    const clampedValue = Math.max(minValue.value, Math.min(newValue, maxValue.value));
-    sliderValue.value = clampedValue;
-    inputValue.value = clampedValue;
-    emit('ability-changed', props.skillId, clampedValue);
-  } else {
-    // For skills: calculate the IP portion from total value
-    const minTotal = baseValue.value + trickleDownBonus.value;
-    const clampedTotal = Math.max(minTotal, Math.min(newValue, maxTotalValue.value));
-    const ipPortion = Math.max(0, clampedTotal - baseValue.value - trickleDownBonus.value);
-
-    sliderValue.value = ipPortion;
-    inputValue.value = clampedTotal;
-    emit('skill-changed', props.category, props.skillId, clampedTotal);
-  }
+  const clampedTotal = clampTotal(newValue);
+  sliderValue.value = clampedTotal;
+  inputValue.value = clampedTotal;
+  emitTrainedValue(clampedTotal);
 
   // Reset interaction flag after a short delay
   setTimeout(() => {
@@ -597,41 +513,13 @@ function onInputChanged(newValue: number | null) {
 }
 
 function setToMax() {
-  if (props.isAbility) {
-    sliderValue.value = maxValue.value;
-    onSliderChanged(maxValue.value);
-  } else {
-    // For skills: set input to max total value, which will calculate the IP portion
-    onInputChanged(maxTotalValue.value);
-  }
+  onInputChanged(maxTotalValue.value);
 }
 
-// Watch for profile prop changes to set programmatic update flag
-watch(
-  () => props.profile,
-  (newProfile, oldProfile) => {
-    // When profile changes (like when switching active profile), set the flag
-    if (newProfile && oldProfile && newProfile.id !== oldProfile.id) {
-      isProgrammaticUpdate.value = true;
-      // Keep flag set longer when profile switches
-      setTimeout(() => {
-        isProgrammaticUpdate.value = false;
-      }, 100);
-    }
-  },
-  { immediate: false }
-);
-
 // Watchers
-// For abilities: watch the total field, for skills: watch the total field too (not pointFromIp)
-// For ACs: watch the skillData itself since it's a number
+// Watch the total field for abilities, skills and ACs alike (not pointsFromIp)
 watch(
-  () => {
-    if (props.category === 'ACs') {
-      return props.skillData; // AC values are simple numbers
-    }
-    return props.skillData?.total; // Other skills have a total property
-  },
+  () => props.skillData?.total,
   (newValue, oldValue) => {
     // Always update on initial load (oldValue is undefined) or when not interacting
     const isInitialLoad = oldValue === undefined;
@@ -641,20 +529,10 @@ watch(
         // Set flag to prevent onInputChanged from emitting during programmatic updates
         isProgrammaticUpdate.value = true;
 
-        if (props.isAbility) {
-          // For abilities: the value directly represents the ability score
+        // ACs are read-only, so there is no slider to update
+        if (props.category !== 'ACs') {
           sliderValue.value = Math.max(newValue, minValue.value);
           inputValue.value = sliderValue.value;
-        } else if (props.category === 'ACs') {
-          // For ACs: the value is the total AC value with all bonuses
-          // ACs are read-only so we don't need to update sliders
-        } else {
-          // For skills: the value represents the total skill value,
-          // we need to calculate the IP portion for the slider
-          const totalSkillValue = newValue;
-          const ipPortion = Math.max(0, totalSkillValue - baseValue.value - trickleDownBonus.value);
-          sliderValue.value = Math.max(ipPortion, 0);
-          inputValue.value = totalSkillValue;
         }
 
         // Clear flag after a short delay to ensure InputNumber event has processed
@@ -666,14 +544,10 @@ watch(
       // Handle case where skillData.value is undefined (no IP invested yet)
       isProgrammaticUpdate.value = true;
 
-      if (props.isAbility) {
-        // For abilities: show breed base
+      // Nothing trained yet: show the minimum (breed base, or 5 + trickle-down, plus bonuses)
+      if (props.isAbility || (!props.isReadOnly && props.category !== 'ACs')) {
         sliderValue.value = minValue.value;
         inputValue.value = minValue.value;
-      } else if (!props.isReadOnly && props.category !== 'ACs') {
-        // For skills: show base + trickle-down
-        sliderValue.value = 0; // No IP invested
-        inputValue.value = baseValue.value + trickleDownBonus.value;
       }
 
       // Clear flag after a short delay to ensure InputNumber event has processed
@@ -691,15 +565,9 @@ watch(sliderValue, (newValue) => {
     // Set flag during programmatic update from slider watcher
     isProgrammaticUpdate.value = true;
 
-    if (props.isAbility) {
-      // For abilities, update the input display directly
-      inputValue.value = newValue;
-    } else {
-      // For skills, update the input value display as the slider moves
-      // This provides visual feedback without triggering expensive equipment updates
-      const totalSkillValue = baseValue.value + trickleDownBonus.value + newValue;
-      inputValue.value = totalSkillValue;
-    }
+    // Update the input display as the slider moves; the store is only updated
+    // on slide end, avoiding expensive recalculation while dragging
+    inputValue.value = newValue;
 
     // Clear flag on next tick
     setTimeout(() => {
@@ -725,14 +593,6 @@ watch(
   },
   { immediate: true }
 );
-
-// Watch minValue changes to ensure current value respects minimum
-watch(minValue, (newMinValue) => {
-  if (sliderValue.value < newMinValue) {
-    sliderValue.value = newMinValue;
-    onSliderChanged(newMinValue);
-  }
-});
 
 // Watch for trickle-down changes to trigger visual feedback
 watch(

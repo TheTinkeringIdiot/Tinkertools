@@ -228,13 +228,14 @@ import InputText from 'primevue/inputtext';
 import InputNumber from 'primevue/inputnumber';
 import Dropdown from 'primevue/dropdown';
 import Button from 'primevue/button';
-import { PROFESSION_NAMES, BREED_NAMES, SPECS } from '@/services/game-data';
+import { PROFESSION_NAMES, BREED_NAMES } from '@/services/game-data';
 import { ACCOUNT_TYPES } from '@/lib/tinkerprofiles/constants';
+import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 
 // Props
 const props = defineProps<{
   visible: boolean;
-  profile: any; // TinkerProfile
+  profile: TinkerProfile | null;
 }>();
 
 // Emits
@@ -293,7 +294,7 @@ const originalData = ref<FormData>({
   Specialization: 0,
 });
 
-const errors = ref<Partial<FormData>>({});
+const errors = ref<Partial<Record<keyof FormData, string>>>({});
 
 // Options
 const professionOptions = PROFESSION_NAMES.map((name, index) => ({

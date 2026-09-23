@@ -106,24 +106,23 @@ Shows owned perks with their levels, points used, and stat bonuses
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
-import type { PerkEntry, ResearchEntry, PerkEffect } from '@/lib/tinkerprofiles/perk-types';
+import type { PerkEntry, ResearchEntry } from '@/lib/tinkerprofiles/perk-types';
 import { parseItemForStatBonuses } from '@/services/perk-bonus-calculator';
 import type { Item } from '@/types/api';
 import { skillService } from '@/services/skill-service';
 
 // Props
-const props = defineProps<{
+defineProps<{
   perks: (PerkEntry | ResearchEntry)[];
   perkType: 'SL' | 'AI' | 'LE';
   editable?: boolean;
 }>();
 
 // Emits
-const emit = defineEmits<{
+defineEmits<{
   'add-perks': [];
   upgrade: [perk: PerkEntry | ResearchEntry];
   remove: [perk: PerkEntry | ResearchEntry];

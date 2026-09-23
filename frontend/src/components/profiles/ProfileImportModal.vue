@@ -431,9 +431,7 @@ Modal for importing profiles from various formats
         <Button
           :label="isBulkImport ? 'Import Profiles' : 'Import Profile'"
           icon="pi pi-upload"
-          :disabled="
-            !hasData || importing || (detectedFormat && detectedFormat.includes('Unsupported'))
-          "
+          :disabled="!hasData || importing || !!detectedFormat?.includes('Unsupported')"
           :loading="importing"
           @click="onImportClick"
         />
@@ -447,7 +445,7 @@ import { ref, reactive, computed, watch } from 'vue';
 import Button from 'primevue/button';
 import Checkbox from 'primevue/checkbox';
 import Dialog from 'primevue/dialog';
-import FileUpload from 'primevue/fileupload';
+import FileUpload, { type FileUploadSelectEvent } from 'primevue/fileupload';
 import InputText from 'primevue/inputtext';
 import ProgressBar from 'primevue/progressbar';
 import ProgressSpinner from 'primevue/progressspinner';
@@ -519,13 +517,6 @@ const hasData = computed(() => {
   );
 });
 
-const currentData = computed(() => {
-  if (importMethod.value === 'file' && selectedFile.value) {
-    return selectedFile.value;
-  }
-  return importText.value.trim();
-});
-
 // Methods
 function extractAOSetupsId(url: string): string | null {
   // Extract profile ID from AOSetups URL
@@ -552,8 +543,9 @@ function validateAOSetupsUrl(url: string): void {
   }
 }
 
-function onFileSelect(event: any) {
-  const file = event.files[0];
+function onFileSelect(event: FileUploadSelectEvent) {
+  const files: File[] = event.files;
+  const file = files[0];
   if (file) {
     clearDuplicatePrompt();
     selectedFile.value = file;
@@ -593,7 +585,6 @@ function detectFormat(data: string): string {
       parsed.profiles &&
       Array.isArray(parsed.profiles)
     ) {
-      const profileCount = parsed.profileCount;
       const actualCount = parsed.profiles.length;
       return `TinkerProfiles Bulk Export (${actualCount} profile${actualCount !== 1 ? 's' : ''})`;
     }
@@ -737,7 +728,6 @@ async function importProfile() {
         if (firstSuccess && firstSuccess.profileId) {
           emit('imported', {
             success: true,
-            profile: { id: firstSuccess.profileId } as any,
             errors: [],
             warnings: [],
             metadata: { source: result.metadata.source, migrated: false },

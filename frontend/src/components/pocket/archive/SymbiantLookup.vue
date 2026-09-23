@@ -10,7 +10,8 @@ import Button from 'primevue/button';
 import DataView from 'primevue/dataview';
 import Tag from 'primevue/tag';
 import Dialog from 'primevue/dialog';
-import type { Symbiant, PocketBoss } from '@/types/api';
+import { getImplantSlotNameFromBitflag } from '@/services/game-utils';
+import type { Mob, Symbiant } from '@/types/api';
 
 const symbiantStore = useSymbiantsStore();
 const pocketBossStore = usePocketBossStore();
@@ -36,14 +37,14 @@ const symbiants = computed(() => {
     result = result.filter(
       (symbiant) =>
         symbiant.name.toLowerCase().includes(search) ||
-        symbiant.slot.toLowerCase().includes(search) ||
+        getSlotName(symbiant).toLowerCase().includes(search) ||
         symbiant.family?.toLowerCase().includes(search)
     );
   }
 
   // Apply slot filter
   if (selectedSlots.value.length > 0) {
-    result = result.filter((symbiant) => selectedSlots.value.includes(symbiant.slot));
+    result = result.filter((symbiant) => selectedSlots.value.includes(getSlotName(symbiant)));
   }
 
   // Apply quality filter
@@ -58,14 +59,16 @@ const symbiants = computed(() => {
 
   return result.sort((a, b) => {
     // Sort by slot first, then by QL, then by name
-    if (a.slot !== b.slot) return a.slot.localeCompare(b.slot);
+    const aSlot = getSlotName(a);
+    const bSlot = getSlotName(b);
+    if (aSlot !== bSlot) return aSlot.localeCompare(bSlot);
     if (a.ql !== b.ql) return b.ql - a.ql; // Higher QL first
     return a.name.localeCompare(b.name);
   });
 });
 
 const availableSlots = computed(() => {
-  const slots = new Set(Array.from(symbiantStore.symbiants.values()).map((s) => s.slot));
+  const slots = new Set(Array.from(symbiantStore.symbiants.values()).map((s) => getSlotName(s)));
   return Array.from(slots).sort();
 });
 
@@ -96,7 +99,11 @@ function showDetails(symbiant: Symbiant) {
   showSymbiantDetails.value = true;
 }
 
-function getDropSources(symbiant: Symbiant): PocketBoss[] {
+function getSlotName(symbiant: Pick<Symbiant, 'slot_id'>): string {
+  return getImplantSlotNameFromBitflag(symbiant.slot_id);
+}
+
+function getDropSources(symbiant: Pick<Symbiant, 'id'>): Mob[] {
   return pocketBossStore.getPocketBossesBySymbiant(symbiant.id);
 }
 
@@ -110,14 +117,17 @@ function getQualitySeverity(ql: number): 'success' | 'info' | 'warning' | 'dange
 function getSlotIcon(slot: string): string {
   const iconMap: Record<string, string> = {
     Head: 'pi-user',
-    Eye: 'pi-eye',
-    Ear: 'pi-volume-up',
+    Eyes: 'pi-eye',
+    Ears: 'pi-volume-up',
     Chest: 'pi-shield',
-    Arm: 'pi-stop',
-    Wrist: 'pi-circle',
-    Hand: 'pi-hand-paper',
+    'Right Arm': 'pi-stop',
+    'Left Arm': 'pi-stop',
+    'Right Wrist': 'pi-circle',
+    'Left Wrist': 'pi-circle',
+    'Right Hand': 'pi-hand-paper',
+    'Left Hand': 'pi-hand-paper',
     Waist: 'pi-minus',
-    Leg: 'pi-sort-down',
+    Legs: 'pi-sort-down',
     Feet: 'pi-step-forward',
   };
   return iconMap[slot] || 'pi-circle';
@@ -226,6 +236,7 @@ defineExpose({
     <!-- Symbiant List/Grid -->
     <DataView
       :value="symbiants"
+      data-key="id"
       :layout="viewMode"
       paginator
       :rows="24"
@@ -255,11 +266,11 @@ defineExpose({
                 <div class="flex items-start justify-between">
                   <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2 mb-1">
-                      <i :class="`pi ${getSlotIcon(symbiant.slot)} text-primary-500`"></i>
+                      <i :class="`pi ${getSlotIcon(getSlotName(symbiant))} text-primary-500`"></i>
                       <span
                         class="text-xs font-medium text-surface-600 dark:text-surface-400 uppercase"
                       >
-                        {{ symbiant.slot }}
+                        {{ getSlotName(symbiant) }}
                       </span>
                     </div>
                     <h3
@@ -305,7 +316,9 @@ defineExpose({
             <template #content>
               <div class="flex items-center justify-between py-2">
                 <div class="flex items-center gap-4 flex-1 min-w-0">
-                  <i :class="`pi ${getSlotIcon(symbiant.slot)} text-xl text-primary-500`"></i>
+                  <i
+                    :class="`pi ${getSlotIcon(getSlotName(symbiant))} text-xl text-primary-500`"
+                  ></i>
 
                   <div class="min-w-0 flex-1">
                     <h3
@@ -316,7 +329,7 @@ defineExpose({
                     <div
                       class="flex items-center gap-3 text-sm text-surface-600 dark:text-surface-400"
                     >
-                      <span>{{ symbiant.slot }}</span>
+                      <span>{{ getSlotName(symbiant) }}</span>
                       <span v-if="symbiant.family">• {{ symbiant.family }}</span>
                     </div>
                   </div>
@@ -346,11 +359,13 @@ defineExpose({
     >
       <template #header>
         <div v-if="selectedSymbiant" class="flex items-center gap-3">
-          <i :class="`pi ${getSlotIcon(selectedSymbiant.slot)} text-xl text-primary-500`"></i>
+          <i
+            :class="`pi ${getSlotIcon(getSlotName(selectedSymbiant))} text-xl text-primary-500`"
+          ></i>
           <div>
             <h2 class="text-xl font-semibold">{{ selectedSymbiant.name }}</h2>
             <p class="text-sm text-surface-600 dark:text-surface-400">
-              {{ selectedSymbiant.slot }} • QL {{ selectedSymbiant.ql }}
+              {{ getSlotName(selectedSymbiant) }} • QL {{ selectedSymbiant.ql }}
             </p>
           </div>
         </div>
@@ -372,30 +387,13 @@ defineExpose({
               <div class="flex justify-between">
                 <span class="font-medium">Body Slot:</span>
                 <div class="flex items-center gap-2">
-                  <i :class="`pi ${getSlotIcon(selectedSymbiant.slot)}`"></i>
-                  <span>{{ selectedSymbiant.slot }}</span>
+                  <i :class="`pi ${getSlotIcon(getSlotName(selectedSymbiant))}`"></i>
+                  <span>{{ getSlotName(selectedSymbiant) }}</span>
                 </div>
               </div>
               <div v-if="selectedSymbiant.family" class="flex justify-between">
                 <span class="font-medium">Family:</span>
                 <span>{{ selectedSymbiant.family }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Stat Bonuses (if available) -->
-          <div v-if="selectedSymbiant.stat_bonuses?.length">
-            <h3 class="text-lg font-semibold mb-3">Stat Bonuses</h3>
-            <div class="space-y-2">
-              <div
-                v-for="bonus in selectedSymbiant.stat_bonuses"
-                :key="bonus.stat"
-                class="flex justify-between items-center"
-              >
-                <span class="font-medium">{{ bonus.stat }}:</span>
-                <span class="text-green-600 dark:text-green-400 font-mono">
-                  +{{ bonus.bonus }}
-                </span>
               </div>
             </div>
           </div>

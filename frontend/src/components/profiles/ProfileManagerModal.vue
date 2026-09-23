@@ -100,10 +100,10 @@ Modal dialog for managing all profiles - create, edit, delete, import, export
               <div class="flex items-center gap-1">
                 <Button
                   v-if="profile.id !== activeProfileId"
+                  v-tooltip="'Set as active profile'"
                   icon="pi pi-check"
                   size="small"
                   severity="success"
-                  v-tooltip="'Set as active profile'"
                   text
                   rounded
                   aria-label="Set as active profile"
@@ -186,7 +186,7 @@ Modal dialog for managing all profiles - create, edit, delete, import, export
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useConfirm } from 'primevue/useconfirm';
 import Button from 'primevue/button';
@@ -200,7 +200,7 @@ import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import type { ProfileMetadata } from '@/lib/tinkerprofiles';
 
 // Props & Emits
-const props = defineProps<{
+defineProps<{
   visible: boolean;
 }>();
 
@@ -224,6 +224,7 @@ const showImportModal = ref(false);
 const selectedProfile = ref<ProfileMetadata | null>(null);
 
 // Methods
+// refreshMetadata catches and logs its own failures, so callers may fire and forget
 async function refreshProfiles() {
   await profilesStore.refreshMetadata();
   emit('refresh');
@@ -281,7 +282,9 @@ function confirmDeleteProfile(profile: ProfileMetadata) {
     rejectLabel: 'Cancel',
     acceptClass: 'p-button-danger',
     acceptLabel: 'Delete',
-    accept: () => deleteProfile(profile.id),
+    accept: () => {
+      void deleteProfile(profile.id);
+    },
   });
 }
 
@@ -295,15 +298,15 @@ async function deleteProfile(profileId: string) {
 }
 
 function onProfileCreated() {
-  refreshProfiles();
+  void refreshProfiles();
 }
 
 function onProfileUpdated() {
-  refreshProfiles();
+  void refreshProfiles();
 }
 
 function onProfileImported() {
-  refreshProfiles();
+  void refreshProfiles();
 }
 
 function formatDate(dateString: string): string {
@@ -316,7 +319,7 @@ function formatDate(dateString: string): string {
 
 // Lifecycle
 onMounted(() => {
-  refreshProfiles();
+  void refreshProfiles();
 });
 </script>
 
