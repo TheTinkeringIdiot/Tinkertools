@@ -1,519 +1,153 @@
 /**
- * Unit tests for CriteriaDisplay component
+ * CriteriaDisplay Component Tests
  *
- * Tests the component for displaying criteria with different view modes
+ * Mounts the real component with the real criteria transformation, chips and
+ * tree display. Raw game criteria go in (value1 = stat, value2 = value,
+ * operator = AO operator code); the tests check which layout the user gets
+ * and what it says about their character.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { ref } from 'vue';
+import PrimeVue from 'primevue/config';
 import CriteriaDisplay from '../CriteriaDisplay.vue';
 import type { Criterion } from '../../types/api';
 import type { CharacterStats } from '../../composables/useActionCriteria';
 
-// Mock the useCriteriaDisplay composable
-vi.mock('../../composables/useActionCriteria', () => ({
-  useCriteriaDisplay: vi.fn(),
-  isRequirementMet: vi.fn(),
-}));
+// AO operator codes: 0 equal, 1 less than, 2 greater than, 4 AND.
+const PISTOL_OVER_356: Criterion = { id: 1, value1: 112, value2: 356, operator: 2 };
+const LEVEL_OVER_150: Criterion = { id: 2, value1: 54, value2: 150, operator: 2 };
+const AGILITY_OVER_199: Criterion = { id: 3, value1: 17, value2: 199, operator: 2 };
+const AND: Criterion = { id: 4, value1: 0, value2: 0, operator: 4 };
 
-// Mock PrimeVue components
-vi.mock('primevue/tag', () => ({
-  default: {
-    name: 'Tag',
-    props: ['value', 'severity', 'class'],
-    template: '<span class="p-tag" :class="`p-tag-${severity} ${$attrs.class}`">{{ value }}</span>',
-  },
-}));
+function mountDisplay(props: {
+  criteria: Criterion[];
+  characterStats?: CharacterStats | null;
+  expanded?: boolean;
+  showOeBreakpoints?: boolean;
+}) {
+  return mount(CriteriaDisplay, { props, global: { plugins: [PrimeVue] } });
+}
 
-// Mock CriterionChip component
-vi.mock('../CriterionChip.vue', () => ({
-  default: {
-    name: 'CriterionChip',
-    props: ['criterion', 'characterStats'],
-    template: '<div class="criterion-chip">{{ criterion.description }}</div>',
-  },
-}));
-
-import { useCriteriaDisplay, isRequirementMet } from '../../composables/useActionCriteria';
+function chipTexts(wrapper: ReturnType<typeof mountDisplay>): string[] {
+  return wrapper.findAll('.criterion-chip').map((chip) => chip.text());
+}
 
 describe('CriteriaDisplay', () => {
-  const mockCriteria: Criterion[] = [
-    { id: 1, value1: 112, value2: 356, operator: 2 }, // Pistol > 356
-    { id: 2, value1: 54, value2: 150, operator: 2 }, // Level > 150
-    { id: 3, value1: 0, value2: 0, operator: 4 }, // AND
-  ];
+  describe('no requirements', () => {
+    it('says so when there are no criteria', () => {
+      const wrapper = mountDisplay({ criteria: [] });
 
-  const mockDisplayCriteria = [
-    {
-      id: 1,
-      stat: 112,
-      statName: 'Pistol',
-      displayValue: 357,
-      displaySymbol: '≥',
-      displayOperator: 'Greater than or equal to',
-      description: 'Pistol ≥ 357',
-      isLogicalOperator: false,
-      isSeparator: false,
-      isStatRequirement: true,
-    },
-    {
-      id: 2,
-      stat: 54,
-      statName: 'Level',
-      displayValue: 151,
-      displaySymbol: '≥',
-      displayOperator: 'Greater than or equal to',
-      description: 'Level ≥ 151',
-      isLogicalOperator: false,
-      isSeparator: false,
-      isStatRequirement: true,
-    },
-    {
-      id: 3,
-      stat: 0,
-      statName: 'Logical',
-      displayValue: 0,
-      displaySymbol: 'AND',
-      displayOperator: 'AND',
-      description: 'AND',
-      isLogicalOperator: true,
-      isSeparator: true,
-      isStatRequirement: false,
-    },
-  ];
-
-  const mockUseCriteriaDisplay = {
-    displayCriteria: ref(mockDisplayCriteria),
-    statRequirements: ref(mockDisplayCriteria.slice(0, 2)),
-    logicalOperators: ref(mockDisplayCriteria.slice(2)),
-    expression: ref({
-      type: 'logical',
-      operator: 'AND',
-      operands: [],
-      description: '(Pistol ≥ 357 AND Level ≥ 151)',
-    }),
-    formattedText: ref('(Pistol ≥ 357 AND Level ≥ 151)'),
-    requirements: ref([
-      { stat: 112, statName: 'Pistol', minValue: 357 },
-      { stat: 54, statName: 'Level', minValue: 151 },
-    ]),
-    simplifiedText: ref('2 requirements'),
-    groupedRequirements: ref([
-      { stat: 112, statName: 'Pistol', criteria: [mockDisplayCriteria[0]] },
-      { stat: 54, statName: 'Level', criteria: [mockDisplayCriteria[1]] },
-    ]),
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(useCriteriaDisplay).mockReturnValue(mockUseCriteriaDisplay);
-    vi.mocked(isRequirementMet).mockReturnValue(true);
-  });
-
-  describe('component rendering', () => {
-    it('should render without errors', () => {
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: mockCriteria,
-        },
-      });
-
-      expect(wrapper.exists()).toBe(true);
+      expect(wrapper.text()).toBe('No requirements');
+      expect(wrapper.findAll('.criterion-chip')).toHaveLength(0);
     });
 
-    it('should render simple mode by default', () => {
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: mockCriteria,
-        },
-      });
+    it('says so in the expanded layout too', () => {
+      const wrapper = mountDisplay({ criteria: [], expanded: true });
 
-      expect(wrapper.text()).toContain('2 requirements');
-    });
-
-    it('should render compact mode', () => {
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: mockCriteria,
-          mode: 'compact',
-        },
-      });
-
-      // In compact mode, should show criterion chips
-      const chips = wrapper.findAllComponents({ name: 'CriterionChip' });
-      expect(chips.length).toBe(2); // Only stat requirements
-    });
-
-    it('should render expanded mode', () => {
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: mockCriteria,
-          mode: 'expanded',
-        },
-      });
-
-      // In expanded mode, should show full formatted text
-      expect(wrapper.text()).toContain('(Pistol ≥ 357 AND Level ≥ 151)');
-    });
-
-    it('should render full mode with all details', () => {
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: mockCriteria,
-          mode: 'full',
-        },
-      });
-
-      // In full mode, should show grouped requirements
-      expect(wrapper.text()).toContain('Pistol');
-      expect(wrapper.text()).toContain('Level');
-
-      const chips = wrapper.findAllComponents({ name: 'CriterionChip' });
-      expect(chips.length).toBe(2);
+      expect(wrapper.text()).toBe('No requirements');
     });
   });
 
-  describe('character stats integration', () => {
-    const characterStats: CharacterStats = {
-      112: 400, // Pistol
-      54: 100, // Level (too low)
-    };
+  describe('one or two requirements', () => {
+    it('shows each requirement as a chip', () => {
+      const wrapper = mountDisplay({ criteria: [PISTOL_OVER_356, LEVEL_OVER_150] });
 
-    it('should pass character stats to criterion chips', () => {
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: mockCriteria,
-          characterStats,
-          mode: 'compact',
-        },
-      });
-
-      const chips = wrapper.findAllComponents({ name: 'CriterionChip' });
-      chips.forEach((chip) => {
-        expect(chip.props('characterStats')).toEqual(characterStats);
-      });
+      expect(chipTexts(wrapper)).toEqual(['Pistol ≥ 357', 'Level ≥ 151']);
+      expect(wrapper.find('button').exists()).toBe(false);
     });
 
-    it('should show requirement met indicator', () => {
-      vi.mocked(isRequirementMet).mockReturnValue(true);
-
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: mockCriteria,
-          characterStats,
-          mode: 'simple',
-        },
+    it('colours each chip by whether the character meets it', () => {
+      const wrapper = mountDisplay({
+        criteria: [PISTOL_OVER_356, LEVEL_OVER_150],
+        characterStats: { 112: 400, 54: 100 },
       });
 
-      expect(wrapper.text()).toContain('✓');
+      const chips = wrapper.findAll('.criterion-chip');
+      expect(chips[0].classes()).toContain('requirement-met');
+      expect(chips[0].text()).toContain('(400)');
+      expect(chips[1].classes()).toContain('requirement-unmet');
+      expect(chips[1].text()).toContain('(100)');
     });
 
-    it('should show requirement not met indicator', () => {
-      vi.mocked(isRequirementMet).mockReturnValue(false);
+    it('shows OE breakpoints on skill chips when asked', () => {
+      const wrapper = mountDisplay({ criteria: [PISTOL_OVER_356], showOeBreakpoints: true });
 
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: mockCriteria,
-          characterStats,
-          mode: 'simple',
-        },
-      });
-
-      expect(wrapper.text()).toContain('✗');
-    });
-
-    it('should show unknown status when no character stats', () => {
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: mockCriteria,
-          mode: 'simple',
-        },
-      });
-
-      expect(wrapper.text()).toContain('?');
-    });
-
-    it('should calculate overall requirement status', () => {
-      vi.mocked(isRequirementMet)
-        .mockReturnValueOnce(true) // Pistol requirement met
-        .mockReturnValueOnce(false); // Level requirement not met
-
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: mockCriteria,
-          characterStats,
-          mode: 'simple',
-        },
-      });
-
-      // Overall status should be false (not all requirements met)
-      expect(wrapper.text()).toContain('✗');
+      expect(wrapper.text()).toContain('OE: 285/214/142/71');
     });
   });
 
-  describe('empty states', () => {
-    it('should handle empty criteria array', () => {
-      mockUseCriteriaDisplay.displayCriteria.value = [];
-      mockUseCriteriaDisplay.statRequirements.value = [];
-      mockUseCriteriaDisplay.simplifiedText.value = 'No requirements';
+  describe('several requirements without logical operators', () => {
+    const criteria = [PISTOL_OVER_356, LEVEL_OVER_150, AGILITY_OVER_199];
 
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: [],
-        },
-      });
+    it('collapses them behind a count with a Show toggle', async () => {
+      const wrapper = mountDisplay({ criteria });
 
-      expect(wrapper.text()).toContain('No requirements');
-    });
+      expect(wrapper.text()).toContain('3 requirements');
+      expect(wrapper.findAll('.criterion-chip')).toHaveLength(0);
 
-    it('should handle criteria with only logical operators', () => {
-      mockUseCriteriaDisplay.statRequirements.value = [];
-      mockUseCriteriaDisplay.simplifiedText.value = 'No requirements';
+      const toggle = wrapper.find('button');
+      expect(toggle.text()).toBe('Show');
+      await toggle.trigger('click');
 
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: [{ id: 1, value1: 0, value2: 0, operator: 4 }],
-        },
-      });
+      expect(chipTexts(wrapper)).toEqual(['Pistol ≥ 357', 'Level ≥ 151', 'Agility ≥ 200']);
+      expect(toggle.text()).toBe('Hide');
 
-      expect(wrapper.text()).toContain('No requirements');
+      await toggle.trigger('click');
+      expect(wrapper.findAll('.criterion-chip')).toHaveLength(0);
     });
   });
 
-  describe('mode-specific behavior', () => {
-    it('should show different content in simple mode', () => {
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: mockCriteria,
-          mode: 'simple',
-        },
-      });
+  describe('expanded layout', () => {
+    const criteria = [PISTOL_OVER_356, LEVEL_OVER_150];
 
-      // Simple mode shows count or single requirement
-      expect(wrapper.text()).toContain('2 requirements');
+    it('lists every requirement without evaluation when no character is selected', () => {
+      const wrapper = mountDisplay({ criteria, expanded: true });
+
+      expect(wrapper.text()).toContain('Requirements:');
+      expect(chipTexts(wrapper)).toEqual(['Pistol ≥ 357', 'Level ≥ 151']);
+      expect(wrapper.text()).not.toContain('Your Character:');
     });
 
-    it('should show individual chips in compact mode', () => {
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: mockCriteria,
-          mode: 'compact',
-        },
+    it('tells the user their character meets every requirement', () => {
+      const wrapper = mountDisplay({
+        criteria,
+        expanded: true,
+        characterStats: { 112: 400, 54: 200 },
       });
 
-      const chips = wrapper.findAllComponents({ name: 'CriterionChip' });
-      expect(chips).toHaveLength(2);
-      expect(chips[0].props('criterion')).toEqual(mockDisplayCriteria[0]);
-      expect(chips[1].props('criterion')).toEqual(mockDisplayCriteria[1]);
+      expect(wrapper.text()).toContain('Meets Requirements');
+      expect(wrapper.text()).not.toContain('Missing:');
     });
 
-    it('should show formatted expression in expanded mode', () => {
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: mockCriteria,
-          mode: 'expanded',
-        },
+    it('lists what the character is missing and by how much', () => {
+      const wrapper = mountDisplay({
+        criteria,
+        expanded: true,
+        characterStats: { 112: 400, 54: 100 },
       });
 
-      expect(wrapper.text()).toContain('(Pistol ≥ 357 AND Level ≥ 151)');
-    });
-
-    it('should group requirements by stat in full mode', () => {
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: mockCriteria,
-          mode: 'full',
-        },
-      });
-
-      // Should show stat names as headers
-      expect(wrapper.text()).toContain('Pistol');
-      expect(wrapper.text()).toContain('Level');
+      expect(wrapper.text()).toContain('Missing Requirements');
+      const missing = wrapper.findAll('.text-danger');
+      expect(missing).toHaveLength(1);
+      expect(missing[0].text()).toContain('Level');
+      expect(missing[0].text()).toContain('100/151 (need 51 more)');
     });
   });
 
-  describe('single requirement handling', () => {
-    const singleCriterion: Criterion[] = [{ id: 1, value1: 112, value2: 356, operator: 2 }];
-
-    beforeEach(() => {
-      mockUseCriteriaDisplay.statRequirements.value = [mockDisplayCriteria[0]];
-      mockUseCriteriaDisplay.simplifiedText.value = 'Pistol ≥ 357';
-    });
-
-    it('should show single requirement directly in simple mode', () => {
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: singleCriterion,
-          mode: 'simple',
-        },
+  describe('logical expressions', () => {
+    it('shows criteria joined by logical operators as a requirement tree', () => {
+      const wrapper = mountDisplay({
+        criteria: [PISTOL_OVER_356, LEVEL_OVER_150, AND],
+        characterStats: { 112: 400, 54: 100 },
+        expanded: true,
       });
 
-      expect(wrapper.text()).toContain('Pistol ≥ 357');
-    });
-
-    it('should show single chip in compact mode', () => {
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: singleCriterion,
-          mode: 'compact',
-        },
-      });
-
-      const chips = wrapper.findAllComponents({ name: 'CriterionChip' });
-      expect(chips).toHaveLength(1);
-    });
-  });
-
-  describe('complex criteria', () => {
-    const complexCriteria: Criterion[] = [
-      { id: 1, value1: 112, value2: 300, operator: 2 }, // Pistol > 300
-      { id: 2, value1: 112, value2: 500, operator: 1 }, // Pistol < 500
-      { id: 3, value1: 0, value2: 0, operator: 4 }, // AND
-      { id: 4, value1: 54, value2: 150, operator: 2 }, // Level > 150
-      { id: 5, value1: 0, value2: 0, operator: 4 }, // AND
-    ];
-
-    it('should handle multiple requirements for same stat', () => {
-      // Mock grouped requirements with multiple criteria for same stat
-      mockUseCriteriaDisplay.groupedRequirements.value = [
-        {
-          stat: 112,
-          statName: 'Pistol',
-          criteria: [
-            mockDisplayCriteria[0],
-            {
-              ...mockDisplayCriteria[0],
-              id: 2,
-              displayValue: 499,
-              displaySymbol: '≤',
-              description: 'Pistol ≤ 499',
-            },
-          ],
-        },
-        { stat: 54, statName: 'Level', criteria: [mockDisplayCriteria[1]] },
-      ];
-
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: complexCriteria,
-          mode: 'full',
-        },
-      });
-
-      expect(wrapper.text()).toContain('Pistol');
-
-      // Should show multiple chips for the same stat
-      const chips = wrapper.findAllComponents({ name: 'CriterionChip' });
-      expect(chips.length).toBeGreaterThan(2);
-    });
-
-    it('should handle nested logical expressions', () => {
-      mockUseCriteriaDisplay.formattedText.value =
-        '((Pistol ≥ 301 AND Pistol ≤ 499) AND Level ≥ 151)';
-
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: complexCriteria,
-          mode: 'expanded',
-        },
-      });
-
-      expect(wrapper.text()).toContain('((Pistol ≥ 301 AND Pistol ≤ 499) AND Level ≥ 151)');
-    });
-  });
-
-  describe('requirement status calculation', () => {
-    it('should handle mixed requirement results', () => {
-      const characterStats: CharacterStats = { 112: 400, 54: 100 };
-
-      vi.mocked(isRequirementMet)
-        .mockReturnValueOnce(true) // First requirement met
-        .mockReturnValueOnce(false); // Second requirement not met
-
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: mockCriteria,
-          characterStats,
-          mode: 'simple',
-        },
-      });
-
-      // Should show overall status as not met
-      expect(wrapper.text()).toContain('✗');
-    });
-
-    it('should handle null requirement results', () => {
-      vi.mocked(isRequirementMet).mockReturnValue(null);
-
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: mockCriteria,
-          characterStats: { 112: 400 },
-          mode: 'simple',
-        },
-      });
-
-      // Should show unknown status
-      expect(wrapper.text()).toContain('?');
-    });
-
-    it('should handle requirements when all are met', () => {
-      vi.mocked(isRequirementMet).mockReturnValue(true);
-
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: mockCriteria,
-          characterStats: { 112: 400, 54: 200 },
-          mode: 'simple',
-        },
-      });
-
-      expect(wrapper.text()).toContain('✓');
-    });
-  });
-
-  describe('edge cases', () => {
-    it('should handle malformed criteria gracefully', () => {
-      const malformedCriteria: Criterion[] = [{ id: 1, value1: 999, value2: 999, operator: 999 }];
-
-      mockUseCriteriaDisplay.displayCriteria.value = [
-        {
-          id: 1,
-          stat: 999,
-          statName: 'Stat 999',
-          displayValue: 999,
-          displaySymbol: 'Op999',
-          displayOperator: 'Op999',
-          description: 'Stat 999 Op999 999',
-          isLogicalOperator: false,
-          isSeparator: false,
-          isStatRequirement: true,
-        },
-      ];
-      mockUseCriteriaDisplay.statRequirements.value = mockUseCriteriaDisplay.displayCriteria.value;
-
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: malformedCriteria,
-        },
-      });
-
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.text()).toContain('Stat 999');
-    });
-
-    it('should handle undefined mode gracefully', () => {
-      const wrapper = mount(CriteriaDisplay, {
-        props: {
-          criteria: mockCriteria,
-          mode: undefined,
-        },
-      });
-
-      // Should default to simple mode
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.text()).toContain('2 requirements');
+      expect(wrapper.find('.criteria-tree-display').exists()).toBe(true);
+      expect(wrapper.text()).toContain('All Required (1/2 met)');
+      const requirements = wrapper.findAll('.tree-content .stat-name').map((n) => n.text());
+      expect(requirements).toEqual(['Pistol', 'Level']);
+      expect(wrapper.find('.unmet-list').text()).toBe('Level100/151 (need 51 more)');
     });
   });
 });

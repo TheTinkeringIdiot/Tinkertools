@@ -1,8 +1,16 @@
 <template>
   <div class="criteria-display">
+    <!-- No Requirements -->
+    <div
+      v-if="statRequirements.length === 0 && stateRequirements.length === 0 && !useTreeDisplay"
+      class="no-requirements"
+    >
+      <span class="text-muted text-sm">No requirements</span>
+    </div>
+
     <!-- Tree Display Mode (default for complex criteria) -->
     <CriteriaTreeDisplay
-      v-if="useTreeDisplay"
+      v-else-if="useTreeDisplay"
       :criteria="criteria"
       :character-stats="characterStats"
       :show-summary="expanded"
@@ -53,7 +61,7 @@
     </div>
 
     <!-- Fallback: Legacy Expanded View -->
-    <div v-else-if="!useTreeDisplay" class="legacy-expanded-view space-y-3">
+    <div v-else class="legacy-expanded-view space-y-3">
       <div class="text-sm font-medium mb-2">Requirements:</div>
       <div class="space-y-2">
         <CriterionChip
@@ -94,11 +102,6 @@
           </div>
         </div>
       </div>
-    </div>
-
-    <!-- No Requirements -->
-    <div v-else-if="!criteria || criteria.length === 0" class="no-requirements">
-      <span class="text-muted text-sm">No requirements</span>
     </div>
   </div>
 </template>
