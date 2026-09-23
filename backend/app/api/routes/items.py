@@ -688,7 +688,9 @@ def filter_items_advanced(
     min_ql: Optional[int] = Query(None, description="Minimum quality level"),
     max_ql: Optional[int] = Query(None, description="Maximum quality level"),
     is_nano: Optional[bool] = Query(None, description="Filter nano programs"),
-    slot: Optional[str] = Query(None, description="Filter by equipment slot"),
+    slot: Optional[int] = Query(
+        None, description="Filter by equipment slot (stat 298)"
+    ),
     # Advanced filters
     has_attack_defense: Optional[bool] = Query(
         None, description="Items with attack/defense stats"
@@ -719,15 +721,16 @@ def filter_items_advanced(
         query = query.filter(Item.ql <= max_ql)
     if is_nano is not None:
         query = query.filter(Item.is_nano == is_nano)
-    if slot:
-        query = query.filter(Item.slot == slot)
+
+    # Slot lives in stat 298 (EquippedIn bitmask), shared with get_items
+    query = apply_common_item_filters(query, db, slot=slot)
 
     # Apply advanced filters
     if has_attack_defense is not None:
         if has_attack_defense:
-            query = query.filter(Item.attack_defense_id.isnot(None))
+            query = query.filter(Item.atkdef_id.isnot(None))
         else:
-            query = query.filter(Item.attack_defense_id.is_(None))
+            query = query.filter(Item.atkdef_id.is_(None))
 
     if has_stats is not None:
         if has_stats:

@@ -6,8 +6,11 @@ import pytest
 from unittest.mock import Mock
 from fastapi.testclient import TestClient
 
+from sqlalchemy import text
+
 from app.main import app
 from app.core.database import get_db
+from app.models import Item
 
 
 @pytest.fixture
@@ -107,6 +110,67 @@ class TestItemSearch:
             names = [item["name"] for item in data["items"]]
             # Check if sorted descending
             assert names == sorted(names, reverse=True)
+
+    def test_filter_by_slot(self, client, db_session):
+        """Test the slot filter matches the EquippedIn (stat 298) bitmask."""
+        # Slot bit 15 at QL 200 is a small set that fits on one page
+        slot, ql = 15, 200
+        expected_ids = set(
+            db_session.execute(
+                text(
+                    "SELECT DISTINCT i.id FROM items i"
+                    " JOIN item_stats s ON s.item_id = i.id"
+                    " JOIN stat_values v ON v.id = s.stat_value_id"
+                    " WHERE v.stat = 298 AND v.value & (1 << :slot) > 0"
+                    " AND i.ql = :ql"
+                ),
+                {"slot": slot, "ql": ql},
+            ).scalars()
+        )
+        assert 0 < len(expected_ids) <= 1000
+
+        response = client.get(
+            f"/api/v1/items/filter?slot={slot}&min_ql={ql}&max_ql={ql}&page_size=1000"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == len(expected_ids)
+        assert {item["id"] for item in data["items"]} == expected_ids
+
+    def test_filter_by_attack_defense(self, client, db_session):
+        """Test has_attack_defense splits items on their attack/defense data."""
+        ql = 200
+        with_atkdef = {
+            item_id
+            for (item_id,) in db_session.query(Item.id).filter(
+                Item.ql == ql, Item.atkdef_id.isnot(None)
+            )
+        }
+        without_atkdef_total = (
+            db_session.query(Item)
+            .filter(Item.ql == ql, Item.atkdef_id.is_(None))
+            .count()
+        )
+        assert 0 < len(with_atkdef) <= 1000
+        assert without_atkdef_total > 0
+
+        response = client.get(
+            f"/api/v1/items/filter?has_attack_defense=true&min_ql={ql}&max_ql={ql}"
+            "&page_size=1000"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == len(with_atkdef)
+        assert {item["id"] for item in data["items"]} == with_atkdef
+
+        response = client.get(
+            f"/api/v1/items/filter?has_attack_defense=false&min_ql={ql}&max_ql={ql}"
+            "&page_size=100"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == without_atkdef_total
+        assert with_atkdef.isdisjoint(item["id"] for item in data["items"])
 
 
 class TestStatBasedQueries:
