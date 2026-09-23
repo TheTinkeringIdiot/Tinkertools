@@ -260,14 +260,15 @@ class TestPocketBossSearch:
         if len(data["items"]) > 0:
             assert "symbiant_count" in data["items"][0]
 
-    def test_boss_by_symbiant_family(self, client):
+    def test_boss_by_symbiant_family(self, client, db_session):
         """Test finding symbiant drops by family for a specific boss."""
-        from app.tests.db_test_constants import MOB_ID_ADOBE_SUZERAIN
+        from app.models import Mob
+        from app.tests.db_test_constants import MOB_ADOBE_SUZERAIN
+
+        mob = db_session.query(Mob).filter(Mob.name == MOB_ADOBE_SUZERAIN).one()
 
         # Get symbiant drops for a specific boss, filtered by family
-        response = client.get(
-            f"/api/v1/mobs/{MOB_ID_ADOBE_SUZERAIN}/drops?family=Artillery"
-        )
+        response = client.get(f"/api/v1/mobs/{mob.id}/drops?family=Artillery")
         assert response.status_code == 200
         data = response.json()
 

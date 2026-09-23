@@ -288,29 +288,47 @@ async def get_mob_by_id(session: AsyncSession, mob_id: int) -> Mob:
     Returns:
         Mob instance
 
-    Example:
-        mob = await get_mob_by_id(session, 1171)  # Adobe Suzerain
-        assert mob.name == "Adobe Suzerain"
-        assert mob.level == 125
-        assert mob.is_pocket_boss is True
+    Note:
+        Mob ids are assigned at import time; use get_mob_by_name() to find a
+        known mob and this helper only for ids read back from the database.
     """
     result = await session.execute(select(Mob).where(Mob.id == mob_id))
     return result.scalar_one()
 
 
-async def get_mob_with_drops(session: AsyncSession, mob_id: int) -> Mob:
+async def get_mob_by_name(session: AsyncSession, name: str) -> Mob:
+    """
+    Get mob by name (unique in the mobs table).
+
+    Args:
+        session: Database session
+        name: Mob name
+
+    Returns:
+        Mob instance
+
+    Example:
+        mob = await get_mob_by_name(session, MOB_ADOBE_SUZERAIN)
+        assert mob.level == 125
+        assert mob.is_pocket_boss is True
+    """
+    result = await session.execute(select(Mob).where(Mob.name == name))
+    return result.scalar_one()
+
+
+async def get_mob_with_drops(session: AsyncSession, name: str) -> Mob:
     """
     Get mob with all dropped items loaded via sources system.
 
     Args:
         session: Database session
-        mob_id: Mob ID
+        name: Mob name
 
     Returns:
         Mob with a cached list of dropped items in mob.dropped_items_cached
 
     Example:
-        mob = await get_mob_with_drops(session, 1171)
+        mob = await get_mob_with_drops(session, MOB_ADOBE_SUZERAIN)
         for item in mob.dropped_items_cached:
             print(f"{mob.name} drops {item.name}")
 
@@ -318,7 +336,7 @@ async def get_mob_with_drops(session: AsyncSession, mob_id: int) -> Mob:
         This uses a custom cached attribute rather than the property
         to avoid lazy loading issues in tests.
     """
-    mob = await get_mob_by_id(session, mob_id)
+    mob = await get_mob_by_name(session, name)
 
     # Get source_type_id for 'mob'
     source_type_result = await session.execute(

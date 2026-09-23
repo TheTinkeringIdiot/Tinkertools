@@ -15,12 +15,12 @@ import pytest
 from app.tests.db_test_constants import (
     ITEM_PISTOL_MASTERY,
     PERK_SL_ACCUMULATOR_1_ITEM_ID,
-    MOB_ID_ADOBE_SUZERAIN,
+    MOB_ADOBE_SUZERAIN,
 )
 from app.tests.db_helpers import (
     get_item_by_aoid,
     get_perk_by_item_id,
-    get_mob_by_id,
+    get_mob_by_name,
 )
 ```
 
@@ -193,11 +193,11 @@ async def test_spell_without_criteria(session):
 ```python
 import pytest
 from app.tests.db_test_constants import (
-    MOB_ID_ADOBE_SUZERAIN,
-    MOB_ID_AHPTA,
+    MOB_ADOBE_SUZERAIN,
+    MOB_AHPTA,
 )
 from app.tests.db_helpers import (
-    get_mob_by_id,
+    get_mob_by_name,
     get_mob_with_drops,
     get_pocket_boss_mobs,
 )
@@ -206,9 +206,8 @@ from app.tests.db_helpers import (
 @pytest.mark.asyncio
 async def test_mob_basic(session):
     """Test basic mob retrieval."""
-    mob = await get_mob_by_id(session, MOB_ID_ADOBE_SUZERAIN)
+    mob = await get_mob_by_name(session, MOB_ADOBE_SUZERAIN)
 
-    assert mob.id == 1171
     assert mob.name == "Adobe Suzerain"
     assert mob.level == 125
     assert mob.playfield == "Scheol Upper"
@@ -218,7 +217,7 @@ async def test_mob_basic(session):
 @pytest.mark.asyncio
 async def test_mob_with_drops(session):
     """Test mob with item drops."""
-    mob = await get_mob_with_drops(session, MOB_ID_ADOBE_SUZERAIN)
+    mob = await get_mob_with_drops(session, MOB_ADOBE_SUZERAIN)
 
     # Adobe Suzerain drops 7 items
     assert len(mob.dropped_items_cached) == 7
@@ -408,7 +407,7 @@ async def test_item(session):
 - `get_spells_with_criteria_count()` - Get complex spells
 
 ### Mob Helpers
-- `get_mob_by_id()` - Get mob
+- `get_mob_by_name()` - Get mob
 - `get_mob_with_drops()` - Get mob with dropped items
 - `get_pocket_boss_mobs()` - Get all pocket bosses
 - `get_mobs_by_level_range()` - Get mobs by level

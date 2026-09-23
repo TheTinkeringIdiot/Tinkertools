@@ -20,7 +20,7 @@ Helper functions to query real database records:
 - **Item queries**: `get_item_by_aoid()`, `get_item_with_sources()`, etc.
 - **Perk queries**: `get_perk_by_item_id()`, `get_perk_series()`, etc.
 - **Spell queries**: `get_spell_by_id()`, `get_spells_with_criteria_count()`, etc.
-- **Mob queries**: `get_mob_by_id()`, `get_mob_with_drops()`, etc.
+- **Mob queries**: `get_mob_by_name()`, `get_mob_with_drops()`, etc.
 - **Source queries**: `get_source_by_id()`, `get_item_sources()`, etc.
 - **Stat queries**: `get_stat_value_by_id()`, `get_stats_by_stat_type()`, etc.
 
@@ -106,8 +106,8 @@ async def test_item(session):
 - `SPELL_ID_SIMPLE_1` (1) - 0 criteria (edge case)
 
 ### Mobs
-- `MOB_ID_ADOBE_SUZERAIN` (1171) - Level 125, 7 drops
-- `MOB_ID_AHPTA` (1173) - Level 220, 5 drops
+- `MOB_ADOBE_SUZERAIN` ("Adobe Suzerain") - Level 125, 7 drops
+- `MOB_AHPTA` ("Ahpta") - Level 220, 5 drops
 
 ### Stats
 - `STAT_ID_COMMON_0` (103) - Common stat (714 occurrences)
@@ -123,7 +123,7 @@ async def test_item(session):
 | `get_item_with_sources()` | Get item with all sources loaded |
 | `get_perk_by_item_id()` | Get perk with item by item_id |
 | `get_spell_by_id()` | Get spell with criteria |
-| `get_mob_by_id()` | Get mob by ID |
+| `get_mob_by_name()` | Get mob by name |
 | `get_mob_with_drops()` | Get mob with all dropped items |
 | `get_source_by_id()` | Get source with type |
 | `get_stat_value_by_id()` | Get stat value by ID |

@@ -97,11 +97,11 @@ async def test_item_query(session):
 
 ### Pattern 2: Complex Relationships
 ```python
-from app.tests.db_test_constants import MOB_ID_ADOBE_SUZERAIN
+from app.tests.db_test_constants import MOB_ADOBE_SUZERAIN
 from app.tests.db_helpers import get_mob_with_drops
 
 async def test_mob_drops(session):
-    mob = await get_mob_with_drops(session, MOB_ID_ADOBE_SUZERAIN)
+    mob = await get_mob_with_drops(session, MOB_ADOBE_SUZERAIN)
     assert mob.level == 125
     assert len(mob.dropped_items_cached) == 7
 ```
@@ -141,8 +141,9 @@ async def test_batch_loading(session):
 - `SPELL_ID_SIMPLE_1` (1) - 0 criteria (edge case)
 
 ### Mobs (5 constants)
-- `MOB_ID_ADOBE_SUZERAIN` (1171) - Level 125, drops 7 symbiants
-- `MOB_ID_AHPTA` (1173) - Level 220, drops 5 symbiants
+- `MOB_ADOBE_SUZERAIN` ("Adobe Suzerain") - Level 125, drops 7 symbiants
+- `MOB_AHPTA` ("Ahpta") - Level 220, drops 5 symbiants
+- Mob ids change between imports, so mobs are identified by name
 
 See `db_test_constants.py` for complete list with documentation.
 
@@ -163,7 +164,7 @@ See `db_test_constants.py` for complete list with documentation.
 - `get_spells_with_criteria_count(session, min_count)` - Complex spells
 
 ### Mob Helpers
-- `get_mob_by_id(session, mob_id)` - Get mob
+- `get_mob_by_name(session, name)` - Get mob
 - `get_mob_with_drops(session, mob_id)` - Get mob with dropped items
 - `get_pocket_boss_mobs(session)` - Get all pocket bosses
 

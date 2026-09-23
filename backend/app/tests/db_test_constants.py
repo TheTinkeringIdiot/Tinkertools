@@ -50,15 +50,15 @@ ITEM_FERVOR_MINION = 210325  # 11 sources
 # Symbiant Items - For mob drop testing
 # =============================================================================
 
-# Adobe Suzerain (Mob 1171) drops - 7 symbiants
+# Adobe Suzerain drops - 7 symbiants
 ITEM_SYMBIANT_ADOBE_ARTILLERY_OCULAR = 219135  # ID: 86188, QL: 170, Artillery Unit Aban
 ITEM_SYMBIANT_ADOBE_INFANTRY_THIGH = 235792  # ID: 94098, QL: 170, Infantry Unit Aban
 ITEM_SYMBIANT_ADOBE_INFANTRY_FEET = 235825  # ID: 94131, QL: 150, Infantry Unit Aban
 
-# Aesma Daeva (Mob 1172) drops - 1 symbiant
+# Aesma Daeva drops - 1 symbiant
 ITEM_SYMBIANT_AESMA_INFANTRY_LEFT_ARM = 235711  # ID: 94018, QL: 260, Infantry Unit Aban
 
-# Ahpta (Mob 1173) drops - 5 symbiants
+# Ahpta drops - 5 symbiants
 ITEM_SYMBIANT_AHPTA_ARTILLERY_FEET = 235612  # ID: 93919, QL: 250, Artillery Unit Aban
 ITEM_SYMBIANT_AHPTA_CONTROL_OCULAR = 236297  # ID: 94602, QL: 270, Control Unit Aban
 ITEM_SYMBIANT_AHPTA_CONTROL_BRAIN = 236312  # ID: 94616, QL: 250, Control Unit Aban
@@ -161,11 +161,13 @@ SPELL_ID_SIMPLE_5 = 5  # Spell AOID: 53045, 0 criteria
 # Mobs (Pocket Bosses)
 # =============================================================================
 
-MOB_ID_ADOBE_SUZERAIN = 1171  # Level: 125, Playfield: "Scheol Upper", 7 items
-MOB_ID_AESMA_DAEVA = 1172  # Level: 220, Playfield: "Inferno Frontier", 1 item
-MOB_ID_AHPTA = 1173  # Level: 220, Playfield: "Inferno Frontier", 5 items
-MOB_ID_ALATYR = 1174  # Level: 188, Playfield: "Penumbra Forest"
-MOB_ID_ANYA = 1175  # Level: 185, Playfield: "Penumbra Valley"
+# Mob ids are serials assigned at import time and change between imports, so
+# tests look mobs up by name (unique in the mobs table) instead.
+MOB_ADOBE_SUZERAIN = "Adobe Suzerain"  # Level: 125, "Scheol Upper", 7 items
+MOB_AESMA_DAEVA = "Aesma Daeva"  # Level: 220, "Inferno Frontier", 1 item
+MOB_AHPTA = "Ahpta"  # Level: 220, "Inferno Frontier", 5 items
+MOB_ALATYR = "Alatyr"  # Level: 188, "Penumbra Forest"
+MOB_ANYA = "Anya"  # Level: 185, "Penumbra Valley"
 
 # All mobs in the database are pocket bosses (is_pocket_boss = True)
 
@@ -195,6 +197,6 @@ SOURCE_ID_1H_BLUNT_INCOMP = (
 )
 
 # Mob sources (with item drops)
-SOURCE_ID_MOB_ADOBE_SUZERAIN = 1  # Source ID: 1171, 7 items dropped
-SOURCE_ID_MOB_AESMA_DAEVA = 2  # Source ID: 1172, 1 item dropped
-SOURCE_ID_MOB_AHPTA = 3  # Source ID: 1173, 5 items dropped
+SOURCE_ID_MOB_ADOBE_SUZERAIN = 1  # 7 items dropped
+SOURCE_ID_MOB_AESMA_DAEVA = 2  # 1 item dropped
+SOURCE_ID_MOB_AHPTA = 3  # 5 items dropped

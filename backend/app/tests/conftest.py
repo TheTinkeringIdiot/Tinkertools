@@ -180,17 +180,17 @@ def sample_symbiant(db_session):
 def sample_pocket_boss(db_session):
     """Query a real pocket boss from the database for testing.
 
-    Uses "Adobe Suzerain" (ID: 1171, Level: 125, Playfield: "Scheol Upper") -
+    Uses "Adobe Suzerain" (Level: 125, Playfield: "Scheol Upper") -
     a real pocket boss mob from the database.
 
     Note: Pocket bosses are stored in the 'mobs' table with is_pocket_boss=True,
     not in a separate 'pocket_bosses' table.
     """
     from app.models import Mob
-    from app.tests.db_test_constants import MOB_ID_ADOBE_SUZERAIN
+    from app.tests.db_test_constants import MOB_ADOBE_SUZERAIN
 
     # Query real pocket boss instead of creating mock
-    boss = db_session.query(Mob).filter(Mob.id == MOB_ID_ADOBE_SUZERAIN).one()
+    boss = db_session.query(Mob).filter(Mob.name == MOB_ADOBE_SUZERAIN).one()
 
     return boss
 
