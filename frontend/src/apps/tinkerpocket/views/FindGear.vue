@@ -95,8 +95,7 @@ const activeProfile = computed(() => profileStore.activeProfile);
 
 const characterStats = computed(() => {
   if (!activeProfile.value) return null;
-  // Convert to plain object to satisfy type requirements
-  return mapProfileToStats(activeProfile.value as any);
+  return mapProfileToStats(activeProfile.value);
 });
 
 const filteredSymbiants = computed(() => {

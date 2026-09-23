@@ -5,14 +5,14 @@
  * for requirements checking against items and actions
  */
 
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import { accountTypeToExpansionBitflag, specializationLevelToBitflag } from './expansion-utils';
 
 /**
  * Maps a TinkerProfile v4.0.0 to a flat record of stat ID → value
  * Used for checking requirements against profile skills and attributes
  */
-export function mapProfileToStats(profile: TinkerProfile): Record<number, number> {
+export function mapProfileToStats(profile: ReadonlyTinkerProfile): Record<number, number> {
   const stats: Record<number, number> = {};
 
   // ============================================================================
@@ -173,7 +173,7 @@ export function mapProfileToStats(profile: TinkerProfile): Record<number, number
 /**
  * Helper function to get a specific stat value from a profile
  */
-export function getProfileStat(profile: TinkerProfile, statId: number): number {
+export function getProfileStat(profile: ReadonlyTinkerProfile, statId: number): number {
   const stats = mapProfileToStats(profile);
   return stats[statId] || 0;
 }
@@ -182,7 +182,7 @@ export function getProfileStat(profile: TinkerProfile, statId: number): number {
  * Helper function to check if a profile meets a specific requirement
  */
 export function profileMeetsRequirement(
-  profile: TinkerProfile,
+  profile: ReadonlyTinkerProfile,
   statId: number,
   operator: number,
   requiredValue: number

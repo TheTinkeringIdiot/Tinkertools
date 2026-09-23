@@ -363,7 +363,7 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
 import { ref, computed, watch } from 'vue';
 import Sidebar from 'primevue/sidebar';
 import type { Item } from '@/types/api';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import { getItemClassName } from '@/services/game-utils';
 import { mapProfileToStats } from '@/utils/profile-stats-mapper';
 import { getItemRequirements } from './item-requirements';
@@ -386,7 +386,7 @@ interface Recommendation {
 
 const props = defineProps<{
   items: Item[];
-  profile?: TinkerProfile | null;
+  profile?: ReadonlyTinkerProfile | null;
   showCompatibility?: boolean;
 }>();
 

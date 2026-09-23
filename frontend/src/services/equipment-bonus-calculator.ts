@@ -15,6 +15,7 @@
 
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import type { Item, Spell, SymbiantItem } from '@/types/api';
+import type { DeepReadonly } from 'vue';
 import { skillService } from './skill-service';
 import { STAT } from './game-data';
 
@@ -391,7 +392,7 @@ export class EquipmentBonusCalculator {
    * @param item Item with spell_data to parse
    * @returns Array of stat bonuses found in the item
    */
-  parseItemSpells(item: Item | SymbiantItem): StatBonus[] {
+  parseItemSpells(item: DeepReadonly<Item | SymbiantItem>): StatBonus[] {
     const bonuses: StatBonus[] = [];
 
     // Extract bonuses from spell_data only (item.stats does NOT contain implant bonuses)

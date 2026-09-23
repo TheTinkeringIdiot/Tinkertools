@@ -143,7 +143,7 @@ Shows item spell effects in a compact, scannable table format following WeaponSt
 import { computed } from 'vue';
 import Card from 'primevue/card';
 import type { SpellData } from '@/types/api';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import {
   formatSpellDataList,
   shouldUseCompactMode,
@@ -160,7 +160,7 @@ import SpellText from './SpellText.vue';
 
 interface Props {
   spellData: SpellData[];
-  profile?: TinkerProfile | null;
+  profile?: ReadonlyTinkerProfile | null;
   showHidden?: boolean;
   advancedView?: boolean;
 }

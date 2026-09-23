@@ -166,7 +166,7 @@ Shows essential weapon information in a dense, scannable table format
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Item } from '@/types/api';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import {
   getWeaponStats,
   calculateWeaponDPS,
@@ -178,7 +178,7 @@ import {
 
 const props = defineProps<{
   item: Item;
-  profile?: TinkerProfile | null;
+  profile?: ReadonlyTinkerProfile | null;
   showCompatibility?: boolean;
   attackStats?: Array<{ stat: number; value: number }>;
   defenseStats?: Array<{ stat: number; value: number }>;

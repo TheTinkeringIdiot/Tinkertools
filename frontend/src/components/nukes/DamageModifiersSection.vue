@@ -217,14 +217,14 @@
 import { ref, computed, watch } from 'vue';
 import InputNumber from 'primevue/inputnumber';
 import type { DamageModifiers } from '@/types/offensive-nano';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import { ENHANCE_NANO_DAMAGE, ANCIENT_MATRIX_DAMAGE } from '@/utils/nuke-regen-calculations';
 
 interface Props {
   damageModifiers: DamageModifiers;
   enhanceNanoDamage: number; // 0-6 from buff dropdown
   ancientMatrix: number; // 0-10 from buff dropdown
-  profile?: TinkerProfile | null; // TinkerProfile for accessing skill 536 base value and damage modifiers
+  profile?: ReadonlyTinkerProfile | null; // TinkerProfile for accessing skill 536 base value and damage modifiers
 }
 
 interface Emits {

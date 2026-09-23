@@ -177,7 +177,7 @@ Shows item requirements organized by category with compatibility checking
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Item } from '@/types/api';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import {
   getStatName,
   getProfessionName,
@@ -189,7 +189,7 @@ import type { Criterion } from '@/types/api';
 
 const props = defineProps<{
   item: Item;
-  profile?: TinkerProfile | null;
+  profile?: ReadonlyTinkerProfile | null;
   showCompatibility?: boolean;
 }>();
 

@@ -214,7 +214,7 @@ Provides full-text search with auto-complete and search suggestions
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import type { ItemSearchQuery } from '@/types/api';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 
 interface SearchSuggestion {
   text: string;
@@ -238,7 +238,7 @@ interface SavedSearch {
 const props = defineProps<{
   query: string;
   loading?: boolean;
-  profile?: TinkerProfile | null;
+  profile?: ReadonlyTinkerProfile | null;
 }>();
 
 const emit = defineEmits<{

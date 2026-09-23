@@ -233,13 +233,13 @@ Shows essential nano information in a dense, scannable table format
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Item } from '@/types/api';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import { getStatName, getNanoSchoolName, getNanoStrainName } from '@/services/game-utils';
 import { SPELL_FORMATS } from '@/services/game-data';
 
 const props = defineProps<{
   item: Item;
-  profile?: TinkerProfile | null;
+  profile?: ReadonlyTinkerProfile | null;
   showCompatibility?: boolean;
   skillRequirements?: Array<{ stat: number; value: number }>;
   skillBonuses?: Array<{ stat: number; value: number }>;

@@ -349,7 +349,7 @@ Provides dynamic filtering with real-time results and profile-aware options
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import type { ItemFilters } from '@/types/api';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import { mapProfileToStats } from '@/utils/profile-stats-mapper';
 
 interface FilterPreset {
@@ -359,7 +359,7 @@ interface FilterPreset {
 
 const props = defineProps<{
   filters: ItemFilters;
-  profile?: TinkerProfile | null;
+  profile?: ReadonlyTinkerProfile | null;
   showCompatibility?: boolean;
 }>();
 

@@ -6,6 +6,7 @@
  * Version 4.0.0 - ID-based skill architecture
  */
 
+import type { DeepReadonly } from 'vue';
 import type { Item, SymbiantItem } from '@/types/api';
 import type { PerkSystem } from './perk-types';
 
@@ -181,6 +182,12 @@ export interface TinkerProfile {
   // Nano buff system (unchanged)
   buffs?: Item[];
 }
+
+/**
+ * A profile as the stores hand it out (Vue `readonly()`). Code that only reads a
+ * profile should accept this; a mutable TinkerProfile is assignable to it.
+ */
+export type ReadonlyTinkerProfile = DeepReadonly<TinkerProfile>;
 
 /** Simplified nano-compatible profile for TinkerNanos */
 export interface NanoCompatibleProfile {

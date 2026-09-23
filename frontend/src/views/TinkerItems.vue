@@ -220,9 +220,7 @@ const { performSearch: searchItems, totalItems, pagination, clearSearch: resetSe
 
 // Computed Properties
 const compatibilityProfile = computed(() =>
-  showCompatibility.value && profilesStore.hasActiveProfile
-    ? (profilesStore.activeProfile as any)
-    : null
+  showCompatibility.value && profilesStore.hasActiveProfile ? profilesStore.activeProfile : null
 );
 
 // Note: activeFilterCount and hasActiveFilters removed - now handled by AdvancedItemSearch

@@ -102,14 +102,14 @@ import Button from 'primevue/button';
 import Badge from 'primevue/badge';
 import Message from 'primevue/message';
 import type { Item } from '@/types/api';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import { getItemIconUrl } from '@/services/game-utils';
 
 // Props
 interface Props {
   visible: boolean;
   item: Pick<Item, 'name' | 'ql' | 'stats' | 'item_class'> | null; // Item to equip
-  profile: TinkerProfile | null;
+  profile: ReadonlyTinkerProfile | null;
   validSlots?: string[]; // Optional list of valid slots for this item
 }
 

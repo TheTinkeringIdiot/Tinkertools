@@ -27,6 +27,7 @@ export type { ProfileVersionCopyResult, MissingItemReport } from './version-copy
 
 export type {
   TinkerProfile,
+  ReadonlyTinkerProfile,
   VersionFlaggedItem,
   ImplantWithClusters,
   SkillData,

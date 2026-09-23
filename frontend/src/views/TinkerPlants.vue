@@ -454,7 +454,7 @@ import { useSymbiantsStore } from '@/stores/symbiants';
 import { equipmentBonusCalculator } from '@/services/equipment-bonus-calculator';
 import { IMP_SKILLS, IMPLANT_SLOT } from '@/services/game-data';
 import { skillService } from '@/services/skill-service';
-import type { SymbiantItem } from '@/types/api';
+import type { Item, SymbiantItem } from '@/types/api';
 import type { AutoCompleteCompleteEvent } from 'primevue/autocomplete';
 import type { InputNumberInputEvent } from 'primevue/inputnumber';
 import Badge from 'primevue/badge';
@@ -738,7 +738,7 @@ const searchSymbiants = (event: AutoCompleteCompleteEvent, slotId: string) => {
 /**
  * Get selected symbiant for a slot
  */
-const getSelectedSymbiant = (slotId: string): DeepReadonly<SymbiantItem> | null => {
+const getSelectedSymbiant = (slotId: string): DeepReadonly<Item> | null => {
   const mapping = slotMapping[slotId as keyof typeof slotMapping];
   if (!mapping) return null;
 

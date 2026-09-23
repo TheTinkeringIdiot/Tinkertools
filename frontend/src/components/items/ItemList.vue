@@ -233,7 +233,7 @@ Shows items in grid or list view with pagination and compatibility indicators
 import { ref, computed, watch } from 'vue';
 import type { PageState } from 'primevue/paginator';
 import type { Item, PaginationInfo } from '@/types/api';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import { getItemIconUrl as getItemIconUrlUtil } from '@/services/game-utils';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { versionedPath } from '@/composables/useGameVersion';
@@ -247,7 +247,7 @@ import ItemQuickView from './ItemQuickView.vue';
 const props = defineProps<{
   items: Item[];
   viewMode: 'grid' | 'list';
-  compatibilityProfile?: TinkerProfile | null;
+  compatibilityProfile?: ReadonlyTinkerProfile | null;
   showCompatibility?: boolean;
   loading?: boolean;
   pagination?: PaginationInfo;

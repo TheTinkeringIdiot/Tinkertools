@@ -98,7 +98,7 @@ Shows essential item information in a compact format
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import type { Item } from '@/types/api';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import { getItemIconUrl } from '@/services/game-utils';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { mapProfileToStats } from '@/utils/profile-stats-mapper';
@@ -106,7 +106,7 @@ import { getItemRequirements, type ItemStatRequirement } from './item-requiremen
 
 const props = defineProps<{
   item: Item;
-  profile?: TinkerProfile | null;
+  profile?: ReadonlyTinkerProfile | null;
   showCompatibility?: boolean;
   isFavorite?: boolean;
 }>();

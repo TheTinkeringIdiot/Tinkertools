@@ -149,7 +149,7 @@ Auto-populates from active TinkerProfile buff names when available.
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import Dropdown from 'primevue/dropdown';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import type { BuffPresets } from '@/types/offensive-nano';
 import {
   CRUNCHCOM_COST_REDUCTION,
@@ -167,7 +167,7 @@ import {
 // Props
 const props = defineProps<{
   buffPresets: BuffPresets;
-  profile?: TinkerProfile | null;
+  profile?: ReadonlyTinkerProfile | null;
 }>();
 
 // Emits

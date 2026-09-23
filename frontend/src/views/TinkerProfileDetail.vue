@@ -406,9 +406,10 @@ async function loadProfile() {
 async function setActiveProfile() {
   try {
     await profilesStore.setActiveProfile(props.profileId);
-    // Update profileData to reflect the newly active profile
-    const updatedProfile = profilesStore.activeProfile;
-    if (updatedProfile && updatedProfile.id === props.profileId) {
+    // Reload our own copy rather than taking the store's activeProfile: that one
+    // is readonly, and the skill handlers below update profileData in place.
+    const updatedProfile = await profilesStore.loadProfile(props.profileId);
+    if (updatedProfile) {
       profileData.value = updatedProfile;
     }
   } catch (err) {

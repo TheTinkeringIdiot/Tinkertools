@@ -76,13 +76,13 @@ import type {
   DamageModifiers,
   BuffPresets,
 } from '@/types/offensive-nano';
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
+import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import { ENHANCE_NANO_DAMAGE, ANCIENT_MATRIX_DAMAGE } from '@/utils/nuke-regen-calculations';
 
 // Props
 interface Props {
   inputState: NukeInputState;
-  activeProfile?: Readonly<TinkerProfile> | TinkerProfile | null;
+  activeProfile?: ReadonlyTinkerProfile | null;
 }
 
 const props = defineProps<Props>();
