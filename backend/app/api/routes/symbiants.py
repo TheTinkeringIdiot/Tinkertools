@@ -61,9 +61,12 @@ def list_symbiants(
     """
     start_time = time.time()
 
-    # Base query with ordering
+    # Base query with ordering (id last so OFFSET pages never overlap)
     base_query = db.query(SymbiantItem).order_by(
-        SymbiantItem.family.asc(), SymbiantItem.ql.asc(), SymbiantItem.name.asc()
+        SymbiantItem.family.asc(),
+        SymbiantItem.ql.asc(),
+        SymbiantItem.name.asc(),
+        SymbiantItem.id.asc(),
     )
 
     # Get total count

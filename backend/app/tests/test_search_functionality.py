@@ -369,7 +369,7 @@ class TestSymbiantSearch:
         assert "name" in symbiant
 
     def test_symbiant_family_filtering(self, client, db_session):
-        """Test every family arrives intact across pages (client-side filtering)."""
+        """Test every symbiant and family arrives intact across pages."""
         from collections import Counter
 
         from sqlalchemy import func
@@ -384,17 +384,24 @@ class TestSymbiantSearch:
         assert "Artillery" in expected
 
         families = Counter()
+        ids = []
         page = 1
         while True:
             response = client.get(f"/api/v1/symbiants?page={page}&page_size=200")
             assert response.status_code == 200
             data = response.json()
             families.update(s["family"] for s in data["items"])
+            ids.extend(s["id"] for s in data["items"])
             if not data["has_next"]:
                 break
             page += 1
 
         assert dict(families) == expected
+        # Pages partition the set: no symbiant repeated or skipped
+        assert len(ids) == len(set(ids))
+        assert set(ids) == {
+            symbiant_id for (symbiant_id,) in db_session.query(SymbiantItem.id)
+        }
 
     def test_symbiant_ql_filtering(self, client):
         """Test symbiant QL filtering (client-side filtering expected)."""

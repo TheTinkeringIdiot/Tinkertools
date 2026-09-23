@@ -45,8 +45,8 @@ def get_spells(
     pages = math.ceil(total / page_size) if total > 0 else 1
     offset = (page - 1) * page_size
 
-    # Get spells for current page
-    spells = query.offset(offset).limit(page_size).all()
+    # Get spells for current page (unique ORDER BY keeps OFFSET pages stable)
+    spells = query.order_by(Spell.id).offset(offset).limit(page_size).all()
 
     return PaginatedResponse[SpellResponse](
         items=spells,
@@ -172,8 +172,8 @@ def get_spells_with_criteria(
     pages = math.ceil(total / page_size) if total > 0 else 1
     offset = (page - 1) * page_size
 
-    # Get spells for current page
-    spells = query.offset(offset).limit(page_size).all()
+    # Get spells for current page (unique ORDER BY keeps OFFSET pages stable)
+    spells = query.order_by(Spell.id).offset(offset).limit(page_size).all()
 
     # Build response objects
     spell_responses = [
@@ -225,8 +225,7 @@ def search_spells(
 
     search_term = f"%{q}%"
     query = (
-        db.query(Spell)
-        .filter(
+        db.query(Spell).filter(
             Spell.spell_format.ilike(search_term)
             # Note: Could add JSONB search for spell_params if needed
             # or_(
@@ -234,7 +233,8 @@ def search_spells(
             #     Spell.spell_params.astext.ilike(search_term)
             # )
         )
-        .order_by(Spell.spell_id)
+        # spell_id is the spell type and repeats; id makes the order unique
+        .order_by(Spell.spell_id, Spell.id)
     )
 
     # Get total count

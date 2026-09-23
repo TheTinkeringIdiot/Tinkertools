@@ -111,6 +111,7 @@ class TestTask4Endpoints:
         """Test basic spells endpoint."""
         mock_query = Mock()
         mock_query.filter.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
         mock_query.count.return_value = 0
         mock_query.offset.return_value = mock_query
         mock_query.limit.return_value = mock_query
@@ -166,6 +167,7 @@ class TestTask4Endpoints:
         mock_query.distinct.return_value = mock_query
         mock_query.join.return_value = mock_query
         mock_query.filter.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
         mock_query.options.return_value = mock_query
         mock_query.count.return_value = 0
         mock_query.offset.return_value = mock_query

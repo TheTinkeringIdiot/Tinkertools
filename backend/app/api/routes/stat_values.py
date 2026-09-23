@@ -21,7 +21,9 @@ def get_stat_values(skip: int = 0, limit: int = 100, db: Session = Depends(get_d
     """
     Get list of stat values.
     """
-    stat_values = db.query(StatValue).offset(skip).limit(limit).all()
+    stat_values = (
+        db.query(StatValue).order_by(StatValue.id).offset(skip).limit(limit).all()
+    )
     return stat_values
 
 

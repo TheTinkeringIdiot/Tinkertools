@@ -184,13 +184,14 @@ def get_nanos(
     # Get total count on lightweight query (no relationship loading)
     total = query.count()
 
-    # Apply sorting
+    # Apply sorting (id breaks ties so OFFSET pages never overlap)
     if sort_by == "name":
         query = query.order_by(desc(Item.name) if sort_desc else asc(Item.name))
     elif sort_by == "ql":
         query = query.order_by(desc(Item.ql) if sort_desc else asc(Item.ql))
     else:
         query = query.order_by(desc(Item.name) if sort_desc else asc(Item.name))
+    query = query.order_by(Item.id)
 
     # Apply pagination and load relationships only for result set
     pages = math.ceil(total / page_size) if total > 0 else 1
@@ -273,9 +274,11 @@ def search_nanos(
     pages = math.ceil(total / page_size) if total > 0 else 1
     offset = (page - 1) * page_size
 
-    # Load relationships only for result set
+    # Load relationships only for result set (unique ORDER BY keeps OFFSET
+    # pages stable)
     items = (
-        query.options(
+        query.order_by(Item.id)
+        .options(
             selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
             selectinload(Item.item_spell_data)
             .selectinload(ItemSpellData.spell_data)
@@ -521,6 +524,8 @@ def get_nanos_by_profession(
         base_query = base_query.order_by(
             desc(Item.ql) if sort_order == "desc" else asc(Item.ql)
         )
+    # id breaks ties so OFFSET pages never overlap
+    base_query = base_query.order_by(Item.id)
 
     # Add DISTINCT to prevent duplicates from joins
     base_query = base_query.distinct()
@@ -723,6 +728,8 @@ def get_offensive_nanos_by_profession(
         base_query = base_query.order_by(
             desc(Item.ql) if sort_order == "desc" else asc(Item.ql)
         )
+    # id breaks ties so OFFSET pages never overlap
+    base_query = base_query.order_by(Item.id)
 
     # Add DISTINCT to prevent duplicates from joins
     base_query = base_query.distinct()

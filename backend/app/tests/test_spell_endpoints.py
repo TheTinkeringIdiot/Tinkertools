@@ -34,6 +34,7 @@ def test_get_spells_empty(client, monkeypatch):
     """Test getting spells when database is empty."""
     mock_query = Mock()
     mock_query.filter.return_value = mock_query
+    mock_query.order_by.return_value = mock_query
     mock_query.count.return_value = 0
     mock_query.offset.return_value = mock_query
     mock_query.limit.return_value = mock_query
@@ -76,6 +77,7 @@ def test_get_spells_with_data(client, monkeypatch):
 
     mock_query = Mock()
     mock_query.filter.return_value = mock_query
+    mock_query.order_by.return_value = mock_query
     mock_query.count.return_value = 1
     mock_query.offset.return_value = mock_query
     mock_query.limit.return_value = mock_query
@@ -118,6 +120,7 @@ def test_get_spells_pagination(client, monkeypatch):
 
     mock_query = Mock()
     mock_query.filter.return_value = mock_query
+    mock_query.order_by.return_value = mock_query
     mock_query.count.return_value = 15
     mock_query.offset.return_value = mock_query
     mock_query.limit.return_value = mock_query
@@ -125,6 +128,7 @@ def test_get_spells_pagination(client, monkeypatch):
     # First page returns first 5 spells
     first_page_query = Mock()
     first_page_query.filter.return_value = first_page_query
+    first_page_query.order_by.return_value = first_page_query
     first_page_query.count.return_value = 15
     first_page_query.offset.return_value = first_page_query
     first_page_query.limit.return_value = first_page_query
@@ -133,6 +137,7 @@ def test_get_spells_pagination(client, monkeypatch):
     # Second page returns next 5 spells
     second_page_query = Mock()
     second_page_query.filter.return_value = second_page_query
+    second_page_query.order_by.return_value = second_page_query
     second_page_query.count.return_value = 15
     second_page_query.offset.return_value = second_page_query
     second_page_query.limit.return_value = second_page_query
@@ -192,6 +197,7 @@ def test_get_spells_filter_by_target(client, monkeypatch):
 
     mock_query = Mock()
     mock_query.filter.return_value = mock_query
+    mock_query.order_by.return_value = mock_query
     mock_query.count.return_value = 5
     mock_query.offset.return_value = mock_query
     mock_query.limit.return_value = mock_query
@@ -249,6 +255,7 @@ def test_get_spells_response_structure(client, monkeypatch):
 
     mock_query = Mock()
     mock_query.filter.return_value = mock_query
+    mock_query.order_by.return_value = mock_query
     mock_query.count.return_value = 1
     mock_query.offset.return_value = mock_query
     mock_query.limit.return_value = mock_query
@@ -513,6 +520,7 @@ def test_get_spells_with_criteria_single_requirement(client, monkeypatch):
     mock_query.distinct.return_value = mock_query
     mock_query.join.return_value = mock_query
     mock_query.filter.return_value = mock_query
+    mock_query.order_by.return_value = mock_query
     mock_query.options.return_value = mock_query
     mock_query.count.return_value = 1
     mock_query.offset.return_value = mock_query
@@ -564,6 +572,7 @@ def test_get_spells_with_criteria_multiple_and(client, monkeypatch):
     mock_query.distinct.return_value = mock_query
     mock_query.join.return_value = mock_query
     mock_query.filter.return_value = mock_query
+    mock_query.order_by.return_value = mock_query
     mock_query.options.return_value = mock_query
     mock_query.count.return_value = 1
     mock_query.offset.return_value = mock_query
@@ -612,6 +621,7 @@ def test_get_spells_with_criteria_multiple_or(client, monkeypatch):
     mock_query.distinct.return_value = mock_query
     mock_query.join.return_value = mock_query
     mock_query.filter.return_value = mock_query
+    mock_query.order_by.return_value = mock_query
     mock_query.options.return_value = mock_query
     mock_query.count.return_value = 1
     mock_query.offset.return_value = mock_query
@@ -668,6 +678,7 @@ def test_get_spells_with_criteria_individual_filters(client, monkeypatch):
     mock_query.distinct.return_value = mock_query
     mock_query.join.return_value = mock_query
     mock_query.filter.return_value = mock_query
+    mock_query.order_by.return_value = mock_query
     mock_query.options.return_value = mock_query
     mock_query.count.return_value = 1
     mock_query.offset.return_value = mock_query
@@ -713,6 +724,7 @@ def test_get_spells_with_criteria_filter_by_target(client, monkeypatch):
     mock_query.distinct.return_value = mock_query
     mock_query.join.return_value = mock_query
     mock_query.filter.return_value = mock_query
+    mock_query.order_by.return_value = mock_query
     mock_query.options.return_value = mock_query
     mock_query.count.return_value = 1
     mock_query.offset.return_value = mock_query
@@ -756,6 +768,7 @@ def test_get_spells_with_criteria_filter_by_spell_id(client, monkeypatch):
     mock_query.distinct.return_value = mock_query
     mock_query.join.return_value = mock_query
     mock_query.filter.return_value = mock_query
+    mock_query.order_by.return_value = mock_query
     mock_query.options.return_value = mock_query
     mock_query.count.return_value = 1
     mock_query.offset.return_value = mock_query
@@ -809,6 +822,7 @@ def test_get_spells_with_criteria_no_filters(client, monkeypatch):
     mock_query.distinct.return_value = mock_query
     mock_query.join.return_value = mock_query
     mock_query.filter.return_value = mock_query
+    mock_query.order_by.return_value = mock_query
     mock_query.options.return_value = mock_query
     mock_query.count.return_value = 1
     mock_query.offset.return_value = mock_query
@@ -857,6 +871,7 @@ def test_get_spells_with_criteria_pagination(client, monkeypatch):
     mock_query.distinct.return_value = mock_query
     mock_query.join.return_value = mock_query
     mock_query.filter.return_value = mock_query
+    mock_query.order_by.return_value = mock_query
     mock_query.options.return_value = mock_query
     mock_query.count.return_value = 10
     mock_query.offset.return_value = mock_query
@@ -903,6 +918,7 @@ def test_get_spells_with_criteria_response_structure(client, monkeypatch):
     mock_query.distinct.return_value = mock_query
     mock_query.join.return_value = mock_query
     mock_query.filter.return_value = mock_query
+    mock_query.order_by.return_value = mock_query
     mock_query.options.return_value = mock_query
     mock_query.count.return_value = 1
     mock_query.offset.return_value = mock_query
@@ -1144,6 +1160,7 @@ def test_get_spells_large_page_size(client, monkeypatch):
 
     mock_query = Mock()
     mock_query.filter.return_value = mock_query
+    mock_query.order_by.return_value = mock_query
     mock_query.count.return_value = 15
     mock_query.offset.return_value = mock_query
     mock_query.limit.return_value = mock_query
@@ -1171,6 +1188,7 @@ def test_get_spells_beyond_last_page(client, monkeypatch):
     """Test requesting page beyond available data."""
     mock_query = Mock()
     mock_query.filter.return_value = mock_query
+    mock_query.order_by.return_value = mock_query
     mock_query.count.return_value = 1
     mock_query.offset.return_value = mock_query
     mock_query.limit.return_value = mock_query

@@ -299,18 +299,18 @@ def get_perks(
         available_ai_points=available_ai_points,
     )
 
-    # Apply sorting
+    # Apply sorting (id breaks ties: perks arrive in no guaranteed order)
     reverse = sort_desc
     if sort_by == "name":
-        filtered_perks.sort(key=lambda p: p.name, reverse=reverse)
+        filtered_perks.sort(key=lambda p: (p.name, p.id), reverse=reverse)
     elif sort_by == "level":
-        filtered_perks.sort(key=lambda p: p.level, reverse=reverse)
+        filtered_perks.sort(key=lambda p: (p.level, p.id), reverse=reverse)
     elif sort_by == "type":
-        filtered_perks.sort(key=lambda p: p.type, reverse=reverse)
+        filtered_perks.sort(key=lambda p: (p.type, p.id), reverse=reverse)
     elif sort_by == "counter":
-        filtered_perks.sort(key=lambda p: p.counter, reverse=reverse)
+        filtered_perks.sort(key=lambda p: (p.counter, p.id), reverse=reverse)
     else:
-        filtered_perks.sort(key=lambda p: p.name, reverse=reverse)
+        filtered_perks.sort(key=lambda p: (p.name, p.id), reverse=reverse)
 
     # Apply pagination
     total = len(filtered_perks)
@@ -410,21 +410,22 @@ def search_perks(
 
         filtered_perks.append(perk)
 
-    # Apply sorting
+    # Apply sorting (id breaks ties: perks arrive in no guaranteed order)
     reverse = request.sort_descending
     if request.sort_by == "name":
-        filtered_perks.sort(key=lambda p: p.name, reverse=reverse)
+        filtered_perks.sort(key=lambda p: (p.name, p.id), reverse=reverse)
     elif request.sort_by == "level":
-        filtered_perks.sort(key=lambda p: p.level, reverse=reverse)
+        filtered_perks.sort(key=lambda p: (p.level, p.id), reverse=reverse)
     elif request.sort_by == "type":
-        filtered_perks.sort(key=lambda p: p.type, reverse=reverse)
+        filtered_perks.sort(key=lambda p: (p.type, p.id), reverse=reverse)
     elif request.sort_by == "cost":
         # Sort by cumulative cost (counter for SL/AI, 0 for LE)
         filtered_perks.sort(
-            key=lambda p: p.counter if p.type in ["SL", "AI"] else 0, reverse=reverse
+            key=lambda p: (p.counter if p.type in ["SL", "AI"] else 0, p.id),
+            reverse=reverse,
         )
     else:
-        filtered_perks.sort(key=lambda p: p.name, reverse=reverse)
+        filtered_perks.sort(key=lambda p: (p.name, p.id), reverse=reverse)
 
     # Apply pagination
     total = len(filtered_perks)

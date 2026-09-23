@@ -74,8 +74,9 @@ def list_mobs(
     if max_level is not None:
         query = query.filter(Mob.level <= max_level)
 
-    # Order by level then name for consistent sorting
-    query = query.order_by(Mob.level.asc(), Mob.name.asc())
+    # Order by level then name for consistent sorting; id breaks ties so
+    # OFFSET pages never overlap
+    query = query.order_by(Mob.level.asc(), Mob.name.asc(), Mob.id.asc())
 
     # Get total count
     total = query.count()
