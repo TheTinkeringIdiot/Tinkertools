@@ -5,21 +5,12 @@ Tests all mob-related endpoints using real database with transaction rollback.
 Queries real mobs and symbiants from the database instead of creating fixtures.
 """
 
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import selectinload
-
-from app.main import app
-from app.models import Mob, Item, ItemStats, Source, SourceType, ItemSource
+from app.models import Mob
 from app.tests.db_test_constants import (
     MOB_ID_ADOBE_SUZERAIN,
     MOB_ID_AESMA_DAEVA,
     MOB_ID_AHPTA,
     MOB_ID_ALATYR,
-    MOB_ID_ANYA,
-    ITEM_SYMBIANT_ADOBE_ARTILLERY_OCULAR,
-    ITEM_SYMBIANT_AESMA_INFANTRY_LEFT_ARM,
-    ITEM_SYMBIANT_AHPTA_CONTROL_OCULAR,
 )
 
 # ============================================================================

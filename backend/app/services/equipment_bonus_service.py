@@ -6,11 +6,10 @@ Handles extraction and aggregation of stat bonuses from equipped items.
 
 from typing import List, Dict, Optional, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import func, text, Integer, and_, select, case, literal_column
+from sqlalchemy import Integer, and_
 import logging
 import time
 from collections import defaultdict
-from functools import lru_cache
 
 from app.models.item import Item, ItemSpellData
 from app.models.spell_data import SpellData, SpellDataSpells

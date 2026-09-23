@@ -2,10 +2,10 @@
 Pydantic schemas for Item models.
 """
 
-from typing import Optional, List, Any, Dict
+from typing import Optional, List, Any
 from pydantic import BaseModel, Field
 from .stat_value import StatValueResponse
-from .spell import SpellWithCriteria, SpellDataResponse
+from .spell import SpellDataResponse
 from .action import ActionResponse
 
 

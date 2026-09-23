@@ -6,13 +6,13 @@ handling, error cases, and integration with the InterpolationService.
 """
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.main import app
 from app.services.interpolation import InterpolationService
-from app.models.interpolated_item import InterpolatedItem, InterpolationResponse
+from app.models.interpolated_item import InterpolatedItem
 from app.core.database import get_db
 
 

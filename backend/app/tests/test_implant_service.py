@@ -3,15 +3,12 @@ Unit tests for ImplantService.
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 from sqlalchemy.orm import Session
 
 from app.services.implant_service import ImplantService
-from app.models.item import Item, ItemStats, ItemSpellData
-from app.models.stat_value import StatValue
-from app.models.spell_data import SpellData, SpellDataSpells
-from app.models.spell import Spell
-from app.api.schemas.item import ItemDetail, StatValueResponse
+from app.models.item import Item
+from app.api.schemas.item import ItemDetail
 
 
 class TestImplantService:
@@ -274,8 +271,6 @@ class TestImplantService:
 
         # Mock all the complex subquery chain by setting up proper return structures
         mock_subquery1 = Mock()
-        mock_subquery2 = Mock()
-        mock_slot_subquery = Mock()
 
         # Mock the main query chain
         mock_query = Mock()

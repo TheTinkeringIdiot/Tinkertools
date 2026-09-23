@@ -4,7 +4,6 @@ Mob model for NPCs that drop items (pocket bosses and regular mobs).
 
 from sqlalchemy import Column, Integer, String, Boolean, ARRAY, Text, TIMESTAMP, text
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 

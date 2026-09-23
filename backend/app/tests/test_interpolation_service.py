@@ -6,22 +6,15 @@ interpolation, criteria interpolation, and quality level range handling.
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, patch
 from sqlalchemy.orm import Session
 
 from app.services.interpolation import InterpolationService
 from app.models.interpolated_item import (
     InterpolatedItem,
     InterpolatedSpell,
-    InterpolatedSpellData,
-    InterpolatedAction,
 )
 from app.models.item import Item
-from app.models.stat_value import StatValue
-from app.models.criterion import Criterion
-from app.models.spell import Spell
-from app.models.spell_data import SpellData
-from app.models.action import Action
 
 
 class TestInterpolationService:

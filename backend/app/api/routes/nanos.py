@@ -2,7 +2,7 @@
 Nano programs API endpoints with rich spell data.
 """
 
-from typing import List, Optional, Dict, Any
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload, selectinload, aliased
 from sqlalchemy import and_, or_, desc, asc, Integer
@@ -22,20 +22,13 @@ from app.models import (
     Criterion,
     Action,
     ActionCriteria,
-    Source,
-    SourceType,
-    ItemSource,
 )
 from app.api.schemas import PaginatedResponse, ItemDetail
 from app.api.schemas.nano import (
     NanoProgram,
     NanoProgramWithSpells,
-    NanoSearchRequest,
     NanoStatsResponse,
     CastingRequirement,
-    NanoEffect,
-    NanoDuration,
-    NanoTargeting,
 )
 from app.core.decorators import cached_response, performance_monitor
 
@@ -180,7 +173,7 @@ def get_nanos(
     Get paginated list of nano programs with rich spell data.
     """
     # Build base query WITHOUT relationship loading (for filtering + counting)
-    query = db.query(Item).filter(Item.is_nano == True)
+    query = db.query(Item).filter(Item.is_nano.is_(True))
 
     # Apply basic filters
     if ql_min is not None:
@@ -270,7 +263,7 @@ def search_nanos(
     # Build base query WITHOUT relationship loading
     query = db.query(Item).filter(
         and_(
-            Item.is_nano == True,
+            Item.is_nano.is_(True),
             or_(Item.name.ilike(search_term), Item.description.ilike(search_term)),
         )
     )
@@ -329,7 +322,7 @@ def get_nano_stats(db: Session = Depends(get_db)):
     # Get all nano items with selectinload to avoid Cartesian product explosion
     items = (
         db.query(Item)
-        .filter(Item.is_nano == True)
+        .filter(Item.is_nano.is_(True))
         .options(
             selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
             selectinload(Item.item_spell_data)
@@ -388,7 +381,7 @@ def get_nano(nano_id: int, db: Session = Depends(get_db)):
     """
     item = (
         db.query(Item)
-        .filter(and_(Item.id == nano_id, Item.is_nano == True))
+        .filter(and_(Item.id == nano_id, Item.is_nano.is_(True)))
         .options(
             joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
             joinedload(Item.item_spell_data)
@@ -458,7 +451,7 @@ def get_nanos_by_profession(
     # Build optimized base query with database-level filtering
     base_query = db.query(Item).filter(
         and_(
-            Item.is_nano == True,
+            Item.is_nano.is_(True),
             ~Item.name.startswith("TESTLIVEITEM"),  # Filter test items at DB level
             # Filter by valid strain at DB level
             Item.id.in_(
@@ -645,7 +638,7 @@ def get_offensive_nanos_by_profession(
     # Build optimized base query with database-level filtering
     base_query = db.query(Item).filter(
         and_(
-            Item.is_nano == True,
+            Item.is_nano.is_(True),
             ~Item.name.startswith("TESTLIVEITEM"),  # Filter test items at DB level
             # Filter by valid strain at DB level
             Item.id.in_(

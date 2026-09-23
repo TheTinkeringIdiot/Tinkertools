@@ -5,8 +5,7 @@ Decorators for API endpoints including caching and performance monitoring.
 import time
 import functools
 import logging
-from typing import Callable, Any
-from fastapi import Request
+from typing import Callable
 import asyncio
 from app.core.cache import (
     cache_key_for_query,

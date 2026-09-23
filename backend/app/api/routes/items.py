@@ -4,8 +4,8 @@ Items API endpoints.
 
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session, joinedload, selectinload, aliased
-from sqlalchemy import or_, and_, func, Integer, text
+from sqlalchemy.orm import Session, joinedload, aliased
+from sqlalchemy import or_, func
 import math
 import time
 import logging
@@ -22,16 +22,13 @@ from app.models import (
     SpellData,
     Action,
     ActionCriteria,
-    Criterion,
     Spell,
     SpellCriterion,
     SpellDataSpells,
     Source,
-    SourceType,
     ItemSource,
 )
 from app.models.interpolated_item import (
-    InterpolatedItem,
     InterpolationRequest,
     InterpolationResponse,
     BatchInterpolationRequest,
@@ -42,7 +39,6 @@ from app.services.interpolation import InterpolationService
 from app.api.schemas import (
     ItemResponse,
     ItemDetail,
-    ItemSearch,
     SpellDataResponse,
     SpellWithCriteria,
     ActionResponse,
@@ -56,8 +52,6 @@ from app.api.schemas import (
 from app.core.decorators import cached_response, performance_monitor
 from app.api.services.item_filter_service import (
     apply_common_item_filters,
-    apply_stat_filters,
-    build_stat_modifier_subquery,
     item_detail_load_options,
 )
 

@@ -7,7 +7,6 @@ Proxy endpoint for AOSetups API to bypass CORS restrictions
 from fastapi import APIRouter, HTTPException, Query
 import httpx
 import re
-from typing import Optional
 
 router = APIRouter(tags=["aosetups"])
 

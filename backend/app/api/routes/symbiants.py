@@ -2,7 +2,7 @@
 Symbiants API endpoints.
 """
 
-from typing import List, Optional
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import and_
@@ -25,11 +25,9 @@ from app.models import (
     SpellDataSpells,
     Spell,
     SpellCriterion,
-    Criterion,
 )
 from app.api.schemas.symbiant import (
     SymbiantResponse,
-    SymbiantWithDropsResponse,
     MobDropInfo,
 )
 from app.api.schemas.action import ActionResponse
@@ -236,7 +234,7 @@ def get_symbiant_sources(symbiant_id: int, db: Session = Depends(get_db)):
             and_(
                 ItemSource.item_id == symbiant_id,
                 Source.source_type_id == source_type.id,
-                Mob.is_pocket_boss == True,
+                Mob.is_pocket_boss.is_(True),
             )
         )
     )

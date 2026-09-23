@@ -6,17 +6,17 @@ import pytest
 import os
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker
 
 from app.main import app
-from app.core.database import Base, get_db
+from app.core.database import get_db
 from app.core.versions import schema_name_for
 from app.core.config import settings
-from app.models import *
+from app.models import *  # noqa: F403 - registers every mapper before tests run
 
-# Import all fixtures from fixture modules
-from app.tests.fixtures.perk_fixtures import *
-from app.tests.fixtures.import_fixtures import *
+# Import all fixtures from fixture modules (pytest discovers them by name)
+from app.tests.fixtures.perk_fixtures import *  # noqa: F403
+from app.tests.fixtures.import_fixtures import *  # noqa: F403
 
 # Use PostgreSQL database from environment variable
 DATABASE_URL = os.getenv("DATABASE_URL")

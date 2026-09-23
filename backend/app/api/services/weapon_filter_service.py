@@ -3,9 +3,9 @@ Service for filtering weapons based on character stats and requirements.
 """
 
 import logging
-from typing import List, Optional
+from typing import List
 from sqlalchemy.orm import Session, joinedload, selectinload
-from sqlalchemy import and_, or_, select, exists, BigInteger, Integer, func
+from sqlalchemy import and_, or_, select, BigInteger, Integer, func
 
 from app.models import (
     Item,
@@ -24,7 +24,6 @@ from app.models import (
     SpellCriterion,
     ItemSource,
     Source,
-    SourceType,
 )
 from app.api.schemas import ItemDetail
 from app.api.schemas.weapon_analysis import WeaponAnalyzeRequest

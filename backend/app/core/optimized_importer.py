@@ -9,16 +9,14 @@ Key optimizations while maintaining data accuracy:
 """
 
 import json
-import csv
 import logging
 import os
-from typing import Dict, List, Any, Optional, Set
+from typing import Dict, List, Any, Optional
 from pathlib import Path
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 import time
-from collections import defaultdict
 
 # Import models directly
 import sys
@@ -1139,9 +1137,9 @@ class OptimizedImporter:
                     self._convert_to_unlogged(db, "stat_values")
                     self._convert_to_unlogged(db, "criteria")
                     unlogged_conversion_successful = True
-                except Exception as e:
+                except Exception:
                     logger.warning(
-                        f"Could not convert to UNLOGGED (FK constraints prevent it)"
+                        "Could not convert to UNLOGGED (FK constraints prevent it)"
                     )
                     logger.info(
                         "Continuing without UNLOGGED optimization (still expect 30-50x speedup)"

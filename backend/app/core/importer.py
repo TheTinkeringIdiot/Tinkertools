@@ -9,7 +9,7 @@ import json
 import csv
 import logging
 import os
-from typing import Dict, List, Any, Optional, Tuple, Iterator
+from typing import Dict, List, Optional, Tuple
 from pathlib import Path
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
@@ -853,9 +853,7 @@ class DataImporter:
                     continue
 
                 # Parse columns (no header row!)
-                ql = row[0]
-                slot = row[1]
-                family = row[2]
+                # row[0..2] are ql, slot and family; the symbiant's own record carries those.
                 boss_name = row[3].strip()
                 playfield = row[4].strip()
                 location = row[5].strip()

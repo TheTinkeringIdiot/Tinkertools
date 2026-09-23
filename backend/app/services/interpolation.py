@@ -10,10 +10,10 @@ from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_
 
-from app.models.item import Item, ItemStats, ItemSpellData, ItemShopHash
+from app.models.item import Item, ItemStats, ItemSpellData
 from app.models.stat_value import StatValue
 from app.models.criterion import Criterion
-from app.models.spell import Spell, SpellCriterion
+from app.models.spell import Spell
 from app.models.spell_data import SpellData, SpellDataSpells
 from app.models.action import Action, ActionCriteria
 from app.models.interpolated_item import (
@@ -557,7 +557,6 @@ class InterpolationService:
             interpolated_spells = []
 
             from app.models.spell_data import SpellDataSpells
-            from app.models.spell import Spell
 
             spells = (
                 self.db.query(Spell)
@@ -778,7 +777,6 @@ class InterpolationService:
 
         for action in actions:
             from app.models.action import ActionCriteria
-            from app.models.criterion import Criterion
 
             criteria_data = (
                 self.db.query(Criterion)

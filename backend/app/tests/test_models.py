@@ -6,8 +6,6 @@ without requiring database access. Database behavior (constraints,
 relationships) is tested through integration tests.
 """
 
-from unittest.mock import Mock
-
 
 def test_stat_value_initialization():
     """Test StatValue model initialization."""

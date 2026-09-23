@@ -12,8 +12,7 @@ import time
 import threading
 import asyncio
 import os
-from unittest.mock import Mock, patch, MagicMock
-from typing import Any
+from unittest.mock import patch
 
 from app.core.cache import (
     CacheService,
@@ -734,14 +733,12 @@ class TestGlobalSettingsInstance:
 
     def test_settings_instance_exists(self):
         """Test that global settings instance is created."""
-        from app.core.config import settings
 
         assert settings is not None
         assert isinstance(settings, Settings)
 
     def test_settings_instance_has_attributes(self):
         """Test that global settings instance has all required attributes."""
-        from app.core.config import settings
 
         assert hasattr(settings, "DATABASE_URL")
         assert hasattr(settings, "CORS_ORIGINS")

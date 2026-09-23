@@ -5,7 +5,7 @@ Mobs API endpoints.
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import select, and_, func
+from sqlalchemy import and_, func
 import math
 import time
 import logging
@@ -25,9 +25,8 @@ from app.models import (
     SpellDataSpells,
     Spell,
     SpellCriterion,
-    Criterion,
 )
-from app.api.schemas.mob import MobResponse, MobDetail, SymbiantDropInfo
+from app.api.schemas.mob import MobResponse
 from app.api.schemas.symbiant import SymbiantResponse
 from app.api.schemas.action import ActionResponse
 from app.api.schemas.criterion import CriterionResponse

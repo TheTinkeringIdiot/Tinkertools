@@ -6,12 +6,11 @@ Uses service layer mocking pattern to avoid database transaction isolation issue
 """
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock
 from fastapi.testclient import TestClient
 
 from app.main import app
 from app.models import Spell, Criterion, SpellCriterion
-from app.api.schemas import SpellResponse, SpellWithCriteria
 from app.core.database import get_db
 
 

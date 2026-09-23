@@ -14,7 +14,7 @@ Key features:
 
 from pathlib import Path
 import logging
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 import time

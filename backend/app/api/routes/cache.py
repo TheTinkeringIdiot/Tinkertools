@@ -2,7 +2,7 @@
 Cache management API endpoints.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from app.core.cache import get_cache_stats, invalidate_cache_pattern, cache_service
 
 router = APIRouter(prefix="/cache", tags=["cache"])

@@ -5,7 +5,6 @@ Pydantic schemas for Symbiant models.
 from typing import Optional, List
 from pydantic import BaseModel, Field
 from .action import ActionResponse
-from .criterion import CriterionResponse
 from .spell import SpellDataResponse
 
 

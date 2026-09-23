@@ -6,10 +6,10 @@ Perks are items with spell_data that provide stat modifications following
 three distinct type systems: SL (Shadowlands), AI (Alien Invasion), and LE (Lost Eden).
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, or_, func, desc, asc
+from sqlalchemy import or_, func
 from pydantic import BaseModel, Field
 import math
 import logging
@@ -19,13 +19,11 @@ from app.core.database import get_db
 from app.services.perk_service import PerkService
 from app.api.schemas.perk import (
     PerkResponse,
-    PerkDetail,
     PerkSeries,
     PerkSearchRequest,
     PerkStatsResponse,
     PerkCalculationRequest,
     PerkCalculationResponse,
-    PerkValidationResponse,
     PerkSeriesResponse,
     PerkSeriesPerk,
 )
@@ -86,7 +84,7 @@ def _get_filtered_perks_from_service(
     """
     from app.models.perk import Perk
     from app.models.item import Item, ItemSpellData
-    from sqlalchemy import and_, or_, func
+    from sqlalchemy import or_, func
 
     # Start with base query joining items with perks table
     query = (
@@ -152,7 +150,6 @@ def _get_filtered_perks_from_service(
             )
 
     # Execute query with proper loading of relationships
-    from sqlalchemy.orm import joinedload
 
     results = (
         query.options(

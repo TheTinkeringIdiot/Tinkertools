@@ -6,9 +6,9 @@ Perks are items with spell_data that provide stat modifications following
 three distinct type systems: SL (Shadowlands), AI (Alien Invasion), and LE (Lost Eden).
 """
 
-from typing import List, Optional, Dict, Tuple, Any
+from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, func, text, Integer, or_, distinct
+from sqlalchemy import func, or_
 import logging
 
 from app.models.item import Item, ItemSpellData, ItemStats
@@ -21,7 +21,6 @@ from app.api.schemas.perk import (
     PerkDetail,
     PerkSeries,
     PerkValidationResponse,
-    PerkCalculationResponse,
     PerkRequirement,
     PerkEffect,
     PerkPointCost,

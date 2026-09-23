@@ -310,7 +310,7 @@ def test_get_nano_stats_level_range(client):
 def test_get_nano_by_id(client, db_session):
     """Test getting a specific nano by ID using real data."""
     # Get a real nano from database
-    real_nano = db_session.query(Item).filter(Item.is_nano == True).first()
+    real_nano = db_session.query(Item).filter(Item.is_nano.is_(True)).first()
     assert real_nano is not None
 
     response = client.get(f"/api/v1/nanos/{real_nano.id}")
@@ -326,7 +326,7 @@ def test_get_nano_by_id(client, db_session):
 def test_get_nano_detail_includes_spells_and_criteria(client, db_session):
     """Test that nano detail includes spells and raw criteria."""
     # Get a real nano
-    real_nano = db_session.query(Item).filter(Item.is_nano == True).first()
+    real_nano = db_session.query(Item).filter(Item.is_nano.is_(True)).first()
     assert real_nano is not None
 
     response = client.get(f"/api/v1/nanos/{real_nano.id}")
@@ -343,7 +343,7 @@ def test_get_nano_detail_includes_spells_and_criteria(client, db_session):
 def test_get_nano_casting_requirements(client, db_session):
     """Test that nano detail includes casting requirements."""
     # Get a real nano
-    real_nano = db_session.query(Item).filter(Item.is_nano == True).first()
+    real_nano = db_session.query(Item).filter(Item.is_nano.is_(True)).first()
     assert real_nano is not None
 
     response = client.get(f"/api/v1/nanos/{real_nano.id}")
@@ -372,7 +372,7 @@ def test_get_nano_invalid_id(client):
 def test_get_non_nano_item(client, db_session):
     """Test getting an item that is not a nano."""
     # Find a non-nano item
-    non_nano = db_session.query(Item).filter(Item.is_nano == False).first()
+    non_nano = db_session.query(Item).filter(Item.is_nano.is_(False)).first()
     assert non_nano is not None
 
     response = client.get(f"/api/v1/nanos/{non_nano.id}")
@@ -633,7 +633,7 @@ def test_get_nanos_by_profession_fast_all_professions(client):
 def test_nano_response_structure_consistency(client, db_session):
     """Test that nano responses have consistent structure across endpoints."""
     # Get a real nano
-    real_nano = db_session.query(Item).filter(Item.is_nano == True).first()
+    real_nano = db_session.query(Item).filter(Item.is_nano.is_(True)).first()
     assert real_nano is not None
 
     # Test detail endpoint
@@ -653,7 +653,7 @@ def test_nano_endpoints_with_real_high_ql_nano(client, db_session):
     """Test endpoints with high QL nano (QL 390)."""
     # Query for a high QL nano
     high_ql_nano = (
-        db_session.query(Item).filter(Item.is_nano == True, Item.ql >= 390).first()
+        db_session.query(Item).filter(Item.is_nano.is_(True), Item.ql >= 390).first()
     )
 
     if high_ql_nano:

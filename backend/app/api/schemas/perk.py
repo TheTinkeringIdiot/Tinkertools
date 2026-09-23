@@ -6,7 +6,7 @@ They follow three distinct type systems: SL (Shadowlands), AI (Alien Invasion),
 and LE (Lost Eden) with different point systems and requirements.
 """
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict
 from pydantic import BaseModel, Field
 from .spell import SpellDataResponse
 from .item import ItemDetail

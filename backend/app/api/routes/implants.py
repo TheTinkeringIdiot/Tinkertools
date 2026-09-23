@@ -12,7 +12,7 @@ import logging
 from app.core.database import get_db
 from app.services.implant_service import ImplantService
 from app.api.schemas.implant import ImplantLookupRequest, ImplantLookupResponse
-from app.api.schemas.item import ItemDetail, ItemResponse
+from app.api.schemas.item import ItemResponse
 from app.core.decorators import performance_monitor
 
 router = APIRouter(prefix="/implants", tags=["implants"])
@@ -125,7 +125,7 @@ def implant_lookup(request: ImplantLookupRequest, db: Session = Depends(get_db))
             "sources": item_detail.sources or [],
         }
 
-        success_message = f"Implant found successfully"
+        success_message = "Implant found successfully"
         if was_interpolated:
             success_message += f" (interpolated from QL {base_ql} to QL {request.ql})"
 

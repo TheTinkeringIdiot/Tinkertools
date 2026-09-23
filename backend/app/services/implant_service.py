@@ -6,16 +6,13 @@ Handles implant lookup by slot, QL, and exact cluster combinations.
 
 from typing import List, Optional, Dict, Tuple
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, Integer, cast, String, select
 import logging
 
 from app.models.item import Item, ItemStats, ItemSpellData
-from app.models.stat_value import StatValue
 from app.models.spell_data import SpellData, SpellDataSpells
 from app.models.spell import Spell, SpellCriterion
 from app.models.action import Action, ActionCriteria
-from app.models.criterion import Criterion
-from app.models.source import ItemSource, Source, SourceType
+from app.models.source import ItemSource, Source
 from app.services.interpolation import InterpolationService
 from app.api.schemas.item import ItemDetail
 from app.api.routes.items import build_item_detail
@@ -206,7 +203,7 @@ class ImplantService:
                 )
                 return item
             else:
-                logger.info(f"No implant found with exact cluster match")
+                logger.info("No implant found with exact cluster match")
                 return None
         else:
             # Handle case where no clusters specified (basic implants with no Modify Stat spells)
@@ -272,7 +269,7 @@ class ImplantService:
                 )
                 return item
             else:
-                logger.info(f"No implant found without clusters")
+                logger.info("No implant found without clusters")
                 return None
 
     def _convert_interpolated_to_detail(self, interpolated_item) -> ItemDetail:

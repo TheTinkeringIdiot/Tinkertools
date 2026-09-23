@@ -4,11 +4,10 @@ Tests that endpoints are working using service layer mocking pattern.
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.models import Item, Spell, Criterion, SpellCriterion
 from app.core.database import get_db
 
 

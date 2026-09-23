@@ -14,9 +14,8 @@ import ijson
 import csv
 import logging
 from pathlib import Path
-from typing import Dict, Set, Tuple, Optional, Any, List
+from typing import Dict, Tuple, Optional, Any, List
 import time
-from collections import defaultdict
 
 from app.core.content_hash import compute_item_hashes
 
@@ -679,7 +678,6 @@ class StreamingCSVTransformer:
         Returns:
             Statistics dictionary
         """
-        import re
 
         logger.info(f"Starting symbiant CSV transformation: {csv_file}")
         start_time = time.time()

@@ -14,7 +14,7 @@ Usage:
 
 from typing import Optional, List
 from sqlalchemy import select, func
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
@@ -355,7 +355,7 @@ async def get_pocket_boss_mobs(session: AsyncSession) -> List[Mob]:
             print(f"{mob.name} (Level {mob.level})")
     """
     result = await session.execute(
-        select(Mob).where(Mob.is_pocket_boss == True).order_by(Mob.level)
+        select(Mob).where(Mob.is_pocket_boss.is_(True)).order_by(Mob.level)
     )
     return list(result.scalars().all())
 
