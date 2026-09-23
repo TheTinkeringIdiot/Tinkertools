@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import path from 'node:path';
+import { configDefaults } from 'vitest/config';
 
 export default defineConfig({
   plugins: [vue()],
@@ -34,6 +35,8 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // e2e/ holds Playwright specs (npm run test:e2e); Vitest cannot run them.
+    exclude: [...configDefaults.exclude, 'e2e/**'],
     globals: true,
     setupFiles: ['./src/__tests__/setup.ts'],
     testTimeout: 10000, // Default 10s for all tests
