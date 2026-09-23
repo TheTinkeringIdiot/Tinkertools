@@ -15,6 +15,8 @@ importer stores the answers in ``nano_properties`` (migration 008), which the
 - ``professions``: the player professions (``PROFESSIONS`` ids) whose members
   can satisfy the Use criteria. Empty when the criteria do not restrict the
   profession at all, or when the nano has no Use action.
+- ``strain``: the NanoStrain stat (75), named by ``NANO_STRAINS``; NULL when
+  the nano has none.
 - ``min_level``: the lowest character Level (stat 54) that can satisfy the Use
   criteria, 1 when they do not ask for a level. NULL when the nano has no Use
   action, since such a nano cannot be cast by a player at all.
@@ -32,6 +34,8 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.nano_strains import NANO_STRAINS
+
 logger = logging.getLogger(__name__)
 
 USE_ACTION = 3
@@ -40,6 +44,7 @@ STAT_LEVEL = 54
 STAT_PROFESSION = 60
 STAT_VISUAL_PROFESSION = 368
 STAT_NANO_SCHOOL = 405
+STAT_NANO_STRAIN = 75
 
 # NanoSchool stat values, as in the frontend's NANOSCHOOL table
 NANO_SCHOOLS: Dict[int, str] = {
@@ -229,6 +234,20 @@ def derive(
     )
 
 
+def strain_name(strain: Optional[int]) -> Optional[str]:
+    return NANO_STRAINS.get(strain) if strain is not None else None
+
+
+def strain_ids(name_or_id: str) -> List[int]:
+    """Strain ids for a strain id or a name (case-insensitive; a few names
+    belong to several ids)."""
+    candidate = name_or_id.strip()
+    if candidate.isdigit():
+        return [int(candidate)]
+    wanted = candidate.casefold()
+    return [sid for sid, name in NANO_STRAINS.items() if name.casefold() == wanted]
+
+
 def school_name(school: Optional[int]) -> Optional[str]:
     return NANO_SCHOOLS.get(school) if school is not None else None
 
@@ -266,7 +285,11 @@ _NANOS_SQL = text("""
            (SELECT sv.value FROM item_stats ist
               JOIN stat_values sv ON sv.id = ist.stat_value_id
              WHERE ist.item_id = i.id AND sv.stat = :school_stat
-             LIMIT 1) AS school_stat
+             LIMIT 1) AS school_stat,
+           (SELECT sv.value FROM item_stats ist
+              JOIN stat_values sv ON sv.id = ist.stat_value_id
+             WHERE ist.item_id = i.id AND sv.stat = :strain_stat
+             LIMIT 1) AS strain
     FROM items i
     WHERE i.is_nano
     """)
@@ -282,10 +305,9 @@ _USE_CRITERIA_SQL = text("""
     """)
 
 
-def compute_all(
-    db: Session,
-) -> List[Tuple[int, Optional[int], List[int], Optional[int]]]:
-    """(item_id, school, professions, min_level) for every nano in the schema."""
+def compute_all(db: Session) -> List[Dict[str, object]]:
+    """nano_properties rows (item_id, school, professions, min_level, strain)
+    for every nano in the schema."""
     use_criteria: Dict[int, List[Criterion]] = {}
     for item_id, stat, value, operator in db.execute(
         _USE_CRITERIA_SQL, {"use_action": USE_ACTION}
@@ -295,11 +317,20 @@ def compute_all(
             criteria.append((stat, value, operator))
 
     rows = []
-    for item_id, school_stat in db.execute(
-        _NANOS_SQL, {"school_stat": STAT_NANO_SCHOOL}
+    for item_id, school_stat, strain in db.execute(
+        _NANOS_SQL,
+        {"school_stat": STAT_NANO_SCHOOL, "strain_stat": STAT_NANO_STRAIN},
     ):
         school, professions, min_level = derive(school_stat, use_criteria.get(item_id))
-        rows.append((item_id, school, professions, min_level))
+        rows.append(
+            {
+                "item_id": item_id,
+                "school": school,
+                "professions": professions,
+                "min_level": min_level,
+                "strain": strain,
+            }
+        )
     return rows
 
 
@@ -313,18 +344,11 @@ def populate(db: Session) -> int:
     if rows:
         db.execute(
             text(
-                "INSERT INTO nano_properties (item_id, school, professions, min_level) "
-                "VALUES (:item_id, :school, :professions, :min_level)"
+                "INSERT INTO nano_properties "
+                "(item_id, school, professions, min_level, strain) "
+                "VALUES (:item_id, :school, :professions, :min_level, :strain)"
             ),
-            [
-                {
-                    "item_id": item_id,
-                    "school": school,
-                    "professions": professions,
-                    "min_level": min_level,
-                }
-                for item_id, school, professions, min_level in rows
-            ],
+            rows,
         )
     logger.info(f"Derived nano properties for {len(rows)} nanos")
     return len(rows)

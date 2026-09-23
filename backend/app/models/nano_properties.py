@@ -9,7 +9,7 @@ from app.core.database import Base
 
 
 class NanoProperties(Base):
-    """School, casting professions and minimum caster level of a nano.
+    """School, casting professions, minimum caster level and strain of a nano.
 
     Filled by the importer from the NanoSchool stat and the Use action criteria
     (app/core/nano_properties.py); see that module for what each value means.
@@ -23,11 +23,13 @@ class NanoProperties(Base):
     school = Column(SmallInteger)
     professions = Column(ARRAY(Integer), nullable=False, default=list)
     min_level = Column(SmallInteger)
+    strain = Column(Integer)
 
     item = relationship("Item", back_populates="nano_properties", viewonly=True)
 
     def __repr__(self):
         return (
             f"<NanoProperties(item_id={self.item_id}, school={self.school}, "
-            f"professions={self.professions}, min_level={self.min_level})>"
+            f"professions={self.professions}, min_level={self.min_level}, "
+            f"strain={self.strain})>"
         )

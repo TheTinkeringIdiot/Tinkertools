@@ -45,11 +45,19 @@ def derived_nano_fields(item: Item) -> dict:
     (see app/core/nano_properties.py for what each one means)."""
     props = item.nano_properties
     if props is None:
-        return {"school": None, "professions": [], "level": None}
+        return {
+            "school": None,
+            "professions": [],
+            "level": None,
+            "strain_id": None,
+            "strain": None,
+        }
     return {
         "school": nano_properties.school_name(props.school),
         "professions": nano_properties.profession_names(props.professions),
         "level": props.min_level,
+        "strain_id": props.strain,
+        "strain": nano_properties.strain_name(props.strain),
     }
 
 
@@ -67,7 +75,6 @@ def parse_nano_from_item_and_spells(item: Item) -> NanoProgram:
         # Use action), not its spells' criteria, which gate individual effects.
         "actions": list(item.actions),
         "effects": [],
-        "strain": None,
         **derived_nano_fields(item),
         "casting_time": None,
         "recharge_time": None,
@@ -88,12 +95,6 @@ def parse_nano_from_item_and_spells(item: Item) -> NanoProgram:
             if spell.tick_interval and not nano_data["recharge_time"]:
                 nano_data["recharge_time"] = spell.tick_interval
 
-    # Extract strain from name patterns (many AO nanos have strain in name)
-    if " - " in item.name:
-        parts = item.name.split(" - ")
-        if len(parts) > 1:
-            nano_data["strain"] = parts[-1].strip()
-
     return NanoProgram(**nano_data)
 
 
@@ -110,8 +111,8 @@ PROFESSION_QUERY = Query(
 )
 STRAIN_QUERY = Query(
     None,
-    description="Filter by strain (the name's text after its last ' - '); "
-    "repeat for several, matching any of them",
+    description="Filter by NanoStrain (stat 75) id, or name as in the frontend's "
+    "NANO_STRAIN table; repeat for several, matching any of them",
 )
 LEVEL_MIN_QUERY = Query(
     None, description="Minimum of the lowest level that can cast it"
@@ -126,10 +127,6 @@ SEARCH_QUERY = Query(
 )
 SORT_BY_QUERY = Query("name", description="Sort by: name, ql, level")
 SORT_DESC_QUERY = Query(False, description="Sort descending")
-
-# A nano's strain as parse_nano_from_item_and_spells() reads it: the name's
-# text after its last " - ", for names that have one
-STRAIN_EXPR = func.btrim(func.regexp_replace(Item.name, "^.* - ", ""), " \t\r\n")
 
 
 def _known_ids(values: Optional[List[str]], lookup) -> Optional[List[int]]:
@@ -155,10 +152,9 @@ def filter_nanos(
 
     Filtering before paginating keeps total, pages and page contents in
     agreement. school, profession and level come from nano_properties, the
-    row derived_nano_fields() reports; strain mirrors
-    parse_nano_from_item_and_spells(). Names that aren't a school or profession
-    are ignored, and a filter of only unknown names matches nothing, like an
-    unknown strain. ``join_properties`` joins nano_properties (outer) even when
+    row derived_nano_fields() reports. Values that aren't a known school,
+    profession or strain name are ignored, and a filter of only unknown values
+    matches nothing. ``join_properties`` joins nano_properties (outer) even when
     no filter needs it, for sorting on it.
     """
     if q:
@@ -168,14 +164,18 @@ def filter_nanos(
         query = query.filter(Item.ql >= ql_min)
     if ql_max is not None:
         query = query.filter(Item.ql <= ql_max)
-    if strain:
-        query = query.filter(Item.name.like("% - %"), STRAIN_EXPR.in_(strain))
 
     schools = _known_ids(school, nano_properties.school_id)
     professions = _known_ids(profession, nano_properties.profession_id)
+    strains = (
+        sorted({i for value in strain for i in nano_properties.strain_ids(value)})
+        if strain
+        else None
+    )
     if (
         schools is not None
         or professions is not None
+        or strains is not None
         or level_min is not None
         or level_max is not None
     ):
@@ -196,6 +196,8 @@ def filter_nanos(
             if professions
             else false()
         )
+    if strains is not None:
+        query = query.filter(NanoProperties.strain.in_(strains) if strains else false())
     if level_min is not None:
         query = query.filter(NanoProperties.min_level >= level_min)
     if level_max is not None:
@@ -348,14 +350,15 @@ def get_nano_strains(
     db: Session = Depends(get_db),
 ):
     """
-    Distinct strains of the nanos matching the /nanos (or, with q, /nanos/search)
-    filters, with how many nanos have each, sorted by strain.
+    Distinct NanoStrains (stat 75) of the nanos matching the /nanos (or, with q,
+    /nanos/search) filters, with how many nanos have each, sorted by name then
+    id, ids without a name last. Nanos without a strain are not counted.
 
     The strain filter itself is not applied, so the list offers every strain
     the other filters leave, whichever strains are currently picked.
     """
     query = filter_nanos(
-        db.query(Item).filter(Item.is_nano.is_(True), Item.name.like("% - %")),
+        db.query(Item).filter(Item.is_nano.is_(True)),
         q=q,
         school=school,
         profession=profession,
@@ -363,18 +366,20 @@ def get_nano_strains(
         level_max=level_max,
         ql_min=ql_min,
         ql_max=ql_max,
+        join_properties=True,
     )
-    strain = STRAIN_EXPR.label("strain")
     rows = (
-        query.with_entities(strain, func.count(Item.id))
-        .group_by(strain)
-        .having(strain != "")
-        .order_by(strain)
+        query.filter(NanoProperties.strain.isnot(None))
+        .with_entities(NanoProperties.strain, func.count(Item.id))
+        .group_by(NanoProperties.strain)
         .all()
     )
-    return NanoStrainsResponse(
-        strains=[NanoStrainCount(strain=name, count=count) for name, count in rows]
-    )
+    strains = [
+        NanoStrainCount(id=sid, name=nano_properties.strain_name(sid), count=count)
+        for sid, count in rows
+    ]
+    strains.sort(key=lambda s: (s.name is None, (s.name or "").casefold(), s.id))
+    return NanoStrainsResponse(strains=strains)
 
 
 @router.get("/stats", response_model=NanoStatsResponse)

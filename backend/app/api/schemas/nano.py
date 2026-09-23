@@ -56,8 +56,11 @@ class NanoProgram(BaseModel):
         description="Nano school from the NanoSchool stat: Combat, Medical, "
         "Protection, Psi or Space",
     )
+    strain_id: Optional[int] = Field(
+        None, description="NanoStrain stat (75); nanos of one strain don't stack"
+    )
     strain: Optional[str] = Field(
-        None, description="Nano strain for conflict detection"
+        None, description="Name of strain_id; null when it has none"
     )
     professions: List[str] = Field(
         default_factory=list,
@@ -114,7 +117,8 @@ class NanoProgramWithSpells(NanoProgram):
 class NanoStrainCount(BaseModel):
     """A strain and how many nanos in the filtered set have it."""
 
-    strain: str = Field(..., description="Strain name")
+    id: int = Field(..., description="NanoStrain (stat 75) id")
+    name: Optional[str] = Field(None, description="Strain name; null if unknown")
     count: int = Field(..., description="Number of matching nanos with this strain")
 
 
@@ -122,7 +126,7 @@ class NanoStrainsResponse(BaseModel):
     """Distinct strains of the nanos matching a set of filters."""
 
     strains: List[NanoStrainCount] = Field(
-        default_factory=list, description="Strains, sorted by name"
+        default_factory=list, description="Strains, sorted by name then id"
     )
 
 
@@ -138,6 +142,8 @@ class NanoItemDetail(ItemDetail):
     level: Optional[int] = Field(
         None, description="Lowest character level that can cast it"
     )
+    strain_id: Optional[int] = Field(None, description="NanoStrain stat (75)")
+    strain: Optional[str] = Field(None, description="Name of strain_id")
 
 
 class NanoSearchRequest(BaseModel):

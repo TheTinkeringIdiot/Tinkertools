@@ -153,7 +153,7 @@ The hashes are stored on `items` (migration 007) and copied into `public.item_re
 
 ## Nano school, professions and level
 
-The `/nanos` endpoints read each nano's school, casting professions and lowest casting level from the per-version table `nano_properties` (migration 008). The values are derived, not imported: `app/core/nano_properties.py` reads the NanoSchool stat (405) and evaluates the Use action's criteria (Profession/VisualProfession, Level, OR/NOT, OnTarget modifiers) for every nano in the schema.
+The `/nanos` endpoints read each nano's school, casting professions, lowest casting level and strain from the per-version table `nano_properties` (migration 008; `strain` added by 009). The values are derived, not imported: `app/core/nano_properties.py` reads the NanoSchool (405) and NanoStrain (75) stats and evaluates the Use action's criteria (Profession/VisualProfession, Level, OR/NOT, OnTarget modifiers) for every nano in the schema.
 
 - **Fresh import**: nothing to do. `finalize_version` rebuilds the table after the data is loaded, for every version and every import mode, `--csv-mode` included.
 - **Existing version imported before migration 008** (a production rollout of this change, or after `adopt-public` on an old install): run once per version
@@ -163,13 +163,17 @@ The `/nanos` endpoints read each nano's school, casting professions and lowest c
   python import_cli.py nano-properties --version prk-2026-01
   ```
 
-  It applies pending migrations to that version's schema (creating `nano_properties` and its indexes and recording `008` in `schema_migrations`), then deletes and re-inserts the table's rows. It changes no other table and takes about a second per version. Until it runs, the `/nanos` endpoints fail with `relation "nano_properties" does not exist`; every other endpoint is unaffected.
+  It applies pending migrations to that version's schema (creating `nano_properties` and its indexes, adding its `strain` column, and recording `008` and `009` in `schema_migrations`), then deletes and re-inserts the table's rows. It changes no other table and takes about a second per version. Until it runs, the `/nanos` endpoints fail with a missing `nano_properties` table or `strain` column; every other endpoint is unaffected.
 - **Re-deriving** after a change to `app/core/nano_properties.py`: run the same command. It is idempotent.
 - **Undo** (per version schema):
 
   ```sql
+  -- only the strain column (009):
+  ALTER TABLE gv_<slug>.nano_properties DROP COLUMN strain;
+  DELETE FROM gv_<slug>.schema_migrations WHERE version = '009';
+  -- the whole table (008 and 009):
   DROP TABLE gv_<slug>.nano_properties;
-  DELETE FROM gv_<slug>.schema_migrations WHERE version = '008';
+  DELETE FROM gv_<slug>.schema_migrations WHERE version IN ('008', '009');
   ```
 
   The code expecting the table must be rolled back with it.

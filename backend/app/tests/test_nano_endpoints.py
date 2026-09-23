@@ -10,6 +10,8 @@ from collections import Counter
 
 from sqlalchemy import text
 
+from app.core.nano_strains import NANO_STRAINS
+
 from app.models import (
     Action,
     Item,
@@ -158,19 +160,23 @@ def test_get_nanos_sort_by_ql_desc(client):
     assert qls == sorted(qls, reverse=True)
 
 
+STRAIN_SQL = """
+    SELECT i.id, sv.value FROM items i
+    JOIN item_stats ist ON ist.item_id = i.id
+    JOIN stat_values sv ON sv.id = ist.stat_value_id
+    WHERE i.is_nano AND sv.stat = 75
+"""
+
+
+def _strains_by_nano(db_session):
+    """{item id: NanoStrain} straight from the raw stat."""
+    return dict(db_session.execute(text(STRAIN_SQL)).all())
+
+
 def test_get_nanos_strain_filter_pages_sum_to_total(client, db_session):
     """Test a strain-filtered list pages cleanly: pages add up to total."""
-    # Strain is the text after a nano name's last " - "; pick the most common
-    strains = Counter()
-    ids_by_strain = {}
-    for item_id, name in db_session.query(Item.id, Item.name).filter(
-        Item.is_nano.is_(True)
-    ):
-        if " - " in name:
-            strain = name.split(" - ")[-1].strip()
-            strains[strain] += 1
-            ids_by_strain.setdefault(strain, set()).add(item_id)
-    strain, count = strains.most_common(1)[0]
+    by_nano = _strains_by_nano(db_session)
+    strain, count = Counter(by_nano.values()).most_common(1)[0]
     page_size = 3
     assert count > page_size
 
@@ -187,7 +193,7 @@ def test_get_nanos_strain_filter_pages_sum_to_total(client, db_session):
         assert data["pages"] == math.ceil(count / page_size)
         if page < data["pages"]:
             assert len(data["items"]) == page_size
-        assert all(nano["strain"] == strain for nano in data["items"])
+        assert all(nano["strain_id"] == strain for nano in data["items"])
         ids.extend(nano["id"] for nano in data["items"])
         if not data["has_next"]:
             break
@@ -195,7 +201,7 @@ def test_get_nanos_strain_filter_pages_sum_to_total(client, db_session):
 
     assert page == data["pages"]
     assert len(ids) == count
-    assert set(ids) == ids_by_strain[strain]
+    assert set(ids) == {i for i, s in by_nano.items() if s == strain}
 
 
 # Independent SQL for the derived filters. Each reads the raw stats and Use
@@ -394,70 +400,82 @@ def test_get_nanos_combined_filters_intersect(client):
     assert {n["id"] for n in both} == doctor & medical
 
 
-def _python_strain(name):
-    """Strain as the endpoints read it, computed independently in Python."""
-    return name.split(" - ")[-1].strip(" \t\r\n") if " - " in name else None
-
-
 def test_get_nanos_several_strains_match_any(client, db_session):
-    """Repeated strain params match nanos with any of those strains."""
-    strains = Counter(
-        _python_strain(name)
-        for (name,) in db_session.query(Item.name).filter(Item.is_nano.is_(True))
-    )
-    del strains[None]
-    (first, _), (second, _) = strains.most_common(2)
-    expected = {
-        item_id
-        for item_id, name in db_session.query(Item.id, Item.name).filter(
-            Item.is_nano.is_(True)
-        )
-        if _python_strain(name) in (first, second)
-    }
-    nanos = _all_filtered(client, {"strain": [first, second]})
+    """Repeated strain params, by id or name, match nanos with any of them."""
+    by_nano = _strains_by_nano(db_session)
+    (first, _), (second, _) = Counter(by_nano.values()).most_common(2)
+    expected = {i for i, s in by_nano.items() if s in (first, second)}
+
+    nanos = _all_filtered(client, {"strain": [str(first), str(second)]})
     assert {nano["id"] for nano in nanos} == expected
-    assert {nano["strain"] for nano in nanos} == {first, second}
+    assert {nano["strain_id"] for nano in nanos} == {first, second}
+    assert all(nano["strain"] == NANO_STRAINS.get(nano["strain_id"]) for nano in nanos)
+
+    # The same strains by name (any case), plus an unknown value that's ignored
+    names = [NANO_STRAINS[first].upper(), NANO_STRAINS[second], "No Such Strain"]
+    by_name = _all_filtered(client, {"strain": names})
+    named_ids = {
+        sid
+        for sid, name in NANO_STRAINS.items()
+        if name.casefold()
+        in {NANO_STRAINS[first].casefold(), NANO_STRAINS[second].casefold()}
+    }
+    assert {nano["id"] for nano in by_name} == {
+        i for i, s in by_nano.items() if s in named_ids
+    }
+
+    nothing = client.get("/api/v1/nanos", params={"strain": "No Such Strain"}).json()
+    assert nothing["total"] == 0
+
+
+def test_nano_strain_fields_match_the_stat(client, db_session):
+    """strain_id is the raw stat 75 (null without one), strain its name."""
+    by_nano = _strains_by_nano(db_session)
+    data = client.get("/api/v1/nanos", params={"page_size": 200}).json()
+    for nano in data["items"]:
+        assert nano["strain_id"] == by_nano.get(nano["id"])
+        assert nano["strain"] == NANO_STRAINS.get(nano["strain_id"])
 
 
 def test_get_nano_strains_counts_the_filtered_nanos(client, db_session):
     """/nanos/strains lists each strain of the filtered nanos with its count."""
     medical = {row[0] for row in db_session.execute(text(SCHOOL_SQL), {"values": [2]})}
     expected = Counter(
-        _python_strain(name)
-        for item_id, name in db_session.query(Item.id, Item.name).filter(
-            Item.is_nano.is_(True)
-        )
-        if item_id in medical
+        s for i, s in _strains_by_nano(db_session).items() if i in medical
     )
-    del expected[None]
-    expected.pop("", None)
 
     data = client.get("/api/v1/nanos/strains", params={"school": "Medical"}).json()
-    got = [(row["strain"], row["count"]) for row in data["strains"]]
-    assert dict(got) == dict(expected)
-    assert [strain for strain, _ in got] == sorted(strain for strain, _ in got)
+    got = {row["id"]: row["count"] for row in data["strains"]}
+    assert got == dict(expected)
+    for row in data["strains"]:
+        assert row["name"] == NANO_STRAINS.get(row["id"])
+    keys = [
+        (row["name"] is None, (row["name"] or "").casefold(), row["id"])
+        for row in data["strains"]
+    ]
+    assert keys == sorted(keys)
 
     # Consistent with /nanos: a strain's count is that filter's total, and the
     # strain filter itself is ignored so the other strains stay listed
-    strain, count = got[0]
+    row = data["strains"][0]
     listed = client.get(
-        "/api/v1/nanos", params={"school": "Medical", "strain": strain}
+        "/api/v1/nanos", params={"school": "Medical", "strain": row["id"]}
     ).json()
-    assert listed["total"] == count
+    assert listed["total"] == row["count"]
     ignoring = client.get(
-        "/api/v1/nanos/strains", params={"school": "Medical", "strain": strain}
+        "/api/v1/nanos/strains", params={"school": "Medical", "strain": row["id"]}
     ).json()
     assert ignoring == data
 
 
 def test_get_nano_strains_with_search_text(client):
-    """With q, /nanos/strains covers the /nanos/search result set."""
+    """With q, /nanos/strains covers the /nanos/search results that have a strain."""
     data = client.get("/api/v1/nanos/strains", params={"q": "heal"}).json()
     total = sum(row["count"] for row in data["strains"])
     found = client.get("/api/v1/nanos/search", params={"q": "heal"}).json()
     with_strain = client.get(
         "/api/v1/nanos/search",
-        params={"q": "heal", "strain": [row["strain"] for row in data["strains"]]},
+        params={"q": "heal", "strain": [row["id"] for row in data["strains"]]},
     ).json()
     assert 0 < total == with_strain["total"] <= found["total"]
 
