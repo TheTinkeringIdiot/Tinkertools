@@ -159,10 +159,16 @@ describe('NanosStore school, profession and level', () => {
     expect(names()).toEqual(['General Buff', 'NPC Proc', 'Zealot Buff']);
   });
 
-  it('filters by level range without ruling out nanos that have no level', () => {
+  it('filters by level range, leaving out nanos that have no level', () => {
     store.setFilters({ levelRange: [40, 100] });
 
-    expect(names()).toEqual(['Doctor Heal', 'NPC Proc']);
+    expect(names()).toEqual(['Doctor Heal']);
+  });
+
+  it('keeps every nano, level or not, over the full level range', () => {
+    store.setFilters({ levelRange: [1, 220] });
+
+    expect(names()).toEqual(['Doctor Heal', 'General Buff', 'NPC Proc', 'Zealot Buff']);
   });
 
   it('sorts by level with nanos that have no level last', () => {

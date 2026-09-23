@@ -97,6 +97,10 @@ export function meetsNanoSkillRequirements(info: NanoCompatibilityInfo): boolean
   return info.unmetRequirements.every((req) => !SKILL_STAT_IDS.has(req.stat));
 }
 
+/** The level range the level filter spans (NanoFilters' slider) */
+const MIN_LEVEL = 1;
+const MAX_LEVEL = 220;
+
 /**
  * Per-version keys: the nano list is server data and favorites are AOID-keyed,
  * so both mean something different in every game version.
@@ -132,7 +136,7 @@ export const useNanosStore = defineStore('nanos', () => {
     effectTypes: [],
     durationType: [],
     targetTypes: [],
-    levelRange: [1, 220],
+    levelRange: [MIN_LEVEL, MAX_LEVEL],
     memoryUsageRange: [0, 1000],
     nanoPointRange: [0, 2000],
     skillGapThreshold: null,
@@ -213,13 +217,15 @@ export const useNanosStore = defineStore('nanos', () => {
       );
     }
 
-    // Apply level range filter
+    // Apply level range filter. The full range filters nothing; a narrowed one
+    // also drops nanos without a level (no Use action, so not player-castable).
     if (filters.value.levelRange) {
       const [minLevel, maxLevel] = filters.value.levelRange;
-      // A nano without a level (no Use action, so not player-castable) is not ruled out
-      result = result.filter(
-        (nano) => nano.level == null || (nano.level >= minLevel && nano.level <= maxLevel)
-      );
+      if (minLevel > MIN_LEVEL || maxLevel < MAX_LEVEL) {
+        result = result.filter(
+          (nano) => nano.level !== null && nano.level >= minLevel && nano.level <= maxLevel
+        );
+      }
     }
 
     // Apply memory usage filter
@@ -430,7 +436,7 @@ export const useNanosStore = defineStore('nanos', () => {
       effectTypes: [],
       durationType: [],
       targetTypes: [],
-      levelRange: [1, 220],
+      levelRange: [MIN_LEVEL, MAX_LEVEL],
       memoryUsageRange: [0, 1000],
       nanoPointRange: [0, 2000],
       skillGapThreshold: null,
