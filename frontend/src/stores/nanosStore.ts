@@ -14,7 +14,7 @@ import type {
   NanoFilters,
   NanoPreferences,
   NanoSearchRequest,
-  NanoSchool,
+  NanoSchoolName,
   NanoEffect,
   EffectDuration,
   TargetingData,
@@ -28,10 +28,11 @@ interface BackendNanoProgram {
   name: string;
   ql: number;
   description?: string;
-  school: NanoSchool;
+  school: NanoSchoolName | null;
   strain: string;
-  profession?: string;
-  level: number;
+  /** Absent from responses of backends that predate it */
+  professions?: string[];
+  level: number | null;
   actions?: Action[];
   casting_time?: number;
   recharge_time?: number;
@@ -51,10 +52,10 @@ function toNanoProgram(item: BackendNanoProgram): NanoProgram {
     name: item.name,
     qualityLevel: item.ql,
     description: item.description,
-    school: item.school,
+    school: item.school ?? null,
     strain: item.strain,
-    profession: item.profession,
-    level: item.level,
+    professions: item.professions ?? [],
+    level: item.level ?? null,
     actions: item.actions ?? [],
     castingTime: item.casting_time,
     rechargeTime: item.recharge_time,
@@ -181,7 +182,9 @@ export const useNanosStore = defineStore('nanos', () => {
 
     // Apply school filter
     if (filters.value.schools.length > 0) {
-      result = result.filter((nano) => filters.value.schools.includes(nano.school));
+      result = result.filter(
+        (nano) => nano.school !== null && filters.value.schools.includes(nano.school)
+      );
     }
 
     // Apply strain filter
@@ -189,10 +192,12 @@ export const useNanosStore = defineStore('nanos', () => {
       result = result.filter((nano) => filters.value.strains.includes(nano.strain));
     }
 
-    // Apply profession filter
+    // Apply profession filter; nanos any profession can cast always pass
     if (filters.value.professions.length > 0) {
       result = result.filter(
-        (nano) => !nano.profession || filters.value.professions.includes(nano.profession)
+        (nano) =>
+          nano.professions.length === 0 ||
+          nano.professions.some((profession) => filters.value.professions.includes(profession))
       );
     }
 
@@ -211,7 +216,7 @@ export const useNanosStore = defineStore('nanos', () => {
     // Apply level range filter
     if (filters.value.levelRange) {
       const [minLevel, maxLevel] = filters.value.levelRange;
-      // A nano whose level the backend does not know (null) is not ruled out
+      // A nano without a level (no Use action, so not player-castable) is not ruled out
       result = result.filter(
         (nano) => nano.level == null || (nano.level >= minLevel && nano.level <= maxLevel)
       );
@@ -271,13 +276,15 @@ export const useNanosStore = defineStore('nanos', () => {
             comparison = a.name.localeCompare(b.name);
             break;
           case 'level':
-            comparison = a.level - b.level;
+            // Nanos without a level sort after every level
+            comparison =
+              (a.level ?? Number.MAX_SAFE_INTEGER) - (b.level ?? Number.MAX_SAFE_INTEGER);
             break;
           case 'qualityLevel':
             comparison = a.qualityLevel - b.qualityLevel;
             break;
           case 'school':
-            comparison = a.school.localeCompare(b.school);
+            comparison = (a.school ?? '').localeCompare(b.school ?? '');
             break;
           case 'nanoPointCost':
             comparison = (a.nanoPointCost || 0) - (b.nanoPointCost || 0);
@@ -309,7 +316,11 @@ export const useNanosStore = defineStore('nanos', () => {
 
   const availableSchools = computed(() => {
     // The backend sends school: null for nanos it has no school for.
-    const schools = new Set(nanos.value.map((nano) => nano.school).filter(Boolean));
+    const schools = new Set(
+      nanos.value
+        .map((nano) => nano.school)
+        .filter((school): school is NanoSchoolName => school !== null)
+    );
     return Array.from(schools).sort();
   });
 
@@ -319,7 +330,7 @@ export const useNanosStore = defineStore('nanos', () => {
   });
 
   const availableProfessions = computed(() => {
-    const professions = new Set(nanos.value.map((nano) => nano.profession).filter(Boolean));
+    const professions = new Set(nanos.value.flatMap((nano) => nano.professions));
     return Array.from(professions).sort();
   });
 
@@ -507,7 +518,11 @@ export const useNanosStore = defineStore('nanos', () => {
         const parsed = JSON.parse(cached);
         // Only load if cached within last hour
         if (Date.now() - parsed.timestamp < 3600000) {
-          nanos.value = parsed.data || [];
+          // A cache written before nanos carried professions lacks the list
+          nanos.value = ((parsed.data || []) as NanoProgram[]).map((nano) => ({
+            ...nano,
+            professions: nano.professions ?? [],
+          }));
           totalCount.value = parsed.totalCount || 0;
         }
       }

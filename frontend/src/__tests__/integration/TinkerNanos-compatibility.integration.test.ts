@@ -87,7 +87,7 @@ function backendNano(id: number, name: string, ql: number, actions: Action[]) {
     description: null,
     school: null,
     strain: null,
-    profession: null,
+    professions: [],
     level: null,
     actions,
     effects: [],

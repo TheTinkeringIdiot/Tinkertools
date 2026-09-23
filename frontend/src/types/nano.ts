@@ -7,7 +7,8 @@ export interface NanoProgram {
   aoid?: number;
   name: string;
   icon?: string;
-  school: NanoSchool;
+  /** The game's NanoSchool stat (405); null when the nano has none */
+  school: NanoSchoolName | null;
   strain: string;
   description?: string;
 
@@ -23,9 +24,14 @@ export interface NanoProgram {
   targeting?: TargetingData;
 
   // Meta information
-  level: number;
+  /**
+   * Lowest character level that can cast it: 1 when the Use action asks for no
+   * level, null when the nano has no Use action (not player-castable)
+   */
+  level: number | null;
   qualityLevel: number;
-  profession?: string;
+  /** Professions that can cast it; empty when the Use action doesn't restrict it */
+  professions: string[];
   sourceLocation?: string;
   acquisitionMethod?: string;
   memoryUsage?: number;
@@ -41,6 +47,10 @@ export interface NanoEffect {
   conflicts?: number[]; // Conflicting nano IDs
 }
 
+/** NanoSchool stat (405) values, as the /nanos endpoints name them */
+export type NanoSchoolName = 'Combat' | 'Medical' | 'Protection' | 'Psi' | 'Space';
+
+/** The nano skills (MC, MM, BM, PM, SI, TS), which TinkerNukes calls schools */
 export type NanoSchool =
   | 'Matter Metamorphosis'
   | 'Biological Metamorphosis'

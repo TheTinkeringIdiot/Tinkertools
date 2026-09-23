@@ -49,7 +49,7 @@ const NANO_FILTERS_KEY = 'tinkertools_nano_filters';
 const FARM_LIST_BASE = 'tinkertools-farm-list';
 
 function sampleNano(id: number, name: string): NanoProgram {
-  return createTestNano({ id, name, school: 'Matter Creation', strain: 'Test Strain' });
+  return createTestNano({ id, name, school: 'Combat', strain: 'Test Strain' });
 }
 
 function samplePocketBoss(id: number, name: string): Mob {

@@ -13,7 +13,7 @@
  * - FR-8: Buff lookup tables
  */
 
-import type { NanoProgram } from './nano';
+import type { NanoProgram, NanoSchool } from './nano';
 import type { Item } from './api';
 
 // ============================================================================
@@ -24,7 +24,13 @@ import type { Item } from './api';
  * Offensive Nano Program extending base NanoProgram
  * Includes damage-specific fields for calculation and display
  */
-export interface OffensiveNano extends NanoProgram {
+export interface OffensiveNano extends Omit<NanoProgram, 'school' | 'professions' | 'level'> {
+  /** The nano skill the nano is cast with (MC, TS...), not the NanoSchool stat */
+  school: NanoSchool;
+
+  /** Level requirement of the first action's criteria, 0 when there is none */
+  level: number;
+
   /** Full item object with actions and criteria for requirement validation */
   item: Item;
 

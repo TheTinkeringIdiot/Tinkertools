@@ -194,6 +194,9 @@ describe('TinkerNukes: Nano Requirements with OR Logic', () => {
     // Mock OffensiveNano structure
     const mockNano: OffensiveNano = {
       ...createTestNano({ id: 1, aoid: 67890, name: 'Test Nuke', ql: 200 }),
+      // TinkerNukes names the nano skill as the school
+      school: 'Matter Creation',
+      level: 100,
       item: createTestItem({
         id: 1,
         aoid: 67890,

@@ -8,7 +8,7 @@
  */
 
 import type { Action } from '@/types/api';
-import type { NanoProgram, NanoSchool } from '@/types/nano';
+import type { NanoProgram, NanoSchoolName } from '@/types/nano';
 
 // ============================================================================
 // Nano Creation Factory
@@ -19,14 +19,15 @@ export interface NanoCreationOptions {
   aoid?: number;
   name?: string;
   ql?: number;
-  school?: NanoSchool;
+  school?: NanoSchoolName | null;
   strain?: string;
   nanoPointCost?: number;
   memoryUsage?: number;
   castingTime?: number;
   rechargeTime?: number;
-  level?: number;
-  profession?: string;
+  level?: number | null;
+  /** Professions that can cast it; empty for a nano any profession can cast */
+  professions?: string[];
   actions?: Action[];
 }
 
@@ -46,14 +47,14 @@ export function createTestNano(options: NanoCreationOptions = {}): NanoProgram {
     aoid = Math.floor(Math.random() * 1000000),
     name = 'Test Nano',
     ql = 100,
-    school = 'Matter Creation',
+    school = 'Combat',
     strain = 'TestStrain',
     nanoPointCost = 50,
     memoryUsage = 20,
     castingTime = 3,
     rechargeTime = 30,
     level = 100,
-    profession = 'All',
+    professions = [],
     actions = [],
   } = options;
 
@@ -69,7 +70,7 @@ export function createTestNano(options: NanoCreationOptions = {}): NanoProgram {
     rechargeTime,
     level,
     qualityLevel: ql,
-    profession,
+    professions,
     actions,
     effects: [],
   };
@@ -86,7 +87,7 @@ export const mockNano1: NanoProgram = {
   id: 1,
   aoid: 12345,
   name: 'Iron Circle',
-  school: 'Matter Metamorphosis',
+  school: 'Protection',
   strain: 'IronCircle',
   nanoPointCost: 100,
   memoryUsage: 25,
@@ -94,7 +95,7 @@ export const mockNano1: NanoProgram = {
   rechargeTime: 30,
   level: 150,
   qualityLevel: 200,
-  profession: 'Adventurer',
+  professions: ['Adventurer'],
   actions: [],
   effects: [],
 };
@@ -106,7 +107,7 @@ export const mockNano2: NanoProgram = {
   id: 2,
   aoid: 12346,
   name: 'Greater Fortification',
-  school: 'Matter Metamorphosis',
+  school: 'Protection',
   strain: 'Fortification',
   nanoPointCost: 120,
   memoryUsage: 30,
@@ -114,7 +115,7 @@ export const mockNano2: NanoProgram = {
   rechargeTime: 30,
   level: 160,
   qualityLevel: 220,
-  profession: 'Adventurer',
+  professions: ['Adventurer'],
   actions: [],
   effects: [],
 };
@@ -127,7 +128,7 @@ export const mockNanoHighPriority: NanoProgram = {
   id: 10,
   aoid: 12350,
   name: 'Iron Circle Superior',
-  school: 'Matter Metamorphosis',
+  school: 'Protection',
   strain: 'IronCircle', // Same strain as mockNano1
   nanoPointCost: 150,
   memoryUsage: 35,
@@ -135,7 +136,7 @@ export const mockNanoHighPriority: NanoProgram = {
   rechargeTime: 30,
   level: 180,
   qualityLevel: 250,
-  profession: 'Adventurer',
+  professions: ['Adventurer'],
   actions: [],
   effects: [],
 };
@@ -148,7 +149,7 @@ export const mockNanoLowPriority: NanoProgram = {
   id: 11,
   aoid: 12340,
   name: 'Iron Circle Basic',
-  school: 'Matter Metamorphosis',
+  school: 'Protection',
   strain: 'IronCircle', // Same strain as mockNano1
   nanoPointCost: 80,
   memoryUsage: 20,
@@ -156,7 +157,7 @@ export const mockNanoLowPriority: NanoProgram = {
   rechargeTime: 30,
   level: 120,
   qualityLevel: 150,
-  profession: 'Adventurer',
+  professions: ['Adventurer'],
   actions: [],
   effects: [],
 };
@@ -169,7 +170,7 @@ export const mockNanoHighNCU: NanoProgram = {
   id: 20,
   aoid: 99999,
   name: 'Massive Buff',
-  school: 'Matter Creation',
+  school: 'Combat',
   strain: 'MassiveBuff',
   nanoPointCost: 200,
   memoryUsage: 1100, // Almost fills NCU
@@ -177,7 +178,7 @@ export const mockNanoHighNCU: NanoProgram = {
   rechargeTime: 60,
   level: 200,
   qualityLevel: 300,
-  profession: 'All',
+  professions: [],
   actions: [],
   effects: [],
 };
@@ -221,14 +222,14 @@ export function createMixedNanoSet(): NanoProgram[] {
     mockNano2,
     createTestNano({
       name: 'Damage Buff',
-      school: 'Matter Creation',
+      school: 'Combat',
       strain: 'DamageEnhancement',
       memoryUsage: 40,
       ql: 180,
     }),
     createTestNano({
       name: 'Heal Buff',
-      school: 'Biological Metamorphosis',
+      school: 'Medical',
       strain: 'HealingAura',
       memoryUsage: 35,
       ql: 200,
@@ -245,7 +246,7 @@ export function createMixedNanoSet(): NanoProgram[] {
  */
 export function createBuffNano(options: Partial<NanoCreationOptions> = {}): NanoProgram {
   return createTestNano({
-    school: 'Matter Creation',
+    school: 'Protection',
     strain: 'BuffStrain',
     memoryUsage: 30,
     ...options,

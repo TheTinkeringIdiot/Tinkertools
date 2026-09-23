@@ -132,9 +132,9 @@ Shows nano information with compatibility indicators and quick actions
                 <Badge :value="nano.strain" severity="warning" />
               </div>
 
-              <div v-if="nano.profession" class="flex items-center gap-2">
+              <div v-if="nano.professions.length" class="flex items-center gap-2">
                 <span class="text-surface-500 dark:text-surface-400">Profession:</span>
-                <span class="font-medium">{{ nano.profession }}</span>
+                <span class="font-medium">{{ nano.professions.join(', ') }}</span>
               </div>
 
               <div v-if="nano.nanoPointCost" class="flex items-center gap-2">

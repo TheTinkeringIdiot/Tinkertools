@@ -41,7 +41,12 @@ Displays comprehensive nano information including effects, requirements, and com
             <Badge :value="`QL ${nano.qualityLevel}`" severity="secondary" />
             <Badge v-if="nano.level" :value="`Level ${nano.level}`" severity="secondary" />
             <Badge v-if="nano.strain" :value="`Strain ${nano.strain}`" severity="warning" />
-            <Badge v-if="nano.profession" :value="nano.profession" severity="help" />
+            <Badge
+              v-for="profession in nano.professions"
+              :key="profession"
+              :value="profession"
+              severity="help"
+            />
           </div>
 
           <p v-if="nano.description" class="text-surface-600 dark:text-surface-400">
@@ -126,9 +131,9 @@ Displays comprehensive nano information including effects, requirements, and com
                     <span class="text-surface-600 dark:text-surface-400">Strain:</span>
                     <span class="font-medium">{{ nano.strain }}</span>
                   </div>
-                  <div v-if="nano.profession" class="grid grid-cols-2 gap-2">
+                  <div v-if="nano.professions.length" class="grid grid-cols-2 gap-2">
                     <span class="text-surface-600 dark:text-surface-400">Profession:</span>
-                    <span class="font-medium">{{ nano.profession }}</span>
+                    <span class="font-medium">{{ nano.professions.join(', ') }}</span>
                   </div>
                 </div>
               </div>
@@ -433,7 +438,7 @@ const schoolAvatarClass = computed(() => {
     'Time and Space': 'bg-yellow-500 text-white',
     'Sensory Improvement': 'bg-indigo-500 text-white',
   };
-  return schoolColors[props.nano.school] || 'bg-surface-500 text-white';
+  return (props.nano.school && schoolColors[props.nano.school]) || 'bg-surface-500 text-white';
 });
 
 const useAction = computed(() => (props.nano ? getNanoUseAction(props.nano) : undefined));

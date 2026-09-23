@@ -82,6 +82,96 @@ describe('NanosStore', () => {
   });
 });
 
+describe('NanosStore school, profession and level', () => {
+  let store: ReturnType<typeof useNanosStore>;
+
+  /** A /nanos item; only the fields under test vary */
+  function nanoItem(id: number, name: string, fields: Record<string, unknown>) {
+    return { id, aoid: 1000 + id, name, ql: 1, strain: null, actions: [], effects: [], ...fields };
+  }
+
+  async function load(items: Record<string, unknown>[]): Promise<void> {
+    vi.spyOn(apiClient, 'getPaginated').mockResolvedValue({
+      items,
+      total: items.length,
+      page: 1,
+      page_size: 200,
+      pages: 1,
+      has_next: false,
+      has_prev: false,
+    });
+    await store.fetchNanos();
+  }
+
+  beforeEach(async () => {
+    setActivePinia(createPinia());
+    store = useNanosStore();
+    await load([
+      nanoItem(1, 'Doctor Heal', { school: 'Medical', professions: ['Doctor'], level: 50 }),
+      nanoItem(2, 'Zealot Buff', {
+        school: 'Protection',
+        professions: ['Martial Artist', 'Enforcer', 'Keeper', 'Shade'],
+        level: 150,
+      }),
+      nanoItem(3, 'General Buff', { school: 'Protection', professions: [], level: 1 }),
+      nanoItem(4, 'NPC Proc', { school: null, professions: [], level: null }),
+    ]);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const names = () => store.filteredNanos.map((nano) => nano.name);
+
+  it('maps the school, professions and level the backend sends', () => {
+    expect(store.getNanoById(2)).toMatchObject({
+      school: 'Protection',
+      professions: ['Martial Artist', 'Enforcer', 'Keeper', 'Shade'],
+      level: 150,
+    });
+    expect(store.getNanoById(4)).toMatchObject({ school: null, professions: [], level: null });
+    expect(store.availableSchools).toEqual(['Medical', 'Protection']);
+    expect(store.availableProfessions).toEqual([
+      'Doctor',
+      'Enforcer',
+      'Keeper',
+      'Martial Artist',
+      'Shade',
+    ]);
+  });
+
+  it('reads a response without professions as unrestricted', async () => {
+    await load([nanoItem(5, 'Old Shape', { school: null, profession: 'Doctor', level: 10 })]);
+
+    expect(store.getNanoById(5)?.professions).toEqual([]);
+  });
+
+  it('filters by school', () => {
+    store.setFilters({ schools: ['Protection'] });
+
+    expect(names()).toEqual(['General Buff', 'Zealot Buff']);
+  });
+
+  it('keeps nanos any of the chosen professions can cast, and unrestricted ones', () => {
+    store.setFilters({ professions: ['Keeper'] });
+
+    expect(names()).toEqual(['General Buff', 'NPC Proc', 'Zealot Buff']);
+  });
+
+  it('filters by level range without ruling out nanos that have no level', () => {
+    store.setFilters({ levelRange: [40, 100] });
+
+    expect(names()).toEqual(['Doctor Heal', 'NPC Proc']);
+  });
+
+  it('sorts by level with nanos that have no level last', () => {
+    store.setFilters({ sortBy: 'level' });
+
+    expect(names()).toEqual(['General Buff', 'Doctor Heal', 'Zealot Buff', 'NPC Proc']);
+  });
+});
+
 describe.skipIf(!BACKEND_AVAILABLE)('NanosStore with backend', () => {
   let store: ReturnType<typeof useNanosStore>;
 
