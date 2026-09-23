@@ -3,18 +3,10 @@ Basic functionality tests for Task 4: Advanced Search and Filtering API.
 Tests that endpoints are working using service layer mocking pattern.
 """
 
-import pytest
 from unittest.mock import Mock
-from fastapi.testclient import TestClient
 
 from app.main import app
 from app.core.database import get_db
-
-
-@pytest.fixture
-def client():
-    """Create a test client."""
-    return TestClient(app)
 
 
 class TestTask4Endpoints:

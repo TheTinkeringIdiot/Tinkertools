@@ -5,19 +5,7 @@ Tests all 7 nano endpoints against actual Anarchy Online game data,
 validating full pipeline from database to response without mocks.
 """
 
-import pytest
-from fastapi.testclient import TestClient
-
-from app.main import app
 from app.models import Item
-
-
-# Test client fixture
-@pytest.fixture
-def client():
-    """Create test client."""
-    return TestClient(app)
-
 
 # ============================================================================
 # GET /api/v1/nanos - List nanos with pagination

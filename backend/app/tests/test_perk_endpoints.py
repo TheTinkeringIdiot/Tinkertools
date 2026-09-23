@@ -6,22 +6,12 @@ validating full pipeline from database to response. Calculation endpoints
 use strategic mocks for business logic testing.
 """
 
-import pytest
 import json
 from unittest.mock import patch
-from fastapi.testclient import TestClient
 
-from app.main import app
 from app.models import Perk
 from app.services.perk_service import PerkService
 from app.api.schemas.perk import PerkValidationDetail, PerkSeries
-
-
-@pytest.fixture
-def client():
-    """Create test client."""
-    return TestClient(app)
-
 
 # ============================================================================
 # GET /api/v1/perks - List Perks Tests

@@ -7,17 +7,10 @@ Uses service layer mocking pattern to avoid database transaction isolation issue
 
 import pytest
 from unittest.mock import Mock
-from fastapi.testclient import TestClient
 
 from app.main import app
 from app.models import Spell, Criterion, SpellCriterion
 from app.core.database import get_db
-
-
-@pytest.fixture
-def client():
-    """Create a test client."""
-    return TestClient(app)
 
 
 def create_spell_with_criteria(spell, criteria):
