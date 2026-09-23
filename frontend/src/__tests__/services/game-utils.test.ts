@@ -20,6 +20,9 @@ describe('Equipment Slot Position Functions', () => {
       // The item slot grid mirrors the character: right hand on the left (2801544)
       expect(getWeaponSlotPosition('RightHand')).toEqual({ row: 3, col: 1 });
       expect(getWeaponSlotPosition('LeftHand')).toEqual({ row: 3, col: 3 });
+      // Profiles store the hands as RHand/LHand; they must land on the same cells.
+      expect(getWeaponSlotPosition('RHand')).toEqual({ row: 3, col: 1 });
+      expect(getWeaponSlotPosition('LHand')).toEqual({ row: 3, col: 3 });
       expect(getWeaponSlotPosition('Hud1')).toEqual({ row: 1, col: 1 });
     });
 
@@ -51,19 +54,21 @@ describe('Equipment Slot Position Functions', () => {
       expect(bodyPosition).toEqual({ row: 2, col: 2 });
     });
 
+    // The grid overlays the in-game armor window (armor_slots.png), which shows
+    // the character facing you: right-side slots in column 1, left-side in column 3.
     it('should return correct positions for shoulder and arm slots', () => {
-      expect(getArmorSlotPosition('LeftShoulder')).toEqual({ row: 2, col: 1 });
-      expect(getArmorSlotPosition('RightShoulder')).toEqual({ row: 2, col: 3 });
-      expect(getArmorSlotPosition('LeftArm')).toEqual({ row: 3, col: 1 });
-      expect(getArmorSlotPosition('RightArm')).toEqual({ row: 3, col: 3 });
+      expect(getArmorSlotPosition('RightShoulder')).toEqual({ row: 2, col: 1 });
+      expect(getArmorSlotPosition('LeftShoulder')).toEqual({ row: 2, col: 3 });
+      expect(getArmorSlotPosition('RightArm')).toEqual({ row: 3, col: 1 });
+      expect(getArmorSlotPosition('LeftArm')).toEqual({ row: 3, col: 3 });
     });
 
     it('should return correct positions for hand and finger slots', () => {
       expect(getArmorSlotPosition('Hands')).toEqual({ row: 3, col: 2 });
-      expect(getArmorSlotPosition('LeftWrist')).toEqual({ row: 4, col: 1 });
-      expect(getArmorSlotPosition('RightWrist')).toEqual({ row: 4, col: 3 });
-      expect(getArmorSlotPosition('LeftFinger')).toEqual({ row: 5, col: 1 });
-      expect(getArmorSlotPosition('RightFinger')).toEqual({ row: 5, col: 3 });
+      expect(getArmorSlotPosition('RightWrist')).toEqual({ row: 4, col: 1 });
+      expect(getArmorSlotPosition('LeftWrist')).toEqual({ row: 4, col: 3 });
+      expect(getArmorSlotPosition('RightFinger')).toEqual({ row: 5, col: 1 });
+      expect(getArmorSlotPosition('LeftFinger')).toEqual({ row: 5, col: 3 });
     });
 
     it('should return default position for invalid slots', () => {

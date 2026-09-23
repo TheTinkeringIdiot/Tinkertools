@@ -1377,10 +1377,11 @@ export function getWeaponSlotPosition(slotName: string): { row: number; col: num
     Utils3: { row: 2, col: 3 },
     Util3: { row: 2, col: 3 },
     UTILS3: { row: 2, col: 3 },
+    // Mirrors the in-game weapon window (weapon_slots.png): right hand on the left.
     LeftHand: { row: 3, col: 3 },
-    LHand: { row: 3, col: 1 },
+    LHand: { row: 3, col: 3 },
     RightHand: { row: 3, col: 1 },
-    RHand: { row: 3, col: 3 },
+    RHand: { row: 3, col: 1 },
     Deck: { row: 3, col: 2 },
     Waist: { row: 3, col: 2 },
     Deck1: { row: 4, col: 1 },
@@ -1408,19 +1409,20 @@ export function getArmorSlotPosition(slotName: string): { row: number; col: numb
     Head: { row: 1, col: 2 },
     Neck: { row: 1, col: 1 },
     Back: { row: 1, col: 3 },
-    LeftShoulder: { row: 2, col: 1 },
+    // Mirrors the in-game armor window (armor_slots.png): right side on the left.
+    RightShoulder: { row: 2, col: 1 },
     Chest: { row: 2, col: 2 },
     Body: { row: 2, col: 2 }, // Legacy compatibility - same as Chest
-    RightShoulder: { row: 2, col: 3 },
-    LeftArm: { row: 3, col: 1 },
+    LeftShoulder: { row: 2, col: 3 },
+    RightArm: { row: 3, col: 1 },
     Hands: { row: 3, col: 2 },
-    RightArm: { row: 3, col: 3 },
-    LeftWrist: { row: 4, col: 1 },
+    LeftArm: { row: 3, col: 3 },
+    RightWrist: { row: 4, col: 1 },
     Legs: { row: 4, col: 2 },
-    RightWrist: { row: 4, col: 3 },
-    LeftFinger: { row: 5, col: 1 },
+    LeftWrist: { row: 4, col: 3 },
+    RightFinger: { row: 5, col: 1 },
     Feet: { row: 5, col: 2 },
-    RightFinger: { row: 5, col: 3 },
+    LeftFinger: { row: 5, col: 3 },
   };
 
   return positions[slotName] || { row: 1, col: 1 };
