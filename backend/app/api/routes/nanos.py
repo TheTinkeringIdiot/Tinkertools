@@ -388,57 +388,51 @@ def get_nano_strains(
 def get_nano_stats(db: Session = Depends(get_db)):
     """
     Get statistics about available nano programs.
+
+    Aggregated in SQL from items and nano_properties; loading and parsing every
+    nano to count them took several seconds per version on a cold cache.
     """
-    # Get all nano items with selectinload to avoid Cartesian product explosion
-    items = (
-        db.query(Item)
-        .filter(Item.is_nano.is_(True))
-        .options(
-            selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
-            selectinload(Item.item_spell_data)
-            .selectinload(ItemSpellData.spell_data)
-            .selectinload(SpellData.spell_data_spells)
-            .selectinload(SpellDataSpells.spell)
-            .selectinload(Spell.spell_criteria)
-            .selectinload(SpellCriterion.criterion),
-            selectinload(Item.actions)
-            .selectinload(Action.action_criteria)
-            .selectinload(ActionCriteria.criterion),
-            selectinload(Item.nano_properties),
+    nanos = db.query(Item).filter(Item.is_nano.is_(True))
+    total, ql_low, ql_high = nanos.with_entities(
+        func.count(Item.id), func.min(Item.ql), func.max(Item.ql)
+    ).one()
+
+    props = nanos.join(NanoProperties, NanoProperties.item_id == Item.id)
+    school_ids = [
+        school
+        for (school,) in props.with_entities(NanoProperties.school)
+        .filter(NanoProperties.school.isnot(None))
+        .distinct()
+    ]
+    strain_ids = [
+        strain
+        for (strain,) in props.with_entities(NanoProperties.strain)
+        .filter(NanoProperties.strain.isnot(None))
+        .distinct()
+    ]
+    profession_ids = [
+        profession
+        for (profession,) in props.with_entities(
+            func.unnest(NanoProperties.professions)
+        ).distinct()
+    ]
+    level_low, level_high = (
+        props.with_entities(
+            func.min(NanoProperties.min_level), func.max(NanoProperties.min_level)
         )
-        .all()
+        .filter(NanoProperties.min_level.isnot(None))
+        .one()
     )
 
-    schools = set()
-    strains = set()
-    professions = set()
-    levels = []
-    quality_levels = []
-
-    for item in items:
-        try:
-            nano = parse_nano_from_item_and_spells(item)
-            if nano.school:
-                schools.add(nano.school)
-            if nano.strain:
-                strains.add(nano.strain)
-            professions.update(nano.professions)
-            if nano.level:
-                levels.append(nano.level)
-            quality_levels.append(nano.ql)
-        except Exception as e:
-            logger.warning(f"Failed to parse nano {item.id} for stats: {e}")
-            continue
-
+    schools = {nano_properties.school_name(school) for school in school_ids}
+    strains = {nano_properties.strain_name(strain) for strain in strain_ids}
     return NanoStatsResponse(
-        total_nanos=len(items),
-        schools=sorted(list(schools)),
-        strains=sorted(list(strains)),
-        professions=sorted(list(professions)),
-        level_range=[min(levels), max(levels)] if levels else [1, 220],
-        quality_level_range=(
-            [min(quality_levels), max(quality_levels)] if quality_levels else [1, 300]
-        ),
+        total_nanos=total,
+        schools=sorted(name for name in schools if name),
+        strains=sorted(name for name in strains if name),
+        professions=sorted(set(nano_properties.profession_names(profession_ids))),
+        level_range=[level_low, level_high] if level_low is not None else [1, 220],
+        quality_level_range=([ql_low, ql_high] if ql_low is not None else [1, 300]),
     )
 
 

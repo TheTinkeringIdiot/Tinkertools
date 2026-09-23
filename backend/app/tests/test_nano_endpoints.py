@@ -715,6 +715,31 @@ def test_get_nano_stats_level_range(client):
     assert len(data["level_range"]) == 2
 
 
+def test_get_nano_stats_matches_the_raw_data(client, db_session):
+    """Totals, schools, strains and QL range agree with SQL on the raw item stats."""
+    data = client.get("/api/v1/nanos/stats").json()
+
+    total, ql_low, ql_high = db_session.execute(
+        text("SELECT count(*), min(ql), max(ql) FROM items WHERE is_nano")
+    ).one()
+    assert data["total_nanos"] == total
+    assert data["quality_level_range"] == [ql_low, ql_high]
+
+    school_values = {value for (value,) in db_session.execute(text("""
+                SELECT DISTINCT sv.value FROM items i
+                JOIN item_stats ist ON ist.item_id = i.id
+                JOIN stat_values sv ON sv.id = ist.stat_value_id
+                WHERE i.is_nano AND sv.stat = 405
+                """))}
+    schools = {1: "Combat", 2: "Medical", 3: "Protection", 4: "Psi", 5: "Space"}
+    assert data["schools"] == sorted(schools[v] for v in school_values if v in schools)
+
+    strain_names = {NANO_STRAINS.get(v) for v in _strains_by_nano(db_session).values()}
+    assert data["strains"] == sorted(name for name in strain_names if name)
+
+    assert data["level_range"][0] >= 1 and data["level_range"][1] <= 220
+
+
 # ============================================================================
 # GET /api/v1/nanos/{nano_id} - Nano detail
 # ============================================================================
