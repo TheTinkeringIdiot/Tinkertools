@@ -295,8 +295,8 @@ Complete character management with skills, equipment, and IP tracking
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { ref, computed, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import Button from 'primevue/button';
 import Badge from 'primevue/badge';
 import ProgressSpinner from 'primevue/progressspinner';
@@ -305,7 +305,6 @@ import TabPanel from 'primevue/tabpanel';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import CharacterInfoPanel from '@/components/profiles/CharacterInfoPanel.vue';
 import IPTrackerPanel from '@/components/profiles/IPTrackerPanel.vue';
-import ItemSlotsDisplay from '@/components/items/ItemSlotsDisplay.vue';
 import EquipmentSlotsDisplay from '@/components/items/EquipmentSlotsDisplay.vue';
 import SkillsManager from '@/components/profiles/skills/SkillsManager.vue';
 import EditCharacterDialog from '@/components/profiles/EditCharacterDialog.vue';
@@ -314,13 +313,11 @@ import BuffTable from '@/components/profiles/buffs/BuffTable.vue';
 import type { TinkerProfile } from '@/lib/tinkerprofiles';
 import type { Item } from '@/types/api';
 import { skillService } from '@/services/skill-service';
-import type { SkillId } from '@/types/skills';
 import { getProfessionName, getBreedName } from '@/services/game-utils';
 import { gameVersionDisplayName } from '@/lib/tinkerprofiles/game-version';
 import { useToast } from 'primevue/usetoast';
 
 // Router
-const route = useRoute();
 const router = useRouter();
 const profilesStore = useTinkerProfilesStore();
 const toast = useToast();
@@ -435,7 +432,7 @@ async function duplicateProfile() {
     });
 
     // Navigate to the new profile
-    router.push({
+    await router.push({
       name: 'TinkerProfileDetail',
       params: { profileId: newProfileId },
     });
@@ -529,7 +526,9 @@ async function handleAbilityChange(abilityId: string | number, newValue: number)
   }
 }
 
-async function handleCharacterUpdate(changes: any) {
+async function handleCharacterUpdate(
+  changes: Parameters<typeof profilesStore.updateCharacterMetadata>[1]
+) {
   if (!profileData.value) return;
 
   try {
@@ -584,20 +583,6 @@ async function handleRemoveAllBuffs() {
   }
 }
 
-// Feedback functions
-function showTrickleDownFeedback(affectedSkillsCount: number) {
-  // Simple console feedback for now - could be enhanced with toast notifications
-  console.info(`✨ Ability change updated trickle-down bonuses for ${affectedSkillsCount} skills`);
-
-  // Could add a toast notification here if PrimeVue Toast is set up:
-  // toast.add({
-  //   severity: 'success',
-  //   summary: 'Trickle-down Updated',
-  //   detail: `${affectedSkillsCount} skills received updated bonuses from ability changes`,
-  //   life: 3000
-  // });
-}
-
 // Equipment helper functions - now return complete equipment records
 function getEquippedWeapons(weapons: Record<string, Item | null>) {
   return weapons || {};
@@ -616,9 +601,9 @@ function getEquippedImplants(implants: Record<string, Item | null>) {
 // Watchers
 watch(
   () => props.profileId,
-  () => {
+  async () => {
     if (props.profileId) {
-      loadProfile();
+      await loadProfile();
     }
   },
   { immediate: true }

@@ -16,12 +16,11 @@ import {
   buildCriteriaTree,
   shouldUseTreeDisplay,
   getTreeSummary,
-  type ParsedAction,
   type DisplayCriterion,
-  type CriteriaExpression,
-  type CriteriaTreeNode,
 } from '../services/action-criteria';
 import type { Action, Criterion } from '../types/api';
+
+type UnmetRequirement = ReturnType<typeof checkActionRequirements>['unmetRequirements'][number];
 
 // ============================================================================
 // Action Display Composable
@@ -223,7 +222,7 @@ export function useCriteriaEvaluation(
    * Get all unmet requirements across all actions
    */
   const allUnmetRequirements = computed(() => {
-    const unmet = new Map<number, any>();
+    const unmet = new Map<number, UnmetRequirement>();
 
     for (const evaluation of actionEvaluations.value) {
       for (const req of evaluation.unmetRequirements) {

@@ -122,7 +122,7 @@ import NanoDetail from '@/components/nanos/NanoDetail.vue';
 import { PROFESSION } from '@/services/game-data';
 import { useNanosStore } from '@/stores/nanosStore';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
-import type { NanoProgram } from '@/types/nano';
+import type { NanoProgram, NanoFilters as NanoFilterState } from '@/types/nano';
 
 // Stores
 const nanosStore = useNanosStore();
@@ -171,11 +171,11 @@ const filteredNanos = computed(() => {
 });
 
 // Methods
-function toggleSearchMode() {
+async function toggleSearchMode() {
   isSearchMode.value = !isSearchMode.value;
   if (isSearchMode.value) {
     // Load all nanos when entering search mode
-    nanosStore.fetchNanos();
+    await nanosStore.fetchNanos();
   }
 }
 
@@ -192,7 +192,7 @@ async function handleSearch(query: string, schools: string[], fields: string[]) 
   }
 }
 
-function handleFilterChange(newFilters: any) {
+function handleFilterChange(newFilters: NanoFilterState) {
   filters.value = newFilters;
   nanosStore.setFilters(newFilters);
 }

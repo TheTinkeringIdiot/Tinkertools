@@ -240,9 +240,6 @@ const sortOptions = [
   { label: 'Item Type', value: 'type' },
 ];
 
-// Search options from ItemSearch component
-const searchOptions = ref({ query: '', exactMatch: true, searchFields: [] as string[] });
-
 // Methods
 async function performAdvancedSearch(query: ItemSearchQuery) {
   searchLoading.value = true;
@@ -323,24 +320,24 @@ function clearSearch() {
 
 // Note: onFiltersChanged, clearFilters, and clearAllFilters removed - now handled by AdvancedItemSearch
 
-function onSortChanged() {
+async function onSortChanged() {
   if (searchPerformed.value) {
     // If we have an advanced search query, use it; otherwise fall back to legacy search
     if (lastAdvancedSearchQuery.value) {
-      performAdvancedSearch(lastAdvancedSearchQuery.value);
+      await performAdvancedSearch(lastAdvancedSearchQuery.value);
     } else {
-      performSearch();
+      await performSearch();
     }
   }
 }
 
-function refreshResults() {
+async function refreshResults() {
   if (searchPerformed.value) {
     // If we have an advanced search query, use it; otherwise fall back to legacy search
     if (lastAdvancedSearchQuery.value) {
-      performAdvancedSearch(lastAdvancedSearchQuery.value);
+      await performAdvancedSearch(lastAdvancedSearchQuery.value);
     } else {
-      performSearch();
+      await performSearch();
     }
   }
 }
@@ -367,8 +364,8 @@ async function quickSearch(type: string) {
   await performAdvancedSearch(query);
 }
 
-function onItemClick(item: Item) {
-  router.push({ name: 'ItemDetail', params: { aoid: item.aoid!.toString() } });
+async function onItemClick(item: Item) {
+  await router.push({ name: 'ItemDetail', params: { aoid: item.aoid!.toString() } });
 }
 
 function onItemCompare(item: Item) {
@@ -405,7 +402,7 @@ async function onItemCastBuff(item: Item) {
   }
 }
 
-function onPageChange(page: number, limit: number) {
+async function onPageChange(page: number, limit: number) {
   // Re-run the last advanced search with the new page and limit
   if (lastAdvancedSearchQuery.value) {
     // Create updated query with new page number and limit
@@ -414,7 +411,7 @@ function onPageChange(page: number, limit: number) {
       page: page,
       limit: limit,
     };
-    performAdvancedSearch(updatedQuery);
+    await performAdvancedSearch(updatedQuery);
   }
 }
 
@@ -424,9 +421,9 @@ const urlSearchTerm = computed(() =>
   typeof route.query.search === 'string' ? route.query.search : ''
 );
 
-function searchFromUrl(term: string): void {
+async function searchFromUrl(term: string): Promise<void> {
   searchQuery.value = term;
-  performAdvancedSearch({
+  await performAdvancedSearch({
     search: term,
     exact_match: false,
     search_fields: ['name'],
@@ -434,14 +431,14 @@ function searchFromUrl(term: string): void {
 }
 
 // A new term from the header while already on this page (no remount).
-watch(urlSearchTerm, (term, previous) => {
-  if (term && term !== previous) searchFromUrl(term);
+watch(urlSearchTerm, async (term, previous) => {
+  if (term && term !== previous) await searchFromUrl(term);
 });
 
-onMounted(() => {
+onMounted(async () => {
   // Header search bar shortcut: /items?search=<term>
   if (urlSearchTerm.value.trim()) {
-    searchFromUrl(urlSearchTerm.value.trim());
+    await searchFromUrl(urlSearchTerm.value.trim());
     return;
   }
 
@@ -458,7 +455,7 @@ onMounted(() => {
     };
 
     // Trigger the advanced search
-    performAdvancedSearch(strainQuery);
+    await performAdvancedSearch(strainQuery);
     return;
   }
 

@@ -31,10 +31,10 @@ onMounted(() => {
 });
 
 // Sync URL query param when tab changes
-watch(activeTab, (newIndex) => {
+watch(activeTab, async (newIndex) => {
   const tabName = tabNames[newIndex];
   if (tabName) {
-    router.replace({ query: { ...route.query, tab: tabName } });
+    await router.replace({ query: { ...route.query, tab: tabName } });
   }
 });
 
