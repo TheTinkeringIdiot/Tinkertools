@@ -2,6 +2,8 @@
  * Types for TinkerFite weapon management and skill-based filtering
  */
 
+import type { Spell } from './api';
+
 export interface StatValue {
   id: number;
   stat: number;
@@ -19,7 +21,7 @@ export interface Weapon {
   stats: StatValue[];
   attack_stats: StatValue[];
   defense_stats: StatValue[];
-  spells: any[]; // Will define spell type later if needed
+  spells: Spell[];
 }
 
 export interface CharacterSkills {

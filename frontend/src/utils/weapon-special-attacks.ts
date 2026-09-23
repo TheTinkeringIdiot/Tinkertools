@@ -272,6 +272,7 @@ export function calculateFastAttackDamage(
  * 4. Fixed 15 second cycle time
  * 5. Number of brawls in 60s sample
  */
+/* eslint-disable @typescript-eslint/no-unused-vars -- unimplemented stub; keeps the signature callers will use */
 export function calculateBrawlDamage(
   weapon: WeaponCandidate,
   state: FiteInputState,
@@ -282,6 +283,7 @@ export function calculateBrawlDamage(
   console.warn('Brawl damage calculation not yet implemented - requires Brawl Item lookup');
   return 0;
 }
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 /**
  * Calculate Sneak Attack damage
@@ -316,10 +318,12 @@ export function calculateSneakAttackDamage(
  *
  * Not implemented in legacy (pass)
  */
+/* eslint-disable @typescript-eslint/no-unused-vars -- unimplemented stub; keeps the signature callers will use */
 export function calculateDimachDamage(weapon: WeaponCandidate, state: FiteInputState): number {
   // Dimach not implemented in legacy
   return 0;
 }
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 /**
  * Get list of special attacks supported by a weapon

@@ -164,20 +164,6 @@ export function calculateTotalDamageBonus(config: NukesConfiguration): DamageBon
   };
 }
 
-/**
- * Calculate damage bonus for a specific nano type
- */
-export function calculateSpecificDamageBonus(
-  config: NukesConfiguration,
-  damageType: DamageTypeId
-): number {
-  const totalBonus = calculateTotalDamageBonus(config);
-
-  // For specific damage types, apply the total bonus
-  // In the original implementation, all damage types benefit equally
-  return totalBonus.total;
-}
-
 // ============================================================================
 // Utility Functions
 // ============================================================================
@@ -302,7 +288,6 @@ export const nanotechnicianSpecialization = {
 
   // Calculations
   calculateTotalDamageBonus,
-  calculateSpecificDamageBonus,
   calculateNanoPool,
   calculateNanoInitiative,
 

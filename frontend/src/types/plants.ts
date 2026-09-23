@@ -289,7 +289,7 @@ export interface StatAnalysis {
 export interface PlantsError {
   type: 'build' | 'symbiant' | 'optimization' | 'data';
   message: string;
-  details?: any;
+  details?: unknown;
   suggestions?: string[];
 }
 
@@ -300,7 +300,7 @@ export interface PlantsError {
 export interface BuildEvent {
   type: 'symbiant_added' | 'symbiant_removed' | 'build_saved' | 'build_loaded';
   timestamp: number;
-  data: any;
+  data: unknown;
 }
 
 export interface PlantsEvents {

@@ -5,8 +5,7 @@
  * title and faction calculations, and profession-specific game mechanics.
  */
 
-import { PROFESSION, BREED, FACTION } from '../services/game-data';
-import { getProfessionName, getBreedName, getFactionName } from '../services/game-utils';
+import { getProfessionName, getBreedName } from '../services/game-utils';
 import { type Character } from './stat-calculations';
 
 // ============================================================================
@@ -840,7 +839,7 @@ export function getRecommendedStatDistribution(
   const priorities: string[] = [];
 
   // Calculate base stats with breed modifiers
-  const baseStats = {
+  const baseStats: Record<number, number> = {
     16: 15 + (breedModifiers[16] || 0), // Strength
     17: 15 + (breedModifiers[17] || 0), // Agility
     18: 15 + (breedModifiers[18] || 0), // Stamina

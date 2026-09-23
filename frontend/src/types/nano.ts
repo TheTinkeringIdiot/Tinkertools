@@ -69,7 +69,7 @@ export type EffectModifier = 'add' | 'multiply' | 'set' | 'percentage';
 
 export interface EffectCondition {
   type: string;
-  value: any;
+  value: unknown;
 }
 
 export interface EffectDuration {
@@ -371,7 +371,7 @@ export interface SynergyBenefit {
 
 export interface SynergyRequirement {
   type: string;
-  value: any;
+  value: unknown;
   description: string;
 }
 

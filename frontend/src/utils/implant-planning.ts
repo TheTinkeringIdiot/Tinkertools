@@ -10,7 +10,6 @@
 import {
   NP_MODS,
   JOBE_SKILL,
-  JOBE_MODS,
   IMP_SKILLS,
   IMP_SLOTS,
   CLUSTER_MIN_QL,
@@ -450,7 +449,7 @@ export function calculateSlotBenefits(slotData: ImplantSlotData, slot: ClusterTy
  * Get all available skills for a slot and cluster type
  */
 export function getAvailableSkills(slotName: ImpSlotName, clusterType: ClusterType): string[] {
-  return IMP_SKILLS[slotName][clusterType] || [];
+  return [...(IMP_SKILLS[slotName][clusterType] || [])];
 }
 
 /**

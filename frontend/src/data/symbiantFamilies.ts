@@ -164,6 +164,6 @@ export function canProfessionUseFamily(profession: Profession, family: SymbiantF
  */
 export function getProfessionsForFamily(family: SymbiantFamily): Profession[] {
   return Object.entries(professionFamilies)
-    .filter(([_, families]) => families.includes(family))
+    .filter(([, families]) => families.includes(family))
     .map(([profession]) => profession as Profession);
 }

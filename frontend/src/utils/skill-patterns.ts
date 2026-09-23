@@ -447,14 +447,14 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
 
   154: {
     statId: 154,
-    patterns: [/^Dodge[\-\s]*R(a)?ng(ed)?$/i],
+    patterns: [/^Dodge[-\s]*R(a)?ng(ed)?$/i],
     category: 'Body & Defense',
     description: 'Dodge Ranged',
   },
 
   155: {
     statId: 155,
-    patterns: [/^Evade[\-\s]*Cls\s*C(ombat)?$/i],
+    patterns: [/^Evade[-\s]*Cls\s*C(ombat)?$/i],
     category: 'Body & Defense',
     description: 'Evade Close Combat',
   },
@@ -468,7 +468,7 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
 
   153: {
     statId: 153,
-    patterns: [/^Duck[\-\s]*Exp(losions?)?$/i],
+    patterns: [/^Duck[-\s]*Exp(losions?)?$/i],
     category: 'Body & Defense',
     description: 'Duck Explosions',
   },
@@ -954,7 +954,7 @@ export const SKILL_PATTERNS: Record<number, SkillPattern> = {
  * @returns The skill value if found, or null
  */
 export function findSkillByPattern(
-  skillCategory: Record<string, any>,
+  skillCategory: Record<string, unknown>,
   statId: number
 ): number | null {
   const pattern = SKILL_PATTERNS[statId];
@@ -966,7 +966,7 @@ export function findSkillByPattern(
       if (regex.test(skillName)) {
         // Handle both direct values and objects with value property
         if (typeof skillData === 'object' && skillData !== null && 'value' in skillData) {
-          return skillData.value;
+          return typeof skillData.value === 'number' ? skillData.value : null;
         } else if (typeof skillData === 'number') {
           return skillData;
         }

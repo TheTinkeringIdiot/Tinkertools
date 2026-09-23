@@ -6,13 +6,9 @@
  */
 
 import {
-  STAT,
-  ITEM_CLASS,
   WEAPON_SLOT_POSITIONS,
   ARMOR_SLOT_POSITION,
   IMPLANT_SLOT_POSITION,
-  PROFESSION,
-  BREED,
 } from '../services/game-data';
 import {
   getStatName,
@@ -136,7 +132,7 @@ export function validateItemEquipment(
   }
 
   // Check flag restrictions
-  const flagConflicts = checkFlagRestrictions(item, character);
+  const flagConflicts = checkFlagRestrictions(item);
   if (flagConflicts.length > 0) {
     canEquip = false;
     reasons.push(...flagConflicts);
@@ -227,26 +223,29 @@ export function checkSlotConflicts(item: Item, currentEquipment?: EquipmentSet):
 
   // Check if slot is already occupied
   switch (slotCategory) {
-    case 'weapon':
+    case 'weapon': {
       const currentWeapon = currentEquipment.weapons[slotName];
       if (currentWeapon) {
         conflicts.push(`${slotName} occupied by ${currentWeapon.name}`);
       }
       break;
+    }
 
-    case 'armor':
+    case 'armor': {
       const currentArmor = currentEquipment.armor[slotName];
       if (currentArmor) {
         conflicts.push(`${slotName} occupied by ${currentArmor.name}`);
       }
       break;
+    }
 
-    case 'implant':
+    case 'implant': {
       const currentImplant = currentEquipment.implants[slotName];
       if (currentImplant) {
         conflicts.push(`${slotName} occupied by ${currentImplant.name}`);
       }
       break;
+    }
   }
 
   return conflicts;
@@ -255,7 +254,7 @@ export function checkSlotConflicts(item: Item, currentEquipment?: EquipmentSet):
 /**
  * Check flag-based restrictions
  */
-export function checkFlagRestrictions(item: Item, character: Character): string[] {
+export function checkFlagRestrictions(item: Item): string[] {
   const issues: string[] = [];
 
   if (!item.flags) {

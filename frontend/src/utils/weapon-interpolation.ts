@@ -15,7 +15,7 @@
  */
 
 import type { WeaponCandidate, FiteInputState } from '@/types/weapon-analysis';
-import type { StatValue, Criterion } from '@/types/api';
+import type { StatValue } from '@/types/api';
 import { checkRequirements } from './weapon-requirements';
 import { WEAPON_STAT_IDS } from '@/types/weapon-analysis';
 
