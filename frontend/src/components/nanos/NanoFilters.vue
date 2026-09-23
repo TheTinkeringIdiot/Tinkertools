@@ -121,6 +121,9 @@ Supports filtering by school, strain, profession, quality level, and skill compa
         <div class="flex items-center gap-2">
           <Checkbox v-model="filters.skillCompatible" input-id="skill-compatible" binary />
           <label
+            v-tooltip.right="
+              'Your skills and abilities are high enough; other requirements (profession, level...) are not checked'
+            "
             for="skill-compatible"
             class="text-sm text-surface-700 dark:text-surface-300 cursor-pointer"
           >
@@ -141,17 +144,23 @@ Supports filtering by school, strain, profession, quality level, and skill compa
 
       <!-- Skill Gap Analysis -->
       <div class="space-y-2">
-        <label class="text-sm font-medium text-surface-700 dark:text-surface-300">
+        <label for="skill-gap" class="text-sm font-medium text-surface-700 dark:text-surface-300">
           Show nanos within skill gap:
         </label>
         <Dropdown
           v-model="skillGapThreshold"
+          input-id="skill-gap"
           :options="skillGapOptions"
           option-label="label"
           option-value="value"
           placeholder="Select threshold"
+          show-clear
           class="w-full"
         />
+        <p class="text-xs text-surface-500 dark:text-surface-400">
+          Nanos you could cast by raising each missing skill by at most this much. Nanos blocked by
+          anything else (profession, level...) are hidden.
+        </p>
       </div>
 
       <!-- Memory Usage Filter -->
@@ -416,12 +425,12 @@ const durationTypes: DurationType[] = [
 const targetTypes = ['Self', 'Team Member', 'Enemy', 'Area', 'Item', 'Pet'];
 
 const skillGapOptions: SkillGapOption[] = [
-  { label: 'No Gap (Exact Match)', value: 0 },
+  { label: 'No Gap (Castable)', value: 0 },
   { label: 'Within 50 points', value: 50 },
   { label: 'Within 100 points', value: 100 },
   { label: 'Within 200 points', value: 200 },
   { label: 'Within 500 points', value: 500 },
-  { label: 'Any Gap', value: 9999 },
+  { label: 'Any Skill Gap', value: 9999 },
 ];
 
 const sortOptions: SortOption[] = [
@@ -613,19 +622,19 @@ watch(
   { deep: true }
 );
 
-// Watch for external changes to modelValue
+// Mirror modelValue, including on mount: filters restored from storage must show
 watch(
   () => props.modelValue,
   (newValue) => {
     filters.value = { ...newValue };
 
-    // Update local state to match
-    selectedQualityLevels.value = newValue.qualityLevels || [];
-    selectedProfessions.value = newValue.professions || [];
-    selectedStrains.value = newValue.strains || [];
-    selectedEffectTypes.value = newValue.effectTypes || [];
-    selectedDurations.value = newValue.durationType || [];
-    selectedTargetTypes.value = newValue.targetTypes || [];
+    // Update local state to match (copies: toggleEffectType edits its array in place)
+    selectedQualityLevels.value = [...(newValue.qualityLevels || [])];
+    selectedProfessions.value = [...(newValue.professions || [])];
+    selectedStrains.value = [...(newValue.strains || [])];
+    selectedEffectTypes.value = [...(newValue.effectTypes || [])];
+    selectedDurations.value = [...(newValue.durationType || [])];
+    selectedTargetTypes.value = [...(newValue.targetTypes || [])];
 
     if (newValue.levelRange) {
       levelRange.value = [...newValue.levelRange] as [number, number];
@@ -637,11 +646,12 @@ watch(
       nanoPointRange.value = [...newValue.nanoPointRange] as [number, number];
     }
 
-    skillGapThreshold.value = newValue.skillGapThreshold || null;
+    // 0 ("no gap") is a threshold, not a missing one
+    skillGapThreshold.value = newValue.skillGapThreshold ?? null;
     sortBy.value = newValue.sortBy || 'name';
     sortDescending.value = newValue.sortDescending || false;
   },
-  { deep: true }
+  { deep: true, immediate: true }
 );
 </script>
 

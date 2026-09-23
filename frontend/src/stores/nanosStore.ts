@@ -3,8 +3,14 @@ import { ref, computed } from 'vue';
 import { apiClient } from '@/services/api-client';
 import { versionKey, adoptLegacyKey } from '@/services/version-keys';
 import { errorMessage } from '@/services/error-message';
+import { SKILL_COST_FACTORS } from '@/services/game-data';
+import { ABILITY_INDEX_TO_STAT_ID } from '@/lib/tinkerprofiles/ip-calculator';
+import { mapProfileToStats } from '@/utils/profile-stats-mapper';
+import { getNanoCompatibility } from '@/components/nanos/nano-compatibility';
+import { useTinkerProfilesStore } from './tinkerProfiles';
 import type {
   NanoProgram,
+  NanoCompatibilityInfo,
   NanoFilters,
   NanoPreferences,
   NanoSearchRequest,
@@ -62,6 +68,34 @@ function toNanoProgram(item: BackendNanoProgram): NanoProgram {
   };
 }
 
+/** Stats a character raises with IP: the six abilities and every trainable skill */
+const SKILL_STAT_IDS = new Set([
+  ...ABILITY_INDEX_TO_STAT_ID,
+  ...Object.keys(SKILL_COST_FACTORS).map(Number),
+]);
+
+/**
+ * How many points the character's skills fall short of casting the nano: the
+ * largest shortfall among its unmet requirements, 0 when it can be cast. Null
+ * when something no skill can fix (profession, level, a flag...) blocks it.
+ */
+export function nanoSkillGap(info: NanoCompatibilityInfo): number | null {
+  if (info.canCast) return 0;
+  if (info.unmetRequirements.length === 0) return null;
+
+  let gap = 0;
+  for (const req of info.unmetRequirements) {
+    if (!SKILL_STAT_IDS.has(req.stat) || req.operator !== '≥') return null;
+    gap = Math.max(gap, req.required - req.current);
+  }
+  return gap;
+}
+
+/** True when no unmet requirement of the nano is on a skill or ability */
+export function meetsNanoSkillRequirements(info: NanoCompatibilityInfo): boolean {
+  return info.unmetRequirements.every((req) => !SKILL_STAT_IDS.has(req.stat));
+}
+
 /**
  * Per-version keys: the nano list is server data and favorites are AOID-keyed,
  * so both mean something different in every game version.
@@ -117,6 +151,31 @@ export const useNanosStore = defineStore('nanos', () => {
   });
 
   // Getters
+
+  /**
+   * The profile compatibility is shown for: the app's active profile, while
+   * the user has compatibility switched on.
+   */
+  const compatibilityProfile = computed(() =>
+    // The profiles store is looked up lazily, as other stores do
+    preferences.value.showCompatibility ? useTinkerProfilesStore().activeProfile : null
+  );
+
+  /**
+   * Casting compatibility of every loaded nano (by nano ID) with the
+   * compatibility profile, or null when compatibility is off. The profile's
+   * stat map is built once per profile change, not once per nano.
+   */
+  const nanoCompatibility = computed(() => {
+    const profile = compatibilityProfile.value;
+    if (!profile) return null;
+
+    const characterStats = mapProfileToStats(profile);
+    return new Map(
+      nanos.value.map((nano) => [nano.id, getNanoCompatibility(nano, characterStats)])
+    );
+  });
+
   const filteredNanos = computed(() => {
     let result = [...nanos.value];
 
@@ -176,6 +235,32 @@ export const useNanosStore = defineStore('nanos', () => {
       });
     }
 
+    // Apply compatibility filters, while compatibility is shown
+    const compatibility = nanoCompatibility.value;
+    if (compatibility) {
+      const infoOf = (nano: NanoProgram) => compatibility.get(nano.id);
+
+      if (filters.value.castable) {
+        result = result.filter((nano) => infoOf(nano)?.canCast);
+      }
+
+      if (filters.value.skillCompatible) {
+        result = result.filter((nano) => {
+          const info = infoOf(nano);
+          return !!info && meetsNanoSkillRequirements(info);
+        });
+      }
+
+      const threshold = filters.value.skillGapThreshold;
+      if (threshold != null) {
+        result = result.filter((nano) => {
+          const info = infoOf(nano);
+          const gap = info ? nanoSkillGap(info) : null;
+          return gap !== null && gap <= threshold;
+        });
+      }
+    }
+
     // Apply sorting
     if (filters.value.sortBy) {
       result.sort((a, b) => {
@@ -200,6 +285,13 @@ export const useNanosStore = defineStore('nanos', () => {
           case 'memoryUsage':
             comparison = (a.memoryUsage || 0) - (b.memoryUsage || 0);
             break;
+          case 'compatibility': {
+            // Without compatibility every score is 0, so this sorts by name
+            const score = (nano: NanoProgram) =>
+              compatibility?.get(nano.id)?.compatibilityScore ?? 0;
+            comparison = score(a) - score(b) || a.name.localeCompare(b.name);
+            break;
+          }
           default:
             comparison = a.name.localeCompare(b.name);
         }
@@ -580,6 +672,8 @@ export const useNanosStore = defineStore('nanos', () => {
     searchHistory: searchHistory as Readonly<typeof searchHistory>,
 
     // Getters
+    compatibilityProfile,
+    nanoCompatibility,
     filteredNanos,
     favoriteNanos,
     availableSchools,

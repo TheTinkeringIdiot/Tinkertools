@@ -17,7 +17,27 @@ Browse nano programs by profession or search across all nanos
           <Badge v-if="selectedProfessionName" :value="selectedProfessionName" severity="info" />
           <Badge :value="`${filteredNanos.length} nanos`" severity="secondary" />
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-4">
+          <!-- Compatibility Toggle: checks the nanos against the active profile -->
+          <span
+            v-if="isSearchMode"
+            v-tooltip.bottom="compatibilityTooltip"
+            class="flex items-center gap-2"
+            data-testid="compatibility-toggle"
+          >
+            <InputSwitch
+              v-model="showCompatibility"
+              input-id="compatibility-toggle"
+              :disabled="!profilesStore.hasActiveProfile"
+            />
+            <label
+              for="compatibility-toggle"
+              class="text-sm text-surface-700 dark:text-surface-300"
+              :class="{ 'opacity-60': !profilesStore.hasActiveProfile }"
+            >
+              Show Compatibility
+            </label>
+          </span>
           <Button
             label="Search Mode"
             :severity="isSearchMode ? 'primary' : 'secondary'"
@@ -43,7 +63,7 @@ Browse nano programs by profession or search across all nanos
       <div class="p-4 border-b border-surface-200 dark:border-surface-700">
         <NanoFilters
           v-model="filters"
-          :show-compatibility="showSkillCompatibility"
+          :show-compatibility="showCompatibility"
           :active-profile="activeProfile"
           :available-strains="nanosStore.availableStrains"
           @filter-change="handleFilterChange"
@@ -64,7 +84,7 @@ Browse nano programs by profession or search across all nanos
           v-else
           :nanos="filteredNanos"
           :loading="loading"
-          :show-compatibility="showSkillCompatibility"
+          :show-compatibility="showCompatibility"
           :active-profile="activeProfile"
           @nano-select="handleNanoSelect"
         />
@@ -95,7 +115,7 @@ Browse nano programs by profession or search across all nanos
       v-model:visible="showNanoDetail"
       :nano="selectedNano"
       :active-profile="activeProfile"
-      :show-compatibility="showSkillCompatibility"
+      :show-compatibility="showCompatibility"
       @close="showNanoDetail = false"
     />
   </div>
@@ -105,6 +125,7 @@ Browse nano programs by profession or search across all nanos
 import { ref, computed, watch } from 'vue';
 import Badge from 'primevue/badge';
 import Button from 'primevue/button';
+import InputSwitch from 'primevue/inputswitch';
 import ProgressSpinner from 'primevue/progressspinner';
 import ProfessionList from '@/components/nanos/ProfessionList.vue';
 import ProfessionNanoDisplay from '@/components/nanos/ProfessionNanoDisplay.vue';
@@ -127,8 +148,6 @@ const isSearchMode = ref(false);
 const searchQuery = ref('');
 const showNanoDetail = ref(false);
 const selectedNano = ref<NanoProgram | null>(null);
-const selectedProfile = ref<string | null>(null);
-const showSkillCompatibility = ref(false);
 const filters = ref(nanosStore.filters);
 
 // Computed
@@ -137,10 +156,23 @@ const selectedProfessionName = computed(() => {
   return PROFESSION[nanosStore.selectedProfession as keyof typeof PROFESSION] || 'Unknown';
 });
 
-const activeProfile = computed(() => {
-  if (!selectedProfile.value) return null;
-  return profilesStore.activeProfile;
+/**
+ * Whether nanos are checked against the active profile. The choice is a
+ * remembered nano preference; it only takes effect while a profile is active.
+ */
+const showCompatibility = computed({
+  get: () => nanosStore.preferences.showCompatibility && profilesStore.hasActiveProfile,
+  set: (value: boolean) => nanosStore.updatePreferences({ showCompatibility: value }),
 });
+
+const compatibilityTooltip = computed(() =>
+  profilesStore.hasActiveProfile
+    ? `Check each nano's casting requirements against ${profilesStore.activeProfileName}`
+    : 'Create or select an active profile to check nano compatibility'
+);
+
+/** The profile compatibility is shown for, as the store evaluates it */
+const activeProfile = computed(() => nanosStore.compatibilityProfile);
 
 const filteredNanos = computed(() => {
   if (!isSearchMode.value) {
