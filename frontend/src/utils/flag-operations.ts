@@ -9,6 +9,12 @@
 // Flag Enum Definitions (converted from Python)
 // ============================================================================
 
+/**
+ * A flag enum or constant map. Numeric TS enums also carry reverse
+ * (value -> name) entries, so values can be strings; callers skip them.
+ */
+export type FlagEnum = Record<string, string | number>;
+
 export enum SPECIALIZATION_FLAG {
   NONE = 0,
   First = 1,
@@ -376,10 +382,10 @@ export function countSetBits(flags: number): number {
 /**
  * Get all set flag values from a combined flag
  */
-export function getSetFlags(flags: number, flagEnum: Record<string, number>): number[] {
+export function getSetFlags(flags: number, flagEnum: FlagEnum): number[] {
   const setFlags: number[] = [];
 
-  for (const [name, value] of Object.entries(flagEnum)) {
+  for (const value of Object.values(flagEnum)) {
     if (typeof value === 'number' && value > 0 && isFlagSet(flags, value)) {
       setFlags.push(value);
     }
@@ -391,7 +397,7 @@ export function getSetFlags(flags: number, flagEnum: Record<string, number>): nu
 /**
  * Get names of all set flags from a combined flag
  */
-export function getSetFlagNames(flags: number, flagEnum: Record<string, number>): string[] {
+export function getSetFlagNames(flags: number, flagEnum: FlagEnum): string[] {
   const setFlagNames: string[] = [];
 
   for (const [name, value] of Object.entries(flagEnum)) {
@@ -677,7 +683,7 @@ export function flagToHexString(flags: number): string {
  */
 export function describeFlagValue(
   flags: number,
-  flagEnum: Record<string, number>,
+  flagEnum: FlagEnum,
   flagTypeName: string = 'flags'
 ): string {
   const setFlags = getSetFlagNames(flags, flagEnum);

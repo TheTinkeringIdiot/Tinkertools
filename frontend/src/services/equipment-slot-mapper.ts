@@ -217,11 +217,11 @@ export class EquipmentSlotMapper {
    * Normalizes equipment data by mapping UI slot names to profile keys
    * Supports legacy profiles with mixed slot naming
    */
-  static normalizeEquipmentData(
-    equipmentData: Record<string, any>,
+  static normalizeEquipmentData<T>(
+    equipmentData: Record<string, T>,
     equipmentType: EquipmentType
-  ): Record<string, any> {
-    const normalized: Record<string, any> = {};
+  ): Record<string, T> {
+    const normalized: Record<string, T> = {};
 
     for (const [slotName, item] of Object.entries(equipmentData || {})) {
       const profileSlotKey = this.mapToProfileSlot(slotName, equipmentType) || slotName;
@@ -235,10 +235,10 @@ export class EquipmentSlotMapper {
    * Creates a standardized equipment access interface
    * Returns an object that can be accessed using either UI names or profile keys
    */
-  static createEquipmentProxy(
-    equipmentData: Record<string, any>,
+  static createEquipmentProxy<T>(
+    equipmentData: Record<string, T>,
     equipmentType: EquipmentType
-  ): Record<string, any> {
+  ): Record<string, T> {
     const normalized = this.normalizeEquipmentData(equipmentData, equipmentType);
 
     return new Proxy(normalized, {
@@ -257,7 +257,7 @@ export class EquipmentSlotMapper {
         return undefined;
       },
 
-      set(target, prop: string, value: any) {
+      set(target, prop: string, value: T) {
         // Always normalize to profile key when setting
         const profileKey = EquipmentSlotMapper.mapToProfileSlot(prop, equipmentType) || prop;
         target[profileKey] = value;
@@ -270,7 +270,7 @@ export class EquipmentSlotMapper {
    * Validates equipment slot compatibility for item requirements
    */
   static validateSlotCompatibility(
-    item: any,
+    item: unknown,
     slotName: string,
     equipmentType: EquipmentType
   ): boolean {
@@ -285,10 +285,10 @@ export class EquipmentSlotMapper {
   /**
    * Legacy support: handle old profile formats with inconsistent slot names
    */
-  static migrateSlotNames(
-    equipmentData: Record<string, any>,
+  static migrateSlotNames<T>(
+    equipmentData: Record<string, T>,
     equipmentType: EquipmentType
-  ): Record<string, any> {
+  ): Record<string, T> {
     return this.normalizeEquipmentData(equipmentData, equipmentType);
   }
 }
@@ -300,7 +300,7 @@ export class EquipmentSlotMapper {
 /**
  * Quick access to weapon equipment with slot name normalization
  */
-export function getWeaponSlot(weapons: Record<string, any>, slotName: string): any {
+export function getWeaponSlot<T>(weapons: Record<string, T>, slotName: string): T | undefined {
   const proxy = EquipmentSlotMapper.createEquipmentProxy(weapons || {}, 'weapons');
   return proxy[slotName];
 }
@@ -308,7 +308,7 @@ export function getWeaponSlot(weapons: Record<string, any>, slotName: string): a
 /**
  * Quick access to clothing equipment with slot name normalization
  */
-export function getClothingSlot(clothing: Record<string, any>, slotName: string): any {
+export function getClothingSlot<T>(clothing: Record<string, T>, slotName: string): T | undefined {
   const proxy = EquipmentSlotMapper.createEquipmentProxy(clothing || {}, 'clothing');
   return proxy[slotName];
 }
@@ -316,7 +316,7 @@ export function getClothingSlot(clothing: Record<string, any>, slotName: string)
 /**
  * Quick access to implant equipment with slot name normalization
  */
-export function getImplantSlot(implants: Record<string, any>, slotName: string): any {
+export function getImplantSlot<T>(implants: Record<string, T>, slotName: string): T | undefined {
   const proxy = EquipmentSlotMapper.createEquipmentProxy(implants || {}, 'implants');
   return proxy[slotName];
 }
@@ -324,10 +324,10 @@ export function getImplantSlot(implants: Record<string, any>, slotName: string):
 /**
  * Set equipment in slot with automatic slot name normalization
  */
-export function setEquipmentSlot(
-  equipmentData: Record<string, any>,
+export function setEquipmentSlot<T>(
+  equipmentData: Record<string, T>,
   slotName: string,
-  item: any,
+  item: T,
   equipmentType: EquipmentType
 ): void {
   const profileSlotKey = EquipmentSlotMapper.mapToProfileSlot(slotName, equipmentType) || slotName;

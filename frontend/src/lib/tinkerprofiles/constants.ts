@@ -7,7 +7,7 @@
 import type { TinkerProfile, NanoCompatibleProfile, SkillData } from './types';
 import type { PerkSystem } from './perk-types';
 import { getBreedInitValue, calcHP, calcNP, ABILITY_INDEX_TO_STAT_ID } from './ip-calculator';
-import { getBreedId, normalizeBreedToId, normalizeProfessionToId } from '../../services/game-utils';
+import { getBreedId, normalizeBreedToId } from '../../services/game-utils';
 import { skillService } from '../../services/skill-service';
 
 // Import BASE_SKILL constant from ip-calculator
@@ -331,30 +331,19 @@ function createDefaultPerkSystem(level: number = 1, alienLevel: number = 0): Per
 }
 
 /**
- * Get breed ID from breed name
- */
-function getBreedIdFromBreedName(breed: string): number {
-  const breedMap: Record<string, number> = {
-    Solitus: 1,
-    Opifex: 2,
-    Nanomage: 3,
-    Atrox: 4,
-  };
-  return breedMap[breed] || 1; // Default to Solitus
-}
-
-/**
  * Create default v4.0.0 skills map for a breed
  * Initializes all ~168 skills with appropriate base values
  */
-export function createDefaultSkillsV4(breed: string): { [skillId: number]: SkillData } {
+export function createDefaultSkillsV4(breed: string | number): {
+  [skillId: number]: SkillData;
+} {
   const skills: { [skillId: number]: SkillData } = {};
 
   // Get all skill IDs from SkillService
   const allSkillIds = skillService.getAllSkills();
 
   // Get breed ID for breed-specific ability lookup
-  const breedId = getBreedId(breed) || 1; // Default to Solitus
+  const breedId = normalizeBreedToId(breed); // Defaults to Solitus
 
   for (const skillId of allSkillIds) {
     const category = skillService.getCategory(Number(skillId));
@@ -389,7 +378,7 @@ export function createDefaultSkillsV4(breed: string): { [skillId: number]: Skill
  */
 export function createDefaultProfile(
   name: string = 'New Character',
-  breed: string = 'Solitus'
+  breed: string | number = 'Solitus'
 ): TinkerProfile {
   const now = new Date().toISOString();
 
@@ -412,8 +401,8 @@ export function createDefaultProfile(
     Character: {
       Name: name,
       Level: 1,
-      Profession: professionId as any, // Store as numeric ID
-      Breed: breedId as any, // Store as numeric ID
+      Profession: professionId, // Store as numeric ID
+      Breed: breedId, // Store as numeric ID
       Faction: 'Neutral',
       Expansion: 'Lost Eden',
       AccountType: 'Paid',
@@ -422,7 +411,7 @@ export function createDefaultProfile(
       Specialization: 0,
     },
 
-    skills: createDefaultSkillsV4(breed),
+    skills: createDefaultSkillsV4(breedId),
 
     Weapons: structuredClone(DEFAULT_WEAPONS),
     Clothing: structuredClone(DEFAULT_CLOTHING),

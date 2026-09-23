@@ -8,7 +8,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { checkActionRequirements, parseAction } from '../action-criteria';
-import type { Action, Criterion } from '../../types/api';
+import type { Action } from '../../types/api';
 
 // Mock game-data constants
 vi.mock('../game-data', () => ({

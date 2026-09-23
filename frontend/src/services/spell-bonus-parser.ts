@@ -28,7 +28,7 @@ interface Spell {
   id: number;
   spell_id: number;
   spell_format?: string;
-  spell_params: Record<string, any>;
+  spell_params: Record<string, unknown>;
   target?: number;
   tick_count?: number;
   tick_interval?: number;
@@ -64,7 +64,7 @@ export interface BonusParseResult {
  * - 14: Wear (armor, jewelry)
  * - 2: Wield (weapons)
  */
-export const EQUIPMENT_EVENTS = [14, 2] as const;
+export const EQUIPMENT_EVENTS: readonly number[] = [14, 2];
 
 /**
  * Spell IDs that provide stat bonuses
@@ -73,7 +73,7 @@ export const EQUIPMENT_EVENTS = [14, 2] as const;
  * - 53014: "Modify {Stat} for {Duration}s by {Amount}" (timed bonus, but some equipment uses this)
  * - 53175: Additional stat modifier format (if exists)
  */
-export const STAT_BONUS_SPELL_IDS = [53045, 53012, 53014, 53175] as const;
+export const STAT_BONUS_SPELL_IDS: readonly number[] = [53045, 53012, 53014, 53175];
 
 // ============================================================================
 // Core Parsing Functions
@@ -101,7 +101,9 @@ export function parseItemSpellBonuses(spellData: SpellData[], itemName?: string)
 
   try {
     // Filter for relevant equipment events
-    const relevantSpellData = spellData.filter((sd) => EQUIPMENT_EVENTS.includes(sd.event as any));
+    const relevantSpellData = spellData.filter(
+      (sd) => sd.event !== undefined && EQUIPMENT_EVENTS.includes(sd.event)
+    );
 
     for (const spellDataEntry of relevantSpellData) {
       if (!spellDataEntry.spells || !Array.isArray(spellDataEntry.spells)) {
@@ -112,7 +114,7 @@ export function parseItemSpellBonuses(spellData: SpellData[], itemName?: string)
 
       // Filter for stat bonus spells
       const bonusSpells = spellDataEntry.spells.filter((spell) =>
-        STAT_BONUS_SPELL_IDS.includes(spell.spell_id as any)
+        STAT_BONUS_SPELL_IDS.includes(spell.spell_id)
       );
 
       for (const spell of bonusSpells) {
@@ -141,6 +143,13 @@ export function parseItemSpellBonuses(spellData: SpellData[], itemName?: string)
   return result;
 }
 
+/** A numeric spell parameter, parsing strings; NaN for anything else */
+function toNumber(value: unknown, parse: (value: string) => number): number {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return parse(value);
+  return NaN;
+}
+
 /**
  * Parse a single spell to extract stat bonus information
  *
@@ -164,8 +173,8 @@ export function parseSpellStatBonus(spell: Spell, itemSource?: string): StatBonu
     }
 
     // Convert to numbers if they're strings
-    const skillId = typeof statParam === 'string' ? parseInt(statParam, 10) : statParam;
-    const amount = typeof amountParam === 'string' ? parseFloat(amountParam) : amountParam;
+    const skillId = toNumber(statParam, (value) => parseInt(value, 10));
+    const amount = toNumber(amountParam, parseFloat);
 
     // Validate numeric conversion
     if (isNaN(skillId) || isNaN(amount)) {
@@ -224,9 +233,7 @@ export function filterEquipmentEvents(spellData: SpellData[]): SpellData[] {
     return [];
   }
 
-  return spellData.filter(
-    (sd) => sd?.event !== undefined && EQUIPMENT_EVENTS.includes(sd.event as any)
-  );
+  return spellData.filter((sd) => sd?.event !== undefined && EQUIPMENT_EVENTS.includes(sd.event));
 }
 
 /**
@@ -244,8 +251,7 @@ export function extractStatBonusSpells(spellData: SpellData[]): Spell[] {
     }
 
     const relevantSpells = spellDataEntry.spells.filter(
-      (spell) =>
-        spell?.spell_id !== undefined && STAT_BONUS_SPELL_IDS.includes(spell.spell_id as any)
+      (spell) => spell?.spell_id !== undefined && STAT_BONUS_SPELL_IDS.includes(spell.spell_id)
     );
 
     bonusSpells.push(...relevantSpells);
@@ -281,7 +287,7 @@ export function convertStatIdToSkillName(statId: number | string): string | null
  * @param spellData Spell data to validate
  * @returns True if structure appears valid, false otherwise
  */
-export function validateSpellDataStructure(spellData: any): spellData is SpellData[] {
+export function validateSpellDataStructure(spellData: unknown): spellData is SpellData[] {
   if (!Array.isArray(spellData)) {
     return false;
   }

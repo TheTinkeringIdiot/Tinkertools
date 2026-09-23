@@ -5,17 +5,15 @@
  * integrating construction analysis with UI state management.
  */
 
-import { reactive, computed, ref } from 'vue';
+import { reactive, computed } from 'vue';
 import {
   generateConstructionPlan,
   rkClusterNP,
-  jobeClusterSkill,
   type SkillSet,
   type ConstructionPlan,
   type ConstructionStep,
 } from '../utils/construction-analysis';
 import { IMP_SLOTS, type ImpSlotName } from '../services/game-data';
-import { isJobeCluster } from '../utils/cluster-utilities';
 
 // ============================================================================
 // Service State

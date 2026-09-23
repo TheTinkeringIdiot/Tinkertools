@@ -61,8 +61,8 @@ export async function analyzeWeaponsWithCache(request: WeaponAnalyzeRequest): Pr
     `[WeaponService] Backend query: ${Math.round(responseTime)}ms, ${weapons.length} weapons`
   );
 
-  // Cache the result (no need to await, fire-and-forget)
-  cacheWeapons(cacheKey, weapons);
+  // Cache the result (fire-and-forget; cacheWeapons logs its own failures)
+  void cacheWeapons(cacheKey, weapons);
 
   return weapons;
 }

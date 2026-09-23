@@ -9,20 +9,15 @@
  * Features comprehensive caching and validation following the equipment bonus calculator pattern.
  */
 
-import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import type {
-  PerkEntry,
-  ResearchEntry,
   PerkValidationResult,
   PerkEffect,
   PerkEffectSummary,
   PerkCharacterData,
   PerkPointCalculation,
-  PerkPurchaseTransaction,
   PerkInfo,
   AnyPerkEntry,
 } from '@/lib/tinkerprofiles/perk-types';
-import { getSkillName } from '@/lib/tinkerprofiles/skill-mappings';
 
 // ============================================================================
 // Type Definitions

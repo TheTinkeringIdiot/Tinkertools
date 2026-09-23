@@ -13,7 +13,7 @@
 /**
  * List of stats that require interpolation
  */
-export const INTERP_STATS = [
+export const INTERP_STATS: readonly number[] = [
   1, 2, 3, 8, 16, 17, 18, 19, 20, 21, 22, 27, 29, 36, 37, 54, 61, 71, 74, 90, 91, 92, 93, 94, 95,
   96, 97, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117,
   118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136,
@@ -23,7 +23,7 @@ export const INTERP_STATS = [
   242, 243, 244, 245, 276, 277, 278, 279, 280, 281, 282, 284, 285, 286, 287, 294, 311, 315, 316,
   317, 318, 319, 343, 364, 374, 375, 379, 380, 381, 382, 383, 475, 476, 477, 478, 479, 480, 481,
   482, 483,
-] as const;
+];
 
 /**
  * Stat ID to human-readable name mapping
@@ -3130,7 +3130,10 @@ export const IMP_SLOTS = [
 /**
  * Complete implant skills mapping by slot and cluster type
  */
-export const IMP_SKILLS = {
+export const IMP_SKILLS: Record<
+  ImpSlotName,
+  Record<'Shiny' | 'Bright' | 'Faded', readonly string[]>
+> = {
   Eye: {
     Shiny: [
       'Aimed Shot',
@@ -3485,7 +3488,7 @@ export const IMP_SKILLS = {
     ],
     Faded: ['Add All Def.', 'Add All Off', 'Duck-Exp', 'Nano Delta'],
   },
-} as const;
+};
 
 /**
  * Cluster type slot indices
@@ -4117,8 +4120,8 @@ export type ImpSlotKey = keyof typeof IMP_SLOT_INDEX;
 export type ImpSlotName = (typeof IMP_SLOTS)[number];
 export type ClusterType = keyof typeof CLUSTER_SLOTS;
 export type ClusterMinQLKey = keyof typeof CLUSTER_MIN_QL;
-export type BreedId = keyof typeof BREEDS;
-export type BreedName = (typeof BREEDS)[BreedId];
+export type NukesBreedId = keyof typeof BREEDS;
+export type NukesBreedName = (typeof BREEDS)[NukesBreedId];
 export type DeckId = keyof typeof DECKS;
 export type DeckName = (typeof DECKS)[DeckId];
 export type SpecId = keyof typeof SPECS;

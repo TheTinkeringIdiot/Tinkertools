@@ -7,13 +7,11 @@
 
 import type {
   TinkerProfile,
-  NanoCompatibleProfile,
   ProfileMetadata,
   ProfileExportFormat,
   ProfileImportResult,
   ProfileImportOptions,
   ProfileValidationResult,
-  ProfileStorageOptions,
   ProfileEvents,
   TinkerProfilesConfig,
   ProfileSearchFilters,
@@ -24,7 +22,7 @@ import type {
 import { ProfileStorage } from './storage';
 import { ProfileValidator } from './validator';
 import { ProfileTransformer } from './transformer';
-import { createDefaultProfile, createDefaultNanoProfile } from './constants';
+import { createDefaultProfile } from './constants';
 import { currentGameVersion, stampGameVersion } from './game-version';
 import { buildVersionCopy, type ProfileVersionCopyResult } from './version-copy';
 import { ipIntegrator } from './ip-integrator';
@@ -124,49 +122,13 @@ export class TinkerProfilesManager {
   // ============================================================================
 
   /**
-   * Convert numeric Misc skills to MiscSkill objects for compatibility
-   */
-  private migrateProfileMiscSkills(profile: TinkerProfile): TinkerProfile {
-    if (!profile.Skills?.Misc) {
-      return profile;
-    }
-
-    const miscSkills = profile.Skills.Misc;
-    let skillsMigrated = 0;
-
-    // Check if migration is needed by examining skills
-    for (const [skillName, skillValue] of Object.entries(miscSkills)) {
-      if (typeof skillValue === 'number') {
-        // Convert numeric value to MiscSkill object
-        (profile.Skills.Misc as any)[skillName] = {
-          baseValue: 0,
-          equipmentBonus: 0,
-          perkBonus: 0,
-          buffBonus: 0,
-          value: skillValue, // Preserve the original numeric value
-        };
-        skillsMigrated++;
-      }
-    }
-
-    if (skillsMigrated > 0) {
-      profile.updated = new Date().toISOString();
-      console.log(
-        `[TinkerProfilesManager] Migrated ${skillsMigrated} Misc skills from numeric to MiscSkill objects for profile ${profile.Character.Name}`
-      );
-    }
-
-    return profile;
-  }
-
-  /**
    * Create a new profile
    */
   async createProfile(name: string, initialData?: Partial<TinkerProfile>): Promise<string> {
     try {
       // Extract breed from initialData to create profile with correct breed-specific values
       const breed = initialData?.Character?.Breed || 'Solitus';
-      let profile = createDefaultProfile(name, breed);
+      const profile = createDefaultProfile(name, breed);
 
       if (initialData) {
         Object.assign(profile, initialData);
@@ -176,10 +138,6 @@ export class TinkerProfilesManager {
       // New profiles belong to the version being browsed, unless the caller
       // (an import, a cross-version copy) already decided otherwise.
       stampGameVersion(profile);
-
-      // Misc skills should already be in correct format for new profiles (Task 1.2 completed)
-      // But apply migration as a safety net
-      profile = this.migrateProfileMiscSkills(profile);
 
       // Calculate caps and trickle-down for the new profile
       const { updateProfileWithIPTracking } = await import('./ip-integrator');
@@ -239,12 +197,9 @@ export class TinkerProfilesManager {
       let profile = await this.storage.loadProfile(profileId);
 
       if (profile) {
-        // Apply Misc skills migration if needed (this happens in storage.loadProfile, but double-check)
-        profile = this.migrateProfileMiscSkills(profile);
-
         // Ensure IP tracking is initialized
         if (!profile.IPTracker) {
-          profile = await ipIntegrator.recalculateProfileIP(profile);
+          profile = ipIntegrator.recalculateProfileIP(profile);
           await this.storage.saveProfile(profile); // Save the updated profile
         }
 
@@ -288,26 +243,20 @@ export class TinkerProfilesManager {
         throw new Error('Profile not found');
       }
 
+      // Apply non-equipment updates as-is
+      const { Weapons, Clothing, Implants, ...otherUpdates } = updates;
+      let updated: TinkerProfile = { ...existing, ...otherUpdates };
+
       // Deep merge equipment updates to preserve other slots
-      let updated = { ...existing };
-
-      // Handle equipment updates specially to preserve other slots
-      if (updates.Weapons) {
-        updated.Weapons = { ...existing.Weapons, ...updates.Weapons };
+      if (Weapons) {
+        updated.Weapons = { ...existing.Weapons, ...Weapons };
       }
-      if (updates.Clothing) {
-        updated.Clothing = { ...existing.Clothing, ...updates.Clothing };
+      if (Clothing) {
+        updated.Clothing = { ...existing.Clothing, ...Clothing };
       }
-      if (updates.Implants) {
-        updated.Implants = { ...existing.Implants, ...updates.Implants };
+      if (Implants) {
+        updated.Implants = { ...existing.Implants, ...Implants };
       }
-
-      // Apply other updates
-      Object.keys(updates).forEach((key) => {
-        if (key !== 'Weapons' && key !== 'Clothing' && key !== 'Implants') {
-          (updated as any)[key] = (updates as any)[key];
-        }
-      });
 
       updated.updated = new Date().toISOString();
 
@@ -321,7 +270,7 @@ export class TinkerProfilesManager {
 
       if (needsRecalc) {
         // Recalculate all stats including equipment bonuses, perk bonuses, etc
-        updated = await ipIntegrator.recalculateProfileIP(updated);
+        updated = ipIntegrator.recalculateProfileIP(updated);
       }
 
       // Validate the updated profile
@@ -472,7 +421,7 @@ export class TinkerProfilesManager {
     const copyResult = await buildVersionCopy(source, targetVersion, this.transformer);
 
     // Recompute IP, caps and bonuses against the newly resolved equipment.
-    const recalculated = await ipIntegrator.recalculateProfileIP(copyResult.profile);
+    const recalculated = ipIntegrator.recalculateProfileIP(copyResult.profile);
     Object.assign(copyResult.profile, recalculated);
     copyResult.profile.gameVersion = targetVersion;
 
@@ -549,7 +498,7 @@ export class TinkerProfilesManager {
     // Apply sorting
     if (sort) {
       filtered.sort((a, b) => {
-        let aVal: any, bVal: any;
+        let aVal: string | number, bVal: string | number;
 
         switch (sort.field) {
           case 'name':
@@ -565,12 +514,12 @@ export class TinkerProfilesManager {
             bVal = b.level;
             break;
           case 'created':
-            aVal = new Date(a.created);
-            bVal = new Date(b.created);
+            aVal = new Date(a.created).getTime();
+            bVal = new Date(b.created).getTime();
             break;
           case 'updated':
-            aVal = new Date(a.updated);
-            bVal = new Date(b.updated);
+            aVal = new Date(a.updated).getTime();
+            bVal = new Date(b.updated).getTime();
             break;
           default:
             return 0;
@@ -583,28 +532,6 @@ export class TinkerProfilesManager {
     }
 
     return filtered;
-  }
-
-  // ============================================================================
-  // Profile Transformations
-  // ============================================================================
-
-  /**
-   * Convert profile to nano-compatible format
-   */
-  async getAsNanoCompatible(profileId: string): Promise<NanoCompatibleProfile | null> {
-    const profile = await this.loadProfile(profileId);
-    if (!profile) return null;
-
-    return this.transformer.toNanoCompatible(profile);
-  }
-
-  /**
-   * Create profile from nano-compatible format
-   */
-  async createFromNanoCompatible(nanoProfile: NanoCompatibleProfile): Promise<string> {
-    const profile = this.transformer.fromNanoCompatible(nanoProfile);
-    return await this.createProfile(profile.Character.Name, profile);
   }
 
   // ============================================================================
@@ -839,7 +766,7 @@ export class TinkerProfilesManager {
       throw new Error('Profile not found');
     }
 
-    const updatedProfile = await ipIntegrator.recalculateProfileIP(profile);
+    const updatedProfile = ipIntegrator.recalculateProfileIP(profile);
     await this.updateProfile(profileId, updatedProfile);
   }
 
@@ -869,8 +796,7 @@ export class TinkerProfilesManager {
    */
   async modifySkill(
     profileId: string,
-    category: string,
-    skillName: string,
+    skillId: number,
     newValue: number
   ): Promise<{
     success: boolean;
@@ -881,7 +807,7 @@ export class TinkerProfilesManager {
       throw new Error('Profile not found');
     }
 
-    const result = await ipIntegrator.modifySkill(profile, category, skillName, newValue);
+    const result = ipIntegrator.modifySkill(profile, skillId, newValue);
 
     if (result.success && result.updatedProfile) {
       await this.updateProfile(profileId, result.updatedProfile);
@@ -898,7 +824,7 @@ export class TinkerProfilesManager {
    */
   async modifyAbility(
     profileId: string,
-    abilityName: string,
+    abilityId: number,
     newValue: number
   ): Promise<{
     success: boolean;
@@ -909,7 +835,7 @@ export class TinkerProfilesManager {
       throw new Error('Profile not found');
     }
 
-    const result = await ipIntegrator.modifyAbility(profile, abilityName, newValue);
+    const result = ipIntegrator.modifyAbility(profile, abilityId, newValue);
 
     if (result.success && result.updatedProfile) {
       await this.updateProfile(profileId, result.updatedProfile);

@@ -9,17 +9,20 @@ import { defineStore } from 'pinia';
 import { ref, computed, readonly, watch, toRaw } from 'vue';
 import {
   TinkerProfilesManager,
+  interpolatedToItem,
   type TinkerProfile,
   type ProfileMetadata,
   type ProfileExportFormat,
   type ProfileImportResult,
   type ProfileImportOptions,
+  type BulkImportResult,
+  type ImplantWithClusters,
+  type ProfileSearchFilters,
+  type ProfileSortOptions,
   type ProfileValidationResult,
   type TinkerProfilesConfig,
 } from '@/lib/tinkerprofiles';
-import { nanoCompatibility } from '@/utils/nano-compatibility';
-import type { Item } from '@/types/api';
-import { skillService } from '@/services/skill-service';
+import type { Item, InterpolatedItem } from '@/types/api';
 import type { SkillId } from '@/types/skills';
 import { getProfessionName } from '@/services/game-utils';
 import { useToast } from 'primevue/usetoast';
@@ -31,27 +34,33 @@ import {
   onGameVersionChange,
 } from '@/composables/useGameVersion';
 
-// Types that may not be exported yet
-type NanoCompatibleProfile = any; // TODO: Add proper type when available
-type BulkImportResult = {
-  totalProfiles: number;
-  successCount: number;
-  failureCount: number;
-  skippedCount: number;
-  results: Array<{
-    profileName: string;
-    profileId?: string;
-    success: boolean;
-    skipped: boolean;
-    error?: string;
-    warnings: string[];
-  }>;
-  metadata: {
-    source: string;
-    exportVersion: string;
-    exportDate: string;
-  };
-};
+/** A profile choice in the profile dropdowns */
+export interface ProfileOption {
+  label: string;
+  value: string | null;
+  gameVersion?: string;
+  /** True when selecting this profile requires copying it into the current version. */
+  otherVersion: boolean;
+  versionLabel: string;
+}
+
+/** The file written by exportAllProfiles() */
+interface BulkProfileExport {
+  version: string;
+  exportDate?: string;
+  profiles: TinkerProfile[];
+}
+
+function isBulkProfileExport(data: unknown): data is BulkProfileExport {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'version' in data &&
+    !!data.version &&
+    'profiles' in data &&
+    Array.isArray(data.profiles)
+  );
+}
 
 /**
  * Unsubscribe for the game-version listener of the most recent store instance.
@@ -111,7 +120,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     )
   );
 
-  function optionFor(profile: ProfileMetadata, otherVersion: boolean) {
+  function optionFor(profile: ProfileMetadata, otherVersion: boolean): ProfileOption {
     return {
       label: `${profile.name} (${profile.profession} ${profile.level})`,
       value: profile.id,
@@ -134,7 +143,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
   /** The same options as PrimeVue option groups, with other versions in a second group. */
   const groupedProfileOptions = computed(() => {
-    const groups: Array<{ label: string; items: any[] }> = [
+    const groups: Array<{ label: string; items: ProfileOption[] }> = [
       {
         label: gameVersionDisplayName(gameVersion.value),
         items: [
@@ -236,33 +245,35 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   function setupEventListeners() {
     if (!profileManager) return;
 
-    profileManager.on('profile:created', async ({ profile }) => {
-      await refreshMetadata();
+    // The manager emits synchronously and does not wait for listeners;
+    // refreshMetadata() catches and logs its own errors.
+    profileManager.on('profile:created', () => {
+      void refreshMetadata();
     });
 
-    profileManager.on('profile:updated', async ({ profile }) => {
+    profileManager.on('profile:updated', ({ profile }) => {
       profiles.value.set(profile.id, profile);
       if (activeProfileId.value === profile.id) {
         activeProfile.value = profile;
       }
-      await refreshMetadata();
+      void refreshMetadata();
     });
 
-    profileManager.on('profile:imported', async ({ profile }) => {
+    profileManager.on('profile:imported', ({ profile }) => {
       profiles.value.set(profile.id, profile);
       if (activeProfileId.value === profile.id) {
         activeProfile.value = profile;
       }
-      await refreshMetadata();
+      void refreshMetadata();
     });
 
-    profileManager.on('profile:deleted', async ({ profileId }) => {
+    profileManager.on('profile:deleted', ({ profileId }) => {
       profiles.value.delete(profileId);
       if (activeProfileId.value === profileId) {
         activeProfileId.value = null;
         activeProfile.value = null;
       }
-      await refreshMetadata();
+      void refreshMetadata();
     });
 
     profileManager.on('profile:activated', ({ profile }) => {
@@ -305,7 +316,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
         // Ensure caps and trickle-down are calculated for display
         // This also recalculates stale values like MaxNCU from stored profiles
         const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
-        const activeWithCaps = await updateProfileWithIPTracking(active);
+        const activeWithCaps = updateProfileWithIPTracking(active);
 
         // Save the recalculated profile back to storage to fix any stale values
         await profileManager.updateProfile(activeWithCaps.id, activeWithCaps);
@@ -415,7 +426,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       if (profile) {
         // Ensure caps and trickle-down are calculated for display
         const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
-        const profileWithCaps = await updateProfileWithIPTracking(profile);
+        const profileWithCaps = updateProfileWithIPTracking(profile);
 
         // Save the updated profile back to storage to persist the recalculated values
         await profileManager.updateProfile(profileId, profileWithCaps);
@@ -463,7 +474,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
           const { updateProfileWithIPTracking } = await import(
             '@/lib/tinkerprofiles/ip-integrator'
           );
-          const updatedProfile = await updateProfileWithIPTracking(profile);
+          const updatedProfile = updateProfileWithIPTracking(profile);
 
           // Update the active profile with recalculated bonuses
           activeProfile.value = updatedProfile;
@@ -544,32 +555,6 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     } finally {
       loading.value = false;
     }
-  }
-
-  // ============================================================================
-  // Profile Transformations
-  // ============================================================================
-
-  /**
-   * Get profile as nano-compatible format
-   */
-  async function getAsNanoCompatible(profileId: string): Promise<NanoCompatibleProfile | null> {
-    if (!profileManager) {
-      throw new Error('Profile manager not initialized');
-    }
-
-    return await profileManager.getAsNanoCompatible(profileId);
-  }
-
-  /**
-   * Create profile from nano-compatible format
-   */
-  async function createFromNanoCompatible(nanoProfile: NanoCompatibleProfile): Promise<string> {
-    if (!profileManager) {
-      throw new Error('Profile manager not initialized');
-    }
-
-    return await profileManager.createFromNanoCompatible(nanoProfile);
   }
 
   // ============================================================================
@@ -701,19 +686,19 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
     try {
       // Parse the bulk export data
-      let exportData: any;
+      let exportData: unknown;
       try {
         exportData = JSON.parse(data);
-      } catch (parseError) {
+      } catch {
         throw new Error('Invalid JSON format');
       }
 
       // Validate bulk export structure
-      if (!exportData.version || !exportData.profiles || !Array.isArray(exportData.profiles)) {
+      if (!isBulkProfileExport(exportData)) {
         throw new Error('Invalid bulk export format');
       }
 
-      const profiles = exportData.profiles as TinkerProfile[];
+      const profiles = exportData.profiles;
       const existingProfiles = profileMetadata.value.map((p) => p.name.toLowerCase());
       const existingIdsByName = new Map(
         profileMetadata.value.map((p) => [p.name.toLowerCase(), p.id])
@@ -827,7 +812,10 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   /**
    * Search profiles with filters
    */
-  async function searchProfiles(filters: any = {}, sort?: any): Promise<ProfileMetadata[]> {
+  async function searchProfiles(
+    filters: ProfileSearchFilters = {},
+    sort?: ProfileSortOptions
+  ): Promise<ProfileMetadata[]> {
     if (!profileManager) {
       throw new Error('Profile manager not initialized');
     }
@@ -917,13 +905,14 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       throw new Error('Profile not found');
     }
 
-    const duplicated = structuredClone(original);
+    const duplicated: Partial<TinkerProfile> & Pick<TinkerProfile, 'Character'> =
+      structuredClone(original);
     duplicated.Character.Name = newName || `${original.Character.Name} (Copy)`;
 
     // Remove ID and timestamps so createProfile generates new ones
-    delete (duplicated as any).id;
-    delete (duplicated as any).created;
-    delete (duplicated as any).updated;
+    delete duplicated.id;
+    delete duplicated.created;
+    delete duplicated.updated;
 
     return await createProfile(duplicated.Character.Name, duplicated);
   }
@@ -951,7 +940,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     try {
       // Use the IP integrator's modifySkill function which handles ID-based updates
       const { modifySkill } = await import('@/lib/tinkerprofiles/ip-integrator');
-      const result = await modifySkill(profile, Number(skillId), newValue);
+      const result = modifySkill(profile, Number(skillId), newValue);
 
       if (result.success && result.updatedProfile) {
         // Update the profile in storage and state
@@ -974,7 +963,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   /**
    * Equip an item to the active profile
    */
-  async function equipItem(item: any, slot: string): Promise<void> {
+  async function equipItem(item: Item | InterpolatedItem, slot: string): Promise<void> {
     if (!activeProfile.value) {
       throw new Error('No active profile selected');
     }
@@ -1015,12 +1004,23 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
     // Convert reactive proxies to plain objects to avoid serialization issues
     const plainProfile = toRaw(activeProfile.value);
-    const plainItem = toRaw(item);
+    // Profiles store plain Items; interpolated ones are converted first
+    const rawItem = toRaw(item);
+    const plainItem = 'interpolating' in rawItem ? interpolatedToItem(rawItem) : rawItem;
 
     // Update the equipment slot - create deep copy to avoid mutating original
     const updatedProfile = { ...plainProfile };
     // Deep copy the equipment category to ensure we don't mutate shared objects
-    updatedProfile[category] = { ...plainProfile[category], [slot]: plainItem };
+    if (category === 'Implants') {
+      // An implant equipped straight from the item database has none of the
+      // planner data (slot position, clusters); it is stored as the item.
+      updatedProfile.Implants = {
+        ...plainProfile.Implants,
+        [slot]: plainItem as ImplantWithClusters,
+      };
+    } else {
+      updatedProfile[category] = { ...plainProfile[category], [slot]: plainItem };
+    }
 
     // Update the profile (triggers save and recalculation)
     await updateProfile(activeProfile.value.id, updatedProfile);
@@ -1050,7 +1050,11 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     // Update the equipment slot to null - create deep copy to avoid mutating original
     const updatedProfile = { ...plainProfile };
     // Deep copy the equipment category to ensure we don't mutate shared objects
-    updatedProfile[category] = { ...plainProfile[category], [slot]: null };
+    if (category === 'Implants') {
+      updatedProfile.Implants = { ...plainProfile.Implants, [slot]: null };
+    } else {
+      updatedProfile[category] = { ...plainProfile[category], [slot]: null };
+    }
 
     // Update the profile (triggers save and recalculation)
     await updateProfile(activeProfile.value.id, updatedProfile);
@@ -1090,7 +1094,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     try {
       // Use enhanced IP integrator for ability modification
       const { modifyAbility } = await import('@/lib/tinkerprofiles/ip-integrator');
-      const result = await modifyAbility(profile, abilityId, newValue);
+      const result = modifyAbility(profile, abilityId, newValue);
 
       if (result.success && result.updatedProfile) {
         // Update the profile in storage and reactive state
@@ -1133,7 +1137,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
 
     // Use the IP integrator to recalculate IP tracking
     const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
-    const updatedProfile = await updateProfileWithIPTracking(profile);
+    const updatedProfile = updateProfileWithIPTracking(profile);
 
     await updateProfile(profileId, updatedProfile);
   }
@@ -1279,7 +1283,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     try {
       // Simply recalculate everything - the new structure handles it correctly
       const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
-      const updatedProfile = await updateProfileWithIPTracking(activeProfile.value);
+      const updatedProfile = updateProfileWithIPTracking(activeProfile.value);
 
       // Set flags to prevent watchers from triggering
       isUpdatingFromEquipmentBonus = true;
@@ -1309,7 +1313,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       if (equipmentUpdateState.value.pendingUpdate) {
         equipmentUpdateState.value.pendingUpdate = false;
         // Use a microtask to avoid stack overflow
-        Promise.resolve().then(() => handleEquipmentChange());
+        void Promise.resolve().then(() => handleEquipmentChange());
       }
     }
   }
@@ -1322,6 +1326,9 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
    */
   function setupEquipmentWatchers(): void {
     if (!activeProfile.value) return;
+
+    // handleEquipmentChange only schedules the (self-catching) recalculation,
+    // so the watchers fire and forget it.
 
     // Clean up any existing watchers before setting up new ones
     cleanupEquipmentWatchers();
@@ -1340,7 +1347,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
           return;
         // Only trigger if there are actual changes
         if (newWeapons !== oldWeapons) {
-          handleEquipmentChange('Weapons');
+          void handleEquipmentChange('Weapons');
         }
       },
       { deep: true, flush: 'post' }
@@ -1358,7 +1365,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
         )
           return;
         if (newClothing !== oldClothing) {
-          handleEquipmentChange('Clothing');
+          void handleEquipmentChange('Clothing');
         }
       },
       { deep: true, flush: 'post' }
@@ -1376,7 +1383,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
         )
           return;
         if (newImplants !== oldImplants) {
-          handleEquipmentChange('Implants');
+          void handleEquipmentChange('Implants');
         }
       },
       { deep: true, flush: 'post' }
@@ -1394,7 +1401,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
         )
           return;
         if (newPerks !== oldPerks) {
-          handleEquipmentChange('PerksAndResearch');
+          void handleEquipmentChange('PerksAndResearch');
         }
       },
       { deep: true, flush: 'post' }
@@ -1406,7 +1413,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
         // Skip if we're updating from buff recalculation
         if (isUpdatingFromBuffs) return;
         if (newBuffs !== oldBuffs) {
-          handleEquipmentChange('Buffs');
+          void handleEquipmentChange('Buffs');
         }
       },
       { deep: true, flush: 'post' }
@@ -1615,7 +1622,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       // Convert profile to raw to avoid reactive proxy serialization issues
       const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
       const rawProfile = toRaw(activeProfile.value);
-      const updatedProfile = await updateProfileWithIPTracking(rawProfile);
+      const updatedProfile = updateProfileWithIPTracking(rawProfile);
 
       // Update the profile in storage and state
       await updateProfile(activeProfile.value.id, updatedProfile);
@@ -1662,7 +1669,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       // Convert profile to raw to avoid reactive proxy serialization issues
       const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
       const rawProfile = toRaw(activeProfile.value);
-      const updatedProfile = await updateProfileWithIPTracking(rawProfile);
+      const updatedProfile = updateProfileWithIPTracking(rawProfile);
 
       // Update the profile in storage and state
       await updateProfile(activeProfile.value.id, updatedProfile);
@@ -1708,7 +1715,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
       // Convert profile to raw to avoid reactive proxy serialization issues
       const { updateProfileWithIPTracking } = await import('@/lib/tinkerprofiles/ip-integrator');
       const rawProfile = toRaw(activeProfile.value);
-      const updatedProfile = await updateProfileWithIPTracking(rawProfile);
+      const updatedProfile = updateProfileWithIPTracking(rawProfile);
 
       // Update the profile in storage and state
       await updateProfile(activeProfile.value.id, updatedProfile);
@@ -1770,8 +1777,6 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
     setActiveProfile,
     clearActiveProfile,
     copyProfileToCurrentVersion,
-    getAsNanoCompatible,
-    createFromNanoCompatible,
     exportProfile,
     exportAllProfiles,
     importProfile,

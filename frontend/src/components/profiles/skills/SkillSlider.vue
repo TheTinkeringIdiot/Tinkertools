@@ -148,13 +148,10 @@ import type { SkillData } from '@/lib/tinkerprofiles/types';
 import { skillService } from '@/services/skill-service';
 import type { SkillId } from '@/types/skills';
 
-// ip-integrator also stores the skill's current cap on each entry
-type SkillDataWithCap = SkillData & { cap?: number };
-
 // Props
 const props = defineProps<{
   skillId: SkillId | number;
-  skillData: SkillDataWithCap | null;
+  skillData: SkillData | null;
   isAbility?: boolean;
   isReadOnly?: boolean;
   category: string;

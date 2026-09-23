@@ -6,7 +6,6 @@
  */
 
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
-import { skillService } from '@/services/skill-service';
 import { accountTypeToExpansionBitflag, specializationLevelToBitflag } from './expansion-utils';
 
 /**
@@ -56,7 +55,7 @@ export function mapProfileToStats(profile: TinkerProfile): Record<number, number
 
       // Use the total value from the unified SkillData structure
       // This includes: base + trickle + pointsFromIp + equipmentBonus + perkBonus + buffBonus
-      stats[skillId] = (skillData as any)?.total || 1;
+      stats[skillId] = skillData?.total || 1;
     }
   }
 

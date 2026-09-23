@@ -13,11 +13,10 @@ import type {
   ItemFilterRequest,
   PaginatedResponse,
   UserFriendlyError,
+  PaginationInfo,
 } from '../types/api';
 import { apiClient } from '../services/api-client';
-import { itemValidation } from '../utils/item-validation';
-import { gameUtils } from '../services/game-utils';
-import { flagOperations } from '../utils/flag-operations';
+import { toUserFriendlyError } from '../services/error-message';
 
 interface ItemsState {
   // Data
@@ -25,7 +24,7 @@ interface ItemsState {
   searchResults: {
     query: ItemSearchQuery | null;
     results: Item[];
-    pagination: any;
+    pagination: PaginationInfo;
     timestamp: number;
   } | null;
 
@@ -126,8 +125,8 @@ export const useItemsStore = defineStore('items', () => {
       } else {
         throw new Error('Search failed');
       }
-    } catch (err: any) {
-      error.value = err;
+    } catch (err) {
+      error.value = toUserFriendlyError(err);
       throw err;
     } finally {
       loading.value = false;
@@ -156,8 +155,8 @@ export const useItemsStore = defineStore('items', () => {
       } else {
         throw new Error(response.error?.message || 'Item not found');
       }
-    } catch (err: any) {
-      error.value = err;
+    } catch (err) {
+      error.value = toUserFriendlyError(err);
       return null;
     } finally {
       loading.value = false;
@@ -209,8 +208,8 @@ export const useItemsStore = defineStore('items', () => {
         } else {
           throw new Error(response.error?.message || 'Items fetch failed');
         }
-      } catch (err: any) {
-        error.value = err;
+      } catch (err) {
+        error.value = toUserFriendlyError(err);
         throw err;
       } finally {
         loading.value = false;
@@ -242,8 +241,8 @@ export const useItemsStore = defineStore('items', () => {
       } else {
         throw new Error('Filter failed');
       }
-    } catch (err: any) {
-      error.value = err;
+    } catch (err) {
+      error.value = toUserFriendlyError(err);
       throw err;
     } finally {
       loading.value = false;
@@ -322,49 +321,6 @@ export const useItemsStore = defineStore('items', () => {
   }
 
   /**
-   * Analyze item for specific character (using profile store)
-   */
-  function analyzeItemForCharacter(item: Item, character: any) {
-    if (!character) return null;
-
-    return itemValidation.analyzeItemUsability(item, character);
-  }
-
-  /**
-   * Get item flag information
-   */
-  function getItemFlags(item: Item) {
-    if (!item.flags) return null;
-
-    return {
-      flags: item.flags,
-      decoded: flagOperations.decodeItemFlags(item.flags),
-      canFlags: item.can_flags ? flagOperations.decodeCanFlags(item.can_flags) : [],
-      factionRestriction: flagOperations.checkFactionRestriction(item.flags, 0), // Neutral check
-      canDrop: flagOperations.canDropItem(item.flags),
-    };
-  }
-
-  /**
-   * Format item requirements for display
-   */
-  function formatItemRequirements(item: Item): string[] {
-    if (!item.requirements) return [];
-
-    return item.requirements.map((req) => {
-      const statName = gameUtils.getStatName(req.stat) || `Stat ${req.stat}`;
-      return `${statName}: ${req.value}`;
-    });
-  }
-
-  /**
-   * Calculate item DPS (for weapons)
-   */
-  function calculateItemDPS(item: Item): number {
-    return itemValidation.calculateItemDPS(item);
-  }
-
-  /**
    * Get item statistics
    */
   const getStats = computed(() => ({
@@ -410,11 +366,5 @@ export const useItemsStore = defineStore('items', () => {
     clearError,
     clearCache,
     preloadCommonItems,
-
-    // Enhanced analysis methods
-    analyzeItemForCharacter,
-    getItemFlags,
-    formatItemRequirements,
-    calculateItemDPS,
   };
 });

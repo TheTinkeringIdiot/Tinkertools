@@ -8,13 +8,14 @@ import { defineStore } from 'pinia';
 import { ref, computed, readonly } from 'vue';
 import type { UserFriendlyError, Item, Symbiant, PocketBoss } from '../types/api';
 import { cacheManager } from '../services/cache-manager';
+import { errorMessage } from '../services/error-message';
 
 export type ApplicationName = 'items' | 'nanos' | 'fite' | 'plants' | 'pocket' | 'nukes';
 
 export interface CrossAppContext {
   sourceApp: ApplicationName;
   targetApp: ApplicationName;
-  contextData: any;
+  contextData: unknown;
   timestamp: number;
 }
 
@@ -132,11 +133,11 @@ export const useAppStore = defineStore('app', () => {
         message: 'All systems initialized successfully',
         duration: 3000,
       });
-    } catch (err: any) {
+    } catch (err) {
       setGlobalError({
         type: 'error',
         title: 'Initialization Failed',
-        message: err.message || 'Failed to initialize application',
+        message: errorMessage(err) || 'Failed to initialize application',
         action: 'Reload the page to try again',
         recoverable: true,
       });
@@ -172,7 +173,7 @@ export const useAppStore = defineStore('app', () => {
     performanceMetrics.value.lastMeasurement = Date.now();
   }
 
-  function navigateToApp(targetApp: ApplicationName, context?: any): void {
+  function navigateToApp(targetApp: ApplicationName, context?: unknown): void {
     crossAppContext.value = {
       sourceApp: currentApp.value,
       targetApp,
@@ -439,7 +440,7 @@ export const useAppStore = defineStore('app', () => {
           case '3':
           case '4':
           case '5':
-          case '6':
+          case '6': {
             event.preventDefault();
             const appMap: ApplicationName[] = [
               'items',
@@ -454,6 +455,7 @@ export const useAppStore = defineStore('app', () => {
               navigateToApp(appMap[appIndex]);
             }
             break;
+          }
         }
       }
 
@@ -543,8 +545,9 @@ export const useAppStore = defineStore('app', () => {
     if (typeof window === 'undefined') return;
 
     // Save state on page unload
+    // Fire-and-forget: saveCachedAppState catches and logs its own errors
     window.addEventListener('beforeunload', () => {
-      saveCachedAppState();
+      void saveCachedAppState();
     });
 
     // Clean up old notifications every 5 minutes
@@ -571,11 +574,11 @@ export const useAppStore = defineStore('app', () => {
         message: 'All cached data has been removed',
         duration: 3000,
       });
-    } catch (err: any) {
+    } catch (err) {
       addNotification({
         type: 'error',
         title: 'Clear Failed',
-        message: err.message || 'Failed to clear caches',
+        message: errorMessage(err) || 'Failed to clear caches',
         duration: 5000,
       });
     } finally {

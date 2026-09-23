@@ -66,7 +66,7 @@ export async function dismissToast(page: Page) {
 /**
  * Set localStorage item
  */
-export async function setLocalStorageItem(page: Page, key: string, value: any) {
+export async function setLocalStorageItem(page: Page, key: string, value: unknown) {
   await page.evaluate(
     ({ key, value }) => {
       localStorage.setItem(key, JSON.stringify(value));
@@ -76,13 +76,32 @@ export async function setLocalStorageItem(page: Page, key: string, value: any) {
 }
 
 /**
- * Get localStorage item
+ * Get localStorage item (JSON-decoded), or null when the key is absent
  */
-export async function getLocalStorageItem(page: Page, key: string): Promise<any> {
+export async function getLocalStorageItem<T = unknown>(page: Page, key: string): Promise<T | null> {
   return await page.evaluate((key) => {
     const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : null;
+    return item ? (JSON.parse(item) as T) : null;
   }, key);
+}
+
+/**
+ * The parts of a stored profile the E2E specs inspect
+ */
+export interface StoredProfile {
+  id: string;
+  name: string;
+  level?: number;
+  profession?: string;
+  equipment?: unknown;
+  buffs?: unknown;
+}
+
+/**
+ * Get the stored profile list, or an empty list when none is stored
+ */
+export async function getStoredProfiles(page: Page): Promise<StoredProfile[]> {
+  return (await getLocalStorageItem<StoredProfile[]>(page, 'tinkertools_profiles')) ?? [];
 }
 
 /**

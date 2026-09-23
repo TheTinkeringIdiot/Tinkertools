@@ -17,12 +17,12 @@ import {
   parseNanoForStatBonuses,
   parseNanoForStatBonusesWithErrors,
   nanoBonusCalculator,
-  STAT_BONUS_SPELL_IDS,
-  NANO_EVENTS,
-  type NanoStatBonus,
-  type NanoBonusError,
-  type NanoCalculationResult,
 } from '../nano-bonus-calculator';
+
+/** Deliberately malformed input, typed as whatever the code under test accepts */
+function malformed<T>(value: unknown): T {
+  return value as T;
+}
 
 describe('NanoBonusCalculator', () => {
   let calculator: NanoBonusCalculator;
@@ -378,20 +378,20 @@ describe('NanoBonusCalculator', () => {
     });
 
     it('should handle null/undefined nanos array gracefully', () => {
-      expect(calculator.calculateBonuses(null as any)).toEqual({});
-      expect(calculator.calculateBonuses(undefined as any)).toEqual({});
+      expect(calculator.calculateBonuses(malformed(null))).toEqual({});
+      expect(calculator.calculateBonuses(malformed(undefined))).toEqual({});
 
-      const result = calculateNanoBonusesWithErrors(null as any);
+      const result = calculateNanoBonusesWithErrors(malformed(null));
       expect(result.success).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
       expect(result.bonuses).toEqual({});
     });
 
     it('should handle non-array nanos input', () => {
-      const result = calculator.calculateBonuses('not an array' as any);
+      const result = calculator.calculateBonuses(malformed('not an array'));
       expect(result).toEqual({});
 
-      const detailedResult = calculateNanoBonusesWithErrors('not an array' as any);
+      const detailedResult = calculateNanoBonusesWithErrors(malformed('not an array'));
       expect(detailedResult.success).toBe(false);
       expect(detailedResult.errors).toEqual(
         expect.arrayContaining([
@@ -411,7 +411,7 @@ describe('NanoBonusCalculator', () => {
 
       const nanosWithNull = [validNano1, null, validNano2];
 
-      const result = calculator.calculateBonuses(nanosWithNull as any);
+      const result = calculator.calculateBonuses(malformed(nanosWithNull));
       expect(result).toEqual({
         17: 20, // Assault Rifle - both valid nanos contribute
       });
@@ -420,7 +420,7 @@ describe('NanoBonusCalculator', () => {
     it('should handle nanos with missing spell_data', () => {
       const nanoWithoutSpellData = createValidNanoItem('No Spell Data', 12345, 200);
       // Explicitly remove spell_data
-      delete (nanoWithoutSpellData as any).spell_data;
+      delete (nanoWithoutSpellData as Partial<Item>).spell_data;
 
       const result = calculator.calculateBonuses([nanoWithoutSpellData]);
       expect(result).toEqual({}); // No bonuses, but no crash
@@ -444,7 +444,7 @@ describe('NanoBonusCalculator', () => {
 
     it('should handle nanos with invalid spell_data format', () => {
       const nanoWithInvalidSpellData = createValidNanoItem('Invalid Spell Data', 12345, 200);
-      nanoWithInvalidSpellData.spell_data = 'not an array' as any;
+      nanoWithInvalidSpellData.spell_data = malformed('not an array');
 
       const result = calculateNanoBonusesWithErrors([nanoWithInvalidSpellData]);
       expect(result.bonuses).toEqual({});
@@ -460,7 +460,7 @@ describe('NanoBonusCalculator', () => {
 
     it('should handle spells with missing spell_id', () => {
       const invalidSpell = { spell_params: { Stat: 17, Amount: 10 } }; // Missing spell_id
-      const spellData = createValidSpellData([invalidSpell as any], 1);
+      const spellData = createValidSpellData([malformed(invalidSpell)], 1);
       const nano = createValidNanoItem('Missing Spell ID', 12345, 200, [spellData]);
 
       const result = calculator.calculateBonuses([nano]);
@@ -534,7 +534,7 @@ describe('NanoBonusCalculator', () => {
       const validNano = createValidNanoItem('Valid Nano', 11111, 200, [validSpellData]);
 
       const invalidNano = createValidNanoItem('Invalid Nano', 22222, 200);
-      invalidNano.spell_data = [{ invalid: 'data' } as any];
+      invalidNano.spell_data = [malformed({ invalid: 'data' })];
 
       const anotherValidNano = createValidNanoItem('Another Valid Nano', 33333, 200, [
         validSpellData,
@@ -697,16 +697,16 @@ describe('NanoBonusCalculator', () => {
     });
 
     it('should handle errors in convenience functions gracefully', () => {
-      const result1 = calculateNanoBonuses(null as any);
+      const result1 = calculateNanoBonuses(malformed(null));
       expect(result1).toEqual({});
 
-      const result2 = parseNanoForStatBonuses(null as any);
+      const result2 = parseNanoForStatBonuses(malformed(null));
       expect(result2).toEqual([]);
 
-      const result3 = calculateNanoBonusesWithErrors(null as any);
+      const result3 = calculateNanoBonusesWithErrors(malformed(null));
       expect(result3.success).toBe(false);
 
-      const result4 = parseNanoForStatBonusesWithErrors(null as any);
+      const result4 = parseNanoForStatBonusesWithErrors(malformed(null));
       expect(result4.bonuses).toEqual([]);
       expect(result4.errors.length).toBeGreaterThan(0);
     });
@@ -762,7 +762,7 @@ describe('NanoBonusCalculator', () => {
     it('should provide comprehensive error reporting', () => {
       const invalidNanos: Item[] = [
         // null entry
-        null as any,
+        malformed(null),
         // Valid nano for comparison
         createValidNanoItem('Valid Nano', 10001, 200, [
           createValidSpellData([createValidSpell(17, 10)], 1),

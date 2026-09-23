@@ -8,7 +8,7 @@
  * - Request batching and deduplication
  */
 
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
 import type {
   ApiResponse,
   PaginatedResponse,
@@ -16,7 +16,6 @@ import type {
   Spell,
   SymbiantItem,
   Mob,
-  MobWithDrops,
   ItemSearchQuery,
   SpellSearchQuery,
   SymbiantSearchQuery,
@@ -25,16 +24,16 @@ import type {
   ItemFilterRequest,
   ItemCompatibilityRequest,
   ItemCompatibilityResult,
-  BatchItemRequest,
   UserFriendlyError,
   ApiError,
-  InterpolatedItem,
   InterpolationRequest,
   InterpolationResponse,
   InterpolationInfo,
   ImplantLookupResponse,
   BatchInterpolationResponse,
   BatchPerkLookupResponse,
+  PerkLookupItem,
+  StatValue,
 } from '../types/api';
 import { ErrorCodes } from '../types/api';
 import type {
@@ -69,6 +68,24 @@ const API_CONFIG = {
 // ============================================================================
 // Error Handling
 // ============================================================================
+
+/** Request config carrying the response interceptor's retry bookkeeping */
+type RetryableRequestConfig = InternalAxiosRequestConfig & {
+  _retry?: boolean;
+  _retryCount?: number;
+};
+
+/** The parts of an axios error (or a look-alike) that error handling reads */
+interface RequestErrorLike {
+  code?: string;
+  message?: string;
+  response?: { status?: number; data?: { error?: ApiError } };
+  config?: RetryableRequestConfig;
+}
+
+function asRequestError(error: unknown): RequestErrorLike {
+  return typeof error === 'object' && error !== null ? (error as RequestErrorLike) : {};
+}
 
 class ApiErrorHandler {
   static handle(error: ApiError): UserFriendlyError {
@@ -130,11 +147,11 @@ interface PendingBatch<T> {
   ids: (string | number)[];
   promise: Promise<T[]>;
   resolve: (data: T[]) => void;
-  reject: (error: any) => void;
+  reject: (error: unknown) => void;
 }
 
 class BatchRequestManager {
-  private pendingBatches = new Map<string, PendingBatch<any>>();
+  private pendingBatches = new Map<string, PendingBatch<unknown>>();
 
   async batchItems(itemIds: number[]): Promise<Item[]> {
     return this.createBatch(this.keyFor('items'), itemIds, (ids) =>
@@ -162,11 +179,12 @@ class BatchRequestManager {
 
     if (existing) {
       existing.ids.push(...ids);
-      return existing.promise;
+      // Batch keys are per resource, so a pending batch under this key holds T
+      return existing.promise as Promise<T[]>;
     }
 
     let resolve: (data: T[]) => void;
-    let reject: (error: any) => void;
+    let reject: (error: unknown) => void;
 
     const promise = new Promise<T[]>((res, rej) => {
       resolve = res;
@@ -180,7 +198,7 @@ class BatchRequestManager {
       reject: reject!,
     };
 
-    this.pendingBatches.set(batchKey, batch);
+    this.pendingBatches.set(batchKey, batch as PendingBatch<unknown>);
 
     // Execute batch after short delay to collect more requests
     setTimeout(async () => {
@@ -244,15 +262,15 @@ class TinkerToolsApiClient {
     // Response interceptor
     this.client.interceptors.response.use(
       (response) => response,
-      async (error) => {
-        const originalRequest = error.config;
+      async (error: unknown) => {
+        const { response, config: originalRequest } = asRequestError(error);
 
         // Retry logic for specific errors
         if (
-          error.response?.status >= 500 &&
+          (response?.status ?? 0) >= 500 &&
           originalRequest &&
           !originalRequest._retry &&
-          originalRequest._retryCount < API_CONFIG.retryAttempts
+          (originalRequest._retryCount ?? 0) < API_CONFIG.retryAttempts
         ) {
           originalRequest._retry = true;
           originalRequest._retryCount = (originalRequest._retryCount || 0) + 1;
@@ -285,7 +303,7 @@ class TinkerToolsApiClient {
         success: true,
         data: response.data,
       } as ApiResponse<T>;
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
@@ -295,39 +313,39 @@ class TinkerToolsApiClient {
       const response = await this.client.get<PaginatedResponse<T>>(url, config);
       // Return the paginated response directly without wrapping
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
 
-  async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  async post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     try {
       const response = await this.client.post<ApiResponse<T>>(url, data, config);
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
 
   async postPaginated<T>(
     url: string,
-    data?: any,
+    data?: unknown,
     config?: AxiosRequestConfig
   ): Promise<PaginatedResponse<T>> {
     try {
       const response = await this.client.post<PaginatedResponse<T>>(url, data, config);
       // Return the paginated response directly without wrapping
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
 
-  async put<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  async put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     try {
       const response = await this.client.put<ApiResponse<T>>(url, data, config);
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
@@ -336,7 +354,7 @@ class TinkerToolsApiClient {
     try {
       const response = await this.client.delete<ApiResponse<T>>(url, config);
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
@@ -440,7 +458,7 @@ class TinkerToolsApiClient {
 
         return this.getPaginated<Item>(`/items?${params.toString()}`);
       }
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
@@ -491,7 +509,10 @@ class TinkerToolsApiClient {
 
       // Backend returns ImplantLookupResponse with item in 'item' field
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
+      // Let a cancellation through as-is: callers abort superseded lookups
+      // and must be able to tell that apart from a failure
+      if (asRequestError(error).code === 'ERR_CANCELED') throw error;
       throw this.handleError(error);
     }
   }
@@ -510,7 +531,7 @@ class TinkerToolsApiClient {
         success: true,
         data: Array.isArray(response.data) ? response.data : [],
       };
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
@@ -534,7 +555,7 @@ class TinkerToolsApiClient {
         success: true,
         data: response.data,
       };
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
@@ -543,13 +564,13 @@ class TinkerToolsApiClient {
   // Perk API
   // ============================================================================
 
-  async lookupPerkByAoid(aoid: number): Promise<any> {
+  async lookupPerkByAoid(aoid: number): Promise<PerkLookupItem | null> {
     try {
-      const response = await this.client.get(`/perks/lookup/${aoid}`);
+      const response = await this.client.get<PerkLookupItem | null>(`/perks/lookup/${aoid}`);
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       // Return null if perk not found
-      if (error.response?.status === 404) {
+      if (asRequestError(error).response?.status === 404) {
         console.warn(`Perk with AOID ${aoid} not found`);
         return null;
       }
@@ -563,7 +584,7 @@ class TinkerToolsApiClient {
         aoids,
       });
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
@@ -586,7 +607,7 @@ class TinkerToolsApiClient {
         options?.gameVersion ? { gameVersion: options.gameVersion } : undefined
       );
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
@@ -595,7 +616,7 @@ class TinkerToolsApiClient {
     try {
       const response = await this.client.post<InterpolationResponse>('/items/interpolate', request);
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
@@ -635,17 +656,19 @@ class TinkerToolsApiClient {
   }
 
   async batchInterpolateItems(
-    requests: Array<{ aoid: number; targetQl: number }>
+    requests: Array<{ aoid: number; targetQl: number }>,
+    options?: { gameVersion?: string }
   ): Promise<BatchInterpolationResponse> {
     try {
       const response = await this.client.post<BatchInterpolationResponse>(
         '/items/batch/interpolate',
         {
           items: requests.map((r) => ({ aoid: r.aoid, target_ql: r.targetQl })),
-        }
+        },
+        options?.gameVersion ? { gameVersion: options.gameVersion } : undefined
       );
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       throw this.handleError(error);
     }
   }
@@ -740,12 +763,15 @@ class TinkerToolsApiClient {
   // Stat Values API
   // ============================================================================
 
-  async getStatValues(params?: { stat?: number; value?: number }): Promise<PaginatedResponse<any>> {
+  async getStatValues(params?: {
+    stat?: number;
+    value?: number;
+  }): Promise<PaginatedResponse<StatValue>> {
     const searchParams = new URLSearchParams();
     if (params?.stat) searchParams.append('stat', params.stat.toString());
     if (params?.value) searchParams.append('value', params.value.toString());
 
-    return this.getPaginated<any>(`/stat-values?${searchParams.toString()}`);
+    return this.getPaginated<StatValue>(`/stat-values?${searchParams.toString()}`);
   }
 
   // ============================================================================
@@ -782,13 +808,15 @@ class TinkerToolsApiClient {
   // Error Handling
   // ============================================================================
 
-  private handleError(error: any): UserFriendlyError {
-    if (error.response?.data?.error) {
-      return ApiErrorHandler.handle(error.response.data.error);
+  private handleError(error: unknown): UserFriendlyError {
+    const { code, message, response } = asRequestError(error);
+
+    if (response?.data?.error) {
+      return ApiErrorHandler.handle(response.data.error);
     }
 
-    // AxiosError.ERR_NETWORK: the request never got a response
-    if (error.code === 'ERR_NETWORK') {
+    // axios reports ERR_NETWORK; NETWORK_ERROR is the older spelling
+    if (code === 'ERR_NETWORK' || code === 'NETWORK_ERROR') {
       return {
         type: 'error',
         title: 'Network Error',
@@ -798,7 +826,7 @@ class TinkerToolsApiClient {
       };
     }
 
-    if (error.code === 'ECONNABORTED') {
+    if (code === 'ECONNABORTED') {
       return {
         type: 'warning',
         title: 'Request Timeout',
@@ -811,7 +839,7 @@ class TinkerToolsApiClient {
     return {
       type: 'error',
       title: 'Unexpected Error',
-      message: error.message || 'An unexpected error occurred',
+      message: message || 'An unexpected error occurred',
       action: 'Please try again or contact support',
       recoverable: false,
     };

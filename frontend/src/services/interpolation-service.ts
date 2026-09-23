@@ -6,14 +6,10 @@
  * item interpolation with local caching and state management.
  */
 
-import { reactive, ref } from 'vue';
-import type {
-  Item,
-  InterpolatedItem,
-  InterpolationInfo,
-  InterpolationResponse,
-} from '../types/api';
+import { reactive } from 'vue';
+import type { Item, InterpolatedItem, InterpolationInfo } from '../types/api';
 import { apiClient } from './api-client';
+import { errorMessage } from './error-message';
 import { INTERP_STATS } from './game-data';
 import { currentVersion } from '../composables/useGameVersion';
 
@@ -173,8 +169,8 @@ class InterpolationService {
       this.state.currentItem = response.item;
 
       return response.item;
-    } catch (error: any) {
-      this.state.error = error.message || 'Failed to interpolate item';
+    } catch (error) {
+      this.state.error = errorMessage(error) || 'Failed to interpolate item';
       return null;
     } finally {
       this.state.loading = false;

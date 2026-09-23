@@ -13,7 +13,7 @@
  */
 
 import { SKILL_ID_MAP, SKILL_CATEGORIES } from '../lib/tinkerprofiles/skill-mappings';
-import { SKILL_PATTERNS, type SkillPattern } from '../utils/skill-patterns';
+import { SKILL_PATTERNS } from '../utils/skill-patterns';
 import {
   type SkillId,
   type SkillMetadata,
@@ -152,7 +152,7 @@ export class SkillService {
     }
 
     // Generate from first letters of words
-    const words = skillName.split(/[\s\-\.&]+/).filter((word) => word.length > 0);
+    const words = skillName.split(/[\s\-.&]+/).filter((word) => word.length > 0);
     if (words.length === 1) {
       return words[0].substring(0, 3).toUpperCase();
     }

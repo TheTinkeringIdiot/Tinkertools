@@ -52,13 +52,16 @@ export interface SkillData {
   buffBonus: number;
 
   /**
+   * Maximum reachable value including equipment/perk/buff bonuses.
+   * Set by ip-integrator for abilities and trainable skills.
+   */
+  cap?: number;
+
+  /**
    * Total skill value: base + trickle + pointsFromIp + equipmentBonus + perkBonus + buffBonus
    * Stored to prevent recalculation overhead and ensure consistency
    */
   total: number;
-
-  /** Maximum reachable value including bonuses; computed by the IP integrator */
-  cap?: number;
 }
 
 /** Comprehensive IP tracking information */

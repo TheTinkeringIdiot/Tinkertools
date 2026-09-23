@@ -10,7 +10,6 @@
 import {
   NP_MODS,
   JOBE_SKILL,
-  JOBE_MODS,
   IMP_SKILLS,
   CLUSTER_MIN_QL,
   type NPModKey,

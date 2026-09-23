@@ -182,7 +182,7 @@ export function validateSkillRegistry(): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
   for (const [skillName, statId] of Object.entries(SKILL_REGISTRY)) {
-    if (!STAT[statId]) {
+    if (!(statId in STAT)) {
       errors.push(`Skill "${skillName}" has invalid STAT ID: ${statId}`);
     }
   }

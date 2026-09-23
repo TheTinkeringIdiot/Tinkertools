@@ -7,11 +7,16 @@
 
 import { defineStore } from 'pinia';
 import { ref, computed, readonly } from 'vue';
-import type { Spell, SpellSearchQuery, PaginatedResponse, UserFriendlyError } from '../types/api';
+import type {
+  Spell,
+  SpellSearchQuery,
+  PaginatedResponse,
+  PaginationInfo,
+  JsonValue,
+  UserFriendlyError,
+} from '../types/api';
 import { apiClient } from '../services/api-client';
-import { nanoCompatibility } from '../utils/nano-compatibility';
-import { gameUtils } from '../services/game-utils';
-import { flagOperations } from '../utils/flag-operations';
+import { toUserFriendlyError } from '../services/error-message';
 
 export const useSpellsStore = defineStore('spells', () => {
   // ============================================================================
@@ -22,7 +27,7 @@ export const useSpellsStore = defineStore('spells', () => {
   const searchResults = ref<{
     query: SpellSearchQuery | null;
     results: Spell[];
-    pagination: any;
+    pagination: Omit<PaginationInfo, 'offset'>;
     timestamp: number;
   } | null>(null);
   const loading = ref(false);
@@ -45,7 +50,10 @@ export const useSpellsStore = defineStore('spells', () => {
   );
 
   const spellsWithCriteria = computed(() =>
-    allSpells.value.filter((spell) => spell.spell_params?.Criteria?.length > 0)
+    allSpells.value.filter((spell) => {
+      const criteria = spell.spell_params?.Criteria;
+      return Array.isArray(criteria) && criteria.length > 0;
+    })
   );
 
   const spellsCount = computed(() => spells.value.size);
@@ -105,8 +113,8 @@ export const useSpellsStore = defineStore('spells', () => {
       } else {
         throw new Error('Search failed');
       }
-    } catch (err: any) {
-      error.value = err;
+    } catch (err) {
+      error.value = toUserFriendlyError(err);
       throw err;
     } finally {
       loading.value = false;
@@ -135,8 +143,8 @@ export const useSpellsStore = defineStore('spells', () => {
       } else {
         throw new Error(response.error?.message || 'Spell not found');
       }
-    } catch (err: any) {
-      error.value = err;
+    } catch (err) {
+      error.value = toUserFriendlyError(err);
       return null;
     } finally {
       loading.value = false;
@@ -153,7 +161,7 @@ export const useSpellsStore = defineStore('spells', () => {
   /**
    * Get spells with specific parameters
    */
-  function getSpellsWithParams(paramFilter: Record<string, any>): Spell[] {
+  function getSpellsWithParams(paramFilter: Record<string, JsonValue>): Spell[] {
     return allSpells.value.filter((spell) => {
       if (!spell.spell_params) return false;
 
@@ -259,75 +267,6 @@ export const useSpellsStore = defineStore('spells', () => {
   }
 
   /**
-   * Convert spell to nano format for compatibility checking
-   */
-  function convertSpellToNano(spell: Spell): any {
-    return {
-      id: spell.id,
-      name: spell.name,
-      school: spell.spell_params?.School || 0,
-      ncuCost: spell.spell_params?.NCU || 0,
-      nanoPoints: spell.spell_params?.NanoPoints || 0,
-      level: spell.spell_params?.Level,
-      requirements: spell.spell_params?.Criteria || [],
-      effects: spell.spell_params?.Effects || [],
-      duration: spell.spell_params?.Duration || 0,
-      stackingLine: spell.spell_params?.StackingLine,
-      attackTime: spell.spell_params?.AttackTime || 1000,
-      rechargeTime: spell.spell_params?.RechargeTime || 1000,
-    };
-  }
-
-  /**
-   * Validate nano requirements for character
-   */
-  function validateNanoForCharacter(spell: Spell, character: any) {
-    if (!character) return null;
-
-    const nano = convertSpellToNano(spell);
-    return nanoCompatibility.validateNanoRequirements(nano, character);
-  }
-
-  /**
-   * Check nano school effectiveness for profession
-   */
-  function getNanoSchoolEffectiveness(spell: Spell, professionId: number): number {
-    const schoolId = spell.spell_params?.School || 0;
-    return nanoCompatibility.getNanoSchoolEffectiveness(professionId, schoolId);
-  }
-
-  /**
-   * Format spell effects for display
-   */
-  function formatSpellEffects(spell: Spell): string[] {
-    const effects = spell.spell_params?.Effects || [];
-    return nanoCompatibility.formatNanoEffects(effects);
-  }
-
-  /**
-   * Get nano difficulty rating
-   */
-  function getSpellDifficulty(spell: Spell): string {
-    const nano = convertSpellToNano(spell);
-    return nanoCompatibility.getNanoDifficulty(nano);
-  }
-
-  /**
-   * Analyze NCU cost and requirements
-   */
-  function analyzeNanoCost(spell: Spell, character: any): any {
-    if (!character) return null;
-
-    const nano = convertSpellToNano(spell);
-    return {
-      ncuCost: nano.ncuCost,
-      nanoCost: nanoCompatibility.calculateNanoCost(nano, character),
-      initTime: nanoCompatibility.calculateNanoInitTime(nano, character),
-      difficulty: nanoCompatibility.getNanoDifficulty(nano),
-    };
-  }
-
-  /**
    * Get spell statistics
    */
   const getStats = computed(() => ({
@@ -371,13 +310,5 @@ export const useSpellsStore = defineStore('spells', () => {
     clearError,
     clearCache,
     preloadCommonSpells,
-
-    // Enhanced nano analysis methods
-    convertSpellToNano,
-    validateNanoForCharacter,
-    getNanoSchoolEffectiveness,
-    formatSpellEffects,
-    getSpellDifficulty,
-    analyzeNanoCost,
   };
 });

@@ -20,11 +20,20 @@ export interface ValidationResult {
  * Validate Character profession and breed IDs
  */
 export function validateCharacterIds(profile: TinkerProfile): ValidationResult {
+  return validateProfessionAndBreedIds(profile.Character.Profession, profile.Character.Breed);
+}
+
+/**
+ * Validate raw profession and breed values (e.g. from untrusted imported data)
+ */
+export function validateProfessionAndBreedIds(
+  professionId: unknown,
+  breedId: unknown
+): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
   // Validate profession ID
-  const professionId = profile.Character.Profession;
   if (typeof professionId !== 'number') {
     errors.push(`Profession must be a number, got ${typeof professionId}`);
   } else if (professionId < 1 || professionId > 15) {
@@ -34,7 +43,6 @@ export function validateCharacterIds(profile: TinkerProfile): ValidationResult {
   }
 
   // Validate breed ID
-  const breedId = profile.Character.Breed;
   if (typeof breedId !== 'number') {
     errors.push(`Breed must be a number, got ${typeof breedId}`);
   } else if (breedId < 0 || breedId > 7) {

@@ -286,23 +286,3 @@ export async function handleGameVersionChange(next: string, previous: string | n
     console.warn('[stores] Preload after version change failed:', error)
   );
 }
-
-/**
- * Get store hydration data for SSR/preloading
- */
-export function getStoreHydrationData(): Record<string, any> {
-  // This would be used for server-side rendering or data preloading
-  // Return minimal data needed to hydrate stores on client
-  return {
-    // Add hydration data as needed
-  };
-}
-
-/**
- * Hydrate stores with preloaded data
- */
-export function hydrateStores(data: Record<string, any>): void {
-  // This would hydrate stores with preloaded data
-  // Useful for SSR or cached state restoration
-  console.log('Hydrating stores with data:', data);
-}

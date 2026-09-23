@@ -18,7 +18,7 @@ import {
   ENHANCE_NANO_DAMAGE,
   ANCIENT_MATRIX,
   DAMAGE_TYPES,
-  type BreedId,
+  type NukesBreedId,
   type DeckId,
   type SpecId,
   type DamageTypeId,
@@ -29,7 +29,7 @@ import {
 // ============================================================================
 
 export interface NukesConfiguration {
-  breed: BreedId;
+  breed: NukesBreedId;
   level: number;
   mc: number;
   nano_init: number;
@@ -164,20 +164,6 @@ export function calculateTotalDamageBonus(config: NukesConfiguration): DamageBon
   };
 }
 
-/**
- * Calculate damage bonus for a specific nano type
- */
-export function calculateSpecificDamageBonus(
-  config: NukesConfiguration,
-  damageType: DamageTypeId
-): number {
-  const totalBonus = calculateTotalDamageBonus(config);
-
-  // For specific damage types, apply the total bonus
-  // In the original implementation, all damage types benefit equally
-  return totalBonus.total;
-}
-
 // ============================================================================
 // Utility Functions
 // ============================================================================
@@ -185,7 +171,7 @@ export function calculateSpecificDamageBonus(
 /**
  * Get breed name from ID
  */
-export function getBreedName(breedId: BreedId): string {
+export function getBreedName(breedId: NukesBreedId): string {
   return BREEDS[breedId];
 }
 
@@ -302,7 +288,6 @@ export const nanotechnicianSpecialization = {
 
   // Calculations
   calculateTotalDamageBonus,
-  calculateSpecificDamageBonus,
   calculateNanoPool,
   calculateNanoInitiative,
 

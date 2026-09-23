@@ -5,22 +5,19 @@
  * for all three perk types: SL Perks, AI Perks, and LE Research
  */
 
-import type { TinkerProfile, SkillWithIP, IPTracker } from './types';
+import type { TinkerProfile } from './types';
 import type {
   PerkSystem,
   PerkEntry,
   ResearchEntry,
   PerkValidationResult,
   PerkEffectSummary,
-  PerkCharacterData,
   PerkPointCalculation,
   PerkChangeEvent,
   PerkInfo,
-  PerkEffect,
-  AnyPerkEntry,
 } from './perk-types';
 
-import { getBreedId, getProfessionId } from '../../services/game-utils';
+import { getBreedName, getProfessionName } from '../../services/game-utils';
 
 // ============================================================================
 // Perk Point Calculation Functions
@@ -120,15 +117,18 @@ function validatePerkRequirements(
 
   // Check profession restriction
   if (perkInfo.requirements.professions && perkInfo.requirements.professions.length > 0) {
-    if (!perkInfo.requirements.professions.includes(character.Profession)) {
-      errors.push(`Not available for ${character.Profession}`);
+    // Requirements list names; the profile stores numeric IDs
+    const professionName = getProfessionName(character.Profession);
+    if (!perkInfo.requirements.professions.includes(professionName)) {
+      errors.push(`Not available for ${professionName}`);
     }
   }
 
   // Check breed restriction
   if (perkInfo.requirements.breeds && perkInfo.requirements.breeds.length > 0) {
-    if (!perkInfo.requirements.breeds.includes(character.Breed)) {
-      errors.push(`Not available for ${character.Breed}`);
+    const breedName = getBreedName(character.Breed);
+    if (!perkInfo.requirements.breeds.includes(breedName)) {
+      errors.push(`Not available for ${breedName}`);
     }
   }
 
@@ -459,9 +459,6 @@ export class PerkManager {
     }
 
     const effects: PerkEffectSummary = {};
-
-    // Process all equipped perks (both SL/AI and LE research)
-    const allPerks = [...profile.PerksAndResearch.perks, ...profile.PerksAndResearch.research];
 
     // TODO: This will need to be implemented once we have perk data in the database
     // For now, return empty effects

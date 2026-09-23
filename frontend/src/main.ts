@@ -64,11 +64,13 @@ onGameVersionChange(async (next, previous) => {
 app.component('Accordion', Accordion);
 app.component('AccordionTab', AccordionTab);
 app.component('Badge', Badge);
+// eslint-disable-next-line vue/no-reserved-component-names -- PrimeVue's registered name, used as <Button> in templates
 app.component('Button', Button);
 app.component('Card', Card);
 app.component('Checkbox', Checkbox);
 app.component('ConfirmDialog', ConfirmDialog);
 app.component('ContextMenu', ContextMenu);
+// eslint-disable-next-line vue/no-reserved-component-names -- PrimeVue's registered name, used as <Dialog> in templates
 app.component('Dialog', Dialog);
 app.component('Dropdown', Dropdown);
 app.component('FileUpload', FileUpload);
@@ -84,6 +86,7 @@ app.component('Slider', Slider);
 app.component('TabView', TabView);
 app.component('TabPanel', TabPanel);
 app.component('Tag', Tag);
+// eslint-disable-next-line vue/no-reserved-component-names -- PrimeVue's registered name, used as <Textarea> in templates
 app.component('Textarea', Textarea);
 app.component('TriStateCheckbox', TriStateCheckbox);
 

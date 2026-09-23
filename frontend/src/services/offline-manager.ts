@@ -6,6 +6,7 @@
 
 import { ref, computed } from 'vue';
 import { cacheManager } from './cache-manager';
+import { errorMessage } from './error-message';
 import { versionKey } from './version-keys';
 import { useAppStore } from '../stores/app';
 import type { Item, Spell, Symbiant, PocketBoss } from '../types/api';
@@ -21,7 +22,7 @@ export interface QueuedOperation {
   id: string;
   type: 'favorite' | 'collection' | 'preference' | 'profile';
   action: 'create' | 'update' | 'delete';
-  data: any;
+  data: unknown;
   timestamp: number;
 }
 
@@ -58,7 +59,8 @@ class OfflineManager {
 
   constructor() {
     this.setupOfflineDetection();
-    this.loadOfflineState();
+    // Logs its own failures; the state simply stays empty
+    void this.loadOfflineState();
   }
 
   // ============================================================================
@@ -153,11 +155,11 @@ class OfflineManager {
         message: 'Data downloaded for offline use',
         duration: 5000,
       });
-    } catch (error: any) {
+    } catch (error) {
       appStore.addNotification({
         type: 'error',
         title: 'Offline Download Failed',
-        message: error.message || 'Failed to download offline data',
+        message: errorMessage(error) || 'Failed to download offline data',
         duration: 8000,
       });
       throw error;
@@ -186,7 +188,8 @@ class OfflineManager {
     };
 
     this.queuedOperations.value.push(queuedOp);
-    this.saveQueuedOperations();
+    // Logs its own failures; the operation stays queued in memory
+    void this.saveQueuedOperations();
   }
 
   /**
@@ -237,11 +240,11 @@ class OfflineManager {
           duration: 5000,
         });
       }
-    } catch (error: any) {
+    } catch (error) {
       appStore.addNotification({
         type: 'error',
         title: 'Sync Failed',
-        message: error.message || 'Failed to sync offline changes',
+        message: errorMessage(error) || 'Failed to sync offline changes',
         duration: 8000,
       });
     } finally {
@@ -325,11 +328,11 @@ class OfflineManager {
         message: 'All offline data has been removed',
         duration: 3000,
       });
-    } catch (error: any) {
+    } catch (error) {
       appStore.addNotification({
         type: 'error',
         title: 'Clear Failed',
-        message: error.message || 'Failed to clear offline data',
+        message: errorMessage(error) || 'Failed to clear offline data',
         duration: 5000,
       });
     } finally {
@@ -352,8 +355,8 @@ class OfflineManager {
       const appStore = useAppStore();
 
       if (wasOffline && navigator.onLine) {
-        // Just came back online - sync queued operations
-        this.syncQueuedOperations();
+        // Just came back online - sync queued operations (reports its own failures)
+        void this.syncQueuedOperations();
 
         appStore.addNotification({
           type: 'success',

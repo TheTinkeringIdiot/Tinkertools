@@ -9,7 +9,7 @@
 export { TinkerProfilesManager } from './manager';
 export { ProfileValidator } from './validator';
 export { ProfileStorage } from './storage';
-export { ProfileTransformer } from './transformer';
+export { ProfileTransformer, interpolatedToItem } from './transformer';
 
 export {
   currentGameVersion,
@@ -29,7 +29,7 @@ export type {
   TinkerProfile,
   VersionFlaggedItem,
   ImplantWithClusters,
-  SkillWithIP,
+  SkillData,
   ProfileMetadata,
   ProfileExportFormat,
   ProfileImportResult,
@@ -39,6 +39,8 @@ export type {
   ProfileStorageOptions,
   ProfileEvents,
   TinkerProfilesConfig,
+  ProfileSearchFilters,
+  ProfileSortOptions,
 } from './types';
 
 export {

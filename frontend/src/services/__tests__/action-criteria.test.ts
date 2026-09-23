@@ -4,7 +4,7 @@
  * Tests all transformation logic, operator handling, and utility functions
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   parseCriterion,
   transformCriterionForDisplay,
@@ -16,6 +16,11 @@ import {
   actionCriteriaService,
 } from '../action-criteria';
 import type { Criterion, Action } from '../../types/api';
+
+/** Deliberately malformed input, typed as whatever the code under test accepts */
+function malformed<T>(value: unknown): T {
+  return value as T;
+}
 
 // Mock game-data constants
 vi.mock('../game-data', () => ({
@@ -757,8 +762,8 @@ describe('action-criteria service', () => {
     });
 
     it('should return empty string for null/undefined expressions', () => {
-      expect(formatCriteriaText(null as any)).toBe('');
-      expect(formatCriteriaText(undefined as any)).toBe('');
+      expect(formatCriteriaText(malformed(null))).toBe('');
+      expect(formatCriteriaText(malformed(undefined))).toBe('');
     });
   });
 

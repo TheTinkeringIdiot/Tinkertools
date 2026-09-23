@@ -5,6 +5,8 @@
  * following the patterns specified in docs/11_api_design_and_data_flow.md
  */
 
+import type { TinkerProfile } from '../lib/tinkerprofiles/types';
+
 // ============================================================================
 // Base API Types
 // ============================================================================
@@ -15,7 +17,7 @@ export interface ApiResponse<T> {
   error?: {
     code: string;
     message: string;
-    details?: any;
+    details?: JsonValue;
   };
   meta?: {
     timestamp: string;
@@ -51,6 +53,46 @@ export interface Criterion {
   operator: number;
 }
 
+/**
+ * A value parsed from JSON. Deliberately not recursive: Vue's ref unwrapping
+ * and DeepReadonly recurse into recursive types without bound.
+ */
+export type JsonValue = string | number | boolean | null | object;
+
+/**
+ * Spell parameters: a JSON object whose keys depend on the spell format.
+ * The numeric parameters the frontend reads are typed; the rest are plain JSON.
+ */
+export interface SpellParams {
+  Stat?: number;
+  StatID?: number;
+  Amount?: number;
+  Value?: number;
+  MinValue?: number;
+  MaxValue?: number;
+  MinAmount?: number;
+  MaxAmount?: number;
+  ModifierStat?: number;
+  BitNum?: number;
+  School?: number;
+  NCU?: number;
+  NanoPoints?: number;
+  Level?: number;
+  Duration?: number;
+  StackingLine?: number;
+  AttackTime?: number;
+  RechargeTime?: number;
+  // Lower-case spellings seen in some records
+  stat?: number;
+  statId?: number;
+  amount?: number;
+  value?: number;
+  minValue?: number;
+  maxValue?: number;
+  modifierStat?: number;
+  [key: string]: JsonValue | undefined;
+}
+
 export interface Spell {
   id: number;
   target?: number;
@@ -59,7 +101,7 @@ export interface Spell {
   spell_id?: number;
   /** @deprecated Use spell_id to look up format from SPELL_FORMATS constant instead */
   spell_format?: string;
-  spell_params: Record<string, any>;
+  spell_params: SpellParams;
   criteria: Criterion[];
 }
 
@@ -99,7 +141,7 @@ export interface Source {
   source_type_id: number;
   source_id: number;
   name: string;
-  extra_data: Record<string, any>;
+  extra_data: Record<string, JsonValue>;
   source_type?: SourceType;
 }
 
@@ -109,7 +151,7 @@ export interface ItemSource {
   min_ql?: number;
   max_ql?: number;
   conditions?: string;
-  extra_data: Record<string, any>;
+  extra_data: Record<string, JsonValue>;
 }
 
 export interface Item {
@@ -136,7 +178,7 @@ export interface InterpolatedSpell {
   tick_interval?: number;
   spell_id?: number;
   spell_format?: string;
-  spell_params: Record<string, any>;
+  spell_params: SpellParams;
   criteria: Criterion[];
 }
 
@@ -236,10 +278,28 @@ export interface BatchPerkLookupRequest {
   aoids: number[];
 }
 
+/** A perk item from the perk lookup endpoints, with its perk metadata */
+export interface PerkLookupItem extends Item {
+  perk_name: string;
+  perk_counter: number;
+  perk_type: string;
+  perk_series?: string | null;
+  perk_professions: string[];
+  perk_breeds: string[];
+  perk_level_required: number;
+  perk_ai_level_required: number | null;
+  // Legacy aliases of the perk_* fields
+  counter: number;
+  type: string;
+  level: number;
+  ai_title: number | null;
+  formatted_name: string;
+}
+
 export interface BatchPerkResult {
   aoid: number;
   success: boolean;
-  perk: any | null;
+  perk: PerkLookupItem | null;
   error: string | null;
 }
 
@@ -264,7 +324,7 @@ export interface SymbiantItem {
  * Type guard to distinguish symbiants from implants
  * Symbiants have family/slot_id, implants have item_class/icon_id
  */
-export function isSymbiant(item: Item | SymbiantItem): item is SymbiantItem {
+export function isSymbiant(item: object): item is SymbiantItem {
   return 'family' in item && 'slot_id' in item;
 }
 
@@ -276,7 +336,7 @@ export interface Mob {
   location: string;
   mob_names: string[];
   is_pocket_boss: boolean;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, JsonValue>;
   symbiant_count?: number;
 }
 
@@ -297,51 +357,11 @@ export interface StatBonus {
 // Character Profile Types (LocalStorage)
 // ============================================================================
 
-/** Skill entry with IP tracking */
-export interface SkillWithIP {
-  value: number;
-  ipSpent: number;
-  pointFromIp: number;
-}
-
-export interface TinkerProfile {
-  Character: {
-    Name: string;
-    Level: number;
-    Profession: string;
-    Breed: string;
-    Faction: string;
-    Expansion: string;
-    AccountType: string;
-    MaxHealth: number;
-    MaxNano: number;
-  };
-  Skills: {
-    Attributes: {
-      Intelligence: SkillWithIP;
-      Psychic: SkillWithIP;
-      Sense: SkillWithIP;
-      Stamina: SkillWithIP;
-      Strength: SkillWithIP;
-      Agility: SkillWithIP;
-    };
-    'Body & Defense': Record<string, SkillWithIP>;
-    ACs: Record<string, number>;
-    'Ranged Weapons': Record<string, SkillWithIP>;
-    'Ranged Specials': Record<string, SkillWithIP>;
-    'Melee Weapons': Record<string, SkillWithIP>;
-    'Melee Specials': Record<string, SkillWithIP>;
-    'Nanos & Casting': Record<string, SkillWithIP>;
-    Exploring: Record<string, SkillWithIP>;
-    'Trade & Repair': Record<string, SkillWithIP>;
-    'Combat & Healing': Record<string, SkillWithIP>;
-    Misc: Record<string, number>; // Misc doesn't use IP tracking
-  };
-  Weapons: Record<string, Item | null>;
-  Clothing: Record<string, Item | null>;
-  Implants: Record<string, Item | null>;
-  PerksAndResearch: any[];
-}
+/**
+ * Character profiles live in the TinkerProfiles library (v4, ID-keyed skills).
+ * Re-exported here for the many callers that import it alongside API types.
+ */
+export type { TinkerProfile };
 
 export interface UserPreferences {
   theme: 'light' | 'dark';
@@ -644,8 +664,11 @@ export interface ImplantSelection {
   slotBitflag: string;
   /** Full implant item data from API (null if not yet loaded, implants only) */
   item: Item | null;
-  /** Symbiant item data (symbiants only) */
-  symbiant?: SymbiantItem | null;
+  /**
+   * Symbiant item data (symbiants only). setSymbiant() swaps the SymbiantItem
+   * it is given for the full Item, and profiles store that Item.
+   */
+  symbiant?: Item | null;
 }
 
 /** Request format for implant lookup API */
