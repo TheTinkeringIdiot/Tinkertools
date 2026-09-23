@@ -9,7 +9,7 @@
  */
 
 import { vi, beforeEach } from 'vitest';
-import axios from 'axios';
+import axios, { AxiosHeaders } from 'axios';
 import {
   ensureVersionsLoaded,
   setCurrentVersion,
@@ -23,7 +23,7 @@ import { TEST_VERSION, TEST_VERSION_REGISTRY } from './helpers/version-fixtures'
 
 // Suppress console warnings in tests to reduce noise (optional)
 // Comment out these lines if you need to debug console output
-global.console = {
+globalThis.console = {
   ...console,
   warn: vi.fn(),
   // Keep error for important failures
@@ -61,7 +61,7 @@ function createLocalStorageMock() {
 
 // Install global localStorage mock
 const localStorageMock = createLocalStorageMock();
-Object.defineProperty(global, 'localStorage', {
+Object.defineProperty(globalThis, 'localStorage', {
   value: localStorageMock,
   writable: true,
   configurable: true,
@@ -79,22 +79,26 @@ Object.defineProperty(global, 'localStorage', {
  * and Vitest gives every test file a fresh module registry, so resolving it
  * once here means no later call can trigger a real request.
  */
-const versionsSpy = vi
-  .spyOn(axios, 'get')
-  .mockResolvedValue({ data: TEST_VERSION_REGISTRY } as any);
+const versionsSpy = vi.spyOn(axios, 'get').mockResolvedValue({
+  data: TEST_VERSION_REGISTRY,
+  status: 200,
+  statusText: 'OK',
+  headers: {},
+  config: { headers: new AxiosHeaders() },
+});
 
 await ensureVersionsLoaded();
 versionsSpy.mockRestore();
 
-setCurrentVersion(TEST_VERSION);
+await setCurrentVersion(TEST_VERSION);
 
 // Clear localStorage before each test to prevent cross-test contamination
-beforeEach(() => {
+beforeEach(async () => {
   localStorageMock.clear();
   vi.clearAllMocks();
 
   // A version-switch test may have left another version active.
   if (currentVersion.value !== TEST_VERSION) {
-    setCurrentVersion(TEST_VERSION);
+    await setCurrentVersion(TEST_VERSION);
   }
 });

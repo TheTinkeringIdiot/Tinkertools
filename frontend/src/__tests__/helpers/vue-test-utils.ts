@@ -7,9 +7,9 @@
  * @see https://test-utils.vuejs.org/ - Vue Test Utils documentation
  */
 
-import { mount, VueWrapper, shallowMount } from '@vue/test-utils';
+import { mount, VueWrapper, shallowMount, type MountingOptions } from '@vue/test-utils';
 import { createPinia, setActivePinia, type Pinia } from 'pinia';
-import { createRouter, createMemoryHistory, type Router } from 'vue-router';
+import { createRouter, createMemoryHistory, type Router, type RouteRecordRaw } from 'vue-router';
 import { vi } from 'vitest';
 import type { Component } from 'vue';
 import { TEST_VERSION } from './version-fixtures';
@@ -18,16 +18,13 @@ import { TEST_VERSION } from './version-fixtures';
 // Mount Options Interface
 // ============================================================================
 
+type BaseMountingOptions = MountingOptions<Record<string, unknown>>;
+type GlobalMountOptions = NonNullable<BaseMountingOptions['global']>;
+
 export interface MountOptions {
-  props?: Record<string, any>;
-  slots?: Record<string, any>;
-  global?: {
-    plugins?: any[];
-    components?: Record<string, Component>;
-    stubs?: Record<string, any>;
-    mocks?: Record<string, any>;
-    provide?: Record<string, any>;
-  };
+  props?: Record<string, unknown>;
+  slots?: BaseMountingOptions['slots'];
+  global?: Pick<GlobalMountOptions, 'plugins' | 'components' | 'stubs' | 'mocks' | 'provide'>;
   attachTo?: HTMLElement | string;
   shallow?: boolean;
 }
@@ -104,8 +101,8 @@ export function createTestPinia(): Pinia {
  * Pass `routes` to replace the default child set; they are mounted as children
  * of the version parent, so give them relative paths ('items', not '/items').
  */
-export function createTestRouter(routes: any[] = []): Router {
-  const children =
+export function createTestRouter(routes: RouteRecordRaw[] = []): Router {
+  const children: RouteRecordRaw[] =
     routes.length > 0
       ? routes
       : [
@@ -134,8 +131,13 @@ export function createTestRouter(routes: any[] = []): Router {
           { path: 'tinkernukes', name: 'TinkerNukes', component: { template: '<div>Nu</div>' } },
         ];
 
+  // Start the history at the version root rather than pushing there: the
+  // router adopts the history's location on install, with no promise to drop.
+  const history = createMemoryHistory();
+  history.replace(`/${TEST_VERSION}/`);
+
   const router = createRouter({
-    history: createMemoryHistory(),
+    history,
     routes: [
       {
         path: '/:version([a-z0-9][a-z0-9.-]{0,39})',
@@ -144,9 +146,6 @@ export function createTestRouter(routes: any[] = []): Router {
       },
     ],
   });
-
-  // Give the router a current location so `version` is available to inherit.
-  router.push(`/${TEST_VERSION}/`);
 
   return router;
 }
@@ -451,7 +450,7 @@ export function mockLocalStorage() {
  */
 export function setupLocalStorageMock() {
   const mock = mockLocalStorage();
-  Object.defineProperty(global, 'localStorage', {
+  Object.defineProperty(globalThis, 'localStorage', {
     value: mock,
     writable: true,
   });
@@ -469,7 +468,7 @@ export function setupLocalStorageMock() {
  * await wrapper.vm.$emit('update', { value: 123 });
  * expectEmitted(wrapper, 'update', { value: 123 });
  */
-export function expectEmitted(wrapper: VueWrapper, eventName: string, payload?: any) {
+export function expectEmitted(wrapper: VueWrapper, eventName: string, payload?: unknown) {
   const emitted = wrapper.emitted(eventName);
   if (!emitted) {
     throw new Error(`Event "${eventName}" was not emitted`);

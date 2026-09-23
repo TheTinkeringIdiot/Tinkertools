@@ -215,14 +215,9 @@ These tests **require a real backend** and should only run when the backend is a
 ```typescript
 import { isBackendAvailable } from '../helpers/backend-check';
 
-let BACKEND_AVAILABLE = false;
-
-beforeAll(async () => {
-  BACKEND_AVAILABLE = await isBackendAvailable();
-  if (!BACKEND_AVAILABLE) {
-    console.warn('Backend not available - skipping integration tests');
-  }
-});
+// Top-level await: `describe.skipIf` reads the flag while the file is being
+// collected, before any `beforeAll` runs, so the check must finish first.
+const BACKEND_AVAILABLE = await isBackendAvailable();
 
 describe.skipIf(!BACKEND_AVAILABLE)('My Backend Tests', () => {
   it('should fetch real data', async () => {
@@ -231,6 +226,9 @@ describe.skipIf(!BACKEND_AVAILABLE)('My Backend Tests', () => {
   });
 });
 ```
+
+Do not set the flag in `beforeAll`: by then the suite has already been
+skipped (or not), so such a suite never runs, even with a backend.
 
 ## Backend Availability Check
 
@@ -531,7 +529,7 @@ If a test times out:
    - Slow operations may need longer: `{ timeout: 30000 }`
 
 4. **Verify backend availability check**
-   - Make sure `beforeAll` with `isBackendAvailable()` is present
+   - Make sure `const BACKEND_AVAILABLE = await isBackendAvailable()` runs at the top level
    - Make sure `describe.skipIf(!BACKEND_AVAILABLE)` wraps tests
 
 ## CI/CD Integration

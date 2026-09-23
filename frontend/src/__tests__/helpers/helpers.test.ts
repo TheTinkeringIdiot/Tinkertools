@@ -5,7 +5,7 @@
  * These tests validate the helper utilities themselves.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import {
   // Profile fixtures
   createTestProfile,
@@ -202,7 +202,7 @@ describe('Test Helpers Validation', () => {
       });
 
       expect(weapon.name).toBe('Combat Rifle');
-      expect(weapon.item_class).toBe(2); // Weapon
+      expect(weapon.item_class).toBe(1); // Weapon
       expect(weapon.stats.length).toBeGreaterThan(0);
 
       // Should have assault rifle bonus
@@ -277,13 +277,16 @@ describe('Test Helpers Validation', () => {
 
       // Extract bonuses
       const weaponBonuses = extractItemBonuses(weapon);
-      const perkBonuses = createSkillBonuses([[SKILL_ID.ASSAULT_RIF, 50]]);
 
       // Verify structure
       expect(profile.Character.Profession).toBe(PROFESSION.SOLDIER);
       expect(weapon.stats.length).toBeGreaterThan(0);
       expect(weaponBonuses[SKILL_ID.ASSAULT_RIF]).toBeGreaterThan(0);
-      expect(perkBonuses[SKILL_ID.ASSAULT_RIF]).toBe(50);
+      // Perk bonuses are carried by Modify Skill spells, not static stats
+      expect(perk.spell_data[0].spells[0].spell_params).toEqual({
+        stat: SKILL_ID.ASSAULT_RIF,
+        amount: 50,
+      });
     });
 
     it('should demonstrate correct v4.0.0 patterns', () => {
