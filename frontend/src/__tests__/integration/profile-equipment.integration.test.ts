@@ -215,7 +215,8 @@ describe('Profile Equipment Integration', () => {
       expect(profile.Implants[HEAD_SLOT]?.name).toBe('Brain Symbiant');
       expect(profile.Implants[HEAD_SLOT]?.type).toBe('symbiant');
 
-      // All items are fetched in one batch at their selected QLs
+      // All items are fetched in one batch at their selected QLs, from the
+      // version the profile is imported into
       expect(context.mockApi.batchInterpolateItems).toHaveBeenCalledTimes(1);
       expect(context.mockApi.batchInterpolateItems).toHaveBeenCalledWith(
         expect.arrayContaining([
@@ -224,7 +225,8 @@ describe('Profile Equipment Integration', () => {
           { aoid: 246662, targetQl: 290 },
           { aoid: 123456, targetQl: 200 },
           { aoid: 789123, targetQl: 150 },
-        ])
+        ]),
+        { gameVersion: TEST_VERSION }
       );
 
       // Verify implant lookup was called with correct cluster mapping

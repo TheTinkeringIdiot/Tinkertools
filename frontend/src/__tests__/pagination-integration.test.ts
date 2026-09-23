@@ -20,7 +20,8 @@ const BACKEND_AVAILABLE = await isBackendAvailable();
 async function searchPage(query: ItemSearchQuery) {
   const store = useItemsStore();
   const items = await store.searchItems(query, true);
-  const pagination: PaginationInfo = store.currentPagination;
+  const pagination: PaginationInfo | undefined = store.currentPagination;
+  if (!pagination) throw new Error('search did not record pagination');
   return { items, pagination };
 }
 

@@ -129,7 +129,7 @@ describe.skipIf(!BACKEND_AVAILABLE)('TinkerItems Full Integration', () => {
 
       expect(items.length).toBeGreaterThan(0);
       expect(store.currentSearchResults).toEqual(items);
-      expect(store.currentPagination.total).toBeGreaterThanOrEqual(items.length);
+      expect(store.currentPagination?.total).toBeGreaterThanOrEqual(items.length);
       expect(store.loading).toBe(false);
     });
 

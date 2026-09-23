@@ -10,7 +10,8 @@ import { apiClient } from '../../services/api-client';
 import { API_ROOT } from '../../services/api-config';
 import { setCurrentVersion } from '../../composables/useGameVersion';
 import { TEST_VERSION, TEST_ALT_VERSION } from '../helpers/version-fixtures';
-import type { Item, Spell, ApiResponse, TinkerProfile, SkillWithIP } from '../../types/api';
+import type { Item, Spell, ApiResponse } from '../../types/api';
+import { createTestProfile } from '../helpers/profile-fixtures';
 
 type RequestInterceptor = (config: InternalAxiosRequestConfig) => InternalAxiosRequestConfig;
 type ResponseErrorInterceptor = (error: unknown) => Promise<unknown>;
@@ -95,49 +96,6 @@ const mockItem: Item = {
   attack_stats: [],
   defense_stats: [],
 };
-
-/** The legacy profile shape the compatibility endpoint is declared with. */
-function legacyProfile(): TinkerProfile {
-  const skill = (value: number): SkillWithIP => ({ value, ipSpent: 0, pointFromIp: 0 });
-  return {
-    Character: {
-      Name: 'Tester',
-      Level: 200,
-      Profession: 'Soldier',
-      Breed: 'Solitus',
-      Faction: 'Neutral',
-      Expansion: 'Lost Eden',
-      AccountType: 'Paid',
-      MaxHealth: 1000,
-      MaxNano: 500,
-    },
-    Skills: {
-      Attributes: {
-        Intelligence: skill(10),
-        Psychic: skill(10),
-        Sense: skill(10),
-        Stamina: skill(10),
-        Strength: skill(10),
-        Agility: skill(10),
-      },
-      'Body & Defense': {},
-      ACs: {},
-      'Ranged Weapons': {},
-      'Ranged Specials': {},
-      'Melee Weapons': {},
-      'Melee Specials': {},
-      'Nanos & Casting': {},
-      Exploring: {},
-      'Trade & Repair': {},
-      'Combat & Healing': {},
-      Misc: {},
-    },
-    Weapons: {},
-    Clothing: {},
-    Implants: {},
-    PerksAndResearch: [],
-  };
-}
 
 const mockApiResponse: ApiResponse<Item> = {
   success: true,
@@ -236,7 +194,7 @@ describe('API Client', () => {
 
     it('should handle item compatibility check', async () => {
       const compatibilityRequest = {
-        profile: legacyProfile(),
+        profile: createTestProfile(),
         item_ids: [1, 2, 3],
         check_type: 'equip' as const,
       };

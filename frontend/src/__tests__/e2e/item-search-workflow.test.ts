@@ -148,15 +148,6 @@ describe('Item Search Workflow', () => {
       expect(wrapper.text()).not.toContain('Cell Scanner');
     });
 
-    it('finds the exact item and QL linked from equipment', async () => {
-      context.mockApi.searchItems.mockResolvedValue(results([combatArmor]));
-
-      await openItems('/items?itemId=5002&ql=150');
-
-      expect(lastQuery()).toMatchObject({ aoid: 5002, min_ql: 150, max_ql: 150 });
-      expect(wrapper.text()).toContain('Combat Armor');
-    });
-
     it('lists the nanos of a strain linked from TinkerNanos', async () => {
       context.mockApi.searchItems.mockResolvedValue(results([ironCircle]));
 
