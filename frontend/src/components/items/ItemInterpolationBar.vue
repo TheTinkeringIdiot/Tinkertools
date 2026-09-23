@@ -178,12 +178,21 @@ const interpolationStatus = computed(() => {
   return currentQl !== localTargetQl.value ? 'interpolated' : 'original';
 });
 
+/**
+ * The range a QL belongs to. Consecutive ranges share their boundary QL (99-100,
+ * 100-199): the QL a base item is defined at belongs to that item's range.
+ */
+function rangeForQl(ql: number): InterpolationRange | undefined {
+  return (
+    interpolationRanges.value.find((r) => r.min_ql === ql) ??
+    interpolationRanges.value.find((r) => ql >= r.min_ql && ql <= r.max_ql)
+  );
+}
+
 const currentRangeText = computed(() => {
   if (!localTargetQl.value || !interpolationRanges.value.length) return '';
 
-  const range = interpolationRanges.value.find(
-    (r) => localTargetQl.value! >= r.min_ql && localTargetQl.value! <= r.max_ql
-  );
+  const range = rangeForQl(localTargetQl.value);
 
   if (!range) return '';
   return range.interpolatable ? `Range: ${range.min_ql}-${range.max_ql}` : `Fixed: ${range.min_ql}`;
@@ -208,9 +217,7 @@ async function handleQlChange(): Promise<void> {
   if (!localTargetQl.value || !itemAoid.value) return;
 
   // Find which range this QL belongs to
-  const targetRange = interpolationRanges.value.find(
-    (r) => localTargetQl.value! >= r.min_ql && localTargetQl.value! <= r.max_ql
-  );
+  const targetRange = rangeForQl(localTargetQl.value);
 
   if (!targetRange) {
     emit('error', 'Invalid QL for this item');

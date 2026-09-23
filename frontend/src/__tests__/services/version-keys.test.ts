@@ -24,13 +24,13 @@ import { setCurrentVersion, currentVersion } from '@/composables/useGameVersion'
 import { TEST_VERSION, TEST_ALT_VERSION } from '../helpers/version-fixtures';
 
 describe('version-keys', () => {
-  beforeEach(() => {
-    setCurrentVersion(TEST_VERSION);
+  beforeEach(async () => {
+    await setCurrentVersion(TEST_VERSION);
     localStorage.clear();
   });
 
-  afterEach(() => {
-    setCurrentVersion(TEST_VERSION);
+  afterEach(async () => {
+    await setCurrentVersion(TEST_VERSION);
   });
 
   describe('key construction', () => {
@@ -46,9 +46,9 @@ describe('version-keys', () => {
       expect(versionPrefix('weapons')).toBe(`weapons:${TEST_VERSION}:`);
     });
 
-    it('follows the active version rather than snapshotting it', () => {
+    it('follows the active version rather than snapshotting it', async () => {
       const before = versionKey('base');
-      setCurrentVersion(TEST_ALT_VERSION);
+      await setCurrentVersion(TEST_ALT_VERSION);
 
       expect(versionKey('base')).not.toBe(before);
       expect(versionKey('base')).toBe(`base:${TEST_ALT_VERSION}`);
@@ -142,8 +142,8 @@ describe('version-keys', () => {
       expect(localStorage.getItem(versionKey('farm-list'))).toBeNull();
     });
 
-    it('adopts into whichever version is active at the time', () => {
-      setCurrentVersion(TEST_ALT_VERSION);
+    it('adopts into whichever version is active at the time', async () => {
+      await setCurrentVersion(TEST_ALT_VERSION);
       localStorage.setItem('farm-list', 'data');
 
       adoptLegacyKey('farm-list');

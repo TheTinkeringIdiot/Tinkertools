@@ -221,6 +221,8 @@ describe('CacheManager', () => {
         expect.stringMatching(/tinkertools_cache_search_/),
         expect.stringContaining('"results":[{"id":1,"name":"Sword"}]')
       );
+      const [, stored] = mockLocalStorage.setItem.mock.calls[0];
+      expect(JSON.parse(stored).data).toEqual(expectedCacheData);
     });
 
     it('should retrieve cached search results', async () => {
@@ -416,11 +418,6 @@ describe('CacheManager', () => {
       });
 
       mockLocalStorage.getItem.mockReturnValueOnce(entry1).mockReturnValueOnce(entry2);
-
-      // Mock Blob constructor
-      global.Blob = vi.fn().mockImplementation((content) => ({
-        size: JSON.stringify(content[0]).length,
-      })) as any;
 
       const stats = await cacheManager.getStats();
 

@@ -787,7 +787,8 @@ class TinkerToolsApiClient {
       return ApiErrorHandler.handle(error.response.data.error);
     }
 
-    if (error.code === 'NETWORK_ERROR') {
+    // AxiosError.ERR_NETWORK: the request never got a response
+    if (error.code === 'ERR_NETWORK') {
       return {
         type: 'error',
         title: 'Network Error',

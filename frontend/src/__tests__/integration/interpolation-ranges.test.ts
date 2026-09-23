@@ -8,406 +8,266 @@
  * Strategy: Skip when backend not available (Option B)
  */
 
-import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'vitest';
-import { mount } from '@vue/test-utils';
-import { createPinia, setActivePinia } from 'pinia';
-import { createRouter, createWebHistory } from 'vue-router';
-import ItemDetail from '../../views/ItemDetail.vue';
-import { useItemsStore } from '../../stores/items';
-import { apiClient } from '../../services/api-client';
+import { describe, it, expect } from 'vitest';
 import { isBackendAvailable, getBackendUrl } from '../helpers/backend-check';
+import { TEST_VERSION } from '../helpers/version-fixtures';
+import type {
+  Item,
+  InterpolationInfo,
+  InterpolationResponse,
+  InterpolatedItem,
+  PaginatedResponse,
+  StatValue,
+} from '@/types/api';
 
-// Real backend URL for integration testing
-const BACKEND_URL = getBackendUrl() + '/api/v1';
+// Real backend URL for integration testing: item data is served per game version
+const BACKEND_URL = `${getBackendUrl()}/api/v1/${TEST_VERSION}`;
 
-// Check backend availability before running tests
-let BACKEND_AVAILABLE = false;
+// Top-level await: describe.skipIf reads this while tests are collected.
+const BACKEND_AVAILABLE = await isBackendAvailable();
 
-beforeAll(async () => {
-  BACKEND_AVAILABLE = await isBackendAvailable();
-  if (!BACKEND_AVAILABLE) {
-    console.warn('Backend not available - skipping interpolation range tests');
-  }
-});
-
-// Known multi-range items for testing
-const TEST_ITEMS = {
-  OTEK_SLICER: {
-    ranges: [
-      { aoid: 262759, min_ql: 100, max_ql: 199, name: 'Otek Slicer QL 100-199' },
-      { aoid: 262760, min_ql: 200, max_ql: 299, name: 'Otek Slicer QL 200-299' },
-      { aoid: 262761, min_ql: 300, max_ql: 300, name: 'Otek Slicer QL 300' },
-    ],
-  },
+/**
+ * Otek Slicer: one base item per patch point. The backend interpolates between
+ * consecutive bases, so interpolation-info lists one range starting at each.
+ */
+const OTEK_SLICER = {
+  aoid: 262759, // the QL 100 base, used as the entry point
+  bases: [
+    { aoid: 262757, ql: 1 },
+    { aoid: 262758, ql: 99 },
+    { aoid: 262759, ql: 100 },
+    { aoid: 262760, ql: 199 },
+    { aoid: 262761, ql: 200 },
+    { aoid: 262762, ql: 299 },
+    { aoid: 262763, ql: 300 },
+  ],
 };
 
+async function getJson<T>(path: string): Promise<T> {
+  const response = await fetch(`${BACKEND_URL}${path}`);
+  expect(response.ok).toBe(true);
+  const body: T = await response.json();
+  return body;
+}
+
+async function interpolate(aoid: number, ql: number): Promise<InterpolatedItem> {
+  const data = await getJson<InterpolationResponse>(`/items/${aoid}/interpolate?target_ql=${ql}`);
+  expect(data.success).toBe(true);
+  expect(data.item).toBeDefined();
+  return data.item!;
+}
+
+async function sortedRanges(aoid: number) {
+  const info = await getJson<InterpolationInfo>(`/items/${aoid}/interpolation-info`);
+  return info.ranges.slice().sort((a, b) => a.min_ql - b.min_ql);
+}
+
+function statMap(stats: StatValue[]): Map<number, number> {
+  return new Map(stats.map((s) => [s.stat, s.value]));
+}
+
 describe.skipIf(!BACKEND_AVAILABLE)('Interpolation Range Transitions', () => {
-  let router: any;
-  let store: any;
-
-  beforeEach(() => {
-    setActivePinia(createPinia());
-    store = useItemsStore();
-
-    router = createRouter({
-      history: createWebHistory(),
-      routes: [
-        {
-          path: '/items/:aoid',
-          name: 'ItemDetail',
-          component: ItemDetail,
-          props: true,
-        },
-      ],
-    });
-  });
-
-  afterEach(() => {
-    // Cleanup
-  });
-
   describe('Multi-Range Item Detection', () => {
-    it('should detect multiple ranges for Otek Slicer', async () => {
-      const response = await fetch(
-        `${BACKEND_URL}/items/${TEST_ITEMS.OTEK_SLICER.ranges[0].aoid}/interpolation-info`
+    it('should detect contiguous ranges for Otek Slicer', async () => {
+      const info = await getJson<InterpolationInfo>(
+        `/items/${OTEK_SLICER.aoid}/interpolation-info`
       );
 
-      expect(response.ok).toBe(true);
-      const data = await response.json();
+      expect(info.interpolatable).toBe(true);
+      expect(info.min_ql).toBe(1);
+      expect(info.max_ql).toBe(300);
 
-      expect(data.success).toBe(true);
-      expect(Array.isArray(data.ranges)).toBe(true);
-      expect(data.ranges.length).toBeGreaterThan(1);
+      const ranges = info.ranges.slice().sort((a, b) => a.min_ql - b.min_ql);
+      expect(ranges).toHaveLength(OTEK_SLICER.bases.length);
 
-      // Verify we have the expected ranges
-      const ranges = data.ranges.sort((a: any, b: any) => a.min_ql - b.min_ql);
+      ranges.forEach((range, index) => {
+        const base = OTEK_SLICER.bases[index];
+        const next = OTEK_SLICER.bases[index + 1] ?? base;
 
-      expect(ranges[0].min_ql).toBe(100);
-      expect(ranges[0].max_ql).toBe(199);
-      expect(ranges[1].min_ql).toBe(200);
-      expect(ranges[1].max_ql).toBe(299);
+        // Each range starts at its base item and runs to the next one
+        expect(range.base_aoid).toBe(base.aoid);
+        expect(range.min_ql).toBe(base.ql);
+        expect(range.max_ql).toBe(next.ql);
+      });
 
-      console.log(
-        'Detected ranges:',
-        ranges.map((r: any) => `QL ${r.min_ql}-${r.max_ql} (AOID: ${r.base_aoid})`)
-      );
+      // The top QL is a single fixed item, nothing to interpolate towards
+      expect(ranges[ranges.length - 1].interpolatable).toBe(false);
     }, 10000);
 
     it('should have correct base_aoid for each range', async () => {
-      for (const range of TEST_ITEMS.OTEK_SLICER.ranges) {
-        const response = await fetch(`${BACKEND_URL}/items/${range.aoid}`);
+      for (const base of OTEK_SLICER.bases) {
+        const item = await getJson<Item>(`/items/${base.aoid}`);
 
-        expect(response.ok).toBe(true);
-        const item = await response.json();
-
-        expect(item.aoid).toBe(range.aoid);
-        expect(item.ql).toBeGreaterThanOrEqual(range.min_ql);
-        expect(item.ql).toBeLessThanOrEqual(range.max_ql);
-
-        console.log(`Range ${range.min_ql}-${range.max_ql}: ${item.name} (QL ${item.ql})`);
+        expect(item.aoid).toBe(base.aoid);
+        expect(item.ql).toBe(base.ql);
       }
     }, 15000);
   });
 
   describe('Range Boundary Testing', () => {
     it('should interpolate correctly at range boundaries', async () => {
-      const testCases = [
-        { aoid: 262759, ql: 199 }, // Top of first range
-        { aoid: 262760, ql: 200 }, // Bottom of second range
-        { aoid: 262760, ql: 299 }, // Top of second range
-        { aoid: 262761, ql: 300 }, // Third range (single QL)
-      ];
+      for (const base of OTEK_SLICER.bases) {
+        const item = await interpolate(OTEK_SLICER.aoid, base.ql);
 
-      for (const { aoid, ql } of testCases) {
-        const response = await fetch(`${BACKEND_URL}/items/${aoid}/interpolate?target_ql=${ql}`);
-
-        expect(response.ok).toBe(true);
-        const data = await response.json();
-
-        expect(data.success).toBe(true);
-        expect(data.item.ql).toBe(ql);
-        expect(data.item.aoid).toBe(aoid);
-
-        console.log(`Boundary test: ${data.item.name} QL ${ql} ✓`);
+        // A patch point QL resolves to the base item defined at that QL
+        expect(item.ql).toBe(base.ql);
+        expect(item.aoid).toBe(base.aoid);
       }
     }, 20000);
 
-    it('should reject interpolation outside valid ranges', async () => {
-      // Test QLs outside any valid range
-      const invalidQls = [50, 99, 301, 500]; // Below min, gap between ranges, above max
+    it('should reject a QL below 1', async () => {
+      const response = await fetch(
+        `${BACKEND_URL}/items/${OTEK_SLICER.aoid}/interpolate?target_ql=0`
+      );
 
-      for (const ql of invalidQls) {
-        const response = await fetch(`${BACKEND_URL}/items/262759/interpolate?target_ql=${ql}`);
+      expect(response.status).toBe(422);
+    }, 10000);
 
-        // Should return error for invalid QL
-        expect(response.ok).toBe(false);
+    it('should hold stats at the top variant above the highest QL', async () => {
+      const top = OTEK_SLICER.bases[OTEK_SLICER.bases.length - 1];
+      const topItem = await getJson<Item>(`/items/${top.aoid}`);
 
-        console.log(`Invalid QL ${ql} correctly rejected`);
-      }
+      const item = await interpolate(OTEK_SLICER.aoid, top.ql + 1);
+
+      expect(item.aoid).toBe(top.aoid);
+      expect(item.interpolating).toBe(false);
+      expect(statMap(item.stats)).toEqual(statMap(topItem.stats));
     }, 15000);
   });
 
   describe('Cross-Range Item Properties', () => {
     it('should maintain item identity across ranges', async () => {
-      const ranges = TEST_ITEMS.OTEK_SLICER.ranges;
-      const itemProperties: any[] = [];
-
-      // Get base properties from each range
-      for (const range of ranges) {
-        const response = await fetch(`${BACKEND_URL}/items/${range.aoid}`);
-        expect(response.ok).toBe(true);
-
-        const item = await response.json();
-        itemProperties.push({
-          aoid: item.aoid,
-          name: item.name,
-          description: item.description,
-          item_class: item.item_class,
-          is_nano: item.is_nano,
-        });
+      const items: Item[] = [];
+      for (const base of OTEK_SLICER.bases) {
+        items.push(await getJson<Item>(`/items/${base.aoid}`));
       }
 
-      // Verify core properties are consistent (should be same item, different QLs)
-      const baseName = itemProperties[0].name.replace(/\s+QL\s+\d+.*$/, '').trim();
-
-      itemProperties.forEach((props) => {
-        expect(props.name).toMatch(new RegExp(baseName, 'i'));
-        expect(props.item_class).toBe(itemProperties[0].item_class);
-        expect(props.is_nano).toBe(itemProperties[0].is_nano);
-      });
-
-      console.log('Cross-range consistency verified:', {
-        baseName,
-        ranges: itemProperties.length,
-        itemClass: itemProperties[0].item_class,
+      // Same item at different QLs: identical name and classification
+      items.forEach((item) => {
+        expect(item.name).toBe(items[0].name);
+        expect(item.item_class).toBe(items[0].item_class);
+        expect(item.is_nano).toBe(items[0].is_nano);
       });
     }, 15000);
 
     it('should have different stat values across ranges', async () => {
-      // Compare stats between different range base items
-      const responses = await Promise.all(
-        TEST_ITEMS.OTEK_SLICER.ranges
-          .slice(0, 2)
-          .map((range) => fetch(`${BACKEND_URL}/items/${range.aoid}`))
+      const [low, high] = await Promise.all([
+        getJson<Item>('/items/262759'), // QL 100
+        getJson<Item>('/items/262761'), // QL 200
+      ]);
+
+      const lowStats = statMap(low.stats);
+      const changed = high.stats.filter(
+        (stat) => lowStats.has(stat.stat) && lowStats.get(stat.stat) !== stat.value
       );
 
-      expect(responses.every((r) => r.ok)).toBe(true);
-
-      const [item1, item2] = await Promise.all(responses.map((r) => r.json()));
-
-      // Stats should be different between different QL ranges
-      if (item1.stats && item2.stats && item1.stats.length > 0 && item2.stats.length > 0) {
-        const stat1 = item1.stats.find((s: any) => s.stat === item2.stats[0].stat);
-        const stat2 = item2.stats[0];
-
-        if (stat1) {
-          expect(stat1.value).not.toBe(stat2.value);
-          console.log('Stat progression verified:', {
-            stat: stat1.stat,
-            ql1: item1.ql,
-            value1: stat1.value,
-            ql2: item2.ql,
-            value2: stat2.value,
-          });
-        }
-      }
+      expect(changed.length).toBeGreaterThan(0);
     }, 15000);
   });
 
   describe('Interpolation Within Ranges', () => {
     it('should interpolate stats correctly within a range', async () => {
-      const baseAoid = 262759; // 100-199 range
-      const baseQl = 100;
-      const targetQl = 150;
+      const [low, high] = await Promise.all([
+        getJson<Item>('/items/262759'), // QL 100
+        getJson<Item>('/items/262760'), // QL 199
+      ]);
 
-      // Get base item stats
-      const baseResponse = await fetch(`${BACKEND_URL}/items/${baseAoid}`);
-      expect(baseResponse.ok).toBe(true);
-      const baseItem = await baseResponse.json();
+      const item = await interpolate(OTEK_SLICER.aoid, 150);
 
-      // Get interpolated item stats
-      const interpResponse = await fetch(
-        `${BACKEND_URL}/items/${baseAoid}/interpolate?target_ql=${targetQl}`
-      );
-      expect(interpResponse.ok).toBe(true);
-      const interpData = await interpResponse.json();
+      expect(item.interpolating).toBe(true);
+      expect(item.low_ql).toBe(100);
+      expect(item.high_ql).toBe(199);
 
-      expect(interpData.success).toBe(true);
-      const interpolatedItem = interpData.item;
+      const lowStats = statMap(low.stats);
+      const highStats = statMap(high.stats);
+      let strictlyBetween = 0;
 
-      // Compare stats - they should be proportionally increased
-      if (baseItem.stats && interpolatedItem.stats) {
-        const baseStatMap = new Map(baseItem.stats.map((s: any) => [s.stat, s.value]));
-        const interpStatMap = new Map(interpolatedItem.stats.map((s: any) => [s.stat, s.value]));
+      for (const { stat, value } of item.stats) {
+        const lo = lowStats.get(stat);
+        const hi = highStats.get(stat);
+        if (lo === undefined || hi === undefined) continue;
 
-        // Find a stat that should interpolate
-        const testStatId = Array.from(baseStatMap.keys())[0];
-        const baseStat = baseStatMap.get(testStatId);
-        const interpStat = interpStatMap.get(testStatId);
-
-        if (baseStat && interpStat) {
-          // Interpolated stat should be higher than base (since we're going from 100 to 150)
-          expect(interpStat).toBeGreaterThan(baseStat);
-
-          console.log('Stat interpolation verified:', {
-            stat: testStatId,
-            baseValue: baseStat,
-            interpValue: interpStat,
-            qlIncrease: targetQl - baseQl,
-          });
-        }
+        // Every interpolated value stays within its two base values
+        expect(value).toBeGreaterThanOrEqual(Math.min(lo, hi));
+        expect(value).toBeLessThanOrEqual(Math.max(lo, hi));
+        if (value > Math.min(lo, hi) && value < Math.max(lo, hi)) strictlyBetween++;
       }
+
+      // ...and the stats that scale with QL really moved off the base
+      expect(strictlyBetween).toBeGreaterThan(0);
     }, 10000);
 
     it('should interpolate requirements correctly within a range', async () => {
-      const baseAoid = 262759;
-      const targetQl = 175;
+      const item = await interpolate(OTEK_SLICER.aoid, 175);
 
-      // Get interpolated item
-      const response = await fetch(
-        `${BACKEND_URL}/items/${baseAoid}/interpolate?target_ql=${targetQl}`
-      );
-      expect(response.ok).toBe(true);
-      const data = await response.json();
+      const actionsWithRequirements = item.actions.filter((a) => a.criteria.length > 0);
+      expect(actionsWithRequirements.length).toBeGreaterThan(0);
 
-      expect(data.success).toBe(true);
-      const interpolatedItem = data.item;
-
-      // Verify requirements are present and interpolated
-      if (interpolatedItem.actions) {
-        const actionsWithRequirements = interpolatedItem.actions.filter(
-          (a: any) => a.criteria && a.criteria.length > 0
-        );
-
-        expect(actionsWithRequirements.length).toBeGreaterThan(0);
-
-        actionsWithRequirements.forEach((action: any) => {
-          action.criteria.forEach((criterion: any) => {
-            expect(criterion).toHaveProperty('value2');
-            expect(typeof criterion.value2).toBe('number');
-            expect(criterion.value2).toBeGreaterThan(0);
-          });
+      actionsWithRequirements.forEach((action) => {
+        action.criteria.forEach((criterion) => {
+          expect(typeof criterion.value2).toBe('number');
+          expect(criterion.value2).toBeGreaterThan(0);
         });
-
-        console.log('Requirements verified:', {
-          actionsWithReq: actionsWithRequirements.length,
-          totalCriteria: actionsWithRequirements.reduce(
-            (sum: number, a: any) => sum + a.criteria.length,
-            0
-          ),
-        });
-      }
+      });
     }, 10000);
   });
 
   describe('Range Navigation Logic', () => {
     it('should identify correct target range for any QL', async () => {
-      // Get ranges for Otek Slicer
-      const response = await fetch(`${BACKEND_URL}/items/262759/interpolation-info`);
-      expect(response.ok).toBe(true);
-      const data = await response.json();
+      const ranges = await sortedRanges(OTEK_SLICER.aoid);
 
-      const ranges = data.ranges.sort((a: any, b: any) => a.min_ql - b.min_ql);
-
-      // Test various QLs and verify they map to correct ranges
+      // A QL strictly inside a range belongs to that range alone
       const testCases = [
-        { ql: 150, expectedRangeIndex: 0 }, // Should be in 100-199
-        { ql: 250, expectedRangeIndex: 1 }, // Should be in 200-299
-        { ql: 300, expectedRangeIndex: 2 }, // Should be in 300-300
+        { ql: 50, baseAoid: 262757 },
+        { ql: 150, baseAoid: 262759 },
+        { ql: 250, baseAoid: 262761 },
       ];
 
-      testCases.forEach(({ ql, expectedRangeIndex }) => {
-        const targetRange = ranges.find((r: any) => ql >= r.min_ql && ql <= r.max_ql);
-        expect(targetRange).toBeDefined();
-        expect(ranges.indexOf(targetRange)).toBe(expectedRangeIndex);
-
-        console.log(
-          `QL ${ql} maps to range ${targetRange.min_ql}-${targetRange.max_ql} (AOID: ${targetRange.base_aoid})`
-        );
+      testCases.forEach(({ ql, baseAoid }) => {
+        const matching = ranges.filter((r) => ql >= r.min_ql && ql <= r.max_ql);
+        expect(matching).toHaveLength(1);
+        expect(matching[0].base_aoid).toBe(baseAoid);
       });
     }, 10000);
 
     it('should validate that each range has unique AOID', async () => {
-      const response = await fetch(`${BACKEND_URL}/items/262759/interpolation-info`);
-      expect(response.ok).toBe(true);
-      const data = await response.json();
+      const ranges = await sortedRanges(OTEK_SLICER.aoid);
 
-      const aoids = data.ranges.map((r: any) => r.base_aoid);
-      const uniqueAoids = new Set(aoids);
-
-      expect(uniqueAoids.size).toBe(aoids.length); // All AOIDs should be unique
-
-      console.log('Range AOIDs verified unique:', Array.from(uniqueAoids));
+      const aoids = ranges.map((r) => r.base_aoid);
+      expect(new Set(aoids).size).toBe(aoids.length);
     }, 10000);
   });
 
   describe('Cross-Range Consistency', () => {
     it('should maintain spell effects across ranges', async () => {
-      const ranges = TEST_ITEMS.OTEK_SLICER.ranges.slice(0, 2); // Test first two ranges
-      const spellDataSets: any[] = [];
-
-      for (const range of ranges) {
-        const response = await fetch(`${BACKEND_URL}/items/${range.aoid}`);
-        expect(response.ok).toBe(true);
-        const item = await response.json();
-
-        if (item.spell_data) {
-          spellDataSets.push({
-            aoid: range.aoid,
-            ql: item.ql,
-            spellData: item.spell_data,
-          });
-        }
+      const items: Item[] = [];
+      for (const base of OTEK_SLICER.bases) {
+        items.push(await getJson<Item>(`/items/${base.aoid}`));
       }
 
-      // If any ranges have spell data, verify structure consistency
-      if (spellDataSets.length > 1) {
-        const baseStructure = spellDataSets[0].spellData;
+      const baseEvents = items[0].spell_data.map((spellData) => spellData.event);
 
-        spellDataSets.slice(1).forEach(({ aoid, ql, spellData }) => {
-          expect(spellData.length).toBe(baseStructure.length);
-
-          // Each spell event should have same structure but potentially different values
-          spellData.forEach((spellEvent: any, index: number) => {
-            expect(spellEvent.event).toBe(baseStructure[index].event);
-            expect(Array.isArray(spellEvent.spells)).toBe(true);
-          });
+      items.forEach((item) => {
+        // Same spell events at every QL, with possibly different values
+        expect(item.spell_data.map((spellData) => spellData.event)).toEqual(baseEvents);
+        item.spell_data.forEach((spellData) => {
+          expect(Array.isArray(spellData.spells)).toBe(true);
         });
-
-        console.log('Spell data consistency verified across ranges');
-      }
+      });
     }, 15000);
 
     it('should maintain action types across ranges', async () => {
-      const ranges = TEST_ITEMS.OTEK_SLICER.ranges.slice(0, 2);
-      const actionSets: any[] = [];
-
-      for (const range of ranges) {
-        const response = await fetch(`${BACKEND_URL}/items/${range.aoid}`);
-        expect(response.ok).toBe(true);
-        const item = await response.json();
-
-        if (item.actions) {
-          actionSets.push({
-            aoid: range.aoid,
-            ql: item.ql,
-            actions: item.actions,
-          });
-        }
+      const items: Item[] = [];
+      for (const base of OTEK_SLICER.bases) {
+        items.push(await getJson<Item>(`/items/${base.aoid}`));
       }
 
-      // Verify action consistency across ranges
-      if (actionSets.length > 1) {
-        const baseActions = actionSets[0].actions;
-        const actionTypes = baseActions.map((a: any) => a.action).sort();
+      const actionTypes = items[0].actions.map((a) => a.action).sort();
+      expect(actionTypes.length).toBeGreaterThan(0);
 
-        actionSets.slice(1).forEach(({ aoid, ql, actions }) => {
-          const rangeActionTypes = actions.map((a: any) => a.action).sort();
-          expect(rangeActionTypes).toEqual(actionTypes);
-        });
-
-        console.log('Action types consistent across ranges:', actionTypes);
-      }
+      items.forEach((item) => {
+        expect(item.actions.map((a) => a.action).sort()).toEqual(actionTypes);
+      });
     }, 15000);
   });
 
@@ -415,78 +275,55 @@ describe.skipIf(!BACKEND_AVAILABLE)('Interpolation Range Transitions', () => {
     it('should retrieve interpolation info quickly', async () => {
       const startTime = performance.now();
 
-      const response = await fetch(`${BACKEND_URL}/items/262759/interpolation-info`);
+      const response = await fetch(`${BACKEND_URL}/items/${OTEK_SLICER.aoid}/interpolation-info`);
 
-      const endTime = performance.now();
-      const duration = endTime - startTime;
+      const duration = performance.now() - startTime;
 
       expect(response.ok).toBe(true);
       expect(duration).toBeLessThan(1000); // Should be under 1 second
-
-      console.log(`Interpolation info retrieved in ${duration.toFixed(2)}ms`);
     }, 10000);
 
     it('should interpolate items efficiently', async () => {
       const startTime = performance.now();
 
-      const response = await fetch(`${BACKEND_URL}/items/262759/interpolate?target_ql=150`);
+      const response = await fetch(
+        `${BACKEND_URL}/items/${OTEK_SLICER.aoid}/interpolate?target_ql=150`
+      );
 
-      const endTime = performance.now();
-      const duration = endTime - startTime;
+      const duration = performance.now() - startTime;
 
       expect(response.ok).toBe(true);
       expect(duration).toBeLessThan(2000); // Should be under 2 seconds
-
-      console.log(`Item interpolation completed in ${duration.toFixed(2)}ms`);
     }, 10000);
   });
 
   describe('Edge Case Testing', () => {
     it('should handle interpolation at exact base QLs', async () => {
-      // Test interpolating to the exact QL of base items
       const testCases = [
         { aoid: 262759, ql: 100 }, // Exact base QL
-        { aoid: 262760, ql: 200 }, // Exact base QL of next range
+        { aoid: 262761, ql: 200 }, // Exact base QL of the next range
       ];
 
       for (const { aoid, ql } of testCases) {
-        const response = await fetch(`${BACKEND_URL}/items/${aoid}/interpolate?target_ql=${ql}`);
+        const item = await interpolate(aoid, ql);
 
-        expect(response.ok).toBe(true);
-        const data = await response.json();
-
-        expect(data.success).toBe(true);
-        expect(data.item.ql).toBe(ql);
-
-        // Should still be marked as interpolating even at base QL
-        expect(data.item.interpolating).toBe(true);
+        expect(item.ql).toBe(ql);
+        // Still interpolating: the next base item sits above it
+        expect(item.interpolating).toBe(true);
       }
     }, 15000);
 
     it('should handle non-interpolatable items gracefully', async () => {
-      // Test with an item that's not interpolatable (like a nano)
-      const nanoParams = new URLSearchParams({
-        q: 'nano',
-        is_nano: 'true',
-        page_size: '1',
-      });
+      // Nanos have a single fixed QL and never interpolate
+      const nanos = await getJson<PaginatedResponse<{ aoid: number }>>('/nanos?page_size=1');
+      expect(nanos.items.length).toBeGreaterThan(0);
+      const nanoAoid = nanos.items[0].aoid;
 
-      const searchResponse = await fetch(`${BACKEND_URL}/items/search?${nanoParams}`);
-      expect(searchResponse.ok).toBe(true);
-      const searchData = await searchResponse.json();
+      const item = await interpolate(nanoAoid, 200);
 
-      if (searchData.items.length > 0) {
-        const nanoAoid = searchData.items[0].aoid;
-
-        const interpResponse = await fetch(
-          `${BACKEND_URL}/items/${nanoAoid}/interpolate?target_ql=200`
-        );
-
-        // Should return error for non-interpolatable items
-        expect(interpResponse.ok).toBe(false);
-
-        console.log('Non-interpolatable item correctly rejected:', searchData.items[0].name);
-      }
+      expect(item.aoid).toBe(nanoAoid);
+      expect(item.is_nano).toBe(true);
+      expect(item.interpolating).toBe(false);
     }, 10000);
   });
 });

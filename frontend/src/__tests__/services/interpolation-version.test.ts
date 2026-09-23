@@ -5,7 +5,7 @@
  * version and must not read or poison the browsing version's cache entries.
  */
 
-import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 vi.mock('@/services/api-client', () => ({
   apiClient: {
@@ -18,18 +18,25 @@ vi.mock('@/services/api-client', () => ({
 import interpolationService from '@/services/interpolation-service';
 import { apiClient } from '@/services/api-client';
 import { currentVersion, setCurrentVersion } from '@/composables/useGameVersion';
+import type { InterpolatedItem, InterpolationInfo } from '@/types/api';
 
-const mockApi = apiClient as unknown as {
-  interpolateItem: Mock;
-  getInterpolationInfo: Mock;
-  checkItemInterpolatable: Mock;
-};
+const mockApi = vi.mocked(apiClient);
 
-function interpolated(ql: number) {
-  return { aoid: 24562, name: 'Notum Splice', target_ql: ql, interpolating: true, stats: [] };
+function interpolated(ql: number): InterpolatedItem {
+  return {
+    id: 1,
+    aoid: 24562,
+    name: 'Notum Splice',
+    is_nano: false,
+    target_ql: ql,
+    interpolating: true,
+    stats: [],
+    spell_data: [],
+    actions: [],
+  };
 }
 
-function info(maxQl: number) {
+function info(maxQl: number): InterpolationInfo {
   return {
     aoid: 24562,
     interpolatable: true,
@@ -41,11 +48,11 @@ function info(maxQl: number) {
 }
 
 describe('interpolation across game versions', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     interpolationService.clearAllCaches();
     currentVersion.value = null;
-    setCurrentVersion('ao-2024-02');
+    await setCurrentVersion('ao-2024-02');
   });
 
   it('sends no version for the browsing version', async () => {
