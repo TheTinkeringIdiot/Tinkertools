@@ -19,8 +19,6 @@ export { offlineManager } from '../services/offline-manager';
 
 // Composable exports
 export { useItems } from '../composables/useItems';
-export { useSearch } from '../composables/useSearch';
-export { useFilters } from '../composables/useFilters';
 
 // Type exports
 export type { ApplicationName, CrossAppContext, AppNotification } from './app';

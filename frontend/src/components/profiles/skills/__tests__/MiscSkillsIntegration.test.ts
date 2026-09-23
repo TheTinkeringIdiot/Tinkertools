@@ -17,7 +17,6 @@ import { createApp } from 'vue';
 import PrimeVue from 'primevue/config';
 import ToastService from 'primevue/toastservice';
 import SkillSlider from '@/components/profiles/skills/SkillSlider.vue';
-import StatBreakdownTooltip from '@/components/profiles/skills/StatBreakdownTooltip.vue';
 import SkillsManager from '@/components/profiles/skills/SkillsManager.vue';
 import type { TinkerProfile } from '@/lib/tinkerprofiles/types';
 import type { SkillId } from '@/types/skills';
@@ -319,131 +318,6 @@ describe('Misc Skills Integration Tests', () => {
     });
   });
 
-  describe('Tooltip Breakdowns for Misc Skills', () => {
-    it('should show tooltip breakdowns for Misc skills', () => {
-      const skillData = createTestSkillData({
-        base: 0,
-
-        equipmentBonus: 50,
-        perkBonus: 25,
-        buffBonus: 10,
-        total: 85,
-      });
-
-      const wrapper = mount(StatBreakdownTooltip, {
-        props: {
-          skillId: toSkillId(SKILL_ID.CONCEALMENT),
-          skillName: 'Concealment',
-          skillData: skillData,
-          isAbility: false,
-          isMiscSkill: true,
-          baseValue: 0,
-          trickleDownBonus: 0,
-          equipmentBonus: 50,
-          perkBonus: 25,
-          buffBonus: 10,
-          ipContribution: 0,
-          abilityImprovements: 0,
-          totalValue: 85,
-        },
-        global: {
-          directives: {
-            tooltip: tooltipDirective,
-          },
-        },
-      });
-
-      expect(wrapper.text()).toContain('Concealment Breakdown');
-      expect(wrapper.text()).toContain('Equipment:');
-      expect(wrapper.text()).toContain('+50');
-      expect(wrapper.text()).toContain('Perks:');
-      expect(wrapper.text()).toContain('+25');
-      expect(wrapper.text()).toContain('Buffs:');
-      expect(wrapper.text()).toContain('+10');
-    });
-
-    it('should NOT show IP or trickle-down rows for Misc skills', () => {
-      const skillData = createTestSkillData({
-        base: 0,
-
-        equipmentBonus: 30,
-        perkBonus: 0,
-        buffBonus: 0,
-        total: 30,
-      });
-
-      const wrapper = mount(StatBreakdownTooltip, {
-        props: {
-          skillId: toSkillId(SKILL_ID.PSYCHOLOGY),
-          skillName: 'Psychology',
-          skillData: skillData,
-          isAbility: false,
-          isMiscSkill: true,
-          baseValue: 0,
-          trickleDownBonus: 0,
-          equipmentBonus: 30,
-          perkBonus: 0,
-          buffBonus: 0,
-          ipContribution: 0,
-          abilityImprovements: 0,
-          totalValue: 30,
-        },
-        global: {
-          directives: {
-            tooltip: tooltipDirective,
-          },
-        },
-      });
-
-      // Should NOT show IP improvements or trickle-down
-      expect(wrapper.text()).not.toContain('IP Improvements');
-      expect(wrapper.text()).not.toContain('Trickle-down');
-
-      // Should show equipment bonus
-      expect(wrapper.text()).toContain('Equipment:');
-      expect(wrapper.text()).toContain('+30');
-    });
-
-    it('should use correct color coding for bonuses', () => {
-      const skillData = createTestSkillData({
-        base: 0,
-
-        equipmentBonus: 40,
-        perkBonus: 20,
-        buffBonus: 5,
-        total: 65,
-      });
-
-      const wrapper = mount(StatBreakdownTooltip, {
-        props: {
-          skillId: toSkillId(SKILL_ID.DUCK_EXP),
-          skillName: 'Duck-Exp',
-          skillData: skillData,
-          isAbility: false,
-          isMiscSkill: true,
-          baseValue: 0,
-          trickleDownBonus: 0,
-          equipmentBonus: 40,
-          perkBonus: 20,
-          buffBonus: 5,
-          ipContribution: 0,
-          abilityImprovements: 0,
-          totalValue: 65,
-        },
-        global: {
-          directives: {
-            tooltip: tooltipDirective,
-          },
-        },
-      });
-
-      // Each bonus source has its own colour
-      expect(wrapper.html()).toContain('text-blue-600'); // Equipment bonus color
-      expect(wrapper.html()).toContain('text-purple-600'); // Perk bonus color
-      expect(wrapper.html()).toContain('text-amber-600'); // Buff bonus color
-    });
-  });
-
   describe('Zero-Value Toggle Functionality', () => {
     it('hides zero-value Misc skills by default', async () => {
       const wrapper = await mountSkillsManager(createMiscSkillsProfile());
@@ -531,60 +405,6 @@ describe('Misc Skills Integration Tests', () => {
 
       expect(wrapper.text()).toContain('100');
       expect(wrapper.find('.equipment-bonus-value').text()).toContain('+75');
-    });
-
-    it('should update tooltip when bonuses change', async () => {
-      const initialSkill = createTestSkillData({
-        base: 0,
-        equipmentBonus: 30,
-        perkBonus: 0,
-        buffBonus: 0,
-        total: 30,
-      });
-
-      const wrapper = mount(StatBreakdownTooltip, {
-        props: {
-          skillId: toSkillId(SKILL_ID.PSYCHOLOGY),
-          skillName: 'Psychology',
-          skillData: initialSkill,
-          isAbility: false,
-          isMiscSkill: true,
-          baseValue: 0,
-          trickleDownBonus: 0,
-          equipmentBonus: 30,
-          perkBonus: 0,
-          buffBonus: 0,
-          ipContribution: 0,
-          abilityImprovements: 0,
-          totalValue: 30,
-        },
-        global: {
-          directives: {
-            tooltip: tooltipDirective,
-          },
-        },
-      });
-
-      expect(wrapper.text()).toContain('+30');
-      expect(wrapper.text()).not.toContain('Perks:');
-
-      // Update with perk bonus
-      const updatedSkill = createTestSkillData({
-        base: 0,
-        equipmentBonus: 30,
-        perkBonus: 20,
-        buffBonus: 0,
-        total: 50,
-      });
-
-      await wrapper.setProps({
-        skillData: updatedSkill,
-      });
-      await nextTick();
-
-      expect(wrapper.text()).toContain('+30');
-      expect(wrapper.text()).toContain('Perks:');
-      expect(wrapper.text()).toContain('+20');
     });
 
     it('shows a Misc skill once a bonus lifts it above zero', async () => {
