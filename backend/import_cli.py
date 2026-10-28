@@ -988,10 +988,14 @@ def convert_shared(args) -> bool:
                     f"{result.merge.new} new revisions, {result.merge.reused} reused")
 
     if results:
-        # Adding storage_fp and vids rewrote every adopted row; reclaim the space.
-        logger.info("VACUUM FULL of the store's items table...")
+        # Adding storage_fp and vids rewrote every adopted row, and remapping
+        # item ids rewrote the curated rows; reclaim the space.
+        logger.info("VACUUM FULL of the store's items table and the curated tables...")
         with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
             conn.execute(text(f"VACUUM (FULL, ANALYZE) {shared_store.STORE_SCHEMA}.items"))
+            for result in results:
+                for table in shared_store.CURATED_TABLES:
+                    conn.execute(text(f'VACUUM (FULL, ANALYZE) "{result.schema}".{table}'))
         for result in results:
             maintain_store(result.schema)
     return True
