@@ -4,10 +4,14 @@ Page-walk tests for paginated endpoints.
 Each test requests every page of a small real result set and checks that the
 pages partition it: no row appears twice and none goes missing. That only
 holds when the endpoint sorts on a unique key, so these tests pin the id
-tiebreakers added to each endpoint's ORDER BY (or Python sort key).
+tiebreakers added to each endpoint's ORDER BY (or Python sort key). Spell and
+stat-value listings are scoped to the version, since in the shared store their
+tables hold every version's rows.
 Symbiant pages are walked in test_search_functionality's family test.
 """
 
+from app.api.routes.spells import spell_in_current_version
+from app.api.routes.stat_values import stat_value_in_current_version
 from app.models import Item, Mob, Spell, StatValue
 
 
@@ -46,7 +50,9 @@ def test_spells_list_pages_partition(client, db_session):
     target = 14  # a few hundred spells: several pages, still cheap
     expected = [
         spell_id
-        for (spell_id,) in db_session.query(Spell.id).filter(Spell.target == target)
+        for (spell_id,) in db_session.query(Spell.id).filter(
+            Spell.target == target, spell_in_current_version()
+        )
     ]
     assert len(expected) > 200
 
@@ -62,7 +68,7 @@ def test_spell_search_pages_partition(client, db_session):
     expected = [
         spell_id
         for (spell_id,) in db_session.query(Spell.id).filter(
-            Spell.spell_format.ilike(f"%{term}%")
+            Spell.spell_format.ilike(f"%{term}%"), spell_in_current_version()
         )
     ]
     assert len(expected) > 200
@@ -123,6 +129,7 @@ def test_stat_values_pages_partition(client, db_session):
     expected = [
         stat_value_id
         for (stat_value_id,) in db_session.query(StatValue.id)
+        .filter(stat_value_in_current_version())
         .order_by(StatValue.id)
         .limit(3 * limit)
     ]

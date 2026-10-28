@@ -178,6 +178,54 @@ class TestComputeRevisionPoints:
         assert [(p.version_slug, p.first_seen) for p in points] == [("a", True)]
 
 
+def item_revisions_is_view(db_session) -> bool:
+    return (
+        db_session.execute(
+            text(
+                "SELECT relkind FROM pg_class WHERE oid = to_regclass('public.item_revisions')"
+            )
+        ).scalar()
+        == "v"
+    )
+
+
+def add_store_revisions(db_session, slugs, revisions):
+    """Shared store layout: give each fixture version a vid and store one
+    ``gd.items`` revision per distinct (aoid, hashes), tagged with the vids of
+    the versions holding it. ``public.item_revisions`` derives from these."""
+    vids = {}
+    for offset, slug in enumerate(slugs):
+        vids[slug] = 32000 + offset
+        db_session.execute(
+            text("UPDATE public.game_versions SET vid = :vid WHERE slug = :slug"),
+            {"vid": vids[slug], "slug": slug},
+        )
+
+    holders = {}
+    for slug, aoid, *hashes in revisions:
+        holders.setdefault((aoid, *hashes), []).append(vids[slug])
+    for (aoid, stats, spells, actions, text_value), members in holders.items():
+        content = stats + spells + actions + text_value
+        db_session.execute(
+            text(
+                "INSERT INTO gd.items (aoid, name, ql, is_nano, content_hash, stats_hash, "
+                "spells_hash, actions_hash, text_hash, storage_fp, vids) "
+                "VALUES (:aoid, 'fixture', 1, false, :content, :stats, :spells, :actions, "
+                ":text, md5(:content), CAST(:vids AS smallint[]))"
+            ),
+            {
+                "aoid": aoid,
+                "content": content,
+                "stats": stats,
+                "spells": spells,
+                "actions": actions,
+                "text": text_value,
+                "vids": members,
+            },
+        )
+    db_session.flush()
+
+
 @pytest.fixture
 def revision_data(db_session):
     """Three versions in one lineage plus revision rows for two items.
@@ -231,6 +279,11 @@ def revision_data(db_session):
         ("prk", 4242, "s2", "p1", "a1", "t2"),
         ("ao-18.7", 7, "x1", "x1", "x1", "x1"),
     ]
+
+    if item_revisions_is_view(db_session):
+        add_store_revisions(db_session, [row["slug"] for row in rows], revisions)
+        return
+
     for slug, aoid, stats, spells, actions, text_value in revisions:
         db_session.add(
             ItemRevision(
