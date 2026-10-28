@@ -46,7 +46,7 @@ npm run build
 # Setup virtual environment
 python -m venv backend/venv
 source backend/venv/bin/activate  # Linux/Mac
-DATABASE_URL is in .env.local. The `source` command does not export it. 
+# DATABASE_URL is in backend/.env.local; load it with: set -a && . ./.env.local && set +a
 
 # Install dependencies
 pip install -r backend/requirements.txt
@@ -107,7 +107,7 @@ This section provides configuration information specifically for Claude Code (cl
 ```bash
 # Load environment from .env.local and start backend
 cd backend && source venv/bin/activate && \
-export $(cat .env.local | xargs) && \
+set -a && . ./.env.local && set +a && \
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
