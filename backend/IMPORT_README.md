@@ -2,30 +2,40 @@
 
 A standalone utility for importing game data into the TinkerTools database. It is separate from the main FastAPI application and uses the `DATABASE_URL` environment variable to connect to any database.
 
-## Game versions
+## Game versions and the shared store
 
-TinkerTools serves several snapshots of the game database side by side: live Anarchy Online, Project Rubi-Ka, and historical client builds. Each snapshot is a **game version** with a slug (`ao`, `prk`, `ao-15.0`) and lives in **its own PostgreSQL schema**, `gv_<slug>`, holding the complete table set.
+TinkerTools serves several snapshots of the game database side by side: live Anarchy Online, Project Rubi-Ka, and historical client builds. Each snapshot is a **game version** with a slug (`ao-2024-02`, `prk-2026-01`, `ao-17-10-5`).
 
-The `public` schema holds only cross-version tables:
+Game content is stored once, in the **shared revision store** (schema `gd`, design.md §12):
 
-| table | purpose |
+| where | what |
 |---|---|
-| `game_versions` | the registry: slug, display name, family, lineage, client build, feature flags |
-| `item_revisions` | one row per (item, version) with content hashes, used for "changed in patch X" |
-| `global_migrations` | tracking for `database/global_migrations/*.sql` |
+| `gd.items` | one row per distinct item revision; `vids SMALLINT[]` lists the versions holding it, `storage_fp` is the dedup key |
+| `gd.*` | every other content table (`item_stats`, `spells`, `actions`, `attack_defense`, ...), the interned `stat_values` and `criteria`, and `nano_properties` keyed by revision id |
+| `gd.schema_migrations` | which `database/migrations` files the store's content tables carry |
+| `gv_<slug>` | views over `gd` (`items` filtered by the version's vid, the rest passed through), the version's `symbiant_items` materialized view, and its curated real tables: `perks`, `mobs`, `sources`, `source_types`, `item_sources`, `application_cache`, `schema_migrations` |
+| `public.game_versions` | the registry: slug, vid, family, lineage, client build, feature flags, extract provenance (`extract_slug`, `tinkerparse_commit`, `rdb_dat_sha256`) |
+| `public.item_revisions` | a view over `gd.items`: one row per (AOID, version) with the content hashes, for "changed in patch X" |
+| `public.global_migrations` | tracking for `database/global_migrations/*.sql` |
 
-Every import command:
+An item that is identical in several versions is one row with several vids. A version's own `items.id` values are revision ids, so an unchanged item has the same id in every version.
 
-1. applies pending global migrations to `public`,
-2. rebuilds (`--clear`) or migrates the version's own schema from `database/migrations/*.sql`,
-3. loads the data into that schema,
-4. upserts the version's registry row,
-5. rebuilds the version's `nano_properties` table (nano school, casting professions, minimum level; see below),
-6. rebuilds the version's rows in `public.item_revisions` from the per-item content hashes.
+The API is unchanged: a request's `search_path` is `gv_<slug>, public`, and the views look like the old tables.
 
-Steps 4-6 run in `finalize_version`, which every import path ends with: single datasets (`items`, `nanos`, `symbiants`), `all`, and `all --csv-mode`.
+### How an import works
 
-Versions are independent: `--clear` on `prk` never touches `ao`.
+1. Global migrations are applied to `public`.
+2. The dump is loaded into a **staging schema** `gv_stage_<slug>`, built fresh from `database/migrations`, with the same importer code as before.
+3. Curated overlays run in staging: `--nanos-csv` applies `update_nanos.py` (crystal sources, nano QL, strain and substrain). Then `nano_properties` is derived.
+4. Install, in one transaction under an advisory lock (`app/core/shared_store.py`):
+   - a fingerprint (`storage_fp`) is computed for every staged item from its stored rows, so the overlay is part of it;
+   - if there is no store yet, the staging tables become `gd`; otherwise `(aoid, storage_fp)` is matched against `gd.items`: a match reuses the revision, a miss copies the item and its whole tree (stats, actions and criteria, spell data, spells, attack/defense, animation/mesh, nano properties) with fresh ids;
+   - the version's vid is set on exactly the revisions it holds, and curated rows are pointed at revision ids;
+   - the staging schema's content tables are replaced by views, `symbiant_items` is rebuilt, and the schema is renamed to `gv_<slug>`, replacing the previous one;
+   - revisions no version holds any more are garbage-collected.
+5. `gd.items` is vacuumed and the touched tables analyzed (the planner's `vids @>` estimates come from array statistics).
+
+Re-importing a slug is a clean replace: its membership is rebuilt, and revisions only it held are collected. Other versions are never changed. Writes never go to shared rows in place, which is why curated edits must happen in staging.
 
 ## Requirements
 
@@ -37,75 +47,102 @@ Default locations are under `backend/database/`; override any of them with a `--
 - `nanos.json` (44 MB) - Nano program data
 - `symbiants.csv` (208 KB) - Curated mob and drop-source data (skip with `--no-symbiants`)
 - `perks.json` (411 KB) - Curated perk metadata (skip with `--no-perks`)
+- `all_nanos_compacted.csv` - Curated crystal/strain data, applied with `--nanos-csv`
 
-Curated files are live-era Anarchy Online data. For a private server or an old client build, either supply that version's own copies or omit them with `--no-perks` / `--no-symbiants`; the registry then records the missing features and the UI hides the affected tools.
+Curated files are live-era Anarchy Online data. For a private server or an old client build, either supply that version's own copies or omit them; the registry then records the missing features and the UI hides the affected tools.
+
+Use the same curated inputs for every version that should share revisions. The overlay is part of the fingerprint: importing one build with `--nanos-csv` and the next without it makes every overlaid nano a separate revision (the item history, which compares `content_hash` of the raw record, is not affected).
 
 ### Environment
 
 ```bash
-export DATABASE_URL="postgresql://aodbuser:password@localhost:5432/tinkertools"
+cd backend && source venv/bin/activate && set -a && . ./.env.local && set +a
 ```
 
-For production deployment, change `DATABASE_URL` to point at the production database.
+or `export DATABASE_URL="postgresql://aodbuser:password@localhost:5432/tinkertools"`.
 
 ## Usage
 
-### Validate files
+### One-time: convert per-version schemas to the shared store
+
+A database whose versions still have their own tables (before October 2026) must be converted once. Back it up first; afterwards a version is no longer self-contained in its schema.
 
 ```bash
-python import_cli.py validate
-python import_cli.py validate --no-perks --no-symbiants   # only items and nanos
+pg_dump -Fc -f tinkertools_pre_shared.dump "$DATABASE_URL"
+python import_cli.py convert-shared --yes
 ```
 
-### Import a whole version (recommended)
+Every registered version is converted in place, in one transaction: the default version first, whose tables become `gd` (it keeps every surrogate id), then the others by sort order (their identical items take its ids; their own revisions get new ids). Then `gd.items` and the curated tables are vacuumed. Re-running it converts whatever is left and refreshes every version's views; it is a no-op on a converted database.
+
+To go back, drop the store and the version schemas (this also drops the `item_revisions` view), then restore:
 
 ```bash
-python import_cli.py all --version ao --csv-mode --clear \
-    --items-file ~/ao-data/items.json \
-    --nanos-file ~/ao-data/nanos.json
+psql "$DATABASE_URL" -c 'DROP SCHEMA gd, gv_ao_2024_02, gv_prk_2026_01 CASCADE'
+pg_restore --clean --if-exists --no-owner -d "$DATABASE_URL" tinkertools_pre_shared.dump
 ```
 
-`--csv-mode` transforms the JSON into CSV files and loads them with PostgreSQL `COPY`. It is roughly 55x faster than the ORM path and is the normal way to load a version.
+The restored registry predates global migration 002, so run the pre-conversion code against it.
 
-### Import a second version
+### Import extracted client builds
+
+The extractor writes one folder per build plus an index (`.docs/plans/multi-version-support/extract-contract.md`):
 
 ```bash
-python import_cli.py all --version prk --csv-mode --clear \
+# every build in index.json
+python import_cli.py import-extracts --extracts-dir ~/projects/AO/extracts
+
+# one build, or several
+python import_cli.py import-extracts --extracts-dir ~/projects/AO/extracts --slug ao-17-10-5 --slug ao-17-10-4
+
+# reload a build that is already installed from the same extract
+python import_cli.py import-extracts --extracts-dir ~/projects/AO/extracts --slug ao-17-10-5 --force
+```
+
+- `extracted` builds load in index order through staging (CSV pipeline). `client_build`, `tinkerparse_commit` and `rdb_dat_sha256` come from the build's `manifest.json`.
+- `duplicate` builds (a client database identical to another build's) load after them: the version is registered, its vid is added to the revisions of its `extract_slug`, and it gets copies of that version's curated rows. Nothing is re-imported. The source must be installed.
+- `failed` and `missing_db` builds are skipped.
+- A build whose registry row already has the same `extract_slug`, `rdb_dat_sha256` and `tinkerparse_commit` is skipped unless `--force`. Re-importing a build also re-points its registered duplicates.
+- Lineage: after the run, each registered build's `parent_slug` is the previous registered build of its family in index order (the first of a family keeps its parent).
+- New rows get a display name like `AO 17.10.5` and a sort order that lists PRK, then AO, newest build first. Existing rows keep their display name, sort order, date, notes, default and enabled flags.
+- Curated data is off by default for extracts. Pass `--perks-file`, `--symbiants-file` and/or `--nanos-csv` to apply them to every build of the run; `features` records what was loaded.
+
+### Import a version from dump files
+
+```bash
+python import_cli.py all --version ao-2024-02 --csv-mode \
+    --items-file ~/ao-data/items.json --nanos-file ~/ao-data/nanos.json \
+    --nanos-csv all_nanos_compacted.csv
+
+python import_cli.py all --version prk-2026-01 --csv-mode \
     --items-file ~/prk/items.json --nanos-file ~/prk/nanos.json \
-    --no-perks --no-symbiants \
-    --display-name "Project Rubi-Ka" --family prk --parent ao
+    --nanos-csv all_nanos_compacted.csv \
+    --display-name "Project Rubi-Ka" --family prk --parent ao-2024-02
 ```
 
-### Import individual datasets
+`--csv-mode` transforms the JSON into CSV files and loads them with PostgreSQL `COPY`. It is roughly 55x faster than the ORM path (`--optimized`, standard) and is the normal way to load a version. Both dev versions were loaded with the crystal/strain overlay; pass `--nanos-csv` when re-importing them, or their nanos become new revisions. `--clear` is accepted but no longer needed: every `all` import replaces the version.
 
-```bash
-python import_cli.py items --version ao --chunk-size 50
-python import_cli.py items --version ao --optimized
-python import_cli.py nanos --version ao
-python import_cli.py symbiants --version ao
-```
+### Individual datasets
+
+`items`, `nanos` and `symbiants` add rows to a version's own tables and only work on a database without the shared store. Against the store they refuse; re-import the whole version with `all`.
 
 ### Registry commands
 
 ```bash
-# Show every registered version, its schema, and what it has loaded
+# Every registered version: schema, vid, build, flags (default, disabled, dup of X)
 python import_cli.py versions
 
 # Create or update a registry row without importing anything
-python import_cli.py register --version ao --set-default \
-    --display-name "Anarchy Online (Live)" --snapshot-date 2026-02-01
+python import_cli.py register --version ao-2024-02 --set-default \
+    --display-name "Anarchy Online (Live)" --snapshot-date 2024-02-24
 
-# One-time transition: adopt an existing single-version install
-python import_cli.py adopt-public --version ao
+# Remove a version: its vids, its schema and its registry row, then garbage-collect
+python import_cli.py drop-version --version ao-15-0-0 --yes
 
-# Remove a version's schema and registry row
-python import_cli.py drop-version --version ao-15.0 --yes
-
-# Apply pending migrations to an existing version and rebuild its nano_properties
-python import_cli.py nano-properties --version ao
+# Re-derive nano_properties (shared store: for every revision at once)
+python import_cli.py nano-properties --version ao-2024-02
 ```
 
-`adopt-public` moves the TinkerTools tables that still sit in `public` into `gv_<slug>` with `ALTER TABLE ... SET SCHEMA` (indexes, sequences and the `symbiant_items` materialized view follow), then applies any missing migrations. Adopted items have no content hashes, so they contribute no `item_revisions` rows until the version is re-imported from its dump files.
+`adopt-public` (move a pre-multi-version install from `public` into `gv_<slug>`) only runs on a database without the store; run `convert-shared` after it.
 
 ## Options
 
@@ -113,7 +150,7 @@ python import_cli.py nano-properties --version ao
 
 | option | meaning |
 |---|---|
-| `--version SLUG` | version to operate on; data lands in `gv_<slug>` (default: `DEFAULT_GAME_VERSION`, normally `ao`) |
+| `--version SLUG` | version to operate on (default: `DEFAULT_GAME_VERSION`). Slugs starting with `stage-` are reserved |
 | `--display-name NAME` | name shown in the version selector (default: the slug) |
 | `--family NAME` | selector grouping (default: `prk` for slugs starting with `prk`, else `ao`) |
 | `--parent SLUG` | the snapshot this one follows; sets lineage for item history |
@@ -122,19 +159,27 @@ python import_cli.py nano-properties --version ao
 | `--sort-order N` | position in the version selector |
 | `--set-default` | serve this version for requests with no version segment |
 | `--disabled` | register the version but hide it from the API and selector |
-| `--notes TEXT` | provenance notes (client build, extractor, curated files used) |
+| `--notes TEXT` | provenance notes |
 | `--no-perks` | import without perk metadata |
 | `--no-symbiants` | import without mobs, sources and symbiant drops |
-| `--yes` | confirm a destructive registry command (required by `drop-version`) |
+| `--yes` | confirm a destructive command (`drop-version`, `convert-shared`) |
+
+### Shared store and extracts
+
+| option | meaning |
+|---|---|
+| `--extracts-dir DIR` | `import-extracts`: folder with `index.json` and `<slug>/{items.json,nanos.json,manifest.json}` |
+| `--slug SLUG` | `import-extracts`: build to import, repeatable (default: every build in the index) |
+| `--force` | `import-extracts`: reload builds already installed from the same extract |
+| `--nanos-csv PATH` | curated crystal/strain CSV applied in staging (`update_nanos.py`) |
 
 ### Import
 
 | option | meaning |
 |---|---|
-| `--clear` | drop and recreate this version's schema from the migrations first (destructive, this version only) |
 | `--csv-mode` | CSV + `COPY` pipeline, ~55x faster (`all` command only) |
 | `--optimized` | batched ORM importer, 10-20x faster than standard |
-| `--ultra` | experimental, 40-60x faster, data loss possible on crash; requires `--optimized --clear` |
+| `--ultra` | experimental, 40-60x faster, data loss possible on crash; requires `--optimized` |
 | `--chunk-size N` | items per chunk in standard mode (default: 100) |
 | `--batch-size N` | batch size for the optimized importer |
 | `--database-url URL` | override `DATABASE_URL` |
@@ -149,76 +194,41 @@ During import each raw record is hashed (`app/core/content_hash.py`):
 
 `Version`, `DBType` and the internal nano marker are stripped, and `StatValues` plus the attack/defense stat lists are sorted, so two extractions of the same client hash identically. Criteria and spell arrays keep their order, because reordering them changes what the item requires or does.
 
-The hashes are stored on `items` (migration 007) and copied into `public.item_revisions` after each load. Comparing an AOID's hashes across versions in lineage order gives the patch points where the item changed, and which part of it changed.
+The hashes are stored on `items` (migration 007). `public.item_revisions` derives one row per (AOID, version) from `gd.items` and the registry vids; nothing has to be rebuilt after an import. Comparing an AOID's hashes across versions in lineage order gives the patch points where the item changed, and which part of it changed.
+
+`storage_fp`, the dedup key, is different from `content_hash`: it is computed from the stored rows (including curated overlays), so two versions share a revision only if they would show exactly the same item.
 
 ## Nano school, professions and level
 
-The `/nanos` endpoints read each nano's school, casting professions, lowest casting level and strain from the per-version table `nano_properties` (migration 008; `strain` added by 009). The values are derived, not imported: `app/core/nano_properties.py` reads the NanoSchool (405) and NanoStrain (75) stats and evaluates the Use action's criteria (Profession/VisualProfession, Level, OR/NOT, OnTarget modifiers) for every nano in the schema.
+The `/nanos` endpoints read each nano's school, casting professions, lowest casting level and strain from `nano_properties` (migration 008; `strain` added by 009). The values are derived from the revision alone: `app/core/nano_properties.py` reads the NanoSchool (405) and NanoStrain (75) stats and evaluates the Use action's criteria for every nano.
 
-- **Fresh import**: nothing to do. `finalize_version` rebuilds the table after the data is loaded, for every version and every import mode, `--csv-mode` included.
-- **Existing version imported before migration 008** (a production rollout of this change, or after `adopt-public` on an old install): run once per version
+- **Import**: derived in staging; the install copies the rows of new revisions only (a reused revision already has them).
+- **Re-deriving** after a change to `app/core/nano_properties.py`: `python import_cli.py nano-properties --version <any slug>` rebuilds `gd.nano_properties` for every revision. It is idempotent.
 
-  ```bash
-  python import_cli.py nano-properties --version ao-2024-02
-  python import_cli.py nano-properties --version prk-2026-01
-  ```
+## Migrations
 
-  It applies pending migrations to that version's schema (creating `nano_properties` and its indexes, adding its `strain` column, and recording `008` and `009` in `schema_migrations`), then deletes and re-inserts the table's rows. It changes no other table and takes about a second per version. Until it runs, the `/nanos` endpoints fail with a missing `nano_properties` table or `strain` column; every other endpoint is unaffected.
-- **Re-deriving** after a change to `app/core/nano_properties.py`: run the same command. It is idempotent.
-- **Undo** (per version schema):
+`database/migrations/*.sql` build staging schemas. `gd.schema_migrations` records which of them the store's content tables carry, and an install refuses a staging schema at a different migration level, or whose content tables have columns the merge does not know (`CONTENT_COLUMNS` in `shared_store.py`). A new migration that changes a content table must be applied to `gd` by hand (`SET search_path TO gd`, then record it in `gd.schema_migrations`), `CONTENT_COLUMNS` and the merge SQL updated, and the views refreshed with `convert-shared --yes`. A migration that changes a curated table must be applied to every `gv_*` schema.
 
-  ```sql
-  -- only the strain column (009):
-  ALTER TABLE gv_<slug>.nano_properties DROP COLUMN strain;
-  DELETE FROM gv_<slug>.schema_migrations WHERE version = '009';
-  -- the whole table (008 and 009):
-  DROP TABLE gv_<slug>.nano_properties;
-  DELETE FROM gv_<slug>.schema_migrations WHERE version IN ('008', '009');
-  ```
+## Never write to content tables in place
 
-  The code expecting the table must be rolled back with it.
+The per-version views are simple views, so PostgreSQL lets `INSERT`/`UPDATE`/`DELETE` through them into `gd`, where the change would reach every version holding the row. Nothing in the app writes to content tables. `update_nanos.py` refuses to run against a version schema made of views, and `POST /performance/indexes/create` creates its indexes on `gd`.
 
 ## Performance notes
 
-- **CSV mode**: full load of items + nanos in a few minutes; the fastest path.
-- **Optimized mode**: 10-20x standard, still ORM-based.
-- **Standard mode**: slowest, most conservative; useful for small or incremental loads.
-- **Memory usage**: controlled by `--chunk-size` in standard mode; CSV mode streams.
-
-## Implementation details
-
-The import utility:
-
-1. **Prepares the schema** - global migrations, then this version's migrations
-2. **Preprocesses singletons** - extracts all StatValues and Criteria for bulk creation
-3. **Processes in chunks** - handles large files without memory issues
-4. **Uses transactions** - each chunk is committed separately for reliability
-5. **Maintains relationships** - handles foreign keys and many-to-many relationships
-6. **Hashes every record** - for cross-version item history
-7. **Registers the version** - registry row, `nano_properties` and `item_revisions`
-8. **Provides progress tracking** - logs progress and performance metrics
+- **CSV mode**: full load of items + nanos in about a minute; the merge into the store adds about 30 seconds per version (fingerprints and copy of new revisions).
+- **Storage**: about 4.8 KB per distinct revision plus up to 7 MB of curated tables per version. The two dev versions take 777 MB (1,370 MB as separate schemas).
 
 ## Troubleshooting
 
 ### Import fails
-- Check `import.log` for detailed error messages
-- Verify `DATABASE_URL` is correct and the database is accessible
-- Ensure sufficient disk space and memory (about 600 MB per version)
-- Try a smaller `--chunk-size` for memory issues
+- Check `import.log` for detailed error messages. A failed import leaves the version as it was (the install is one transaction) and drops its staging schema.
+- "still use the per-version table layout": run `convert-shared --yes` first.
+- "Migration levels differ" or "has columns ...": see Migrations above.
+- "holds the same AOID more than once": the dump has duplicate records for an AOID; a version must have one item per AOID.
 
 ### Data went into the wrong schema
 - Confirm the slug: `python import_cli.py versions`
 - The API resolves a version through `public.game_versions`; a version with a schema but no registry row is invisible to it, and `versions` marks a registry row whose schema is missing as `NO SCHEMA`
 
-### No item history
-- `item_revisions` is empty for a version whose items predate migration 007; re-import that version
-
-### Performance issues
-- Prefer `--csv-mode` for a full load
-- Monitor database performance during import
-- Run during off-peak hours in production
-
-### Data quality
-- The utility validates data during import
-- Failed items are logged but do not stop the import
-- Check logs for items that failed to import
+### Backups
+- `gd`, `public` and every `gv_*` schema depend on each other; back up and restore the whole database, not single schemas.
