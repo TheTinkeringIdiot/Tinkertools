@@ -60,6 +60,18 @@ class NanoDataUpdater:
         from app.core.versions import registry
         self.schema_name = registry.schema_for(self.version_slug)
         await self.conn.execute(f'SET search_path TO "{self.schema_name}", public')
+
+        # In the shared store (design.md §12) a version's items are rows other
+        # versions share; curated edits must happen in the staging schema
+        # before the merge (import_cli.py all/import-extracts --nanos-csv).
+        relkind = await self.conn.fetchval(
+            "SELECT c.relkind FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+            "WHERE n.nspname = $1 AND c.relname = 'items'", self.schema_name)
+        if relkind == 'v':
+            raise RuntimeError(
+                f"{self.schema_name} reads the shared revision store; editing it would change "
+                "every version holding those items. Re-import with "
+                "'import_cli.py all --nanos-csv <csv>' (or import-extracts --nanos-csv) instead.")
         print(f"✓ Using game version '{self.version_slug or registry.default_slug()}' (schema {self.schema_name})")
     
     async def disconnect(self):
