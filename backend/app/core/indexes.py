@@ -252,8 +252,8 @@ def check_index_usage(db: Session) -> dict:
         query = text("""
             SELECT 
                 schemaname,
-                tablename,
-                indexname,
+                relname AS tablename,
+                indexrelname AS indexname,
                 idx_scan as times_used,
                 idx_tup_read as tuples_read,
                 idx_tup_fetch as tuples_fetched
