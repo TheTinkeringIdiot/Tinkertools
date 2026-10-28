@@ -4,13 +4,21 @@ Spells API endpoints.
 
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 import math
 import time
 import logging
 
 from app.core.database import get_db
-from app.models import Spell, SpellCriterion, Criterion
+from app.models import (
+    Spell,
+    SpellCriterion,
+    Criterion,
+    SpellDataSpells,
+    ItemSpellData,
+    Item,
+)
 from app.api.schemas import SpellResponse, SpellWithCriteria, PaginatedResponse
 from app.core.decorators import cached_response, performance_monitor
 
@@ -18,6 +26,30 @@ router = APIRouter(prefix="/spells", tags=["spells"])
 
 # Set up logging for performance monitoring
 logger = logging.getLogger(__name__)
+
+
+def spell_in_current_version():
+    """
+    EXISTS clause: the outer spell belongs to an item of the current version.
+
+    Spells are reached only through items (item_spell_data ->
+    spell_data_spells). In a schema-per-version layout every spell already
+    belongs to its schema's items, but when content tables are shared across
+    versions the spells table holds every version's rows, so the listings join
+    back to the version's ``items`` to stay scoped.
+    """
+    return (
+        select(1)
+        .select_from(SpellDataSpells)
+        .join(
+            ItemSpellData,
+            ItemSpellData.spell_data_id == SpellDataSpells.spell_data_id,
+        )
+        .join(Item, Item.id == ItemSpellData.item_id)
+        .where(SpellDataSpells.spell_id == Spell.id)
+        .correlate(Spell)
+        .exists()
+    )
 
 
 @router.get("", response_model=PaginatedResponse[SpellResponse])
@@ -32,7 +64,7 @@ def get_spells(
     """
     Get paginated list of spells.
     """
-    query = db.query(Spell)
+    query = db.query(Spell).filter(spell_in_current_version())
 
     # Apply filters
     if target is not None:
@@ -91,7 +123,7 @@ def get_spells_with_criteria(
     """
     start_time = time.time()
 
-    query = db.query(Spell).distinct()
+    query = db.query(Spell).filter(spell_in_current_version()).distinct()
 
     if criteria_requirements:
         # Parse complex criteria requirements
@@ -226,7 +258,8 @@ def search_spells(
     search_term = f"%{q}%"
     query = (
         db.query(Spell).filter(
-            Spell.spell_format.ilike(search_term)
+            spell_in_current_version(),
+            Spell.spell_format.ilike(search_term),
             # Note: Could add JSONB search for spell_params if needed
             # or_(
             #     Spell.spell_format.ilike(search_term),
@@ -269,7 +302,9 @@ def get_spell(spell_id: int, db: Session = Depends(get_db)):
     """
     Get detailed information about a specific spell.
     """
-    spell = db.query(Spell).filter(Spell.id == spell_id).first()
+    spell = (
+        db.query(Spell).filter(Spell.id == spell_id, spell_in_current_version()).first()
+    )
 
     if not spell:
         raise HTTPException(status_code=404, detail="Spell not found")
