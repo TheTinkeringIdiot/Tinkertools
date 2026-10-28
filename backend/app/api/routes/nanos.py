@@ -5,7 +5,7 @@ Nano programs API endpoints with rich spell data.
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload, selectinload, aliased
-from sqlalchemy import and_, or_, desc, asc, false, func, Integer
+from sqlalchemy import and_, or_, desc, asc, false, func, select, Integer
 import math
 import logging
 
@@ -35,9 +35,64 @@ from app.api.schemas.nano import (
 )
 from app.core import nano_properties
 from app.core.decorators import cached_response, performance_monitor
+from app.api.services.item_filter_service import item_has_stat
 
 router = APIRouter(prefix="/nanos", tags=["nanos"])
 logger = logging.getLogger(__name__)
+
+
+def _has_valid_strain():
+    """EXISTS: the outer nano has a real NanoStrain (stat 75, not 0 or 99999)."""
+    return item_has_stat(
+        StatValue.stat == 75,
+        StatValue.value > 0,
+        StatValue.value != 99999,
+    )
+
+
+def _has_profession_requirement(profession_id: int):
+    """
+    EXISTS: a USE action of the outer item requires ``profession_id``.
+
+    Profession (stat 60) and VisualProfession (stat 368) both count. A
+    criterion preceded by operator 18 (target modifier) applies to the target,
+    not the caster, so it is ignored. Correlated on ``Item.id`` so the planner
+    drives from the item set (see item_filter_service).
+    """
+    ac_current = aliased(ActionCriteria)
+    c_current = aliased(Criterion)
+    ac_prev = aliased(ActionCriteria)
+    c_prev = aliased(Criterion)
+
+    return (
+        select(1)
+        .select_from(Action)
+        .join(ac_current, Action.id == ac_current.action_id)
+        .join(c_current, ac_current.criterion_id == c_current.id)
+        .outerjoin(
+            ac_prev,
+            and_(
+                ac_prev.action_id == Action.id,
+                ac_prev.order_index == ac_current.order_index - 1,
+            ),
+        )
+        .outerjoin(c_prev, ac_prev.criterion_id == c_prev.id)
+        .where(
+            Action.item_id == Item.id,
+            Action.action == 3,  # USE action
+            or_(
+                and_(c_current.value1 == 60, c_current.value2 == profession_id),
+                and_(c_current.value1 == 368, c_current.value2 == profession_id),
+            ),
+            # Exclude if preceded by operator 18 (target modifier)
+            or_(
+                c_prev.id.is_(None),  # No previous criterion
+                c_prev.operator != 18,  # Previous is not operator 18
+            ),
+        )
+        .correlate(Item)
+        .exists()
+    )
 
 
 def derived_nano_fields(item: Item) -> dict:
@@ -521,59 +576,14 @@ def get_nanos_by_profession(
             Item.is_nano.is_(True),
             ~Item.name.startswith("TESTLIVEITEM"),  # Filter test items at DB level
             # Filter by valid strain at DB level
-            Item.id.in_(
-                db.query(ItemStats.item_id)
-                .join(StatValue, ItemStats.stat_value_id == StatValue.id)
-                .filter(
-                    and_(
-                        StatValue.stat == 75,  # Strain stat
-                        StatValue.value > 0,
-                        StatValue.value != 99999,
-                    )
-                )
-            ),
+            _has_valid_strain(),
         )
     )
 
-    # Filter by profession requirement using optimized subquery
+    # Filter by profession requirement
     # Excludes profession criteria preceded by operator 18 (target modifier)
     if profession_id > 0:
-        # Alias for the current and previous criteria
-        ac_current = aliased(ActionCriteria)
-        c_current = aliased(Criterion)
-        ac_prev = aliased(ActionCriteria)
-        c_prev = aliased(Criterion)
-
-        profession_subquery = (
-            db.query(Action.item_id)
-            .join(ac_current, Action.id == ac_current.action_id)
-            .join(c_current, ac_current.criterion_id == c_current.id)
-            .outerjoin(
-                ac_prev,
-                and_(
-                    ac_prev.action_id == Action.id,
-                    ac_prev.order_index == ac_current.order_index - 1,
-                ),
-            )
-            .outerjoin(c_prev, ac_prev.criterion_id == c_prev.id)
-            .filter(
-                and_(
-                    Action.action == 3,  # USE action
-                    or_(
-                        and_(c_current.value1 == 60, c_current.value2 == profession_id),
-                        and_(
-                            c_current.value1 == 368, c_current.value2 == profession_id
-                        ),
-                    ),
-                    # Exclude if preceded by operator 18 (target modifier)
-                    or_(
-                        c_prev.id.is_(None),  # No previous criterion
-                        c_prev.operator != 18,  # Previous is not operator 18
-                    ),
-                )
-            )
-        )
-        base_query = base_query.filter(Item.id.in_(profession_subquery))
+        base_query = base_query.filter(_has_profession_requirement(profession_id))
 
     # Apply sorting with DISTINCT to prevent duplicates
     if sort == "name":
@@ -712,74 +722,29 @@ def get_offensive_nanos_by_profession(
             Item.is_nano.is_(True),
             ~Item.name.startswith("TESTLIVEITEM"),  # Filter test items at DB level
             # Filter by valid strain at DB level
-            Item.id.in_(
-                db.query(ItemStats.item_id)
-                .join(StatValue, ItemStats.stat_value_id == StatValue.id)
-                .filter(
-                    and_(
-                        StatValue.stat == 75,  # Strain stat
-                        StatValue.value > 0,
-                        StatValue.value != 99999,
-                    )
-                )
-            ),
+            _has_valid_strain(),
             # Filter for offensive spells at DB level
-            Item.id.in_(
-                db.query(ItemSpellData.item_id)
-                .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)
-                .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)
-                .join(Spell, SpellDataSpells.spell_id == Spell.id)
-                .filter(
-                    and_(
-                        Spell.target == 3,  # Offensive target
-                        Spell.spell_id == 53002,  # Modify stat spell
-                        Spell.spell_params.op("->>")("Stat").cast(Integer)
-                        == 27,  # Health damage
-                    )
-                )
-            ),
+            select(1)
+            .select_from(ItemSpellData)
+            .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)
+            .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)
+            .join(Spell, SpellDataSpells.spell_id == Spell.id)
+            .where(
+                ItemSpellData.item_id == Item.id,
+                Spell.target == 3,  # Offensive target
+                Spell.spell_id == 53002,  # Modify stat spell
+                Spell.spell_params.op("->>")("Stat").cast(Integer)
+                == 27,  # Health damage
+            )
+            .correlate(Item)
+            .exists(),
         )
     )
 
-    # Filter by profession requirement using optimized subquery
+    # Filter by profession requirement
     # Excludes profession criteria preceded by operator 18 (target modifier)
     if profession_id > 0:
-        # Alias for the current and previous criteria
-        ac_current = aliased(ActionCriteria)
-        c_current = aliased(Criterion)
-        ac_prev = aliased(ActionCriteria)
-        c_prev = aliased(Criterion)
-
-        profession_subquery = (
-            db.query(Action.item_id)
-            .join(ac_current, Action.id == ac_current.action_id)
-            .join(c_current, ac_current.criterion_id == c_current.id)
-            .outerjoin(
-                ac_prev,
-                and_(
-                    ac_prev.action_id == Action.id,
-                    ac_prev.order_index == ac_current.order_index - 1,
-                ),
-            )
-            .outerjoin(c_prev, ac_prev.criterion_id == c_prev.id)
-            .filter(
-                and_(
-                    Action.action == 3,  # USE action
-                    or_(
-                        and_(c_current.value1 == 60, c_current.value2 == profession_id),
-                        and_(
-                            c_current.value1 == 368, c_current.value2 == profession_id
-                        ),
-                    ),
-                    # Exclude if preceded by operator 18 (target modifier)
-                    or_(
-                        c_prev.id.is_(None),  # No previous criterion
-                        c_prev.operator != 18,  # Previous is not operator 18
-                    ),
-                )
-            )
-        )
-        base_query = base_query.filter(Item.id.in_(profession_subquery))
+        base_query = base_query.filter(_has_profession_requirement(profession_id))
 
     # Apply sorting with DISTINCT to prevent duplicates
     if sort == "name":
@@ -920,11 +885,11 @@ def get_nanos_by_profession_fast(
             WHERE ist.item_id = i.id AND sv.stat = 75 
             AND sv.value > 0 AND sv.value != 99999
         )
-        {'AND i.id IN (\
-            SELECT a.item_id FROM actions a\
+        {'AND EXISTS (\
+            SELECT 1 FROM actions a\
             JOIN action_criteria ac ON a.id = ac.action_id\
             JOIN criteria c ON ac.criterion_id = c.id\
-            WHERE a.action = 3\
+            WHERE a.item_id = i.id AND a.action = 3\
             AND ((c.value1 = 60 AND c.value2 = :prof_id)\
                  OR (c.value1 = 368 AND c.value2 = :prof_id))\
         )' if profession_id > 0 else ''}
@@ -947,11 +912,11 @@ def get_nanos_by_profession_fast(
     """
         + (
             """ 
-        AND i.id IN (
-            SELECT a.item_id FROM actions a
+        AND EXISTS (
+            SELECT 1 FROM actions a
             JOIN action_criteria ac ON a.id = ac.action_id
             JOIN criteria c ON ac.criterion_id = c.id
-            WHERE a.action = 3
+            WHERE a.item_id = i.id AND a.action = 3
             AND ((c.value1 = 60 AND c.value2 = :prof_id)
                  OR (c.value1 = 368 AND c.value2 = :prof_id))
         )

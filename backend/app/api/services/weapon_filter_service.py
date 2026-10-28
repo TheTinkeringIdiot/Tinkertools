@@ -156,6 +156,7 @@ class WeaponFilterService:
             .select_from(Action)
             .join(ActionCriteria, Action.id == ActionCriteria.action_id)
             .where(Action.item_id == Item.id)
+            .correlate(Item)
             .exists()
         )
 
@@ -166,114 +167,122 @@ class WeaponFilterService:
             )
         )
 
-        # OPTIMIZED: Use subqueries materialized once + NOT IN for exclusions
-        # Much faster than multiple correlated NOT EXISTS subqueries that scan tables repeatedly
+        # Requirement exclusions are NOT EXISTS clauses correlated on the outer
+        # items row (planned as anti-joins), not NOT IN over every matching
+        # criterion: the NOT IN form is planned child-first and its cost grows
+        # with every revision in a shared store, not with this version's
+        # weapons. No action has a NULL item_id, so the results are identical.
 
         # Exclude items with NPC family requirements (NPC-only weapons)
         npc_weapon_ids = (
-            select(Item.id)
-            .select_from(Item)
-            .join(Action, Item.id == Action.item_id)
+            select(1)
+            .select_from(Action)
             .join(ActionCriteria, Action.id == ActionCriteria.action_id)
             .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
             .where(
+                Action.item_id == Item.id,
                 Action.action == 8,  # Action type 8 = WIELD
                 Criterion.value1 == self.NPC_FAMILY_STAT,
             )
-            .scalar_subquery()
+            .correlate(Item)
+            .exists()
         )
 
-        query = query.filter(Item.id.not_in(npc_weapon_ids))
+        query = query.filter(~npc_weapon_ids)
 
         # Apply faction filter if needed (side 0 = neutral can use all)
         if request.side > 0:
             faction_restricted_ids = (
-                select(Item.id)
-                .select_from(Item)
-                .join(ItemStats, ItemStats.item_id == Item.id)
+                select(1)
+                .select_from(ItemStats)
                 .join(StatValue, StatValue.id == ItemStats.stat_value_id)
                 .where(
+                    ItemStats.item_id == Item.id,
                     StatValue.stat == self.FACTION_STAT,
                     StatValue.value != request.side,
                     StatValue.value != 0,
                 )
-                .scalar_subquery()
+                .correlate(Item)
+                .exists()
             )
 
-            query = query.filter(Item.id.not_in(faction_restricted_ids))
+            query = query.filter(~faction_restricted_ids)
 
         # Apply breed filter
         breed_restricted_ids = (
-            select(Item.id)
-            .select_from(Item)
-            .join(Action, Item.id == Action.item_id)
+            select(1)
+            .select_from(Action)
             .join(ActionCriteria, Action.id == ActionCriteria.action_id)
             .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
             .where(
+                Action.item_id == Item.id,
                 Action.action == 8,  # Action type 8 = WIELD
                 Criterion.value1 == 4,  # Stat 4 = Breed
                 Criterion.value2 != request.breed_id,
                 Criterion.value2 != 0,
             )
-            .scalar_subquery()
+            .correlate(Item)
+            .exists()
         )
 
-        query = query.filter(Item.id.not_in(breed_restricted_ids))
+        query = query.filter(~breed_restricted_ids)
 
         # Apply profession filter
         # Include items where: no profession requirement OR profession matches (handles OR logic correctly)
         if request.profession_id > 0:
             # Items with profession requirements
             items_with_prof_req = (
-                select(Item.id)
-                .select_from(Item)
-                .join(Action, Item.id == Action.item_id)
+                select(1)
+                .select_from(Action)
                 .join(ActionCriteria, Action.id == ActionCriteria.action_id)
                 .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
                 .where(
+                    Action.item_id == Item.id,
                     Action.action == 8,
                     or_(
                         Criterion.value1 == 60,  # Stat 60 = Profession
                         Criterion.value1 == 368,  # Stat 368 = VisualProfession
                     ),
                 )
-                .scalar_subquery()
+                .correlate(Item)
+                .exists()
             )
 
             # Items where profession matches (includes items with value2=0 for "any profession")
             items_prof_match = (
-                select(Item.id)
-                .select_from(Item)
-                .join(Action, Item.id == Action.item_id)
+                select(1)
+                .select_from(Action)
                 .join(ActionCriteria, Action.id == ActionCriteria.action_id)
                 .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
                 .where(
+                    Action.item_id == Item.id,
                     Action.action == 8,
                     or_(Criterion.value1 == 60, Criterion.value1 == 368),
                     or_(
                         Criterion.value2 == request.profession_id, Criterion.value2 == 0
                     ),
                 )
-                .scalar_subquery()
+                .correlate(Item)
+                .exists()
             )
 
             # Include items without profession requirements OR with matching profession
             query = query.filter(
                 or_(
-                    Item.id.not_in(items_with_prof_req),  # No profession requirement
-                    Item.id.in_(items_prof_match),  # Has matching profession
+                    ~items_with_prof_req,  # No profession requirement
+                    items_prof_match,  # Has matching profession
                 )
             )
 
         # Apply expansion filter - Operator 22 (StatBitSet)
         # Exclude items requiring expansions character doesn't have
         expansion_required_not_met = (
-            select(Item.id)
-            .select_from(Item)
-            .join(Action, Item.id == Action.item_id)
+            select(1)
+            .select_from(Action)
             .join(ActionCriteria, Action.id == ActionCriteria.action_id)
             .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
             .where(
+                Action.item_id == Item.id,
                 Action.action == 8,
                 Criterion.value1 == self.EXPANSION_STAT,
                 Criterion.operator == 22,
@@ -285,20 +294,21 @@ class WeaponFilterService:
                 )
                 != Criterion.value2,
             )
-            .scalar_subquery()
+            .correlate(Item)
+            .exists()
         )
 
-        query = query.filter(Item.id.not_in(expansion_required_not_met))
+        query = query.filter(~expansion_required_not_met)
 
         # Apply expansion filter - Operator 107 (StatBitNotSet)
         # Exclude items forbidden for character's expansions
         expansion_forbidden = (
-            select(Item.id)
-            .select_from(Item)
-            .join(Action, Item.id == Action.item_id)
+            select(1)
+            .select_from(Action)
             .join(ActionCriteria, Action.id == ActionCriteria.action_id)
             .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
             .where(
+                Action.item_id == Item.id,
                 Action.action == 8,
                 Criterion.value1 == self.EXPANSION_STAT,
                 Criterion.operator == 107,
@@ -310,10 +320,11 @@ class WeaponFilterService:
                 )
                 != 0,
             )
-            .scalar_subquery()
+            .correlate(Item)
+            .exists()
         )
 
-        query = query.filter(Item.id.not_in(expansion_forbidden))
+        query = query.filter(~expansion_forbidden)
 
         # Use distinct to avoid duplicates
         query = query.distinct()

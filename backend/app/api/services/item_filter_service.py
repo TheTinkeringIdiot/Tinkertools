@@ -15,12 +15,20 @@ Stat ID reference for the filters below:
 - 75  NanoStrain
 - 298 EquippedIn (bitmask of equipment slots)
 - 389 Expansion requirement (used for froob filtering)
+
+Every child-table filter is an EXISTS / NOT EXISTS correlated on the outer
+``items`` row rather than ``items.id IN (SELECT item_id FROM <child> ...)``.
+The IN form is planned child-first: it collects every matching child row in
+the database and then probes items. Anchored on ``items``, the planner can
+drive from the (version-filtered) item set, so the cost follows the size of
+one version rather than of every revision in a shared store. NOT EXISTS is
+also planned as an anti-join, where NOT IN can only be a hashed subplan.
 """
 
 import logging
 from typing import List, Optional
 
-from sqlalchemy import or_, and_, Integer
+from sqlalchemy import or_, and_, Integer, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import (
@@ -59,59 +67,91 @@ STAT_MODIFY_SPELLS = [
 NODROP_FLAG = 16384  # bit within stat 0 (ITEM_NONE_FLAG)
 
 
-def build_stat_modifier_subquery(
-    db: Session, stat_ids: list, operator: str = None, value: int = None
-):
+def _compare(column, operator: str, value: int):
+    """``column <operator> value`` for the operators the stat filters accept."""
+    if operator == ">=":
+        return column >= value
+    if operator == "<=":
+        return column <= value
+    if operator == "==":
+        return column == value
+    if operator == "!=":
+        return column != value
+    raise ValueError(f"Unsupported operator: {operator}")
+
+
+def item_has_stat(*conditions):
+    """EXISTS clause: the outer items row has a stat matching ``conditions``.
+
+    ``conditions`` are expressions over ``StatValue``. Correlated on
+    ``Item.id``, so it must be used in a query selecting from ``Item``.
     """
-    Build a subquery to find items that modify specific stats.
+    return (
+        select(1)
+        .select_from(ItemStats)
+        .join(StatValue, ItemStats.stat_value_id == StatValue.id)
+        .where(ItemStats.item_id == Item.id, *conditions)
+        .correlate(Item)
+        .exists()
+    )
+
+
+def item_has_criterion(*conditions):
+    """EXISTS clause: an action of the outer items row has a matching criterion.
+
+    ``conditions`` are expressions over ``Action`` and ``Criterion``.
+    """
+    return (
+        select(1)
+        .select_from(Action)
+        .join(ActionCriteria, Action.id == ActionCriteria.action_id)
+        .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
+        .where(Action.item_id == Item.id, *conditions)
+        .correlate(Item)
+        .exists()
+    )
+
+
+def item_modifies_stat(stat_ids: list, operator: str = None, value: int = None):
+    """
+    EXISTS clause: the outer items row has a spell that modifies one of ``stat_ids``.
 
     Handles multiple spell types that can modify stats:
     - 53045/53012/53014: Modify Stat spells (param: 'Stat')
     - 53026: Set Skill spells (param: 'Skill')
 
     Args:
-        db: Database session
         stat_ids: List of stat IDs to search for
         operator: Optional operator for value comparison ('>=', '<=', '==', '!=')
         value: Optional value to compare against (requires operator)
 
     Returns:
-        Subquery of Item.id values matching the criteria
+        A boolean clause correlated on ``Item.id``.
     """
-    subqueries = []
-
-    for spell_id, param_field in STAT_MODIFY_SPELLS:
-        stat_accessor = Spell.spell_params.op("->>")(param_field).cast(Integer)
-        amount_accessor = Spell.spell_params.op("->>")("Amount").cast(Integer)
-
-        subq = (
-            db.query(Item.id.distinct())
-            .join(ItemSpellData, Item.id == ItemSpellData.item_id)
-            .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)
-            .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)
-            .join(Spell, SpellDataSpells.spell_id == Spell.id)
-            .filter(Spell.spell_id == spell_id)
-            .filter(stat_accessor.in_(stat_ids))
+    spell_matches = [
+        and_(
+            Spell.spell_id == spell_id,
+            Spell.spell_params.op("->>")(param_field).cast(Integer).in_(stat_ids),
         )
+        for spell_id, param_field in STAT_MODIFY_SPELLS
+    ]
+    conditions = [ItemSpellData.item_id == Item.id, or_(*spell_matches)]
 
-        # Apply value comparison if specified
-        if operator and value is not None:
-            if operator == ">=":
-                subq = subq.filter(amount_accessor >= value)
-            elif operator == "<=":
-                subq = subq.filter(amount_accessor <= value)
-            elif operator == "==":
-                subq = subq.filter(amount_accessor == value)
-            elif operator == "!=":
-                subq = subq.filter(amount_accessor != value)
+    # Apply value comparison if specified
+    if operator and value is not None:
+        amount_accessor = Spell.spell_params.op("->>")("Amount").cast(Integer)
+        conditions.append(_compare(amount_accessor, operator, value))
 
-        subqueries.append(subq)
-
-    # Combine all subqueries with UNION
-    if len(subqueries) == 1:
-        return subqueries[0]
-
-    return subqueries[0].union(*subqueries[1:])
+    return (
+        select(1)
+        .select_from(ItemSpellData)
+        .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)
+        .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)
+        .join(Spell, SpellDataSpells.spell_id == Spell.id)
+        .where(*conditions)
+        .correlate(Item)
+        .exists()
+    )
 
 
 def apply_stat_filters(query, stat_filters: str, db: Session):
@@ -159,30 +199,16 @@ def apply_stat_filters(query, stat_filters: str, db: Session):
         for function, stat_id, operator, value in filters:
             if function == "requires":
                 # Look for requirement criteria in actions
-                subquery = (
-                    db.query(Item.id.distinct())
-                    .join(Action, Item.id == Action.item_id)
-                    .join(ActionCriteria, Action.id == ActionCriteria.action_id)
-                    .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
-                    .filter(Criterion.value1 == stat_id)
+                query = query.filter(
+                    item_has_criterion(
+                        Criterion.value1 == stat_id,
+                        _compare(Criterion.value2, operator, value),
+                    )
                 )
-
-                # Apply operator to the requirement value
-                if operator == ">=":
-                    subquery = subquery.filter(Criterion.value2 >= value)
-                elif operator == "<=":
-                    subquery = subquery.filter(Criterion.value2 <= value)
-                elif operator == "==":
-                    subquery = subquery.filter(Criterion.value2 == value)
-                elif operator == "!=":
-                    subquery = subquery.filter(Criterion.value2 != value)
-
-                query = query.filter(Item.id.in_(subquery))
 
             elif function == "modifies":
                 # Look for stat modification spells (handles multiple spell types)
-                subquery = build_stat_modifier_subquery(db, [stat_id], operator, value)
-                query = query.filter(Item.id.in_(subquery))
+                query = query.filter(item_modifies_stat([stat_id], operator, value))
 
         # Use distinct to avoid duplicates from joins
         query = query.distinct()
@@ -193,16 +219,6 @@ def apply_stat_filters(query, stat_filters: str, db: Session):
         return query
 
     return query
-
-
-def _criterion_subquery(db: Session, value1: int, value2: int):
-    """Subquery of item ids whose action criteria match (value1, value2)."""
-    return (
-        db.query(Action.item_id)
-        .join(ActionCriteria, Action.id == ActionCriteria.action_id)
-        .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
-        .filter(Criterion.value1 == value1, Criterion.value2 == value2)
-    )
 
 
 def apply_common_item_filters(
@@ -230,68 +246,52 @@ def apply_common_item_filters(
     """
     # Equipment slot filter (stat 298 - EquippedIn, bitmask)
     if slot is not None and slot > 0:
-        slot_subquery = (
-            db.query(ItemStats.item_id)
-            .join(StatValue, ItemStats.stat_value_id == StatValue.id)
-            .filter(StatValue.stat == 298, StatValue.value.op("&")(1 << slot) > 0)
+        query = query.filter(
+            item_has_stat(StatValue.stat == 298, StatValue.value.op("&")(1 << slot) > 0)
         )
-        query = query.filter(Item.id.in_(slot_subquery))
 
-    # Requirement filters using subqueries
+    # Requirement filters
     if breed is not None and breed > 0:
-        query = query.filter(Item.id.in_(_criterion_subquery(db, 4, breed)))
+        query = query.filter(
+            item_has_criterion(Criterion.value1 == 4, Criterion.value2 == breed)
+        )
 
     if gender is not None and gender > 0:
-        query = query.filter(Item.id.in_(_criterion_subquery(db, 59, gender)))
+        query = query.filter(
+            item_has_criterion(Criterion.value1 == 59, Criterion.value2 == gender)
+        )
 
     if faction is not None and faction > 0:
-        query = query.filter(Item.id.in_(_criterion_subquery(db, 33, faction)))
+        query = query.filter(
+            item_has_criterion(Criterion.value1 == 33, Criterion.value2 == faction)
+        )
 
     # Profession: both Profession (stat 60) and VisualProfession (stat 368)
     # are valid, and only on wear/use actions (action == 3)
     if profession is not None and profession > 0:
-        prof_subquery = (
-            db.query(Action.item_id)
-            .join(ActionCriteria, Action.id == ActionCriteria.action_id)
-            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
-            .filter(
+        query = query.filter(
+            item_has_criterion(
                 Action.action == 3,
-                or_(
-                    and_(Criterion.value1 == 60, Criterion.value2 == profession),
-                    and_(Criterion.value1 == 368, Criterion.value2 == profession),
-                ),
+                Criterion.value1.in_((60, 368)),
+                Criterion.value2 == profession,
             )
         )
-        query = query.filter(Item.id.in_(prof_subquery))
 
-    # Froob friendly filter (exclude items with expansion requirements)
+    # Froob friendly filter (exclude items with expansion requirements).
+    # NOT EXISTS rather than NOT IN: same result here (item_stats.item_id is
+    # NOT NULL and no action has a NULL item_id), and it plans as an anti-join.
     if froob_friendly is True:
-        stats_subquery = (
-            db.query(ItemStats.item_id)
-            .join(StatValue, ItemStats.stat_value_id == StatValue.id)
-            .filter(StatValue.stat == 389)
-        )
-        criteria_subquery = (
-            db.query(Action.item_id)
-            .join(ActionCriteria, Action.id == ActionCriteria.action_id)
-            .join(Criterion, ActionCriteria.criterion_id == Criterion.id)
-            .filter(Criterion.value1 == 389)
-        )
         query = query.filter(
-            ~Item.id.in_(stats_subquery), ~Item.id.in_(criteria_subquery)
+            ~item_has_stat(StatValue.stat == 389),
+            ~item_has_criterion(Criterion.value1 == 389),
         )
 
     # NoDrop filter (stat 0 - ITEM_NONE_FLAG, bit 16384)
     if nodrop is not None:
-        nodrop_subquery = (
-            db.query(ItemStats.item_id)
-            .join(StatValue, ItemStats.stat_value_id == StatValue.id)
-            .filter(StatValue.stat == 0, StatValue.value.op("&")(NODROP_FLAG) > 0)
+        has_nodrop = item_has_stat(
+            StatValue.stat == 0, StatValue.value.op("&")(NODROP_FLAG) > 0
         )
-        if nodrop:
-            query = query.filter(Item.id.in_(nodrop_subquery))
-        else:
-            query = query.filter(~Item.id.in_(nodrop_subquery))
+        query = query.filter(has_nodrop if nodrop else ~has_nodrop)
 
     # Stat bonus filters - find items that modify specific stats
     if stat_bonuses:
@@ -302,8 +302,7 @@ def apply_common_item_filters(
                 if stat_id.strip()
             ]
             if bonus_stat_ids:
-                stat_bonus_subquery = build_stat_modifier_subquery(db, bonus_stat_ids)
-                query = query.filter(Item.id.in_(stat_bonus_subquery))
+                query = query.filter(item_modifies_stat(bonus_stat_ids))
         except ValueError:
             logger.warning(f"Invalid stat_bonuses parameter: {stat_bonuses}")
 
@@ -312,12 +311,9 @@ def apply_common_item_filters(
 
     # Strain filter (stat 75 - NanoStrain)
     if strain is not None and strain > 0:
-        strain_subquery = (
-            db.query(ItemStats.item_id)
-            .join(StatValue, ItemStats.stat_value_id == StatValue.id)
-            .filter(StatValue.stat == 75, StatValue.value == strain)
+        query = query.filter(
+            item_has_stat(StatValue.stat == 75, StatValue.value == strain)
         )
-        query = query.filter(Item.id.in_(strain_subquery))
 
     return query
 

@@ -5,7 +5,7 @@ Items API endpoints.
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload, aliased
-from sqlalchemy import or_, func
+from sqlalchemy import or_, func, select
 import math
 import time
 import logging
@@ -52,6 +52,7 @@ from app.api.schemas import (
 from app.core.decorators import cached_response, performance_monitor
 from app.api.services.item_filter_service import (
     apply_common_item_filters,
+    item_has_stat,
     item_detail_load_options,
 )
 
@@ -623,12 +624,9 @@ def search_items(
     # Item class filter (stat 76) - search uses the stat subquery rather
     # than the Item.item_class column used by get_items
     if item_class is not None and item_class > 0:
-        item_class_subquery = (
-            db.query(ItemStats.item_id)
-            .join(StatValue, ItemStats.stat_value_id == StatValue.id)
-            .filter(StatValue.stat == 76, StatValue.value == item_class)
+        query = query.filter(
+            item_has_stat(StatValue.stat == 76, StatValue.value == item_class)
         )
-        query = query.filter(Item.id.in_(item_class_subquery))
 
     # Apply the advanced filters shared across item endpoints
     query = apply_common_item_filters(
@@ -733,12 +731,10 @@ def filter_items_advanced(
             query = query.filter(Item.atkdef_id.is_(None))
 
     if has_stats is not None:
-        if has_stats:
-            has_stats_subquery = db.query(ItemStats.item_id).distinct()
-            query = query.filter(Item.id.in_(has_stats_subquery))
-        else:
-            has_stats_subquery = db.query(ItemStats.item_id).distinct()
-            query = query.filter(~Item.id.in_(has_stats_subquery))
+        has_any_stat = (
+            select(1).where(ItemStats.item_id == Item.id).correlate(Item).exists()
+        )
+        query = query.filter(has_any_stat if has_stats else ~has_any_stat)
 
     # Apply sorting
     if sort_by == "name":
