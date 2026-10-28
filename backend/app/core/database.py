@@ -143,9 +143,10 @@ def test_connection() -> bool:
 
 def get_table_count(slug: Optional[str] = None) -> int:
     """
-    Number of tables in a game version's schema (default version if no slug).
-    Falls back to the public schema while data has not yet been moved into a
-    version schema.
+    Number of tables and views in a game version's schema (default version if
+    no slug). In the shared store layout most of a version's tables are views
+    over ``gd``. Falls back to the public schema while data has not yet been
+    moved into a version schema.
     """
     if not IS_POSTGRES:
         try:
@@ -163,7 +164,7 @@ def get_table_count(slug: Optional[str] = None) -> int:
             query = text("""
                 SELECT COUNT(*)
                 FROM information_schema.tables
-                WHERE table_schema = :schema AND table_type = 'BASE TABLE'
+                WHERE table_schema = :schema AND table_type IN ('BASE TABLE', 'VIEW')
             """)
             count = connection.execute(query, {"schema": schema}).scalar()
             if not count:

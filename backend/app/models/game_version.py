@@ -1,10 +1,11 @@
 """
 Game version registry models (``public`` schema).
 
-These two tables are cross-version: they live in ``public`` rather than in a
-per-version ``gv_<slug>`` schema, so queries against them are unaffected by the
-request's ``search_path``. See ``database/global_migrations/001_game_versions.sql``
-for the authoritative DDL.
+These are cross-version: they live in ``public`` rather than in a per-version
+``gv_<slug>`` schema, so queries against them are unaffected by the request's
+``search_path``. See ``database/global_migrations/`` for the registry DDL. With
+the shared revision store (design.md §12) ``item_revisions`` is a read-only view
+over ``gd.items`` created by ``app/core/shared_store.py``.
 """
 
 from sqlalchemy import (
@@ -14,6 +15,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    SmallInteger,
     String,
     Text,
     func,
@@ -46,13 +48,18 @@ class GameVersion(Base):
     is_default = Column(Boolean, nullable=False, default=False)
     features = Column(JSONB, nullable=False, default=dict)
     notes = Column(Text)
+    # Shared store membership id (gd.items.vids) and extract provenance.
+    vid = Column(SmallInteger, unique=True)
+    extract_slug = Column(String(40))
+    tinkerparse_commit = Column(String(64))
+    rdb_dat_sha256 = Column(String(64))
     created_at = Column(DateTime, server_default=func.current_timestamp())
     updated_at = Column(DateTime, server_default=func.current_timestamp())
 
     # Lineage: the snapshot this one follows.
     parent = relationship("GameVersion", remote_side=[slug], backref="children")
     item_revisions = relationship(
-        "ItemRevision", back_populates="game_version", cascade="all, delete-orphan"
+        "ItemRevision", back_populates="game_version", viewonly=True
     )
 
     def __repr__(self):
@@ -62,8 +69,9 @@ class GameVersion(Base):
 class ItemRevision(Base):
     """Content hashes for one item in one version.
 
-    Populated by the importer after a version loads. Comparing the sub-hashes
-    across a lineage yields the snapshots at which an item's definition changed.
+    A view over the shared store: one row per (AOID, version holding that
+    revision). Comparing the sub-hashes across a lineage yields the snapshots at
+    which an item's definition changed.
     """
 
     __tablename__ = "item_revisions"
@@ -82,7 +90,9 @@ class ItemRevision(Base):
     text_hash = Column(String(40), nullable=False)
     is_nano = Column(Boolean, nullable=False, default=False)
 
-    game_version = relationship("GameVersion", back_populates="item_revisions")
+    game_version = relationship(
+        "GameVersion", back_populates="item_revisions", viewonly=True
+    )
 
     def __repr__(self):
         return f"<ItemRevision(aoid={self.aoid}, version_slug='{self.version_slug}')>"

@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from typing import List
 import logging
 
+from app.core.shared_store import STORE_SCHEMA
+
 logger = logging.getLogger(__name__)
 
 # Index definitions for performance optimization
@@ -186,11 +188,45 @@ def create_performance_indexes(db: Session) -> List[str]:
     Create all performance indexes for optimizing TinkerTools API queries.
     Each index is created in its own transaction to avoid rollback issues.
 
+    In the shared store layout the session's version schema holds views, which
+    cannot be indexed; the indexes go on the store's tables instead.
+
     Returns:
         List of successfully created index names
     """
     created_indexes = []
 
+    previous_path = None
+    if _items_is_view(db):
+        previous_path = db.execute(text("SHOW search_path")).scalar()
+        db.execute(text(f"SET search_path TO {STORE_SCHEMA}, public"))
+        db.commit()
+
+    try:
+        _create_each(db, created_indexes)
+    finally:
+        if previous_path is not None:
+            db.rollback()
+            db.execute(text(f"SET search_path TO {previous_path}"))
+            db.commit()
+
+    logger.info(f"Successfully created {len(created_indexes)} performance indexes")
+    return created_indexes
+
+
+def _items_is_view(db: Session) -> bool:
+    """Whether ``items`` on the session's search_path is a view (shared store)."""
+    return (
+        db.execute(
+            text(
+                "SELECT c.relkind FROM pg_class c " "WHERE c.oid = to_regclass('items')"
+            )
+        ).scalar()
+        == "v"
+    )
+
+
+def _create_each(db: Session, created_indexes: List[str]) -> None:
     for index_def in PERFORMANCE_INDEXES:
         try:
             logger.info(f"Creating index: {index_def['name']}")
@@ -202,9 +238,6 @@ def create_performance_indexes(db: Session) -> List[str]:
             logger.warning(f"Failed to create index {index_def['name']}: {e}")
             db.rollback()  # Rollback only this failed index
             continue
-
-    logger.info(f"Successfully created {len(created_indexes)} performance indexes")
-    return created_indexes
 
 
 def check_index_usage(db: Session) -> dict:
@@ -225,11 +258,11 @@ def check_index_usage(db: Session) -> dict:
                 idx_tup_read as tuples_read,
                 idx_tup_fetch as tuples_fetched
             FROM pg_stat_user_indexes
-            WHERE schemaname = current_schema()
+            WHERE schemaname IN (current_schema(), :store)
             ORDER BY idx_scan DESC;
         """)
 
-        result = db.execute(query)
+        result = db.execute(query, {"store": STORE_SCHEMA})
         indexes = []
 
         for row in result:

@@ -10,6 +10,16 @@ Two migration sets:
   and are tracked in ``<schema>.schema_migrations``. The files are unqualified,
   so ``search_path`` decides which version they land in.
 
+With the shared revision store (``app/core/shared_store.py``) the per-version
+files build *staging* schemas, whose content tables are merged into ``gd`` and
+replaced by views. ``gd.schema_migrations`` records which of these files the
+store's content tables carry; an install refuses a staging schema at a
+different level. There is no automatic fan-out yet: a new file that changes a
+content table must also be applied to ``gd`` by hand (``SET search_path TO gd``,
+then record it in ``gd.schema_migrations``) and the views refreshed with
+``import_cli.py convert-shared --yes``; one that changes a curated table must be
+applied to every ``gv_*`` schema.
+
 Both runners are versioned: the leading digits of a filename are its version,
 already-applied versions are skipped, and each file runs in its own
 transaction. This replaces the old "drop every table and replay every file"
@@ -122,6 +132,90 @@ def adoptable_tables_present(existing: Sequence[str]) -> List[str]:
     """Filter ``existing`` table names down to the ones we are willing to move."""
     present = set(existing)
     return [t for t in ADOPTABLE_TABLES if t in present]
+
+
+def upsert_game_version(
+    conn: Connection,
+    slug: str,
+    display_name: Optional[str],
+    family: str,
+    parent_slug: Optional[str] = None,
+    client_build: Optional[str] = None,
+    snapshot_date: Optional[date] = None,
+    sort_order: int = 0,
+    enabled: bool = True,
+    is_default: bool = False,
+    features: Optional[Dict] = None,
+    notes: Optional[str] = None,
+) -> str:
+    """Insert or update one ``public.game_versions`` row on ``conn``, inside the
+    caller's transaction (no commit).
+
+    Returns:
+        The schema name recorded for the version.
+    """
+    validate_slug(slug)
+    schema = schema_name_for(slug)
+    if parent_slug:
+        validate_slug(parent_slug)
+
+    params = {
+        "slug": slug,
+        "schema_name": schema,
+        "display_name": display_name or slug,
+        "family": family,
+        "parent_slug": parent_slug,
+        "client_build": client_build,
+        "snapshot_date": (
+            snapshot_date.isoformat()
+            if isinstance(snapshot_date, date)
+            else snapshot_date
+        ),
+        "sort_order": sort_order,
+        "enabled": enabled,
+        "is_default": is_default,
+        "features": json.dumps(features or {}),
+        "notes": notes,
+    }
+
+    if is_default:
+        # A partial unique index allows only one default row.
+        conn.execute(
+            text(
+                "UPDATE public.game_versions SET is_default = FALSE "
+                "WHERE is_default AND slug <> :slug"
+            ),
+            {"slug": slug},
+        )
+
+    conn.execute(
+        text("""
+            INSERT INTO public.game_versions (
+                slug, schema_name, display_name, family, parent_slug,
+                client_build, snapshot_date, sort_order, enabled,
+                is_default, features, notes
+            ) VALUES (
+                :slug, :schema_name, :display_name, :family, :parent_slug,
+                :client_build, CAST(:snapshot_date AS DATE), :sort_order, :enabled,
+                :is_default, CAST(:features AS JSONB), :notes
+            )
+            ON CONFLICT (slug) DO UPDATE SET
+                schema_name = EXCLUDED.schema_name,
+                display_name = EXCLUDED.display_name,
+                family = EXCLUDED.family,
+                parent_slug = EXCLUDED.parent_slug,
+                client_build = EXCLUDED.client_build,
+                snapshot_date = EXCLUDED.snapshot_date,
+                sort_order = EXCLUDED.sort_order,
+                enabled = EXCLUDED.enabled,
+                is_default = EXCLUDED.is_default,
+                features = EXCLUDED.features,
+                notes = EXCLUDED.notes,
+                updated_at = CURRENT_TIMESTAMP
+            """),
+        params,
+    )
+    return schema
 
 
 class MigrationRunner:
@@ -434,68 +528,21 @@ class MigrationRunner:
         Returns:
             The schema name recorded for the version.
         """
-        validate_slug(slug)
-        schema = schema_name_for(slug)
-        if parent_slug:
-            validate_slug(parent_slug)
-
-        params = {
-            "slug": slug,
-            "schema_name": schema,
-            "display_name": display_name or slug,
-            "family": family,
-            "parent_slug": parent_slug,
-            "client_build": client_build,
-            "snapshot_date": (
-                snapshot_date.isoformat()
-                if isinstance(snapshot_date, date)
-                else snapshot_date
-            ),
-            "sort_order": sort_order,
-            "enabled": enabled,
-            "is_default": is_default,
-            "features": json.dumps(features or {}),
-            "notes": notes,
-        }
-
         with self._transactional_connection() as conn:
             try:
-                if is_default:
-                    # A partial unique index allows only one default row.
-                    conn.execute(
-                        text(
-                            "UPDATE public.game_versions SET is_default = FALSE "
-                            "WHERE is_default AND slug <> :slug"
-                        ),
-                        {"slug": slug},
-                    )
-
-                conn.execute(
-                    text("""
-                        INSERT INTO public.game_versions (
-                            slug, schema_name, display_name, family, parent_slug,
-                            client_build, snapshot_date, sort_order, enabled,
-                            is_default, features, notes
-                        ) VALUES (
-                            :slug, :schema_name, :display_name, :family, :parent_slug,
-                            :client_build, CAST(:snapshot_date AS DATE), :sort_order, :enabled,
-                            :is_default, CAST(:features AS JSONB), :notes
-                        )
-                        ON CONFLICT (slug) DO UPDATE SET
-                            schema_name = EXCLUDED.schema_name,
-                            display_name = EXCLUDED.display_name,
-                            family = EXCLUDED.family,
-                            parent_slug = EXCLUDED.parent_slug,
-                            client_build = EXCLUDED.client_build,
-                            snapshot_date = EXCLUDED.snapshot_date,
-                            sort_order = EXCLUDED.sort_order,
-                            enabled = EXCLUDED.enabled,
-                            is_default = EXCLUDED.is_default,
-                            features = EXCLUDED.features,
-                            notes = EXCLUDED.notes,
-                            updated_at = CURRENT_TIMESTAMP
-                        """),
-                    params,
+                schema = upsert_game_version(
+                    conn,
+                    slug=slug,
+                    display_name=display_name,
+                    family=family,
+                    parent_slug=parent_slug,
+                    client_build=client_build,
+                    snapshot_date=snapshot_date,
+                    sort_order=sort_order,
+                    enabled=enabled,
+                    is_default=is_default,
+                    features=features,
+                    notes=notes,
                 )
                 conn.commit()
             except Exception:
@@ -564,11 +611,7 @@ class MigrationRunner:
             if not self._table_exists(conn, "public", "game_versions"):
                 return []
             rows = conn.execute(text("""
-                SELECT slug, schema_name, display_name, family, parent_slug,
-                       client_build, snapshot_date, sort_order, enabled,
-                       is_default, features, notes
-                FROM public.game_versions
-                ORDER BY sort_order, slug
+                SELECT * FROM public.game_versions ORDER BY sort_order, slug
                 """)).mappings().all()
         return [dict(row) for row in rows]
 

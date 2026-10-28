@@ -2,8 +2,9 @@
 Game version registry.
 
 TinkerTools serves several snapshots of the game database (live AO, PRK,
-historical client builds). Each snapshot lives in its own PostgreSQL schema,
-``gv_<slug>``, holding the full per-version table set. ``public.game_versions``
+historical client builds). Each snapshot has its own PostgreSQL schema,
+``gv_<slug>``, exposing the per-version table set: views over the shared
+revision store ``gd`` plus its curated tables (see ``shared_store``). ``public.game_versions``
 is the registry of known snapshots; this module caches it in-process and maps a
 version slug to its schema.
 
