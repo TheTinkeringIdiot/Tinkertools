@@ -525,6 +525,8 @@ def _responses(client, conn, schema):
         client.post("/api/v1/cache/clear")
         response = client.get(url)
         out[url] = (response.status_code, response.json())
+    # Leave no fixture responses in the response cache for later tests.
+    client.post("/api/v1/cache/clear")
     conn.execute(text("SET LOCAL search_path TO public"))
     return out
 
