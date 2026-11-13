@@ -40,9 +40,6 @@ class Item(Base):
     item_spell_data = relationship(
         "ItemSpellData", back_populates="item", cascade="all, delete-orphan"
     )
-    item_shop_hashes = relationship(
-        "ItemShopHash", back_populates="item", cascade="all, delete-orphan"
-    )
     actions = relationship(
         "Action", back_populates="item", cascade="all, delete-orphan"
     )
@@ -66,10 +63,6 @@ class Item(Base):
     @property
     def spell_data(self):
         return [isd.spell_data for isd in self.item_spell_data]
-
-    @property
-    def shop_hashes(self):
-        return [ish.shop_hash for ish in self.item_shop_hashes]
 
     @property
     def sources(self):
@@ -117,23 +110,3 @@ class ItemSpellData(Base):
 
     def __repr__(self):
         return f"<ItemSpellData(item_id={self.item_id}, spell_data_id={self.spell_data_id})>"
-
-
-class ItemShopHash(Base):
-    __tablename__ = "item_shop_hash"
-
-    item_id = Column(
-        Integer, ForeignKey("items.id", ondelete="CASCADE"), primary_key=True
-    )
-    shop_hash_id = Column(
-        Integer, ForeignKey("shop_hash.id", ondelete="CASCADE"), primary_key=True
-    )
-
-    # Relationships
-    item = relationship("Item", back_populates="item_shop_hashes")
-    shop_hash = relationship("ShopHash", back_populates="item_shop_hashes")
-
-    def __repr__(self):
-        return (
-            f"<ItemShopHash(item_id={self.item_id}, shop_hash_id={self.shop_hash_id})>"
-        )
