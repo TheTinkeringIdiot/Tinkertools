@@ -13,7 +13,6 @@ import type { Item } from '@/types/api';
 
 function makeItem(overrides: Partial<Item> = {}): Item {
   return {
-    id: 1,
     aoid: 21793,
     name: 'Augmented Nano Armor Sleeves',
     ql: 200,

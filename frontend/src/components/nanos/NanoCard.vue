@@ -180,8 +180,8 @@ Shows nano information with compatibility indicators and quick actions
             >
             <div class="space-y-1">
               <div
-                v-for="req in requirements.slice(0, showCompatibility ? 99 : 3)"
-                :key="req.id"
+                v-for="(req, index) in requirements.slice(0, showCompatibility ? 99 : 3)"
+                :key="index"
                 class="flex items-center justify-between text-xs"
               >
                 <span class="text-surface-600 dark:text-surface-400">
@@ -256,7 +256,7 @@ Shows nano information with compatibility indicators and quick actions
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { computed } from 'vue';
 import Avatar from 'primevue/avatar';
 import Badge from 'primevue/badge';
 import Button from 'primevue/button';
@@ -266,6 +266,7 @@ import Chip from 'primevue/chip';
 import type { DisplayCriterion } from '@/services/action-criteria';
 import type { NanoProgram, NanoCompatibilityInfo, NanoEffect } from '@/types/nano';
 import CriterionReference from '@/components/CriterionReference.vue';
+import { useNanosStore } from '@/stores/nanosStore';
 import { getNanoRequirements } from './nano-compatibility';
 import { schoolAvatarClass, schoolInitials } from './nano-schools';
 
@@ -287,11 +288,12 @@ const props = withDefaults(
 // Emits
 const emit = defineEmits<{
   select: [nano: NanoProgram];
-  favorite: [nanoId: number, isFavorite: boolean];
+  favorite: [aoid: number, isFavorite: boolean];
 }>();
 
-// Reactive state
-const isFavorite = ref(false);
+const nanosStore = useNanosStore();
+
+const isFavorite = computed(() => nanosStore.isFavorite(props.nano.aoid));
 
 // Computed
 const requirements = computed(() => getNanoRequirements(props.nano));
@@ -390,25 +392,9 @@ const handleSelect = () => {
 };
 
 const toggleFavorite = () => {
-  isFavorite.value = !isFavorite.value;
-  emit('favorite', props.nano.id, isFavorite.value);
+  nanosStore.toggleFavorite(props.nano.aoid);
+  emit('favorite', props.nano.aoid, isFavorite.value);
 };
-
-// Load favorite status
-const loadFavoriteStatus = () => {
-  try {
-    const favorites = localStorage.getItem('tinkertools_nano_favorites');
-    if (favorites) {
-      const favoritesArray: number[] = JSON.parse(favorites);
-      isFavorite.value = favoritesArray.includes(props.nano.id);
-    }
-  } catch (error) {
-    console.warn('Failed to load favorite status:', error);
-  }
-};
-
-// Initialize
-loadFavoriteStatus();
 </script>
 
 <style scoped>

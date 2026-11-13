@@ -1593,7 +1593,7 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
         if (newStackingOrder >= conflictStackingOrder) {
           // Remove the conflicting buff
           activeProfile.value.buffs = activeProfile.value.buffs.filter(
-            (buff) => buff.id !== conflictBuff.id
+            (buff) => buff.aoid !== conflictBuff.aoid
           );
         } else {
           // New buff has lower priority, cannot cast
@@ -1646,19 +1646,19 @@ export const useTinkerProfilesStore = defineStore('tinkerProfiles', () => {
   /**
    * Remove a specific buff from the active profile
    */
-  async function removeBuff(itemId: number): Promise<void> {
+  async function removeBuff(aoid: number): Promise<void> {
     if (!activeProfile.value || !activeProfile.value.buffs) {
       return;
     }
 
-    const buffToRemove = activeProfile.value.buffs.find((buff) => buff.id === itemId);
+    const buffToRemove = activeProfile.value.buffs.find((buff) => buff.aoid === aoid);
     if (!buffToRemove) {
       return;
     }
 
     // Remove the buff and convert to plain objects
     activeProfile.value.buffs = activeProfile.value.buffs
-      .filter((buff) => buff.id !== itemId)
+      .filter((buff) => buff.aoid !== aoid)
       .map((buff) => toRaw(buff));
 
     // Set flag to prevent watcher loops

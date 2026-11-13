@@ -271,7 +271,6 @@ class InterpolationService {
    */
   itemToInterpolatedItem(item: Item): InterpolatedItem {
     return {
-      id: item.id,
       aoid: item.aoid,
       name: item.name,
       ql: item.ql,
@@ -304,8 +303,6 @@ class InterpolationService {
           action: action.action,
           criteria: action.criteria || [],
         })) || [],
-      attack_defense_id: item.attack_defense?.id,
-      animation_mesh_id: item.animation_mesh?.id,
     };
   }
 

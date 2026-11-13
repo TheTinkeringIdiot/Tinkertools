@@ -19,15 +19,19 @@ Shows item spell effects in a compact, scannable table format following WeaponSt
 
         <!-- Compact Mode (for simple effects) -->
         <div v-if="useCompactMode" class="compact-effects">
-          <div v-for="effectGroup in formattedSpellData" :key="effectGroup.id" class="effect-group">
+          <div
+            v-for="(effectGroup, groupIndex) in formattedSpellData"
+            :key="groupIndex"
+            class="effect-group"
+          >
             <div class="effect-header">
               <span class="event-icon">{{ getEventIcon(effectGroup.event || 0) }}</span>
               <span class="event-name">{{ effectGroup.eventName || 'Effect' }}</span>
             </div>
             <div class="spells-list">
               <div
-                v-for="spell in visibleSpells(effectGroup.spells)"
-                :key="spell.id"
+                v-for="(spell, spellIndex) in visibleSpells(effectGroup.spells)"
+                :key="spellIndex"
                 class="spell-compact"
               >
                 <span class="spell-text">{{ spell.formattedText }}</span>
@@ -61,10 +65,10 @@ Shows item spell effects in a compact, scannable table format following WeaponSt
 
             <!-- Data Rows -->
             <tbody>
-              <template v-for="effectGroup in formattedSpellData" :key="effectGroup.id">
+              <template v-for="(effectGroup, groupIndex) in formattedSpellData" :key="groupIndex">
                 <tr
                   v-for="(spell, index) in visibleSpells(effectGroup.spells)"
-                  :key="spell.id"
+                  :key="index"
                   class="data-row"
                 >
                   <!-- Event Column (only show for first spell in group) -->

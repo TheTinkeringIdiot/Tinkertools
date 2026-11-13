@@ -4,8 +4,7 @@ import type { Action } from './api';
 import type { DisplayCriterion } from '@/services/action-criteria';
 
 export interface NanoProgram {
-  id: number;
-  aoid?: number;
+  aoid: number;
   name: string;
   icon?: string;
   /** The game's NanoSchool stat (405); null when the nano has none */

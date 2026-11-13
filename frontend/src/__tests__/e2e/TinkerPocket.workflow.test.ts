@@ -74,7 +74,7 @@ describe.skipIf(!BACKEND_AVAILABLE)('TinkerPocket Workflow', () => {
     let target: Symbiant | undefined;
     let expectedBossIds: number[] = [];
     for (const symbiant of symbiants.slice(0, 25)) {
-      const response = await apiClient.getSymbiantDroppedBy(symbiant.id);
+      const response = await apiClient.getSymbiantDroppedBy(symbiant.aoid);
       if (response.data && response.data.length > 0) {
         target = symbiant;
         expectedBossIds = response.data.map((boss) => boss.id);
@@ -91,7 +91,7 @@ describe.skipIf(!BACKEND_AVAILABLE)('TinkerPocket Workflow', () => {
     const aggregated = symbiantStore.aggregatedBosses;
     expect(Array.from(aggregated.keys()).sort()).toEqual([...expectedBossIds].sort());
     aggregated.forEach((entry) => {
-      expect(entry.symbiants.map((s) => s.id)).toContain(target!.id);
+      expect(entry.symbiants.map((s) => s.aoid)).toContain(target!.aoid);
       expect(entry.farmed).toBe(false);
     });
 

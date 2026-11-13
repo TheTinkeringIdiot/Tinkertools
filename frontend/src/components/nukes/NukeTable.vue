@@ -284,7 +284,6 @@ const tableData = computed(() => {
 
     // Return formatted row data
     return {
-      id: nano.id,
       aoid: nano.aoid,
       name: nano.name,
       ql: nano.qualityLevel,

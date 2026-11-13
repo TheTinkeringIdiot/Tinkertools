@@ -132,9 +132,9 @@ describe('OR operator handling in criteria tree builder', () => {
       // Expression: (Soldier OR Enforcer)
       // Logical meaning: "Must be one of these professions" - single choice
       const criteria: Criterion[] = [
-        { id: 1, value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
-        { id: 2, value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
+        { value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
+        { value1: 0, value2: 0, operator: 3 }, // OR
       ];
 
       const tree = buildCriteriaTree(criteria, {});
@@ -153,9 +153,9 @@ describe('OR operator handling in criteria tree builder', () => {
 
     it('should mark OR as met when one option is satisfied', () => {
       const criteria: Criterion[] = [
-        { id: 1, value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
-        { id: 2, value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
+        { value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
+        { value1: 0, value2: 0, operator: 3 }, // OR
       ];
 
       // Character is a Soldier (satisfies first option)
@@ -172,9 +172,9 @@ describe('OR operator handling in criteria tree builder', () => {
 
     it('should mark OR as met when other option is satisfied', () => {
       const criteria: Criterion[] = [
-        { id: 1, value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
-        { id: 2, value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
+        { value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
+        { value1: 0, value2: 0, operator: 3 }, // OR
       ];
 
       // Character is an Enforcer (satisfies second option)
@@ -196,11 +196,11 @@ describe('OR operator handling in criteria tree builder', () => {
       // Expression: ((Soldier OR Enforcer) OR Adventurer)
       // Logical meaning: "Must be one of these three professions" - single choice
       const criteria: Criterion[] = [
-        { id: 1, value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
-        { id: 2, value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 4, value1: 60, value2: 6, operator: 0 }, // Profession = Adventurer
-        { id: 5, value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
+        { value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 60, value2: 6, operator: 0 }, // Profession = Adventurer
+        { value1: 0, value2: 0, operator: 3 }, // OR
       ];
 
       const tree = buildCriteriaTree(criteria, {});
@@ -219,11 +219,11 @@ describe('OR operator handling in criteria tree builder', () => {
 
     it('should mark chained OR as met when any option is satisfied', () => {
       const criteria: Criterion[] = [
-        { id: 1, value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
-        { id: 2, value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 4, value1: 60, value2: 6, operator: 0 }, // Profession = Adventurer
-        { id: 5, value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
+        { value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 60, value2: 6, operator: 0 }, // Profession = Adventurer
+        { value1: 0, value2: 0, operator: 3 }, // OR
       ];
 
       // Character is an Adventurer (satisfies third option)
@@ -240,11 +240,11 @@ describe('OR operator handling in criteria tree builder', () => {
 
     it('should not count multiple satisfied OR options separately', () => {
       const criteria: Criterion[] = [
-        { id: 1, value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
-        { id: 2, value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 4, value1: 60, value2: 6, operator: 0 }, // Profession = Adventurer
-        { id: 5, value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
+        { value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 60, value2: 6, operator: 0 }, // Profession = Adventurer
+        { value1: 0, value2: 0, operator: 3 }, // OR
       ];
 
       // Character is a Soldier (satisfies first option)
@@ -266,11 +266,11 @@ describe('OR operator handling in criteria tree builder', () => {
       // Expression: ((Soldier OR Enforcer) AND Pistol >= 100)
       // Logical meaning: "Must be Soldier or Enforcer, AND have 100+ pistol" - 2 requirements
       const criteria: Criterion[] = [
-        { id: 1, value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
-        { id: 2, value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 4, value1: 112, value2: 99, operator: 2 }, // Pistol > 99 (displays as >= 100)
-        { id: 5, value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
+        { value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 112, value2: 99, operator: 2 }, // Pistol > 99 (displays as >= 100)
+        { value1: 0, value2: 0, operator: 4 }, // AND
       ];
 
       const tree = buildCriteriaTree(criteria, {});
@@ -289,11 +289,11 @@ describe('OR operator handling in criteria tree builder', () => {
 
     it('should show partial when OR met but AND requirement not met', () => {
       const criteria: Criterion[] = [
-        { id: 1, value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
-        { id: 2, value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 4, value1: 112, value2: 99, operator: 2 }, // Pistol > 99 (displays as >= 100)
-        { id: 5, value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
+        { value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 112, value2: 99, operator: 2 }, // Pistol > 99 (displays as >= 100)
+        { value1: 0, value2: 0, operator: 4 }, // AND
       ];
 
       // Character is Soldier but has low pistol
@@ -310,11 +310,11 @@ describe('OR operator handling in criteria tree builder', () => {
 
     it('should show met when both OR and AND requirements satisfied', () => {
       const criteria: Criterion[] = [
-        { id: 1, value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
-        { id: 2, value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 4, value1: 112, value2: 99, operator: 2 }, // Pistol > 99 (displays as >= 100)
-        { id: 5, value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
+        { value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 112, value2: 99, operator: 2 }, // Pistol > 99 (displays as >= 100)
+        { value1: 0, value2: 0, operator: 4 }, // AND
       ];
 
       // Character is Enforcer with good pistol
@@ -336,13 +336,13 @@ describe('OR operator handling in criteria tree builder', () => {
       // Expression: ((Soldier OR Enforcer) AND (Pistol >= 100 OR FlingShot >= 100))
       // Logical meaning: "Must be Soldier/Enforcer AND have 100+ in pistol OR flingshot" - 2 choices
       const criteria: Criterion[] = [
-        { id: 1, value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
-        { id: 2, value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 4, value1: 112, value2: 99, operator: 2 }, // Pistol > 99
-        { id: 5, value1: 150, value2: 99, operator: 2 }, // FlingShot > 99
-        { id: 6, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 7, value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
+        { value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 112, value2: 99, operator: 2 }, // Pistol > 99
+        { value1: 150, value2: 99, operator: 2 }, // FlingShot > 99
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 0, value2: 0, operator: 4 }, // AND
       ];
 
       const tree = buildCriteriaTree(criteria, {});
@@ -361,13 +361,13 @@ describe('OR operator handling in criteria tree builder', () => {
 
     it('should count correctly when one OR satisfied in nested structure', () => {
       const criteria: Criterion[] = [
-        { id: 1, value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
-        { id: 2, value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 4, value1: 112, value2: 99, operator: 2 }, // Pistol > 99
-        { id: 5, value1: 150, value2: 99, operator: 2 }, // FlingShot > 99
-        { id: 6, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 7, value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
+        { value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 112, value2: 99, operator: 2 }, // Pistol > 99
+        { value1: 150, value2: 99, operator: 2 }, // FlingShot > 99
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 0, value2: 0, operator: 4 }, // AND
       ];
 
       // Character is Soldier with good pistol
@@ -384,13 +384,13 @@ describe('OR operator handling in criteria tree builder', () => {
 
     it('should show partial when only one nested OR satisfied', () => {
       const criteria: Criterion[] = [
-        { id: 1, value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
-        { id: 2, value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 4, value1: 112, value2: 99, operator: 2 }, // Pistol > 99
-        { id: 5, value1: 150, value2: 99, operator: 2 }, // FlingShot > 99
-        { id: 6, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 7, value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
+        { value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 112, value2: 99, operator: 2 }, // Pistol > 99
+        { value1: 150, value2: 99, operator: 2 }, // FlingShot > 99
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 0, value2: 0, operator: 4 }, // AND
       ];
 
       // Character is Soldier but has low weapon skills
@@ -412,13 +412,13 @@ describe('OR operator handling in criteria tree builder', () => {
       // Expression: (((Soldier OR Enforcer) AND Pistol >= 100) AND Level >= 50)
       // Logical meaning: "Must be Soldier/Enforcer, have 100+ pistol, and be level 50+" - 3 requirements
       const criteria: Criterion[] = [
-        { id: 1, value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
-        { id: 2, value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 4, value1: 112, value2: 99, operator: 2 }, // Pistol > 99
-        { id: 5, value1: 0, value2: 0, operator: 4 }, // AND
-        { id: 6, value1: 54, value2: 49, operator: 2 }, // Level > 49
-        { id: 7, value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
+        { value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 112, value2: 99, operator: 2 }, // Pistol > 99
+        { value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 54, value2: 49, operator: 2 }, // Level > 49
+        { value1: 0, value2: 0, operator: 4 }, // AND
       ];
 
       const tree = buildCriteriaTree(criteria, {});
@@ -437,13 +437,13 @@ describe('OR operator handling in criteria tree builder', () => {
 
     it('should track met count correctly when some requirements satisfied', () => {
       const criteria: Criterion[] = [
-        { id: 1, value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
-        { id: 2, value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 4, value1: 112, value2: 99, operator: 2 }, // Pistol > 99
-        { id: 5, value1: 0, value2: 0, operator: 4 }, // AND
-        { id: 6, value1: 54, value2: 49, operator: 2 }, // Level > 49
-        { id: 7, value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
+        { value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 112, value2: 99, operator: 2 }, // Pistol > 99
+        { value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 54, value2: 49, operator: 2 }, // Level > 49
+        { value1: 0, value2: 0, operator: 4 }, // AND
       ];
 
       // Character is Enforcer with good pistol but low level
@@ -463,8 +463,8 @@ describe('OR operator handling in criteria tree builder', () => {
     it('should handle single OR option as 1 requirement', () => {
       // Edge case: OR with only one child (shouldn't happen but test anyway)
       const criteria: Criterion[] = [
-        { id: 1, value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
-        { id: 2, value1: 0, value2: 0, operator: 3 }, // OR (malformed but handle it)
+        { value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
+        { value1: 0, value2: 0, operator: 3 }, // OR (malformed but handle it)
       ];
 
       const tree = buildCriteriaTree(criteria, {});
@@ -478,9 +478,9 @@ describe('OR operator handling in criteria tree builder', () => {
     it('should handle stat requirements with different operators in OR', () => {
       // OR with different comparison operators
       const criteria: Criterion[] = [
-        { id: 1, value1: 112, value2: 99, operator: 2 }, // Pistol >= 100
-        { id: 2, value1: 150, value2: 99, operator: 2 }, // FlingShot >= 100
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 112, value2: 99, operator: 2 }, // Pistol >= 100
+        { value1: 150, value2: 99, operator: 2 }, // FlingShot >= 100
+        { value1: 0, value2: 0, operator: 3 }, // OR
       ];
 
       const tree = buildCriteriaTree(criteria, {});

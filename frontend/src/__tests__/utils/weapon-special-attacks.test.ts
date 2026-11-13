@@ -33,7 +33,7 @@ describe('weapon-special-attacks', () => {
 
   // Test fixture: Base weapon
   const createWeapon = (stats: Array<{ stat: number; value: number }>): WeaponCandidate => ({
-    id: 1,
+    aoid: 1,
     name: 'Test Weapon',
     ql: 200,
     is_nano: false,

@@ -15,7 +15,6 @@ import { SKILL_ID } from './skill-fixtures';
 // ============================================================================
 
 export interface ItemCreationOptions {
-  id?: number;
   aoid?: number;
   name?: string;
   ql?: number;
@@ -44,7 +43,6 @@ export interface ItemCreationOptions {
  */
 export function createTestItem(options: ItemCreationOptions = {}): Item {
   const {
-    id = Math.floor(Math.random() * 1000000),
     aoid = Math.floor(Math.random() * 1000000),
     name = 'Test Item',
     ql = 100,
@@ -59,7 +57,6 @@ export function createTestItem(options: ItemCreationOptions = {}): Item {
   } = options;
 
   return {
-    id,
     aoid,
     name,
     ql,
@@ -83,11 +80,10 @@ export function createTestItem(options: ItemCreationOptions = {}): Item {
  *
  * @example
  * const stat = createStatValue(SKILL_ID.ASSAULT_RIF, 10);
- * // Result: { id: 1, stat: 116, value: 10 }
+ * // Result: { stat: 116, value: 10 }
  */
-export function createStatValue(stat: number, value: number, id?: number): StatValue {
+export function createStatValue(stat: number, value: number): StatValue {
   return {
-    id: id ?? Math.floor(Math.random() * 1000000),
     stat,
     value,
   };
@@ -120,7 +116,6 @@ export function createCriterion(
   id?: number
 ): Criterion {
   return {
-    id: id ?? Math.floor(Math.random() * 1000000),
     value1,
     value2,
     operator,
@@ -137,18 +132,9 @@ export function createCriterion(
  * });
  */
 export function createSpell(options: Partial<Spell> = {}): Spell {
-  const {
-    id = Math.floor(Math.random() * 1000000),
-    target,
-    tick_count,
-    tick_interval,
-    spell_id,
-    spell_params = {},
-    criteria = [],
-  } = options;
+  const { target, tick_count, tick_interval, spell_id, spell_params = {}, criteria = [] } = options;
 
   return {
-    id,
     target,
     tick_count,
     tick_interval,
@@ -168,10 +154,9 @@ export function createSpell(options: Partial<Spell> = {}): Spell {
  * });
  */
 export function createSpellData(options: Partial<SpellData> = {}): SpellData {
-  const { id = Math.floor(Math.random() * 1000000), event, spells = [] } = options;
+  const { event, spells = [] } = options;
 
   return {
-    id,
     event,
     spells,
   };
@@ -185,12 +170,10 @@ export function createSpellData(options: Partial<SpellData> = {}): SpellData {
  * Create an Action object
  */
 export function createAction(options: Partial<Action> = {}): Action {
-  const { id = Math.floor(Math.random() * 1000000), action, item_id = 0, criteria = [] } = options;
+  const { action, criteria = [] } = options;
 
   return {
-    id,
     action,
-    item_id,
     criteria,
   };
 }

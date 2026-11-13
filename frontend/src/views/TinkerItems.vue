@@ -367,13 +367,16 @@ async function onItemClick(item: Item) {
 }
 
 function onItemCompare(item: Item) {
-  if (comparisonItems.value.length < 3 && !comparisonItems.value.find((i) => i.id === item.id)) {
+  if (
+    comparisonItems.value.length < 3 &&
+    !comparisonItems.value.find((i) => i.aoid === item.aoid)
+  ) {
     comparisonItems.value.push(item);
   }
 }
 
-function removeFromComparison(itemId: number) {
-  comparisonItems.value = comparisonItems.value.filter((item) => item.id !== itemId);
+function removeFromComparison(aoid: number) {
+  comparisonItems.value = comparisonItems.value.filter((item) => item.aoid !== aoid);
 }
 
 function clearComparison() {

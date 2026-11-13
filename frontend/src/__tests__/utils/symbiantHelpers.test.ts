@@ -12,7 +12,6 @@ describe('symbiantHelpers', () => {
   describe('getSymbiantDisplayName', () => {
     it('returns name if available', () => {
       const symbiant: Symbiant = {
-        id: 1,
         aoid: 100,
         name: 'Test Symbiant',
         ql: 100,
@@ -25,7 +24,6 @@ describe('symbiantHelpers', () => {
 
     it('returns family-based name if name not available', () => {
       const symbiant: Symbiant = {
-        id: 1,
         aoid: 100,
         name: '',
         ql: 100,
@@ -38,7 +36,6 @@ describe('symbiantHelpers', () => {
 
     it('returns AOID-based name if neither name nor family available', () => {
       const symbiant: Symbiant = {
-        id: 1,
         aoid: 12345,
         name: '',
         ql: 100,
@@ -48,25 +45,11 @@ describe('symbiantHelpers', () => {
       };
       expect(getSymbiantDisplayName(symbiant)).toBe('Symbiant 12345');
     });
-
-    it('returns ID-based name if AOID not available', () => {
-      const symbiant: Symbiant = {
-        id: 1,
-        aoid: 0,
-        name: '',
-        ql: 100,
-        slot_id: 1,
-        family: null, // the API sends null for symbiants without a family
-        actions: [],
-      };
-      expect(getSymbiantDisplayName(symbiant)).toBe('Symbiant 1');
-    });
   });
 
   describe('getSymbiantSlotId', () => {
     it('returns slot_id if available', () => {
       const symbiant: Symbiant = {
-        id: 1,
         aoid: 100,
         name: 'Test',
         slot_id: 5,
@@ -79,7 +62,6 @@ describe('symbiantHelpers', () => {
 
     it('generates consistent slot_id based on ID', () => {
       const symbiant1: Symbiant = {
-        id: 1,
         aoid: 100,
         name: 'Test',
         ql: 100,
@@ -88,7 +70,6 @@ describe('symbiantHelpers', () => {
         actions: [],
       };
       const symbiant2: Symbiant = {
-        id: 1,
         aoid: 200,
         name: 'Test',
         ql: 100,
@@ -101,7 +82,6 @@ describe('symbiantHelpers', () => {
 
     it('keeps a slot_id of 0 rather than generating one', () => {
       const symbiant: Symbiant = {
-        id: 7,
         aoid: 100,
         name: 'Test',
         ql: 100,
@@ -114,7 +94,6 @@ describe('symbiantHelpers', () => {
 
     it('generates valid slot_id values (0-9)', () => {
       const symbiant: Symbiant = {
-        id: 5,
         aoid: 100,
         name: 'Test',
         ql: 100,
@@ -131,7 +110,6 @@ describe('symbiantHelpers', () => {
   describe('getSymbiantQL', () => {
     it('returns QL if available', () => {
       const symbiant: Symbiant = {
-        id: 1,
         aoid: 100,
         name: 'Test',
         ql: 200,
@@ -144,7 +122,6 @@ describe('symbiantHelpers', () => {
 
     it('generates QL between 50-300', () => {
       const symbiant: Symbiant = {
-        id: 10,
         aoid: 100,
         name: 'Test',
         ql: 0,
@@ -157,9 +134,8 @@ describe('symbiantHelpers', () => {
       expect(ql).toBeLessThanOrEqual(300);
     });
 
-    it('generates consistent QL based on ID', () => {
+    it('generates consistent QL based on AOID', () => {
       const symbiant1: Symbiant = {
-        id: 10,
         aoid: 100,
         name: 'Test',
         ql: 0,
@@ -168,9 +144,8 @@ describe('symbiantHelpers', () => {
         actions: [],
       };
       const symbiant2: Symbiant = {
-        id: 10,
-        aoid: 200,
-        name: 'Test',
+        aoid: 100,
+        name: 'Other',
         ql: 0,
         slot_id: 1,
         family: 'Artillery',
@@ -183,7 +158,6 @@ describe('symbiantHelpers', () => {
   describe('getSymbiantFamily', () => {
     it('returns family if available', () => {
       const symbiant: Symbiant = {
-        id: 1,
         aoid: 100,
         name: 'Test',
         ql: 100,
@@ -197,7 +171,6 @@ describe('symbiantHelpers', () => {
     it('generates valid family types', () => {
       const validFamilies = ['Artillery', 'Control', 'Extermination', 'Infantry', 'Support'];
       const symbiant: Symbiant = {
-        id: 3,
         aoid: 100,
         name: 'Test',
         ql: 100,
@@ -211,7 +184,6 @@ describe('symbiantHelpers', () => {
 
     it('generates consistent family based on ID', () => {
       const symbiant1: Symbiant = {
-        id: 7,
         aoid: 100,
         name: 'Test',
         ql: 100,
@@ -220,7 +192,6 @@ describe('symbiantHelpers', () => {
         actions: [],
       };
       const symbiant2: Symbiant = {
-        id: 7,
         aoid: 200,
         name: 'Test',
         ql: 100,
@@ -235,7 +206,6 @@ describe('symbiantHelpers', () => {
   describe('enrichSymbiant', () => {
     it('preserves existing values', () => {
       const symbiant: Symbiant = {
-        id: 1,
         aoid: 100,
         name: 'Existing Name',
         slot_id: 5,
@@ -253,7 +223,6 @@ describe('symbiantHelpers', () => {
 
     it('fills in missing values', () => {
       const symbiant: Symbiant = {
-        id: 1,
         aoid: 100,
         name: 'Test',
         ql: 100,
@@ -267,13 +236,11 @@ describe('symbiantHelpers', () => {
       expect(enriched.slot_id).toBeDefined();
       expect(enriched.ql).toBeDefined();
       expect(enriched.family).toBeDefined();
-      expect(enriched.id).toBe(1);
       expect(enriched.aoid).toBe(100);
     });
 
     it('creates consistent enriched data', () => {
       const symbiant: Symbiant = {
-        id: 5,
         aoid: 200,
         name: 'Test',
         ql: 100,
@@ -289,7 +256,6 @@ describe('symbiantHelpers', () => {
 
     it('handles edge cases gracefully', () => {
       const symbiant: Symbiant = {
-        id: 0,
         aoid: 0,
         name: 'Test',
         ql: 100,

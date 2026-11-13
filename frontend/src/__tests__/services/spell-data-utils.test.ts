@@ -37,7 +37,6 @@ describe('spell-data-utils', () => {
 
   describe('formatSpell', () => {
     const mockSpell: Spell = {
-      id: 1,
       target: 1,
       tick_count: 1,
       tick_interval: 100,

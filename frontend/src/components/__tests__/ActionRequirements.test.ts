@@ -38,12 +38,12 @@ const STRENGTH = 16;
 const STAMINA = 18;
 
 /** A "stat > value" criterion, displayed as "stat ≥ value + 1". */
-function atLeast(id: number, stat: number, value: number): Criterion {
-  return { id, value1: stat, value2: value - 1, operator: 2 };
+function atLeast(stat: number, value: number): Criterion {
+  return { value1: stat, value2: value - 1, operator: 2 };
 }
 
-function action(id: number, actionType: number, criteria: Criterion[] = []): Action {
-  return { id, action: actionType, item_id: 123, criteria };
+function action(actionType: number, criteria: Criterion[] = []): Action {
+  return { action: actionType, criteria };
 }
 
 function mountRequirements(
@@ -79,7 +79,7 @@ describe('ActionRequirements', () => {
   });
 
   describe('single action', () => {
-    const wield = action(1, WIELD, [atLeast(1, PISTOL, 357)]);
+    const wield = action(WIELD, [atLeast(PISTOL, 357)]);
 
     it('features the action with its requirements', () => {
       const wrapper = mountRequirements({ actions: [wield] });
@@ -111,7 +111,7 @@ describe('ActionRequirements', () => {
     });
 
     it('says an action without criteria has no requirements', () => {
-      const wrapper = mountRequirements({ actions: [action(1, WIELD)] });
+      const wrapper = mountRequirements({ actions: [action(WIELD)] });
 
       expect(primaryText(wrapper)).toBe('WieldNo requirements');
     });
@@ -125,7 +125,7 @@ describe('ActionRequirements', () => {
       await router.push(`/${TEST_VERSION}/`);
 
       // Access Notum Source's Use action: NotRunningNano 209909, nothing else
-      const use = action(1, USE, [{ id: 1, value1: 0, value2: 209909, operator: 101 }]);
+      const use = action(USE, [{ value1: 0, value2: 209909, operator: 101 }]);
       const wrapper = mount(ActionRequirements, {
         props: { actions: [use], characterStats: { [LEVEL]: 60 } },
         global: { plugins: [PrimeVue, router], directives: { tooltip: Tooltip } },
@@ -140,7 +140,7 @@ describe('ActionRequirements', () => {
     });
 
     it('names unknown action types by number', () => {
-      const wrapper = mountRequirements({ actions: [action(1, 999, [atLeast(1, LEVEL, 10)])] });
+      const wrapper = mountRequirements({ actions: [action(999, [atLeast(LEVEL, 10)])] });
 
       expect(wrapper.find('.primary-action h4').text()).toBe('Action 999');
     });
@@ -155,10 +155,7 @@ describe('ActionRequirements', () => {
   describe('choosing the featured action', () => {
     it('prefers Wield or Wear over other actions', () => {
       const wrapper = mountRequirements({
-        actions: [
-          action(1, USE, [atLeast(1, LEVEL, 50)]),
-          action(2, WEAR, [atLeast(2, AGILITY, 200)]),
-        ],
+        actions: [action(USE, [atLeast(LEVEL, 50)]), action(WEAR, [atLeast(AGILITY, 200)])],
       });
 
       expect(wrapper.find('.primary-action h4').text()).toBe('Wear');
@@ -167,7 +164,7 @@ describe('ActionRequirements', () => {
 
     it('otherwise features the first action with requirements', () => {
       const wrapper = mountRequirements({
-        actions: [action(1, GET), action(2, USE, [atLeast(2, LEVEL, 50)])],
+        actions: [action(GET), action(USE, [atLeast(LEVEL, 50)])],
       });
 
       expect(wrapper.find('.primary-action h4').text()).toBe('Use');
@@ -177,7 +174,7 @@ describe('ActionRequirements', () => {
     it('evaluates the featured action, not the first action in the list', () => {
       // Get has no requirements and is always possible; the featured Use action is not.
       const wrapper = mountRequirements({
-        actions: [action(1, GET), action(2, USE, [atLeast(2, LEVEL, 50)])],
+        actions: [action(GET), action(USE, [atLeast(LEVEL, 50)])],
         characterStats: { [LEVEL]: 10 },
       });
 
@@ -187,9 +184,9 @@ describe('ActionRequirements', () => {
 
   describe('multiple actions', () => {
     const actions = [
-      action(1, WIELD, [atLeast(1, PISTOL, 357)]),
-      action(2, USE, [atLeast(2, LEVEL, 151), atLeast(3, AGILITY, 100)]),
-      action(3, GET),
+      action(WIELD, [atLeast(PISTOL, 357)]),
+      action(USE, [atLeast(LEVEL, 151), atLeast(AGILITY, 100)]),
+      action(GET),
     ];
 
     it('lists the other actions with their requirement counts', () => {
@@ -242,12 +239,8 @@ describe('ActionRequirements', () => {
     it('lists the largest shortfalls first, up to three', () => {
       const wrapper = mountRequirements({
         actions: [
-          action(1, WIELD, [atLeast(1, PISTOL, 357), atLeast(2, STRENGTH, 300)]),
-          action(2, USE, [
-            atLeast(3, LEVEL, 151),
-            atLeast(4, AGILITY, 100),
-            atLeast(5, STAMINA, 90),
-          ]),
+          action(WIELD, [atLeast(PISTOL, 357), atLeast(STRENGTH, 300)]),
+          action(USE, [atLeast(LEVEL, 151), atLeast(AGILITY, 100), atLeast(STAMINA, 90)]),
         ],
         characterStats: {
           [PISTOL]: 300,
@@ -273,14 +266,14 @@ describe('ActionRequirements', () => {
   describe('when the actions change', () => {
     it('shows the new requirements and re-evaluates the character', async () => {
       const wrapper = mountRequirements({
-        actions: [action(1, WIELD, [atLeast(1, PISTOL, 300)])],
+        actions: [action(WIELD, [atLeast(PISTOL, 300)])],
         characterStats: { [PISTOL]: 320 },
       });
       expect(primaryText(wrapper)).toContain('Pistol ≥ 300');
       expect(wrapper.find('.primary-action .p-tag').text()).toBe('Can Use');
 
       // e.g. the item was interpolated to a higher QL
-      await wrapper.setProps({ actions: [action(1, WIELD, [atLeast(1, PISTOL, 340)])] });
+      await wrapper.setProps({ actions: [action(WIELD, [atLeast(PISTOL, 340)])] });
 
       expect(primaryText(wrapper)).toContain('Pistol ≥ 340');
       expect(primaryText(wrapper)).not.toContain('Pistol ≥ 300');

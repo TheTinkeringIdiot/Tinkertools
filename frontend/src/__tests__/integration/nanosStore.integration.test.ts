@@ -35,24 +35,26 @@ describe('NanosStore', () => {
     expect(store.totalCount).toBe(0);
   });
 
-  it('manages favorites and persists them per game version', () => {
-    const nanoId = 42;
+  it('manages favorites by AOID and persists them per game version', () => {
+    const aoid = 42;
 
-    store.addToFavorites(nanoId);
-    expect(store.favorites).toContain(nanoId);
+    store.addToFavorites(aoid);
+    expect(store.favorites).toContain(aoid);
+    expect(store.isFavorite(aoid)).toBe(true);
     expect(localStorage.setItem).toHaveBeenCalledWith(
       versionKey('tinkertools_nano_favorites'),
-      JSON.stringify([nanoId])
+      JSON.stringify({ version: 2, aoids: [aoid] })
     );
 
-    store.removeFromFavorites(nanoId);
-    expect(store.favorites).not.toContain(nanoId);
+    store.removeFromFavorites(aoid);
+    expect(store.favorites).not.toContain(aoid);
 
-    store.toggleFavorite(nanoId);
-    expect(store.favorites).toContain(nanoId);
+    store.toggleFavorite(aoid);
+    expect(store.favorites).toContain(aoid);
 
-    store.toggleFavorite(nanoId);
-    expect(store.favorites).not.toContain(nanoId);
+    store.toggleFavorite(aoid);
+    expect(store.favorites).not.toContain(aoid);
+    expect(store.isFavorite(aoid)).toBe(false);
   });
 
   it('handles errors gracefully', async () => {
@@ -86,8 +88,8 @@ describe('NanosStore school, profession and level', () => {
   let store: ReturnType<typeof useNanosStore>;
 
   /** A /nanos item; only the fields under test vary */
-  function nanoItem(id: number, name: string, fields: Record<string, unknown>) {
-    return { id, aoid: 1000 + id, name, ql: 1, strain: null, actions: [], effects: [], ...fields };
+  function nanoItem(aoid: number, name: string, fields: Record<string, unknown>) {
+    return { aoid, name, ql: 1, strain: null, actions: [], effects: [], ...fields };
   }
 
   async function load(items: Record<string, unknown>[]): Promise<void> {
@@ -125,12 +127,12 @@ describe('NanosStore school, profession and level', () => {
   const names = () => store.filteredNanos.map((nano) => nano.name);
 
   it('maps the school, professions and level the backend sends', () => {
-    expect(store.getNanoById(2)).toMatchObject({
+    expect(store.getNanoByAoid(2)).toMatchObject({
       school: 'Protection',
       professions: ['Martial Artist', 'Enforcer', 'Keeper', 'Shade'],
       level: 150,
     });
-    expect(store.getNanoById(4)).toMatchObject({ school: null, professions: [], level: null });
+    expect(store.getNanoByAoid(4)).toMatchObject({ school: null, professions: [], level: null });
     expect(store.availableSchools).toEqual(['Medical', 'Protection']);
     expect(store.availableProfessions).toEqual([
       'Doctor',
@@ -144,7 +146,7 @@ describe('NanosStore school, profession and level', () => {
   it('reads a response without professions as unrestricted', async () => {
     await load([nanoItem(5, 'Old Shape', { school: null, profession: 'Doctor', level: 10 })]);
 
-    expect(store.getNanoById(5)?.professions).toEqual([]);
+    expect(store.getNanoByAoid(5)?.professions).toEqual([]);
   });
 
   /** The URL of the last request */
@@ -267,7 +269,7 @@ describe.skipIf(!BACKEND_AVAILABLE)('NanosStore with backend', () => {
     expect(store.totalCount).toBeGreaterThan(0);
 
     const firstNano = store.nanos[0];
-    expect(typeof firstNano.id).toBe('number');
+    expect(typeof firstNano.aoid).toBe('number');
     expect(typeof firstNano.aoid).toBe('number');
     expect(typeof firstNano.name).toBe('string');
     expect(typeof firstNano.qualityLevel).toBe('number');
@@ -307,14 +309,14 @@ describe.skipIf(!BACKEND_AVAILABLE)('NanosStore with backend', () => {
     expect(schools).toEqual([...schools].sort());
   }, 10000);
 
-  it('gets nano by id correctly', async () => {
+  it('gets nano by AOID correctly', async () => {
     await store.fetchNanos();
     expect(store.nanos.length).toBeGreaterThan(0);
 
     const firstNano = store.nanos[0];
-    const foundNano = store.getNanoById(firstNano.id);
+    const foundNano = store.getNanoByAoid(firstNano.aoid);
 
-    expect(foundNano?.id).toBe(firstNano.id);
+    expect(foundNano?.aoid).toBe(firstNano.aoid);
     expect(foundNano?.name).toBe(firstNano.name);
   }, 10000);
 });

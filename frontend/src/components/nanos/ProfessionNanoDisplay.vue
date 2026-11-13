@@ -175,7 +175,7 @@ Shows nanos organized by strain in decreasing QL order
                   <tbody>
                     <tr
                       v-for="nano in substrainGroup.nanos"
-                      :key="nano.id"
+                      :key="nano.aoid"
                       class="border-b border-surface-200 dark:border-surface-700 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors cursor-pointer"
                       :class="{
                         'opacity-60': !canUseNano(nano) && showUnusableNanos,
@@ -203,7 +203,7 @@ Shows nanos organized by strain in decreasing QL order
                         <RouterLink
                           :to="{
                             name: 'ItemDetail',
-                            params: { aoid: nano.aoid?.toString() || nano.id.toString() },
+                            params: { aoid: nano.aoid.toString() },
                           }"
                           class="font-medium text-surface-900 dark:text-surface-50 hover:text-primary-600 dark:hover:text-primary-400 transition-colors hover:underline"
                           @click.stop
@@ -559,7 +559,7 @@ function onNanoSelect(nano: Item) {
   // Navigate to item detail page
   void router.push({
     name: 'ItemDetail',
-    params: { aoid: nano.aoid?.toString() || nano.id.toString() },
+    params: { aoid: nano.aoid.toString() },
   });
 }
 

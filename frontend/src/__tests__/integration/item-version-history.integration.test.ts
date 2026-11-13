@@ -89,7 +89,6 @@ const REVISIONS: ItemRevisionsResponse = {
 
 function makeItem(overrides: Partial<Item> = {}): Item {
   return {
-    id: 1,
     aoid: 24562,
     name: 'Notum Splice',
     ql: 200,

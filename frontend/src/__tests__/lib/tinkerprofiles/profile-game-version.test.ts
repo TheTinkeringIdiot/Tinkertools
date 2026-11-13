@@ -348,7 +348,6 @@ function mockBatchResolution(present: Record<number, string>) {
 
 function interpolatedItem(aoid: number, name: string, ql: number): InterpolatedItem {
   return {
-    id: aoid * 10,
     aoid,
     name,
     ql,
@@ -365,22 +364,22 @@ function profileWithEquipment(): TinkerProfile {
   const profile = createTestProfile({ id: 'source', name: 'Source' });
   profile.gameVersion = PRK;
 
-  profile.Weapons.RHand = createTestItem({ id: 1, aoid: 1001, name: 'Old Rifle', ql: 200 });
-  profile.Clothing.Head = createTestItem({ id: 2, aoid: 1002, name: 'Old Helmet', ql: 150 });
+  profile.Weapons.RHand = createTestItem({ aoid: 1001, name: 'Old Rifle', ql: 200 });
+  profile.Clothing.Head = createTestItem({ aoid: 1002, name: 'Old Helmet', ql: 150 });
   profile.Implants['2'] = {
-    ...createTestItem({ id: 3, aoid: 1003, name: 'Old Implant', ql: 100 }),
+    ...createTestItem({ aoid: 1003, name: 'Old Implant', ql: 100 }),
     slot: 2,
     type: 'implant',
     clusters: { Shiny: { stat: 112, skillName: 'Pistol' } },
   };
-  profile.buffs = [createTestItem({ id: 4, aoid: 1004, name: 'Old Buff', ql: 50 })];
+  profile.buffs = [createTestItem({ aoid: 1004, name: 'Old Buff', ql: 50 })];
   profile.PerksAndResearch.perks = [
     {
       aoid: 1005,
       name: 'Old Perk',
       level: 1,
       type: 'SL',
-      item: createTestItem({ id: 5, aoid: 1005, name: 'Old Perk', ql: 1 }),
+      item: createTestItem({ aoid: 1005, name: 'Old Perk', ql: 1 }),
     },
   ];
 
@@ -471,7 +470,7 @@ describe('buildVersionCopy', () => {
     mockBatchResolution({ 1004: 'New Buff' });
 
     const source = createTestProfile({ id: 'dupes', name: 'Dupes' });
-    const buff = createTestItem({ id: 4, aoid: 1004, name: 'Old Buff', ql: 50 });
+    const buff = createTestItem({ aoid: 1004, name: 'Old Buff', ql: 50 });
     source.buffs = [buff, { ...buff }];
 
     const result = await buildVersionCopy(source, AO_LIVE);
@@ -500,26 +499,25 @@ describe('buildVersionCopy', () => {
       data: createTestItem({
         aoid: 1001,
         name: 'New Rifle',
-        attack_stats: [{ id: 1, stat: 133, value: 100 }],
-        defense_stats: [{ id: 2, stat: 51, value: 100 }],
+        attack_stats: [{ stat: 133, value: 100 }],
+        defense_stats: [{ stat: 51, value: 100 }],
       }),
     });
 
     const source = profileWithEquipment();
     source.Weapons.RHand = createTestItem({
-      id: 1,
       aoid: 1001,
       name: 'Old Rifle',
       ql: 200,
-      attack_stats: [{ id: 9, stat: 133, value: 50 }],
+      attack_stats: [{ stat: 133, value: 50 }],
     });
 
     const result = await buildVersionCopy(source, AO_LIVE, new ProfileTransformer());
     const rifle = result.profile.Weapons.RHand;
 
     expect(apiClient.getItem).toHaveBeenCalledWith(1001, { gameVersion: AO_LIVE });
-    expect(rifle?.attack_stats).toEqual([{ id: 1, stat: 133, value: 100 }]);
-    expect(rifle?.defense_stats).toEqual([{ id: 2, stat: 51, value: 100 }]);
+    expect(rifle?.attack_stats).toEqual([{ stat: 133, value: 100 }]);
+    expect(rifle?.defense_stats).toEqual([{ stat: 51, value: 100 }]);
   });
 
   it('skips cluster-built implants that carry no aoid', async () => {
@@ -528,7 +526,6 @@ describe('buildVersionCopy', () => {
 
     const source = createTestProfile({ id: 'built', name: 'Built' });
     source.Implants['4'] = {
-      id: 0,
       aoid: 0,
       name: 'Player-built implant',
       ql: 200,

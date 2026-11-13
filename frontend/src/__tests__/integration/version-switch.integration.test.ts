@@ -48,8 +48,8 @@ const WEAPON_CACHE_BASE = 'tinkertools_weapon_cache';
 const NANO_FILTERS_KEY = 'tinkertools_nano_filters';
 const FARM_LIST_BASE = 'tinkertools-farm-list';
 
-function sampleNano(id: number, name: string): NanoProgram {
-  return createTestNano({ id, name, school: 'Combat', strain: 'Test Strain' });
+function sampleNano(aoid: number, name: string): NanoProgram {
+  return createTestNano({ aoid, name, school: 'Combat', strain: 'Test Strain' });
 }
 
 function samplePocketBoss(id: number, name: string): Mob {

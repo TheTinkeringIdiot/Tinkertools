@@ -183,7 +183,7 @@ describe('Test Helpers Validation', () => {
 
       expect(item.name).toBe('Test Weapon');
       expect(item.ql).toBe(200);
-      expect(item.id).toBeDefined();
+      expect(item.aoid).toBeDefined();
       expect(item.aoid).toBeDefined();
     });
 
@@ -192,7 +192,6 @@ describe('Test Helpers Validation', () => {
 
       expect(stat.stat).toBe(SKILL_ID.ASSAULT_RIF);
       expect(stat.value).toBe(10);
-      expect(stat.id).toBeDefined();
     });
 
     it('should create weapon item with bonuses', () => {

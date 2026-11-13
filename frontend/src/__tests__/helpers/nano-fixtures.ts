@@ -15,7 +15,6 @@ import type { NanoProgram, NanoSchoolName } from '@/types/nano';
 // ============================================================================
 
 export interface NanoCreationOptions {
-  id?: number;
   aoid?: number;
   name?: string;
   ql?: number;
@@ -45,7 +44,6 @@ export interface NanoCreationOptions {
  */
 export function createTestNano(options: NanoCreationOptions = {}): NanoProgram {
   const {
-    id = Math.floor(Math.random() * 1000000),
     aoid = Math.floor(Math.random() * 1000000),
     name = 'Test Nano',
     ql = 100,
@@ -62,7 +60,6 @@ export function createTestNano(options: NanoCreationOptions = {}): NanoProgram {
   } = options;
 
   return {
-    id,
     aoid,
     name,
     school,
@@ -88,7 +85,6 @@ export function createTestNano(options: NanoCreationOptions = {}): NanoProgram {
  * Iron Circle - Protection buff (QL 200)
  */
 export const mockNano1: NanoProgram = {
-  id: 1,
   aoid: 12345,
   name: 'Iron Circle',
   school: 'Protection',
@@ -109,7 +105,6 @@ export const mockNano1: NanoProgram = {
  * Greater Fortification - Protection buff (QL 220)
  */
 export const mockNano2: NanoProgram = {
-  id: 2,
   aoid: 12346,
   name: 'Greater Fortification',
   school: 'Protection',
@@ -131,7 +126,6 @@ export const mockNano2: NanoProgram = {
  * Same strain as mockNano1, for testing strain conflicts
  */
 export const mockNanoHighPriority: NanoProgram = {
-  id: 10,
   aoid: 12350,
   name: 'Iron Circle Superior',
   school: 'Protection',
@@ -153,7 +147,6 @@ export const mockNanoHighPriority: NanoProgram = {
  * Same strain as mockNano1, for testing strain conflicts
  */
 export const mockNanoLowPriority: NanoProgram = {
-  id: 11,
   aoid: 12340,
   name: 'Iron Circle Basic',
   school: 'Protection',
@@ -175,7 +168,6 @@ export const mockNanoLowPriority: NanoProgram = {
  * Uses 1100 NCU, almost filling a typical character's available NCU
  */
 export const mockNanoHighNCU: NanoProgram = {
-  id: 20,
   aoid: 99999,
   name: 'Massive Buff',
   school: 'Combat',
@@ -267,9 +259,9 @@ export function createBuffNano(options: Partial<NanoCreationOptions> = {}): Nano
  */
 export function createPriorityTestSet(): NanoProgram[] {
   return [
-    createBuffNano({ id: 101, name: 'Low Priority Buff', ql: 100, memoryUsage: 20 }),
-    createBuffNano({ id: 102, name: 'Medium Priority Buff', ql: 150, memoryUsage: 25 }),
-    createBuffNano({ id: 103, name: 'High Priority Buff', ql: 200, memoryUsage: 30 }),
+    createBuffNano({ name: 'Low Priority Buff', ql: 100, memoryUsage: 20 }),
+    createBuffNano({ name: 'Medium Priority Buff', ql: 150, memoryUsage: 25 }),
+    createBuffNano({ name: 'High Priority Buff', ql: 200, memoryUsage: 30 }),
   ];
 }
 
@@ -291,9 +283,7 @@ export function createNanoUseAction(
   itemId: number = 1
 ): Action {
   return {
-    id: itemId,
     action: 3,
-    item_id: itemId,
     criteria: criteria.map(([value1, value2, operator], index) => ({
       id: itemId * 100 + index,
       value1,

@@ -308,7 +308,6 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
       // Mock equipment that boosts Strength
       testProfile.Weapons = {
         'Right Hand': createTestItem({
-          id: 1,
           aoid: 12345,
           name: 'Test Weapon',
           spell_data: [
@@ -333,7 +332,6 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
       // Setup: Give Stamina a +20 equipment bonus
       testProfile.Clothing = {
         Body: createTestItem({
-          id: 2,
           aoid: 54321,
           name: 'Test Armor',
           spell_data: [
@@ -367,7 +365,6 @@ describe('IP Integrator - Bug Fixes and Data Flow', () => {
       testProfile.Implants = {
         Head: {
           ...createTestItem({
-            id: 3,
             aoid: 11111,
             name: 'Test Implant',
             spell_data: [

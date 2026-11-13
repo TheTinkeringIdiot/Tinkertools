@@ -41,12 +41,11 @@ import { versionedPath } from '@/composables/useGameVersion';
 import TinkerItems from '@/views/TinkerItems.vue';
 import type { Item, PaginatedResponse } from '@/types/api';
 
-const rifle100 = createWeaponItem({ id: 1, aoid: 1001, name: 'Assault Rifle', ql: 100 });
-const rifle200 = createWeaponItem({ id: 2, aoid: 1002, name: 'Superior Assault Rifle', ql: 200 });
-const combatArmor = createArmorItem({ id: 3, aoid: 2001, name: 'Combat Armor', ql: 150 });
-const lightArmor = createArmorItem({ id: 4, aoid: 2002, name: 'Light Armor', ql: 50 });
+const rifle100 = createWeaponItem({ aoid: 1001, name: 'Assault Rifle', ql: 100 });
+const rifle200 = createWeaponItem({ aoid: 1002, name: 'Superior Assault Rifle', ql: 200 });
+const combatArmor = createArmorItem({ aoid: 2001, name: 'Combat Armor', ql: 150 });
+const lightArmor = createArmorItem({ aoid: 2002, name: 'Light Armor', ql: 50 });
 const traderImplant = createImplantItem({
-  id: 5,
   aoid: 3001,
   name: 'Trader Implant',
   ql: 180,
@@ -54,15 +53,14 @@ const traderImplant = createImplantItem({
   stats: [createStatValue(SKILL_ID.INTELLIGENCE, 20)],
 });
 const strengthImplant = createImplantItem({
-  id: 6,
   aoid: 3002,
   name: 'Strength Implant',
   ql: 75,
   item_class: 3,
   stats: [createStatValue(SKILL_ID.STRENGTH, 15)],
 });
-const combatNano = createNanoItem({ id: 7, aoid: 4001, name: 'Combat Nano', ql: 120 });
-const buffNano = createNanoItem({ id: 8, aoid: 4002, name: 'Buff Nano', ql: 250 });
+const combatNano = createNanoItem({ aoid: 4001, name: 'Combat Nano', ql: 120 });
+const buffNano = createNanoItem({ aoid: 4002, name: 'Buff Nano', ql: 250 });
 
 const allItems = [
   rifle100,

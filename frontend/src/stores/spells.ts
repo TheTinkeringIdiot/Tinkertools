@@ -91,7 +91,7 @@ export const useSpellsStore = defineStore('spells', () => {
       if (response.items) {
         // Store individual spells in cache
         response.items.forEach((spell) => {
-          spells.value.set(spell.id, spell);
+          spells.value.set((spell as Spell & { id: number }).id, spell);
         });
 
         // Store search results

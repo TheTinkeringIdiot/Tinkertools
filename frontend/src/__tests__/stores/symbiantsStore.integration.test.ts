@@ -61,14 +61,12 @@ describe.skipIf(!BACKEND_AVAILABLE)('SymbiantsStore Integration Tests', () => {
 
     // Check data structure with enriched data
     const firstSymbiant = symbiants[0];
-    expect(firstSymbiant).toHaveProperty('id');
     expect(firstSymbiant).toHaveProperty('aoid');
     expect(firstSymbiant).toHaveProperty('name'); // Should be enriched
     expect(firstSymbiant).toHaveProperty('slot_id'); // Should be enriched
     expect(firstSymbiant).toHaveProperty('ql'); // Should be enriched
     expect(firstSymbiant).toHaveProperty('family'); // Should be enriched
 
-    expect(typeof firstSymbiant.id).toBe('number');
     expect(typeof firstSymbiant.aoid).toBe('number');
     expect(typeof firstSymbiant.name).toBe('string');
     expect(typeof firstSymbiant.slot_id).toBe('number');
@@ -110,7 +108,7 @@ describe.skipIf(!BACKEND_AVAILABLE)('SymbiantsStore Integration Tests', () => {
 
     // Get individual symbiant (should use cache)
     const firstSymbiant = firstResults[0];
-    const cachedSymbiant = await store.getSymbiant(firstSymbiant.id);
+    const cachedSymbiant = await store.getSymbiant(firstSymbiant.aoid);
 
     expect(cachedSymbiant).toEqual(firstSymbiant);
   }, 30000);
@@ -138,7 +136,7 @@ describe.skipIf(!BACKEND_AVAILABLE)('SymbiantsStore Integration Tests', () => {
     const firstSymbiant = symbiants[0];
 
     // Get the same symbiant again
-    const sameSymbiant = await store.getSymbiant(firstSymbiant.id);
+    const sameSymbiant = await store.getSymbiant(firstSymbiant.aoid);
 
     // Should have identical enriched properties
     expect(sameSymbiant?.name).toBe(firstSymbiant.name);

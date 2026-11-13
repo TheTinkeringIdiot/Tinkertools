@@ -110,8 +110,8 @@ describe.skipIf(!BACKEND_AVAILABLE)('TinkerItems Full Integration', () => {
       const page2 = await apiClient.searchItems({ search: 'implant', page: 2, limit: 10 });
       expect(page2.page).toBe(2);
       expect(page2.items.length).toBeGreaterThan(0);
-      const page1Ids = page1.items.map((item) => item.id);
-      expect(page2.items.some((item) => page1Ids.includes(item.id))).toBe(false);
+      const page1Ids = page1.items.map((item) => item.aoid);
+      expect(page2.items.some((item) => page1Ids.includes(item.aoid))).toBe(false);
     });
 
     it('answers a search within the 5 second budget', async () => {

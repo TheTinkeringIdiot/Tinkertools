@@ -42,7 +42,7 @@ vi.mock('@/components/items/ItemQuickView.vue', () => ({
 
 function makeItems(count: number, firstId = 1): Item[] {
   return Array.from({ length: count }, (_, i) =>
-    createTestItem({ id: firstId + i, aoid: 10000 + firstId + i, name: `Item ${firstId + i}` })
+    createTestItem({ aoid: 10000 + firstId + i, name: `Item ${firstId + i}` })
   );
 }
 

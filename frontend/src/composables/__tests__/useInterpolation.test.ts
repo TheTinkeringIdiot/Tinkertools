@@ -27,14 +27,13 @@ vi.mock('../../services/interpolation-service', () => ({
 const mockInterpolationService = vi.mocked(interpolationService);
 
 const sampleItem: Item = {
-  id: 1,
   aoid: 12345,
   name: 'Test Weapon',
   ql: 100,
   description: 'A test weapon',
   item_class: 1,
   is_nano: false,
-  stats: [{ id: 1, stat: 1, value: 100 }],
+  stats: [{ stat: 1, value: 100 }],
   spell_data: [],
   actions: [],
   attack_stats: [],
@@ -42,7 +41,6 @@ const sampleItem: Item = {
 };
 
 const sampleInterpolatedItem: InterpolatedItem = {
-  id: 1,
   aoid: 12345,
   name: 'Test Weapon',
   ql: 150,
@@ -55,7 +53,7 @@ const sampleInterpolatedItem: InterpolatedItem = {
   target_ql: 150,
   ql_delta: 50,
   ql_delta_full: 100,
-  stats: [{ id: 1, stat: 1, value: 150 }],
+  stats: [{ stat: 1, value: 150 }],
   spell_data: [],
   actions: [],
 };
@@ -383,7 +381,7 @@ describe('useInterpolation', () => {
     it('should handle item without AOID', async () => {
       const { setItemFromObject, error } = useInterpolation();
 
-      const itemWithoutAoid = { ...sampleItem, aoid: undefined };
+      const itemWithoutAoid = { ...sampleItem, aoid: 0 };
       await setItemFromObject(itemWithoutAoid);
 
       expect(error.value?.message).toBe('Item has no AOID');

@@ -40,15 +40,13 @@ describe('TinkerPocket: Symbiant Requirements with OR Logic', () => {
   it('should correctly filter symbiant with profession OR requirement', () => {
     // Symbiant: Artillery Eye (requires Soldier OR Enforcer)
     const symbiantAction: Action = {
-      id: 1,
       action: 6, // Wield
-      item_id: 12345,
       criteria: [
-        { id: 1, value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
-        { id: 2, value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 4, value1: 17, value2: 299, operator: 2 }, // Stamina > 299 (>= 300)
-        { id: 5, value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
+        { value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 17, value2: 299, operator: 2 }, // Stamina > 299 (>= 300)
+        { value1: 0, value2: 0, operator: 4 }, // AND
       ],
     };
 
@@ -76,7 +74,6 @@ describe('TinkerPocket: Symbiant Requirements with OR Logic', () => {
   it('should filter symbiants by profile correctly (FindGear.vue pattern)', () => {
     // Mock symbiant data structure matching TinkerPocket
     const mockSymbiant: Partial<SymbiantItem> = {
-      id: 1,
       aoid: 12345,
       name: 'Artillery Eye',
       ql: 300,
@@ -84,13 +81,11 @@ describe('TinkerPocket: Symbiant Requirements with OR Logic', () => {
       slot_id: 1,
       actions: [
         {
-          id: 1,
           action: 6, // Wield
-          item_id: 12345,
           criteria: [
-            { id: 1, value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
-            { id: 2, value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
-            { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
+            { value1: 60, value2: 1, operator: 0 }, // Profession = Soldier
+            { value1: 60, value2: 12, operator: 0 }, // Profession = Enforcer
+            { value1: 0, value2: 0, operator: 3 }, // OR
           ],
         },
       ],
@@ -116,17 +111,15 @@ describe('TinkerPocket: Symbiant Requirements with OR Logic', () => {
    */
   it('should count OR profession choice as single requirement, not sum of options', () => {
     const symbiantAction: Action = {
-      id: 1,
       action: 6,
-      item_id: 1,
       criteria: [
-        { id: 1, value1: 60, value2: 1, operator: 0 }, // Soldier
-        { id: 2, value1: 60, value2: 2, operator: 0 }, // MartialArtist
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 4, value1: 60, value2: 3, operator: 0 }, // Engineer
-        { id: 5, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 6, value1: 17, value2: 299, operator: 2 }, // Stamina >= 300
-        { id: 7, value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 60, value2: 1, operator: 0 }, // Soldier
+        { value1: 60, value2: 2, operator: 0 }, // MartialArtist
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 60, value2: 3, operator: 0 }, // Engineer
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 17, value2: 299, operator: 2 }, // Stamina >= 300
+        { value1: 0, value2: 0, operator: 4 }, // AND
       ],
     };
 
@@ -157,15 +150,13 @@ describe('TinkerNukes: Nano Requirements with OR Logic', () => {
   it('should correctly filter nano with profession OR requirement', () => {
     // Mock offensive nano with NT OR MP requirement
     const nanoAction: Action = {
-      id: 1,
       action: 3, // Use
-      item_id: 67890,
       criteria: [
-        { id: 1, value1: 60, value2: 11, operator: 0 }, // Profession = NanoTechnician
-        { id: 2, value1: 60, value2: 12, operator: 0 }, // Profession = MetaPhysicist
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 4, value1: 130, value2: 799, operator: 2 }, // Matter Creation > 799 (>= 800)
-        { id: 5, value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 60, value2: 11, operator: 0 }, // Profession = NanoTechnician
+        { value1: 60, value2: 12, operator: 0 }, // Profession = MetaPhysicist
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 130, value2: 799, operator: 2 }, // Matter Creation > 799 (>= 800)
+        { value1: 0, value2: 0, operator: 4 }, // AND
       ],
     };
 
@@ -193,25 +184,22 @@ describe('TinkerNukes: Nano Requirements with OR Logic', () => {
   it('should filter nanos by character profile (nuke-filtering.ts pattern)', () => {
     // Mock OffensiveNano structure
     const mockNano: OffensiveNano = {
-      ...createTestNano({ id: 1, aoid: 67890, name: 'Test Nuke', ql: 200 }),
+      ...createTestNano({ aoid: 67890, name: 'Test Nuke', ql: 200 }),
       // TinkerNukes names the nano skill as the school
       school: 'Matter Creation',
       level: 100,
       item: createTestItem({
-        id: 1,
         aoid: 67890,
         name: 'Test Nuke',
         ql: 200,
         is_nano: true,
         actions: [
           {
-            id: 1,
             action: 3,
-            item_id: 67890,
             criteria: [
-              { id: 1, value1: 60, value2: 11, operator: 0 }, // NT only
-              { id: 2, value1: 130, value2: 799, operator: 2 }, // MC >= 800
-              { id: 3, value1: 0, value2: 0, operator: 4 }, // AND
+              { value1: 60, value2: 11, operator: 0 }, // NT only
+              { value1: 130, value2: 799, operator: 2 }, // MC >= 800
+              { value1: 0, value2: 0, operator: 4 }, // AND
             ],
           },
         ],
@@ -238,7 +226,7 @@ describe('TinkerNukes: Nano Requirements with OR Logic', () => {
     // Filter should include nano for NT
     const filtered = filterByCharacterProfile([mockNano], ntCharacter);
     expect(filtered).toHaveLength(1);
-    expect(filtered[0].id).toBe(1);
+    expect(filtered[0].aoid).toBe(67890);
 
     // Filter should exclude nano for non-NT
     const soldierCharacter = {
@@ -259,15 +247,13 @@ describe('TinkerNukes: Nano Requirements with OR Logic', () => {
    */
   it('should handle nano with school OR requirement', () => {
     const nanoAction: Action = {
-      id: 1,
       action: 3,
-      item_id: 1,
       criteria: [
-        { id: 1, value1: 130, value2: 799, operator: 2 }, // MC >= 800
-        { id: 2, value1: 127, value2: 799, operator: 2 }, // MM >= 800
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 4, value1: 60, value2: 11, operator: 0 }, // NT profession
-        { id: 5, value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 130, value2: 799, operator: 2 }, // MC >= 800
+        { value1: 127, value2: 799, operator: 2 }, // MM >= 800
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 60, value2: 11, operator: 0 }, // NT profession
+        { value1: 0, value2: 0, operator: 4 }, // AND
       ],
     };
 
@@ -321,11 +307,9 @@ describe('Cross-Tool: Shared Profile State', () => {
 
     // Test with symbiant action
     const symbiantAction: Action = {
-      id: 1,
       action: 6,
-      item_id: 1,
       criteria: [
-        { id: 1, value1: 17, value2: 299, operator: 2 }, // Stamina >= 300
+        { value1: 17, value2: 299, operator: 2 }, // Stamina >= 300
       ],
     };
 
@@ -334,13 +318,11 @@ describe('Cross-Tool: Shared Profile State', () => {
 
     // Test with nano action
     const nanoAction: Action = {
-      id: 2,
       action: 3,
-      item_id: 2,
       criteria: [
-        { id: 1, value1: 60, value2: 11, operator: 0 }, // NT profession
-        { id: 2, value1: 130, value2: 799, operator: 2 }, // MC >= 800
-        { id: 3, value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 60, value2: 11, operator: 0 }, // NT profession
+        { value1: 130, value2: 799, operator: 2 }, // MC >= 800
+        { value1: 0, value2: 0, operator: 4 }, // AND
       ],
     };
 
@@ -378,24 +360,20 @@ describe('Cross-Tool: Shared Profile State', () => {
 
     // Symbiant requirement check (TinkerPocket pattern)
     const symbiantAction = parseAction({
-      id: 1,
       action: 6,
-      item_id: 1,
       criteria: [
-        { id: 1, value1: 60, value2: 1, operator: 0 }, // Soldier
-        { id: 2, value1: 17, value2: 299, operator: 2 }, // Stamina >= 300
-        { id: 3, value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 60, value2: 1, operator: 0 }, // Soldier
+        { value1: 17, value2: 299, operator: 2 }, // Stamina >= 300
+        { value1: 0, value2: 0, operator: 4 }, // AND
       ],
     });
     expect(checkActionRequirements(symbiantAction, stats).canPerform).toBe(true);
 
     // Nano requirement check (TinkerNukes pattern) - should fail for Soldier
     const nanoAction = parseAction({
-      id: 2,
       action: 3,
-      item_id: 2,
       criteria: [
-        { id: 1, value1: 60, value2: 11, operator: 0 }, // NT only
+        { value1: 60, value2: 11, operator: 0 }, // NT only
       ],
     });
     expect(checkActionRequirements(nanoAction, stats).canPerform).toBe(false);
@@ -411,19 +389,17 @@ describe('Cross-Tool: OR Logic Edge Cases', () => {
   it('should handle deeply nested OR chains consistently', () => {
     // 5-profession OR chain (common in weapon proficiency items)
     const action: Action = {
-      id: 1,
       action: 6,
-      item_id: 1,
       criteria: [
-        { id: 1, value1: 60, value2: 1, operator: 0 }, // Soldier
-        { id: 2, value1: 60, value2: 2, operator: 0 }, // MartialArtist
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 4, value1: 60, value2: 3, operator: 0 }, // Engineer
-        { id: 5, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 6, value1: 60, value2: 4, operator: 0 }, // Fixer
-        { id: 7, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 8, value1: 60, value2: 5, operator: 0 }, // Agent
-        { id: 9, value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 60, value2: 1, operator: 0 }, // Soldier
+        { value1: 60, value2: 2, operator: 0 }, // MartialArtist
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 60, value2: 3, operator: 0 }, // Engineer
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 60, value2: 4, operator: 0 }, // Fixer
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 60, value2: 5, operator: 0 }, // Agent
+        { value1: 0, value2: 0, operator: 3 }, // OR
       ],
     };
 
@@ -445,17 +421,15 @@ describe('Cross-Tool: OR Logic Edge Cases', () => {
   it('should handle mixed AND/OR with stat requirements', () => {
     // Pattern: (ProfA OR ProfB) AND Skill1>=X AND Skill2>=Y
     const action: Action = {
-      id: 1,
       action: 6,
-      item_id: 1,
       criteria: [
-        { id: 1, value1: 60, value2: 11, operator: 0 }, // NT
-        { id: 2, value1: 60, value2: 12, operator: 0 }, // MP
-        { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-        { id: 4, value1: 130, value2: 799, operator: 2 }, // MC >= 800
-        { id: 5, value1: 0, value2: 0, operator: 4 }, // AND
-        { id: 6, value1: 127, value2: 599, operator: 2 }, // MM >= 600
-        { id: 7, value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 60, value2: 11, operator: 0 }, // NT
+        { value1: 60, value2: 12, operator: 0 }, // MP
+        { value1: 0, value2: 0, operator: 3 }, // OR
+        { value1: 130, value2: 799, operator: 2 }, // MC >= 800
+        { value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 127, value2: 599, operator: 2 }, // MM >= 600
+        { value1: 0, value2: 0, operator: 4 }, // AND
       ],
     };
 
@@ -487,9 +461,7 @@ describe('Cross-Tool: OR Logic Edge Cases', () => {
   it('should handle empty criteria gracefully', () => {
     // Some items have no requirements
     const action: Action = {
-      id: 1,
       action: 1, // Get
-      item_id: 1,
       criteria: [],
     };
 
@@ -513,13 +485,11 @@ describe('Cross-Tool: Performance and Consistency', () => {
     const actions: Action[] = [];
     for (let i = 0; i < 100; i++) {
       actions.push({
-        id: i,
         action: 6,
-        item_id: i,
         criteria: [
-          { id: 1, value1: 60, value2: i % 12, operator: 0 }, // Various professions
-          { id: 2, value1: 130, value2: 700 + i, operator: 2 }, // Varying skill requirements
-          { id: 3, value1: 0, value2: 0, operator: 4 },
+          { value1: 60, value2: i % 12, operator: 0 }, // Various professions
+          { value1: 130, value2: 700 + i, operator: 2 }, // Varying skill requirements
+          { value1: 0, value2: 0, operator: 4 },
         ],
       });
     }

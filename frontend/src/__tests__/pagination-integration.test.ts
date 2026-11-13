@@ -66,7 +66,7 @@ describe.skipIf(!BACKEND_AVAILABLE)('Pagination Integration Tests', () => {
         expect(pagination.page).toBe(page);
         expect(pagination.limit).toBe(5);
         expect(pagination.offset).toBe((page - 1) * 5);
-        pageIds.push(items.map((item) => item.id));
+        pageIds.push(items.map((item) => item.aoid));
       }
 
       expect(pageIds[0].some((id) => pageIds[1].includes(id))).toBe(false);

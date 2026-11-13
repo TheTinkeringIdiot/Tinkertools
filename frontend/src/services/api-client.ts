@@ -696,12 +696,12 @@ class TinkerToolsApiClient {
     return this.getPaginated<SymbiantItem>(`/symbiants?${params.toString()}`);
   }
 
-  async getSymbiant(id: number): Promise<ApiResponse<SymbiantItem>> {
-    return this.get<SymbiantItem>(`/symbiants/${id}`);
+  async getSymbiant(aoid: number): Promise<ApiResponse<SymbiantItem>> {
+    return this.get<SymbiantItem>(`/symbiants/${aoid}`);
   }
 
-  async getSymbiantDroppedBy(symbiantId: number): Promise<ApiResponse<Mob[]>> {
-    return this.get<Mob[]>(`/symbiants/${symbiantId}/dropped-by`);
+  async getSymbiantDroppedBy(aoid: number): Promise<ApiResponse<Mob[]>> {
+    return this.get<Mob[]>(`/symbiants/${aoid}/dropped-by`);
   }
 
   // ============================================================================
@@ -785,6 +785,34 @@ class TinkerToolsApiClient {
       aoids: aoids.slice(0, 500),
     });
     return (response.data as ItemRevisionsBatchResponse) ?? { items: {} };
+  }
+
+  /**
+   * AOIDs of internal item ids that were persisted before user data moved to
+   * AOIDs, as `gameVersion` knows them. Ids it does not have are left out.
+   * Only the user data migration (legacy-id-migration.ts) has a use for this.
+   */
+  async resolveLegacyItemIds(
+    internalIds: number[],
+    gameVersion: string
+  ): Promise<Map<number, number>> {
+    const chunkSize = 1000;
+    const resolved = new Map<number, number>();
+    try {
+      for (let start = 0; start < internalIds.length; start += chunkSize) {
+        const response = await this.client.post<{ aoids: Record<string, number> }>(
+          '/legacy-item-ids/resolve',
+          { item_ids: internalIds.slice(start, start + chunkSize) },
+          { gameVersion }
+        );
+        for (const [internalId, aoid] of Object.entries(response.data.aoids)) {
+          resolved.set(Number(internalId), aoid);
+        }
+      }
+    } catch (error) {
+      throw this.handleError(error);
+    }
+    return resolved;
   }
 
   // ============================================================================

@@ -82,7 +82,6 @@ const { AxiosError, AxiosHeaders } = await vi.importActual<typeof import('axios'
 
 // Mock data
 const mockItem: Item = {
-  id: 1,
   aoid: 12345,
   name: 'Test Item',
   ql: 200,
@@ -206,7 +205,6 @@ describe('API Client', () => {
 
   describe('Spells API', () => {
     const mockSpell: Spell = {
-      id: 1,
       target: 2,
       tick_count: 1,
       tick_interval: 0,

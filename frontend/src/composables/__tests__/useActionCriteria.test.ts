@@ -48,22 +48,16 @@ describe('useActionCriteria composables', () => {
   describe('useActionDisplay', () => {
     const mockActions: Action[] = [
       {
-        id: 1,
         action: 6, // Wield
-        item_id: 123,
-        criteria: [{ id: 1, value1: 112, value2: 356, operator: 2 }],
+        criteria: [{ value1: 112, value2: 356, operator: 2 }],
       },
       {
-        id: 2,
         action: 1, // Get
-        item_id: 123,
         criteria: [],
       },
       {
-        id: 3,
         action: 8, // Attack
-        item_id: 123,
-        criteria: [{ id: 2, value1: 54, value2: 150, operator: 2 }],
+        criteria: [{ value1: 54, value2: 150, operator: 2 }],
       },
     ];
 
@@ -99,7 +93,7 @@ describe('useActionCriteria composables', () => {
 
     beforeEach(() => {
       vi.mocked(parseAction).mockImplementation((action) => {
-        return mockParsedActions.find((p) => p.id === action.id)!;
+        return mockParsedActions.find((p) => p.action === action.action)!;
       });
     });
 
@@ -150,7 +144,7 @@ describe('useActionCriteria composables', () => {
       const actions = ref(actionsWithoutWield);
 
       vi.mocked(parseAction).mockImplementation((action) => {
-        return mockParsedActions.find((p) => p.id === action.id)!;
+        return mockParsedActions.find((p) => p.action === action.action)!;
       });
 
       const { primaryAction } = useActionDisplay(actions);
@@ -169,9 +163,9 @@ describe('useActionCriteria composables', () => {
 
   describe('useCriteriaDisplay', () => {
     const mockCriteria: Criterion[] = [
-      { id: 1, value1: 112, value2: 356, operator: 2 }, // Pistol > 356
-      { id: 2, value1: 54, value2: 150, operator: 2 }, // Level > 150
-      { id: 3, value1: 0, value2: 0, operator: 4 }, // AND
+      { value1: 112, value2: 356, operator: 2 }, // Pistol > 356
+      { value1: 54, value2: 150, operator: 2 }, // Level > 150
+      { value1: 0, value2: 0, operator: 4 }, // AND
     ];
 
     const mockDisplayCriteria = [
@@ -215,7 +209,7 @@ describe('useActionCriteria composables', () => {
 
     beforeEach(() => {
       vi.mocked(transformCriterionForDisplay).mockImplementation((criterion) => {
-        return mockDisplayCriteria.find((d) => d.id === criterion.id)!;
+        return mockDisplayCriteria.find((d) => d.stat === criterion.value1)!;
       });
 
       vi.mocked(parseCriteriaExpression).mockReturnValue({
@@ -328,10 +322,8 @@ describe('useActionCriteria composables', () => {
   describe('useCriteriaEvaluation', () => {
     const mockActions: Action[] = [
       {
-        id: 1,
         action: 6,
-        item_id: 123,
-        criteria: [{ id: 1, value1: 112, value2: 356, operator: 2 }],
+        criteria: [{ value1: 112, value2: 356, operator: 2 }],
       },
     ];
 
@@ -451,9 +443,7 @@ describe('useActionCriteria composables', () => {
   describe('useItemActions', () => {
     const mockActions: Action[] = [
       {
-        id: 1,
         action: 6,
-        item_id: 123,
         criteria: [],
       },
     ];
@@ -463,7 +453,6 @@ describe('useActionCriteria composables', () => {
       const characterStats = ref({ 112: 400 });
 
       vi.mocked(parseAction).mockReturnValue({
-        id: 1,
         action: 6,
         actionName: 'Wield',
         hasRequirements: false,
@@ -519,7 +508,6 @@ describe('useActionCriteria composables', () => {
       });
 
       vi.mocked(transformCriterionForDisplay).mockReturnValue({
-        id: 1,
         stat: 112,
         statName: 'Pistol',
         displayValue: 357,
@@ -540,19 +528,16 @@ describe('useActionCriteria composables', () => {
 
   describe('utility functions', () => {
     const mockAction: Action = {
-      id: 1,
       action: 6,
-      item_id: 123,
       criteria: [
-        { id: 1, value1: 112, value2: 356, operator: 2 },
-        { id: 2, value1: 0, value2: 0, operator: 4 },
+        { value1: 112, value2: 356, operator: 2 },
+        { value1: 0, value2: 0, operator: 4 },
       ],
     };
 
     beforeEach(() => {
       vi.mocked(transformCriterionForDisplay)
         .mockReturnValueOnce({
-          id: 1,
           stat: 112,
           statName: 'Pistol',
           displayValue: 357,
@@ -564,7 +549,6 @@ describe('useActionCriteria composables', () => {
           isStatRequirement: true,
         })
         .mockReturnValueOnce({
-          id: 2,
           stat: 0,
           statName: 'Logical',
           displayValue: 0,
@@ -585,9 +569,7 @@ describe('useActionCriteria composables', () => {
 
       it('should detect actions without stat requirements', () => {
         const actionWithoutStats: Action = {
-          id: 1,
           action: 1,
-          item_id: 123,
           criteria: [],
         };
 
@@ -599,13 +581,12 @@ describe('useActionCriteria composables', () => {
     describe('getMostRestrictiveRequirement', () => {
       it('should find most restrictive requirement for a stat', () => {
         const criteria: Criterion[] = [
-          { id: 1, value1: 112, value2: 300, operator: 2 },
-          { id: 2, value1: 112, value2: 356, operator: 2 },
+          { value1: 112, value2: 300, operator: 2 },
+          { value1: 112, value2: 356, operator: 2 },
         ];
 
         vi.mocked(transformCriterionForDisplay)
           .mockReturnValueOnce({
-            id: 1,
             stat: 112,
             statName: 'Pistol',
             displayValue: 301,
@@ -617,7 +598,6 @@ describe('useActionCriteria composables', () => {
             isStatRequirement: true,
           })
           .mockReturnValueOnce({
-            id: 2,
             stat: 112,
             statName: 'Pistol',
             displayValue: 357,

@@ -46,7 +46,6 @@ describe('PerkBonusCalculator', () => {
   // ==========================================================================
 
   const createValidSpell = (statId: number, amount: number, spellId: number = 53045): Spell => ({
-    id: Math.floor(Math.random() * 10000),
     spell_id: spellId,
     spell_params: {
       Stat: statId,
@@ -56,13 +55,11 @@ describe('PerkBonusCalculator', () => {
   });
 
   const createValidSpellData = (spells: Spell[], event: number = 14): SpellData => ({
-    id: Math.floor(Math.random() * 10000),
     event,
     spells,
   });
 
   const createValidPerkItem = (name: string, aoid: number, spellData: SpellData[] = []): Item => ({
-    id: Math.floor(Math.random() * 10000),
     aoid,
     name,
     ql: 200,
@@ -437,7 +434,6 @@ describe('PerkBonusCalculator', () => {
 
     it('should handle spells with missing parameters', () => {
       const spellWithMissingParams: Spell = {
-        id: Math.floor(Math.random() * 10000),
         spell_id: 53045,
         spell_params: {}, // Empty parameters
         criteria: [],
@@ -459,7 +455,6 @@ describe('PerkBonusCalculator', () => {
 
     it('should handle spells with invalid parameter types', () => {
       const spellWithInvalidParams: Spell = {
-        id: Math.floor(Math.random() * 10000),
         spell_id: 53045,
         // Malformed on purpose: the typed params are numbers
         spell_params: {

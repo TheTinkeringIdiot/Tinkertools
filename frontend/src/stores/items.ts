@@ -101,7 +101,7 @@ export const useItemsStore = defineStore('items', () => {
       if (response.items) {
         // Store individual items in cache
         response.items.forEach((item) => {
-          items.value.set(item.id, item);
+          items.value.set(item.aoid, item);
         });
 
         // Store search results

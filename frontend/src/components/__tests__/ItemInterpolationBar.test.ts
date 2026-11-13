@@ -43,14 +43,13 @@ const BASE_AOID = 12345;
 const DEBOUNCE_MS = 500;
 
 const mockItem: Item = {
-  id: 1,
   aoid: BASE_AOID,
   name: 'Test Weapon',
   ql: 150,
   description: 'A test weapon',
   item_class: 1,
   is_nano: false,
-  stats: [{ id: 1, stat: 1, value: 100 }],
+  stats: [{ stat: 1, value: 100 }],
   spell_data: [],
   actions: [],
   attack_stats: [],
@@ -72,7 +71,6 @@ const mockInfo: InterpolationInfo = {
 };
 
 const mockInterpolatedItem: InterpolatedItem = {
-  id: 1,
   aoid: BASE_AOID,
   name: 'Test Weapon',
   ql: 175,
@@ -83,7 +81,7 @@ const mockInterpolatedItem: InterpolatedItem = {
   target_ql: 175,
   ql_delta: 75,
   ql_delta_full: 99,
-  stats: [{ id: 1, stat: 1, value: 125 }],
+  stats: [{ stat: 1, value: 125 }],
   spell_data: [],
   actions: [],
 };

@@ -64,7 +64,7 @@
     <div v-if="node.children && node.children.length > 0" class="tree-children">
       <CriteriaTreeNode
         v-for="(child, index) in node.children"
-        :key="child.criterion?.id || `${child.type}-${index}`"
+        :key="`${child.type}-${index}`"
         :node="child"
         :character-stats="characterStats"
         :level="node.level + 1"

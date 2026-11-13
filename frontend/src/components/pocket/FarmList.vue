@@ -223,7 +223,7 @@ watch(
             <div class="flex flex-wrap gap-2">
               <Tag
                 v-for="symbiant in farmListSymbiants"
-                :key="symbiant!.id"
+                :key="symbiant!.aoid"
                 severity="info"
                 class="cursor-pointer hover:opacity-80 transition-opacity"
                 @click="handleRemoveSymbiant(symbiant!.aoid!)"
@@ -308,7 +308,7 @@ watch(
                   <div class="flex flex-wrap gap-1">
                     <Tag
                       v-for="symbiant in entry.symbiants"
-                      :key="symbiant.id"
+                      :key="symbiant.aoid"
                       :value="symbiant.name"
                       size="small"
                       severity="secondary"

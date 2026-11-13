@@ -15,10 +15,10 @@ import type { Criterion } from '../../types/api';
 import type { CharacterStats } from '../../composables/useActionCriteria';
 
 // AO operator codes: 0 equal, 1 less than, 2 greater than, 4 AND.
-const PISTOL_OVER_356: Criterion = { id: 1, value1: 112, value2: 356, operator: 2 };
-const LEVEL_OVER_150: Criterion = { id: 2, value1: 54, value2: 150, operator: 2 };
-const AGILITY_OVER_199: Criterion = { id: 3, value1: 17, value2: 199, operator: 2 };
-const AND: Criterion = { id: 4, value1: 0, value2: 0, operator: 4 };
+const PISTOL_OVER_356: Criterion = { value1: 112, value2: 356, operator: 2 };
+const LEVEL_OVER_150: Criterion = { value1: 54, value2: 150, operator: 2 };
+const AGILITY_OVER_199: Criterion = { value1: 17, value2: 199, operator: 2 };
+const AND: Criterion = { value1: 0, value2: 0, operator: 4 };
 
 function mountDisplay(props: {
   criteria: Criterion[];

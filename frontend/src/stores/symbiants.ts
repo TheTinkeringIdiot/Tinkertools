@@ -12,6 +12,12 @@ import { toUserFriendlyError } from '../services/error-message';
 import { enrichSymbiant } from '../utils/symbiantHelpers';
 import { get, set, del } from 'idb-keyval';
 import {
+  emptyAoidList,
+  migratePendingIds,
+  parseAoidList,
+  serializeAoidList,
+} from '../services/legacy-id-migration';
+import {
   versionKey,
   activeVersionSlug,
   browsingVersionSlug,
@@ -30,18 +36,14 @@ interface AggregatedBoss {
   farmed: boolean;
 }
 
-interface FarmListStorage {
-  aoids: number[];
-  version: 2; // Bumped version for AOID migration
-}
-
 interface FarmProgressStorage {
   farmedBossIds: number[];
   version: 1;
 }
 
-// LocalStorage key bases. Farm lists hold AOIDs and farm progress holds boss
-// ids, so both are per game version; the slug is appended at read/write time.
+// LocalStorage key bases. Farm lists hold AOIDs and farm progress holds ids of
+// the curated boss records (not items), so both are per game version; the slug
+// is appended at read/write time.
 const FARM_LIST_BASE = 'tinkertools-farm-list';
 const FARM_PROGRESS_BASE = 'tinkertools-farm-progress';
 
@@ -61,11 +63,19 @@ interface SymbiantCacheEntry {
   gameVersion?: string;
 }
 
+/** The internal symbiant ids of a farm list in its first format, else null */
+function legacyFarmListIds(value: unknown): number[] | null {
+  if (!value || typeof value !== 'object') return null;
+  const ids = (value as { symbiantIds?: unknown }).symbiantIds;
+  return Array.isArray(ids) && ids.every((id) => typeof id === 'number') ? ids : null;
+}
+
 export const useSymbiantsStore = defineStore('symbiants', () => {
   // ============================================================================
   // State
   // ============================================================================
 
+  /** Every symbiant of the active version, by AOID */
   const symbiants = ref(new Map<number, Symbiant>());
   const loading = ref(false);
   const error = ref<UserFriendlyError | null>(null);
@@ -84,10 +94,12 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
 
   // Farm List state (uses AOID for stability)
   const farmListAoids = ref<number[]>([]);
+  /** Farm list entries stored as internal ids before AOIDs, not yet migrated */
+  let pendingFarmListIds: number[] = [];
   const farmedBossIds = ref<Set<number>>(new Set());
   const farmListLoading = ref(false);
   const aggregatedBosses = ref<Map<number, AggregatedBoss>>(new Map());
-  const bossDropCache = ref<Map<number, Mob[]>>(new Map()); // keyed by internal ID
+  const bossDropCache = ref<Map<number, Mob[]>>(new Map()); // keyed by symbiant AOID
 
   // ============================================================================
   // Getters
@@ -95,8 +107,9 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
 
   const allSymbiants = computed(() => Array.from(symbiants.value.values()));
 
-  const symbiantsById = computed(
-    () => (ids: number[]) => ids.map((id) => symbiants.value.get(id)).filter(Boolean) as Symbiant[]
+  const symbiantsByAoid = computed(
+    () => (aoids: number[]) =>
+      aoids.map((aoid) => symbiants.value.get(aoid)).filter(Boolean) as Symbiant[]
   );
 
   const symbiantsByFamily = computed(
@@ -169,7 +182,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
             // Populate Pinia store from cached data
             symbiants.value.clear();
             cached.data.forEach((symbiant) => {
-              symbiants.value.set(symbiant.id, symbiant);
+              symbiants.value.set(symbiant.aoid, symbiant);
             });
             lastFetch.value = cached.timestamp;
 
@@ -235,7 +248,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
       // Clear old data and store new data in Pinia
       symbiants.value.clear();
       allSymbiantsData.forEach((symbiant) => {
-        symbiants.value.set(symbiant.id, symbiant);
+        symbiants.value.set(symbiant.aoid, symbiant);
       });
 
       lastFetch.value = Date.now();
@@ -264,23 +277,23 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
   }
 
   /**
-   * Get a single symbiant by ID
+   * Get a single symbiant by AOID
    */
-  async function getSymbiant(id: number, forceRefresh = false): Promise<Symbiant | null> {
+  async function getSymbiant(aoid: number, forceRefresh = false): Promise<Symbiant | null> {
     // Check cache first
-    if (!forceRefresh && symbiants.value.has(id)) {
-      return symbiants.value.get(id) || null;
+    if (!forceRefresh && symbiants.value.has(aoid)) {
+      return symbiants.value.get(aoid) || null;
     }
 
     loading.value = true;
     error.value = null;
 
     try {
-      const response = await apiClient.getSymbiant(id);
+      const response = await apiClient.getSymbiant(aoid);
 
       if (response.data) {
         const enriched = enrichSymbiant(response.data);
-        symbiants.value.set(id, enriched);
+        symbiants.value.set(aoid, enriched);
         lastFetch.value = Date.now();
         return enriched;
       } else {
@@ -298,7 +311,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
    * Get symbiant by AOID (game ID)
    */
   function getSymbiantByAoid(aoid: number): Symbiant | null {
-    return allSymbiants.value.find((symbiant) => symbiant.aoid === aoid) || null;
+    return symbiants.value.get(aoid) || null;
   }
 
   /**
@@ -357,6 +370,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     lastFetch.value = 0;
     error.value = null;
     farmListAoids.value = [];
+    pendingFarmListIds = [];
     farmedBossIds.value = new Set();
     aggregatedBosses.value.clear();
     bossDropCache.value.clear();
@@ -409,11 +423,11 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
   }
 
   /**
-   * Remove symbiant by ID from comparison
+   * Remove symbiant by AOID from comparison
    */
-  function removeFromComparison(symbiantId: number): void {
+  function removeFromComparison(aoid: number): void {
     const index = selectedForComparison.value.findIndex(
-      (slot) => slot !== null && slot.id === symbiantId
+      (slot) => slot !== null && slot.aoid === aoid
     );
     if (index !== -1) {
       selectedForComparison.value[index] = null;
@@ -431,9 +445,9 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
    * Check if symbiant is in comparison
    * Returns slot index (0-2) or null if not found
    */
-  function isInComparison(symbiantId: number): number | null {
+  function isInComparison(aoid: number): number | null {
     const index = selectedForComparison.value.findIndex(
-      (slot) => slot !== null && slot.id === symbiantId
+      (slot) => slot !== null && slot.aoid === aoid
     );
     return index !== -1 ? index : null;
   }
@@ -479,6 +493,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
    */
   function clearFarmList(): void {
     farmListAoids.value = [];
+    pendingFarmListIds = [];
     farmedBossIds.value.clear();
     aggregatedBosses.value.clear();
     saveFarmList();
@@ -541,7 +556,6 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
       const bossMap = new Map<number, AggregatedBoss>();
 
       for (const aoid of farmListAoids.value) {
-        // Look up symbiant by AOID to get internal ID for API call
         const symbiant = getSymbiantByAoid(aoid);
         console.log(
           '[FarmList] Processing AOID:',
@@ -552,15 +566,13 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
 
         if (!symbiant) continue;
 
-        // Check cache first (keyed by internal ID)
-        let bosses = bossDropCache.value.get(symbiant.id);
+        let bosses = bossDropCache.value.get(aoid);
 
         if (!bosses) {
-          // Fetch from API using internal ID
-          const response = await apiClient.getSymbiantDroppedBy(symbiant.id);
+          const response = await apiClient.getSymbiantDroppedBy(aoid);
           bosses = response.data || [];
           console.log('[FarmList] API returned bosses:', bosses);
-          bossDropCache.value.set(symbiant.id, bosses);
+          bossDropCache.value.set(aoid, bosses);
         }
 
         for (const boss of bosses) {
@@ -573,7 +585,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
           }
           // Add symbiant to this boss's list if not already there
           const entry = bossMap.get(boss.id)!;
-          if (!entry.symbiants.some((s) => s.id === symbiant.id)) {
+          if (!entry.symbiants.some((s) => s.aoid === aoid)) {
             entry.symbiants.push(symbiant);
           }
         }
@@ -590,36 +602,55 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
    * Save farm list to localStorage (using AOIDs)
    */
   function saveFarmList(): void {
-    const data: FarmListStorage = {
-      aoids: farmListAoids.value,
-      version: 2,
-    };
-    localStorage.setItem(userDataKey(FARM_LIST_BASE), JSON.stringify(data));
+    localStorage.setItem(
+      userDataKey(FARM_LIST_BASE),
+      serializeAoidList({ aoids: farmListAoids.value, pendingInternalIds: pendingFarmListIds })
+    );
   }
 
+  /** Settles when the farm list loaded last has been migrated to AOIDs */
+  let farmListMigration: Promise<void> = Promise.resolve();
+
   /**
-   * Load farm list from localStorage
-   * Handles migration from old format (version 1 with IDs) by clearing
+   * Load farm list from localStorage. A list in the first format (version 1,
+   * internal symbiant ids) is migrated in the background (see
+   * legacy-id-migration.ts) and joins the list once the backend has resolved it.
    */
   function loadFarmList(): void {
+    let stored = emptyAoidList();
+    const slug = browsingVersionSlug();
     try {
-      adoptLegacyKey(FARM_LIST_BASE, browsingVersionSlug());
-      const saved = localStorage.getItem(userDataKey(FARM_LIST_BASE));
-      if (saved) {
-        const data = JSON.parse(saved);
-        // Check version - if old format, clear it
-        if (data.version === 2 && data.aoids) {
-          farmListAoids.value = data.aoids;
-        } else {
-          // Old format with symbiantIds - clear and start fresh
-          console.log('[SymbiantsStore] Migrating farm list to AOID format');
-          farmListAoids.value = [];
-          saveFarmList(); // Save empty list in new format
-        }
-      }
+      adoptLegacyKey(FARM_LIST_BASE, slug);
+      stored = parseAoidList(localStorage.getItem(userDataKey(FARM_LIST_BASE)), legacyFarmListIds);
     } catch (error) {
       console.error('[SymbiantsStore] Failed to load farm list:', error);
     }
+    farmListAoids.value = stored.aoids;
+    pendingFarmListIds = stored.pendingInternalIds;
+
+    farmListMigration = migratePendingIds(stored, {
+      storageKey: userDataKey(FARM_LIST_BASE),
+      base: FARM_LIST_BASE,
+      slug,
+    }).then((migrated) => {
+      // Another version's farm list may have been loaded meanwhile
+      if (!migrated || browsingVersionSlug() !== slug) return;
+      // Cleared while the lookup was running: the clear stands
+      if (pendingFarmListIds.length === 0) {
+        saveFarmList();
+        return;
+      }
+      // Keep what the user added while the lookup was running
+      const added = farmListAoids.value.filter((aoid) => !migrated.aoids.includes(aoid));
+      farmListAoids.value = [...migrated.aoids, ...added];
+      pendingFarmListIds = [];
+      if (added.length > 0) saveFarmList();
+    });
+  }
+
+  /** For callers that need the migrated farm list, not just what is loaded so far */
+  function farmListReady(): Promise<void> {
+    return farmListMigration;
   }
 
   /**
@@ -714,7 +745,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
 
     // Getters
     allSymbiants,
-    symbiantsById,
+    symbiantsByAoid,
     symbiantsByFamily,
     symbiantFamilies,
     symbiantsCount,
@@ -748,6 +779,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     getFarmListCount,
     aggregateBossesForFarmList,
     loadFarmList,
+    farmListReady,
     loadFarmProgress,
     exportFarmListToUrl,
     importFarmListFromUrl,
