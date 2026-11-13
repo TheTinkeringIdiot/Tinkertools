@@ -291,8 +291,8 @@ function handleClearComparison() {
   symbiantsStore.clearComparison();
 }
 
-function isSymbiantInComparison(symbiantId: number): boolean {
-  return symbiantsStore.isInComparison(symbiantId) !== null;
+function isSymbiantInComparison(aoid: number): boolean {
+  return symbiantsStore.isInComparison(aoid) !== null;
 }
 
 function handleAddToFarmList(symbiant: SymbiantItem) {
@@ -626,7 +626,7 @@ watch(
         <div v-if="filteredSymbiants.length > 0" class="space-y-2">
           <div
             v-for="symbiant in filteredSymbiants"
-            :key="symbiant.id"
+            :key="symbiant.aoid"
             class="symbiant-card flex items-center gap-4 p-4 bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-lg cursor-pointer transition-all duration-200"
             @click="navigateToItem(symbiant.aoid)"
           >
@@ -652,9 +652,11 @@ watch(
             <div class="flex gap-1">
               <!-- Compare Button -->
               <Button
-                v-tooltip="isSymbiantInComparison(symbiant.id) ? 'In comparison' : 'Add to compare'"
-                :icon="isSymbiantInComparison(symbiant.id) ? 'pi pi-check' : 'pi pi-clone'"
-                :severity="isSymbiantInComparison(symbiant.id) ? 'success' : 'secondary'"
+                v-tooltip="
+                  isSymbiantInComparison(symbiant.aoid) ? 'In comparison' : 'Add to compare'
+                "
+                :icon="isSymbiantInComparison(symbiant.aoid) ? 'pi pi-check' : 'pi pi-clone'"
+                :severity="isSymbiantInComparison(symbiant.aoid) ? 'success' : 'secondary'"
                 size="small"
                 outlined
                 @click.stop="handleAddToComparison(symbiant)"

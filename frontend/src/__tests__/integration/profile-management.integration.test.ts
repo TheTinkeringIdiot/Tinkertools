@@ -50,9 +50,7 @@ function batchResponse(results: BatchInterpolateItemResult[]): BatchInterpolatio
   return { success: true, results, errors: [] };
 }
 
-function interpolatedItem(
-  item: Pick<InterpolatedItem, 'id' | 'aoid' | 'name' | 'ql'>
-): InterpolatedItem {
+function interpolatedItem(item: Pick<InterpolatedItem, 'aoid' | 'name' | 'ql'>): InterpolatedItem {
   return {
     ...item,
     is_nano: false,
@@ -330,7 +328,6 @@ describe('Profile Management Integration', () => {
 
       // Add some equipment
       profile.Clothing['Chest'] = {
-        id: 1,
         aoid: 12345,
         name: 'Test Armor',
         ql: 100,
@@ -586,7 +583,7 @@ describe('Profile Management Integration', () => {
             aoid: 246660,
             target_ql: 300,
             success: true,
-            item: interpolatedItem({ id: 1, aoid: 246660, name: 'Test Item', ql: 300 }),
+            item: interpolatedItem({ aoid: 246660, name: 'Test Item', ql: 300 }),
             error: null,
           },
         ])
@@ -910,11 +907,11 @@ describe('Profile Management Integration', () => {
         gameVersion: PRK,
         Weapons: {
           ...source!.Weapons,
-          RHand: createTestItem({ id: 1, aoid: 2001, name: 'PRK Rifle', ql: 200 }),
+          RHand: createTestItem({ aoid: 2001, name: 'PRK Rifle', ql: 200 }),
         },
         Clothing: {
           ...source!.Clothing,
-          Head: createTestItem({ id: 2, aoid: 2002, name: 'PRK Helmet', ql: 150 }),
+          Head: createTestItem({ aoid: 2002, name: 'PRK Helmet', ql: 150 }),
         },
       });
       await waitForUpdates();
@@ -929,7 +926,6 @@ describe('Profile Management Integration', () => {
                   target_ql: req.targetQl,
                   success: true,
                   item: interpolatedItem({
-                    id: 99,
                     aoid: req.aoid,
                     name: 'Live Rifle',
                     ql: req.targetQl,

@@ -69,14 +69,12 @@ const requirementAt = (ql: number) => 5 * ql;
 
 function otekAt(aoid: number, ql: number): Item {
   return createWeaponItem({
-    id: aoid,
     aoid,
     name: 'Otek Slicer',
     ql,
-    stats: [createStatValue(QL_STAT, ql, 1), createStatValue(DAMAGE_STAT, damageAt(ql), 2)],
+    stats: [createStatValue(QL_STAT, ql), createStatValue(DAMAGE_STAT, damageAt(ql))],
     actions: [
       createAction({
-        id: 1,
         action: WIELD_ACTION,
         criteria: [createCriterion(ONE_HAND_EDGED, requirementAt(ql), 2, 1)],
       }),

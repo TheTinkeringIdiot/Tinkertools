@@ -405,7 +405,7 @@ Displays comprehensive nano information including effects, requirements, and com
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { computed } from 'vue';
 import Avatar from 'primevue/avatar';
 import Badge from 'primevue/badge';
 import Button from 'primevue/button';
@@ -418,6 +418,7 @@ import CriteriaDisplay from '@/components/CriteriaDisplay.vue';
 import CriterionReference from '@/components/CriterionReference.vue';
 import { getNanoCompatibility, getNanoUseAction } from './nano-compatibility';
 import { schoolAvatarClass, schoolInitials } from './nano-schools';
+import { useNanosStore } from '@/stores/nanosStore';
 import { mapProfileToStats } from '@/utils/profile-stats-mapper';
 import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import type { NanoProgram, NanoEffect, EffectDuration, TargetingData } from '@/types/nano';
@@ -445,7 +446,8 @@ const emit = defineEmits<{
 }>();
 
 // Reactive state
-const isFavorite = ref(false);
+const nanosStore = useNanosStore();
+const isFavorite = computed(() => !!props.nano && nanosStore.isFavorite(props.nano.aoid));
 
 // Computed
 const avatarClass = computed(() => schoolAvatarClass(props.nano?.school));
@@ -567,40 +569,7 @@ const getEffectSeverity = (type: string): string => {
 };
 
 const toggleFavorite = () => {
-  if (!props.nano) return;
-
-  isFavorite.value = !isFavorite.value;
-
-  try {
-    const favorites = JSON.parse(localStorage.getItem('tinkertools_nano_favorites') || '[]');
-    const nanoId = props.nano.id;
-
-    if (isFavorite.value) {
-      if (!favorites.includes(nanoId)) {
-        favorites.push(nanoId);
-      }
-    } else {
-      const index = favorites.indexOf(nanoId);
-      if (index > -1) {
-        favorites.splice(index, 1);
-      }
-    }
-
-    localStorage.setItem('tinkertools_nano_favorites', JSON.stringify(favorites));
-  } catch (error) {
-    console.warn('Failed to save favorite status:', error);
-  }
-};
-
-const loadFavoriteStatus = () => {
-  if (!props.nano) return;
-
-  try {
-    const favorites = JSON.parse(localStorage.getItem('tinkertools_nano_favorites') || '[]');
-    isFavorite.value = favorites.includes(props.nano.id);
-  } catch (error) {
-    console.warn('Failed to load favorite status:', error);
-  }
+  if (props.nano) nanosStore.toggleFavorite(props.nano.aoid);
 };
 
 const handleVisibilityChange = (visible: boolean) => {
@@ -610,17 +579,6 @@ const handleVisibilityChange = (visible: boolean) => {
 const handleClose = () => {
   emit('close');
 };
-
-// Watch for nano changes
-watch(
-  () => props.nano,
-  () => {
-    if (props.nano) {
-      loadFavoriteStatus();
-    }
-  },
-  { immediate: true }
-);
 </script>
 
 <style scoped>

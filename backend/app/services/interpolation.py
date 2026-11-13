@@ -447,7 +447,6 @@ class InterpolationService:
         if hasattr(item, "item_stats") and item.item_stats:
             return [
                 {
-                    "id": item_stat.stat_value.id,
                     "stat": item_stat.stat_value.stat,
                     "value": item_stat.stat_value.value,
                 }
@@ -462,10 +461,7 @@ class InterpolationService:
             .all()
         )
 
-        return [
-            {"id": stat.id, "stat": stat.stat, "value": stat.value}
-            for stat in item_stats
-        ]
+        return [{"stat": stat.stat, "value": stat.value} for stat in item_stats]
 
     def _interpolate_stats(
         self, lo_item: Item, hi_item: Optional[Item], interpolated: InterpolatedItem
@@ -499,7 +495,7 @@ class InterpolationService:
                 new_value = interpolated.interpolate_value(
                     lo_stat["value"], hi_stat["value"]
                 )
-                new_stat = {"id": lo_stat["id"], "stat": stat_id, "value": new_value}
+                new_stat = {"stat": stat_id, "value": new_value}
                 interpolated_stats.append(new_stat)
             else:
                 # Use low value for non-interpolatable stats
@@ -760,7 +756,6 @@ class InterpolationService:
                         criterion = ac.criterion
                         criteria_dicts.append(
                             {
-                                "id": criterion.id,
                                 "value1": criterion.value1,
                                 "value2": criterion.value2,
                                 "operator": criterion.operator,
@@ -790,7 +785,6 @@ class InterpolationService:
             for criterion in criteria_data:
                 criteria_dicts.append(
                     {
-                        "id": criterion.id,
                         "value1": criterion.value1,
                         "value2": criterion.value2,
                         "operator": criterion.operator,
@@ -868,7 +862,6 @@ class InterpolationService:
                     lo_crit["value2"], hi_crit["value2"]
                 )
                 new_criterion = {
-                    "id": lo_crit["id"],
                     "value1": lo_crit["value1"],
                     "value2": new_value2,
                     "operator": lo_crit["operator"],

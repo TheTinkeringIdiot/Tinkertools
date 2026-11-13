@@ -30,7 +30,6 @@ const mockGetItem = vi.mocked(apiClient.getItem);
 
 function statCriterion(overrides: Partial<DisplayCriterion> = {}): DisplayCriterion {
   return {
-    id: 1,
     stat: 112,
     statName: 'Pistol',
     displayValue: 357,
@@ -56,7 +55,7 @@ function mountChip(props: {
 
 /** A criterion as the real parser turns a raw (value1, value2, operator) row into one */
 function parsed(value1: number, value2: number, operator: number): DisplayCriterion {
-  return transformCriterionForDisplay({ id: 1, value1, value2, operator });
+  return transformCriterionForDisplay({ value1, value2, operator });
 }
 
 /** Rendered text with whitespace runs collapsed, as the browser displays it. */

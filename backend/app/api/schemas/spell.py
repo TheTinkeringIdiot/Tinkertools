@@ -4,7 +4,7 @@ Pydantic schemas for Spell models.
 
 from typing import Optional, List, Any, Union, Dict
 from pydantic import BaseModel, Field
-from .criterion import CriterionResponse
+from .criterion import CriterionResponse, ItemCriterionResponse
 
 
 class SpellBase(BaseModel):
@@ -46,12 +46,25 @@ class SpellWithCriteria(SpellResponse):
         from_attributes = True
 
 
-class SpellDataResponse(BaseModel):
-    """Schema for SpellData responses."""
+class ItemSpellResponse(SpellBase):
+    """A spell effect as embedded in an item: its content only, no row id.
 
-    id: int = Field(description="Spell Data ID")
+    ``spell_id`` is the game's effect type, not a row id.
+    """
+
+    criteria: List[ItemCriterionResponse] = Field(
+        default_factory=list, description="Spell criteria"
+    )
+
+    class Config:
+        from_attributes = True
+
+
+class SpellDataResponse(BaseModel):
+    """Schema for SpellData responses (an item's effects for one event)."""
+
     event: Optional[int] = Field(None, description="Event trigger")
-    spells: List[SpellWithCriteria] = Field(
+    spells: List[ItemSpellResponse] = Field(
         default_factory=list, description="Spells in this spell data"
     )
 

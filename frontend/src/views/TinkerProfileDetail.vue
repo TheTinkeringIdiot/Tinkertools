@@ -568,7 +568,7 @@ async function handleEquipmentChange() {
 // Handle buff removal events
 async function handleRemoveBuff(buff: Item) {
   try {
-    await profilesStore.removeBuff(buff.id);
+    await profilesStore.removeBuff(buff.aoid);
   } catch (err) {
     console.error('Failed to remove buff:', err);
     error.value = err instanceof Error ? err.message : 'Failed to remove buff';

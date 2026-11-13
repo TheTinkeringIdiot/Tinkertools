@@ -38,10 +38,10 @@ from app.services.interpolation import InterpolationService
 from app.api.schemas import (
     ItemDetail,
     SpellDataResponse,
-    SpellWithCriteria,
+    ItemSpellResponse,
     ActionResponse,
-    CriterionResponse,
-    StatValueResponse,
+    ItemCriterionResponse,
+    ItemStatResponse,
     SourceResponse,
     SourceTypeResponse,
     ItemSourceResponse,
@@ -79,8 +79,7 @@ def build_item_detail(item: Item, db: Session) -> ItemDetail:
 
             # Get criteria for this spell
             criteria = [
-                CriterionResponse(
-                    id=sc.criterion.id,
+                ItemCriterionResponse(
                     value1=sc.criterion.value1,
                     value2=sc.criterion.value2,
                     operator=sc.criterion.operator,
@@ -89,8 +88,7 @@ def build_item_detail(item: Item, db: Session) -> ItemDetail:
             ]
 
             spells_with_criteria.append(
-                SpellWithCriteria(
-                    id=spell.id,
+                ItemSpellResponse(
                     target=spell.target,
                     tick_count=spell.tick_count,
                     tick_interval=spell.tick_interval,
@@ -102,9 +100,7 @@ def build_item_detail(item: Item, db: Session) -> ItemDetail:
             )
 
         spell_data_list.append(
-            SpellDataResponse(
-                id=spell_data.id, event=spell_data.event, spells=spells_with_criteria
-            )
+            SpellDataResponse(event=spell_data.event, spells=spells_with_criteria)
         )
 
     # Get attack/defense stats from preloaded data
@@ -119,8 +115,7 @@ def build_item_detail(item: Item, db: Session) -> ItemDetail:
     actions = []
     for action in item.actions:
         criteria = [
-            CriterionResponse(
-                id=ac.criterion.id,
+            ItemCriterionResponse(
                 value1=ac.criterion.value1,
                 value2=ac.criterion.value2,
                 operator=ac.criterion.operator,
@@ -130,9 +125,7 @@ def build_item_detail(item: Item, db: Session) -> ItemDetail:
 
         actions.append(
             ActionResponse(
-                id=action.id,
                 action=action.action,
-                item_id=action.item_id,
                 criteria=criteria,
             )
         )
@@ -171,18 +164,15 @@ def build_item_detail(item: Item, db: Session) -> ItemDetail:
             )
         )
 
-    # Convert stats to StatValueResponse objects
+    # Convert stats to ItemStatResponse objects
     stats_response = [
-        StatValueResponse(id=stat.id, stat=stat.stat, value=stat.value)
-        for stat in stats
+        ItemStatResponse(stat=stat.stat, value=stat.value) for stat in stats
     ]
     attack_stats_response = [
-        StatValueResponse(id=stat.id, stat=stat.stat, value=stat.value)
-        for stat in attack_stats
+        ItemStatResponse(stat=stat.stat, value=stat.value) for stat in attack_stats
     ]
     defense_stats_response = [
-        StatValueResponse(id=stat.id, stat=stat.stat, value=stat.value)
-        for stat in defense_stats
+        ItemStatResponse(stat=stat.stat, value=stat.value) for stat in defense_stats
     ]
 
     return ItemDetail(
@@ -206,7 +196,7 @@ def build_item_details_bulk(items: List[Item], db: Session) -> List[ItemDetail]:
     """
     Build ItemDetail responses for multiple items with optimized caching.
 
-    Caches StatValueResponse objects to avoid creating duplicate response objects
+    Caches ItemStatResponse objects to avoid creating duplicate response objects
     for stat_values that appear across multiple items (e.g., common attack stats).
 
     Args:
@@ -223,10 +213,10 @@ def build_item_details_bulk(items: List[Item], db: Session) -> List[ItemDetail]:
     stat_value_cache = {}
 
     def get_stat_response(stat_value):
-        """Get cached StatValueResponse or create and cache new one."""
+        """Get cached ItemStatResponse or create and cache new one."""
         if stat_value.id not in stat_value_cache:
-            stat_value_cache[stat_value.id] = StatValueResponse(
-                id=stat_value.id, stat=stat_value.stat, value=stat_value.value
+            stat_value_cache[stat_value.id] = ItemStatResponse(
+                stat=stat_value.stat, value=stat_value.value
             )
         return stat_value_cache[stat_value.id]
 
@@ -248,8 +238,7 @@ def build_item_details_bulk(items: List[Item], db: Session) -> List[ItemDetail]:
 
                 # Get criteria for this spell
                 criteria = [
-                    CriterionResponse(
-                        id=sc.criterion.id,
+                    ItemCriterionResponse(
                         value1=sc.criterion.value1,
                         value2=sc.criterion.value2,
                         operator=sc.criterion.operator,
@@ -258,8 +247,7 @@ def build_item_details_bulk(items: List[Item], db: Session) -> List[ItemDetail]:
                 ]
 
                 spells_with_criteria.append(
-                    SpellWithCriteria(
-                        id=spell.id,
+                    ItemSpellResponse(
                         target=spell.target,
                         tick_count=spell.tick_count,
                         tick_interval=spell.tick_interval,
@@ -272,7 +260,6 @@ def build_item_details_bulk(items: List[Item], db: Session) -> List[ItemDetail]:
 
             spell_data_list.append(
                 SpellDataResponse(
-                    id=spell_data.id,
                     event=spell_data.event,
                     spells=spells_with_criteria,
                 )
@@ -292,8 +279,7 @@ def build_item_details_bulk(items: List[Item], db: Session) -> List[ItemDetail]:
         actions = []
         for action in item.actions:
             criteria = [
-                CriterionResponse(
-                    id=ac.criterion.id,
+                ItemCriterionResponse(
                     value1=ac.criterion.value1,
                     value2=ac.criterion.value2,
                     operator=ac.criterion.operator,
@@ -303,9 +289,7 @@ def build_item_details_bulk(items: List[Item], db: Session) -> List[ItemDetail]:
 
             actions.append(
                 ActionResponse(
-                    id=action.id,
                     action=action.action,
-                    item_id=action.item_id,
                     criteria=criteria,
                 )
             )
@@ -344,7 +328,7 @@ def build_item_details_bulk(items: List[Item], db: Session) -> List[ItemDetail]:
                 )
             )
 
-        # Convert stats to StatValueResponse objects using cache
+        # Convert stats to ItemStatResponse objects using cache
         stats_response = [get_stat_response(stat) for stat in stats]
         attack_stats_response = [get_stat_response(stat) for stat in attack_stats]
         defense_stats_response = [get_stat_response(stat) for stat in defense_stats]

@@ -18,12 +18,12 @@ import { WEAPON_STAT_IDS, INITIATIVE_IDS } from '@/types/weapon-analysis';
 describe('Weapon Speed Calculations', () => {
   it('calculates base weapon speeds with aggdef modifier', () => {
     const weapon: WeaponCandidate = {
-      id: 1,
+      aoid: 1,
       name: 'Test Weapon',
       is_nano: false,
       stats: [
-        { id: 1, stat: WEAPON_STAT_IDS.ATTACK_DELAY, value: 200 }, // 2 seconds
-        { id: 2, stat: WEAPON_STAT_IDS.RECHARGE_DELAY, value: 300 }, // 3 seconds
+        { stat: WEAPON_STAT_IDS.ATTACK_DELAY, value: 200 }, // 2 seconds
+        { stat: WEAPON_STAT_IDS.RECHARGE_DELAY, value: 300 }, // 3 seconds
       ],
       spell_data: [],
       actions: [],
@@ -65,12 +65,12 @@ describe('Weapon Speed Calculations', () => {
 
   it('applies aggdef modifier correctly', () => {
     const weapon: WeaponCandidate = {
-      id: 1,
+      aoid: 1,
       name: 'Test Weapon',
       is_nano: false,
       stats: [
-        { id: 1, stat: WEAPON_STAT_IDS.ATTACK_DELAY, value: 200 },
-        { id: 2, stat: WEAPON_STAT_IDS.RECHARGE_DELAY, value: 300 },
+        { stat: WEAPON_STAT_IDS.ATTACK_DELAY, value: 200 },
+        { stat: WEAPON_STAT_IDS.RECHARGE_DELAY, value: 300 },
       ],
       spell_data: [],
       actions: [],
@@ -113,13 +113,13 @@ describe('Weapon Speed Calculations', () => {
 
   it('applies initiative bonus correctly', () => {
     const weapon: WeaponCandidate = {
-      id: 1,
+      aoid: 1,
       name: 'Melee Weapon',
       is_nano: false,
       stats: [
-        { id: 1, stat: WEAPON_STAT_IDS.ATTACK_DELAY, value: 200 },
-        { id: 2, stat: WEAPON_STAT_IDS.RECHARGE_DELAY, value: 300 },
-        { id: 3, stat: WEAPON_STAT_IDS.INITIATIVE_TYPE, value: INITIATIVE_IDS.MELEE_INIT },
+        { stat: WEAPON_STAT_IDS.ATTACK_DELAY, value: 200 },
+        { stat: WEAPON_STAT_IDS.RECHARGE_DELAY, value: 300 },
+        { stat: WEAPON_STAT_IDS.INITIATIVE_TYPE, value: INITIATIVE_IDS.MELEE_INIT },
       ],
       spell_data: [],
       actions: [],
@@ -162,13 +162,13 @@ describe('Weapon Speed Calculations', () => {
 
   it('enforces minimum attack times', () => {
     const weapon: WeaponCandidate = {
-      id: 1,
+      aoid: 1,
       name: 'Fast Weapon',
       is_nano: false,
       stats: [
-        { id: 1, stat: WEAPON_STAT_IDS.ATTACK_DELAY, value: 100 },
-        { id: 2, stat: WEAPON_STAT_IDS.RECHARGE_DELAY, value: 100 },
-        { id: 3, stat: WEAPON_STAT_IDS.INITIATIVE_TYPE, value: INITIATIVE_IDS.MELEE_INIT },
+        { stat: WEAPON_STAT_IDS.ATTACK_DELAY, value: 100 },
+        { stat: WEAPON_STAT_IDS.RECHARGE_DELAY, value: 100 },
+        { stat: WEAPON_STAT_IDS.INITIATIVE_TYPE, value: INITIATIVE_IDS.MELEE_INIT },
       ],
       spell_data: [],
       actions: [],
@@ -212,14 +212,14 @@ describe('Weapon Speed Calculations', () => {
 describe('AR Bonus Calculations', () => {
   it('calculates AR bonus for low attack skill', () => {
     const weapon: WeaponCandidate = {
-      id: 1,
+      aoid: 1,
       name: 'Test Weapon',
       is_nano: false,
       stats: [],
       spell_data: [],
       actions: [],
       attack_stats: [
-        { id: 1, stat: 112, value: 100 }, // 100% pistol
+        { stat: 112, value: 100 }, // 100% pistol
       ],
       defense_stats: [],
       equipable: true,
@@ -259,14 +259,14 @@ describe('AR Bonus Calculations', () => {
 
   it('calculates AR bonus for high attack skill (tiered formula)', () => {
     const weapon: WeaponCandidate = {
-      id: 1,
+      aoid: 1,
       name: 'Test Weapon',
       is_nano: false,
       stats: [],
       spell_data: [],
       actions: [],
       attack_stats: [
-        { id: 1, stat: 112, value: 100 }, // 100% pistol
+        { stat: 112, value: 100 }, // 100% pistol
       ],
       defense_stats: [],
       equipable: true,
@@ -308,15 +308,15 @@ describe('AR Bonus Calculations', () => {
 
   it('respects AR cap for MBS weapons', () => {
     const weapon: WeaponCandidate = {
-      id: 1,
+      aoid: 1,
       name: 'MBS Weapon',
       is_nano: false,
       stats: [
-        { id: 1, stat: WEAPON_STAT_IDS.AR_CAP, value: 1200 }, // AR cap at 1200
+        { stat: WEAPON_STAT_IDS.AR_CAP, value: 1200 }, // AR cap at 1200
       ],
       spell_data: [],
       actions: [],
-      attack_stats: [{ id: 1, stat: 112, value: 100 }],
+      attack_stats: [{ stat: 112, value: 100 }],
       defense_stats: [],
       equipable: true,
     };
@@ -359,19 +359,19 @@ describe('AR Bonus Calculations', () => {
 describe('Base Damage Over 60s Calculations', () => {
   it('calculates basic damage over 60s without crits', () => {
     const weapon: WeaponCandidate = {
-      id: 1,
+      aoid: 1,
       name: 'Test Weapon',
       is_nano: false,
       stats: [
-        { id: 1, stat: WEAPON_STAT_IDS.ATTACK_DELAY, value: 200 },
-        { id: 2, stat: WEAPON_STAT_IDS.RECHARGE_DELAY, value: 300 },
-        { id: 3, stat: WEAPON_STAT_IDS.MIN_DAMAGE, value: 100 },
-        { id: 4, stat: WEAPON_STAT_IDS.MAX_DAMAGE, value: 200 },
-        { id: 5, stat: WEAPON_STAT_IDS.CRITICAL_BONUS, value: 50 },
+        { stat: WEAPON_STAT_IDS.ATTACK_DELAY, value: 200 },
+        { stat: WEAPON_STAT_IDS.RECHARGE_DELAY, value: 300 },
+        { stat: WEAPON_STAT_IDS.MIN_DAMAGE, value: 100 },
+        { stat: WEAPON_STAT_IDS.MAX_DAMAGE, value: 200 },
+        { stat: WEAPON_STAT_IDS.CRITICAL_BONUS, value: 50 },
       ],
       spell_data: [],
       actions: [],
-      attack_stats: [{ id: 1, stat: 112, value: 100 }],
+      attack_stats: [{ stat: 112, value: 100 }],
       defense_stats: [],
       equipable: true,
     };
@@ -426,19 +426,19 @@ describe('Base Damage Over 60s Calculations', () => {
 
   it('handles 100% crit rate correctly', () => {
     const weapon: WeaponCandidate = {
-      id: 1,
+      aoid: 1,
       name: 'Test Weapon',
       is_nano: false,
       stats: [
-        { id: 1, stat: WEAPON_STAT_IDS.ATTACK_DELAY, value: 200 },
-        { id: 2, stat: WEAPON_STAT_IDS.RECHARGE_DELAY, value: 300 },
-        { id: 3, stat: WEAPON_STAT_IDS.MIN_DAMAGE, value: 100 },
-        { id: 4, stat: WEAPON_STAT_IDS.MAX_DAMAGE, value: 200 },
-        { id: 5, stat: WEAPON_STAT_IDS.CRITICAL_BONUS, value: 100 },
+        { stat: WEAPON_STAT_IDS.ATTACK_DELAY, value: 200 },
+        { stat: WEAPON_STAT_IDS.RECHARGE_DELAY, value: 300 },
+        { stat: WEAPON_STAT_IDS.MIN_DAMAGE, value: 100 },
+        { stat: WEAPON_STAT_IDS.MAX_DAMAGE, value: 200 },
+        { stat: WEAPON_STAT_IDS.CRITICAL_BONUS, value: 100 },
       ],
       spell_data: [],
       actions: [],
-      attack_stats: [{ id: 1, stat: 112, value: 100 }],
+      attack_stats: [{ stat: 112, value: 100 }],
       defense_stats: [],
       equipable: true,
     };
@@ -487,19 +487,19 @@ describe('Base Damage Over 60s Calculations', () => {
 
   it('applies target AC reduction correctly', () => {
     const weapon: WeaponCandidate = {
-      id: 1,
+      aoid: 1,
       name: 'Test Weapon',
       is_nano: false,
       stats: [
-        { id: 1, stat: WEAPON_STAT_IDS.ATTACK_DELAY, value: 200 },
-        { id: 2, stat: WEAPON_STAT_IDS.RECHARGE_DELAY, value: 300 },
-        { id: 3, stat: WEAPON_STAT_IDS.MIN_DAMAGE, value: 100 },
-        { id: 4, stat: WEAPON_STAT_IDS.MAX_DAMAGE, value: 200 },
-        { id: 5, stat: WEAPON_STAT_IDS.CRITICAL_BONUS, value: 50 },
+        { stat: WEAPON_STAT_IDS.ATTACK_DELAY, value: 200 },
+        { stat: WEAPON_STAT_IDS.RECHARGE_DELAY, value: 300 },
+        { stat: WEAPON_STAT_IDS.MIN_DAMAGE, value: 100 },
+        { stat: WEAPON_STAT_IDS.MAX_DAMAGE, value: 200 },
+        { stat: WEAPON_STAT_IDS.CRITICAL_BONUS, value: 50 },
       ],
       spell_data: [],
       actions: [],
-      attack_stats: [{ id: 1, stat: 112, value: 100 }],
+      attack_stats: [{ stat: 112, value: 100 }],
       defense_stats: [],
       equipable: true,
     };

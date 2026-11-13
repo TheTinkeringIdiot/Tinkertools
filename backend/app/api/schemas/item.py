@@ -4,7 +4,7 @@ Pydantic schemas for Item models.
 
 from typing import Optional, List, Any
 from pydantic import BaseModel, Field
-from .stat_value import StatValueResponse
+from .stat_value import ItemStatResponse
 from .spell import SpellDataResponse
 from .action import ActionResponse
 
@@ -38,7 +38,9 @@ class ItemCreate(ItemBase):
 class ItemResponse(ItemBase):
     """Schema for Item responses."""
 
-    id: int = Field(description="Database ID")
+    # Deprecated: an internal row id that differs between game versions. Use
+    # ``aoid``; this field is removed with the content-addressed store.
+    id: int = Field(description="Deprecated internal row ID; do not rely on it")
 
     class Config:
         from_attributes = True
@@ -47,16 +49,16 @@ class ItemResponse(ItemBase):
 class ItemDetail(ItemResponse):
     """Detailed Item response with related data."""
 
-    stats: List[StatValueResponse] = Field(
+    stats: List[ItemStatResponse] = Field(
         default_factory=list, description="Item stats"
     )
     spell_data: List[SpellDataResponse] = Field(
         default_factory=list, description="Item spell data"
     )
-    attack_stats: List[StatValueResponse] = Field(
+    attack_stats: List[ItemStatResponse] = Field(
         default_factory=list, description="Attack stats"
     )
-    defense_stats: List[StatValueResponse] = Field(
+    defense_stats: List[ItemStatResponse] = Field(
         default_factory=list, description="Defense stats"
     )
     actions: List[ActionResponse] = Field(

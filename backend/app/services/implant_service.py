@@ -282,22 +282,21 @@ class ImplantService:
         Returns:
             ItemDetail object
         """
-        from app.api.schemas.spell import SpellDataResponse, SpellWithCriteria
+        from app.api.schemas.spell import SpellDataResponse, ItemSpellResponse
         from app.api.schemas.action import ActionResponse
-        from app.api.schemas.criterion import CriterionResponse
+        from app.api.schemas.criterion import ItemCriterionResponse
 
         # Convert InterpolatedSpellData to SpellDataResponse format
         converted_spell_data = []
         for idx, spell_data in enumerate(interpolated_item.spell_data or []):
-            # Convert InterpolatedSpell objects to SpellWithCriteria
+            # Convert InterpolatedSpell objects to ItemSpellResponse
             converted_spells = []
             for spell_idx, spell in enumerate(spell_data.spells):
-                # Convert criteria dicts to CriterionResponse objects
+                # Convert criteria dicts to ItemCriterionResponse objects
                 converted_criteria = []
                 for criteria_dict in spell.criteria:
                     converted_criteria.append(
-                        CriterionResponse(
-                            id=0,  # Interpolated items don't have DB IDs
+                        ItemCriterionResponse(
                             stat=criteria_dict.get("stat", 0),
                             value1=criteria_dict.get("value1", 0),
                             value2=criteria_dict.get("value2", 0),
@@ -306,8 +305,7 @@ class ImplantService:
                     )
 
                 converted_spells.append(
-                    SpellWithCriteria(
-                        id=0,  # Interpolated items don't have DB IDs
+                    ItemSpellResponse(
                         target=spell.target,
                         tick_count=spell.tick_count,
                         tick_interval=spell.tick_interval,
@@ -320,7 +318,6 @@ class ImplantService:
 
             converted_spell_data.append(
                 SpellDataResponse(
-                    id=0,  # Interpolated items don't have DB IDs
                     event=spell_data.event,
                     spells=converted_spells,
                 )
@@ -329,12 +326,11 @@ class ImplantService:
         # Convert InterpolatedAction to ActionResponse format
         converted_actions = []
         for action in interpolated_item.actions or []:
-            # Convert criteria dicts to CriterionResponse objects
+            # Convert criteria dicts to ItemCriterionResponse objects
             converted_criteria = []
             for criteria_dict in action.criteria:
                 converted_criteria.append(
-                    CriterionResponse(
-                        id=0,  # Interpolated items don't have DB IDs
+                    ItemCriterionResponse(
                         stat=criteria_dict.get("stat", 0),
                         value1=criteria_dict.get("value1", 0),
                         value2=criteria_dict.get("value2", 0),
@@ -344,8 +340,6 @@ class ImplantService:
 
             converted_actions.append(
                 ActionResponse(
-                    id=0,  # Interpolated items don't have DB IDs
-                    item_id=interpolated_item.id,
                     action=action.action,
                     criteria=converted_criteria,
                 )

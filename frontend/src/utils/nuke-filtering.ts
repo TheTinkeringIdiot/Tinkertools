@@ -46,7 +46,7 @@ export function filterByCharacterProfile(
   return nanos.filter((nano) => {
     // Check if nano has actions (should always have at least one)
     if (!nano.item.actions || nano.item.actions.length === 0) {
-      console.warn(`[filterByCharacterProfile] Nano ${nano.id} has no actions`);
+      console.warn(`[filterByCharacterProfile] Nano ${nano.aoid} has no actions`);
       return true; // No requirements means always usable
     }
 

@@ -61,16 +61,16 @@ class TestInterpolationService:
     def mock_stats_lo(self):
         """Create mock low QL stats."""
         return [
-            {"id": 1, "stat": 1, "value": 100},  # Interpolatable stat
-            {"id": 2, "stat": 999, "value": 50},  # Non-interpolatable stat
+            {"stat": 1, "value": 100},  # Interpolatable stat
+            {"stat": 999, "value": 50},  # Non-interpolatable stat
         ]
 
     @pytest.fixture
     def mock_stats_hi(self):
         """Create mock high QL stats."""
         return [
-            {"id": 3, "stat": 1, "value": 200},  # Interpolatable stat
-            {"id": 4, "stat": 999, "value": 50},  # Non-interpolatable stat (same value)
+            {"stat": 1, "value": 200},  # Interpolatable stat
+            {"stat": 999, "value": 50},  # Non-interpolatable stat (same value)
         ]
 
     # ============================================================================
@@ -229,8 +229,8 @@ class TestInterpolationService:
 
     def test_interpolate_stats_same_values(self, service, mock_item_lo, mock_item_hi):
         """Test stat interpolation when low and high values are the same."""
-        same_stats_lo = [{"id": 1, "stat": 1, "value": 100}]
-        same_stats_hi = [{"id": 2, "stat": 1, "value": 100}]
+        same_stats_lo = [{"stat": 1, "value": 100}]
+        same_stats_hi = [{"stat": 1, "value": 100}]
 
         with patch.object(service, "_load_item_stats") as mock_load:
             mock_load.side_effect = [same_stats_lo, same_stats_hi]
@@ -355,11 +355,10 @@ class TestInterpolationService:
     def test_interpolate_criteria_basic(self, service):
         """Test basic criteria interpolation."""
         lo_criteria = [
-            {"id": 1, "value1": 1, "value2": 100, "operator": 1}  # Interpolatable stat
+            {"value1": 1, "value2": 100, "operator": 1}  # Interpolatable stat
         ]
         hi_criteria = [
             {
-                "id": 2,
                 "value1": 1,
                 "value2": 200,
                 "operator": 1,
@@ -386,13 +385,12 @@ class TestInterpolationService:
         """Test criteria interpolation with non-interpolatable stat."""
         lo_criteria = [
             {
-                "id": 1,
                 "value1": 999,
                 "value2": 100,
                 "operator": 1,
             }  # Non-interpolatable stat
         ]
-        hi_criteria = [{"id": 2, "value1": 999, "value2": 200, "operator": 1}]
+        hi_criteria = [{"value1": 999, "value2": 200, "operator": 1}]
 
         interpolated = InterpolatedItem(
             id=1,
@@ -411,9 +409,9 @@ class TestInterpolationService:
 
     def test_interpolate_criteria_mismatched_operators(self, service):
         """Test criteria interpolation with mismatched operators."""
-        lo_criteria = [{"id": 1, "value1": 1, "value2": 100, "operator": 1}]
+        lo_criteria = [{"value1": 1, "value2": 100, "operator": 1}]
         hi_criteria = [
-            {"id": 2, "value1": 1, "value2": 200, "operator": 2}  # Different operator
+            {"value1": 1, "value2": 200, "operator": 2}  # Different operator
         ]
 
         interpolated = InterpolatedItem(

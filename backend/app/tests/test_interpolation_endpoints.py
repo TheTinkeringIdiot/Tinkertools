@@ -52,8 +52,8 @@ class TestInterpolationEndpoints:
             ql_delta=50,
             ql_delta_full=100,
             stats=[
-                {"id": 1, "stat": 1, "value": 150},
-                {"id": 2, "stat": 2, "value": 75},
+                {"stat": 1, "value": 150},
+                {"stat": 2, "value": 75},
             ],
             spell_data=[],
             actions=[],

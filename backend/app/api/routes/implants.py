@@ -77,16 +77,13 @@ def implant_lookup(request: ImplantLookupRequest, db: Session = Depends(get_db))
             "description": item_detail.description,
             "is_nano": item_detail.is_nano,
             "stats": (
-                [
-                    {"id": stat.id, "stat": stat.stat, "value": stat.value}
-                    for stat in item_detail.stats
-                ]
+                [{"stat": stat.stat, "value": stat.value} for stat in item_detail.stats]
                 if item_detail.stats
                 else []
             ),
             "spell_data": (
                 [
-                    {"id": spell.id, "event": spell.event, "spells": spell.spells}
+                    {"event": spell.event, "spells": spell.spells}
                     for spell in item_detail.spell_data
                 ]
                 if item_detail.spell_data
@@ -94,7 +91,7 @@ def implant_lookup(request: ImplantLookupRequest, db: Session = Depends(get_db))
             ),
             "attack_stats": (
                 [
-                    {"id": stat.id, "stat": stat.stat, "value": stat.value}
+                    {"stat": stat.stat, "value": stat.value}
                     for stat in item_detail.attack_stats
                 ]
                 if item_detail.attack_stats
@@ -102,7 +99,7 @@ def implant_lookup(request: ImplantLookupRequest, db: Session = Depends(get_db))
             ),
             "defense_stats": (
                 [
-                    {"id": stat.id, "stat": stat.stat, "value": stat.value}
+                    {"stat": stat.stat, "value": stat.value}
                     for stat in item_detail.defense_stats
                 ]
                 if item_detail.defense_stats
@@ -111,7 +108,6 @@ def implant_lookup(request: ImplantLookupRequest, db: Session = Depends(get_db))
             "actions": (
                 [
                     {
-                        "id": action.id,
                         "action": action.action,
                         "criteria": action.criteria,
                     }

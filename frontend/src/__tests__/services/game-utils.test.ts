@@ -205,9 +205,9 @@ describe('Equipment Slot Position Functions', () => {
 describe('getItemIconUrl', () => {
   it('should extract icon ID from stat 79 and return correct URL', () => {
     const stats: StatValue[] = [
-      { id: 1, stat: 12, value: 100 },
-      { id: 2, stat: 79, value: 123456 },
-      { id: 3, stat: 85, value: 200 },
+      { stat: 12, value: 100 },
+      { stat: 79, value: 123456 },
+      { stat: 85, value: 200 },
     ];
 
     const iconUrl = getItemIconUrl(stats);
@@ -216,8 +216,8 @@ describe('getItemIconUrl', () => {
 
   it('should return null when stat 79 is not found', () => {
     const stats: StatValue[] = [
-      { id: 1, stat: 12, value: 100 },
-      { id: 2, stat: 85, value: 200 },
+      { stat: 12, value: 100 },
+      { stat: 85, value: 200 },
     ];
 
     const iconUrl = getItemIconUrl(stats);
@@ -230,7 +230,7 @@ describe('getItemIconUrl', () => {
   });
 
   it('should handle stat 79 with zero value', () => {
-    const stats: StatValue[] = [{ id: 1, stat: 79, value: 0 }];
+    const stats: StatValue[] = [{ stat: 79, value: 0 }];
 
     // Zero is considered falsy, so should return null
     const iconUrl = getItemIconUrl(stats);
@@ -239,9 +239,9 @@ describe('getItemIconUrl', () => {
 
   it('should handle multiple stat 79 entries and use the first one', () => {
     const stats: StatValue[] = [
-      { id: 1, stat: 79, value: 111 },
-      { id: 2, stat: 79, value: 222 },
-      { id: 3, stat: 12, value: 100 },
+      { stat: 79, value: 111 },
+      { stat: 79, value: 222 },
+      { stat: 12, value: 100 },
     ];
 
     const iconUrl = getItemIconUrl(stats);
@@ -249,7 +249,7 @@ describe('getItemIconUrl', () => {
   });
 
   it('should handle negative icon values', () => {
-    const stats: StatValue[] = [{ id: 1, stat: 79, value: -123 }];
+    const stats: StatValue[] = [{ stat: 79, value: -123 }];
 
     const iconUrl = getItemIconUrl(stats);
     expect(iconUrl).toBe('https://cdn.tinkeringidiot.com/aoicons/-123.png');

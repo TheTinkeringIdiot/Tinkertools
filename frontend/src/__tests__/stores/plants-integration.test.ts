@@ -17,10 +17,9 @@ import { useSymbiantsStore } from '@/stores/symbiants';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import type { PaginatedResponse, Symbiant } from '@/types/api';
 
-function createSymbiant(overrides: Partial<Symbiant> & Pick<Symbiant, 'id'>): Symbiant {
+function createSymbiant(overrides: Partial<Symbiant> & Pick<Symbiant, 'aoid'>): Symbiant {
   return {
-    aoid: 100 + overrides.id,
-    name: `Test Symbiant ${overrides.id}`,
+    name: `Test Symbiant ${overrides.aoid}`,
     ql: 100,
     slot_id: 1,
     family: 'Artillery',
@@ -45,9 +44,9 @@ function symbiantPage(
 }
 
 const SYMBIANTS: Symbiant[] = [
-  createSymbiant({ id: 1, name: 'Seeker Head Unit', family: 'Artillery' }),
-  createSymbiant({ id: 2, name: 'Hacker Chest Unit', family: 'Control' }),
-  createSymbiant({ id: 3, name: 'Hacker Eye Unit', family: 'Control' }),
+  createSymbiant({ aoid: 1, name: 'Seeker Head Unit', family: 'Artillery' }),
+  createSymbiant({ aoid: 2, name: 'Hacker Chest Unit', family: 'Control' }),
+  createSymbiant({ aoid: 3, name: 'Hacker Eye Unit', family: 'Control' }),
 ];
 
 describe('Plants Store Integration', () => {
@@ -58,8 +57,8 @@ describe('Plants Store Integration', () => {
     await setupIntegrationTest();
 
     vi.mocked(apiClient.searchSymbiants).mockResolvedValue(symbiantPage(SYMBIANTS));
-    vi.mocked(apiClient.getSymbiant).mockImplementation((id: number) =>
-      Promise.resolve({ success: true, data: createSymbiant({ id }) })
+    vi.mocked(apiClient.getSymbiant).mockImplementation((aoid: number) =>
+      Promise.resolve({ success: true, data: createSymbiant({ aoid }) })
     );
 
     symbiantsStore = useSymbiantsStore();
@@ -80,21 +79,21 @@ describe('Plants Store Integration', () => {
       await symbiantsStore.loadAllSymbiants();
 
       const familyMap = symbiantsStore.symbiantsByFamilyMap;
-      expect(familyMap.get('Artillery')?.map((s) => s.id)).toEqual([1]);
-      expect(familyMap.get('Control')?.map((s) => s.id)).toEqual([2, 3]);
+      expect(familyMap.get('Artillery')?.map((s) => s.aoid)).toEqual([1]);
+      expect(familyMap.get('Control')?.map((s) => s.aoid)).toEqual([2, 3]);
     });
 
     it('pages search results', async () => {
       const searchResults = await symbiantsStore.searchSymbiants({ page: 2, limit: 2 });
 
-      expect(searchResults.map((s) => s.id)).toEqual([3]);
+      expect(searchResults.map((s) => s.aoid)).toEqual([3]);
     });
 
     it('retrieves individual symbiant details', async () => {
       const symbiant = await symbiantsStore.getSymbiant(1);
 
       expect(symbiant).toBeTruthy();
-      expect(symbiant?.id).toBe(1);
+      expect(symbiant?.aoid).toBe(1);
       expect(symbiant?.name).toBe('Test Symbiant 1');
     });
 
@@ -116,8 +115,8 @@ describe('Plants Store Integration', () => {
     });
 
     it('loads every page of a multi-page symbiant list', async () => {
-      const firstPage = Array.from({ length: 100 }, (_, i) => createSymbiant({ id: i + 1 }));
-      const secondPage = Array.from({ length: 50 }, (_, i) => createSymbiant({ id: i + 101 }));
+      const firstPage = Array.from({ length: 100 }, (_, i) => createSymbiant({ aoid: i + 1 }));
+      const secondPage = Array.from({ length: 50 }, (_, i) => createSymbiant({ aoid: i + 101 }));
       vi.mocked(apiClient.searchSymbiants)
         .mockResolvedValueOnce(symbiantPage(firstPage, { total: 150, hasNext: true }))
         .mockResolvedValueOnce(symbiantPage(secondPage, { page: 2, total: 150 }));

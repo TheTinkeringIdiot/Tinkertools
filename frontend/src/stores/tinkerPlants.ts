@@ -321,8 +321,8 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
 
       // Check symbiant-specific changes
       if (current.type === 'symbiant') {
-        const currentSymbiantId = current.symbiant?.id || null;
-        const profileSymbiantId = profile.symbiant?.id || null;
+        const currentSymbiantId = current.symbiant?.aoid || null;
+        const profileSymbiantId = profile.symbiant?.aoid || null;
         if (currentSymbiantId !== profileSymbiantId || current.ql !== profile.ql) {
           return true;
         }
@@ -711,7 +711,6 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
             `Could not fetch full item data for symbiant ${symbiant.aoid}, using minimal data`
           );
           enrichedSymbiant = {
-            id: symbiant.id,
             aoid: symbiant.aoid,
             name: symbiant.name,
             ql: symbiant.ql,
@@ -730,7 +729,6 @@ export const useTinkerPlantsStore = defineStore('tinkerPlants', () => {
         console.error(`Failed to fetch full item data for symbiant ${symbiant.aoid}:`, error);
         // Fallback: convert minimal symbiant to Item structure
         enrichedSymbiant = {
-          id: symbiant.id,
           aoid: symbiant.aoid,
           name: symbiant.name,
           ql: symbiant.ql,

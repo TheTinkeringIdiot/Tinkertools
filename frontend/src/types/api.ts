@@ -39,15 +39,17 @@ export interface PaginatedResponse<T> {
 // ============================================================================
 // Game Data Models
 // ============================================================================
+//
+// AOID is the only identity an item has: the backend's row ids differ between
+// game versions, so nothing here carries one. Stats, effects, actions and
+// criteria are content and have no identity of their own.
 
 export interface StatValue {
-  id: number;
   stat: number;
   value: number;
 }
 
 export interface Criterion {
-  id: number;
   value1: number;
   value2: number;
   operator: number;
@@ -94,7 +96,6 @@ export interface SpellParams {
 }
 
 export interface Spell {
-  id: number;
   target?: number;
   tick_count?: number;
   tick_interval?: number;
@@ -106,27 +107,22 @@ export interface Spell {
 }
 
 export interface SpellData {
-  id: number;
   event?: number;
   spells: Spell[];
 }
 
 export interface AttackDefense {
-  id: number;
   attack: StatValue[];
   defense: StatValue[];
 }
 
 export interface AnimationMesh {
-  id: number;
   animation?: StatValue;
   mesh?: StatValue;
 }
 
 export interface Action {
-  id: number;
   action?: number;
-  item_id: number;
   criteria: Criterion[];
 }
 
@@ -155,8 +151,7 @@ export interface ItemSource {
 }
 
 export interface Item {
-  id: number;
-  aoid?: number;
+  aoid: number;
   name: string;
   ql?: number;
   description?: string;
@@ -194,8 +189,7 @@ export interface InterpolatedAction {
 
 export interface InterpolatedItem {
   // Original item data
-  id: number;
-  aoid?: number;
+  aoid: number;
   name: string;
   ql?: number;
   description?: string;
@@ -214,10 +208,6 @@ export interface InterpolatedItem {
   stats: StatValue[];
   spell_data: InterpolatedSpellData[];
   actions: InterpolatedAction[];
-
-  // Optional related data
-  attack_defense_id?: number;
-  animation_mesh_id?: number;
 }
 
 export interface InterpolationResponse {
@@ -305,7 +295,6 @@ export interface BatchPerkLookupResponse {
 }
 
 export interface SymbiantItem {
-  id: number;
   aoid: number;
   name: string;
   ql: number;

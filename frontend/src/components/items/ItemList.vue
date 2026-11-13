@@ -34,12 +34,12 @@ Shows items in grid or list view with pagination and compatibility indicators
         v-if="viewMode === 'grid'"
         class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6"
       >
-        <div v-for="item in items" :key="item.id" class="relative">
+        <div v-for="item in items" :key="item.aoid" class="relative">
           <ItemCard
             :item="item"
             :profile="compatibilityProfile"
             :show-compatibility="showCompatibility"
-            :is-comparing="isComparing(item.id)"
+            :is-comparing="isComparing(item.aoid)"
             @click="$emit('item-click', item)"
             @compare="$emit('item-compare', item)"
             @cast-buff="$emit('cast-buff', item)"
@@ -62,7 +62,7 @@ Shows items in grid or list view with pagination and compatibility indicators
       <div v-else class="space-y-2 mb-6">
         <div
           v-for="item in items"
-          :key="item.id"
+          :key="item.aoid"
           class="bg-surface-0 dark:bg-surface-950 border border-surface-200 dark:border-surface-700 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
           @click="$emit('item-click', item)"
         >
@@ -77,7 +77,7 @@ Shows items in grid or list view with pagination and compatibility indicators
                   :src="getItemIconUrl(item) ?? undefined"
                   :alt="`${item.name} icon`"
                   class="w-10 h-10 object-contain"
-                  @error="handleIconError(item.id)"
+                  @error="handleIconError(item.aoid)"
                 />
                 <i v-else class="pi pi-box text-surface-400"></i>
               </div>
@@ -143,7 +143,7 @@ Shows items in grid or list view with pagination and compatibility indicators
                       icon="pi pi-clone"
                       size="small"
                       text
-                      :severity="isComparing(item.id) ? 'primary' : 'secondary'"
+                      :severity="isComparing(item.aoid) ? 'primary' : 'secondary'"
                       @click.stop="$emit('item-compare', item)"
                     />
 
@@ -348,8 +348,8 @@ const profileStats = computed(() =>
 );
 
 // Methods
-function isComparing(itemId: number): boolean {
-  return props.comparisonItems?.includes(itemId) || false;
+function isComparing(aoid: number): boolean {
+  return props.comparisonItems?.includes(aoid) || false;
 }
 
 function getCompatibilityStatus(item: Item): 'compatible' | 'incompatible' | 'unknown' {
@@ -362,7 +362,7 @@ function getCompatibilityStatus(item: Item): 'compatible' | 'incompatible' | 'un
 }
 
 function getItemUrl(item: Item): string {
-  return `${window.location.origin}${versionedPath(`/items/${item.aoid ?? item.id}`)}`;
+  return `${window.location.origin}${versionedPath(`/items/${item.aoid}`)}`;
 }
 
 function showQuickView(item: Item) {
@@ -419,12 +419,12 @@ function onPageChange(event: PageState) {
 }
 
 function getItemIconUrl(item: Item): string | null {
-  if (iconLoadErrors.value.has(item.id)) return null;
+  if (iconLoadErrors.value.has(item.aoid)) return null;
   return getItemIconUrlUtil(item.stats || []);
 }
 
-function handleIconError(itemId: number) {
-  iconLoadErrors.value.add(itemId);
+function handleIconError(aoid: number) {
+  iconLoadErrors.value.add(aoid);
 }
 </script>
 

@@ -60,6 +60,8 @@ class InterpolatedItem(BaseModel):
     """
 
     # Original item data
+    # Deprecated: an internal row id that differs between game versions. Use
+    # ``aoid``; this field is removed with the content-addressed store.
     id: int
     aoid: Optional[int] = None
     name: str
@@ -80,10 +82,6 @@ class InterpolatedItem(BaseModel):
     stats: List[Dict[str, Any]] = Field(default_factory=list)
     spell_data: List[InterpolatedSpellData] = Field(default_factory=list)
     actions: List[InterpolatedAction] = Field(default_factory=list)
-
-    # Optional related data (copied from original item)
-    attack_defense_id: Optional[int] = None
-    animation_mesh_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -111,8 +109,6 @@ class InterpolatedItem(BaseModel):
             stats=[],  # Will be populated separately
             spell_data=[],  # Will be populated separately
             actions=[],  # Will be populated separately
-            attack_defense_id=item.atkdef_id,
-            animation_mesh_id=item.animation_mesh_id,
         )
 
     def interpolate_value(self, lo_val: int, hi_val: int) -> int:

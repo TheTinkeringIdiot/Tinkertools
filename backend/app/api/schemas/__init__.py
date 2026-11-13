@@ -2,9 +2,15 @@
 Pydantic schemas for API request/response models.
 """
 
-from .stat_value import StatValueResponse, StatValueCreate
-from .criterion import CriterionResponse, CriterionCreate
-from .spell import SpellResponse, SpellCreate, SpellWithCriteria, SpellDataResponse
+from .stat_value import StatValueResponse, ItemStatResponse, StatValueCreate
+from .criterion import CriterionResponse, ItemCriterionResponse, CriterionCreate
+from .spell import (
+    SpellResponse,
+    SpellCreate,
+    SpellWithCriteria,
+    ItemSpellResponse,
+    SpellDataResponse,
+)
 from .action import ActionResponse, ActionCreate
 from .nano import (
     NanoProgram,
@@ -34,12 +40,15 @@ from .common import PaginatedResponse, ErrorResponse
 
 __all__ = [
     "StatValueResponse",
+    "ItemStatResponse",
     "StatValueCreate",
     "CriterionResponse",
+    "ItemCriterionResponse",
     "CriterionCreate",
     "SpellResponse",
     "SpellCreate",
     "SpellWithCriteria",
+    "ItemSpellResponse",
     "SpellDataResponse",
     "ActionResponse",
     "ActionCreate",

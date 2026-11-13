@@ -80,7 +80,7 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
       <div class="grid gap-4" :style="{ gridTemplateColumns: `repeat(${items.length}, 1fr)` }">
         <div
           v-for="item in items"
-          :key="item.id"
+          :key="item.aoid"
           class="relative p-4 border border-surface-200 dark:border-surface-700 rounded-lg bg-surface-0 dark:bg-surface-950"
         >
           <!-- Remove Button -->
@@ -91,7 +91,7 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
             text
             severity="danger"
             class="absolute top-1 right-1"
-            @click="$emit('remove-item', item.id)"
+            @click="$emit('remove-item', item.aoid)"
           />
 
           <!-- Item Basic Info -->
@@ -109,17 +109,17 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
             </div>
 
             <!-- Overall Score -->
-            <div v-if="showCompatibility && comparisonScores[item.id]" class="mt-2">
+            <div v-if="showCompatibility && comparisonScores[item.aoid]" class="mt-2">
               <div class="text-xs text-surface-600 dark:text-surface-400 mb-1">
                 Compatibility Score
               </div>
               <ProgressBar
-                :value="comparisonScores[item.id].overall * 100"
+                :value="comparisonScores[item.aoid].overall * 100"
                 :show-value="true"
                 :class="{
-                  'progress-high': comparisonScores[item.id].overall >= 0.8,
-                  'progress-medium': comparisonScores[item.id].overall >= 0.5,
-                  'progress-low': comparisonScores[item.id].overall < 0.5,
+                  'progress-high': comparisonScores[item.aoid].overall >= 0.8,
+                  'progress-medium': comparisonScores[item.aoid].overall >= 0.5,
+                  'progress-low': comparisonScores[item.aoid].overall < 0.5,
                 }"
                 style="height: 8px"
               />
@@ -147,7 +147,7 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
                 </div>
                 <div
                   v-for="item in items"
-                  :key="`ql-${item.id}`"
+                  :key="`ql-${item.aoid}`"
                   class="text-sm font-mono"
                   :class="getComparisonClass('ql', item.ql)"
                 >
@@ -157,12 +157,12 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
                 <div class="text-xs font-medium text-surface-600 dark:text-surface-400">
                   Item Class
                 </div>
-                <div v-for="item in items" :key="`class-${item.id}`" class="text-sm">
+                <div v-for="item in items" :key="`class-${item.aoid}`" class="text-sm">
                   {{ getItemClassLabel(item.item_class) }}
                 </div>
 
                 <div class="text-xs font-medium text-surface-600 dark:text-surface-400">Type</div>
-                <div v-for="item in items" :key="`type-${item.id}`" class="text-sm">
+                <div v-for="item in items" :key="`type-${item.aoid}`" class="text-sm">
                   {{ item.is_nano ? 'Nano Program' : 'Regular Item' }}
                 </div>
               </div>
@@ -196,7 +196,7 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
                 </div>
                 <div
                   v-for="item in items"
-                  :key="`stat-${statId}-${item.id}`"
+                  :key="`stat-${statId}-${item.aoid}`"
                   class="text-sm font-mono"
                   :class="getStatComparisonClass(statId, getItemStat(item, statId))"
                 >
@@ -225,7 +225,7 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
                 </div>
                 <div
                   v-for="item in items"
-                  :key="`req-${statId}-${item.id}`"
+                  :key="`req-${statId}-${item.aoid}`"
                   class="text-sm font-mono flex items-center gap-1"
                   :class="getRequirementComparisonClass(statId, getItemRequirement(item, statId))"
                 >
@@ -273,7 +273,7 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
                     </div>
                     <div
                       v-for="item in items"
-                      :key="`attack-${statId}-${item.id}`"
+                      :key="`attack-${statId}-${item.aoid}`"
                       class="text-sm font-mono"
                       :class="
                         getStatComparisonClass(
@@ -306,7 +306,7 @@ Allows comparing up to 3 items with detailed stat differences and recommendation
                     </div>
                     <div
                       v-for="item in items"
-                      :key="`defense-${statId}-${item.id}`"
+                      :key="`defense-${statId}-${item.aoid}`"
                       class="text-sm font-mono"
                       :class="
                         getStatComparisonClass(
@@ -391,7 +391,7 @@ const props = defineProps<{
 }>();
 
 defineEmits<{
-  'remove-item': [itemId: number];
+  'remove-item': [aoid: number];
   'clear-all': [];
   close: [];
 }>();
@@ -495,7 +495,7 @@ const recommendations = computed((): Recommendation[] => {
     category: 'quality',
     title: 'Highest Quality',
     description: 'Higher quality items typically have better stats and effects.',
-    winner: qlWinner.id,
+    winner: qlWinner.aoid,
     icon: 'pi pi-star',
     color: '#fbbf24',
   });
@@ -503,7 +503,7 @@ const recommendations = computed((): Recommendation[] => {
   // Stats recommendation
   if (commonStats.value.length > 0) {
     const statTotals = props.items.map((item) => ({
-      id: item.id,
+      aoid: item.aoid,
       total: commonStats.value.reduce(
         (sum, statId) => sum + Math.abs(getItemStat(item, statId)),
         0
@@ -518,7 +518,7 @@ const recommendations = computed((): Recommendation[] => {
       category: 'stats',
       title: 'Best Overall Stats',
       description: 'Item with the highest combined stat bonuses.',
-      winner: statWinner.id,
+      winner: statWinner.aoid,
       icon: 'pi pi-chart-bar',
       color: '#10b981',
     });
@@ -527,7 +527,7 @@ const recommendations = computed((): Recommendation[] => {
   // Compatibility recommendation
   if (props.showCompatibility && props.profile) {
     const compatibilityScores = props.items.map((item) => ({
-      id: item.id,
+      aoid: item.aoid,
       compatible: getItemRequirements(item).every((req) => canMeetRequirement(req.stat, req.value)),
     }));
 
@@ -656,8 +656,8 @@ function getItemClassLabel(classId: number | undefined): string {
   return getItemClassName(classId) || `Class ${classId}`;
 }
 
-function getItemName(itemId: number): string {
-  const item = props.items.find((i) => i.id === itemId);
+function getItemName(aoid: number): string {
+  const item = props.items.find((i) => i.aoid === aoid);
   return item?.name || 'Unknown';
 }
 
@@ -668,7 +668,7 @@ function refreshComparison() {
 
 function calculateComparisonScores() {
   props.items.forEach((item) => {
-    comparisonScores.value[item.id] = {
+    comparisonScores.value[item.aoid] = {
       overall: 0.8, // Mock score
       stats: 0.7,
       requirements: 0.9,
@@ -681,7 +681,7 @@ function exportComparison() {
   // Export comparison data as CSV or JSON
   const data = {
     items: props.items.map((item) => ({
-      id: item.id,
+      aoid: item.aoid,
       name: item.name,
       ql: item.ql,
       stats: item.stats,

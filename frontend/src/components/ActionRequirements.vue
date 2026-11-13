@@ -24,7 +24,7 @@
         <!-- Requirements -->
         <div v-if="primaryAction.hasRequirements" class="requirements-list">
           <CriteriaDisplay
-            :criteria="actions.find((a) => a.id === primaryAction.id)?.criteria || []"
+            :criteria="primaryAction.rawCriteria"
             :character-stats="characterStats"
             :expanded="true"
             :show-oe-breakpoints="showOeBreakpoints"
@@ -37,13 +37,13 @@
       <div v-if="otherActions.length > 0" class="other-actions">
         <Accordion v-model:activeIndex="expandedActions" multiple>
           <AccordionTab
-            v-for="action in otherActions"
-            :key="action.id"
+            v-for="(action, index) in otherActions"
+            :key="index"
             :header="getActionHeader(action)"
           >
             <div v-if="action.hasRequirements" class="requirements-list">
               <CriteriaDisplay
-                :criteria="actions.find((a) => a.id === action.id)?.criteria || []"
+                :criteria="action.rawCriteria"
                 :character-stats="characterStats"
                 :expanded="false"
                 :show-oe-breakpoints="showOeBreakpoints"
@@ -148,7 +148,7 @@ const expandedActions = ref<number[]>([]);
 
 const otherActions = computed(() => {
   if (!primaryAction.value) return parsedActions.value;
-  return parsedActions.value.filter((action) => action.id !== primaryAction.value!.id);
+  return parsedActions.value.filter((action) => action !== primaryAction.value);
 });
 
 // ============================================================================
@@ -157,7 +157,8 @@ const otherActions = computed(() => {
 
 /** met / unmet / unknown (can't be checked from the profile); null without a character */
 function actionStatus(action: ParsedAction): 'met' | 'unmet' | 'unknown' | null {
-  return actionEvaluations.value.find((e) => e.action.id === action.id)?.status ?? null;
+  // Evaluations are listed in the order of the parsed actions
+  return actionEvaluations.value[parsedActions.value.indexOf(action)]?.status ?? null;
 }
 
 function statusLabel(status: 'met' | 'unmet' | 'unknown' | null): string {

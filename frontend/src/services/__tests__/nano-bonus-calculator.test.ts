@@ -47,7 +47,6 @@ describe('NanoBonusCalculator', () => {
   // ==========================================================================
 
   const createValidSpell = (statId: number, amount: number, spellId: number = 53045): Spell => ({
-    id: Math.floor(Math.random() * 10000),
     spell_id: spellId,
     spell_params: {
       Stat: statId,
@@ -57,7 +56,6 @@ describe('NanoBonusCalculator', () => {
   });
 
   const createValidSpellData = (spells: Spell[], event: number = 1): SpellData => ({
-    id: Math.floor(Math.random() * 10000),
     event,
     spells,
   });
@@ -68,7 +66,6 @@ describe('NanoBonusCalculator', () => {
     ql: number = 200,
     spellData: SpellData[] = []
   ): Item => ({
-    id: Math.floor(Math.random() * 10000),
     aoid,
     name,
     ql,
@@ -76,9 +73,9 @@ describe('NanoBonusCalculator', () => {
     item_class: 1,
     is_nano: true, // This is a nano item
     stats: [
-      { id: 1, stat: 54, value: 25 }, // NCU cost
-      { id: 2, stat: 75, value: 100 + aoid }, // NanoStrain (unique per nano)
-      { id: 3, stat: 551, value: 1000 }, // StackingOrder
+      { stat: 54, value: 25 }, // NCU cost
+      { stat: 75, value: 100 + aoid }, // NanoStrain (unique per nano)
+      { stat: 551, value: 1000 }, // StackingOrder
     ],
     spell_data: spellData,
     actions: [],
@@ -478,7 +475,6 @@ describe('NanoBonusCalculator', () => {
 
     it('should handle spells with missing parameters', () => {
       const spellWithMissingParams: Spell = {
-        id: Math.floor(Math.random() * 10000),
         spell_id: 53045,
         spell_params: {}, // Empty parameters
         criteria: [],
@@ -553,9 +549,9 @@ describe('NanoBonusCalculator', () => {
       // Create nano with extremely high NCU cost
       const highNCUNano = createValidNanoItem('High NCU Nano', 12345, 200, [spellData]);
       highNCUNano.stats = [
-        { id: 1, stat: 54, value: 10000 }, // Very high NCU cost
-        { id: 2, stat: 75, value: 100 },
-        { id: 3, stat: 551, value: 1000 },
+        { stat: 54, value: 10000 }, // Very high NCU cost
+        { stat: 75, value: 100 },
+        { stat: 551, value: 1000 },
       ];
 
       const result = calculateNanoBonusesWithErrors([highNCUNano]);
@@ -594,18 +590,18 @@ describe('NanoBonusCalculator', () => {
         createValidSpellData([createValidSpell(17, 10)], 1),
       ]);
       nano1.stats = [
-        { id: 1, stat: 54, value: 25 },
-        { id: 2, stat: 75, value: 100 }, // Different NanoStrain
-        { id: 3, stat: 551, value: 1000 },
+        { stat: 54, value: 25 },
+        { stat: 75, value: 100 }, // Different NanoStrain
+        { stat: 551, value: 1000 },
       ];
 
       const nano2 = createValidNanoItem('Nano 2', 22222, 200, [
         createValidSpellData([createValidSpell(17, 15)], 1),
       ]);
       nano2.stats = [
-        { id: 1, stat: 54, value: 30 },
-        { id: 2, stat: 75, value: 200 }, // Different NanoStrain
-        { id: 3, stat: 551, value: 1000 },
+        { stat: 54, value: 30 },
+        { stat: 75, value: 200 }, // Different NanoStrain
+        { stat: 551, value: 1000 },
       ];
 
       const result = calculator.calculateBonuses([nano1, nano2]);
@@ -621,18 +617,18 @@ describe('NanoBonusCalculator', () => {
         createValidSpellData([createValidSpell(17, 20)], 1),
       ]);
       highPriorityNano.stats = [
-        { id: 1, stat: 54, value: 25 },
-        { id: 2, stat: 75, value: 100 }, // Same NanoStrain
-        { id: 3, stat: 551, value: 2000 }, // Higher StackingOrder
+        { stat: 54, value: 25 },
+        { stat: 75, value: 100 }, // Same NanoStrain
+        { stat: 551, value: 2000 }, // Higher StackingOrder
       ];
 
       const lowPriorityNano = createValidNanoItem('Low Priority', 22222, 200, [
         createValidSpellData([createValidSpell(17, 10)], 1),
       ]);
       lowPriorityNano.stats = [
-        { id: 1, stat: 54, value: 20 },
-        { id: 2, stat: 75, value: 100 }, // Same NanoStrain
-        { id: 3, stat: 551, value: 1000 }, // Lower StackingOrder
+        { stat: 54, value: 20 },
+        { stat: 75, value: 100 }, // Same NanoStrain
+        { stat: 551, value: 1000 }, // Lower StackingOrder
       ];
 
       // Calculator should still aggregate both (conflict resolution at store level)

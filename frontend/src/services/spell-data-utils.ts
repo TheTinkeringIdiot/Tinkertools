@@ -15,7 +15,6 @@ import { versionedPath } from '@/composables/useGameVersion';
 // ============================================================================
 
 export interface FormattedSpell {
-  id: number;
   target?: number;
   targetName?: string;
   tickCount?: number;
@@ -28,7 +27,6 @@ export interface FormattedSpell {
 }
 
 export interface FormattedSpellData {
-  id: number;
   event?: number;
   eventName?: string;
   spells: FormattedSpell[];
@@ -310,7 +308,6 @@ export function formatSpell(spell: Spell): FormattedSpell {
   // Fallback if interpolation didn't work or no format string found
   if (!formattedText || formattedText === formatString) {
     formattedText = generateFallbackSpellText({
-      id: spell.id,
       target: spell.target,
       targetName,
       tickCount: spell.tick_count,
@@ -324,7 +321,6 @@ export function formatSpell(spell: Spell): FormattedSpell {
   }
 
   return {
-    id: spell.id,
     target: spell.target,
     targetName,
     tickCount: spell.tick_count,
@@ -347,7 +343,6 @@ export function formatSpellData(spellData: SpellData): FormattedSpellData {
   const formattedSpells = spellData.spells.map(formatSpell);
 
   return {
-    id: spellData.id,
     event: spellData.event,
     eventName,
     spells: formattedSpells,

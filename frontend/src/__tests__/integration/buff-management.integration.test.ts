@@ -80,7 +80,6 @@ describe('Buff Management Integration', () => {
 
   // Test buff items with different NCU costs and strains
   const createBuffItem = (overrides: Partial<Item> = {}): Item => ({
-    id: Math.floor(Math.random() * 100000),
     aoid: Math.floor(Math.random() * 100000),
     name: 'Test Buff',
     ql: 200,
@@ -88,9 +87,9 @@ describe('Buff Management Integration', () => {
     item_class: 0, // Nano class
     is_nano: true,
     stats: [
-      { id: 1, stat: 54, value: 30 }, // NCU cost (stat 54)
-      { id: 2, stat: 75, value: 1000 }, // NanoStrain (stat 75)
-      { id: 3, stat: 551, value: 100 }, // StackingOrder (stat 551)
+      { stat: 54, value: 30 }, // NCU cost (stat 54)
+      { stat: 75, value: 1000 }, // NanoStrain (stat 75)
+      { stat: 551, value: 100 }, // StackingOrder (stat 551)
     ],
     spell_data: [],
     actions: [],
@@ -100,52 +99,47 @@ describe('Buff Management Integration', () => {
   });
 
   const buffLowNCU = createBuffItem({
-    id: 1001,
     name: 'Iron Circle',
     stats: [
-      { id: 1, stat: 54, value: 25 }, // Low NCU cost
-      { id: 2, stat: 75, value: 1000 }, // Strain A
-      { id: 3, stat: 551, value: 100 }, // Priority 100
+      { stat: 54, value: 25 }, // Low NCU cost
+      { stat: 75, value: 1000 }, // Strain A
+      { stat: 551, value: 100 }, // Priority 100
     ],
   });
 
   const buffMediumNCU = createBuffItem({
-    id: 1002,
     name: 'Fortification',
     stats: [
-      { id: 1, stat: 54, value: 30 }, // Medium NCU cost
-      { id: 2, stat: 75, value: 2000 }, // Strain B (different)
-      { id: 3, stat: 551, value: 120 }, // Priority 120
+      { stat: 54, value: 30 }, // Medium NCU cost
+      { stat: 75, value: 2000 }, // Strain B (different)
+      { stat: 551, value: 120 }, // Priority 120
     ],
   });
 
   const buffHighNCU = createBuffItem({
-    id: 1003,
     name: 'Massive Enhancement',
     stats: [
-      { id: 1, stat: 54, value: 1100 }, // High NCU cost - won't fit
-      { id: 2, stat: 75, value: 3000 }, // Strain C
-      { id: 3, stat: 551, value: 150 },
+      { stat: 54, value: 1100 }, // High NCU cost - won't fit
+      { stat: 75, value: 3000 }, // Strain C
+      { stat: 551, value: 150 },
     ],
   });
 
   const buffSameStrainHighPriority = createBuffItem({
-    id: 1004,
     name: 'Iron Circle Superior',
     stats: [
-      { id: 1, stat: 54, value: 35 },
-      { id: 2, stat: 75, value: 1000 }, // Same strain as buffLowNCU
-      { id: 3, stat: 551, value: 200 }, // Higher priority than buffLowNCU
+      { stat: 54, value: 35 },
+      { stat: 75, value: 1000 }, // Same strain as buffLowNCU
+      { stat: 551, value: 200 }, // Higher priority than buffLowNCU
     ],
   });
 
   const buffSameStrainLowPriority = createBuffItem({
-    id: 1005,
     name: 'Iron Circle Basic',
     stats: [
-      { id: 1, stat: 54, value: 20 },
-      { id: 2, stat: 75, value: 1000 }, // Same strain as buffLowNCU
-      { id: 3, stat: 551, value: 50 }, // Lower priority than buffLowNCU
+      { stat: 54, value: 20 },
+      { stat: 75, value: 1000 }, // Same strain as buffLowNCU
+      { stat: 551, value: 50 }, // Lower priority than buffLowNCU
     ],
   });
 
@@ -198,7 +192,7 @@ describe('Buff Management Integration', () => {
       const profile = store.activeProfile;
       expect(profile?.buffs).toBeDefined();
       expect(profile?.buffs?.length).toBe(1);
-      expect(profile?.buffs?.[0].id).toBe(buffLowNCU.id);
+      expect(profile?.buffs?.[0].aoid).toBe(buffLowNCU.aoid);
 
       // Verify NCU was updated
       expect(store.currentNCU).toBe(25);
@@ -253,12 +247,11 @@ describe('Buff Management Integration', () => {
       // Only 1200 - 1100 = 100 NCU left: a 200 NCU buff must be rejected
       expect(store.availableNCU).toBe(100);
       const buffTooLarge = createBuffItem({
-        id: 9999,
         name: 'Too Large Buff',
         stats: [
-          { id: 1, stat: 54, value: 200 }, // Requires 200 NCU, but only 100 available
-          { id: 2, stat: 75, value: 9999 }, // Unique strain
-          { id: 3, stat: 551, value: 100 },
+          { stat: 54, value: 200 }, // Requires 200 NCU, but only 100 available
+          { stat: 75, value: 9999 }, // Unique strain
+          { stat: 551, value: 100 },
         ],
       });
 
@@ -296,12 +289,11 @@ describe('Buff Management Integration', () => {
       expect(
         store.canCastBuff(
           createBuffItem({
-            id: 1007,
             name: 'Wide Buff',
             stats: [
-              { id: 1, stat: 54, value: 101 },
-              { id: 2, stat: 75, value: 7000 },
-              { id: 3, stat: 551, value: 100 },
+              { stat: 54, value: 101 },
+              { stat: 75, value: 7000 },
+              { stat: 551, value: 100 },
             ],
           })
         )
@@ -316,7 +308,7 @@ describe('Buff Management Integration', () => {
       await nextTick();
 
       expect(store.activeProfile?.buffs?.length).toBe(1);
-      expect(store.activeProfile?.buffs?.[0].id).toBe(buffLowNCU.id);
+      expect(store.activeProfile?.buffs?.[0].aoid).toBe(buffLowNCU.aoid);
       expect(store.currentNCU).toBe(25);
 
       // Cast higher priority buff with same strain
@@ -326,7 +318,7 @@ describe('Buff Management Integration', () => {
       // Verify old buff was replaced
       const profile = store.activeProfile;
       expect(profile?.buffs?.length).toBe(1);
-      expect(profile?.buffs?.[0].id).toBe(buffSameStrainHighPriority.id);
+      expect(profile?.buffs?.[0].aoid).toBe(buffSameStrainHighPriority.aoid);
       expect(profile?.buffs?.[0].name).toBe('Iron Circle Superior');
 
       // Verify NCU updated to new buff's cost
@@ -348,7 +340,7 @@ describe('Buff Management Integration', () => {
       // Verify original buff remains
       const profile = store.activeProfile;
       expect(profile?.buffs?.length).toBe(1);
-      expect(profile?.buffs?.[0].id).toBe(buffSameStrainHighPriority.id);
+      expect(profile?.buffs?.[0].aoid).toBe(buffSameStrainHighPriority.aoid);
 
       // Verify NCU didn't change
       expect(store.currentNCU).toBe(35);
@@ -371,12 +363,11 @@ describe('Buff Management Integration', () => {
       await nextTick();
 
       const buffDifferentStrain = createBuffItem({
-        id: 1006,
         name: 'Different Strain Buff',
         stats: [
-          { id: 1, stat: 54, value: 40 },
-          { id: 2, stat: 75, value: 3000 }, // Unique strain
-          { id: 3, stat: 551, value: 100 },
+          { stat: 54, value: 40 },
+          { stat: 75, value: 3000 }, // Unique strain
+          { stat: 551, value: 100 },
         ],
       });
 
@@ -399,7 +390,7 @@ describe('Buff Management Integration', () => {
       // Check conflicts for buff with same strain
       const conflicts = store.getBuffConflicts(buffSameStrainHighPriority);
       expect(conflicts.length).toBe(1);
-      expect(conflicts[0].id).toBe(buffLowNCU.id);
+      expect(conflicts[0].aoid).toBe(buffLowNCU.aoid);
 
       // Check conflicts for buff with different strain
       const noConflicts = store.getBuffConflicts(buffMediumNCU);
@@ -418,13 +409,13 @@ describe('Buff Management Integration', () => {
       expect(store.activeProfile?.buffs?.length).toBe(2);
 
       // Remove first buff
-      await store.removeBuff(buffLowNCU.id);
+      await store.removeBuff(buffLowNCU.aoid);
       await nextTick();
 
       // Verify buff was removed
       const profile = store.activeProfile;
       expect(profile?.buffs?.length).toBe(1);
-      expect(profile?.buffs?.[0].id).toBe(buffMediumNCU.id);
+      expect(profile?.buffs?.[0].aoid).toBe(buffMediumNCU.aoid);
 
       // Verify NCU decreased
       // MaxNCU 2400, with 30 NCU used = 2370 available
@@ -491,7 +482,7 @@ describe('Buff Management Integration', () => {
       expect(store.activeProfile?.buffs?.length).toBe(0);
 
       // Try to remove buff
-      await store.removeBuff(buffLowNCU.id);
+      await store.removeBuff(buffLowNCU.aoid);
       await nextTick();
 
       // Should not error
@@ -535,7 +526,7 @@ describe('Buff Management Integration', () => {
       await nextTick();
 
       expect(store.activeProfile?.buffs?.length).toBe(1);
-      expect(store.activeProfile?.buffs?.[0].id).toBe(buffMediumNCU.id);
+      expect(store.activeProfile?.buffs?.[0].aoid).toBe(buffMediumNCU.aoid);
       expect(store.currentNCU).toBe(30);
 
       // Switch back to first profile
@@ -544,7 +535,7 @@ describe('Buff Management Integration', () => {
 
       // Verify first profile still has its original buff
       expect(store.activeProfile?.buffs?.length).toBe(1);
-      expect(store.activeProfile?.buffs?.[0].id).toBe(buffLowNCU.id);
+      expect(store.activeProfile?.buffs?.[0].aoid).toBe(buffLowNCU.aoid);
       expect(store.currentNCU).toBe(25);
     });
 
@@ -565,7 +556,7 @@ describe('Buff Management Integration', () => {
       await store.castBuff(buffMediumNCU);
       await nextTick();
 
-      const profile1BuffIds = store.activeProfile?.buffs?.map((b) => b.id) || [];
+      const profile1BuffIds = store.activeProfile?.buffs?.map((b) => b.aoid) || [];
       expect(profile1BuffIds).toHaveLength(2);
 
       // Switch to second profile
@@ -576,7 +567,7 @@ describe('Buff Management Integration', () => {
       expect(store.activeProfile?.buffs?.length).toBe(0);
 
       // Verify no buff IDs from profile 1 leaked
-      const profile2BuffIds = store.activeProfile?.buffs?.map((b) => b.id) || [];
+      const profile2BuffIds = store.activeProfile?.buffs?.map((b) => b.aoid) || [];
       for (const id of profile1BuffIds) {
         expect(profile2BuffIds).not.toContain(id);
       }
@@ -626,11 +617,10 @@ describe('Buff Management Integration', () => {
   describe('Edge Cases and Error Handling', () => {
     it('should handle buff with missing NCU stat gracefully', async () => {
       const buffNoNCU = createBuffItem({
-        id: 2001,
         name: 'Broken Buff',
         stats: [
-          { id: 2, stat: 75, value: 5000 }, // Has strain but no NCU stat
-          { id: 3, stat: 551, value: 100 },
+          { stat: 75, value: 5000 }, // Has strain but no NCU stat
+          { stat: 551, value: 100 },
         ],
       });
 
@@ -644,10 +634,9 @@ describe('Buff Management Integration', () => {
 
     it('should handle buff with missing strain stat gracefully', async () => {
       const buffNoStrain = createBuffItem({
-        id: 2002,
         name: 'Strainless Buff',
         stats: [
-          { id: 1, stat: 54, value: 30 }, // Has NCU but no strain
+          { stat: 54, value: 30 }, // Has NCU but no strain
         ],
       });
 
@@ -661,12 +650,11 @@ describe('Buff Management Integration', () => {
 
     it('should handle buff with equal stacking priority correctly', async () => {
       const buffEqualPriority = createBuffItem({
-        id: 2003,
         name: 'Equal Priority Buff',
         stats: [
-          { id: 1, stat: 54, value: 30 },
-          { id: 2, stat: 75, value: 1000 }, // Same strain as buffLowNCU
-          { id: 3, stat: 551, value: 100 }, // EQUAL priority to buffLowNCU
+          { stat: 54, value: 30 },
+          { stat: 75, value: 1000 }, // Same strain as buffLowNCU
+          { stat: 551, value: 100 }, // EQUAL priority to buffLowNCU
         ],
       });
 
@@ -681,7 +669,7 @@ describe('Buff Management Integration', () => {
 
       // Should replace (new replaces existing when equal)
       expect(store.activeProfile?.buffs?.length).toBe(1);
-      expect(store.activeProfile?.buffs?.[0].id).toBe(buffEqualPriority.id);
+      expect(store.activeProfile?.buffs?.[0].aoid).toBe(buffEqualPriority.aoid);
     });
 
     it('should persist buffs to localStorage correctly', async () => {

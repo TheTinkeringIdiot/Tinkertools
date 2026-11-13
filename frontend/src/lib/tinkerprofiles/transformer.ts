@@ -88,12 +88,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * Convert an interpolated item from the batch endpoint into the Item shape
- * stored in profiles. Interpolated spell data and actions carry no database
- * IDs, so they are numbered by position to keep them distinguishable.
+ * stored in profiles.
  */
 export function interpolatedToItem(item: InterpolatedItem): Item {
   return {
-    id: item.id,
     aoid: item.aoid,
     name: item.name,
     ql: item.ql,
@@ -101,17 +99,8 @@ export function interpolatedToItem(item: InterpolatedItem): Item {
     item_class: item.item_class,
     is_nano: item.is_nano,
     stats: item.stats || [],
-    spell_data: (item.spell_data || []).map((sd, sdIndex) => ({
-      id: sdIndex + 1,
-      event: sd.event,
-      spells: sd.spells.map((spell, spellIndex) => ({ id: spellIndex + 1, ...spell })),
-    })),
-    actions: (item.actions || []).map((action, actionIndex) => ({
-      id: actionIndex + 1,
-      item_id: item.id,
-      action: action.action,
-      criteria: action.criteria,
-    })),
+    spell_data: item.spell_data || [],
+    actions: item.actions || [],
     attack_stats: [],
     defense_stats: [],
     sources: [],
@@ -906,7 +895,6 @@ export class ProfileTransformer {
     slotPosition: number
   ): ImplantWithClusters {
     const placeholderItem: Item = {
-      id: 0,
       aoid: placement.aoid || 0,
       name:
         placement.implantType === 'implant'

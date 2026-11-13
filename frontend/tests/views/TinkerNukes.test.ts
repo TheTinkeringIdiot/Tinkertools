@@ -42,7 +42,6 @@ const GREATER_THAN = 2;
 /** An offensive nano whose only casting requirement is Matter Creation >= `mcRequired`. */
 function offensiveNanoItem(aoid: number, name: string, mcRequired: number): Item {
   return {
-    id: aoid,
     aoid,
     name,
     ql: 200,
@@ -50,16 +49,14 @@ function offensiveNanoItem(aoid: number, name: string, mcRequired: number): Item
     item_class: 0,
     is_nano: true,
     stats: [
-      { id: 1, stat: 294, value: 100 }, // Cast time
-      { id: 2, stat: 210, value: 200 }, // Recharge time
-      { id: 3, stat: 407, value: 50 }, // Nano point cost
+      { stat: 294, value: 100 }, // Cast time
+      { stat: 210, value: 200 }, // Recharge time
+      { stat: 407, value: 50 }, // Nano point cost
     ],
     spell_data: [
       {
-        id: aoid,
         spells: [
           {
-            id: aoid,
             target: 3,
             spell_id: 53002, // Hit target for damage
             spell_params: { MinValue: -500, MaxValue: -900, ModifierStat: 93 },
@@ -70,12 +67,8 @@ function offensiveNanoItem(aoid: number, name: string, mcRequired: number): Item
     ],
     actions: [
       {
-        id: aoid,
         action: 3,
-        item_id: aoid,
-        criteria: [
-          { id: aoid, value1: MATTER_CREATION, value2: mcRequired - 1, operator: GREATER_THAN },
-        ],
+        criteria: [{ value1: MATTER_CREATION, value2: mcRequired - 1, operator: GREATER_THAN }],
       },
     ],
     attack_stats: [],

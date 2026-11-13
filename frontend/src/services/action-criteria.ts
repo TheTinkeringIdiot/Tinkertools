@@ -21,7 +21,6 @@ import type { Action, Criterion } from '../types/api';
 // ============================================================================
 
 export interface ParsedCriterion {
-  id: number;
   stat: number;
   statName: string;
   value: number;
@@ -31,7 +30,6 @@ export interface ParsedCriterion {
 }
 
 export interface DisplayCriterion {
-  id: number;
   stat: number;
   statName: string;
   displayValue: number;
@@ -97,7 +95,6 @@ export interface CriteriaTreeNode {
 }
 
 export interface ParsedAction {
-  id: number;
   action: number;
   actionName: string;
   criteria: DisplayCriterion[];
@@ -202,7 +199,6 @@ export function parseCriterion(criterion: Criterion): ParsedCriterion {
   const rawDescription = `${statName} ${operatorName} ${criterion.value2}`;
 
   return {
-    id: criterion.id,
     stat: criterion.value1,
     statName,
     value: criterion.value2,
@@ -216,14 +212,13 @@ export function parseCriterion(criterion: Criterion): ParsedCriterion {
  * Transform a criterion for intuitive display
  */
 export function transformCriterionForDisplay(criterion: Criterion): DisplayCriterion {
-  const { id, value1: stat, value2: value, operator } = criterion;
+  const { value1: stat, value2: value, operator } = criterion;
   const statName = getStatName(stat) || `Stat ${stat}`;
 
   // Handle modifier operators FIRST (before logical operator check)
   if (operator in MODIFIER_OPERATORS) {
     const modifierType = MODIFIER_OPERATORS[operator as keyof typeof MODIFIER_OPERATORS];
     return {
-      id,
       stat,
       statName: 'Modifier',
       displayValue: value,
@@ -241,7 +236,6 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
   // State conditions (most carry no stat or value)
   if (operator in STATE_OPERATORS) {
     return {
-      id,
       stat,
       statName,
       displayValue: value,
@@ -262,7 +256,6 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
     const isSeparator = operator === 4; // AND used as separator
 
     return {
-      id,
       stat,
       statName: 'Logical',
       displayValue: value,
@@ -285,7 +278,6 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
   if (operator === 127) {
     // CheckNcu - checks if a nano is NOT running
     return {
-      id,
       stat,
       statName: 'NCU Check',
       displayValue: value, // aoid of nano
@@ -306,7 +298,6 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
   if (operator === 91) {
     // RunningNano - checks if a specific nano (by AOID) is running
     return {
-      id,
       stat,
       statName: 'Running Nano',
       displayValue: value, // aoid of nano
@@ -328,7 +319,6 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
     // RunningNanoLine - checks if any nano from a specific line/strain is running
     const lineName = getNanoStrainName(value) || `Line ${value}`;
     return {
-      id,
       stat,
       statName: 'Running Nano Line',
       displayValue: value, // nano line/strain ID
@@ -346,7 +336,6 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
   if (operator === 101) {
     // NotRunningNano - checks if a specific nano (by AOID) is NOT running
     return {
-      id,
       stat,
       statName: 'Not Running Nano',
       displayValue: value, // aoid of nano
@@ -368,7 +357,6 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
     // NotRunningNanoLine - checks if NO nano from a specific line/strain is running
     const lineName = getNanoStrainName(value) || `Line ${value}`;
     return {
-      id,
       stat,
       statName: 'Not Running Nano Line',
       displayValue: value, // nano line/strain ID
@@ -387,7 +375,6 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
   const itemReference = ITEM_REFERENCE_OPERATORS[operator];
   if (itemReference) {
     return {
-      id,
       stat,
       statName,
       displayValue: value,
@@ -411,7 +398,6 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
     const operatorName = OPERATOR[operator as keyof typeof OPERATOR] || `Operator ${operator}`;
     const subject = stat !== 0 ? ` ${statName}` : '';
     return {
-      id,
       stat,
       statName,
       displayValue: value,
@@ -475,7 +461,6 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
   }
 
   return {
-    id,
     stat,
     statName,
     displayValue,
@@ -614,7 +599,6 @@ export function parseAction(action: Action): ParsedAction {
     : `${actionName}: No requirements`;
 
   return {
-    id: action.id,
     action: action.action || 0,
     actionName,
     criteria,

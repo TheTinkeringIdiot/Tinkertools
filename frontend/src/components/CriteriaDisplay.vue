@@ -21,8 +21,8 @@
     <div v-else-if="!expanded && listedRequirements.length <= 2" class="simple-view">
       <div class="flex flex-wrap gap-2">
         <CriterionChip
-          v-for="criterion in listedRequirements"
-          :key="criterion.id"
+          v-for="(criterion, index) in listedRequirements"
+          :key="index"
           :criterion="criterion"
           :character-stats="characterStats"
           size="small"
@@ -48,8 +48,8 @@
       <Transition name="slide-down">
         <div v-if="showExpanded" class="mt-2 space-y-2">
           <CriterionChip
-            v-for="criterion in listedRequirements"
-            :key="criterion.id"
+            v-for="(criterion, index) in listedRequirements"
+            :key="index"
             :criterion="criterion"
             :character-stats="characterStats"
             size="small"
@@ -64,8 +64,8 @@
       <div class="text-sm font-medium mb-2">Requirements:</div>
       <div class="space-y-2">
         <CriterionChip
-          v-for="criterion in listedRequirements"
-          :key="criterion.id"
+          v-for="(criterion, index) in listedRequirements"
+          :key="index"
           :criterion="criterion"
           :character-stats="characterStats"
           size="normal"
@@ -184,7 +184,7 @@ const SUMMARY = {
  */
 const evaluation = computed(() => {
   if (!props.characterStats || listedRequirements.value.length === 0) return null;
-  const parsed = parseAction({ id: 0, action: 0, item_id: 0, criteria: props.criteria });
+  const parsed = parseAction({ action: 0, criteria: props.criteria });
   return checkActionRequirements(parsed, props.characterStats);
 });
 </script>

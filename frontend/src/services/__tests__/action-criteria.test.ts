@@ -140,7 +140,6 @@ describe('action-criteria service', () => {
   describe('parseCriterion', () => {
     it('should parse a basic criterion correctly', () => {
       const criterion: Criterion = {
-        id: 1,
         value1: 112, // Pistol
         value2: 356,
         operator: 2, // StatGreaterThan
@@ -149,7 +148,6 @@ describe('action-criteria service', () => {
       const result = parseCriterion(criterion);
 
       expect(result).toEqual({
-        id: 1,
         stat: 112,
         statName: 'Pistol',
         value: 356,
@@ -161,7 +159,6 @@ describe('action-criteria service', () => {
 
     it('should handle unknown stat IDs', () => {
       const criterion: Criterion = {
-        id: 1,
         value1: 999, // Unknown stat
         value2: 100,
         operator: 0,
@@ -176,7 +173,6 @@ describe('action-criteria service', () => {
     describe('operator transformations', () => {
       it('should transform StatGreaterThan (>) to >= with +1 value', () => {
         const criterion: Criterion = {
-          id: 1,
           value1: 112, // Pistol
           value2: 356,
           operator: 2, // StatGreaterThan
@@ -193,7 +189,6 @@ describe('action-criteria service', () => {
 
       it('should transform StatLessThan (<) to <= with -1 value', () => {
         const criterion: Criterion = {
-          id: 1,
           value1: 127, // Psychology
           value2: 200,
           operator: 1, // StatLessThan
@@ -210,7 +205,6 @@ describe('action-criteria service', () => {
 
       it('should handle StatEqual (=) without transformation', () => {
         const criterion: Criterion = {
-          id: 1,
           value1: 60, // Profession
           value2: 8,
           operator: 0, // StatEqual
@@ -226,7 +220,6 @@ describe('action-criteria service', () => {
 
       it('should handle StatNotEqual (≠)', () => {
         const criterion: Criterion = {
-          id: 1,
           value1: 60,
           value2: 5,
           operator: 24, // StatNotEqual
@@ -242,7 +235,6 @@ describe('action-criteria service', () => {
 
       it('should handle bit set operations', () => {
         const criterion: Criterion = {
-          id: 1,
           value1: 30, // Can flags
           value2: 64,
           operator: 22, // StatBitSet
@@ -259,7 +251,6 @@ describe('action-criteria service', () => {
     describe('logical operators', () => {
       it('should identify AND operators (separators)', () => {
         const criterion: Criterion = {
-          id: 1,
           value1: 0,
           value2: 0,
           operator: 4, // And
@@ -276,7 +267,6 @@ describe('action-criteria service', () => {
 
       it('should identify OR operators', () => {
         const criterion: Criterion = {
-          id: 1,
           value1: 0,
           value2: 0,
           operator: 3, // Or
@@ -293,7 +283,6 @@ describe('action-criteria service', () => {
 
       it('should identify NOT operators', () => {
         const criterion: Criterion = {
-          id: 1,
           value1: 0,
           value2: 0,
           operator: 42, // Not
@@ -311,7 +300,6 @@ describe('action-criteria service', () => {
     describe('special stat formatting', () => {
       it('should format Level stat with prefix', () => {
         const criterion: Criterion = {
-          id: 1,
           value1: 54, // Level
           value2: 150,
           operator: 2,
@@ -323,7 +311,6 @@ describe('action-criteria service', () => {
 
       it('should format Profession stat with name lookup', () => {
         const criterion: Criterion = {
-          id: 1,
           value1: 60, // Profession
           value2: 5, // Agent
           operator: 0,
@@ -335,7 +322,6 @@ describe('action-criteria service', () => {
 
       it('should format Breed stat with name lookup', () => {
         const criterion: Criterion = {
-          id: 1,
           value1: 4, // Breed
           value2: 1, // Opifex
           operator: 0,
@@ -347,7 +333,6 @@ describe('action-criteria service', () => {
 
       it('should format Gender stat with name lookup', () => {
         const criterion: Criterion = {
-          id: 1,
           value1: 59, // Gender
           value2: 1, // Female
           operator: 0,
@@ -361,7 +346,7 @@ describe('action-criteria service', () => {
 
   describe('parseCriteriaExpression', () => {
     it('should handle simple stat requirements', () => {
-      const criteria: Criterion[] = [{ id: 1, value1: 112, value2: 356, operator: 2 }];
+      const criteria: Criterion[] = [{ value1: 112, value2: 356, operator: 2 }];
 
       const result = parseCriteriaExpression(criteria);
 
@@ -376,9 +361,9 @@ describe('action-criteria service', () => {
 
     it('should handle logical expressions with reverse polish notation', () => {
       const criteria: Criterion[] = [
-        { id: 1, value1: 112, value2: 356, operator: 2 }, // Pistol > 356
-        { id: 2, value1: 17, value2: 200, operator: 2 }, // Stamina > 200
-        { id: 3, value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 112, value2: 356, operator: 2 }, // Pistol > 356
+        { value1: 17, value2: 200, operator: 2 }, // Stamina > 200
+        { value1: 0, value2: 0, operator: 4 }, // AND
       ];
 
       const result = parseCriteriaExpression(criteria);
@@ -390,11 +375,11 @@ describe('action-criteria service', () => {
 
     it('should handle complex nested expressions', () => {
       const criteria: Criterion[] = [
-        { id: 1, value1: 60, value2: 8, operator: 0 }, // Profession = 8
-        { id: 2, value1: 112, value2: 442, operator: 2 }, // Pistol > 442
-        { id: 3, value1: 0, value2: 0, operator: 4 }, // AND
-        { id: 4, value1: 150, value2: 221, operator: 2 }, // FlingShot > 221
-        { id: 5, value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 60, value2: 8, operator: 0 }, // Profession = 8
+        { value1: 112, value2: 442, operator: 2 }, // Pistol > 442
+        { value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 150, value2: 221, operator: 2 }, // FlingShot > 221
+        { value1: 0, value2: 0, operator: 4 }, // AND
       ];
 
       const result = parseCriteriaExpression(criteria);
@@ -408,8 +393,8 @@ describe('action-criteria service', () => {
 
     it('should handle NOT operations', () => {
       const criteria: Criterion[] = [
-        { id: 1, value1: 60, value2: 5, operator: 0 }, // Profession = 5
-        { id: 2, value1: 0, value2: 0, operator: 42 }, // NOT
+        { value1: 60, value2: 5, operator: 0 }, // Profession = 5
+        { value1: 0, value2: 0, operator: 42 }, // NOT
       ];
 
       const result = parseCriteriaExpression(criteria);
@@ -428,10 +413,8 @@ describe('action-criteria service', () => {
   describe('parseAction', () => {
     it('should parse a complete action with criteria', () => {
       const action: Action = {
-        id: 1,
         action: 6, // Wield
-        item_id: 123,
-        criteria: [{ id: 1, value1: 112, value2: 356, operator: 2 }],
+        criteria: [{ value1: 112, value2: 356, operator: 2 }],
       };
 
       const result = parseAction(action);
@@ -445,9 +428,7 @@ describe('action-criteria service', () => {
 
     it('should handle actions without requirements', () => {
       const action: Action = {
-        id: 1,
         action: 1, // Get
-        item_id: 123,
         criteria: [],
       };
 
@@ -460,9 +441,7 @@ describe('action-criteria service', () => {
 
     it('should handle unknown action types', () => {
       const action: Action = {
-        id: 1,
         action: 999,
-        item_id: 123,
         criteria: [],
       };
 
@@ -475,10 +454,10 @@ describe('action-criteria service', () => {
   describe('getCriteriaRequirements', () => {
     it('should extract stat requirements from criteria', () => {
       const criteria: Criterion[] = [
-        { id: 1, value1: 112, value2: 356, operator: 2 }, // Pistol >= 357
-        { id: 2, value1: 54, value2: 149, operator: 1 }, // Level <= 148
-        { id: 3, value1: 60, value2: 8, operator: 0 }, // Profession = 8
-        { id: 4, value1: 0, value2: 0, operator: 4 }, // AND (ignored)
+        { value1: 112, value2: 356, operator: 2 }, // Pistol >= 357
+        { value1: 54, value2: 149, operator: 1 }, // Level <= 148
+        { value1: 60, value2: 8, operator: 0 }, // Profession = 8
+        { value1: 0, value2: 0, operator: 4 }, // AND (ignored)
       ];
 
       const result = getCriteriaRequirements(criteria);
@@ -509,9 +488,9 @@ describe('action-criteria service', () => {
 
     it('should handle multiple requirements for the same stat', () => {
       const criteria: Criterion[] = [
-        { id: 1, value1: 112, value2: 300, operator: 2 }, // Pistol >= 301
-        { id: 2, value1: 112, value2: 500, operator: 1 }, // Pistol <= 499
-        { id: 3, value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 112, value2: 300, operator: 2 }, // Pistol >= 301
+        { value1: 112, value2: 500, operator: 1 }, // Pistol <= 499
+        { value1: 0, value2: 0, operator: 4 }, // AND
       ];
 
       const result = getCriteriaRequirements(criteria);
@@ -527,8 +506,8 @@ describe('action-criteria service', () => {
 
     it('should handle bit flag requirements', () => {
       const criteria: Criterion[] = [
-        { id: 1, value1: 30, value2: 64, operator: 22 }, // Must have flag
-        { id: 2, value1: 30, value2: 32, operator: 107 }, // Must lack flag
+        { value1: 30, value2: 64, operator: 22 }, // Must have flag
+        { value1: 30, value2: 32, operator: 107 }, // Must lack flag
       ];
 
       const result = getCriteriaRequirements(criteria);
@@ -628,15 +607,13 @@ describe('action-criteria service', () => {
       // Typical OR pattern: (Prof = 1) OR (Prof = 2) OR (Prof = 3)
       // RPN: Prof=1 Prof=2 OR Prof=3 OR
       const action: Action = {
-        id: 1,
         action: 6, // Wield
-        item_id: 123,
         criteria: [
-          { id: 1, value1: 60, value2: 1, operator: 0 }, // Profession = 1 (Soldier)
-          { id: 2, value1: 60, value2: 2, operator: 0 }, // Profession = 2 (MartialArtist)
-          { id: 3, value1: 0, value2: 0, operator: 3 }, // OR
-          { id: 4, value1: 60, value2: 3, operator: 0 }, // Profession = 3 (Engineer)
-          { id: 5, value1: 0, value2: 0, operator: 3 }, // OR
+          { value1: 60, value2: 1, operator: 0 }, // Profession = 1 (Soldier)
+          { value1: 60, value2: 2, operator: 0 }, // Profession = 2 (MartialArtist)
+          { value1: 0, value2: 0, operator: 3 }, // OR
+          { value1: 60, value2: 3, operator: 0 }, // Profession = 3 (Engineer)
+          { value1: 0, value2: 0, operator: 3 }, // OR
         ],
       };
 
@@ -785,7 +762,6 @@ describe('action-criteria service', () => {
   describe('edge cases and error handling', () => {
     it('should handle criteria with unknown operators gracefully', () => {
       const criterion: Criterion = {
-        id: 1,
         value1: 112,
         value2: 356,
         operator: 999, // Unknown operator
@@ -802,9 +778,7 @@ describe('action-criteria service', () => {
 
     it('should handle empty action criteria', () => {
       const action: Action = {
-        id: 1,
         action: 6,
-        item_id: 123,
         criteria: [],
       };
 
@@ -816,7 +790,7 @@ describe('action-criteria service', () => {
     it('should handle malformed reverse polish notation gracefully', () => {
       // Missing operands for operator
       const criteria: Criterion[] = [
-        { id: 1, value1: 0, value2: 0, operator: 4 }, // AND with no operands
+        { value1: 0, value2: 0, operator: 4 }, // AND with no operands
       ];
 
       const result = parseCriteriaExpression(criteria);
@@ -840,7 +814,7 @@ describe('criteria that name an item or nano', () => {
     [101, 'Not running', 'Nano'],
     [127, 'Not running', 'Nano'],
   ] as const)('operator %i reads "%s" and keeps the AOID', (operator, prefix, kind) => {
-    const criterion = transformCriterionForDisplay({ id: 1, value1: 0, value2: 226987, operator });
+    const criterion = transformCriterionForDisplay({ value1: 0, value2: 226987, operator });
 
     expect(criterion).toMatchObject({
       referenceAoid: 226987,
@@ -852,7 +826,7 @@ describe('criteria that name an item or nano', () => {
   });
 
   it('leaves perk conditions unnamed: their values are perk ids, not item AOIDs', () => {
-    const criterion = transformCriterionForDisplay({ id: 1, value1: 0, value2: 145, operator: 93 });
+    const criterion = transformCriterionForDisplay({ value1: 0, value2: 145, operator: 93 });
 
     expect(criterion.referenceAoid).toBeUndefined();
   });
@@ -861,15 +835,13 @@ describe('criteria that name an item or nano', () => {
 describe('integration tests', () => {
   it('should handle real-world Dark Pistol example correctly', () => {
     const darkPistolAction: Action = {
-      id: 93424,
       action: 8, // Attack
-      item_id: 129671,
       criteria: [
-        { id: 1, value1: 60, value2: 8, operator: 0 }, // Profession = 8 (Bureaucrat)
-        { id: 2, value1: 112, value2: 442, operator: 2 }, // Pistol > 442
-        { id: 3, value1: 0, value2: 0, operator: 4 }, // AND
-        { id: 4, value1: 150, value2: 221, operator: 2 }, // FlingShot > 221
-        { id: 5, value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 60, value2: 8, operator: 0 }, // Profession = 8 (Bureaucrat)
+        { value1: 112, value2: 442, operator: 2 }, // Pistol > 442
+        { value1: 0, value2: 0, operator: 4 }, // AND
+        { value1: 150, value2: 221, operator: 2 }, // FlingShot > 221
+        { value1: 0, value2: 0, operator: 4 }, // AND
       ],
     };
 

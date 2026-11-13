@@ -101,12 +101,10 @@ class PerkService:
             "spell_data": (
                 [
                     {
-                        "id": sd.spell_data.id,
                         "event": sd.spell_data.event,
                         "spells": (
                             [
                                 {
-                                    "id": spell.id,
                                     "target": spell.target,
                                     "tick_count": spell.tick_count,
                                     "tick_interval": spell.tick_interval,
@@ -132,7 +130,6 @@ class PerkService:
             "actions": (
                 [
                     {
-                        "id": action.id,
                         "action": action.action,
                         "criteria": (
                             [

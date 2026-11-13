@@ -21,11 +21,11 @@ from app.models import Item
 from app.tests.db_test_constants import ITEM_PISTOL_MASTERY
 from app.api.schemas import (
     ItemDetail,
-    StatValueResponse,
+    ItemStatResponse,
     SpellDataResponse,
     ActionResponse,
-    CriterionResponse,
-    SpellWithCriteria,
+    ItemCriterionResponse,
+    ItemSpellResponse,
 )
 
 
@@ -89,14 +89,12 @@ class TestItemEndpoints:
             item_class=1,
             description="A test weapon",
             is_nano=False,
-            stats=[StatValueResponse(id=1, stat=16, value=50)],
+            stats=[ItemStatResponse(stat=16, value=50)],
             spell_data=[
                 SpellDataResponse(
-                    id=1,
                     event=1,
                     spells=[
-                        SpellWithCriteria(
-                            id=1,
+                        ItemSpellResponse(
                             target=1,
                             tick_count=None,
                             tick_interval=None,
@@ -108,16 +106,12 @@ class TestItemEndpoints:
                     ],
                 )
             ],
-            attack_stats=[StatValueResponse(id=2, stat=100, value=200)],
-            defense_stats=[StatValueResponse(id=3, stat=101, value=150)],
+            attack_stats=[ItemStatResponse(stat=100, value=200)],
+            defense_stats=[ItemStatResponse(stat=101, value=150)],
             actions=[
                 ActionResponse(
-                    id=1,
                     action=1,
-                    item_id=1,
-                    criteria=[
-                        CriterionResponse(id=1, value1=16, value2=100, operator=1)
-                    ],
+                    criteria=[ItemCriterionResponse(value1=16, value2=100, operator=1)],
                 )
             ],
             sources=[],
@@ -135,16 +129,14 @@ class TestItemEndpoints:
             description="A comprehensive test weapon",
             is_nano=False,
             stats=[
-                StatValueResponse(id=4, stat=16, value=50),  # Strength
-                StatValueResponse(id=5, stat=17, value=25),  # Intelligence
+                ItemStatResponse(stat=16, value=50),  # Strength
+                ItemStatResponse(stat=17, value=25),  # Intelligence
             ],
             spell_data=[
                 SpellDataResponse(
-                    id=2,
                     event=1,
                     spells=[
-                        SpellWithCriteria(
-                            id=2,
+                        ItemSpellResponse(
                             target=1,
                             tick_count=None,
                             tick_interval=None,
@@ -156,16 +148,12 @@ class TestItemEndpoints:
                     ],
                 )
             ],
-            attack_stats=[StatValueResponse(id=6, stat=100, value=200)],
-            defense_stats=[StatValueResponse(id=7, stat=101, value=150)],
+            attack_stats=[ItemStatResponse(stat=100, value=200)],
+            defense_stats=[ItemStatResponse(stat=101, value=150)],
             actions=[
                 ActionResponse(
-                    id=2,
                     action=1,
-                    item_id=2,
-                    criteria=[
-                        CriterionResponse(id=2, value1=16, value2=100, operator=1)
-                    ],
+                    criteria=[ItemCriterionResponse(value1=16, value2=100, operator=1)],
                 )
             ],
             sources=[],

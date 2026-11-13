@@ -48,7 +48,7 @@ Displays nano programs in a scrollable list with compatibility indicators
         <div class="grid gap-4" :class="compactView ? 'grid-cols-1' : 'grid-cols-1'">
           <NanoCard
             v-for="nano in paginatedNanos"
-            :key="nano.id"
+            :key="nano.aoid"
             :nano="nano"
             :compact="compactView"
             :show-compatibility="showCompatibility"
@@ -137,7 +137,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   'nano-select': [nano: NanoProgram];
   'page-change': [page: number, rows: number];
-  favorite: [nanoId: number, isFavorite: boolean];
+  favorite: [aoid: number, isFavorite: boolean];
 }>();
 
 // Reactive state
@@ -174,8 +174,8 @@ const handleNanoSelect = (nano: NanoProgram) => {
   emit('nano-select', nano);
 };
 
-const handleFavorite = (nanoId: number, isFavorite: boolean) => {
-  emit('favorite', nanoId, isFavorite);
+const handleFavorite = (aoid: number, isFavorite: boolean) => {
+  emit('favorite', aoid, isFavorite);
 };
 
 const handlePageChange = (event: PageState) => {

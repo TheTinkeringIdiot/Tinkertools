@@ -304,13 +304,13 @@ export const useAppStore = defineStore('app', () => {
   // ============================================================================
 
   function addSelectedItem(item: Item): void {
-    if (!selectedItems.value.find((i) => i.id === item.id)) {
+    if (!selectedItems.value.find((i) => i.aoid === item.aoid)) {
       selectedItems.value.push(item);
     }
   }
 
-  function removeSelectedItem(itemId: number): void {
-    const index = selectedItems.value.findIndex((i) => i.id === itemId);
+  function removeSelectedItem(aoid: number): void {
+    const index = selectedItems.value.findIndex((i) => i.aoid === aoid);
     if (index > -1) {
       selectedItems.value.splice(index, 1);
     }
@@ -321,21 +321,21 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function toggleItemSelection(item: Item): void {
-    if (selectedItems.value.find((i) => i.id === item.id)) {
-      removeSelectedItem(item.id);
+    if (selectedItems.value.find((i) => i.aoid === item.aoid)) {
+      removeSelectedItem(item.aoid);
     } else {
       addSelectedItem(item);
     }
   }
 
   function addSelectedSymbiant(symbiant: Symbiant): void {
-    if (!selectedSymbiants.value.find((s) => s.id === symbiant.id)) {
+    if (!selectedSymbiants.value.find((s) => s.aoid === symbiant.aoid)) {
       selectedSymbiants.value.push(symbiant);
     }
   }
 
-  function removeSelectedSymbiant(symbiantId: number): void {
-    const index = selectedSymbiants.value.findIndex((s) => s.id === symbiantId);
+  function removeSelectedSymbiant(aoid: number): void {
+    const index = selectedSymbiants.value.findIndex((s) => s.aoid === aoid);
     if (index > -1) {
       selectedSymbiants.value.splice(index, 1);
     }

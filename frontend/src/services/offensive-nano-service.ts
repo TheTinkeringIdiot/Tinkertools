@@ -178,7 +178,7 @@ function extractLevel(item: ItemDetail): number {
 export function buildOffensiveNano(item: ItemDetail): OffensiveNano | null {
   // Validate item has spell data
   if (!item.spell_data || item.spell_data.length === 0) {
-    console.warn(`[buildOffensiveNano] Item ${item.id} has no spell_data`);
+    console.warn(`[buildOffensiveNano] Item ${item.aoid} has no spell_data`);
     return null;
   }
 
@@ -197,7 +197,7 @@ export function buildOffensiveNano(item: ItemDetail): OffensiveNano | null {
   }
 
   if (offensiveSpells.length === 0) {
-    console.warn(`[buildOffensiveNano] Item ${item.id} has no offensive spell`);
+    console.warn(`[buildOffensiveNano] Item ${item.aoid} has no offensive spell`);
     return null;
   }
 
@@ -241,7 +241,6 @@ export function buildOffensiveNano(item: ItemDetail): OffensiveNano | null {
     item,
 
     // Base NanoProgram fields
-    id: item.id,
     aoid: item.aoid,
     name: item.name,
     school: extractNanoSchool(item),

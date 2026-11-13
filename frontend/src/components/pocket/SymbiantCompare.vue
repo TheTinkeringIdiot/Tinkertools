@@ -29,7 +29,7 @@ function clearSymbiant(index: number) {
   selectedSymbiants.value[index] = null;
   // Sync to store
   if (symbiant) {
-    symbiantStore.removeFromComparison(symbiant.id);
+    symbiantStore.removeFromComparison(symbiant.aoid);
   }
   updateUrl();
 }
@@ -187,13 +187,14 @@ function getCellClass(
   return '';
 }
 
-// URL persistence
+// URL persistence. The slots are a1..a3 (AOIDs); links made before that used
+// s1..s3 with internal ids, which no longer mean anything and are ignored.
 function updateUrl() {
   const query: Record<string, string> = {};
 
   selectedSymbiants.value.forEach((symbiant, index) => {
     if (symbiant) {
-      query[`s${index + 1}`] = symbiant.id.toString();
+      query[`a${index + 1}`] = symbiant.aoid.toString();
     }
   });
 
@@ -203,18 +204,16 @@ function updateUrl() {
 }
 
 function loadFromUrl() {
-  const s1 = route.query.s1 ? parseInt(route.query.s1 as string) : null;
-  const s2 = route.query.s2 ? parseInt(route.query.s2 as string) : null;
-  const s3 = route.query.s3 ? parseInt(route.query.s3 as string) : null;
-
-  const ids = [s1, s2, s3];
+  const aoids = [route.query.a1, route.query.a2, route.query.a3].map((value) =>
+    value ? parseInt(value as string) : null
+  );
 
   // Get all symbiants from store
   const allSymbiants = symbiantStore.allSymbiants as EnrichedSymbiant[];
 
-  ids.forEach((id, index) => {
-    if (id) {
-      const symbiant = allSymbiants.find((s) => s.id === id);
+  aoids.forEach((aoid, index) => {
+    if (aoid) {
+      const symbiant = allSymbiants.find((s) => s.aoid === aoid);
       if (symbiant) {
         selectedSymbiants.value[index] = symbiant;
       }

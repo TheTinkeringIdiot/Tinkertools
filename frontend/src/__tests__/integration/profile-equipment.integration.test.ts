@@ -52,44 +52,41 @@ describe('Profile Equipment Integration', () => {
   let context: IntegrationTestContext;
 
   const mockItem: Item = createTestItem({
-    id: 1,
     aoid: 246660,
     name: "Combined Commando's Jacket",
     ql: 300,
     description: 'A tactical jacket',
     item_class: 2,
     stats: [
-      { id: 1, stat: 79, value: 123456 }, // Icon stat
-      { id: 2, stat: 12, value: 100 },
+      { stat: 79, value: 123456 }, // Icon stat
+      { stat: 12, value: 100 },
     ],
   });
 
   const mockImplantItem: Item = createTestItem({
-    id: 2,
     aoid: 87654,
     name: 'Ocular Enhancement',
     ql: 100,
     description: 'An eye implant',
     item_class: 3, // Implant class
     stats: [
-      { id: 1, stat: 79, value: 987654 }, // Icon stat
-      { id: 2, stat: 17, value: 20 }, // Agility
-      { id: 3, stat: 19, value: 25 }, // Intelligence
+      { stat: 79, value: 987654 }, // Icon stat
+      { stat: 17, value: 20 }, // Agility
+      { stat: 19, value: 25 }, // Intelligence
     ],
   });
 
   /** Items the backend knows, keyed by AOID */
   const catalog: Record<number, Item> = {
     246660: mockItem,
-    246661: { ...mockItem, id: 2, aoid: 246661, name: "Combined Commando's Headwear" },
-    246662: { ...mockItem, id: 3, aoid: 246662, name: "Combined Commando's Legwear" },
-    123456: { ...mockItem, id: 4, aoid: 123456, name: 'Assault Rifle', item_class: 1 },
-    789123: { ...mockItem, id: 5, aoid: 789123, name: 'Brain Symbiant', item_class: 3 },
+    246661: { ...mockItem, aoid: 246661, name: "Combined Commando's Headwear" },
+    246662: { ...mockItem, aoid: 246662, name: "Combined Commando's Legwear" },
+    123456: { ...mockItem, aoid: 123456, name: 'Assault Rifle', item_class: 1 },
+    789123: { ...mockItem, aoid: 789123, name: 'Brain Symbiant', item_class: 3 },
   };
 
   function toInterpolated(item: Item, targetQl: number): InterpolatedItem {
     return {
-      id: item.id,
       aoid: item.aoid,
       name: item.name,
       ql: targetQl,
@@ -363,12 +360,12 @@ describe('Profile Equipment Integration', () => {
       context.mockApi.lookupImplant
         .mockResolvedValueOnce({
           success: true,
-          item: { ...mockImplantItem, id: 10, name: 'Chest Enhancement', ql: 150 },
+          item: { ...mockImplantItem, name: 'Chest Enhancement', ql: 150 },
           interpolated: false,
         })
         .mockResolvedValueOnce({
           success: true,
-          item: { ...mockImplantItem, id: 11, name: 'Ear Enhancement', ql: 200 },
+          item: { ...mockImplantItem, name: 'Ear Enhancement', ql: 200 },
           interpolated: false,
         });
 

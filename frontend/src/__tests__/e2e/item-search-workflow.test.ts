@@ -36,11 +36,10 @@ import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import TinkerItems from '@/views/TinkerItems.vue';
 import type { Item, PaginatedResponse } from '@/types/api';
 
-const cellScanner = createTestItem({ id: 1, aoid: 5001, name: 'Cell Scanner', ql: 50 });
-const combatArmor = createArmorItem({ id: 2, aoid: 5002, name: 'Combat Armor', ql: 150 });
-const rifle = createWeaponItem({ id: 3, aoid: 5003, name: 'Assault Rifle', ql: 200 });
+const cellScanner = createTestItem({ aoid: 5001, name: 'Cell Scanner', ql: 50 });
+const combatArmor = createArmorItem({ aoid: 5002, name: 'Combat Armor', ql: 150 });
+const rifle = createWeaponItem({ aoid: 5003, name: 'Assault Rifle', ql: 200 });
 const ironCircle = createTestItem({
-  id: 4,
   aoid: 5004,
   name: 'Iron Circle',
   ql: 60,
@@ -195,7 +194,7 @@ describe('Item Search Workflow', () => {
 
   describe('Comparing items', () => {
     it('collects up to three distinct items in the comparison panel', async () => {
-      const extra = createWeaponItem({ id: 9, aoid: 5009, name: 'Spare Rifle', ql: 10 });
+      const extra = createWeaponItem({ aoid: 5009, name: 'Spare Rifle', ql: 10 });
       context.mockApi.searchItems.mockResolvedValue(
         results([cellScanner, combatArmor, rifle, extra])
       );

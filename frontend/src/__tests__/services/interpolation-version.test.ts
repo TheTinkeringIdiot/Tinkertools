@@ -24,7 +24,6 @@ const mockApi = vi.mocked(apiClient);
 
 function interpolated(ql: number): InterpolatedItem {
   return {
-    id: 1,
     aoid: 24562,
     name: 'Notum Splice',
     is_nano: false,

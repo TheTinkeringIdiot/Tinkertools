@@ -15,7 +15,7 @@ Users can query symbiants by family type (Artillery, Control, Extermination, Inf
 4. Results returned as paginated `SymbiantResponse` objects
 
 ### Finding Drop Sources
-1. Frontend requests drop sources for a symbiant via `/api/symbiants/{id}/dropped-by`
+1. Frontend requests drop sources for a symbiant via `/api/symbiants/{aoid}/dropped-by`
 2. Backend traverses: SymbiantItem → ItemSource → Source → Mob
 3. Filters for `is_pocket_boss = TRUE` and `source_type = 'mob'`
 4. Returns list of `MobDropInfo` objects with boss metadata
@@ -230,11 +230,11 @@ List symbiants with filtering
 - Query params: `family`, `families[]`, `slot_id`, `min_ql`, `max_ql`, `page`, `page_size`
 - Response: `PaginatedResponse<SymbiantResponse>`
 
-### GET /api/symbiants/{id}
+### GET /api/symbiants/{aoid}
 Get single symbiant details
 - Response: `SymbiantResponse`
 
-### GET /api/symbiants/{id}/dropped-by
+### GET /api/symbiants/{aoid}/dropped-by
 Get pocket bosses that drop this symbiant
 - Response: `MobDropInfo[]`
 

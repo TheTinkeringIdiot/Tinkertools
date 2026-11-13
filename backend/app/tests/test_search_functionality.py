@@ -179,7 +179,7 @@ class TestSymbiantSearch:
         assert len(data["items"]) == min(data["page_size"], expected_total)
 
         symbiant = data["items"][0]
-        assert "id" in symbiant
+        assert "aoid" in symbiant
         assert "family" in symbiant
         assert "name" in symbiant
 
@@ -206,7 +206,7 @@ class TestSymbiantSearch:
             assert response.status_code == 200
             data = response.json()
             families.update(s["family"] for s in data["items"])
-            ids.extend(s["id"] for s in data["items"])
+            ids.extend(s["aoid"] for s in data["items"])
             if not data["has_next"]:
                 break
             page += 1
@@ -214,9 +214,7 @@ class TestSymbiantSearch:
         assert dict(families) == expected
         # Pages partition the set: no symbiant repeated or skipped
         assert len(ids) == len(set(ids))
-        assert set(ids) == {
-            symbiant_id for (symbiant_id,) in db_session.query(SymbiantItem.id)
-        }
+        assert set(ids) == {aoid for (aoid,) in db_session.query(SymbiantItem.aoid)}
 
     def test_symbiant_ql_filtering(self, client):
         """Test symbiant QL filtering (client-side filtering expected)."""
@@ -346,20 +344,20 @@ class TestRealDataValidation:
             assert "ql" in item_data
 
     def test_get_specific_symbiant(self, client):
-        """Test getting a specific symbiant by ID using real database data."""
-        # Get list to find a real ID
+        """Test getting a specific symbiant by AOID using real database data."""
+        # Get list to find a real AOID
         response = client.get("/api/v1/symbiants?page_size=1")
         assert response.status_code == 200
         data = response.json()
 
         if data["total"] > 0:
-            symbiant_id = data["items"][0]["id"]
+            aoid = data["items"][0]["aoid"]
 
             # Get specific symbiant
-            response = client.get(f"/api/v1/symbiants/{symbiant_id}")
+            response = client.get(f"/api/v1/symbiants/{aoid}")
             assert response.status_code == 200
             symbiant_data = response.json()
-            assert symbiant_data["id"] == symbiant_id
+            assert symbiant_data["aoid"] == aoid
             assert "family" in symbiant_data
 
     def test_get_specific_pocket_boss(self, client):

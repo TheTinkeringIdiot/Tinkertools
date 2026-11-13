@@ -11,7 +11,9 @@ from .spell import SpellDataResponse
 class SymbiantResponse(BaseModel):
     """Schema for Symbiant responses from materialized view."""
 
-    id: int = Field(description="Database ID")
+    # Deprecated: an internal row id that differs between game versions. Use
+    # ``aoid``; this field is removed with the content-addressed store.
+    id: int = Field(description="Deprecated internal row ID; do not rely on it")
     aoid: int = Field(description="Anarchy Online item ID")
     name: str = Field(description="Symbiant name")
     ql: int = Field(description="Quality level")

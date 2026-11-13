@@ -78,7 +78,6 @@ const createStarvedInputState = (): NukeInputState => {
 };
 
 const nanoItem = (aoid: number, name: string): Item => ({
-  id: aoid,
   aoid,
   name,
   is_nano: true,
@@ -89,10 +88,9 @@ const nanoItem = (aoid: number, name: string): Item => ({
   defense_stats: [],
 });
 
-const createNano = (overrides: Partial<OffensiveNano> & Pick<OffensiveNano, 'id' | 'name'>) => {
-  const aoid = overrides.aoid ?? overrides.id;
+const createNano = (overrides: Partial<OffensiveNano> & Pick<OffensiveNano, 'aoid' | 'name'>) => {
+  const aoid = overrides.aoid;
   const nano: OffensiveNano = {
-    aoid,
     school: 'Biological Metamorphosis',
     strain: '1',
     level: 200,
@@ -115,9 +113,9 @@ const createNano = (overrides: Partial<OffensiveNano> & Pick<OffensiveNano, 'id'
 };
 
 const createMockNanos = (): OffensiveNano[] => [
-  createNano({ id: 1001, name: 'Viral Bomb', qualityLevel: 250 }),
+  createNano({ aoid: 1001, name: 'Viral Bomb', qualityLevel: 250 }),
   createNano({
-    id: 1002,
+    aoid: 1002,
     name: 'Corrosive Cloud',
     level: 210,
     qualityLevel: 260,
@@ -132,7 +130,7 @@ const createMockNanos = (): OffensiveNano[] => [
     nanoPointCost: 450,
   }),
   createNano({
-    id: 1003,
+    aoid: 1003,
     name: 'Energy Blast',
     school: 'Matter Creation',
     level: 220,
@@ -275,7 +273,7 @@ describe('NukeTable', () => {
   describe('Pagination', () => {
     const manyNanos = () =>
       Array.from({ length: 30 }, (_, i) =>
-        createNano({ id: 2000 + i, name: `Nano ${i + 1}`, qualityLevel: 100 + i })
+        createNano({ aoid: 2000 + i, name: `Nano ${i + 1}`, qualityLevel: 100 + i })
       );
 
     it('should show 25 rows per page', () => {
@@ -464,7 +462,7 @@ describe('NukeTable', () => {
 
   describe('Edge Cases', () => {
     it('should handle very large damage values', () => {
-      mountTable([createNano({ id: 8888, name: 'Huge', minDamage: 999999, maxDamage: 9999999 })]);
+      mountTable([createNano({ aoid: 8888, name: 'Huge', minDamage: 999999, maxDamage: 9999999 })]);
 
       expect(Number(row('Huge')['Mid Damage'])).toBeGreaterThan(1000000);
     });
@@ -472,7 +470,7 @@ describe('NukeTable', () => {
     it('should not show NaN for zero cast time, recharge and cost', () => {
       mountTable([
         createNano({
-          id: 7777,
+          aoid: 7777,
           name: 'Zeroes',
           minDamage: 0,
           maxDamage: 0,
