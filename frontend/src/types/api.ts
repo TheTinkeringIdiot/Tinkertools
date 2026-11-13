@@ -220,11 +220,6 @@ export interface InterpolatedItem {
   animation_mesh_id?: number;
 }
 
-export interface InterpolationRequest {
-  aoid: number;
-  target_ql: number;
-}
-
 export interface InterpolationResponse {
   success: boolean;
   item?: InterpolatedItem;

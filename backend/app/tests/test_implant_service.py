@@ -34,36 +34,6 @@ class TestImplantService:
         assert self.service._determine_base_ql(250) == 201
         assert self.service._determine_base_ql(300) == 201
 
-    def test_validate_cluster_combination_valid(self):
-        """Test cluster combination validation with valid inputs."""
-        # Valid single cluster
-        assert self.service.validate_cluster_combination({"Shiny": 16}) is True
-
-        # Valid multiple clusters
-        assert (
-            self.service.validate_cluster_combination(
-                {"Shiny": 16, "Bright": 112, "Faded": 19}
-            )
-            is True
-        )
-
-        # Valid partial clusters
-        assert (
-            self.service.validate_cluster_combination({"Shiny": 16, "Faded": 19})
-            is True
-        )
-
-    def test_validate_cluster_combination_invalid(self):
-        """Test cluster combination validation with invalid inputs."""
-        # Invalid position name
-        assert self.service.validate_cluster_combination({"Invalid": 16}) is False
-
-        # Mixed valid and invalid positions
-        assert (
-            self.service.validate_cluster_combination({"Shiny": 16, "Invalid": 19})
-            is False
-        )
-
     def test_lookup_implant_invalid_slot(self):
         """Test lookup with invalid slot number."""
         result = self.service.lookup_implant(
@@ -231,30 +201,6 @@ class TestImplantService:
             item_detail, was_interpolated, base_ql = result
             assert was_interpolated is False  # Fallback to original
             assert item_detail.ql == 1
-
-    def test_get_available_implants_for_slot(self):
-        """Test getting available implants for a slot."""
-        # Mock query results
-        mock_items = [Mock(id=1, name="Implant A"), Mock(id=2, name="Implant B")]
-
-        mock_query = Mock()
-        mock_query.filter.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.all.return_value = mock_items
-        self.mock_db.query.return_value = mock_query
-
-        result = self.service.get_available_implants_for_slot(2, 1)  # Valid bitflag
-
-        assert len(result) == 2
-        assert result == mock_items
-
-    def test_get_available_implants_invalid_slot(self):
-        """Test getting available implants with invalid slot."""
-        result = self.service.get_available_implants_for_slot(0, 1)
-        assert result == []
-
-        result = self.service.get_available_implants_for_slot(14, 1)
-        assert result == []
 
     @pytest.mark.skip(
         reason="Complex query mocking required for _find_implant_with_clusters method. Test requires refactoring to properly mock complex subquery chains with joins and aggregations."

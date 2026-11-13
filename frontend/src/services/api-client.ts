@@ -20,13 +20,11 @@ import type {
   MobDropsQuery,
   UserFriendlyError,
   ApiError,
-  InterpolationRequest,
   InterpolationResponse,
   InterpolationInfo,
   ImplantLookupResponse,
   BatchInterpolationResponse,
   BatchPerkLookupResponse,
-  PerkLookupItem,
 } from '../types/api';
 import { ErrorCodes } from '../types/api';
 import type {
@@ -409,66 +407,9 @@ class TinkerToolsApiClient {
     }
   }
 
-  async getAvailableImplants(slot: number, ql: number = 1): Promise<ApiResponse<Item[]>> {
-    try {
-      const response = await this.client.get<Item[]>(`/implants/slots/${slot}/available?ql=${ql}`);
-
-      // Check if response is already wrapped in ApiResponse format
-      if (response.data && typeof response.data === 'object' && 'success' in response.data) {
-        return response.data as ApiResponse<Item[]>;
-      }
-
-      // Wrap raw response in ApiResponse format
-      return {
-        success: true,
-        data: Array.isArray(response.data) ? response.data : [],
-      };
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  async validateClusters(
-    clusters: Record<string, number>
-  ): Promise<ApiResponse<{ valid: boolean; message: string }>> {
-    try {
-      const response = await this.client.post<{ valid: boolean; message: string }>(
-        '/implants/validate-clusters',
-        clusters
-      );
-
-      // Check if response is already wrapped in ApiResponse format
-      if (response.data && typeof response.data === 'object' && 'success' in response.data) {
-        return response.data as ApiResponse<{ valid: boolean; message: string }>;
-      }
-
-      // Wrap raw response in ApiResponse format
-      return {
-        success: true,
-        data: response.data,
-      };
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
   // ============================================================================
   // Perk API
   // ============================================================================
-
-  async lookupPerkByAoid(aoid: number): Promise<PerkLookupItem | null> {
-    try {
-      const response = await this.client.get<PerkLookupItem | null>(`/perks/lookup/${aoid}`);
-      return response.data;
-    } catch (error) {
-      // Return null if perk not found
-      if (asRequestError(error).response?.status === 404) {
-        console.warn(`Perk with AOID ${aoid} not found`);
-        return null;
-      }
-      throw this.handleError(error);
-    }
-  }
 
   async batchLookupPerks(aoids: number[]): Promise<BatchPerkLookupResponse> {
     try {
@@ -498,15 +439,6 @@ class TinkerToolsApiClient {
         `/items/${aoid}/interpolate?${params.toString()}`,
         options?.gameVersion ? { gameVersion: options.gameVersion } : undefined
       );
-      return response.data;
-    } catch (error) {
-      throw this.handleError(error);
-    }
-  }
-
-  async interpolateItemByRequest(request: InterpolationRequest): Promise<InterpolationResponse> {
-    try {
-      const response = await this.client.post<InterpolationResponse>('/items/interpolate', request);
       return response.data;
     } catch (error) {
       throw this.handleError(error);

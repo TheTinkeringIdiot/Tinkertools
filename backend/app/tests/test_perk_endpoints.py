@@ -1,52 +1,55 @@
 """
 Test perk API endpoints using real database data.
 
-Tests the perk lookup endpoint against actual Anarchy Online game data,
+Tests the batch perk lookup endpoint against actual Anarchy Online game data,
 validating the full pipeline from database to response.
 """
 
 # ============================================================================
-# GET /api/v1/perks/lookup/{aoid} - Perk Lookup Tests
+# POST /api/v1/perks/batch/lookup - Perk Lookup Tests
 # ============================================================================
 
 
-def test_lookup_perk_by_aoid_accumulator(client):
-    """Test successful perk lookup by AOID for Accumulator."""
-    # AOID 210830 = Accumulator counter 1
-    response = client.get("/api/v1/perks/lookup/210830")
+def test_batch_lookup_returns_perks_in_request_order(client):
+    """The Accumulator series is looked up by AOID, one result per AOID."""
+    aoids = [210830, 210831, 210832]  # Accumulator counter 1, 2, 3
+
+    response = client.post("/api/v1/perks/batch/lookup", json={"aoids": aoids})
 
     assert response.status_code == 200
     data = response.json()
-    assert data is not None
-    assert data["name"] == "Accumulator"
-    assert data["counter"] == 1
-    assert data["type"] == "SL"
+    assert data["success"] is True
+    assert data["errors"] == []
+    assert [result["aoid"] for result in data["results"]] == aoids
+    for counter, result in enumerate(data["results"], start=1):
+        assert result["success"] is True
+        assert result["perk"]["name"] == "Accumulator"
+        assert result["perk"]["counter"] == counter
+        assert result["perk"]["type"] == "SL"
 
 
-def test_lookup_perk_by_aoid_not_found(client):
-    """Test lookup of non-existent AOID."""
-    response = client.get("/api/v1/perks/lookup/999999999")
+def test_batch_lookup_reports_an_unknown_aoid(client):
+    """An AOID that is not a perk fails on its own; the rest still resolve."""
+    response = client.post(
+        "/api/v1/perks/batch/lookup", json={"aoids": [210830, 999999999]}
+    )
 
     assert response.status_code == 200
-    # Returns null body for easier handling in frontend
-    assert response.json() is None
+    data = response.json()
+    assert data["success"] is False
+    found, missing = data["results"]
+    assert found["success"] is True
+    assert found["perk"]["name"] == "Accumulator"
+    assert missing == {
+        "aoid": 999999999,
+        "success": False,
+        "perk": None,
+        "error": "Perk with AOID 999999999 not found",
+    }
+    assert data["errors"] == ["Perk 999999999 not found"]
 
 
-def test_lookup_perk_invalid_aoid(client):
-    """Test lookup with invalid AOID."""
-    response = client.get("/api/v1/perks/lookup/invalid")
+def test_batch_lookup_rejects_invalid_aoids(client):
+    """AOIDs must be integers."""
+    response = client.post("/api/v1/perks/batch/lookup", json={"aoids": ["invalid"]})
     assert response.status_code == 422
-
-
-def test_lookup_perk_multiple_aoids(client):
-    """Test lookup for multiple known AOIDs."""
-    # Test Accumulator series
-    aoids = [210830, 210831, 210832]  # Counter 1, 2, 3
-
-    for i, aoid in enumerate(aoids, start=1):
-        response = client.get(f"/api/v1/perks/lookup/{aoid}")
-        assert response.status_code == 200
-        data = response.json()
-        assert data is not None
-        assert data["name"] == "Accumulator"
-        assert data["counter"] == i

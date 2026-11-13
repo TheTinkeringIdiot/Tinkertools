@@ -15,7 +15,7 @@ import time
 
 from app.core.database import get_db
 from app.services.perk_service import PerkService
-from app.core.decorators import cached_response, performance_monitor
+from app.core.decorators import performance_monitor
 
 router = APIRouter(prefix="/perks", tags=["perks"])
 logger = logging.getLogger(__name__)
@@ -44,33 +44,6 @@ class BatchPerkLookupResponse(BaseModel):
 def get_perk_service(db: Session = Depends(get_db)) -> PerkService:
     """Dependency to get PerkService instance."""
     return PerkService(db)
-
-
-@router.get("/lookup/{aoid}")
-@cached_response("perk_lookup")
-@performance_monitor
-def lookup_perk_by_aoid(
-    aoid: int, perk_service: PerkService = Depends(get_perk_service)
-):
-    """
-    Look up a perk by its AOID (Anarchy Online ID).
-
-    Used primarily for importing perks from external sources like AOSetups
-    where only the AOID is provided. Returns basic perk information
-    including name, type, level.
-    """
-    logger.info(f"Looking up perk by AOID: {aoid}")
-
-    perk_info = perk_service.get_perk_info_by_aoid(aoid)
-
-    if not perk_info:
-        # Return a 404 with null body for easier handling in frontend
-        return None
-
-    logger.info(
-        f"Found perk: {perk_info['name']} (type: {perk_info.get('type', 'SL')}, level: {perk_info.get('counter', 1)})"
-    )
-    return perk_info
 
 
 @router.post("/batch/lookup", response_model=BatchPerkLookupResponse)

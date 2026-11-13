@@ -206,53 +206,6 @@ class PerkService:
 
         return perk_info
 
-    def get_perk_info_by_aoid(self, aoid: int) -> Optional[Dict[str, Any]]:
-        """
-        Get complete perk item with full item details and perk metadata.
-
-        Args:
-            aoid: The AOID of the perk item
-
-        Returns:
-            Dictionary with complete perk item information or None if not found
-        """
-        logger.info(f"Looking up perk info by AOID: {aoid}")
-
-        # Query the perk item by AOID with all relationships loaded
-        from sqlalchemy.orm import selectinload
-
-        perk_item = (
-            self.db.query(Item)
-            .join(Perk, Item.id == Perk.item_id)
-            .filter(Item.aoid == aoid)
-            .options(
-                joinedload(Item.perk),
-                selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
-                selectinload(Item.item_spell_data)
-                .selectinload(ItemSpellData.spell_data)
-                .selectinload(SpellData.spell_data_spells)
-                .selectinload(SpellDataSpells.spell)
-                .selectinload(Spell.spell_criteria)
-                .selectinload(SpellCriterion.criterion),
-                selectinload(Item.actions)
-                .selectinload(Action.action_criteria)
-                .selectinload(ActionCriteria.criterion),
-                joinedload(Item.attack_defense),
-            )
-            .first()
-        )
-
-        if not perk_item:
-            logger.info(f"No perk found with AOID {aoid}")
-            return None
-
-        perk_info = self._build_perk_info_dict(perk_item)
-        if perk_info:
-            logger.info(
-                f"Found complete perk item: {perk_item.perk.name} (type: {perk_item.perk.type}, level: {perk_item.perk.counter})"
-            )
-        return perk_info
-
     def batch_get_perk_info_by_aoids(
         self, aoids: List[int]
     ) -> Dict[int, Optional[Dict[str, Any]]]:

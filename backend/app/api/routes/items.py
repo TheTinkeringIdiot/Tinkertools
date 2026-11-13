@@ -29,7 +29,6 @@ from app.models import (
     ItemSource,
 )
 from app.models.interpolated_item import (
-    InterpolationRequest,
     InterpolationResponse,
     BatchInterpolationRequest,
     BatchInterpolationResponse,
@@ -907,56 +906,4 @@ def get_interpolation_info(aoid: int, db: Session = Depends(get_db)):
         logger.error(f"Failed to get interpolation info for aoid={aoid}: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Failed to get interpolation info: {str(e)}"
-        )
-
-
-@router.post("/interpolate", response_model=InterpolationResponse)
-@performance_monitor
-def interpolate_item_by_request(
-    request: InterpolationRequest, db: Session = Depends(get_db)
-):
-    """
-    Interpolate an item using a request body.
-
-    Alternative endpoint that accepts JSON request body instead of query parameters.
-    Useful for more complex interpolation requests in the future.
-    """
-    start_time = time.time()
-
-    try:
-        interpolation_service = InterpolationService(db)
-        interpolated_item = interpolation_service.interpolate_item(
-            request.aoid, request.target_ql
-        )
-
-        if not interpolated_item:
-            raise HTTPException(
-                status_code=404, detail=f"Item with AOID {request.aoid} not found"
-            )
-
-        interpolation_range = interpolation_service.get_interpolation_range(
-            request.aoid
-        )
-        range_dict = None
-        if interpolation_range:
-            range_dict = {
-                "min_ql": interpolation_range[0],
-                "max_ql": interpolation_range[1],
-            }
-
-        query_time = time.time() - start_time
-        logger.info(
-            f"Item interpolation (POST) aoid={request.aoid} target_ql={request.target_ql} time={query_time:.3f}s"
-        )
-
-        return InterpolationResponse(
-            success=True, item=interpolated_item, interpolation_range=range_dict
-        )
-
-    except Exception as e:
-        logger.error(
-            f"Interpolation (POST) failed for aoid={request.aoid} target_ql={request.target_ql}: {str(e)}"
-        )
-        return InterpolationResponse(
-            success=False, error=f"Failed to interpolate item: {str(e)}"
         )
