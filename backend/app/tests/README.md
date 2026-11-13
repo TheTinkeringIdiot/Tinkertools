@@ -60,9 +60,7 @@ app/tests/
 ├── test_interpolation_*.py     # Interpolation tests
 ├── test_perk_*.py              # Perk-related tests
 ├── test_nano_endpoints.py      # Nano endpoint tests
-├── test_mob_endpoints.py       # Mob endpoint tests
-├── test_spell_endpoints.py     # Spell endpoint tests
-└── test_equipment_bonus_endpoints.py
+└── test_mob_endpoints.py       # Mob endpoint tests
 ```
 
 ## Real Database Testing Philosophy

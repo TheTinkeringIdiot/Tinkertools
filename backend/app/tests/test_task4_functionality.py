@@ -72,134 +72,9 @@ class TestTask4Endpoints:
         finally:
             app.dependency_overrides.clear()
 
-    def test_items_filter_endpoint_exists(self, client):
-        """Test advanced filtering endpoint exists."""
-        mock_query = Mock()
-        mock_query.options.return_value = mock_query
-        mock_query.filter.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.count.return_value = 0
-        mock_query.offset.return_value = mock_query
-        mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = []
-
-        mock_db = Mock()
-        mock_db.query.return_value = mock_query
-
-        def mock_get_db():
-            return mock_db
-
-        app.dependency_overrides[get_db] = mock_get_db
-
-        try:
-            response = client.get("/api/v1/items/filter?min_ql=100")
-            assert response.status_code == 200
-            data = response.json()
-            assert "items" in data
-            assert "total" in data
-        finally:
-            app.dependency_overrides.clear()
-
-    def test_items_with_stats_endpoint_exists(self, client):
-        """Test stat-based queries endpoint exists."""
-        # This endpoint requires stat_requirements parameter
-        response = client.get("/api/v1/items/with-stats?stat_requirements=16:>=100")
-        # Should get 200 (works with mocked data) or 400 (validation error)
-        assert response.status_code in [200, 400, 422]
-
-    def test_spells_basic(self, client):
-        """Test basic spells endpoint."""
-        mock_query = Mock()
-        mock_query.filter.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.count.return_value = 0
-        mock_query.offset.return_value = mock_query
-        mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = []
-
-        mock_db = Mock()
-        mock_db.query.return_value = mock_query
-
-        def mock_get_db():
-            return mock_db
-
-        app.dependency_overrides[get_db] = mock_get_db
-
-        try:
-            response = client.get("/api/v1/spells")
-            assert response.status_code == 200
-            data = response.json()
-            assert "items" in data
-            assert "total" in data
-        finally:
-            app.dependency_overrides.clear()
-
-    def test_spells_search(self, client):
-        """Test spell search endpoint."""
-        mock_query = Mock()
-        mock_query.filter.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.count.return_value = 0
-        mock_query.offset.return_value = mock_query
-        mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = []
-
-        mock_db = Mock()
-        mock_db.query.return_value = mock_query
-
-        def mock_get_db():
-            return mock_db
-
-        app.dependency_overrides[get_db] = mock_get_db
-
-        try:
-            response = client.get("/api/v1/spells/search?q=heal")
-            assert response.status_code == 200
-            data = response.json()
-            assert "items" in data
-            assert "total" in data
-        finally:
-            app.dependency_overrides.clear()
-
-    def test_spells_with_criteria(self, client):
-        """Test spell criteria filtering."""
-        mock_query = Mock()
-        mock_query.distinct.return_value = mock_query
-        mock_query.join.return_value = mock_query
-        mock_query.filter.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.options.return_value = mock_query
-        mock_query.count.return_value = 0
-        mock_query.offset.return_value = mock_query
-        mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = []
-
-        mock_db = Mock()
-        mock_db.query.return_value = mock_query
-
-        def mock_get_db():
-            return mock_db
-
-        app.dependency_overrides[get_db] = mock_get_db
-
-        try:
-            response = client.get("/api/v1/spells/with-criteria")
-            assert response.status_code in [200, 422]  # 422 if no criteria configured
-        finally:
-            app.dependency_overrides.clear()
-
 
 class TestCachingFunctionality:
     """Test caching endpoints work."""
-
-    def test_cache_stats(self, client):
-        """Test cache statistics endpoint."""
-        response = client.get("/api/v1/cache/stats")
-        assert response.status_code == 200
-        data = response.json()
-        assert "hits" in data
-        assert "misses" in data
-        assert "cache_size" in data
 
     def test_cache_clear(self, client):
         """Test cache clearing."""
@@ -208,42 +83,6 @@ class TestCachingFunctionality:
         data = response.json()
         assert "message" in data
 
-    def test_cache_cleanup(self, client):
-        """Test cache cleanup."""
-        response = client.post("/api/v1/cache/cleanup")
-        assert response.status_code == 200
-        data = response.json()
-        assert "message" in data
-
-
-class TestPerformanceMonitoring:
-    """Test performance monitoring endpoints."""
-
-    def test_performance_health(self, client):
-        """Test performance health check."""
-        response = client.get("/api/v1/performance/health")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "healthy"
-        assert "performance_monitoring" in data
-
-    def test_performance_overview(self, client):
-        """Test performance overview endpoint."""
-        mock_db = Mock()
-
-        def mock_get_db():
-            return mock_db
-
-        app.dependency_overrides[get_db] = mock_get_db
-
-        try:
-            response = client.get("/api/v1/performance/overview")
-            assert response.status_code == 200
-            data = response.json()
-            assert "cache_stats" in data
-        finally:
-            app.dependency_overrides.clear()
-
 
 class TestPaginationConsistency:
     """Test pagination works consistently across endpoints."""
@@ -251,7 +90,7 @@ class TestPaginationConsistency:
     def test_pagination_parameters(self, client):
         """Test pagination parameters are handled correctly."""
         # Removed deprecated endpoints: pocket-bosses, symbiants
-        endpoints = ["/api/v1/items", "/api/v1/spells"]
+        endpoints = ["/api/v1/items"]
 
         for endpoint in endpoints:
             # Setup mock for each endpoint
@@ -321,7 +160,6 @@ class TestErrorHandling:
         """Test nonexistent resources return proper 404s."""
         endpoints = [
             "/api/v1/items/99999999",
-            "/api/v1/spells/99999999",
         ]
 
         for endpoint in endpoints:
@@ -367,7 +205,7 @@ class TestEndpointResponseStructure:
     def test_list_endpoints_structure(self, client):
         """Test list endpoints have consistent structure."""
         # Removed deprecated endpoints: pocket-bosses, symbiants
-        endpoints = ["/api/v1/items", "/api/v1/spells"]
+        endpoints = ["/api/v1/items"]
 
         for endpoint in endpoints:
             # Setup mock
@@ -411,7 +249,6 @@ class TestEndpointResponseStructure:
         # Removed deprecated pocket-bosses endpoint
         search_endpoints = [
             "/api/v1/items/search?q=test",
-            "/api/v1/spells/search?q=test",
         ]
 
         for endpoint in search_endpoints:

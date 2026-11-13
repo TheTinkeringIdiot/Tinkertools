@@ -83,22 +83,6 @@ class CacheService:
                 "cache_size": len(self.cache),
             }
 
-    def cleanup_expired(self) -> int:
-        """Remove expired entries and return count removed."""
-        with self.lock:
-            current_time = time.time()
-            expired_keys = []
-
-            for key, (value, expiry_time) in self.cache.items():
-                if current_time > expiry_time:
-                    expired_keys.append(key)
-
-            for key in expired_keys:
-                del self.cache[key]
-                self.stats["evictions"] += 1
-
-            return len(expired_keys)
-
 
 # Global cache instance
 cache_service = CacheService()
@@ -119,30 +103,10 @@ def cache_response(key: str, response: Any, ttl: int = 300) -> None:
     cache_service.set(key, response, ttl)
 
 
-def invalidate_cache_pattern(pattern: str) -> int:
-    """Invalidate cache keys matching a pattern (simple startswith)."""
-    with cache_service.lock:
-        keys_to_delete = []
-        for key in cache_service.cache.keys():
-            if key.startswith(pattern):
-                keys_to_delete.append(key)
-
-        for key in keys_to_delete:
-            cache_service.delete(key)
-
-        return len(keys_to_delete)
-
-
-def get_cache_stats() -> dict:
-    """Get cache statistics."""
-    return cache_service.get_stats()
-
-
 # Cache TTL settings for different types of data
 CACHE_TTL = {
     "items_list": 300,  # 5 minutes - item lists change infrequently
     "item_detail": 600,  # 10 minutes - individual items rarely change
-    "spells_list": 600,  # 10 minutes - spells are static
     "pocket_bosses": 1800,  # 30 minutes - boss info is very static
     "symbiants": 1800,  # 30 minutes - symbiant info is very static
     "search_results": 180,  # 3 minutes - search results can be cached briefly

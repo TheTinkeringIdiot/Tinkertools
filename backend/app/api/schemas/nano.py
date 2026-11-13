@@ -2,11 +2,10 @@
 Nano program response schemas with rich spell data.
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 from pydantic import BaseModel, Field
 from app.api.schemas.action import ActionResponse
 from app.api.schemas.item import ItemDetail
-from app.api.schemas.spell import SpellResponse
 
 
 class NanoEffect(BaseModel):
@@ -101,17 +100,6 @@ class NanoProgram(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-class NanoProgramWithSpells(NanoProgram):
-    """Nano program with detailed spell information."""
-
-    spells: List[SpellResponse] = Field(
-        default_factory=list, description="Associated spells"
-    )
-    raw_criteria: List[Dict[str, Any]] = Field(
-        default_factory=list, description="Raw spell criteria data"
-    )
 
 
 class NanoStrainCount(BaseModel):

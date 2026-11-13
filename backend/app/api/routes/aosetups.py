@@ -4,7 +4,7 @@ AOSetups Proxy Routes
 Proxy endpoint for AOSetups API to bypass CORS restrictions
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 import httpx
 import re
 
@@ -68,33 +68,3 @@ async def get_aosetups_profile(profile_id: str):
         raise HTTPException(
             status_code=500, detail=f"Unexpected error while fetching profile: {str(e)}"
         )
-
-
-@router.get("/aosetups/profile-from-url")
-async def get_aosetups_profile_from_url(
-    url: str = Query(..., description="Full AOSetups profile URL")
-):
-    """
-    Proxy endpoint to fetch AOSetups profile data from a full URL.
-
-    Args:
-        url: Full AOSetups profile URL (e.g., https://www.aosetups.com/equip/63d44b91a247b52f79ea5ff6)
-
-    Returns:
-        Profile data from AOSetups API
-
-    Raises:
-        HTTPException: If URL is invalid or profile not found
-    """
-    # Extract profile ID from URL
-    match = re.search(r"aosetups\.com/equip/([a-f0-9]{24})", url, re.IGNORECASE)
-    if not match:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid AOSetups URL format. Expected format: https://www.aosetups.com/equip/{profile_id}",
-        )
-
-    profile_id = match.group(1)
-
-    # Use the existing profile endpoint
-    return await get_aosetups_profile(profile_id)

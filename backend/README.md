@@ -92,15 +92,12 @@ The API will be available at:
 ### Core Resources
 - `GET /api/v1/items` - Search and filter items
 - `GET /api/v1/nanos` - Nano program database
-- `GET /api/v1/spells` - Spell and nano data
 - `GET /api/v1/symbiants` - Symbiant database
 - `GET /api/v1/pocket-bosses` - Pocket boss information
-- `GET /api/v1/stat-values` - Game statistics reference
 
 ### System Endpoints
 - `GET /health` - Health check
-- `GET /api/v1/cache/stats` - Cache statistics
-- `GET /api/v1/performance/stats` - Performance metrics
+- `POST /api/v1/cache/clear` - Clear the response cache
 
 ## Development Commands
 
@@ -207,7 +204,6 @@ gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
 
 ### Health Checks
 - `GET /health` - Basic health status
-- `GET /api/v1/performance/stats` - Detailed performance metrics
 
 ### Logging
 Structured logging with configurable levels. Logs include:

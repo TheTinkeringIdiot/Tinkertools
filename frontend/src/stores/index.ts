@@ -8,7 +8,6 @@
 export { useAppStore } from './app';
 export { useTinkerProfilesStore } from './tinkerProfiles';
 export { useItemsStore } from './items';
-export { useSpellsStore } from './spells';
 export { useSymbiantsStore } from './symbiants';
 export { usePocketBossesStore } from './pocket-bosses';
 
@@ -97,7 +96,6 @@ export async function resetAllStores(): Promise<void> {
   const [
     { useAppStore },
     { useItemsStore },
-    { useSpellsStore },
     { useSymbiantsStore },
     { usePocketBossesStore },
     { usePocketBossStore },
@@ -112,7 +110,6 @@ export async function resetAllStores(): Promise<void> {
   ] = await Promise.all([
     import('./app'),
     import('./items'),
-    import('./spells'),
     import('./symbiants'),
     import('./pocket-bosses'),
     import('./pocketBossStore'),
@@ -128,7 +125,6 @@ export async function resetAllStores(): Promise<void> {
 
   const appStore = useAppStore();
   const itemsStore = useItemsStore();
-  const spellsStore = useSpellsStore();
   const symbiantsStore = useSymbiantsStore();
   const pocketBossesStore = usePocketBossesStore();
   const pocketBossStore = usePocketBossStore();
@@ -144,7 +140,6 @@ export async function resetAllStores(): Promise<void> {
   // worse than a noisy console, so every one of these still gets its turn.
   const outcomes = await Promise.allSettled([
     itemsStore.clearCache(),
-    spellsStore.clearCache(),
     symbiantsStore.clearCache(),
     pocketBossesStore.clearCache(),
     pocketBossStore.clearCache(),
@@ -181,7 +176,6 @@ export async function resetForVersionChange(): Promise<void> {
   const [
     { useAppStore },
     { useItemsStore },
-    { useSpellsStore },
     { useSymbiantsStore },
     { usePocketBossesStore },
     { usePocketBossStore },
@@ -193,7 +187,6 @@ export async function resetForVersionChange(): Promise<void> {
   ] = await Promise.all([
     import('./app'),
     import('./items'),
-    import('./spells'),
     import('./symbiants'),
     import('./pocket-bosses'),
     import('./pocketBossStore'),
@@ -208,7 +201,6 @@ export async function resetForVersionChange(): Promise<void> {
   interpolationService.clearAllCaches();
 
   useItemsStore().clearCache();
-  useSpellsStore().clearCache();
   usePocketBossesStore().clearCache();
   usePocketBossStore().clearCache();
   useTinkerPlantsStore().clearCache();

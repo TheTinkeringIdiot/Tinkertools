@@ -170,56 +170,6 @@ export const useItemsStore = defineStore('items', () => {
   }
 
   /**
-   * Get multiple items by IDs (uses batching)
-   */
-  async function getItems(ids: number[], forceRefresh = false): Promise<Item[]> {
-    const results: Item[] = [];
-    const missingIds: number[] = [];
-
-    // Check cache for existing items
-    if (!forceRefresh) {
-      for (const id of ids) {
-        const cachedItem = items.value.get(id);
-        if (cachedItem) {
-          results.push(cachedItem);
-        } else {
-          missingIds.push(id);
-        }
-      }
-    } else {
-      missingIds.push(...ids);
-    }
-
-    // Fetch missing items
-    if (missingIds.length > 0) {
-      loading.value = true;
-      error.value = null;
-
-      try {
-        const response = await apiClient.getItems(missingIds);
-
-        if (response.success && response.data) {
-          response.data.forEach((item) => {
-            items.value.set(item.aoid!, item); // Cache by AOID
-            results.push(item);
-          });
-          lastFetch.value = Date.now();
-        } else {
-          throw new Error(response.error?.message || 'Items fetch failed');
-        }
-      } catch (err) {
-        error.value = toUserFriendlyError(err);
-        throw err;
-      } finally {
-        loading.value = false;
-      }
-    }
-
-    // Return items in original order
-    return ids.map((id) => items.value.get(id)!).filter(Boolean);
-  }
-
-  /**
    * Get items with specific stat requirements
    */
   function getItemsWithStats(
@@ -329,7 +279,6 @@ export const useItemsStore = defineStore('items', () => {
     searchItems,
     getItem,
     getItemFromCache,
-    getItems,
     getItemsWithStats,
     clearSearch,
     clearError,

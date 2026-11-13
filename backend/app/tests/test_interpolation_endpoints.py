@@ -282,113 +282,6 @@ class TestInterpolationEndpoints:
         assert "Failed to get interpolation info: Database error" in str(data)
 
     # ============================================================================
-    # POST /items/interpolate Tests
-    # ============================================================================
-
-    def test_interpolate_item_post_success(
-        self, client, monkeypatch, sample_interpolated_item
-    ):
-        """Test successful item interpolation via POST endpoint."""
-        # Setup mock service methods
-        mock_interpolate = Mock(return_value=sample_interpolated_item)
-        mock_get_range = Mock(return_value=(100, 200))
-
-        monkeypatch.setattr(
-            "app.api.routes.items.InterpolationService.interpolate_item",
-            mock_interpolate,
-        )
-        monkeypatch.setattr(
-            "app.api.routes.items.InterpolationService.get_interpolation_range",
-            mock_get_range,
-        )
-
-        # Make request
-        response = client.post(
-            "/api/v1/items/interpolate", json={"aoid": 12345, "target_ql": 150}
-        )
-
-        # Assertions
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["item"]["aoid"] == 12345
-        assert data["item"]["target_ql"] == 150
-        assert data["item"]["interpolating"] is True
-
-        # Verify service calls
-        mock_interpolate.assert_called_once()
-        mock_get_range.assert_called_once()
-
-    def test_interpolate_item_post_not_found(self, client, monkeypatch):
-        """Test POST interpolation when item is not found."""
-        # Setup mock service - endpoint catches 404 and returns success=False
-        mock_interpolate = Mock(return_value=None)
-        monkeypatch.setattr(
-            "app.api.routes.items.InterpolationService.interpolate_item",
-            mock_interpolate,
-        )
-
-        # Make request
-        response = client.post(
-            "/api/v1/items/interpolate", json={"aoid": 99999, "target_ql": 150}
-        )
-
-        # Assertions - Endpoint catches exception and returns success=False
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is False
-        assert "Item with AOID 99999 not found" in data["error"]
-
-    def test_interpolate_item_post_invalid_json(self, client):
-        """Test POST interpolation with invalid JSON."""
-        response = client.post("/api/v1/items/interpolate", json={"invalid": "data"})
-        assert response.status_code == 422  # Validation error
-
-    def test_interpolate_item_post_missing_aoid(self, client):
-        """Test POST interpolation with missing AOID."""
-        response = client.post("/api/v1/items/interpolate", json={"target_ql": 150})
-        assert response.status_code == 422  # Validation error
-
-    def test_interpolate_item_post_missing_target_ql(self, client):
-        """Test POST interpolation with missing target_ql."""
-        response = client.post("/api/v1/items/interpolate", json={"aoid": 12345})
-        assert response.status_code == 422  # Validation error
-
-    def test_interpolate_item_post_invalid_ql_range(self, client):
-        """Test POST interpolation with QL out of valid range."""
-        # Test below minimum
-        response = client.post(
-            "/api/v1/items/interpolate", json={"aoid": 12345, "target_ql": 0}
-        )
-        assert response.status_code == 422
-
-        # Test above maximum
-        response = client.post(
-            "/api/v1/items/interpolate", json={"aoid": 12345, "target_ql": 501}
-        )
-        assert response.status_code == 422
-
-    def test_interpolate_item_post_service_exception(self, client, monkeypatch):
-        """Test handling of service exceptions in POST endpoint."""
-        # Setup mock service to raise exception
-        mock_interpolate = Mock(side_effect=Exception("Database error"))
-        monkeypatch.setattr(
-            "app.api.routes.items.InterpolationService.interpolate_item",
-            mock_interpolate,
-        )
-
-        # Make request
-        response = client.post(
-            "/api/v1/items/interpolate", json={"aoid": 12345, "target_ql": 150}
-        )
-
-        # Assertions
-        assert response.status_code == 200  # Returns success=false instead of error
-        data = response.json()
-        assert data["success"] is False
-        assert "Failed to interpolate item: Database error" in data["error"]
-
-    # ============================================================================
     # Performance and Logging Tests
     # ============================================================================
 
@@ -506,17 +399,6 @@ class TestInterpolationEndpoints:
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/json"
-
-    def test_interpolation_post_content_type_validation(self, client):
-        """Test that POST endpoint validates content type."""
-        # Test with incorrect content type - FastAPI expects JSON
-        response = client.post(
-            "/api/v1/items/interpolate",
-            data="invalid data",
-            headers={"Content-Type": "application/json"},
-        )
-        # Should return validation error for malformed JSON
-        assert response.status_code == 422
 
     # ============================================================================
     # Concurrent Request Tests

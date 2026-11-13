@@ -95,14 +95,11 @@ getPocketBosses(query: PocketBossSearchQuery): Promise<PaginatedResponse<PocketB
 ### Backend API Routes (`backend/app/api/routes/`)
 
 - **items.py**: Item database, search, filtering, interpolation, and source endpoints
-- **spells.py**: Nano/spell programs with filtering by school
 - **symbiants.py**: Symbiant data for TinkerPlants integration
 - **pocket_bosses.py**: Pocket boss database for TinkerPocket
-- **stat_values.py**: Stat value lookups and calculations
 - **sources**: Source system for tracking item origins (crystals, NPCs, missions, etc.)
 - **health.py**: System health monitoring and diagnostics
-- **cache.py**: Cache management and performance metrics
-- **performance.py**: Performance monitoring endpoints
+- **cache.py**: Clears the response cache
 
 ### Database Connection (`backend/app/core/database.py`)
 
@@ -512,8 +509,6 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 
 **Available Endpoints:**
 - `/api/v1/health`: System health status
-- `/api/v1/performance`: Performance metrics
-- `/api/v1/cache/stats`: Cache utilization statistics
 
 **Monitoring Targets:**
 - API response times under performance thresholds

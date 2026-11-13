@@ -220,11 +220,6 @@ export interface InterpolatedItem {
   animation_mesh_id?: number;
 }
 
-export interface InterpolationRequest {
-  aoid: number;
-  target_ql: number;
-}
-
 export interface InterpolationResponse {
   success: boolean;
   item?: InterpolatedItem;
@@ -417,14 +412,6 @@ export interface ItemSearchQuery {
   limit?: number;
   sort?: 'name' | 'ql' | 'item_class' | 'aoid';
   sort_order?: 'asc' | 'desc';
-}
-
-export interface SpellSearchQuery {
-  search?: string;
-  has_criteria?: boolean;
-  spell_id?: number;
-  page?: number;
-  limit?: number;
 }
 
 // Pagination fields removed - all filtering now handled client-side

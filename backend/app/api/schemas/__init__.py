@@ -8,7 +8,6 @@ from .spell import SpellResponse, SpellCreate, SpellWithCriteria, SpellDataRespo
 from .action import ActionResponse, ActionCreate
 from .nano import (
     NanoProgram,
-    NanoProgramWithSpells,
     NanoSearchRequest,
     NanoStatsResponse,
     NanoEffect,
@@ -30,13 +29,6 @@ from .mob import MobResponse, MobDetail, SymbiantDropInfo
 # Keep old pocket_boss imports for backwards compatibility
 from .pocket_boss import PocketBossResponse, PocketBossCreate, PocketBossDetail
 from .source import SourceTypeResponse, SourceResponse, ItemSourceResponse
-from .equipment_bonus import (
-    EquipmentBonusRequest,
-    EquipmentBonusResponse,
-    ItemBonusDetailResponse,
-    StatBonus,
-    ItemBonusBreakdown,
-)
 from .weapon_analysis import WeaponSkill, WeaponAnalyzeRequest
 from .common import PaginatedResponse, ErrorResponse
 
@@ -52,7 +44,6 @@ __all__ = [
     "ActionResponse",
     "ActionCreate",
     "NanoProgram",
-    "NanoProgramWithSpells",
     "NanoSearchRequest",
     "NanoStatsResponse",
     "NanoEffect",
@@ -78,11 +69,6 @@ __all__ = [
     "SourceTypeResponse",
     "SourceResponse",
     "ItemSourceResponse",
-    "EquipmentBonusRequest",
-    "EquipmentBonusResponse",
-    "ItemBonusDetailResponse",
-    "StatBonus",
-    "ItemBonusBreakdown",
     "WeaponSkill",
     "WeaponAnalyzeRequest",
     "PaginatedResponse",

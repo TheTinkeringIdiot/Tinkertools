@@ -154,15 +154,6 @@ class InterpolatedItem(BaseModel):
         self.ql = target_ql
 
 
-class InterpolationRequest(BaseModel):
-    """
-    Request model for item interpolation.
-    """
-
-    aoid: int = Field(..., description="Anarchy Online ID of the item")
-    target_ql: int = Field(..., ge=1, le=500, description="Target quality level")
-
-
 class InterpolationResponse(BaseModel):
     """
     Response model for item interpolation.

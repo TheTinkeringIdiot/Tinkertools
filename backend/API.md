@@ -140,37 +140,6 @@ Get detailed information about a specific item by its Anarchy Online ID (AOID).
 - `defense_stats`: Defense-related statistics for weapons
 - `actions`: Item actions with criteria (equipping, using, etc.)
 
-#### GET /api/v1/items/with-stats
-Get items that have specific stat requirements.
-
-**Query Parameters:**
-- `stat` (int, required): Stat ID to filter by
-- `min_value` (int): Minimum stat value
-- `max_value` (int): Maximum stat value
-- `limit` (int): Maximum results (default: 100)
-
-### Spells
-
-#### GET /api/v1/spells
-Get a paginated list of spells.
-
-**Query Parameters:**
-- `page` (int): Page number
-- `page_size` (int): Items per page
-- `target` (int): Filter by target type
-
-#### GET /api/v1/spells/{spell_id}
-Get detailed information about a specific spell including criteria.
-
-#### GET /api/v1/spells/with-criteria
-Get spells that match specific criteria.
-
-**Query Parameters:**
-- `value1` (int): Criterion value1
-- `value2` (int): Criterion value2
-- `operator` (int): Criterion operator
-- `limit` (int): Maximum results
-
 ### Symbiants
 
 #### GET /api/v1/symbiants
@@ -207,18 +176,6 @@ Get detailed information about a specific pocket boss including drops.
 
 #### GET /api/v1/pocket-bosses/{boss_id}/drops
 Get list of symbiants dropped by a specific pocket boss.
-
-### Stat Values
-
-#### GET /api/v1/stat-values
-Get list of stat values.
-
-**Query Parameters:**
-- `skip` (int): Number of items to skip
-- `limit` (int): Maximum results
-
-#### GET /api/v1/stat-values/{stat_value_id}
-Get a specific stat value by ID.
 
 ## Error Responses
 

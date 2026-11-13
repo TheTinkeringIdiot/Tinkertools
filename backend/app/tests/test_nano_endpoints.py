@@ -563,7 +563,10 @@ def test_known_nanos_have_expected_derived_fields(client, db_session):
             .filter(Item.is_nano.is_(True), Item.aoid == aoid)
             .one()
         )
-        nano = client.get(f"/api/v1/nanos/{item.id}").json()
+        found = client.get(
+            "/api/v1/nanos/search", params={"q": item.name, "page_size": 200}
+        ).json()["items"]
+        (nano,) = [n for n in found if n["aoid"] == aoid]
         assert (nano["school"], nano["professions"], nano["level"]) == (
             school,
             professions,
@@ -741,41 +744,8 @@ def test_get_nano_stats_matches_the_raw_data(client, db_session):
 
 
 # ============================================================================
-# GET /api/v1/nanos/{nano_id} - Nano detail
+# Actions on list and search results
 # ============================================================================
-
-
-def test_get_nano_by_id(client, db_session):
-    """Test getting a specific nano by ID using real data."""
-    # Get a real nano from database
-    real_nano = db_session.query(Item).filter(Item.is_nano.is_(True)).first()
-    assert real_nano is not None
-
-    response = client.get(f"/api/v1/nanos/{real_nano.id}")
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["id"] == real_nano.id
-    assert data["aoid"] == real_nano.aoid
-    assert data["name"] == real_nano.name
-    assert data["ql"] == real_nano.ql
-
-
-def test_get_nano_detail_includes_spells_and_criteria(client, db_session):
-    """Test that nano detail includes spells and raw criteria."""
-    # Get a real nano
-    real_nano = db_session.query(Item).filter(Item.is_nano.is_(True)).first()
-    assert real_nano is not None
-
-    response = client.get(f"/api/v1/nanos/{real_nano.id}")
-
-    assert response.status_code == 200
-    data = response.json()
-    # NanoProgramWithSpells includes these fields
-    assert "spells" in data
-    assert "raw_criteria" in data
-    assert isinstance(data["spells"], list)
-    assert isinstance(data["raw_criteria"], list)
 
 
 def _nano_with_use_and_spell_criteria(db_session):
@@ -827,22 +797,6 @@ def _response_actions(nano):
     )
 
 
-def test_get_nano_returns_use_action_criteria(client, db_session):
-    """Casting requirements come from the nano's actions, not its spell criteria."""
-    nano = _nano_with_use_and_spell_criteria(db_session)
-    assert nano is not None
-
-    response = client.get(f"/api/v1/nanos/{nano.id}")
-
-    assert response.status_code == 200
-    data = response.json()
-    assert "casting_requirements" not in data
-    assert _response_actions(data) == _expected_actions(nano)
-    use_actions = [a for a in data["actions"] if a["action"] == 3]
-    assert len(use_actions) == 1
-    assert len(use_actions[0]["criteria"]) > 0
-
-
 def test_list_and_search_nanos_return_actions(client, db_session):
     """The list and search endpoints return the same actions as the database."""
     nano = _nano_with_use_and_spell_criteria(db_session)
@@ -874,31 +828,6 @@ def test_list_and_search_nanos_return_actions(client, db_session):
     matches = [n for n in searched.json()["items"] if n["id"] == nano.id]
     assert len(matches) == 1
     assert _response_actions(matches[0]) == expected
-
-
-def test_get_nano_not_found(client):
-    """Test getting non-existent nano."""
-    response = client.get("/api/v1/nanos/999999999")
-    assert response.status_code == 404
-    data = response.json()
-    # Error response contains error message
-    assert "error" in data or "detail" in data
-
-
-def test_get_nano_invalid_id(client):
-    """Test getting nano with invalid ID."""
-    response = client.get("/api/v1/nanos/invalid")
-    assert response.status_code == 422
-
-
-def test_get_non_nano_item(client, db_session):
-    """Test getting an item that is not a nano."""
-    # Find a non-nano item
-    non_nano = db_session.query(Item).filter(Item.is_nano.is_(False)).first()
-    assert non_nano is not None
-
-    response = client.get(f"/api/v1/nanos/{non_nano.id}")
-    assert response.status_code == 404
 
 
 # ============================================================================
@@ -1079,130 +1008,8 @@ def test_get_offensive_nanos_sort_by_ql(client):
 
 
 # ============================================================================
-# GET /api/v1/nanos/profession/{profession_id}/fast - Fast endpoint
-# ============================================================================
-
-
-def test_get_nanos_by_profession_fast(client):
-    """Test fast nano endpoint by profession."""
-    response = client.get("/api/v1/nanos/profession/11/fast")
-
-    assert response.status_code == 200
-    data = response.json()
-    assert "items" in data
-
-
-def test_get_nanos_by_profession_fast_returns_minimal_data(client):
-    """Test that fast endpoint returns minimal ItemDetail structure."""
-    response = client.get("/api/v1/nanos/profession/0/fast?page_size=5")
-
-    assert response.status_code == 200
-    data = response.json()
-    if len(data["items"]) > 0:
-        item = data["items"][0]
-        assert "id" in item
-        assert "aoid" in item
-        assert "name" in item
-        assert "ql" in item
-        # Fast endpoint should have empty lists for performance
-        assert item["stats"] == []
-        assert item["spell_data"] == []
-        assert item["actions"] == []
-        assert item["sources"] == []
-
-
-def test_get_nanos_by_profession_fast_filters_test_items(client):
-    """Test that fast endpoint filters out TESTLIVEITEM."""
-    response = client.get("/api/v1/nanos/profession/0/fast")
-
-    assert response.status_code == 200
-    data = response.json()
-    for item in data["items"]:
-        assert not item["name"].startswith("TESTLIVEITEM")
-
-
-def test_get_nanos_by_profession_fast_pagination(client):
-    """Test pagination in fast endpoint."""
-    response = client.get("/api/v1/nanos/profession/0/fast?page=1&page_size=10")
-
-    assert response.status_code == 200
-    data = response.json()
-    assert "page" in data
-    assert "total" in data
-    assert "has_next" in data
-    assert "has_prev" in data
-
-
-def test_get_nanos_by_profession_fast_sort_by_name(client):
-    """Test sorting by name in fast endpoint."""
-    response = client.get(
-        "/api/v1/nanos/profession/0/fast?sort=name&sort_order=asc&page_size=20"
-    )
-
-    assert response.status_code == 200
-    data = response.json()
-    names = [item["name"] for item in data["items"]]
-    assert names == sorted(names)
-
-
-def test_get_nanos_by_profession_fast_sort_by_ql(client):
-    """Test sorting by QL in fast endpoint."""
-    response = client.get(
-        "/api/v1/nanos/profession/0/fast?sort=ql&sort_order=desc&page_size=20"
-    )
-
-    assert response.status_code == 200
-    data = response.json()
-    qls = [item["ql"] for item in data["items"]]
-    assert qls == sorted(qls, reverse=True)
-
-
-def test_get_nanos_by_profession_fast_all_professions(client):
-    """Test fast endpoint with profession_id=0 for all professions."""
-    response = client.get("/api/v1/nanos/profession/0/fast")
-
-    assert response.status_code == 200
-    data = response.json()
-    assert "items" in data
-    assert len(data["items"]) > 0
-
-
-# ============================================================================
 # Edge Cases and Integration Tests
 # ============================================================================
-
-
-def test_nano_response_structure_consistency(client, db_session):
-    """Test that nano responses have consistent structure across endpoints."""
-    # Get a real nano
-    real_nano = db_session.query(Item).filter(Item.is_nano.is_(True)).first()
-    assert real_nano is not None
-
-    # Test detail endpoint
-    detail_response = client.get(f"/api/v1/nanos/{real_nano.id}")
-    assert detail_response.status_code == 200
-    detail_data = detail_response.json()
-
-    # Both should have core fields
-    assert "id" in detail_data
-    assert "aoid" in detail_data
-    assert "name" in detail_data
-    assert "ql" in detail_data
-    assert "actions" in detail_data
-
-
-def test_nano_endpoints_with_real_high_ql_nano(client, db_session):
-    """Test endpoints with high QL nano (QL 390)."""
-    # Query for a high QL nano
-    high_ql_nano = (
-        db_session.query(Item).filter(Item.is_nano.is_(True), Item.ql >= 390).first()
-    )
-
-    if high_ql_nano:
-        response = client.get(f"/api/v1/nanos/{high_ql_nano.id}")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["ql"] >= 390
 
 
 def test_nano_boundary_ql_values(client):

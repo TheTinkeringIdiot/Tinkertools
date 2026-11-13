@@ -4,7 +4,7 @@ Implant Service for TinkerTools.
 Handles implant lookup by slot, QL, and exact cluster combinations.
 """
 
-from typing import List, Optional, Dict, Tuple
+from typing import Optional, Dict, Tuple
 from sqlalchemy.orm import Session, joinedload
 import logging
 
@@ -366,52 +366,3 @@ class ImplantService:
             actions=converted_actions,
             sources=[],  # Sources not typically available in interpolated items
         )
-
-    def get_available_implants_for_slot(self, slot: int, ql: int = 1) -> List[Item]:
-        """
-        Get all available implants for a specific slot.
-
-        Args:
-            slot: Numeric slot position
-            ql: Quality level to query (default: 1)
-
-        Returns:
-            List of Item objects for the slot
-        """
-        if slot not in self.VALID_SLOT_BITFLAGS:
-            return []
-
-        # Basic query for implants at specified QL
-        query = (
-            self.db.query(Item)
-            .filter(Item.item_class == 3)
-            .filter(Item.ql == ql)
-            .order_by(Item.name)
-        )
-
-        # TODO: Add proper slot filtering when slot data is available
-        # For now, return all implants at the specified QL
-
-        return query.all()
-
-    def validate_cluster_combination(self, clusters: Dict[str, int]) -> bool:
-        """
-        Validate if a cluster combination is theoretically possible.
-
-        Args:
-            clusters: Dict mapping position names to STAT IDs
-
-        Returns:
-            True if the combination could exist
-        """
-        # Basic validation - ensure positions are valid
-        valid_positions = {"Shiny", "Bright", "Faded"}
-
-        for position in clusters.keys():
-            if position not in valid_positions:
-                return False
-
-        # Additional validation logic could be added here
-        # (e.g., checking if certain STAT combinations are impossible)
-
-        return True
