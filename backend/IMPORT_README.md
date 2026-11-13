@@ -83,6 +83,30 @@ pg_restore --clean --if-exists --no-owner -d "$DATABASE_URL" tinkertools_pre_sha
 
 The restored registry predates global migration 002, so run the pre-conversion code against it.
 
+### Extract client builds
+
+`extract_builds.py` runs [TinkerParse](https://github.com/TheTinkeringIdiot/TinkerParse) over client builds and writes the extracts folder. It needs `git`, `dotnet` (.NET 8) and, for archives, `7z`; it does not touch the database.
+
+```bash
+# a new game patch: the installed clients
+python extract_builds.py --extracts-dir ~/projects/AO/extracts --tinkerparse ~/projects/TinkerParse \
+    --live "~/.wine/drive_c/Funcom/Anarchy Online" --prk ~/.prk/drive_c/ProjectRubiKa
+
+# historical builds: 7z archives and folders of unpacked clients, one sub-folder per build number
+python extract_builds.py --extracts-dir ~/projects/AO/extracts --tinkerparse ~/projects/TinkerParse \
+    --archive ~/versions/17.0.0_to_17.10.5 --builds-dir ~/versions/unpacked --work-dir /tmp/extract-work
+```
+
+- The parser is built from one pinned commit (`TINKERPARSE_COMMIT` in the script), whatever the checkout's working tree holds. Content hashes cover parser-generated fields, so change the pin for every build or for none: after changing it, run every source again.
+- A build is named by its client: `version.id` for `--live`, `patch.version` for `--prk`, the folder name otherwise. `18.8.62_EP1` becomes `ao-18-8-62-ep1`.
+- A build whose folder already holds the same client database from the same parser commit is skipped (`--force` parses it again). Parsing is deterministic: a second run writes identical files.
+- Builds with an identical client database are parsed once; the others are indexed as `duplicate`. A client without `ResourceDatabase.dat` and `.idx` is `missing_db`. A build the parser cannot read (no items, or more than 1% of records in error) is `failed` and gets no folder.
+- One build number with two different databases: the later one is parsed under a numbered slug (`ao-16-2-0-2`) and kept only if its items or nanos differ; a repack with the same content is dropped.
+- `index.json` is rewritten after every source. Builds from earlier runs stay in it, so a run with only `--live` adds the new patch to the existing history.
+- Each archive is unpacked once into `--work-dir` (database files only, up to about 45 GB) and removed when its builds are done. Progress goes to `<extracts-dir>/extract.log`.
+
+Then import what was extracted:
+
 ### Import extracted client builds
 
 The extractor writes one folder per build plus an index (`.docs/plans/multi-version-support/extract-contract.md`):
