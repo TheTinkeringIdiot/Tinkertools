@@ -486,13 +486,10 @@ class TestInstall:
 API_CALLS = [
     "/api/v1/items/1001",
     "/api/v1/items/1002",
-    "/api/v1/items/1001/sources",
     "/api/v1/items?page=1&page_size=50",
     "/api/v1/items/search?q=Alpha&page_size=50",
     "/api/v1/nanos?page=1&page_size=50",
-    "/api/v1/perks?page=1&page_size=50",
     "/api/v1/symbiants?page=1&page_size=50",
-    "/api/v1/spells?page=1&page_size=50",
 ]
 
 ID_KEYS = {

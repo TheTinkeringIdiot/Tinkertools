@@ -20,8 +20,6 @@ from app.core.cache import (
     cache_key_for_query,
     get_cached_response,
     cache_response,
-    invalidate_cache_pattern,
-    get_cache_stats,
     CACHE_TTL,
 )
 from app.core.decorators import cached_response, performance_monitor, log_query_params
@@ -148,22 +146,6 @@ class TestCacheService:
         assert stats["hit_rate_percent"] == 0
         assert stats["cache_size"] == 0
 
-    def test_cache_cleanup_expired(self, cache):
-        """Test manual cleanup of expired entries."""
-        cache.set("expired1", "value1", ttl=1)
-        cache.set("expired2", "value2", ttl=1)
-        cache.set("valid", "value3", ttl=10)
-
-        # Wait for expiration
-        time.sleep(1.1)
-
-        # Cleanup expired entries
-        removed_count = cache.cleanup_expired()
-
-        assert removed_count == 2
-        assert cache.get("valid") == "value3"
-        assert cache.stats["evictions"] == 2
-
     def test_generate_key_consistency(self, cache):
         """Test that key generation is consistent for same parameters."""
         key1 = cache._generate_key("test", param1="value1", param2="value2")
@@ -289,48 +271,10 @@ class TestCacheModuleFunctions:
         result = get_cached_response("test_key")
         assert result == data
 
-    def test_invalidate_cache_pattern(self):
-        """Test pattern-based cache invalidation."""
-        cache_response("items:list:1", {"data": "list1"})
-        cache_response("items:list:2", {"data": "list2"})
-        cache_response("items:detail:1", {"data": "detail1"})
-        cache_response("spells:list:1", {"data": "spells"})
-
-        # Invalidate all items:list patterns
-        removed = invalidate_cache_pattern("items:list:")
-
-        assert removed == 2
-        assert get_cached_response("items:list:1") is None
-        assert get_cached_response("items:list:2") is None
-        assert get_cached_response("items:detail:1") is not None
-        assert get_cached_response("spells:list:1") is not None
-
-    def test_invalidate_cache_pattern_no_matches(self):
-        """Test pattern invalidation with no matches."""
-        cache_response("test:key", {"data": "test"})
-
-        removed = invalidate_cache_pattern("nonexistent:")
-
-        assert removed == 0
-        assert get_cached_response("test:key") is not None
-
-    def test_get_cache_stats_function(self):
-        """Test getting cache statistics via module function."""
-        cache_response("key1", "value1")
-        get_cached_response("key1")
-
-        stats = get_cache_stats()
-
-        assert "hits" in stats
-        assert "misses" in stats
-        assert "cache_size" in stats
-        assert stats["cache_size"] > 0
-
     def test_cache_ttl_constants(self):
         """Test that CACHE_TTL constants are defined."""
         assert "items_list" in CACHE_TTL
         assert "item_detail" in CACHE_TTL
-        assert "spells_list" in CACHE_TTL
         assert "pocket_bosses" in CACHE_TTL
         assert "symbiants" in CACHE_TTL
         assert "search_results" in CACHE_TTL
@@ -427,15 +371,14 @@ class TestCachedResponseDecorator:
         await get_items()
 
         # Immediately should be cached
-        stats_before = get_cache_stats()
+        stats_before = cache_service.get_stats()
         await get_items()
-        stats_after = get_cache_stats()
+        stats_after = cache_service.get_stats()
 
         assert stats_after["hits"] > stats_before["hits"]
 
         # After TTL should not be cached
         time.sleep(1.1)
-        cache_service.cleanup_expired()
 
         await get_items()
         # Would be a miss (hard to test directly due to re-caching)
@@ -467,7 +410,7 @@ class TestCachedResponseDecorator:
         get_items()
 
         # Check that cache was set (can't easily verify TTL, but check it cached)
-        stats = get_cache_stats()
+        stats = cache_service.get_stats()
         assert stats["sets"] > 0
 
 

@@ -3,8 +3,8 @@ Nano programs API endpoints with rich spell data.
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session, joinedload, selectinload, aliased
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session, selectinload, aliased
 from sqlalchemy import and_, or_, desc, asc, false, func, select, Integer
 import math
 import logging
@@ -28,7 +28,6 @@ from app.api.schemas import PaginatedResponse, ItemDetail
 from app.api.schemas.nano import (
     NanoItemDetail,
     NanoProgram,
-    NanoProgramWithSpells,
     NanoStatsResponse,
     NanoStrainCount,
     NanoStrainsResponse,
@@ -491,62 +490,6 @@ def get_nano_stats(db: Session = Depends(get_db)):
     )
 
 
-@router.get("/{nano_id}", response_model=NanoProgramWithSpells)
-@cached_response("nano_detail")
-@performance_monitor
-def get_nano(nano_id: int, db: Session = Depends(get_db)):
-    """
-    Get detailed information about a specific nano program.
-    """
-    item = (
-        db.query(Item)
-        .filter(and_(Item.id == nano_id, Item.is_nano.is_(True)))
-        .options(
-            joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
-            joinedload(Item.item_spell_data)
-            .joinedload(ItemSpellData.spell_data)
-            .joinedload(SpellData.spell_data_spells)
-            .joinedload(SpellDataSpells.spell)
-            .joinedload(Spell.spell_criteria)
-            .joinedload(SpellCriterion.criterion),
-            joinedload(Item.actions)
-            .joinedload(Action.action_criteria)
-            .joinedload(ActionCriteria.criterion),
-            joinedload(Item.nano_properties),
-        )
-        .first()
-    )
-
-    if not item:
-        raise HTTPException(status_code=404, detail="Nano program not found")
-
-    try:
-        nano = parse_nano_from_item_and_spells(item)
-
-        # Get associated spells and criteria for detailed view
-        spells = []
-        raw_criteria = []
-
-        for spell_data in item.spell_data:
-            for spell in spell_data.spells:
-                spells.append(spell)
-                for criterion in spell.criteria:
-                    raw_criteria.append(
-                        {
-                            "value1": criterion.value1,
-                            "value2": criterion.value2,
-                            "operator": criterion.operator,
-                        }
-                    )
-
-        return NanoProgramWithSpells(
-            **nano.dict(), spells=spells, raw_criteria=raw_criteria
-        )
-    except Exception as e:
-        logger.error(f"Failed to parse nano {nano_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to process nano data")
-
-
 @router.get(
     "/profession/{profession_id}", response_model=PaginatedResponse[NanoItemDetail]
 )
@@ -836,137 +779,6 @@ def get_offensive_nanos_by_profession(
     return PaginatedResponse[ItemDetail](
         items=detailed_items,
         total=total,  # Now accurate count from DB filtering
-        page=page,
-        page_size=page_size,
-        pages=pages,
-        has_next=page < pages,
-        has_prev=page > 1,
-    )
-
-
-@router.get(
-    "/profession/{profession_id}/fast", response_model=PaginatedResponse[ItemDetail]
-)
-@cached_response("nanos_profession_fast", ttl=7200)  # Cache for 2 hours
-@performance_monitor
-def get_nanos_by_profession_fast(
-    profession_id: int,
-    page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(1000, ge=1, le=1000, description="Items per page"),
-    sort: str = Query("ql", description="Sort field: name, ql"),
-    sort_order: str = Query("desc", description="Sort order: asc, desc"),
-    db: Session = Depends(get_db),
-):
-    """
-    Ultra-fast nano programs by profession using minimal joins.
-
-    This endpoint prioritizes speed over complete data by:
-    - Minimal relationship loading
-    - Raw SQL for complex filters
-    - Simplified response objects
-    - Extended caching
-    """
-    from sqlalchemy import text
-
-    # Build optimized SQL query with minimal joins
-    sort_field = "i.ql" if sort == "ql" else "i.name"
-    sort_direction = "DESC" if sort_order == "desc" else "ASC"
-
-    # Use raw SQL for maximum performance
-    sql_query = text(f"""
-        SELECT DISTINCT
-            i.id, i.aoid, i.name, i.ql, i.item_class, i.description, i.is_nano
-        FROM items i
-        WHERE i.is_nano = true
-        AND NOT i.name LIKE 'TESTLIVEITEM%'
-        AND EXISTS (
-            SELECT 1 FROM item_stats ist 
-            JOIN stat_values sv ON ist.stat_value_id = sv.id 
-            WHERE ist.item_id = i.id AND sv.stat = 75 
-            AND sv.value > 0 AND sv.value != 99999
-        )
-        {'AND EXISTS (\
-            SELECT 1 FROM actions a\
-            JOIN action_criteria ac ON a.id = ac.action_id\
-            JOIN criteria c ON ac.criterion_id = c.id\
-            WHERE a.item_id = i.id AND a.action = 3\
-            AND ((c.value1 = 60 AND c.value2 = :prof_id)\
-                 OR (c.value1 = 368 AND c.value2 = :prof_id))\
-        )' if profession_id > 0 else ''}
-        ORDER BY {sort_field} {sort_direction}
-        LIMIT :limit OFFSET :offset
-    """)
-
-    count_query = text(
-        """
-        SELECT COUNT(DISTINCT i.id)
-        FROM items i
-        WHERE i.is_nano = true
-        AND NOT i.name LIKE 'TESTLIVEITEM%'
-        AND EXISTS (
-            SELECT 1 FROM item_stats ist 
-            JOIN stat_values sv ON ist.stat_value_id = sv.id 
-            WHERE ist.item_id = i.id AND sv.stat = 75 
-            AND sv.value > 0 AND sv.value != 99999
-        )
-    """
-        + (
-            """ 
-        AND EXISTS (
-            SELECT 1 FROM actions a
-            JOIN action_criteria ac ON a.id = ac.action_id
-            JOIN criteria c ON ac.criterion_id = c.id
-            WHERE a.item_id = i.id AND a.action = 3
-            AND ((c.value1 = 60 AND c.value2 = :prof_id)
-                 OR (c.value1 = 368 AND c.value2 = :prof_id))
-        )
-    """
-            if profession_id > 0
-            else ""
-        )
-    )
-
-    # Execute queries
-    offset = (page - 1) * page_size
-    params = {
-        "limit": page_size,
-        "offset": offset,
-        "prof_id": profession_id if profession_id > 0 else None,
-    }
-
-    # Get total count
-    count_result = db.execute(count_query, params).scalar()
-    total = count_result or 0
-
-    # Get items
-    result = db.execute(sql_query, params).fetchall()
-
-    # Build minimal ItemDetail objects
-    detailed_items = []
-    for row in result:
-        detailed_items.append(
-            ItemDetail(
-                id=row[0],
-                aoid=row[1],
-                name=row[2],
-                ql=row[3],
-                item_class=row[4],
-                description=row[5] or "",
-                is_nano=row[6],
-                stats=[],  # Skip for performance - load separately if needed
-                spell_data=[],  # Skip for performance - load separately if needed
-                attack_stats=[],
-                defense_stats=[],
-                actions=[],  # Skip for performance - load separately if needed
-                sources=[],  # Skip for performance - load separately if needed
-            )
-        )
-
-    pages = math.ceil(total / page_size) if total > 0 else 1
-
-    return PaginatedResponse[ItemDetail](
-        items=detailed_items,
-        total=total,
         page=page,
         page_size=page_size,
         pages=pages,

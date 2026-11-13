@@ -262,7 +262,7 @@ class TestCurrentVersion:
         monkeypatch.setattr(registry, "_versions", {}, raising=False)
         monkeypatch.setattr(registry, "_loaded_at", time.monotonic(), raising=False)
 
-        response = client.get("/api/v1/ao-2024-02/stat-values", params={"page_size": 1})
+        response = client.get("/api/v1/ao-2024-02/mobs", params={"page_size": 1})
         registry.invalidate()
 
         assert response.status_code != 404

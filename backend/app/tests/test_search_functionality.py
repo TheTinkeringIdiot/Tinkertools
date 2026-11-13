@@ -3,14 +3,11 @@ Tests for advanced search and filtering functionality using real database data.
 """
 
 import pytest
-from unittest.mock import Mock
 from fastapi.testclient import TestClient
 
 from sqlalchemy import text
 
 from app.main import app
-from app.core.database import get_db
-from app.models import Item
 
 
 @pytest.fixture
@@ -51,66 +48,6 @@ class TestItemSearch:
             # At least one item should contain "weapon" in its name
             assert any("weapon" in name for name in item_names)
 
-    def test_item_advanced_filtering(self, client):
-        """Test advanced filtering endpoint."""
-        response = client.get("/api/v1/items/filter?min_ql=100&max_ql=200")
-        assert response.status_code == 200
-        data = response.json()
-
-        assert "items" in data
-        assert data["total"] >= 0
-        # Verify all items are within the QL range
-        for item in data["items"]:
-            assert 100 <= item["ql"] <= 200
-
-    def test_item_class_filtering(self, client):
-        """Test filtering by item class."""
-        response = client.get("/api/v1/items/filter?item_class=1")
-        assert response.status_code == 200
-        data = response.json()
-
-        assert data["total"] >= 0
-        # All results should have the same item_class
-        for item in data["items"]:
-            assert item["item_class"] == 1
-
-    def test_nano_filtering(self, client):
-        """Test filtering by nano flag."""
-        response = client.get("/api/v1/items/filter?is_nano=true")
-        assert response.status_code == 200
-        data = response.json()
-
-        assert data["total"] > 0
-        # All results should be nano items
-        for item in data["items"]:
-            assert item["is_nano"] is True
-
-    def test_sorting_functionality(self, client):
-        """Test sorting options."""
-        # Sort by QL ascending
-        response = client.get(
-            "/api/v1/items/filter?sort_by=ql&sort_order=asc&page_size=10"
-        )
-        assert response.status_code == 200
-        data = response.json()
-
-        if data["total"] > 1:
-            qls = [item["ql"] for item in data["items"]]
-            # Check if sorted ascending
-            assert qls == sorted(qls)
-
-        # Sort by name descending
-        response = client.get(
-            "/api/v1/items/filter?sort_by=name&sort_order=desc&page_size=10"
-        )
-        assert response.status_code == 200
-        data = response.json()
-
-        if data["total"] > 1:
-            names = [item["name"] for item in data["items"]]
-            # Check if sorted descending
-            assert names == sorted(names, reverse=True)
-
     def test_filter_by_slot(self, client, db_session):
         """Test the slot filter matches the EquippedIn (stat 298) bitmask."""
         # Slot bit 15 at QL 200 is a small set that fits on one page
@@ -130,134 +67,12 @@ class TestItemSearch:
         assert 0 < len(expected_ids) <= 1000
 
         response = client.get(
-            f"/api/v1/items/filter?slot={slot}&min_ql={ql}&max_ql={ql}&page_size=1000"
+            f"/api/v1/items?slot={slot}&min_ql={ql}&max_ql={ql}&page_size=1000"
         )
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == len(expected_ids)
         assert {item["id"] for item in data["items"]} == expected_ids
-
-    def test_filter_by_attack_defense(self, client, db_session):
-        """Test has_attack_defense splits items on their attack/defense data."""
-        ql = 200
-        with_atkdef = {
-            item_id
-            for (item_id,) in db_session.query(Item.id).filter(
-                Item.ql == ql, Item.atkdef_id.isnot(None)
-            )
-        }
-        without_atkdef_total = (
-            db_session.query(Item)
-            .filter(Item.ql == ql, Item.atkdef_id.is_(None))
-            .count()
-        )
-        assert 0 < len(with_atkdef) <= 1000
-        assert without_atkdef_total > 0
-
-        response = client.get(
-            f"/api/v1/items/filter?has_attack_defense=true&min_ql={ql}&max_ql={ql}"
-            "&page_size=1000"
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["total"] == len(with_atkdef)
-        assert {item["id"] for item in data["items"]} == with_atkdef
-
-        response = client.get(
-            f"/api/v1/items/filter?has_attack_defense=false&min_ql={ql}&max_ql={ql}"
-            "&page_size=100"
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["total"] == without_atkdef_total
-        assert with_atkdef.isdisjoint(item["id"] for item in data["items"])
-
-
-class TestStatBasedQueries:
-    """Test stat-based item queries."""
-
-    def test_items_with_stats_endpoint(self, client):
-        """Test items with stats endpoint basic functionality."""
-        response = client.get("/api/v1/items/with-stats?stat_requirements=16:>=100")
-        assert response.status_code in [200, 422]  # 422 if validation fails
-
-        if response.status_code == 200:
-            data = response.json()
-            assert "items" in data
-            assert "total" in data
-
-    def test_multiple_stat_requirements(self, client):
-        """Test multiple stat requirements with AND logic."""
-        response = client.get(
-            "/api/v1/items/with-stats?stat_requirements=16:>=50,17:>=50&logic=and"
-        )
-        assert response.status_code in [200, 422]
-
-        if response.status_code == 200:
-            data = response.json()
-            assert "items" in data
-
-    def test_multiple_stat_requirements_or(self, client):
-        """Test multiple stat requirements with OR logic."""
-        response = client.get(
-            "/api/v1/items/with-stats?stat_requirements=16:>=50,17:>=50&logic=or"
-        )
-        assert response.status_code in [200, 422]
-
-        if response.status_code == 200:
-            data = response.json()
-            assert "items" in data
-
-
-class TestSpellSearch:
-    """Test spell search functionality with real database data."""
-
-    def test_spells_endpoint_basic(self, client):
-        """Test basic spells endpoint."""
-        response = client.get("/api/v1/spells")
-        assert response.status_code == 200
-        data = response.json()
-
-        assert "items" in data
-        assert "total" in data
-        assert isinstance(data["items"], list)
-        assert data["total"] > 0
-
-    def test_spell_search(self, client):
-        """Test spell search functionality."""
-        # Search for common spell-related terms that likely exist in database
-        response = client.get("/api/v1/spells/search?q=Modif")
-        assert response.status_code == 200
-        data = response.json()
-
-        assert "items" in data
-        assert data["total"] >= 0
-        # If there are results, verify they contain search term
-        if len(data["items"]) > 0:
-            spell_formats = [spell["spell_format"].lower() for spell in data["items"]]
-            # At least one spell should contain the search term
-            assert any("modif" in fmt for fmt in spell_formats)
-
-    def test_spell_target_filtering(self, client):
-        """Test filtering spells by target."""
-        response = client.get("/api/v1/spells?target=1")
-        assert response.status_code == 200
-        data = response.json()
-
-        assert data["total"] >= 0
-        # All results should have target = 1
-        for spell in data["items"]:
-            assert spell["target"] == 1
-
-    def test_spell_with_criteria(self, client):
-        """Test spell criteria filtering endpoint."""
-        response = client.get("/api/v1/spells/with-criteria")
-        assert response.status_code in [200, 422]
-
-        if response.status_code == 200:
-            data = response.json()
-            assert "items" in data
-            assert "total" in data
 
 
 class TestPocketBossSearch:
@@ -418,20 +233,6 @@ class TestSymbiantSearch:
 class TestCacheAndPerformance:
     """Test caching and performance monitoring functionality."""
 
-    def test_cache_stats(self, mock_client):
-        """Test cache statistics endpoint."""
-        # Cache stats endpoint doesn't use database
-        response = mock_client.get("/api/v1/cache/stats")
-        assert response.status_code == 200
-        data = response.json()
-
-        assert "hits" in data
-        assert "misses" in data
-        assert "cache_size" in data
-        assert "hit_rate_percent" in data
-        assert isinstance(data["hits"], int)
-        assert isinstance(data["misses"], int)
-
     def test_cache_clear(self, mock_client):
         """Test cache clearing."""
         # Cache clear endpoint doesn't use database
@@ -441,51 +242,6 @@ class TestCacheAndPerformance:
 
         assert "message" in data
         assert "cleared" in data["message"].lower()
-
-    def test_cache_cleanup(self, mock_client):
-        """Test cache cleanup endpoint."""
-        # Cache cleanup endpoint doesn't use database
-        response = mock_client.post("/api/v1/cache/cleanup")
-        assert response.status_code == 200
-        data = response.json()
-
-        assert "message" in data
-        assert "removed" in data["message"].lower()
-
-    def test_performance_health(self, mock_client):
-        """Test performance health check."""
-        # Performance health endpoint doesn't use database
-        response = mock_client.get("/api/v1/performance/health")
-        assert response.status_code == 200
-        data = response.json()
-
-        assert data["status"] == "healthy"
-        assert "performance_monitoring" in data
-        assert "monitoring_endpoints" in data
-
-    def test_performance_overview(self, mock_client):
-        """Test performance overview endpoint."""
-        # Performance overview endpoint may use database for stats
-        # Mock it to avoid database dependencies
-        mock_query = Mock()
-        mock_query.options.return_value = mock_query
-        mock_query.all.return_value = []
-
-        mock_db = Mock()
-        mock_db.execute.return_value = mock_query
-
-        app.dependency_overrides[get_db] = lambda: mock_db
-
-        try:
-            response = mock_client.get("/api/v1/performance/overview")
-            assert response.status_code == 200
-            data = response.json()
-
-            assert "cache_stats" in data
-            # index_usage might fail if pg_stat_statements isn't available
-            # so we don't assert on it
-        finally:
-            app.dependency_overrides.clear()
 
 
 class TestPaginationAndEdgeCases:
@@ -535,19 +291,12 @@ class TestPaginationAndEdgeCases:
         assert data["items"] == []
         assert data["pages"] >= 1
 
-    def test_invalid_stat_requirements_format(self, client):
-        """Test invalid stat requirement formats are handled."""
-        response = client.get(
-            "/api/v1/items/with-stats?stat_requirements=invalid_format"
-        )
-        assert response.status_code in [200, 422, 400]
         # Should either handle gracefully (200) or return proper error code
 
     def test_endpoint_response_structure(self, client):
         """Test that all paginated endpoints have consistent response structure."""
         endpoints = [
             "/api/v1/items",
-            "/api/v1/spells",
             "/api/v1/mobs?is_pocket_boss=true",
             "/api/v1/symbiants",
         ]

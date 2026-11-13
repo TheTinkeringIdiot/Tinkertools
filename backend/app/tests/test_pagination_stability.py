@@ -4,15 +4,11 @@ Page-walk tests for paginated endpoints.
 Each test requests every page of a small real result set and checks that the
 pages partition it: no row appears twice and none goes missing. That only
 holds when the endpoint sorts on a unique key, so these tests pin the id
-tiebreakers added to each endpoint's ORDER BY (or Python sort key). Spell and
-stat-value listings are scoped to the version, since in the shared store their
-tables hold every version's rows.
+tiebreakers added to each endpoint's ORDER BY.
 Symbiant pages are walked in test_search_functionality's family test.
 """
 
-from app.api.routes.spells import spell_in_current_version
-from app.api.routes.stat_values import stat_value_in_current_version
-from app.models import Item, Mob, Spell, StatValue
+from app.models import Item, Mob
 
 
 def _walk(client, url, page_size):
@@ -40,40 +36,6 @@ def test_mobs_pages_partition(client, db_session):
     expected = [mob_id for (mob_id,) in db_session.query(Mob.id)]
 
     ids, total = _walk(client, "/api/v1/mobs", page_size=25)
-
-    assert total == len(expected)
-    _assert_partition(ids, expected)
-
-
-def test_spells_list_pages_partition(client, db_session):
-    """The spell list had no ORDER BY at all."""
-    target = 14  # a few hundred spells: several pages, still cheap
-    expected = [
-        spell_id
-        for (spell_id,) in db_session.query(Spell.id).filter(
-            Spell.target == target, spell_in_current_version()
-        )
-    ]
-    assert len(expected) > 200
-
-    ids, total = _walk(client, f"/api/v1/spells?target={target}", page_size=200)
-
-    assert total == len(expected)
-    _assert_partition(ids, expected)
-
-
-def test_spell_search_pages_partition(client, db_session):
-    """Spell search sorts by spell_id, the spell type, which repeats heavily."""
-    term = "Teleport"
-    expected = [
-        spell_id
-        for (spell_id,) in db_session.query(Spell.id).filter(
-            Spell.spell_format.ilike(f"%{term}%"), spell_in_current_version()
-        )
-    ]
-    assert len(expected) > 200
-
-    ids, total = _walk(client, f"/api/v1/spells/search?q={term}", page_size=200)
 
     assert total == len(expected)
     _assert_partition(ids, expected)
@@ -112,32 +74,3 @@ def test_nano_search_pages_partition(client, db_session):
 
     assert total == len(expected)
     _assert_partition(ids, expected)
-
-
-def test_perks_pages_partition(client):
-    """Perks are sorted in Python; many AI perks share a level."""
-    ids, total = _walk(client, "/api/v1/perks?type=AI&sort_by=level", page_size=50)
-
-    assert total > 50
-    assert len(ids) == total
-    assert len(set(ids)) == total, "a perk appeared on more than one page"
-
-
-def test_stat_values_pages_partition(client, db_session):
-    """stat-values pages with skip/limit and had no ORDER BY."""
-    limit = 100
-    expected = [
-        stat_value_id
-        for (stat_value_id,) in db_session.query(StatValue.id)
-        .filter(stat_value_in_current_version())
-        .order_by(StatValue.id)
-        .limit(3 * limit)
-    ]
-
-    ids = []
-    for skip in range(0, 3 * limit, limit):
-        response = client.get(f"/api/v1/stat-values?skip={skip}&limit={limit}")
-        assert response.status_code == 200
-        ids.extend(row["id"] for row in response.json())
-
-    assert ids == expected
