@@ -76,3 +76,5 @@ frontend/test-results/
 frontend/playwright-report/
 frontend/e2e/screenshots/
 frontend/.playwright/
+# Golden API reference captures (backend/tools/golden.py)
+.golden/
