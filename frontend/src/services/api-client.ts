@@ -5,7 +5,6 @@
  * - Axios integration with interceptors
  * - Request/response typing
  * - Error handling and retry logic
- * - Request batching and deduplication
  */
 
 import axios, { AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
@@ -13,11 +12,9 @@ import type {
   ApiResponse,
   PaginatedResponse,
   Item,
-  Spell,
   SymbiantItem,
   Mob,
   ItemSearchQuery,
-  SpellSearchQuery,
   SymbiantSearchQuery,
   MobSearchQuery,
   MobDropsQuery,
@@ -30,7 +27,6 @@ import type {
   BatchInterpolationResponse,
   BatchPerkLookupResponse,
   PerkLookupItem,
-  StatValue,
 } from '../types/api';
 import { ErrorCodes } from '../types/api';
 import type {
@@ -59,7 +55,6 @@ const API_CONFIG = {
   timeout: 120000, // 120 seconds - increased for large dataset loads (symbiants ~900+ items, pocket bosses)
   retryAttempts: 3,
   retryDelay: 1000,
-  batchDelay: 50, // ms to wait before executing batch requests
 };
 
 // ============================================================================
@@ -137,89 +132,11 @@ class ApiErrorHandler {
 }
 
 // ============================================================================
-// Batch Request Manager
-// ============================================================================
-
-interface PendingBatch<T> {
-  ids: (string | number)[];
-  promise: Promise<T[]>;
-  resolve: (data: T[]) => void;
-  reject: (error: unknown) => void;
-}
-
-class BatchRequestManager {
-  private pendingBatches = new Map<string, PendingBatch<unknown>>();
-
-  async batchItems(itemIds: number[]): Promise<Item[]> {
-    return this.createBatch(this.keyFor('items'), itemIds, (ids) =>
-      apiClient.post<Item[]>('/items/batch', { item_ids: ids })
-    );
-  }
-
-  async batchSpells(spellIds: number[]): Promise<Spell[]> {
-    return this.createBatch(this.keyFor('spells'), spellIds, (ids) =>
-      apiClient.post<Spell[]>('/spells/batch', { spell_ids: ids })
-    );
-  }
-
-  /** Batches must never mix game versions: the key carries the current version. */
-  private keyFor(resource: string): string {
-    return `${dataVersion.value ?? ''}:${resource}`;
-  }
-
-  private async createBatch<T>(
-    batchKey: string,
-    ids: (string | number)[],
-    executor: (ids: (string | number)[]) => Promise<ApiResponse<T[]>>
-  ): Promise<T[]> {
-    const existing = this.pendingBatches.get(batchKey);
-
-    if (existing) {
-      existing.ids.push(...ids);
-      // Batch keys are per resource, so a pending batch under this key holds T
-      return existing.promise as Promise<T[]>;
-    }
-
-    let resolve: (data: T[]) => void;
-    let reject: (error: unknown) => void;
-
-    const promise = new Promise<T[]>((res, rej) => {
-      resolve = res;
-      reject = rej;
-    });
-
-    const batch: PendingBatch<T> = {
-      ids: [...ids],
-      promise,
-      resolve: resolve!,
-      reject: reject!,
-    };
-
-    this.pendingBatches.set(batchKey, batch as PendingBatch<unknown>);
-
-    // Execute batch after short delay to collect more requests
-    setTimeout(async () => {
-      try {
-        const response = await executor(batch.ids);
-        batch.resolve(response.data || []);
-      } catch (error) {
-        batch.reject(error);
-      } finally {
-        this.pendingBatches.delete(batchKey);
-      }
-    }, API_CONFIG.batchDelay);
-
-    return promise;
-  }
-}
-
-// ============================================================================
 // Main API Client
 // ============================================================================
 
 class TinkerToolsApiClient {
   private client: AxiosInstance;
-  private batchManager: BatchRequestManager;
 
   constructor() {
     this.client = axios.create({
@@ -232,7 +149,6 @@ class TinkerToolsApiClient {
       },
     });
 
-    this.batchManager = new BatchRequestManager();
     this.setupInterceptors();
   }
 
@@ -467,17 +383,6 @@ class TinkerToolsApiClient {
     );
   }
 
-  async getItems(ids: number[]): Promise<ApiResponse<Item[]>> {
-    if (ids.length === 1) {
-      const response = await this.getItem(ids[0]);
-      return {
-        ...response,
-        data: response.data ? [response.data] : [],
-      };
-    }
-    return this.batchManager.batchItems(ids).then((data) => ({ success: true, data }));
-  }
-
   // ============================================================================
   // Implant API
   // ============================================================================
@@ -661,27 +566,6 @@ class TinkerToolsApiClient {
   }
 
   // ============================================================================
-  // Spells API
-  // ============================================================================
-
-  async searchSpells(query: SpellSearchQuery): Promise<PaginatedResponse<Spell>> {
-    const params = new URLSearchParams();
-
-    if (query.search) params.append('search', query.search);
-    if (query.has_criteria !== undefined)
-      params.append('has_criteria', query.has_criteria.toString());
-    if (query.spell_id) params.append('spell_id', query.spell_id.toString());
-    if (query.page) params.append('page', query.page.toString());
-    if (query.limit) params.append('limit', query.limit.toString());
-
-    return this.getPaginated<Spell>(`/spells?${params.toString()}`);
-  }
-
-  async getSpell(id: number): Promise<ApiResponse<Spell>> {
-    return this.get<Spell>(`/spells/${id}`);
-  }
-
-  // ============================================================================
   // Symbiants API
   // ============================================================================
 
@@ -745,25 +629,6 @@ class TinkerToolsApiClient {
   async getPocketBossDrops(id: number): Promise<ApiResponse<SymbiantItem[]>> {
     return this.getMobDrops(id);
   }
-
-  // ============================================================================
-  // Stat Values API
-  // ============================================================================
-
-  async getStatValues(params?: {
-    stat?: number;
-    value?: number;
-  }): Promise<PaginatedResponse<StatValue>> {
-    const searchParams = new URLSearchParams();
-    if (params?.stat) searchParams.append('stat', params.stat.toString());
-    if (params?.value) searchParams.append('value', params.value.toString());
-
-    return this.getPaginated<StatValue>(`/stat-values?${searchParams.toString()}`);
-  }
-
-  // ============================================================================
-  // Health Check
-  // ============================================================================
 
   // ============================================================================
   // Game versions and item change history (cross-version endpoints)
@@ -834,5 +699,5 @@ class TinkerToolsApiClient {
 // ============================================================================
 
 export const apiClient = new TinkerToolsApiClient();
-export { ApiErrorHandler, BatchRequestManager };
+export { ApiErrorHandler };
 export default apiClient;

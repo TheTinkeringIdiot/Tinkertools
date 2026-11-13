@@ -10,7 +10,7 @@ import { apiClient } from '../../services/api-client';
 import { API_ROOT } from '../../services/api-config';
 import { setCurrentVersion } from '../../composables/useGameVersion';
 import { TEST_VERSION, TEST_ALT_VERSION } from '../helpers/version-fixtures';
-import type { Item, Spell, ApiResponse } from '../../types/api';
+import type { Item, ApiResponse } from '../../types/api';
 
 type RequestInterceptor = (config: InternalAxiosRequestConfig) => InternalAxiosRequestConfig;
 type ResponseErrorInterceptor = (error: unknown) => Promise<unknown>;
@@ -189,62 +189,6 @@ describe('API Client', () => {
       await apiClient.getItem(1);
 
       expect(mockAxiosInstance.get).toHaveBeenCalledWith('/items/1', undefined);
-    });
-
-    it('should batch multiple item requests', async () => {
-      const itemIds = [1, 2, 3];
-      mockAxiosInstance.post.mockResolvedValue({
-        data: { success: true, data: [mockItem] },
-      });
-
-      const result = await apiClient.getItems(itemIds);
-
-      expect(result.success).toBe(true);
-      expect(result.data).toEqual([mockItem]);
-    });
-  });
-
-  describe('Spells API', () => {
-    const mockSpell: Spell = {
-      id: 1,
-      target: 2,
-      tick_count: 1,
-      tick_interval: 0,
-      spell_id: 53002, // Use a known spell format ID for testing
-      spell_format: 'Test spell format', // This will be ignored in favor of spell_id lookup
-      spell_params: {},
-      criteria: [],
-    };
-
-    beforeEach(() => {
-      mockAxiosInstance.get.mockResolvedValue({
-        data: { success: true, data: [mockSpell] },
-      });
-    });
-
-    it('should search spells with query parameters', async () => {
-      const query = {
-        search: 'damage',
-        has_criteria: true,
-        limit: 20,
-      };
-
-      await apiClient.searchSpells(query);
-
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith(
-        expect.stringContaining('/spells'),
-        undefined
-      );
-    });
-
-    it('should get single spell by ID', async () => {
-      mockAxiosInstance.get.mockResolvedValue({
-        data: { success: true, data: mockSpell },
-      });
-
-      await apiClient.getSpell(1);
-
-      expect(mockAxiosInstance.get).toHaveBeenCalledWith('/spells/1', undefined);
     });
   });
 

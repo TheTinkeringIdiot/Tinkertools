@@ -9,7 +9,7 @@ import { cacheManager } from './cache-manager';
 import { errorMessage } from './error-message';
 import { versionKey } from './version-keys';
 import { useAppStore } from '../stores/app';
-import type { Item, Spell, Symbiant, PocketBoss } from '../types/api';
+import type { Item, Symbiant, PocketBoss } from '../types/api';
 
 export interface OfflineCapability {
   isOffline: boolean;
@@ -28,7 +28,6 @@ export interface QueuedOperation {
 
 export interface OfflineDataSet {
   items: Item[];
-  spells: Spell[];
   symbiants: Symbiant[];
   pocketBosses: PocketBoss[];
   lastUpdate: number;
@@ -49,7 +48,6 @@ class OfflineManager {
   private get offlineDataKeys() {
     return {
       items: versionKey('offline_items'),
-      spells: versionKey('offline_spells'),
       symbiants: versionKey('offline_symbiants'),
       pocketBosses: versionKey('offline_pocket_bosses'),
       operations: versionKey('offline_queued_operations'),
@@ -95,7 +93,6 @@ class OfflineManager {
   async downloadOfflineData(
     options: {
       includeItems?: boolean;
-      includeSpells?: boolean;
       includeSymbiants?: boolean;
       includePocketBosses?: boolean;
       progressCallback?: (progress: number, status: string) => void;
@@ -105,7 +102,7 @@ class OfflineManager {
     const { progressCallback } = options;
 
     let progress = 0;
-    const totalSteps = Object.values(options).filter(Boolean).length || 4;
+    const totalSteps = Object.values(options).filter(Boolean).length || 3;
     const stepSize = 100 / totalSteps;
 
     try {
@@ -115,14 +112,6 @@ class OfflineManager {
       if (options.includeItems !== false) {
         progressCallback?.(progress, 'Downloading items...');
         await this.downloadItemsData();
-        progress += stepSize;
-        appStore.updateLoadingProgress(progress);
-      }
-
-      // Download spells data
-      if (options.includeSpells !== false) {
-        progressCallback?.(progress, 'Downloading spells...');
-        await this.downloadSpellsData();
         progress += stepSize;
         appStore.updateLoadingProgress(progress);
       }
@@ -171,7 +160,7 @@ class OfflineManager {
   /**
    * Get offline data
    */
-  async getOfflineData<T>(type: 'items' | 'spells' | 'symbiants' | 'pocketBosses'): Promise<T[]> {
+  async getOfflineData<T>(type: 'items' | 'symbiants' | 'pocketBosses'): Promise<T[]> {
     const key = this.offlineDataKeys[type];
     const data = await cacheManager.get<T[]>(key);
     return data || [];
@@ -257,9 +246,7 @@ class OfflineManager {
   /**
    * Check if data is available offline
    */
-  async isDataAvailableOffline(
-    type: 'items' | 'spells' | 'symbiants' | 'pocketBosses'
-  ): Promise<boolean> {
+  async isDataAvailableOffline(type: 'items' | 'symbiants' | 'pocketBosses'): Promise<boolean> {
     const data = await this.getOfflineData(type);
     return data.length > 0;
   }
@@ -269,16 +256,14 @@ class OfflineManager {
    */
   async getOfflineStats(): Promise<{
     totalItems: number;
-    totalSpells: number;
     totalSymbiants: number;
     totalPocketBosses: number;
     totalSize: number;
     lastUpdate: Date;
     queuedOperations: number;
   }> {
-    const [items, spells, symbiants, pocketBosses] = await Promise.all([
+    const [items, symbiants, pocketBosses] = await Promise.all([
       this.getOfflineData<Item>('items'),
-      this.getOfflineData<Spell>('spells'),
       this.getOfflineData<Symbiant>('symbiants'),
       this.getOfflineData<PocketBoss>('pocketBosses'),
     ]);
@@ -287,7 +272,6 @@ class OfflineManager {
 
     return {
       totalItems: items.length,
-      totalSpells: spells.length,
       totalSymbiants: symbiants.length,
       totalPocketBosses: pocketBosses.length,
       totalSize: cacheStats.totalSize,
@@ -308,7 +292,6 @@ class OfflineManager {
       // Clear cached offline data
       await Promise.all([
         cacheManager.remove(this.offlineDataKeys.items),
-        cacheManager.remove(this.offlineDataKeys.spells),
         cacheManager.remove(this.offlineDataKeys.symbiants),
         cacheManager.remove(this.offlineDataKeys.pocketBosses),
         cacheManager.remove(this.offlineDataKeys.operations),
@@ -420,7 +403,6 @@ class OfflineManager {
   private async checkOfflineDataAvailability(): Promise<void> {
     const hasAnyData = await Promise.all([
       this.isDataAvailableOffline('items'),
-      this.isDataAvailableOffline('spells'),
       this.isDataAvailableOffline('symbiants'),
       this.isDataAvailableOffline('pocketBosses'),
     ]);
@@ -439,19 +421,6 @@ class OfflineManager {
     });
 
     await cacheManager.set(this.offlineDataKeys.items, commonItems, Infinity);
-  }
-
-  private async downloadSpellsData(): Promise<void> {
-    const { useSpellsStore } = await import('../stores/spells');
-    const spellsStore = useSpellsStore();
-
-    // Download spells with criteria (most useful)
-    const commonSpells = await spellsStore.searchSpells({
-      has_criteria: true,
-      limit: 200,
-    });
-
-    await cacheManager.set(this.offlineDataKeys.spells, commonSpells, Infinity);
   }
 
   private async downloadSymbiantsData(): Promise<void> {

@@ -419,14 +419,6 @@ export interface ItemSearchQuery {
   sort_order?: 'asc' | 'desc';
 }
 
-export interface SpellSearchQuery {
-  search?: string;
-  has_criteria?: boolean;
-  spell_id?: number;
-  page?: number;
-  limit?: number;
-}
-
 // Pagination fields removed - all filtering now handled client-side
 export interface SymbiantSearchQuery {
   search?: string;
