@@ -911,8 +911,8 @@ class PerkService:
 
     def _get_spell_data_responses(self, item: Item) -> List[SpellDataResponse]:
         """Convert item spell data to response format following the pattern from items endpoint."""
-        from app.api.schemas.spell import SpellWithCriteria
-        from app.api.schemas.criterion import CriterionResponse
+        from app.api.schemas.spell import ItemSpellResponse
+        from app.api.schemas.criterion import ItemCriterionResponse
 
         spell_data_list = []
 
@@ -952,8 +952,7 @@ class PerkService:
                             for sc in spell.spell_criteria:
                                 if sc.criterion:
                                     criteria.append(
-                                        CriterionResponse(
-                                            id=sc.criterion.id,
+                                        ItemCriterionResponse(
                                             value1=sc.criterion.value1,
                                             value2=sc.criterion.value2,
                                             operator=sc.criterion.operator,
@@ -961,8 +960,7 @@ class PerkService:
                                     )
 
                         spells_with_criteria.append(
-                            SpellWithCriteria(
-                                id=spell.id,
+                            ItemSpellResponse(
                                 target=spell.target,
                                 tick_count=spell.tick_count,
                                 tick_interval=spell.tick_interval,
@@ -975,7 +973,6 @@ class PerkService:
 
                 spell_data_list.append(
                     SpellDataResponse(
-                        id=spell_data.id,
                         event=spell_data.event,
                         spells=spells_with_criteria,
                     )

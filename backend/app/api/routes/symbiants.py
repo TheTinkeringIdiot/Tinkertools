@@ -31,8 +31,8 @@ from app.api.schemas.symbiant import (
     MobDropInfo,
 )
 from app.api.schemas.action import ActionResponse
-from app.api.schemas.criterion import CriterionResponse
-from app.api.schemas.spell import SpellDataResponse, SpellWithCriteria
+from app.api.schemas.criterion import ItemCriterionResponse
+from app.api.schemas.spell import SpellDataResponse, ItemSpellResponse
 from app.api.schemas import PaginatedResponse
 from app.core.decorators import cached_response, performance_monitor
 
@@ -110,8 +110,7 @@ def list_symbiants(
             if item.actions:
                 for action in item.actions:
                     criteria = [
-                        CriterionResponse(
-                            id=ac.criterion.id,
+                        ItemCriterionResponse(
                             value1=ac.criterion.value1,
                             value2=ac.criterion.value2,
                             operator=ac.criterion.operator,
@@ -121,9 +120,7 @@ def list_symbiants(
 
                     actions.append(
                         ActionResponse(
-                            id=action.id,
                             action=action.action,
-                            item_id=action.item_id,
                             criteria=criteria,
                         )
                     )
@@ -139,8 +136,7 @@ def list_symbiants(
 
                     # Get criteria for this spell
                     criteria = [
-                        CriterionResponse(
-                            id=sc.criterion.id,
+                        ItemCriterionResponse(
                             value1=sc.criterion.value1,
                             value2=sc.criterion.value2,
                             operator=sc.criterion.operator,
@@ -149,8 +145,7 @@ def list_symbiants(
                     ]
 
                     spells_with_criteria.append(
-                        SpellWithCriteria(
-                            id=spell.id,
+                        ItemSpellResponse(
                             target=spell.target,
                             tick_count=spell.tick_count,
                             tick_interval=spell.tick_interval,
@@ -163,7 +158,6 @@ def list_symbiants(
 
                 spell_data_list.append(
                     SpellDataResponse(
-                        id=spell_data.id,
                         event=spell_data.event,
                         spells=spells_with_criteria,
                     )
@@ -199,10 +193,10 @@ def list_symbiants(
     )
 
 
-@router.get("/{symbiant_id}/dropped-by", response_model=List[MobDropInfo])
+@router.get("/{aoid}/dropped-by", response_model=List[MobDropInfo])
 @cached_response("symbiant_sources")
 @performance_monitor
-def get_symbiant_sources(symbiant_id: int, db: Session = Depends(get_db)):
+def get_symbiant_sources(aoid: int, db: Session = Depends(get_db)):
     """
     Get all pocket bosses that drop this symbiant.
 
@@ -212,12 +206,12 @@ def get_symbiant_sources(symbiant_id: int, db: Session = Depends(get_db)):
     Only returns mobs where is_pocket_boss = TRUE.
 
     Args:
-        symbiant_id: Database ID of the symbiant (from symbiant_items view)
+        aoid: Anarchy Online item ID of the symbiant
     """
     start_time = time.time()
 
     # Verify symbiant exists
-    symbiant = db.query(SymbiantItem).filter(SymbiantItem.id == symbiant_id).first()
+    symbiant = db.query(SymbiantItem).filter(SymbiantItem.aoid == aoid).first()
     if not symbiant:
         raise HTTPException(status_code=404, detail="Symbiant not found")
 
@@ -235,7 +229,7 @@ def get_symbiant_sources(symbiant_id: int, db: Session = Depends(get_db)):
         .join(ItemSource, ItemSource.source_id == Source.id)
         .filter(
             and_(
-                ItemSource.item_id == symbiant_id,
+                ItemSource.item_id == symbiant.id,
                 Source.source_type_id == source_type.id,
                 Mob.is_pocket_boss.is_(True),
             )
@@ -250,7 +244,7 @@ def get_symbiant_sources(symbiant_id: int, db: Session = Depends(get_db)):
     # Log performance metrics
     query_time = time.time() - start_time
     logger.info(
-        f"Symbiant sources query symbiant_id={symbiant_id} results={len(mobs)} time={query_time:.3f}s"
+        f"Symbiant sources query aoid={aoid} results={len(mobs)} time={query_time:.3f}s"
     )
 
     return [
@@ -266,14 +260,14 @@ def get_symbiant_sources(symbiant_id: int, db: Session = Depends(get_db)):
     ]
 
 
-@router.get("/{symbiant_id}", response_model=SymbiantResponse)
+@router.get("/{aoid}", response_model=SymbiantResponse)
 @cached_response("symbiants")
 @performance_monitor
-def get_symbiant(symbiant_id: int, db: Session = Depends(get_db)):
+def get_symbiant(aoid: int, db: Session = Depends(get_db)):
     """
-    Get detailed information about a specific symbiant.
+    Get detailed information about a specific symbiant, by its AOID.
     """
-    symbiant = db.query(SymbiantItem).filter(SymbiantItem.id == symbiant_id).first()
+    symbiant = db.query(SymbiantItem).filter(SymbiantItem.aoid == aoid).first()
 
     if not symbiant:
         raise HTTPException(status_code=404, detail="Symbiant not found")
@@ -281,7 +275,7 @@ def get_symbiant(symbiant_id: int, db: Session = Depends(get_db)):
     # Get actions/criteria and spell_data from Item table
     item = (
         db.query(Item)
-        .filter(Item.id == symbiant_id)
+        .filter(Item.id == symbiant.id)
         .options(
             joinedload(Item.actions)
             .joinedload(Action.action_criteria)
@@ -304,8 +298,7 @@ def get_symbiant(symbiant_id: int, db: Session = Depends(get_db)):
         if item.actions:
             for action in item.actions:
                 criteria = [
-                    CriterionResponse(
-                        id=ac.criterion.id,
+                    ItemCriterionResponse(
                         value1=ac.criterion.value1,
                         value2=ac.criterion.value2,
                         operator=ac.criterion.operator,
@@ -315,9 +308,7 @@ def get_symbiant(symbiant_id: int, db: Session = Depends(get_db)):
 
                 actions.append(
                     ActionResponse(
-                        id=action.id,
                         action=action.action,
-                        item_id=action.item_id,
                         criteria=criteria,
                     )
                 )
@@ -333,8 +324,7 @@ def get_symbiant(symbiant_id: int, db: Session = Depends(get_db)):
 
                 # Get criteria for this spell
                 criteria = [
-                    CriterionResponse(
-                        id=sc.criterion.id,
+                    ItemCriterionResponse(
                         value1=sc.criterion.value1,
                         value2=sc.criterion.value2,
                         operator=sc.criterion.operator,
@@ -343,8 +333,7 @@ def get_symbiant(symbiant_id: int, db: Session = Depends(get_db)):
                 ]
 
                 spells_with_criteria.append(
-                    SpellWithCriteria(
-                        id=spell.id,
+                    ItemSpellResponse(
                         target=spell.target,
                         tick_count=spell.tick_count,
                         tick_interval=spell.tick_interval,
@@ -357,7 +346,6 @@ def get_symbiant(symbiant_id: int, db: Session = Depends(get_db)):
 
             spell_data_list.append(
                 SpellDataResponse(
-                    id=spell_data.id,
                     event=spell_data.event,
                     spells=spells_with_criteria,
                 )

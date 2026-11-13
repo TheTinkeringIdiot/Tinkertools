@@ -19,6 +19,13 @@ class CriterionCreate(CriterionBase):
     pass
 
 
+class ItemCriterionResponse(CriterionBase):
+    """A criterion as embedded in an item's actions and spells: no row id."""
+
+    class Config:
+        from_attributes = True
+
+
 class CriterionResponse(CriterionBase):
     """Schema for Criterion responses."""
 

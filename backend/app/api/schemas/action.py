@@ -4,7 +4,7 @@ Pydantic schemas for Action models.
 
 from typing import Optional, List
 from pydantic import BaseModel, Field
-from .criterion import CriterionResponse
+from .criterion import ItemCriterionResponse
 
 
 class ActionBase(BaseModel):
@@ -20,11 +20,9 @@ class ActionCreate(ActionBase):
 
 
 class ActionResponse(ActionBase):
-    """Schema for Action responses."""
+    """An action as embedded in an item: its content only, no row ids."""
 
-    id: int = Field(description="Action ID")
-    item_id: int = Field(description="Item ID")
-    criteria: List[CriterionResponse] = Field(
+    criteria: List[ItemCriterionResponse] = Field(
         default_factory=list, description="Action criteria"
     )
 

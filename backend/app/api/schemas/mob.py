@@ -29,6 +29,8 @@ class MobResponse(BaseModel):
 class SymbiantDropInfo(BaseModel):
     """Symbiant drop information for mob detail."""
 
+    # Deprecated: an internal row id that differs between game versions. Use
+    # ``aoid``; this field is removed with the content-addressed store.
     id: int
     aoid: int
     name: str

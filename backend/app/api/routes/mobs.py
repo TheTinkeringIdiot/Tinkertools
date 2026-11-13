@@ -29,8 +29,8 @@ from app.models import (
 from app.api.schemas.mob import MobResponse
 from app.api.schemas.symbiant import SymbiantResponse
 from app.api.schemas.action import ActionResponse
-from app.api.schemas.criterion import CriterionResponse
-from app.api.schemas.spell import SpellDataResponse, SpellWithCriteria
+from app.api.schemas.criterion import ItemCriterionResponse
+from app.api.schemas.spell import SpellDataResponse, ItemSpellResponse
 from app.api.schemas import PaginatedResponse
 from app.core.decorators import cached_response, performance_monitor
 
@@ -228,8 +228,7 @@ def get_mob_drops(
             if item.actions:
                 for action in item.actions:
                     criteria = [
-                        CriterionResponse(
-                            id=ac.criterion.id,
+                        ItemCriterionResponse(
                             value1=ac.criterion.value1,
                             value2=ac.criterion.value2,
                             operator=ac.criterion.operator,
@@ -239,9 +238,7 @@ def get_mob_drops(
 
                     actions.append(
                         ActionResponse(
-                            id=action.id,
                             action=action.action,
-                            item_id=action.item_id,
                             criteria=criteria,
                         )
                     )
@@ -257,8 +254,7 @@ def get_mob_drops(
 
                     # Get criteria for this spell
                     criteria = [
-                        CriterionResponse(
-                            id=sc.criterion.id,
+                        ItemCriterionResponse(
                             value1=sc.criterion.value1,
                             value2=sc.criterion.value2,
                             operator=sc.criterion.operator,
@@ -267,8 +263,7 @@ def get_mob_drops(
                     ]
 
                     spells_with_criteria.append(
-                        SpellWithCriteria(
-                            id=spell.id,
+                        ItemSpellResponse(
                             target=spell.target,
                             tick_count=spell.tick_count,
                             tick_interval=spell.tick_interval,
@@ -281,7 +276,6 @@ def get_mob_drops(
 
                 spell_data_list.append(
                     SpellDataResponse(
-                        id=spell_data.id,
                         event=spell_data.event,
                         spells=spells_with_criteria,
                     )

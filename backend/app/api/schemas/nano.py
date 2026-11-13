@@ -44,7 +44,9 @@ class NanoProgram(BaseModel):
     """Complete nano program with item and spell data."""
 
     # Basic item info
-    id: int = Field(..., description="Unique identifier")
+    # Deprecated: an internal row id that differs between game versions. Use
+    # ``aoid``; this field is removed with the content-addressed store.
+    id: int = Field(..., description="Deprecated internal row ID; do not rely on it")
     aoid: int = Field(..., description="Anarchy Online item ID")
     name: str = Field(..., description="Nano program name")
     ql: int = Field(..., description="Quality level")

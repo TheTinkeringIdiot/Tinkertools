@@ -184,11 +184,11 @@ Get a paginated list of symbiants.
 - `min_ql` (int): Minimum quality level
 - `max_ql` (int): Maximum quality level
 
-#### GET /api/v1/symbiants/{symbiant_id}
-Get detailed information about a specific symbiant including drop sources.
+#### GET /api/v1/symbiants/{aoid}
+Get detailed information about a specific symbiant, addressed by its AOID.
 
-#### GET /api/v1/symbiants/{symbiant_id}/dropped-by
-Get list of pocket bosses that drop a specific symbiant.
+#### GET /api/v1/symbiants/{aoid}/dropped-by
+Get list of pocket bosses that drop a specific symbiant, addressed by its AOID.
 
 ### Pocket Bosses
 
