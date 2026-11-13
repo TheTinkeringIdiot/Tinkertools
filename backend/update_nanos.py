@@ -27,13 +27,16 @@ DEFAULT_CSV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "all
 
 
 class NanoDataUpdater:
-    def __init__(self, version_slug: str = None, csv_path: str = None):
+    def __init__(self, version_slug: str = None, csv_path: str = None, keep_strain: bool = False):
         self.database_url = os.getenv('DATABASE_URL')
         if not self.database_url:
             raise ValueError("DATABASE_URL environment variable not set")
 
         self.csv_path = csv_path or DEFAULT_CSV_PATH
         self.version_slug = version_slug
+        # Historical builds: a nano that carries its own strain keeps it; the
+        # CSV only fills in strains the build left out.
+        self.keep_strain = keep_strain
         self.schema_name = None
         self.conn = None
         self.stats = {
@@ -211,20 +214,23 @@ class NanoDataUpdater:
             """, nano_ql, nano_item_id)
             self.stats['ql_updates'] += 1
         
+        strain_value = int(strain_id) if strain_id and strain_id.isdigit() else 0
+        own_strain = current_stats.get(75)
+        if self.keep_strain and own_strain not in (None, 0, 99999) and own_strain != strain_value:
+            return
+
         # Update NanoStrain (stat 75) if strain_id is valid
-        if strain_id and strain_id.isdigit() and int(strain_id) > 0:
-            strain_value = int(strain_id)
-            if current_stats.get(75) != strain_value:
-                await self.update_item_stat(nano_item_id, 75, strain_value)
-                self.stats['strain_updates'] += 1
-        
+        if strain_value > 0 and own_strain != strain_value:
+            await self.update_item_stat(nano_item_id, 75, strain_value)
+            self.stats['strain_updates'] += 1
+
         # Update NanoSubStrain (stat 1003) if sub_strain_id is valid and > 0
         if sub_strain_id and sub_strain_id.isdigit() and int(sub_strain_id) > 0:
             sub_strain_value = int(sub_strain_id)
             if current_stats.get(1003) != sub_strain_value:
                 await self.update_item_stat(nano_item_id, 1003, sub_strain_value)
                 self.stats['substrain_updates'] += 1
-    
+
     async def process_nano_csv(self):
         """Process the compacted nano CSV and create source relationships"""
         print(f"Processing nano CSV: {self.csv_path}")

@@ -848,7 +848,7 @@ def drop_staging(runner, staging: Optional[str]) -> None:
         runner.drop_version_schema(staging)
 
 
-def apply_nano_overlay(staging: str, csv_path: str) -> bool:
+def apply_nano_overlay(staging: str, csv_path: str, keep_strain: bool = False) -> bool:
     """Run ``update_nanos.py`` (crystal sources, nano QL, strain and substrain)
     against the staging schema.
 
@@ -863,7 +863,8 @@ def apply_nano_overlay(staging: str, csv_path: str) -> bool:
         logger.error(f"Nano CSV not found: {path}")
         return False
     logger.info(f"Applying curated nano data from {path} in staging")
-    asyncio.run(NanoDataUpdater(version_slug=staging, csv_path=str(path)).run())
+    asyncio.run(NanoDataUpdater(
+        version_slug=staging, csv_path=str(path), keep_strain=keep_strain).run())
     return True
 
 
@@ -943,7 +944,8 @@ def stage_and_install(args, slug: str, build_fields) -> bool:
                 return False
             client_build = getattr(args, 'client_build', None)
 
-        if getattr(args, 'nanos_csv', None) and not apply_nano_overlay(staging, args.nanos_csv):
+        if getattr(args, 'nanos_csv', None) and not apply_nano_overlay(
+                staging, args.nanos_csv, getattr(args, 'nanos_keep_strain', False)):
             return False
 
         populate_nano_properties(staging)
@@ -1143,6 +1145,7 @@ def import_extract(args, root: Path, entries: list, entry: dict) -> bool:
         no_perks=not args.perks_file,
         no_symbiants=not args.symbiants_file,
         nanos_csv=args.nanos_csv,
+        nanos_keep_strain=args.nanos_keep_strain,
         client_build=manifest.get("client_build") or entry.get("build"),
     )
     features = {
@@ -1714,6 +1717,12 @@ Environment:
         default=None,
         help="Curated crystal/strain CSV applied in staging before the merge "
              "(update_nanos.py), e.g. backend/all_nanos_compacted.csv"
+    )
+    store_group.add_argument(
+        "--nanos-keep-strain",
+        action="store_true",
+        help="With --nanos-csv: a nano that has its own strain in this build keeps it; "
+             "the CSV only fills in missing strains (use for historical builds)"
     )
 
     parser.add_argument(
