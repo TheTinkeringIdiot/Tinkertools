@@ -10,6 +10,7 @@ from app.api.routes.health import router as health_router
 from app.api.routes.versions import router as versions_router
 from app.api.routes.item_revisions import router as item_revisions_router
 from app.api.routes.items import router as items_router
+from app.api.routes.legacy_item_ids import router as legacy_item_ids_router
 from app.api.routes.implants import router as implants_router
 from app.api.routes.nanos import router as nanos_router
 from app.api.routes.spells import router as spells_router
@@ -102,6 +103,7 @@ app.include_router(health_router, prefix="")
 app.include_router(versions_router, prefix="/api/v1")
 app.include_router(item_revisions_router, prefix="/api/v1")
 app.include_router(items_router, prefix="/api/v1")
+app.include_router(legacy_item_ids_router, prefix="/api/v1")
 app.include_router(implants_router, prefix="/api/v1")
 app.include_router(nanos_router, prefix="/api/v1")
 app.include_router(spells_router, prefix="/api/v1")
