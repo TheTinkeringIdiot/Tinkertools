@@ -193,10 +193,17 @@ Unrelated to the redesign; listed so they are not lost. None has been reproduced
 
 Acceptance for 3 and 4 is response equality with the current system on a fixed sample of builds (14.2.2, 15.0.1, 17.10.5, live, PRK), apart from the intended ID changes.
 
-## 8. Open decisions
+## 8. Decisions
 
-- `/spells` and `/stat-values`: keep as browsable entities, reshape around effect types, or retire.
-- Whether effect order within an event matters in game. If it does, it is stored beside the canonical form and excluded from the hash; if not, it is dropped.
+Settled 2026-11-13:
+
+- `/spells` and `/stat-values` are retired as browsable entities, after a stage 1 check of what the three frontend callers use them for.
+- Effect order within an event is dropped. Effects are stored and displayed in canonical order and order does not affect the hash.
+- All routes without a caller are deleted, after an exhaustive caller check that includes tests and known external consumers.
+- Work stops at every stage gate for a report and approval of the next stage.
+
+Still open:
+
 - Relevance classification: who maintains the stat and effect-type lists, and where they live (data file in the repo is the default).
 - Build dates: source for `released_on` for the historical builds.
 - Whether curated facts need validity ranges at all in the first cut, or one current copy is enough.
@@ -207,3 +214,44 @@ Acceptance for 3 and 4 is response equality with the current system on a fixed s
 - The archive has no builds between 17.10.5 and live, so that span is one step with no per-patch attribution.
 - Diffs show client data only. Server-side changes (drop rates, mob stats, some proc behaviour) are invisible.
 - Two CSV nanos and one record per early build are missing from the old extracts (parse errors recorded in the manifests).
+
+## 10. Agentic implementation plan
+
+The work in §7 is carried out by agents, with one orchestrating session acting as integrator. About a dozen build agents in total, never more than four at once.
+
+### 10.1 Ground rules
+
+- **Contracts before agents.** The orchestrator writes the three things every agent depends on: the canonical-form and hashing module, the table definitions for the new store, and the acceptance harness.
+- **Golden reference.** Before anything changes, current API responses are captured for a fixed set of endpoints on five builds (14.2.2, 15.0.1, 17.10.5, live, PRK). Read-path work must reproduce them, apart from the intended ID changes, which a normalizer strips. Defects from §6 that affect responses are fixed before capture.
+- **Isolation.** Each agent works in its own git worktree on a named set of files. The new store lives in its own database schema beside the current one, which agents may read but never write. Only the importer stage writes to the database.
+- **Small test database.** Three builds in a scratch database, so an agent's loop takes seconds instead of a full import.
+- **Builders do not sign off their own work.** See 10.3.
+
+### 10.2 Stages
+
+| Stage | Work | Agents | Objective gate |
+|---|---|---|---|
+| 0 | Golden capture harness, canonical forms, table definitions | orchestrator | Order-only changes vanish on the extracts and no real change is lost |
+| 1 | Prune unused routes; move the API and client user data to AOID | 2 in parallel | Backend and frontend suites pass; golden reference re-captured |
+| 2 | New importer: parts, revisions, build ranges, search projections, change log | 1 | Item-by-item equality with the current store on the five builds; full import timed and sized |
+| 3 | Read path by route family: item detail and interpolation; search and filters; nanos; weapons and implants; symbiants, mobs and perks | 4 in parallel, after the orchestrator writes the shared item loader | Golden reference matches per family; performance budgets met |
+| 4 | Diff engine and endpoints; frontend timeline, build change list, compare views | 2 in parallel | Diff output matches the hand-verified 14.5.0, 14.6.0 and live results (§2.4) |
+| 5 | Cutover: remove per-version schemas and the old store, update import docs | orchestrator | Full suites pass; browser check on old and new builds |
+
+Stage 1 does not depend on the new store and can run alongside stage 0. The importer (stage 2) is the critical path and runs at the highest model tier.
+
+### 10.3 Stage review loop
+
+A stage is complete only when both hold: its objective gate passes, and an independent grading agent passes it. This applies to all six stages.
+
+- **Who grades.** A fresh agent each round. It is given the stage's goals, the diff and access to the running application. It is not given the builder's report or the orchestrator's opinion of the work.
+- **What it does.** Reads the changes, runs the test suites, and uses the application in a browser on at least one old build, live and PRK. It measures; it does not estimate.
+- **What it grades**, each on a 1 to 5 scale with evidence:
+  - *Quality*: correctness, clarity, tests that test behaviour, no dead code or leftovers, consistency with the surrounding code.
+  - *Fit and feel*: the application behaves coherently for a player. For stages with no visible change, this means nothing regressed and nothing got more awkward.
+  - *Performance*: against the project budgets (complex stat queries under 500 ms, route navigation under 200 ms, initial page load under 3 s), plus import time and database size where the stage affects them, compared with the figures recorded before the stage.
+- **Pass rule.** Every dimension scores 4 or higher and there is no unresolved blocking finding. A score below 4 must come with specific, reproducible findings; a low score without them does not block and the grader is asked to substantiate it.
+- **Scope.** The grader judges the stage's goals and any regression. Problems that existed before the stage are recorded in a backlog and do not block, unless the stage made them worse.
+- **On a fail.** Findings go back to a build agent, the objective gate is re-run, and a new grader reviews the result.
+- **Limit.** Three grading rounds per stage. If the third fails, work stops and the findings go to the user.
+- **Report.** At each gate the user receives the objective gate results and the grader's report unedited, and approves the next stage.
