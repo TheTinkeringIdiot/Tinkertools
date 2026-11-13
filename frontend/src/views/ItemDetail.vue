@@ -389,8 +389,10 @@ const equipDialogVisible = ref(false);
 const validSlots = ref<string[]>([]);
 
 // Item change history across game versions
+// History points are builds, so the browsing version is compared as its build
+// (on a 'latest' alias that is the alias's target).
 const {
-  currentVersion,
+  dataVersion: currentVersion,
   current: currentGameVersion,
   versions: gameVersions,
   versionedPath,

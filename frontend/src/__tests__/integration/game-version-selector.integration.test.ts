@@ -43,6 +43,7 @@ import {
   useGameVersion,
   isAcceptableVersion,
   reserveRouteSegments,
+  defaultSlugOf,
 } from '@/composables/useGameVersion';
 import type { GameVersion } from '@/types/game-version';
 
@@ -71,6 +72,13 @@ const LIVE = makeVersion({
   sort_order: 10,
   is_default: true,
   features: { items: true, nanos: true, perks: true, symbiants: true, sources: true },
+});
+
+const AO_LATEST = makeVersion({
+  ...LIVE,
+  slug: 'ao',
+  display_name: 'AO - Latest',
+  alias_of: 'ao-2024-02',
 });
 
 const OLD = makeVersion({
@@ -112,7 +120,7 @@ async function setRegistry(list: GameVersion[], currentSlug: string) {
   versionRegistry.value = list;
   currentVersion.value = null;
   await setCurrentVersion(currentSlug);
-  useGameVersion().defaultVersion.value = list.find((v) => v.is_default)?.slug ?? null;
+  useGameVersion().defaultVersion.value = defaultSlugOf(list);
 }
 
 describe('GameVersionSelector', () => {
@@ -185,6 +193,59 @@ describe('GameVersionSelector', () => {
     await flushAsync();
 
     expect(routerMock.replace).not.toHaveBeenCalled();
+  });
+
+  it('offers the latest entries first, then builds grouped by family', async () => {
+    await setRegistry([AO_LATEST, LIVE, OLD, PRK], 'ao');
+    const wrapper = mount(GameVersionSelector, {
+      global: { plugins: [PrimeVue, stubRouter()] },
+    });
+
+    expect(wrapper.find('[data-testid="version-pill"]').text()).toContain('AO - Latest');
+    expect(wrapper.find('[data-testid="version-pill-subtitle"]').text()).toBe('18.8.72');
+
+    await wrapper.find('[data-testid="version-pill"]').trigger('click');
+
+    const titles = wrapper.findAll('[data-testid="version-group-title"]').map((t) => t.text());
+    expect(titles).toEqual(['Latest', 'Anarchy Online', 'Project Rubi-Ka']);
+    const options = wrapper.findAll('[data-testid="version-option"]');
+    expect(options.map((option) => option.attributes('data-slug'))).toEqual([
+      'ao',
+      'ao-2024-02',
+      'ao-2003-06',
+      'prk',
+    ]);
+    expect(options[0].text()).toContain('Newest build, now 18.8.72');
+  });
+
+  it('narrows the list as the user types a build or name', async () => {
+    await setRegistry([AO_LATEST, LIVE, OLD, PRK], 'ao');
+    const wrapper = mount(GameVersionSelector, {
+      global: { plugins: [PrimeVue, stubRouter()] },
+    });
+    await wrapper.find('[data-testid="version-pill"]').trigger('click');
+
+    await wrapper.find('[data-testid="version-search"]').setValue('2003');
+    expect(
+      wrapper.findAll('[data-testid="version-option"]').map((o) => o.attributes('data-slug'))
+    ).toEqual(['ao-2003-06']);
+
+    await wrapper.find('[data-testid="version-search"]').setValue('no such build');
+    expect(wrapper.findAll('[data-testid="version-option"]')).toHaveLength(0);
+    expect(wrapper.find('[data-testid="version-search-empty"]').exists()).toBe(true);
+  });
+
+  it('treats the latest entry as the default and requests data from its build', async () => {
+    await setRegistry([AO_LATEST, LIVE, OLD, PRK], 'ao');
+    const { isDefaultVersion, dataVersion, hasFeature } = useGameVersion();
+
+    expect(defaultSlugOf([AO_LATEST, LIVE, OLD, PRK])).toBe('ao');
+    expect(isDefaultVersion.value).toBe(true);
+    expect(dataVersion.value).toBe('ao-2024-02');
+    expect(hasFeature('perks')).toBe(true);
+
+    await setCurrentVersion('ao-2003-06');
+    expect(dataVersion.value).toBe('ao-2003-06');
   });
 
   it('opens the game versions page from the info icon', async () => {

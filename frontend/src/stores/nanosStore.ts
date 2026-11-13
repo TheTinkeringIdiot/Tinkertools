@@ -1,7 +1,12 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { apiClient } from '@/services/api-client';
-import { versionKey, adoptLegacyKey } from '@/services/version-keys';
+import {
+  versionKey,
+  userDataKey,
+  browsingVersionSlug,
+  adoptLegacyKey,
+} from '@/services/version-keys';
 import { errorMessage } from '@/services/error-message';
 import { SKILL_COST_FACTORS } from '@/services/game-data';
 import { ABILITY_INDEX_TO_STAT_ID } from '@/lib/tinkerprofiles/ip-calculator';
@@ -618,7 +623,7 @@ export const useNanosStore = defineStore('nanos', () => {
 
   const saveFavorites = (): void => {
     try {
-      localStorage.setItem(versionKey(FAVORITES_BASE), JSON.stringify(favorites.value));
+      localStorage.setItem(userDataKey(FAVORITES_BASE), JSON.stringify(favorites.value));
     } catch (error) {
       console.warn('Failed to save favorites:', error);
     }
@@ -626,8 +631,8 @@ export const useNanosStore = defineStore('nanos', () => {
 
   const loadFavorites = (): void => {
     try {
-      adoptLegacyKey(FAVORITES_BASE);
-      const saved = localStorage.getItem(versionKey(FAVORITES_BASE));
+      adoptLegacyKey(FAVORITES_BASE, browsingVersionSlug());
+      const saved = localStorage.getItem(userDataKey(FAVORITES_BASE));
       if (saved) {
         favorites.value = JSON.parse(saved);
       }

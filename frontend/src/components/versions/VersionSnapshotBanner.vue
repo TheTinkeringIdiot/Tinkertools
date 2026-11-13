@@ -69,6 +69,8 @@ const visible = computed(
     !!currentVersion.value &&
     !isDefaultVersion.value &&
     !!current.value &&
+    // A 'latest' alias follows the live game; it is not a snapshot.
+    !current.value.alias_of &&
     dismissedSlug.value !== currentVersion.value
 );
 

@@ -39,7 +39,7 @@ import type {
   ItemRevisionsBatchResponse,
 } from '../types/game-version';
 import { API_ROOT, apiBaseFor } from './api-config';
-import { currentVersion } from '../composables/useGameVersion';
+import { dataVersion, dataSlug } from '../composables/useGameVersion';
 
 declare module 'axios' {
   interface AxiosRequestConfig {
@@ -164,7 +164,7 @@ class BatchRequestManager {
 
   /** Batches must never mix game versions: the key carries the current version. */
   private keyFor(resource: string): string {
-    return `${currentVersion.value ?? ''}:${resource}`;
+    return `${dataVersion.value ?? ''}:${resource}`;
   }
 
   private async createBatch<T>(
@@ -242,7 +242,7 @@ class TinkerToolsApiClient {
       (config) => {
         // Scope the request to the selected game version, unless the caller
         // asked for a specific one (e.g. peeking at an item in another snapshot).
-        config.baseURL = apiBaseFor(config.gameVersion ?? currentVersion.value);
+        config.baseURL = apiBaseFor(dataSlug(config.gameVersion) ?? dataVersion.value);
 
         // Add request ID for tracking
         config.headers['X-Request-ID'] =

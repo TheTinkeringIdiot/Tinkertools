@@ -234,7 +234,10 @@ export async function resetForVersionChange(): Promise<void> {
  * of versions the user is no longer browsing. User data (favorites, farm lists,
  * collection progress) is never purged.
  */
-export async function purgeOtherVersionCaches(slug?: string): Promise<void> {
+export async function purgeOtherVersionCaches(version?: string): Promise<void> {
+  // Caches are filed under the build, which a 'latest' alias only points at.
+  const { dataSlug } = await import('../composables/useGameVersion');
+  const slug = dataSlug(version) ?? undefined;
   const [
     { cacheManager },
     weaponCache,

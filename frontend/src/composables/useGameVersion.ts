@@ -112,8 +112,7 @@ export function ensureVersionsLoaded(): Promise<void> {
       versions.value = [...response.data.versions].sort(
         (a, b) => a.sort_order - b.sort_order || a.slug.localeCompare(b.slug)
       );
-      registryDefault.value =
-        versions.value.find((v) => v.is_default)?.slug ?? response.data.current ?? null;
+      registryDefault.value = defaultSlugOf(versions.value) ?? response.data.current ?? null;
       registryFailed.value = false;
     })
     .catch((error) => {
@@ -126,6 +125,26 @@ export function ensureVersionsLoaded(): Promise<void> {
     });
 
   return loadPromise;
+}
+
+/**
+ * The slug a first visit lands on: the 'latest' alias that follows the default
+ * build when there is one (so the visitor moves with the next patch), else the
+ * default build itself.
+ */
+export function defaultSlugOf(list: GameVersion[]): string | null {
+  const build = list.find((v) => v.is_default && !v.alias_of);
+  const alias = build && list.find((v) => v.alias_of === build.slug);
+  return alias?.slug ?? build?.slug ?? list.find((v) => v.is_default)?.slug ?? null;
+}
+
+/**
+ * The build whose data a slug serves: an alias's target, any other slug as is.
+ * Requests and client-side caches use this, so a cache never outlives a patch.
+ */
+export function dataSlug(slug: string | null | undefined): string | null {
+  if (!slug) return null;
+  return getVersion(slug)?.alias_of ?? slug;
 }
 
 /** Drop the cached registry so the next ensureVersionsLoaded() refetches. */
@@ -190,7 +209,7 @@ export function legacyDataVersion(): string {
   return (
     hostnameDefault() ??
     registryDefault.value ??
-    versions.value.find((v) => v.is_default)?.slug ??
+    defaultSlugOf(versions.value) ??
     envDefault() ??
     resolveVersion()
   );
@@ -242,6 +261,8 @@ export function versionedPath(path: string, slug?: string): string {
 export interface GameVersionState {
   /** Read-only by convention: mutate through switchVersion / the router. */
   currentVersion: Ref<string | null>;
+  /** The build behind the current version (differs from it on a 'latest' alias). */
+  dataVersion: ComputedRef<string | null>;
   current: ComputedRef<GameVersion | undefined>;
   versions: Ref<GameVersion[]>;
   registryLoaded: Ref<boolean>;
@@ -255,6 +276,7 @@ export interface GameVersionState {
 }
 
 const current = computed(() => getVersion(currentVersion.value));
+const dataVersion = computed(() => dataSlug(currentVersion.value));
 const isDefaultVersion = computed(
   () => !!currentVersion.value && currentVersion.value === registryDefault.value
 );
@@ -289,6 +311,7 @@ export function useGameVersion(): GameVersionState {
 
   return {
     currentVersion,
+    dataVersion,
     current,
     versions,
     registryLoaded,
@@ -303,4 +326,4 @@ export function useGameVersion(): GameVersionState {
 }
 
 // Direct access for non-component code (api-client, cache keys).
-export { currentVersion, versions };
+export { currentVersion, dataVersion, versions };

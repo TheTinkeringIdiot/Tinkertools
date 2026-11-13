@@ -19,8 +19,9 @@ import {
   purgeOtherVersions,
   purgeLocalStoragePrefix,
   adoptLegacyKey,
+  userDataKey,
 } from '@/services/version-keys';
-import { setCurrentVersion, currentVersion } from '@/composables/useGameVersion';
+import { setCurrentVersion, currentVersion, versions } from '@/composables/useGameVersion';
 import { TEST_VERSION, TEST_ALT_VERSION } from '../helpers/version-fixtures';
 
 describe('version-keys', () => {
@@ -31,6 +32,42 @@ describe('version-keys', () => {
 
   afterEach(async () => {
     await setCurrentVersion(TEST_VERSION);
+  });
+
+  describe("on a 'latest' alias", () => {
+    let registry: typeof versions.value;
+
+    beforeEach(async () => {
+      registry = versions.value;
+      const build = registry.find((v) => v.slug === TEST_VERSION)!;
+      versions.value = [
+        { ...build, slug: 'ao', display_name: 'AO - Latest', alias_of: TEST_VERSION },
+        ...registry,
+      ];
+      await setCurrentVersion('ao');
+    });
+
+    afterEach(() => {
+      versions.value = registry;
+    });
+
+    it('files cached game data under the build, so a patch starts a fresh cache', () => {
+      expect(versionKey('tinkertools_nanos_cache')).toBe(`tinkertools_nanos_cache:${TEST_VERSION}`);
+    });
+
+    it('files user data under the alias, so it survives a patch', () => {
+      expect(userDataKey('tinkertools_nano_favorites')).toBe('tinkertools_nano_favorites:ao');
+    });
+
+    it('keeps the build cache when other versions are purged', () => {
+      localStorage.setItem(versionKey('cache'), 'live');
+      localStorage.setItem(versionKey('cache', TEST_ALT_VERSION), 'other');
+
+      purgeOtherVersions('cache');
+
+      expect(localStorage.getItem(`cache:${TEST_VERSION}`)).toBe('live');
+      expect(localStorage.getItem(`cache:${TEST_ALT_VERSION}`)).toBeNull();
+    });
   });
 
   describe('key construction', () => {

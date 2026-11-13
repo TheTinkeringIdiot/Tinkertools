@@ -354,14 +354,14 @@ import { mapProfileToStats } from '@/utils/profile-stats-mapper';
 import { checkActionRequirements, parseAction } from '@/services/action-criteria';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
 import { apiBaseFor } from '@/services/api-config';
-import { currentVersion } from '@/composables/useGameVersion';
+import { dataVersion } from '@/composables/useGameVersion';
 
 /**
  * Version-scoped API base. Read it per call, not once at module load: the user
  * can switch game versions without a reload.
  */
 function apiBase(): string {
-  return apiBaseFor(currentVersion.value);
+  return apiBaseFor(dataVersion.value);
 }
 
 interface SubstrainGroup {

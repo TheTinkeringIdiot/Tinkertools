@@ -11,7 +11,7 @@ import type { Item, InterpolatedItem, InterpolationInfo } from '../types/api';
 import { apiClient } from './api-client';
 import { errorMessage } from './error-message';
 import { INTERP_STATS } from './game-data';
-import { currentVersion } from '../composables/useGameVersion';
+import { dataVersion, dataSlug } from '../composables/useGameVersion';
 
 /** Options accepted by every call that reaches the backend. */
 export interface InterpolationRequestOptions {
@@ -25,7 +25,7 @@ export interface InterpolationRequestOptions {
  * overwrite the browsing version's entries.
  */
 function versionKey(options?: InterpolationRequestOptions): string {
-  return options?.gameVersion || currentVersion.value || '';
+  return dataSlug(options?.gameVersion) || dataVersion.value || '';
 }
 
 // ============================================================================

@@ -184,6 +184,23 @@ class VersionRegistry:
         v = self.get(slug)
         return v is not None and (v.enabled or not enabled_only)
 
+    def aliases(self) -> Dict[str, GameVersion]:
+        """``{family: newest enabled version}``. The family name works as a slug
+        that follows the family's newest build (``/api/v1/ao/...``), so links and
+        saved client state survive a game patch. Newest is first in display order."""
+        latest: Dict[str, GameVersion] = {}
+        for v in self.all():
+            if v.family and v.family not in self._versions:
+                latest.setdefault(v.family, v)
+        return latest
+
+    def resolve(self, slug: str) -> Optional[str]:
+        """Concrete slug for a version slug or family alias; None when unknown."""
+        if self.is_version(slug):
+            return slug
+        target = self.aliases().get(slug)
+        return target.slug if target else None
+
     def default_slug(self) -> str:
         self._ensure()
         for v in self._versions.values():

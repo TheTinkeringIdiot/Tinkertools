@@ -15,11 +15,14 @@
  * `isVersionKey` / `versionOfKey` understand both, because the slug always sits
  * in the segment immediately after `base`.
  *
+ * Server-derived caches carry the build's slug (so they never outlive a patch);
+ * user data carries the browsed slug, which may be a 'latest' alias (`userDataKey`).
+ *
  * Pure UI preferences (sort order, theme, recent free-text searches) are NOT
  * namespaced: they mean the same thing in every version.
  */
 
-import { currentVersion, VERSION_SLUG_PATTERN } from '@/composables/useGameVersion';
+import { currentVersion, dataVersion, VERSION_SLUG_PATTERN } from '@/composables/useGameVersion';
 
 /** Used when no version has been resolved yet (early boot, tests without a router). */
 export const UNKNOWN_VERSION = 'unknown';
@@ -28,7 +31,20 @@ export const VERSION_KEY_SEPARATOR = ':';
 
 /** The slug every key written right now should carry. */
 export function activeVersionSlug(): string {
+  return dataVersion.value ?? UNKNOWN_VERSION;
+}
+
+/**
+ * The slug user data (favorites, farm lists) is filed under: the version being
+ * browsed, which on a 'latest' alias stays the same across game patches.
+ */
+export function browsingVersionSlug(): string {
   return currentVersion.value ?? UNKNOWN_VERSION;
+}
+
+/** Key for user data of the version being browsed; see browsingVersionSlug. */
+export function userDataKey(base: string): string {
+  return versionKey(base, browsingVersionSlug());
 }
 
 /** `'tinkertools_nanos_cache'` -> `'tinkertools_nanos_cache:ao-2024-02'`. */

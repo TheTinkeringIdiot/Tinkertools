@@ -27,6 +27,12 @@ export interface GameVersion {
   features: GameVersionFeatures;
   notes: string | null;
   is_current: boolean;
+  /**
+   * Set on a family alias ('ao', 'prk'): the build it follows right now. An
+   * alias is what URLs, the remembered version and profiles point at so they
+   * move with the game; data is always requested and cached under the build.
+   */
+  alias_of?: string | null;
 }
 
 export interface GameVersionListResponse {

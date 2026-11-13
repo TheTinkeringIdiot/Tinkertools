@@ -71,8 +71,11 @@ class GameVersionMiddleware:
             rest = path[len(self.prefix) + 1 :]
             segment, _, tail = rest.partition("/")
             strip = False
-            if segment and await run_in_threadpool(registry.is_version, segment):
-                slug = segment
+            resolved = (
+                await run_in_threadpool(registry.resolve, segment) if segment else None
+            )
+            if resolved:
+                slug = resolved
                 strip = True
             elif (
                 segment

@@ -36,6 +36,26 @@ def _to_response(
     return response
 
 
+FAMILY_LABELS = {"ao": "AO", "prk": "PRK"}
+
+
+def _aliases(versions: List[GameVersion]) -> List[GameVersionResponse]:
+    """One 'latest' entry per family, following its newest version (the first
+    in display order). Its slug is the family name; see VersionRegistry.aliases."""
+    slugs = {v.slug for v in versions}
+    aliases: dict = {}
+    for version in versions:
+        if version.family in aliases or version.family in slugs:
+            continue
+        alias = GameVersionResponse.model_validate(version)
+        alias.slug = version.family
+        alias.alias_of = version.slug
+        label = FAMILY_LABELS.get(version.family, version.family.upper())
+        alias.display_name = f"{label} - Latest"
+        aliases[version.family] = alias
+    return list(aliases.values())
+
+
 @router.get("", response_model=GameVersionListResponse)
 def list_versions(request: Request, db: Session = Depends(get_db)):
     """
@@ -53,7 +73,7 @@ def list_versions(request: Request, db: Session = Depends(get_db)):
         .all()
     )
 
-    items = [_to_response(v, current_slug) for v in versions]
+    items = _aliases(versions) + [_to_response(v, current_slug) for v in versions]
     return GameVersionListResponse(
         versions=items, current=current_slug, total=len(items)
     )
@@ -83,7 +103,7 @@ def get_current_version(request: Request, db: Session = Depends(get_db)):
 @router.get("/{slug}", response_model=GameVersionResponse)
 def get_version(slug: str, request: Request, db: Session = Depends(get_db)):
     """
-    Details for one game version. Unknown or disabled slugs 404.
+    Details for one game version or family alias. Unknown or disabled slugs 404.
     """
     version = (
         db.query(GameVersion)
@@ -91,6 +111,18 @@ def get_version(slug: str, request: Request, db: Session = Depends(get_db)):
         .first()
     )
     if version is None:
-        raise HTTPException(status_code=404, detail=f"Game version '{slug}' not found")
+        family = (
+            db.query(GameVersion)
+            .filter(GameVersion.family == slug, GameVersion.enabled.is_(True))
+            .order_by(GameVersion.sort_order.asc(), GameVersion.slug.asc())
+            .all()
+        )
+        alias = next((a for a in _aliases(family) if a.slug == slug), None)
+        if alias is None:
+            raise HTTPException(
+                status_code=404, detail=f"Game version '{slug}' not found"
+            )
+        alias.is_current = alias.alias_of == _current_slug(request)
+        return alias
 
     return _to_response(version, _current_slug(request))

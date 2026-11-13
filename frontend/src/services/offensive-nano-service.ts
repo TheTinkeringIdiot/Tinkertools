@@ -14,7 +14,7 @@ import type { Item as ItemDetail, Spell } from '@/types/api';
 import type { OffensiveNano, DamageType } from '@/types/offensive-nano';
 import type { NanoSchool } from '@/types/nano';
 import { apiBaseFor } from '@/services/api-config';
-import { currentVersion } from '@/composables/useGameVersion';
+import { dataVersion } from '@/composables/useGameVersion';
 
 // ============================================================================
 // API Configuration
@@ -25,7 +25,7 @@ import { currentVersion } from '@/composables/useGameVersion';
  * can switch game versions without a reload.
  */
 function apiBase(): string {
-  return apiBaseFor(currentVersion.value);
+  return apiBaseFor(dataVersion.value);
 }
 
 // ============================================================================

@@ -33,6 +33,11 @@ class GameVersionResponse(BaseModel):
         default_factory=dict, description="Feature flags driving UI gating"
     )
     notes: Optional[str] = Field(None, description="Provenance notes")
+    alias_of: Optional[str] = Field(
+        None,
+        description="Set on a family alias ('ao', 'prk'): the build it currently "
+        "follows. An alias always serves its family's newest version.",
+    )
     is_current: bool = Field(
         False, description="Whether this is the version resolved for this request"
     )

@@ -281,3 +281,54 @@ class TestCurrentVersion:
         registry.invalidate()
 
         assert response.status_code == 404
+
+
+class TestFamilyAlias:
+    """The family name is a slug that follows the family's newest version."""
+
+    def test_the_list_offers_a_latest_entry_for_the_family(self, client, game_versions):
+        versions = client.get("/api/v1/versions").json()["versions"]
+        alias = next(v for v in versions if v["slug"] == "ao")
+
+        assert alias["alias_of"] == "ao-18.8"
+        assert alias["display_name"] == "AO - Latest"
+        assert alias["client_build"] == "18.8.72"
+        assert alias["is_default"] is True
+        assert [v["alias_of"] for v in versions if v["slug"] == "ao-18.8"] == [None]
+
+    def test_a_real_version_named_like_its_family_is_not_shadowed(
+        self, client, game_versions
+    ):
+        versions = client.get("/api/v1/versions").json()["versions"]
+        prk = [v for v in versions if v["slug"] == "prk"]
+
+        assert len(prk) == 1
+        assert prk[0]["alias_of"] is None
+
+    def test_requests_under_the_alias_are_served_from_the_newest_version(
+        self, client, game_versions, patched_registry
+    ):
+        response = client.get("/api/v1/ao/versions/current")
+
+        assert response.status_code == 200
+        assert response.json()["slug"] == "ao-18.8"
+        assert response.headers["X-Game-Version"] == "ao-18.8"
+
+    def test_the_alias_moves_when_a_newer_version_is_registered(
+        self, client, db_session, game_versions
+    ):
+        db_session.add(
+            GameVersion(
+                slug="ao-18.9",
+                schema_name="gv_ao_18_9",
+                display_name="Anarchy Online 18.9",
+                family="ao",
+                parent_slug="ao-18.8",
+                sort_order=15,
+                enabled=True,
+                is_default=False,
+            )
+        )
+        db_session.flush()
+
+        assert client.get("/api/v1/versions/ao").json()["alias_of"] == "ao-18.9"

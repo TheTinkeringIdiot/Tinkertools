@@ -14,6 +14,8 @@ import { get, set, del } from 'idb-keyval';
 import {
   versionKey,
   activeVersionSlug,
+  browsingVersionSlug,
+  userDataKey,
   adoptLegacyKey,
   adoptLegacyIdbKey,
 } from '../services/version-keys';
@@ -592,7 +594,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
       aoids: farmListAoids.value,
       version: 2,
     };
-    localStorage.setItem(versionKey(FARM_LIST_BASE), JSON.stringify(data));
+    localStorage.setItem(userDataKey(FARM_LIST_BASE), JSON.stringify(data));
   }
 
   /**
@@ -601,8 +603,8 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
    */
   function loadFarmList(): void {
     try {
-      adoptLegacyKey(FARM_LIST_BASE);
-      const saved = localStorage.getItem(versionKey(FARM_LIST_BASE));
+      adoptLegacyKey(FARM_LIST_BASE, browsingVersionSlug());
+      const saved = localStorage.getItem(userDataKey(FARM_LIST_BASE));
       if (saved) {
         const data = JSON.parse(saved);
         // Check version - if old format, clear it
@@ -628,7 +630,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
       farmedBossIds: Array.from(farmedBossIds.value),
       version: 1,
     };
-    localStorage.setItem(versionKey(FARM_PROGRESS_BASE), JSON.stringify(data));
+    localStorage.setItem(userDataKey(FARM_PROGRESS_BASE), JSON.stringify(data));
   }
 
   /**
@@ -636,8 +638,8 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
    */
   function loadFarmProgress(): void {
     try {
-      adoptLegacyKey(FARM_PROGRESS_BASE);
-      const saved = localStorage.getItem(versionKey(FARM_PROGRESS_BASE));
+      adoptLegacyKey(FARM_PROGRESS_BASE, browsingVersionSlug());
+      const saved = localStorage.getItem(userDataKey(FARM_PROGRESS_BASE));
       if (saved) {
         const data: FarmProgressStorage = JSON.parse(saved);
         farmedBossIds.value = new Set(data.farmedBossIds || []);
