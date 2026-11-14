@@ -6,13 +6,14 @@ import logging
 import time
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
 from app.core.decorators import cached_response
 from app.api.schemas import ItemDetail
 from app.api.schemas.weapon_analysis import WeaponAnalyzeRequest
-from app.api.services.weapon_filter_service import WeaponFilterService
+from app.api.services.weapon_filter_service import filter_weapons
+from app.store.context import Build, get_build, get_store
 
 router = APIRouter(prefix="/weapons", tags=["weapons"])
 logger = logging.getLogger(__name__)
@@ -20,12 +21,15 @@ logger = logging.getLogger(__name__)
 
 @router.post("/analyze", response_model=List[ItemDetail])
 @cached_response("weapons_analyze", ttl=3600)
-def analyze_weapons(request: WeaponAnalyzeRequest, db: Session = Depends(get_db)):
+def analyze_weapons(
+    request: WeaponAnalyzeRequest,
+    db: Session = Depends(get_store),
+    build: Build = Depends(get_build),
+):
     """
     Analyze weapons for a character and return equipable weapons.
 
     Filters weapons based on:
-    - Character level (QL range: level ± 50)
     - Top weapon skills (includes weapons where any skill contributes >= 50%)
     - Breed requirements
     - Profession requirements
@@ -33,7 +37,9 @@ def analyze_weapons(request: WeaponAnalyzeRequest, db: Session = Depends(get_db)
     - Expansion requirements (stat 389 with bitflag matching)
     - Excludes NPC-only items
 
-    Returns a list of weapons with full details including stats, attack_stats, actions, etc.
+    Every QL variant of a matching weapon is returned, whatever the character's
+    level, with full details (stats, attack_stats, actions, etc.), ordered by
+    AOID.
 
     Expected result set size: 200-1000 weapons for typical level 220 character.
 
@@ -42,25 +48,21 @@ def analyze_weapons(request: WeaponAnalyzeRequest, db: Session = Depends(get_db)
     start_time = time.time()
 
     try:
-        # Create weapon filter service
-        weapon_service = WeaponFilterService(db)
+        weapons = filter_weapons(db, build, request)
+        # Rendered once: the cache then holds the finished response, and a
+        # list of this size is not validated against the response model again.
+        response = JSONResponse(weapons)
 
-        # Filter weapons based on character requirements
-        weapons = weapon_service.filter_weapons(request)
-
-        # Log performance metrics
         elapsed_time = time.time() - start_time
         logger.info(
             f"Weapon analysis complete: returned {len(weapons)} weapons in {elapsed_time:.3f}s"
         )
-
-        # Check performance requirement
         if elapsed_time > 0.5:
             logger.warning(
                 f"Weapon analysis exceeded 500ms target: {elapsed_time:.3f}s"
             )
 
-        return weapons
+        return response
 
     except Exception as e:
         logger.error(f"Weapon analysis failed: {str(e)}", exc_info=True)

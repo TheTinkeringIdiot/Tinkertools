@@ -1,24 +1,41 @@
 """
 Cross-version item change history ("changed in" dropdown).
 
-The importer writes one ``public.item_revisions`` row per (item, version) with
-a content hash plus four sub-hashes (stats, spells, actions, text). Walking
-those rows along the version lineage (``game_versions.parent_slug``) yields the
-snapshots at which an item's definition changed.
+The store keeps, per branch, the runs of consecutive builds in which an item
+has one content (``item_presence``). Walking the builds along their lineage
+and comparing each build's content of the item with the nearest earlier build
+that has the item yields the builds at which its definition changed.
 
-Both endpoints read only ``public`` tables, so they are version-independent:
-the version segment in the URL does not change the rows considered, only which
-version counts as "current" for ``is_current``-style fields.
+The lineage of a build is the builds of its branch before it, in ordinal
+order, continued at the branch's parent build (PRK forks from AO 17.10.5).
+
+Both endpoints answer for every enabled build at once: the version segment in
+the URL does not change the builds considered, only which one counts as
+"current" for ``first_seen_in``, ``latest_change_slug`` and
+``present_in_current``.
+
+What counts as a change is what the four labels of ``changed`` cover:
+
+* ``stats``    the stats part, the attack/defense part and the animation mesh
+* ``spells``   the effects part
+* ``actions``  the actions part
+* ``text``     the text part
+
+A build in which only something else differs (the shop data or the static
+instance id of the misc part) is not a change point.
 """
 
-import logging
-from typing import Dict, Iterable, List, Optional, Sequence
+from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from bisect import bisect_right
+from dataclasses import dataclass
+from datetime import date
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+
+from fastapi import APIRouter, Depends
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
-from app.models import GameVersion, ItemRevision
 from app.api.schemas.versions import (
     ItemRevisionBatchEntry,
     ItemRevisionPoint,
@@ -26,150 +43,270 @@ from app.api.schemas.versions import (
     ItemRevisionsBatchResponse,
     ItemRevisionsResponse,
 )
+from app.store import tables as t
+from app.store.context import Build, get_build, get_store
+from app.store.presence import any_of
 
 router = APIRouter(prefix="/items", tags=["item-revisions"])
 
-logger = logging.getLogger(__name__)
+# Labels reported in ``changed``, in report order.
+CHANGE_LABELS = ("stats", "spells", "actions", "text")
 
-# Sub-hash column -> label reported in ``changed``. Order is the report order.
-HASH_FIELDS = (
-    ("stats_hash", "stats"),
-    ("spells_hash", "spells"),
-    ("actions_hash", "actions"),
-    ("text_hash", "text"),
-)
+# What an item is in one build, as far as ``changed`` tells apart: one value
+# per label of CHANGE_LABELS.
+Content = Tuple[Any, Any, Any, Any]
 
 
-def _display_order(versions: Iterable[GameVersion]) -> List[GameVersion]:
-    """Versions in selector order: ``(sort_order, slug)``."""
-    return sorted(versions, key=lambda v: (v.sort_order or 0, v.slug))
+@dataclass(frozen=True)
+class HistoryBuild:
+    """A build as the history reports it."""
+
+    build_id: int
+    slug: str
+    branch: str
+    ordinal: int
+    sort_order: int
+    display_name: str
+    client_build: Optional[str]
+    released_on: Optional[date]
+    parent_build_id: Optional[int]
 
 
-def ancestry(
-    versions_by_slug: Dict[str, GameVersion], slug: Optional[str]
-) -> List[str]:
-    """Slugs from ``slug`` upward through ``parent_slug``, nearest first.
+@dataclass(frozen=True)
+class Run:
+    """One row of ``item_presence``: a content and the builds that carry it."""
 
-    Stops at an unknown slug (a disabled or deleted parent breaks the chain)
-    and at a repeat, so a malformed cycle in the registry cannot hang a request.
-    """
-    chain: List[str] = []
-    seen = set()
-    cursor = slug
-    while cursor and cursor in versions_by_slug and cursor not in seen:
-        seen.add(cursor)
-        chain.append(cursor)
-        cursor = versions_by_slug[cursor].parent_slug
-    return chain
+    from_ordinal: int
+    to_ordinal: int
+    content: Content
 
 
-def compute_revision_points(
-    versions: Sequence[GameVersion],
-    rows: Sequence[ItemRevision],
-) -> List[ItemRevisionPoint]:
-    """Snapshots at which one item's definition changed.
+# {branch: runs in ordinal order} of one item.
+Runs = Dict[str, List[Run]]
 
-    ``versions`` are the enabled registry rows; ``rows`` are the
-    ``item_revisions`` rows for a single AOID. For each version that has a row,
-    in display order, the predecessor is the nearest ancestor along
-    ``parent_slug`` that also has a row for this item. With no such ancestor the
-    item is new to that lineage, so the point is reported as ``first_seen``.
-    Otherwise the four sub-hashes are compared and the differing ones are
-    reported in ``changed``.
 
-    A version is emitted only if it is a real change point: either
-    ``first_seen`` or with at least one differing sub-hash. Unchanged snapshots
-    carry no information for the history dropdown and are dropped.
-    """
-    versions_by_slug = {v.slug: v for v in versions}
-    rows_by_slug = {
-        r.version_slug: r for r in rows if r.version_slug in versions_by_slug
-    }
+class Lineage:
+    """The enabled builds of the store and how they follow each other."""
 
-    points: List[ItemRevisionPoint] = []
+    def __init__(self, builds: Iterable[HistoryBuild]):
+        self.display_order = sorted(builds, key=lambda b: (b.sort_order, b.slug))
+        self.by_slug = {build.slug: build for build in self.display_order}
+        by_id = {build.build_id: build for build in self.display_order}
 
-    for version in _display_order(versions):
-        row = rows_by_slug.get(version.slug)
-        if row is None:
-            continue
+        self.predecessor: Dict[str, Optional[HistoryBuild]] = {}
+        branches: Dict[str, List[HistoryBuild]] = {}
+        for build in self.display_order:
+            branches.setdefault(build.branch, []).append(build)
+        for members in branches.values():
+            members.sort(key=lambda b: b.ordinal)
+            first = members[0]
+            self.predecessor[first.slug] = (
+                by_id.get(first.parent_build_id)
+                if first.parent_build_id is not None
+                else None
+            )
+            for earlier, later in zip(members, members[1:]):
+                self.predecessor[later.slug] = earlier
 
-        # Nearest ancestor holding this item. A version that is its own parent,
-        # or that reaches itself through a cycle, is not its own predecessor.
-        predecessor = None
-        for ancestor_slug in ancestry(versions_by_slug, version.parent_slug):
-            if ancestor_slug == version.slug:
-                continue
-            if ancestor_slug in rows_by_slug:
-                predecessor = rows_by_slug[ancestor_slug]
-                break
+        # Every build after the builds it descends from. A parent link that
+        # loops back is cut where it closes, so a malformed registry cannot
+        # hang a request.
+        self.oldest_first: List[HistoryBuild] = []
+        self._ancestry: Dict[str, List[str]] = {}
+        placed = set()
+        for build in self.display_order:
+            pending = []
+            cursor: Optional[HistoryBuild] = build
+            while cursor is not None and cursor.slug not in placed:
+                placed.add(cursor.slug)
+                pending.append(cursor)
+                cursor = self.predecessor[cursor.slug]
+            for member in reversed(pending):
+                before = self.predecessor[member.slug]
+                inherited = self._ancestry.get(before.slug, []) if before else []
+                self._ancestry[member.slug] = [member.slug, *inherited]
+                self.oldest_first.append(member)
 
-        if predecessor is None:
-            first_seen = True
-            changed: List[str] = []
-        else:
-            first_seen = False
-            changed = [
-                label
-                for attr, label in HASH_FIELDS
-                if getattr(row, attr) != getattr(predecessor, attr)
-            ]
-            if not changed:
-                continue
+    def ancestry(self, slug: Optional[str]) -> List[str]:
+        """Slugs from ``slug`` back to the root of its lineage, nearest first."""
+        return self._ancestry.get(slug, []) if slug else []
 
-        points.append(
-            ItemRevisionPoint(
-                version_slug=version.slug,
-                display_name=version.display_name,
-                family=version.family,
-                snapshot_date=version.snapshot_date,
-                client_build=version.client_build,
-                changed=changed,
-                first_seen=first_seen,
+
+def load_lineage(db: Session) -> Lineage:
+    rows = db.execute(
+        select(
+            t.build.c.build_id,
+            t.build.c.slug,
+            t.build.c.branch,
+            t.build.c.ordinal,
+            t.build.c.sort_order,
+            t.build.c.display_name,
+            t.build.c.client_build,
+            t.build.c.released_on,
+            t.build.c.parent_build_id,
+        ).where(t.build.c.enabled)
+    )
+    return Lineage(HistoryBuild(**row._mapping) for row in rows)
+
+
+def load_runs(db: Session, aoids: Sequence[int]) -> Dict[int, Runs]:
+    """``{aoid: runs per branch}`` of the items that exist in any build."""
+    revision = t.item_revision
+    mesh = (
+        select(t.part_misc.c.doc["animation_mesh"])
+        .where(t.part_misc.c.misc_id == revision.c.misc_id)
+        .scalar_subquery()
+    )
+    rows = db.execute(
+        select(
+            t.item_presence.c.aoid,
+            t.item_presence.c.branch,
+            t.item_presence.c.from_ordinal,
+            t.item_presence.c.to_ordinal,
+            revision.c.stats_id,
+            revision.c.atkdef_id,
+            mesh.label("mesh"),
+            revision.c.effects_id,
+            revision.c.actions_id,
+            revision.c.text_id,
+        )
+        .select_from(
+            t.item_presence.join(
+                revision, revision.c.rev_id == t.item_presence.c.rev_id
             )
         )
+        .where(any_of(t.item_presence.c.aoid, aoids))
+        .order_by(
+            t.item_presence.c.aoid,
+            t.item_presence.c.branch,
+            t.item_presence.c.from_ordinal,
+        )
+    )
+    runs: Dict[int, Runs] = {}
+    for row in rows:
+        content: Content = (
+            (row.stats_id, row.atkdef_id, _canonical(row.mesh)),
+            row.effects_id,
+            row.actions_id,
+            row.text_id,
+        )
+        runs.setdefault(row.aoid, {}).setdefault(row.branch, []).append(
+            Run(row.from_ordinal, row.to_ordinal, content)
+        )
+    return runs
 
-    return points
+
+def _canonical(document: Any) -> Any:
+    """A JSON document as a value that compares and hashes by content."""
+    if isinstance(document, dict):
+        return tuple(
+            sorted((key, _canonical(value)) for key, value in document.items())
+        )
+    if isinstance(document, list):
+        return tuple(_canonical(value) for value in document)
+    return document
+
+
+def content_in(runs: Runs, build: HistoryBuild) -> Optional[Content]:
+    """The item's content in ``build``; None when the build lacks the item."""
+    branch_runs = runs.get(build.branch)
+    if not branch_runs:
+        return None
+    at = bisect_right(branch_runs, build.ordinal, key=lambda run: run.from_ordinal)
+    if at == 0 or branch_runs[at - 1].to_ordinal < build.ordinal:
+        return None
+    return branch_runs[at - 1].content
+
+
+@dataclass(frozen=True)
+class History:
+    """One item across the enabled builds."""
+
+    present: frozenset  # slugs of the builds that have the item
+    points: List[ItemRevisionPoint]  # change points, display order
+
+
+def compute_history(lineage: Lineage, runs: Runs) -> History:
+    """Where one item is present and where its definition changed.
+
+    Each build that has the item is compared with the nearest build before it
+    in its lineage that has the item too, however many builds lie between: an
+    item that leaves and comes back unchanged has not changed. With no such
+    build the item is new to the lineage and the point is ``first_seen``.
+    Otherwise the build is a change point when one of the four labelled
+    contents differs.
+    """
+    present = set()
+    # The content the item has as of each build: its own, or the one it had
+    # in the nearest earlier build of the lineage that has the item.
+    inherited: Dict[str, Optional[Content]] = {}
+    changes: Dict[str, Tuple[bool, List[str]]] = {}
+
+    for build in lineage.oldest_first:
+        before = lineage.predecessor[build.slug]
+        previous = inherited.get(before.slug) if before else None
+        content = content_in(runs, build)
+        inherited[build.slug] = content if content is not None else previous
+        if content is None:
+            continue
+        present.add(build.slug)
+        if previous is None:
+            changes[build.slug] = (True, [])
+        elif content != previous:
+            changes[build.slug] = (
+                False,
+                [
+                    label
+                    for label, new, old in zip(CHANGE_LABELS, content, previous)
+                    if new != old
+                ],
+            )
+
+    points = [
+        ItemRevisionPoint(
+            version_slug=build.slug,
+            display_name=build.display_name,
+            family=build.branch,
+            snapshot_date=build.released_on,
+            client_build=build.client_build,
+            changed=changes[build.slug][1],
+            first_seen=changes[build.slug][0],
+        )
+        for build in lineage.display_order
+        if build.slug in changes
+    ]
+    return History(present=frozenset(present), points=points)
 
 
 def _first_seen_in(
-    versions_by_slug: Dict[str, GameVersion],
-    points: Sequence[ItemRevisionPoint],
-    current_slug: Optional[str],
+    lineage: Lineage, points: Sequence[ItemRevisionPoint], current_slug: str
 ) -> Optional[str]:
     """Where the item first appears, preferring the current version's lineage.
 
     Several lineages can each have a ``first_seen`` point (AO and PRK both
     introduce an item independently). The one that matters to the viewer is the
     root-most first appearance along their own ancestry. Failing that (the
-    current version has no row, or is not registered at all) fall back to the
-    first appearance closest to a lineage root, then to the first point.
+    current version's lineage never had the item) fall back to the first
+    appearance closest to a lineage root.
     """
-    if not points:
+    first_seen = [point for point in points if point.first_seen]
+    if not first_seen:
         return None
-
-    first_seen_slugs = {p.version_slug for p in points if p.first_seen}
+    first_seen_slugs = {point.version_slug for point in first_seen}
 
     # ancestry() runs nearest-first, so the last match is the root-most ancestor.
-    for slug in reversed(ancestry(versions_by_slug, current_slug)):
+    for slug in reversed(lineage.ancestry(current_slug)):
         if slug in first_seen_slugs:
             return slug
 
-    if first_seen_slugs:
-        return min(
-            (p for p in points if p.first_seen),
-            key=lambda p: (
-                len(ancestry(versions_by_slug, p.version_slug)),
-                p.version_slug,
-            ),
-        ).version_slug
-
-    return points[0].version_slug
+    return min(
+        first_seen,
+        key=lambda p: (len(lineage.ancestry(p.version_slug)), p.version_slug),
+    ).version_slug
 
 
 def _latest_change_slug(
-    versions_by_slug: Dict[str, GameVersion],
-    points: Sequence[ItemRevisionPoint],
-    current_slug: Optional[str],
+    lineage: Lineage, points: Sequence[ItemRevisionPoint], current_slug: str
 ) -> Optional[str]:
     """The snapshot in which the current version's definition was introduced.
 
@@ -177,24 +314,17 @@ def _latest_change_slug(
     which is the most recent patch the viewer's data reflects.
     """
     point_slugs = {p.version_slug for p in points}
-    for slug in ancestry(versions_by_slug, current_slug):
+    for slug in lineage.ancestry(current_slug):
         if slug in point_slugs:
             return slug
     return None
 
 
-def _enabled_versions(db: Session) -> List[GameVersion]:
-    return (
-        db.query(GameVersion)
-        .filter(GameVersion.enabled.is_(True))
-        .order_by(GameVersion.sort_order.asc(), GameVersion.slug.asc())
-        .all()
-    )
-
-
 @router.post("/revisions/batch", response_model=ItemRevisionsBatchResponse)
 def get_item_revisions_batch(
-    payload: ItemRevisionsBatchRequest, request: Request, db: Session = Depends(get_db)
+    payload: ItemRevisionsBatchRequest,
+    db: Session = Depends(get_store),
+    build: Build = Depends(get_build),
 ):
     """
     Revision summaries for a page of items.
@@ -202,61 +332,42 @@ def get_item_revisions_batch(
     Intended for list views: one request per page of rows, giving each row its
     "changed in N patches" badge without a per-row round trip.
     """
-    current_slug = getattr(request.state, "game_version", None)
-
     aoids = list(dict.fromkeys(payload.aoids))
-    versions = _enabled_versions(db)
-    versions_by_slug = {v.slug: v for v in versions}
-
-    rows = db.query(ItemRevision).filter(ItemRevision.aoid.in_(aoids)).all()
-
-    rows_by_aoid: Dict[int, List[ItemRevision]] = {aoid: [] for aoid in aoids}
-    for row in rows:
-        rows_by_aoid.setdefault(row.aoid, []).append(row)
+    lineage = load_lineage(db)
+    runs = load_runs(db, aoids)
 
     items: Dict[int, ItemRevisionBatchEntry] = {}
     for aoid in aoids:
-        aoid_rows = rows_by_aoid.get(aoid, [])
-        points = compute_revision_points(versions, aoid_rows)
+        history = compute_history(lineage, runs.get(aoid, {}))
         items[aoid] = ItemRevisionBatchEntry(
             aoid=aoid,
-            revision_count=len(points),
-            latest_change_slug=_latest_change_slug(
-                versions_by_slug, points, current_slug
-            ),
-            present_in_current=any(r.version_slug == current_slug for r in aoid_rows),
+            revision_count=len(history.points),
+            latest_change_slug=_latest_change_slug(lineage, history.points, build.slug),
+            present_in_current=build.slug in history.present,
         )
 
     return ItemRevisionsBatchResponse(items=items)
 
 
 @router.get("/{aoid}/revisions", response_model=ItemRevisionsResponse)
-def get_item_revisions(aoid: int, request: Request, db: Session = Depends(get_db)):
+def get_item_revisions(
+    aoid: int, db: Session = Depends(get_store), build: Build = Depends(get_build)
+):
     """
     Change history for one item across every enabled game version.
 
-    404 only if the registry itself is empty; an item with no revision rows
-    returns an empty history and lists every version under ``missing_in``, so
-    the UI can say "not present in this version" rather than erroring.
+    An item no build has returns an empty history and lists every version
+    under ``missing_in``, so the UI can say "not present in this version"
+    rather than erroring.
     """
-    current_slug = getattr(request.state, "game_version", None)
+    lineage = load_lineage(db)
+    history = compute_history(lineage, load_runs(db, [aoid]).get(aoid, {}))
 
-    versions = _enabled_versions(db)
-    if not versions:
-        raise HTTPException(status_code=404, detail="No game versions are registered")
-
-    versions_by_slug = {v.slug: v for v in versions}
-
-    rows = db.query(ItemRevision).filter(ItemRevision.aoid == aoid).all()
-    present = {r.version_slug for r in rows if r.version_slug in versions_by_slug}
-
-    points = compute_revision_points(versions, rows)
-
-    ordered_slugs = [v.slug for v in _display_order(versions)]
+    ordered_slugs = [build_.slug for build_ in lineage.display_order]
     return ItemRevisionsResponse(
         aoid=aoid,
-        present_in=[slug for slug in ordered_slugs if slug in present],
-        first_seen_in=_first_seen_in(versions_by_slug, points, current_slug),
-        revisions=points,
-        missing_in=[slug for slug in ordered_slugs if slug not in present],
+        present_in=[slug for slug in ordered_slugs if slug in history.present],
+        first_seen_in=_first_seen_in(lineage, history.points, build.slug),
+        revisions=history.points,
+        missing_in=[slug for slug in ordered_slugs if slug not in history.present],
     )
