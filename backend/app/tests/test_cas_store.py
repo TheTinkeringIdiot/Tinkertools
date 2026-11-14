@@ -827,8 +827,16 @@ def test_builds_are_planned_from_the_index_and_the_registry(tmp_path):
     assert [s for s in specs if specs[s].overlay_strain_first] == ["ao-3", "prk-1"]
 
 
+@pytest.fixture
+def plain_workers(monkeypatch):
+    """Worker processes without coverage measurement: a worker ends without
+    running exit handlers and would leave an empty coverage data file behind."""
+    for name in [name for name in os.environ if name.startswith("COV_CORE_")]:
+        monkeypatch.delenv(name)
+
+
 @pytest.mark.parametrize("workers", [0, 2])
-def test_extracted_builds_are_read_in_order(conn, tmp_path, workers):
+def test_extracted_builds_are_read_in_order(conn, tmp_path, workers, plain_workers):
     folders = [
         write_extract(tmp_path, "ao-1", [item(1, "Old")], [nano(10)]),
         write_extract(tmp_path, "ao-2", [item(1, "New"), item(2)], [nano(10)]),
@@ -852,7 +860,7 @@ def test_extracted_builds_are_read_in_order(conn, tmp_path, workers):
     ).fetchall() == [(True,)]
 
 
-def test_a_build_that_cannot_be_read_is_reported(tmp_path):
+def test_a_build_that_cannot_be_read_is_reported(tmp_path, plain_workers):
     folder = tmp_path / "ao-1"
     folder.mkdir()
     reader = ExtractReader([folder], 1)
