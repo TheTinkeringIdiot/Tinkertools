@@ -187,54 +187,42 @@ class TestListVersions:
         assert current == ["prk"]
 
 
-class TestGetVersion:
-    """GET /api/v1/versions/{slug}"""
-
-    def test_returns_known_version(self, client, game_versions):
-        response = client.get("/api/v1/versions/ao-18.7")
-        assert response.status_code == 200
-        assert response.json()["display_name"] == "Anarchy Online 18.7"
-
-    def test_unknown_slug_returns_404(self, client, game_versions):
-        response = client.get("/api/v1/versions/nope")
-        assert response.status_code == 404
-
-    def test_disabled_slug_returns_404(self, client, disabled_version):
-        response = client.get("/api/v1/versions/ao-15.0")
-        assert response.status_code == 404
+def current_versions(response):
+    """Slugs the list marks as the version the request was served from."""
+    return [v["slug"] for v in response.json()["versions"] if v["is_current"]]
 
 
-class TestCurrentVersion:
-    """GET /api/v1/versions/current"""
+class TestVersionResolution:
+    """How the middleware picks the version, seen through GET /api/v1/versions."""
 
     def test_unversioned_url_resolves_to_the_default_version(
         self, client, game_versions, patched_registry
     ):
-        response = client.get("/api/v1/versions/current")
+        response = client.get("/api/v1/versions")
         assert response.status_code == 200
 
         data = response.json()
-        assert data["slug"] == "ao-18.8"
-        assert data["is_default"] is True
-        assert data["is_current"] is True
+        assert data["current"] == "ao-18.8"
+        assert current_versions(response) == ["ao-18.8"]
+        default = [v["slug"] for v in data["versions"] if v["is_default"]]
+        assert only_fixture_slugs(default) == ["ao-18.8"]
 
     def test_versioned_url_resolves_to_that_version(
         self, client, game_versions, patched_registry
     ):
-        response = client.get("/api/v1/prk/versions/current")
+        response = client.get("/api/v1/prk/versions")
         assert response.status_code == 200
 
-        data = response.json()
-        assert data["slug"] == "prk"
-        assert data["is_current"] is True
+        assert response.json()["current"] == "prk"
+        assert current_versions(response) == ["prk"]
 
     def test_sets_the_game_version_response_header(
         self, client, game_versions, patched_registry
     ):
-        response = client.get("/api/v1/prk/versions/current")
+        response = client.get("/api/v1/prk/versions")
         assert response.headers["X-Game-Version"] == "prk"
 
-        response = client.get("/api/v1/versions/current")
+        response = client.get("/api/v1/versions")
         assert response.headers["X-Game-Version"] == "ao-18.8"
 
     def test_unknown_version_segment_is_not_stripped(
@@ -242,14 +230,14 @@ class TestCurrentVersion:
     ):
         # "not-a-version" is not in the registry: fail loudly rather than serve
         # the default version's data under someone else's slug.
-        response = client.get("/api/v1/not-a-version/versions/current")
+        response = client.get("/api/v1/not-a-version/versions")
         assert response.status_code == 404
         assert response.json()["detail"] == "Unknown game version 'not-a-version'"
 
     def test_api_routes_are_never_taken_for_versions(
         self, client, game_versions, patched_registry
     ):
-        response = client.get("/api/v1/versions/current")
+        response = client.get("/api/v1/versions")
         assert response.status_code == 200
         assert "X-Game-Version-Fallback" not in response.headers
 
@@ -268,7 +256,9 @@ class TestCurrentVersion:
         assert response.status_code != 404
         assert response.headers["X-Game-Version-Fallback"] == "ao-2024-02"
 
-    def test_unregistered_default_returns_404(self, client, monkeypatch):
+    def test_unregistered_default_is_current_but_matches_no_version(
+        self, client, monkeypatch
+    ):
         # The configured default has no registry row yet (pre-import state).
         registry = versions_module.registry
         monkeypatch.setattr(registry, "_versions", {}, raising=False)
@@ -277,10 +267,12 @@ class TestCurrentVersion:
             versions_module.settings, "DEFAULT_GAME_VERSION", "zz-unregistered"
         )
 
-        response = client.get("/api/v1/versions/current")
+        response = client.get("/api/v1/versions")
         registry.invalidate()
 
-        assert response.status_code == 404
+        assert response.status_code == 200
+        assert response.json()["current"] == "zz-unregistered"
+        assert current_versions(response) == []
 
 
 class TestFamilyAlias:
@@ -308,10 +300,11 @@ class TestFamilyAlias:
     def test_requests_under_the_alias_are_served_from_the_newest_version(
         self, client, game_versions, patched_registry
     ):
-        response = client.get("/api/v1/ao/versions/current")
+        response = client.get("/api/v1/ao/versions")
 
         assert response.status_code == 200
-        assert response.json()["slug"] == "ao-18.8"
+        assert response.json()["current"] == "ao-18.8"
+        assert current_versions(response) == ["ao-18.8"]
         assert response.headers["X-Game-Version"] == "ao-18.8"
 
     def test_the_alias_moves_when_a_newer_version_is_registered(
@@ -331,4 +324,6 @@ class TestFamilyAlias:
         )
         db_session.flush()
 
-        assert client.get("/api/v1/versions/ao").json()["alias_of"] == "ao-18.9"
+        versions = client.get("/api/v1/versions").json()["versions"]
+        alias = next(v for v in versions if v["slug"] == "ao")
+        assert alias["alias_of"] == "ao-18.9"

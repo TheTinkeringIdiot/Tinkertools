@@ -28,7 +28,6 @@ import type {
 } from '../types/api';
 import { ErrorCodes } from '../types/api';
 import type {
-  GameVersionListResponse,
   ItemRevisionsResponse,
   ItemRevisionsBatchResponse,
 } from '../types/game-version';
@@ -565,11 +564,6 @@ class TinkerToolsApiClient {
   // ============================================================================
   // Game versions and item change history (cross-version endpoints)
   // ============================================================================
-
-  async getGameVersions(): Promise<GameVersionListResponse> {
-    const response = await this.get<GameVersionListResponse>('/versions');
-    return response.data as GameVersionListResponse;
-  }
 
   async getItemRevisions(aoid: number): Promise<ItemRevisionsResponse> {
     const response = await this.get<ItemRevisionsResponse>(`/items/${aoid}/revisions`);

@@ -68,21 +68,6 @@ class CacheService:
         with self.lock:
             self.cache.clear()
 
-    def get_stats(self) -> dict:
-        """Get cache statistics."""
-        with self.lock:
-            total_requests = self.stats["hits"] + self.stats["misses"]
-            hit_rate = (
-                (self.stats["hits"] / total_requests * 100) if total_requests > 0 else 0
-            )
-
-            return {
-                **self.stats,
-                "total_requests": total_requests,
-                "hit_rate_percent": round(hit_rate, 2),
-                "cache_size": len(self.cache),
-            }
-
 
 # Global cache instance
 cache_service = CacheService()

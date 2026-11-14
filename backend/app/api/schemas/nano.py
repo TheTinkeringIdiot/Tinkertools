@@ -134,16 +134,3 @@ class NanoItemDetail(ItemDetail):
     )
     strain_id: Optional[int] = Field(None, description="NanoStrain stat (75)")
     strain: Optional[str] = Field(None, description="Name of strain_id")
-
-
-class NanoStatsResponse(BaseModel):
-    """Statistics about nano programs in the database."""
-
-    total_nanos: int = Field(..., description="Total number of nano programs")
-    schools: List[str] = Field(..., description="Available nano schools")
-    strains: List[str] = Field(..., description="Available strains")
-    professions: List[str] = Field(..., description="Available professions")
-    level_range: List[int] = Field(..., description="Min and max levels [min, max]")
-    quality_level_range: List[int] = Field(
-        ..., description="Min and max QLs [min, max]"
-    )

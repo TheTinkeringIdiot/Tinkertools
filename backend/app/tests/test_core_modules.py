@@ -120,32 +120,6 @@ class TestCacheService:
         assert len(cache.cache) == 0
         assert cache.get("key1") is None
 
-    def test_cache_stats(self, cache):
-        """Test cache statistics tracking."""
-        # Generate some cache activity
-        cache.set("key1", "value1")
-        cache.set("key2", "value2")
-        cache.get("key1")  # hit
-        cache.get("key1")  # hit
-        cache.get("missing")  # miss
-
-        stats = cache.get_stats()
-
-        assert stats["hits"] == 2
-        assert stats["misses"] == 1
-        assert stats["sets"] == 2
-        assert stats["total_requests"] == 3
-        assert stats["hit_rate_percent"] == pytest.approx(66.67, rel=0.01)
-        assert stats["cache_size"] == 2
-
-    def test_cache_stats_no_requests(self, cache):
-        """Test cache statistics with no requests."""
-        stats = cache.get_stats()
-
-        assert stats["total_requests"] == 0
-        assert stats["hit_rate_percent"] == 0
-        assert stats["cache_size"] == 0
-
     def test_generate_key_consistency(self, cache):
         """Test that key generation is consistent for same parameters."""
         key1 = cache._generate_key("test", param1="value1", param2="value2")
@@ -371,11 +345,10 @@ class TestCachedResponseDecorator:
         await get_items()
 
         # Immediately should be cached
-        stats_before = cache_service.get_stats()
+        hits_before = cache_service.stats["hits"]
         await get_items()
-        stats_after = cache_service.get_stats()
 
-        assert stats_after["hits"] > stats_before["hits"]
+        assert cache_service.stats["hits"] > hits_before
 
         # After TTL should not be cached
         time.sleep(1.1)
@@ -410,8 +383,7 @@ class TestCachedResponseDecorator:
         get_items()
 
         # Check that cache was set (can't easily verify TTL, but check it cached)
-        stats = cache_service.get_stats()
-        assert stats["sets"] > 0
+        assert cache_service.stats["sets"] > 0
 
 
 class TestPerformanceMonitorDecorator:

@@ -12,7 +12,6 @@ from .spell import (
 from .action import ActionResponse, ActionCreate
 from .nano import (
     NanoProgram,
-    NanoStatsResponse,
     NanoDuration,
     NanoTargeting,
 )
@@ -42,7 +41,6 @@ __all__ = [
     "ActionResponse",
     "ActionCreate",
     "NanoProgram",
-    "NanoStatsResponse",
     "NanoDuration",
     "NanoTargeting",
     "ItemResponse",

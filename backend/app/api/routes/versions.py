@@ -8,10 +8,9 @@ registry is read from the database rather than from the in-process
 committed state.
 """
 
-import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -19,8 +18,6 @@ from app.models import GameVersion
 from app.api.schemas.versions import GameVersionListResponse, GameVersionResponse
 
 router = APIRouter(prefix="/versions", tags=["versions"])
-
-logger = logging.getLogger(__name__)
 
 
 def _current_slug(request: Request) -> Optional[str]:
@@ -77,52 +74,3 @@ def list_versions(request: Request, db: Session = Depends(get_db)):
     return GameVersionListResponse(
         versions=items, current=current_slug, total=len(items)
     )
-
-
-# Declared before /versions/{slug} so "current" is not captured as a slug.
-@router.get("/current", response_model=GameVersionResponse)
-def get_current_version(request: Request, db: Session = Depends(get_db)):
-    """
-    The game version resolved for this request.
-
-    404 if the resolved slug has no row in the registry, which means the
-    configured default version has not been registered yet.
-    """
-    current_slug = _current_slug(request)
-
-    version = db.query(GameVersion).filter(GameVersion.slug == current_slug).first()
-    if version is None:
-        logger.warning("Resolved game version %r is not in the registry", current_slug)
-        raise HTTPException(
-            status_code=404, detail=f"Game version '{current_slug}' not found"
-        )
-
-    return _to_response(version, current_slug)
-
-
-@router.get("/{slug}", response_model=GameVersionResponse)
-def get_version(slug: str, request: Request, db: Session = Depends(get_db)):
-    """
-    Details for one game version or family alias. Unknown or disabled slugs 404.
-    """
-    version = (
-        db.query(GameVersion)
-        .filter(GameVersion.slug == slug, GameVersion.enabled.is_(True))
-        .first()
-    )
-    if version is None:
-        family = (
-            db.query(GameVersion)
-            .filter(GameVersion.family == slug, GameVersion.enabled.is_(True))
-            .order_by(GameVersion.sort_order.asc(), GameVersion.slug.asc())
-            .all()
-        )
-        alias = next((a for a in _aliases(family) if a.slug == slug), None)
-        if alias is None:
-            raise HTTPException(
-                status_code=404, detail=f"Game version '{slug}' not found"
-            )
-        alias.is_current = alias.alias_of == _current_slug(request)
-        return alias
-
-    return _to_response(version, _current_slug(request))

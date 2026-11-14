@@ -120,22 +120,4 @@ describe.skipIf(!BACKEND_AVAILABLE)('Backend Integration Tests', () => {
     // qualityLevel should be mapped from ql
     expect(nano.qualityLevel).toEqual(expect.any(Number)); // mapped from the backend's ql
   }, 10000);
-
-  it('gets nano statistics from backend', async () => {
-    const response = await fetch(`${apiBaseFor(TEST_VERSION)}/nanos/stats`);
-    expect(response.ok).toBe(true);
-
-    const stats = await response.json();
-
-    expect(stats).toHaveProperty('total_nanos');
-    expect(stats).toHaveProperty('schools');
-    expect(stats).toHaveProperty('strains');
-    expect(stats).toHaveProperty('professions');
-    expect(stats).toHaveProperty('level_range');
-    expect(stats).toHaveProperty('quality_level_range');
-
-    expect(typeof stats.total_nanos).toBe('number');
-    expect(Array.isArray(stats.schools)).toBe(true);
-    expect(Array.isArray(stats.strains)).toBe(true);
-  }, 10000);
 });

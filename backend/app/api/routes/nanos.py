@@ -28,7 +28,6 @@ from app.api.schemas import PaginatedResponse, ItemDetail
 from app.api.schemas.nano import (
     NanoItemDetail,
     NanoProgram,
-    NanoStatsResponse,
     NanoStrainCount,
     NanoStrainsResponse,
 )
@@ -434,60 +433,6 @@ def get_nano_strains(
     ]
     strains.sort(key=lambda s: (s.name is None, (s.name or "").casefold(), s.id))
     return NanoStrainsResponse(strains=strains)
-
-
-@router.get("/stats", response_model=NanoStatsResponse)
-@cached_response("nanos_stats")
-@performance_monitor
-def get_nano_stats(db: Session = Depends(get_db)):
-    """
-    Get statistics about available nano programs.
-
-    Aggregated in SQL from items and nano_properties; loading and parsing every
-    nano to count them took several seconds per version on a cold cache.
-    """
-    nanos = db.query(Item).filter(Item.is_nano.is_(True))
-    total, ql_low, ql_high = nanos.with_entities(
-        func.count(Item.id), func.min(Item.ql), func.max(Item.ql)
-    ).one()
-
-    props = nanos.join(NanoProperties, NanoProperties.item_id == Item.id)
-    school_ids = [
-        school
-        for (school,) in props.with_entities(NanoProperties.school)
-        .filter(NanoProperties.school.isnot(None))
-        .distinct()
-    ]
-    strain_ids = [
-        strain
-        for (strain,) in props.with_entities(NanoProperties.strain)
-        .filter(NanoProperties.strain.isnot(None))
-        .distinct()
-    ]
-    profession_ids = [
-        profession
-        for (profession,) in props.with_entities(
-            func.unnest(NanoProperties.professions)
-        ).distinct()
-    ]
-    level_low, level_high = (
-        props.with_entities(
-            func.min(NanoProperties.min_level), func.max(NanoProperties.min_level)
-        )
-        .filter(NanoProperties.min_level.isnot(None))
-        .one()
-    )
-
-    schools = {nano_properties.school_name(school) for school in school_ids}
-    strains = {nano_properties.strain_name(strain) for strain in strain_ids}
-    return NanoStatsResponse(
-        total_nanos=total,
-        schools=sorted(name for name in schools if name),
-        strains=sorted(name for name in strains if name),
-        professions=sorted(set(nano_properties.profession_names(profession_ids))),
-        level_range=[level_low, level_high] if level_low is not None else [1, 220],
-        quality_level_range=([ql_low, ql_high] if ql_low is not None else [1, 300]),
-    )
 
 
 @router.get(

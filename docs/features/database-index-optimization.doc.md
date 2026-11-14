@@ -146,7 +146,6 @@ def import_all_csv_mode(args):
 | GET /api/nanos | 450ms | 120ms | 73% faster |
 | GET /api/nanos/by-profession/11 | 380ms | 95ms | 75% faster |
 | GET /api/nanos/offensive | 520ms | 140ms | 73% faster |
-| GET /api/nanos/{id} | 85ms | 25ms | 71% faster |
 
 ### Item Endpoints (with spell data)
 | Endpoint | Before | After | Improvement |
