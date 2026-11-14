@@ -794,19 +794,19 @@ def test_mobs_are_numbered_in_order_of_first_appearance(conn, tmp_path):
     ).fetchone() == (125, "Inferno", "Somewhere", ["Minion", "Other"])
 
 
-def test_an_escaped_apostrophe_is_resolved_in_minion_names_only(conn, tmp_path):
+def test_mob_text_is_stored_as_written(conn, tmp_path):
     files = curated_files(tmp_path, [("Ahpta", "Inferno", 1)])
     text = files.symbiants_csv.read_text()
     files.symbiants_csv.write_text(
-        text.replace("Somewhere", "Razor\\'s Lair").replace(
-            '"Minion, Other"', "Aniitap\\'s Shadow"
+        text.replace("Somewhere", "Razor's Lair").replace(
+            '"Minion, Other"', "Aniitap's Shadow/Aniitap(250)"
         )
     )
     sync_curated(conn, files)
 
     assert conn.execute("SELECT location, mob_names FROM mob").fetchone() == (
-        "Razor\\'s Lair",
-        ["Aniitap's Shadow"],
+        "Razor's Lair",
+        ["Aniitap's Shadow/Aniitap(250)"],
     )
 
 

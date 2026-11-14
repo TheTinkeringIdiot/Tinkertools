@@ -15,6 +15,11 @@ type. Only the following is allowed to differ:
    keeps them de-duplicated and unordered, so their order in a response is an
    artefact and repeats are lost; the new store keeps the client's sequence.
    The criteria of an *action* are compared in order.
+4. A mob's ``location`` is compared with ``\\'`` read as ``'``. The store being
+   replaced serves the apostrophe of a few locations with a stray backslash
+   (``Razor\\'s Lair``). A mob is any object that carries ``is_pocket_boss``:
+   the rows of ``/mobs``, ``/mobs/<id>`` and ``/symbiants/<aoid>/dropped-by``.
+   No other response carries a mob's location.
 
 Row order is compared exactly. Every list the API sorts ends its sort on the
 AOID (or the mob id), so the order is the same whatever the storage. The one
@@ -512,7 +517,10 @@ def normalize(value: Any, parent: str = "", grandparent: str = "") -> Any:
     if isinstance(value, dict):
         internal = "aoid" in value or "source_type_id" in value
         skip = INTERNAL_ID_KEYS | ({"id"} if internal else frozenset())
-        return {k: normalize(v, k, parent) for k, v in value.items() if k not in skip}
+        result = {k: normalize(v, k, parent) for k, v in value.items() if k not in skip}
+        if "is_pocket_boss" in value and isinstance(value.get("location"), str):
+            result["location"] = value["location"].replace("\\'", "'")
+        return result
     if isinstance(value, list):
         items = [normalize(v, parent, grandparent) for v in value]
         if parent in ROW_LISTS or parent in ORDERED_LISTS:

@@ -24,6 +24,10 @@ professions, minimum level), symbiant rows, and the curated data as the build
 is served with it: perks, mobs, sources and item-source links, after the
 feature-flag and presence rules of database/cas/002_curated_and_derived.sql.
 
+Known defect of the current store: it holds the apostrophe in a mob's location
+as ``\\'`` (``Razor\\'s Lair``). That is read as ``'`` on the current store's
+side, in a mob's location and nowhere else.
+
 The current store does not hold shop data, keeps effect criteria unordered and
 has no effect descriptions of its own to compare, so those are checked against
 the raw extract only: every rebuilt item is compared, document by document,
@@ -590,8 +594,11 @@ def compare_curated(report, conn, build, gv):
             )
         }
     old = {
-        row[0]: row[1:]
-        for row in conn.execute(f'SELECT id, {columns} FROM "{gv}".mobs')
+        mob_id: (name, level, playfield, location and location.replace("\\'", "'"))
+        + tuple(rest)
+        for mob_id, name, level, playfield, location, *rest in conn.execute(
+            f'SELECT id, {columns} FROM "{gv}".mobs'
+        )
     }
     report.compare_maps("mobs", new, old)
 
