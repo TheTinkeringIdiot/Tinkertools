@@ -10,7 +10,9 @@ fixture) and asks the API.
 import os
 
 import pytest
+from sqlalchemy import update
 
+from app.store import tables as t
 from app.tests.fixtures.store_fixtures import criterion, item, modify
 
 pytestmark = pytest.mark.skipif(
@@ -403,6 +405,24 @@ def test_dropped_by_lists_the_bosses_by_level_and_name(store):
     ]
     assert not_a_symbiant.status_code == 404
     assert unknown.status_code == 404
+
+
+def test_dropped_by_leaves_out_a_mob_that_is_not_a_pocket_boss(store):
+    store.add_build("b1", 1, items=[symbiant(1)])
+    store.curate(mobs=[("Boss", "Inferno", 1, 200), ("Minion", "Inferno", 1, 100)])
+    store.db.execute(
+        update(t.mob).where(t.mob.c.name == "Minion").values(is_pocket_boss=False)
+    )
+
+    with store.client("b1") as client:
+        dropped_by = client.get("/api/v1/symbiants/1/dropped-by").json()
+        bosses = mob_names(client, "/mobs?is_pocket_boss=true")
+        others = mob_names(client, "/mobs?is_pocket_boss=false")
+        minion_drops = aoids(client, "/mobs/2/drops")
+
+    assert [mob["name"] for mob in dropped_by] == ["Boss"]
+    assert (bosses, others) == (["Boss"], ["Minion"])
+    assert minion_drops == [1]
 
 
 def test_an_id_no_integer_column_can_hold_is_not_found(store):

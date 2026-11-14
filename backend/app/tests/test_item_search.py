@@ -299,6 +299,23 @@ def test_stat_bonuses_finds_items_that_modify_or_set_one_of_the_stats(store):
         assert listed(client, stat_bonuses="124,abc") == [1, 2, 3, 4]
 
 
+def test_an_effect_that_hits_a_stat_is_not_a_bonus_to_it(store):
+    hit_health = {**modify(27, 50), "SpellID": 53002}
+    store.add_build(
+        "b1",
+        1,
+        items=[
+            item(1, SpellData=effects(modify(27, 50))),
+            item(2, SpellData=effects(hit_health)),
+        ],
+    )
+
+    with store.client("b1") as client:
+        assert listed(client, stat_bonuses="27") == [1]
+        assert listed(client, stat_filters="modifies:27:>=:1") == [1]
+        assert searched(client, "thing", stat_bonuses="27") == [1]
+
+
 def test_stat_filters_compare_requirements_and_bonuses(store):
     store.add_build(
         "b1",

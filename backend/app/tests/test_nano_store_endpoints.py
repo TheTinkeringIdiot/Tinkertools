@@ -383,6 +383,31 @@ def test_search_pages_add_up_to_its_total(store):
     assert (past_the_end["has_next"], past_the_end["has_prev"]) == (False, True)
 
 
+def test_strain_counts_take_every_list_filter_but_the_strain(store):
+    nanos = [
+        program(10, strain=1, school=2, use=cast_by(DOCTOR, level=100)),
+        program(11, strain=2, school=1, use=cast_by(NT, level=20)),
+        program(12, strain=5, school=2, use=[]),
+        program(13, strain=1, school=2, use=cast_by(DOCTOR, level=10)),
+    ]
+    store.add_build("live", 1, nanos=nanos)
+
+    with store.client("live") as client:
+
+        def counts(query):
+            strains = client.get(f"/api/v1/nanos/strains?{query}").json()["strains"]
+            return {row["id"]: row["count"] for row in strains}
+
+        assert counts("") == {1: 2, 2: 1, 5: 1}
+        # as in the list, anyone can cast a nano whose Use action names nobody
+        assert counts("profession=Doctor") == {1: 2, 5: 1}
+        assert counts("profession=Nano-Technician") == {2: 1, 5: 1}
+        assert counts("school=Combat") == {2: 1}
+        assert counts("level_min=20") == {1: 1, 2: 1}
+        assert counts("level_max=10") == {1: 1, 5: 1}
+        assert counts("profession=Doctor&strain=5") == {1: 2, 5: 1}
+
+
 def test_strains_are_sorted_by_name_with_unnamed_ids_last(store):
     nanos = [
         program(10, strain=123456),
