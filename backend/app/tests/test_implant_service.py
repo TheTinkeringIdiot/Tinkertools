@@ -175,9 +175,9 @@ def test_of_several_implants_with_the_same_clusters_the_lowest_aoid_is_found(sto
         "live",
         1,
         items=[
-            implant(30, [STRENGTH], name="TestItem"),
-            implant(10, [STRENGTH], name="Eye Implant: Strength"),
-            implant(20, [STRENGTH], name="Cyborg Eye"),
+            implant(30, [STRENGTH], name="Eye Implant: Strength, Shiny"),
+            implant(10, [STRENGTH], name="Eye Implant: Strength, Shiny"),
+            implant(20, [STRENGTH], name="Eye Implant: Strength, Shiny"),
             implant(31, name="Other basic"),
             implant(11, name="Basic"),
         ],
@@ -185,6 +185,23 @@ def test_of_several_implants_with_the_same_clusters_the_lowest_aoid_is_found(sto
 
     assert [found(store, EYE, 1, {"Shiny": STRENGTH}) for _ in range(3)] == [10] * 3
     assert found(store, EYE, 1, {}) == 11
+
+
+def test_an_implant_of_the_standard_series_comes_before_its_namesakes(store):
+    store.add_build(
+        "live",
+        1,
+        items=[
+            implant(10, [STRENGTH], name="A Shining Strength Eye Implant"),
+            implant(20, [STRENGTH], name="Eye Implant: Strength, Shiny"),
+            implant(30, [STRENGTH], name="TestItem: Criteria"),
+            implant(11, [AGILITY], name="Eye Implant: Agility, Shiny"),
+            implant(21, [AGILITY], name="Cyborg Eye Implant"),
+        ],
+    )
+
+    assert found(store, EYE, 1, {"Shiny": STRENGTH}) == 20
+    assert found(store, EYE, 1, {"Shiny": AGILITY}) == 11
 
 
 def test_a_cluster_no_column_can_hold_finds_nothing(store):

@@ -26,6 +26,8 @@ IMPLANT_ITEM_CLASS = 3
 STAT_SLOT = 298
 # The effect type of a cluster: "Modify {Stat} {Amount}".
 CLUSTER_SPELL_ID = 53045
+# Names of the implants players build: "Head Implant: Disease AC, Shiny".
+STANDARD_SERIES_NAME = "% Implant: %"
 
 
 def _is_cluster() -> ColumnElement:
@@ -134,11 +136,22 @@ class ImplantService:
         implant that has none.
 
         A cluster is an effect of type 53045 (Modify Stat) on the stat it
-        raises. Several items can carry the same set (a test item beside the
-        real implant): the lowest AOID is taken, so the answer is the same on
-        every call.
+        raises. Several items can carry the same set, so the choice is fixed:
+        an implant of the standard series first, then the lowest AOID.
+
+        The standard series is named "<slot> Implant: <skill>, <positions>".
+        The builds from 15.0 to 17.10.5 and PRK also keep some 120 implants
+        of an older series ("A Shining Poison Protection Head Implant") that
+        differ from their standard twin in name and icon only, have lower
+        AOIDs and are gone from the live game; live has test items and
+        cyborg implants with higher AOIDs beside a few standard ones.
         """
         revision = t.item_revision
+        in_standard_series = (
+            select(t.part_text.c.name.like(STANDARD_SERIES_NAME))
+            .where(t.part_text.c.text_id == revision.c.text_id)
+            .scalar_subquery()
+        )
         query = (
             revisions(self.build, revision.c.aoid)
             .where(
@@ -150,7 +163,7 @@ class ImplantService:
                 ),
                 *_has_exactly(list(clusters.values())),
             )
-            .order_by(revision.c.aoid)
+            .order_by(in_standard_series.desc(), revision.c.aoid)
             .limit(1)
         )
         return self.db.execute(query).scalar_one_or_none()
