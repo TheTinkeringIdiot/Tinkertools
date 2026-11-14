@@ -5,23 +5,21 @@ tool records the responses of a fixed set of requests on a fixed set of builds
 and compares two recordings. Values are compared strictly, including their JSON
 type. Only the following is allowed to differ:
 
-1. Internal ids. An item's ``id`` (any object that also carries ``aoid``),
-   ``item_id``, ``animation_mesh_id`` and ``attack_defense_id`` are ignored.
-   Every other ``id`` (strains, mobs, sources) is compared.
+1. Internal ids. An item's ``id`` (any object that also carries ``aoid``), a
+   source record's ``id``, ``item_id``, ``animation_mesh_id`` and
+   ``attack_defense_id`` are ignored. Every other ``id`` (strains, mobs,
+   source types) is compared.
 2. The order of stats, events, effects, actions and attack/defense entries,
    which carries no meaning (app/core/parts.py).
 3. The criteria of an *effect* are compared as a set. The store being replaced
    keeps them de-duplicated and unordered, so their order in a response is an
    artefact and repeats are lost; the new store keeps the client's sequence.
    The criteria of an *action* are compared in order.
-4. The order of rows that tie on a list's sort key. Rows are matched by AOID
-   (or name), and the sequence of sort-key values is compared separately, so a
-   wrong sort is caught while tie order is free. Lists the API sorts by
-   internal id (``/items``, ``/weapons/analyze``) declare no sort key: that
-   order is not part of the contract.
 
-When a result does not fit on one page, the total, the sort-key sequence and
-the rows both pages share are compared.
+Row order is compared exactly. Every list the API sorts ends its sort on the
+AOID (or the mob id), so the order is the same whatever the storage. The one
+exception is ``/weapons/analyze``, which returns its rows in no defined order;
+they are matched by AOID.
 
 Usage:
     python tools/golden.py samples EXTRACTS_DIR            > tools/golden_samples.json
@@ -51,7 +49,9 @@ SAMPLE_COUNTS = {"items": 20, "nanos": 10, "weapons": 8, "implants": 5}
 # Ignored wherever they appear.
 INTERNAL_ID_KEYS = frozenset({"item_id", "animation_mesh_id", "attack_defense_id"})
 # Lists of result rows: matched by identity, with a separate sort-key check.
-ROW_LISTS = ("items", "weapons", "results", "strains")
+ROW_LISTS = ("items", "weapons", "results", "strains", "versions")
+# Other lists whose order is content.
+ORDERED_LISTS = frozenset({"ranges", "mob_names"})
 DEFAULT_SAMPLES = Path(__file__).with_name("golden_samples.json")
 
 NT, ADVENTURER, DOCTOR = 11, 6, 10
@@ -103,7 +103,11 @@ def _order(*fields: str) -> Order:
 
 
 def _get(
-    path: str, order: Optional[Order] = None, all_pages: bool = False, **params
+    path: str,
+    order: Optional[Order] = None,
+    all_pages: bool = False,
+    in_order: bool = True,
+    **params,
 ) -> Request:
     query = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
     return {
@@ -111,14 +115,22 @@ def _get(
         "path": path + ("?" + query if query else ""),
         "order": order,
         "all_pages": all_pages,
+        "in_order": in_order,
     }
 
 
-def _post(path: str, body: dict) -> Request:
-    return {"method": "POST", "path": path, "body": body, "order": None}
+def _post(path: str, body: dict, in_order: bool = True) -> Request:
+    return {
+        "method": "POST",
+        "path": path,
+        "body": body,
+        "order": None,
+        "in_order": in_order,
+    }
 
 
-BY_NAME = _order("name")
+BY_NAME = _order("name", "aoid")
+BY_AOID = _order("aoid")
 
 
 def requests_for(sample: Dict[str, List[int]]) -> Iterator[Tuple[str, Request]]:
@@ -171,6 +183,18 @@ def requests_for(sample: Dict[str, List[int]]) -> Iterator[Tuple[str, Request]]:
             "/items/search", order=BY_NAME, page_size=big, **params
         )
     for name, params in {
+        "name-sword": dict(q="sword", search_fields="name"),
+        "name-two-words": dict(q="nano crystal heal", search_fields="name"),
+        "description": dict(q="doctor", search_fields="description", min_ql=200),
+        "name-and-description": dict(q="omni armed", search_fields="name,description"),
+        "default-fields": dict(q="viral"),
+        "weapons": dict(q="shotgun", weapons="true", search_fields="name"),
+        "filtered": dict(q="eye implant", search_fields="name", min_ql=200, max_ql=200),
+    }.items():
+        yield f"fuzzy/{name}", _get(
+            "/items/search", exact_match="false", page_size=big, **params
+        )
+    for name, params in {
         "class-weapon-ql": dict(item_class=1, min_ql=299, max_ql=299),
         "class-weapon-ql-low": dict(item_class=1, min_ql=100, max_ql=100),
         "nanos-ql": dict(is_nano="true", min_ql=215, max_ql=220),
@@ -180,7 +204,7 @@ def requests_for(sample: Dict[str, List[int]]) -> Iterator[Tuple[str, Request]]:
         "stat-bonus-low": dict(stat_bonuses="19,21", min_ql=150, max_ql=152),
         "strain": dict(strain=144),
     }.items():
-        yield f"items/{name}", _get("/items", page_size=big, **params)
+        yield f"items/{name}", _get("/items", order=BY_AOID, page_size=big, **params)
 
     for name, order, params in (
         ("school", BY_NAME, dict(school="Combat", ql_min=100, ql_max=110)),
@@ -194,20 +218,20 @@ def requests_for(sample: Dict[str, List[int]]) -> Iterator[Tuple[str, Request]]:
             BY_NAME,
             dict(profession=DOCTOR, ql_min=60, ql_max=70),
         ),
-        ("ql-sorted", _order("ql"), dict(ql_min=205, ql_max=207, sort_by="ql")),
+        ("ql-sorted", _order("ql", "aoid"), dict(ql_min=205, ql_max=207, sort_by="ql")),
         (
             "ql-sorted-desc",
-            _order("-ql"),
+            _order("-ql", "aoid"),
             dict(ql_min=100, ql_max=104, sort_by="ql", sort_desc="true"),
         ),
         (
             "level-sorted",
-            _order("level"),
+            _order("level", "aoid"),
             dict(school="Combat", ql_min=100, ql_max=140, sort_by="level"),
         ),
         (
             "level-sorted-desc",
-            _order("-level"),
+            _order("-level", "aoid"),
             dict(
                 profession=NT, ql_min=150, ql_max=200, sort_by="level", sort_desc="true"
             ),
@@ -218,13 +242,15 @@ def requests_for(sample: Dict[str, List[int]]) -> Iterator[Tuple[str, Request]]:
     yield "nanos/search-heal", _get(
         "/nanos/search", order=BY_NAME, q="heal", ql_min=150, ql_max=170, page_size=200
     )
-    yield "nanos/strains", _get("/nanos/strains", order=BY_NAME)
+    yield "nanos/strains", _get("/nanos/strains", order=_order("name"))
     yield "nanos/strains-profession", _get(
-        "/nanos/strains", order=BY_NAME, profession=DOCTOR
+        "/nanos/strains", order=_order("name"), profession=DOCTOR
     )
     for profession in (ADVENTURER, DOCTOR, NT):
         yield f"nanos/profession/{profession}", _get(
-            f"/nanos/profession/{profession}", order=_order("-ql"), page_size=big
+            f"/nanos/profession/{profession}",
+            order=_order("-ql", "aoid"),
+            page_size=big,
         )
     yield f"nanos/profession/{DOCTOR}/by-name", _get(
         f"/nanos/profession/{DOCTOR}",
@@ -235,13 +261,13 @@ def requests_for(sample: Dict[str, List[int]]) -> Iterator[Tuple[str, Request]]:
     )
     yield f"nanos/profession/{NT}/ql-asc", _get(
         f"/nanos/profession/{NT}",
-        order=_order("ql"),
+        order=_order("ql", "aoid"),
         page_size=big,
         sort="ql",
         sort_order="asc",
     )
     yield f"nanos/offensive/{NT}", _get(
-        f"/nanos/offensive/{NT}", order=_order("-ql"), page_size=big
+        f"/nanos/offensive/{NT}", order=_order("-ql", "aoid"), page_size=big
     )
 
     for name, body in {
@@ -265,7 +291,7 @@ def requests_for(sample: Dict[str, List[int]]) -> Iterator[Tuple[str, Request]]:
             ],
         ),
     }.items():
-        yield f"weapons/{name}", _post("/weapons/analyze", body)
+        yield f"weapons/{name}", _post("/weapons/analyze", body, in_order=False)
 
     for name, body in {
         "right-hand-three": dict(
@@ -284,16 +310,19 @@ def requests_for(sample: Dict[str, List[int]]) -> Iterator[Tuple[str, Request]]:
 
     yield "symbiants", _get(
         "/symbiants",
-        order=_order("family", "ql", "name"),
+        order=_order("family", "ql", "name", "aoid"),
         all_pages=True,
         page_size=200,
     )
     yield "mobs/pocket-bosses", _get(
-        "/mobs", order=_order("level", "name"), is_pocket_boss="true", page_size=big
+        "/mobs",
+        order=_order("level", "name", "id"),
+        is_pocket_boss="true",
+        page_size=big,
     )
     yield "mobs/level-range", _get(
         "/mobs",
-        order=_order("level", "name"),
+        order=_order("level", "name", "id"),
         min_level=100,
         max_level=200,
         page_size=big,
@@ -304,14 +333,13 @@ def requests_for(sample: Dict[str, List[int]]) -> Iterator[Tuple[str, Request]]:
     yield "versions", _get("/versions")
 
     yield "errors/item-not-found", _get("/items/999999999")
-    yield "errors/interpolate-not-found", _get(
-        "/items/999999999/interpolate", target_ql=5
-    )
+    yield "errors/item-id-not-a-number", _get("/items/abc")
     yield "errors/search-without-query", _get("/items/search")
     yield "errors/symbiant-not-found", _get("/symbiants/999999999")
-    yield "errors/bad-implant-slot", _post(
-        "/implants/lookup", dict(slot=3, ql=100, clusters={})
+    yield "errors/implant-ql-out-of-range", _post(
+        "/implants/lookup", dict(slot=2, ql=0, clusters={})
     )
+    yield "errors/nano-profession-unknown", _get("/nanos/profession/99")
 
 
 def follow_up_requests(
@@ -327,7 +355,7 @@ def follow_up_requests(
         yield f"mob/{mob['name']}", _get(f"/mobs/{mob['id']}"), "/mobs/<id>"
         yield (
             f"mob-drops/{mob['name']}",
-            _get(f"/mobs/{mob['id']}/drops", order=_order("ql", "name")),
+            _get(f"/mobs/{mob['id']}/drops", order=_order("ql", "name", "aoid")),
             "/mobs/<id>/drops",
         )
     symbiants = fetch(_get("/symbiants", page_size=200))["body"]
@@ -336,7 +364,7 @@ def follow_up_requests(
         yield f"symbiant/{aoid}", _get(f"/symbiants/{aoid}"), f"/symbiants/{aoid}"
         yield (
             f"symbiant-dropped-by/{aoid}",
-            _get(f"/symbiants/{aoid}/dropped-by", order=_order("level", "name")),
+            _get(f"/symbiants/{aoid}/dropped-by", order=_order("level", "name", "id")),
             f"/symbiants/{aoid}/dropped-by",
         )
 
@@ -393,10 +421,6 @@ def _rows(body: Any) -> Tuple[Optional[str], Optional[list]]:
             if isinstance(body.get(key), list):
                 return key, body[key]
     return None, None
-
-
-def _order_values(rows: list, order: Order) -> List[list]:
-    return [[row.get(field) for field, _ in order] for row in rows]
 
 
 def unsorted_at(rows: list, order: Order) -> Optional[int]:
@@ -484,11 +508,12 @@ def canonical(value: Any) -> str:
 def normalize(value: Any, parent: str = "", grandparent: str = "") -> Any:
     """Apply the allowed differences listed in the module docstring."""
     if isinstance(value, dict):
-        skip = INTERNAL_ID_KEYS | ({"id"} if "aoid" in value else frozenset())
+        internal = "aoid" in value or "source_type_id" in value
+        skip = INTERNAL_ID_KEYS | ({"id"} if internal else frozenset())
         return {k: normalize(v, k, parent) for k, v in value.items() if k not in skip}
     if isinstance(value, list):
         items = [normalize(v, parent, grandparent) for v in value]
-        if parent in ROW_LISTS:
+        if parent in ROW_LISTS or parent in ORDERED_LISTS:
             return items
         if parent == "criteria":
             if grandparent == "actions":
@@ -500,8 +525,9 @@ def normalize(value: Any, parent: str = "", grandparent: str = "") -> Any:
 
 def _row_key(row: Any) -> Any:
     if isinstance(row, dict):
-        if "aoid" in row:
-            return ("aoid", row["aoid"])
+        for key in ("aoid", "slug"):
+            if key in row:
+                return (key, row[key])
         if "name" in row:
             return ("name", f"{row['name']} #{row.get('id', '')}")
     return ("json", canonical(row))
@@ -524,19 +550,20 @@ def differences(old: dict, new: dict) -> List[str]:
             found.append("envelope: " + _first_difference(rest_a, rest_b))
     rows_a = [normalize(row, "", key or "rows") for row in raw_a]
     rows_b = [normalize(row, "", key or "rows") for row in raw_b]
-    order = old["request"].get("order")
-    if order and canonical(_order_values(rows_a, order)) != canonical(
-        _order_values(rows_b, order)
-    ):
-        fields = ", ".join(f"{f} {d}" for f, d in order)
-        found.append(f"rows are ordered differently ({fields})")
+    if old["request"].get("in_order", True) and [_row_key(r) for r in rows_a] != [
+        _row_key(r) for r in rows_b
+    ]:
+        if sorted(map(str, map(_row_key, rows_a))) == sorted(
+            map(str, map(_row_key, rows_b))
+        ):
+            found.append("same rows in a different order")
+        else:
+            found.append("different rows")
     by_a = {_row_key(r): r for r in rows_a}
     by_b = {_row_key(r): r for r in rows_b}
     if len(by_a) != len(rows_a) or len(by_b) != len(rows_b):
         found.append("rows repeat within one response")
-    body = old["body"] if isinstance(old["body"], dict) else {}
-    complete = body.get("total") in (None, len(rows_a)) and not body.get("has_next")
-    if complete and set(by_a) != set(by_b):
+    if set(by_a) != set(by_b):
         found.append(
             f"rows: {len(set(by_a) - set(by_b))} missing, "
             f"{len(set(by_b) - set(by_a))} unexpected"

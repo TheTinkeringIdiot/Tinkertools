@@ -2,9 +2,18 @@
 -- Runs after 001_store.sql, with the same search_path.
 --
 -- Curated data is maintained by hand (CSV files), not extracted from a client
--- build. It is stored once, keyed by AOID, and applies to every build in which
--- the items it names are present. Derived tables are computed at import from
--- parts plus curated data and can be rebuilt at any time.
+-- build. It is stored once, keyed by AOID. Derived tables are computed at
+-- import from parts plus curated data and can be rebuilt at any time.
+--
+-- Where curated data applies. A curated fact is served for a build only when
+--   1. the items it names are present in that build, and
+--   2. the build's features flag for it is on (build.features, the same keys
+--      the version registry uses today): "perks" for perk, "mobs" for mob and
+--      for sources of type mob, "sources" for sources of type item.
+-- Today the flags are on as follows: perks and mobs only on the newest AO
+-- build and PRK, sources on every build. An old build therefore answers
+-- "not found" for a perk lookup and lists no mobs even though the perk items
+-- and symbiants exist in it.
 
 -- ---------------------------------------------------------------------------
 -- Curated: nano metadata (all_nanos_compacted.csv)
@@ -29,9 +38,27 @@ CREATE TABLE nano_overlay (
 
 -- Which strain wins when a build's own data and the overlay disagree is a
 -- property of the build: the newest AO build and PRK take the overlay's strain
--- (the overlay describes the current game), older builds keep their own valid
--- strain and use the overlay only to fill gaps (strains were reassigned over
--- the years). A strain value of NULL, 0 or 99999 is not valid.
+-- (the overlay describes the current game); older builds keep their own
+-- strain when they have a usable one (strains were reassigned over the years).
+--
+-- The exact rule, which reproduces backend/update_nanos.py. For a nano
+-- revision with an overlay row, "own" being the revision's own stat 75 and
+-- "usable" meaning not absent, not 0 and not 99999:
+--   1. If the build is not overlay_strain_first, own is usable and own differs
+--      from the overlay strain: keep own strain AND own substrain untouched.
+--      Substrain always follows the strain decision; it is never filled in on
+--      its own.
+--   2. Otherwise: strain becomes the overlay strain when that is > 0, else it
+--      stays as own; substrain becomes the overlay substrain when that is > 0,
+--      else it stays as own.
+-- A nano without an overlay row keeps its own values. Own values of 0 or 99999
+-- that survive these rules are kept as they are, in nano_properties.strain and
+-- in the stats of a response: they are not turned into NULL.
+--
+-- Everything that filters or groups by strain (/items?strain=, /nanos strain
+-- filters, the "has a real strain" test of the profession lists, strain
+-- counts) reads nano_properties, never stat_entry, because stat_entry holds
+-- only the build's own value.
 ALTER TABLE build ADD COLUMN overlay_strain_first boolean NOT NULL DEFAULT false;
 
 -- ---------------------------------------------------------------------------
@@ -80,8 +107,7 @@ CREATE INDEX symbiant_items_aoid ON symbiant_items (aoid);
 -- Curated: perks
 -- ---------------------------------------------------------------------------
 
--- A perk is an item with perk metadata. The perk applies in every build in
--- which the item is present.
+-- A perk is an item with perk metadata.
 CREATE TABLE perk (
     aoid               integer PRIMARY KEY,
     name               varchar(128) NOT NULL,
@@ -123,18 +149,28 @@ CREATE TABLE source_type (
 
 -- Something an item comes from. entity_id names the thing itself: the AOID of
 -- the item for type 'item' (a nanocrystal that uploads a nano), the mob_id for
--- type 'mob'.
+-- type 'mob'. The API returns entity_id as "source_id".
+--
+-- source_id is an internal key: the API's "id" of a source is not stable
+-- across builds today and is not part of the contract.
+--
+-- name is stored for sources that have a name of their own (mobs). For a
+-- source of type 'item' it is NULL: the name returned is the source item's
+-- name in the requested build, because item names change between builds. The
+-- same holds for the "crystal_name" the API returns in an item source's
+-- extra data; item_source.metadata does not store it.
 CREATE TABLE source (
-    source_id       integer PRIMARY KEY,
+    source_id       integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     source_type_id  integer NOT NULL REFERENCES source_type (source_type_id),
     entity_id       integer NOT NULL,
-    name            varchar(255) NOT NULL,
+    name            varchar(255),
     metadata        jsonb NOT NULL DEFAULT '{}'::jsonb,
     UNIQUE (source_type_id, entity_id)
 );
 
 -- An item's sources. A link applies in a build when the item is present in it
--- and, for a source of type 'item', when the source item is present too.
+-- and, for a source of type 'item', when the source item is present too (and
+-- the build's feature flag is on, see the top of this file).
 CREATE TABLE item_source (
     aoid        integer NOT NULL,
     source_id   integer NOT NULL REFERENCES source (source_id) ON DELETE CASCADE,

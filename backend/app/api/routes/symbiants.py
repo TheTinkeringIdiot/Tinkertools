@@ -61,12 +61,12 @@ def list_symbiants(
     """
     start_time = time.time()
 
-    # Base query with ordering (id last so OFFSET pages never overlap)
+    # Base query with ordering (AOID last so OFFSET pages never overlap)
     base_query = db.query(SymbiantItem).order_by(
         SymbiantItem.family.asc(),
         SymbiantItem.ql.asc(),
         SymbiantItem.name.asc(),
-        SymbiantItem.id.asc(),
+        SymbiantItem.aoid.asc(),
     )
 
     # Get total count
@@ -237,7 +237,7 @@ def get_symbiant_sources(aoid: int, db: Session = Depends(get_db)):
     )
 
     # Order by level and name
-    query = query.order_by(Mob.level.asc(), Mob.name.asc())
+    query = query.order_by(Mob.level.asc(), Mob.name.asc(), Mob.id.asc())
 
     mobs = query.all()
 

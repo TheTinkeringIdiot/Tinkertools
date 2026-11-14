@@ -272,7 +272,7 @@ def sort_nanos(query, sort_by: str, sort_desc: bool):
         )
     else:
         query = query.order_by(desc(Item.name) if sort_desc else asc(Item.name))
-    return query.order_by(Item.id)
+    return query.order_by(Item.aoid)
 
 
 def _page_of_nanos(query, total: int, page: int, page_size: int):
@@ -542,7 +542,7 @@ def get_nanos_by_profession(
             desc(Item.ql) if sort_order == "desc" else asc(Item.ql)
         )
     # id breaks ties so OFFSET pages never overlap
-    base_query = base_query.order_by(Item.id)
+    base_query = base_query.order_by(Item.aoid)
 
     # Add DISTINCT to prevent duplicates from joins
     base_query = base_query.distinct()
@@ -703,7 +703,7 @@ def get_offensive_nanos_by_profession(
             desc(Item.ql) if sort_order == "desc" else asc(Item.ql)
         )
     # id breaks ties so OFFSET pages never overlap
-    base_query = base_query.order_by(Item.id)
+    base_query = base_query.order_by(Item.aoid)
 
     # Add DISTINCT to prevent duplicates from joins
     base_query = base_query.distinct()

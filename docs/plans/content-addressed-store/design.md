@@ -169,6 +169,9 @@ Also:
 ## 5. API changes
 
 - The frontend-facing contract for item reads stays, with these changes.
+- Every list the API sorts ends its sort on the AOID (or the mob id for mobs), never on an internal id, so row order and pagination are the same whatever the storage. This is already true of the current code as of stage 0.
+- An item whose attack/defense block is empty is not a weapon. The current store treats the handful of such junk items (four or five per build) as weapons in `weapons=true` searches; the new one will not.
+- `/items/{aoid}/revisions` and `POST /items/revisions/batch` read the per-version hash table that the new store replaces. They keep their response shape, are re-implemented on the change log in stage 4, and are outside the golden reference because the hash values change by design.
 - Every identifier becomes an AOID. Row IDs for stats, spells, criteria and actions are dropped from responses. `/nanos/{id}`, `/symbiants/{id}`, equipment bonuses and source links move to AOID. Client-side user data (nano favorites, farm progress) moves to AOID with it.
 - Version stays in the URL path (`/api/v1/{slug}/...`), including the family aliases (`ao`, `prk`); it becomes a query parameter internally instead of a schema switch.
 - Responses for a specific revision are immutable and served with long-lived cache headers keyed by revision.

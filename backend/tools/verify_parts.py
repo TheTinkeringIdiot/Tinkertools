@@ -7,7 +7,8 @@ app/core/parts.py:
    "changed" exactly when the raw data differs in content, and must not when
    it differs only in order.
 2. Within each build: a part hash must stand for exactly one content, and one
-   content must have exactly one hash, across all items.
+   content must have exactly one hash, across all items. The effect text
+   left out of the hash must be determined by what is hashed.
 3. Every part document can be stored: it contains no NUL character.
 
 The raw comparison shares the scope decisions of the canonical forms, which
@@ -94,8 +95,25 @@ def check_build(slug, records):
     """Checks 2 and 3 for one build; returns the split of every record."""
     by_hash = {name: {} for name in PART_NAMES}
     by_content = {name: {} for name in PART_NAMES}
+    formats, descriptions = {}, {}
     problems, parts = [], {}
     for aoid, (record, is_nano) in records.items():
+        # Rendered effect text is left out of the hash, which is only sound if
+        # it is a function of what is hashed.
+        for event in record.get("SpellData") or []:
+            for raw in event.get("Items") or []:
+                shown = (raw.get("SpellFormat"), raw.get("SpellDescription"))
+                hashed = dump(
+                    {
+                        k: v
+                        for k, v in raw.items()
+                        if k not in ("SpellFormat", "SpellDescription")
+                    }
+                )
+                if formats.setdefault(raw["SpellID"], shown[0]) != shown[0]:
+                    problems.append((aoid, "effect type with two formats"))
+                if descriptions.setdefault(hashed, shown[1]) != shown[1]:
+                    problems.append((aoid, "effect with two descriptions"))
         split = parts[aoid] = split_item(record, is_nano)
         if "\x00" in json.dumps(split.documents, ensure_ascii=False):
             problems.append((aoid, "document contains NUL"))
@@ -108,7 +126,7 @@ def check_build(slug, records):
                 problems.append((aoid, name, "one content, two hashes"))
     sizes = ", ".join(f"{name} {len(by_hash[name])}" for name in PART_NAMES)
     print(f"{slug}: {len(records)} items; distinct parts: {sizes}")
-    print(f"  hash/content not one-to-one or not storable: {len(problems)}")
+    print(f"  one-to-one, text and storability problems: {len(problems)}")
     for row in problems[:10]:
         print("   ", row)
     return parts, problems

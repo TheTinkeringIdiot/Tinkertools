@@ -427,9 +427,10 @@ def get_items(
     offset = (page - 1) * page_size
 
     # Load relationships only for the paginated result set. A unique ORDER BY
-    # keeps OFFSET pages from repeating or skipping rows.
+    # keeps OFFSET pages from repeating or skipping rows; AOID is the item's
+    # identity in every build, so the order does not depend on storage.
     items = (
-        query.order_by(Item.id)
+        query.order_by(Item.aoid)
         .options(*item_detail_load_options())
         .offset(offset)
         .limit(page_size)
@@ -548,7 +549,7 @@ def search_items(
             query = query.filter(or_(*search_conditions))
 
         # Item.id breaks name ties so OFFSET pages never overlap
-        query = query.order_by(Item.name, Item.id)
+        query = query.order_by(Item.name, Item.aoid)
 
         # Apply weapons filter
         if weapons:
@@ -587,14 +588,14 @@ def search_items(
             query = (
                 query.filter(Item.atkdef_id.isnot(None))
                 .distinct()
-                .order_by(Item.name, Item.id)
+                .order_by(Item.name, Item.aoid)
             )
         else:
             query = query.order_by(
                 func.ts_rank(
                     func.to_tsvector("english", search_expression), ts_query
                 ).desc(),
-                Item.id,
+                Item.aoid,
             )
 
     # Quality level range (endpoint-specific: validated 1-999 here)

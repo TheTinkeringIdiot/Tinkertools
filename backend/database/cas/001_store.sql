@@ -31,6 +31,8 @@ CREATE TABLE build (
     slug                varchar(40)  NOT NULL UNIQUE,
     branch              varchar(20)  NOT NULL,
     ordinal             integer      NOT NULL,
+    -- position in the version list the API returns (/versions), newest first
+    sort_order          integer      NOT NULL DEFAULT 0,
     display_name        varchar(120) NOT NULL,
     client_build        varchar(40),
     released_on         date,
@@ -60,6 +62,7 @@ CREATE TABLE part_text (
 CREATE INDEX part_text_name ON part_text (name);
 CREATE INDEX part_text_name_lower ON part_text (lower(name));
 CREATE INDEX part_text_name_fts ON part_text USING gin (to_tsvector('english', name));
+CREATE INDEX part_text_desc_fts ON part_text USING gin (to_tsvector('english', description));
 CREATE INDEX part_text_name_desc_fts ON part_text
     USING gin (to_tsvector('english', name || ' ' || description));
 -- Interpolation groups the QL variants of an item by identical name and description.
@@ -135,7 +138,9 @@ CREATE INDEX item_revision_atkdef ON item_revision (atkdef_id) WHERE atkdef_id I
 -- the revision is the item's content in every build of the branch with
 -- from_ordinal <= ordinal <= to_ordinal. A run that reaches the branch's newest
 -- build is open and has to_ordinal = 2147483647, so importing a newer build
--- writes rows only for items that changed, appeared or disappeared.
+-- writes rows only for items that changed, appeared or disappeared. A closed
+-- run must end at a build of the branch; the importer guarantees it (the
+-- open-run sentinel rules out a foreign key).
 -- "Item as of build N": aoid = ? AND from_ordinal <= N AND to_ordinal >= N.
 CREATE TABLE item_presence (
     branch        varchar(20) NOT NULL,
@@ -185,14 +190,15 @@ CREATE INDEX requirement_value ON requirement (value1, value2, actions_id);
 CREATE INDEX requirement_action_value ON requirement (action, value1, value2, actions_id);
 
 -- One row per effect. subject is the stat, skill or nano the effect acts on
--- (params Stat, else Skill, else NanoID); amount is params Amount.
+-- (params Stat, else Skill, else NanoID); amount is params Amount. subject is
+-- bigint because some nano ids in the client data exceed the integer range.
 -- "Modifies stat S by op V", the offensive nano test, implant cluster sets.
 CREATE TABLE effect_entry (
     effects_id  integer NOT NULL REFERENCES part_effects (effects_id) ON DELETE CASCADE,
     event       integer NOT NULL,
     spell_id    integer NOT NULL,
     target      integer,
-    subject     integer,
+    subject     bigint,
     amount      integer
 );
 CREATE INDEX effect_entry_subject ON effect_entry (spell_id, subject, amount, effects_id);

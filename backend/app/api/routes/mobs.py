@@ -193,7 +193,9 @@ def get_mob_drops(
         query = query.filter(SymbiantItem.family == family)
 
     # Order by QL and name
-    query = query.order_by(SymbiantItem.ql.asc(), SymbiantItem.name.asc())
+    query = query.order_by(
+        SymbiantItem.ql.asc(), SymbiantItem.name.asc(), SymbiantItem.aoid.asc()
+    )
 
     symbiants = query.all()
 
