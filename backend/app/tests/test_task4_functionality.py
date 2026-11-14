@@ -1,76 +1,19 @@
 """
 Basic functionality tests for Task 4: Advanced Search and Filtering API.
-Tests that endpoints are working using service layer mocking pattern.
+The item endpoints answer with the shapes and status codes clients rely on.
 """
 
-from unittest.mock import Mock
+import pytest
 
-from app.main import app
-from app.core.database import get_db
-
-
-class TestTask4Endpoints:
-    """Test that all Task 4 endpoints are functional."""
-
-    def test_items_basic_endpoint(self, client):
-        """Test basic items endpoint works."""
-        mock_query = Mock()
-        mock_query.options.return_value = mock_query
-        mock_query.filter.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.distinct.return_value = mock_query
-        mock_query.count.return_value = 0
-        mock_query.offset.return_value = mock_query
-        mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = []
-
-        mock_db = Mock()
-        mock_db.query.return_value = mock_query
-
-        def mock_get_db():
-            return mock_db
-
-        app.dependency_overrides[get_db] = mock_get_db
-
-        try:
-            response = client.get("/api/v1/items")
-            assert response.status_code == 200
-            data = response.json()
-            assert "items" in data
-            assert "total" in data
-            assert "page" in data
-            assert isinstance(data["items"], list)
-        finally:
-            app.dependency_overrides.clear()
-
-    def test_items_search_endpoint_exists(self, client):
-        """Test items search endpoint exists and handles basic queries."""
-        mock_query = Mock()
-        mock_query.options.return_value = mock_query
-        mock_query.filter.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_query.distinct.return_value = mock_query
-        mock_query.count.return_value = 0
-        mock_query.offset.return_value = mock_query
-        mock_query.limit.return_value = mock_query
-        mock_query.all.return_value = []
-
-        mock_db = Mock()
-        mock_db.query.return_value = mock_query
-
-        def mock_get_db():
-            return mock_db
-
-        app.dependency_overrides[get_db] = mock_get_db
-
-        try:
-            response = client.get("/api/v1/items/search?q=test")
-            assert response.status_code == 200
-            data = response.json()
-            assert "items" in data
-            assert "total" in data
-        finally:
-            app.dependency_overrides.clear()
+PAGE_FIELDS = {
+    "items": list,
+    "total": int,
+    "page": int,
+    "page_size": int,
+    "pages": int,
+    "has_next": bool,
+    "has_prev": bool,
+}
 
 
 class TestCachingFunctionality:
@@ -87,61 +30,20 @@ class TestCachingFunctionality:
 class TestPaginationConsistency:
     """Test pagination works consistently across endpoints."""
 
-    def test_pagination_parameters(self, client):
-        """Test pagination parameters are handled correctly."""
-        # Removed deprecated endpoints: pocket-bosses, symbiants
-        endpoints = ["/api/v1/items"]
+    @pytest.mark.parametrize(
+        "endpoint", ["/api/v1/items?", "/api/v1/items/search?q=test&"]
+    )
+    def test_pagination_parameters(self, client, endpoint):
+        """A page carries its rows and every paging field, each of its type."""
+        response = client.get(f"{endpoint}page=2&page_size=5")
+        assert response.status_code == 200, f"Endpoint {endpoint} failed"
+        data = response.json()
 
-        for endpoint in endpoints:
-            # Setup mock for each endpoint
-            mock_query = Mock()
-            if endpoint == "/api/v1/items":
-                mock_query.options.return_value = mock_query
-            mock_query.filter.return_value = mock_query
-            mock_query.order_by.return_value = mock_query
-            mock_query.distinct.return_value = mock_query
-            mock_query.count.return_value = 10
-            mock_query.offset.return_value = mock_query
-            mock_query.limit.return_value = mock_query
-            mock_query.all.return_value = []
-
-            mock_db = Mock()
-            mock_db.query.return_value = mock_query
-
-            def mock_get_db():
-                return mock_db
-
-            app.dependency_overrides[get_db] = mock_get_db
-
-            try:
-                # Test basic pagination
-                response = client.get(f"{endpoint}?page=1&page_size=5")
-                assert response.status_code == 200, f"Endpoint {endpoint} failed"
-                data = response.json()
-
-                # Check required fields
-                required_fields = [
-                    "items",
-                    "total",
-                    "page",
-                    "page_size",
-                    "pages",
-                    "has_next",
-                    "has_prev",
-                ]
-                for field in required_fields:
-                    assert field in data, f"Missing {field} in {endpoint} response"
-
-                # Check data types
-                assert isinstance(data["items"], list)
-                assert isinstance(data["total"], int)
-                assert isinstance(data["page"], int)
-                assert isinstance(data["page_size"], int)
-                assert isinstance(data["pages"], int)
-                assert isinstance(data["has_next"], bool)
-                assert isinstance(data["has_prev"], bool)
-            finally:
-                app.dependency_overrides.clear()
+        for field, kind in PAGE_FIELDS.items():
+            assert isinstance(data.get(field), kind), f"{field} in {endpoint}"
+        assert (data["page"], data["page_size"]) == (2, 5)
+        assert len(data["items"]) == 5
+        assert data["has_prev"] is True
 
     def test_invalid_pagination_handled(self, client):
         """Test invalid pagination parameters are handled gracefully."""
@@ -158,132 +60,19 @@ class TestErrorHandling:
 
     def test_nonexistent_resources_return_404(self, client):
         """Test nonexistent resources return proper 404s."""
-        endpoints = [
-            "/api/v1/items/99999999",
-        ]
+        response = client.get("/api/v1/items/99999999")
 
-        for endpoint in endpoints:
-            # Setup mock to return None
-            mock_query = Mock()
-            if "/items/" in endpoint:
-                mock_query.options.return_value = mock_query
-            mock_query.filter.return_value = mock_query
-            mock_query.first.return_value = None
-
-            mock_db = Mock()
-            mock_db.query.return_value = mock_query
-
-            def mock_get_db():
-                return mock_db
-
-            app.dependency_overrides[get_db] = mock_get_db
-
-            try:
-                response = client.get(endpoint)
-                assert (
-                    response.status_code == 404
-                ), f"Endpoint {endpoint} should return 404"
-                data = response.json()
-                assert "error" in data or "detail" in data
-            finally:
-                app.dependency_overrides.clear()
+        assert response.status_code == 404
+        data = response.json()
+        assert "error" in data or "detail" in data
 
     def test_validation_errors_return_422(self, client):
         """Test validation errors return proper 422s."""
-        # Invalid page parameters
         response = client.get("/api/v1/items?page=invalid")
         assert response.status_code == 422
 
-        # Invalid page size too large (if enforced)
         response = client.get("/api/v1/items?page_size=10000")
-        assert response.status_code in [200, 422]  # Depends on implementation
-
-
-class TestEndpointResponseStructure:
-    """Test that endpoints return consistent response structures."""
-
-    def test_list_endpoints_structure(self, client):
-        """Test list endpoints have consistent structure."""
-        # Removed deprecated endpoints: pocket-bosses, symbiants
-        endpoints = ["/api/v1/items"]
-
-        for endpoint in endpoints:
-            # Setup mock
-            mock_query = Mock()
-            if endpoint == "/api/v1/items":
-                mock_query.options.return_value = mock_query
-            mock_query.filter.return_value = mock_query
-            mock_query.order_by.return_value = mock_query
-            mock_query.distinct.return_value = mock_query
-            mock_query.count.return_value = 1
-            mock_query.offset.return_value = mock_query
-            mock_query.limit.return_value = mock_query
-            mock_query.all.return_value = []
-
-            mock_db = Mock()
-            mock_db.query.return_value = mock_query
-
-            def mock_get_db():
-                return mock_db
-
-            app.dependency_overrides[get_db] = mock_get_db
-
-            try:
-                response = client.get(f"{endpoint}?page_size=1")
-                assert response.status_code == 200
-                data = response.json()
-
-                # Must have pagination structure
-                assert "items" in data
-                assert "total" in data
-                assert "page" in data
-                assert "page_size" in data
-                assert "pages" in data
-                assert "has_next" in data
-                assert "has_prev" in data
-            finally:
-                app.dependency_overrides.clear()
-
-    def test_search_endpoints_structure(self, client):
-        """Test search endpoints have consistent structure."""
-        # Removed deprecated pocket-bosses endpoint
-        search_endpoints = [
-            "/api/v1/items/search?q=test",
-        ]
-
-        for endpoint in search_endpoints:
-            # Setup mock
-            mock_query = Mock()
-            if "/items/" in endpoint:
-                mock_query.options.return_value = mock_query
-            mock_query.filter.return_value = mock_query
-            mock_query.order_by.return_value = mock_query
-            mock_query.distinct.return_value = mock_query
-            mock_query.count.return_value = 0
-            mock_query.offset.return_value = mock_query
-            mock_query.limit.return_value = mock_query
-            mock_query.all.return_value = []
-
-            mock_db = Mock()
-            mock_db.query.return_value = mock_query
-
-            def mock_get_db():
-                return mock_db
-
-            app.dependency_overrides[get_db] = mock_get_db
-
-            try:
-                response = client.get(endpoint)
-                assert response.status_code == 200
-                data = response.json()
-
-                # Search results should still be paginated
-                assert "items" in data
-                assert "total" in data
-                assert isinstance(data["items"], list)
-                assert isinstance(data["total"], int)
-            finally:
-                app.dependency_overrides.clear()
+        assert response.status_code == 422
 
 
 class TestHealthAndStatus:

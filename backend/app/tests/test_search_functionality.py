@@ -52,10 +52,10 @@ class TestItemSearch:
         """Test the slot filter matches the EquippedIn (stat 298) bitmask."""
         # Slot bit 15 at QL 200 is a small set that fits on one page
         slot, ql = 15, 200
-        expected_ids = set(
+        expected_aoids = set(
             db_session.execute(
                 text(
-                    "SELECT DISTINCT i.id FROM items i"
+                    "SELECT DISTINCT i.aoid FROM items i"
                     " JOIN item_stats s ON s.item_id = i.id"
                     " JOIN stat_values v ON v.id = s.stat_value_id"
                     " WHERE v.stat = 298 AND v.value & (1 << :slot) > 0"
@@ -64,15 +64,15 @@ class TestItemSearch:
                 {"slot": slot, "ql": ql},
             ).scalars()
         )
-        assert 0 < len(expected_ids) <= 1000
+        assert 0 < len(expected_aoids) <= 1000
 
         response = client.get(
             f"/api/v1/items?slot={slot}&min_ql={ql}&max_ql={ql}&page_size=1000"
         )
         assert response.status_code == 200
         data = response.json()
-        assert data["total"] == len(expected_ids)
-        assert {item["id"] for item in data["items"]} == expected_ids
+        assert data["total"] == len(expected_aoids)
+        assert {item["aoid"] for item in data["items"]} == expected_aoids
 
 
 class TestPocketBossSearch:
