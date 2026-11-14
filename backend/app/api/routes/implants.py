@@ -9,7 +9,9 @@ from sqlalchemy.orm import Session
 import logging
 
 from app.core.database import get_db
+from app.store.context import Build, get_build, get_store
 from app.services.implant_service import ImplantService
+from app.services.interpolation import InterpolationService
 from app.api.schemas.implant import ImplantLookupRequest, ImplantLookupResponse
 from app.core.decorators import performance_monitor
 
@@ -19,7 +21,12 @@ logger = logging.getLogger(__name__)
 
 @router.post("/lookup", response_model=ImplantLookupResponse)
 @performance_monitor
-def implant_lookup(request: ImplantLookupRequest, db: Session = Depends(get_db)):
+def implant_lookup(
+    request: ImplantLookupRequest,
+    db: Session = Depends(get_db),
+    store: Session = Depends(get_store),
+    build: Build = Depends(get_build),
+):
     """
     Look up an implant by slot, QL, and exact cluster combination.
 
@@ -43,7 +50,7 @@ def implant_lookup(request: ImplantLookupRequest, db: Session = Depends(get_db))
         )
 
         # Create service instance
-        implant_service = ImplantService(db)
+        implant_service = ImplantService(db, InterpolationService(store, build))
 
         # Perform lookup
         result = implant_service.lookup_implant(

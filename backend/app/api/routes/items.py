@@ -4,30 +4,16 @@ Items API endpoints.
 
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
 import math
 import time
 import logging
 
 from app.core.database import get_db
-from app.models import (
-    Item,
-    ItemStats,
-    StatValue,
-    AttackDefense,
-    AttackDefenseAttack,
-    AttackDefenseDefense,
-    ItemSpellData,
-    SpellData,
-    Action,
-    ActionCriteria,
-    Spell,
-    SpellCriterion,
-    SpellDataSpells,
-    Source,
-    ItemSource,
-)
+from app.store.context import Build, get_build, get_store
+from app.store.items import load_item_details
+from app.models import Item, StatValue
 from app.models.interpolated_item import (
     InterpolationResponse,
     BatchInterpolationRequest,
@@ -663,7 +649,9 @@ def search_items(
 @router.get("/{aoid}", response_model=ItemDetail)
 @cached_response("item_detail")
 @performance_monitor
-def get_item(aoid: int, db: Session = Depends(get_db)):
+def get_item(
+    aoid: int, db: Session = Depends(get_store), build: Build = Depends(get_build)
+):
     """
     Get detailed information about a specific item including stats, spells, attack/defense data, and sources.
 
@@ -675,38 +663,11 @@ def get_item(aoid: int, db: Session = Depends(get_db)):
         - Attack/defense statistics
         - Sources (crystals for nanos, NPCs/missions for other items)
     """
-    # Load item with all related data
-    item = (
-        db.query(Item)
-        .options(
-            joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
-            joinedload(Item.item_spell_data)
-            .joinedload(ItemSpellData.spell_data)
-            .joinedload(SpellData.spell_data_spells)
-            .joinedload(SpellDataSpells.spell)
-            .joinedload(Spell.spell_criteria)
-            .joinedload(SpellCriterion.criterion),
-            joinedload(Item.actions)
-            .joinedload(Action.action_criteria)
-            .joinedload(ActionCriteria.criterion),
-            joinedload(Item.item_sources)
-            .joinedload(ItemSource.source)
-            .joinedload(Source.source_type),
-            joinedload(Item.attack_defense)
-            .joinedload(AttackDefense.attack_stats)
-            .joinedload(AttackDefenseAttack.stat_value),
-            joinedload(Item.attack_defense)
-            .joinedload(AttackDefense.defense_stats)
-            .joinedload(AttackDefenseDefense.stat_value),
-        )
-        .filter(Item.aoid == aoid)
-        .first()
-    )
-
-    if not item:
+    items = load_item_details(db, build, aoids=[aoid])
+    if not items:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    return build_item_detail(item, db)
+    return items[0]
 
 
 @router.get("/{aoid}/interpolate", response_model=InterpolationResponse)
@@ -716,7 +677,8 @@ def interpolate_item(
     target_ql: int = Query(
         ..., ge=1, le=500, description="Target quality level for interpolation"
     ),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_store),
+    build: Build = Depends(get_build),
 ):
     """
     Interpolate an item to a specific quality level.
@@ -728,7 +690,7 @@ def interpolate_item(
 
     try:
         # Create interpolation service
-        interpolation_service = InterpolationService(db)
+        interpolation_service = InterpolationService(db, build)
 
         # Perform interpolation
         interpolated_item = interpolation_service.interpolate_item(aoid, target_ql)
@@ -769,7 +731,9 @@ def interpolate_item(
 @router.post("/batch/interpolate", response_model=BatchInterpolationResponse)
 @performance_monitor
 def batch_interpolate_items(
-    request: BatchInterpolationRequest, db: Session = Depends(get_db)
+    request: BatchInterpolationRequest,
+    db: Session = Depends(get_store),
+    build: Build = Depends(get_build),
 ):
     """
     Batch interpolate multiple items to specific quality levels.
@@ -777,13 +741,14 @@ def batch_interpolate_items(
     Accepts up to 100 items in a single request. Returns partial success
     (some items can fail while others succeed).
 
-    Performance: Uses a single InterpolationService instance (single DB session)
-    for all items to minimize database connection overhead.
+    Performance: the variants of every requested item are loaded together, so
+    the number of queries does not grow with the number of items.
     """
     start_time = time.time()
 
     # Create single interpolation service for all items
-    interpolation_service = InterpolationService(db)
+    interpolation_service = InterpolationService(db, build)
+    interpolation_service.preload(item_req.aoid for item_req in request.items)
 
     results = []
     errors = []
@@ -852,14 +817,16 @@ def batch_interpolate_items(
 
 @router.get("/{aoid}/interpolation-info")
 @performance_monitor
-def get_interpolation_info(aoid: int, db: Session = Depends(get_db)):
+def get_interpolation_info(
+    aoid: int, db: Session = Depends(get_store), build: Build = Depends(get_build)
+):
     """
     Get interpolation information for an item.
 
     Returns whether the item can be interpolated and its quality level ranges.
     """
     try:
-        interpolation_service = InterpolationService(db)
+        interpolation_service = InterpolationService(db, build)
 
         # Get interpolation ranges
         interpolation_ranges = interpolation_service.get_interpolation_ranges(aoid)

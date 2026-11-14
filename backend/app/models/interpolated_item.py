@@ -60,8 +60,8 @@ class InterpolatedItem(BaseModel):
     """
 
     # Original item data
-    # Deprecated: an internal row id that differs between game versions. Use
-    # ``aoid``; this field is removed with the content-addressed store.
+    # Deprecated: holds the AOID. Use ``aoid``; this field is removed once
+    # every route reads the content-addressed store.
     id: int
     aoid: Optional[int] = None
     name: str
@@ -93,7 +93,7 @@ class InterpolatedItem(BaseModel):
         Used for non-interpolated items or as a base for interpolation.
         """
         return cls(
-            id=item.id,
+            id=item.aoid,
             aoid=item.aoid,
             name=item.name,
             ql=item.ql,

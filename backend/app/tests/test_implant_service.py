@@ -17,10 +17,7 @@ class TestImplantService:
     def setup_method(self):
         """Set up test fixtures."""
         self.mock_db = Mock(spec=Session)
-        self.service = ImplantService(self.mock_db)
-
-        # Mock interpolation service
-        self.service.interpolation_service = Mock()
+        self.service = ImplantService(self.mock_db, Mock())
 
     def test_determine_base_ql(self):
         """Test base QL determination logic."""
