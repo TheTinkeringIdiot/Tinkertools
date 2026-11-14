@@ -110,6 +110,9 @@ Parts are JSONB documents. Canonical form rules:
 - Stats: sorted by stat ID.
 - Effects within an event: sorted by a stable key (effect type, target, stat/nano/skill, then remaining parameters). The original order is kept as a separate field only if it is shown to matter in game.
 - Criteria within an action or effect: order preserved (they are evaluated as a sequence).
+- A stat/value pair repeated verbatim is stored once; an effect repeated within an event is kept as often as it appears.
+- An attack/defense block with no entries is the same as none. NUL characters (present in some shop hashes) are written as the text `\u0000`, because PostgreSQL cannot store them.
+- StaticInstance (stat 23) is kept in `misc`, not in the stat set.
 - Events: keyed by event ID.
 
 ### 3.2 Revisions and presence
@@ -124,7 +127,13 @@ Parts are JSONB documents. Canonical form rules:
 
 ### 3.3 Curated data
 
-Perks, symbiant families, mobs, sources and item-source links are hand-maintained, not extracted. They are stored once, keyed by AOID, with an optional validity range where a fact only holds for some builds. The nano CSV overlay (QL, strain fill-in, crystal sources) stays an import-time input; a build's own strain wins where it has one.
+Perks, mobs, sources and item-source links are hand-maintained, not extracted. They are stored once, keyed by AOID, and apply in every build where the items they name are present (`backend/database/cas/002_curated_and_derived.sql`). Mob ids are part of the API and of stored farm progress, so they never change across imports.
+
+The nano CSV is stored once as `nano_overlay` (QL, strain, substrain per nano AOID):
+
+- A nano revision's `ql` column is the overlay QL. It is a derived column outside the revision hash.
+- Effective strain is held per revision in `nano_properties`. Which side wins a disagreement is a property of the build (`build.overlay_strain_first`): the newest AO build and PRK take the overlay's strain, older builds keep their own valid strain and use the overlay only to fill gaps. This preserves what the current store does.
+- In responses, a nano's stats are its stat set with NanoStrain (75) and NanoSubStrain (1003) replaced by the effective values.
 
 ### 3.4 Change log
 
@@ -222,7 +231,7 @@ The work in §7 is carried out by agents, with one orchestrating session acting 
 ### 10.1 Ground rules
 
 - **Contracts before agents.** The orchestrator writes the three things every agent depends on: the canonical-form and hashing module, the table definitions for the new store, and the acceptance harness.
-- **Golden reference.** Before anything changes, current API responses are captured for a fixed set of endpoints on five builds (14.2.2, 15.0.1, 17.10.5, live, PRK). Read-path work must reproduce them, apart from the intended ID changes, which a normalizer strips. Defects from §6 that affect responses are fixed before capture.
+- **Golden reference.** API responses are captured for a fixed set of requests on five builds (14.2.2, 15.0.1, 17.10.5, live, PRK) with `backend/tools/golden.py`; the baseline is taken from the code as it stands after stage 1. Read-path work must reproduce it. The only differences allowed are listed at the top of that file: internal ids, order that carries no meaning, tie order within a sort key, and the criteria of effects, which are compared as a set because the current store keeps them de-duplicated and unordered while the new one keeps the client's sequence.
 - **Isolation.** Each agent works in its own git worktree on a named set of files. The new store lives in its own database schema beside the current one, which agents may read but never write. Only the importer stage writes to the database.
 - **Small test database.** Three builds in a scratch database, so an agent's loop takes seconds instead of a full import.
 - **Builders do not sign off their own work.** See 10.3.

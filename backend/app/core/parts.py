@@ -33,7 +33,13 @@ Rules:
 - StaticInstance (stat 23) is the client's row id for the item. It lives in
   ``misc`` rather than ``stats`` so that it cannot make two otherwise equal
   stat sets differ.
-- A part the record does not have is ``None`` and has no hash.
+- A part the record does not have is ``None`` and has no hash. An attack/defense
+  block with no entries counts as absent.
+- A stat/value pair repeated verbatim is stored once: the repetition carries
+  nothing. The same stat with two different values keeps both, and an effect
+  repeated within an event is kept as often as it appears.
+- NUL characters, which the client data contains (shop hashes) and PostgreSQL
+  text and jsonb cannot hold, are written as the six characters ``\\u0000``.
 - ``revision_hash`` identifies the whole content of one item revision: it
   covers every part hash and whether the record is a nano. Two builds carry
   the same revision of an AOID exactly when it is equal.
@@ -88,12 +94,23 @@ class ItemParts:
 
 
 def _pairs(entries: Any, skip: frozenset = frozenset()) -> List[Pair]:
-    pairs = [
-        [entry["Stat"], entry["RawValue"]]
+    pairs = {
+        (entry["Stat"], entry["RawValue"])
         for entry in entries or []
         if entry.get("Stat") not in skip
-    ]
-    return sorted(pairs)
+    }
+    return [list(pair) for pair in sorted(pairs)]
+
+
+def _storable(value: Any) -> Any:
+    """``value`` with NUL characters, which PostgreSQL cannot store, made visible."""
+    if isinstance(value, str):
+        return value.replace("\x00", "\\u0000") if "\x00" in value else value
+    if isinstance(value, dict):
+        return {key: _storable(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_storable(item) for item in value]
+    return value
 
 
 def _criteria(entries: Any) -> List[List[int]]:
@@ -124,16 +141,18 @@ def _effect(raw: Dict[str, Any]) -> Dict[str, Any]:
         "target": raw.get("Target"),
         "tick_count": raw.get("TickCount"),
         "tick_interval": raw.get("TickInterval"),
-        "params": {k: v for k, v in raw.items() if k not in _EFFECT_FIXED_KEYS},
+        "params": {
+            k: _storable(v) for k, v in raw.items() if k not in _EFFECT_FIXED_KEYS
+        },
         "criteria": _criteria(raw.get("Criteria")),
-        "description": raw.get("SpellDescription"),
+        "description": _storable(raw.get("SpellDescription")),
     }
 
 
 def text_part(record: Dict[str, Any]) -> Dict[str, Any]:
     return {
-        "name": record.get("Name") or "",
-        "description": record.get("Description") or "",
+        "name": _storable(record.get("Name") or ""),
+        "description": _storable(record.get("Description") or ""),
     }
 
 
@@ -166,10 +185,11 @@ def actions_part(record: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
 
 
 def atkdef_part(record: Dict[str, Any]) -> Optional[Dict[str, List[Pair]]]:
-    raw = record.get("AttackDefenseData")
-    if not raw:
+    raw = record.get("AttackDefenseData") or {}
+    attack, defense = _pairs(raw.get("Attack")), _pairs(raw.get("Defense"))
+    if not attack and not defense:
         return None
-    return {"attack": _pairs(raw.get("Attack")), "defense": _pairs(raw.get("Defense"))}
+    return {"attack": attack, "defense": defense}
 
 
 def misc_part(record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -180,7 +200,7 @@ def misc_part(record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if entry.get("Stat") == STAT_STATIC_INSTANCE
     ]
     if instances:
-        misc["static_instance"] = sorted(instances)
+        misc["static_instance"] = sorted(set(instances))
     mesh = record.get("AnimationMesh")
     if mesh:
         misc["animation_mesh"] = {
@@ -189,7 +209,7 @@ def misc_part(record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             if mesh.get(key)
         }
     if record.get("ShopHashData"):
-        misc["shop"] = record["ShopHashData"]
+        misc["shop"] = _storable(record["ShopHashData"])
     return misc or None
 
 

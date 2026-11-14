@@ -2,23 +2,35 @@
 
 The rewrite of the storage layer must not change what the API returns. This
 tool records the responses of a fixed set of requests on a fixed set of builds
-and compares two recordings, ignoring only what is allowed to change:
+and compares two recordings. Values are compared strictly, including their JSON
+type. Only the following is allowed to differ:
 
-- internal row ids (``id``, ``item_id``): items are identified by AOID;
-- the order of stats, effects, actions, events and attack/defense entries
-  (see app/core/parts.py). The order of criteria is compared, because it is
-  meaningful;
-- the order of rows that tie on a list's sort key. Lists are compared as sets
-  keyed by AOID, and the sequence of sort-key values is compared separately.
-  When a result does not fit on one page, only the total and the sort-key
-  sequence are compared with the rows both pages share.
+1. Internal ids. An item's ``id`` (any object that also carries ``aoid``),
+   ``item_id``, ``animation_mesh_id`` and ``attack_defense_id`` are ignored.
+   Every other ``id`` (strains, mobs, sources) is compared.
+2. The order of stats, events, effects, actions and attack/defense entries,
+   which carries no meaning (app/core/parts.py).
+3. The criteria of an *effect* are compared as a set. The store being replaced
+   keeps them de-duplicated and unordered, so their order in a response is an
+   artefact and repeats are lost; the new store keeps the client's sequence.
+   The criteria of an *action* are compared in order.
+4. The order of rows that tie on a list's sort key. Rows are matched by AOID
+   (or name), and the sequence of sort-key values is compared separately, so a
+   wrong sort is caught while tie order is free. Lists the API sorts by
+   internal id (``/items``, ``/weapons/analyze``) declare no sort key: that
+   order is not part of the contract.
+
+When a result does not fit on one page, the total, the sort-key sequence and
+the rows both pages share are compared.
 
 Usage:
     python tools/golden.py samples EXTRACTS_DIR            > tools/golden_samples.json
     python tools/golden.py capture BASE_URL OUT_DIR [--samples FILE] [--build SLUG ...]
-    python tools/golden.py compare OLD_DIR NEW_DIR [--ignore-key KEY ...]
+    python tools/golden.py compare OLD_DIR NEW_DIR
 
-``compare`` exits 1 when any response differs.
+``capture`` exits 1 if a response is not sorted the way its request declares.
+``compare`` exits 1 when any response differs. Timings in a capture are single
+measurements and are reported for orientation only.
 """
 
 from __future__ import annotations
@@ -32,20 +44,22 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple
 
 BUILDS = ("ao-14-2-2", "ao-15-0-1", "ao-17-10-5", "ao-18-8-62-ep1", "prk-0-7-1")
 SAMPLE_COUNTS = {"items": 20, "nanos": 10, "weapons": 8, "implants": 5}
-IGNORED_KEYS = frozenset({"id", "item_id"})
-# Lists whose order is part of the content.
-ORDERED_LISTS = frozenset({"criteria"})
-# Lists of result rows, compared as sets with a separate sort-key check.
-ROW_LISTS = ("items", "weapons", "results")
+# Ignored wherever they appear.
+INTERNAL_ID_KEYS = frozenset({"item_id", "animation_mesh_id", "attack_defense_id"})
+# Lists of result rows: matched by identity, with a separate sort-key check.
+ROW_LISTS = ("items", "weapons", "results", "strains")
 DEFAULT_SAMPLES = Path(__file__).with_name("golden_samples.json")
 
 NT, ADVENTURER, DOCTOR = 11, 6, 10
 # Perks exist only in the newest builds; elsewhere the lookup finds nothing.
 PERK_AOIDS = (211897, 252356, 253065, 260942, 261097, 261129, 261349, 261929)
+
+Order = List[Tuple[str, str]]
+Request = Dict[str, Any]
 
 
 # --------------------------------------------------------------------------- samples
@@ -83,24 +97,32 @@ def build_samples(extracts: Path) -> Dict[str, Dict[str, List[int]]]:
 # --------------------------------------------------------------------------- requests
 
 
+def _order(*fields: str) -> Order:
+    """``_order("ql", "-name")``: ascending ql, then descending name."""
+    return [(f.lstrip("-"), "desc" if f.startswith("-") else "asc") for f in fields]
+
+
 def _get(
-    path: str, order_key: Optional[str] = None, all_pages: bool = False, **params
-) -> dict:
+    path: str, order: Optional[Order] = None, all_pages: bool = False, **params
+) -> Request:
     query = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
     return {
         "method": "GET",
         "path": path + ("?" + query if query else ""),
-        "order_key": order_key,
+        "order": order,
         "all_pages": all_pages,
     }
 
 
-def _post(path: str, body: dict) -> dict:
-    return {"method": "POST", "path": path, "body": body, "order_key": None}
+def _post(path: str, body: dict) -> Request:
+    return {"method": "POST", "path": path, "body": body, "order": None}
 
 
-def requests_for(sample: Dict[str, List[int]]) -> Iterable[Tuple[str, dict]]:
-    """Every request made against one build, as ``(name, request)``."""
+BY_NAME = _order("name")
+
+
+def requests_for(sample: Dict[str, List[int]]) -> Iterator[Tuple[str, Request]]:
+    """Every fixed request made against one build, as ``(name, request)``."""
     everything = (
         sample["items"] + sample["nanos"] + sample["weapons"] + sample["implants"]
     )
@@ -123,6 +145,7 @@ def requests_for(sample: Dict[str, List[int]]) -> Iterable[Tuple[str, dict]]:
         "text-two-words": dict(q="combat armor"),
         "text-exact": dict(q="Pillow", exact_match="true"),
         "weapons-only": dict(q="rifle", weapons="true", min_ql=200),
+        "weapons-only-low": dict(q="pistol", weapons="true", max_ql=60),
         "ql-range": dict(q="ring", min_ql=150, max_ql=160),
         "class-armor": dict(q="cloak", item_class=2),
         "slot-head": dict(q="helmet", slot=2, min_ql=150),
@@ -130,51 +153,95 @@ def requests_for(sample: Dict[str, List[int]]) -> Iterable[Tuple[str, dict]]:
             q="a", stat_filters="requires:112:>=:100,modifies:17:>=:1"
         ),
         "requires-level": dict(q="of", stat_filters="requires:54:>=:215"),
+        "requires-level-low": dict(q="armor", stat_filters="requires:54:>=:100"),
         "modifies-skill": dict(q="e", stat_bonuses="124", min_ql=250),
+        "modifies-skill-low": dict(q="a", stat_bonuses="124", min_ql=90, max_ql=100),
         "froob-nodrop-breed": dict(
             q="bracer", froob_friendly="true", nodrop="false", breed=1
         ),
+        "froob-low": dict(q="armor", froob_friendly="true", min_ql=95, max_ql=100),
         "profession-faction": dict(
             q="armor", profession=ADVENTURER, faction=1, min_ql=280
         ),
+        "profession-low": dict(q="a", profession=ADVENTURER, min_ql=140, max_ql=150),
         "gender": dict(q="a", gender=2),
         "no-match": dict(q="zzzzqqqq"),
     }.items():
         yield f"search/{name}", _get(
-            "/items/search", order_key="name", page_size=big, **params
+            "/items/search", order=BY_NAME, page_size=big, **params
         )
     for name, params in {
         "class-weapon-ql": dict(item_class=1, min_ql=299, max_ql=299),
+        "class-weapon-ql-low": dict(item_class=1, min_ql=100, max_ql=100),
         "nanos-ql": dict(is_nano="true", min_ql=215, max_ql=220),
         "slot-profession": dict(slot=6, profession=DOCTOR, min_ql=200),
+        "slot-low": dict(slot=6, min_ql=120, max_ql=121),
         "stat-bonus": dict(stat_bonuses="19,21", min_ql=290),
+        "stat-bonus-low": dict(stat_bonuses="19,21", min_ql=150, max_ql=152),
         "strain": dict(strain=144),
     }.items():
         yield f"items/{name}", _get("/items", page_size=big, **params)
 
-    for name, params in {
-        "school": dict(school="Combat", ql_min=100, ql_max=110),
-        "profession-level": dict(profession=NT, level_min=100, level_max=150),
-        "ql-sorted": dict(ql_min=205, ql_max=207, sort_by="ql"),
-        "strain": dict(strain=144),
-    }.items():
-        yield f"nanos/{name}", _get("/nanos", page_size=200, **params)
+    for name, order, params in (
+        ("school", BY_NAME, dict(school="Combat", ql_min=100, ql_max=110)),
+        (
+            "profession-level",
+            BY_NAME,
+            dict(profession=NT, level_min=100, level_max=150),
+        ),
+        (
+            "profession-any-level",
+            BY_NAME,
+            dict(profession=DOCTOR, ql_min=60, ql_max=70),
+        ),
+        ("ql-sorted", _order("ql"), dict(ql_min=205, ql_max=207, sort_by="ql")),
+        (
+            "ql-sorted-desc",
+            _order("-ql"),
+            dict(ql_min=100, ql_max=104, sort_by="ql", sort_desc="true"),
+        ),
+        (
+            "level-sorted",
+            _order("level"),
+            dict(school="Combat", ql_min=100, ql_max=140, sort_by="level"),
+        ),
+        (
+            "level-sorted-desc",
+            _order("-level"),
+            dict(
+                profession=NT, ql_min=150, ql_max=200, sort_by="level", sort_desc="true"
+            ),
+        ),
+        ("strain", BY_NAME, dict(strain=144)),
+    ):
+        yield f"nanos/{name}", _get("/nanos", order=order, page_size=200, **params)
     yield "nanos/search-heal", _get(
-        "/nanos/search",
-        order_key="name",
-        q="heal",
-        ql_min=150,
-        ql_max=170,
-        page_size=200,
+        "/nanos/search", order=BY_NAME, q="heal", ql_min=150, ql_max=170, page_size=200
     )
-    yield "nanos/strains", _get("/nanos/strains")
-    yield "nanos/strains-profession", _get("/nanos/strains", profession=DOCTOR)
+    yield "nanos/strains", _get("/nanos/strains", order=BY_NAME)
+    yield "nanos/strains-profession", _get(
+        "/nanos/strains", order=BY_NAME, profession=DOCTOR
+    )
     for profession in (ADVENTURER, DOCTOR, NT):
         yield f"nanos/profession/{profession}", _get(
-            f"/nanos/profession/{profession}", order_key="name", page_size=big
+            f"/nanos/profession/{profession}", order=_order("-ql"), page_size=big
         )
+    yield f"nanos/profession/{DOCTOR}/by-name", _get(
+        f"/nanos/profession/{DOCTOR}",
+        order=BY_NAME,
+        page_size=big,
+        sort="name",
+        sort_order="asc",
+    )
+    yield f"nanos/profession/{NT}/ql-asc", _get(
+        f"/nanos/profession/{NT}",
+        order=_order("ql"),
+        page_size=big,
+        sort="ql",
+        sort_order="asc",
+    )
     yield f"nanos/offensive/{NT}", _get(
-        f"/nanos/offensive/{NT}", order_key="name", page_size=big
+        f"/nanos/offensive/{NT}", order=_order("-ql"), page_size=big
     )
 
     for name, body in {
@@ -215,17 +282,69 @@ def requests_for(sample: Dict[str, List[int]]) -> Iterable[Tuple[str, dict]]:
     }.items():
         yield f"implants/{name}", _post("/implants/lookup", body)
 
-    yield "symbiants", _get("/symbiants", all_pages=True, page_size=200)
-    yield "mobs/pocket-bosses", _get("/mobs", is_pocket_boss="true", page_size=big)
+    yield "symbiants", _get(
+        "/symbiants",
+        order=_order("family", "ql", "name"),
+        all_pages=True,
+        page_size=200,
+    )
+    yield "mobs/pocket-bosses", _get(
+        "/mobs", order=_order("level", "name"), is_pocket_boss="true", page_size=big
+    )
+    yield "mobs/level-range", _get(
+        "/mobs",
+        order=_order("level", "name"),
+        min_level=100,
+        max_level=200,
+        page_size=big,
+    )
     yield "perks/batch-lookup", _post(
         "/perks/batch/lookup", {"aoids": list(PERK_AOIDS) + everything[:3]}
     )
+    yield "versions", _get("/versions")
+
+    yield "errors/item-not-found", _get("/items/999999999")
+    yield "errors/interpolate-not-found", _get(
+        "/items/999999999/interpolate", target_ql=5
+    )
+    yield "errors/search-without-query", _get("/items/search")
+    yield "errors/symbiant-not-found", _get("/symbiants/999999999")
+    yield "errors/bad-implant-slot", _post(
+        "/implants/lookup", dict(slot=3, ql=100, clusters={})
+    )
+
+
+def follow_up_requests(
+    fetch: Callable[[Request], dict],
+) -> Iterator[Tuple[str, Request, str]]:
+    """Requests whose path needs a value the server chose (a mob's id).
+
+    Yields ``(name, request, recorded_path)``; the recorded path omits the id.
+    """
+    mobs = fetch(_get("/mobs", is_pocket_boss="true", page_size=1000))["body"]
+    rows = mobs.get("items", []) if isinstance(mobs, dict) else []
+    for mob in sorted(rows, key=lambda m: m.get("name") or "")[:5]:
+        yield f"mob/{mob['name']}", _get(f"/mobs/{mob['id']}"), "/mobs/<id>"
+        yield (
+            f"mob-drops/{mob['name']}",
+            _get(f"/mobs/{mob['id']}/drops", order=_order("ql", "name")),
+            "/mobs/<id>/drops",
+        )
+    symbiants = fetch(_get("/symbiants", page_size=200))["body"]
+    rows = symbiants.get("items", []) if isinstance(symbiants, dict) else []
+    for aoid in _spread([row["aoid"] for row in rows], 4):
+        yield f"symbiant/{aoid}", _get(f"/symbiants/{aoid}"), f"/symbiants/{aoid}"
+        yield (
+            f"symbiant-dropped-by/{aoid}",
+            _get(f"/symbiants/{aoid}/dropped-by", order=_order("level", "name")),
+            f"/symbiants/{aoid}/dropped-by",
+        )
 
 
 # --------------------------------------------------------------------------- capture
 
 
-def call(base: str, request: dict) -> dict:
+def call(base: str, request: Request) -> dict:
     body = request.get("body")
     data = json.dumps(body).encode() if body is not None else None
     http = urllib.request.Request(
@@ -265,71 +384,10 @@ def call(base: str, request: dict) -> dict:
     return result
 
 
-def capture(
-    base: str, out: Path, samples: Dict[str, Dict[str, List[int]]], builds
-) -> int:
-    base = base.rstrip("/")
-    for slug in builds:
-        folder = out / slug
-        folder.mkdir(parents=True, exist_ok=True)
-        index, slow = {}, []
-        for name, request in requests_for(samples[slug]):
-            result = call(f"{base}/api/v1/{slug}", request)
-            filename = hashlib.sha1(name.encode()).hexdigest()[:16] + ".json"
-            (folder / filename).write_text(json.dumps(result, sort_keys=True))
-            index[name] = {
-                "file": filename,
-                "status": result["status"],
-                "ms": result["ms"],
-            }
-            if result["ms"] > 500 and not request.get("all_pages"):
-                slow.append((result["ms"], name))
-        # Mob drops need the server's own mob ids, which are not part of the contract.
-        mobs = call(
-            f"{base}/api/v1/{slug}",
-            _get("/mobs", is_pocket_boss="true", page_size=1000),
-        )
-        rows = mobs["body"].get("items", []) if isinstance(mobs["body"], dict) else []
-        for mob in sorted(rows, key=lambda m: m.get("name") or "")[:5]:
-            name = f"mob-drops/{mob['name']}"
-            result = call(f"{base}/api/v1/{slug}", _get(f"/mobs/{mob['id']}/drops"))
-            result["request"]["path"] = "/mobs/<id>/drops"
-            filename = hashlib.sha1(name.encode()).hexdigest()[:16] + ".json"
-            (folder / filename).write_text(json.dumps(result, sort_keys=True))
-            index[name] = {
-                "file": filename,
-                "status": result["status"],
-                "ms": result["ms"],
-            }
-        (folder / "index.json").write_text(json.dumps(index, indent=1, sort_keys=True))
-        statuses: Dict[int, int] = {}
-        for entry in index.values():
-            statuses[entry["status"]] = statuses.get(entry["status"], 0) + 1
-        print(
-            f"{slug}: {len(index)} responses, statuses {statuses}, "
-            f"{len(slow)} over 500 ms" + (f" (slowest {max(slow)})" if slow else "")
-        )
-    return 0
-
-
-# --------------------------------------------------------------------------- compare
-
-
-def normalize(value: Any, ignored: frozenset, parent: str = "") -> Any:
-    """Drop ignored keys and remove the order of lists whose order is not content."""
-    if isinstance(value, dict):
-        return {
-            k: normalize(v, ignored, k) for k, v in value.items() if k not in ignored
-        }
-    if isinstance(value, list):
-        items = [normalize(v, ignored, parent) for v in value]
-        if parent in ORDERED_LISTS or parent in ROW_LISTS:
-            return items
-        return sorted(items, key=lambda v: json.dumps(v, sort_keys=True))
-    return value
-
-
 def _rows(body: Any) -> Tuple[Optional[str], Optional[list]]:
+    """The list of result rows in a response body and the key it is under."""
+    if isinstance(body, list):
+        return "", body
     if isinstance(body, dict):
         for key in ROW_LISTS:
             if isinstance(body.get(key), list):
@@ -337,44 +395,154 @@ def _rows(body: Any) -> Tuple[Optional[str], Optional[list]]:
     return None, None
 
 
+def _order_values(rows: list, order: Order) -> List[list]:
+    return [[row.get(field) for field, _ in order] for row in rows]
+
+
+def unsorted_at(rows: list, order: Order) -> Optional[int]:
+    """Index of the first row that breaks the declared order, judged on its
+    numeric fields only: text is collated by the database, not by Python."""
+    previous = None
+    for index, row in enumerate(rows):
+        key = []
+        for field, direction in order:
+            value = row.get(field)
+            if isinstance(value, str):
+                break
+            # NULLs sort last in either direction
+            rank = (
+                (1, 0)
+                if value is None
+                else (0, value if direction == "asc" else -value)
+            )
+            key.append(rank)
+        if previous is not None and key[: len(previous)] < previous[: len(key)]:
+            return index
+        previous = key
+    return None
+
+
+def capture(
+    base: str, out: Path, samples: Dict[str, Dict[str, List[int]]], builds
+) -> int:
+    base = base.rstrip("/")
+    failed = 0
+    for slug in builds:
+        folder = out / slug
+        folder.mkdir(parents=True, exist_ok=True)
+        root = f"{base}/api/v1/{slug}"
+        index: Dict[str, dict] = {}
+        notes: List[str] = []
+
+        def record(name: str, request: Request, recorded_path: Optional[str] = None):
+            result = call(root, request)
+            if recorded_path:
+                result["request"] = dict(request, path=recorded_path)
+            filename = hashlib.sha1(name.encode()).hexdigest()[:16] + ".json"
+            (folder / filename).write_text(json.dumps(result, sort_keys=True))
+            _, rows = _rows(result["body"])
+            index[name] = {
+                "file": filename,
+                "status": result["status"],
+                "ms": result["ms"],
+                "rows": len(rows) if rows is not None else None,
+            }
+            if request.get("order") and rows:
+                at = unsorted_at(rows, request["order"])
+                if at is not None:
+                    notes.append(f"NOT SORTED as declared: {name} (row {at})")
+
+        for name, request in requests_for(samples[slug]):
+            record(name, request)
+        for name, request, recorded_path in follow_up_requests(lambda r: call(root, r)):
+            record(name, request, recorded_path)
+
+        (folder / "index.json").write_text(json.dumps(index, indent=1, sort_keys=True))
+        statuses: Dict[int, int] = {}
+        for entry in index.values():
+            statuses[entry["status"]] = statuses.get(entry["status"], 0) + 1
+        empty = sorted(n for n, e in index.items() if e["rows"] == 0)
+        slow = sum(1 for e in index.values() if e["ms"] > 500)
+        print(
+            f"{slug}: {len(index)} responses, statuses {dict(sorted(statuses.items()))}, "
+            f"{len(empty)} with no rows, {slow} over 500 ms"
+        )
+        for note in notes:
+            print(f"  {note}")
+        failed += len(notes)
+    return 1 if failed else 0
+
+
+# --------------------------------------------------------------------------- compare
+
+
+def canonical(value: Any) -> str:
+    """Strict text form: 15 and 15.0, or false and 0, are different values."""
+    return json.dumps(value, sort_keys=True)
+
+
+def normalize(value: Any, parent: str = "", grandparent: str = "") -> Any:
+    """Apply the allowed differences listed in the module docstring."""
+    if isinstance(value, dict):
+        skip = INTERNAL_ID_KEYS | ({"id"} if "aoid" in value else frozenset())
+        return {k: normalize(v, k, parent) for k, v in value.items() if k not in skip}
+    if isinstance(value, list):
+        items = [normalize(v, parent, grandparent) for v in value]
+        if parent in ROW_LISTS:
+            return items
+        if parent == "criteria":
+            if grandparent == "actions":
+                return items
+            return sorted({canonical(v): v for v in items}.values(), key=canonical)
+        return sorted(items, key=canonical)
+    return value
+
+
 def _row_key(row: Any) -> Any:
     if isinstance(row, dict):
-        for key in ("aoid", "name"):
-            if key in row:
-                return (key, row[key])
-    return ("json", json.dumps(row, sort_keys=True))
+        if "aoid" in row:
+            return ("aoid", row["aoid"])
+        if "name" in row:
+            return ("name", f"{row['name']} #{row.get('id', '')}")
+    return ("json", canonical(row))
 
 
-def differences(old: dict, new: dict, ignored: frozenset) -> List[str]:
+def differences(old: dict, new: dict) -> List[str]:
     if old["status"] != new["status"]:
         return [f"status {old['status']} -> {new['status']}"]
-    a, b = normalize(old["body"], ignored), normalize(new["body"], ignored)
-    key, rows_a = _rows(a)
-    _, rows_b = _rows(b)
-    if key is None or rows_b is None:
-        return [] if a == b else [_first_difference(a, b)]
+    key, raw_a = _rows(old["body"])
+    _, raw_b = _rows(new["body"])
+    if key is None or raw_b is None:
+        a, b = normalize(old["body"]), normalize(new["body"])
+        return [] if canonical(a) == canonical(b) else [_first_difference(a, b)]
 
     found = []
-    rest_a = {k: v for k, v in a.items() if k != key}
-    rest_b = {k: v for k, v in b.items() if k != key}
-    if rest_a != rest_b:
-        found.append("envelope: " + _first_difference(rest_a, rest_b))
-    order_key = old["request"].get("order_key")
-    if order_key:
-        seq_a = [r.get(order_key) for r in rows_a]
-        seq_b = [r.get(order_key) for r in rows_b]
-        if seq_a != seq_b:
-            found.append(f"order by {order_key} differs")
+    if key:
+        rest_a = normalize({k: v for k, v in old["body"].items() if k != key})
+        rest_b = normalize({k: v for k, v in new["body"].items() if k != key})
+        if canonical(rest_a) != canonical(rest_b):
+            found.append("envelope: " + _first_difference(rest_a, rest_b))
+    rows_a = [normalize(row, "", key or "rows") for row in raw_a]
+    rows_b = [normalize(row, "", key or "rows") for row in raw_b]
+    order = old["request"].get("order")
+    if order and canonical(_order_values(rows_a, order)) != canonical(
+        _order_values(rows_b, order)
+    ):
+        fields = ", ".join(f"{f} {d}" for f, d in order)
+        found.append(f"rows are ordered differently ({fields})")
     by_a = {_row_key(r): r for r in rows_a}
     by_b = {_row_key(r): r for r in rows_b}
-    complete = a.get("total") in (None, len(rows_a)) and not a.get("has_next")
+    if len(by_a) != len(rows_a) or len(by_b) != len(rows_b):
+        found.append("rows repeat within one response")
+    body = old["body"] if isinstance(old["body"], dict) else {}
+    complete = body.get("total") in (None, len(rows_a)) and not body.get("has_next")
     if complete and set(by_a) != set(by_b):
         found.append(
             f"rows: {len(set(by_a) - set(by_b))} missing, "
             f"{len(set(by_b) - set(by_a))} unexpected"
         )
     for row_key in sorted(set(by_a) & set(by_b), key=str):
-        if by_a[row_key] != by_b[row_key]:
+        if canonical(by_a[row_key]) != canonical(by_b[row_key]):
             found.append(
                 f"row {row_key[1]}: " + _first_difference(by_a[row_key], by_b[row_key])
             )
@@ -392,23 +560,23 @@ def _first_difference(a: Any, b: Any, path: str = "") -> str:
                 return f"{path}.{k}: added"
             if k not in b:
                 return f"{path}.{k}: removed"
-            if a[k] != b[k]:
+            if canonical(a[k]) != canonical(b[k]):
                 return _first_difference(a[k], b[k], f"{path}.{k}")
     if isinstance(a, list):
         if len(a) != len(b):
             return f"{path}: {len(a)} entries -> {len(b)}"
         for i, (x, y) in enumerate(zip(a, b)):
-            if x != y:
+            if canonical(x) != canonical(y):
                 return _first_difference(x, y, f"{path}[{i}]")
     return f"{path or '.'}: {_short(a)} -> {_short(b)}"
 
 
 def _short(value: Any) -> str:
-    text = json.dumps(value, sort_keys=True)
+    text = canonical(value)
     return text if len(text) <= 80 else text[:77] + "..."
 
 
-def compare(old_dir: Path, new_dir: Path, ignored: frozenset) -> int:
+def compare(old_dir: Path, new_dir: Path) -> int:
     failed = 0
     for slug in sorted(p.name for p in old_dir.iterdir() if p.is_dir()):
         old_index = json.loads((old_dir / slug / "index.json").read_text())
@@ -425,14 +593,13 @@ def compare(old_dir: Path, new_dir: Path, ignored: frozenset) -> int:
                 continue
             old = json.loads((old_dir / slug / entry["file"]).read_text())
             new = json.loads((new_dir / slug / new_index[name]["file"]).read_text())
-            found = differences(old, new, ignored)
+            found = differences(old, new)
             if found:
                 bad.append((name, found))
-        old_ms = sum(e["ms"] for e in old_index.values())
-        new_ms = sum(new_index[n]["ms"] for n in old_index if n in new_index)
+        extra = sorted(set(new_index) - set(old_index))
         print(
-            f"{slug}: {len(old_index) - len(bad)}/{len(old_index)} match; "
-            f"total time {old_ms} ms -> {new_ms} ms"
+            f"{slug}: {len(old_index) - len(bad)}/{len(old_index)} match"
+            + (f"; {len(extra)} responses only in the new capture" if extra else "")
         )
         for name, found in bad[:15]:
             print(f"  {name}")
@@ -440,7 +607,7 @@ def compare(old_dir: Path, new_dir: Path, ignored: frozenset) -> int:
                 print(f"      {line}")
         if len(bad) > 15:
             print(f"  ... and {len(bad) - 15} more")
-        failed += len(bad)
+        failed += len(bad) + len(extra)
     return 1 if failed else 0
 
 
@@ -457,7 +624,6 @@ def main() -> int:
     d = commands.add_parser("compare")
     d.add_argument("old", type=Path)
     d.add_argument("new", type=Path)
-    d.add_argument("--ignore-key", action="append", default=[])
     args = parser.parse_args()
 
     if args.command == "samples":
@@ -466,7 +632,7 @@ def main() -> int:
     if args.command == "capture":
         samples = json.loads(args.samples.read_text())
         return capture(args.base_url, args.out, samples, args.build or BUILDS)
-    return compare(args.old, args.new, IGNORED_KEYS | frozenset(args.ignore_key))
+    return compare(args.old, args.new)
 
 
 if __name__ == "__main__":

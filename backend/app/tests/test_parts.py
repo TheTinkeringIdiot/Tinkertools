@@ -8,6 +8,7 @@ nothing that the application shows is lost from the stored documents.
 """
 
 import copy
+import json
 
 from app.core.parts import PART_NAMES, effect_formats, split_item
 
@@ -175,6 +176,55 @@ def test_the_client_row_id_does_not_make_two_stat_sets_differ():
     parts = split_item(reinstanced, False)
     assert [23, 111] not in parts.documents["stats"]
     assert parts.documents["misc"]["static_instance"] == [111]
+
+
+def test_a_stat_listed_twice_with_one_value_is_stored_once():
+    doubled = make_record()
+    doubled["StatValues"].append({"Stat": 54, "RawValue": 200})
+    doubled["AttackDefenseData"]["Attack"].append({"Stat": 112, "RawValue": 100})
+
+    assert changed_parts(make_record(), doubled) == set()
+
+
+def test_an_effect_repeated_in_one_event_is_kept_as_often_as_it_appears():
+    doubled = make_record()
+    doubled["SpellData"][0]["Items"].append(modify(150, 42))
+
+    assert changed_parts(make_record(), doubled) == {"effects"}
+    event = split_item(doubled, False).documents["effects"][1]
+    assert [e["params"]["Stat"] for e in event["effects"]] == [150, 150, 151, 156]
+
+
+def test_an_empty_attack_defense_block_is_the_same_as_none():
+    empty = make_record()
+    empty["AttackDefenseData"] = {"Attack": [], "Defense": []}
+    absent = make_record()
+    absent["AttackDefenseData"] = None
+
+    assert changed_parts(empty, absent) == set()
+    assert split_item(empty, False).hashes["atkdef"] is None
+
+
+def test_nul_characters_are_stored_in_a_form_the_database_accepts():
+    shop = {"Items": [{"Hash": {"Text": "\x00\x00\x00c"}, "MinLevel": 1}]}
+    record = make_record()
+    record["ShopHashData"] = shop
+    record["Name"] = "Odd\x00Name"
+    other = make_record()
+    other["ShopHashData"] = {
+        "Items": [{"Hash": {"Text": "\x00\x00\x00d"}, "MinLevel": 1}]
+    }
+    other["Name"] = "Odd\x00Name"
+
+    parts = split_item(record, False)
+
+    assert "\x00" not in json.dumps(parts.documents, ensure_ascii=False)
+    assert (
+        parts.documents["misc"]["shop"]["Items"][0]["Hash"]["Text"]
+        == "\\u0000" * 3 + "c"
+    )
+    assert parts.documents["text"]["name"] == "Odd\\u0000Name"
+    assert changed_parts(record, other) == {"misc"}
 
 
 def test_a_stat_listed_twice_keeps_both_values():

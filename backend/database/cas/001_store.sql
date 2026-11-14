@@ -4,8 +4,9 @@
 --
 -- The file is unqualified: run it with search_path set to the store's schema
 -- (cas in a normal install). It creates everything extracted from client
--- builds. Curated data (perks, mobs, sources, nano metadata) is defined
--- separately.
+-- builds. Curated data (perks, mobs, sources, nano metadata) and the tables
+-- derived from it (nano properties, symbiants) are in
+-- 002_curated_and_derived.sql.
 --
 -- Conventions
 --   * A part row is immutable once written, except display-only fields that
@@ -14,6 +15,10 @@
 --   * Parts get a surrogate integer id so revisions and projections stay
 --     narrow; the hash is the content address and is unique.
 --   * No timestamps (project rule: static game data has no audit trail).
+
+-- Needed for the no-overlap constraint on item_presence. The extension is
+-- trusted, so the database owner can create it.
+CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 -- ---------------------------------------------------------------------------
 -- Builds
@@ -100,8 +105,11 @@ CREATE TABLE effect_type (
 -- Revisions and presence
 -- ---------------------------------------------------------------------------
 
--- One row per distinct content an AOID has ever had. ql and item_class are
--- derived from the stats and exist for filtering and sorting.
+-- One row per distinct content an AOID has ever had. hash is the revision
+-- hash of app/core/parts.py. ql and item_class are derived columns for
+-- filtering and sorting and are not part of the hash: item_class is stat 76;
+-- ql is stat 54 for an item and the curated QL for a nano (see nano_overlay in
+-- 002_curated_and_derived.sql).
 CREATE TABLE item_revision (
     rev_id      integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     aoid        integer  NOT NULL,
@@ -136,7 +144,15 @@ CREATE TABLE item_presence (
     to_ordinal    integer     NOT NULL DEFAULT 2147483647,
     rev_id        integer     NOT NULL REFERENCES item_revision (rev_id),
     PRIMARY KEY (branch, aoid, from_ordinal),
-    CHECK (from_ordinal <= to_ordinal)
+    CHECK (from_ordinal <= to_ordinal),
+    -- the run starts at a build that exists
+    FOREIGN KEY (branch, from_ordinal) REFERENCES build (branch, ordinal),
+    -- an AOID has at most one revision in any build of a branch
+    EXCLUDE USING gist (
+        branch WITH =,
+        aoid WITH =,
+        int8range(from_ordinal, to_ordinal, '[]') WITH &&
+    )
 );
 CREATE INDEX item_presence_range ON item_presence (branch, to_ordinal, from_ordinal);
 CREATE INDEX item_presence_rev ON item_presence (rev_id);
@@ -222,6 +238,7 @@ CREATE TABLE item_change (
     relevance      smallint,
     note_id        integer REFERENCES build_note (note_id) ON DELETE SET NULL,
     PRIMARY KEY (branch, ordinal, aoid),
+    FOREIGN KEY (branch, ordinal) REFERENCES build (branch, ordinal),
     CHECK ((kind = 'A') = (old_rev_id IS NULL)),
     CHECK ((kind = 'R') = (new_rev_id IS NULL))
 );
