@@ -2,7 +2,7 @@
 
 ## Overview
 
-The TinkerTools API provides access to Anarchy Online game data including items, spells, symbiants, and pocket bosses. The API follows RESTful conventions and returns JSON responses.
+The TinkerTools API provides access to Anarchy Online game data including items, symbiants, and mobs (including pocket bosses). The API follows RESTful conventions and returns JSON responses.
 
 ## Base URL
 
@@ -159,23 +159,37 @@ Get detailed information about a specific symbiant, addressed by its AOID.
 #### GET /api/v1/symbiants/{aoid}/dropped-by
 Get list of pocket bosses that drop a specific symbiant, addressed by its AOID.
 
-### Pocket Bosses
+### Mobs
 
-#### GET /api/v1/pocket-bosses
-Get a paginated list of pocket bosses.
+#### GET /api/v1/mobs
+Get a paginated list of mobs, including pocket bosses.
 
 **Query Parameters:**
-- `page` (int): Page number
-- `page_size` (int): Items per page
-- `min_level` (int): Minimum boss level
-- `max_level` (int): Maximum boss level
-- `playfield` (string): Filter by playfield
+- `page` (int): Page number (default 1)
+- `page_size` (int): Items per page (default 50, max 1000)
+- `is_pocket_boss` (bool): Filter pocket bosses
+- `min_level` (int): Minimum mob level
+- `max_level` (int): Maximum mob level
+- `playfield` (string): Filter by playfield (partial match)
 
-#### GET /api/v1/pocket-bosses/{boss_id}
-Get detailed information about a specific pocket boss including drops.
+#### GET /api/v1/mobs/{mob_id}
+Get detailed information about a specific mob.
 
-#### GET /api/v1/pocket-bosses/{boss_id}/drops
-Get list of symbiants dropped by a specific pocket boss.
+#### GET /api/v1/mobs/{mob_id}/drops
+Get list of symbiants dropped by a specific mob.
+
+**Query Parameters:**
+- `family` (string): Filter by symbiant family
+
+### Legacy Item IDs
+
+#### POST /api/v1/legacy-item-ids/resolve
+Resolve internal item row ids (as issued by a game version) to AOIDs. Up to 1000 ids per request.
+
+**Request Body:**
+- `item_ids` (int[]): Internal item row ids
+
+**Response:** `{"aoids": {"<item_id>": <aoid>}}`. Ids the game version does not have are omitted.
 
 ## Error Responses
 
@@ -231,6 +245,6 @@ Currently, no rate limiting is implemented as the API serves cached game referen
 
 ### Version 1.0.0
 - Initial release with basic CRUD endpoints
-- Support for items, spells, symbiants, pocket bosses, and stat values
+- Support for items, symbiants, and pocket bosses
 - Pagination and search functionality
 - Error handling and validation

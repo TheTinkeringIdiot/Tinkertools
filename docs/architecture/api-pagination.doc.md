@@ -103,7 +103,7 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 }
 
 // OLD (incorrect usage with type casting)
-return this.get<Spell[]>(`/spells?${params}`) as Promise<PaginatedResponse<Spell>>
+return this.get<Item[]>(`/items/search?${params}`) as Promise<PaginatedResponse<Item>>
 ```
 
 **Problems:**
@@ -128,7 +128,7 @@ interface PaginatedResponse<T> {
 }
 
 // NEW (correct usage without casting)
-return this.getPaginated<Spell>(`/spells?${params}`)
+return this.getPaginated<Item>(`/items/search?${params}`)
 ```
 
 **Benefits:**
@@ -144,19 +144,12 @@ All paginated endpoints were migrated to use the new pattern:
 ### Items
 - `GET /items/search` - `getPaginated<Item>()`
 - `GET /items` - `getPaginated<Item>()`
-- `POST /items/filter` - `postPaginated<Item>()`
-
-### Spells
-- `GET /spells` - `getPaginated<Spell>()`
 
 ### Symbiants
 - `GET /symbiants` - `getPaginated<SymbiantItem>()`
 
 ### Mobs/Pocket Bosses
 - `GET /mobs` - `getPaginated<Mob>()`
-
-### Stat Values
-- `GET /stat-values` - `getPaginated<any>()`
 
 ## Implementation Files
 
@@ -169,11 +162,10 @@ All paginated endpoints were migrated to use the new pattern:
 - **`frontend/src/services/api-client.ts`**
   - `getPaginated<T>()` - GET requests returning paginated data
   - `postPaginated<T>()` - POST requests returning paginated data
-  - Updated endpoint methods: `searchItems()`, `searchSpells()`, `searchSymbiants()`, `searchPocketBosses()`, `filterItems()`
+  - Updated endpoint methods: `searchItems()`, `searchSymbiants()`, `searchMobs()`, `searchPocketBosses()`
 
 ### Stores (Pinia)
 - **`frontend/src/stores/items.ts`** - Item search and filtering
-- **`frontend/src/stores/spells.ts`** - Spell search
 - **`frontend/src/stores/symbiants.ts`** - Symbiant browsing
 - **`frontend/src/stores/pocket-bosses.ts`** - Pocket boss search
 - **`frontend/src/stores/pocketBossStore.ts`** - Alternative boss store

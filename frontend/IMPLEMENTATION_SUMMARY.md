@@ -24,8 +24,6 @@ export const mockApiClient = {
   getItem: vi.fn(),
   interpolateItem: vi.fn(),
   searchItems: vi.fn(),
-  getItems: vi.fn(),
-  filterItems: vi.fn(),
   // ... all other API methods
 
   // Nanos/Spells

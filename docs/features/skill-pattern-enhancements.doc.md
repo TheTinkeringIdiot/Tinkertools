@@ -271,7 +271,6 @@ Backend returns matching implant item
 ### API Client
 - **`frontend/src/services/api-client.ts`** (+58 lines)
   - Updated `lookupImplant()` to return `ImplantLookupResponse`
-  - Standardized response wrapping for `getAvailableImplants()` and `validateClusters()`
   - Better error handling with API response validation
 
 ### Backend API Error Handling

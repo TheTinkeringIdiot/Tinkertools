@@ -93,7 +93,7 @@ The API will be available at:
 - `GET /api/v1/items` - Search and filter items
 - `GET /api/v1/nanos` - Nano program database
 - `GET /api/v1/symbiants` - Symbiant database
-- `GET /api/v1/pocket-bosses` - Pocket boss information
+- `GET /api/v1/mobs` - Mobs and pocket bosses (`is_pocket_boss` filter)
 
 ### System Endpoints
 - `GET /health` - Health check

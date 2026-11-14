@@ -70,26 +70,26 @@ This document provides a comprehensive overview of the shared infrastructure, da
 - Typed HTTP client with Axios integration
 - Request/response typing for all endpoints
 - Error handling and retry logic (3 attempts, 1s delay)
-- Request batching and deduplication
 - Timeout configuration (30s default)
 
 **Available Endpoints:**
 ```typescript
 // Items
-getItems(query: ItemSearchQuery): Promise<PaginatedResponse<Item>>
-getItem(aoid: number): Promise<ApiResponse<Item>>  // Uses AOID for item lookup, includes sources
-getItemSources(aoid: number): Promise<ApiResponse<ItemSource[]>>  // Get sources for specific item
+searchItems(query: ItemSearchQuery): Promise<PaginatedResponse<Item>>
+getItem(aoid: number): Promise<ApiResponse<Item>>  // Uses AOID for item lookup
 interpolateItem(aoid: number, targetQl: number): Promise<InterpolationResponse>
 
-// Spells/Nanos  
-getSpells(query: SpellSearchQuery): Promise<PaginatedResponse<Spell>>
-getSpell(id: number): Promise<ApiResponse<Spell>>
-
 // Symbiants
-getSymbiants(query: SymbiantSearchQuery): Promise<PaginatedResponse<Symbiant>>
+searchSymbiants(query: SymbiantSearchQuery): Promise<PaginatedResponse<SymbiantItem>>
+getSymbiant(aoid: number): Promise<ApiResponse<SymbiantItem>>  // By AOID
+getSymbiantDroppedBy(aoid: number): Promise<ApiResponse<Mob[]>>
 
-// Pocket Bosses
-getPocketBosses(query: PocketBossSearchQuery): Promise<PaginatedResponse<PocketBoss>>
+// Mobs / Pocket Bosses
+searchMobs(query: MobSearchQuery): Promise<PaginatedResponse<Mob>>
+getMob(id: number): Promise<ApiResponse<Mob>>
+searchPocketBosses(query: MobSearchQuery): Promise<PaginatedResponse<Mob>>
+getPocketBoss(id: number): Promise<ApiResponse<Mob>>
+getPocketBossDrops(id: number): Promise<ApiResponse<SymbiantItem[]>>
 ```
 
 ### Backend API Routes (`backend/app/api/routes/`)
@@ -145,7 +145,6 @@ getPocketBosses(query: PocketBossSearchQuery): Promise<PaginatedResponse<PocketB
 - **useAppStore**: Global application state, theme, notifications
 - **useProfileStore**: Character profile management, LocalStorage persistence
 - **useItemsStore**: Item data caching and search state (cached by AOID)
-- **useSpellsStore**: Nano/spell data management
 - **useSymbiantsStore**: Symbiant data for TinkerPlants
 - **usePocketBossesStore**: Pocket boss data for TinkerPocket
 
@@ -539,8 +538,7 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 
 1. **Caching**: Leverage existing cache infrastructure
 2. **Interpolation**: Use interpolation system for quality scaling
-3. **Batching**: Use API client batching for multiple requests
-4. **Monitoring**: Check performance endpoints during development
+3. **Batching**: Use the batch endpoints (`POST /items/batch/interpolate`, `POST /perks/batch/lookup`) for multiple items
 
 ---
 
