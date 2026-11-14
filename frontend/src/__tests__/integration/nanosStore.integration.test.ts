@@ -7,11 +7,11 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { setActivePinia, createPinia } from 'pinia';
 import { defaultNanoFilters, useNanosStore } from '@/stores/nanosStore';
 import { apiClient } from '@/services/api-client';
 import { versionKey } from '@/services/version-keys';
 import { isBackendAvailable } from '../helpers/backend-check';
+import { createAppPinia } from '../helpers/integration-test-utils';
 
 // Top-level await: skipIf is evaluated while tests are collected.
 const BACKEND_AVAILABLE = await isBackendAvailable();
@@ -20,7 +20,7 @@ describe('NanosStore', () => {
   let store: ReturnType<typeof useNanosStore>;
 
   beforeEach(() => {
-    setActivePinia(createPinia());
+    createAppPinia();
     store = useNanosStore();
   });
 
@@ -106,7 +106,7 @@ describe('NanosStore school, profession and level', () => {
   }
 
   beforeEach(async () => {
-    setActivePinia(createPinia());
+    createAppPinia();
     store = useNanosStore();
     await load([
       nanoItem(1, 'Doctor Heal', { school: 'Medical', professions: ['Doctor'], level: 50 }),
@@ -125,14 +125,15 @@ describe('NanosStore school, profession and level', () => {
   });
 
   const names = () => store.filteredNanos.map((nano) => nano.name);
+  const nanoByAoid = (aoid: number) => store.nanos.find((nano) => nano.aoid === aoid);
 
   it('maps the school, professions and level the backend sends', () => {
-    expect(store.getNanoByAoid(2)).toMatchObject({
+    expect(nanoByAoid(2)).toMatchObject({
       school: 'Protection',
       professions: ['Martial Artist', 'Enforcer', 'Keeper', 'Shade'],
       level: 150,
     });
-    expect(store.getNanoByAoid(4)).toMatchObject({ school: null, professions: [], level: null });
+    expect(nanoByAoid(4)).toMatchObject({ school: null, professions: [], level: null });
     expect(store.availableSchools).toEqual(['Medical', 'Protection']);
     expect(store.availableProfessions).toEqual([
       'Doctor',
@@ -146,7 +147,7 @@ describe('NanosStore school, profession and level', () => {
   it('reads a response without professions as unrestricted', async () => {
     await load([nanoItem(5, 'Old Shape', { school: null, profession: 'Doctor', level: 10 })]);
 
-    expect(store.getNanoByAoid(5)?.professions).toEqual([]);
+    expect(nanoByAoid(5)?.professions).toEqual([]);
   });
 
   /** The URL of the last request */
@@ -235,7 +236,7 @@ describe('NanosStore school, profession and level', () => {
         castable: 'yes',
       })
     );
-    setActivePinia(createPinia());
+    createAppPinia();
     const restored = useNanosStore().filters;
 
     expect(restored).toEqual({
@@ -250,7 +251,7 @@ describe.skipIf(!BACKEND_AVAILABLE)('NanosStore with backend', () => {
   let store: ReturnType<typeof useNanosStore>;
 
   beforeEach(() => {
-    setActivePinia(createPinia());
+    createAppPinia();
     store = useNanosStore();
   });
 
@@ -307,16 +308,5 @@ describe.skipIf(!BACKEND_AVAILABLE)('NanosStore with backend', () => {
     const schools = store.availableSchools;
     expect(schools.every((school) => typeof school === 'string')).toBe(true);
     expect(schools).toEqual([...schools].sort());
-  }, 10000);
-
-  it('gets nano by AOID correctly', async () => {
-    await store.fetchNanos();
-    expect(store.nanos.length).toBeGreaterThan(0);
-
-    const firstNano = store.nanos[0];
-    const foundNano = store.getNanoByAoid(firstNano.aoid);
-
-    expect(foundNano?.aoid).toBe(firstNano.aoid);
-    expect(foundNano?.name).toBe(firstNano.name);
   }, 10000);
 });

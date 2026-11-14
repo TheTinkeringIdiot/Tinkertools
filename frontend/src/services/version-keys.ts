@@ -22,7 +22,12 @@
  * namespaced: they mean the same thing in every version.
  */
 
-import { currentVersion, dataVersion, VERSION_SLUG_PATTERN } from '@/composables/useGameVersion';
+import {
+  currentVersion,
+  dataVersion,
+  legacyDataVersion,
+  VERSION_SLUG_PATTERN,
+} from '@/composables/useGameVersion';
 
 /** Used when no version has been resolved yet (early boot, tests without a router). */
 export const UNKNOWN_VERSION = 'unknown';
@@ -171,9 +176,10 @@ export function purgeLocalStoragePrefix(prefix: string): number {
 }
 
 /**
- * One-time migration: an un-namespaced key written before versions existed is
- * the current version's data. Rename it rather than dropping it so users keep
- * their favorites, farm lists and collection progress.
+ * One-time migration: move the un-namespaced key written before versions
+ * existed to `slug` (default: the active build), rather than dropping it.
+ * Callers decide that `slug` is the version the data belongs to; for user
+ * data that is adoptLegacyUserData's job.
  *
  * No-op when the versioned key already exists or the legacy key is absent.
  */
@@ -194,6 +200,19 @@ export function adoptLegacyKey(base: string, slug?: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * User data (favorites, farm lists, farm progress) saved before versions
+ * existed belongs to legacyDataVersion() and to no other version, the same
+ * rule profiles follow. It is adopted when that version is the one being
+ * browsed; on any other version the un-namespaced key is left where it is, so
+ * its ids are never read against a database that did not issue them.
+ */
+export function adoptLegacyUserData(base: string): boolean {
+  const slug = currentVersion.value;
+  if (slug === null || slug !== legacyDataVersion()) return false;
+  return adoptLegacyKey(base, slug);
 }
 
 // ============================================================================

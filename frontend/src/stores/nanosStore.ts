@@ -1,17 +1,19 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { apiClient } from '@/services/api-client';
+import { useToast } from 'primevue/usetoast';
 import {
   versionKey,
   userDataKey,
   browsingVersionSlug,
   adoptLegacyKey,
+  adoptLegacyUserData,
 } from '@/services/version-keys';
 import {
-  emptyAoidList,
+  droppedEntriesMessage,
   migratePendingIds,
-  parseAoidList,
-  serializeAoidList,
+  readAoidList,
+  writeAoids,
 } from '@/services/legacy-id-migration';
 import { errorMessage } from '@/services/error-message';
 import { SKILL_COST_FACTORS } from '@/services/game-data';
@@ -245,6 +247,8 @@ const SEARCH_HISTORY_KEY = 'tinkertools_nano_search_history';
 const SELECTED_PROFESSION_KEY = 'tinkertools_nano_selected_profession';
 
 export const useNanosStore = defineStore('nanos', () => {
+  const toast = useToast();
+
   // State
 
   /** The nanos loaded: one server page, or every match while compatibility filters */
@@ -267,8 +271,6 @@ export const useNanosStore = defineStore('nanos', () => {
   const selectedProfession = ref<number | null>(null);
   /** AOIDs of the favorite nanos */
   const favorites = ref<number[]>([]);
-  /** Favorites stored as internal ids before the move to AOIDs, not yet migrated */
-  let pendingFavoriteIds: number[] = [];
   const searchHistory = ref<string[]>([]);
 
   const filters = ref<NanoFilters>(defaultNanoFilters());
@@ -376,10 +378,6 @@ export const useNanosStore = defineStore('nanos', () => {
   const resultCount = computed(() => {
     if (compatibilityOverflow.value !== null) return compatibilityOverflow.value;
     return needsAllResults.value ? filteredNanos.value.length : totalCount.value;
-  });
-
-  const favoriteNanos = computed(() => {
-    return nanos.value.filter((nano) => favorites.value.includes(nano.aoid));
   });
 
   const availableSchools = computed(() => {
@@ -580,10 +578,6 @@ export const useNanosStore = defineStore('nanos', () => {
     savePreferences();
   };
 
-  const getNanoByAoid = (aoid: number): NanoProgram | undefined => {
-    return nanos.value.find((nano) => nano.aoid === aoid);
-  };
-
   const getNanosBySchool = (school: string): NanoProgram[] => {
     return nanos.value.filter((nano) => nano.school === school);
   };
@@ -630,56 +624,47 @@ export const useNanosStore = defineStore('nanos', () => {
     }
   };
 
+  /** Favorites saved before they were AOIDs: a bare array of internal ids */
+  const legacyFavoriteIds = (value: unknown): number[] | null =>
+    isNumberList(value) ? value : null;
+
   const saveFavorites = (): void => {
     try {
-      localStorage.setItem(
-        userDataKey(FAVORITES_BASE),
-        serializeAoidList({ aoids: favorites.value, pendingInternalIds: pendingFavoriteIds })
-      );
+      writeAoids(userDataKey(FAVORITES_BASE), legacyFavoriteIds, favorites.value);
     } catch (error) {
       console.warn('Failed to save favorites:', error);
     }
   };
 
-  /** Settles when the favorites loaded last have been migrated to AOIDs */
-  let favoritesMigration: Promise<void> = Promise.resolve();
-
   /**
-   * Favorites saved before they were AOIDs are a bare array of internal ids.
-   * Those are migrated in the background (see legacy-id-migration.ts) and
-   * join the list once the backend has resolved them.
+   * Show the favorites stored for the version being browsed. Entries saved as
+   * internal ids are migrated in the background (see legacy-id-migration.ts)
+   * and appear once the backend has resolved them.
    */
   const loadFavorites = (): void => {
-    let stored = emptyAoidList();
     const slug = browsingVersionSlug();
-    try {
-      adoptLegacyKey(FAVORITES_BASE, slug);
-      stored = parseAoidList(localStorage.getItem(userDataKey(FAVORITES_BASE)), (value) =>
-        isNumberList(value) ? value : null
-      );
-    } catch (error) {
-      console.warn('Failed to load favorites:', error);
-    }
-    favorites.value = stored.aoids;
-    pendingFavoriteIds = stored.pendingInternalIds;
+    const storageKey = versionKey(FAVORITES_BASE, slug);
+    adoptLegacyUserData(FAVORITES_BASE);
+    favorites.value = readAoidList(storageKey, legacyFavoriteIds).aoids;
 
-    favoritesMigration = migratePendingIds(stored, {
-      storageKey: userDataKey(FAVORITES_BASE),
+    void migratePendingIds({
+      storageKey,
       base: FAVORITES_BASE,
       slug,
-    }).then((migrated) => {
-      // Another version's favorites may have been loaded meanwhile
-      if (!migrated || browsingVersionSlug() !== slug) return;
-      // Keep what the user favorited while the lookup was running
-      const added = favorites.value.filter((aoid) => !migrated.aoids.includes(aoid));
-      favorites.value = [...migrated.aoids, ...added];
-      pendingFavoriteIds = [];
-      if (added.length > 0) saveFavorites();
+      legacyIds: legacyFavoriteIds,
+      onDropped: (dropped, total) =>
+        toast.add({
+          severity: 'warn',
+          summary: 'Some favorites were not carried over',
+          detail: droppedEntriesMessage(dropped, total, 'favorite nanos'),
+          life: 10000,
+        }),
+    })?.then(() => {
+      // Another version's favorites may be on show by now
+      if (browsingVersionSlug() !== slug) return;
+      favorites.value = readAoidList(storageKey, legacyFavoriteIds).aoids;
     });
   };
-
-  /** For callers that need the migrated favorites, not just the ones loaded so far */
-  const favoritesReady = (): Promise<void> => favoritesMigration;
 
   const saveFilters = (): void => {
     try {
@@ -798,7 +783,6 @@ export const useNanosStore = defineStore('nanos', () => {
     selectedNano.value = null;
     error.value = null;
     favorites.value = [];
-    pendingFavoriteIds = [];
     loadNanosFromStorage();
     loadFavorites();
   };
@@ -830,7 +814,6 @@ export const useNanosStore = defineStore('nanos', () => {
     requestKey,
     filteredNanos,
     resultCount,
-    favoriteNanos,
     availableSchools,
     strainOptions: strainOptions as Readonly<typeof strainOptions>,
     strainRequestKey,
@@ -851,9 +834,7 @@ export const useNanosStore = defineStore('nanos', () => {
     toggleFavorite,
     addToFavorites,
     removeFromFavorites,
-    favoritesReady,
     updatePreferences,
-    getNanoByAoid,
     getNanosBySchool,
     getNanosByStrain,
     initialize,

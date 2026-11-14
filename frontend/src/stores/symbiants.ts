@@ -11,18 +11,20 @@ import { apiClient } from '../services/api-client';
 import { toUserFriendlyError } from '../services/error-message';
 import { enrichSymbiant } from '../utils/symbiantHelpers';
 import { get, set, del } from 'idb-keyval';
+import { useToast } from 'primevue/usetoast';
 import {
-  emptyAoidList,
+  droppedEntriesMessage,
   migratePendingIds,
-  parseAoidList,
-  serializeAoidList,
+  readAoidList,
+  replaceAoidList,
+  writeAoids,
 } from '../services/legacy-id-migration';
 import {
   versionKey,
   activeVersionSlug,
   browsingVersionSlug,
   userDataKey,
-  adoptLegacyKey,
+  adoptLegacyUserData,
   adoptLegacyIdbKey,
 } from '../services/version-keys';
 
@@ -71,6 +73,8 @@ function legacyFarmListIds(value: unknown): number[] | null {
 }
 
 export const useSymbiantsStore = defineStore('symbiants', () => {
+  const toast = useToast();
+
   // ============================================================================
   // State
   // ============================================================================
@@ -94,8 +98,6 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
 
   // Farm List state (uses AOID for stability)
   const farmListAoids = ref<number[]>([]);
-  /** Farm list entries stored as internal ids before AOIDs, not yet migrated */
-  let pendingFarmListIds: number[] = [];
   const farmedBossIds = ref<Set<number>>(new Set());
   const farmListLoading = ref(false);
   const aggregatedBosses = ref<Map<number, AggregatedBoss>>(new Map());
@@ -106,11 +108,6 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
   // ============================================================================
 
   const allSymbiants = computed(() => Array.from(symbiants.value.values()));
-
-  const symbiantsByAoid = computed(
-    () => (aoids: number[]) =>
-      aoids.map((aoid) => symbiants.value.get(aoid)).filter(Boolean) as Symbiant[]
-  );
 
   const symbiantsByFamily = computed(
     () => (family: string) => allSymbiants.value.filter((symbiant) => symbiant.family === family)
@@ -370,7 +367,6 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     lastFetch.value = 0;
     error.value = null;
     farmListAoids.value = [];
-    pendingFarmListIds = [];
     farmedBossIds.value = new Set();
     aggregatedBosses.value.clear();
     bossDropCache.value.clear();
@@ -492,11 +488,9 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
    * Clear all symbiants from farm list and reset progress
    */
   function clearFarmList(): void {
-    farmListAoids.value = [];
-    pendingFarmListIds = [];
     farmedBossIds.value.clear();
     aggregatedBosses.value.clear();
-    saveFarmList();
+    replaceFarmList([]);
     saveFarmProgress();
   }
 
@@ -599,58 +593,48 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
   }
 
   /**
-   * Save farm list to localStorage (using AOIDs)
+   * Save a change to the farm list. Entries still waiting to be migrated to
+   * AOIDs stay stored with it.
    */
   function saveFarmList(): void {
-    localStorage.setItem(
-      userDataKey(FARM_LIST_BASE),
-      serializeAoidList({ aoids: farmListAoids.value, pendingInternalIds: pendingFarmListIds })
-    );
+    writeAoids(userDataKey(FARM_LIST_BASE), legacyFarmListIds, farmListAoids.value);
   }
 
-  /** Settles when the farm list loaded last has been migrated to AOIDs */
-  let farmListMigration: Promise<void> = Promise.resolve();
+  /** Make `aoids` the whole farm list, entries not yet migrated included */
+  function replaceFarmList(aoids: number[]): void {
+    farmListAoids.value = aoids;
+    replaceAoidList(userDataKey(FARM_LIST_BASE), aoids);
+  }
 
   /**
-   * Load farm list from localStorage. A list in the first format (version 1,
-   * internal symbiant ids) is migrated in the background (see
-   * legacy-id-migration.ts) and joins the list once the backend has resolved it.
+   * Show the farm list stored for the version being browsed. A list in the
+   * first format (version 1, internal symbiant ids) is migrated in the
+   * background (see legacy-id-migration.ts) and appears once the backend has
+   * resolved it.
    */
   function loadFarmList(): void {
-    let stored = emptyAoidList();
     const slug = browsingVersionSlug();
-    try {
-      adoptLegacyKey(FARM_LIST_BASE, slug);
-      stored = parseAoidList(localStorage.getItem(userDataKey(FARM_LIST_BASE)), legacyFarmListIds);
-    } catch (error) {
-      console.error('[SymbiantsStore] Failed to load farm list:', error);
-    }
-    farmListAoids.value = stored.aoids;
-    pendingFarmListIds = stored.pendingInternalIds;
+    const storageKey = versionKey(FARM_LIST_BASE, slug);
+    adoptLegacyUserData(FARM_LIST_BASE);
+    farmListAoids.value = readAoidList(storageKey, legacyFarmListIds).aoids;
 
-    farmListMigration = migratePendingIds(stored, {
-      storageKey: userDataKey(FARM_LIST_BASE),
+    void migratePendingIds({
+      storageKey,
       base: FARM_LIST_BASE,
       slug,
-    }).then((migrated) => {
-      // Another version's farm list may have been loaded meanwhile
-      if (!migrated || browsingVersionSlug() !== slug) return;
-      // Cleared while the lookup was running: the clear stands
-      if (pendingFarmListIds.length === 0) {
-        saveFarmList();
-        return;
-      }
-      // Keep what the user added while the lookup was running
-      const added = farmListAoids.value.filter((aoid) => !migrated.aoids.includes(aoid));
-      farmListAoids.value = [...migrated.aoids, ...added];
-      pendingFarmListIds = [];
-      if (added.length > 0) saveFarmList();
+      legacyIds: legacyFarmListIds,
+      onDropped: (dropped, total) =>
+        toast.add({
+          severity: 'warn',
+          summary: 'Some farm list entries were not carried over',
+          detail: droppedEntriesMessage(dropped, total, 'farm list symbiants'),
+          life: 10000,
+        }),
+    })?.then(() => {
+      // Another version's farm list may be on show by now
+      if (browsingVersionSlug() !== slug) return;
+      farmListAoids.value = readAoidList(storageKey, legacyFarmListIds).aoids;
     });
-  }
-
-  /** For callers that need the migrated farm list, not just what is loaded so far */
-  function farmListReady(): Promise<void> {
-    return farmListMigration;
   }
 
   /**
@@ -669,7 +653,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
    */
   function loadFarmProgress(): void {
     try {
-      adoptLegacyKey(FARM_PROGRESS_BASE, browsingVersionSlug());
+      adoptLegacyUserData(FARM_PROGRESS_BASE);
       const saved = localStorage.getItem(userDataKey(FARM_PROGRESS_BASE));
       if (saved) {
         const data: FarmProgressStorage = JSON.parse(saved);
@@ -700,8 +684,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
       .split(',')
       .map(Number)
       .filter((aoid) => !isNaN(aoid) && aoid > 0);
-    farmListAoids.value = aoids;
-    saveFarmList();
+    replaceFarmList(aoids);
   }
 
   /**
@@ -745,7 +728,6 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
 
     // Getters
     allSymbiants,
-    symbiantsByAoid,
     symbiantsByFamily,
     symbiantFamilies,
     symbiantsCount,
@@ -779,7 +761,6 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     getFarmListCount,
     aggregateBossesForFarmList,
     loadFarmList,
-    farmListReady,
     loadFarmProgress,
     exportFarmListToUrl,
     importFarmListFromUrl,

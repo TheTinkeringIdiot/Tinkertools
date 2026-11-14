@@ -46,6 +46,26 @@ export interface IntegrationTestContext {
 }
 
 /**
+ * A fresh, active Pinia installed on an app that provides what stores inject
+ * (toasts, confirm dialogs), as main.ts does. Stores that call useToast()
+ * cannot be created on a bare `createPinia()`. Storage is left untouched.
+ */
+export function createAppPinia(): { app: App; pinia: Pinia } {
+  // Registration order matters: PrimeVue and its services first, then Pinia,
+  // so store setup can inject them.
+  const app = createApp({});
+  app.use(PrimeVue);
+  app.use(ToastService);
+  app.use(ConfirmationService);
+
+  const pinia = createPinia();
+  app.use(pinia);
+  setActivePinia(pinia);
+
+  return { app, pinia };
+}
+
+/**
  * Setup integration test context with real Pinia, mocked externals
  *
  * IMPORTANT: Use vi.mock('@/services/api-client') at the top of your test file
@@ -70,17 +90,7 @@ export interface IntegrationTestContext {
  * });
  */
 export async function setupIntegrationTest(): Promise<IntegrationTestContext> {
-  // CRITICAL: Registration order matters!
-  // PrimeVue + ToastService FIRST, then Pinia
-  // This ensures components that use stores can also use PrimeVue components
-  const app = createApp({});
-  app.use(PrimeVue); // ← FIRST: UI framework
-  app.use(ToastService); // ← SECOND: Toast notifications
-  app.use(ConfirmationService); // ← THEN: confirm dialogs (useConfirm)
-
-  const pinia = createPinia();
-  app.use(pinia); // ← THIRD: State management
-  setActivePinia(pinia);
+  const { app, pinia } = createAppPinia();
 
   const mockApi = await getMockApiClient();
   const mockLocalStorage = createMockLocalStorage();

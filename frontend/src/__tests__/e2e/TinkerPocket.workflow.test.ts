@@ -9,12 +9,12 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createPinia, setActivePinia } from 'pinia';
 import { usePocketBossStore } from '@/stores/pocketBossStore';
 import { useSymbiantsStore } from '@/stores/symbiants';
 import { apiClient } from '@/services/api-client';
 import type { Symbiant } from '@/types/api';
 import { isBackendAvailable } from '../helpers/backend-check';
+import { createAppPinia } from '../helpers/integration-test-utils';
 
 // Top-level await: skipIf is evaluated while tests are collected.
 const BACKEND_AVAILABLE = await isBackendAvailable();
@@ -24,7 +24,7 @@ describe.skipIf(!BACKEND_AVAILABLE)('TinkerPocket Workflow', () => {
   let symbiantStore: ReturnType<typeof useSymbiantsStore>;
 
   beforeEach(() => {
-    setActivePinia(createPinia());
+    createAppPinia();
     pocketBossStore = usePocketBossStore();
     symbiantStore = useSymbiantsStore();
   });

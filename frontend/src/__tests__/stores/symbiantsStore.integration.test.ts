@@ -8,7 +8,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { setActivePinia, createPinia } from 'pinia';
 
 // jsdom has no IndexedDB: back idb-keyval with an in-memory map so the store's
 // persistent cache behaves as it does in a browser.
@@ -34,13 +33,14 @@ import { apiClient } from '@/services/api-client';
 // Symbiant slot ids are implant-slot bit flags, eye (2) through feet (8192).
 const IMPLANT_SLOT_FLAGS = Array.from({ length: 13 }, (_, i) => 2 ** (i + 1));
 import { isBackendAvailable } from '../helpers/backend-check';
+import { createAppPinia } from '../helpers/integration-test-utils';
 
 // Top-level await: skipIf is evaluated while tests are collected.
 const BACKEND_AVAILABLE = await isBackendAvailable();
 
 describe.skipIf(!BACKEND_AVAILABLE)('SymbiantsStore Integration Tests', () => {
   beforeEach(async () => {
-    setActivePinia(createPinia());
+    createAppPinia();
     // Every test starts from an empty IndexedDB cache
     await useSymbiantsStore().clearCache();
   });
@@ -154,7 +154,7 @@ describe.skipIf(!BACKEND_AVAILABLE)('SymbiantsStore Integration Tests', () => {
     expect(firstCount).toBeGreaterThan(0);
 
     // A new session: empty in-memory store, same IndexedDB
-    setActivePinia(createPinia());
+    createAppPinia();
     const store = useSymbiantsStore();
     const searchSpy = vi.spyOn(apiClient, 'searchSymbiants');
 

@@ -8,10 +8,10 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { setActivePinia, createPinia } from 'pinia';
 import { useNanosStore } from '@/stores/nanosStore';
 import { apiBaseFor } from '@/services/api-config';
 import { isBackendAvailable } from '../helpers/backend-check';
+import { createAppPinia } from '../helpers/integration-test-utils';
 import { TEST_VERSION } from '../helpers/version-fixtures';
 
 // Top-level await: describe.skipIf reads this while tests are collected.
@@ -21,7 +21,7 @@ describe.skipIf(!BACKEND_AVAILABLE)('Backend Integration Tests', () => {
   let store: ReturnType<typeof useNanosStore>;
 
   beforeEach(() => {
-    setActivePinia(createPinia());
+    createAppPinia();
     store = useNanosStore();
     vi.clearAllMocks();
   });
