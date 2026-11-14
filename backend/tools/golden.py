@@ -20,6 +20,11 @@ type. Only the following is allowed to differ:
    (``Razor\\'s Lair``). A mob is any object that carries ``is_pocket_boss``:
    the rows of ``/mobs``, ``/mobs/<id>`` and ``/symbiants/<aoid>/dropped-by``.
    No other response carries a mob's location.
+5. A nano program's ``casting_time`` and ``recharge_time`` are ignored. The
+   store being replaced served the tick count of whichever effect it loaded
+   first, which differed between builds for the same nano; the new store
+   serves the nano's attack delay (stat 294) and recharge delay (stat 210).
+   A nano program is any object that carries both keys.
 
 Row order is compared exactly. Every list the API sorts ends its sort on the
 AOID (or the mob id), so the order is the same whatever the storage. The one
@@ -512,11 +517,16 @@ def canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True)
 
 
+NANO_TIMING_KEYS = frozenset({"casting_time", "recharge_time"})
+
+
 def normalize(value: Any, parent: str = "", grandparent: str = "") -> Any:
     """Apply the allowed differences listed in the module docstring."""
     if isinstance(value, dict):
         internal = "aoid" in value or "source_type_id" in value
         skip = INTERNAL_ID_KEYS | ({"id"} if internal else frozenset())
+        if NANO_TIMING_KEYS <= value.keys():
+            skip = skip | NANO_TIMING_KEYS
         result = {k: normalize(v, k, parent) for k, v in value.items() if k not in skip}
         if "is_pocket_boss" in value and isinstance(value.get("location"), str):
             result["location"] = value["location"].replace("\\'", "'")
