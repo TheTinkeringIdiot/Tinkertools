@@ -1362,15 +1362,18 @@ def import_cas(args) -> bool:
             logger.info(f"Created the store's tables in schema {args.schema}")
         conn.commit()
 
-        specs = plan_builds(root, entries, read_registry(conn))
-        if args.slug:
-            specs = [spec for spec in specs if spec.slug in args.slug]
+        planned = plan_builds(root, entries, read_registry(conn))
+        specs = [spec for spec in planned if not args.slug or spec.slug in args.slug]
+        unknown = set(args.slug or []) - {spec.slug for spec in specs}
+        if unknown:
+            logger.error(f"No importable extract for: {', '.join(sorted(unknown))}")
+            return False
         stored = {row[0] for row in conn.execute("SELECT slug FROM build")}
 
         with cas_store.phase(timings, "curated data"):
             written = sync_curated(conn, files)
             policy_changed = [cas_store.update_presentation(conn, spec)
-                              for spec in specs if spec.slug in stored]
+                              for spec in planned if spec.slug in stored]
             if written["nano_overlay"]:
                 cas_store.apply_nano_overlay(conn)
             elif any(policy_changed):

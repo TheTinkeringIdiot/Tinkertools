@@ -18,8 +18,6 @@ Canonical form (the rules of app/core/parts.py, applied to both sides):
   compared per effect type.
 - A nano's stats are compared with stat 75 and 1003 replaced by the effective
   strain and substrain of ``nano_properties``, as the read path will serve them.
-- NUL characters, which the new store writes as the text ``\\u0000``, are
-  compared in that form.
 
 Also compared: item counts, nano properties (strain, substrain, school,
 professions, minimum level), symbiant rows, and the curated data as the build
@@ -71,17 +69,6 @@ STAT_STRAIN, STAT_SUBSTRAIN = 75, 1003
 
 def dump(value):
     return json.dumps(value, sort_keys=True, ensure_ascii=False)
-
-
-def visible_nul(value):
-    """``value`` with NUL characters written the way the new store keeps them."""
-    if isinstance(value, str):
-        return value.replace("\x00", "\\u0000")
-    if isinstance(value, dict):
-        return {key: visible_nul(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [visible_nul(item) for item in value]
-    return value
 
 
 def effect_key(spell_id, target, tick_count, tick_interval, params, criteria):
@@ -263,7 +250,7 @@ def current_items(conn, vid):
         by_id[item_id] = {
             "aoid": aoid,
             "scalars": (bool(is_nano), ql, item_class),
-            "text": (visible_nul(name), visible_nul(description or "")),
+            "text": (name, description or ""),
             "stats": [],
             "static_instance": [],
             "effects": collections.defaultdict(list),
@@ -348,7 +335,7 @@ def current_items(conn, vid):
                 target,
                 tick_count,
                 tick_interval,
-                visible_nul(spell_params),
+                spell_params,
                 criteria.get(spell, []),
             )
         )
@@ -611,6 +598,8 @@ def compare_curated(report, conn, build, gv):
     # A link is served when its item is present and its source is: a mob source
     # under the symbiants flag, an item source under the sources flag when the
     # source item is present. An item source is named by that item in this build.
+    # Sources are compared through their served links: the current store has no
+    # row for a crystal none of whose nanos is in the build.
     served = f"""
         SELECT i.aoid, st.name, s.entity_id, COALESCE(s.name, ct.name), s.metadata,
                l.drop_rate, l.min_ql, l.max_ql, l.conditions,
