@@ -1,18 +1,15 @@
 """
-Real database record identifiers for testing.
+Identifiers of real game records for testing.
 
-This module contains constants for specific AOIDs and IDs from the production
-TinkerTools database. These records have known characteristics and are used
-in tests to replace mock data with real database queries.
-
-All values are taken from database research and represent stable, well-known
-game data that can be reliably used in tests.
+Constants for specific AOIDs and names in the game data the development store
+holds. These records have known characteristics; a test on the real game data
+names them here and reads the values it expects from the store.
 
 Usage:
+    from app.store.items import load_records
     from app.tests.db_test_constants import ITEM_PISTOL_MASTERY
-    from app.tests.db_helpers import get_item_by_aoid
 
-    item = await get_item_by_aoid(session, ITEM_PISTOL_MASTERY)
+    (item,) = load_records(store_db, build, aoids=[ITEM_PISTOL_MASTERY])
 """
 
 # =============================================================================

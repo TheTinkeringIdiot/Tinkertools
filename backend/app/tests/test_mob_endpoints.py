@@ -1,22 +1,27 @@
 """
 Unit tests for mob API endpoints.
 
-Tests all mob-related endpoints using real database with transaction rollback.
-Queries real mobs and symbiants from the database instead of creating fixtures.
+Most tests read the real mobs and symbiants of the development store and take
+the values they expect from the store's own ``mob`` table. The two that need a
+store without mobs, or a mob without drops, fill a throwaway store.
 """
 
-from app.models import Mob
+from sqlalchemy import select
+
+from app.store import tables as t
 from app.tests.db_test_constants import (
     MOB_ADOBE_SUZERAIN,
     MOB_AESMA_DAEVA,
     MOB_AHPTA,
-    MOB_ALATYR,
 )
+from app.tests.fixtures.store_fixtures import item
 
 
-def _mob(db_session, name):
-    """Look up a real mob by its (unique) name."""
-    return db_session.query(Mob).filter(Mob.name == name).one()
+def _mob(store_db, name):
+    """The store's row of a served mob, by its (unique) name."""
+    return store_db.execute(
+        select(t.mob).where(t.mob.c.name == name, ~t.mob.c.retired)
+    ).one()
 
 
 # ============================================================================
@@ -24,19 +29,26 @@ def _mob(db_session, name):
 # ============================================================================
 
 
-def test_list_mobs_empty(client, db_session):
-    """Test listing mobs when database is empty (no mobs from fixtures)."""
-    response = client.get("/api/v1/mobs")
+def test_list_mobs_empty(store):
+    """Test listing mobs of a store that has none."""
+    store.add_build("b1", 1, items=[item(1)])
+
+    with store.client("b1") as client:
+        response = client.get("/api/v1/mobs")
 
     assert response.status_code == 200
-    data = response.json()
-    assert "items" in data
-    assert "total" in data
-    assert "page" in data
-    assert data["page"] == 1
+    assert response.json() == {
+        "items": [],
+        "total": 0,
+        "page": 1,
+        "page_size": 50,
+        "pages": 1,
+        "has_next": False,
+        "has_prev": False,
+    }
 
 
-def test_list_mobs_with_data(client, db_session):
+def test_list_mobs_with_data(client, store_db):
     """Test listing mobs with data using real database mobs."""
     response = client.get("/api/v1/mobs?page_size=200")
 
@@ -45,14 +57,14 @@ def test_list_mobs_with_data(client, db_session):
     assert len(data["items"]) >= 1
 
     # Verify Adobe Suzerain exists in the list
-    mob = _mob(db_session, MOB_ADOBE_SUZERAIN)
-    adobe_suzerain = next((m for m in data["items"] if m["id"] == mob.id), None)
+    mob = _mob(store_db, MOB_ADOBE_SUZERAIN)
+    adobe_suzerain = next((m for m in data["items"] if m["id"] == mob.mob_id), None)
     assert adobe_suzerain is not None
     assert adobe_suzerain["name"] == mob.name
     assert adobe_suzerain["level"] == mob.level
 
 
-def test_list_mobs_pagination(client, db_session):
+def test_list_mobs_pagination(client, store_db):
     """Test mob pagination."""
     response = client.get("/api/v1/mobs?page=1&page_size=5")
 
@@ -63,7 +75,7 @@ def test_list_mobs_pagination(client, db_session):
     assert data["page_size"] == 5
 
 
-def test_list_mobs_filter_pocket_boss(client, db_session):
+def test_list_mobs_filter_pocket_boss(client, store_db):
     """Test filtering mobs by pocket boss status."""
     response = client.get("/api/v1/mobs?is_pocket_boss=true&page_size=200")
 
@@ -76,14 +88,14 @@ def test_list_mobs_filter_pocket_boss(client, db_session):
         assert mob["is_pocket_boss"] is True
 
     # Verify our known pocket boss is in the list
-    mob = _mob(db_session, MOB_ADOBE_SUZERAIN)
-    adobe_suzerain = next((m for m in data["items"] if m["id"] == mob.id), None)
+    mob = _mob(store_db, MOB_ADOBE_SUZERAIN)
+    adobe_suzerain = next((m for m in data["items"] if m["id"] == mob.mob_id), None)
     assert adobe_suzerain is not None
 
 
-def test_list_mobs_filter_playfield(client, db_session):
+def test_list_mobs_filter_playfield(client, store_db):
     """Test filtering mobs by playfield."""
-    mob = _mob(db_session, MOB_ADOBE_SUZERAIN)
+    mob = _mob(store_db, MOB_ADOBE_SUZERAIN)
 
     response = client.get(f"/api/v1/mobs?playfield={mob.playfield}")
 
@@ -92,12 +104,12 @@ def test_list_mobs_filter_playfield(client, db_session):
     assert data["total"] >= 1
 
     # Find our mob
-    adobe_suzerain = next((m for m in data["items"] if m["id"] == mob.id), None)
+    adobe_suzerain = next((m for m in data["items"] if m["id"] == mob.mob_id), None)
     assert adobe_suzerain is not None
     assert mob.playfield in adobe_suzerain["playfield"]
 
 
-def test_list_mobs_filter_level_range(client, db_session):
+def test_list_mobs_filter_level_range(client, store_db):
     """Test filtering mobs by level range."""
     # Get mobs in level range 120-130 (Adobe Suzerain is level 125)
     response = client.get("/api/v1/mobs?min_level=120&max_level=130")
@@ -110,8 +122,8 @@ def test_list_mobs_filter_level_range(client, db_session):
         assert 120 <= mob["level"] <= 130
 
     # Adobe Suzerain should be in this range
-    mob = _mob(db_session, MOB_ADOBE_SUZERAIN)
-    adobe_suzerain = next((m for m in data["items"] if m["id"] == mob.id), None)
+    mob = _mob(store_db, MOB_ADOBE_SUZERAIN)
+    adobe_suzerain = next((m for m in data["items"] if m["id"] == mob.mob_id), None)
     assert adobe_suzerain is not None
 
 
@@ -135,22 +147,22 @@ def test_list_mobs_invalid_page_size(client):
 # ============================================================================
 
 
-def test_get_mob_by_id(client, db_session):
+def test_get_mob_by_id(client, store_db):
     """Test getting a specific mob by ID using real database mob."""
-    mob = _mob(db_session, MOB_ADOBE_SUZERAIN)
+    mob = _mob(store_db, MOB_ADOBE_SUZERAIN)
 
-    response = client.get(f"/api/v1/mobs/{mob.id}")
+    response = client.get(f"/api/v1/mobs/{mob.mob_id}")
 
     assert response.status_code == 200
     data = response.json()
-    assert data["id"] == mob.id
+    assert data["id"] == mob.mob_id
     assert data["name"] == mob.name
     assert data["level"] == mob.level
     assert data["playfield"] == mob.playfield
     assert data["is_pocket_boss"] is True
 
 
-def test_get_mob_not_found(client, db_session):
+def test_get_mob_not_found(client, store_db):
     """Test getting non-existent mob."""
     response = client.get("/api/v1/mobs/999999999")
 
@@ -172,12 +184,12 @@ def test_get_mob_invalid_id(client):
 # ============================================================================
 
 
-def test_get_mob_drops(client, db_session):
+def test_get_mob_drops(client, store_db):
     """Test getting symbiant drops for a mob using real database data."""
     # Adobe Suzerain has 7 symbiant drops
-    mob = _mob(db_session, MOB_ADOBE_SUZERAIN)
+    mob = _mob(store_db, MOB_ADOBE_SUZERAIN)
 
-    response = client.get(f"/api/v1/mobs/{mob.id}/drops")
+    response = client.get(f"/api/v1/mobs/{mob.mob_id}/drops")
 
     assert response.status_code == 200
     data = response.json()
@@ -186,12 +198,12 @@ def test_get_mob_drops(client, db_session):
     assert len(data) >= 1
 
 
-def test_get_mob_drops_filter_family(client, db_session):
+def test_get_mob_drops_filter_family(client, store_db):
     """Test filtering mob drops by family using real database data."""
     # Ahpta has symbiants from Artillery and Control families
-    mob = _mob(db_session, MOB_AHPTA)
+    mob = _mob(store_db, MOB_AHPTA)
 
-    response = client.get(f"/api/v1/mobs/{mob.id}/drops?family=Control")
+    response = client.get(f"/api/v1/mobs/{mob.mob_id}/drops?family=Control")
 
     assert response.status_code == 200
     data = response.json()
@@ -202,21 +214,26 @@ def test_get_mob_drops_filter_family(client, db_session):
         assert symbiant["family"] == "Control"
 
 
-def test_get_mob_drops_no_drops(client, db_session):
-    """Test getting drops for mob with no drops using real database mob."""
-    # Alatyr has 7 drops, but we'll test with an invalid mob ID for no drops
-    # Actually, all our test mobs have drops, so this tests the endpoint structure
-    mob = _mob(db_session, MOB_ALATYR)
+def test_get_mob_drops_no_drops(store):
+    """Test getting drops for a mob none of whose drops the build carries."""
+    symbiant = item(
+        1, name="Active Ocular Symbiant, Artillery Unit Aban", stats=[(298, 2)]
+    )
+    store.add_build("b1", 1, items=[symbiant])
+    store.curate(mobs=[("Ahpta", "Inferno", 1), ("Alatyr", "Inferno", 2)])
 
-    response = client.get(f"/api/v1/mobs/{mob.id}/drops")
+    with store.client("b1") as client:
+        mobs = {mob["name"]: mob for mob in client.get("/api/v1/mobs").json()["items"]}
+        with_drops = client.get(f"/api/v1/mobs/{mobs['Ahpta']['id']}/drops")
+        without_drops = client.get(f"/api/v1/mobs/{mobs['Alatyr']['id']}/drops")
 
-    assert response.status_code == 200
-    data = response.json()
-    assert isinstance(data, list)
-    # Alatyr actually has drops, so we just verify it returns a list
+    assert [symbiant["aoid"] for symbiant in with_drops.json()] == [1]
+    assert without_drops.status_code == 200
+    assert without_drops.json() == []
+    assert mobs["Alatyr"]["symbiant_count"] == 0
 
 
-def test_get_mob_drops_mob_not_found(client, db_session):
+def test_get_mob_drops_mob_not_found(client, store_db):
     """Test getting drops for non-existent mob."""
     response = client.get("/api/v1/mobs/999999999/drops")
 
@@ -233,12 +250,12 @@ def test_get_mob_drops_invalid_mob_id(client):
     assert response.status_code == 422
 
 
-def test_get_mob_drops_with_actions(client, db_session):
+def test_get_mob_drops_with_actions(client, store_db):
     """Test that mob drops include actions with criteria using real database data."""
     # Adobe Suzerain drops symbiants which should have actions
-    mob = _mob(db_session, MOB_ADOBE_SUZERAIN)
+    mob = _mob(store_db, MOB_ADOBE_SUZERAIN)
 
-    response = client.get(f"/api/v1/mobs/{mob.id}/drops")
+    response = client.get(f"/api/v1/mobs/{mob.mob_id}/drops")
 
     assert response.status_code == 200
     data = response.json()
@@ -249,12 +266,12 @@ def test_get_mob_drops_with_actions(client, db_session):
         assert "actions" in symbiant_response
 
 
-def test_get_mob_drops_with_spell_data(client, db_session):
+def test_get_mob_drops_with_spell_data(client, store_db):
     """Test that mob drops include spell_data using real database data."""
     # Adobe Suzerain drops symbiants which should have spell data
-    mob = _mob(db_session, MOB_ADOBE_SUZERAIN)
+    mob = _mob(store_db, MOB_ADOBE_SUZERAIN)
 
-    response = client.get(f"/api/v1/mobs/{mob.id}/drops")
+    response = client.get(f"/api/v1/mobs/{mob.mob_id}/drops")
 
     assert response.status_code == 200
     data = response.json()
@@ -270,23 +287,23 @@ def test_get_mob_drops_with_spell_data(client, db_session):
 # ============================================================================
 
 
-def test_mob_endpoints_performance_logging(client, db_session):
+def test_mob_endpoints_performance_logging(client, store_db):
     """Test that mob endpoints log performance metrics."""
-    mob = _mob(db_session, MOB_ADOBE_SUZERAIN)
+    mob = _mob(store_db, MOB_ADOBE_SUZERAIN)
 
-    response = client.get(f"/api/v1/mobs/{mob.id}")
+    response = client.get(f"/api/v1/mobs/{mob.mob_id}")
 
     assert response.status_code == 200
     # Performance logging is done by the @performance_monitor decorator
     # We just verify the endpoint works correctly
 
 
-def test_list_mobs_with_symbiant_counts(client, db_session):
+def test_list_mobs_with_symbiant_counts(client, store_db):
     """Test that mob list includes symbiant drop counts."""
-    mob = _mob(db_session, MOB_ADOBE_SUZERAIN)
+    mob = _mob(store_db, MOB_ADOBE_SUZERAIN)
 
     # Get the mob by ID to check symbiant_count field
-    response = client.get(f"/api/v1/mobs/{mob.id}")
+    response = client.get(f"/api/v1/mobs/{mob.mob_id}")
 
     assert response.status_code == 200
     data = response.json()
@@ -295,11 +312,11 @@ def test_list_mobs_with_symbiant_counts(client, db_session):
     assert data["symbiant_count"] >= 1
 
 
-def test_get_mob_by_id_with_symbiant_count(client, db_session):
+def test_get_mob_by_id_with_symbiant_count(client, store_db):
     """Test that mob detail includes symbiant drop count."""
-    mob = _mob(db_session, MOB_ADOBE_SUZERAIN)
+    mob = _mob(store_db, MOB_ADOBE_SUZERAIN)
 
-    response = client.get(f"/api/v1/mobs/{mob.id}")
+    response = client.get(f"/api/v1/mobs/{mob.mob_id}")
 
     assert response.status_code == 200
     data = response.json()
@@ -308,7 +325,7 @@ def test_get_mob_by_id_with_symbiant_count(client, db_session):
     assert data["symbiant_count"] >= 1
 
 
-def test_list_mobs_ordering(client, db_session):
+def test_list_mobs_ordering(client, store_db):
     """Test that mobs are ordered by level then name."""
     # Just verify that endpoint returns ordered results by level
     response = client.get("/api/v1/mobs?page=1&page_size=50")
@@ -322,12 +339,12 @@ def test_list_mobs_ordering(client, db_session):
         assert data["items"][i]["level"] <= data["items"][i + 1]["level"]
 
 
-def test_mob_drops_ordering(client, db_session):
+def test_mob_drops_ordering(client, store_db):
     """Test that mob drops are ordered by QL then name using real database data."""
     # Adobe Suzerain has 7 symbiants with different QLs (150, 170, etc.)
-    mob = _mob(db_session, MOB_ADOBE_SUZERAIN)
+    mob = _mob(store_db, MOB_ADOBE_SUZERAIN)
 
-    response = client.get(f"/api/v1/mobs/{mob.id}/drops")
+    response = client.get(f"/api/v1/mobs/{mob.mob_id}/drops")
 
     assert response.status_code == 200
     data = response.json()
@@ -341,18 +358,18 @@ def test_mob_drops_ordering(client, db_session):
                 assert data[i]["name"] <= data[i + 1]["name"]
 
 
-def test_multiple_mobs_multiple_drops(client, db_session):
+def test_multiple_mobs_multiple_drops(client, store_db):
     """Test scenario with multiple mobs each having multiple drops."""
     # Use real mobs: Adobe Suzerain (7 drops), Ahpta (5 drops), Aesma Daeva (1 drop)
     mobs = [
-        _mob(db_session, MOB_ADOBE_SUZERAIN),
-        _mob(db_session, MOB_AHPTA),
-        _mob(db_session, MOB_AESMA_DAEVA),
+        _mob(store_db, MOB_ADOBE_SUZERAIN),
+        _mob(store_db, MOB_AHPTA),
+        _mob(store_db, MOB_AESMA_DAEVA),
     ]
 
     # Test each mob endpoint works
     for mob in mobs:
-        response = client.get(f"/api/v1/mobs/{mob.id}/drops")
+        response = client.get(f"/api/v1/mobs/{mob.mob_id}/drops")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
@@ -364,7 +381,7 @@ def test_multiple_mobs_multiple_drops(client, db_session):
 
     # Check that our mobs appear in the list
     for mob in mobs:
-        test_mob = next((m for m in data["items"] if m["id"] == mob.id), None)
+        test_mob = next((m for m in data["items"] if m["id"] == mob.mob_id), None)
         if test_mob:
             assert "symbiant_count" in test_mob
             assert test_mob["symbiant_count"] >= 0

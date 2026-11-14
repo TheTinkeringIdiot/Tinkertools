@@ -2,23 +2,43 @@
 Unit tests for nano API endpoints using real database data.
 
 Tests all 7 nano endpoints against actual Anarchy Online game data,
-validating full pipeline from database to response without mocks.
+validating full pipeline from database to response without mocks. Expected
+values come from the store the endpoints read: the nanos' raw stats and the
+criteria of their Use actions, not the derived ``nano_properties`` columns the
+filters use.
 """
 
 import math
 from collections import Counter
 
-from sqlalchemy import text
+from sqlalchemy import or_, select
 
 from app.core.nano_strains import NANO_STRAINS
+from app.store import tables as t
+from app.store.items import load_records
+from app.store.presence import has_stat, nano_policy, revisions
 
-from app.models import (
-    Action,
-    Item,
-    ItemSpellData,
-    SpellCriterion,
-    SpellDataSpells,
-)
+USE_ACTION = 3
+STAT_LEVEL = 54
+STAT_NANO_SCHOOL = 405
+PROFESSION_STATS = (60, 368)
+OPERATOR_EQUAL, OPERATOR_GREATER = 0, 2
+# OR, NOT and the modifiers that turn a criterion to something else than the
+# caster: a Use action with one of them is not answerable criterion by criterion
+COMPOUND_OPERATORS = {3, 42, 18, 19, 21, 26}
+
+_nano_records = {}
+
+
+def _nanos(store_db, build):
+    """Every nano of the build as the store serves it, read once per run."""
+    if build.slug not in _nano_records:
+        rev_ids = store_db.execute(
+            revisions(build).where(t.item_revision.c.is_nano)
+        ).scalars()
+        _nano_records[build.slug] = load_records(store_db, build, rev_ids=list(rev_ids))
+    return _nano_records[build.slug]
+
 
 # ============================================================================
 # GET /api/v1/nanos - List nanos with pagination
@@ -160,22 +180,22 @@ def test_get_nanos_sort_by_ql_desc(client):
     assert qls == sorted(qls, reverse=True)
 
 
-STRAIN_SQL = """
-    SELECT i.aoid, sv.value FROM items i
-    JOIN item_stats ist ON ist.item_id = i.id
-    JOIN stat_values sv ON sv.id = ist.stat_value_id
-    WHERE i.is_nano AND sv.stat = 75
-"""
+def _strains_by_nano(store_db, build):
+    """{AOID: NanoStrain} of the build's nanos that have one: the effective
+    strain of the build's strain policy, as the store derives it."""
+    properties = t.nano_properties
+    return dict(
+        store_db.execute(
+            revisions(build, t.item_revision.c.aoid, properties.c.strain)
+            .join(properties, nano_policy(build))
+            .where(t.item_revision.c.is_nano, properties.c.strain.isnot(None))
+        ).all()
+    )
 
 
-def _strains_by_nano(db_session):
-    """{AOID: NanoStrain} straight from the raw stat."""
-    return dict(db_session.execute(text(STRAIN_SQL)).all())
-
-
-def test_get_nanos_strain_filter_pages_sum_to_total(client, db_session):
+def test_get_nanos_strain_filter_pages_sum_to_total(client, store_db, build):
     """Test a strain-filtered list pages cleanly: pages add up to total."""
-    by_nano = _strains_by_nano(db_session)
+    by_nano = _strains_by_nano(store_db, build)
     strain, count = Counter(by_nano.values()).most_common(1)[0]
     page_size = 3
     assert count > page_size
@@ -204,56 +224,64 @@ def test_get_nanos_strain_filter_pages_sum_to_total(client, db_session):
     assert set(ids) == {i for i, s in by_nano.items() if s == strain}
 
 
-# Independent SQL for the derived filters. Each reads the raw stats and Use
-# criteria, not nano_properties. Profession and level are only answerable by a
-# join for Use criteria without OR, NOT or target modifiers, so those two are
-# compared on that subset of nanos; every nano the API returns must also carry
-# the value it was filtered on.
-SCHOOL_SQL = """
-    SELECT i.aoid FROM items i
-    JOIN item_stats ist ON ist.item_id = i.id
-    JOIN stat_values sv ON sv.id = ist.stat_value_id
-    WHERE i.is_nano AND sv.stat = 405 AND sv.value = ANY(:values)
-"""
-
-SIMPLE_USE_ACTIONS_SQL = """
-    SELECT a.id, i.aoid FROM actions a
-    JOIN items i ON i.id = a.item_id AND i.is_nano
-    WHERE a.action = 3
-      AND NOT EXISTS (
-        SELECT 1 FROM action_criteria ac JOIN criteria c ON c.id = ac.criterion_id
-        WHERE ac.action_id = a.id AND c.operator IN (3, 42, 18, 19, 21, 26)
-      )
-"""
-
-# For Use criteria whose profession criteria are all "== p" for one p: that p,
-# or NULL when there are none (any profession can cast it)
-SIMPLE_PROFESSION_SQL = f"""
-    SELECT s.aoid,
-           MIN(c.value2) FILTER (WHERE c.value1 IN (60, 368)) AS profession
-    FROM ({SIMPLE_USE_ACTIONS_SQL}) s
-    LEFT JOIN action_criteria ac ON ac.action_id = s.id
-    LEFT JOIN criteria c ON c.id = ac.criterion_id
-    GROUP BY s.aoid
-    HAVING bool_and(c.value1 IS NULL OR c.value1 NOT IN (60, 368) OR c.operator = 0)
-       AND COUNT(DISTINCT c.value2) FILTER (WHERE c.value1 IN (60, 368)) <= 1
-"""
-
-# Lowest level = 1 + the largest "Level > n" (operator 2), for Use criteria
-# whose only level criteria are of that form
-SIMPLE_LEVEL_SQL = f"""
-    SELECT s.aoid,
-           COALESCE(MAX(c.value2) FILTER (WHERE c.value1 = 54) + 1, 1) AS level
-    FROM ({SIMPLE_USE_ACTIONS_SQL}) s
-    LEFT JOIN action_criteria ac ON ac.action_id = s.id
-    LEFT JOIN criteria c ON c.id = ac.criterion_id
-    GROUP BY s.aoid
-    HAVING bool_and(c.value1 IS DISTINCT FROM 54 OR c.operator = 2)
-"""
+# Independent answers for the derived filters. Each reads the raw stats and
+# Use criteria, not nano_properties. Profession and level are only answerable
+# criterion by criterion for Use criteria without OR, NOT or target modifiers,
+# so those two are compared on that subset of nanos; every nano the API returns
+# must also carry the value it was filtered on.
+def _in_schools(store_db, build, schools):
+    """AOIDs of the nanos whose NanoSchool stat is one of ``schools``."""
+    return set(
+        store_db.execute(
+            revisions(build, t.item_revision.c.aoid).where(
+                t.item_revision.c.is_nano,
+                has_stat(
+                    t.stat_entry.c.stat == STAT_NANO_SCHOOL,
+                    t.stat_entry.c.value.in_(schools),
+                ),
+            )
+        ).scalars()
+    )
 
 
-def _simple_ids(db_session):
-    return {row[1] for row in db_session.execute(text(SIMPLE_USE_ACTIONS_SQL))}
+def _simple_use_criteria(store_db, build):
+    """{AOID: criteria of the Use action} of the nanos whose Use action has
+    no OR, NOT or target modifier."""
+    simple = {}
+    for record in _nanos(store_db, build):
+        for action in record.actions:
+            operators = {operator for _, _, operator in action["criteria"]}
+            if action["action"] == USE_ACTION and not operators & COMPOUND_OPERATORS:
+                simple[record.aoid] = action["criteria"]
+    return simple
+
+
+def _simple_ids(store_db, build):
+    return set(_simple_use_criteria(store_db, build))
+
+
+def _simple_professions(store_db, build):
+    """{AOID: profession} for Use criteria whose profession criteria are all
+    "== p" for one p: that p, or None when there are none (any profession can
+    cast it)."""
+    professions = {}
+    for aoid, criteria in _simple_use_criteria(store_db, build).items():
+        named = [c for c in criteria if c[0] in PROFESSION_STATS]
+        values = {value for _, value, _ in named}
+        if all(c[2] == OPERATOR_EQUAL for c in named) and len(values) <= 1:
+            professions[aoid] = min(values, default=None)
+    return professions
+
+
+def _simple_levels(store_db, build):
+    """{AOID: lowest level} = 1 + the largest "Level > n", for Use criteria
+    whose only level criteria are of that form."""
+    levels = {}
+    for aoid, criteria in _simple_use_criteria(store_db, build).items():
+        on_level = [c for c in criteria if c[0] == STAT_LEVEL]
+        if all(c[2] == OPERATOR_GREATER for c in on_level):
+            levels[aoid] = max((value + 1 for _, value, _ in on_level), default=1)
+    return levels
 
 
 def _all_filtered(client, params, page_size=200):
@@ -276,9 +304,9 @@ def _all_filtered(client, params, page_size=200):
     return nanos
 
 
-def test_get_nanos_school_filter_matches_nano_school_stat(client, db_session):
+def test_get_nanos_school_filter_matches_nano_school_stat(client, store_db, build):
     """school=Medical returns exactly the nanos whose NanoSchool stat is 2."""
-    expected = {row[0] for row in db_session.execute(text(SCHOOL_SQL), {"values": [2]})}
+    expected = _in_schools(store_db, build, [2])
     assert expected
 
     nanos = _all_filtered(client, {"school": "Medical"})
@@ -286,29 +314,26 @@ def test_get_nanos_school_filter_matches_nano_school_stat(client, db_session):
     assert all(nano["school"] == "Medical" for nano in nanos)
 
 
-def test_get_nanos_several_schools_match_any(client, db_session):
+def test_get_nanos_several_schools_match_any(client, store_db, build):
     """Repeated school params match nanos in any of those schools."""
-    expected = {
-        row[0] for row in db_session.execute(text(SCHOOL_SQL), {"values": [2, 4]})
-    }
+    expected = _in_schools(store_db, build, [2, 4])
     nanos = _all_filtered(client, {"school": ["Medical", "Psi"]})
     assert {nano["aoid"] for nano in nanos} == expected
     assert {nano["school"] for nano in nanos} == {"Medical", "Psi"}
 
 
-def _expected_for_professions(db_session, profession_ids):
-    """(simple nano ids, those castable by any of profession_ids) from raw SQL."""
-    rows = db_session.execute(text(SIMPLE_PROFESSION_SQL)).all()
-    simple = {item_id for item_id, _ in rows}
+def _expected_for_professions(store_db, build, profession_ids):
+    """(simple nano ids, those castable by any of profession_ids)."""
+    professions = _simple_professions(store_db, build)
     castable = {
-        item_id
-        for item_id, profession in rows
+        aoid
+        for aoid, profession in professions.items()
         if profession is None or profession in profession_ids
     }
-    return simple, castable
+    return set(professions), castable
 
 
-def test_get_nanos_profession_filter_matches_use_criteria(client, db_session):
+def test_get_nanos_profession_filter_matches_use_criteria(client, store_db, build):
     """profession=Doctor (or its id) returns what a Doctor can cast: nanos
     limited to professions including Doctor, and unrestricted ones."""
     nanos = _all_filtered(client, {"profession": "Doctor"})
@@ -320,7 +345,7 @@ def test_get_nanos_profession_filter_matches_use_criteria(client, db_session):
     )
     assert any(nano["professions"] == [] for nano in nanos)
 
-    simple, expected = _expected_for_professions(db_session, {10})
+    simple, expected = _expected_for_professions(store_db, build, {10})
     assert expected
     assert ids & simple == expected
 
@@ -328,12 +353,12 @@ def test_get_nanos_profession_filter_matches_use_criteria(client, db_session):
     assert by_id["total"] == len(ids)
 
 
-def test_get_nanos_several_professions_match_any(client, db_session):
+def test_get_nanos_several_professions_match_any(client, store_db, build):
     """Repeated profession params match nanos castable by any of them."""
     nanos = _all_filtered(client, {"profession": ["Doctor", "Nano-Technician"]})
     ids = {nano["aoid"] for nano in nanos}
 
-    simple, expected = _expected_for_professions(db_session, {10, 11})
+    simple, expected = _expected_for_professions(store_db, build, {10, 11})
     assert ids & simple == expected
 
     doctor = {n["aoid"] for n in _all_filtered(client, {"profession": "Doctor"})}
@@ -376,16 +401,16 @@ def test_search_nanos_takes_the_list_filters(client):
     assert {nano["aoid"] for nano in found} <= listed
 
 
-def test_get_nanos_level_filter_matches_use_criteria(client, db_session):
+def test_get_nanos_level_filter_matches_use_criteria(client, store_db, build):
     """level_min/level_max bound the lowest level that can cast the nano."""
     nanos = _all_filtered(client, {"level_min": 150, "level_max": 200})
     assert nanos
     assert all(150 <= nano["level"] <= 200 for nano in nanos)
 
-    simple = _simple_ids(db_session)
+    simple = _simple_ids(store_db, build)
     expected = {
-        item_id
-        for item_id, level in db_session.execute(text(SIMPLE_LEVEL_SQL))
+        aoid
+        for aoid, level in _simple_levels(store_db, build).items()
         if 150 <= level <= 200
     }
     assert expected
@@ -400,9 +425,9 @@ def test_get_nanos_combined_filters_intersect(client):
     assert {n["aoid"] for n in both} == doctor & medical
 
 
-def test_get_nanos_several_strains_match_any(client, db_session):
+def test_get_nanos_several_strains_match_any(client, store_db, build):
     """Repeated strain params, by id or name, match nanos with any of them."""
-    by_nano = _strains_by_nano(db_session)
+    by_nano = _strains_by_nano(store_db, build)
     (first, _), (second, _) = Counter(by_nano.values()).most_common(2)
     expected = {i for i, s in by_nano.items() if s in (first, second)}
 
@@ -428,20 +453,20 @@ def test_get_nanos_several_strains_match_any(client, db_session):
     assert nothing["total"] == 0
 
 
-def test_nano_strain_fields_match_the_stat(client, db_session):
+def test_nano_strain_fields_match_the_stat(client, store_db, build):
     """strain_id is the raw stat 75 (null without one), strain its name."""
-    by_nano = _strains_by_nano(db_session)
+    by_nano = _strains_by_nano(store_db, build)
     data = client.get("/api/v1/nanos", params={"page_size": 200}).json()
     for nano in data["items"]:
         assert nano["strain_id"] == by_nano.get(nano["aoid"])
         assert nano["strain"] == NANO_STRAINS.get(nano["strain_id"])
 
 
-def test_get_nano_strains_counts_the_filtered_nanos(client, db_session):
+def test_get_nano_strains_counts_the_filtered_nanos(client, store_db, build):
     """/nanos/strains lists each strain of the filtered nanos with its count."""
-    medical = {row[0] for row in db_session.execute(text(SCHOOL_SQL), {"values": [2]})}
+    medical = _in_schools(store_db, build, [2])
     expected = Counter(
-        s for i, s in _strains_by_nano(db_session).items() if i in medical
+        s for i, s in _strains_by_nano(store_db, build).items() if i in medical
     )
 
     data = client.get("/api/v1/nanos/strains", params={"school": "Medical"}).json()
@@ -480,7 +505,7 @@ def test_get_nano_strains_with_search_text(client):
     assert 0 < total == with_strain["total"] <= found["total"]
 
 
-def test_search_nanos_sorts_like_the_list(client, db_session):
+def test_search_nanos_sorts_like_the_list(client, store_db, build):
     """/nanos/search takes sort_by and sort_desc, stable across pages."""
     for sort_by in ("name", "ql", "level"):
         for sort_desc in (False, True):
@@ -495,17 +520,28 @@ def test_search_nanos_sorts_like_the_list(client, db_session):
             assert len({nano["aoid"] for nano in nanos}) == len(nanos)
             if sort_by == "name":
                 # Name order is the database collation's, so ask it
-                expected = [
-                    row[0]
-                    for row in db_session.execute(
-                        text(
-                            "SELECT aoid FROM items WHERE is_nano AND "
-                            "(name ILIKE '%heal%' OR description ILIKE '%heal%') "
-                            f"ORDER BY name {'DESC' if sort_desc else 'ASC'}, aoid "
-                            "LIMIT 40"
+                name = t.part_text.c.name
+                expected = list(
+                    store_db.execute(
+                        revisions(build, t.item_revision.c.aoid)
+                        .join(
+                            t.part_text,
+                            t.part_text.c.text_id == t.item_revision.c.text_id,
                         )
-                    )
-                ]
+                        .where(
+                            t.item_revision.c.is_nano,
+                            or_(
+                                name.ilike("%heal%"),
+                                t.part_text.c.description.ilike("%heal%"),
+                            ),
+                        )
+                        .order_by(
+                            name.desc() if sort_desc else name.asc(),
+                            t.item_revision.c.aoid,
+                        )
+                        .limit(40)
+                    ).scalars()
+                )
                 assert [nano["aoid"] for nano in nanos] == expected, sort_desc
             else:
                 values = [nano[sort_by] for nano in nanos if nano[sort_by] is not None]
@@ -549,7 +585,7 @@ def test_get_nanos_sort_by_level(client):
     assert last["items"][-1]["level"] is None
 
 
-def test_known_nanos_have_expected_derived_fields(client, db_session):
+def test_known_nanos_have_expected_derived_fields(client, store_db, build):
     """Well-known nanos read back with the school, professions and level the game gives them."""
     expected = {
         218168: ("Combat", ["Nano-Technician"], 220),  # Izgimmer's Ultimatum
@@ -558,11 +594,8 @@ def test_known_nanos_have_expected_derived_fields(client, db_session):
         235248: ("Psi", [], 125),  # Umbral Wrangler (Major), any profession
     }
     for aoid, (school, professions, level) in expected.items():
-        item = (
-            db_session.query(Item)
-            .filter(Item.is_nano.is_(True), Item.aoid == aoid)
-            .one()
-        )
+        (item,) = load_records(store_db, build, aoids=[aoid])
+        assert item.is_nano
         found = client.get(
             "/api/v1/nanos/search", params={"q": item.name, "page_size": 200}
         ).json()["items"]
@@ -675,42 +708,28 @@ def test_search_nanos_pagination(client):
 # ============================================================================
 
 
-def _nano_with_use_and_spell_criteria(db_session):
+def _nano_with_use_and_spell_criteria(store_db, build):
     """A nano whose Use action and whose spells both carry criteria."""
-    use_action_items = (
-        db_session.query(Action.item_id)
-        .filter(Action.action == 3, Action.action_criteria.any())
-        .subquery()
-    )
-    spell_criteria_items = (
-        db_session.query(ItemSpellData.item_id)
-        .join(
-            SpellDataSpells,
-            SpellDataSpells.spell_data_id == ItemSpellData.spell_data_id,
+    for record in sorted(_nanos(store_db, build), key=lambda nano: nano.aoid):
+        use_criteria = any(
+            action["action"] == USE_ACTION and action["criteria"]
+            for action in record.actions
         )
-        .join(SpellCriterion, SpellCriterion.spell_id == SpellDataSpells.spell_id)
-        .subquery()
-    )
-    return (
-        db_session.query(Item)
-        .filter(
-            Item.is_nano.is_(True),
-            Item.id.in_(db_session.query(use_action_items.c.item_id)),
-            Item.id.in_(db_session.query(spell_criteria_items.c.item_id)),
+        spell_criteria = any(
+            effect["criteria"]
+            for event in record.effects
+            for effect in event["effects"]
         )
-        .order_by(Item.id)
-        .first()
-    )
+        if use_criteria and spell_criteria:
+            return record
+    return None
 
 
-def _expected_actions(item):
-    """The item's actions as the API serializes them, criteria in order."""
+def _expected_actions(record):
+    """The nano's actions as the store holds them, criteria in order."""
     return sorted(
-        (
-            action.action,
-            [(c.value1, c.value2, c.operator) for c in action.criteria],
-        )
-        for action in item.actions
+        (action["action"], [tuple(criterion) for criterion in action["criteria"]])
+        for action in record.actions
     )
 
 
@@ -724,9 +743,9 @@ def _response_actions(nano):
     )
 
 
-def test_list_and_search_nanos_return_actions(client, db_session):
-    """The list and search endpoints return the same actions as the database."""
-    nano = _nano_with_use_and_spell_criteria(db_session)
+def test_list_and_search_nanos_return_actions(client, store_db, build):
+    """The list and search endpoints return the same actions as the store."""
+    nano = _nano_with_use_and_spell_criteria(store_db, build)
     assert nano is not None
     expected = _expected_actions(nano)
 
@@ -803,7 +822,7 @@ def test_get_nanos_by_profession_returns_item_detail(client):
         assert item["is_nano"] is True
 
 
-def test_profession_and_search_endpoints_return_derived_fields(client, db_session):
+def test_profession_and_search_endpoints_return_derived_fields(client, store_db, build):
     """/nanos/profession/{id} and /nanos/search carry school, professions, level."""
     items = client.get("/api/v1/nanos/profession/11").json()["items"]
     assert items
@@ -811,7 +830,7 @@ def test_profession_and_search_endpoints_return_derived_fields(client, db_sessio
         assert {"school", "professions", "level"} <= item.keys()
     # That endpoint matches any caster Profession == NT criterion; the derived
     # list agrees wherever the Use criteria have no OR, NOT or target modifier
-    simple = _simple_ids(db_session)
+    simple = _simple_ids(store_db, build)
     assert all(
         "Nano-Technician" in item["professions"]
         for item in items

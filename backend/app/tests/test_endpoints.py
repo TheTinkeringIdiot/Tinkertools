@@ -2,23 +2,22 @@
 Unit tests for API endpoints.
 
 Request validation is tested without a database. The list and search
-endpoints build multi-step queries that mocks cannot follow faithfully, so they
-run against the real database with transaction rollback (the shared ``client``
-fixture). Item detail reads the content-addressed store: it is checked here
-against the real game data and, on controlled data, in test_store_read.py.
+endpoints run against the real game data (the shared ``client`` fixture) and are
+compared with what the store's loader reads for the same build. The same
+routes are tested on controlled data in test_store_read.py and
+test_item_search.py.
 """
 
 import math
 
 import pytest
-from unittest.mock import Mock
 from fastapi.testclient import TestClient
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_, select
 
 from app.main import app
-from app.core.database import get_db
-from app.models import Item
+from app.store import tables as t
+from app.store.items import load_records, load_sources
+from app.store.presence import revisions
 from app.tests.db_test_constants import ITEM_PISTOL_MASTERY
 
 
@@ -27,15 +26,8 @@ class TestGeneralEndpoints:
 
     @pytest.fixture
     def client(self):
-        """Create a test client with mocked database dependency."""
-
-        def override_get_db():
-            return Mock(spec=Session)
-
-        app.dependency_overrides[get_db] = override_get_db
-        client = TestClient(app)
-        yield client
-        app.dependency_overrides.clear()
+        """Create a test client; these requests are answered without a database."""
+        return TestClient(app)
 
     def test_health_endpoint(self, client):
         """Test health check endpoint."""
@@ -61,15 +53,8 @@ class TestItemEndpoints:
 
     @pytest.fixture
     def client(self):
-        """Create a test client with mocked database dependency."""
-
-        def override_get_db():
-            return Mock(spec=Session)
-
-        app.dependency_overrides[get_db] = override_get_db
-        client = TestClient(app)
-        yield client
-        app.dependency_overrides.clear()
+        """Create a test client; these requests are answered without a database."""
+        return TestClient(app)
 
     # ============================================================================
     # Validation Error Tests
@@ -93,9 +78,16 @@ class TestItemListAndSearchEndpoints:
     """Test cases for the item list and search endpoints against real data."""
 
     @pytest.fixture
-    def pistol_mastery(self, db_session):
+    def pistol_mastery(self, store_db, build):
         """Pistol Mastery: a real item with stats, spell data and actions."""
-        return db_session.query(Item).filter(Item.aoid == ITEM_PISTOL_MASTERY).one()
+        (record,) = load_records(store_db, build, aoids=[ITEM_PISTOL_MASTERY])
+        return record
+
+    @pytest.fixture
+    def sources(self, store_db, build, pistol_mastery):
+        """The sources the build serves for Pistol Mastery."""
+        aoid = pistol_mastery.aoid
+        return load_sources(store_db, build, [aoid]).get(aoid, [])
 
     # ============================================================================
     # GET /api/v1/items Tests
@@ -114,13 +106,15 @@ class TestItemListAndSearchEndpoints:
         assert data["has_next"] is False
         assert data["has_prev"] is False
 
-    def test_get_items_with_filters(self, client, db_session):
+    def test_get_items_with_filters(self, client, store_db, build):
         """Test item filtering with query parameters."""
-        expected_total = (
-            db_session.query(Item)
-            .filter(Item.item_class == 1, Item.ql >= 100, Item.ql <= 200)
-            .count()
+        revision = t.item_revision
+        matching = revisions(build).where(
+            revision.c.item_class == 1, revision.c.ql >= 100, revision.c.ql <= 200
         )
+        expected_total = store_db.execute(
+            select(func.count()).select_from(matching.subquery())
+        ).scalar_one()
         assert expected_total > 0
 
         response = client.get(
@@ -135,7 +129,7 @@ class TestItemListAndSearchEndpoints:
             assert item["item_class"] == 1
             assert 100 <= item["ql"] <= 200
 
-    def test_get_items_returns_detailed_items(self, client, pistol_mastery):
+    def test_get_items_returns_detailed_items(self, client, pistol_mastery, sources):
         """Test that the items list endpoint returns detailed item information."""
         response = client.get(
             f"/api/v1/items?min_ql={pistol_mastery.ql}&max_ql={pistol_mastery.ql}"
@@ -145,23 +139,23 @@ class TestItemListAndSearchEndpoints:
         assert response.status_code == 200
         items = {item["aoid"]: item for item in response.json()["items"]}
         assert pistol_mastery.aoid in items
-        self._assert_matches_db(items[pistol_mastery.aoid], pistol_mastery)
+        self._assert_matches_store(items[pistol_mastery.aoid], pistol_mastery, sources)
 
     # ============================================================================
     # GET /api/v1/items/{aoid} Tests
     # ============================================================================
 
     def test_get_item_returns_the_item_with_its_related_data(
-        self, client, pistol_mastery
+        self, client, pistol_mastery, sources
     ):
-        """Item detail, read from the new store, agrees with the current one."""
+        """Item detail carries every part the store holds for the item."""
         response = client.get(f"/api/v1/items/{pistol_mastery.aoid}")
 
         assert response.status_code == 200
         data = response.json()
         assert data["aoid"] == pistol_mastery.aoid
         assert data["stats"] and data["spell_data"] and data["sources"]
-        self._assert_matches_db(data, pistol_mastery)
+        self._assert_matches_store(data, pistol_mastery, sources)
 
     def test_get_item_not_found(self, client):
         response = client.get("/api/v1/items/999999999")
@@ -187,7 +181,7 @@ class TestItemListAndSearchEndpoints:
         )
         assert pistol_mastery.aoid in [item["aoid"] for item in data["items"]]
 
-    def test_search_items_returns_detailed_items(self, client, pistol_mastery):
+    def test_search_items_returns_detailed_items(self, client, pistol_mastery, sources):
         """Test that the item search endpoint returns detailed item information."""
         response = client.get(
             f"/api/v1/items/search?q={pistol_mastery.name}&page_size=1000"
@@ -196,19 +190,26 @@ class TestItemListAndSearchEndpoints:
         assert response.status_code == 200
         items = {item["aoid"]: item for item in response.json()["items"]}
         assert pistol_mastery.aoid in items
-        self._assert_matches_db(items[pistol_mastery.aoid], pistol_mastery)
+        self._assert_matches_store(items[pistol_mastery.aoid], pistol_mastery, sources)
 
-    def test_pagination(self, client, db_session, pistol_mastery):
+    def test_pagination(self, client, store_db, build, pistol_mastery):
         """Test that search pages partition the full result set."""
         # The term matches several items sharing a name ("Nano Can: Pistol
         # Mastery"), so pages only partition cleanly with a unique sort order
         term = pistol_mastery.name
-        expected_aoids = {
-            aoid
-            for (aoid,) in db_session.query(Item.aoid).filter(
-                or_(Item.name.ilike(f"%{term}%"), Item.description.ilike(f"%{term}%"))
-            )
-        }
+        text = t.part_text
+        expected_aoids = set(
+            store_db.execute(
+                revisions(build, t.item_revision.c.aoid)
+                .join(text, text.c.text_id == t.item_revision.c.text_id)
+                .where(
+                    or_(
+                        text.c.name.ilike(f"%{term}%"),
+                        text.c.description.ilike(f"%{term}%"),
+                    )
+                )
+            ).scalars()
+        )
         page_size = 5
         expected_pages = math.ceil(len(expected_aoids) / page_size)
         assert expected_pages > 1
@@ -241,18 +242,13 @@ class TestItemListAndSearchEndpoints:
             assert pistol_mastery.aoid in aoids
 
     @staticmethod
-    def _assert_matches_db(item_json, item):
-        """Check an ItemDetail payload against the item's database rows."""
-        assert item_json["name"] == item.name
-        assert item_json["ql"] == item.ql
-        assert len(item_json["stats"]) == len(item.item_stats)
-        assert len(item_json["spell_data"]) == len(item.item_spell_data)
-        assert len(item_json["actions"]) == len(item.actions)
-        assert len(item_json["sources"]) == len(item.item_sources)
-        attack_defense = item.attack_defense
-        assert len(item_json["attack_stats"]) == (
-            len(attack_defense.attack_stats) if attack_defense else 0
-        )
-        assert len(item_json["defense_stats"]) == (
-            len(attack_defense.defense_stats) if attack_defense else 0
-        )
+    def _assert_matches_store(item_json, record, sources):
+        """Check an ItemDetail payload against the item the store holds."""
+        assert item_json["name"] == record.name
+        assert item_json["ql"] == record.ql
+        assert len(item_json["stats"]) == len(record.stats)
+        assert len(item_json["spell_data"]) == len(record.effects)
+        assert len(item_json["actions"]) == len(record.actions)
+        assert len(item_json["sources"]) == len(sources)
+        assert len(item_json["attack_stats"]) == len(record.attack)
+        assert len(item_json["defense_stats"]) == len(record.defense)

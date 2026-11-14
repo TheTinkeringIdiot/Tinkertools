@@ -5,9 +5,21 @@ Tests for advanced search and filtering functionality using real database data.
 import pytest
 from fastapi.testclient import TestClient
 
-from sqlalchemy import text
+from sqlalchemy import BigInteger, cast, func, select
 
 from app.main import app
+from app.store import tables as t
+from app.store.presence import has_stat, present, revisions
+
+
+def _symbiants(build, *columns):
+    """SELECT over the rows of ``symbiant_items`` the build carries."""
+    return select(*columns).select_from(
+        t.symbiant_items.join(
+            t.item_presence,
+            (t.item_presence.c.rev_id == t.symbiant_items.c.rev_id) & present(build),
+        )
+    )
 
 
 @pytest.fixture
@@ -48,20 +60,17 @@ class TestItemSearch:
             # At least one item should contain "weapon" in its name
             assert any("weapon" in name for name in item_names)
 
-    def test_filter_by_slot(self, client, db_session):
+    def test_filter_by_slot(self, client, store_db, build):
         """Test the slot filter matches the EquippedIn (stat 298) bitmask."""
         # Slot bit 15 at QL 200 is a small set that fits on one page
         slot, ql = 15, 200
+        equipped_in = cast(t.stat_entry.c.value, BigInteger).op("&")(1 << slot) > 0
         expected_aoids = set(
-            db_session.execute(
-                text(
-                    "SELECT DISTINCT i.aoid FROM items i"
-                    " JOIN item_stats s ON s.item_id = i.id"
-                    " JOIN stat_values v ON v.id = s.stat_value_id"
-                    " WHERE v.stat = 298 AND v.value & (1 << :slot) > 0"
-                    " AND i.ql = :ql"
-                ),
-                {"slot": slot, "ql": ql},
+            store_db.execute(
+                revisions(build, t.item_revision.c.aoid).where(
+                    t.item_revision.c.ql == ql,
+                    has_stat(t.stat_entry.c.stat == 298, equipped_in),
+                )
             ).scalars()
         )
         assert 0 < len(expected_aoids) <= 1000
@@ -139,15 +148,18 @@ class TestPocketBossSearch:
         if len(data["items"]) > 0:
             assert "symbiant_count" in data["items"][0]
 
-    def test_boss_by_symbiant_family(self, client, db_session):
+    def test_boss_by_symbiant_family(self, client, store_db):
         """Test finding symbiant drops by family for a specific boss."""
-        from app.models import Mob
         from app.tests.db_test_constants import MOB_ADOBE_SUZERAIN
 
-        mob = db_session.query(Mob).filter(Mob.name == MOB_ADOBE_SUZERAIN).one()
+        mob_id = store_db.execute(
+            select(t.mob.c.mob_id).where(
+                t.mob.c.name == MOB_ADOBE_SUZERAIN, ~t.mob.c.retired
+            )
+        ).scalar_one()
 
         # Get symbiant drops for a specific boss, filtered by family
-        response = client.get(f"/api/v1/mobs/{mob.id}/drops?family=Artillery")
+        response = client.get(f"/api/v1/mobs/{mob_id}/drops?family=Artillery")
         assert response.status_code == 200
         data = response.json()
 
@@ -162,11 +174,9 @@ class TestPocketBossSearch:
 class TestSymbiantSearch:
     """Test symbiant search functionality."""
 
-    def test_symbiants_basic(self, client, db_session):
+    def test_symbiants_basic(self, client, store_db, build):
         """Test basic symbiants endpoint."""
-        from app.models import SymbiantItem
-
-        expected_total = db_session.query(SymbiantItem).count()
+        expected_total = store_db.execute(_symbiants(build, func.count())).scalar_one()
         assert expected_total > 0
 
         response = client.get("/api/v1/symbiants")
@@ -183,18 +193,15 @@ class TestSymbiantSearch:
         assert "family" in symbiant
         assert "name" in symbiant
 
-    def test_symbiant_family_filtering(self, client, db_session):
+    def test_symbiant_family_filtering(self, client, store_db, build):
         """Test every symbiant and family arrives intact across pages."""
         from collections import Counter
 
-        from sqlalchemy import func
-
-        from app.models import SymbiantItem
-
+        family = t.symbiant_items.c.family
         expected = dict(
-            db_session.query(SymbiantItem.family, func.count())
-            .group_by(SymbiantItem.family)
-            .all()
+            store_db.execute(
+                _symbiants(build, family, func.count()).group_by(family)
+            ).all()
         )
         assert "Artillery" in expected
 
@@ -214,7 +221,9 @@ class TestSymbiantSearch:
         assert dict(families) == expected
         # Pages partition the set: no symbiant repeated or skipped
         assert len(ids) == len(set(ids))
-        assert set(ids) == {aoid for (aoid,) in db_session.query(SymbiantItem.aoid)}
+        assert set(ids) == set(
+            store_db.execute(_symbiants(build, t.symbiant_items.c.aoid)).scalars()
+        )
 
     def test_symbiant_ql_filtering(self, client):
         """Test symbiant QL filtering (client-side filtering expected)."""

@@ -1,10 +1,13 @@
 """
 AOID is the only item identity the API takes, and item content carries no row ids.
 
-Runs against the real database inside a rolled-back transaction.
+Runs against the real game data of the development store.
 """
 
-from app.models import Item, Mob, Perk, SymbiantItem
+from sqlalchemy import select
+
+from app.store import tables as t
+from app.store.presence import present, revisions
 from app.tests.db_test_constants import (
     ITEM_SYMBIANT_ADOBE_ARTILLERY_OCULAR,
     MOB_ADOBE_SUZERAIN,
@@ -13,8 +16,46 @@ from app.tests.db_test_constants import (
 ROW_ID_KEYS = {"id", "item_id"}
 
 
-def _symbiant(db_session, aoid):
-    return db_session.query(SymbiantItem).filter(SymbiantItem.aoid == aoid).one()
+def _symbiants(build, *conditions):
+    """SELECT over the rows of ``symbiant_items`` the build carries."""
+    return (
+        select(t.symbiant_items)
+        .select_from(
+            t.symbiant_items.join(
+                t.item_presence,
+                (t.item_presence.c.rev_id == t.symbiant_items.c.rev_id)
+                & present(build),
+            )
+        )
+        .where(*conditions)
+    )
+
+
+def _symbiant(store_db, build, aoid):
+    return store_db.execute(_symbiants(build, t.symbiant_items.c.aoid == aoid)).one()
+
+
+def _mob_id(store_db, name):
+    return store_db.execute(
+        select(t.mob.c.mob_id).where(t.mob.c.name == name, ~t.mob.c.retired)
+    ).scalar_one()
+
+
+def _weapons(store_db, build, count):
+    """AOIDs of the first ``count`` QL 100 weapons of the build."""
+    revision = t.item_revision
+    return list(
+        store_db.execute(
+            revisions(build, revision.c.aoid)
+            .where(
+                revision.c.atkdef_id.isnot(None),
+                revision.c.item_class == 1,
+                revision.c.ql == 100,
+            )
+            .order_by(revision.c.aoid)
+            .limit(count)
+        ).scalars()
+    )
 
 
 def _assert_no_nested_row_ids(item):
@@ -42,8 +83,8 @@ def _assert_no_nested_row_ids(item):
 # ============================================================================
 
 
-def test_symbiant_detail_is_addressed_by_aoid(client, db_session):
-    symbiant = _symbiant(db_session, ITEM_SYMBIANT_ADOBE_ARTILLERY_OCULAR)
+def test_symbiant_detail_is_addressed_by_aoid(client, store_db, build):
+    symbiant = _symbiant(store_db, build, ITEM_SYMBIANT_ADOBE_ARTILLERY_OCULAR)
 
     response = client.get(f"/api/v1/symbiants/{symbiant.aoid}")
 
@@ -56,29 +97,31 @@ def test_symbiant_detail_is_addressed_by_aoid(client, db_session):
     _assert_no_nested_row_ids(data)
 
 
-def test_symbiant_detail_does_not_accept_an_internal_id(client, db_session):
-    symbiant = _symbiant(db_session, ITEM_SYMBIANT_ADOBE_ARTILLERY_OCULAR)
-    assert symbiant.id != symbiant.aoid
-    id_is_some_symbiants_aoid = (
-        db_session.query(SymbiantItem).filter(SymbiantItem.aoid == symbiant.id).first()
-    )
+def test_symbiant_detail_does_not_accept_an_internal_id(client, store_db, build):
+    symbiant = _symbiant(store_db, build, ITEM_SYMBIANT_ADOBE_ARTILLERY_OCULAR)
+    assert symbiant.rev_id != symbiant.aoid
+    id_is_some_symbiants_aoid = store_db.execute(
+        _symbiants(build, t.symbiant_items.c.aoid == symbiant.rev_id)
+    ).first()
 
-    response = client.get(f"/api/v1/symbiants/{symbiant.id}")
+    response = client.get(f"/api/v1/symbiants/{symbiant.rev_id}")
 
     if id_is_some_symbiants_aoid is None:
         assert response.status_code == 404
     else:
-        assert response.json()["aoid"] == symbiant.id
+        assert response.json()["aoid"] == symbiant.rev_id
 
 
-def test_symbiant_dropped_by_is_addressed_by_aoid(client, db_session):
-    symbiant = _symbiant(db_session, ITEM_SYMBIANT_ADOBE_ARTILLERY_OCULAR)
-    boss = db_session.query(Mob).filter(Mob.name == MOB_ADOBE_SUZERAIN).one()
+def test_symbiant_dropped_by_is_addressed_by_aoid(client, store_db, build):
+    symbiant = _symbiant(store_db, build, ITEM_SYMBIANT_ADOBE_ARTILLERY_OCULAR)
+    boss_id = _mob_id(store_db, MOB_ADOBE_SUZERAIN)
 
     response = client.get(f"/api/v1/symbiants/{symbiant.aoid}/dropped-by")
 
     assert response.status_code == 200
-    assert boss.name in [mob["name"] for mob in response.json()]
+    assert (boss_id, MOB_ADOBE_SUZERAIN) in [
+        (mob["id"], mob["name"]) for mob in response.json()
+    ]
 
 
 def test_symbiant_dropped_by_unknown_aoid_is_404(client):
@@ -92,7 +135,7 @@ def test_symbiant_dropped_by_unknown_aoid_is_404(client):
 # ============================================================================
 
 
-def test_item_detail_has_no_nested_row_ids(client, db_session):
+def test_item_detail_has_no_nested_row_ids(client):
     response = client.get(f"/api/v1/items/{ITEM_SYMBIANT_ADOBE_ARTILLERY_OCULAR}")
 
     assert response.status_code == 200
@@ -111,11 +154,11 @@ def test_item_list_has_no_nested_row_ids(client):
         _assert_no_nested_row_ids(item)
 
 
-def test_symbiant_list_and_mob_drops_have_no_nested_row_ids(client, db_session):
-    boss = db_session.query(Mob).filter(Mob.name == MOB_ADOBE_SUZERAIN).one()
+def test_symbiant_list_and_mob_drops_have_no_nested_row_ids(client, store_db):
+    boss_id = _mob_id(store_db, MOB_ADOBE_SUZERAIN)
 
     listed = client.get("/api/v1/symbiants?page_size=20").json()["items"]
-    drops = client.get(f"/api/v1/mobs/{boss.id}/drops").json()
+    drops = client.get(f"/api/v1/mobs/{boss_id}/drops").json()
 
     assert listed and drops
     for symbiant in listed + drops:
@@ -203,21 +246,16 @@ WEAPON_REQUEST = {
 }
 
 
-def _content_routes(client, db_session):
-    weapons = [
-        aoid
-        for (aoid,) in db_session.query(Item.aoid)
-        .filter(Item.atkdef_id.isnot(None), Item.item_class == 1, Item.ql == 100)
-        .order_by(Item.aoid)
-        .limit(5)
-    ]
-    perks = [
-        aoid
-        for (aoid,) in db_session.query(Item.aoid)
-        .join(Perk, Perk.item_id == Item.id)
-        .order_by(Item.aoid)
-        .limit(5)
-    ]
+def _content_routes(client, store_db, build):
+    weapons = _weapons(store_db, build, 5)
+    perks = list(
+        store_db.execute(
+            revisions(build, t.item_revision.c.aoid)
+            .join(t.perk, t.perk.c.aoid == t.item_revision.c.aoid)
+            .order_by(t.item_revision.c.aoid)
+            .limit(5)
+        ).scalars()
+    )
     assert weapons and perks
     return {
         "item search": client.get("/api/v1/items/search?q=pistol&page_size=30"),
@@ -242,8 +280,8 @@ def _content_routes(client, db_session):
     }
 
 
-def test_no_route_exposes_row_ids_inside_item_content(client, db_session):
-    for name, response in _content_routes(client, db_session).items():
+def test_no_route_exposes_row_ids_inside_item_content(client, store_db, build):
+    for name, response in _content_routes(client, store_db, build).items():
         assert response.status_code == 200, (name, response.text[:200])
         body = response.json()
         # The response really carries content, so the check below is not vacuous
@@ -269,14 +307,9 @@ def test_weapon_analysis_returns_weapons_the_character_can_use(client):
     assert len({weapon["aoid"] for weapon in weapons}) == len(weapons)
 
 
-def test_batch_interpolation_matches_single_interpolation(client, db_session):
-    aoids = [
-        aoid
-        for (aoid,) in db_session.query(Item.aoid)
-        .filter(Item.atkdef_id.isnot(None), Item.item_class == 1, Item.ql == 100)
-        .order_by(Item.aoid)
-        .limit(3)
-    ]
+def test_batch_interpolation_matches_single_interpolation(client, store_db, build):
+    aoids = _weapons(store_db, build, 3)
+    assert aoids
 
     batch = client.post(
         "/api/v1/items/batch/interpolate",

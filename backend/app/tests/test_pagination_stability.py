@@ -9,7 +9,22 @@ on how the data is stored; the last tests pin that.
 Symbiant pages are walked in test_search_functionality's family test.
 """
 
-from app.models import Item, Mob
+from sqlalchemy import select
+
+from app.store import tables as t
+from app.store.presence import revisions
+
+
+def _nano_aoids(store_db, build, *conditions):
+    """AOIDs of the build's nanos meeting ``conditions``, from the store."""
+    text = t.part_text
+    return list(
+        store_db.execute(
+            revisions(build, t.item_revision.c.aoid)
+            .join(text, text.c.text_id == t.item_revision.c.text_id)
+            .where(t.item_revision.c.is_nano, *conditions)
+        ).scalars()
+    )
 
 
 def _walk(client, url, page_size, key="id"):
@@ -32,9 +47,12 @@ def _assert_partition(ids, expected_ids):
     assert set(ids) == set(expected_ids)
 
 
-def test_mobs_pages_partition(client, db_session):
+def test_mobs_pages_partition(client, store_db):
     """Mobs sort by level then name; many mobs share a level."""
-    expected = [mob_id for (mob_id,) in db_session.query(Mob.id)]
+    expected = list(
+        store_db.execute(select(t.mob.c.mob_id).where(~t.mob.c.retired)).scalars()
+    )
+    assert len(expected) > 25
 
     ids, total = _walk(client, "/api/v1/mobs", page_size=25)
 
@@ -42,15 +60,10 @@ def test_mobs_pages_partition(client, db_session):
     _assert_partition(ids, expected)
 
 
-def test_nanos_list_pages_partition(client, db_session):
+def test_nanos_list_pages_partition(client, store_db, build):
     """Nanos sort by name by default; nano names repeat across QLs."""
     ql = 100
-    expected = [
-        aoid
-        for (aoid,) in db_session.query(Item.aoid).filter(
-            Item.is_nano.is_(True), Item.ql == ql
-        )
-    ]
+    expected = _nano_aoids(store_db, build, t.item_revision.c.ql == ql)
     assert len(expected) > 20
 
     ids, total = _walk(
@@ -61,16 +74,15 @@ def test_nanos_list_pages_partition(client, db_session):
     _assert_partition(ids, expected)
 
 
-def test_nano_search_pages_partition(client, db_session):
+def test_nano_search_pages_partition(client, store_db, build):
     """Nano search had no ORDER BY at all."""
     term = "Mongo"
-    expected = [
-        aoid
-        for (aoid,) in db_session.query(Item.aoid).filter(
-            Item.is_nano.is_(True),
-            Item.name.ilike(f"%{term}%") | Item.description.ilike(f"%{term}%"),
-        )
-    ]
+    expected = _nano_aoids(
+        store_db,
+        build,
+        t.part_text.c.name.ilike(f"%{term}%")
+        | t.part_text.c.description.ilike(f"%{term}%"),
+    )
     assert len(expected) > 7
 
     ids, total = _walk(
