@@ -211,8 +211,14 @@ Settled 2026-11-13:
 
 - `/spells` and `/stat-values` are retired as browsable entities, after a stage 1 check of what the three frontend callers use them for.
 - Effect order within an event is dropped. Effects are stored and displayed in canonical order and order does not affect the hash.
-- All routes without a caller are deleted, after an exhaustive caller check that includes tests and known external consumers.
+- All routes without a caller are deleted, after an exhaustive caller check of the frontend and known external consumers.
 - Work stops at every stage gate for a report and approval of the next stage.
+
+Settled 2026-11-14, at the stage 1 gate:
+
+- Production is loaded by a fresh import. Internal row ids therefore do not carry over, so favorites and farm lists that still hold row ids can only be translated with a map of row id to AOID exported from the production database before cutover. `/legacy-item-ids/resolve` reads that map from stage 5 on; until it exists the route resolves against the current store, which is correct only for the development database.
+- The curated inputs are committed: `backend/all_nanos_compacted.csv` and `backend/database/perks.json`, beside `backend/database/symbiants.csv`. The importer reads them from there by default.
+- `GET /symbiants/{aoid}` stays: external utilities call it. `GET /nanos/stats`, `GET /versions/current` and `GET /versions/{slug}` are deleted. A test is not a caller.
 
 Still open:
 

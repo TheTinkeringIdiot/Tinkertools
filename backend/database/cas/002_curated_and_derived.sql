@@ -18,9 +18,9 @@
 -- from the per-version tables being empty. The new read path has to apply
 -- the flags itself.
 --
--- Inputs. backend/database/symbiants.csv (tracked) for mobs and their drops.
--- The nano CSV (all_nanos_compacted.csv) and the perk data (perks.json) are
--- not in the repository; their locations are given to the importer.
+-- Inputs, all tracked: backend/database/symbiants.csv for mobs and their
+-- drops, backend/all_nanos_compacted.csv for nano metadata and
+-- backend/database/perks.json for perks.
 
 -- ---------------------------------------------------------------------------
 -- Curated: nano metadata (all_nanos_compacted.csv)
