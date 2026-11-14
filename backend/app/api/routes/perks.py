@@ -13,9 +13,9 @@ from pydantic import BaseModel, Field
 import logging
 import time
 
-from app.core.database import get_db
-from app.services.perk_service import PerkService
 from app.core.decorators import performance_monitor
+from app.store import curated
+from app.store.context import Build, get_build, get_store
 
 router = APIRouter(prefix="/perks", tags=["perks"])
 logger = logging.getLogger(__name__)
@@ -41,16 +41,12 @@ class BatchPerkLookupResponse(BaseModel):
     errors: List[str] = []
 
 
-def get_perk_service(db: Session = Depends(get_db)) -> PerkService:
-    """Dependency to get PerkService instance."""
-    return PerkService(db)
-
-
 @router.post("/batch/lookup", response_model=BatchPerkLookupResponse)
 @performance_monitor
 def batch_lookup_perks(
     request: BatchPerkLookupRequest,
-    perk_service: PerkService = Depends(get_perk_service),
+    db: Session = Depends(get_store),
+    build: Build = Depends(get_build),
 ):
     """
     Look up multiple perks by their AOIDs in a single request.
@@ -61,15 +57,10 @@ def batch_lookup_perks(
     results = []
     errors = []
 
-    # Single batch query instead of N individual queries
-    try:
-        perk_info_map = perk_service.batch_get_perk_info_by_aoids(request.aoids)
-    except Exception as e:
-        logger.error(f"Batch perk lookup query failed: {e}")
-        perk_info_map = {}
+    perks = curated.lookup_perks(db, build, request.aoids)
 
     for aoid in request.aoids:
-        perk_info = perk_info_map.get(aoid)
+        perk_info = perks.get(aoid)
         if perk_info:
             results.append(BatchPerkResult(aoid=aoid, success=True, perk=perk_info))
         else:

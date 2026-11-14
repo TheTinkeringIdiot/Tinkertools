@@ -122,7 +122,7 @@ These fixtures support testing:
 1. **Model Validation**: Items with Perk records are properly linked
 2. **Database Queries**: Filtering and querying based on Perk relationship
 3. **Import Logic**: Verification that import system creates proper Perk records
-4. **Service Layer**: PerkService queries return items with Perk relationships
+4. **Service Layer**: the perk lookup returns items with Perk relationships
 5. **API Responses**: Endpoints return proper perk data from Perk model
 
 ## Integration with Existing Tests
