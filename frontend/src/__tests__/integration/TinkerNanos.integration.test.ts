@@ -90,6 +90,8 @@ const NANOS: BackendNano[] = [
     school: 'Combat',
     professions: ['Soldier'],
     level: 25,
+    casting_time: 340,
+    recharge_time: 560,
     strain_id: 101,
     strain: 'Street Sweeping',
   }),
@@ -284,6 +286,21 @@ describe('TinkerNanos Compatibility Integration', () => {
       const card = wrapper.findAll('.nano-card').find((c) => c.text().includes('Alleysweeper'));
       expect(card?.text()).toContain('Combat');
       expect(card?.text()).toContain('Soldier');
+    });
+
+    it('shows cast and recharge times in seconds, from the centiseconds the backend sends', async () => {
+      await openNanoSearch();
+
+      const cardText = (name: string) =>
+        wrapper
+          .findAll('.nano-card')
+          .find((c) => c.text().includes(name))
+          ?.text();
+      expect(cardText('Alleysweeper')).toContain('Cast Time:3.40s');
+      expect(cardText('Alleysweeper')).toContain('Recharge:5.60s');
+      // a nano without the stats shows neither line
+      expect(cardText('Minor Suppressor')).not.toContain('Cast Time');
+      expect(cardText('Minor Suppressor')).not.toContain('Recharge');
     });
   });
 

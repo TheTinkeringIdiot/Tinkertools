@@ -18,7 +18,9 @@ export interface NanoProgram {
   // The nano item's actions; the Use action's criteria are its casting requirements
   actions?: Action[];
   nanoPointCost?: number;
+  /** Time to cast, in centiseconds (AttackDelay, stat 294) */
   castingTime?: number;
+  /** Time to recharge, in centiseconds (RechargeDelay, stat 210) */
   rechargeTime?: number;
 
   // Effects

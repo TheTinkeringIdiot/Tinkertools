@@ -29,6 +29,9 @@ export interface BackendNano {
   professions: string[];
   level: number | null;
   actions: Action[];
+  /** Centiseconds: the nano's AttackDelay (294) and RechargeDelay (210) stats */
+  casting_time?: number | null;
+  recharge_time?: number | null;
   effects: [];
 }
 

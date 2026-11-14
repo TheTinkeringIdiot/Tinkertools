@@ -3,153 +3,18 @@ Nano programs API endpoints with rich spell data.
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session, selectinload, aliased
-from sqlalchemy import and_, or_, desc, asc, false, func, select, Integer
-import math
-import logging
 
-from app.core.database import get_db
-from app.models import (
-    Item,
-    ItemStats,
-    StatValue,
-    ItemSpellData,
-    SpellData,
-    SpellDataSpells,
-    Spell,
-    SpellCriterion,
-    Criterion,
-    Action,
-    ActionCriteria,
-    NanoProperties,
-)
-from app.api.schemas import PaginatedResponse, ItemDetail
-from app.api.schemas.nano import (
-    NanoItemDetail,
-    NanoProgram,
-    NanoStrainCount,
-    NanoStrainsResponse,
-)
-from app.core import nano_properties
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
+
+from app.api.schemas import ItemDetail, PaginatedResponse
+from app.api.schemas.nano import NanoItemDetail, NanoProgram, NanoStrainsResponse
 from app.core.decorators import cached_response, performance_monitor
-from app.api.services.item_filter_service import item_has_stat
+from app.services import nanos
+from app.services.nanos import NanoFilters
+from app.store import Build, get_build, get_store, page_fields
 
 router = APIRouter(prefix="/nanos", tags=["nanos"])
-logger = logging.getLogger(__name__)
-
-
-def _has_valid_strain():
-    """EXISTS: the outer nano has a real NanoStrain (stat 75, not 0 or 99999)."""
-    return item_has_stat(
-        StatValue.stat == 75,
-        StatValue.value > 0,
-        StatValue.value != 99999,
-    )
-
-
-def _has_profession_requirement(profession_id: int):
-    """
-    EXISTS: a USE action of the outer item requires ``profession_id``.
-
-    Profession (stat 60) and VisualProfession (stat 368) both count. A
-    criterion preceded by operator 18 (target modifier) applies to the target,
-    not the caster, so it is ignored. Correlated on ``Item.id`` so the planner
-    drives from the item set (see item_filter_service).
-    """
-    ac_current = aliased(ActionCriteria)
-    c_current = aliased(Criterion)
-    ac_prev = aliased(ActionCriteria)
-    c_prev = aliased(Criterion)
-
-    return (
-        select(1)
-        .select_from(Action)
-        .join(ac_current, Action.id == ac_current.action_id)
-        .join(c_current, ac_current.criterion_id == c_current.id)
-        .outerjoin(
-            ac_prev,
-            and_(
-                ac_prev.action_id == Action.id,
-                ac_prev.order_index == ac_current.order_index - 1,
-            ),
-        )
-        .outerjoin(c_prev, ac_prev.criterion_id == c_prev.id)
-        .where(
-            Action.item_id == Item.id,
-            Action.action == 3,  # USE action
-            or_(
-                and_(c_current.value1 == 60, c_current.value2 == profession_id),
-                and_(c_current.value1 == 368, c_current.value2 == profession_id),
-            ),
-            # Exclude if preceded by operator 18 (target modifier)
-            or_(
-                c_prev.id.is_(None),  # No previous criterion
-                c_prev.operator != 18,  # Previous is not operator 18
-            ),
-        )
-        .correlate(Item)
-        .exists()
-    )
-
-
-def derived_nano_fields(item: Item) -> dict:
-    """school, professions and level of a nano, from its nano_properties row
-    (see app/core/nano_properties.py for what each one means)."""
-    props = item.nano_properties
-    if props is None:
-        return {
-            "school": None,
-            "professions": [],
-            "level": None,
-            "strain_id": None,
-            "strain": None,
-        }
-    return {
-        "school": nano_properties.school_name(props.school),
-        "professions": nano_properties.profession_names(props.professions),
-        "level": props.min_level,
-        "strain_id": props.strain,
-        "strain": nano_properties.strain_name(props.strain),
-    }
-
-
-def parse_nano_from_item_and_spells(item: Item) -> NanoProgram:
-    """
-    Convert an Item with spell data into a rich NanoProgram object.
-    """
-    nano_data = {
-        "id": item.id,
-        "aoid": item.aoid,
-        "name": item.name,
-        "ql": item.ql,
-        "description": item.description,
-        # What it takes to cast the nano is the criteria of its actions (the
-        # Use action), not its spells' criteria, which gate individual effects.
-        "actions": list(item.actions),
-        "effects": [],
-        **derived_nano_fields(item),
-        "casting_time": None,
-        "recharge_time": None,
-        "memory_usage": None,
-        "nano_point_cost": None,
-        "duration": None,
-        "targeting": None,
-        "source_location": None,
-        "acquisition_method": None,
-    }
-
-    # Extract data from associated spells
-    for spell_data in item.spell_data:
-        for spell in spell_data.spells:
-            # Extract basic spell properties
-            if spell.tick_count and not nano_data["casting_time"]:
-                nano_data["casting_time"] = spell.tick_count
-            if spell.tick_interval and not nano_data["recharge_time"]:
-                nano_data["recharge_time"] = spell.tick_interval
-
-    return NanoProgram(**nano_data)
-
 
 SCHOOL_QUERY = Query(
     None,
@@ -182,139 +47,6 @@ SORT_BY_QUERY = Query("name", description="Sort by: name, ql, level")
 SORT_DESC_QUERY = Query(False, description="Sort descending")
 
 
-def _known_ids(values: Optional[List[str]], lookup) -> Optional[List[int]]:
-    """Ids of the names in ``values`` that ``lookup`` knows; None if no filter."""
-    if not values:
-        return None
-    return sorted({i for i in (lookup(v) for v in values) if i is not None})
-
-
-def filter_nanos(
-    query,
-    school: Optional[List[str]] = None,
-    profession: Optional[List[str]] = None,
-    strain: Optional[List[str]] = None,
-    level_min: Optional[int] = None,
-    level_max: Optional[int] = None,
-    ql_min: Optional[int] = None,
-    ql_max: Optional[int] = None,
-    q: Optional[str] = None,
-    join_properties: bool = False,
-):
-    """Apply the /nanos filters to a query over nano Items, in SQL.
-
-    Filtering before paginating keeps total, pages and page contents in
-    agreement. school, profession and level come from nano_properties, the
-    row derived_nano_fields() reports. Values that aren't a known school,
-    profession or strain name are ignored, and a filter of only unknown values
-    matches nothing. ``join_properties`` joins nano_properties (outer) even when
-    no filter needs it, for sorting on it.
-    """
-    if q:
-        term = f"%{q}%"
-        query = query.filter(or_(Item.name.ilike(term), Item.description.ilike(term)))
-    if ql_min is not None:
-        query = query.filter(Item.ql >= ql_min)
-    if ql_max is not None:
-        query = query.filter(Item.ql <= ql_max)
-
-    schools = _known_ids(school, nano_properties.school_id)
-    professions = _known_ids(profession, nano_properties.profession_id)
-    strains = (
-        sorted({i for value in strain for i in nano_properties.strain_ids(value)})
-        if strain
-        else None
-    )
-    if (
-        schools is not None
-        or professions is not None
-        or strains is not None
-        or level_min is not None
-        or level_max is not None
-    ):
-        query = query.join(NanoProperties, NanoProperties.item_id == Item.id)
-    elif join_properties:
-        query = query.outerjoin(NanoProperties, NanoProperties.item_id == Item.id)
-
-    if schools is not None:
-        query = query.filter(NanoProperties.school.in_(schools) if schools else false())
-    if professions is not None:
-        # An empty list is "no restriction" only for nanos with a Use action;
-        # the rest (level NULL) are procs and effects nobody casts
-        unrestricted = and_(
-            NanoProperties.professions == [], NanoProperties.min_level.isnot(None)
-        )
-        query = query.filter(
-            or_(NanoProperties.professions.overlap(professions), unrestricted)
-            if professions
-            else false()
-        )
-    if strains is not None:
-        query = query.filter(NanoProperties.strain.in_(strains) if strains else false())
-    if level_min is not None:
-        query = query.filter(NanoProperties.min_level >= level_min)
-    if level_max is not None:
-        query = query.filter(NanoProperties.min_level <= level_max)
-    return query
-
-
-def sort_nanos(query, sort_by: str, sort_desc: bool):
-    """Order a filter_nanos() query; id breaks ties so OFFSET pages never
-    overlap. sort_by=level needs the query built with join_properties."""
-    if sort_by == "ql":
-        query = query.order_by(desc(Item.ql) if sort_desc else asc(Item.ql))
-    elif sort_by == "level":
-        # Nanos without a level (no Use action) sort last either way
-        level = NanoProperties.min_level
-        query = query.order_by(
-            level.desc().nulls_last() if sort_desc else level.asc().nulls_last()
-        )
-    else:
-        query = query.order_by(desc(Item.name) if sort_desc else asc(Item.name))
-    return query.order_by(Item.aoid)
-
-
-def _page_of_nanos(query, total: int, page: int, page_size: int):
-    """One page of a sorted nano query as a PaginatedResponse[NanoProgram]."""
-    pages = math.ceil(total / page_size) if total > 0 else 1
-    items = (
-        query.options(
-            selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
-            selectinload(Item.item_spell_data)
-            .selectinload(ItemSpellData.spell_data)
-            .selectinload(SpellData.spell_data_spells)
-            .selectinload(SpellDataSpells.spell)
-            .selectinload(Spell.spell_criteria)
-            .selectinload(SpellCriterion.criterion),
-            selectinload(Item.actions)
-            .selectinload(Action.action_criteria)
-            .selectinload(ActionCriteria.criterion),
-            selectinload(Item.nano_properties),
-        )
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-        .all()
-    )
-
-    nanos = []
-    for item in items:
-        try:
-            nanos.append(parse_nano_from_item_and_spells(item))
-        except Exception as e:
-            logger.warning(f"Failed to parse nano {item.id}: {e}")
-            continue
-
-    return PaginatedResponse[NanoProgram](
-        items=nanos,
-        total=total,
-        page=page,
-        page_size=page_size,
-        pages=pages,
-        has_next=page < pages,
-        has_prev=page > 1,
-    )
-
-
 @router.get("", response_model=PaginatedResponse[NanoProgram])
 @cached_response("nanos_list")
 @performance_monitor
@@ -330,14 +62,13 @@ def get_nanos(
     ql_max: Optional[int] = QL_MAX_QUERY,
     sort_by: str = SORT_BY_QUERY,
     sort_desc: bool = SORT_DESC_QUERY,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_store),
+    build: Build = Depends(get_build),
 ):
     """
     Get paginated list of nano programs with rich spell data.
     """
-    # Filter and count WITHOUT relationship loading
-    query = filter_nanos(
-        db.query(Item).filter(Item.is_nano.is_(True)),
+    filters = NanoFilters(
         school=school,
         profession=profession,
         strain=strain,
@@ -345,10 +76,13 @@ def get_nanos(
         level_max=level_max,
         ql_min=ql_min,
         ql_max=ql_max,
-        join_properties=sort_by == "level",
     )
-    total = query.count()
-    return _page_of_nanos(sort_nanos(query, sort_by, sort_desc), total, page, page_size)
+    items, total = nanos.nano_page(
+        db, build, filters, sort_by, sort_desc, page, page_size
+    )
+    return PaginatedResponse[NanoProgram](
+        items=items, **page_fields(total, page, page_size)
+    )
 
 
 @router.get("/search", response_model=PaginatedResponse[NanoProgram])
@@ -367,14 +101,14 @@ def search_nanos(
     ql_max: Optional[int] = QL_MAX_QUERY,
     sort_by: str = SORT_BY_QUERY,
     sort_desc: bool = SORT_DESC_QUERY,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_store),
+    build: Build = Depends(get_build),
 ):
     """
     Search nano programs by name or description, with the same filters and
     sorting as GET /nanos.
     """
-    query = filter_nanos(
-        db.query(Item).filter(Item.is_nano.is_(True)),
+    filters = NanoFilters(
         q=q,
         school=school,
         profession=profession,
@@ -383,10 +117,13 @@ def search_nanos(
         level_max=level_max,
         ql_min=ql_min,
         ql_max=ql_max,
-        join_properties=sort_by == "level",
     )
-    total = query.count()
-    return _page_of_nanos(sort_nanos(query, sort_by, sort_desc), total, page, page_size)
+    items, total = nanos.nano_page(
+        db, build, filters, sort_by, sort_desc, page, page_size
+    )
+    return PaginatedResponse[NanoProgram](
+        items=items, **page_fields(total, page, page_size)
+    )
 
 
 @router.get("/strains", response_model=NanoStrainsResponse)
@@ -400,7 +137,8 @@ def get_nano_strains(
     level_max: Optional[int] = LEVEL_MAX_QUERY,
     ql_min: Optional[int] = QL_MIN_QUERY,
     ql_max: Optional[int] = QL_MAX_QUERY,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_store),
+    build: Build = Depends(get_build),
 ):
     """
     Distinct NanoStrains (stat 75) of the nanos matching the /nanos (or, with q,
@@ -410,8 +148,7 @@ def get_nano_strains(
     The strain filter itself is not applied, so the list offers every strain
     the other filters leave, whichever strains are currently picked.
     """
-    query = filter_nanos(
-        db.query(Item).filter(Item.is_nano.is_(True)),
+    filters = NanoFilters(
         q=q,
         school=school,
         profession=profession,
@@ -419,20 +156,8 @@ def get_nano_strains(
         level_max=level_max,
         ql_min=ql_min,
         ql_max=ql_max,
-        join_properties=True,
     )
-    rows = (
-        query.filter(NanoProperties.strain.isnot(None))
-        .with_entities(NanoProperties.strain, func.count(Item.id))
-        .group_by(NanoProperties.strain)
-        .all()
-    )
-    strains = [
-        NanoStrainCount(id=sid, name=nano_properties.strain_name(sid), count=count)
-        for sid, count in rows
-    ]
-    strains.sort(key=lambda s: (s.name is None, (s.name or "").casefold(), s.id))
-    return NanoStrainsResponse(strains=strains)
+    return NanoStrainsResponse(strains=nanos.strain_counts(db, build, filters))
 
 
 @router.get(
@@ -446,133 +171,28 @@ def get_nanos_by_profession(
     page_size: int = Query(1000, ge=1, le=1000, description="Items per page"),
     sort: str = Query("ql", description="Sort field: name, ql"),
     sort_order: str = Query("desc", description="Sort order: asc, desc"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_store),
+    build: Build = Depends(get_build),
 ):
     """
-    Get nano programs filtered by profession requirement.
-    OPTIMIZED endpoint specifically for TinkerNanos profession-based filtering.
+    Get nano programs filtered by profession requirement, for TinkerNanos.
 
-    Major performance improvements:
-    - Database-level filtering instead of Python filtering
-    - selectinload instead of joinedload to avoid cartesian products
-    - Single query with proper pagination
-    - Moved test item and strain filtering to SQL
+    Lists the nanoprograms that:
+    - Name the profession in their Use action (every nano for profession_id 0)
+    - Have a real strain (not 0 and not 99999)
+    - Are not test items (name NOT LIKE 'TESTLIVEITEM%')
     """
-    # Build optimized base query with database-level filtering
-    base_query = db.query(Item).filter(
-        and_(
-            Item.is_nano.is_(True),
-            ~Item.name.startswith("TESTLIVEITEM"),  # Filter test items at DB level
-            # Filter by valid strain at DB level
-            _has_valid_strain(),
-        )
+    found = nanos.profession_page(
+        db,
+        nanos.castable_nanos(build, profession_id),
+        sort,
+        sort_order,
+        page,
+        page_size,
     )
-
-    # Filter by profession requirement
-    # Excludes profession criteria preceded by operator 18 (target modifier)
-    if profession_id > 0:
-        base_query = base_query.filter(_has_profession_requirement(profession_id))
-
-    # Apply sorting with DISTINCT to prevent duplicates
-    if sort == "name":
-        base_query = base_query.order_by(
-            desc(Item.name) if sort_order == "desc" else asc(Item.name)
-        )
-    elif sort == "ql":
-        base_query = base_query.order_by(
-            desc(Item.ql) if sort_order == "desc" else asc(Item.ql)
-        )
-    else:
-        base_query = base_query.order_by(
-            desc(Item.ql) if sort_order == "desc" else asc(Item.ql)
-        )
-    # The AOID breaks ties so OFFSET pages never overlap
-    base_query = base_query.order_by(Item.aoid)
-
-    # Add DISTINCT to prevent duplicates from joins
-    base_query = base_query.distinct()
-
-    # Get total count efficiently
-    total = base_query.count()
-
-    # Apply pagination
-    pages = math.ceil(total / page_size) if total > 0 else 1
-    offset = (page - 1) * page_size
-
-    # Execute main query with selectinload for better performance
-    items = (
-        base_query.offset(offset)
-        .limit(page_size)
-        .options(
-            # Use selectinload instead of joinedload to avoid cartesian products
-            selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
-            selectinload(Item.item_spell_data)
-            .selectinload(ItemSpellData.spell_data)
-            .selectinload(SpellData.spell_data_spells)
-            .selectinload(SpellDataSpells.spell)
-            .selectinload(Spell.spell_criteria)
-            .selectinload(SpellCriterion.criterion),
-            selectinload(Item.actions)
-            .selectinload(Action.action_criteria)
-            .selectinload(ActionCriteria.criterion),
-            selectinload(Item.nano_properties),
-            # Skip source loading if not critical for performance
-            # selectinload(Item.item_sources).selectinload(ItemSource.source)
-            #     .selectinload(Source.source_type)
-        )
-        .all()
-    )
-
-    # Convert to ItemDetail objects - now all filtering is done at DB level
-    detailed_items = []
-    for item in items:
-        # All filtering now done at database level, no need for Python filtering
-
-        # Build stats response
-        stats_response = (
-            [stat.stat_value for stat in item.item_stats] if item.item_stats else []
-        )
-
-        # Build spell data response
-        spell_data_list = (
-            [isd.spell_data for isd in item.item_spell_data]
-            if item.item_spell_data
-            else []
-        )
-
-        # Build actions response
-        actions = [action for action in item.actions] if item.actions else []
-
-        # Build minimal sources response (load separately if needed)
-        sources = []  # Disabled for performance - can be loaded separately if needed
-
-        detailed_items.append(
-            NanoItemDetail(
-                id=item.id,
-                aoid=item.aoid,
-                name=item.name,
-                ql=item.ql,
-                item_class=item.item_class,
-                description=item.description,
-                is_nano=item.is_nano,
-                stats=stats_response,
-                spell_data=spell_data_list,
-                attack_stats=[],  # Nanos don't have attack stats
-                defense_stats=[],  # Nanos don't have defense stats
-                actions=actions,
-                sources=sources,
-                **derived_nano_fields(item),
-            )
-        )
-
     return PaginatedResponse[NanoItemDetail](
-        items=detailed_items,
-        total=total,  # Now accurate count from DB filtering
-        page=page,
-        page_size=page_size,
-        pages=pages,
-        has_next=page < pages,
-        has_prev=page > 1,
+        items=nanos.nano_item_details(db, build, found.rev_ids),
+        **page_fields(found.total, page, page_size),
     )
 
 
@@ -585,148 +205,26 @@ def get_offensive_nanos_by_profession(
     page_size: int = Query(1000, ge=1, le=1000, description="Items per page"),
     sort: str = Query("ql", description="Sort field: name, ql"),
     sort_order: str = Query("desc", description="Sort order: asc, desc"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_store),
+    build: Build = Depends(get_build),
 ):
     """
-    Get offensive nano programs filtered by profession requirement.
-    OPTIMIZED endpoint specifically for TinkerNukes offensive nano filtering.
+    Get offensive nano programs filtered by profession requirement, for
+    TinkerNukes.
 
-    Filters for nanoprograms that:
-    - Belong to the specified profession (profession_id)
-    - Contain offensive spells (target=3, spell_id=53002)
-    - Deal health damage (spell_params.Stat=27)
-    - Have valid strain values (stat 75 > 0 AND stat 75 != 99999)
-    - Are not test items (name NOT LIKE 'TESTLIVEITEM%')
-
-    Performance optimizations:
-    - Database-level filtering for offensive spells
-    - selectinload instead of joinedload to avoid cartesian products
-    - Single query with proper pagination
-    - Moved test item and strain filtering to SQL
+    Lists the nanoprograms of GET /nanos/profession/{profession_id} that
+    lower a hostile target's health: an effect with target 3, spell 53002
+    and Stat 27.
     """
-    # Build optimized base query with database-level filtering
-    base_query = db.query(Item).filter(
-        and_(
-            Item.is_nano.is_(True),
-            ~Item.name.startswith("TESTLIVEITEM"),  # Filter test items at DB level
-            # Filter by valid strain at DB level
-            _has_valid_strain(),
-            # Filter for offensive spells at DB level
-            select(1)
-            .select_from(ItemSpellData)
-            .join(SpellData, ItemSpellData.spell_data_id == SpellData.id)
-            .join(SpellDataSpells, SpellData.id == SpellDataSpells.spell_data_id)
-            .join(Spell, SpellDataSpells.spell_id == Spell.id)
-            .where(
-                ItemSpellData.item_id == Item.id,
-                Spell.target == 3,  # Offensive target
-                Spell.spell_id == 53002,  # Modify stat spell
-                Spell.spell_params.op("->>")("Stat").cast(Integer)
-                == 27,  # Health damage
-            )
-            .correlate(Item)
-            .exists(),
-        )
+    found = nanos.profession_page(
+        db,
+        nanos.offensive_nanos(build, profession_id),
+        sort,
+        sort_order,
+        page,
+        page_size,
     )
-
-    # Filter by profession requirement
-    # Excludes profession criteria preceded by operator 18 (target modifier)
-    if profession_id > 0:
-        base_query = base_query.filter(_has_profession_requirement(profession_id))
-
-    # Apply sorting with DISTINCT to prevent duplicates
-    if sort == "name":
-        base_query = base_query.order_by(
-            desc(Item.name) if sort_order == "desc" else asc(Item.name)
-        )
-    elif sort == "ql":
-        base_query = base_query.order_by(
-            desc(Item.ql) if sort_order == "desc" else asc(Item.ql)
-        )
-    else:
-        base_query = base_query.order_by(
-            desc(Item.ql) if sort_order == "desc" else asc(Item.ql)
-        )
-    # The AOID breaks ties so OFFSET pages never overlap
-    base_query = base_query.order_by(Item.aoid)
-
-    # Add DISTINCT to prevent duplicates from joins
-    base_query = base_query.distinct()
-
-    # Get total count efficiently
-    total = base_query.count()
-
-    # Apply pagination
-    pages = math.ceil(total / page_size) if total > 0 else 1
-    offset = (page - 1) * page_size
-
-    # Execute main query with selectinload for better performance
-    items = (
-        base_query.offset(offset)
-        .limit(page_size)
-        .options(
-            # Use selectinload instead of joinedload to avoid cartesian products
-            selectinload(Item.item_stats).selectinload(ItemStats.stat_value),
-            selectinload(Item.item_spell_data)
-            .selectinload(ItemSpellData.spell_data)
-            .selectinload(SpellData.spell_data_spells)
-            .selectinload(SpellDataSpells.spell)
-            .selectinload(Spell.spell_criteria)
-            .selectinload(SpellCriterion.criterion),
-            selectinload(Item.actions)
-            .selectinload(Action.action_criteria)
-            .selectinload(ActionCriteria.criterion),
-        )
-        .all()
-    )
-
-    # Convert to ItemDetail objects - now all filtering is done at DB level
-    detailed_items = []
-    for item in items:
-        # All filtering now done at database level, no need for Python filtering
-
-        # Build stats response
-        stats_response = (
-            [stat.stat_value for stat in item.item_stats] if item.item_stats else []
-        )
-
-        # Build spell data response
-        spell_data_list = (
-            [isd.spell_data for isd in item.item_spell_data]
-            if item.item_spell_data
-            else []
-        )
-
-        # Build actions response
-        actions = [action for action in item.actions] if item.actions else []
-
-        # Build minimal sources response (load separately if needed)
-        sources = []  # Disabled for performance - can be loaded separately if needed
-
-        detailed_items.append(
-            ItemDetail(
-                id=item.id,
-                aoid=item.aoid,
-                name=item.name,
-                ql=item.ql,
-                item_class=item.item_class,
-                description=item.description,
-                is_nano=item.is_nano,
-                stats=stats_response,
-                spell_data=spell_data_list,
-                attack_stats=[],  # Nanos don't have attack stats
-                defense_stats=[],  # Nanos don't have defense stats
-                actions=actions,
-                sources=sources,
-            )
-        )
-
     return PaginatedResponse[ItemDetail](
-        items=detailed_items,
-        total=total,  # Now accurate count from DB filtering
-        page=page,
-        page_size=page_size,
-        pages=pages,
-        has_next=page < pages,
-        has_prev=page > 1,
+        items=nanos.item_details(db, build, found.rev_ids),
+        **page_fields(found.total, page, page_size),
     )

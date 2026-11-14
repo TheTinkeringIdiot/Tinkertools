@@ -80,8 +80,16 @@ class NanoProgram(BaseModel):
         description="Actions with criteria; the Use action's criteria are the "
         "requirements to cast this nano",
     )
-    casting_time: Optional[int] = Field(None, description="Time to cast in seconds")
-    recharge_time: Optional[int] = Field(None, description="Recharge time in seconds")
+    casting_time: Optional[int] = Field(
+        None,
+        description="Time to cast, in centiseconds: the AttackDelay stat (294); "
+        "null when the nano does not have it",
+    )
+    recharge_time: Optional[int] = Field(
+        None,
+        description="Time to recharge, in centiseconds: the RechargeDelay stat "
+        "(210); null when the nano does not have it",
+    )
     memory_usage: Optional[int] = Field(None, description="Memory usage in MB")
     nano_point_cost: Optional[int] = Field(None, description="Nano point cost")
 
