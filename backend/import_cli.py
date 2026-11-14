@@ -1381,11 +1381,13 @@ def import_cas(args) -> bool:
                 f"{table} {count}" for table, count in written.items() if count))
 
         todo = [spec for spec in specs if spec.slug not in stored]
-        # A duplicate of the build before it needs no data read.
+        # Refuse an out-of-order build before anything is read. A duplicate of
+        # the build before it needs no data read at all.
         newest_extract, needs_content = {}, {}
         for spec in todo:
             if spec.branch not in newest_extract:
                 newest = cas_store.newest_build(conn, spec.branch)
+                cas_store.require_newer(newest, spec)
                 newest_extract[spec.branch] = newest["extract_slug"] if newest else None
             needs_content[spec.slug] = (spec.extract_slug == spec.slug
                                         or newest_extract[spec.branch] != spec.extract_slug)

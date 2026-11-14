@@ -17,7 +17,7 @@ import json
 import multiprocessing
 from collections import deque
 from pathlib import Path
-from typing import Any, Deque, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Deque, Dict, Iterator, List, Tuple
 
 from app.core.cas_store import BuildContent, BuildSpec, StoreError, split_records
 
@@ -101,9 +101,9 @@ def plan_builds(
                 parent_slug=parent,
                 enabled=known["enabled"] if known else True,
                 is_default=bool(known and known["is_default"]),
-                features=dict(known["features"] or {})
-                if known
-                else dict(DEFAULT_FEATURES),
+                features=(
+                    dict(known["features"] or {}) if known else dict(DEFAULT_FEATURES)
+                ),
                 extract_slug=extract_slug,
                 rdb_dat_sha256=entry.get("rdb_dat_sha256")
                 or manifest.get("rdb_dat_sha256"),

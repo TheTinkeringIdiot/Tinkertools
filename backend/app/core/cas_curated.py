@@ -131,6 +131,9 @@ def read_perks(path: Path) -> Rows:
     return rows
 
 
+_BACKSLASH_ESCAPE = re.compile(r"\\(.)")
+
+
 def _aoid_from_link(link: str) -> Optional[int]:
     match = re.search(r"AOID=(\d+)", link, re.IGNORECASE) or re.search(r"(\d+)", link)
     return int(match.group(1)) if match else None
@@ -141,6 +144,11 @@ def read_symbiants(path: Path) -> Tuple[List[Dict[str, Any]], List[Tuple[int, st
 
     Returns ``([mob, ...], [(item aoid, mob name), ...])``. A mob is described
     by the first row that names it.
+
+    The file writes an apostrophe as ``\\'``. In the list of a mob's minions
+    the backslash is dropped (``Aniitap\\'s Shadow`` is stored as ``Aniitap's
+    Shadow``); a location keeps the file's text unchanged. Both are what the
+    API serves today.
     """
     mobs: Dict[str, Dict[str, Any]] = {}
     drops: Dict[Tuple[int, str], None] = {}
@@ -161,7 +169,11 @@ def read_symbiants(path: Path) -> Tuple[List[Dict[str, Any]], List[Tuple[int, st
                     "level": int(level) if level.isdigit() else None,
                     "playfield": playfield,
                     "location": row[5].strip(),
-                    "mob_names": [m.strip() for m in row[6].split(",") if m.strip()],
+                    "mob_names": [
+                        _BACKSLASH_ESCAPE.sub(r"\1", m.strip())
+                        for m in row[6].split(",")
+                        if m.strip()
+                    ],
                 }
             elif known["playfield"] != playfield:
                 raise StoreError(
@@ -206,7 +218,8 @@ def _sync(
     different = [k for k in wanted if k in stored and stored[k] != wanted[k]]
     if gone:
         cursor.executemany(
-            sql.SQL("DELETE FROM {} WHERE {}").format(sql.Identifier(table), where), gone
+            sql.SQL("DELETE FROM {} WHERE {}").format(sql.Identifier(table), where),
+            gone,
         )
     if new:
         cursor.executemany(

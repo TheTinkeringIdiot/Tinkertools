@@ -172,7 +172,9 @@ def analyze(conn: psycopg.Connection, schema: str) -> None:
     ).fetchall()
     for (table,) in tables:
         conn.execute(
-            sql.SQL("ANALYZE {}.{}").format(sql.Identifier(schema), sql.Identifier(table))
+            sql.SQL("ANALYZE {}.{}").format(
+                sql.Identifier(schema), sql.Identifier(table)
+            )
         )
 
 
@@ -386,7 +388,10 @@ class BuildResult:
 
 
 def _copy_rows(
-    conn: psycopg.Connection, table: str, columns: Sequence[str], rows: Iterable[Sequence]
+    conn: psycopg.Connection,
+    table: str,
+    columns: Sequence[str],
+    rows: Iterable[Sequence],
 ) -> None:
     statement = sql.SQL("COPY {} ({}) FROM STDIN").format(
         sql.Identifier(table), sql.SQL(", ").join(map(sql.Identifier, columns))
@@ -398,8 +403,7 @@ def _copy_rows(
 
 def _stage(conn: psycopg.Connection, rows: List[ItemRow]) -> None:
     conn.execute("DROP TABLE IF EXISTS incoming, new_rev, incoming_rev")
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TEMP TABLE incoming (
             aoid integer PRIMARY KEY,
             is_nano boolean NOT NULL,
@@ -413,18 +417,15 @@ def _stage(conn: psycopg.Connection, rows: List[ItemRow]) -> None:
             atkdef_hash char(40),
             misc_hash char(40)
         ) ON COMMIT DROP
-        """
-    )
+        """)
     _copy_rows(conn, "incoming", ITEM_COLUMNS, rows)
     conn.execute("ANALYZE incoming")
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TEMP TABLE new_rev ON COMMIT DROP AS
         SELECT i.* FROM incoming i
         LEFT JOIN item_revision r ON r.aoid = i.aoid AND r.hash = i.hash
         WHERE r.rev_id IS NULL
-        """
-    )
+        """)
     conn.execute("ANALYZE new_rev")
 
 
@@ -476,7 +477,11 @@ def _store_parts(conn: psycopg.Connection, content: BuildContent) -> Dict[str, i
             conn,
             projection,
             (id_column,) + columns,
-            ((ids[h],) + tuple(row) for h, d in zip(hashes, docs) for row in rows_of(d)),
+            (
+                (ids[h],) + tuple(row)
+                for h, d in zip(hashes, docs)
+                for row in rows_of(d)
+            ),
         )
     return {name: len(hashes) for name, hashes in wanted.items()}
 
@@ -514,9 +519,7 @@ def _store_revisions(conn: psycopg.Connection) -> int:
     id_columns = sql.SQL(", ").join(
         sql.Identifier(id_column) for _, id_column in PART_TABLES.values()
     )
-    inserted = conn.execute(
-        sql.SQL(
-            """
+    inserted = conn.execute(sql.SQL("""
             INSERT INTO item_revision
                 (aoid, hash, is_nano, ql, item_class, {id_columns})
             SELECT n.aoid, n.hash, n.is_nano,
@@ -525,9 +528,7 @@ def _store_revisions(conn: psycopg.Connection) -> int:
             FROM new_rev n
             LEFT JOIN nano_overlay o ON o.aoid = n.aoid
             {joins}
-            """
-        ).format(id_columns=id_columns, ids=ids, joins=joins)
-    ).rowcount
+            """).format(id_columns=id_columns, ids=ids, joins=joins)).rowcount
     expected = conn.execute("SELECT count(*) FROM new_rev").fetchone()[0]
     if inserted != expected:
         raise StoreError(
@@ -541,8 +542,7 @@ def _store_revisions(conn: psycopg.Connection) -> int:
         for name in _SYMBIANT_FAMILIES
     )
     conn.execute(
-        sql.SQL(
-            """
+        sql.SQL("""
             INSERT INTO symbiant_items (rev_id, aoid, name, ql, slot_id, family)
             SELECT r.rev_id, r.aoid, t.name, r.ql,
                    (SELECT max(s.value) FROM stat_entry s
@@ -552,8 +552,7 @@ def _store_revisions(conn: psycopg.Connection) -> int:
             JOIN item_revision r ON r.aoid = n.aoid AND r.hash = n.hash
             JOIN part_text t ON t.text_id = r.text_id
             WHERE t.name ~ {pattern}
-            """
-        ).format(
+            """).format(
             slot=sql.Literal(STAT_SLOT),
             family=family,
             pattern=sql.Literal(_SYMBIANT_NAME),
@@ -564,9 +563,9 @@ def _store_revisions(conn: psycopg.Connection) -> int:
 
 def _parts_changed_sql() -> sql.Composable:
     return sql.SQL(" + ").join(
-        sql.SQL("CASE WHEN nr.{col} IS DISTINCT FROM orv.{col} THEN {bit} ELSE 0 END").format(
-            col=sql.Identifier(id_column), bit=sql.Literal(PART_BITS[name])
-        )
+        sql.SQL(
+            "CASE WHEN nr.{col} IS DISTINCT FROM orv.{col} THEN {bit} ELSE 0 END"
+        ).format(col=sql.Identifier(id_column), bit=sql.Literal(PART_BITS[name]))
         for name, (_, id_column) in PART_TABLES.items()
     )
 
@@ -584,13 +583,11 @@ def _record_presence(
     ``previous`` is the ordinal of the branch's newest build before this one;
     ``parent`` is the (branch, ordinal) a first build is compared with.
     """
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TEMP TABLE incoming_rev ON COMMIT DROP AS
         SELECT i.aoid, r.rev_id FROM incoming i
         JOIN item_revision r ON r.aoid = i.aoid AND r.hash = i.hash
-        """
-    )
+        """)
     conn.execute("ANALYZE incoming_rev")
 
     if previous is not None:
@@ -604,12 +601,13 @@ def _record_presence(
             "WHERE branch = {} AND from_ordinal <= {ordinal} AND to_ordinal >= {ordinal}"
         ).format(sql.Literal(parent[0]), ordinal=sql.Literal(parent[1]))
     else:
-        baseline = sql.SQL("SELECT NULL::integer AS aoid, NULL::integer AS rev_id WHERE false")
+        baseline = sql.SQL(
+            "SELECT NULL::integer AS aoid, NULL::integer AS rev_id WHERE false"
+        )
 
     kinds = dict(
         conn.execute(
-            sql.SQL(
-                """
+            sql.SQL("""
                 WITH written AS (
                     INSERT INTO item_change
                         (branch, ordinal, aoid, kind, old_rev_id, new_rev_id, parts_changed)
@@ -627,8 +625,7 @@ def _record_presence(
                     RETURNING kind
                 )
                 SELECT kind, count(*) FROM written GROUP BY kind
-                """
-            ).format(
+                """).format(
                 branch=sql.Literal(branch),
                 ordinal=sql.Literal(ordinal),
                 parts_changed=_parts_changed_sql(),
@@ -663,9 +660,7 @@ def _record_presence(
     ).rowcount
 
 
-def _insert_build(
-    conn: psycopg.Connection, spec: BuildSpec, item_count: int
-) -> int:
+def _insert_build(conn: psycopg.Connection, spec: BuildSpec, item_count: int) -> int:
     parent_id = None
     if spec.parent_slug:
         row = conn.execute(
@@ -721,6 +716,17 @@ def newest_build(conn: psycopg.Connection, branch: str) -> Optional[Dict[str, An
     return dict(zip(("build_id", "slug", "ordinal", "extract_slug", "item_count"), row))
 
 
+def require_newer(newest: Optional[Dict[str, Any]], spec: BuildSpec) -> None:
+    """Refuse ``spec`` unless it comes after ``newest``, its branch's newest build."""
+    if newest is not None and spec.ordinal <= newest["ordinal"]:
+        raise StoreError(
+            f"'{spec.slug}' (ordinal {spec.ordinal}) is not newer than "
+            f"'{newest['slug']}' (ordinal {newest['ordinal']}), the newest build of "
+            f"branch '{spec.branch}' in the store. Builds are imported oldest first; "
+            "rebuild the store to insert an older one."
+        )
+
+
 def same_as_newest(conn: psycopg.Connection, spec: BuildSpec) -> bool:
     """Whether ``spec`` carries the very extract of its branch's newest build."""
     newest = newest_build(conn, spec.branch)
@@ -749,13 +755,7 @@ def import_build(
         return BuildResult(slug=spec.slug, imported=False)
 
     newest = newest_build(conn, spec.branch)
-    if newest is not None and spec.ordinal <= newest["ordinal"]:
-        raise StoreError(
-            f"'{spec.slug}' (ordinal {spec.ordinal}) is not newer than "
-            f"'{newest['slug']}' (ordinal {newest['ordinal']}), the newest build of "
-            f"branch '{spec.branch}' in the store. Builds are imported oldest first; "
-            "rebuild the store to insert an older one."
-        )
+    require_newer(newest, spec)
 
     result = BuildResult(slug=spec.slug, imported=True)
     if content is None:
@@ -766,7 +766,8 @@ def import_build(
             )
         result.same_as_previous = True
         result.items = newest["item_count"]
-        _insert_build(conn, spec, newest["item_count"])
+        build_id = _insert_build(conn, spec, newest["item_count"])
+        ensure_nano_properties(conn, build_id)
         return result
 
     result.items = len(content.rows)
@@ -883,8 +884,7 @@ def ensure_nano_properties(
     build, or of every build, under each build's strain policy. Returns the
     number of rows added."""
     missing = conn.execute(
-        sql.SQL(
-            """
+        sql.SQL("""
             WITH wanted AS (
                 SELECT DISTINCT r.rev_id, b.overlay_strain_first AS policy
                 FROM build b
@@ -903,11 +903,12 @@ def ensure_nano_properties(
             JOIN part_stats s ON s.stats_id = r.stats_id
             LEFT JOIN part_actions a ON a.actions_id = r.actions_id
             LEFT JOIN nano_overlay o ON o.aoid = r.aoid
-            """
-        ).format(
-            build=sql.SQL("b.build_id = {}").format(sql.Literal(build_id))
-            if build_id is not None
-            else sql.SQL("true")
+            """).format(
+            build=(
+                sql.SQL("b.build_id = {}").format(sql.Literal(build_id))
+                if build_id is not None
+                else sql.SQL("true")
+            )
         )
     ).fetchall()
 
@@ -926,9 +927,7 @@ def ensure_nano_properties(
             (o_strain, o_substrain) if has_overlay else None,
             policy,
         )
-        rows.append(
-            (rev_id, policy, school, professions, min_level, strain, substrain)
-        )
+        rows.append((rev_id, policy, school, professions, min_level, strain, substrain))
     _copy_rows(
         conn,
         "nano_properties",
@@ -949,15 +948,13 @@ def ensure_nano_properties(
 def apply_nano_overlay(conn: psycopg.Connection) -> None:
     """Re-derive everything that depends on ``nano_overlay`` after it changed:
     the QL of nano revisions and the strains in ``nano_properties``."""
-    conn.execute(
-        """
+    conn.execute("""
         UPDATE item_revision r SET ql = v.ql
         FROM (SELECT r2.rev_id, COALESCE(o.ql, 1) AS ql
               FROM item_revision r2
               LEFT JOIN nano_overlay o ON o.aoid = r2.aoid
               WHERE r2.is_nano) v
         WHERE v.rev_id = r.rev_id AND r.ql IS DISTINCT FROM v.ql
-        """
-    )
+        """)
     conn.execute("DELETE FROM nano_properties")
     ensure_nano_properties(conn)
