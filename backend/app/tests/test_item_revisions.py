@@ -9,11 +9,10 @@ hand-made items and asks the API for an item's history.
 """
 
 import os
+from datetime import date
 
 import pytest
-from sqlalchemy import update
 
-from app.store import tables as t
 from app.tests.fixtures.store_fixtures import criterion, item, modify
 
 pytestmark = pytest.mark.skipif(
@@ -125,18 +124,35 @@ def test_a_build_that_only_reorders_or_renumbers_internals_is_no_change(store):
 
 
 def test_a_point_describes_its_build(store):
-    store.add_build("ao-1", 1, items=[wrench()], client_build="1.0")
+    store.add_build(
+        "ao-1",
+        1,
+        items=[wrench()],
+        display_name="AO 1.0",
+        client_build="1.0",
+        released_on=date(2001, 6, 27),
+    )
+    store.add_build("ao-2", 2, items=[wrench(stat=11)])
 
     assert history(store)["revisions"] == [
         {
-            "version_slug": "ao-1",
-            "display_name": "ao-1",
+            "version_slug": "ao-2",
+            "display_name": "ao-2",
             "family": "ao",
             "snapshot_date": None,
+            "client_build": None,
+            "changed": ["stats"],
+            "first_seen": False,
+        },
+        {
+            "version_slug": "ao-1",
+            "display_name": "AO 1.0",
+            "family": "ao",
+            "snapshot_date": "2001-06-27",
             "client_build": "1.0",
             "changed": [],
             "first_seen": True,
-        }
+        },
     ]
 
 
@@ -182,11 +198,8 @@ def test_an_item_no_build_has_gets_an_empty_history(store):
 
 def test_a_disabled_build_is_not_part_of_the_history(store):
     store.add_build("ao-1", 1, items=[wrench()])
-    store.add_build("ao-2", 2, items=[wrench(stat=11)])
+    store.add_build("ao-2", 2, items=[wrench(stat=11)], enabled=False)
     store.add_build("ao-3", 3, items=[wrench(stat=11)])
-    store.db.execute(
-        update(t.build).where(t.build.c.slug == "ao-2").values(enabled=False)
-    )
 
     data = history(store)
 

@@ -28,7 +28,7 @@ import os
 import uuid
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, List, Sequence
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence
 
 import pytest
 from fastapi.testclient import TestClient
@@ -85,9 +85,16 @@ class ThrowawayStore:
         nanos: Sequence[Dict[str, Any]] = (),
         branch: str = "ao",
         **fields: Any,
-    ) -> Build:
+    ) -> Optional[Build]:
         """Import a build made of raw item and nano records; every feature is
-        on unless ``features`` says otherwise."""
+        on unless ``features`` says otherwise.
+
+        ``fields`` are fields of the importer's ``BuildSpec``: ``display_name``
+        (the slug by default), ``enabled``, ``client_build``, ``released_on``,
+        ``parent_slug``, ``is_default``. Returns the build as requests read
+        it, or None for a build stored with ``enabled=False``, which no
+        request can name.
+        """
         fields.setdefault("features", dict(ALL_FEATURES))
         fields.setdefault("sort_order", 1000 - ordinal)
         load(
@@ -96,7 +103,7 @@ class ThrowawayStore:
             items=items,
             nanos=nanos,
         )
-        return self.build(slug)
+        return self.build(slug) if fields.get("enabled", True) else None
 
     def curate(self, mobs: Iterable[tuple] = (), nanos: str = "") -> None:
         """Load curated data: ``mobs`` as ``(boss, playfield, item aoid)``
