@@ -425,6 +425,13 @@ def test_exact_search_is_sorted_by_name_then_aoid(store):
     with store.client("b1") as client:
         assert searched(client, "ring") == [3, 2, 4, 1]
         assert searched(client, "ring", page_size=2, page=2) == [4, 1]
+        past_the_end = client.get(
+            "/api/v1/items/search?q=ring&page_size=2&page=9"
+        ).json()
+
+    assert past_the_end["items"] == []
+    assert (past_the_end["total"], past_the_end["pages"]) == (4, 2)
+    assert (past_the_end["has_next"], past_the_end["has_prev"]) == (False, True)
 
 
 def test_search_reads_the_names_of_the_build(store):
