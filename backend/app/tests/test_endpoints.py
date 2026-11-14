@@ -203,31 +203,31 @@ class TestItemListAndSearchEndpoints:
         # The term matches several items sharing a name ("Nano Can: Pistol
         # Mastery"), so pages only partition cleanly with a unique sort order
         term = pistol_mastery.name
-        expected_ids = {
-            item_id
-            for (item_id,) in db_session.query(Item.id).filter(
+        expected_aoids = {
+            aoid
+            for (aoid,) in db_session.query(Item.aoid).filter(
                 or_(Item.name.ilike(f"%{term}%"), Item.description.ilike(f"%{term}%"))
             )
         }
         page_size = 5
-        expected_pages = math.ceil(len(expected_ids) / page_size)
+        expected_pages = math.ceil(len(expected_aoids) / page_size)
         assert expected_pages > 1
 
-        seen_ids = []
+        seen_aoids = []
         for page in range(1, expected_pages + 1):
             response = client.get(
                 f"/api/v1/items/search?q={term}&page={page}&page_size={page_size}"
             )
             assert response.status_code == 200
             data = response.json()
-            assert data["total"] == len(expected_ids)
+            assert data["total"] == len(expected_aoids)
             assert data["pages"] == expected_pages
             assert data["has_prev"] is (page > 1)
             assert data["has_next"] is (page < expected_pages)
-            seen_ids.extend(item["id"] for item in data["items"])
+            seen_aoids.extend(item["aoid"] for item in data["items"])
 
-        assert len(seen_ids) == len(set(seen_ids))
-        assert set(seen_ids) == expected_ids
+        assert len(seen_aoids) == len(set(seen_aoids))
+        assert set(seen_aoids) == expected_aoids
 
     def test_search_with_exact_match_parameter(self, client, pistol_mastery):
         """Test search with exact_match parameter."""

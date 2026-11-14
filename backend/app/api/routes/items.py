@@ -5,15 +5,15 @@ Items API endpoints.
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, func
-import math
+from sqlalchemy import ColumnElement
 import time
 import logging
 
-from app.core.database import get_db
+from app.store import tables as t
 from app.store.context import Build, get_build, get_store
 from app.store.items import load_item_details
-from app.models import Item, StatValue
+from app.store.presence import fetch_page, page_fields, revisions
+from app.models import Item
 from app.models.interpolated_item import (
     InterpolationResponse,
     BatchInterpolationRequest,
@@ -34,10 +34,12 @@ from app.api.schemas import (
     PaginatedResponse,
 )
 from app.core.decorators import cached_response, performance_monitor
-from app.api.services.item_filter_service import (
-    apply_common_item_filters,
-    item_has_stat,
-    item_detail_load_options,
+from app.api.services.item_search import (
+    common_item_filters,
+    fetch_search_page,
+    full_text_match,
+    parse_search_fields,
+    substring_match,
 )
 
 router = APIRouter(prefix="/items", tags=["items"])
@@ -370,70 +372,46 @@ def get_items(
         description="Stat filters in format 'function:stat:operator:value' separated by commas",
     ),
     strain: Optional[int] = Query(None, description="Filter by nano strain (stat 75)"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_store),
+    build: Build = Depends(get_build),
 ):
     """
     Get paginated list of items with optional filters and complete item details.
     """
-    # Build base query WITHOUT relationship loading (for filtering + counting)
-    query = db.query(Item)
+    revision = t.item_revision
+    query = revisions(build)
 
-    # Apply filters
     # NOTE: item_class is NOT used for nano filtering - use is_nano=true instead
     if item_class:
-        query = query.filter(Item.item_class == item_class)
+        query = query.where(revision.c.item_class == item_class)
     if min_ql is not None:
-        query = query.filter(Item.ql >= min_ql)
+        query = query.where(revision.c.ql >= min_ql)
     if max_ql is not None:
-        query = query.filter(Item.ql <= max_ql)
+        query = query.where(revision.c.ql <= max_ql)
     if is_nano is not None:
-        query = query.filter(Item.is_nano == is_nano)
+        query = query.where(revision.c.is_nano == is_nano)
 
-    # Apply the advanced filters shared across item endpoints
-    query = apply_common_item_filters(
-        query,
-        db,
-        slot=slot,
-        breed=breed,
-        gender=gender,
-        faction=faction,
-        profession=profession,
-        froob_friendly=froob_friendly,
-        nodrop=nodrop,
-        stat_bonuses=stat_bonuses,
-        stat_filters=stat_filters,
-        strain=strain,
+    query = query.where(
+        *common_item_filters(
+            build,
+            slot=slot,
+            breed=breed,
+            gender=gender,
+            faction=faction,
+            profession=profession,
+            froob_friendly=froob_friendly,
+            nodrop=nodrop,
+            stat_bonuses=stat_bonuses,
+            stat_filters=stat_filters,
+            strain=strain,
+        )
     )
 
-    # Get total count on lightweight query (no relationship loading)
-    total = query.count()
-
-    # Calculate pagination
-    pages = math.ceil(total / page_size) if total > 0 else 1
-    offset = (page - 1) * page_size
-
-    # Load relationships only for the paginated result set. A unique ORDER BY
-    # keeps OFFSET pages from repeating or skipping rows; AOID is the item's
-    # identity in every build, so the order does not depend on storage.
-    items = (
-        query.order_by(Item.aoid)
-        .options(*item_detail_load_options())
-        .offset(offset)
-        .limit(page_size)
-        .all()
-    )
-
-    # Build detailed response items in bulk
-    detailed_items = build_item_details_bulk(items, db)
+    found = fetch_page(db, query, [], page, page_size)
 
     return PaginatedResponse[ItemDetail](
-        items=detailed_items,
-        total=total,
-        page=page,
-        page_size=page_size,
-        pages=pages,
-        has_next=page < pages,
-        has_prev=page > 1,
+        items=load_item_details(db, build, rev_ids=found.rev_ids),
+        **page_fields(found.total, page, page_size),
     )
 
 
@@ -484,165 +462,69 @@ def search_items(
         description="Stat filters in format 'function:stat:operator:value' separated by commas",
     ),
     strain: Optional[int] = Query(None, description="Filter by nano strain (stat 75)"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_store),
+    build: Build = Depends(get_build),
 ):
     """
     Search items by name or description using exact matching (default) or fuzzy/stemmed search.
     Returns complete item details including stats, spells, and attack/defense data.
+
+    Exact matches are sorted by name. Stemmed matches are sorted by rank, or by
+    name when only weapons are asked for. Ties end on the AOID.
     """
     start_time = time.time()
+    fields_to_search = parse_search_fields(search_fields)
+    revision = t.item_revision
+    text = t.part_text
 
-    # Parse search fields
-    fields_to_search = ["name", "description"]  # Default fields
-    if search_fields:
-        requested_fields = [f.strip().lower() for f in search_fields.split(",")]
-        valid_fields = {"name", "description", "effects", "stats"}
-        fields_to_search = [f for f in requested_fields if f in valid_fields]
-        if not fields_to_search:  # Fallback if no valid fields provided
-            fields_to_search = ["name", "description"]
-
-    # Log search parameters for debugging
-    logger.info(
-        f"Search query='{q}' search_fields='{search_fields}' parsed_fields={fields_to_search} exact_match={exact_match}"
-    )
-
+    query = revisions(build).join(text, text.c.text_id == revision.c.text_id)
+    sort_key: ColumnElement = text.c.name
+    by_rank = not exact_match and not weapons
     if exact_match:
-        # Use ILIKE for exact word matching (default behavior)
-        search_term = f"%{q}%"
-
-        # Build search conditions based on requested fields
-        search_conditions = []
-
-        if "name" in fields_to_search:
-            search_conditions.append(Item.name.ilike(search_term))
-        if "description" in fields_to_search:
-            search_conditions.append(Item.description.ilike(search_term))
-
-        if not search_conditions:
-            search_conditions.append(Item.name.ilike(search_term))
-
-        logger.info(
-            f"Final query: searching {len(search_conditions)} field(s) for term '{q}' in fields {fields_to_search}"
-        )
-
-        # Build base query WITHOUT relationship loading
-        query = db.query(Item)
-
-        # Apply the search filter
-        if len(search_conditions) == 1:
-            query = query.filter(search_conditions[0])
-        else:
-            query = query.filter(or_(*search_conditions))
-
-        # The AOID breaks name ties so OFFSET pages never overlap
-        query = query.order_by(Item.name, Item.aoid)
-
-        # Apply weapons filter
-        if weapons:
-            query = query.filter(Item.atkdef_id.isnot(None)).distinct()
+        query = query.where(substring_match(fields_to_search, q))
     else:
-        # Use PostgreSQL full-text search for fuzzy/stemmed matching.
-        # websearch_to_tsquery safely parses raw user input: it never raises
-        # tsquery syntax errors (unlike to_tsquery, which 500s on inputs
-        # containing quotes, parentheses, ':', '!', etc.), ANDs bare terms,
-        # and supports "quoted phrases", OR, and -exclusion for free.
-        ts_query = func.websearch_to_tsquery("english", q)
+        matches, rank = full_text_match(fields_to_search, q)
+        query = query.where(matches)
+        if by_rank:
+            sort_key = rank
 
-        # Build full-text search expression based on requested fields
-        search_expression_parts = []
-        if "name" in fields_to_search:
-            search_expression_parts.append(Item.name)
-        if "description" in fields_to_search:
-            search_expression_parts.append(func.coalesce(Item.description, ""))
-
-        if not search_expression_parts:
-            search_expression = Item.name + " " + func.coalesce(Item.description, "")
-        elif len(search_expression_parts) == 1:
-            search_expression = search_expression_parts[0]
-        else:
-            search_expression = search_expression_parts[0]
-            for part in search_expression_parts[1:]:
-                search_expression = search_expression + " " + part
-
-        # Build base query WITHOUT relationship loading
-        query = db.query(Item).filter(
-            func.to_tsvector("english", search_expression).op("@@")(ts_query)
-        )
-
-        # Apply weapons filter
-        if weapons:
-            query = (
-                query.filter(Item.atkdef_id.isnot(None))
-                .distinct()
-                .order_by(Item.name, Item.aoid)
-            )
-        else:
-            query = query.order_by(
-                func.ts_rank(
-                    func.to_tsvector("english", search_expression), ts_query
-                ).desc(),
-                Item.aoid,
-            )
-
-    # Quality level range (endpoint-specific: validated 1-999 here)
+    if weapons:
+        query = query.where(revision.c.atkdef_id.isnot(None))
     if min_ql is not None:
-        query = query.filter(Item.ql >= min_ql)
+        query = query.where(revision.c.ql >= min_ql)
     if max_ql is not None:
-        query = query.filter(Item.ql <= max_ql)
-
-    # Item class filter (stat 76) - search uses the stat subquery rather
-    # than the Item.item_class column used by get_items
+        query = query.where(revision.c.ql <= max_ql)
     if item_class is not None and item_class > 0:
-        query = query.filter(
-            item_has_stat(StatValue.stat == 76, StatValue.value == item_class)
+        query = query.where(revision.c.item_class == item_class)
+
+    query = query.where(
+        *common_item_filters(
+            build,
+            slot=slot,
+            breed=breed,
+            gender=gender,
+            faction=faction,
+            profession=profession,
+            froob_friendly=froob_friendly,
+            nodrop=nodrop,
+            stat_bonuses=stat_bonuses,
+            stat_filters=stat_filters,
+            strain=strain,
         )
-
-    # Apply the advanced filters shared across item endpoints
-    query = apply_common_item_filters(
-        query,
-        db,
-        slot=slot,
-        breed=breed,
-        gender=gender,
-        faction=faction,
-        profession=profession,
-        froob_friendly=froob_friendly,
-        nodrop=nodrop,
-        stat_bonuses=stat_bonuses,
-        stat_filters=stat_filters,
-        strain=strain,
     )
 
-    # Get total count on lightweight query (no relationship loading)
-    total = query.count()
+    found = fetch_search_page(db, query, sort_key, by_rank, page, page_size)
+    items = load_item_details(db, build, rev_ids=found.rev_ids)
 
-    # Calculate pagination
-    pages = math.ceil(total / page_size) if total > 0 else 1
-    offset = (page - 1) * page_size
-
-    # Load relationships only for the paginated result set
-    items = (
-        query.options(*item_detail_load_options()).offset(offset).limit(page_size).all()
-    )
-
-    # Build detailed response items in bulk
-    detailed_items = build_item_details_bulk(items, db)
-
-    # Log performance metrics
     query_time = time.time() - start_time
     search_method = "exact_ilike" if exact_match else "fuzzy_fulltext"
     logger.info(
-        f"Item search query='{q}' results={total} time={query_time:.3f}s method={search_method}"
+        f"Item search query='{q}' fields={fields_to_search} results={found.total} "
+        f"time={query_time:.3f}s method={search_method}"
     )
 
     return PaginatedResponse[ItemDetail](
-        items=detailed_items,
-        total=total,
-        page=page,
-        page_size=page_size,
-        pages=pages,
-        has_next=page < pages,
-        has_prev=page > 1,
+        items=items, **page_fields(found.total, page, page_size)
     )
 
 
