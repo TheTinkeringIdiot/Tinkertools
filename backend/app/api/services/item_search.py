@@ -1,8 +1,9 @@
 """
 Filters and text search of the item list and item search routes, on the store.
 
-Every function returns conditions for a query built on
-``app.store.presence.revisions``; nothing here executes a query.
+The filter and match functions return conditions for a query built on
+``app.store.presence.revisions``; ``fetch_search_page`` runs such a query for
+one page of a search.
 
 Stat ids the filters read:
 - 0   flags (bit 16384 = NODROP)
@@ -20,12 +21,22 @@ from __future__ import annotations
 import logging
 from typing import List, Optional, Sequence, Tuple
 
-from sqlalchemy import BigInteger, ColumnElement, cast, false, func, or_, select
+from sqlalchemy import (
+    BigInteger,
+    ColumnElement,
+    Select,
+    cast,
+    false,
+    func,
+    or_,
+    select,
+)
+from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import literal_column
 
 from app.store import tables as t
 from app.store.context import Build
-from app.store.presence import has_effect, has_requirement, has_stat
+from app.store.presence import Page, has_effect, has_requirement, has_stat
 
 logger = logging.getLogger(__name__)
 
@@ -292,3 +303,44 @@ def full_text_match(
     vector = func.to_tsvector(_TEXT_CONFIG, document)
     ts_query = func.websearch_to_tsquery(_TEXT_CONFIG, q)
     return vector.op("@@")(ts_query), func.ts_rank(vector, ts_query)
+
+
+def fetch_search_page(
+    db: Session,
+    query: Select,
+    sort_key: ColumnElement,
+    descending: bool,
+    page: int,
+    page_size: int,
+) -> Page:
+    """One page of a text search and the number of matches, sorted by
+    ``sort_key`` and then the AOID.
+
+    Like ``app.store.presence.fetch_page``, for a query whose cost is finding
+    the matches: they are found once, set aside, then counted and sorted.
+    Planned together with its ORDER BY and LIMIT, such a query tempts the
+    planner to walk the name index in the hope of an early end, which a
+    selective filter turns into a scan of every text. A page past the end has
+    no row to carry the count, which is then asked for on its own.
+    """
+    matches = (
+        query.add_columns(t.item_revision.c.aoid, sort_key.label("sort_key"))
+        .cte("matches")
+        .prefix_with("MATERIALIZED")
+    )
+    total = select(func.count()).select_from(matches).scalar_subquery()
+    key = matches.c.sort_key.desc() if descending else matches.c.sort_key
+    rows = db.execute(
+        select(matches.c.rev_id, total.label("total"))
+        .order_by(key, matches.c.aoid)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    ).all()
+    if rows:
+        return Page(rev_ids=[row.rev_id for row in rows], total=rows[0].total)
+    if page == 1:
+        return Page(rev_ids=[], total=0)
+    total = db.execute(
+        select(func.count()).select_from(query.order_by(None).subquery())
+    ).scalar_one()
+    return Page(rev_ids=[], total=total)

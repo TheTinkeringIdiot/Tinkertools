@@ -36,6 +36,7 @@ from app.api.schemas import (
 from app.core.decorators import cached_response, performance_monitor
 from app.api.services.item_search import (
     common_item_filters,
+    fetch_search_page,
     full_text_match,
     parse_search_fields,
     substring_match,
@@ -477,14 +478,15 @@ def search_items(
     text = t.part_text
 
     query = revisions(build).join(text, text.c.text_id == revision.c.text_id)
-    order_by: List[ColumnElement] = [text.c.name]
+    sort_key: ColumnElement = text.c.name
+    by_rank = not exact_match and not weapons
     if exact_match:
         query = query.where(substring_match(fields_to_search, q))
     else:
         matches, rank = full_text_match(fields_to_search, q)
         query = query.where(matches)
-        if not weapons:
-            order_by = [rank.desc()]
+        if by_rank:
+            sort_key = rank
 
     if weapons:
         query = query.where(revision.c.atkdef_id.isnot(None))
@@ -511,7 +513,7 @@ def search_items(
         )
     )
 
-    found = fetch_page(db, query, order_by, page, page_size)
+    found = fetch_search_page(db, query, sort_key, by_rank, page, page_size)
     items = load_item_details(db, build, rev_ids=found.rev_ids)
 
     query_time = time.time() - start_time
