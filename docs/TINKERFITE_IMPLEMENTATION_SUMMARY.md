@@ -29,10 +29,10 @@ TinkerFite has been successfully rebuilt as a modern weapon analysis tool follow
    - `WeaponAnalyzeRequest` model with validation
 
 2. **`backend/app/api/services/weapon_filter_service.py`**
-   - `WeaponFilterService` class with comprehensive filtering logic
-   - QL range filter (level ± 50)
+   - `weapon_query` / `filter_weapons`: one query on the content-addressed store for the requested game version
    - Weapon skill matching (≥50% attack stat contribution)
-   - Breed, profession, and faction filtering
+   - Breed, profession, faction, expansion and NPC-only filtering
+   - No QL filter: every QL variant is returned for client-side interpolation
 
 3. **`backend/app/api/routes/weapons.py`**
    - `POST /api/v1/weapons/analyze` endpoint
@@ -50,6 +50,7 @@ TinkerFite has been successfully rebuilt as a modern weapon analysis tool follow
   "breed_id": 1,
   "profession_id": 11,
   "side": 2,
+  "expansion_bitflag": 127,
   "top_weapon_skills": [
     {"skill_id": 116, "value": 2500},
     {"skill_id": 113, "value": 2400},
@@ -58,14 +59,9 @@ TinkerFite has been successfully rebuilt as a modern weapon analysis tool follow
 }
 ```
 
-**Response**: Array of `ItemDetail` objects (200-1000 weapons)
+**Response**: Array of `ItemDetail` objects ordered by AOID (200-1000+ weapons)
 
-### Test Results
-
-- Level 220 character: Returns **412 weapons** ✅
-- Level 100 character: Returns **66 weapons** ✅
-- Validation: Rejects invalid input ✅
-- Complete ItemDetail objects with all required data ✅
+The backend is described in `docs/features/tinkerfite-backend.doc.md`; its tests are `backend/app/tests/test_weapon_analysis.py`.
 
 ---
 

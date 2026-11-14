@@ -15,9 +15,8 @@ The TinkerTools API serves as the backend for six web-based utilities:
 ## Technology Stack
 
 - **FastAPI** - Modern Python web framework
-- **SQLAlchemy** (async) - Database ORM
+- **SQLAlchemy** (synchronous, Core queries on the store's tables) - Database access
 - **PostgreSQL** - Primary database
-- **Redis** - Caching layer
 - **Pydantic** - Data validation and serialization
 - **uvicorn** - ASGI server
 
@@ -25,7 +24,6 @@ The TinkerTools API serves as the backend for six web-based utilities:
 
 - Python 3.9+
 - PostgreSQL 12+
-- Redis (optional, for caching)
 - Virtual environment tool (venv, conda, etc.)
 
 ## Local Development Setup
@@ -48,36 +46,25 @@ venv\Scripts\activate     # Windows
 pip install -r requirements.txt
 ```
 
-### 4. Database Setup
-Ensure PostgreSQL is running and create the database:
-```bash
-# Run from project root
-cd ../database
-./setup.sh
-```
-
-### 5. Environment Configuration
-Copy the example environment file and configure:
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your local settings:
+### 4. Environment Configuration
+Create `backend/.env.local` (git-ignored) with your local settings:
 ```env
 DATABASE_URL=postgresql://tinker_user:dev_password@localhost:5432/tinkertools
 CORS_ORIGINS=http://localhost:5173
 APP_ENV=development
 LOG_LEVEL=INFO
-REDIS_URL=redis://localhost:6379/0
 ```
+Load it with `set -a && . ./.env.local && set +a`.
 
-### 6. Import Game Data
-Import the game data using the CLI tool:
+### 5. Import Game Data
+Game data lives in the content-addressed store (schema `cas`), built from extracted client builds:
 ```bash
-python import_cli.py --items items.json --nanos nanos.json --symbiants symbiants.csv
+python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --workers 8
+python tools/verify_cas.py --store
 ```
+See `IMPORT_README.md` for the extracts, the version registry and the other import commands.
 
-### 7. Start Development Server
+### 6. Start Development Server
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
@@ -89,15 +76,27 @@ The API will be available at:
 
 ## API Endpoints
 
+Every route below also exists under `/api/v1/<version>/...` (a build slug from `/versions`, or `ao` / `prk`).
+
 ### Core Resources
-- `GET /api/v1/items` - Search and filter items
-- `GET /api/v1/nanos` - Nano program database
-- `GET /api/v1/symbiants` - Symbiant database
-- `GET /api/v1/mobs` - Mobs and pocket bosses (`is_pocket_boss` filter)
+- `GET /api/v1/versions` - Game versions served
+- `GET /api/v1/items`, `/items/search`, `/items/{aoid}` - Items
+- `GET /api/v1/items/{aoid}/interpolate`, `POST /api/v1/items/batch/interpolate` - Items at a quality level
+- `GET /api/v1/items/{aoid}/revisions`, `POST /api/v1/items/revisions/batch` - Item change history
+- `GET /api/v1/nanos`, `/nanos/search`, `/nanos/strains`, `/nanos/profession/{id}`, `/nanos/offensive/{id}` - Nano programs
+- `POST /api/v1/weapons/analyze` - Weapons a character can use
+- `POST /api/v1/implants/lookup` - Implant by slot and clusters
+- `GET /api/v1/symbiants`, `/symbiants/{aoid}`, `/symbiants/{aoid}/dropped-by` - Symbiants
+- `GET /api/v1/mobs`, `/mobs/{id}`, `/mobs/{id}/drops` - Mobs and pocket bosses (`is_pocket_boss` filter)
+- `POST /api/v1/perks/batch/lookup` - Perks by AOID
 
 ### System Endpoints
 - `GET /health` - Health check
 - `POST /api/v1/cache/clear` - Clear the response cache
+
+## Architecture
+
+Routes read the store through `app/store` (see the module docstring of `app/store/__init__.py`): a request names a build, queries start from the revisions present in that build, and items are loaded in a constant number of queries. `GET /versions` and `POST /legacy-item-ids/resolve` are the two routes that still read the registry and the old per-version store.
 
 ## Development Commands
 
@@ -130,43 +129,19 @@ pytest app/tests/test_endpoints.py
 
 ## Database Management
 
-### Migrations (Alembic)
-```bash
-# Generate migration
-alembic revision --autogenerate -m "Description"
+The store's tables are defined in `database/cas/*.sql` and created or upgraded by `import_cli.py import-cas`. Never `DROP SCHEMA cas`; use `import-cas --reset --yes` on a scratch schema (see `IMPORT_README.md`).
 
-# Apply migrations
-alembic upgrade head
-
-# View migration history
-alembic history
-```
-
-### Manual Database Operations
 ```bash
 # Connect to database
 psql -U tinker_user -d tinkertools
-
-# Run schema tests
-psql -U tinker_user -d tinkertools -f ../database/tests/test_schema.sql
 ```
 
 ## Performance Considerations
 
-### Query Optimization
 - Complex stat queries target: < 500ms
-- All endpoints use proper database indexes
-- Async SQLAlchemy for concurrent request handling
-
-### Caching Strategy
-- Redis for frequently accessed data
-- Application-level caching for static game data
-- Cache invalidation on data updates
-
-### Resource Limits
-- Connection pooling configured for production load
-- Async I/O for database operations
-- Proper error handling and timeouts
+- Filters run on the store's search projections (`stat_entry`, `requirement`, `effect_entry`, `atkdef_entry`), which are indexed
+- Synchronous SQLAlchemy; FastAPI runs the routes in its thread pool
+- In-process response cache for static game data (`app/core/cache.py`), cleared with `POST /api/v1/cache/clear`
 
 ## Configuration
 
@@ -175,21 +150,11 @@ psql -U tinker_user -d tinkertools -f ../database/tests/test_schema.sql
 - `CORS_ORIGINS` - Allowed frontend origins
 - `APP_ENV` - Environment (development/production)
 - `LOG_LEVEL` - Logging level (DEBUG/INFO/WARNING/ERROR)
-- `REDIS_URL` - Redis connection string
 
 ### Application Settings
 Configuration is managed through `app/core/config.py` using Pydantic Settings.
 
 ## Production Deployment
-
-### Docker Support
-```bash
-# Build image
-docker build -t tinkertools-api .
-
-# Run container
-docker run -p 8000:8000 tinkertools-api
-```
 
 ### Manual Deployment
 ```bash
@@ -226,10 +191,8 @@ Structured logging with configurable levels. Logs include:
 - Server contains only static game reference data
 - No user accounts or authentication required
 
-### Legacy Compatibility
-- Database schema matches existing Django model structure
-- Maintains compatibility with existing data exports
-- Supports gradual migration from legacy systems
+### Old Store
+- The ORM models in `app/models/` and the per-version store they map remain until cutover; only the legacy id lookup and the old importers use them
 
 ## Troubleshooting
 
@@ -242,24 +205,6 @@ sudo systemctl status postgresql
 
 # Verify database exists
 psql -U postgres -l | grep tinkertools
-```
-
-**Import Errors**
-```bash
-# Check data file format
-head -n 5 items.json
-
-# Verify database schema
-psql -U tinker_user -d tinkertools -c "\dt"
-```
-
-**Performance Issues**
-```bash
-# Check database indexes
-psql -U tinker_user -d tinkertools -c "\di"
-
-# Monitor query performance
-tail -f /var/log/postgresql/postgresql.log
 ```
 
 For additional help, check the main project documentation in `../docs/` or the issue tracker.

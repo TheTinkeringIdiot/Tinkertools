@@ -8,31 +8,9 @@ TinkerTools has received significant enhancements to the perk system, focusing o
 
 ### Complete Perk Item Detail Loading
 
-#### Backend Enhancement (`backend/app/services/perk_service.py`)
+#### Backend (`backend/app/store/curated.py` (`lookup_perks`))
 
-The perk service now loads complete item details with all relationships:
-
-**Features**
-- **Full Relationship Loading**: Loads stats, spell data, actions, and attack/defense information
-- **Enhanced Error Handling**: Comprehensive error recovery for missing relationships
-- **Complete Item Response**: Returns full ItemDetail schema with perk metadata
-- **Performance Optimized**: Uses selectinload and joinedload for efficient queries
-
-**Key Methods Enhanced**
-- `get_perk_info_by_aoid()`: Now returns complete item details with perk metadata
-- `_get_spell_data_responses()`: New method for converting spell data to response format
-- Query optimization with proper relationship loading
-
-#### Schema Enhancements (`backend/app/api/schemas/perk.py`)
-
-**New Schema Classes**
-- `PerkItemDetail`: Complete perk item with full ItemDetail inheritance
-- `PerkValidationDetail`: Enhanced validation response with detailed error reporting
-
-**Enhanced Features**
-- Full item details including stats, spell data, actions
-- Perk-specific metadata (name, counter, type, series, requirements)
-- Backwards compatibility with existing schemas
+`POST /perks/batch/lookup` returns, for each AOID that is a perk the requested game version serves, the perk's item (stats, spell data, actions) followed by its curated fields (name, counter, type, series, professions, breeds, level and AI level requirements). Perks are read from the content-addressed store in three queries whatever the number of AOIDs; a build without the `perks` feature has none.
 
 ### Perk Bonus Calculation System
 
@@ -142,8 +120,8 @@ A comprehensive service for calculating stat bonuses from perk items:
 ## Implementation Files
 
 ### Backend Files
-- `backend/app/services/perk_service.py` - Enhanced perk service with complete item loading
-- `backend/app/api/schemas/perk.py` - New schema classes for complete perk details
+- `backend/app/api/routes/perks.py` - Batch perk lookup endpoint
+- `backend/app/store/curated.py` - `lookup_perks`: perks with complete item details
 
 ### Frontend Core Files
 - `frontend/src/services/perk-bonus-calculator.ts` - New bonus calculation service
@@ -161,9 +139,7 @@ A comprehensive service for calculating stat bonuses from perk items:
 ## Performance Characteristics
 
 ### Backend Performance
-- **Complete Loading**: Efficient relationship loading with selectinload/joinedload
-- **Query Optimization**: Single queries with proper relationship eager loading
-- **Error Recovery**: Individual relationship failures don't break entire response
+- **Constant query count**: three queries per batch lookup, whatever the number of perks
 
 ### Frontend Performance
 - **Calculation Speed**: Sub-200ms for 30+ perks (verified by tests)

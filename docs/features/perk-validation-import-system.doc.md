@@ -102,8 +102,7 @@ The import system has been enhanced with:
 ### Core Validation Files
 - `backend/app/core/perk_validator.py` - Main validation utilities
 - `backend/app/models/perk.py` - Perk database model
-- `backend/app/api/schemas/perk.py` - Perk API schemas
-- `backend/app/services/perk_service.py` - Perk business logic
+- `backend/app/store/curated.py` - `lookup_perks`, the perk lookup the API serves
 
 ### API Integration
 - `backend/app/api/routes/perks.py` - Perk API endpoints

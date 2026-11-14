@@ -237,38 +237,15 @@ NukeTable re-renders with filtered results
 ## Implementation Files
 
 ### Backend API Endpoint
-**File**: `/backend/app/api/routes/nanos.py` (lines 511-659)
+**Files**: `backend/app/api/routes/nanos.py` (`GET /nanos/offensive/{profession_id}`), `backend/app/services/nanos.py` (`offensive_nanos`, `castable_nanos`)
 
-```python
-@router.get("/offensive/{profession_id}", response_model=PaginatedResponse[ItemDetail])
-@cached_response("nanos_offensive", ttl=3600)  # Cache for 1 hour
-@performance_monitor
-def get_offensive_nanos_by_profession(
-    profession_id: int,
-    page: int = Query(1, ge=1),
-    page_size: int = Query(1000, ge=1, le=1000),
-    sort: str = Query("ql"),
-    sort_order: str = Query("desc"),
-    db: Session = Depends(get_db)
-):
-    """
-    OPTIMIZED endpoint for TinkerNukes offensive nano filtering.
+The endpoint reads the content-addressed store for the requested game version and returns `PaginatedResponse[ItemDetail]`, cached for one hour. A nano is listed when:
+- its Use action names the profession (every nano for `profession_id` 0)
+- it has an effect with target 3 (hostile), spell 53002 and Stat 27 (health)
+- its effective strain is real (not 0 and not 99999)
+- it is not a test item (name does not start with `TESTLIVEITEM`)
 
-    Database-level filtering for:
-    - Profession requirement (profession_id)
-    - Offensive spells (target=3, spell_id=53002)
-    - Health damage (spell_params.Stat=27)
-    - Valid strain (stat 75 > 0 AND stat 75 != 99999)
-    - Not test items (name NOT LIKE 'TESTLIVEITEM%')
-    """
-```
-
-**Key Optimizations**:
-- Database-level filtering moves strain validation and offensive spell detection to SQL
-- `selectinload` instead of `joinedload` to avoid cartesian products
-- `DISTINCT` clause prevents duplicates from multi-table joins
-- Single query with proper pagination
-- 1-hour cache TTL for static game data
+All filtering happens in one query on the nano revisions of the build; the page is then loaded in a constant number of queries. Sorting is by `ql` (default, descending) or `name`, ties broken by AOID.
 
 ### Frontend Main View
 **File**: `/frontend/src/views/TinkerNukes.vue`
@@ -422,13 +399,12 @@ def get_offensive_nanos_by_profession(
 ## Performance Optimizations
 
 ### Backend Database-Level Filtering
-1. **Strain Validation in SQL**: Moved from Python to SQL subquery (stat 75 > 0 AND stat 75 != 99999)
-2. **Offensive Spell Detection in SQL**: Filter for target=3, spell_id=53002, Stat=27 at database level
-3. **Test Item Exclusion**: `WHERE name NOT LIKE 'TESTLIVEITEM%'` in SQL
-4. **selectinload Strategy**: Avoids cartesian products from joinedload
-5. **DISTINCT Clause**: Prevents duplicate rows from multi-table joins
-6. **Single Query**: All filtering in one database round-trip
-7. **Caching**: 1-hour TTL for static game data
+1. **Strain Validation in SQL**: the effective strain of `nano_properties` (> 0 and != 99999)
+2. **Offensive Spell Detection in SQL**: `effect_entry` with target=3, spell_id=53002, subject=27
+3. **Test Item Exclusion**: name does not start with `TESTLIVEITEM`
+4. **One Row per Nano**: the revisions of a build have one row per item, so no DISTINCT is needed
+5. **Constant Query Count**: one query finds the page, the loader reads it
+6. **Caching**: 1-hour TTL for static game data
 
 ### Frontend Performance
 1. **ID-Based Skill Lookups**: O(1) access instead of string-based O(n) searches

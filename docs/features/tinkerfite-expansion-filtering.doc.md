@@ -184,5 +184,5 @@ LIMIT 10;
 ## Related Documentation
 - Expansion utils: `frontend/src/utils/expansion-utils.ts`
 - Breed/profession filtering: Similar pattern in `weapon_filter_service.py`
-- Cache implementation: `.docs/features/tinkerfite-performance-optimization.doc.md`
+- Weapon analysis backend: `docs/features/tinkerfite-backend.doc.md`
 - API schema: `backend/app/api/schemas/weapon_analysis.py`

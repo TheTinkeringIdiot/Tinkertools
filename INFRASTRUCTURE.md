@@ -7,7 +7,7 @@ This document provides a comprehensive overview of the shared infrastructure, da
 - **Game Data Constants**: 2,150+ entries in `frontend/src/services/game-data.ts`
 - **API Client**: Unified typed client in `frontend/src/services/api-client.ts`
 - **State Management**: Pinia stores with cross-app sharing in `frontend/src/stores/`
-- **Database**: 23 core tables with PostgreSQL backend (includes source system)
+- **Database**: PostgreSQL; game data in the content-addressed store (schema `cas`), read through `backend/app/store/`
 - **Interpolation System**: Quality level interpolation across all items
 - **Profile System**: Character data management in `frontend/src/lib/tinkerprofiles/`
 
@@ -94,33 +94,27 @@ getPocketBossDrops(id: number): Promise<ApiResponse<SymbiantItem[]>>
 
 ### Backend API Routes (`backend/app/api/routes/`)
 
-- **items.py**: Item database, search, filtering, interpolation, and source endpoints
-- **symbiants.py**: Symbiant data for TinkerPlants integration
-- **pocket_bosses.py**: Pocket boss database for TinkerPocket
-- **sources**: Source system for tracking item origins (crystals, NPCs, missions, etc.)
-- **health.py**: System health monitoring and diagnostics
-- **cache.py**: Clears the response cache
+- **items.py**: Item list, search, detail and interpolation
+- **item_revisions.py**: Item change history across game versions
+- **nanos.py**: Nano lists, search, strains, profession and offensive lists
+- **weapons.py**: Weapon analysis for TinkerFite
+- **implants.py**: Implant lookup by slot and clusters
+- **symbiants.py**, **mobs.py**: Symbiants, mobs and pocket boss drops
+- **perks.py**: Batch perk lookup for profile imports
+- **versions.py**: Game version registry
+- **legacy_item_ids.py**: Internal item id to AOID lookup (transitional)
+- **aosetups.py**: Proxy for AO Setups profile imports
+- **health.py**, **cache.py**: Liveness check, response cache clearing
 
-### Database Connection (`backend/app/core/database.py`)
+### Store Read Layer (`backend/app/store/`)
 
-**Configuration:**
-- PostgreSQL connection pooling (pool size: 10, max overflow: 20)
-- Session management with FastAPI dependency injection
-- Environment-based configuration via DATABASE_URL
-- Connection pre-ping validation for reliability
+Every game-data route reads the content-addressed store (PostgreSQL schema `cas`) through this package: `context` (the build a request names, the session), `tables`, `presence` (the revisions of a build, filters, paging), `items` (item loader and the `ItemDetail` document) and `curated` (symbiants, mobs, perks). The module docstring of `backend/app/store/__init__.py` is the guide. `GET /versions` and `POST /legacy-item-ids/resolve` still read `public.game_versions` and the old per-version store through `backend/app/core/database.py`.
 
-### Source System (`backend/app/models/source.py`)
+### Source System
 
-**Polymorphic source tracking for item origins:**
-- **SourceType**: Categories of sources (item, npc, boss, mission, vendor)
-- **Source**: Polymorphic references to actual source entities
-- **ItemSource**: Junction table with drop rates, QL ranges, and conditions
-
-**Current Implementation:**
-- Nanocrystals → Nanoprograms (via update_nanos.py)
-- Ready for NPCs, missions, bosses, vendors (future)
-- JSONB metadata for flexible data storage
-- Performance optimized with proper indexing
+**Item origins, as the store serves them** (`source_type`, `source`, `item_source` in `backend/database/cas/002_curated_and_derived.sql`):
+- Nanocrystals → nanoprograms (from `all_nanos_compacted.csv`); served when the build has the `sources` feature and the crystal is present in the build
+- Mobs → symbiants (from `database/symbiants.csv`); served when the build has the `symbiants` feature
 
 ### Data Migration Utilities (`backend/`)
 
@@ -367,25 +361,19 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 
 ## 🗄️ Database Schema Reference
 
-### Core Tables (20 total)
+### Content-addressed store (schema `cas`)
 
-**Primary Data Tables:**
-- **items**: Main item database (weapons, armor, implants)
-- **spells**: Nano programs with school classifications
-- **symbiants**: Symbiant data for TinkerPlants
-- **pocket_bosses**: Pocket boss database for TinkerPocket
-- **stat_values**: Stat ID and value pairs with unique constraints
-- **criteria**: Requirement criteria for items and spells
+Defined in `backend/database/cas/001_store.sql` and `002_curated_and_derived.sql`; the part documents are described in `backend/app/core/parts.py`.
 
-**Junction Tables** (Many-to-Many Relationships):
-- **item_stats**: Items ↔ Stat Values
-- **spell_criteria**: Spells ↔ Criteria
-- **pocket_boss_symbiants**: Pocket Bosses ↔ Symbiants
-- **spell_data_spells**: Spell Data ↔ Spells
-- **action_criteria**: Actions ↔ Criteria
+- **build**: One row per client build (branch, ordinal, display fields, feature flags)
+- **item_revision**: One row per distinct content of an item; points to its parts
+- **part_text / part_stats / part_effects / part_actions / part_atkdef / part_misc**: De-duplicated part documents
+- **item_presence**: Runs of consecutive builds in which an item has one revision
+- **stat_entry / requirement / effect_entry / atkdef_entry**: Search projections of the parts
+- **nano_properties**, **symbiant_items**: Derived from items
+- **nano_overlay**, **perk**, **mob**, **source_type**, **source**, **item_source**: Curated data
 
-**System Tables:**
-- **application_cache**: Application-level caching with TTL
+The old per-version store (schemas `gd` and `gv_*`, ORM models in `backend/app/models/`) remains until cutover and is read only by the legacy id lookup.
 
 ### Performance Optimizations
 
@@ -442,7 +430,7 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 
 **Implementation Details:**
 - **Frontend Store Caching**: Items cached by AOID for efficient lookup
-- **Backend Database Query**: `Item.aoid` field used for item retrieval
+- **Backend Database Query**: Items are looked up by AOID in the requested build (`load_item_details`)
 - **URL Generation**: Item links automatically use `item.aoid` for navigation
 - **Share Functionality**: Generated URLs use AOID for game-relevant sharing
 
@@ -497,7 +485,7 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 **Multi-Level Caching:**
 1. **Browser Cache**: Static assets and API responses
 2. **Service Cache**: Client-side data caching with TTL
-3. **Database Cache**: Application-level caching table
+3. **Response Cache**: In-process cache of API responses (`backend/app/core/cache.py`)
 
 **Cache Management:**
 - Automatic cleanup based on TTL
@@ -507,7 +495,7 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 ### Performance Monitoring
 
 **Available Endpoints:**
-- `/api/v1/health`: System health status
+- `/health`: Liveness check
 
 **Monitoring Targets:**
 - API response times under performance thresholds

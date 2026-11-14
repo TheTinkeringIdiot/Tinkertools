@@ -74,8 +74,8 @@ remaining connection slots are reserved for roles with SUPERUSER attribute
 
 #### Perks Endpoint (`POST /perks/batch/lookup`)
 1. Receives `BatchPerkLookupRequest` with array of AOIDs (max 100)
-2. Uses single `PerkService` instance (one DB session)
-3. Looks up each perk by AOID
+2. Looks up all perks at once in the content-addressed store (`lookup_perks`, three queries)
+3. Matches each requested AOID to its perk
 4. Returns complete perk details including requirements, buffs, and actions
 5. Supports partial success (some perks found, others not)
 
@@ -121,7 +121,7 @@ private async fetchPerks(
 - **`backend/app/api/routes/perks.py`** - Added batch lookup endpoint
   - `POST /perks/batch/lookup` endpoint (67 new lines)
   - Returns `BatchPerkLookupResponse` with array of `BatchPerkResult`
-  - Reuses existing `PerkService` for consistency
+  - Reads perks through `lookup_perks` in `backend/app/store/curated.py`
   - Max 100 perks per request
   - Single database session for all perks
 
@@ -247,9 +247,9 @@ const phases = ['Validating format', 'Loading items', 'Loading perks', 'Finalizi
 - **Incremental progress**: Update progress during batch processing (currently only shows phase)
 
 ## Related Documentation
-- **Database connection pooling**: `backend/app/core/database.py`
+- **Store session and build**: `backend/app/store/context.py`
 - **Interpolation service**: `backend/app/services/interpolation.py`
-- **Perk service**: `backend/app/services/perk_service.py`
+- **Perk lookup**: `backend/app/store/curated.py`
 - **Profile transformer**: `frontend/src/lib/tinkerprofiles/transformer.ts`
 - **Import validation**: `docs/features/profile-import-validation.doc.md`
 - **Profile storage**: `frontend/src/lib/tinkerprofiles/CLAUDE.md`

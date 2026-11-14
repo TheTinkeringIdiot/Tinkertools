@@ -24,16 +24,18 @@ Interactive API documentation is available at:
 ### Health Check
 
 #### GET /health
-Check the health status of the API and database connection.
+Check that the API process is up.
 
 **Response:**
 ```json
 {
-  "status": "ok",
-  "database": "healthy",
-  "table_count": 21
+  "status": "ok"
 }
 ```
+
+### Game versions
+
+Every route under `/api/v1` also exists under `/api/v1/<version>`, where `<version>` is a build slug from `GET /api/v1/versions` (`ao-18-8-62-ep1`) or a family alias (`ao`, `prk`). Without the segment the default build is served. An unknown slug is a 404.
 
 ### Items
 
@@ -42,11 +44,14 @@ Get a paginated list of items with optional filters.
 
 **Query Parameters:**
 - `page` (int): Page number (default: 1)
-- `page_size` (int): Items per page (default: 50, max: 200)
-- `item_class` (string): Filter by item class
+- `page_size` (int): Items per page (default: 50, max: 1000)
+- `item_class` (int): Filter by item class
 - `min_ql` (int): Minimum quality level
 - `max_ql` (int): Maximum quality level
 - `is_nano` (bool): Filter nano programs
+- `slot`, `profession`, `breed`, `gender`, `faction`, `froob_friendly`, `nodrop`, `stat_bonuses`, `stat_filters`, `strain`: advanced filters, described at `/docs`
+
+Items are ordered by AOID.
 
 **Response:**
 ```json
@@ -78,36 +83,27 @@ Get detailed information about a specific item by its Anarchy Online ID (AOID).
 **Response:**
 ```json
 {
-  "id": 1,
   "aoid": 12345,
   "name": "Enhanced Leather Vest",
   "ql": 25,
   "item_class": 4,
   "description": "A sturdy leather vest...",
   "is_nano": false,
+  "id": 12345,
   "stats": [
-    {
-      "id": 101,
-      "stat": 16,
-      "value": 15
-    }
+    {"stat": 16, "value": 15}
   ],
   "spell_data": [
     {
-      "id": 201,
-      "event": 1,
+      "event": 14,
       "spells": [
         {
-          "id": 301,
-          "target": 1,
-          "tick_count": null,
-          "tick_interval": null,
-          "spell_id": 12345,
-          "spell_format": "Increase {stat} by {value}",
-          "spell_params": {
-            "stat": 96,
-            "value": 10
-          },
+          "target": 2,
+          "tick_count": 1,
+          "tick_interval": 0,
+          "spell_id": 53045,
+          "spell_format": "Modify {Stat} {Amount}",
+          "spell_params": {"Stat": 96, "Amount": 10, "SpellDescription": "Modify 96 10"},
           "criteria": []
         }
       ]
@@ -117,28 +113,25 @@ Get detailed information about a specific item by its Anarchy Online ID (AOID).
   "defense_stats": [],
   "actions": [
     {
-      "id": 401,
-      "action": 1,
-      "item_id": 1,
+      "action": 6,
       "criteria": [
-        {
-          "id": 501,
-          "value1": 16,
-          "value2": 100,
-          "operator": 1
-        }
+        {"value1": 16, "value2": 100, "operator": 2}
       ]
     }
-  ]
+  ],
+  "sources": []
 }
 ```
+
+`id` is deprecated and equals `aoid`. Nested objects carry no ids.
 
 **Field Descriptions:**
 - `stats`: Basic item statistics
 - `spell_data`: Spell effects with nested spells and their criteria  
 - `attack_stats`: Attack-related statistics for weapons
 - `defense_stats`: Defense-related statistics for weapons
-- `actions`: Item actions with criteria (equipping, using, etc.)
+- `actions`: Item actions with criteria (equipping, using, etc.), criteria in evaluation order
+- `sources`: Where the item comes from (crystals for nanos, mobs for symbiants)
 
 ### Symbiants
 
@@ -147,11 +140,9 @@ Get a paginated list of symbiants.
 
 **Query Parameters:**
 - `page` (int): Page number
-- `page_size` (int): Items per page
-- `family` (string): Filter by symbiant family
-- `slot` (string): Filter by equipment slot
-- `min_ql` (int): Minimum quality level
-- `max_ql` (int): Maximum quality level
+- `page_size` (int): Items per page (default 50, max 200)
+
+Ordered by family, QL, name and AOID. Filtering is done by the client.
 
 #### GET /api/v1/symbiants/{aoid}
 Get detailed information about a specific symbiant, addressed by its AOID.
