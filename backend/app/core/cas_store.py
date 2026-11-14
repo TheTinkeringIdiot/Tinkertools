@@ -46,6 +46,7 @@ import re
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
@@ -372,6 +373,7 @@ class BuildSpec:
     display_name: str
     sort_order: int = 0
     client_build: Optional[str] = None
+    released_on: Optional[date] = None
     parent_slug: Optional[str] = None
     enabled: bool = True
     is_default: bool = False
@@ -386,6 +388,7 @@ class BuildSpec:
 # what it contains. They follow the registry on every import run.
 PRESENTATION_COLUMNS = (
     "display_name",
+    "released_on",
     "sort_order",
     "enabled",
     "is_default",
@@ -699,9 +702,9 @@ def _insert_build(conn: psycopg.Connection, spec: BuildSpec, item_count: int) ->
         """
         INSERT INTO build
             (slug, branch, ordinal, sort_order, display_name, client_build,
-             parent_build_id, enabled, is_default, features, extract_slug,
-             rdb_dat_sha256, tinkerparse_commit, item_count, notes)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             released_on, parent_build_id, enabled, is_default, features,
+             extract_slug, rdb_dat_sha256, tinkerparse_commit, item_count, notes)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
             spec.slug,
@@ -710,6 +713,7 @@ def _insert_build(conn: psycopg.Connection, spec: BuildSpec, item_count: int) ->
             spec.sort_order,
             spec.display_name,
             spec.client_build,
+            spec.released_on,
             parent_id,
             spec.enabled,
             spec.is_default,

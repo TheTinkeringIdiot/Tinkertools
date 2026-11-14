@@ -64,7 +64,8 @@ def plan_builds(
     """The ``build`` row of every importable entry of index.json, in index order.
 
     ``registry`` holds the rows of ``public.game_versions`` by slug; a build it
-    knows takes its display name, list position, flags and features from there.
+    knows takes its display name, release date (the registry's
+    ``snapshot_date``), list position, flags and features from there.
 
     - ``ordinal`` is the entry's position among all entries of its family, so
       a build that failed to extract keeps its place should it be fixed.
@@ -111,6 +112,7 @@ def plan_builds(
                 display_name=display_name,
                 sort_order=sort_order,
                 client_build=client_build,
+                released_on=known.get("snapshot_date") if known else None,
                 parent_slug=parent,
                 enabled=known["enabled"] if known else True,
                 is_default=bool(known and known["is_default"]),

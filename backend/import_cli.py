@@ -1289,8 +1289,8 @@ def read_registry(conn) -> dict:
     """Rows of ``public.game_versions`` by slug; empty when there is no registry."""
     if conn.execute("SELECT to_regclass('public.game_versions')").fetchone()[0] is None:
         return {}
-    columns = ("slug", "display_name", "parent_slug", "sort_order", "enabled",
-               "is_default", "features", "notes")
+    columns = ("slug", "display_name", "parent_slug", "snapshot_date", "sort_order",
+               "enabled", "is_default", "features", "notes")
     rows = conn.execute(f"SELECT {', '.join(columns)} FROM public.game_versions").fetchall()
     return {row[0]: dict(zip(columns, row)) for row in rows}
 

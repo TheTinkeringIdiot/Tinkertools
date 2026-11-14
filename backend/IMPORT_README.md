@@ -132,7 +132,7 @@ python import_cli.py import-extracts --extracts-dir ~/projects/AO/extracts --slu
 
 ### Content-addressed store (`import-cas`, `tools/verify_cas.py`)
 
-The content-addressed store (`docs/plans/content-addressed-store/design.md`, tables in `database/cas/`) is built next to the shared store, in its own schema (`cas`). The API does not read it yet. `import-cas` never writes to `public`, `gd` or a `gv_*` schema; it reads the registry (`public.game_versions`) for display names, order, flags and features.
+The content-addressed store (`docs/plans/content-addressed-store/design.md`, tables in `database/cas/`) is built next to the shared store, in its own schema (`cas`). Every game-data route of the API reads it (`app/store`); only `GET /versions` and `POST /legacy-item-ids/resolve` still read the registry and the shared store. `import-cas` never writes to `public`, `gd` or a `gv_*` schema; it reads the registry (`public.game_versions`) for display names, release dates (`snapshot_date`), order, flags and features, and brings the stored builds in line with it on every run.
 
 ```bash
 # every importable build in index.json, oldest first

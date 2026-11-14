@@ -15,6 +15,7 @@ import os
 import subprocess
 import sys
 import uuid
+from datetime import date
 from pathlib import Path
 
 import psycopg
@@ -104,9 +105,8 @@ def nano(aoid, strain=None, substrain=None, use=None, school=1):
 
 def spec(slug, ordinal, branch="ao", **fields):
     fields.setdefault("extract_slug", slug)
-    return BuildSpec(
-        slug=slug, branch=branch, ordinal=ordinal, display_name=slug, **fields
-    )
+    fields.setdefault("display_name", slug)
+    return BuildSpec(slug=slug, branch=branch, ordinal=ordinal, **fields)
 
 
 def load(conn, build, items=(), nanos=()):
@@ -770,6 +770,35 @@ def test_presentation_follows_the_registry_without_touching_content(conn):
     assert table_counts(conn) == before
 
 
+def released_on(conn, slug):
+    return conn.execute(
+        "SELECT released_on FROM build WHERE slug = %s", (slug,)
+    ).fetchone()[0]
+
+
+def test_a_build_is_stored_with_its_release_date(conn):
+    load(conn, spec("b1", 1, released_on=date(2024, 2, 24)), [item(1)])
+    load(conn, spec("b2", 2), [item(1)])
+
+    assert released_on(conn, "b1") == date(2024, 2, 24)
+    assert released_on(conn, "b2") is None
+
+
+def test_the_release_date_follows_the_registry(conn):
+    build = spec("b1", 1)
+    load(conn, build, [item(1)])
+    before = table_counts(conn)
+
+    build.released_on = date(2024, 2, 24)
+    cas_store.update_presentation(conn, build)
+    assert released_on(conn, "b1") == date(2024, 2, 24)
+
+    build.released_on = None
+    cas_store.update_presentation(conn, build)
+    assert released_on(conn, "b1") is None
+    assert table_counts(conn) == before
+
+
 # ---------------------------------------------------------------------------
 # Curated data
 # ---------------------------------------------------------------------------
@@ -1147,6 +1176,7 @@ def test_builds_are_planned_from_the_index_and_the_registry(tmp_path):
         "ao-3": {
             "display_name": "Live",
             "parent_slug": "ao-2",
+            "snapshot_date": date(2024, 2, 24),
             "sort_order": 7,
             "enabled": True,
             "is_default": True,
@@ -1156,6 +1186,7 @@ def test_builds_are_planned_from_the_index_and_the_registry(tmp_path):
         "prk-1": {
             "display_name": "PRK",
             "parent_slug": "ao-1",
+            "snapshot_date": None,
             "sort_order": 1,
             "enabled": True,
             "is_default": False,
@@ -1171,6 +1202,12 @@ def test_builds_are_planned_from_the_index_and_the_registry(tmp_path):
     assert (specs["ao-3"].display_name, specs["ao-3"].is_default) == ("Live", True)
     assert specs["ao-3"].features == {"perks": True}
     assert specs["ao-1"].display_name == "AO 1"
+    assert [specs[s].released_on for s in specs] == [
+        None,
+        None,
+        date(2024, 2, 24),
+        None,
+    ]
     assert specs["ao-3"].parent_slug is None
     assert specs["prk-1"].parent_slug == "ao-1"
 
@@ -1270,6 +1307,30 @@ def test_import_cas_refuses_an_extracts_folder_without_an_index(
     expected = "No index.json" if with_folder else "Extracts folder not found"
     assert expected in done.stderr and str(extracts) in done.stderr
     assert "to import" not in done.stderr and "Traceback" not in done.stderr
+
+
+def test_the_registry_is_read_with_everything_a_build_takes_from_it(conn):
+    module_spec = importlib.util.spec_from_file_location(
+        "import_cli", BACKEND / "import_cli.py"
+    )
+    import_cli = importlib.util.module_from_spec(module_spec)
+    module_spec.loader.exec_module(import_cli)
+
+    registry = import_cli.read_registry(conn)
+
+    assert registry, "the development database has a registry"
+    for slug, row in registry.items():
+        assert set(row) >= {
+            "display_name",
+            "snapshot_date",
+            "parent_slug",
+            "sort_order",
+            "enabled",
+            "is_default",
+            "features",
+            "notes",
+        }
+        assert row["snapshot_date"] is None or isinstance(row["snapshot_date"], date)
 
 
 @pytest.fixture(scope="module")
