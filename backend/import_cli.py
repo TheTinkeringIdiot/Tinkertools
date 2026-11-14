@@ -19,6 +19,12 @@ Usage:
     # One-time: convert per-version table schemas into the shared store
     python import_cli.py convert-shared --yes
 
+    # Import extracted client builds into the content-addressed store (schema cas).
+    # Builds load oldest first; builds already in the store are skipped.
+    python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --workers 8
+    python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --schema cas_dev \
+        --slug ao-14-2-2 --slug ao-14-4-2 --slug ao-14-5-0
+
     # Import extracted client builds (extract contract: index.json + <slug>/)
     python import_cli.py import-extracts --extracts-dir ~/projects/AO/extracts
     python import_cli.py import-extracts --extracts-dir ~/projects/AO/extracts --slug ao-17-10-5
@@ -1290,6 +1296,147 @@ def import_extracts(args) -> bool:
     return all(r in ("ok", "failed", "missing_db") for r in outcome.values())
 
 
+# ---------------------------------------------------------------------------
+# Content-addressed store (docs/plans/content-addressed-store/design.md)
+# ---------------------------------------------------------------------------
+
+def read_registry(conn) -> dict:
+    """Rows of ``public.game_versions`` by slug; empty when there is no registry."""
+    if conn.execute("SELECT to_regclass('public.game_versions')").fetchone()[0] is None:
+        return {}
+    columns = ("slug", "display_name", "parent_slug", "sort_order", "enabled",
+               "is_default", "features", "notes")
+    rows = conn.execute(f"SELECT {', '.join(columns)} FROM public.game_versions").fetchall()
+    return {row[0]: dict(zip(columns, row)) for row in rows}
+
+
+def import_cas(args) -> bool:
+    """Import builds from an extracts folder into the content-addressed store.
+
+    Curated data is brought in line with its files first. Builds then load in
+    index order, each in its own transaction; builds already in the store are
+    skipped, so the command can be re-run and picks up where it stopped.
+    """
+    import time
+    from app.core import cas_store
+    from app.core.cas_curated import CuratedFiles, sync_curated
+    from app.core.cas_extract import ExtractReader, plan_builds, read_manifest
+
+    if not args.extracts_dir:
+        logger.error("--extracts-dir is required")
+        return False
+    root = Path(os.path.expandvars(args.extracts_dir)).expanduser()
+    started = time.perf_counter()
+    timings = {}
+    try:
+        entries = read_extract_index(root)
+        known = {e["slug"] for e in entries}
+        for slug in args.slug or []:
+            if slug not in known:
+                # A folder outside the index: take what the manifest says.
+                manifest = read_manifest(root, slug)
+                entries.append({"slug": slug, "family": manifest.get("family") or "ao",
+                                "build": manifest.get("client_build"), "status": "extracted",
+                                "extract_slug": slug,
+                                "rdb_dat_sha256": manifest.get("rdb_dat_sha256")})
+        files = CuratedFiles()
+        for attribute, given in (("nanos_csv", args.nanos_csv), ("perks_json", args.perks_file),
+                                 ("symbiants_csv", args.symbiants_file)):
+            if given:
+                setattr(files, attribute, Path(os.path.expandvars(given)).expanduser())
+            if not getattr(files, attribute).exists():
+                raise FileNotFoundError(f"Data file not found: {getattr(files, attribute)}")
+        conn = cas_store.connect(args.database_url or os.environ["DATABASE_URL"], args.schema)
+    except (cas_store.StoreError, FileNotFoundError, ValueError) as e:
+        logger.error(str(e))
+        return False
+
+    reader = None
+    try:
+        if args.reset:
+            if not args.yes:
+                logger.error(f"--reset drops every table of schema {args.schema}; re-run with --yes")
+                return False
+            cas_store.drop_store(conn, args.schema)
+        if cas_store.create_store(conn, args.schema):
+            logger.info(f"Created the store's tables in schema {args.schema}")
+        conn.commit()
+
+        specs = plan_builds(root, entries, read_registry(conn))
+        if args.slug:
+            specs = [spec for spec in specs if spec.slug in args.slug]
+        stored = {row[0] for row in conn.execute("SELECT slug FROM build")}
+
+        with cas_store.phase(timings, "curated data"):
+            written = sync_curated(conn, files)
+            policy_changed = [cas_store.update_presentation(conn, spec)
+                              for spec in specs if spec.slug in stored]
+            if written["nano_overlay"]:
+                cas_store.apply_nano_overlay(conn)
+            elif any(policy_changed):
+                cas_store.ensure_nano_properties(conn)
+            conn.commit()
+        if any(written.values()):
+            logger.info("Curated rows written: " + ", ".join(
+                f"{table} {count}" for table, count in written.items() if count))
+
+        todo = [spec for spec in specs if spec.slug not in stored]
+        # A duplicate of the build before it needs no data read.
+        newest_extract, needs_content = {}, {}
+        for spec in todo:
+            if spec.branch not in newest_extract:
+                newest = cas_store.newest_build(conn, spec.branch)
+                newest_extract[spec.branch] = newest["extract_slug"] if newest else None
+            needs_content[spec.slug] = (spec.extract_slug == spec.slug
+                                        or newest_extract[spec.branch] != spec.extract_slug)
+            newest_extract[spec.branch] = spec.extract_slug
+        reader = ExtractReader(
+            [root / spec.extract_slug for spec in todo if needs_content[spec.slug]],
+            args.workers)
+
+        logger.info(f"{len(specs) - len(todo)} build(s) already in the store, "
+                    f"{len(todo)} to import")
+        for spec in todo:
+            content = None
+            if needs_content[spec.slug]:
+                with cas_store.phase(timings, "read and split (waiting)"):
+                    content = reader.next()
+            try:
+                result = cas_store.import_build(conn, spec, content, timings)
+                with cas_store.phase(timings, "commit"):
+                    conn.commit()
+            finally:
+                if content is not None:
+                    content.close()
+            if result.same_as_previous:
+                logger.info(f"  {spec.slug:<20} same data as the build before it")
+            else:
+                logger.info(
+                    f"  {spec.slug:<20} {result.items:>6} items, "
+                    f"{result.new_revisions:>6} new revisions, "
+                    f"+{result.added} -{result.removed} ~{result.changed}, "
+                    f"new parts {sum(result.new_parts.values())}")
+
+        if todo:
+            with cas_store.phase(timings, "analyze"):
+                cas_store.analyze(conn, args.schema)
+                conn.commit()
+    except cas_store.StoreError as e:
+        logger.error(str(e))
+        return False
+    finally:
+        if reader is not None:
+            reader.close()
+        conn.close()
+
+    logger.info("=" * 60)
+    for name, seconds in timings.items():
+        logger.info(f"  {name:<28} {seconds:8.1f} s")
+    logger.info(f"  {'total (wall clock)':<28} {time.perf_counter() - started:8.1f} s")
+    logger.info("=" * 60)
+    return True
+
+
 def import_single_dataset(args, importer_func, features: dict, reads_items: bool = False) -> bool:
     """Run one dataset import, then register the version and its revisions.
 
@@ -1550,7 +1697,7 @@ def validate_files(args=None):
 
 DATA_COMMANDS = {"symbiants", "items", "nanos", "all"}
 REGISTRY_COMMANDS = {"versions", "register", "adopt-public", "drop-version", "nano-properties"}
-STORE_COMMANDS = {"convert-shared", "import-extracts"}
+STORE_COMMANDS = {"convert-shared", "import-extracts", "import-cas"}
 
 
 def main():
@@ -1725,6 +1872,26 @@ Environment:
              "the CSV only fills in missing strains (use for historical builds)"
     )
 
+    cas_group = parser.add_argument_group("content-addressed store (import-cas)")
+    cas_group.add_argument(
+        "--schema",
+        type=str,
+        default="cas",
+        help="Schema holding the content-addressed store (default: cas)"
+    )
+    cas_group.add_argument(
+        "--workers",
+        type=int,
+        default=4,
+        help="Builds read and split in parallel, about 2 GB of memory each "
+             "(default: 4; 0 reads in this process)"
+    )
+    cas_group.add_argument(
+        "--reset",
+        action="store_true",
+        help="Drop the store's tables in --schema and import from scratch (needs --yes)"
+    )
+
     parser.add_argument(
         "--clear",
         action="store_true",
@@ -1868,6 +2035,8 @@ Environment:
             success = convert_shared(args)
         elif args.command == "import-extracts":
             success = import_extracts(args)
+        elif args.command == "import-cas":
+            success = import_cas(args)
     except KeyboardInterrupt:
         logger.info("\nImport interrupted by user")
         sys.exit(1)
