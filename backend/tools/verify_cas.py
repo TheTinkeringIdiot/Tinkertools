@@ -45,7 +45,8 @@ Usage: python tools/verify_cas.py SLUG --extracts-dir DIR [--schema cas]
                                   [--show N] [--against OTHER_SLUG]
        python tools/verify_cas.py SLUG --skip-extract [--schema cas] ...
        python tools/verify_cas.py --store [--schema cas]
-Exit status is 1 if anything differs, 2 if the check cannot be run.
+Exit status is 1 if anything differs, 2 if the check cannot be run (no store,
+no extract, a build that one of the stores does not hold, bad arguments).
 """
 
 import argparse
@@ -106,7 +107,7 @@ def load_build(conn, slug):
         (slug,),
     ).fetchone()
     if row is None:
-        sys.exit(f"Build '{slug}' is not in the new store")
+        fail(f"Build '{slug}' is not in the new store")
     return dict(
         zip(("build_id", "branch", "ordinal", "features", "overlay_strain_first"), row)
     )
@@ -402,7 +403,7 @@ def current_items(conn, vid):
     items = {}
     for item in by_id.values():
         if item["aoid"] in items:
-            sys.exit(f"Current store holds AOID {item['aoid']} twice in this build")
+            fail(f"Current store holds AOID {item['aoid']} twice in this build")
         item["effects"] = sorted(
             (event, sorted(effects)) for (_, event), effects in item["effects"].items()
         )
@@ -1019,7 +1020,7 @@ def main():
         "SELECT vid, schema_name FROM public.game_versions WHERE slug = %s", (against,)
     ).fetchone()
     if registered is None or registered[0] is None:
-        sys.exit(f"Build '{against}' is not in the current store")
+        fail(f"Build '{against}' is not in the current store")
     vid, gv = registered
     extract = None
     if args.extracts_dir:

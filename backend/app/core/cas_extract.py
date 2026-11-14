@@ -223,7 +223,7 @@ class ExtractReader:
             process.join()
             raise StoreError(
                 f"Reading {folder} failed: worker exited with code {process.exitcode}"
-            )
+            ) from None
         self._start()
         if message[0] == "error":
             process.join()
