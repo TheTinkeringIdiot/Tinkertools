@@ -118,7 +118,7 @@ class InterpolationService:
             by_text.setdefault(row.text_id, []).append(records[row.rev_id])
             text_of[row.aoid] = row.text_id
         for aoid in missing:
-            self._variants[aoid] = by_text.get(text_of.get(aoid, -1), [])
+            self._variants[aoid] = by_text[text_of[aoid]] if aoid in text_of else []
 
     def _find_item_variants(self, aoid: int) -> List[ItemRecord]:
         """
