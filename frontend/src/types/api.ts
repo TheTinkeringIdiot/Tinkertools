@@ -442,34 +442,6 @@ export interface StatRequirement {
   value: number;
 }
 
-export interface ItemFilters {
-  // Basic type filters
-  isNano?: boolean;
-  isWeapon?: boolean;
-  itemClasses?: number[];
-
-  // Quality level filters
-  minQL?: number;
-  maxQL?: number;
-
-  // Stat filters
-  statFilterMode?: 'any' | 'can_meet' | 'cannot_meet' | 'has_stats';
-  selectedStats?: number[];
-  statMinValues?: Record<number, number>;
-
-  // Property filters
-  hasEffects?: boolean | null;
-  hasRequirements?: boolean | null;
-  isTradeable?: boolean | null;
-  isDroppable?: boolean | null;
-
-  // Source filters
-  sources?: string[];
-
-  // Special filters
-  favorite_items?: boolean;
-}
-
 export interface PaginationInfo {
   page: number;
   limit: number;
@@ -574,31 +546,6 @@ export interface CacheConfig {
 }
 
 // ============================================================================
-// Request/Response Wrappers
-// ============================================================================
-
-export interface BatchRequest<T> {
-  items: T[];
-  include_related?: boolean;
-}
-
-export interface BatchItemRequest {
-  item_ids: number[];
-  include_stats?: boolean;
-  include_spells?: boolean;
-  include_actions?: boolean;
-}
-
-export interface SearchResponse<T> extends PaginatedResponse<T> {
-  facets?: {
-    item_class?: Array<{ value: number; count: number }>;
-    ql_range?: { min: number; max: number };
-    expansions?: Array<{ value: string; count: number }>;
-  };
-  suggestions?: string[];
-}
-
-// ============================================================================
 // TinkerPlants Types
 // ============================================================================
 
@@ -699,14 +646,4 @@ export interface PerImplantRequirement {
   slotName: string;
   /** Requirements for this implant */
   requirements: ImplantRequirement[];
-}
-
-/** Validation result for implant configuration */
-export interface ImplantValidationResult {
-  /** Whether configuration is valid */
-  valid: boolean;
-  /** Blocking errors (invalid clusters, QoL out of range, etc.) */
-  errors: string[];
-  /** Non-blocking warnings (suboptimal choices, etc.) */
-  warnings: string[];
 }

@@ -288,7 +288,6 @@ const props = withDefaults(
 // Emits
 const emit = defineEmits<{
   select: [nano: NanoProgram];
-  favorite: [aoid: number, isFavorite: boolean];
 }>();
 
 const nanosStore = useNanosStore();
@@ -393,7 +392,6 @@ const handleSelect = () => {
 
 const toggleFavorite = () => {
   nanosStore.toggleFavorite(props.nano.aoid);
-  emit('favorite', props.nano.aoid, isFavorite.value);
 };
 </script>
 

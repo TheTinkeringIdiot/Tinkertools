@@ -54,10 +54,6 @@ export const useItemsStore = defineStore('items', () => {
 
   const allItems = computed(() => Array.from(items.value.values()));
 
-  const itemsById = computed(
-    () => (ids: number[]) => ids.map((id) => items.value.get(id)).filter(Boolean) as Item[]
-  );
-
   const nanoItems = computed(() => allItems.value.filter((item) => item.is_nano));
 
   const regularItems = computed(() => allItems.value.filter((item) => !item.is_nano));
@@ -264,7 +260,6 @@ export const useItemsStore = defineStore('items', () => {
 
     // Getters
     allItems,
-    itemsById,
     nanoItems,
     regularItems,
     itemsByClass,

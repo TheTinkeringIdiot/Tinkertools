@@ -683,7 +683,6 @@ export class ProfileTransformer {
           } else {
             // Fallback to basic data if item fetch failed
             profile.Weapons[slot] = {
-              id: placement.aoid,
               aoid: placement.aoid,
               name: `Item ${placement.aoid} (fetch failed)`,
               ql: placement.targetQl || 1,
@@ -696,7 +695,7 @@ export class ProfileTransformer {
               attack_stats: [],
               defense_stats: [],
               sources: [],
-            } as Item;
+            };
             result.warnings.push(`Failed to fetch weapon item AOID ${placement.aoid}`);
           }
         }
@@ -727,7 +726,6 @@ export class ProfileTransformer {
           } else {
             // Fallback to basic data if item fetch failed
             profile.Clothing[slot] = {
-              id: placement.aoid,
               aoid: placement.aoid,
               name: `Item ${placement.aoid} (fetch failed)`,
               ql: placement.targetQl || 1,
@@ -740,7 +738,7 @@ export class ProfileTransformer {
               attack_stats: [],
               defense_stats: [],
               sources: [],
-            } as Item;
+            };
             result.warnings.push(`Failed to fetch clothing item AOID ${placement.aoid}`);
           }
         }
@@ -1117,22 +1115,20 @@ export class ProfileTransformer {
     const itemMap = await this.fetchItems(fetchRequests, undefined, gameVersion);
 
     // Helper to create a fallback item when fetch fails
-    const createFallback = (aoid: number, ql: number): Item =>
-      ({
-        id: aoid,
-        aoid: aoid,
-        name: `Item ${aoid} (fetch failed)`,
-        ql: ql,
-        description: undefined,
-        item_class: undefined,
-        is_nano: false,
-        stats: [],
-        spell_data: [],
-        actions: [],
-        attack_stats: [],
-        defense_stats: [],
-        sources: [],
-      }) as Item;
+    const createFallback = (aoid: number, ql: number): Item => ({
+      aoid: aoid,
+      name: `Item ${aoid} (fetch failed)`,
+      ql: ql,
+      description: undefined,
+      item_class: undefined,
+      is_nano: false,
+      stats: [],
+      spell_data: [],
+      actions: [],
+      attack_stats: [],
+      defense_stats: [],
+      sources: [],
+    });
 
     // Map items to their profile slots
     for (const entry of allItems) {
@@ -1294,7 +1290,6 @@ export class ProfileTransformer {
       } else {
         // Minimal fallback for unfetchable nanos
         buffs.push({
-          id: aoid,
           aoid: aoid,
           name: `Nano ${aoid} (fetch failed)`,
           ql: 1,
@@ -1307,7 +1302,7 @@ export class ProfileTransformer {
           attack_stats: [],
           defense_stats: [],
           sources: [],
-        } as Item);
+        });
         result.warnings.push(`Failed to fetch nano AOID ${aoid}`);
       }
     }

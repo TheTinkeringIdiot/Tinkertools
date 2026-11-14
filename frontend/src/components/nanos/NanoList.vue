@@ -54,7 +54,6 @@ Displays nano programs in a scrollable list with compatibility indicators
             :show-compatibility="showCompatibility"
             :compatibility-info="getCompatibilityInfo(nano)"
             @select="handleNanoSelect"
-            @favorite="handleFavorite"
           />
         </div>
       </div>
@@ -137,7 +136,6 @@ const props = withDefaults(
 const emit = defineEmits<{
   'nano-select': [nano: NanoProgram];
   'page-change': [page: number, rows: number];
-  favorite: [aoid: number, isFavorite: boolean];
 }>();
 
 // Reactive state
@@ -172,10 +170,6 @@ const getCompatibilityInfo = (nano: NanoProgram): NanoCompatibilityInfo | null =
 
 const handleNanoSelect = (nano: NanoProgram) => {
   emit('nano-select', nano);
-};
-
-const handleFavorite = (aoid: number, isFavorite: boolean) => {
-  emit('favorite', aoid, isFavorite);
 };
 
 const handlePageChange = (event: PageState) => {
