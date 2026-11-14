@@ -681,7 +681,7 @@ def _record_presence(
     ).rowcount
 
 
-def _insert_build(conn: psycopg.Connection, spec: BuildSpec, item_count: int) -> int:
+def _insert_build(conn: psycopg.Connection, spec: BuildSpec, item_count: int) -> None:
     parent_id = None
     if spec.parent_slug:
         row = conn.execute(
@@ -695,14 +695,13 @@ def _insert_build(conn: psycopg.Connection, spec: BuildSpec, item_count: int) ->
         parent_id = row[0]
     if spec.is_default:
         conn.execute("UPDATE build SET is_default = false WHERE is_default")
-    return conn.execute(
+    conn.execute(
         """
         INSERT INTO build
             (slug, branch, ordinal, sort_order, display_name, client_build,
              parent_build_id, enabled, is_default, features, extract_slug,
              rdb_dat_sha256, tinkerparse_commit, item_count, notes)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING build_id
         """,
         (
             spec.slug,
@@ -721,7 +720,7 @@ def _insert_build(conn: psycopg.Connection, spec: BuildSpec, item_count: int) ->
             item_count,
             spec.notes,
         ),
-    ).fetchone()[0]
+    )
 
 
 def newest_build(conn: psycopg.Connection, branch: str) -> Optional[Dict[str, Any]]:
@@ -909,62 +908,115 @@ def assign_strain_policy(conn: psycopg.Connection, branch: Optional[str] = None)
     ).rowcount
 
 
+# A row of ``nano_properties`` (alias np) is served: some build holds its
+# revision under its strain policy.
+_SERVED = """
+    EXISTS (
+        SELECT 1 FROM item_presence p
+        JOIN build b ON b.branch = p.branch
+            AND b.ordinal BETWEEN p.from_ordinal AND p.to_ordinal
+        WHERE p.rev_id = np.rev_id
+          AND b.overlay_strain_first = np.overlay_strain_first)
+"""
+
+
 def serve_newest_with_overlay(conn: psycopg.Connection, branch: str) -> None:
     """Hand the overlay strain policy to the newest stored build of ``branch``
     and bring ``nano_properties`` in line with it.
 
-    Only the branch's two newest builds can lack rows afterwards: the newest,
-    and the one the policy was taken from."""
+    ``nano_properties`` must be in line with the store as it was before the
+    newest build of ``branch`` came, which every import leaves it. The work is
+    then bounded by what that build changed, not by the size of the store:
+
+    - a row can only have lost its last build if its revision was in the
+      build the policy was taken from and is not in the newest one, so only
+      the presence runs that ended between the two are looked at;
+    - the newest build can only lack rows for the runs that start after the
+      build before it, and that build, under the policy it went back to, only
+      for the runs that start after the build before itself.
+    """
     assign_strain_policy(conn, branch)
-    newest_two = [
-        row[0]
-        for row in conn.execute(
-            "SELECT build_id FROM build WHERE branch = %s "
-            "ORDER BY ordinal DESC LIMIT 2",
-            (branch,),
+    builds = conn.execute(
+        "SELECT ordinal, overlay_strain_first FROM build WHERE branch = %s "
+        "ORDER BY ordinal DESC LIMIT 3",
+        (branch,),
+    ).fetchall()
+    if len(builds) > 1:
+        conn.execute(
+            sql.SQL("""
+                WITH left_newest AS MATERIALIZED (
+                    SELECT DISTINCT rev_id FROM item_presence
+                    WHERE branch = %(branch)s
+                      AND to_ordinal >= %(previous)s AND to_ordinal < %(newest)s
+                )
+                DELETE FROM nano_properties np USING left_newest l
+                WHERE np.rev_id = l.rev_id AND NOT {served}
+                """).format(served=sql.SQL(_SERVED)),
+            {"branch": branch, "newest": builds[0][0], "previous": builds[1][0]},
         )
-    ]
-    sync_nano_properties(conn, newest_two)
-
-
-def sync_nano_properties(
-    conn: psycopg.Connection, build_ids: Optional[Sequence[int]] = None
-) -> int:
-    """Make ``nano_properties`` hold exactly one row per nano revision and
-    strain policy under which a stored build serves it: rows no build is served
-    with are deleted, missing ones are derived. With ``build_ids``, rows are
-    derived for those builds only. Returns the number of rows written."""
-    deleted = conn.execute("""
-        DELETE FROM nano_properties np
-        WHERE NOT EXISTS (
-            SELECT 1 FROM item_presence p
-            JOIN build b ON b.branch = p.branch
-                AND b.ordinal BETWEEN p.from_ordinal AND p.to_ordinal
-            WHERE p.rev_id = np.rev_id
-              AND b.overlay_strain_first = np.overlay_strain_first)
-        """).rowcount
-    return deleted + ensure_nano_properties(conn, build_ids)
-
-
-def ensure_nano_properties(
-    conn: psycopg.Connection, build_ids: Optional[Sequence[int]] = None
-) -> int:
-    """Add the ``nano_properties`` rows that are missing for the nanos of the
-    given builds, or of every build, under each build's strain policy. Returns
-    the number of rows added."""
-    missing = conn.execute(
-        sql.SQL("""
-            WITH wanted AS (
-                SELECT DISTINCT r.rev_id, b.overlay_strain_first AS policy
-                FROM build b
-                JOIN item_presence p ON p.branch = b.branch
-                    AND p.from_ordinal <= b.ordinal AND p.to_ordinal >= b.ordinal
+    after = [ordinal for ordinal, _ in builds[1:]] + [None]
+    _add_nano_properties(
+        conn,
+        sql.SQL(" UNION ").join(
+            sql.SQL("""
+                SELECT p.rev_id, {policy}::boolean AS policy
+                FROM item_presence p
                 JOIN item_revision r ON r.rev_id = p.rev_id AND r.is_nano
-                WHERE {build} AND NOT EXISTS (
+                WHERE p.branch = {branch}
+                  AND p.from_ordinal <= {ordinal} AND p.to_ordinal >= {ordinal}
+                  AND ({after}::integer IS NULL OR p.from_ordinal > {after})
+                  AND NOT EXISTS (
                     SELECT 1 FROM nano_properties np
-                    WHERE np.rev_id = r.rev_id
-                      AND np.overlay_strain_first = b.overlay_strain_first)
+                    WHERE np.rev_id = p.rev_id
+                      AND np.overlay_strain_first = {policy})
+                """).format(
+                branch=sql.Literal(branch),
+                ordinal=sql.Literal(ordinal),
+                policy=sql.Literal(policy),
+                after=sql.Literal(after_ordinal),
             )
+            for (ordinal, policy), after_ordinal in zip(builds[:2], after)
+        ),
+    )
+
+
+def sync_nano_properties(conn: psycopg.Connection) -> int:
+    """Make ``nano_properties`` hold exactly one row per nano revision and
+    strain policy under which a stored build serves it, whatever state it is
+    in: rows no build is served with are deleted, missing ones are derived.
+    Returns the number of rows written."""
+    deleted = conn.execute(
+        sql.SQL("DELETE FROM nano_properties np WHERE NOT {served}").format(
+            served=sql.SQL(_SERVED)
+        )
+    ).rowcount
+    return deleted + ensure_nano_properties(conn)
+
+
+def ensure_nano_properties(conn: psycopg.Connection) -> int:
+    """Add the ``nano_properties`` rows that are missing for the nanos of
+    every build under its strain policy. Returns the number of rows added."""
+    return _add_nano_properties(
+        conn,
+        sql.SQL("""
+            SELECT DISTINCT r.rev_id, b.overlay_strain_first AS policy
+            FROM build b
+            JOIN item_presence p ON p.branch = b.branch
+                AND p.from_ordinal <= b.ordinal AND p.to_ordinal >= b.ordinal
+            JOIN item_revision r ON r.rev_id = p.rev_id AND r.is_nano
+            WHERE NOT EXISTS (
+                SELECT 1 FROM nano_properties np
+                WHERE np.rev_id = r.rev_id
+                  AND np.overlay_strain_first = b.overlay_strain_first)
+            """),
+    )
+
+
+def _add_nano_properties(conn: psycopg.Connection, wanted: sql.Composable) -> int:
+    """Derive and store a ``nano_properties`` row for every (rev_id, policy)
+    that the query ``wanted`` returns. Returns the number of rows added."""
+    missing = conn.execute(sql.SQL("""
+            WITH wanted AS ({wanted})
             SELECT w.rev_id, w.policy, s.doc, a.doc,
                    o.aoid IS NOT NULL, o.strain, o.substrain
             FROM wanted w
@@ -972,14 +1024,7 @@ def ensure_nano_properties(
             JOIN part_stats s ON s.stats_id = r.stats_id
             LEFT JOIN part_actions a ON a.actions_id = r.actions_id
             LEFT JOIN nano_overlay o ON o.aoid = r.aoid
-            """).format(
-            build=(
-                sql.SQL("b.build_id = ANY({})").format(sql.Literal(list(build_ids)))
-                if build_ids is not None
-                else sql.SQL("true")
-            )
-        )
-    ).fetchall()
+            """).format(wanted=wanted)).fetchall()
 
     derived: Dict[Tuple, Tuple] = {}
     rows = []

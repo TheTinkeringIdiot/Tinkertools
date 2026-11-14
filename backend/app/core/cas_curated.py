@@ -165,9 +165,7 @@ def read_symbiants(path: Path) -> Tuple[List[Dict[str, Any]], List[Tuple[int, st
                     "level": int(level) if level.isdigit() else None,
                     "playfield": playfield,
                     "location": row[5].strip(),
-                    "mob_names": [
-                        m.strip() for m in row[6].split(",") if m.strip()
-                    ],
+                    "mob_names": [m.strip() for m in row[6].split(",") if m.strip()],
                 }
             elif known["playfield"] != playfield:
                 raise StoreError(
@@ -290,7 +288,8 @@ def _mob_rows(conn: psycopg.Connection, mobs: List[Dict[str, Any]]) -> Rows:
 
 def sync_curated(conn: psycopg.Connection, files: CuratedFiles) -> Dict[str, int]:
     """Make the curated tables equal to the files. Returns the number of rows
-    written per table; a non-zero ``nano_overlay`` count calls for
+    written per table (inserted, updated or deleted, counting the links that
+    go with a deleted source); a non-zero ``nano_overlay`` count calls for
     :func:`app.core.cas_store.apply_nano_overlay`."""
     overlay, crystal_links = read_nanos(files.nanos_csv)
     mobs, drops = read_symbiants(files.symbiants_csv)
@@ -330,9 +329,13 @@ def sync_curated(conn: psycopg.Connection, files: CuratedFiles) -> Dict[str, int
     }
     for _, crystal, _, _ in crystal_links:
         sources[(SOURCE_TYPE_ITEM, crystal)] = (None, {"type": "nanocrystal"})
+    count_links = "SELECT count(*) FROM item_source"
+    links_before = conn.execute(count_links).fetchone()[0]
     written["source"] = _sync(
         conn, "source", ("source_type_id", "entity_id"), ("name", "metadata"), sources
     )
+    # Links of a deleted source go with it (ON DELETE CASCADE).
+    links_cascaded = links_before - conn.execute(count_links).fetchone()[0]
     written["mob"] = _sync(conn, "mob", ("mob_id",), MOB_COLUMNS, mob_rows)
 
     source_ids = {
@@ -354,7 +357,7 @@ def sync_curated(conn: psycopg.Connection, files: CuratedFiles) -> Dict[str, int
             None,
             {"nano_name": nano_name, "crystal_aoid": crystal},
         )
-    written["item_source"] = _sync(
+    written["item_source"] = links_cascaded + _sync(
         conn,
         "item_source",
         ("aoid", "source_id"),

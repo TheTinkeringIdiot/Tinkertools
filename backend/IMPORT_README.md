@@ -163,7 +163,7 @@ python tools/verify_cas.py --store
 python tools/verify_cas.py ao-17-10-5 --extracts-dir ~/projects/AO/extracts
 ```
 
-- Both end with `N difference(s)` and exit 1 unless N is 0; exit 2 means the check could not be run (no store in `--schema`, no extract).
+- Both end with `N difference(s)` and exit 1 unless N is 0; exit 2 means the check could not be run (no store in `--schema`, no extract, a build or `--against` build that is not in its store).
 - A build check needs `--extracts-dir`: effect criteria order, effect descriptions and shop data can only be compared with the raw extract. `--skip-extract` leaves that part out and says so in its last line; it is not a complete check.
 - `--schema NAME` checks another store, `--show N` prints more examples, `--against SLUG` compares with another build of the current store.
 
