@@ -16,6 +16,7 @@ import {
   droppedEntriesMessage,
   migratePendingIds,
   readAoidList,
+  showAoids,
   replaceAoidList,
   writeAoids,
 } from '../services/legacy-id-migration';
@@ -616,7 +617,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     const slug = browsingVersionSlug();
     const storageKey = versionKey(FARM_LIST_BASE, slug);
     adoptLegacyUserData(FARM_LIST_BASE);
-    farmListAoids.value = readAoidList(storageKey, legacyFarmListIds).aoids;
+    showAoids(farmListAoids, readAoidList(storageKey, legacyFarmListIds).aoids);
 
     void migratePendingIds({
       storageKey,
@@ -633,7 +634,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
     })?.then(() => {
       // Another version's farm list may be on show by now
       if (browsingVersionSlug() !== slug) return;
-      farmListAoids.value = readAoidList(storageKey, legacyFarmListIds).aoids;
+      showAoids(farmListAoids, readAoidList(storageKey, legacyFarmListIds).aoids);
     });
   }
 

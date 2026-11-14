@@ -13,6 +13,7 @@ import {
   droppedEntriesMessage,
   migratePendingIds,
   readAoidList,
+  showAoids,
   writeAoids,
 } from '@/services/legacy-id-migration';
 import { errorMessage } from '@/services/error-message';
@@ -645,7 +646,7 @@ export const useNanosStore = defineStore('nanos', () => {
     const slug = browsingVersionSlug();
     const storageKey = versionKey(FAVORITES_BASE, slug);
     adoptLegacyUserData(FAVORITES_BASE);
-    favorites.value = readAoidList(storageKey, legacyFavoriteIds).aoids;
+    showAoids(favorites, readAoidList(storageKey, legacyFavoriteIds).aoids);
 
     void migratePendingIds({
       storageKey,
@@ -662,7 +663,7 @@ export const useNanosStore = defineStore('nanos', () => {
     })?.then(() => {
       // Another version's favorites may be on show by now
       if (browsingVersionSlug() !== slug) return;
-      favorites.value = readAoidList(storageKey, legacyFavoriteIds).aoids;
+      showAoids(favorites, readAoidList(storageKey, legacyFavoriteIds).aoids);
     });
   };
 

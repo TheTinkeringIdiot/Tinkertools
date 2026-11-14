@@ -18,6 +18,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { flushPromises } from '@vue/test-utils';
+import { nextTick, watch } from 'vue';
 import type { ToastMessageOptions } from 'primevue/toast';
 
 // CRITICAL: mock the API before any store import pulls it in.
@@ -525,6 +526,30 @@ describe('User data keyed by AOID', () => {
         farmedBossIds: [SUZERAIN.id],
         version: 1,
       });
+    });
+
+    it('does not redraw the list when loading finds it unchanged', async () => {
+      const store = useSymbiantsStore();
+      store.loadFarmList();
+      await migrationSettles();
+      const redraws = vi.fn();
+      const stop = watch(() => store.farmListAoids, redraws, { deep: true });
+
+      // Nothing stored: every visit to TinkerPocket loads the list again
+      store.loadFarmList();
+      await migrationSettles();
+      store.addToFarmList(OCULAR);
+      await nextTick();
+      expect(redraws).toHaveBeenCalledTimes(1);
+
+      // Stored and unchanged
+      store.loadFarmList();
+      await migrationSettles();
+      await nextTick();
+      stop();
+
+      expect(redraws).toHaveBeenCalledTimes(1);
+      expect(store.farmListAoids).toEqual([OCULAR.aoid]);
     });
 
     it('migrates a farm list stored as internal ids, backing up what cannot be resolved', async () => {
