@@ -298,6 +298,15 @@ def test_a_build_older_than_the_newest_of_its_branch_is_refused(conn):
         load(conn, spec("b3", 3), [item(1)])
 
 
+def test_a_second_build_at_the_ordinal_of_the_newest_is_refused(conn):
+    load(conn, spec("b5", 5), [item(1)])
+
+    with pytest.raises(StoreError, match="not newer"):
+        load(conn, spec("b5-again", 5), [item(1, "Other")])
+    assert as_of(conn, "ao", 5).keys() == {1}
+    assert name_as_of(conn, 1, 5) == "Thing"
+
+
 # ---------------------------------------------------------------------------
 # Change log
 # ---------------------------------------------------------------------------
@@ -514,6 +523,19 @@ def test_symbiants_are_recognised_by_name(conn):
     ]
 
 
+@pytest.mark.parametrize(
+    "tier, family",
+    [("Aban", "Control"), ("Alpha", "Infantry"), ("Beta", "Support")],
+)
+def test_symbiants_of_every_tier_are_recognised(conn, tier, family):
+    name = f"Vital Brain Symbiant, {family} Unit {tier}"
+    load(conn, spec("b1", 1), [item(1, name, ql=300, stats=[(298, 1)])])
+
+    assert conn.execute(
+        "SELECT aoid, name, ql, slot_id, family FROM symbiant_items"
+    ).fetchall() == [(1, name, 300, 1, family)]
+
+
 # ---------------------------------------------------------------------------
 # Nano overlay
 # ---------------------------------------------------------------------------
@@ -658,6 +680,35 @@ def test_nano_properties_hold_only_the_rows_builds_are_served_with(conn):
     load(conn, spec("b3", 3), nanos=[nano(10, strain=8)])
     assert nano_property_rows(conn) == nano_rows_served(conn)
     assert len(nano_property_rows(conn)) == 4
+
+
+def test_nano_properties_follow_every_handover_of_the_policy(conn):
+    conn.execute("INSERT INTO nano_overlay VALUES (10, 125, 9, 4), (12, 60, 5, 0)")
+    steps = [
+        (spec("ao-1", 1), [nano(10, strain=7), nano(11), nano(12, strain=3)]),
+        (
+            spec("prk-1", 1, branch="prk", parent_slug="ao-1"),
+            [nano(10, strain=7), nano(12, strain=3)],
+        ),
+        (spec("ao-2", 2), [nano(10, strain=7), nano(11)]),
+        (spec("ao-3", 3, extract_slug="ao-2"), None),
+        (spec("ao-4", 4), [nano(11), nano(12, strain=3), nano(13)]),
+        (spec("ao-5", 5), [nano(13)]),
+        (spec("prk-2", 2, branch="prk"), [nano(10, strain=8)]),
+    ]
+    for build, nanos in steps:
+        if nanos is None:
+            import_build(conn, build, None)
+        else:
+            load(conn, build, nanos=nanos)
+
+        assert nano_property_rows(conn) == nano_rows_served(conn), build.slug
+
+    assert nano_served(conn, "ao-1", 12)[:3] == (60, 3, None)
+    assert nano_served(conn, "ao-4", 12)[:3] == (60, 3, None)
+    assert nano_served(conn, "prk-1", 12)[:3] == (60, 3, None)
+    assert nano_served(conn, "prk-1", 10)[:3] == (125, 7, None)
+    assert nano_served(conn, "prk-2", 10)[:3] == (125, 9, 4)
 
 
 def test_a_build_that_fails_to_import_leaves_the_overlay_with_the_stored_one(conn):
@@ -833,6 +884,67 @@ def test_a_mob_removed_from_the_file_does_not_renumber_the_others(conn, tmp_path
 
     assert mob_ids(conn) == {"Beit": 2}
     assert conn.execute("SELECT count(*) FROM item_source").fetchone()[0] == 1
+
+
+def mob_sources(conn):
+    """``{mob_id: name}`` of the mobs the store lists as sources of items."""
+    return dict(
+        conn.execute(
+            "SELECT s.entity_id, s.name FROM source s "
+            "JOIN source_type t USING (source_type_id) WHERE t.name = 'mob'"
+        ).fetchall()
+    )
+
+
+def test_a_mob_removed_from_the_file_is_no_longer_a_source(conn, tmp_path):
+    sync_curated(
+        conn, curated_files(tmp_path, [("Ahpta", "Inferno", 1), ("Beit", "Scheol", 2)])
+    )
+    assert mob_sources(conn) == {1: "Ahpta", 2: "Beit"}
+
+    sync_curated(conn, curated_files(tmp_path, [("Beit", "Scheol", 2)]))
+
+    assert mob_sources(conn) == {2: "Beit"}
+    assert mob_drops(conn) == {(2, 2)}
+
+
+def test_the_drops_that_go_with_a_removed_mob_are_counted_as_written(conn, tmp_path):
+    sync_curated(
+        conn,
+        curated_files(
+            tmp_path,
+            [("Ahpta", "Inferno", 1), ("Ahpta", "Inferno", 3), ("Beit", "Scheol", 2)],
+        ),
+    )
+
+    written = sync_curated(conn, curated_files(tmp_path, [("Beit", "Scheol", 2)]))
+
+    assert (written["mob"], written["source"], written["item_source"]) == (1, 1, 2)
+
+
+def test_a_store_made_before_mobs_could_be_retired_is_brought_up_to_date(
+    conn, tmp_path
+):
+    schema = conn.execute("SELECT current_schema()").fetchone()[0]
+    both = [("Ahpta", "Inferno", 1), ("Beit", "Scheol", 2)]
+    conn.execute(
+        "INSERT INTO mob (mob_id, name, level, playfield, location, mob_names) "
+        "VALUES (1, 'Ahpta', 125, 'Inferno', 'Somewhere', '{}'), "
+        "(2, 'Beit', 125, 'Scheol', 'Somewhere', '{}')"
+    )
+    conn.execute("ALTER TABLE mob DROP COLUMN retired")
+
+    cas_store.upgrade_store(conn, schema)
+    sync_curated(conn, curated_files(tmp_path, both))
+    sync_curated(conn, curated_files(tmp_path, both[:1]))
+
+    assert conn.execute(
+        "SELECT mob_id, name, retired FROM mob ORDER BY mob_id"
+    ).fetchall() == [(1, "Ahpta", False), (2, "Beit", True)]
+    before = table_counts(conn)
+    cas_store.upgrade_store(conn, schema)
+    assert table_counts(conn) == before
+    assert not any(sync_curated(conn, curated_files(tmp_path, both[:1])).values())
 
 
 def test_the_id_of_a_removed_mob_is_never_given_to_another(conn, tmp_path):
@@ -1193,6 +1305,16 @@ def small_store(conn):
         [weapon(Description="Loud."), item(2)],
         [nano(10, strain=7)],
     )
+
+
+def test_the_verifier_cannot_check_a_build_the_store_lacks(conn, verify_cas, capsys):
+    small_store(conn)
+
+    with pytest.raises(SystemExit) as stopped:
+        verify_cas.load_build(conn, "ao-9")
+
+    assert stopped.value.code == 2
+    assert "ao-9" in capsys.readouterr().err
 
 
 def test_the_verifiers_store_rules_hold_after_imports(conn, verify_cas):
