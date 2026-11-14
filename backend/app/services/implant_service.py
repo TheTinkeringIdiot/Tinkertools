@@ -360,3 +360,7 @@ class ImplantService:
             actions=converted_actions,
             sources=[],  # Sources not typically available in interpolated items
         )
+
+    def validate_cluster_combination(self, clusters: Dict[str, int]) -> bool:
+        """Whether every cluster position named in the request is one an implant has."""
+        return all(position in {"Shiny", "Bright", "Faded"} for position in clusters)

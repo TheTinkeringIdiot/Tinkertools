@@ -134,3 +134,18 @@ def test_interpolated_item_has_no_nested_row_ids(client):
     _assert_no_nested_row_ids(item)
     assert "attack_defense_id" not in item
     assert "animation_mesh_id" not in item
+
+
+def test_implant_lookup_returns_an_implant_without_row_ids(client):
+    """The lookup the implant planner uses answers, for clustered and basic implants."""
+    for clusters in ({"Shiny": 100, "Bright": 102, "Faded": 150}, {}):
+        response = client.post(
+            "/api/v1/implants/lookup",
+            json={"slot": 1024, "ql": 200, "clusters": clusters},
+        )
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["success"] is True
+        assert body["item"]["aoid"]
+        _assert_no_nested_row_ids(body["item"])

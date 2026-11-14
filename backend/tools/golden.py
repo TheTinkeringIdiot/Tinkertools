@@ -201,11 +201,17 @@ def requests_for(sample: Dict[str, List[int]]) -> Iterable[Tuple[str, dict]]:
         yield f"weapons/{name}", _post("/weapons/analyze", body)
 
     for name, body in {
-        "chest-three": dict(
-            slot=32, ql=200, clusters={"Shiny": 16, "Bright": 112, "Faded": 19}
+        "right-hand-three": dict(
+            slot=1024, ql=200, clusters={"Shiny": 100, "Bright": 102, "Faded": 150}
         ),
-        "head-one": dict(slot=4, ql=120, clusters={"Shiny": 19}),
-        "eye-empty": dict(slot=2, ql=50, clusters={}),
+        "eye-two-interpolated": dict(
+            slot=2, ql=120, clusters={"Shiny": 101, "Bright": 130}
+        ),
+        "head-two-low": dict(slot=4, ql=37, clusters={"Shiny": 221, "Bright": 140}),
+        "eye-basic": dict(slot=2, ql=50, clusters={}),
+        "no-such-combination": dict(
+            slot=32, ql=200, clusters={"Shiny": 16, "Bright": 112}
+        ),
     }.items():
         yield f"implants/{name}", _post("/implants/lookup", body)
 
