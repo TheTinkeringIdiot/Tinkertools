@@ -4,7 +4,7 @@ Pydantic schemas for Spell models.
 
 from typing import Optional, List, Any, Union, Dict
 from pydantic import BaseModel, Field
-from .criterion import CriterionResponse, ItemCriterionResponse
+from .criterion import ItemCriterionResponse
 
 
 class SpellBase(BaseModel):
@@ -24,26 +24,6 @@ class SpellCreate(SpellBase):
     """Schema for creating a Spell."""
 
     pass
-
-
-class SpellResponse(SpellBase):
-    """Schema for Spell responses."""
-
-    id: int = Field(description="Spell ID")
-
-    class Config:
-        from_attributes = True
-
-
-class SpellWithCriteria(SpellResponse):
-    """Spell response with criteria included."""
-
-    criteria: List[CriterionResponse] = Field(
-        default_factory=list, description="Spell criteria"
-    )
-
-    class Config:
-        from_attributes = True
 
 
 class ItemSpellResponse(SpellBase):

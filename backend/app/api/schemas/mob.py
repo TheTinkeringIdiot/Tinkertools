@@ -24,30 +24,3 @@ class MobResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-class SymbiantDropInfo(BaseModel):
-    """Symbiant drop information for mob detail."""
-
-    # Deprecated: an internal row id that differs between game versions. Use
-    # ``aoid``; this field is removed with the content-addressed store.
-    id: int
-    aoid: int
-    name: str
-    ql: int
-    slot_id: int
-    family: Optional[str]
-
-    class Config:
-        from_attributes = True
-
-
-class MobDetail(MobResponse):
-    """Detailed Mob response with dropped items."""
-
-    dropped_items: List[SymbiantDropInfo] = Field(
-        default_factory=list, description="Symbiants dropped by this mob"
-    )
-
-    class Config:
-        from_attributes = True

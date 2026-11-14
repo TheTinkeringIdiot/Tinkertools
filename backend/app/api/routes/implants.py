@@ -45,13 +45,6 @@ def implant_lookup(request: ImplantLookupRequest, db: Session = Depends(get_db))
         # Create service instance
         implant_service = ImplantService(db)
 
-        # Validate cluster combination
-        if not implant_service.validate_cluster_combination(request.clusters):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid cluster combination: {request.clusters}",
-            )
-
         # Perform lookup
         result = implant_service.lookup_implant(
             slot=request.slot, target_ql=request.ql, clusters=request.clusters

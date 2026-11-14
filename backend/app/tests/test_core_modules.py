@@ -273,12 +273,12 @@ class TestCacheModuleFunctions:
 
     def test_cache_ttl_constants(self):
         """Test that CACHE_TTL constants are defined."""
-        assert "items_list" in CACHE_TTL
-        assert "item_detail" in CACHE_TTL
-        assert "pocket_bosses" in CACHE_TTL
-        assert "symbiants" in CACHE_TTL
-        assert "search_results" in CACHE_TTL
-        assert "stats" in CACHE_TTL
+        assert set(CACHE_TTL) == {
+            "items_list",
+            "item_detail",
+            "symbiants",
+            "weapons_analyze",
+        }
 
         # Verify they're all positive integers
         for ttl_value in CACHE_TTL.values():

@@ -22,11 +22,3 @@ class ItemStatResponse(StatValueBase):
     """A stat as embedded in an item: its content only, no row id."""
 
     model_config = {"from_attributes": True}
-
-
-class StatValueResponse(StatValueBase):
-    """Schema for StatValue responses."""
-
-    id: int = Field(description="StatValue ID")
-
-    model_config = {"from_attributes": True}

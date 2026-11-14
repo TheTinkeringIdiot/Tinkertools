@@ -4,7 +4,7 @@ AOID is the only item identity the API takes, and item content carries no row id
 Runs against the real database inside a rolled-back transaction.
 """
 
-from app.models import Mob, SymbiantItem
+from app.models import Item, Mob, Perk, SymbiantItem
 from app.tests.db_test_constants import (
     ITEM_SYMBIANT_ADOBE_ARTILLERY_OCULAR,
     MOB_ADOBE_SUZERAIN,
@@ -149,3 +149,145 @@ def test_implant_lookup_returns_an_implant_without_row_ids(client):
         assert body["success"] is True
         assert body["item"]["aoid"]
         _assert_no_nested_row_ids(body["item"])
+
+
+# ============================================================================
+# Every route that embeds item content
+# ============================================================================
+
+CONTENT_LISTS = (
+    "stats",
+    "attack_stats",
+    "defense_stats",
+    "spell_data",
+    "spells",
+    "criteria",
+    "actions",
+)
+
+
+def _row_ids_in_content(value, inside_content=False, path=""):
+    """Paths of row ids found on entries of an item's content lists, at any depth."""
+    found = []
+    if isinstance(value, dict):
+        if inside_content:
+            found += [f"{path}.{key}" for key in ROW_ID_KEYS & value.keys()]
+        for key, child in value.items():
+            found += _row_ids_in_content(child, key in CONTENT_LISTS, f"{path}.{key}")
+    elif isinstance(value, list):
+        for child in value:
+            found += _row_ids_in_content(child, inside_content, path)
+    return found
+
+
+def _content_entries(value, wanted):
+    """How many entries the named content lists hold, at any depth."""
+    if isinstance(value, dict):
+        return sum(
+            (len(child) if key in wanted and isinstance(child, list) else 0)
+            + _content_entries(child, wanted)
+            for key, child in value.items()
+        )
+    if isinstance(value, list):
+        return sum(_content_entries(child, wanted) for child in value)
+    return 0
+
+
+WEAPON_REQUEST = {
+    "level": 220,
+    "breed_id": 1,
+    "profession_id": 11,
+    "side": 1,
+    "expansion_bitflag": 127,
+    "top_weapon_skills": [{"skill_id": 112, "value": 2500}],
+}
+
+
+def _content_routes(client, db_session):
+    weapons = [
+        aoid
+        for (aoid,) in db_session.query(Item.aoid)
+        .filter(Item.atkdef_id.isnot(None), Item.item_class == 1, Item.ql == 100)
+        .order_by(Item.aoid)
+        .limit(5)
+    ]
+    perks = [
+        aoid
+        for (aoid,) in db_session.query(Item.aoid)
+        .join(Perk, Perk.item_id == Item.id)
+        .order_by(Item.aoid)
+        .limit(5)
+    ]
+    assert weapons and perks
+    return {
+        "item search": client.get("/api/v1/items/search?q=pistol&page_size=30"),
+        "nano list": client.get("/api/v1/nanos?page_size=30"),
+        "nano search": client.get("/api/v1/nanos/search?q=heal&page_size=30"),
+        "profession nanos": client.get("/api/v1/nanos/profession/10?page_size=30"),
+        "offensive nanos": client.get("/api/v1/nanos/offensive/11?page_size=30"),
+        "weapon analysis": client.post("/api/v1/weapons/analyze", json=WEAPON_REQUEST),
+        "batch interpolation": client.post(
+            "/api/v1/items/batch/interpolate",
+            json={"items": [{"aoid": aoid, "target_ql": 120} for aoid in weapons]},
+        ),
+        "perk lookup": client.post("/api/v1/perks/batch/lookup", json={"aoids": perks}),
+        "implant lookup": client.post(
+            "/api/v1/implants/lookup",
+            json={
+                "slot": 1024,
+                "ql": 200,
+                "clusters": {"Shiny": 100, "Bright": 102, "Faded": 150},
+            },
+        ),
+    }
+
+
+def test_no_route_exposes_row_ids_inside_item_content(client, db_session):
+    for name, response in _content_routes(client, db_session).items():
+        assert response.status_code == 200, (name, response.text[:200])
+        body = response.json()
+        # The response really carries content, so the check below is not vacuous
+        assert _content_entries(body, {"actions", "spells", "stats"}) > 0, name
+        assert _row_ids_in_content(body) == [], name
+
+
+def test_the_row_id_check_sees_a_leak():
+    leaking = {"items": [{"aoid": 1, "id": 7, "actions": [{"id": 3, "criteria": []}]}]}
+    nested = {"item": {"spell_data": [{"spells": [{"criteria": [{"item_id": 9}]}]}]}}
+
+    assert _row_ids_in_content(leaking) == [".items.actions.id"]
+    assert _row_ids_in_content(nested) == [".item.spell_data.spells.criteria.item_id"]
+
+
+def test_weapon_analysis_returns_weapons_the_character_can_use(client):
+    response = client.post("/api/v1/weapons/analyze", json=WEAPON_REQUEST)
+
+    assert response.status_code == 200
+    weapons = response.json()
+    assert len(weapons) > 50
+    assert all(weapon["attack_stats"] for weapon in weapons)
+    assert len({weapon["aoid"] for weapon in weapons}) == len(weapons)
+
+
+def test_batch_interpolation_matches_single_interpolation(client, db_session):
+    aoids = [
+        aoid
+        for (aoid,) in db_session.query(Item.aoid)
+        .filter(Item.atkdef_id.isnot(None), Item.item_class == 1, Item.ql == 100)
+        .order_by(Item.aoid)
+        .limit(3)
+    ]
+
+    batch = client.post(
+        "/api/v1/items/batch/interpolate",
+        json={"items": [{"aoid": aoid, "target_ql": 120} for aoid in aoids]},
+    )
+
+    assert batch.status_code == 200
+    results = batch.json()["results"]
+    assert [result["item"]["aoid"] for result in results if result.get("item")]
+    for aoid, result in zip(aoids, results):
+        single = client.get(
+            f"/api/v1/items/{aoid}/interpolate", params={"target_ql": 120}
+        )
+        assert result["item"] == single.json()["item"], aoid

@@ -136,31 +136,6 @@ class NanoItemDetail(ItemDetail):
     strain: Optional[str] = Field(None, description="Name of strain_id")
 
 
-class NanoSearchRequest(BaseModel):
-    """Request model for nano search."""
-
-    query: Optional[str] = Field(None, description="Search query")
-    schools: Optional[List[str]] = Field(None, description="Filter by nano schools")
-    strains: Optional[List[str]] = Field(None, description="Filter by strains")
-    professions: Optional[List[str]] = Field(None, description="Filter by professions")
-    quality_levels: Optional[List[int]] = Field(
-        None, description="Filter by quality levels"
-    )
-    level_range: Optional[List[int]] = Field(None, description="Level range [min, max]")
-
-    # Compatibility filtering (requires profile data)
-    skill_compatible: Optional[bool] = Field(
-        False, description="Filter by skill compatibility"
-    )
-    castable: Optional[bool] = Field(
-        False, description="Filter by castable with current stats"
-    )
-
-    # Sorting
-    sort_by: str = Field("name", description="Sort field (name, level, school, ql)")
-    sort_descending: bool = Field(False, description="Sort in descending order")
-
-
 class NanoStatsResponse(BaseModel):
     """Statistics about nano programs in the database."""
 

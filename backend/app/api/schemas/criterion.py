@@ -24,12 +24,3 @@ class ItemCriterionResponse(CriterionBase):
 
     class Config:
         from_attributes = True
-
-
-class CriterionResponse(CriterionBase):
-    """Schema for Criterion responses."""
-
-    id: int = Field(description="Criterion ID")
-
-    class Config:
-        from_attributes = True
