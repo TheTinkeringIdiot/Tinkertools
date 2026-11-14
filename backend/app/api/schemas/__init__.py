@@ -16,15 +16,7 @@ from .nano import (
     NanoTargeting,
 )
 from .item import ItemResponse, ItemCreate, ItemDetail, ItemSearch, ItemRequirement
-from .symbiant import (
-    SymbiantResponse,
-    SymbiantWithDropsResponse,
-    MobDropInfo,
-    # Deprecated but kept for backwards compatibility:
-    SymbiantCreate,
-    SymbiantDetail,
-    PocketBossInfo,
-)
+from .symbiant import SymbiantResponse, MobDropInfo
 from .mob import MobResponse
 from .source import SourceTypeResponse, SourceResponse, ItemSourceResponse
 from .weapon_analysis import WeaponSkill, WeaponAnalyzeRequest
@@ -49,11 +41,7 @@ __all__ = [
     "ItemSearch",
     "ItemRequirement",
     "SymbiantResponse",
-    "SymbiantWithDropsResponse",
     "MobDropInfo",
-    "SymbiantCreate",  # Deprecated
-    "SymbiantDetail",  # Deprecated
-    "PocketBossInfo",  # Deprecated
     "MobResponse",
     "SourceTypeResponse",
     "SourceResponse",
