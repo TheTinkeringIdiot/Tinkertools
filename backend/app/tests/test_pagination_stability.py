@@ -12,7 +12,7 @@ Symbiant pages are walked in test_search_functionality's family test.
 from app.models import Item, Mob
 
 
-def _walk(client, url, page_size):
+def _walk(client, url, page_size, key="id"):
     """Fetch every page of a paginated endpoint; return (ids, reported total)."""
     separator = "&" if "?" in url else "?"
     ids = []
@@ -21,7 +21,7 @@ def _walk(client, url, page_size):
         response = client.get(f"{url}{separator}page={page}&page_size={page_size}")
         assert response.status_code == 200
         data = response.json()
-        ids.extend(row["id"] for row in data["items"])
+        ids.extend(row[key] for row in data["items"])
         if page >= data["pages"]:
             return ids, data["total"]
         page += 1
@@ -46,14 +46,16 @@ def test_nanos_list_pages_partition(client, db_session):
     """Nanos sort by name by default; nano names repeat across QLs."""
     ql = 100
     expected = [
-        item_id
-        for (item_id,) in db_session.query(Item.id).filter(
+        aoid
+        for (aoid,) in db_session.query(Item.aoid).filter(
             Item.is_nano.is_(True), Item.ql == ql
         )
     ]
     assert len(expected) > 20
 
-    ids, total = _walk(client, f"/api/v1/nanos?ql_min={ql}&ql_max={ql}", page_size=20)
+    ids, total = _walk(
+        client, f"/api/v1/nanos?ql_min={ql}&ql_max={ql}", page_size=20, key="aoid"
+    )
 
     assert total == len(expected)
     _assert_partition(ids, expected)
@@ -63,15 +65,17 @@ def test_nano_search_pages_partition(client, db_session):
     """Nano search had no ORDER BY at all."""
     term = "Mongo"
     expected = [
-        item_id
-        for (item_id,) in db_session.query(Item.id).filter(
+        aoid
+        for (aoid,) in db_session.query(Item.aoid).filter(
             Item.is_nano.is_(True),
             Item.name.ilike(f"%{term}%") | Item.description.ilike(f"%{term}%"),
         )
     ]
     assert len(expected) > 7
 
-    ids, total = _walk(client, f"/api/v1/nanos/search?q={term}", page_size=7)
+    ids, total = _walk(
+        client, f"/api/v1/nanos/search?q={term}", page_size=7, key="aoid"
+    )
 
     assert total == len(expected)
     _assert_partition(ids, expected)

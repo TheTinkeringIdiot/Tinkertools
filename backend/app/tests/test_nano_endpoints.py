@@ -161,7 +161,7 @@ def test_get_nanos_sort_by_ql_desc(client):
 
 
 STRAIN_SQL = """
-    SELECT i.id, sv.value FROM items i
+    SELECT i.aoid, sv.value FROM items i
     JOIN item_stats ist ON ist.item_id = i.id
     JOIN stat_values sv ON sv.id = ist.stat_value_id
     WHERE i.is_nano AND sv.stat = 75
@@ -169,7 +169,7 @@ STRAIN_SQL = """
 
 
 def _strains_by_nano(db_session):
-    """{item id: NanoStrain} straight from the raw stat."""
+    """{AOID: NanoStrain} straight from the raw stat."""
     return dict(db_session.execute(text(STRAIN_SQL)).all())
 
 
@@ -194,7 +194,7 @@ def test_get_nanos_strain_filter_pages_sum_to_total(client, db_session):
         if page < data["pages"]:
             assert len(data["items"]) == page_size
         assert all(nano["strain_id"] == strain for nano in data["items"])
-        ids.extend(nano["id"] for nano in data["items"])
+        ids.extend(nano["aoid"] for nano in data["items"])
         if not data["has_next"]:
             break
         page += 1
@@ -210,14 +210,14 @@ def test_get_nanos_strain_filter_pages_sum_to_total(client, db_session):
 # compared on that subset of nanos; every nano the API returns must also carry
 # the value it was filtered on.
 SCHOOL_SQL = """
-    SELECT i.id FROM items i
+    SELECT i.aoid FROM items i
     JOIN item_stats ist ON ist.item_id = i.id
     JOIN stat_values sv ON sv.id = ist.stat_value_id
     WHERE i.is_nano AND sv.stat = 405 AND sv.value = ANY(:values)
 """
 
 SIMPLE_USE_ACTIONS_SQL = """
-    SELECT a.id, a.item_id FROM actions a
+    SELECT a.id, i.aoid FROM actions a
     JOIN items i ON i.id = a.item_id AND i.is_nano
     WHERE a.action = 3
       AND NOT EXISTS (
@@ -229,12 +229,12 @@ SIMPLE_USE_ACTIONS_SQL = """
 # For Use criteria whose profession criteria are all "== p" for one p: that p,
 # or NULL when there are none (any profession can cast it)
 SIMPLE_PROFESSION_SQL = f"""
-    SELECT s.item_id,
+    SELECT s.aoid,
            MIN(c.value2) FILTER (WHERE c.value1 IN (60, 368)) AS profession
     FROM ({SIMPLE_USE_ACTIONS_SQL}) s
     LEFT JOIN action_criteria ac ON ac.action_id = s.id
     LEFT JOIN criteria c ON c.id = ac.criterion_id
-    GROUP BY s.item_id
+    GROUP BY s.aoid
     HAVING bool_and(c.value1 IS NULL OR c.value1 NOT IN (60, 368) OR c.operator = 0)
        AND COUNT(DISTINCT c.value2) FILTER (WHERE c.value1 IN (60, 368)) <= 1
 """
@@ -242,12 +242,12 @@ SIMPLE_PROFESSION_SQL = f"""
 # Lowest level = 1 + the largest "Level > n" (operator 2), for Use criteria
 # whose only level criteria are of that form
 SIMPLE_LEVEL_SQL = f"""
-    SELECT s.item_id,
+    SELECT s.aoid,
            COALESCE(MAX(c.value2) FILTER (WHERE c.value1 = 54) + 1, 1) AS level
     FROM ({SIMPLE_USE_ACTIONS_SQL}) s
     LEFT JOIN action_criteria ac ON ac.action_id = s.id
     LEFT JOIN criteria c ON c.id = ac.criterion_id
-    GROUP BY s.item_id
+    GROUP BY s.aoid
     HAVING bool_and(c.value1 IS DISTINCT FROM 54 OR c.operator = 2)
 """
 
@@ -272,7 +272,7 @@ def _all_filtered(client, params, page_size=200):
             break
         page += 1
     assert len(nanos) == data["total"]
-    assert len({nano["id"] for nano in nanos}) == len(nanos)
+    assert len({nano["aoid"] for nano in nanos}) == len(nanos)
     return nanos
 
 
@@ -282,7 +282,7 @@ def test_get_nanos_school_filter_matches_nano_school_stat(client, db_session):
     assert expected
 
     nanos = _all_filtered(client, {"school": "Medical"})
-    assert {nano["id"] for nano in nanos} == expected
+    assert {nano["aoid"] for nano in nanos} == expected
     assert all(nano["school"] == "Medical" for nano in nanos)
 
 
@@ -292,7 +292,7 @@ def test_get_nanos_several_schools_match_any(client, db_session):
         row[0] for row in db_session.execute(text(SCHOOL_SQL), {"values": [2, 4]})
     }
     nanos = _all_filtered(client, {"school": ["Medical", "Psi"]})
-    assert {nano["id"] for nano in nanos} == expected
+    assert {nano["aoid"] for nano in nanos} == expected
     assert {nano["school"] for nano in nanos} == {"Medical", "Psi"}
 
 
@@ -312,7 +312,7 @@ def test_get_nanos_profession_filter_matches_use_criteria(client, db_session):
     """profession=Doctor (or its id) returns what a Doctor can cast: nanos
     limited to professions including Doctor, and unrestricted ones."""
     nanos = _all_filtered(client, {"profession": "Doctor"})
-    ids = {nano["id"] for nano in nanos}
+    ids = {nano["aoid"] for nano in nanos}
     assert all(
         "Doctor" in nano["professions"]
         or (nano["professions"] == [] and nano["level"] is not None)
@@ -331,13 +331,13 @@ def test_get_nanos_profession_filter_matches_use_criteria(client, db_session):
 def test_get_nanos_several_professions_match_any(client, db_session):
     """Repeated profession params match nanos castable by any of them."""
     nanos = _all_filtered(client, {"profession": ["Doctor", "Nano-Technician"]})
-    ids = {nano["id"] for nano in nanos}
+    ids = {nano["aoid"] for nano in nanos}
 
     simple, expected = _expected_for_professions(db_session, {10, 11})
     assert ids & simple == expected
 
-    doctor = {n["id"] for n in _all_filtered(client, {"profession": "Doctor"})}
-    nt = {n["id"] for n in _all_filtered(client, {"profession": "Nano-Technician"})}
+    doctor = {n["aoid"] for n in _all_filtered(client, {"profession": "Doctor"})}
+    nt = {n["aoid"] for n in _all_filtered(client, {"profession": "Nano-Technician"})}
     assert ids == doctor | nt
     # An unknown name among known ones is ignored
     mixed = client.get(
@@ -368,12 +368,12 @@ def test_search_nanos_takes_the_list_filters(client):
         assert "Doctor" in nano["professions"] or nano["professions"] == []
 
     listed = {
-        n["id"]
+        n["aoid"]
         for n in _all_filtered(
             client, {"school": ["Medical", "Psi"], "profession": "Doctor"}
         )
     }
-    assert {nano["id"] for nano in found} <= listed
+    assert {nano["aoid"] for nano in found} <= listed
 
 
 def test_get_nanos_level_filter_matches_use_criteria(client, db_session):
@@ -389,15 +389,15 @@ def test_get_nanos_level_filter_matches_use_criteria(client, db_session):
         if 150 <= level <= 200
     }
     assert expected
-    assert {nano["id"] for nano in nanos} & simple == expected
+    assert {nano["aoid"] for nano in nanos} & simple == expected
 
 
 def test_get_nanos_combined_filters_intersect(client):
     """Filters combine with AND, and totals stay consistent."""
-    doctor = {n["id"] for n in _all_filtered(client, {"profession": "Doctor"})}
-    medical = {n["id"] for n in _all_filtered(client, {"school": "Medical"})}
+    doctor = {n["aoid"] for n in _all_filtered(client, {"profession": "Doctor"})}
+    medical = {n["aoid"] for n in _all_filtered(client, {"school": "Medical"})}
     both = _all_filtered(client, {"profession": "Doctor", "school": "Medical"})
-    assert {n["id"] for n in both} == doctor & medical
+    assert {n["aoid"] for n in both} == doctor & medical
 
 
 def test_get_nanos_several_strains_match_any(client, db_session):
@@ -407,7 +407,7 @@ def test_get_nanos_several_strains_match_any(client, db_session):
     expected = {i for i, s in by_nano.items() if s in (first, second)}
 
     nanos = _all_filtered(client, {"strain": [str(first), str(second)]})
-    assert {nano["id"] for nano in nanos} == expected
+    assert {nano["aoid"] for nano in nanos} == expected
     assert {nano["strain_id"] for nano in nanos} == {first, second}
     assert all(nano["strain"] == NANO_STRAINS.get(nano["strain_id"]) for nano in nanos)
 
@@ -420,7 +420,7 @@ def test_get_nanos_several_strains_match_any(client, db_session):
         if name.casefold()
         in {NANO_STRAINS[first].casefold(), NANO_STRAINS[second].casefold()}
     }
-    assert {nano["id"] for nano in by_name} == {
+    assert {nano["aoid"] for nano in by_name} == {
         i for i, s in by_nano.items() if s in named_ids
     }
 
@@ -433,7 +433,7 @@ def test_nano_strain_fields_match_the_stat(client, db_session):
     by_nano = _strains_by_nano(db_session)
     data = client.get("/api/v1/nanos", params={"page_size": 200}).json()
     for nano in data["items"]:
-        assert nano["strain_id"] == by_nano.get(nano["id"])
+        assert nano["strain_id"] == by_nano.get(nano["aoid"])
         assert nano["strain"] == NANO_STRAINS.get(nano["strain_id"])
 
 
@@ -492,21 +492,21 @@ def test_search_nanos_sorts_like_the_list(client, db_session):
                 "/api/v1/nanos/search", params={**params, "page_size": 20, "page": 2}
             ).json()
             nanos = first["items"] + second["items"]
-            assert len({nano["id"] for nano in nanos}) == len(nanos)
+            assert len({nano["aoid"] for nano in nanos}) == len(nanos)
             if sort_by == "name":
                 # Name order is the database collation's, so ask it
                 expected = [
                     row[0]
                     for row in db_session.execute(
                         text(
-                            "SELECT id FROM items WHERE is_nano AND "
+                            "SELECT aoid FROM items WHERE is_nano AND "
                             "(name ILIKE '%heal%' OR description ILIKE '%heal%') "
-                            f"ORDER BY name {'DESC' if sort_desc else 'ASC'}, id "
+                            f"ORDER BY name {'DESC' if sort_desc else 'ASC'}, aoid "
                             "LIMIT 40"
                         )
                     )
                 ]
-                assert [nano["id"] for nano in nanos] == expected, sort_desc
+                assert [nano["aoid"] for nano in nanos] == expected, sort_desc
             else:
                 values = [nano[sort_by] for nano in nanos if nano[sort_by] is not None]
                 assert values == sorted(values, reverse=sort_desc), (
@@ -736,14 +736,14 @@ def test_list_and_search_nanos_return_actions(client, db_session):
     assert listed.status_code == 200
     # The filter may match more than one page; walk them until the nano turns up
     pages = listed.json()["pages"]
-    found = [n for n in listed.json()["items"] if n["id"] == nano.id]
+    found = [n for n in listed.json()["items"] if n["aoid"] == nano.aoid]
     page = 2
     while not found and page <= pages:
         next_page = client.get(
             f"/api/v1/nanos?ql_min={nano.ql}&ql_max={nano.ql}"
             f"&page_size=200&page={page}"
         )
-        found = [n for n in next_page.json()["items"] if n["id"] == nano.id]
+        found = [n for n in next_page.json()["items"] if n["aoid"] == nano.aoid]
         page += 1
     assert len(found) == 1
     assert _response_actions(found[0]) == expected
@@ -752,7 +752,7 @@ def test_list_and_search_nanos_return_actions(client, db_session):
         "/api/v1/nanos/search", params={"q": nano.name, "page_size": 200}
     )
     assert searched.status_code == 200
-    matches = [n for n in searched.json()["items"] if n["id"] == nano.id]
+    matches = [n for n in searched.json()["items"] if n["aoid"] == nano.aoid]
     assert len(matches) == 1
     assert _response_actions(matches[0]) == expected
 
@@ -815,7 +815,7 @@ def test_profession_and_search_endpoints_return_derived_fields(client, db_sessio
     assert all(
         "Nano-Technician" in item["professions"]
         for item in items
-        if item["id"] in simple
+        if item["aoid"] in simple
     )
 
     found = client.get("/api/v1/nanos/search?q=Izgimmer").json()["items"]
