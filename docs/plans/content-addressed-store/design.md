@@ -127,7 +127,7 @@ Parts are JSONB documents. Canonical form rules:
 
 ### 3.3 Curated data
 
-Perks, mobs, sources and item-source links are hand-maintained, not extracted. They are stored once, keyed by AOID, and apply in every build where the items they name are present (`backend/database/cas/002_curated_and_derived.sql`). Mob ids are part of the API and of stored farm progress, so they never change across imports.
+Perks, mobs, sources and item-source links are hand-maintained, not extracted. They are stored once, keyed by AOID. A curated fact is served for a build only when the items it names are present in that build and the build's feature flag for it is on; today perks and mobs are on only for the newest AO build and PRK. Item-source names are read from the source item in the requested build. The rules are stated in `backend/database/cas/002_curated_and_derived.sql`. Mob ids are part of the API and of stored farm progress, so they never change across imports.
 
 The nano CSV is stored once as `nano_overlay` (QL, strain, substrain per nano AOID):
 

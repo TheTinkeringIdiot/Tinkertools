@@ -7,13 +7,20 @@
 --
 -- Where curated data applies. A curated fact is served for a build only when
 --   1. the items it names are present in that build, and
---   2. the build's features flag for it is on (build.features, the same keys
---      the version registry uses today): "perks" for perk, "mobs" for mob and
---      for sources of type mob, "sources" for sources of type item.
--- Today the flags are on as follows: perks and mobs only on the newest AO
--- build and PRK, sources on every build. An old build therefore answers
--- "not found" for a perk lookup and lists no mobs even though the perk items
--- and symbiants exist in it.
+--   2. the build's features flag for it is on (build.features, the keys of
+--      public.game_versions.features today: items, nanos, perks, sources,
+--      symbiants): "perks" for perk, "symbiants" for mob and for sources of
+--      type mob, "sources" for sources of type item.
+-- Today "perks" and "symbiants" are on only for the newest AO build and PRK,
+-- and "sources" on every build. An old build therefore answers "not found"
+-- for a perk lookup and lists no mobs even though the perk items and
+-- symbiants exist in it. No route reads the flags today: the effect comes
+-- from the per-version tables being empty. The new read path has to apply
+-- the flags itself.
+--
+-- Inputs. backend/database/symbiants.csv (tracked) for mobs and their drops.
+-- The nano CSV (all_nanos_compacted.csv) and the perk data (perks.json) are
+-- not in the repository; their locations are given to the importer.
 
 -- ---------------------------------------------------------------------------
 -- Curated: nano metadata (all_nanos_compacted.csv)
@@ -125,9 +132,12 @@ CREATE INDEX perk_series ON perk (perk_series, counter);
 -- Curated: mobs and item sources
 -- ---------------------------------------------------------------------------
 
--- mob_id is assigned by the curated data and is part of the API
--- (/mobs/{mob_id}) and of players' stored farm progress: it must stay the same
--- across imports. The importer assigns ids by mob name and never renumbers.
+-- mob_id is part of the API (/mobs/{mob_id}) and of players' stored farm
+-- progress, so it must stay the same across imports. The ids in use today are
+-- the order of first appearance in backend/database/symbiants.csv, identical
+-- on the newest AO build and PRK. The importer keeps those ids: a mob already
+-- known keeps its id whatever the file order, and a new mob gets the next
+-- free one.
 CREATE TABLE mob (
     mob_id          integer PRIMARY KEY,
     name            varchar(255) NOT NULL UNIQUE,

@@ -548,7 +548,7 @@ def search_items(
         else:
             query = query.filter(or_(*search_conditions))
 
-        # Item.id breaks name ties so OFFSET pages never overlap
+        # The AOID breaks name ties so OFFSET pages never overlap
         query = query.order_by(Item.name, Item.aoid)
 
         # Apply weapons filter

@@ -26,7 +26,9 @@ Usage:
     python tools/golden.py capture BASE_URL OUT_DIR [--samples FILE] [--build SLUG ...]
     python tools/golden.py compare OLD_DIR NEW_DIR
 
-``capture`` exits 1 if a response is not sorted the way its request declares.
+``capture`` exits 1 if a response is not sorted the way its request declares;
+that check covers the leading numeric sort fields only, since text is collated
+by the database. ``compare`` checks row order exactly.
 ``compare`` exits 1 when any response differs. Timings in a capture are single
 measurements and are reported for orientation only.
 """
@@ -543,6 +545,8 @@ def differences(old: dict, new: dict) -> List[str]:
         return [] if canonical(a) == canonical(b) else [_first_difference(a, b)]
 
     found = []
+    if isinstance(old["body"], dict) != isinstance(new["body"], dict):
+        return ["the response changed shape (object or list)"]
     if key:
         rest_a = normalize({k: v for k, v in old["body"].items() if k != key})
         rest_b = normalize({k: v for k, v in new["body"].items() if k != key})

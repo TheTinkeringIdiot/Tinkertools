@@ -541,7 +541,7 @@ def get_nanos_by_profession(
         base_query = base_query.order_by(
             desc(Item.ql) if sort_order == "desc" else asc(Item.ql)
         )
-    # id breaks ties so OFFSET pages never overlap
+    # The AOID breaks ties so OFFSET pages never overlap
     base_query = base_query.order_by(Item.aoid)
 
     # Add DISTINCT to prevent duplicates from joins
@@ -702,7 +702,7 @@ def get_offensive_nanos_by_profession(
         base_query = base_query.order_by(
             desc(Item.ql) if sort_order == "desc" else asc(Item.ql)
         )
-    # id breaks ties so OFFSET pages never overlap
+    # The AOID breaks ties so OFFSET pages never overlap
     base_query = base_query.order_by(Item.aoid)
 
     # Add DISTINCT to prevent duplicates from joins

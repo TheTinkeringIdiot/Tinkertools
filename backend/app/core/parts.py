@@ -45,6 +45,11 @@ Rules:
   the same revision of an AOID exactly when it is equal.
 - ``Sounds``, ``UNK1``, ``Version`` and ``DBType`` are not stored: no feature
   reads them and the extracts remain the source of truth.
+
+Rebuilding an API response from the documents: stat 23 goes back into the
+stats from ``misc.static_instance``; an effect's ``description`` is returned as
+``spell_params.SpellDescription`` and its format comes from the effect type; a
+nano's strain stats come from the nano overlay rule, not from ``stats``.
 """
 
 from __future__ import annotations
