@@ -17,6 +17,7 @@ from app.models import *  # noqa: F403 - registers every mapper before tests run
 # Import all fixtures from fixture modules (pytest discovers them by name)
 from app.tests.fixtures.perk_fixtures import *  # noqa: F403
 from app.tests.fixtures.import_fixtures import *  # noqa: F403
+from app.tests.fixtures.store_fixtures import store  # noqa: F401
 
 # Use PostgreSQL database from environment variable
 DATABASE_URL = os.getenv("DATABASE_URL")
