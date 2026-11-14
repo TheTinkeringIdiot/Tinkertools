@@ -9,14 +9,6 @@ from .spell import SpellDataResponse
 from .action import ActionResponse
 
 
-class ItemRequirement(BaseModel):
-    """Schema for item requirements."""
-
-    stat: int = Field(description="Stat ID")
-    value: int = Field(description="Required value")
-    operator: str = Field(description="Comparison operator")
-
-
 class ItemBase(BaseModel):
     """Base Item schema."""
 
@@ -26,13 +18,6 @@ class ItemBase(BaseModel):
     item_class: Optional[int] = Field(None, description="Item class/category")
     description: Optional[str] = Field(None, description="Item description")
     is_nano: bool = Field(False, description="Is this a nano program")
-
-
-class ItemCreate(ItemBase):
-    """Schema for creating an Item."""
-
-    animation_mesh_id: Optional[int] = None
-    atkdef_id: Optional[int] = None
 
 
 class ItemResponse(ItemBase):
@@ -69,16 +54,3 @@ class ItemDetail(ItemResponse):
 
     class Config:
         from_attributes = True
-
-
-class ItemSearch(BaseModel):
-    """Item search parameters."""
-
-    q: Optional[str] = Field(None, description="Search query")
-    item_class: Optional[str] = Field(None, description="Filter by item class")
-    min_ql: Optional[int] = Field(None, description="Minimum quality level")
-    max_ql: Optional[int] = Field(None, description="Maximum quality level")
-    slot: Optional[str] = Field(None, description="Filter by equipment slot")
-    is_nano: Optional[bool] = Field(None, description="Filter nano programs")
-    page: int = Field(1, ge=1, description="Page number")
-    page_size: int = Field(50, ge=1, le=200, description="Items per page")

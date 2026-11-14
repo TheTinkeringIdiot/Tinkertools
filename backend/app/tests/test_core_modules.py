@@ -248,7 +248,6 @@ class TestCacheModuleFunctions:
     def test_cache_ttl_constants(self):
         """Test that CACHE_TTL constants are defined."""
         assert set(CACHE_TTL) == {
-            "items_list",
             "item_detail",
             "symbiants",
             "weapons_analyze",
@@ -280,7 +279,7 @@ class TestCachedResponseDecorator:
         """Test that async functions are cached correctly."""
         call_count = 0
 
-        @cached_response("items_list")
+        @cached_response("item_detail")
         async def get_items(page: int = 1):
             nonlocal call_count
             call_count += 1
@@ -302,7 +301,7 @@ class TestCachedResponseDecorator:
         """Test that different parameters create different cache entries."""
         call_count = 0
 
-        @cached_response("items_list")
+        @cached_response("item_detail")
         async def get_items(page: int = 1):
             nonlocal call_count
             call_count += 1
@@ -319,7 +318,7 @@ class TestCachedResponseDecorator:
         """Test that sync functions are cached correctly."""
         call_count = 0
 
-        @cached_response("items_list")
+        @cached_response("item_detail")
         def get_items(page: int = 1):
             nonlocal call_count
             call_count += 1
@@ -338,7 +337,7 @@ class TestCachedResponseDecorator:
     async def test_custom_ttl(self):
         """Test that custom TTL is respected."""
 
-        @cached_response("items_list", ttl=1)
+        @cached_response("item_detail", ttl=1)
         async def get_items():
             return {"items": []}
 
@@ -361,7 +360,7 @@ class TestCachedResponseDecorator:
         """Test that 'db' parameter is excluded from cache key."""
         call_count = 0
 
-        @cached_response("items_list")
+        @cached_response("item_detail")
         async def get_items(page: int = 1, db=None):
             nonlocal call_count
             call_count += 1
@@ -376,7 +375,7 @@ class TestCachedResponseDecorator:
     def test_default_ttl_from_cache_type(self):
         """Test that default TTL is used from CACHE_TTL when not specified."""
 
-        @cached_response("items_list")
+        @cached_response("item_detail")
         def get_items():
             return {"items": []}
 
@@ -548,7 +547,7 @@ class TestDecoratorComposition:
         call_count = 0
 
         @performance_monitor
-        @cached_response("items_list")
+        @cached_response("item_detail")
         async def get_items(page: int = 1):
             nonlocal call_count
             call_count += 1

@@ -13,12 +13,6 @@ class ActionBase(BaseModel):
     action: Optional[int] = Field(None, description="Action type ID")
 
 
-class ActionCreate(ActionBase):
-    """Schema for creating an Action."""
-
-    item_id: int = Field(description="Item ID this action belongs to")
-
-
 class ActionResponse(ActionBase):
     """An action as embedded in an item: its content only, no row ids."""
 

@@ -20,12 +20,6 @@ class SpellBase(BaseModel):
     )
 
 
-class SpellCreate(SpellBase):
-    """Schema for creating a Spell."""
-
-    pass
-
-
 class ItemSpellResponse(SpellBase):
     """A spell effect as embedded in an item: its content only, no row id.
 

@@ -12,12 +12,6 @@ class StatValueBase(BaseModel):
     value: int = Field(description="Stat value")
 
 
-class StatValueCreate(StatValueBase):
-    """Schema for creating a StatValue."""
-
-    pass
-
-
 class ItemStatResponse(StatValueBase):
     """A stat as embedded in an item: its content only, no row id."""
 

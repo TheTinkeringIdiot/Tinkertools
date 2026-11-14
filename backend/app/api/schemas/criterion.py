@@ -13,12 +13,6 @@ class CriterionBase(BaseModel):
     operator: int = Field(description="Operator for comparison")
 
 
-class CriterionCreate(CriterionBase):
-    """Schema for creating a Criterion."""
-
-    pass
-
-
 class ItemCriterionResponse(CriterionBase):
     """A criterion as embedded in an item's actions and spells: no row id."""
 

@@ -2,7 +2,7 @@
 Common Pydantic schemas used across the API.
 """
 
-from typing import TypeVar, Generic, Optional, List
+from typing import TypeVar, Generic, List
 from pydantic import BaseModel, Field
 
 T = TypeVar("T")
@@ -18,12 +18,3 @@ class PaginatedResponse(BaseModel, Generic[T]):
     pages: int = Field(description="Total number of pages")
     has_next: bool = Field(description="Whether there is a next page")
     has_prev: bool = Field(description="Whether there is a previous page")
-
-
-class HealthResponse(BaseModel):
-    """Health check response."""
-
-    status: str = Field(description="Health status")
-    database: Optional[str] = Field(None, description="Database connection status")
-    table_count: Optional[int] = Field(None, description="Number of database tables")
-    version: Optional[str] = Field(None, description="API version")
