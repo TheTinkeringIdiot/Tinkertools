@@ -169,11 +169,11 @@ Displays comprehensive nano information including effects, requirements, and com
                   </div>
                   <div v-if="nano.castingTime" class="grid grid-cols-2 gap-2">
                     <span class="text-surface-600 dark:text-surface-400">Casting Time:</span>
-                    <span class="font-medium">{{ formatTime(nano.castingTime) }}</span>
+                    <span class="font-medium">{{ formatCentiseconds(nano.castingTime) }}</span>
                   </div>
                   <div v-if="nano.rechargeTime" class="grid grid-cols-2 gap-2">
                     <span class="text-surface-600 dark:text-surface-400">Recharge Time:</span>
-                    <span class="font-medium">{{ formatTime(nano.rechargeTime) }}</span>
+                    <span class="font-medium">{{ formatCentiseconds(nano.rechargeTime) }}</span>
                   </div>
                   <div v-if="nano.memoryUsage" class="grid grid-cols-2 gap-2">
                     <span class="text-surface-600 dark:text-surface-400">Memory Usage:</span>
@@ -419,6 +419,7 @@ import CriterionReference from '@/components/CriterionReference.vue';
 import { getNanoCompatibility, getNanoUseAction } from './nano-compatibility';
 import { schoolAvatarClass, schoolInitials } from './nano-schools';
 import { useNanosStore } from '@/stores/nanosStore';
+import { centisecondsToSeconds } from '@/utils/nuke-casting-calculations';
 import { mapProfileToStats } from '@/utils/profile-stats-mapper';
 import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
 import type { NanoProgram, NanoEffect, EffectDuration, TargetingData } from '@/types/nano';
@@ -500,6 +501,10 @@ const compatibilityScoreSeverity = computed(() => {
 });
 
 // Methods
+/** Cast and recharge times are stat values in centiseconds; shown as on an item's page */
+const formatCentiseconds = (centiseconds: number): string =>
+  `${centisecondsToSeconds(centiseconds).toFixed(2)}s`;
+
 const formatTime = (seconds: number): string => {
   if (seconds < 60) {
     return `${seconds}s`;

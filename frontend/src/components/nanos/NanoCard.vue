@@ -144,12 +144,12 @@ Shows nano information with compatibility indicators and quick actions
 
               <div v-if="nano.castingTime" class="flex items-center gap-2">
                 <span class="text-surface-500 dark:text-surface-400">Cast Time:</span>
-                <span class="font-medium">{{ formatTime(nano.castingTime) }}</span>
+                <span class="font-medium">{{ formatCentiseconds(nano.castingTime) }}</span>
               </div>
 
               <div v-if="nano.rechargeTime" class="flex items-center gap-2">
                 <span class="text-surface-500 dark:text-surface-400">Recharge:</span>
-                <span class="font-medium">{{ formatTime(nano.rechargeTime) }}</span>
+                <span class="font-medium">{{ formatCentiseconds(nano.rechargeTime) }}</span>
               </div>
             </div>
           </div>
@@ -267,6 +267,7 @@ import type { DisplayCriterion } from '@/services/action-criteria';
 import type { NanoProgram, NanoCompatibilityInfo, NanoEffect } from '@/types/nano';
 import CriterionReference from '@/components/CriterionReference.vue';
 import { useNanosStore } from '@/stores/nanosStore';
+import { centisecondsToSeconds } from '@/utils/nuke-casting-calculations';
 import { getNanoRequirements } from './nano-compatibility';
 import { schoolAvatarClass, schoolInitials } from './nano-schools';
 
@@ -344,19 +345,9 @@ const compatibilityTooltip = computed(() => {
 });
 
 // Methods
-const formatTime = (seconds: number): string => {
-  if (seconds < 60) {
-    return `${seconds}s`;
-  } else if (seconds < 3600) {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
-  } else {
-    const hours = Math.floor(seconds / 3600);
-    const remainingMinutes = Math.floor((seconds % 3600) / 60);
-    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
-  }
-};
+/** Cast and recharge times are stat values in centiseconds; shown as on an item's page */
+const formatCentiseconds = (centiseconds: number): string =>
+  `${centisecondsToSeconds(centiseconds).toFixed(2)}s`;
 
 const formatEffect = (effect: NanoEffect): string => {
   const typeLabels: Record<string, string> = {
