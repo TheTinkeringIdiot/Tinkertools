@@ -191,6 +191,88 @@ describe('API Client', () => {
     });
   });
 
+  describe('Legacy Item ID Resolution', () => {
+    /** Answers each request as a backend that knows every id asked for, as id + 100000. */
+    function resolveEveryId() {
+      mockAxiosInstance.post.mockImplementation(
+        async (_url: string, body: { item_ids: number[] }) => ({
+          data: { aoids: Object.fromEntries(body.item_ids.map((id) => [String(id), id + 100000])) },
+        })
+      );
+    }
+
+    it('returns the AOIDs keyed by numeric internal id, without the ids the backend omits', async () => {
+      mockAxiosInstance.post.mockResolvedValue({ data: { aoids: { '7': 246817, '9': 100123 } } });
+
+      const resolved = await apiClient.resolveLegacyItemIds([7, 8, 9], TEST_VERSION);
+
+      expect(resolved).toEqual(
+        new Map([
+          [7, 246817],
+          [9, 100123],
+        ])
+      );
+      expect(resolved.has(8)).toBe(false);
+    });
+
+    it('asks in requests of at most 1000 ids and merges the answers', async () => {
+      resolveEveryId();
+      const ids = Array.from({ length: 2500 }, (_, index) => index + 1);
+
+      const resolved = await apiClient.resolveLegacyItemIds(ids, TEST_VERSION);
+
+      const requested: Array<{ url: string; ids: number[] }> =
+        mockAxiosInstance.post.mock.calls.map((call) => ({ url: call[0], ids: call[1].item_ids }));
+      expect(requested.map((request) => request.url)).toEqual([
+        '/legacy-item-ids/resolve',
+        '/legacy-item-ids/resolve',
+        '/legacy-item-ids/resolve',
+      ]);
+      expect(requested.map((request) => request.ids.length)).toEqual([1000, 1000, 500]);
+      expect(requested.flatMap((request) => request.ids)).toEqual(ids);
+
+      expect(resolved.size).toBe(2500);
+      expect(resolved.get(1)).toBe(100001);
+      expect(resolved.get(1001)).toBe(101001);
+      expect(resolved.get(2500)).toBe(102500);
+    });
+
+    it('asks the game version it was given, not the one being browsed', async () => {
+      await setCurrentVersion(TEST_VERSION);
+      resolveEveryId();
+
+      await apiClient.resolveLegacyItemIds([1], TEST_ALT_VERSION);
+
+      const requestConfig: Partial<InternalAxiosRequestConfig> =
+        mockAxiosInstance.post.mock.calls[0][2];
+      expect(requestConfig).toEqual({ gameVersion: TEST_ALT_VERSION });
+      const sent = registeredInterceptors.request[0]({
+        headers: new AxiosHeaders(),
+        ...requestConfig,
+      });
+      expect(sent.baseURL).toBe(`${API_ROOT}/${TEST_ALT_VERSION}`);
+    });
+
+    it('makes no request for an empty list', async () => {
+      const resolved = await apiClient.resolveLegacyItemIds([], TEST_VERSION);
+
+      expect(resolved.size).toBe(0);
+      expect(mockAxiosInstance.post).not.toHaveBeenCalled();
+    });
+
+    it('rejects when a request fails, even after earlier ones succeeded', async () => {
+      mockAxiosInstance.post
+        .mockResolvedValueOnce({ data: { aoids: { '1': 100001 } } })
+        .mockRejectedValueOnce(new AxiosError('Network Error', AxiosError.ERR_NETWORK));
+      const ids = Array.from({ length: 1500 }, (_, index) => index + 1);
+
+      await expect(apiClient.resolveLegacyItemIds(ids, TEST_VERSION)).rejects.toMatchObject({
+        type: 'error',
+        title: 'Network Error',
+      });
+    });
+  });
+
   describe('Error Handling', () => {
     it('should handle network errors', async () => {
       mockAxiosInstance.get.mockRejectedValue(
