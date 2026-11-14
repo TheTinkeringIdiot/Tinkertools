@@ -163,7 +163,7 @@ def get_nano_strains(
 @router.get(
     "/profession/{profession_id}", response_model=PaginatedResponse[NanoItemDetail]
 )
-@cached_response("nanos_profession", ttl=3600)  # Cache for 1 hour
+@cached_response("nanos_profession")
 @performance_monitor
 def get_nanos_by_profession(
     profession_id: int,
@@ -197,7 +197,7 @@ def get_nanos_by_profession(
 
 
 @router.get("/offensive/{profession_id}", response_model=PaginatedResponse[ItemDetail])
-@cached_response("nanos_offensive", ttl=3600)  # Cache for 1 hour
+@cached_response("nanos_offensive")
 @performance_monitor
 def get_offensive_nanos_by_profession(
     profession_id: int,

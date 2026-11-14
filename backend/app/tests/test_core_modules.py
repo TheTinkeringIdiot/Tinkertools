@@ -8,211 +8,264 @@ Tests critical functionality that affects all features:
 """
 
 import pytest
+import json
+import random
 import time
 import threading
 import asyncio
 import os
+from typing import List
 from unittest.mock import patch
 
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
+from fastapi.testclient import TestClient
+from pydantic import BaseModel, Field
+
 from app.core.cache import (
-    CacheService,
-    cache_service,
-    cache_key_for_query,
-    get_cached_response,
-    cache_response,
     CACHE_TTL,
+    ENTRY_OVERHEAD,
+    LARGEST_ENTRY_FRACTION,
+    CacheService,
+    cache_key_for_query,
+    cache_response,
+    cache_service,
+    get_cached_response,
 )
 from app.core.decorators import cached_response, performance_monitor, log_query_params
 from app.core.config import Settings, settings
+from app.main import app
 
 # ============================================================================
 # Cache Module Tests
 # ============================================================================
 
 
+class Clock:
+    """A clock a test moves by hand."""
+
+    def __init__(self):
+        self.now = 1000.0
+
+    def __call__(self):
+        return self.now
+
+
+def room_for(entries, of_size):
+    """The byte budget that holds exactly ``entries`` values of ``of_size``."""
+    return entries * (of_size + ENTRY_OVERHEAD)
+
+
+def held(cache, keys):
+    """Which of ``keys`` the cache still holds, read without using them."""
+    return [key for key in keys if key in cache.cache]
+
+
 class TestCacheService:
     """Test suite for CacheService class."""
 
     @pytest.fixture
-    def cache(self):
+    def clock(self):
+        return Clock()
+
+    @pytest.fixture
+    def cache(self, clock):
         """Create a fresh cache instance for each test."""
-        return CacheService(default_ttl=10)
+        return CacheService(default_ttl=10, max_bytes=1024 * 1024, clock=clock)
 
-    def test_cache_initialization(self, cache):
-        """Test cache initializes with correct defaults."""
-        assert cache.default_ttl == 10
-        assert len(cache.cache) == 0
-        assert cache.stats["hits"] == 0
-        assert cache.stats["misses"] == 0
-        assert cache.stats["evictions"] == 0
-        assert cache.stats["sets"] == 0
+    def test_a_value_is_read_back_until_it_is_deleted(self, cache):
+        cache.set("key", "value")
 
-    def test_cache_set_and_get(self, cache):
-        """Test basic cache set and get operations."""
-        cache.set("test_key", "test_value")
+        assert cache.get("key") == "value"
+        assert cache.delete("key") is True
+        assert cache.get("key") is None
+        assert cache.delete("key") is False
+        assert (cache.stats["hits"], cache.stats["misses"]) == (1, 1)
 
-        result = cache.get("test_key")
-        assert result == "test_value"
-        assert cache.stats["hits"] == 1
-        assert cache.stats["sets"] == 1
+    def test_a_key_never_written_is_a_miss(self, cache):
+        assert cache.get("nonexistent_key") is None
+        assert (cache.stats["hits"], cache.stats["misses"]) == (0, 1)
 
-    def test_cache_miss(self, cache):
-        """Test cache miss behavior."""
-        result = cache.get("nonexistent_key")
+    def test_an_entry_expires_after_its_ttl(self, cache, clock):
+        cache.set("short", "value", ttl=1)
+        cache.set("default", "value")
 
-        assert result is None
-        assert cache.stats["misses"] == 1
-        assert cache.stats["hits"] == 0
+        clock.now += 0.9
+        assert cache.get("short") == "value"
+        clock.now += 0.2
+        assert cache.get("short") is None
+        assert cache.get("default") == "value"
+        clock.now += 10
+        assert cache.get("default") is None
+        assert cache.total_bytes == 0
 
-    def test_cache_ttl_expiration(self, cache):
-        """Test that cached values expire after TTL."""
-        cache.set("short_lived", "value", ttl=1)
+    def test_a_write_drops_every_entry_that_has_expired(self, cache, clock):
+        cache.set("short", b"x" * 100, ttl=5)
+        cache.set("long", b"x" * 100, ttl=50)
+        cache.set("short too", b"x" * 100, ttl=5)
+        clock.now += 6
 
-        # Value should be available immediately
-        assert cache.get("short_lived") == "value"
+        cache.set("new", b"x" * 100, ttl=5)
 
-        # Wait for expiration
-        time.sleep(1.1)
+        assert held(cache, ["short", "long", "short too", "new"]) == ["long", "new"]
+        assert cache.total_bytes == room_for(2, 100)
+        assert cache.stats["expirations"] == 2
 
-        # Value should be expired
-        result = cache.get("short_lived")
-        assert result is None
-        assert cache.stats["evictions"] == 1
+    def test_a_rewritten_entry_expires_by_its_last_write(self, cache, clock):
+        cache.set("key", "old", ttl=5)
+        clock.now += 4
+        cache.set("key", "new", ttl=5)
+        clock.now += 4
+        cache.set("other", "value")
 
-    def test_cache_custom_ttl(self, cache):
-        """Test setting custom TTL overrides default."""
-        cache.set("custom_ttl", "value", ttl=2)
-        cache.set("default_ttl", "value")
+        assert cache.get("key") == "new"
 
-        # Custom TTL should be 2 seconds
-        time.sleep(2.1)
-        assert cache.get("custom_ttl") is None
+    def test_the_least_recently_used_entry_goes_first(self, clock):
+        cache = CacheService(max_bytes=room_for(16, 100), clock=clock)
+        keys = [f"key {n}" for n in range(16)]
+        for key in keys:
+            cache.set(key, b"x" * 100)
 
-        # Default should still be valid (10 seconds)
-        assert cache.get("default_ttl") == "value"
+        assert cache.get("key 0") is not None
+        cache.set("new", b"x" * 100)
+        assert held(cache, keys) == ["key 0", *keys[2:]]
 
-    def test_cache_delete(self, cache):
-        """Test cache deletion."""
-        cache.set("to_delete", "value")
+        cache.set("key 2", b"y" * 100)
+        cache.set("newer", b"x" * 100)
+        assert held(cache, keys) == ["key 0", "key 2", *keys[4:]]
+        assert held(cache, ["new", "newer"]) == ["new", "newer"]
+        assert cache.stats["evictions"] == 2
 
-        # Verify it exists
-        assert cache.get("to_delete") == "value"
+    def test_a_larger_entry_evicts_as_many_as_it_needs(self, clock):
+        cache = CacheService(max_bytes=room_for(64, 100), clock=clock)
+        keys = [f"key {n}" for n in range(64)]
+        for key in keys:
+            cache.set(key, b"x" * 100)
 
-        # Delete and verify
-        result = cache.delete("to_delete")
-        assert result is True
-        assert cache.get("to_delete") is None
+        cache.set("large", b"x" * (3 * 100 + 2 * ENTRY_OVERHEAD))
 
-        # Try deleting non-existent key
-        result = cache.delete("nonexistent")
-        assert result is False
+        assert held(cache, keys) == keys[3:]
+        assert cache.get("large") is not None
+        assert cache.total_bytes == cache.max_bytes
 
-    def test_cache_clear(self, cache):
-        """Test clearing all cache entries."""
-        cache.set("key1", "value1")
-        cache.set("key2", "value2")
-        cache.set("key3", "value3")
+    def test_the_size_stays_within_its_bound_under_many_distinct_keys(self, clock):
+        cache = CacheService(max_bytes=200_000, clock=clock)
+        sizes = random.Random(7)
 
-        assert len(cache.cache) == 3
+        for n in range(5000):
+            cache.set(f"key {n}", b"x" * sizes.randrange(0, 20_000), ttl=60)
+            clock.now += 0.01
+            assert cache.total_bytes <= cache.max_bytes
+            assert cache.total_bytes == sum(e.size for e in cache.cache.values())
+
+        assert 0 < len(cache.cache) < 400
+        assert cache.get("key 4999") is not None or cache.stats["rejections"] > 0
+
+    def test_an_entry_too_large_for_the_cache_is_not_kept(self, clock):
+        cache = CacheService(max_bytes=160_000, clock=clock)
+        limit = 160_000 // LARGEST_ENTRY_FRACTION
+        cache.set("small", b"x" * 100)
+        cache.set("replaced", b"x" * 100)
+
+        assert cache.set("fits", b"x" * (limit - ENTRY_OVERHEAD)) is True
+        assert cache.set("too large", b"x" * (limit - ENTRY_OVERHEAD + 1)) is False
+        assert cache.set("replaced", b"x" * limit) is False
+
+        assert held(cache, ["small", "fits", "too large", "replaced"]) == [
+            "small",
+            "fits",
+        ]
+        assert cache.stats["rejections"] == 2
+
+    def test_a_cache_without_room_keeps_nothing(self, clock):
+        cache = CacheService(max_bytes=0, clock=clock)
+
+        assert cache.set("key", b"") is False
+        assert cache.get("key") is None
+
+    def test_an_entry_is_as_large_as_its_bytes_or_as_the_caller_says(self, cache):
+        cache.set("bytes", b"x" * 300)
+        cache.set("text", "x" * 200)
+        cache.set("response", JSONResponse({"a": 1}))
+        cache.set("sized", {"any": "object"}, size=1000)
+
+        sizes = {key: entry.size - ENTRY_OVERHEAD for key, entry in cache.cache.items()}
+        assert sizes == {
+            "bytes": 300,
+            "text": 200,
+            "response": len(b'{"a":1}'),
+            "sized": 1000,
+        }
+
+    def test_clear_empties_the_cache(self, cache):
+        for key in ("key1", "key2", "key3"):
+            cache.set(key, b"value")
 
         cache.clear()
 
-        assert len(cache.cache) == 0
         assert cache.get("key1") is None
+        assert (len(cache.cache), cache.total_bytes) == (0, 0)
+        cache.set("key1", b"value")
+        assert cache.get("key1") == b"value"
 
-    def test_generate_key_consistency(self, cache):
-        """Test that key generation is consistent for same parameters."""
-        key1 = cache._generate_key("test", param1="value1", param2="value2")
-        key2 = cache._generate_key("test", param1="value1", param2="value2")
+    def test_a_key_depends_on_its_parameters_and_not_on_their_order(self, cache):
+        key = cache._generate_key("test", param1="value1", param2="value2")
 
-        assert key1 == key2
+        assert key == cache._generate_key("test", param2="value2", param1="value1")
+        assert key != cache._generate_key("test", param1="value1", param2="value3")
+        assert key != cache._generate_key("other", param1="value1", param2="value2")
+        assert key.startswith("test:")
 
-    def test_generate_key_order_independence(self, cache):
-        """Test that key generation is order-independent."""
-        key1 = cache._generate_key("test", param1="value1", param2="value2")
-        key2 = cache._generate_key("test", param2="value2", param1="value1")
-
-        assert key1 == key2
-
-    def test_generate_key_different_params(self, cache):
-        """Test that different parameters generate different keys."""
-        key1 = cache._generate_key("test", param1="value1")
-        key2 = cache._generate_key("test", param1="value2")
-
-        assert key1 != key2
-
-    def test_generate_key_with_complex_types(self, cache):
-        """Test key generation with complex parameter types."""
-        key1 = cache._generate_key(
+    def test_a_key_takes_parameters_of_any_type(self, cache):
+        key = cache._generate_key(
             "test", list_param=[1, 2, 3], dict_param={"a": "b"}, int_param=42
         )
 
-        # Should not raise exception and should generate a key
-        assert key1.startswith("test:")
-        assert len(key1) > 5
+        assert key != cache._generate_key(
+            "test", list_param=[1, 2, 4], dict_param={"a": "b"}, int_param=42
+        )
 
-    def test_cache_thread_safety_basic(self, cache):
-        """Test basic thread safety of cache operations."""
+    def test_requests_that_differ_in_one_parameter_never_share_a_key(self, cache):
+        # enough requests that a 32-bit key would give several of them the
+        # key of another
+        requests = 300_000
+
+        keys = {cache._generate_key("items", page=page) for page in range(requests)}
+
+        assert len(keys) == requests
+
+    def test_concurrent_writers_and_readers_see_their_own_values(self, cache):
         results = []
 
         def worker(value):
             cache.set(f"key_{value}", value)
             time.sleep(0.01)
-            result = cache.get(f"key_{value}")
-            results.append(result)
+            results.append(cache.get(f"key_{value}"))
 
-        threads = []
-        for i in range(10):
-            thread = threading.Thread(target=worker, args=(i,))
-            threads.append(thread)
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(10)]
+        for thread in threads:
             thread.start()
-
         for thread in threads:
             thread.join()
 
-        # All values should be retrieved correctly
-        assert len(results) == 10
-        assert set(results) == set(range(10))
+        assert sorted(results) == list(range(10))
 
-    def test_cache_thread_safety_concurrent_access(self, cache):
-        """Test thread safety with concurrent reads and writes."""
-        cache.set("shared_key", 0)
+    def test_concurrent_eviction_keeps_the_size_consistent(self, clock):
+        cache = CacheService(max_bytes=room_for(50, 100), clock=clock)
 
-        def incrementer():
-            for _ in range(100):
-                value = cache.get("shared_key")
-                cache.set("shared_key", value + 1)
+        def writer(worker):
+            for n in range(500):
+                cache.set(f"{worker}-{n}", b"x" * 100)
+                cache.get(f"{worker}-{n - 1}")
 
-        threads = []
-        for _ in range(5):
-            thread = threading.Thread(target=incrementer)
-            threads.append(thread)
+        threads = [threading.Thread(target=writer, args=(i,)) for i in range(5)]
+        for thread in threads:
             thread.start()
-
         for thread in threads:
             thread.join()
 
-        # Final value should be 500 (5 threads * 100 increments)
-        final_value = cache.get("shared_key")
-        assert final_value == 500
-
-    def test_cache_stores_different_types(self, cache):
-        """Test that cache can store different Python types."""
-        test_data = {
-            "string": "test",
-            "int": 42,
-            "float": 3.14,
-            "list": [1, 2, 3],
-            "dict": {"key": "value"},
-            "none": None,
-            "bool": True,
-        }
-
-        for key, value in test_data.items():
-            cache.set(key, value)
-
-        for key, expected_value in test_data.items():
-            assert cache.get(key) == expected_value
+        assert len(cache.cache) == 50
+        assert cache.total_bytes == cache.max_bytes
 
 
 class TestCacheModuleFunctions:
@@ -230,7 +283,7 @@ class TestCacheModuleFunctions:
         key = cache_key_for_query("items", page=1, limit=10)
 
         assert key.startswith("items:")
-        assert isinstance(key, str)
+        assert key != cache_key_for_query("items", page=2, limit=10)
 
     def test_get_cached_response_miss(self):
         """Test getting non-existent cached response."""
@@ -245,23 +298,45 @@ class TestCacheModuleFunctions:
         result = get_cached_response("test_key")
         assert result == data
 
-    def test_cache_ttl_constants(self):
-        """Test that CACHE_TTL constants are defined."""
-        assert set(CACHE_TTL) == {
-            "item_detail",
-            "symbiants",
-            "weapons_analyze",
-        }
+    def test_the_shared_cache_is_bounded_by_the_setting(self):
+        assert cache_service.max_bytes == settings.RESPONSE_CACHE_MAX_BYTES
+        assert Settings().RESPONSE_CACHE_MAX_BYTES == 256 * 1024 * 1024
 
-        # Verify they're all positive integers
+    def test_every_cache_type_has_a_positive_ttl(self):
         for ttl_value in CACHE_TTL.values():
             assert isinstance(ttl_value, int)
             assert ttl_value > 0
+
+    def test_clearing_over_the_api_empties_the_shared_cache(self):
+        cache_response("test_key", b"value", ttl=60)
+
+        with TestClient(app) as client:
+            response = client.post("/api/v1/cache/clear")
+
+        assert response.status_code == 200
+        assert get_cached_response("test_key") is None
+        assert cache_service.total_bytes == 0
 
 
 # ============================================================================
 # Decorators Module Tests
 # ============================================================================
+
+
+class Row(BaseModel):
+    id: int
+    name: str = Field(serialization_alias="label")
+    note: str | None = None
+
+
+class Listing(BaseModel):
+    items: List[Row]
+    page: int
+
+
+def body(response):
+    """The JSON a cached endpoint's response carries."""
+    return json.loads(response.body)
 
 
 class TestCachedResponseDecorator:
@@ -286,33 +361,11 @@ class TestCachedResponseDecorator:
             await asyncio.sleep(0.01)
             return {"items": [], "page": page}
 
-        # First call should execute function
-        result1 = await get_items(page=1)
+        first = await get_items(page=1)
+        second = await get_items(page=1)
+
         assert call_count == 1
-        assert result1["page"] == 1
-
-        # Second call should use cache
-        result2 = await get_items(page=1)
-        assert call_count == 1  # Not incremented
-        assert result2 == result1
-
-    @pytest.mark.asyncio
-    async def test_async_function_different_params(self):
-        """Test that different parameters create different cache entries."""
-        call_count = 0
-
-        @cached_response("item_detail")
-        async def get_items(page: int = 1):
-            nonlocal call_count
-            call_count += 1
-            return {"items": [], "page": page}
-
-        result1 = await get_items(page=1)
-        result2 = await get_items(page=2)
-
-        assert call_count == 2
-        assert result1["page"] == 1
-        assert result2["page"] == 2
+        assert body(first) == body(second) == {"items": [], "page": 1}
 
     def test_sync_function_caching(self):
         """Test that sync functions are cached correctly."""
@@ -324,36 +377,58 @@ class TestCachedResponseDecorator:
             call_count += 1
             return {"items": [], "page": page}
 
-        # First call should execute function
-        result1 = get_items(page=1)
-        assert call_count == 1
+        first = get_items(page=1)
+        second = get_items(page=1)
 
-        # Second call should use cache
-        result2 = get_items(page=1)
         assert call_count == 1
-        assert result2 == result1
+        assert body(first) == body(second) == {"items": [], "page": 1}
 
-    @pytest.mark.asyncio
-    async def test_custom_ttl(self):
-        """Test that custom TTL is respected."""
+    def test_requests_that_differ_in_one_parameter_get_their_own_response(self):
+        calls = []
+
+        @cached_response("item_detail")
+        def get_items(page: int = 1, page_size: int = 50, q: str = ""):
+            calls.append((page, page_size, q))
+            return {"page": page, "page_size": page_size, "q": q}
+
+        requests = [
+            {"page": 1, "page_size": 50, "q": "a"},
+            {"page": 2, "page_size": 50, "q": "a"},
+            {"page": 1, "page_size": 51, "q": "a"},
+            {"page": 1, "page_size": 50, "q": "b"},
+        ]
+        first = [body(get_items(**request)) for request in requests]
+        again = [body(get_items(**request)) for request in requests]
+
+        assert first == again == requests
+        assert len(calls) == len(requests)
+
+    def test_an_entry_is_cached_for_the_ttl_of_its_type_or_its_own(self, monkeypatch):
+        clock = Clock()
+        monkeypatch.setattr(cache_service, "_clock", clock)
+        calls = []
+
+        @cached_response("item_detail")
+        def by_type():
+            calls.append("type")
+            return {}
 
         @cached_response("item_detail", ttl=1)
-        async def get_items():
-            return {"items": []}
+        def by_ttl():
+            calls.append("ttl")
+            return {}
 
-        await get_items()
+        by_type(), by_ttl()
+        clock.now += 2
+        by_type(), by_ttl()
+        clock.now += CACHE_TTL["item_detail"]
+        by_type()
 
-        # Immediately should be cached
-        hits_before = cache_service.stats["hits"]
-        await get_items()
+        assert calls == ["type", "ttl", "ttl", "type"]
 
-        assert cache_service.stats["hits"] > hits_before
-
-        # After TTL should not be cached
-        time.sleep(1.1)
-
-        await get_items()
-        # Would be a miss (hard to test directly due to re-caching)
+    def test_a_cache_type_without_a_ttl_is_refused(self):
+        with pytest.raises(ValueError, match="no_such_type"):
+            cached_response("no_such_type")
 
     @pytest.mark.asyncio
     async def test_db_param_excluded_from_cache_key(self):
@@ -366,23 +441,117 @@ class TestCachedResponseDecorator:
             call_count += 1
             return {"items": [], "page": page}
 
-        # These should use the same cache despite different db sessions
         await get_items(page=1, db="session1")
         await get_items(page=1, db="session2")
 
-        assert call_count == 1  # Only called once
+        assert call_count == 1
 
-    def test_default_ttl_from_cache_type(self):
-        """Test that default TTL is used from CACHE_TTL when not specified."""
-
+    def test_the_cache_holds_the_serialised_body_at_its_size(self):
         @cached_response("item_detail")
         def get_items():
-            return {"items": []}
+            return Listing(items=[Row(id=1, name="Wrench")], page=1)
 
-        get_items()
+        response = get_items()
 
-        # Check that cache was set (can't easily verify TTL, but check it cached)
-        assert cache_service.stats["sets"] > 0
+        (entry,) = cache_service.cache.values()
+        assert entry.value.body == response.body
+        assert entry.size == len(response.body) + ENTRY_OVERHEAD
+        assert cache_service.total_bytes == entry.size
+
+    def test_an_endpoint_answers_the_same_with_and_without_the_cache(self):
+        api = FastAPI()
+        calls = []
+
+        def listing(page: int = 1):
+            calls.append(page)
+            return Listing(items=[Row(id=1, name="Wrénch"), Row(id=2, name="")], page=1)
+
+        api.get("/plain", response_model=Listing)(listing)
+        api.get("/cached", response_model=Listing)(
+            cached_response("item_detail")(listing)
+        )
+        api.get("/cached-rows", response_model=List[Row])(
+            cached_response("item_detail")(lambda: listing().items)
+        )
+
+        with TestClient(api) as client:
+            plain = client.get("/plain")
+            miss = client.get("/cached")
+            hit = client.get("/cached")
+            rows = client.get("/cached-rows")
+
+        assert calls == [1, 1, 1]
+        assert plain.json()["items"][0] == {"id": 1, "label": "Wrénch", "note": None}
+        assert miss.content == hit.content == plain.content
+        assert miss.headers["content-type"] == plain.headers["content-type"]
+        assert hit.headers["content-type"] == plain.headers["content-type"]
+        assert rows.json() == plain.json()["items"]
+
+    def test_a_response_the_endpoint_built_is_cached_by_its_body(self):
+        calls = []
+
+        @cached_response("weapons_analyze")
+        def analyze(skill: int = 1):
+            calls.append(skill)
+            return JSONResponse([{"aoid": skill}])
+
+        first, second = analyze(skill=5), analyze(skill=5)
+
+        assert calls == [5]
+        assert body(first) == body(second) == [{"aoid": 5}]
+        assert second.media_type == "application/json"
+
+    def test_an_error_is_not_cached(self):
+        calls = []
+
+        @cached_response("item_detail")
+        def get_item(aoid: int):
+            calls.append(aoid)
+            if len(calls) == 1:
+                raise HTTPException(status_code=404, detail="Item not found")
+            return {"aoid": aoid}
+
+        @cached_response("item_detail")
+        def unavailable():
+            calls.append("unavailable")
+            return JSONResponse({"detail": "later"}, status_code=503)
+
+        with pytest.raises(HTTPException):
+            get_item(aoid=1)
+        assert body(get_item(aoid=1)) == {"aoid": 1}
+        assert unavailable().status_code == unavailable().status_code == 503
+        assert calls == [1, 1, "unavailable", "unavailable"]
+
+    def test_a_body_too_large_for_the_cache_is_served_and_not_kept(self, monkeypatch):
+        monkeypatch.setattr(cache_service, "max_bytes", 64 * 1024)
+        calls = []
+
+        @cached_response("item_detail")
+        def get_items(size: int):
+            calls.append(size)
+            return {"text": "x" * size}
+
+        large = [get_items(size=8 * 1024), get_items(size=8 * 1024)]
+        small = [get_items(size=100), get_items(size=100)]
+
+        assert [len(body(response)["text"]) for response in large] == [8192, 8192]
+        assert [len(body(response)["text"]) for response in small] == [100, 100]
+        assert calls == [8192, 8192, 100]
+        assert cache_service.total_bytes <= 64 * 1024
+
+    def test_many_distinct_requests_stay_within_the_bound(self, monkeypatch):
+        monkeypatch.setattr(cache_service, "max_bytes", 256 * 1024)
+
+        @cached_response("item_detail")
+        def get_items(page: int):
+            return {"page": page, "text": "x" * 4000}
+
+        for page in range(2000):
+            get_items(page=page)
+            assert cache_service.total_bytes <= 256 * 1024
+
+        assert 0 < len(cache_service.cache) < 64
+        assert body(get_items(page=1999))["page"] == 1999
 
 
 class TestPerformanceMonitorDecorator:

@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     GAME_VERSION_REGISTRY_TTL: int = 60
     # PostgreSQL schema of the content-addressed store the API reads.
     CAS_SCHEMA: str = "cas"
+    # Most memory the response cache may hold, in bytes (app/core/cache.py).
+    # 0 turns the cache off.
+    RESPONSE_CACHE_MAX_BYTES: int = 256 * 1024 * 1024
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

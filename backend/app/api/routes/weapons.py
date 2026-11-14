@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("/analyze", response_model=List[ItemDetail])
-@cached_response("weapons_analyze", ttl=3600)
+@cached_response("weapons_analyze")
 def analyze_weapons(
     request: WeaponAnalyzeRequest,
     db: Session = Depends(get_store),
