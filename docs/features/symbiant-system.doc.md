@@ -260,7 +260,7 @@ bosses = (
     db.query(Mob)
     .join(Source, Source.source_id == Mob.id)
     .join(ItemSource, ItemSource.source_id == Source.id)
-    .filter(ItemSource.item_id == symbiant_id)
+    .filter(ItemSource.item_id == symbiant.id)
     .filter(Mob.is_pocket_boss == True)
     .all()
 )
