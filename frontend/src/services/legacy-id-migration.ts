@@ -138,11 +138,6 @@ export function replaceAoidList(storageKey: string, aoids: number[]): void {
 }
 
 /**
- * Where the original ids of `base` are kept for `slug` when some could not be
- * resolved. Deliberately not a version key of `base`, so nothing that sweeps
- * `base` keys touches it.
- */
-/**
  * Puts a list read from storage on show, unless the same list already is.
  * Replacing a list with an equal one would re-render everything that depends
  * on it (every row of the symbiant table, for the farm list) for nothing.
@@ -153,6 +148,11 @@ export function showAoids(shown: { value: number[] }, stored: number[]): void {
   if (!same) shown.value = stored;
 }
 
+/**
+ * Where the original ids of `base` are kept for `slug` when some could not be
+ * resolved. Deliberately not a version key of `base`, so nothing that sweeps
+ * `base` keys touches it.
+ */
 export function internalIdBackupKey(base: string, slug: string): string {
   return `${base}_internal_id_backup${VERSION_KEY_SEPARATOR}${slug}`;
 }
