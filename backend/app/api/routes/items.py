@@ -12,7 +12,12 @@ import logging
 from app.store import tables as t
 from app.store.context import Build, get_build, get_store
 from app.store.items import load_item_details
-from app.store.presence import fetch_page, page_fields, revisions
+from app.store.presence import (
+    fetch_page,
+    fetch_search_page,
+    page_fields,
+    revisions,
+)
 from app.models.interpolated_item import (
     InterpolationResponse,
     BatchInterpolationRequest,
@@ -24,7 +29,6 @@ from app.api.schemas import ItemDetail, PaginatedResponse
 from app.core.decorators import cached_response, performance_monitor
 from app.api.services.item_search import (
     common_item_filters,
-    fetch_search_page,
     full_text_match,
     parse_search_fields,
     substring_match,
@@ -207,7 +211,9 @@ def search_items(
         )
     )
 
-    found = fetch_search_page(db, query, sort_key, by_rank, page, page_size)
+    found = fetch_search_page(
+        db, query, [sort_key.desc() if by_rank else sort_key], page, page_size
+    )
     items = load_item_details(db, build, rev_ids=found.rev_ids)
 
     query_time = time.time() - start_time

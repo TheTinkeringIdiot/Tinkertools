@@ -32,7 +32,7 @@ from app.store.items import (
     spell_params,
     stats_response,
 )
-from app.store.presence import any_of, present
+from app.store.presence import any_of, page_offset, present
 
 PROFESSION_NAMES = {
     1: "Soldier",
@@ -129,7 +129,7 @@ def list_symbiants(
             t.symbiant_items.c.name,
             t.symbiant_items.c.aoid,
         )
-        .offset((page - 1) * page_size)
+        .offset(page_offset(page, page_size))
         .limit(page_size)
     ).all()
     return _symbiant_responses(db, build, rows), total
@@ -233,7 +233,7 @@ def list_mobs(
     rows = db.execute(
         _mobs(build, *conditions)
         .order_by(t.mob.c.level, t.mob.c.name, t.mob.c.mob_id)
-        .offset((page - 1) * page_size)
+        .offset(page_offset(page, page_size))
         .limit(page_size)
     )
     return [MobResponse.model_validate(dict(row._mapping)) for row in rows], total

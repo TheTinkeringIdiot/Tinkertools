@@ -16,6 +16,7 @@ of the build, so nothing built on it needs DISTINCT. Filters are added with
 
 ``fetch_page`` counts the matches and returns one page of revision ids in the
 requested order, always ending the sort on the AOID so pages are stable.
+``fetch_search_page`` does the same for a query that matches text.
 ``app.store.items`` turns the ids into response items.
 """
 
@@ -25,9 +26,23 @@ import math
 from dataclasses import dataclass
 from typing import Any, Dict, List, Sequence
 
-from sqlalchemy import ColumnElement, Integer, Select, and_, exists, func, select
+from sqlalchemy import (
+    ColumnElement,
+    Integer,
+    Select,
+    and_,
+    asc,
+    desc,
+    exists,
+    func,
+    nulls_first,
+    nulls_last,
+    select,
+)
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import operators
+from sqlalchemy.sql.elements import UnaryExpression
 from sqlalchemy.sql.expression import FromClause, bindparam
 
 from app.store import tables as t
@@ -60,12 +75,23 @@ def revisions(build: Build, *columns: Any) -> Select:
 _INTEGER_COLUMN = range(-(2**31), 2**31)
 
 
+def _storable(values: Sequence[int]) -> ColumnElement:
+    """``values`` as one array parameter, without those no integer column can
+    hold."""
+    storable = [value for value in values if value in _INTEGER_COLUMN]
+    return bindparam(None, storable, type_=ARRAY(Integer))
+
+
 def any_of(column: ColumnElement, values: Sequence[int]) -> ColumnElement:
     """``column = ANY(values)`` for an integer column: one array parameter
     however many values. A value no integer column can hold matches nothing
     and is left out, so an absurd id in a request is simply not found."""
-    storable = [value for value in values if value in _INTEGER_COLUMN]
-    return column == func.any(bindparam(None, storable, type_=ARRAY(Integer)))
+    return column == func.any(_storable(values))
+
+
+def none_of(column: ColumnElement, values: Sequence[int]) -> ColumnElement:
+    """``column <> ALL(values)``, the complement of ``any_of``."""
+    return column != func.all(_storable(values))
 
 
 def has_stat(*conditions: ColumnElement) -> ColumnElement:
@@ -119,6 +145,16 @@ class Page:
     total: int
 
 
+# The largest OFFSET the database takes. No list has that many rows.
+_LAST_OFFSET = 2**63 - 1
+
+
+def page_offset(page: int, page_size: int) -> int:
+    """How many rows come before ``page``. A page number too large to count
+    that far is a page past the end, like any other the list does not have."""
+    return min((page - 1) * page_size, _LAST_OFFSET)
+
+
 def fetch_page(
     db: Session,
     query: Select,
@@ -136,10 +172,76 @@ def fetch_page(
     ).scalar_one()
     rev_ids = db.execute(
         query.order_by(*order_by, t.item_revision.c.aoid)
-        .offset((page - 1) * page_size)
+        .offset(page_offset(page, page_size))
         .limit(page_size)
     ).scalars()
     return Page(rev_ids=list(rev_ids), total=total)
+
+
+_SORT_MODIFIERS = {
+    operators.asc_op: asc,
+    operators.desc_op: desc,
+    operators.nulls_first_op: nulls_first,
+    operators.nulls_last_op: nulls_last,
+}
+
+
+def _sort_on(key: ColumnElement, column: ColumnElement) -> ColumnElement:
+    """``column`` in the direction and null placement of sort key ``key``."""
+    if isinstance(key, UnaryExpression) and key.modifier in _SORT_MODIFIERS:
+        return _SORT_MODIFIERS[key.modifier](_sort_on(key.element, column))
+    return column
+
+
+def _sorted_value(key: ColumnElement) -> ColumnElement:
+    """What sort key ``key`` sorts on, without direction or null placement."""
+    while isinstance(key, UnaryExpression) and key.modifier in _SORT_MODIFIERS:
+        key = key.element
+    return key
+
+
+def fetch_search_page(
+    db: Session,
+    query: Select,
+    order_by: Sequence[ColumnElement],
+    page: int,
+    page_size: int,
+) -> Page:
+    """``fetch_page`` for a query that matches text, in one statement.
+
+    Finding the matches is the whole cost of a text search, so they are found
+    once and set aside (a materialized CTE), then counted and sorted for the
+    page. ``fetch_page`` would match twice, and worse: planned together with
+    ORDER BY and LIMIT, a text match the planner cannot estimate tempts it to
+    walk the name index of ``part_text`` in the hope of an early end, which a
+    rare word turns into reading every text. The total comes back with the
+    page whether or not the page has rows.
+    """
+    values = [_sorted_value(key) for key in order_by]
+    matches = (
+        query.order_by(None)
+        .add_columns(
+            t.item_revision.c.aoid,
+            *(value.label(f"sort_{n}") for n, value in enumerate(values)),
+        )
+        .cte("matches")
+        .prefix_with("MATERIALIZED")
+    )
+    page_ids = (
+        select(matches.c.rev_id)
+        .order_by(
+            *(_sort_on(key, matches.c[f"sort_{n}"]) for n, key in enumerate(order_by)),
+            matches.c.aoid,
+        )
+        .offset(page_offset(page, page_size))
+        .limit(page_size)
+        .scalar_subquery()
+    )
+    total = select(func.count()).select_from(matches).scalar_subquery()
+    row = db.execute(
+        select(total.label("total"), func.array(page_ids).label("rev_ids"))
+    ).one()
+    return Page(rev_ids=list(row.rev_ids), total=row.total)
 
 
 def page_fields(total: int, page: int, page_size: int) -> Dict[str, Any]:

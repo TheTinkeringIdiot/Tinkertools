@@ -49,6 +49,7 @@ from app.store.presence import (
     Page,
     any_of,
     fetch_page,
+    fetch_search_page,
     has_effect,
     nano_policy,
     revisions,
@@ -216,27 +217,6 @@ def _sort_keys(
     return [column.desc() if descending else column.asc()]
 
 
-def _fetch_search_page(
-    db: Session,
-    query: Select,
-    order_by: Sequence[ColumnElement],
-    page: int,
-    page_size: int,
-) -> Page:
-    """``fetch_page`` for a text search, in one query.
-
-    Nothing indexes a text pattern, so matching is the whole cost of a search
-    and counting in a query of its own doubles it. And a LIMIT misleads the
-    planner, which cannot estimate the pattern, into walking the name index
-    until enough rows match: all of it for a rare word. So the matches are
-    fetched whole, in order, and the page is cut here; they are at most the
-    nanos of one build.
-    """
-    matches = db.execute(query.order_by(*order_by, _revision.c.aoid)).scalars().all()
-    start = (page - 1) * page_size
-    return Page(rev_ids=list(matches[start : start + page_size]), total=len(matches))
-
-
 def nano_page(
     db: Session,
     build: Build,
@@ -252,7 +232,7 @@ def nano_page(
     """
     query = filtered_nanos(build, filters, with_properties=sort_by == "level")
     keys = _sort_keys(sort_by, sort_desc, _text.c.name)
-    fetch = _fetch_search_page if filters.q else fetch_page
+    fetch = fetch_search_page if filters.q else fetch_page
     found = fetch(db, query, keys, page, page_size)
     records = load_records(db, build, rev_ids=found.rev_ids)
     derived = load_derived_fields(db, build, found.rev_ids)

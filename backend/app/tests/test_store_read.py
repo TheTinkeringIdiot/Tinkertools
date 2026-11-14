@@ -10,6 +10,7 @@ import os
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy import case
 from starlette.requests import Request
 
 from app.store import tables as t
@@ -17,6 +18,7 @@ from app.store.context import Build, get_build, resolve_build
 from app.store.items import load_item_details, load_item_documents, load_records
 from app.store.presence import (
     fetch_page,
+    fetch_search_page,
     has_atkdef,
     has_effect,
     has_requirement,
@@ -529,3 +531,86 @@ def test_pages_are_sorted_with_the_aoid_breaking_ties_and_counted_once(store):
         "has_prev": True,
     }
     assert page_fields(0, 1, 50)["pages"] == 1
+
+
+def test_a_text_search_page_is_matched_sorted_and_counted_in_one_statement(store):
+    names = {1: "Ring B", 2: "Ring A", 3: "Ring B", 4: "Ring C", 5: "Belt"}
+    build = store.add_build(
+        "b1", 1, items=[item(aoid, name=name, ql=aoid) for aoid, name in names.items()]
+    )
+    name = t.part_text.c.name
+    query = (
+        revisions(build)
+        .join(t.part_text, t.part_text.c.text_id == t.item_revision.c.text_id)
+        .where(name.ilike("%ring%"))
+    )
+
+    def aoids(order_by, page):
+        found = fetch_search_page(store.db, query, order_by, page, 3)
+        records = load_records(store.db, build, rev_ids=found.rev_ids)
+        return [record.aoid for record in records], found.total
+
+    with store.counting_queries() as statements:
+        fetch_search_page(store.db, query, [name], 1, 3)
+
+    assert len(statements) == 1
+    assert aoids([name], 1) == ([2, 1, 3], 4)
+    assert aoids([name], 2) == ([4], 4)
+    assert aoids([name], 3) == ([], 4)
+    assert aoids([name.desc()], 1) == ([4, 1, 3], 4)
+    assert aoids([name.desc(), t.item_revision.c.ql.desc()], 1) == ([4, 3, 1], 4)
+    assert aoids([], 1) == ([1, 2, 3], 4)
+
+
+def test_a_text_search_sorts_nulls_where_the_sort_key_puts_them(store):
+    build = store.add_build(
+        "b1", 1, items=[item(aoid, name="Ring", ql=aoid) for aoid in (1, 2, 3)]
+    )
+    ql = t.item_revision.c.ql
+    odd_ql = case((ql != 2, ql))
+    query = (
+        revisions(build)
+        .join(t.part_text, t.part_text.c.text_id == t.item_revision.c.text_id)
+        .where(t.part_text.c.name.ilike("%ring%"))
+    )
+
+    def aoids(key):
+        found = fetch_search_page(store.db, query, [key], 1, 5)
+        records = load_records(store.db, build, rev_ids=found.rev_ids)
+        return [record.aoid for record in records]
+
+    assert aoids(odd_ql.desc().nulls_last()) == [3, 1, 2]
+    assert aoids(odd_ql.asc().nulls_first()) == [2, 1, 3]
+
+
+@pytest.mark.parametrize(
+    "path, total",
+    [
+        ("/items", 3),
+        ("/items/search?q=unit", 2),
+        ("/nanos", 1),
+        ("/nanos/search?q=nano", 1),
+        ("/symbiants", 2),
+        ("/mobs", 2),
+    ],
+)
+def test_a_page_number_too_large_to_count_to_is_a_page_past_the_end(store, path, total):
+    symbiants = [
+        item(aoid, name="Active Ocular Symbiant, Artillery Unit Aban", stats=[(298, 2)])
+        for aoid in (1, 2)
+    ]
+    store.add_build("b1", 1, items=symbiants, nanos=[item(3, name="Nano")])
+    store.curate(mobs=[("Ahpta", "Inferno", 1), ("Cama", "Inferno", 2)])
+    separator = "&" if "?" in path else "?"
+
+    with store.client("b1") as client:
+        responses = [
+            client.get(f"/api/v1{path}{separator}page={page}&page_size=50")
+            for page in (2**62, 10**30)
+        ]
+
+    for response in responses:
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert (body["items"], body["total"], body["pages"]) == ([], total, 1)
+        assert (body["has_next"], body["has_prev"]) == (False, True)
