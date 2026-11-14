@@ -68,16 +68,17 @@ _SYMBIANT_COLUMNS = (
 
 
 def _carried(build: Build) -> ColumnElement:
-    """The row of ``symbiant_items`` is the revision ``build`` carries of its
-    item, so a query filtered by it has one row per symbiant of the build.
+    """The row of ``symbiant_items`` is a revision ``build`` carries, so a
+    query filtered by it has one row per symbiant of the build.
 
-    A lookup per row by the key of ``item_presence``: joined instead, the
-    planner reads the whole presence of the branch to find a few thousand
-    symbiants.
+    A lookup per row through ``item_presence_rev``, which finds at most one
+    run of the build. Joined instead, the planner reads the whole presence of
+    the branch to find a few thousand symbiants; looked up by AOID, it may
+    pick the exclusion constraint's index, which is twenty times slower.
     """
-    return t.symbiant_items.c.rev_id == (
-        select(t.item_presence.c.rev_id)
-        .where(present(build), t.item_presence.c.aoid == t.symbiant_items.c.aoid)
+    return t.symbiant_items.c.aoid == (
+        select(t.item_presence.c.aoid)
+        .where(present(build), t.item_presence.c.rev_id == t.symbiant_items.c.rev_id)
         .scalar_subquery()
     )
 
