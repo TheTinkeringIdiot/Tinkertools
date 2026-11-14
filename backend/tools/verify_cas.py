@@ -24,20 +24,24 @@ professions, minimum level), symbiant rows, and the curated data as the build
 is served with it: perks, mobs, sources and item-source links, after the
 feature-flag and presence rules of database/cas/002_curated_and_derived.sql.
 
-The current store does not hold shop data, so ``misc.shop`` has nothing to be
-compared with there. With ``--extracts-dir`` every rebuilt item is also
-compared, document by document, with the raw extract split by parts.py, which
-covers it.
+The current store does not hold shop data, keeps effect criteria unordered and
+has no effect descriptions of its own to compare, so those are checked against
+the raw extract only: every rebuilt item is compared, document by document,
+with the extract split by parts.py. A build check therefore needs
+``--extracts-dir``. ``--skip-extract`` leaves that comparison out; the run
+then says so and is not a complete check of the build.
 
 With ``--store`` the store is checked as a whole instead: each search
-projection is derived again in SQL from the part documents, the presence and
-change-log rules of database/cas/001_store.sql are tested, and the item count
-of every build is compared with the current store.
+projection is derived again in SQL from the part documents, the presence,
+change-log and strain-policy rules of database/cas/001_store.sql and
+002_curated_and_derived.sql are tested, and the item count of every build is
+compared with the current store.
 
-Usage: python tools/verify_cas.py SLUG [--schema cas] [--extracts-dir DIR]
+Usage: python tools/verify_cas.py SLUG --extracts-dir DIR [--schema cas]
                                   [--show N] [--against OTHER_SLUG]
+       python tools/verify_cas.py SLUG --skip-extract [--schema cas] ...
        python tools/verify_cas.py --store [--schema cas]
-Exit status is 1 if anything differs.
+Exit status is 1 if anything differs, 2 if the check cannot be run.
 """
 
 import argparse
@@ -46,6 +50,8 @@ import json
 import os
 import sys
 from pathlib import Path
+
+import psycopg
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -579,7 +585,9 @@ def compare_curated(report, conn, build, gv):
     if features.get("symbiants"):
         new = {
             row[0]: row[1:]
-            for row in conn.execute(f"SELECT mob_id, {columns} FROM mob")
+            for row in conn.execute(
+                f"SELECT mob_id, {columns} FROM mob WHERE NOT retired"
+            )
         }
     old = {
         row[0]: row[1:]
@@ -730,7 +738,28 @@ PROJECTION_CHECKS = {
     ),
 }
 
-# Each query returns the rows that break a rule of 001_store.sql; none may.
+# item_change.parts_changed as 001_store.sql defines it, from the part ids of
+# the two revisions (o old, n new).
+PART_CHANGE_BITS = {
+    "text_id": 1,
+    "stats_id": 2,
+    "effects_id": 4,
+    "actions_id": 8,
+    "atkdef_id": 16,
+    "misc_id": 32,
+}
+_PARTS_CHANGED = " + ".join(
+    f"CASE WHEN n.{column} IS DISTINCT FROM o.{column} THEN {bit} ELSE 0 END"
+    for column, bit in PART_CHANGE_BITS.items()
+)
+_SERVED_WITH = """
+    item_presence p
+    JOIN build b ON b.branch = p.branch
+        AND b.ordinal BETWEEN p.from_ordinal AND p.to_ordinal
+"""
+
+# Each query returns the rows that break a rule of 001_store.sql or
+# 002_curated_and_derived.sql; none may.
 INVARIANTS = {
     "closed runs that do not end at a build of their branch": f"""
         SELECT p.branch, p.aoid, p.to_ordinal FROM item_presence p
@@ -795,6 +824,26 @@ INVARIANTS = {
                         AND p.to_ordinal >= parent.ordinal))))
            OR (c.kind = 'C') <> (c.old_rev_id IS NOT NULL AND c.new_rev_id IS NOT NULL)
            OR c.old_rev_id = c.new_rev_id
+    """,
+    "change log entries whose parts_changed is not what the revisions differ in": f"""
+        SELECT c.branch, c.ordinal, c.aoid, c.kind, c.parts_changed
+        FROM item_change c
+        LEFT JOIN item_revision o ON o.rev_id = c.old_rev_id
+        LEFT JOIN item_revision n ON n.rev_id = c.new_rev_id
+        WHERE c.parts_changed <>
+              CASE WHEN c.kind = 'C' THEN {_PARTS_CHANGED} ELSE 0 END
+    """,
+    "builds whose strain policy is not 'the newest of its branch takes the overlay'": """
+        SELECT b.slug, b.overlay_strain_first FROM build b
+        WHERE b.overlay_strain_first <> (b.ordinal =
+            (SELECT max(ordinal) FROM build WHERE branch = b.branch))
+    """,
+    "nano properties under a policy no build serves the revision with": f"""
+        SELECT np.rev_id, np.overlay_strain_first FROM nano_properties np
+        WHERE NOT EXISTS (
+            SELECT 1 FROM {_SERVED_WITH}
+            WHERE p.rev_id = np.rev_id
+              AND b.overlay_strain_first = np.overlay_strain_first)
     """,
     "nanos served without nano properties under their build's policy": """
         SELECT DISTINCT b.slug, r.aoid FROM build b
@@ -875,6 +924,42 @@ def compare_extract(report, documents, extracts, extract_slug):
     report.differences += len(wrong_ql)
 
 
+def fail(message):
+    """End the run: the check could not be made."""
+    print(f"error: {message}", file=sys.stderr)
+    sys.exit(2)
+
+
+def open_store(schema):
+    """A read-only connection to the store in ``schema``, which must be one
+    the importer has brought up to date."""
+    url = os.environ.get("DATABASE_URL")
+    if not url:
+        fail("DATABASE_URL is not set")
+    try:
+        conn = cas_store.connect(url, schema)
+    except (cas_store.StoreError, psycopg.Error) as exc:
+        fail(str(exc).strip())
+    conn.read_only = True
+    if not cas_store.store_exists(conn, schema):
+        fail(f"Schema '{schema}' holds no content-addressed store")
+    columns = {
+        row[0]
+        for row in conn.execute(
+            "SELECT table_name || '.' || column_name FROM information_schema.columns "
+            "WHERE table_schema = %s",
+            (schema,),
+        )
+    }
+    missing = sorted({"build.overlay_strain_first", "mob.retired"} - columns)
+    if missing:
+        fail(
+            f"Schema '{schema}' is not a current content-addressed store "
+            f"(no {', '.join(missing)}); run import_cli.py import-cas on it first"
+        )
+    return conn
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("slug", nargs="?")
@@ -886,7 +971,18 @@ def main():
         "item count of every build against the current store",
     )
     parser.add_argument("--schema", default="cas")
-    parser.add_argument("--extracts-dir", default=None)
+    parser.add_argument(
+        "--extracts-dir",
+        default=None,
+        help="extracts folder; a build check compares every part document with "
+        "the raw extract (required for a build unless --skip-extract)",
+    )
+    parser.add_argument(
+        "--skip-extract",
+        action="store_true",
+        help="check a build against the current store only: effect criteria "
+        "order, effect descriptions and shop data stay unchecked",
+    )
     parser.add_argument("--show", type=int, default=3, help="examples per difference")
     parser.add_argument(
         "--against",
@@ -898,8 +994,13 @@ def main():
 
     if bool(args.slug) == args.store:
         parser.error("give a build slug or --store")
-    conn = cas_store.connect(os.environ["DATABASE_URL"], args.schema)
-    conn.read_only = True
+    if args.slug and bool(args.extracts_dir) == args.skip_extract:
+        parser.error(
+            "a build check needs --extracts-dir DIR: effect criteria order, effect "
+            "descriptions and shop data are only checked against the raw extract "
+            "(--skip-extract leaves them unchecked, and not both)"
+        )
+    conn = open_store(args.schema)
     if args.store:
         report = Report(args.show)
         check_store(report, conn)
@@ -913,6 +1014,15 @@ def main():
     if registered is None or registered[0] is None:
         sys.exit(f"Build '{against}' is not in the current store")
     vid, gv = registered
+    extract = None
+    if args.extracts_dir:
+        extract_slug = conn.execute(
+            "SELECT extract_slug FROM build WHERE slug = %s", (args.slug,)
+        ).fetchone()[0]
+        extract = Path(args.extracts_dir).expanduser() / extract_slug
+        for name in ("items.json", "nanos.json"):
+            if not (extract / name).is_file():
+                fail(f"No extract to compare with: {extract / name} not found")
 
     print(
         f"Build {args.slug}: new store schema {args.schema} "
@@ -926,15 +1036,15 @@ def main():
     compare_formats(report, conn, formats)
     compare_derived(report, conn, build, gv, new_nanos, old_nanos)
     compare_curated(report, conn, build, gv)
-    if args.extracts_dir:
-        extract_slug = conn.execute(
-            "SELECT extract_slug FROM build WHERE slug = %s", (args.slug,)
-        ).fetchone()[0]
-        compare_extract(
-            report, documents, Path(args.extracts_dir).expanduser(), extract_slug
-        )
+    if extract is not None:
+        compare_extract(report, documents, extract.parent, extract.name)
 
     print(f"\n{args.slug}: {report.differences} difference(s)")
+    if extract is None:
+        print(
+            "WARNING: INCOMPLETE CHECK (--skip-extract). Not compared with the raw "
+            "extract: effect criteria order, effect descriptions, shop data."
+        )
     return 1 if report.differences else 0
 
 

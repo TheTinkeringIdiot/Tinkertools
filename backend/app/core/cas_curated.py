@@ -12,9 +12,13 @@ rows that differ, so it runs at the start of every import.
 
 Rules:
 
-- A mob keeps its ``mob_id`` for as long as it is in the file, whatever the
-  file order; a mob new to the store gets the next id after the highest one.
-  On an empty store that is the order of first appearance in the file.
+- A ``mob_id`` belongs to one mob name for ever. A mob keeps its id whatever
+  the file order; a mob new to the store gets the next id after the highest
+  one ever given. On an empty store that is the order of first appearance in
+  the file.
+- A mob that leaves the file is not deleted: its row is marked ``retired`` and
+  it loses its source and its drops. Should its name return to the file, it is
+  the same mob again, with the same id.
 - A source of type 'item' is a nanocrystal named by the nano CSV. Its name is
   not stored: it is the crystal item's name in the build being served.
 - When the nano CSV lists a crystal twice for one nano, the first counts.
@@ -244,16 +248,42 @@ def _sync(
     return len(gone) + len(new) + len(different)
 
 
+MOB_COLUMNS = (
+    "name",
+    "level",
+    "playfield",
+    "location",
+    "mob_names",
+    "is_pocket_boss",
+    "metadata",
+    "retired",
+)
+
+
 def _mob_rows(conn: psycopg.Connection, mobs: List[Dict[str, Any]]) -> Rows:
-    """``mob`` rows for the file's mobs, keeping the ids of those already stored."""
-    ids = dict(conn.execute("SELECT name, mob_id FROM mob").fetchall())
-    next_id = max(ids.values(), default=0) + 1
+    """Every ``mob`` row the table must hold, by id, in :data:`MOB_COLUMNS`.
+
+    The file's mobs keep the id stored for their name or take the next id
+    after the highest stored one. Stored mobs the file no longer names stay as
+    they are, retired, so their ids are never given out again.
+    """
+    stored = {
+        row[1]: row
+        for row in conn.execute(
+            sql.SQL("SELECT mob_id, {} FROM mob").format(
+                sql.SQL(", ").join(map(sql.Identifier, MOB_COLUMNS))
+            )
+        )
+    }
+    next_id = max((row[0] for row in stored.values()), default=0) + 1
     rows: Rows = {}
     for mob in mobs:
-        if mob["name"] not in ids:
-            ids[mob["name"]] = next_id
-            next_id += 1
-        rows[(ids[mob["name"]],)] = (
+        known = stored.pop(mob["name"], None)
+        if known is not None:
+            mob_id = known[0]
+        else:
+            mob_id, next_id = next_id, next_id + 1
+        rows[(mob_id,)] = (
             mob["name"],
             mob["level"],
             mob["playfield"],
@@ -261,7 +291,10 @@ def _mob_rows(conn: psycopg.Connection, mobs: List[Dict[str, Any]]) -> Rows:
             mob["mob_names"],
             True,
             {},
+            False,
         )
+    for mob_id, *columns in stored.values():
+        rows[(mob_id,)] = tuple(columns[:-1]) + (True,)
     return rows
 
 
@@ -301,29 +334,16 @@ def sync_curated(conn: psycopg.Connection, files: CuratedFiles) -> Dict[str, int
     }
 
     mob_rows = _mob_rows(conn, mobs)
+    served_mobs = {mob_id: row for (mob_id,), row in mob_rows.items() if not row[-1]}
     sources: Rows = {
-        (SOURCE_TYPE_MOB, mob_id): (row[0], {}) for (mob_id,), row in mob_rows.items()
+        (SOURCE_TYPE_MOB, mob_id): (row[0], {}) for mob_id, row in served_mobs.items()
     }
     for _, crystal, _, _ in crystal_links:
         sources[(SOURCE_TYPE_ITEM, crystal)] = (None, {"type": "nanocrystal"})
     written["source"] = _sync(
         conn, "source", ("source_type_id", "entity_id"), ("name", "metadata"), sources
     )
-    written["mob"] = _sync(
-        conn,
-        "mob",
-        ("mob_id",),
-        (
-            "name",
-            "level",
-            "playfield",
-            "location",
-            "mob_names",
-            "is_pocket_boss",
-            "metadata",
-        ),
-        mob_rows,
-    )
+    written["mob"] = _sync(conn, "mob", ("mob_id",), MOB_COLUMNS, mob_rows)
 
     source_ids = {
         (type_id, entity): source_id
@@ -331,7 +351,7 @@ def sync_curated(conn: psycopg.Connection, files: CuratedFiles) -> Dict[str, int
             "SELECT source_id, source_type_id, entity_id FROM source"
         )
     }
-    mob_ids = {row[0]: mob_id for (mob_id,), row in mob_rows.items()}
+    mob_ids = {row[0]: mob_id for mob_id, row in served_mobs.items()}
     links: Rows = {}
     for aoid, mob_name in drops:
         source_id = source_ids[(SOURCE_TYPE_MOB, mob_ids[mob_name])]

@@ -48,6 +48,10 @@ CREATE TABLE nano_overlay (
 -- (the overlay describes the current game); older builds keep their own
 -- strain when they have a usable one (strains were reassigned over the years).
 --
+-- overlay_strain_first is true for exactly the newest build of each branch
+-- that is in the store, at every commit: the importer moves it from the
+-- previous newest build in the transaction that stores a newer one.
+--
 -- The exact rule, which reproduces backend/update_nanos.py. For a nano
 -- revision with an overlay row, "own" being the revision's own stat 75 and
 -- "usable" meaning not absent, not 0 and not 99999:
@@ -75,7 +79,9 @@ ALTER TABLE build ADD COLUMN overlay_strain_first boolean NOT NULL DEFAULT false
 -- School, casting professions and minimum caster level of a nano revision
 -- (app/core/nano_properties.py evaluates the Use action's criteria), with its
 -- effective strain. A revision has one row per strain policy under which it is
--- served, so a query joins on the build's overlay_strain_first.
+-- served, so a query joins on the build's overlay_strain_first. The table
+-- holds no other rows: a row whose policy no build serves the revision with
+-- is deleted when the policy moves.
 CREATE TABLE nano_properties (
     rev_id                integer  NOT NULL REFERENCES item_revision (rev_id) ON DELETE CASCADE,
     overlay_strain_first  boolean  NOT NULL,
@@ -136,8 +142,17 @@ CREATE INDEX perk_series ON perk (perk_series, counter);
 -- progress, so it must stay the same across imports. The ids in use today are
 -- the order of first appearance in backend/database/symbiants.csv, identical
 -- on the newest AO build and PRK. The importer keeps those ids: a mob already
--- known keeps its id whatever the file order, and a new mob gets the next
--- free one.
+-- known keeps its id whatever the file order, and a new mob gets the next id
+-- after the highest one ever given.
+--
+-- An id is never given to another mob. A mob that leaves the file is therefore
+-- not deleted: its row stays with retired = true, and its source row and item
+-- links are removed. A mob is identified by its name, so a retired mob whose
+-- name returns to the file is served again under its old id.
+--
+-- Retired mobs are not served. Every read of this table filters on
+-- NOT retired: a retired mob is absent from /mobs and every list or count
+-- built on it, and /mobs/{mob_id} answers "not found" for its id.
 CREATE TABLE mob (
     mob_id          integer PRIMARY KEY,
     name            varchar(255) NOT NULL UNIQUE,
@@ -146,7 +161,8 @@ CREATE TABLE mob (
     location        varchar(255),
     mob_names       text[],
     is_pocket_boss  boolean NOT NULL DEFAULT true,
-    metadata        jsonb NOT NULL DEFAULT '{}'::jsonb
+    metadata        jsonb NOT NULL DEFAULT '{}'::jsonb,
+    retired         boolean NOT NULL DEFAULT false
 );
 CREATE INDEX mob_playfield ON mob (playfield);
 CREATE INDEX mob_level ON mob (level, name);

@@ -19,6 +19,8 @@ A build is imported in one transaction by :func:`import_build`:
    same comparison writes the change log.
 4. Derived rows are added for what the build brought: symbiant rows for new
    revisions, nano properties for the build's nanos under its strain policy.
+5. The build becomes the one of its branch that is served with the curated
+   nano strains; the build that was the newest until now goes back to its own.
 
 Rules:
 
@@ -30,6 +32,10 @@ Rules:
   recorded without touching presence: open runs already cover it.
 - The first build of a branch that has a parent build is compared with the
   parent's content for the change log; its presence runs all start at it.
+- The newest stored build of each branch, and no other, is served with the
+  overlay's nano strains (``build.overlay_strain_first``). The flag follows
+  what is in the store, never what an import is about to bring, and
+  ``nano_properties`` holds exactly the rows the stored builds are served with.
 - Nothing commits here. The caller owns the transaction.
 """
 
@@ -143,6 +149,23 @@ def create_store(conn: psycopg.Connection, schema: str) -> bool:
     for path in sorted(SQL_DIR.glob("*.sql")):
         conn.execute(path.read_text(encoding="utf-8"))
     return True
+
+
+def upgrade_store(conn: psycopg.Connection, schema: str) -> None:
+    """Give a store created from an earlier state of the SQL files what they
+    define today. Changes nothing on a store that is up to date."""
+    validate_store_schema(schema)
+    has_retired = conn.execute(
+        "SELECT 1 FROM information_schema.columns WHERE table_schema = %s "
+        "AND table_name = 'mob' AND column_name = 'retired'",
+        (schema,),
+    ).fetchone()
+    if not has_retired:
+        conn.execute(
+            sql.SQL(
+                "ALTER TABLE {}.mob ADD COLUMN retired boolean NOT NULL DEFAULT false"
+            ).format(sql.Identifier(schema))
+        )
 
 
 def drop_store(conn: psycopg.Connection, schema: str) -> None:
@@ -357,18 +380,16 @@ class BuildSpec:
     rdb_dat_sha256: Optional[str] = None
     tinkerparse_commit: Optional[str] = None
     notes: Optional[str] = None
-    overlay_strain_first: bool = False
 
 
-# Columns of ``build`` that describe how a build is presented and served, as
-# opposed to what it contains. They follow the registry on every import run.
+# Columns of ``build`` that describe how a build is presented, as opposed to
+# what it contains. They follow the registry on every import run.
 PRESENTATION_COLUMNS = (
     "display_name",
     "sort_order",
     "enabled",
     "is_default",
     "features",
-    "overlay_strain_first",
 )
 
 
@@ -679,9 +700,8 @@ def _insert_build(conn: psycopg.Connection, spec: BuildSpec, item_count: int) ->
         INSERT INTO build
             (slug, branch, ordinal, sort_order, display_name, client_build,
              parent_build_id, enabled, is_default, features, extract_slug,
-             rdb_dat_sha256, tinkerparse_commit, item_count, notes,
-             overlay_strain_first)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             rdb_dat_sha256, tinkerparse_commit, item_count, notes)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING build_id
         """,
         (
@@ -700,7 +720,6 @@ def _insert_build(conn: psycopg.Connection, spec: BuildSpec, item_count: int) ->
             spec.tinkerparse_commit,
             item_count,
             spec.notes,
-            spec.overlay_strain_first,
         ),
     ).fetchone()[0]
 
@@ -766,8 +785,8 @@ def import_build(
             )
         result.same_as_previous = True
         result.items = newest["item_count"]
-        build_id = _insert_build(conn, spec, newest["item_count"])
-        ensure_nano_properties(conn, build_id)
+        _insert_build(conn, spec, newest["item_count"])
+        serve_newest_with_overlay(conn, spec.branch)
         return result
 
     result.items = len(content.rows)
@@ -776,7 +795,7 @@ def import_build(
         parent = conn.execute(
             "SELECT branch, ordinal FROM build WHERE slug = %s", (spec.parent_slug,)
         ).fetchone()
-    build_id = _insert_build(conn, spec, result.items)
+    _insert_build(conn, spec, result.items)
     with phase(timings, "stage"):
         _stage(conn, content.rows)
     with phase(timings, "parts"):
@@ -794,16 +813,12 @@ def import_build(
             result,
         )
     with phase(timings, "nano properties"):
-        ensure_nano_properties(conn, build_id)
+        serve_newest_with_overlay(conn, spec.branch)
     return result
 
 
-def update_presentation(conn: psycopg.Connection, spec: BuildSpec) -> bool:
-    """Bring the presentation columns of a stored build in line with ``spec``.
-
-    Returns whether its strain policy changed, which calls for
-    :func:`ensure_nano_properties`.
-    """
+def update_presentation(conn: psycopg.Connection, spec: BuildSpec) -> None:
+    """Bring the presentation columns of a stored build in line with ``spec``."""
     row = conn.execute(
         sql.SQL("SELECT {} FROM build WHERE slug = %s").format(
             sql.SQL(", ").join(map(sql.Identifier, PRESENTATION_COLUMNS))
@@ -811,11 +826,11 @@ def update_presentation(conn: psycopg.Connection, spec: BuildSpec) -> bool:
         (spec.slug,),
     ).fetchone()
     if row is None:
-        return False
+        return
     stored = dict(zip(PRESENTATION_COLUMNS, row))
     wanted = {name: getattr(spec, name) for name in PRESENTATION_COLUMNS}
     if stored == wanted:
-        return False
+        return
     if wanted["is_default"] and not stored["is_default"]:
         conn.execute("UPDATE build SET is_default = false WHERE is_default")
     conn.execute(
@@ -831,7 +846,6 @@ def update_presentation(conn: psycopg.Connection, spec: BuildSpec) -> bool:
         ]
         + [spec.slug],
     )
-    return stored["overlay_strain_first"] != wanted["overlay_strain_first"]
 
 
 # ---------------------------------------------------------------------------
@@ -877,12 +891,67 @@ def _use_criteria(actions: Optional[List[Dict[str, Any]]]) -> Optional[List[Tupl
     return [tuple(criterion) for action in use for criterion in action["criteria"]]
 
 
-def ensure_nano_properties(
-    conn: psycopg.Connection, build_id: Optional[int] = None
+def assign_strain_policy(conn: psycopg.Connection, branch: Optional[str] = None) -> int:
+    """Make the newest stored build of each branch (or of ``branch`` only) the
+    one served with the overlay's strain, and no other build. Returns the
+    number of builds whose policy changed; ``nano_properties`` then needs
+    :func:`sync_nano_properties`."""
+    return conn.execute(
+        """
+        UPDATE build b SET overlay_strain_first = n.newest
+        FROM (SELECT build_id,
+                     ordinal = max(ordinal) OVER (PARTITION BY branch) AS newest
+              FROM build) n
+        WHERE n.build_id = b.build_id AND b.overlay_strain_first <> n.newest
+          AND (%(branch)s::varchar IS NULL OR b.branch = %(branch)s::varchar)
+        """,
+        {"branch": branch},
+    ).rowcount
+
+
+def serve_newest_with_overlay(conn: psycopg.Connection, branch: str) -> None:
+    """Hand the overlay strain policy to the newest stored build of ``branch``
+    and bring ``nano_properties`` in line with it.
+
+    Only the branch's two newest builds can lack rows afterwards: the newest,
+    and the one the policy was taken from."""
+    assign_strain_policy(conn, branch)
+    newest_two = [
+        row[0]
+        for row in conn.execute(
+            "SELECT build_id FROM build WHERE branch = %s "
+            "ORDER BY ordinal DESC LIMIT 2",
+            (branch,),
+        )
+    ]
+    sync_nano_properties(conn, newest_two)
+
+
+def sync_nano_properties(
+    conn: psycopg.Connection, build_ids: Optional[Sequence[int]] = None
 ) -> int:
-    """Add the ``nano_properties`` rows that are missing for the nanos of one
-    build, or of every build, under each build's strain policy. Returns the
-    number of rows added."""
+    """Make ``nano_properties`` hold exactly one row per nano revision and
+    strain policy under which a stored build serves it: rows no build is served
+    with are deleted, missing ones are derived. With ``build_ids``, rows are
+    derived for those builds only. Returns the number of rows written."""
+    deleted = conn.execute("""
+        DELETE FROM nano_properties np
+        WHERE NOT EXISTS (
+            SELECT 1 FROM item_presence p
+            JOIN build b ON b.branch = p.branch
+                AND b.ordinal BETWEEN p.from_ordinal AND p.to_ordinal
+            WHERE p.rev_id = np.rev_id
+              AND b.overlay_strain_first = np.overlay_strain_first)
+        """).rowcount
+    return deleted + ensure_nano_properties(conn, build_ids)
+
+
+def ensure_nano_properties(
+    conn: psycopg.Connection, build_ids: Optional[Sequence[int]] = None
+) -> int:
+    """Add the ``nano_properties`` rows that are missing for the nanos of the
+    given builds, or of every build, under each build's strain policy. Returns
+    the number of rows added."""
     missing = conn.execute(
         sql.SQL("""
             WITH wanted AS (
@@ -905,8 +974,8 @@ def ensure_nano_properties(
             LEFT JOIN nano_overlay o ON o.aoid = r.aoid
             """).format(
             build=(
-                sql.SQL("b.build_id = {}").format(sql.Literal(build_id))
-                if build_id is not None
+                sql.SQL("b.build_id = ANY({})").format(sql.Literal(list(build_ids)))
+                if build_ids is not None
                 else sql.SQL("true")
             )
         )
@@ -947,7 +1016,8 @@ def ensure_nano_properties(
 
 def apply_nano_overlay(conn: psycopg.Connection) -> None:
     """Re-derive everything that depends on ``nano_overlay`` after it changed:
-    the QL of nano revisions and the strains in ``nano_properties``."""
+    the QL of nano revisions and the strains in ``nano_properties``. The
+    strain policy of every build must be assigned before."""
     conn.execute("""
         UPDATE item_revision r SET ql = v.ql
         FROM (SELECT r2.rev_id, COALESCE(o.ql, 1) AS ql

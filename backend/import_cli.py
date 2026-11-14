@@ -1028,23 +1028,6 @@ def read_extract_index(root: Path) -> list:
     return entries
 
 
-def read_extract_manifest(root: Path, slug: str) -> dict:
-    import json
-
-    folder = root / slug
-    path = folder / "manifest.json"
-    if not path.exists():
-        raise FileNotFoundError(f"No manifest for '{slug}': {path}")
-    with open(path) as f:
-        manifest = json.load(f)
-    if manifest.get("slug") != slug:
-        raise ValueError(f"{path} names slug {manifest.get('slug')!r}, expected {slug!r}")
-    for name in ("items.json", "nanos.json"):
-        if not (folder / name).exists():
-            raise FileNotFoundError(f"Missing {folder / name}")
-    return manifest
-
-
 def extract_sort_order(entries: list, slug: str, family: str) -> int:
     same_family = [e["slug"] for e in entries if e["family"] == family]
     base = FAMILY_SORT_BASE.get(family, OTHER_FAMILY_SORT_BASE)
@@ -1120,10 +1103,11 @@ def apply_lineage(entries: list) -> None:
 
 def import_extract(args, root: Path, entries: list, entry: dict) -> bool:
     import argparse as _argparse
+    from app.core.cas_extract import read_manifest
     from app.core.migration_runner import MigrationRunner
 
     slug = entry["slug"]
-    manifest = read_extract_manifest(root, slug)
+    manifest = read_manifest(root, slug)
     sha = manifest.get("rdb_dat_sha256") or entry.get("rdb_dat_sha256")
     commit = manifest.get("tinkerparse_commit")
 
@@ -1245,6 +1229,7 @@ def import_extracts(args) -> bool:
         logger.error(f"Cannot read {root / 'index.json'}: {e}")
         return False
 
+    from app.core.cas_extract import read_manifest
     from app.core.migration_runner import MigrationRunner
     MigrationRunner(db_url=getattr(args, 'database_url', None)).run_global_migrations()
 
@@ -1260,7 +1245,7 @@ def import_extracts(args) -> bool:
         if entry is None:
             # A folder outside the index: take what the manifest says.
             try:
-                manifest = read_extract_manifest(root, slug)
+                manifest = read_manifest(root, slug)
             except Exception as e:
                 logger.error(str(e))
                 return False
@@ -1313,22 +1298,39 @@ def read_registry(conn) -> dict:
 def import_cas(args) -> bool:
     """Import builds from an extracts folder into the content-addressed store.
 
-    Curated data is brought in line with its files first. Builds then load in
-    index order, each in its own transaction; builds already in the store are
+    The extracts folder, its index, the manifests of the planned builds, the
+    curated files and the options are checked before anything is written.
+    Curated data is then brought in line with its files. Builds load in index
+    order, each in its own transaction; builds already in the store are
     skipped, so the command can be re-run and picks up where it stopped.
+
+    The nano strain policy follows the store: after every commit the newest
+    stored build of each branch is the one served with the curated strains,
+    whatever the index lists beyond it.
     """
     import time
     from app.core import cas_store
     from app.core.cas_curated import CuratedFiles, sync_curated
     from app.core.cas_extract import ExtractReader, plan_builds, read_manifest
 
+    if args.workers < 0:
+        logger.error("--workers must be 0 or more")
+        return False
     if not args.extracts_dir:
         logger.error("--extracts-dir is required")
         return False
     root = Path(os.path.expandvars(args.extracts_dir)).expanduser()
     started = time.perf_counter()
     timings = {}
+    conn = None
     try:
+        if not root.is_dir():
+            raise FileNotFoundError(f"Extracts folder not found: {root}")
+        if not (root / "index.json").is_file():
+            raise FileNotFoundError(f"No index.json in the extracts folder {root}")
+        if args.reset and not args.yes:
+            raise ValueError(
+                f"--reset drops every table of schema {args.schema}; re-run with --yes")
         entries = read_extract_index(root)
         known = {e["slug"] for e in entries}
         for slug in args.slug or []:
@@ -1347,37 +1349,38 @@ def import_cas(args) -> bool:
             if not getattr(files, attribute).exists():
                 raise FileNotFoundError(f"Data file not found: {getattr(files, attribute)}")
         conn = cas_store.connect(args.database_url or os.environ["DATABASE_URL"], args.schema)
+        planned = plan_builds(root, entries, read_registry(conn))
+        conn.commit()
+        specs = [spec for spec in planned if not args.slug or spec.slug in args.slug]
+        unknown = set(args.slug or []) - {spec.slug for spec in specs}
+        if unknown:
+            raise ValueError(f"No importable extract for: {', '.join(sorted(unknown))}")
     except (cas_store.StoreError, FileNotFoundError, ValueError) as e:
         logger.error(str(e))
+        if conn is not None:
+            conn.close()
         return False
 
     reader = None
     try:
         if args.reset:
-            if not args.yes:
-                logger.error(f"--reset drops every table of schema {args.schema}; re-run with --yes")
-                return False
             cas_store.drop_store(conn, args.schema)
         if cas_store.create_store(conn, args.schema):
             logger.info(f"Created the store's tables in schema {args.schema}")
+        cas_store.upgrade_store(conn, args.schema)
         conn.commit()
-
-        planned = plan_builds(root, entries, read_registry(conn))
-        specs = [spec for spec in planned if not args.slug or spec.slug in args.slug]
-        unknown = set(args.slug or []) - {spec.slug for spec in specs}
-        if unknown:
-            logger.error(f"No importable extract for: {', '.join(sorted(unknown))}")
-            return False
         stored = {row[0] for row in conn.execute("SELECT slug FROM build")}
 
         with cas_store.phase(timings, "curated data"):
             written = sync_curated(conn, files)
-            policy_changed = [cas_store.update_presentation(conn, spec)
-                              for spec in planned if spec.slug in stored]
+            for spec in planned:
+                if spec.slug in stored:
+                    cas_store.update_presentation(conn, spec)
+            cas_store.assign_strain_policy(conn)
             if written["nano_overlay"]:
                 cas_store.apply_nano_overlay(conn)
-            elif any(policy_changed):
-                cas_store.ensure_nano_properties(conn)
+            else:
+                cas_store.sync_nano_properties(conn)
             conn.commit()
         if any(written.values()):
             logger.info("Curated rows written: " + ", ".join(
@@ -1842,7 +1845,8 @@ Environment:
     version_group.add_argument(
         "--yes",
         action="store_true",
-        help="Confirm a destructive registry command (required by drop-version)"
+        help="Confirm a destructive command (required by drop-version, convert-shared "
+             "and import-cas --reset)"
     )
 
     store_group = parser.add_argument_group("shared store and extracts")
@@ -1850,13 +1854,16 @@ Environment:
         "--extracts-dir",
         type=str,
         default=None,
-        help="import-extracts: folder holding index.json and one <slug>/ per build"
+        help="import-extracts, import-cas: folder holding index.json and one <slug>/ "
+             "per build (required)"
     )
     store_group.add_argument(
         "--slug",
         action="append",
         default=None,
-        help="import-extracts: build to import (repeatable; default: every build in index.json)"
+        help="import-extracts, import-cas: build to import (repeatable; default: every "
+             "build in index.json). import-cas takes the builds of a branch oldest first "
+             "and refuses one older than the newest it holds"
     )
     store_group.add_argument(
         "--force",
@@ -1867,8 +1874,10 @@ Environment:
         "--nanos-csv",
         type=str,
         default=None,
-        help="Curated crystal/strain CSV applied in staging before the merge "
-             "(update_nanos.py), e.g. backend/all_nanos_compacted.csv"
+        help="Curated crystal/strain CSV, e.g. backend/all_nanos_compacted.csv. "
+             "all, import-extracts: applied in staging before the merge (update_nanos.py); "
+             "off when not given. import-cas: source of nano QL, strains and crystal "
+             "sources (default: backend/all_nanos_compacted.csv)"
     )
     store_group.add_argument(
         "--nanos-keep-strain",

@@ -9,16 +9,20 @@ is this nano served with. The rollback at the end removes the schema again;
 no other schema is touched.
 """
 
+import importlib.util
 import json
 import os
+import subprocess
+import sys
 import uuid
+from pathlib import Path
 
 import psycopg
 import pytest
 
 from app.core import cas_store
 from app.core.cas_curated import CuratedFiles, sync_curated
-from app.core.cas_extract import ExtractReader, plan_builds
+from app.core.cas_extract import ExtractReader, plan_builds, read_manifest
 from app.core.cas_store import (
     BuildSpec,
     StoreError,
@@ -400,6 +404,26 @@ def test_a_branch_starts_from_its_parent_build(conn):
     assert name_as_of(conn, 3, 3) == "Later"
 
 
+def test_a_branch_is_compared_with_its_fork_point_not_the_parents_newest_build(
+    conn,
+):
+    load(conn, spec("ao-1", 1), [item(1), item(2), item(3, "At the fork")])
+    load(conn, spec("ao-2", 2), [item(1, "Renamed later"), item(3, "Later")])
+    at_fork = as_of(conn, "ao", 1)
+    load(
+        conn,
+        spec("prk-1", 1, branch="prk", parent_slug="ao-1"),
+        [item(1), item(2, "Reworked")],
+    )
+
+    assert changes(conn, 1, "prk") == {2: ("C", 1), 3: ("R", 0)}
+    assert dict(
+        conn.execute(
+            "SELECT aoid, old_rev_id FROM item_change WHERE branch = 'prk'"
+        ).fetchall()
+    ) == {2: at_fork[2], 3: at_fork[3]}
+
+
 def test_a_branch_cannot_fork_from_a_build_the_store_lacks(conn):
     with pytest.raises(StoreError, match="import it first"):
         load(conn, spec("prk-1", 1, branch="prk", parent_slug="ao-9"), [item(1)])
@@ -432,6 +456,39 @@ def test_parts_can_be_searched_by_what_they_contain(conn):
     assert revisions("SELECT stat FROM stat_entry WHERE stat = 23") == []
     assert revisions("SELECT format FROM effect_type WHERE spell_id = 53045") == [
         ("Modify {Stat} {Amount}",)
+    ]
+
+
+def effect(spell_id, **params):
+    return {"SpellID": spell_id, "Target": 2, "Criteria": [], **params}
+
+
+def test_an_effects_subject_is_its_stat_else_its_skill_else_its_nano(conn):
+    effects = [
+        effect(101, Stat=5, Skill=6, NanoID=7),
+        effect(102, Skill=6, NanoID=7),
+        effect(103, NanoID=7),
+        effect(104, Stat="none", Skill=6),
+        effect(105, Amount=3),
+    ]
+    load(conn, spec("b1", 1), [item(1, SpellData=[{"Event": 14, "Items": effects}])])
+
+    assert dict(
+        conn.execute("SELECT spell_id, subject FROM effect_entry").fetchall()
+    ) == {101: 5, 102: 6, 103: 7, 104: 6, 105: None}
+
+
+def test_an_effect_types_format_follows_the_latest_import(conn):
+    reworded = dict(modify(17, 3), SpellFormat="Change {Stat} by {Amount}")
+    load(
+        conn,
+        spec("b1", 1),
+        [item(1, SpellData=[{"Event": 14, "Items": [modify(17, 3)]}])],
+    )
+    load(conn, spec("b2", 2), [item(1, SpellData=[{"Event": 14, "Items": [reworded]}])])
+
+    assert conn.execute("SELECT spell_id, format FROM effect_type").fetchall() == [
+        (53045, "Change {Stat} by {Amount}")
     ]
 
 
@@ -518,7 +575,7 @@ def test_one_nano_revision_is_served_under_each_builds_strain_policy(conn):
         nano(12, strain=3),
     ]
     load(conn, spec("old", 1), nanos=nanos)
-    load(conn, spec("live", 2, overlay_strain_first=True), nanos=nanos)
+    load(conn, spec("live", 2), nanos=nanos)
 
     assert nano_served(conn, "old", 10) == (125, 7, 2, 1, [10], 100)
     assert nano_served(conn, "live", 10) == (125, 9, 4, 1, [10], 100)
@@ -529,7 +586,7 @@ def test_one_nano_revision_is_served_under_each_builds_strain_policy(conn):
 
 def test_a_changed_overlay_reaches_the_revisions_already_stored(conn):
     conn.execute("INSERT INTO nano_overlay VALUES (10, 125, 9, 4)")
-    load(conn, spec("live", 1, overlay_strain_first=True), nanos=[nano(10, strain=7)])
+    load(conn, spec("live", 1), nanos=[nano(10, strain=7)])
 
     conn.execute("UPDATE nano_overlay SET ql = 130, strain = 12 WHERE aoid = 10")
     cas_store.apply_nano_overlay(conn)
@@ -537,24 +594,108 @@ def test_a_changed_overlay_reaches_the_revisions_already_stored(conn):
     assert nano_served(conn, "live", 10)[:3] == (130, 12, 4)
 
 
+def strain_policies(conn):
+    """``{slug: overlay_strain_first}`` of every stored build."""
+    return dict(conn.execute("SELECT slug, overlay_strain_first FROM build").fetchall())
+
+
+def nano_property_rows(conn):
+    return set(conn.execute("SELECT rev_id, overlay_strain_first FROM nano_properties"))
+
+
+def nano_rows_served(conn):
+    """(revision, strain policy) of every nano of every build: the rows the
+    read path looks up in ``nano_properties``."""
+    return set(conn.execute("""
+            SELECT r.rev_id, b.overlay_strain_first FROM build b
+            JOIN item_presence p ON p.branch = b.branch
+                AND p.from_ordinal <= b.ordinal AND p.to_ordinal >= b.ordinal
+            JOIN item_revision r ON r.rev_id = p.rev_id AND r.is_nano
+            """))
+
+
+def test_the_newest_stored_build_of_each_branch_takes_the_overlay(conn):
+    conn.execute("INSERT INTO nano_overlay VALUES (10, 125, 9, 4)")
+    load(conn, spec("ao-1", 1), nanos=[nano(10, strain=7)])
+    assert strain_policies(conn) == {"ao-1": True}
+    assert nano_served(conn, "ao-1", 10)[:3] == (125, 9, 4)
+
+    load(conn, spec("ao-2", 2), nanos=[nano(10, strain=7)])
+    load(conn, spec("prk-1", 1, branch="prk", parent_slug="ao-1"), nanos=[nano(10)])
+    import_build(conn, spec("ao-3", 3, extract_slug="ao-2"), None)
+
+    assert strain_policies(conn) == {
+        "ao-1": False,
+        "ao-2": False,
+        "ao-3": True,
+        "prk-1": True,
+    }
+    assert nano_served(conn, "ao-1", 10)[:3] == (125, 7, None)
+    assert nano_served(conn, "ao-2", 10)[:3] == (125, 7, None)
+    assert nano_served(conn, "ao-3", 10)[:3] == (125, 9, 4)
+    assert nano_served(conn, "prk-1", 10)[:3] == (125, 9, 4)
+
+
 def test_a_build_that_stops_being_the_newest_gets_its_own_strains_back(conn):
     conn.execute("INSERT INTO nano_overlay VALUES (10, 125, 9, 4)")
-    live = spec("live", 1, overlay_strain_first=True)
-    load(conn, live, nanos=[nano(10, strain=7)])
+    load(conn, spec("b1", 1), nanos=[nano(10, strain=7), nano(11, strain=3)])
+    assert nano_served(conn, "b1", 10)[:3] == (125, 9, 4)
 
-    live.overlay_strain_first = False
-    assert cas_store.update_presentation(conn, live)
-    cas_store.ensure_nano_properties(conn)
+    load(conn, spec("b2", 2), nanos=[nano(10, strain=8)])
 
-    assert nano_served(conn, "live", 10)[:3] == (125, 7, None)
+    assert nano_served(conn, "b1", 10)[:3] == (125, 7, None)
+    assert nano_served(conn, "b2", 10)[:3] == (125, 9, 4)
+
+
+def test_nano_properties_hold_only_the_rows_builds_are_served_with(conn):
+    conn.execute("INSERT INTO nano_overlay VALUES (10, 125, 9, 4)")
+    load(conn, spec("b1", 1), nanos=[nano(10, strain=7), nano(11, strain=3)])
+    assert nano_property_rows(conn) == nano_rows_served(conn)
+
+    load(conn, spec("b2", 2), nanos=[nano(10, strain=8), nano(11, strain=3)])
+    assert nano_property_rows(conn) == nano_rows_served(conn)
+
+    load(conn, spec("b3", 3), nanos=[nano(10, strain=8)])
+    assert nano_property_rows(conn) == nano_rows_served(conn)
+    assert len(nano_property_rows(conn)) == 4
+
+
+def test_a_build_that_fails_to_import_leaves_the_overlay_with_the_stored_one(conn):
+    conn.execute("INSERT INTO nano_overlay VALUES (10, 125, 9, 4)")
+    load(conn, spec("b1", 1), nanos=[nano(10, strain=7)])
+    content = split_records([(nano(10, strain=8), True)])
+
+    def unreadable(wanted):
+        raise StoreError("unreadable")
+
+    content.documents = unreadable
+    with pytest.raises(StoreError, match="unreadable"):
+        with conn.transaction():
+            import_build(conn, spec("b2", 2), content)
+
+    assert strain_policies(conn) == {"b1": True}
+    assert nano_served(conn, "b1", 10)[:3] == (125, 9, 4)
+    assert nano_property_rows(conn) == nano_rows_served(conn)
+
+
+def test_a_store_brought_in_under_another_policy_is_put_right(conn):
+    conn.execute("INSERT INTO nano_overlay VALUES (10, 125, 9, 4)")
+    load(conn, spec("b1", 1), nanos=[nano(10, strain=7)])
+    load(conn, spec("b2", 2), nanos=[nano(10, strain=7)])
+    conn.execute("UPDATE build SET overlay_strain_first = (slug = 'b1')")
+
+    assert cas_store.assign_strain_policy(conn) == 2
+    cas_store.sync_nano_properties(conn)
+
+    assert strain_policies(conn) == {"b1": False, "b2": True}
+    assert nano_served(conn, "b2", 10)[:3] == (125, 9, 4)
+    assert nano_property_rows(conn) == nano_rows_served(conn)
 
 
 def test_a_duplicate_build_serves_nanos_under_its_own_strain_policy(conn):
     conn.execute("INSERT INTO nano_overlay VALUES (10, 125, 9, 4)")
     load(conn, spec("old", 1), nanos=[nano(10, strain=7)])
-    import_build(
-        conn, spec("live", 2, extract_slug="old", overlay_strain_first=True), None
-    )
+    import_build(conn, spec("live", 2, extract_slug="old"), None)
 
     assert nano_served(conn, "old", 10)[:3] == (125, 7, None)
     assert nano_served(conn, "live", 10)[:3] == (125, 9, 4)
@@ -570,7 +711,7 @@ def test_presentation_follows_the_registry_without_touching_content(conn):
         {"perks": True},
         True,
     )
-    assert cas_store.update_presentation(conn, build) is False
+    cas_store.update_presentation(conn, build)
 
     assert conn.execute(
         "SELECT display_name, features, is_default FROM build WHERE slug = 'b1'"
@@ -586,13 +727,15 @@ NANO_HEADER = "nano_id,ql,crystal_ids,nano_name,strain_id,sub_strain_id\n"
 
 
 def curated_files(tmp_path, mobs, nanos=""):
-    """Curated input files; ``mobs`` is a list of (boss, playfield, item aoid)."""
+    """Curated input files; ``mobs`` is a list of (boss, playfield, item aoid)
+    or (boss, playfield, item aoid, level)."""
     symbiants = tmp_path / "symbiants.csv"
     symbiants.write_text(
         "".join(
-            f'170,Eye,Artillery,{boss},{playfield},Somewhere,"Minion, Other",125,,,'
+            f'170,Eye,Artillery,{boss},{playfield},Somewhere,"Minion, Other",'
+            f"{level[0] if level else 125},,,"
             f"<a href=http://x/showitem.asp?AOID={aoid}>QL 170 Thing</A>,\n"
-            for boss, playfield, aoid in mobs
+            for boss, playfield, aoid, *level in mobs
         )
     )
     nanos_csv = tmp_path / "nanos.csv"
@@ -621,7 +764,21 @@ def curated_files(tmp_path, mobs, nanos=""):
 
 
 def mob_ids(conn):
-    return dict(conn.execute("SELECT name, mob_id FROM mob").fetchall())
+    """``{name: mob_id}`` of the mobs that are served."""
+    return dict(
+        conn.execute("SELECT name, mob_id FROM mob WHERE NOT retired").fetchall()
+    )
+
+
+def mob_drops(conn):
+    """``{(item aoid, mob_id)}`` as the read path finds the drops of mobs."""
+    return set(
+        conn.execute(
+            "SELECT l.aoid, s.entity_id FROM item_source l "
+            "JOIN source s USING (source_id) JOIN source_type t USING (source_type_id) "
+            "WHERE t.name = 'mob'"
+        )
+    )
 
 
 def test_mobs_are_numbered_in_order_of_first_appearance(conn, tmp_path):
@@ -676,6 +833,86 @@ def test_a_mob_removed_from_the_file_does_not_renumber_the_others(conn, tmp_path
 
     assert mob_ids(conn) == {"Beit": 2}
     assert conn.execute("SELECT count(*) FROM item_source").fetchone()[0] == 1
+
+
+def test_the_id_of_a_removed_mob_is_never_given_to_another(conn, tmp_path):
+    sync_curated(
+        conn, curated_files(tmp_path, [("Ahpta", "Inferno", 1), ("Beit", "Scheol", 2)])
+    )
+    sync_curated(conn, curated_files(tmp_path, [("Ahpta", "Inferno", 1)]))
+    sync_curated(
+        conn, curated_files(tmp_path, [("Ahpta", "Inferno", 1), ("Cama", "Adonis", 9)])
+    )
+
+    assert mob_ids(conn) == {"Ahpta": 1, "Cama": 3}
+    assert mob_drops(conn) == {(1, 1), (9, 3)}
+    assert conn.execute(
+        "SELECT name, retired FROM mob WHERE mob_id = 2"
+    ).fetchall() == [("Beit", True)]
+
+
+def test_a_removed_mob_that_returns_has_its_id_and_drops_again(conn, tmp_path):
+    both = [("Ahpta", "Inferno", 1), ("Beit", "Scheol", 2)]
+    sync_curated(conn, curated_files(tmp_path, both))
+    sync_curated(conn, curated_files(tmp_path, both[:1]))
+    assert mob_drops(conn) == {(1, 1)}
+
+    sync_curated(conn, curated_files(tmp_path, both))
+
+    assert mob_ids(conn) == {"Ahpta": 1, "Beit": 2}
+    assert mob_drops(conn) == {(1, 1), (2, 2)}
+    assert not any(sync_curated(conn, curated_files(tmp_path, both)).values())
+
+
+def test_a_mob_is_described_by_the_first_row_that_names_it(conn, tmp_path):
+    sync_curated(
+        conn,
+        curated_files(
+            tmp_path, [("Ahpta", "Inferno", 1, 150), ("Ahpta", "Inferno", 2, 220)]
+        ),
+    )
+
+    assert conn.execute("SELECT name, level FROM mob").fetchall() == [("Ahpta", 150)]
+    assert mob_drops(conn) == {(1, 1), (2, 1)}
+
+
+def test_a_nano_listed_twice_takes_the_first_rows_values(conn, tmp_path):
+    files = curated_files(
+        tmp_path, [], "10,125,300,Heal,9,4\n10,200,300;301,Heal Again,8,3\n"
+    )
+    sync_curated(conn, files)
+
+    assert conn.execute("SELECT * FROM nano_overlay").fetchall() == [(10, 125, 9, 4)]
+    assert conn.execute(
+        "SELECT s.entity_id, l.min_ql, l.max_ql, l.metadata->>'nano_name' "
+        "FROM item_source l JOIN source s USING (source_id) ORDER BY s.entity_id"
+    ).fetchall() == [(300, 125, 125, "Heal"), (301, 200, 200, "Heal Again")]
+
+
+def test_changed_curated_rows_are_updated_in_place(conn, tmp_path):
+    sync_curated(
+        conn,
+        curated_files(
+            tmp_path, [("Ahpta", "Inferno", 1, 150)], "10,125,300,Heal,9,4\n"
+        ),
+    )
+    files = curated_files(
+        tmp_path, [("Ahpta", "Pandemonium", 1, 220)], "10,130,300,Greater Heal,12,4\n"
+    )
+    files.perks_json.write_text(
+        files.perks_json.read_text().replace('"Wizard"], [], 10', '"Wizard"], [], 40')
+    )
+    written = sync_curated(conn, files)
+
+    assert (written["mob"], written["nano_overlay"], written["perk"]) == (1, 1, 1)
+    assert conn.execute("SELECT mob_id, playfield, level FROM mob").fetchall() == [
+        (1, "Pandemonium", 220)
+    ]
+    assert conn.execute("SELECT * FROM nano_overlay").fetchall() == [(10, 130, 12, 4)]
+    assert conn.execute("SELECT level_required FROM perk").fetchall() == [(40,)]
+    assert conn.execute(
+        "SELECT min_ql, metadata->>'nano_name' FROM item_source WHERE aoid = 10"
+    ).fetchall() == [(130, "Greater Heal")]
 
 
 def test_a_mob_drop_is_linked_through_the_mobs_source(conn, tmp_path):
@@ -824,7 +1061,6 @@ def test_builds_are_planned_from_the_index_and_the_registry(tmp_path):
     assert specs["ao-1"].display_name == "AO 1"
     assert specs["ao-3"].parent_slug is None
     assert specs["prk-1"].parent_slug == "ao-1"
-    assert [s for s in specs if specs[s].overlay_strain_first] == ["ao-3", "prk-1"]
 
 
 @pytest.fixture
@@ -860,12 +1096,139 @@ def test_extracted_builds_are_read_in_order(conn, tmp_path, workers, plain_worke
     ).fetchall() == [(True,)]
 
 
-def test_a_build_that_cannot_be_read_is_reported(tmp_path, plain_workers):
-    folder = tmp_path / "ao-1"
-    folder.mkdir()
-    reader = ExtractReader([folder], 1)
+@pytest.mark.parametrize("workers", [0, 1])
+def test_a_build_that_cannot_be_read_is_reported(tmp_path, workers, plain_workers):
+    folder = write_extract(tmp_path, "ao-1", [])
+    (folder / "items.json").write_text("[{")
+    reader = ExtractReader([folder], workers)
     try:
-        with pytest.raises(StoreError, match="ao-1"):
+        with pytest.raises(StoreError, match="Reading .*ao-1 failed: JSONDecodeError"):
             reader.next()
     finally:
         reader.close()
+
+
+def test_a_manifest_must_belong_to_a_complete_extract_of_its_slug(tmp_path):
+    write_extract(tmp_path, "ao-1", [])
+    assert read_manifest(tmp_path, "ao-1")["client_build"] == "ao-1"
+
+    with pytest.raises(StoreError, match="No manifest"):
+        read_manifest(tmp_path, "ao-2")
+
+    (tmp_path / "ao-1").rename(tmp_path / "ao-2")
+    with pytest.raises(StoreError, match="names slug 'ao-1', expected 'ao-2'"):
+        read_manifest(tmp_path, "ao-2")
+
+    write_extract(tmp_path, "ao-3", [])
+    (tmp_path / "ao-3" / "nanos.json").unlink()
+    with pytest.raises(StoreError, match="Missing .*nanos.json"):
+        read_manifest(tmp_path, "ao-3")
+
+
+# ---------------------------------------------------------------------------
+# Command line and verifier
+# ---------------------------------------------------------------------------
+
+BACKEND = Path(__file__).resolve().parents[2]
+
+
+@pytest.mark.parametrize("with_folder", [False, True])
+def test_import_cas_refuses_an_extracts_folder_without_an_index(
+    tmp_path, with_folder, plain_workers
+):
+    extracts = tmp_path / "extracts"
+    if with_folder:
+        extracts.mkdir()
+    done = subprocess.run(
+        [
+            sys.executable,
+            str(BACKEND / "import_cli.py"),
+            "import-cas",
+            "--extracts-dir",
+            str(extracts),
+            "--schema",
+            f"cas_test_{uuid.uuid4().hex[:12]}",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+    )
+
+    assert done.returncode == 1
+    expected = "No index.json" if with_folder else "Extracts folder not found"
+    assert expected in done.stderr and str(extracts) in done.stderr
+    assert "to import" not in done.stderr and "Traceback" not in done.stderr
+
+
+@pytest.fixture(scope="module")
+def verify_cas():
+    location = BACKEND / "tools" / "verify_cas.py"
+    module_spec = importlib.util.spec_from_file_location("verify_cas", location)
+    module = importlib.util.module_from_spec(module_spec)
+    module_spec.loader.exec_module(module)
+    return module
+
+
+def broken_rules(conn, verify_cas):
+    """Names of the verifier's store rules that the store breaks."""
+    return {
+        rule
+        for rule, query in verify_cas.INVARIANTS.items()
+        if conn.execute(query).fetchall()
+    }
+
+
+def small_store(conn):
+    conn.execute("INSERT INTO nano_overlay VALUES (10, 125, 9, 4)")
+    load(conn, spec("ao-1", 1), [weapon(), item(2)], [nano(10, strain=7), nano(11)])
+    load(
+        conn,
+        spec("ao-2", 2),
+        [weapon(Name="Big Gun", AttackDefenseData={}), item(3)],
+        [nano(10, strain=8)],
+    )
+    load(
+        conn,
+        spec("prk-1", 1, branch="prk", parent_slug="ao-1"),
+        [weapon(Description="Loud."), item(2)],
+        [nano(10, strain=7)],
+    )
+
+
+def test_the_verifiers_store_rules_hold_after_imports(conn, verify_cas):
+    small_store(conn)
+
+    assert broken_rules(conn, verify_cas) == set()
+
+
+@pytest.mark.parametrize(
+    "tamper, rule",
+    [
+        (
+            "UPDATE item_change SET parts_changed = 63 WHERE kind = 'C' AND branch = 'ao'",
+            "change log entries whose parts_changed is not what the revisions differ in",
+        ),
+        (
+            "UPDATE item_change SET parts_changed = 1 WHERE kind = 'A'",
+            "change log entries whose parts_changed is not what the revisions differ in",
+        ),
+        (
+            "UPDATE build SET overlay_strain_first = (slug = 'ao-1') WHERE branch = 'ao'",
+            "builds whose strain policy is not 'the newest of its branch takes the overlay'",
+        ),
+        (
+            "INSERT INTO nano_properties (rev_id, overlay_strain_first) "
+            "SELECT rev_id, NOT overlay_strain_first FROM nano_properties np "
+            "WHERE NOT EXISTS (SELECT 1 FROM nano_properties o WHERE o.rev_id = np.rev_id "
+            "AND o.overlay_strain_first <> np.overlay_strain_first)",
+            "nano properties under a policy no build serves the revision with",
+        ),
+    ],
+)
+def test_the_verifier_notices_a_store_that_breaks_a_rule(
+    conn, verify_cas, tamper, rule
+):
+    small_store(conn)
+    assert conn.execute(tamper).rowcount > 0
+
+    assert rule in broken_rules(conn, verify_cas)

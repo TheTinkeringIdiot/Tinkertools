@@ -36,10 +36,26 @@ DEFAULT_FEATURES = {
 
 
 def read_manifest(root: Path, slug: str) -> Dict[str, Any]:
-    path = root / slug / "manifest.json"
+    """The manifest of the extracted build ``slug``.
+
+    The folder must be a complete extract: a manifest that names the slug,
+    next to items.json and nanos.json.
+    """
+    folder = root / slug
+    path = folder / "manifest.json"
     if not path.exists():
         raise StoreError(f"No manifest for '{slug}': {path}")
-    return json.loads(path.read_text(encoding="utf-8"))
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except ValueError as exc:
+        raise StoreError(f"{path} is not valid JSON: {exc}") from exc
+    if not isinstance(manifest, dict) or manifest.get("slug") != slug:
+        named = manifest.get("slug") if isinstance(manifest, dict) else None
+        raise StoreError(f"{path} names slug {named!r}, expected {slug!r}")
+    for name in ("items.json", "nanos.json"):
+        if not (folder / name).exists():
+            raise StoreError(f"Missing {folder / name}")
+    return manifest
 
 
 def plan_builds(
@@ -54,8 +70,6 @@ def plan_builds(
       a build that failed to extract keeps its place should it be fixed.
     - ``parent_slug`` is set only for a build whose registered parent belongs
       to another family: the fork point of a branch.
-    - ``overlay_strain_first`` is true for the newest importable build of each
-      family: the curated nano strains describe the game as it is now.
     """
     family_of = {entry["slug"]: entry["family"] for entry in entries}
     specs = []
@@ -64,7 +78,6 @@ def plan_builds(
             continue
         slug, family = entry["slug"], entry["family"]
         same_family = [e for e in entries if e["family"] == family]
-        importable = [e["slug"] for e in same_family if e["status"] in IMPORTABLE]
         position = [e["slug"] for e in same_family].index(slug)
         extract_slug = entry.get("extract_slug") or slug
         manifest = read_manifest(root, extract_slug)
@@ -109,7 +122,6 @@ def plan_builds(
                 or manifest.get("rdb_dat_sha256"),
                 tinkerparse_commit=commit,
                 notes=(known or {}).get("notes") or notes,
-                overlay_strain_first=slug == importable[-1],
             )
         )
     return specs
@@ -173,7 +185,8 @@ class ExtractReader:
     them at once and ahead of the consumer.
 
     :meth:`next` returns the content of the next folder. With ``workers`` 0
-    builds are read in this process, one at a time.
+    builds are read in this process, one at a time. A build that cannot be
+    read is a :class:`StoreError` naming its folder, wherever it was read.
     """
 
     def __init__(self, folders: List[Path], workers: int):
@@ -195,7 +208,13 @@ class ExtractReader:
 
     def next(self) -> BuildContent:
         if self._workers <= 0:
-            return read_build(self._pending.popleft())
+            folder = self._pending.popleft()
+            try:
+                return read_build(folder)
+            except Exception as exc:
+                raise StoreError(
+                    f"Reading {folder} failed: {type(exc).__name__}: {exc}"
+                ) from exc
         self._start()
         folder, process, connection = self._running.popleft()
         try:
