@@ -356,6 +356,33 @@ def test_search_matches_name_or_description_and_takes_the_list_filters(store):
         assert strains["strains"] == [{"id": 5, "name": "Challenger", "count": 1}]
 
 
+def test_search_pages_add_up_to_its_total(store):
+    nanos = [program(aoid, name=f"Heal {aoid % 3}") for aoid in range(10, 17)]
+    store.add_build("live", 1, nanos=nanos + [program(20, name="Burn")])
+
+    with store.client("live") as client:
+
+        def page(number):
+            path = f"/api/v1/nanos/search?q=heal&page_size=3&page={number}"
+            return client.get(path).json()
+
+        pages = [page(number) for number in (1, 2, 3)]
+        past_the_end = page(4)
+
+    assert [[n["aoid"] for n in p["items"]] for p in pages] == [
+        [12, 15, 10],
+        [13, 16, 11],
+        [14],
+    ]
+    assert [(p["total"], p["pages"], p["has_next"]) for p in pages] == [
+        (7, 3, True),
+        (7, 3, True),
+        (7, 3, False),
+    ]
+    assert (past_the_end["items"], past_the_end["total"]) == ([], 7)
+    assert (past_the_end["has_next"], past_the_end["has_prev"]) == (False, True)
+
+
 def test_strains_are_sorted_by_name_with_unnamed_ids_last(store):
     nanos = [
         program(10, strain=123456),
