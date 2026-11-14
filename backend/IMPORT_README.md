@@ -130,6 +130,43 @@ python import_cli.py import-extracts --extracts-dir ~/projects/AO/extracts --slu
 - New rows get a display name like `AO 17.10.5` and a sort order that lists PRK, then AO, newest build first. Existing rows keep their display name, sort order, date, notes, default and enabled flags.
 - Curated data is off by default for extracts. Pass `--perks-file`, `--symbiants-file` and/or `--nanos-csv` to apply them to every build of the run; `features` records what was loaded.
 
+### Content-addressed store (`import-cas`, `tools/verify_cas.py`)
+
+The content-addressed store (`docs/plans/content-addressed-store/design.md`, tables in `database/cas/`) is built next to the shared store, in its own schema (`cas`). The API does not read it yet. `import-cas` never writes to `public`, `gd` or a `gv_*` schema; it reads the registry (`public.game_versions`) for display names, order, flags and features.
+
+```bash
+# every importable build in index.json, oldest first
+python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --workers 8
+
+# a scratch copy with a few builds
+python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --schema cas_dev \
+    --slug ao-14-2-2 --slug ao-15-0-1 --slug ao-17-10-5
+
+# start over: drops the tables of the schema, keeps the schema
+python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --schema cas_dev --reset --yes
+```
+
+- The extracts folder, its `index.json`, the manifest of every planned build and the curated files are checked first; if one is missing the command stops before it writes anything.
+- Curated data (`all_nanos_compacted.csv`, `database/perks.json`, `database/symbiants.csv`, or `--nanos-csv`, `--perks-file`, `--symbiants-file`) is synced on every run and applies to every build. A mob that leaves `symbiants.csv` is kept as a retired row, so its id is never given to another mob.
+- Each build is one transaction. Builds already in the store are skipped, so a run that stopped can be repeated and picks up where it stopped. A build older than the newest stored build of its branch is refused: `--reset` and import again to insert one.
+- The newest stored build of each branch is the one served with the curated nano strains; the build before it goes back to its own strains in the transaction that stores the new one.
+- `--workers N` reads and splits N builds ahead of the importer, about 2 GB of memory each; `--workers 0` reads in the importer's process.
+- **Never `DROP SCHEMA cas`.** The `btree_gist` extension lives in the schema the first store was created in, and dropping that schema takes the extension and the presence constraint of every other store with it. Use `--reset --yes`, which drops tables only.
+
+Verify after an import (`DATABASE_URL` set as above; the current store is only read):
+
+```bash
+# the store as a whole: projections, presence, change log, strain policy, item counts
+python tools/verify_cas.py --store
+
+# one build against the current store and its raw extract
+python tools/verify_cas.py ao-17-10-5 --extracts-dir ~/projects/AO/extracts
+```
+
+- Both end with `N difference(s)` and exit 1 unless N is 0; exit 2 means the check could not be run (no store in `--schema`, no extract).
+- A build check needs `--extracts-dir`: effect criteria order, effect descriptions and shop data can only be compared with the raw extract. `--skip-extract` leaves that part out and says so in its last line; it is not a complete check.
+- `--schema NAME` checks another store, `--show N` prints more examples, `--against SLUG` compares with another build of the current store.
+
 ### Import a version from dump files
 
 ```bash
@@ -186,16 +223,24 @@ python import_cli.py nano-properties --version ao-2024-02
 | `--notes TEXT` | provenance notes |
 | `--no-perks` | import without perk metadata |
 | `--no-symbiants` | import without mobs, sources and symbiant drops |
-| `--yes` | confirm a destructive command (`drop-version`, `convert-shared`) |
+| `--yes` | confirm a destructive command (`drop-version`, `convert-shared`, `import-cas --reset`) |
 
 ### Shared store and extracts
 
 | option | meaning |
 |---|---|
-| `--extracts-dir DIR` | `import-extracts`: folder with `index.json` and `<slug>/{items.json,nanos.json,manifest.json}` |
-| `--slug SLUG` | `import-extracts`: build to import, repeatable (default: every build in the index) |
+| `--extracts-dir DIR` | `import-extracts`, `import-cas`: folder with `index.json` and `<slug>/{items.json,nanos.json,manifest.json}` |
+| `--slug SLUG` | `import-extracts`, `import-cas`: build to import, repeatable (default: every build in the index) |
 | `--force` | `import-extracts`: reload builds already installed from the same extract |
-| `--nanos-csv PATH` | curated crystal/strain CSV applied in staging (`update_nanos.py`) |
+| `--nanos-csv PATH` | curated crystal/strain CSV. `all`, `import-extracts`: applied in staging (`update_nanos.py`), off when not given. `import-cas`: default `all_nanos_compacted.csv` |
+
+### Content-addressed store
+
+| option | meaning |
+|---|---|
+| `--schema NAME` | `import-cas`: schema of the store (default: `cas`) |
+| `--workers N` | `import-cas`: builds read and split in parallel (default: 4; 0 reads in the importer's process) |
+| `--reset` | `import-cas`: drop the store's tables in `--schema` and import from scratch; needs `--yes` |
 
 ### Import
 
