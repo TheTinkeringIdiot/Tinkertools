@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     # Seconds the in-process game version registry is cached before re-reading
     # public.game_versions.
     GAME_VERSION_REGISTRY_TTL: int = 60
+    # PostgreSQL schema of the content-addressed store the API reads.
+    CAS_SCHEMA: str = "cas"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
