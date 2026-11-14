@@ -109,6 +109,24 @@ def test_a_stat_the_higher_variant_lacks_is_dropped(service):
     assert 212 not in stats_of(service.interpolate_item(201, 50))
 
 
+def test_a_stat_an_item_holds_twice_is_interpolated_on_its_highest_values(store):
+    build = store.add_build(
+        "b1",
+        1,
+        items=[
+            armor(201, 1, 5, 50, extra_stats=[(2, 15), (2, 100)]),
+            armor(202, 101, 104, 248, extra_stats=[(2, 900), (2, 15)]),
+        ],
+    )
+    service = InterpolationService(store.db, build)
+
+    at_variant = service.interpolate_item(201, 1)
+    between = service.interpolate_item(201, 51)
+
+    assert sorted(s["value"] for s in at_variant.stats if s["stat"] == 2) == [15, 100]
+    assert [s["value"] for s in between.stats if s["stat"] == 2] == [500]
+
+
 def test_modifier_amounts_scale_for_interpolatable_effect_types_only(service):
     interpolated = service.interpolate_item(201, 50)
 

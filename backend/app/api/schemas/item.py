@@ -38,8 +38,9 @@ class ItemCreate(ItemBase):
 class ItemResponse(ItemBase):
     """Schema for Item responses."""
 
-    # Deprecated: an internal row id that differs between game versions. Use
-    # ``aoid``; this field is removed with the content-addressed store.
+    # Deprecated: the AOID on routes that read the content-addressed store, an
+    # internal row id that differs between game versions on the others. Use
+    # ``aoid``; this field is removed once every route reads the new store.
     id: int = Field(description="Deprecated internal row ID; do not rely on it")
 
     class Config:

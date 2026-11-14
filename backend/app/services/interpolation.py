@@ -270,8 +270,10 @@ class InterpolationService:
         if hi_item is None:
             return stats_response(lo_item.stats)
 
-        lo_stats = dict(lo_item.stats)
-        hi_stats = dict(hi_item.stats)
+        # One value per stat. An item can hold a stat twice (stat 2 on many
+        # items): the interpolated item holds it once, from the highest values.
+        lo_stats = dict(sorted(lo_item.stats))
+        hi_stats = dict(sorted(hi_item.stats))
 
         interpolated_stats = []
         for stat_id, lo_value in lo_stats.items():

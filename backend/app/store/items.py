@@ -184,7 +184,10 @@ def load_records(
     rev_ids: Optional[Sequence[int]] = None,
 ) -> List[ItemRecord]:
     """The items of ``build`` with these AOIDs, or these revisions, in the
-    order given. One query."""
+    order given, each once. One query.
+
+    AOIDs are looked up in the build. Revision ids are taken as given: they
+    must come from a query on the build's presence."""
     wanted = aoids if aoids is not None else rev_ids
     if not wanted:
         return []

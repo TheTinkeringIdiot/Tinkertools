@@ -20,8 +20,8 @@ from __future__ import annotations
 import re
 import threading
 import time
-from dataclasses import dataclass
-from typing import Iterator, List, Mapping, Optional
+from dataclasses import dataclass, field
+from typing import Iterator, List, Mapping, Optional, TypeVar
 
 from fastapi import HTTPException, Request
 from sqlalchemy import select
@@ -43,7 +43,7 @@ class Build:
     slug: str
     branch: str
     ordinal: int
-    features: Mapping[str, bool]
+    features: Mapping[str, bool] = field(hash=False)
     overlay_strain_first: bool
     is_default: bool = False
 
@@ -53,7 +53,10 @@ class Build:
         return bool(self.features.get(feature))
 
 
-def _in_schema(bind: Engine | Connection, schema: str) -> Engine | Connection:
+Bind = TypeVar("Bind", Engine, Connection)
+
+
+def _in_schema(bind: Bind, schema: str) -> Bind:
     if not _SCHEMA_NAME.match(schema):
         raise ValueError(f"Invalid store schema name: {schema!r}")
     return bind.execution_options(schema_translate_map={t.LOGICAL_SCHEMA: schema})
@@ -152,10 +155,6 @@ class BuildRegistry:
 
     def resolve(self, slug: Optional[str]) -> Optional[Build]:
         return resolve_build(self.all(), slug)
-
-    def invalidate(self) -> None:
-        with self._lock:
-            self._loaded_at = None
 
 
 builds = BuildRegistry()
