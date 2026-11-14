@@ -1,336 +1,298 @@
 """
-Unit tests for ImplantService.
+Tests for POST /implants/lookup: the implant with a slot and an exact set of
+clusters, at any QL.
+
+Each test fills a throwaway store (the ``store`` fixture) with a few hand-made
+implants and looks one up through the API.
 """
 
+import os
+
 import pytest
-from unittest.mock import Mock
-from sqlalchemy.orm import Session
 
-from app.services.implant_service import ImplantService
-from app.models.item import Item
-from app.api.schemas.item import ItemDetail
+from app.tests.fixtures.store_fixtures import modify
+
+pytestmark = pytest.mark.skipif(
+    not os.getenv("DATABASE_URL", "").startswith("postgres"), reason="needs PostgreSQL"
+)
+
+EYE, HEAD, CHEST = 2, 4, 32
+STRENGTH, AGILITY, STAMINA, PISTOL = 16, 17, 18, 112
+ON_WEAR, ON_USE = 14, 0
 
 
-class TestImplantService:
-    """Test cases for ImplantService."""
+def implant(aoid, clusters=(), slot=EYE, ql=1, name=None, event=ON_WEAR, **extra):
+    """An implant whose clusters raise each stat by twice the QL."""
+    record = {
+        "AOID": aoid,
+        "Name": name or "Implant " + "+".join(map(str, clusters)),
+        "Description": "",
+        "StatValues": [
+            {"Stat": 54, "RawValue": ql},
+            {"Stat": 76, "RawValue": 3},
+            {"Stat": 298, "RawValue": slot},
+        ],
+    }
+    if clusters:
+        record["SpellData"] = [
+            {"Event": event, "Items": [modify(stat, ql * 2) for stat in clusters]}
+        ]
+    record.update(extra)
+    return record
 
-    def setup_method(self):
-        """Set up test fixtures."""
-        self.mock_db = Mock(spec=Session)
-        self.service = ImplantService(self.mock_db, Mock())
 
-    def test_determine_base_ql(self):
-        """Test base QL determination logic."""
-        # Test QL 1-200 range
-        assert self.service._determine_base_ql(1) == 1
-        assert self.service._determine_base_ql(100) == 1
-        assert self.service._determine_base_ql(200) == 1
-
-        # Test QL 201-300 range
-        assert self.service._determine_base_ql(201) == 201
-        assert self.service._determine_base_ql(250) == 201
-        assert self.service._determine_base_ql(300) == 201
-
-    def test_lookup_implant_invalid_slot(self):
-        """Test lookup with invalid slot number."""
-        result = self.service.lookup_implant(
-            slot=0, target_ql=100, clusters={"Shiny": 16}  # Invalid
+def lookup(store, slot, ql, clusters, slug="live"):
+    with store.client(slug) as client:
+        response = client.post(
+            "/api/v1/implants/lookup",
+            json={"slot": slot, "ql": ql, "clusters": clusters},
         )
-        assert result is None
+    assert response.status_code == 200, response.text
+    return response.json()
 
-        result = self.service.lookup_implant(
-            slot=14, target_ql=100, clusters={"Shiny": 16}  # Invalid
-        )
-        assert result is None
 
-    @pytest.mark.skip(
-        reason="Complex query mocking required for _find_implant_with_clusters method. Test requires refactoring to properly mock complex subquery chains."
+def found(store, slot, ql, clusters, slug="live"):
+    """AOID of the implant looked up, None when there is none."""
+    data = lookup(store, slot, ql, clusters, slug)
+    assert data["success"] == (data["item"] is not None)
+    return data["item"]["aoid"] if data["success"] else None
+
+
+# ---------------------------------------------------------------------------
+# Which implant
+# ---------------------------------------------------------------------------
+
+
+def test_the_implant_has_exactly_the_clusters_asked_for(store):
+    store.add_build(
+        "live",
+        1,
+        items=[
+            implant(1, [STRENGTH]),
+            implant(2, [STRENGTH, AGILITY]),
+            implant(3, [STRENGTH, AGILITY, STAMINA]),
+            implant(4, [AGILITY, STAMINA]),
+        ],
     )
-    def test_lookup_implant_no_match_found(self):
-        """Test lookup when no matching implant exists."""
-        # Mock query that returns no results
-        mock_query = Mock()
-        mock_query.filter.return_value = mock_query
-        mock_query.first.return_value = None
-        self.mock_db.query.return_value = mock_query
 
-        result = self.service.lookup_implant(
-            slot=2, target_ql=100, clusters={"Shiny": 16}  # Valid bitflag (2^1)
-        )
-        assert result is None
+    assert found(store, EYE, 1, {"Shiny": STRENGTH}) == 1
+    assert found(store, EYE, 1, {"Shiny": STRENGTH, "Bright": AGILITY}) == 2
+    assert found(store, EYE, 1, {"Bright": AGILITY, "Shiny": STRENGTH}) == 2
+    assert (
+        found(store, EYE, 1, {"Shiny": STRENGTH, "Bright": AGILITY, "Faded": STAMINA})
+        == 3
+    )
+    assert found(store, EYE, 1, {"Shiny": AGILITY}) is None
+    assert found(store, EYE, 1, {"Shiny": STRENGTH, "Bright": STAMINA}) is None
+    assert found(store, EYE, 1, {"Shiny": STRENGTH, "Bright": PISTOL}) is None
 
-    def test_lookup_implant_exact_ql_match(self):
-        """Test lookup when target QL matches database item QL."""
-        # Create mock item
-        mock_item = Mock(spec=Item)
-        mock_item.id = 1
-        mock_item.aoid = 12345
-        mock_item.name = "Test Implant"
-        mock_item.ql = 100
-        mock_item.item_class = 3
-        mock_item.description = "Test description"
-        mock_item.is_nano = False
-        mock_item.item_stats = []
-        mock_item.item_spell_data = []
-        mock_item.actions = []
-        mock_item.sources = []
 
-        # Mock the _find_implant_with_clusters method directly to avoid complex query mocking
-        self.service._find_implant_with_clusters = Mock(return_value=mock_item)
+def test_without_clusters_the_basic_implant_is_found(store):
+    store.add_build(
+        "live", 1, items=[implant(1, [STRENGTH]), implant(2, name="Basic Implant")]
+    )
 
-        # Mock build_item_detail function
-        expected_detail = ItemDetail(
-            id=1,
-            aoid=12345,
-            name="Test Implant",
-            ql=100,
-            item_class=3,
-            description="Test description",
-            is_nano=False,
-            stats=[],
-            spell_data=[],
-            attack_stats=[],
-            defense_stats=[],
-            actions=[],
-            sources=[],
-        )
+    assert found(store, EYE, 1, {}) == 2
 
-        # Mock the build_item_detail import
-        with pytest.MonkeyPatch().context() as m:
-            mock_build = Mock(return_value=expected_detail)
-            m.setattr("app.services.implant_service.build_item_detail", mock_build)
 
-            result = self.service.lookup_implant(
-                slot=2, target_ql=100, clusters={"Shiny": 16}  # Valid bitflag (2^1)
+def test_no_basic_implant_means_nothing_is_found_without_clusters(store):
+    store.add_build("live", 1, items=[implant(1, [STRENGTH])])
+
+    data = lookup(store, EYE, 1, {})
+
+    assert (data["success"], data["item"], data["interpolated"]) == (False, None, False)
+    assert data["message"] == "No implant found for slot 2 with clusters {} at QL 1"
+    assert data["base_ql"] is None
+
+
+def test_the_implant_fits_the_slot_asked_for(store):
+    store.add_build(
+        "live",
+        1,
+        items=[
+            implant(1, [STRENGTH], slot=HEAD),
+            implant(2, [STRENGTH], slot=EYE | CHEST),
+        ],
+    )
+
+    assert found(store, HEAD, 1, {"Shiny": STRENGTH}) == 1
+    assert found(store, EYE, 1, {"Shiny": STRENGTH}) == 2
+    assert found(store, CHEST, 1, {"Shiny": STRENGTH}) == 2
+    assert found(store, 8, 1, {"Shiny": STRENGTH}) is None
+
+
+def test_a_slot_that_is_not_one_implant_slot_finds_nothing(store):
+    store.add_build("live", 1, items=[implant(1, [STRENGTH], slot=EYE | HEAD)])
+
+    assert found(store, EYE | HEAD, 1, {"Shiny": STRENGTH}) is None
+    assert found(store, 1, 1, {"Shiny": STRENGTH}) is None
+    assert found(store, 16383, 1, {"Shiny": STRENGTH}) is None
+
+
+def test_only_implants_are_looked_up(store):
+    armor = implant(1, [STRENGTH])
+    armor["StatValues"][1]["RawValue"] = 2
+    store.add_build("live", 1, items=[armor, implant(2, [STRENGTH])])
+
+    assert found(store, EYE, 1, {"Shiny": STRENGTH}) == 2
+
+
+def test_only_modify_effects_are_clusters(store):
+    other_effect = {**modify(AGILITY, 5), "SpellID": 53012}
+    with_other = implant(1, [STRENGTH])
+    with_other["SpellData"][0]["Items"].append(other_effect)
+    only_other = implant(2, name="Other")
+    only_other["SpellData"] = [{"Event": ON_WEAR, "Items": [other_effect]}]
+    store.add_build("live", 1, items=[with_other, only_other])
+
+    assert found(store, EYE, 1, {"Shiny": STRENGTH}) == 1
+    assert found(store, EYE, 1, {"Shiny": STRENGTH, "Bright": AGILITY}) is None
+    assert found(store, EYE, 1, {}) == 2
+
+
+def test_clusters_count_whatever_event_carries_them(store):
+    store.add_build(
+        "live",
+        1,
+        items=[implant(1, [STRENGTH], event=ON_USE), implant(2, name="Basic")],
+    )
+
+    assert found(store, EYE, 1, {"Shiny": STRENGTH}) == 1
+    assert found(store, EYE, 1, {}) == 2
+
+
+def test_a_cluster_asked_for_twice_matches_two_such_effects(store):
+    store.add_build(
+        "live", 1, items=[implant(1, [STRENGTH]), implant(2, [STRENGTH, STRENGTH])]
+    )
+
+    assert found(store, EYE, 1, {"Shiny": STRENGTH, "Bright": STRENGTH}) == 2
+    assert found(store, EYE, 1, {"Shiny": STRENGTH}) == 1
+
+
+def test_of_several_implants_with_the_same_clusters_the_lowest_aoid_is_found(store):
+    store.add_build(
+        "live",
+        1,
+        items=[
+            implant(30, [STRENGTH], name="TestItem"),
+            implant(10, [STRENGTH], name="Eye Implant: Strength"),
+            implant(20, [STRENGTH], name="Cyborg Eye"),
+            implant(31, name="Other basic"),
+            implant(11, name="Basic"),
+        ],
+    )
+
+    assert [found(store, EYE, 1, {"Shiny": STRENGTH}) for _ in range(3)] == [10] * 3
+    assert found(store, EYE, 1, {}) == 11
+
+
+def test_a_cluster_no_column_can_hold_finds_nothing(store):
+    store.add_build("live", 1, items=[implant(1, [STRENGTH])])
+
+    assert found(store, EYE, 1, {"Shiny": 2**40}) is None
+    assert found(store, EYE, 1, {"Shiny": STRENGTH, "Bright": 2**40}) is None
+
+
+def test_the_implant_is_looked_up_in_the_requested_build(store):
+    store.add_build("old", 1, items=[implant(1, [STRENGTH]), implant(2, [AGILITY])])
+    store.add_build("new", 2, items=[implant(1, [STAMINA]), implant(3, [AGILITY])])
+
+    assert found(store, EYE, 1, {"Shiny": STRENGTH}, "old") == 1
+    assert found(store, EYE, 1, {"Shiny": STRENGTH}, "new") is None
+    assert found(store, EYE, 1, {"Shiny": STAMINA}, "new") == 1
+    assert found(store, EYE, 1, {"Shiny": AGILITY}, "old") == 2
+    assert found(store, EYE, 1, {"Shiny": AGILITY}, "new") == 3
+
+
+# ---------------------------------------------------------------------------
+# At which QL
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def ladder(store):
+    """One implant at its four stored QLs, as the game data has it."""
+    store.add_build(
+        "live",
+        1,
+        items=[
+            implant(1, [STRENGTH], ql=1, name="Implant"),
+            implant(2, [STRENGTH], ql=200, name="Implant"),
+            implant(3, [STRENGTH], ql=201, name="Refined Implant"),
+            implant(4, [STRENGTH], ql=300, name="Refined Implant"),
+        ],
+    )
+    return store
+
+
+def strength_of(item_json):
+    (event,) = item_json["spell_data"]
+    (spell,) = event["spells"]
+    assert spell["spell_params"]["Stat"] == STRENGTH
+    return spell["spell_params"]["Amount"]
+
+
+def test_at_a_stored_base_ql_the_implant_is_served_as_it_is(ladder):
+    data = lookup(ladder, EYE, 1, {"Shiny": STRENGTH})
+
+    assert (data["success"], data["interpolated"], data["base_ql"]) == (True, False, 1)
+    assert data["message"] == "Implant found successfully"
+    with ladder.client("live") as client:
+        assert data["item"] == client.get("/api/v1/items/1").json()
+
+    refined = lookup(ladder, EYE, 201, {"Shiny": STRENGTH})
+    assert (refined["item"]["aoid"], refined["interpolated"]) == (3, False)
+    assert refined["base_ql"] == 201
+
+
+def test_up_to_ql_200_the_ql_1_implant_is_interpolated(ladder):
+    data = lookup(ladder, EYE, 100, {"Shiny": STRENGTH})
+
+    assert (data["success"], data["interpolated"], data["base_ql"]) == (True, True, 1)
+    assert data["message"] == (
+        "Implant found successfully (interpolated from QL 1 to QL 100)"
+    )
+    item = data["item"]
+    assert (item["aoid"], item["id"], item["name"]) == (1, 1, "Implant")
+    assert (item["ql"], item["item_class"], item["is_nano"]) == (100, 3, False)
+    assert strength_of(item) == 200
+    assert {"stat": 298, "value": EYE} in item["stats"]
+    assert (item["attack_stats"], item["defense_stats"], item["sources"]) == (
+        [],
+        [],
+        [],
+    )
+
+    top = lookup(ladder, EYE, 200, {"Shiny": STRENGTH})
+    assert (top["item"]["aoid"], top["item"]["ql"], top["interpolated"]) == (
+        2,
+        200,
+        True,
+    )
+    assert strength_of(top["item"]) == 400
+
+
+def test_above_ql_200_the_refined_implant_is_interpolated(ladder):
+    data = lookup(ladder, EYE, 250, {"Shiny": STRENGTH})
+
+    assert (data["interpolated"], data["base_ql"]) == (True, 201)
+    assert (data["item"]["aoid"], data["item"]["name"]) == (3, "Refined Implant")
+    assert (data["item"]["ql"], strength_of(data["item"])) == (250, 500)
+
+
+def test_an_implant_is_found_by_its_base_ql_variant_only(store):
+    store.add_build("live", 1, items=[implant(2, [STRENGTH], ql=200)])
+
+    assert found(store, EYE, 200, {"Shiny": STRENGTH}) is None
+
+
+def test_a_ql_outside_the_implant_range_is_rejected(store):
+    store.add_build("live", 1, items=[implant(1, [STRENGTH])])
+
+    with store.client("live") as client:
+        for ql in (0, 301):
+            response = client.post(
+                "/api/v1/implants/lookup", json={"slot": EYE, "ql": ql, "clusters": {}}
             )
-
-            assert result is not None
-            item_detail, was_interpolated, base_ql = result
-            assert was_interpolated is False
-            assert base_ql == 1
-            assert item_detail.aoid == 12345
-
-    def test_lookup_implant_needs_interpolation(self):
-        """Test lookup when interpolation is needed."""
-        # Create mock base item at QL 1
-        mock_item = Mock(spec=Item)
-        mock_item.id = 1
-        mock_item.aoid = 12345
-        mock_item.name = "Test Implant"
-        mock_item.ql = 1
-        mock_item.item_class = 3
-
-        # Mock the _find_implant_with_clusters method directly
-        self.service._find_implant_with_clusters = Mock(return_value=mock_item)
-
-        # Mock interpolated item
-        mock_interpolated = Mock()
-        mock_interpolated.id = 1
-        mock_interpolated.aoid = 12345
-        mock_interpolated.name = "Test Implant"
-        mock_interpolated.ql = 150  # Target QL
-        mock_interpolated.item_class = 3
-        mock_interpolated.description = "Test description"
-        mock_interpolated.is_nano = False
-        mock_interpolated.stats = []
-        mock_interpolated.spell_data = []
-        mock_interpolated.attack_stats = []
-        mock_interpolated.defense_stats = []
-        mock_interpolated.actions = []
-
-        self.service.interpolation_service.interpolate_item.return_value = (
-            mock_interpolated
-        )
-
-        result = self.service.lookup_implant(
-            slot=2, target_ql=150, clusters={"Shiny": 16}  # Valid bitflag (2^1)
-        )
-
-        assert result is not None
-        item_detail, was_interpolated, base_ql = result
-        assert was_interpolated is True
-        assert base_ql == 1
-        assert item_detail.ql == 150
-
-    def test_lookup_implant_interpolation_fails(self):
-        """Test lookup when interpolation fails."""
-        # Create mock base item
-        mock_item = Mock(spec=Item)
-        mock_item.id = 1
-        mock_item.aoid = 12345
-        mock_item.ql = 1
-        mock_item.item_stats = []
-        mock_item.item_spell_data = []
-        mock_item.actions = []
-
-        # Mock the _find_implant_with_clusters method directly
-        self.service._find_implant_with_clusters = Mock(return_value=mock_item)
-
-        # Mock failed interpolation
-        self.service.interpolation_service.interpolate_item.return_value = None
-
-        # Mock build_item_detail function
-        expected_detail = ItemDetail(
-            id=1,
-            aoid=12345,
-            name="Test Implant",
-            ql=1,
-            item_class=3,
-            description=None,
-            is_nano=False,
-            stats=[],
-            spell_data=[],
-            attack_stats=[],
-            defense_stats=[],
-            actions=[],
-            sources=[],
-        )
-
-        with pytest.MonkeyPatch().context() as m:
-            mock_build = Mock(return_value=expected_detail)
-            m.setattr("app.services.implant_service.build_item_detail", mock_build)
-
-            result = self.service.lookup_implant(
-                slot=2, target_ql=150, clusters={"Shiny": 16}  # Valid bitflag (2^1)
-            )
-
-            assert result is not None
-            item_detail, was_interpolated, base_ql = result
-            assert was_interpolated is False  # Fallback to original
-            assert item_detail.ql == 1
-
-    @pytest.mark.skip(
-        reason="Complex query mocking required for _find_implant_with_clusters method. Test requires refactoring to properly mock complex subquery chains with joins and aggregations."
-    )
-    def test_find_implant_with_spell_clusters_exact_match(self):
-        """Test finding implant with exact cluster match via spells."""
-        # Create mock item with spell data for clusters
-        mock_item = Mock(spec=Item)
-        mock_item.id = 1
-        mock_item.aoid = 12345
-        mock_item.name = "Test Implant with Clusters"
-        mock_item.ql = 1
-        mock_item.item_class = 3
-
-        # Mock all the complex subquery chain by setting up proper return structures
-        mock_subquery1 = Mock()
-
-        # Mock the main query chain
-        mock_query = Mock()
-        mock_query.filter.return_value = mock_query
-        mock_query.first.return_value = mock_item
-
-        # Mock the database query method to handle different query types
-        def mock_query_side_effect(model):
-            if model == Item:
-                mock_item_query = Mock()
-                mock_item_query.join.return_value = mock_item_query
-                mock_item_query.filter.return_value = mock_item_query
-                mock_item_query.group_by.return_value = mock_item_query
-                mock_item_query.having.return_value = mock_item_query
-                mock_item_query.subquery.return_value = mock_subquery1
-                mock_item_query.first.return_value = mock_item
-                return mock_item_query
-            return mock_query
-
-        self.mock_db.query.side_effect = mock_query_side_effect
-
-        # Test finding implant with specific clusters
-        result = self.service._find_implant_with_clusters(
-            slot=32,  # Chest slot
-            base_ql=1,
-            clusters={"Shiny": 16, "Bright": 17},  # Strength and Stamina
-        )
-
-        assert result is not None
-        assert result.aoid == 12345
-        assert result.name == "Test Implant with Clusters"
-
-    @pytest.mark.skip(
-        reason="Complex query mocking required for _find_implant_with_clusters method. Test requires refactoring to properly mock complex subquery chains."
-    )
-    def test_find_implant_no_clusters_basic_implant(self):
-        """Test finding basic implant with no clusters."""
-        # Create mock basic implant with no spell data
-        mock_item = Mock(spec=Item)
-        mock_item.id = 2
-        mock_item.aoid = 54321
-        mock_item.name = "Basic Implant"
-        mock_item.ql = 1
-        mock_item.item_class = 3
-
-        mock_query = Mock()
-        mock_query.filter.return_value = mock_query
-        mock_query.first.return_value = mock_item
-        self.mock_db.query.return_value = mock_query
-
-        # Test finding implant with no clusters specified
-        result = self.service._find_implant_with_clusters(
-            slot=32, base_ql=1, clusters={}  # Chest slot  # No clusters
-        )
-
-        assert result is not None
-        assert result.aoid == 54321
-        assert result.name == "Basic Implant"
-
-    @pytest.mark.skip(
-        reason="Complex query mocking required for _find_implant_with_clusters method. Test requires refactoring to properly mock complex subquery chains."
-    )
-    def test_find_implant_with_clusters_no_match(self):
-        """Test when no implant matches the cluster requirements."""
-        # Mock query that returns no results
-        mock_query = Mock()
-        mock_query.filter.return_value = mock_query
-        mock_query.first.return_value = None
-        self.mock_db.query.return_value = mock_query
-
-        result = self.service._find_implant_with_clusters(
-            slot=32,  # Chest slot
-            base_ql=1,
-            clusters={
-                "Shiny": 16,
-                "Bright": 17,
-                "Faded": 18,
-            },  # Very specific combination
-        )
-
-        assert result is None
-
-
-class TestImplantServiceIntegration:
-    """Integration tests that require database setup."""
-
-    @pytest.mark.skip(reason="Requires database setup")
-    def test_find_implant_with_clusters_integration(self):
-        """Integration test for cluster matching query."""
-        # This would require actual database setup with test data
-        # Left as a placeholder for when database test fixtures are available
-        pass
-
-    @pytest.mark.skip(reason="Requires database setup")
-    def test_exact_cluster_match_integration(self):
-        """Integration test for exact cluster matching."""
-        # Test that implants with extra clusters are excluded
-        # Test that implants missing required clusters are excluded
-        # Test that implants with exact matches are included
-        pass
-
-    @pytest.mark.skip(reason="Requires database setup")
-    def test_spell_based_cluster_detection_integration(self):
-        """Integration test for spell-based cluster detection."""
-        # Test with real implant data:
-        # 1. Create test implants with spell_id 53045 that modify different stats
-        # 2. Verify that _find_implant_with_clusters correctly identifies implants
-        #    based on their Modify Stat spells rather than direct stat values
-        # 3. Verify exact match logic: implant with Shiny(16) + Bright(17) clusters
-        #    should NOT match request for just Shiny(16) cluster
-        # 4. Verify rejection of implants with extra clusters
-        # 5. Verify basic implants (no clusters) are found when no clusters requested
-        pass
-
-    @pytest.mark.skip(reason="Requires database setup")
-    def test_spell_params_json_parsing_integration(self):
-        """Integration test for spell_params JSON parsing."""
-        # Test that the JSON parsing of spell_params->>'Stat' works correctly
-        # with real database data and various stat ID formats
-        pass
+            assert response.status_code == 422

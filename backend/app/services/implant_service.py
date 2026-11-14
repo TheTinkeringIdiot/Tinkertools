@@ -4,31 +4,79 @@ Implant Service for TinkerTools.
 Handles implant lookup by slot, QL, and exact cluster combinations.
 """
 
-from typing import Optional, Dict, Tuple
-from sqlalchemy.orm import Session, joinedload
 import logging
+from typing import Dict, Optional, Sequence, Tuple
 
-from app.models.item import Item, ItemStats, ItemSpellData
-from app.models.spell_data import SpellData, SpellDataSpells
-from app.models.spell import Spell, SpellCriterion
-from app.models.action import Action, ActionCriteria
-from app.models.source import ItemSource, Source
-from app.services.interpolation import InterpolationService
+from sqlalchemy import ColumnElement, Integer, func, select
+from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.orm import Session
+from sqlalchemy.sql.expression import bindparam
+
 from app.api.schemas.item import ItemDetail
-from app.api.routes.items import build_item_detail
+from app.models.interpolated_item import InterpolatedItem
+from app.services.interpolation import InterpolationService
+from app.store import tables as t
+from app.store.context import Build
+from app.store.items import load_item_details
+from app.store.presence import any_of, has_effect, has_stat, revisions
 
 logger = logging.getLogger(__name__)
 
+IMPLANT_ITEM_CLASS = 3
+STAT_SLOT = 298
+# The effect type of a cluster: "Modify {Stat} {Amount}".
+CLUSTER_SPELL_ID = 53045
+
+
+def _is_cluster() -> ColumnElement:
+    return t.effect_entry.c.spell_id == CLUSTER_SPELL_ID
+
+
+def _cluster_count(*conditions: ColumnElement) -> ColumnElement:
+    """How many cluster effects of the revision meet ``conditions``."""
+    return (
+        select(func.count())
+        .select_from(t.effect_entry)
+        .where(
+            t.effect_entry.c.effects_id == t.item_revision.c.effects_id,
+            _is_cluster(),
+            *conditions,
+        )
+        .scalar_subquery()
+    )
+
+
+def _none_of(column: ColumnElement, values: Sequence[int]) -> ColumnElement:
+    """``column <> ALL(values)``, the complement of ``any_of``."""
+    storable = [value for value in values if -(2**31) <= value < 2**31]
+    return column != func.all(bindparam(None, storable, type_=ARRAY(Integer)))
+
+
+def _has_exactly(cluster_stats: Sequence[int]) -> Sequence[ColumnElement]:
+    """The revision's cluster effects modify exactly ``cluster_stats``: one
+    effect for each stat asked for and none for any other stat."""
+    subject = t.effect_entry.c.subject
+    if not cluster_stats:
+        return [~has_effect(_is_cluster())]
+    return [
+        # Redundant with the count below, but indexed: it finds the few
+        # effect sets with the first cluster before anything is counted.
+        has_effect(_is_cluster(), subject == cluster_stats[0]),
+        _cluster_count(any_of(subject, cluster_stats)) == len(cluster_stats),
+        ~has_effect(_is_cluster(), _none_of(subject, cluster_stats)),
+    ]
+
 
 class ImplantService:
-    """Service for implant-related operations."""
+    """Implant lookups in one build of the store."""
 
     # Valid implant slot bitflags (2^1 to 2^13)
     VALID_SLOT_BITFLAGS = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192]
 
-    def __init__(self, db: Session, interpolation_service: InterpolationService):
+    def __init__(self, db: Session, build: Build):
         self.db = db
-        self.interpolation_service = interpolation_service
+        self.build = build
+        self.interpolation_service = InterpolationService(db, build)
 
     def lookup_implant(
         self, slot: int, target_ql: int, clusters: Dict[str, int]
@@ -37,51 +85,31 @@ class ImplantService:
         Look up an implant by slot, QL, and exact cluster combination.
 
         Args:
-            slot: Numeric slot position (1-13)
+            slot: IMPLANT_SLOT bitflag (2 to 8192)
             target_ql: Target quality level (1-300)
             clusters: Dict mapping position names to STAT IDs
 
         Returns:
             Tuple of (ItemDetail, was_interpolated, base_ql) or None if not found
         """
-        # Validate slot bitflag
         if slot not in self.VALID_SLOT_BITFLAGS:
             logger.warning(f"Invalid implant slot bitflag: {slot}")
             return None
 
-        # Determine base QL for efficient lookup
         base_ql = self._determine_base_ql(target_ql)
-
-        # Find implant with exact cluster match
-        implant_item = self._find_implant_with_clusters(slot, base_ql, clusters)
-
-        if not implant_item:
+        aoid = self._find_implant_with_clusters(slot, base_ql, clusters)
+        if aoid is None:
             logger.info(
                 f"No implant found for slot {slot}, QL {target_ql}, clusters {clusters}"
             )
             return None
 
-        # Check if interpolation is needed
-        needs_interpolation = target_ql != implant_item.ql
+        if target_ql != base_ql:
+            interpolated = self.interpolation_service.interpolate_item(aoid, target_ql)
+            if interpolated is not None:
+                return self._convert_interpolated_to_detail(interpolated), True, base_ql
 
-        if needs_interpolation:
-            # Use InterpolationService to get the item at target QL
-            interpolated = self.interpolation_service.interpolate_item(
-                implant_item.aoid, target_ql
-            )
-            if interpolated:
-                # Convert InterpolatedItem to ItemDetail
-                item_detail = self._convert_interpolated_to_detail(interpolated)
-                return item_detail, True, base_ql
-            else:
-                # Fallback to original item if interpolation fails
-                logger.warning(
-                    f"Interpolation failed for implant AOID {implant_item.aoid}, using base item"
-                )
-
-        # Return original item
-        item_detail = build_item_detail(implant_item, self.db)
-        return item_detail, False, base_ql
+        return load_item_details(self.db, self.build, aoids=[aoid])[0], False, base_ql
 
     def _determine_base_ql(self, target_ql: int) -> int:
         """
@@ -99,264 +127,60 @@ class ImplantService:
 
     def _find_implant_with_clusters(
         self, slot: int, base_ql: int, clusters: Dict[str, int]
-    ) -> Optional[Item]:
+    ) -> Optional[int]:
         """
-        Find an implant item with exact cluster match using optimized CTE-based query.
+        The AOID of the implant of the build at ``base_ql`` that fits ``slot``
+        and has exactly the requested clusters; without clusters, the basic
+        implant that has none.
 
-        Implant clusters are represented as spells with ID 53045 (Modify Stat) that modify
-        specific skills. This method finds implants that have exactly the requested clusters
-        and no extra ones.
-
-        Args:
-            slot: Numeric slot position
-            base_ql: Base quality level to query
-            clusters: Dict mapping position names to STAT IDs
-
-        Returns:
-            Item with exact cluster match or None
+        A cluster is an effect of type 53045 (Modify Stat) on the stat it
+        raises. Several items can carry the same set (a test item beside the
+        real implant): the lowest AOID is taken, so the answer is the same on
+        every call.
         """
-        from sqlalchemy import text
-
-        cluster_stats = list(clusters.values())
-        cluster_count = len(cluster_stats)
-
-        logger.info(
-            f"Searching for implant: slot={slot}, base_ql={base_ql}, clusters={clusters}"
+        revision = t.item_revision
+        query = (
+            revisions(self.build, revision.c.aoid)
+            .where(
+                revision.c.item_class == IMPLANT_ITEM_CLASS,
+                revision.c.ql == base_ql,
+                has_stat(
+                    t.stat_entry.c.stat == STAT_SLOT,
+                    t.stat_entry.c.value.op("&")(slot) > 0,
+                ),
+                *_has_exactly(list(clusters.values())),
+            )
+            .order_by(revision.c.aoid)
+            .limit(1)
         )
+        return self.db.execute(query).scalar_one_or_none()
 
-        if cluster_stats:
-            # Use raw SQL with CTEs for optimal performance
-            # Single query that PostgreSQL can optimize effectively
-            cluster_list = ",".join(str(stat) for stat in cluster_stats)
-
-            raw_query = text(f"""
-                WITH implant_candidates AS (
-                    -- Get all implants at the specified QL and slot
-                    SELECT DISTINCT i.id
-                    FROM items i
-                    JOIN item_stats ist ON i.id = ist.item_id
-                    JOIN stat_values sv ON ist.stat_value_id = sv.id
-                    WHERE i.item_class = 3
-                      AND i.ql = :base_ql
-                      AND sv.stat = 298
-                      AND (sv.value & :slot) > 0
-                ),
-                implant_clusters AS (
-                    -- Get all Modify Stat spells for candidate implants
-                    SELECT
-                        ic.id as item_id,
-                        (s.spell_params->>'Stat')::integer as cluster_stat
-                    FROM implant_candidates ic
-                    JOIN item_spell_data isd ON ic.id = isd.item_id
-                    JOIN spell_data sd ON isd.spell_data_id = sd.id
-                    JOIN spell_data_spells sds ON sd.id = sds.spell_data_id
-                    JOIN spells s ON sds.spell_id = s.id
-                    WHERE s.spell_id = 53045
-                ),
-                cluster_matches AS (
-                    -- Count matching and non-matching clusters
-                    SELECT
-                        item_id,
-                        COUNT(*) FILTER (WHERE cluster_stat IN ({cluster_list})) as matching_count,
-                        COUNT(*) FILTER (WHERE cluster_stat NOT IN ({cluster_list})) as extra_count
-                    FROM implant_clusters
-                    GROUP BY item_id
-                )
-                -- Select items with exact cluster match
-                SELECT i.*
-                FROM items i
-                JOIN cluster_matches cm ON i.id = cm.item_id
-                WHERE cm.matching_count = :cluster_count
-                  AND cm.extra_count = 0
-                LIMIT 1
-            """)
-
-            result = self.db.execute(
-                raw_query,
-                {"base_ql": base_ql, "slot": slot, "cluster_count": cluster_count},
-            ).first()
-
-            if result:
-                # Convert row to Item object with eager loading
-                item = (
-                    self.db.query(Item)
-                    .options(
-                        joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
-                        joinedload(Item.item_spell_data)
-                        .joinedload(ItemSpellData.spell_data)
-                        .joinedload(SpellData.spell_data_spells)
-                        .joinedload(SpellDataSpells.spell)
-                        .joinedload(Spell.spell_criteria)
-                        .joinedload(SpellCriterion.criterion),
-                        joinedload(Item.actions)
-                        .joinedload(Action.action_criteria)
-                        .joinedload(ActionCriteria.criterion),
-                        joinedload(Item.item_sources)
-                        .joinedload(ItemSource.source)
-                        .joinedload(Source.source_type),
-                    )
-                    .filter(Item.id == result.id)
-                    .first()
-                )
-                logger.info(
-                    f"Found implant: AOID={item.aoid}, name='{item.name}', QL={item.ql}"
-                )
-                return item
-            else:
-                logger.info("No implant found with exact cluster match")
-                return None
-        else:
-            # Handle case where no clusters specified (basic implants with no Modify Stat spells)
-            # Use optimized raw SQL
-            raw_query = text("""
-                WITH implant_candidates AS (
-                    -- Get all implants at the specified QL and slot
-                    SELECT DISTINCT i.id
-                    FROM items i
-                    JOIN item_stats ist ON i.id = ist.item_id
-                    JOIN stat_values sv ON ist.stat_value_id = sv.id
-                    WHERE i.item_class = 3
-                      AND i.ql = :base_ql
-                      AND sv.stat = 298
-                      AND (sv.value & :slot) > 0
-                ),
-                implants_with_clusters AS (
-                    -- Get implants that have any Modify Stat spells
-                    SELECT DISTINCT ic.id
-                    FROM implant_candidates ic
-                    JOIN item_spell_data isd ON ic.id = isd.item_id
-                    JOIN spell_data sd ON isd.spell_data_id = sd.id
-                    JOIN spell_data_spells sds ON sd.id = sds.spell_data_id
-                    JOIN spells s ON sds.spell_id = s.id
-                    WHERE s.spell_id = 53045
-                )
-                -- Select implants without any clusters
-                SELECT i.*
-                FROM items i
-                JOIN implant_candidates ic ON i.id = ic.id
-                WHERE i.id NOT IN (SELECT id FROM implants_with_clusters)
-                LIMIT 1
-            """)
-
-            result = self.db.execute(
-                raw_query, {"base_ql": base_ql, "slot": slot}
-            ).first()
-
-            if result:
-                # Convert row to Item object with eager loading
-                item = (
-                    self.db.query(Item)
-                    .options(
-                        joinedload(Item.item_stats).joinedload(ItemStats.stat_value),
-                        joinedload(Item.item_spell_data)
-                        .joinedload(ItemSpellData.spell_data)
-                        .joinedload(SpellData.spell_data_spells)
-                        .joinedload(SpellDataSpells.spell)
-                        .joinedload(Spell.spell_criteria)
-                        .joinedload(SpellCriterion.criterion),
-                        joinedload(Item.actions)
-                        .joinedload(Action.action_criteria)
-                        .joinedload(ActionCriteria.criterion),
-                        joinedload(Item.item_sources)
-                        .joinedload(ItemSource.source)
-                        .joinedload(Source.source_type),
-                    )
-                    .filter(Item.id == result.id)
-                    .first()
-                )
-                logger.info(
-                    f"Found implant: AOID={item.aoid}, name='{item.name}', QL={item.ql}"
-                )
-                return item
-            else:
-                logger.info("No implant found without clusters")
-                return None
-
-    def _convert_interpolated_to_detail(self, interpolated_item) -> ItemDetail:
+    def _convert_interpolated_to_detail(
+        self, interpolated_item: InterpolatedItem
+    ) -> ItemDetail:
         """
-        Convert an InterpolatedItem to ItemDetail format.
-
-        Args:
-            interpolated_item: InterpolatedItem from interpolation service
-
-        Returns:
-            ItemDetail object
+        An interpolated item as an ``ItemDetail``. Interpolated items carry no
+        attack/defense stats and no sources.
         """
-        from app.api.schemas.spell import SpellDataResponse, ItemSpellResponse
-        from app.api.schemas.action import ActionResponse
-        from app.api.schemas.criterion import ItemCriterionResponse
-
-        # Convert InterpolatedSpellData to SpellDataResponse format
-        converted_spell_data = []
-        for idx, spell_data in enumerate(interpolated_item.spell_data or []):
-            # Convert InterpolatedSpell objects to ItemSpellResponse
-            converted_spells = []
-            for spell_idx, spell in enumerate(spell_data.spells):
-                # Convert criteria dicts to ItemCriterionResponse objects
-                converted_criteria = []
-                for criteria_dict in spell.criteria:
-                    converted_criteria.append(
-                        ItemCriterionResponse(
-                            stat=criteria_dict.get("stat", 0),
-                            value1=criteria_dict.get("value1", 0),
-                            value2=criteria_dict.get("value2", 0),
-                            operator=criteria_dict.get("operator", 0),
-                        )
-                    )
-
-                converted_spells.append(
-                    ItemSpellResponse(
-                        target=spell.target,
-                        tick_count=spell.tick_count,
-                        tick_interval=spell.tick_interval,
-                        spell_id=spell.spell_id,
-                        spell_format=spell.spell_format,
-                        spell_params=spell.spell_params,
-                        criteria=converted_criteria,
-                    )
-                )
-
-            converted_spell_data.append(
-                SpellDataResponse(
-                    event=spell_data.event,
-                    spells=converted_spells,
-                )
-            )
-
-        # Convert InterpolatedAction to ActionResponse format
-        converted_actions = []
-        for action in interpolated_item.actions or []:
-            # Convert criteria dicts to ItemCriterionResponse objects
-            converted_criteria = []
-            for criteria_dict in action.criteria:
-                converted_criteria.append(
-                    ItemCriterionResponse(
-                        stat=criteria_dict.get("stat", 0),
-                        value1=criteria_dict.get("value1", 0),
-                        value2=criteria_dict.get("value2", 0),
-                        operator=criteria_dict.get("operator", 0),
-                    )
-                )
-
-            converted_actions.append(
-                ActionResponse(
-                    action=action.action,
-                    criteria=converted_criteria,
-                )
-            )
-
-        return ItemDetail(
-            id=interpolated_item.id or 0,
-            aoid=interpolated_item.aoid,
-            name=interpolated_item.name,
-            ql=interpolated_item.ql,
-            item_class=interpolated_item.item_class,
-            description=interpolated_item.description,
-            is_nano=interpolated_item.is_nano,
-            stats=interpolated_item.stats or [],
-            spell_data=converted_spell_data,
-            attack_stats=[],  # InterpolatedItem doesn't have separate attack_stats
-            defense_stats=[],  # InterpolatedItem doesn't have separate defense_stats
-            actions=converted_actions,
-            sources=[],  # Sources not typically available in interpolated items
+        return ItemDetail.model_validate(
+            {
+                "id": interpolated_item.id or 0,
+                "aoid": interpolated_item.aoid,
+                "name": interpolated_item.name,
+                "ql": interpolated_item.ql,
+                "item_class": interpolated_item.item_class,
+                "description": interpolated_item.description,
+                "is_nano": interpolated_item.is_nano,
+                "stats": interpolated_item.stats,
+                "spell_data": [
+                    spell_data.model_dump()
+                    for spell_data in interpolated_item.spell_data
+                ],
+                "attack_stats": [],
+                "defense_stats": [],
+                "actions": [
+                    action.model_dump() for action in interpolated_item.actions
+                ],
+                "sources": [],
+            }
         )
