@@ -41,10 +41,9 @@ from app.store.context import Build
 from app.store.items import (
     ItemRecord,
     actions_response,
+    item_document,
     load_effect_formats,
     load_records,
-    spell_data_response,
-    stats_response,
 )
 from app.store.presence import (
     Page,
@@ -400,21 +399,7 @@ def nano_program(record: ItemRecord, derived: Dict[int, DerivedFields]) -> NanoP
 def _detail_fields(record: ItemRecord, formats: Dict[int, str]) -> Dict[str, Any]:
     """A nano as an item of a profession list: no attack or defense skills,
     and sources left to the item's own page."""
-    return {
-        "id": record.aoid,
-        "aoid": record.aoid,
-        "name": record.name,
-        "ql": record.ql,
-        "item_class": record.item_class,
-        "description": record.description,
-        "is_nano": record.is_nano,
-        "stats": stats_response(record.stats),
-        "spell_data": spell_data_response(record, formats),
-        "attack_stats": [],
-        "defense_stats": [],
-        "actions": actions_response(record),
-        "sources": [],
-    }
+    return {**item_document(record, formats), "attack_stats": [], "defense_stats": []}
 
 
 def nano_item_details(

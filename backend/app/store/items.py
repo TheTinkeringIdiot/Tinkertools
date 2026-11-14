@@ -6,6 +6,8 @@ Item loader: revisions of a build as the items the API serves.
 Use records when a route computes on items (interpolation, analysis).
 ``load_item_details`` returns the ``ItemDetail`` responses, in three queries
 however many items are asked for: parts, effect formats, sources.
+``load_item_documents`` returns the same items as plain JSON documents, for a
+route that serves too many of them to validate each into a model.
 
 Both take either AOIDs, which are looked up in the build, or revision ids that
 a query on ``app.store.presence`` already found in the build. Results come
@@ -342,29 +344,61 @@ def actions_response(record: ItemRecord) -> List[Dict[str, Any]]:
     ]
 
 
+def item_document(
+    record: ItemRecord,
+    formats: Dict[int, str],
+    sources: Sequence[ItemSourceResponse] = (),
+) -> Dict[str, Any]:
+    """One record as the JSON document of its ``ItemDetail``.
+
+    This is where the shape of a served item is written down. ``item_detail``
+    validates it into the response model; a route that serves many items at
+    once sends the documents as they are.
+    """
+    return {
+        "aoid": record.aoid,
+        "name": record.name,
+        "ql": record.ql,
+        "item_class": record.item_class,
+        "description": record.description,
+        "is_nano": record.is_nano,
+        "id": record.aoid,
+        "stats": stats_response(record.stats),
+        "spell_data": spell_data_response(record, formats),
+        "attack_stats": stats_response(record.attack),
+        "defense_stats": stats_response(record.defense),
+        "actions": actions_response(record),
+        "sources": [source.model_dump(mode="json") for source in sources],
+    }
+
+
 def item_detail(
     record: ItemRecord,
     formats: Dict[int, str],
     sources: Sequence[ItemSourceResponse] = (),
 ) -> ItemDetail:
     """The ``ItemDetail`` response of one record."""
-    return ItemDetail.model_validate(
-        {
-            "id": record.aoid,
-            "aoid": record.aoid,
-            "name": record.name,
-            "ql": record.ql,
-            "item_class": record.item_class,
-            "description": record.description,
-            "is_nano": record.is_nano,
-            "stats": stats_response(record.stats),
-            "spell_data": spell_data_response(record, formats),
-            "attack_stats": stats_response(record.attack),
-            "defense_stats": stats_response(record.defense),
-            "actions": actions_response(record),
-            "sources": list(sources),
-        }
-    )
+    return ItemDetail.model_validate(item_document(record, formats, sources))
+
+
+def load_item_documents(
+    db: Session,
+    build: Build,
+    *,
+    aoids: Optional[Sequence[int]] = None,
+    rev_ids: Optional[Sequence[int]] = None,
+) -> List[Dict[str, Any]]:
+    """``item_document`` of these AOIDs or revisions of ``build``, in the
+    order given. Three queries whatever the number of items."""
+    records = load_records(db, build, aoids=aoids, rev_ids=rev_ids)
+    if not records:
+        return []
+    formats = load_effect_formats(db)
+    sources = load_sources(db, build, [record.aoid for record in records])
+    return [
+        item_document(record, formats, sources.get(record.aoid, ()))
+        for record in records
+    ]
 
 
 def load_item_details(
@@ -376,11 +410,7 @@ def load_item_details(
 ) -> List[ItemDetail]:
     """``ItemDetail`` responses for these AOIDs or revisions of ``build``, in
     the order given. Three queries whatever the number of items."""
-    records = load_records(db, build, aoids=aoids, rev_ids=rev_ids)
-    if not records:
-        return []
-    formats = load_effect_formats(db)
-    sources = load_sources(db, build, [record.aoid for record in records])
     return [
-        item_detail(record, formats, sources.get(record.aoid, ())) for record in records
+        ItemDetail.model_validate(document)
+        for document in load_item_documents(db, build, aoids=aoids, rev_ids=rev_ids)
     ]

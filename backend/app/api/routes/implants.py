@@ -64,58 +64,6 @@ def implant_lookup(
 
         item_detail, was_interpolated, base_ql = result
 
-        # Convert ItemDetail to dict for response
-        item_dict = {
-            "id": item_detail.id,
-            "aoid": item_detail.aoid,
-            "name": item_detail.name,
-            "ql": item_detail.ql,
-            "item_class": item_detail.item_class,
-            "description": item_detail.description,
-            "is_nano": item_detail.is_nano,
-            "stats": (
-                [{"stat": stat.stat, "value": stat.value} for stat in item_detail.stats]
-                if item_detail.stats
-                else []
-            ),
-            "spell_data": (
-                [
-                    {"event": spell.event, "spells": spell.spells}
-                    for spell in item_detail.spell_data
-                ]
-                if item_detail.spell_data
-                else []
-            ),
-            "attack_stats": (
-                [
-                    {"stat": stat.stat, "value": stat.value}
-                    for stat in item_detail.attack_stats
-                ]
-                if item_detail.attack_stats
-                else []
-            ),
-            "defense_stats": (
-                [
-                    {"stat": stat.stat, "value": stat.value}
-                    for stat in item_detail.defense_stats
-                ]
-                if item_detail.defense_stats
-                else []
-            ),
-            "actions": (
-                [
-                    {
-                        "action": action.action,
-                        "criteria": action.criteria,
-                    }
-                    for action in item_detail.actions
-                ]
-                if item_detail.actions
-                else []
-            ),
-            "sources": item_detail.sources or [],
-        }
-
         success_message = "Implant found successfully"
         if was_interpolated:
             success_message += f" (interpolated from QL {base_ql} to QL {request.ql})"
@@ -126,7 +74,7 @@ def implant_lookup(
 
         return ImplantLookupResponse(
             success=True,
-            item=item_dict,
+            item=item_detail.model_dump(),
             message=success_message,
             interpolated=was_interpolated,
             base_ql=base_ql,

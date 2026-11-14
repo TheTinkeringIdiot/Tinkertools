@@ -329,13 +329,19 @@ def test_a_weapon_row_is_the_items_detail(store):
         }
     ]
     store.add_build("live", 1, items=[sword])
+    store.curate(mobs=[("Ahpta", "Inferno", 1)])
 
     with store.client("live") as client:
-        rows = client.post("/api/v1/weapons/analyze", json=character()).json()
-        detail = client.get("/api/v1/items/1").json()
+        rows = client.post("/api/v1/weapons/analyze", json=character())
+        detail = client.get("/api/v1/items/1")
 
-    assert rows == [detail]
-    assert detail["attack_stats"] and detail["spell_data"] and detail["actions"]
+    assert rows.json() == [detail.json()]
+    assert rows.text == f"[{detail.text}]"
+    item = detail.json()
+    assert item["attack_stats"] and item["defense_stats"] and item["actions"]
+    assert item["spell_data"][0]["spells"][0]["criteria"]
+    assert [source["source"]["name"] for source in item["sources"]] == ["Ahpta"]
+    assert {"stat": 23, "value": 9001} in item["stats"]
 
 
 def test_no_weapon_gives_an_empty_list(store):

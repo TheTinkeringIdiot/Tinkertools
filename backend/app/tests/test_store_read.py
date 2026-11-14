@@ -14,7 +14,7 @@ from starlette.requests import Request
 
 from app.store import tables as t
 from app.store.context import Build, get_build, resolve_build
-from app.store.items import load_item_details, load_records
+from app.store.items import load_item_details, load_item_documents, load_records
 from app.store.presence import (
     fetch_page,
     has_atkdef,
@@ -396,6 +396,24 @@ def test_a_page_of_items_costs_as_many_queries_as_one_item(store):
     assert len(details) == 80
     assert all(detail.sources for detail in details[40:])
     assert 0 < len(page) == len(one) <= 3
+
+
+def test_the_plain_documents_are_the_json_of_the_item_details(store):
+    build = store.add_build(
+        "b1", 1, items=[sword(aoid=1), item(2), item(300)], nanos=[nano(10)]
+    )
+    store.curate(mobs=[("Ahpta", "Inferno", 1)], nanos="10,125,300,Heal,9,4\n")
+    everything = [1, 2, 10, 300]
+
+    documents = load_item_documents(store.db, build, aoids=everything)
+    details = load_item_details(store.db, build, aoids=everything)
+
+    assert documents == [detail.model_dump(mode="json") for detail in details]
+    assert [list(document) for document in documents] == [
+        list(detail.model_dump()) for detail in details
+    ]
+    assert documents[0]["sources"] and documents[2]["sources"]
+    assert documents[0]["attack_stats"] and documents[0]["spell_data"]
 
 
 def test_records_hold_the_item_as_served(store):

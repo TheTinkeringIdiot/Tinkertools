@@ -23,14 +23,7 @@ from sqlalchemy.orm import Session
 from app.api.schemas.weapon_analysis import WeaponAnalyzeRequest
 from app.store import tables as t
 from app.store.context import Build
-from app.store.items import (
-    actions_response,
-    load_effect_formats,
-    load_records,
-    load_sources,
-    spell_data_response,
-    stats_response,
-)
+from app.store.items import load_item_documents
 from app.store.presence import any_of, has_atkdef, has_requirement, has_stat, revisions
 
 WEAPON_ITEM_CLASS = 1
@@ -164,29 +157,4 @@ def filter_weapons(
     rev_ids = db.execute(
         weapon_query(build, request).order_by(t.item_revision.c.aoid)
     ).scalars()
-    records = load_records(db, build, rev_ids=list(rev_ids))
-    if not records:
-        return []
-    formats = load_effect_formats(db)
-    sources = load_sources(db, build, [record.aoid for record in records])
-    return [
-        {
-            "aoid": record.aoid,
-            "name": record.name,
-            "ql": record.ql,
-            "item_class": record.item_class,
-            "description": record.description,
-            "is_nano": record.is_nano,
-            "id": record.aoid,
-            "stats": stats_response(record.stats),
-            "spell_data": spell_data_response(record, formats),
-            "attack_stats": stats_response(record.attack),
-            "defense_stats": stats_response(record.defense),
-            "actions": actions_response(record),
-            "sources": [
-                source.model_dump(mode="json")
-                for source in sources.get(record.aoid, ())
-            ],
-        }
-        for record in records
-    ]
+    return load_item_documents(db, build, rev_ids=list(rev_ids))
