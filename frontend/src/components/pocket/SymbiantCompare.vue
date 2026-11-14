@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useToast } from 'primevue/usetoast';
 import { useSymbiantsStore } from '@/stores/symbiants';
+import { apiClient } from '@/services/api-client';
+import { legacyDataVersion } from '@/composables/useGameVersion';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Tag from 'primevue/tag';
@@ -19,26 +22,20 @@ interface EnrichedSymbiant extends Symbiant {
 const symbiantStore = useSymbiantsStore();
 const route = useRoute();
 const router = useRouter();
+const toast = useToast();
 
-// Symbiant selection state - now driven by store
+// The store holds the selection; this mirrors it for display
 const selectedSymbiants = ref<(EnrichedSymbiant | null)[]>([null, null, null]);
 
-// Clear a symbiant selection
 function clearSymbiant(index: number) {
   const symbiant = selectedSymbiants.value[index];
-  selectedSymbiants.value[index] = null;
-  // Sync to store
   if (symbiant) {
     symbiantStore.removeFromComparison(symbiant.aoid);
   }
-  updateUrl();
 }
 
-// Clear all symbiant selections
 function clearAll() {
-  selectedSymbiants.value = [null, null, null];
   symbiantStore.clearComparison();
-  updateUrl();
 }
 
 // Extract stats from symbiant actions
@@ -187,15 +184,34 @@ function getCellClass(
   return '';
 }
 
-// URL persistence. The slots are a1..a3 (AOIDs); links made before that used
-// s1..s3 with internal ids, which no longer mean anything and are ignored.
-function updateUrl() {
-  const query: Record<string, string> = {};
+// URL persistence. The slots are a1..a3 (AOIDs). Links made before that used
+// s1..s3 with internal ids of the database TinkerTools served at the time;
+// those are translated once and the URL rewritten.
+const SLOT_PARAMS = ['a1', 'a2', 'a3'];
+const LEGACY_SLOT_PARAMS = ['s1', 's2', 's3'];
 
-  selectedSymbiants.value.forEach((symbiant, index) => {
-    if (symbiant) {
-      query[`a${index + 1}`] = symbiant.aoid.toString();
-    }
+function slotIds(params: string[]): (number | null)[] {
+  return params.map((param) => {
+    const raw = route.query[param];
+    const id = typeof raw === 'string' ? Number(raw) : NaN;
+    return Number.isInteger(id) && id > 0 ? id : null;
+  });
+}
+
+const hasIds = (ids: (number | null)[]): boolean => ids.some((id) => id !== null);
+
+const selectedAoids = (): (number | null)[] =>
+  selectedSymbiants.value.map((symbiant) => symbiant?.aoid ?? null);
+
+const onCompareTab = computed(() => route.name === 'TinkerPocket' && route.query.tab === 'compare');
+
+/** Make the URL name the selection, keeping the parameters that are not slots */
+function updateUrl() {
+  const query = { ...route.query };
+  [...SLOT_PARAMS, ...LEGACY_SLOT_PARAMS].forEach((param) => delete query[param]);
+
+  selectedAoids().forEach((aoid, index) => {
+    if (aoid !== null) query[SLOT_PARAMS[index]] = aoid.toString();
   });
 
   router.replace({ query }).catch(() => {
@@ -203,70 +219,104 @@ function updateUrl() {
   });
 }
 
+function showSelection(symbiants: (Symbiant | null)[]) {
+  symbiantStore.clearComparison();
+  symbiants.forEach((symbiant) => symbiant && symbiantStore.addToComparison(symbiant));
+  loadFromStore();
+}
+
 function loadFromUrl() {
-  const aoids = [route.query.a1, route.query.a2, route.query.a3].map((value) =>
-    value ? parseInt(value as string) : null
+  showSelection(
+    slotIds(SLOT_PARAMS).map((aoid) => (aoid ? symbiantStore.getSymbiantByAoid(aoid) : null))
+  );
+}
+
+function describeSlots(slots: number[]): string {
+  if (slots.length === 1) return `Symbiant ${slots[0]}`;
+  return `Symbiants ${slots.slice(0, -1).join(', ')} and ${slots[slots.length - 1]}`;
+}
+
+async function loadFromLegacyUrl() {
+  const internalIds = slotIds(LEGACY_SLOT_PARAMS);
+
+  let aoids = new Map<number, number>();
+  try {
+    aoids = await apiClient.resolveLegacyItemIds(
+      internalIds.filter((id): id is number => id !== null),
+      legacyDataVersion()
+    );
+  } catch (error) {
+    console.warn('[SymbiantCompare] Could not translate an old comparison link:', error);
+  }
+
+  const notLoaded: number[] = [];
+  showSelection(
+    internalIds.map((id, index) => {
+      if (id === null) return null;
+      const aoid = aoids.get(id);
+      const symbiant = aoid === undefined ? null : symbiantStore.getSymbiantByAoid(aoid);
+      if (!symbiant) notLoaded.push(index + 1);
+      return symbiant;
+    })
   );
 
-  // Get all symbiants from store
-  const allSymbiants = symbiantStore.allSymbiants as EnrichedSymbiant[];
-
-  aoids.forEach((aoid, index) => {
-    if (aoid) {
-      const symbiant = allSymbiants.find((s) => s.aoid === aoid);
-      if (symbiant) {
-        selectedSymbiants.value[index] = symbiant;
-      }
-    }
-  });
-
-  // Sync loaded symbiants back to store
-  symbiantStore.clearComparison();
-  selectedSymbiants.value.forEach((s) => s && symbiantStore.addToComparison(s));
+  if (notLoaded.length > 0) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Outdated comparison link',
+      detail: `This link was made with an older version of TinkerTools. ${describeSlots(notLoaded)} could not be loaded.`,
+      life: 10000,
+    });
+  }
 }
 
 function loadFromStore() {
-  // Load from store's comparison state
-  const storeSelection = symbiantStore.selectedForComparison;
-  selectedSymbiants.value = [...storeSelection] as (EnrichedSymbiant | null)[];
+  selectedSymbiants.value = [...symbiantStore.selectedForComparison] as (EnrichedSymbiant | null)[];
 }
 
-// Load symbiants on mount
 onMounted(async () => {
   // Ensure all symbiants are loaded (store handles caching)
   await symbiantStore.loadAllSymbiants();
 
   // Priority: URL params > Store state
-  if (route.query.s1 || route.query.s2 || route.query.s3) {
-    // Load from URL
+  if (hasIds(slotIds(SLOT_PARAMS))) {
     loadFromUrl();
+    updateUrl();
+  } else if (hasIds(slotIds(LEGACY_SLOT_PARAMS))) {
+    await loadFromLegacyUrl();
+    updateUrl();
   } else {
-    // Load from store
     loadFromStore();
+    if (onCompareTab.value) updateUrl();
   }
 });
 
-// Watch for URL changes
+// A selection named by the URL (a pasted link, browser back/forward) is shown.
+// Only the slot parameters are watched: other parameters change with tabs and
+// filters, and must not bring back a selection the URL happens to still carry.
 watch(
-  () => route.query,
-  () => {
-    if (route.name === 'TinkerPocket') {
-      loadFromUrl();
-    }
+  () => slotIds(SLOT_PARAMS).join(),
+  (urlSelection) => {
+    if (route.name !== 'TinkerPocket' || !hasIds(slotIds(SLOT_PARAMS))) return;
+    if (urlSelection === selectedAoids().join()) return;
+    loadFromUrl();
+    updateUrl();
   }
 );
 
-// Watch for store changes (from other tabs/components)
+// The selection changes from the Browse tab and from item pages
 watch(
   () => symbiantStore.selectedForComparison,
-  (newSelection) => {
-    // Only update if there are no URL params (to respect URL priority)
-    if (!route.query.s1 && !route.query.s2 && !route.query.s3) {
-      selectedSymbiants.value = [...newSelection] as (EnrichedSymbiant | null)[];
-    }
+  () => {
+    loadFromStore();
+    if (onCompareTab.value) updateUrl();
   },
   { deep: true }
 );
+
+watch(onCompareTab, (showing) => {
+  if (showing) updateUrl();
+});
 </script>
 
 <template>
