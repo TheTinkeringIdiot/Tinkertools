@@ -26,9 +26,9 @@ class ImplantService:
     # Valid implant slot bitflags (2^1 to 2^13)
     VALID_SLOT_BITFLAGS = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192]
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, interpolation_service: InterpolationService):
         self.db = db
-        self.interpolation_service = InterpolationService(db)
+        self.interpolation_service = interpolation_service
 
     def lookup_implant(
         self, slot: int, target_ql: int, clusters: Dict[str, int]

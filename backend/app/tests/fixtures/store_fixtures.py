@@ -1,0 +1,164 @@
+"""
+A throwaway content-addressed store for read-path tests.
+
+The ``store`` fixture creates an empty store in a schema of its own, inside a
+transaction that is rolled back when the test ends, exactly as the importer's
+tests do. A test fills it with hand-made builds through the real importer and
+then calls the API, or the read layer, against it::
+
+    def test_an_item_is_served_as_of_the_requested_build(store):
+        store.add_build("old", 1, items=[item(100, name="Wrench", ql=10)])
+        store.add_build("new", 2, items=[item(100, name="Spanner", ql=10)])
+
+        with store.client("old") as client:
+            assert client.get("/api/v1/items/100").json()["name"] == "Wrench"
+
+``item``, ``nano``, ``modify`` and ``criterion`` build raw records as the
+extracts hold them; they are the helpers of ``test_cas_store``.
+
+Use this when a test needs data it controls: several builds of one item,
+feature flags, curated data, an exact page of results. A test that only checks
+a route against the real game data needs none of it: the ``client`` fixture
+reads the development store.
+"""
+
+from __future__ import annotations
+
+import os
+import uuid
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Any, Dict, Iterable, Iterator, List, Sequence
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Connection
+from sqlalchemy.orm import Session
+
+from app.core import cas_store
+from app.core.cache import cache_service
+from app.core.cas_curated import sync_curated
+from app.main import app
+from app.store.context import (
+    Build,
+    get_build,
+    get_store,
+    read_builds,
+    resolve_build,
+    store_session,
+)
+from app.tests.test_cas_store import (  # noqa: F401 - re-exported for tests
+    criterion,
+    curated_files,
+    item,
+    load,
+    modify,
+    nano,
+    spec,
+)
+
+ALL_FEATURES = {
+    "items": True,
+    "nanos": True,
+    "perks": True,
+    "sources": True,
+    "symbiants": True,
+}
+
+
+class ThrowawayStore:
+    """An empty store in its own schema, filled by the test that owns it."""
+
+    def __init__(self, connection: Connection, schema: str, tmp_path: Path):
+        self._connection = connection
+        self._raw = connection.connection.driver_connection
+        self._tmp_path = tmp_path
+        self.schema = schema
+        self.db: Session = store_session(connection, schema)
+
+    def add_build(
+        self,
+        slug: str,
+        ordinal: int,
+        items: Sequence[Dict[str, Any]] = (),
+        nanos: Sequence[Dict[str, Any]] = (),
+        branch: str = "ao",
+        **fields: Any,
+    ) -> Build:
+        """Import a build made of raw item and nano records; every feature is
+        on unless ``features`` says otherwise."""
+        fields.setdefault("features", dict(ALL_FEATURES))
+        fields.setdefault("sort_order", 1000 - ordinal)
+        load(
+            self._raw,
+            spec(slug, ordinal, branch=branch, **fields),
+            items=items,
+            nanos=nanos,
+        )
+        return self.build(slug)
+
+    def curate(self, mobs: Iterable[tuple] = (), nanos: str = "") -> None:
+        """Load curated data: ``mobs`` as ``(boss, playfield, item aoid)``
+        rows of symbiants.csv, ``nanos`` as rows of the nano CSV
+        (``nano_id,ql,crystal_ids,nano_name,strain_id,sub_strain_id``)."""
+        sync_curated(self._raw, curated_files(self._tmp_path, list(mobs), nanos))
+        cas_store.apply_nano_overlay(self._raw)
+
+    def builds(self) -> List[Build]:
+        return read_builds(self.db)
+
+    def build(self, slug: str) -> Build:
+        found = resolve_build(self.builds(), slug)
+        if found is None:
+            raise KeyError(slug)
+        return found
+
+    @contextmanager
+    def client(self, slug: str) -> Iterator[TestClient]:
+        """A test client whose requests read build ``slug`` of this store."""
+        build = self.build(slug)
+        app.dependency_overrides[get_store] = lambda: self.db
+        app.dependency_overrides[get_build] = lambda: build
+        cache_service.clear()
+        try:
+            with TestClient(app) as client:
+                yield client
+        finally:
+            app.dependency_overrides.pop(get_store, None)
+            app.dependency_overrides.pop(get_build, None)
+            cache_service.clear()
+
+    @contextmanager
+    def counting_queries(self) -> Iterator[List[str]]:
+        """Collects the statements sent to the store while the block runs."""
+        statements: List[str] = []
+
+        def record(conn, cursor, statement, parameters, context, executemany):
+            statements.append(statement)
+
+        event.listen(self._connection, "before_cursor_execute", record)
+        try:
+            yield statements
+        finally:
+            event.remove(self._connection, "before_cursor_execute", record)
+
+
+@pytest.fixture
+def store(tmp_path) -> Iterator[ThrowawayStore]:
+    url = cas_store.libpq_url(os.environ["DATABASE_URL"]).replace(
+        "postgresql://", "postgresql+psycopg://", 1
+    )
+    engine = create_engine(url)
+    connection = engine.connect()
+    transaction = connection.begin()
+    schema = f"cas_test_{uuid.uuid4().hex[:12]}"
+    try:
+        raw = connection.connection.driver_connection
+        cas_store.use_schema(raw, schema, local=True)
+        cas_store.create_store(raw, schema)
+        yield ThrowawayStore(connection, schema, tmp_path)
+    finally:
+        transaction.rollback()
+        connection.close()
+        engine.dispose()

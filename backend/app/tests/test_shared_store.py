@@ -483,9 +483,9 @@ class TestInstall:
             install(conn, build_extra, "zz-b")
 
 
+# Routes that still read the per-version schemas. Item detail reads the
+# content-addressed store; the item list returns the same detail of every item.
 API_CALLS = [
-    "/api/v1/items/1001",
-    "/api/v1/items/1002",
     "/api/v1/items?page=1&page_size=50",
     "/api/v1/items/search?q=Alpha&page_size=50",
     "/api/v1/nanos?page=1&page_size=50",
