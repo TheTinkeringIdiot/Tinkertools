@@ -96,3 +96,30 @@ def test_a_site_that_cannot_be_reached_is_a_gateway_error(proxy):
     assert client.get(f"/api/v1/aosetups/profile/{PROFILE_ID}").status_code == 502
     client, _ = proxy(too_slow)
     assert client.get(f"/api/v1/aosetups/profile/{PROFILE_ID}").status_code == 504
+
+
+def test_a_profile_the_site_does_not_have_is_not_found(proxy):
+    client, outbound = proxy(lambda request: httpx.Response(404, text="Not Found"))
+
+    response = client.get(f"/api/v1/aosetups/profile/{PROFILE_ID}")
+
+    assert response.status_code == 404
+    assert PROFILE_ID in response.json()["error"]
+    assert len(outbound.requests) == 1
+
+
+@pytest.mark.parametrize("status", [403, 429, 500, 503])
+def test_another_status_of_the_site_is_passed_on(proxy, status):
+    client, _ = proxy(lambda request: httpx.Response(status, text="site says no"))
+
+    response = client.get(f"/api/v1/aosetups/profile/{PROFILE_ID}")
+
+    assert response.status_code == status
+    assert f"status {status}" in response.json()["error"]
+    assert "site says no" in response.json()["error"]
+
+
+def test_an_answer_that_is_not_json_is_a_server_error(proxy):
+    client, _ = proxy(lambda request: httpx.Response(200, text="<html>"))
+
+    assert client.get(f"/api/v1/aosetups/profile/{PROFILE_ID}").status_code == 500

@@ -55,6 +55,8 @@ async def get_aosetups_profile(profile_id: str):
                     detail=f"AOSetups API returned status {response.status_code}: {response.text[:200]}",
                 )
 
+    except HTTPException:
+        raise
     except httpx.TimeoutException:
         raise HTTPException(
             status_code=504,
