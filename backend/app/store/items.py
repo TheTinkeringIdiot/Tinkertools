@@ -64,8 +64,7 @@ class ItemRecord:
 
     ``effects`` and ``actions`` are the part documents of app/core/parts.py
     (empty lists when the item has none); criteria are ``[value1, value2,
-    operator]`` triples in evaluation order. The documents are shared with
-    nothing else and may be read freely, but treat them as immutable.
+    operator]`` triples in evaluation order. Treat the documents as read-only.
     """
 
     rev_id: int

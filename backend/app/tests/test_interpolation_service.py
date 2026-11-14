@@ -343,7 +343,7 @@ def test_preloaded_items_are_interpolated_without_further_queries(store):
         results = [service.interpolate_item(aoid, 100) for aoid in aoids]
 
     assert all(result.interpolating for result in results)
-    assert len(many) == len(one) <= 3
+    assert 0 < len(many) == len(one) <= 3
 
 
 # ---------------------------------------------------------------------------

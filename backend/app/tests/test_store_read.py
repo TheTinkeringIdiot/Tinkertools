@@ -159,6 +159,22 @@ def test_an_item_absent_from_the_build_is_not_found(store):
     assert response.json() == {"error": "Item not found", "code": "HTTP_404"}
 
 
+@pytest.mark.parametrize("aoid", [-5, 2**31, 99999999999, 10**30])
+def test_an_aoid_no_item_can_have_is_not_found(store, aoid):
+    store.add_build("b1", 1, items=[item(1)])
+
+    with store.client("b1") as client:
+        assert client.get(f"/api/v1/items/{aoid}").status_code == 404
+        info = client.get(f"/api/v1/items/{aoid}/interpolation-info")
+        batch = client.post(
+            "/api/v1/items/batch/interpolate",
+            json={"items": [{"aoid": aoid, "target_ql": 5}, {"aoid": 1}]},
+        )
+
+    assert info.status_code == 404
+    assert [result["success"] for result in batch.json()["results"]] == [False, True]
+
+
 def test_item_detail_carries_every_part_of_the_item(store):
     store.add_build("b1", 1, items=[sword()])
 
@@ -379,7 +395,7 @@ def test_a_page_of_items_costs_as_many_queries_as_one_item(store):
 
     assert len(details) == 80
     assert all(detail.sources for detail in details[40:])
-    assert len(page) == len(one) <= 3
+    assert 0 < len(page) == len(one) <= 3
 
 
 def test_records_hold_the_item_as_served(store):

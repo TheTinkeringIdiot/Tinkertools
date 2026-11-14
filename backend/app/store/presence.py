@@ -57,9 +57,15 @@ def revisions(build: Build, *columns: Any) -> Select:
     )
 
 
+_INTEGER_COLUMN = range(-(2**31), 2**31)
+
+
 def any_of(column: ColumnElement, values: Sequence[int]) -> ColumnElement:
-    """``column = ANY(values)``: one array parameter however many values."""
-    return column == func.any(bindparam(None, list(values), type_=ARRAY(Integer)))
+    """``column = ANY(values)`` for an integer column: one array parameter
+    however many values. A value no integer column can hold matches nothing
+    and is left out, so an absurd id in a request is simply not found."""
+    storable = [value for value in values if value in _INTEGER_COLUMN]
+    return column == func.any(bindparam(None, storable, type_=ARRAY(Integer)))
 
 
 def has_stat(*conditions: ColumnElement) -> ColumnElement:

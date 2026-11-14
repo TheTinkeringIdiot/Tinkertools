@@ -290,4 +290,4 @@ def test_a_batch_costs_as_many_queries_as_one_item(store):
             response = batch(client, *[(1000 + n, 100) for n in range(30)])
 
     assert all(result["item"]["interpolating"] for result in response.json()["results"])
-    assert len(many) == len(one) <= 3
+    assert 0 < len(many) == len(one) <= 3
