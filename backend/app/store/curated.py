@@ -26,11 +26,10 @@ from app.store.items import (
     SOURCE_TYPE_MOB,
     ItemRecord,
     actions_response,
+    item_document,
     load_effect_formats,
     load_records,
     spell_data_response,
-    spell_params,
-    stats_response,
 )
 from app.store.presence import any_of, page_offset, present
 
@@ -319,47 +318,42 @@ def symbiant_dropped_by(db: Session, build: Build, aoid: int) -> List[MobDropInf
 def _perk_info(
     perk: Any, record: ItemRecord, formats: Dict[int, str]
 ) -> Dict[str, Any]:
-    """A perk as the lookup serves it: its item, then the curated fields."""
+    """A perk as the lookup serves it: its item, then the curated fields.
+
+    The item is ``item_document`` in the shape this route has always had:
+    stats carry a null ``stat_name``, action criteria their ``order_index``,
+    and there are no effect criteria, attack or defense skills, or sources.
+    """
     ai_level = perk.ai_level_required
     if ai_level is not None and ai_level <= 0:
         ai_level = None
+    document = item_document(record, formats)
+    del document["sources"]
     return {
         "id": record.aoid,
-        "aoid": record.aoid,
-        "name": record.name,
-        "ql": record.ql,
-        "item_class": record.item_class,
-        "description": record.description,
-        "is_nano": record.is_nano,
-        "stats": [{**stat, "stat_name": None} for stat in stats_response(record.stats)],
+        **document,
+        "stats": [{**stat, "stat_name": None} for stat in document["stats"]],
         "spell_data": [
             {
-                "event": event["event"],
+                **event,
                 "spells": [
-                    {
-                        "target": effect["target"],
-                        "tick_count": effect["tick_count"],
-                        "tick_interval": effect["tick_interval"],
-                        "spell_id": effect["spell_id"],
-                        "spell_format": formats.get(effect["spell_id"]),
-                        "spell_params": spell_params(effect),
-                    }
-                    for effect in event["effects"]
+                    {key: value for key, value in spell.items() if key != "criteria"}
+                    for spell in event["spells"]
                 ],
             }
-            for event in record.effects
+            for event in document["spell_data"]
         ],
         "attack_stats": [],
         "defense_stats": [],
         "actions": [
             {
-                "action": action["action"],
+                **action,
                 "criteria": [
                     {**criterion, "order_index": position}
                     for position, criterion in enumerate(action["criteria"])
                 ],
             }
-            for action in actions_response(record)
+            for action in document["actions"]
         ],
         "perk_name": perk.name,
         "perk_counter": perk.counter,

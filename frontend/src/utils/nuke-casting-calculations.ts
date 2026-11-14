@@ -178,6 +178,22 @@ export function centisecondsToSeconds(centiseconds: number): number {
 }
 
 /**
+ * Format a time in centiseconds for display as seconds
+ *
+ * Cast and recharge times are stat values in centiseconds; a nano's card and
+ * detail page show them as an item's page does.
+ *
+ * @param centiseconds - Time value in centiseconds (1/100 second)
+ * @returns The time in seconds with 2 decimals and its unit
+ *
+ * @example
+ * formatCentiseconds(150) // Returns "1.50s"
+ */
+export function formatCentiseconds(centiseconds: number): string {
+  return `${centisecondsToSeconds(centiseconds).toFixed(2)}s`;
+}
+
+/**
  * Format seconds for display with appropriate unit labels
  *
  * Display format:

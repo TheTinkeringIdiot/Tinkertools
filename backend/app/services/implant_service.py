@@ -7,10 +7,8 @@ Handles implant lookup by slot, QL, and exact cluster combinations.
 import logging
 from typing import Dict, Optional, Sequence, Tuple
 
-from sqlalchemy import ColumnElement, Integer, func, select
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.orm import Session
-from sqlalchemy.sql.expression import bindparam
 
 from app.api.schemas.item import ItemDetail
 from app.models.interpolated_item import InterpolatedItem
@@ -18,7 +16,7 @@ from app.services.interpolation import InterpolationService
 from app.store import tables as t
 from app.store.context import Build
 from app.store.items import load_item_details
-from app.store.presence import any_of, has_effect, revisions
+from app.store.presence import any_of, has_effect, none_of, revisions
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +47,6 @@ def _cluster_count(*conditions: ColumnElement) -> ColumnElement:
     )
 
 
-def _none_of(column: ColumnElement, values: Sequence[int]) -> ColumnElement:
-    """``column <> ALL(values)``, the complement of ``any_of``."""
-    storable = [value for value in values if -(2**31) <= value < 2**31]
-    return column != func.all(bindparam(None, storable, type_=ARRAY(Integer)))
-
-
 def _has_exactly(cluster_stats: Sequence[int]) -> Sequence[ColumnElement]:
     """The revision's cluster effects modify exactly ``cluster_stats``: one
     effect for each stat asked for and none for any other stat."""
@@ -66,7 +58,7 @@ def _has_exactly(cluster_stats: Sequence[int]) -> Sequence[ColumnElement]:
         # effect sets with the first cluster before anything is counted.
         has_effect(_is_cluster(), subject == cluster_stats[0]),
         _cluster_count(any_of(subject, cluster_stats)) == len(cluster_stats),
-        ~has_effect(_is_cluster(), _none_of(subject, cluster_stats)),
+        ~has_effect(_is_cluster(), none_of(subject, cluster_stats)),
     ]
 
 

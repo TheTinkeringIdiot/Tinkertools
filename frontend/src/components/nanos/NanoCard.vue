@@ -267,7 +267,7 @@ import type { DisplayCriterion } from '@/services/action-criteria';
 import type { NanoProgram, NanoCompatibilityInfo, NanoEffect } from '@/types/nano';
 import CriterionReference from '@/components/CriterionReference.vue';
 import { useNanosStore } from '@/stores/nanosStore';
-import { centisecondsToSeconds } from '@/utils/nuke-casting-calculations';
+import { formatCentiseconds } from '@/utils/nuke-casting-calculations';
 import { getNanoRequirements } from './nano-compatibility';
 import { schoolAvatarClass, schoolInitials } from './nano-schools';
 
@@ -345,10 +345,6 @@ const compatibilityTooltip = computed(() => {
 });
 
 // Methods
-/** Cast and recharge times are stat values in centiseconds; shown as on an item's page */
-const formatCentiseconds = (centiseconds: number): string =>
-  `${centisecondsToSeconds(centiseconds).toFixed(2)}s`;
-
 const formatEffect = (effect: NanoEffect): string => {
   const typeLabels: Record<string, string> = {
     stat_boost: 'Stat Boost',

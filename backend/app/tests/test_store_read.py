@@ -17,6 +17,7 @@ from app.store import tables as t
 from app.store.context import Build, get_build, resolve_build
 from app.store.items import load_item_details, load_item_documents, load_records
 from app.store.presence import (
+    any_of,
     fetch_page,
     fetch_search_page,
     has_atkdef,
@@ -24,6 +25,7 @@ from app.store.presence import (
     has_requirement,
     has_stat,
     nano_policy,
+    none_of,
     page_fields,
     revisions,
 )
@@ -503,6 +505,16 @@ def test_filters_compose_on_the_revisions_of_a_build(store):
         .where(t.nano_properties.c.strain == 8)
     )
     assert aoids_of(store, by_strain) == [11]
+
+
+def test_none_of_is_the_complement_of_any_of_for_the_values_a_column_can_hold(store):
+    build = store.add_build("b1", 1, items=[item(1), item(2), item(3)])
+    aoid = t.item_revision.c.aoid
+    wanted = [1, 3, 2**40]
+
+    assert aoids_of(store, revisions(build, aoid).where(any_of(aoid, wanted))) == [1, 3]
+    assert aoids_of(store, revisions(build, aoid).where(none_of(aoid, wanted))) == [2]
+    assert aoids_of(store, revisions(build, aoid).where(none_of(aoid, []))) == [1, 2, 3]
 
 
 def test_pages_are_sorted_with_the_aoid_breaking_ties_and_counted_once(store):
