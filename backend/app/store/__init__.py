@@ -52,8 +52,8 @@ Porting a route
 3. Items. ``load_item_details`` returns ``ItemDetail`` responses in three
    queries for any number of items. ``load_records`` returns ``ItemRecord``
    values (one query) for code that computes on items or builds another
-   response shape; ``item_detail``, ``stats_response``, ``actions_response``
-   and ``spell_data_response`` turn a record into response pieces.
+   response shape; ``stats_response`` and ``actions_response`` turn a record
+   into response pieces.
    ``item_document`` is the one place the shape of an ``ItemDetail`` is
    written; ``load_item_documents`` returns the plain documents for a route
    that serves too many items to validate each (``/weapons/analyze``). A lighter
@@ -139,14 +139,11 @@ from app.store.context import Build, get_build, get_store
 from app.store.items import (
     ItemRecord,
     actions_response,
-    item_detail,
     item_document,
     load_effect_formats,
     load_item_details,
     load_item_documents,
     load_records,
-    load_sources,
-    spell_data_response,
     stats_response,
 )
 from app.store.presence import (
@@ -176,17 +173,14 @@ __all__ = [
     "has_effect",
     "has_requirement",
     "has_stat",
-    "item_detail",
     "item_document",
     "load_effect_formats",
     "load_item_details",
     "load_item_documents",
     "load_records",
-    "load_sources",
     "nano_policy",
     "page_fields",
     "present",
     "revisions",
-    "spell_data_response",
     "stats_response",
 ]

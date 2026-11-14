@@ -351,9 +351,9 @@ def item_document(
 ) -> Dict[str, Any]:
     """One record as the JSON document of its ``ItemDetail``.
 
-    This is where the shape of a served item is written down. ``item_detail``
-    validates it into the response model; a route that serves many items at
-    once sends the documents as they are.
+    This is where the shape of a served item is written down.
+    ``load_item_details`` validates it into the response model; a route that
+    serves many items at once sends the documents as they are.
     """
     return {
         "aoid": record.aoid,
@@ -370,15 +370,6 @@ def item_document(
         "actions": actions_response(record),
         "sources": [source.model_dump(mode="json") for source in sources],
     }
-
-
-def item_detail(
-    record: ItemRecord,
-    formats: Dict[int, str],
-    sources: Sequence[ItemSourceResponse] = (),
-) -> ItemDetail:
-    """The ``ItemDetail`` response of one record."""
-    return ItemDetail.model_validate(item_document(record, formats, sources))
 
 
 def load_item_documents(
