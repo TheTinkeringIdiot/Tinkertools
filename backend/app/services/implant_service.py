@@ -18,11 +18,12 @@ from app.services.interpolation import InterpolationService
 from app.store import tables as t
 from app.store.context import Build
 from app.store.items import load_item_details
-from app.store.presence import any_of, has_effect, has_stat, revisions
+from app.store.presence import any_of, has_effect, revisions
 
 logger = logging.getLogger(__name__)
 
 IMPLANT_ITEM_CLASS = 3
+STAT_QL = 54
 STAT_SLOT = 298
 # The effect type of a cluster: "Modify {Stat} {Amount}".
 CLUSTER_SPELL_ID = 53045
@@ -152,15 +153,29 @@ class ImplantService:
             .where(t.part_text.c.text_id == revision.c.text_id)
             .scalar_subquery()
         )
+        # The stat sets of the slot at this QL. The QL is tested on the stats
+        # part as well as on the revision because that test has an index to
+        # start from and all implants of a slot and QL share a handful of
+        # stat sets.
+        slot_entry, ql_entry = t.stat_entry.alias("slot"), t.stat_entry.alias("ql")
+        fitting_stats = (
+            select(slot_entry.c.stats_id)
+            .select_from(
+                ql_entry.join(slot_entry, slot_entry.c.stats_id == ql_entry.c.stats_id)
+            )
+            .where(
+                ql_entry.c.stat == STAT_QL,
+                ql_entry.c.value == base_ql,
+                slot_entry.c.stat == STAT_SLOT,
+                slot_entry.c.value.op("&")(slot) > 0,
+            )
+        )
         query = (
             revisions(self.build, revision.c.aoid)
             .where(
                 revision.c.item_class == IMPLANT_ITEM_CLASS,
                 revision.c.ql == base_ql,
-                has_stat(
-                    t.stat_entry.c.stat == STAT_SLOT,
-                    t.stat_entry.c.value.op("&")(slot) > 0,
-                ),
+                revision.c.stats_id.in_(fitting_stats),
                 *_has_exactly(list(clusters.values())),
             )
             .order_by(in_standard_series.desc(), revision.c.aoid)
