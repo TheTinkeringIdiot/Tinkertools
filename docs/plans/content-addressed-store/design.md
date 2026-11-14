@@ -171,7 +171,16 @@ Also:
 - The frontend-facing contract for item reads stays, with these changes.
 - Every list the API sorts ends its sort on the AOID (or the mob id for mobs), never on an internal id, so row order and pagination are the same whatever the storage. This is already true of the current code as of stage 0.
 - An item whose attack/defense block is empty is not a weapon. The current store treats the handful of such junk items (four or five per build) as weapons in `weapons=true` searches; the new one will not.
-- `/items/{aoid}/revisions` and `POST /items/revisions/batch` read the per-version hash table that the new store replaces. They keep their response shape, are re-implemented on the change log in stage 4, and are outside the golden reference because the hash values change by design.
+- `/items/{aoid}/revisions` and `POST /items/revisions/batch` keep their response shape and read the presence runs of the new store (ported in stage 3; the change log compares with the previous build only, so it cannot show an item that leaves and returns). They are outside the golden reference. A change that is only a reordering is no longer reported: about one history in six loses a "spells" point.
+- Behaviour changed on purpose by the read path (stage 3), each measured against the old path:
+  - A nano's `casting_time` and `recharge_time` are its attack delay (stat 294) and recharge delay (stat 210), in centiseconds. The old values were the tick count of an arbitrary effect.
+  - Interpolating an item that holds a stat twice with different values (in practice Mass, stat 2) takes the highest value of each variant; the old choice was arbitrary.
+  - `/implants/lookup` among implants with the same slot and cluster set prefers the one named `... Implant: ...`, then the lowest AOID.
+  - `/weapons/analyze` returns its rows in AOID order.
+  - Requests that failed with a 500 now answer: a ranked search with stat filters, `slot` of 63 or more, a page number beyond any count (an empty page with the right total).
+  - Four mob locations lose a stray backslash (`symbiants.csv`).
+  - An item's `id` in a response is its AOID.
+- The response cache holds rendered responses, is bounded in bytes (`RESPONSE_CACHE_MAX_BYTES`, 256 MB by default) and evicts the least recently used entry.
 - Every identifier becomes an AOID. Row IDs for stats, spells, criteria and actions are dropped from responses. `/nanos/{id}`, `/symbiants/{id}`, equipment bonuses and source links move to AOID. Client-side user data (nano favorites, farm progress) moves to AOID with it.
 - Version stays in the URL path (`/api/v1/{slug}/...`), including the family aliases (`ao`, `prk`); it becomes a query parameter internally instead of a schema switch.
 - Responses for a specific revision are immutable and served with long-lived cache headers keyed by revision.
@@ -240,7 +249,7 @@ The work in §7 is carried out by agents, with one orchestrating session acting 
 ### 10.1 Ground rules
 
 - **Contracts before agents.** The orchestrator writes the three things every agent depends on: the canonical-form and hashing module, the table definitions for the new store, and the acceptance harness.
-- **Golden reference.** API responses are captured for a fixed set of requests on five builds (14.2.2, 15.0.1, 17.10.5, live, PRK) with `backend/tools/golden.py`; the baseline is taken from the code as it stands after stage 1. Read-path work must reproduce it. The only differences allowed are listed at the top of that file: internal ids, order that carries no meaning, tie order within a sort key, and the criteria of effects, which are compared as a set because the current store keeps them de-duplicated and unordered while the new one keeps the client's sequence.
+- **Golden reference.** API responses are captured for a fixed set of requests on five builds (14.2.2, 15.0.1, 17.10.5, live, PRK) with `backend/tools/golden.py`; the baseline is taken from the code as it stands after stage 1. Read-path work must reproduce it. The only differences allowed are listed at the top of that file: internal ids, order that carries no meaning, tie order within a sort key, and the criteria of effects, which are compared as a set because the current store keeps them de-duplicated and unordered while the new one keeps the client's sequence. Two rules were added while porting: a mob's location is compared without the stray backslash, and a nano program's casting and recharge time are not compared.
 - **Isolation.** Each agent works in its own git worktree on a named set of files. The new store lives in its own database schema beside the current one, which agents may read but never write. Only the importer stage writes to the database.
 - **Small test database.** Three builds in a scratch database, so an agent's loop takes seconds instead of a full import.
 - **Builders do not sign off their own work.** See 10.3.
