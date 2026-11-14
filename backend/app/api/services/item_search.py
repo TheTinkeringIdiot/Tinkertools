@@ -20,17 +20,12 @@ from __future__ import annotations
 import logging
 from typing import List, Optional, Sequence, Tuple
 
-from sqlalchemy import BigInteger, ColumnElement, and_, cast, exists, false, func, or_
+from sqlalchemy import BigInteger, ColumnElement, cast, false, func, or_, select
 from sqlalchemy.sql.expression import literal_column
 
 from app.store import tables as t
 from app.store.context import Build
-from app.store.presence import (
-    has_effect,
-    has_requirement,
-    has_stat,
-    nano_policy,
-)
+from app.store.presence import has_effect, has_requirement, has_stat
 
 logger = logging.getLogger(__name__)
 
@@ -98,21 +93,27 @@ def has_strain(build: Build, strain: int) -> ColumnElement:
     """The revision's strain in ``build`` is ``strain``.
 
     A nano's strain is the effective one of the build's strain policy
-    (``nano_properties``); any other item only has the stat of its own.
+    (``nano_properties``); any other item only has the stat of its own. Both
+    sets are small and found by index, so the revision is tested against
+    their union rather than each revision against two subqueries.
     """
-    is_nano_of_strain = exists().where(
-        nano_policy(build), t.nano_properties.c.strain == strain
+    other = t.item_revision.alias("strain_item")
+    nanos = select(t.nano_properties.c.rev_id).where(
+        t.nano_properties.c.overlay_strain_first == build.overlay_strain_first,
+        t.nano_properties.c.strain == strain,
     )
-    return or_(
-        is_nano_of_strain,
-        and_(
-            ~t.item_revision.c.is_nano,
-            has_stat(
-                t.stat_entry.c.stat == STAT_NANO_STRAIN,
-                t.stat_entry.c.value == strain,
-            ),
-        ),
+    others = (
+        select(other.c.rev_id)
+        .select_from(
+            t.stat_entry.join(other, other.c.stats_id == t.stat_entry.c.stats_id)
+        )
+        .where(
+            t.stat_entry.c.stat == STAT_NANO_STRAIN,
+            t.stat_entry.c.value == strain,
+            ~other.c.is_nano,
+        )
     )
+    return t.item_revision.c.rev_id.in_(nanos.union_all(others))
 
 
 def parse_stat_bonuses(stat_bonuses: Optional[str]) -> List[int]:
@@ -249,8 +250,8 @@ def common_item_filters(
 
 
 def parse_search_fields(search_fields: Optional[str]) -> List[str]:
-    """The fields a search reads, in the order asked: ``name`` and
-    ``description`` by default and when no known field is asked for. The fields
+    """The known fields a ``search_fields`` parameter names: ``name`` and
+    ``description`` by default and when it names no known field. The fields
     ``effects`` and ``stats`` are accepted and search nothing."""
     if search_fields:
         requested = [field.strip().lower() for field in search_fields.split(",")]
@@ -260,13 +261,15 @@ def parse_search_fields(search_fields: Optional[str]) -> List[str]:
     return list(SEARCHABLE_FIELDS)
 
 
+def _text_columns(fields: Sequence[str]) -> List[ColumnElement]:
+    return [t.part_text.c[field] for field in SEARCHABLE_FIELDS if field in fields]
+
+
 def substring_match(fields: Sequence[str], q: str) -> ColumnElement:
     """``q`` occurs in one of ``fields`` of ``part_text``, whatever the case.
     Only the name is read when ``fields`` names neither text column."""
     pattern = f"%{q}%"
-    columns = [t.part_text.c[field] for field in fields if field in SEARCHABLE_FIELDS]
-    if not columns:
-        columns = [t.part_text.c.name]
+    columns = _text_columns(fields) or [t.part_text.c.name]
     return or_(*(column.ilike(pattern) for column in columns))
 
 
@@ -278,13 +281,11 @@ def full_text_match(
 
     ``q`` is read by ``websearch_to_tsquery``, which accepts any input: bare
     words are ANDed, and it knows quoted phrases, OR and -exclusion. The
-    document is the fields joined by a space in the order asked; name, the
-    description, and name then description have an index in 001_store.sql.
-    Both text columns are read when ``fields`` names neither.
+    document is the name, the description, or the name, a space and the
+    description: the three expressions indexed in 001_store.sql. Both columns
+    are read when ``fields`` names neither.
     """
-    columns = [t.part_text.c[field] for field in fields if field in SEARCHABLE_FIELDS]
-    if not columns:
-        columns = [t.part_text.c.name, t.part_text.c.description]
+    columns = _text_columns(fields) or _text_columns(SEARCHABLE_FIELDS)
     document = columns[0]
     for column in columns[1:]:
         document = document.op("||")(_SPACE).op("||")(column)
