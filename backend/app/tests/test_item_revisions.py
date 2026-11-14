@@ -1,433 +1,351 @@
 """
-Tests for cross-version item change history.
+Tests for cross-version item change history:
 
-``compute_revision_points`` is a pure function over registry rows and revision
-rows, so most of the coverage here is plain unit tests with lightweight stubs.
-The two endpoints get one round trip each against inserted rows.
+    GET  /items/{aoid}/revisions
+    POST /items/revisions/batch
+
+Each test fills a throwaway store (the ``store`` fixture) with a few builds of
+hand-made items and asks the API for an item's history.
 """
 
-from datetime import date
-from types import SimpleNamespace
+import os
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import update
 
-from app.api.routes.item_revisions import compute_revision_points
-from app.models import GameVersion, ItemRevision
+from app.store import tables as t
+from app.tests.fixtures.store_fixtures import criterion, item, modify
 
-# Slugs the endpoint fixtures insert. The deployment database has its own
-# registry rows, so assertions filter the API's version lists down to these.
-FIXTURE_SLUGS = ["ao-18.7", "ao-18.8", "prk"]
+pytestmark = pytest.mark.skipif(
+    not os.getenv("DATABASE_URL", "").startswith("postgres"), reason="needs PostgreSQL"
+)
 
-
-def only_fixture_slugs(slugs):
-    """Keep just the fixture's own slugs, in the order the API returned."""
-    return [slug for slug in slugs if slug in FIXTURE_SLUGS]
+WRENCH = 100
 
 
-def make_version(slug, parent_slug=None, sort_order=0, enabled=True):
-    """Minimal stand-in for a GameVersion row."""
-    return SimpleNamespace(
-        slug=slug,
-        parent_slug=parent_slug,
-        sort_order=sort_order,
-        enabled=enabled,
-        display_name=slug.upper(),
-        family="ao",
-        snapshot_date=None,
-        client_build=None,
+def wrench(name="Wrench", stat=10, amounts=(5,), requires=50, instance=1, **extra):
+    """Item 100 with one knob per part of its definition."""
+    return item(
+        WRENCH,
+        name=name,
+        stats=[(17, stat), (23, instance)],
+        SpellData=[{"Event": 14, "Items": [modify(124, n) for n in amounts]}],
+        ActionData={
+            "Actions": [{"Action": 6, "Criteria": [criterion(112, requires, 2)]}]
+        },
+        **extra,
     )
 
 
-def make_row(slug, stats="s", spells="p", actions="a", text="t"):
-    """Minimal stand-in for an ItemRevision row."""
-    return SimpleNamespace(
-        aoid=1,
-        version_slug=slug,
-        content_hash=f"{stats}{spells}{actions}{text}",
-        stats_hash=stats,
-        spells_hash=spells,
-        actions_hash=actions,
-        text_hash=text,
+def history(store, aoid=WRENCH, slug=None):
+    slug = slug or store.builds()[0].slug
+    with store.client(slug) as client:
+        response = client.get(f"/api/v1/items/{aoid}/revisions")
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def points(store, aoid=WRENCH, slug=None):
+    """``{slug: changed labels, or "first seen"}`` in the order returned."""
+    return {
+        point["version_slug"]: "first seen" if point["first_seen"] else point["changed"]
+        for point in history(store, aoid, slug)["revisions"]
+    }
+
+
+def summary(store, aoids, slug):
+    with store.client(slug) as client:
+        response = client.post("/api/v1/items/revisions/batch", json={"aoids": aoids})
+    assert response.status_code == 200, response.text
+    return response.json()["items"]
+
+
+# ---------------------------------------------------------------------------
+# Change points
+# ---------------------------------------------------------------------------
+
+
+def test_an_item_that_never_changed_has_one_point_where_it_first_appears(store):
+    store.add_build("ao-1", 1, items=[])
+    store.add_build("ao-2", 2, items=[wrench()])
+    store.add_build("ao-3", 3, items=[wrench()])
+
+    data = history(store)
+
+    assert data["aoid"] == WRENCH
+    assert points(store) == {"ao-2": "first seen"}
+    assert data["first_seen_in"] == "ao-2"
+    assert data["present_in"] == ["ao-3", "ao-2"]
+    assert data["missing_in"] == ["ao-1"]
+
+
+def test_each_changed_part_is_reported_under_its_label(store):
+    store.add_build("ao-1", 1, items=[wrench()])
+    store.add_build("ao-2", 2, items=[wrench(stat=11)])
+    store.add_build("ao-3", 3, items=[wrench(stat=11, amounts=(6,))])
+    store.add_build("ao-4", 4, items=[wrench(stat=11, amounts=(6,), requires=60)])
+    store.add_build(
+        "ao-5", 5, items=[wrench("Spanner", stat=11, amounts=(6,), requires=60)]
+    )
+    store.add_build("ao-6", 6, items=[wrench("Spanner")])
+
+    assert points(store) == {
+        "ao-6": ["stats", "spells", "actions"],
+        "ao-5": ["text"],
+        "ao-4": ["actions"],
+        "ao-3": ["spells"],
+        "ao-2": ["stats"],
+        "ao-1": "first seen",
+    }
+
+
+def test_attack_skills_and_the_mesh_count_as_stats(store):
+    attack = {"Attack": [{"Stat": 112, "RawValue": 100}], "Defense": []}
+    mesh = {"Animation": {"Stat": 12, "RawValue": 7}}
+    store.add_build("ao-1", 1, items=[wrench()])
+    store.add_build("ao-2", 2, items=[wrench(AttackDefenseData=attack)])
+    store.add_build(
+        "ao-3",
+        3,
+        items=[wrench(AttackDefenseData=attack, AnimationMesh=mesh)],
     )
 
-
-# ao-18.7 -> ao-18.8 -> prk, displayed newest lineage first.
-LINEAGE = [
-    make_version("ao-18.7", parent_slug=None, sort_order=30),
-    make_version("ao-18.8", parent_slug="ao-18.7", sort_order=20),
-    make_version("prk", parent_slug="ao-18.8", sort_order=10),
-]
+    assert points(store) == {
+        "ao-3": ["stats"],
+        "ao-2": ["stats"],
+        "ao-1": "first seen",
+    }
 
 
-class TestComputeRevisionPoints:
-    """Unit tests for the lineage walk."""
+def test_a_build_that_only_reorders_or_renumbers_internals_is_no_change(store):
+    store.add_build("ao-1", 1, items=[wrench(amounts=(5, 6), instance=1)])
+    store.add_build("ao-2", 2, items=[wrench(amounts=(6, 5), instance=2)])
 
-    def test_no_rows_yields_no_points(self):
-        assert compute_revision_points(LINEAGE, []) == []
-
-    def test_single_version_is_first_seen(self):
-        points = compute_revision_points(LINEAGE, [make_row("ao-18.7")])
-
-        assert len(points) == 1
-        assert points[0].version_slug == "ao-18.7"
-        assert points[0].first_seen is True
-        assert points[0].changed == []
-
-    def test_stat_change_between_snapshots(self):
-        rows = [
-            make_row("ao-18.7", stats="s1"),
-            make_row("ao-18.8", stats="s2"),
-        ]
-        points = compute_revision_points(LINEAGE, rows)
-
-        # Display order puts ao-18.8 (sort_order 20) before ao-18.7 (30).
-        assert [p.version_slug for p in points] == ["ao-18.8", "ao-18.7"]
-        change = points[0]
-        assert change.first_seen is False
-        assert change.changed == ["stats"]
-        assert points[1].first_seen is True
-
-    def test_unchanged_child_emits_no_point(self):
-        rows = [
-            make_row("ao-18.7"),
-            make_row("ao-18.8"),
-            make_row("prk"),
-        ]
-        points = compute_revision_points(LINEAGE, rows)
-
-        # prk inherits ao-18.8's definition unchanged, so it is not a patch point.
-        assert [p.version_slug for p in points] == ["ao-18.7"]
-        assert points[0].first_seen is True
-
-    def test_prk_text_change_emits_point(self):
-        rows = [
-            make_row("ao-18.7"),
-            make_row("ao-18.8"),
-            make_row("prk", text="t2"),
-        ]
-        points = compute_revision_points(LINEAGE, rows)
-
-        assert [p.version_slug for p in points] == ["prk", "ao-18.7"]
-        assert points[0].changed == ["text"]
-        assert points[0].first_seen is False
-
-    def test_reports_every_changed_sub_hash_in_order(self):
-        rows = [
-            make_row("ao-18.7"),
-            make_row("ao-18.8", stats="s2", spells="p2", actions="a2", text="t2"),
-        ]
-        points = compute_revision_points(LINEAGE, rows)
-
-        assert points[0].changed == ["stats", "spells", "actions", "text"]
-
-    def test_missing_middle_snapshot_compares_against_nearest_ancestor(self):
-        # The item is absent from ao-18.8, so prk compares against ao-18.7.
-        rows = [
-            make_row("ao-18.7", stats="s1"),
-            make_row("prk", stats="s2"),
-        ]
-        points = compute_revision_points(LINEAGE, rows)
-
-        assert [p.version_slug for p in points] == ["prk", "ao-18.7"]
-        assert points[0].changed == ["stats"]
-        assert points[0].first_seen is False
-
-    def test_missing_middle_snapshot_with_no_change_emits_nothing(self):
-        rows = [make_row("ao-18.7"), make_row("prk")]
-        points = compute_revision_points(LINEAGE, rows)
-
-        assert [p.version_slug for p in points] == ["ao-18.7"]
-
-    def test_separate_lineage_is_first_seen_on_its_own(self):
-        versions = [
-            make_version("ao-18.7", parent_slug=None, sort_order=30),
-            make_version("prk", parent_slug=None, sort_order=10),
-        ]
-        rows = [make_row("ao-18.7"), make_row("prk")]
-        points = compute_revision_points(versions, rows)
-
-        assert [(p.version_slug, p.first_seen) for p in points] == [
-            ("prk", True),
-            ("ao-18.7", True),
-        ]
-
-    def test_rows_for_unknown_versions_are_ignored(self):
-        rows = [make_row("ao-18.7"), make_row("ao-15.0", stats="s9")]
-        points = compute_revision_points(LINEAGE, rows)
-
-        assert [p.version_slug for p in points] == ["ao-18.7"]
-
-    def test_parent_cycle_does_not_hang(self):
-        versions = [
-            make_version("a", parent_slug="b", sort_order=1),
-            make_version("b", parent_slug="a", sort_order=2),
-        ]
-        rows = [make_row("a", stats="s1"), make_row("b", stats="s2")]
-
-        points = compute_revision_points(versions, rows)
-
-        # Both resolve a predecessor via the cycle; neither walk loops forever.
-        assert [p.version_slug for p in points] == ["a", "b"]
-        assert all(p.changed == ["stats"] for p in points)
-
-    def test_self_parent_does_not_hang(self):
-        versions = [make_version("a", parent_slug="a", sort_order=1)]
-        points = compute_revision_points(versions, [make_row("a")])
-
-        assert [(p.version_slug, p.first_seen) for p in points] == [("a", True)]
+    assert points(store) == {"ao-1": "first seen"}
 
 
-def item_revisions_is_view(db_session) -> bool:
-    return (
-        db_session.execute(
-            text(
-                "SELECT relkind FROM pg_class WHERE oid = to_regclass('public.item_revisions')"
-            )
-        ).scalar()
-        == "v"
+def test_a_point_describes_its_build(store):
+    store.add_build("ao-1", 1, items=[wrench()], client_build="1.0")
+
+    assert history(store)["revisions"] == [
+        {
+            "version_slug": "ao-1",
+            "display_name": "ao-1",
+            "family": "ao",
+            "snapshot_date": None,
+            "client_build": "1.0",
+            "changed": [],
+            "first_seen": True,
+        }
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Items that leave and come back
+# ---------------------------------------------------------------------------
+
+
+def test_an_item_that_returns_unchanged_has_not_changed(store):
+    store.add_build("ao-1", 1, items=[wrench()])
+    store.add_build("ao-2", 2, items=[])
+    store.add_build("ao-3", 3, items=[])
+    store.add_build("ao-4", 4, items=[wrench()])
+
+    data = history(store)
+
+    assert points(store) == {"ao-1": "first seen"}
+    assert data["present_in"] == ["ao-4", "ao-1"]
+    assert data["missing_in"] == ["ao-3", "ao-2"]
+
+
+def test_an_item_that_returns_changed_is_compared_with_what_it_was(store):
+    store.add_build("ao-1", 1, items=[wrench()])
+    store.add_build("ao-2", 2, items=[])
+    store.add_build("ao-3", 3, items=[wrench(stat=11)])
+
+    assert points(store) == {"ao-3": ["stats"], "ao-1": "first seen"}
+
+
+def test_an_item_no_build_has_gets_an_empty_history(store):
+    store.add_build("ao-1", 1, items=[wrench()])
+    store.add_build("ao-2", 2, items=[wrench()])
+
+    for aoid in (999, 0, -5, 2**40):
+        assert history(store, aoid) == {
+            "aoid": aoid,
+            "present_in": [],
+            "first_seen_in": None,
+            "revisions": [],
+            "missing_in": ["ao-2", "ao-1"],
+        }
+
+
+def test_a_disabled_build_is_not_part_of_the_history(store):
+    store.add_build("ao-1", 1, items=[wrench()])
+    store.add_build("ao-2", 2, items=[wrench(stat=11)])
+    store.add_build("ao-3", 3, items=[wrench(stat=11)])
+    store.db.execute(
+        update(t.build).where(t.build.c.slug == "ao-2").values(enabled=False)
     )
 
+    data = history(store)
 
-def add_store_revisions(db_session, slugs, revisions):
-    """Shared store layout: give each fixture version a vid and store one
-    ``gd.items`` revision per distinct (aoid, hashes), tagged with the vids of
-    the versions holding it. ``public.item_revisions`` derives from these."""
-    vids = {}
-    for offset, slug in enumerate(slugs):
-        vids[slug] = 32000 + offset
-        db_session.execute(
-            text("UPDATE public.game_versions SET vid = :vid WHERE slug = :slug"),
-            {"vid": vids[slug], "slug": slug},
-        )
+    assert points(store) == {"ao-3": ["stats"], "ao-1": "first seen"}
+    assert data["present_in"] == ["ao-3", "ao-1"]
+    assert data["missing_in"] == []
 
-    holders = {}
-    for slug, aoid, *hashes in revisions:
-        holders.setdefault((aoid, *hashes), []).append(vids[slug])
-    for (aoid, stats, spells, actions, text_value), members in holders.items():
-        content = stats + spells + actions + text_value
-        db_session.execute(
-            text(
-                "INSERT INTO gd.items (aoid, name, ql, is_nano, content_hash, stats_hash, "
-                "spells_hash, actions_hash, text_hash, storage_fp, vids) "
-                "VALUES (:aoid, 'fixture', 1, false, :content, :stats, :spells, :actions, "
-                ":text, md5(:content), CAST(:vids AS smallint[]))"
-            ),
-            {
-                "aoid": aoid,
-                "content": content,
-                "stats": stats,
-                "spells": spells,
-                "actions": actions,
-                "text": text_value,
-                "vids": members,
-            },
-        )
-    db_session.flush()
+
+# ---------------------------------------------------------------------------
+# A branch that forks
+# ---------------------------------------------------------------------------
 
 
 @pytest.fixture
-def revision_data(db_session):
-    """Three versions in one lineage plus revision rows for two items.
+def forked(store):
+    """AO builds 1 to 3 and a PRK branch forked from AO 2.
 
-    aoid 4242 changes stats in ao-18.8 and text in prk.
-    aoid 7 exists only in ao-18.7.
+    ======  ====  ====  ====  =====
+    item    ao-1  ao-2  ao-3  prk-1
+    ======  ====  ====  ====  =====
+    100     v1    v1    v2    v3
+    200     v1    v1    v1    v1
+    300     .     .     v1    v1
+    400     .     .     .     v1
+    500     v1    .     .     v2
+    ======  ====  ====  ====  =====
     """
-    # Only one row in the whole table may be is_default; clear any existing one
-    # inside the test transaction, which is rolled back afterwards.
-    db_session.execute(
-        text("UPDATE public.game_versions SET is_default = FALSE WHERE is_default")
+    store.add_build(
+        "ao-1", 1, items=[wrench(), item(200, name="Same"), item(500, name="Back")]
     )
+    store.add_build("ao-2", 2, items=[wrench(), item(200, name="Same")])
+    store.add_build(
+        "ao-3",
+        3,
+        items=[wrench(stat=11), item(200, name="Same"), item(300, name="Late")],
+    )
+    store.add_build(
+        "prk-1",
+        1,
+        branch="prk",
+        parent_slug="ao-2",
+        sort_order=1,
+        items=[
+            wrench("PRK Wrench"),
+            item(200, name="Same"),
+            item(300, name="Late"),
+            item(400, name="Own"),
+            item(500, name="Back again"),
+        ],
+    )
+    return store
 
-    rows = [
-        dict(
-            slug="ao-18.7",
-            schema_name="gv_ao_18_7",
-            display_name="AO 18.7",
-            family="ao",
-            parent_slug=None,
-            sort_order=30,
-            snapshot_date=date(2019, 11, 1),
-        ),
-        dict(
-            slug="ao-18.8",
-            schema_name="gv_ao_18_8",
-            display_name="AO 18.8",
-            family="ao",
-            parent_slug="ao-18.7",
-            sort_order=20,
-            is_default=True,
-            snapshot_date=date(2025, 6, 1),
-        ),
-        dict(
-            slug="prk",
-            schema_name="gv_prk",
-            display_name="PRK",
-            family="prk",
-            parent_slug="ao-18.8",
-            sort_order=10,
-            snapshot_date=date(2026, 1, 15),
-        ),
+
+def test_a_fork_is_compared_with_the_build_it_forks_from(forked):
+    assert points(forked) == {
+        "prk-1": ["text"],
+        "ao-3": ["stats"],
+        "ao-1": "first seen",
+    }
+    assert points(forked, 200) == {"ao-1": "first seen"}
+    assert history(forked, 200)["present_in"] == ["prk-1", "ao-3", "ao-2", "ao-1"]
+
+
+def test_a_fork_does_not_inherit_from_builds_after_the_fork(forked):
+    assert points(forked, 300) == {"prk-1": "first seen", "ao-3": "first seen"}
+    assert points(forked, 400) == {"prk-1": "first seen"}
+
+
+def test_a_fork_looks_past_the_builds_that_lack_the_item(forked):
+    assert points(forked, 500) == {"prk-1": ["text"], "ao-1": "first seen"}
+
+
+def test_first_seen_is_the_first_appearance_in_the_viewers_lineage(forked):
+    assert history(forked, 300, "prk-1")["first_seen_in"] == "prk-1"
+    assert history(forked, 300, "ao-3")["first_seen_in"] == "ao-3"
+    assert history(forked, WRENCH, "prk-1")["first_seen_in"] == "ao-1"
+    # The viewer's lineage never had the item: the appearance nearest a root.
+    assert history(forked, 400, "ao-3")["first_seen_in"] == "prk-1"
+    # Two as near: the first by slug.
+    assert history(forked, 300, "ao-1")["first_seen_in"] == "ao-3"
+
+
+def test_the_requested_build_does_not_change_the_history_itself(forked):
+    as_ao, as_prk = history(forked, WRENCH, "ao-1"), history(forked, WRENCH, "prk-1")
+
+    assert as_ao == as_prk
+
+
+# ---------------------------------------------------------------------------
+# POST /items/revisions/batch
+# ---------------------------------------------------------------------------
+
+
+def test_the_batch_summarises_each_item_for_the_requested_build(forked):
+    assert summary(forked, [WRENCH, 200, 400, 999, WRENCH], "ao-3") == {
+        "100": {
+            "aoid": 100,
+            "revision_count": 3,
+            "latest_change_slug": "ao-3",
+            "present_in_current": True,
+        },
+        "200": {
+            "aoid": 200,
+            "revision_count": 1,
+            "latest_change_slug": "ao-1",
+            "present_in_current": True,
+        },
+        "400": {
+            "aoid": 400,
+            "revision_count": 1,
+            "latest_change_slug": None,
+            "present_in_current": False,
+        },
+        "999": {
+            "aoid": 999,
+            "revision_count": 0,
+            "latest_change_slug": None,
+            "present_in_current": False,
+        },
+    }
+
+
+def test_the_latest_change_is_the_one_the_requested_build_reflects(forked):
+    def latest(slug, aoid=WRENCH):
+        return summary(forked, [aoid], slug)[str(aoid)]["latest_change_slug"]
+
+    assert [latest(slug) for slug in ("ao-1", "ao-2", "ao-3", "prk-1")] == [
+        "ao-1",
+        "ao-1",
+        "ao-3",
+        "prk-1",
     ]
-    for row in rows:
-        db_session.add(GameVersion(**row))
-        db_session.flush()
+    assert latest("prk-1", 200) == "ao-1"
+    assert latest("ao-2", 500) == "ao-1"
+    assert summary(forked, [500], "ao-2")["500"]["present_in_current"] is False
 
-    revisions = [
-        ("ao-18.7", 4242, "s1", "p1", "a1", "t1"),
-        ("ao-18.8", 4242, "s2", "p1", "a1", "t1"),
-        ("prk", 4242, "s2", "p1", "a1", "t2"),
-        ("ao-18.7", 7, "x1", "x1", "x1", "x1"),
-    ]
 
-    if item_revisions_is_view(db_session):
-        add_store_revisions(db_session, [row["slug"] for row in rows], revisions)
-        return
+def test_the_batch_costs_the_same_queries_for_one_item_or_many(forked):
+    counts = []
+    for aoids in ([WRENCH], [WRENCH, 200, 300, 400, 500, 999]):
+        with forked.client("ao-3") as client, forked.counting_queries() as statements:
+            client.post("/api/v1/items/revisions/batch", json={"aoids": aoids})
+            counts.append(len(statements))
 
-    for slug, aoid, stats, spells, actions, text_value in revisions:
-        db_session.add(
-            ItemRevision(
-                aoid=aoid,
-                version_slug=slug,
-                content_hash=stats + spells + actions + text_value,
-                stats_hash=stats,
-                spells_hash=spells,
-                actions_hash=actions,
-                text_hash=text_value,
-            )
+    assert counts[0] == counts[1]
+
+
+def test_the_batch_takes_between_one_and_500_items(forked):
+    with forked.client("ao-3") as client:
+        empty = client.post("/api/v1/items/revisions/batch", json={"aoids": []})
+        full = client.post(
+            "/api/v1/items/revisions/batch", json={"aoids": list(range(500))}
         )
-    db_session.flush()
-
-
-class TestItemRevisionsEndpoint:
-    """GET /api/v1/items/{aoid}/revisions"""
-
-    def test_returns_change_points_and_presence(self, client, revision_data):
-        response = client.get("/api/v1/items/4242/revisions")
-        assert response.status_code == 200
-
-        data = response.json()
-        assert data["aoid"] == 4242
-        assert data["present_in"] == ["prk", "ao-18.8", "ao-18.7"]
-        assert only_fixture_slugs(data["missing_in"]) == []
-        assert [
-            (r["version_slug"], r["changed"], r["first_seen"])
-            for r in data["revisions"]
-        ] == [
-            ("prk", ["text"], False),
-            ("ao-18.8", ["stats"], False),
-            ("ao-18.7", [], True),
-        ]
-        assert data["first_seen_in"] == "ao-18.7"
-
-    def test_reports_versions_the_item_is_missing_from(self, client, revision_data):
-        response = client.get("/api/v1/items/7/revisions")
-        assert response.status_code == 200
-
-        data = response.json()
-        assert data["present_in"] == ["ao-18.7"]
-        assert only_fixture_slugs(data["missing_in"]) == ["prk", "ao-18.8"]
-        assert data["first_seen_in"] == "ao-18.7"
-
-    def test_unknown_aoid_returns_empty_history(self, client, revision_data):
-        response = client.get("/api/v1/items/999999/revisions")
-        assert response.status_code == 200
-
-        data = response.json()
-        assert data["revisions"] == []
-        assert data["present_in"] == []
-        assert data["first_seen_in"] is None
-        assert only_fixture_slugs(data["missing_in"]) == ["prk", "ao-18.8", "ao-18.7"]
-
-    def test_version_segment_does_not_change_the_rows(
-        self, client, revision_data, monkeypatch
-    ):
-        import time
-        from app.core import versions as versions_module
-        from app.core.versions import GameVersion as GameVersionDC
-
-        registry = versions_module.registry
-        monkeypatch.setattr(
-            registry,
-            "_versions",
-            {
-                "prk": GameVersionDC(
-                    slug="prk",
-                    schema_name="gv_prk",
-                    display_name="PRK",
-                    family="prk",
-                    parent_slug="ao-18.8",
-                    sort_order=10,
-                )
-            },
-            raising=False,
+        too_many = client.post(
+            "/api/v1/items/revisions/batch", json={"aoids": list(range(501))}
         )
-        monkeypatch.setattr(registry, "_loaded_at", time.monotonic(), raising=False)
 
-        response = client.get("/api/v1/prk/items/4242/revisions")
-        registry.invalidate()
-
-        assert response.status_code == 200
-        assert response.headers["X-Game-Version"] == "prk"
-        assert len(response.json()["revisions"]) == 3
-
-
-class TestItemRevisionsBatchEndpoint:
-    """POST /api/v1/items/revisions/batch"""
-
-    def test_summarises_each_requested_aoid(self, client, revision_data, monkeypatch):
-        import time
-        from app.core import versions as versions_module
-        from app.core.versions import GameVersion as GameVersionDC
-
-        registry = versions_module.registry
-        monkeypatch.setattr(
-            registry,
-            "_versions",
-            {
-                "ao-18.8": GameVersionDC(
-                    slug="ao-18.8",
-                    schema_name="gv_ao_18_8",
-                    display_name="AO 18.8",
-                    family="ao",
-                    parent_slug="ao-18.7",
-                    sort_order=20,
-                    is_default=True,
-                )
-            },
-            raising=False,
-        )
-        monkeypatch.setattr(registry, "_loaded_at", time.monotonic(), raising=False)
-
-        response = client.post(
-            "/api/v1/items/revisions/batch",
-            json={"aoids": [4242, 7, 999999]},
-        )
-        registry.invalidate()
-
-        assert response.status_code == 200
-        items = response.json()["items"]
-
-        assert items["4242"]["revision_count"] == 3
-        assert items["4242"]["present_in_current"] is True
-        # The current version's definition was introduced in ao-18.8.
-        assert items["4242"]["latest_change_slug"] == "ao-18.8"
-
-        assert items["7"]["revision_count"] == 1
-        assert items["7"]["present_in_current"] is False
-        assert items["7"]["latest_change_slug"] == "ao-18.7"
-
-        assert items["999999"]["revision_count"] == 0
-        assert items["999999"]["present_in_current"] is False
-        assert items["999999"]["latest_change_slug"] is None
-
-    def test_rejects_an_empty_aoid_list(self, client, revision_data):
-        response = client.post("/api/v1/items/revisions/batch", json={"aoids": []})
-        assert response.status_code == 422
-
-    def test_rejects_more_than_500_aoids(self, client, revision_data):
-        response = client.post(
-            "/api/v1/items/revisions/batch",
-            json={"aoids": list(range(501))},
-        )
-        assert response.status_code == 422
+    assert (empty.status_code, full.status_code, too_many.status_code) == (
+        422,
+        200,
+        422,
+    )
