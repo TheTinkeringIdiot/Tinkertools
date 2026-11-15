@@ -27,6 +27,7 @@ for the rows of a page, never for a whole list.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -45,6 +46,7 @@ from sqlalchemy import (
     select,
     true,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import ColumnElement, FromClause
 
@@ -57,6 +59,7 @@ from app.core.change_rules import (
     default_rules,
     relevance_mask,
     relevance_names,
+    with_relevance,
 )
 from app.store import tables as t
 from app.store.context import Build, read_builds, resolve_build
@@ -311,6 +314,8 @@ class ChangeFilters:
     search: Optional[str] = None
     # conditions on t.item_revision, the revision a row is listed by
     item_conditions: Sequence[ColumnElement] = ()
+    # a SELECT of the AOIDs the changes must be among
+    among: Optional[Select] = None
     expand_notes: bool = False
     note_id: Optional[int] = None
 
@@ -436,6 +441,8 @@ def fetch_changes(
     changes = source.cte("changes").prefix_with("MATERIALIZED")
     revision, text = t.item_revision, t.part_text
     conditions: List[ColumnElement] = list(filters.item_conditions)
+    if filters.among is not None:
+        conditions.append(changes.c.aoid.in_(filters.among))
     if filters.kinds:
         conditions.append(
             changes.c.kind.in_([KIND_CODES[name] for name in filters.kinds])
@@ -700,6 +707,7 @@ def _criteria_changes(changes: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]
 
 def _effect_response(effect: Dict[str, Any], formats: Dict[int, str]):
     return {
+        "relevance": effect.get("relevance"),
         "spell_id": effect["spell_id"],
         "target": effect["target"],
         "tick_count": effect["tick_count"],
@@ -711,8 +719,9 @@ def _effect_response(effect: Dict[str, Any], formats: Dict[int, str]):
 
 
 def diff_response(diff: Dict[str, Any], formats: Dict[int, str]) -> Dict[str, Any]:
-    """A diff of ``item_diff.diff_parts`` as an ``ItemDiff`` document: effects
-    and criteria shaped as the item responses shape them."""
+    """A diff of ``item_diff.diff_parts``, tagged by ``with_relevance``, as an
+    ``ItemDiff`` document: effects and criteria shaped as the item responses
+    shape them."""
     return {
         **diff,
         "actions": [
@@ -729,6 +738,7 @@ def diff_response(diff: Dict[str, Any], formats: Dict[int, str]) -> Dict[str, An
                         "old": _effect_response(pair["old"], formats),
                         "new": _effect_response(pair["new"], formats),
                         "fields": pair["fields"],
+                        "relevance": pair["relevance"],
                         "criteria": (
                             None
                             if pair["criteria"] is None
@@ -744,17 +754,21 @@ def diff_response(diff: Dict[str, Any], formats: Dict[int, str]) -> Dict[str, An
 
 
 def diff_revisions(
-    db: Session, pairs: Sequence[Tuple[int, int]]
+    db: Session,
+    pairs: Sequence[Tuple[int, int]],
+    rules: Optional[RelevanceRules] = None,
 ) -> Dict[Tuple[int, int], Dict[str, Any]]:
     """``{(old rev_id, new rev_id): ItemDiff document}`` for these pairs of
     revisions, in two queries whatever their number."""
     if not pairs:
         return {}
+    rules = rules or default_rules().relevance
     documents = load_part_documents(db, sorted({rev for pair in pairs for rev in pair}))
     formats = load_effect_formats(db)
     return {
         (old, new): diff_response(
-            item_diff.diff_parts(documents[old], documents[new]), formats
+            with_relevance(item_diff.diff_parts(documents[old], documents[new]), rules),
+            formats,
         )
         for old, new in dict.fromkeys(pairs)
     }
@@ -879,6 +893,38 @@ def compare_item(
 # ---------------------------------------------------------------------------
 # Shared transitions
 # ---------------------------------------------------------------------------
+
+
+ANY_VALUE = object()
+
+
+def _json_equals(column: ColumnElement, value: Any) -> ColumnElement:
+    if value is None:
+        return column.is_(None)
+    return column == cast(literal(json.dumps(value)), JSONB)
+
+
+def items_with_transition(
+    build: Build, path: str, old: Any = ANY_VALUE, new: Any = ANY_VALUE
+) -> Select:
+    """SELECT of the AOIDs of the changed items of ``build`` that have a
+    shared transition on ``path``; with ``old`` and ``new`` (JSON values,
+    None for an absent side), exactly the items of that one transition."""
+    bt, members = t.build_transition, t.change_transition
+    query = (
+        select(members.c.aoid)
+        .select_from(members.join(bt, bt.c.transition_id == members.c.transition_id))
+        .where(
+            bt.c.branch == build.branch,
+            bt.c.ordinal == build.ordinal,
+            bt.c.path == path,
+        )
+    )
+    if old is not ANY_VALUE:
+        query = query.where(_json_equals(bt.c.old, old))
+    if new is not ANY_VALUE:
+        query = query.where(_json_equals(bt.c.new, new))
+    return query
 
 
 def _path_fields(path: str) -> Dict[str, Any]:

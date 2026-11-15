@@ -903,10 +903,15 @@ def change_analysis_invariants(conn, rules):
             JOIN build b ON b.build_id = n.build_id
             WHERE b.branch <> c.branch OR b.ordinal <> c.ordinal OR c.kind <> 'C'
         """,
-        "shared transitions of fewer than two items, or of no build's changes": f"""
+        "shared transitions of fewer than two items, or not of the items listed for them": f"""
             SELECT t.branch, t.ordinal, t.path FROM build_transition t
             WHERE t.items < {change_analysis.MIN_SHARED_ITEMS}
                OR t.occurrences < t.items
+               OR t.items <> (SELECT count(*) FROM change_transition m
+                              JOIN item_change c ON c.branch = t.branch
+                                  AND c.ordinal = t.ordinal AND c.aoid = m.aoid
+                                  AND c.kind = 'C'
+                              WHERE m.transition_id = t.transition_id)
                OR t.items > (SELECT count(*) FROM item_change c
                              WHERE c.branch = t.branch AND c.ordinal = t.ordinal
                                AND c.kind = 'C')

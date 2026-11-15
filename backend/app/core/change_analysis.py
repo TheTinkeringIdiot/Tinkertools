@@ -19,8 +19,9 @@ Three things are derived, all reproducible from the store and the two files:
     changes each explains. This needs the field-level diff of every changed
     item of a build that has notes.
 
-``build_transition``
-    The field transitions shared by at least two changed items of a build.
+``build_transition`` and ``change_transition``
+    The field transitions shared by at least two changed items of a build,
+    and the items that have each.
 
 :func:`sync` brings all three in line at the start of an import run and does
 the expensive parts only when a rules file (or the engine) changed;
@@ -387,26 +388,30 @@ def _json_value(value: Any) -> Optional[Jsonb]:
     return Jsonb(list(value) if isinstance(value, tuple) else value)
 
 
+# Per transition: [occurrences, AOIDs of the items that have it].
+Counted = Dict[Transition, List[Any]]
+
+
 def shared_transitions(
-    counted: Dict[Transition, List[int]],
-) -> List[Tuple[Transition, int, int]]:
-    """``(transition, items, occurrences)`` of the transitions enough items
-    share, most shared first."""
+    counted: Counted,
+) -> List[Tuple[Transition, List[int], int]]:
+    """``(transition, AOIDs of its items, occurrences)`` of the transitions
+    enough items share, most shared first."""
     shared = [
-        (transition, items, occurrences)
-        for transition, (items, occurrences) in counted.items()
-        if items >= MIN_SHARED_ITEMS
+        (transition, aoids, occurrences)
+        for transition, (occurrences, aoids) in counted.items()
+        if len(aoids) >= MIN_SHARED_ITEMS
     ]
-    shared.sort(key=lambda entry: (-entry[1], -entry[2], repr(entry[0])))
+    shared.sort(key=lambda entry: (-len(entry[1]), -entry[2], repr(entry[0])))
     return shared
 
 
-def count_transitions(counted: Dict[Transition, List[int]], found: List[Transition]):
+def count_transitions(counted: Counted, aoid: int, found: List[Transition]) -> None:
     """Add the transitions of one item to ``counted``."""
     for transition, occurrences in Counter(found).items():
-        entry = counted.setdefault(transition, [0, 0])
-        entry[0] += 1
-        entry[1] += occurrences
+        entry = counted.setdefault(transition, [0, []])
+        entry[0] += occurrences
+        entry[1].append(aoid)
 
 
 # ---------------------------------------------------------------------------
@@ -466,9 +471,9 @@ def analyze(
     that differ. Returns counts for the log."""
     by_build = _sync_notes(conn, notes, scope)
     tags: List[Tuple[str, int, int, int]] = []
-    counted: Dict[Tuple[str, int], Dict[Transition, List[int]]] = defaultdict(dict)
+    counted: Dict[Tuple[str, int], Counted] = defaultdict(dict)
     for (branch, ordinal, aoid), diff in ChangeDiffs(conn, changed_rows(conn, scope)):
-        count_transitions(counted[(branch, ordinal)], item_diff.transitions(diff))
+        count_transitions(counted[(branch, ordinal)], aoid, item_diff.transitions(diff))
         candidates = by_build.get((branch, ordinal))
         if not candidates:
             continue
@@ -507,26 +512,45 @@ def analyze(
     conn.execute(
         sql.SQL("DELETE FROM build_transition c WHERE {}").format(_in_scope(scope))
     )
-    written = 0
+    shared = [
+        (branch, ordinal, entry)
+        for (branch, ordinal), transitions in counted.items()
+        for entry in shared_transitions(transitions)
+    ]
+    ids = [
+        row[0]
+        for row in conn.execute(
+            "SELECT nextval(pg_get_serial_sequence('build_transition', "
+            "'transition_id')) FROM generate_series(1, %s)",
+            (len(shared),),
+        )
+    ]
     with conn.cursor().copy(
-        "COPY build_transition (branch, ordinal, part, path, old, new, items, "
-        "occurrences) FROM STDIN"
+        "COPY build_transition (transition_id, branch, ordinal, part, path, old, "
+        "new, items, occurrences) FROM STDIN"
     ) as copy:
-        for (branch, ordinal), transitions in counted.items():
-            for transition, items, occurrences in shared_transitions(transitions):
-                copy.write_row(
-                    (
-                        branch,
-                        ordinal,
-                        transition.part,
-                        transition.path,
-                        _json_value(transition.old),
-                        _json_value(transition.new),
-                        items,
-                        occurrences,
-                    )
+        for transition_id, (branch, ordinal, entry) in zip(ids, shared):
+            transition, aoids, occurrences = entry
+            copy.write_row(
+                (
+                    transition_id,
+                    branch,
+                    ordinal,
+                    transition.part,
+                    transition.path,
+                    _json_value(transition.old),
+                    _json_value(transition.new),
+                    len(aoids),
+                    occurrences,
                 )
-                written += 1
+            )
+    with conn.cursor().copy(
+        "COPY change_transition (transition_id, aoid) FROM STDIN"
+    ) as copy:
+        for transition_id, (_, _, (_, aoids, _)) in zip(ids, shared):
+            for aoid in aoids:
+                copy.write_row((transition_id, aoid))
+    written = len(shared)
     return {"noted": len(tags), "retagged": retagged, "transitions": written}
 
 

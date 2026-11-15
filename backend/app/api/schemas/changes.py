@@ -49,11 +49,22 @@ class FieldChange(BaseModel):
     new: Any = Field(None, description="Value after; null when absent")
 
 
+class PartFieldChange(FieldChange):
+    """A field of the text or misc part."""
+
+    relevance: Optional[RelevanceName] = Field(
+        None, description="What this entry adds to the relevance of the change"
+    )
+
+
 class StatChange(BaseModel):
     """One stat (or attack/defense skill) whose value differs."""
 
     stat: int = Field(description="Stat or skill id")
     change: ChangeKind
+    relevance: Optional[RelevanceName] = Field(
+        None, description="What this entry adds to the relevance of the change"
+    )
     old: Optional[int] = Field(None, description="Value before; null when added")
     new: Optional[int] = Field(None, description="Value after; null when removed")
     bits_set: Optional[List[int]] = Field(
@@ -83,6 +94,9 @@ class ActionChange(BaseModel):
 
     action: int = Field(description="Action id")
     change: ChangeKind
+    relevance: Optional[RelevanceName] = Field(
+        None, description="What this entry adds to the relevance of the change"
+    )
     criteria: List[CriterionChange] = Field(
         description="The whole criteria sequence, old and new merged in order"
     )
@@ -98,6 +112,13 @@ class DiffEffect(BaseModel):
     spell_format: Optional[str] = None
     spell_params: Dict[str, Any] = Field(default_factory=dict)
     criteria: List[ItemCriterionResponse] = Field(default_factory=list)
+    relevance: Optional[RelevanceName] = Field(
+        None,
+        description="Added and removed effects: what the effect adds to the "
+        "relevance of the change. Null on the two sides of a changed effect "
+        "(see the pair), and for an effect that only moved to another event "
+        "in an item whose effects also differ otherwise",
+    )
 
 
 class EffectChange(BaseModel):
@@ -105,6 +126,9 @@ class EffectChange(BaseModel):
 
     old: DiffEffect
     new: DiffEffect
+    relevance: Optional[RelevanceName] = Field(
+        None, description="What this entry adds to the relevance of the change"
+    )
     fields: List[FieldChange] = Field(
         description="Fixed fields and parameters that differ"
     )
@@ -121,6 +145,12 @@ class EventChange(BaseModel):
     old_event: Optional[int] = Field(
         None, description="Renumbered events only: the event id before"
     )
+    relevance: Optional[RelevanceName] = Field(
+        None,
+        description="Set (to the class of event changes, 'cosmetic') when the "
+        "item's effects differ in nothing but the events they hang on; null "
+        "otherwise: the entries under added, removed and changed carry it",
+    )
     added: List[DiffEffect] = Field(default_factory=list)
     removed: List[DiffEffect] = Field(default_factory=list)
     changed: List[EffectChange] = Field(default_factory=list)
@@ -128,15 +158,16 @@ class EventChange(BaseModel):
 
 class ItemDiff(BaseModel):
     """Field-level diff of two revisions of an item. A part that did not
-    change is an empty list."""
+    change is an empty list. Every entry has a ``relevance``; the relevance
+    of the whole change is the union of its entries' values."""
 
-    text: List[FieldChange] = Field(default_factory=list)
+    text: List[PartFieldChange] = Field(default_factory=list)
     stats: List[StatChange] = Field(default_factory=list)
     effects: List[EventChange] = Field(default_factory=list)
     actions: List[ActionChange] = Field(default_factory=list)
     attack: List[StatChange] = Field(default_factory=list)
     defense: List[StatChange] = Field(default_factory=list)
-    misc: List[FieldChange] = Field(default_factory=list)
+    misc: List[PartFieldChange] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

@@ -217,7 +217,7 @@ def test_sync_classifies_a_log_that_was_never_classified(conn):
     load(conn, spec("one", 1), items=[item(1, name="A")])
     load(conn, spec("two", 2), items=[item(1, name="B")])
     conn.execute("UPDATE item_change SET relevance = NULL")
-    conn.execute("TRUNCATE revision_relevance, store_state, build_transition")
+    conn.execute("TRUNCATE revision_relevance, store_state, build_transition CASCADE")
 
     done = change_analysis.sync(conn, rules())
 
@@ -422,7 +422,9 @@ def test_upgrade_gives_an_older_store_the_change_analysis_tables(conn):
     load(conn, spec("one", 1), items=[item(1, name="A")])
     load(conn, spec("two", 2), items=[item(1, name="B")])
     schema = conn.execute("SELECT current_schema()").fetchone()[0]
-    conn.execute("DROP TABLE revision_relevance, build_transition, store_state")
+    conn.execute(
+        "DROP TABLE revision_relevance, change_transition, build_transition, store_state"
+    )
     conn.execute("DROP INDEX item_change_note")
     conn.execute("UPDATE item_change SET relevance = NULL")
 

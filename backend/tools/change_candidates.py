@@ -72,7 +72,7 @@ def main():
         explained = Counter()
         for (_, _, aoid), diff in change_analysis.ChangeDiffs(conn, rows):
             found = item_diff.transitions(diff)
-            change_analysis.count_transitions(counted, found)
+            change_analysis.count_transitions(counted, aoid, found)
             shapes[frozenset((t.part, t.path) for t in found)].append(aoid)
             facts = item_diff.transitions(diff, full_text=True)
             for note in build_notes:
@@ -82,7 +82,7 @@ def main():
         shared = [
             entry
             for entry in change_analysis.shared_transitions(counted)
-            if entry[1] >= args.min_items
+            if len(entry[1]) >= args.min_items
         ]
         common = sorted(
             ((len(aoids), sorted(shape), aoids) for shape, aoids in shapes.items()),
@@ -94,9 +94,9 @@ def main():
         print(f"\n{slug}: {len(rows)} changed items")
         if shared:
             print("  transitions:")
-        for transition, items, occurrences in shared[: args.top]:
+        for transition, members, occurrences in shared[: args.top]:
             print(
-                f"    {items:6} items {occurrences:6} times  {transition.part} "
+                f"    {len(members):6} items {occurrences:6} times  {transition.part} "
                 f"{transition.path}: {show(transition.old)} -> {show(transition.new)}"
             )
         if common:

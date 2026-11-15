@@ -34,17 +34,28 @@ CREATE TABLE revision_relevance (
 --   items        changed items with the transition
 --   occurrences  times it occurs in them
 CREATE TABLE build_transition (
-    branch       varchar(20) NOT NULL,
-    ordinal      integer     NOT NULL,
-    part         varchar(10) NOT NULL,
-    path         text        NOT NULL,
-    old          jsonb,
-    new          jsonb,
-    items        integer     NOT NULL,
-    occurrences  integer     NOT NULL,
+    transition_id  serial PRIMARY KEY,
+    branch         varchar(20) NOT NULL,
+    ordinal        integer     NOT NULL,
+    part           varchar(10) NOT NULL,
+    path           text        NOT NULL,
+    old            jsonb,
+    new            jsonb,
+    items          integer     NOT NULL,
+    occurrences    integer     NOT NULL,
     FOREIGN KEY (branch, ordinal) REFERENCES build (branch, ordinal) ON DELETE CASCADE
 );
 CREATE INDEX build_transition_build ON build_transition (branch, ordinal, items DESC);
+CREATE INDEX build_transition_path ON build_transition (branch, ordinal, path);
+
+-- The changed items that have each shared transition, so a change list can
+-- be narrowed to "the items of this line".
+CREATE TABLE change_transition (
+    transition_id  integer NOT NULL
+        REFERENCES build_transition (transition_id) ON DELETE CASCADE,
+    aoid           integer NOT NULL,
+    PRIMARY KEY (transition_id, aoid)
+);
 
 CREATE INDEX item_change_note ON item_change (note_id) WHERE note_id IS NOT NULL;
 

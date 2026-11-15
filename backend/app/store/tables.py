@@ -208,6 +208,7 @@ revision_relevance = Table(
 build_transition = Table(
     "build_transition",
     metadata,
+    Column("transition_id", Integer, primary_key=True),
     Column("branch", String(20), nullable=False),
     Column("ordinal", Integer, nullable=False),
     Column("part", String(10), nullable=False),
@@ -216,6 +217,13 @@ build_transition = Table(
     Column("new", JSONB),
     Column("items", Integer, nullable=False),
     Column("occurrences", Integer, nullable=False),
+)
+
+change_transition = Table(
+    "change_transition",
+    metadata,
+    Column("transition_id", Integer, primary_key=True),
+    Column("aoid", Integer, primary_key=True),
 )
 
 nano_overlay = Table(

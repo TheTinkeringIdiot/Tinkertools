@@ -65,13 +65,14 @@ from __future__ import annotations
 import hashlib
 import re
 import tomllib
+from collections import Counter
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, Tuple
 
-from app.core.item_diff import MISC_FIELDS, Transition
+from app.core.item_diff import MISC_FIELDS, Transition, effect_content
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "database"
 RELEVANCE_FILE = DATA_DIR / "change_relevance.toml"
@@ -198,6 +199,79 @@ def parse_relevance(text: str) -> RelevanceRules:
         },
         digest=hashlib.sha1(text.encode("utf-8")).hexdigest(),
     )
+
+
+def with_relevance(diff: Dict[str, Any], rules: RelevanceRules) -> Dict[str, Any]:
+    """A diff of ``app.core.item_diff.diff_parts`` with the relevance class
+    of every entry, as ``relevance``: what the entry adds to the relevance of
+    the whole change, which is the union of its entries' classes.
+
+    Effects follow the rule of the module docstring: an effect counts under
+    the class of its type when the two revisions do not hold it equally
+    often, wherever it hangs. An effect that only moved to another event, and
+    an event that was only renumbered, have the class of ``event`` when
+    nothing else about the item's effects differs, and ``None`` when
+    something does: the change is then classified by what really differs.
+    """
+    net: Counter = Counter()
+    for event in diff["effects"]:
+        for effect in event["added"]:
+            net[effect_content(effect)] += 1
+        for effect in event["removed"]:
+            net[effect_content(effect)] -= 1
+        for pair in event["changed"]:
+            net[effect_content(pair["new"])] += 1
+            net[effect_content(pair["old"])] -= 1
+    moved = None if any(net.values()) else rules.changes["event"]
+
+    def of_effect(*effects: Dict[str, Any]) -> Optional[str]:
+        if any(net[effect_content(effect)] for effect in effects):
+            return rules.effect_class(effects[0]["spell_id"])
+        return moved
+
+    def tagged(entries: List[Dict[str, Any]], relevance: Any) -> List[Dict[str, Any]]:
+        return [
+            {
+                **entry,
+                "relevance": relevance(entry) if callable(relevance) else relevance,
+            }
+            for entry in entries
+        ]
+
+    whole = rules.changes
+    return {
+        "text": tagged(diff["text"], "text"),
+        "stats": tagged(diff["stats"], lambda c: rules.stat_class(c["stat"])),
+        "actions": tagged(diff["actions"], whole["actions"]),
+        "attack": tagged(diff["attack"], whole["attack_defense"]),
+        "defense": tagged(diff["defense"], whole["attack_defense"]),
+        "misc": tagged(diff["misc"], lambda c: whole[c["field"]]),
+        "effects": [
+            {
+                **event,
+                "relevance": moved,
+                "added": tagged(event["added"], of_effect),
+                "removed": tagged(event["removed"], of_effect),
+                "changed": tagged(
+                    event["changed"], lambda pair: of_effect(pair["new"], pair["old"])
+                ),
+            }
+            for event in diff["effects"]
+        ],
+    }
+
+
+def diff_relevance(diff: Dict[str, Any]) -> int:
+    """The relevance bitmask of a diff tagged by :func:`with_relevance`: the
+    union of its entries' classes."""
+    names = set()
+    for part, entries in diff.items():
+        for entry in entries:
+            names.add(entry["relevance"])
+            if part == "effects":
+                for effects in (entry["added"], entry["removed"], entry["changed"]):
+                    names.update(effect["relevance"] for effect in effects)
+    return relevance_mask(sorted(name for name in names if name is not None))
 
 
 # ---------------------------------------------------------------------------

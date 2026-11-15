@@ -21,6 +21,8 @@ Responses depend only on the builds named and are immutable until the next
 import, hence the response cache.
 """
 
+import json
+from dataclasses import replace
 from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -40,6 +42,7 @@ from app.core.change_rules import relevance_names
 from app.core.decorators import cached_response, performance_monitor
 from app.store import page_fields
 from app.store.changes import (
+    ANY_VALUE,
     KIND_NAMES,
     BuildIndex,
     ChangeFilters,
@@ -52,6 +55,7 @@ from app.store.changes import (
     fetch_changes,
     find_build,
     item_timeline,
+    items_with_transition,
     load_build_index,
     load_notes,
     load_snapshots,
@@ -152,6 +156,16 @@ class ChangeQuery:
         )
 
 
+def _json_value(name: str, text: Optional[str]) -> Any:
+    """A transition value given as JSON; ``ANY_VALUE`` when not given."""
+    if text is None:
+        return ANY_VALUE
+    try:
+        return json.loads(text)
+    except ValueError:
+        raise HTTPException(status_code=422, detail=f"{name} is not JSON: {text!r}")
+
+
 def _other_build(db: Session, slug: str) -> Build:
     found = find_build(db, slug)
     if found is None:
@@ -205,6 +219,19 @@ def _change_list(
 @performance_monitor
 def get_build_changes(
     query: ChangeQuery = Depends(),
+    transition: Optional[str] = Query(
+        None,
+        description="Only the changed items that have a shared transition on "
+        "this path (a ``path`` of /changes/transitions)",
+    ),
+    transition_old: Optional[str] = Query(
+        None,
+        description="With ``transition``: the transition's old value as JSON "
+        '(60, "added", [124,1060,2], null). Left out: any',
+    ),
+    transition_new: Optional[str] = Query(
+        None, description="With ``transition``: its new value as JSON"
+    ),
     db: Session = Depends(get_store),
     build: Build = Depends(get_build),
 ):
@@ -216,12 +243,31 @@ def get_build_changes(
     Changes that a build note explains are collapsed by default: they are
     counted in ``notes`` and left out of ``items`` and ``total``; ask for
     ``notes=expand`` to list everything or ``note_id`` to list one note's.
+
+    ``transition`` narrows the list to the items of one line of
+    ``/changes/transitions``: with its ``old`` and ``new`` and
+    ``notes=expand``, ``total`` is that line's ``items``.
     """
+    filters = query.filters(build)
+    if transition is not None:
+        filters = replace(
+            filters,
+            among=items_with_transition(
+                build,
+                transition,
+                _json_value("transition_old", transition_old),
+                _json_value("transition_new", transition_new),
+            ),
+        )
+    elif transition_old is not None or transition_new is not None:
+        raise HTTPException(
+            status_code=422, detail="transition_old and transition_new need transition"
+        )
     index = load_build_index(db)
     found = fetch_changes(
         db,
         logged_changes(build),
-        query.filters(build),
+        filters,
         query.sort,
         query.page,
         query.page_size,

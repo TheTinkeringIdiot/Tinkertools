@@ -340,7 +340,7 @@ def _hashable(value: Any) -> Hashable:
     return value
 
 
-def _effect_content(effect: Effect) -> Hashable:
+def effect_content(effect: Effect) -> Hashable:
     """An effect as a value: everything but its rendered description."""
     return _hashable({k: v for k, v in effect.items() if k != "description"})
 
@@ -448,7 +448,7 @@ def diff_event_effects(
 ) -> Tuple[List[Change], List[Effect], List[Effect]]:
     """``(changed, added, removed)`` between the effects of one event, by the
     pairing rule of the module docstring."""
-    rest_old, rest_new = _without_common(old, new, _effect_content)
+    rest_old, rest_new = _without_common(old, new, effect_content)
     rest_old.sort(key=_canonical_order)
     rest_new.sort(key=_canonical_order)
     changed: List[Change] = []
@@ -463,7 +463,7 @@ def diff_event_effects(
 
 
 def _event_content(event: Dict[str, Any]) -> Hashable:
-    return frozenset(Counter(map(_effect_content, event["effects"])).items())
+    return frozenset(Counter(map(effect_content, event["effects"])).items())
 
 
 def _event_change(event: int, change: str, old_event: Optional[int] = None) -> Change:

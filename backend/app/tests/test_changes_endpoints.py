@@ -11,6 +11,7 @@ Each test fills a throwaway store (the ``store`` fixture) with a few builds of
 hand-made items and asks the API what changed.
 """
 
+import json
 import os
 
 import pytest
@@ -178,13 +179,14 @@ def test_timeline_entries_carry_the_field_level_diff_of_each_step(history):
     newest, renamed, added = timeline(history, "four", WRENCH)["entries"]
 
     assert renamed["diff"]["text"] == [
-        {"field": "name", "old": "Wrench", "new": "Spanner"}
+        {"field": "name", "old": "Wrench", "new": "Spanner", "relevance": "text"}
     ]
     assert renamed["relevance"] == ["text"]
     assert newest["diff"]["stats"] == [
         {
             "stat": STAT_CAN,
             "change": "changed",
+            "relevance": "gameplay",
             "old": 1,
             "new": 9,
             "bits_set": [8],
@@ -424,6 +426,7 @@ def test_change_list_gives_field_level_diffs_when_asked(history):
         {
             "stat": STAT_VALUE,
             "change": "changed",
+            "relevance": "economy",
             "old": 100,
             "new": 250,
             "bits_set": None,
@@ -691,7 +694,7 @@ def test_item_compare_diffs_the_item_between_two_builds(history):
     assert body["parts"] == ["text", "stats", "actions"]
     assert body["relevance"] == ["gameplay", "text"]
     assert body["diff"]["text"] == [
-        {"field": "name", "old": "Wrench", "new": "Spanner"}
+        {"field": "name", "old": "Wrench", "new": "Spanner", "relevance": "text"}
     ]
     assert [c["stat"] for c in body["diff"]["stats"]] == [STAT_CAN]
 
@@ -817,3 +820,189 @@ def test_transitions_filter_by_part_and_size(procs):
 
 def test_a_build_with_no_shared_transition_lists_none(procs):
     assert get(procs, "one", "/changes/transitions")["transitions"] == []
+
+
+# ---------------------------------------------------------------------------
+# Relevance of each entry of a diff
+# ---------------------------------------------------------------------------
+
+
+def entry_relevance(diff):
+    """The classes the entries of an ``ItemDiff`` carry, in declared order."""
+    found = set()
+    for part, entries in diff.items():
+        for entry in entries:
+            found.add(entry["relevance"])
+            if part == "effects":
+                for effects in (entry["added"], entry["removed"], entry["changed"]):
+                    found.update(effect["relevance"] for effect in effects)
+    return [n for n in ("gameplay", "economy", "cosmetic", "text") if n in found]
+
+
+def float_text(text):
+    return {
+        "SpellID": 53057,
+        "Target": 2,
+        "TickCount": 1,
+        "TickInterval": 0,
+        "Text": text,
+        "Criteria": [],
+        "SpellFormat": "Float text: {Text}",
+        "SpellDescription": f"Float text: {text}",
+    }
+
+
+def test_every_entry_of_a_diff_says_what_it_is_relevant_to(history):
+    wrench = compare_item(history, "four", WRENCH, "one")["diff"]
+    pliers = compare_item(history, "four", PLIERS, "one")["diff"]
+    hammer = compare_item(history, "fork", HAMMER, "one")["diff"]
+
+    assert [c["relevance"] for c in wrench["text"]] == ["text"]
+    assert [c["relevance"] for c in wrench["stats"]] == ["gameplay"]
+    assert [c["relevance"] for c in wrench["actions"]] == ["gameplay"]
+    assert {c["stat"]: c["relevance"] for c in pliers["stats"]} == {
+        STAT_VALUE: "economy",
+        STAT_ICON: "cosmetic",
+    }
+    (event,) = hammer["effects"]
+    (pair,) = event["changed"]
+    assert pair["relevance"] == "gameplay" and event["relevance"] is None
+    assert pair["old"]["relevance"] is None and pair["new"]["relevance"] is None
+
+
+def test_the_relevance_of_a_change_is_the_union_of_its_entries(history):
+    lists = [
+        changes(history, slug, include_diff="true", notes="expand")
+        for slug in ("two", "three", "four", "fork")
+    ]
+    lists.append(compare(history, "three", "one", include_diff="true"))
+    lists.append(compare(history, "fork", "four", include_diff="true"))
+    checked = 0
+    for body in lists:
+        for row in body["items"]:
+            if row["kind"] == "changed":
+                assert entry_relevance(row["diff"]) == row["relevance"], row
+                checked += 1
+    assert checked >= 10
+
+
+def test_effects_that_only_move_between_events_are_cosmetic_entries(store):
+    """Item 1 only has its event renumbered; item 2 is renumbered and gets a
+    stronger effect; item 3 changes its float text and nothing else; item 4
+    moves one effect to another event and keeps the other."""
+    store.add_build(
+        "one",
+        1,
+        items=[
+            item(1, SpellData=wear(modify(16, 5))),
+            item(2, SpellData=wear(modify(16, 5), modify(17, 5))),
+            item(3, SpellData=wear(modify(16, 5), float_text("Ow"))),
+            item(4, SpellData=wear(modify(16, 5), modify(17, 5))),
+        ],
+    )
+    store.add_build(
+        "two",
+        2,
+        items=[
+            item(1, SpellData=wear(modify(16, 5), event=0)),
+            item(2, SpellData=wear(modify(16, 5), modify(17, 9), event=0)),
+            item(3, SpellData=wear(modify(16, 5), float_text("Ouch"))),
+            item(
+                4,
+                SpellData=wear(modify(16, 5)) + wear(modify(17, 5), event=2),
+            ),
+        ],
+    )
+
+    found = rows(changes(store, "two", include_diff="true"))
+
+    (renumbered,) = found[1]["diff"]["effects"]
+    assert (renumbered["change"], renumbered["relevance"]) == ("renumbered", "cosmetic")
+    assert found[1]["relevance"] == ["cosmetic"]
+
+    assert found[2]["relevance"] == ["gameplay"]
+    added, removed = found[2]["diff"]["effects"]
+    assert removed["relevance"] is None and added["relevance"] is None
+    assert {e["spell_params"]["Stat"]: e["relevance"] for e in added["added"]} == {
+        16: None,  # the same effect, moved
+        17: "gameplay",
+    }
+
+    assert found[3]["relevance"] == ["cosmetic"]
+    assert found[3]["diff"]["effects"][0]["changed"][0]["relevance"] == "cosmetic"
+
+    assert found[4]["relevance"] == ["cosmetic"]
+    for row in found.values():
+        assert entry_relevance(row["diff"]) == row["relevance"]
+
+
+# ---------------------------------------------------------------------------
+# A transition as a filter
+# ---------------------------------------------------------------------------
+
+
+def test_a_transition_line_leads_to_exactly_its_items(procs):
+    lines = get(procs, "two", "/changes/transitions")["transitions"]
+    assert lines
+
+    for line in lines:
+        body = changes(
+            procs,
+            "two",
+            sort="aoid",
+            notes="expand",
+            transition=line["path"],
+            transition_old=json.dumps(line["old"]),
+            transition_new=json.dumps(line["new"]),
+        )
+        assert body["total"] == line["items"], line
+
+    chance = changes(
+        procs,
+        "two",
+        sort="aoid",
+        transition="effect:53089:spell_params.Chance",
+        transition_old="60",
+        transition_new="100",
+    )
+    assert aoids(chance) == [1, 2, 3]
+
+
+def test_a_transition_filter_without_values_takes_every_line_of_the_path(procs):
+    def found(**params):
+        return aoids(changes(procs, "two", sort="aoid", **params))
+
+    assert found(transition="stat:287") == [3, 4]
+    assert found(transition="stat:287", transition_old="null") == [3, 4]
+    assert found(transition="stat:287", transition_new="15") == []
+    assert found(transition="no:such:path") == []
+    assert found(transition="name") == []  # one item only: not a shared line
+
+
+def test_a_transition_filter_combines_with_the_other_filters_and_notes(procs):
+    procs.note_changes("""
+[[note]]
+build = "two"
+title = "Range written out"
+explains = [{ path = "stat:287", old = "absent" }]
+""")
+
+    collapsed = changes(procs, "two", sort="aoid", transition="stat:287")
+    expanded = changes(procs, "two", sort="aoid", transition="stat:287", notes="expand")
+    with_effects = changes(
+        procs, "two", sort="aoid", transition="stat:287", part="effects"
+    )
+
+    # item 4 only gained the stat: the note explains it; item 3 also changed
+    assert aoids(collapsed) == [3]
+    assert collapsed["notes"][0]["matching"] == 1
+    assert aoids(expanded) == [3, 4]
+    assert aoids(with_effects) == [3]
+
+
+def test_a_transition_value_must_be_json_and_needs_a_path(procs):
+    with procs.client("two") as client:
+        bad = client.get("/api/v1/changes?transition=stat:287&transition_old=abc")
+        alone = client.get("/api/v1/changes?transition_new=20")
+
+    assert bad.status_code == 422 and alone.status_code == 422
