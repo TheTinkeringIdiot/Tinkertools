@@ -309,26 +309,30 @@ def upgrade_store(conn: psycopg.Connection, schema: str) -> None:
         conn.execute((SQL_DIR / "003_change_analysis.sql").read_text(encoding="utf-8"))
     if not conn.execute(
         "SELECT 1 FROM information_schema.columns WHERE table_schema = %s "
-        "AND table_name = 'build_transition' AND column_name = 'unnoted_items'",
+        "AND table_name = 'build_transition' AND column_name = 'unexplained_items'",
         (schema,),
     ).fetchone():
         # The change analysis rewrites every row: it runs again because the
         # engine version changed with these columns.
         table = sql.Identifier(schema, "build_transition")
-        conn.execute(
-            sql.SQL(
-                "ALTER TABLE {} ADD COLUMN relevance smallint NOT NULL DEFAULT 0, "
-                "ADD COLUMN unnoted_items integer NOT NULL DEFAULT 0, "
-                "ADD COLUMN unnoted_occurrences integer NOT NULL DEFAULT 0"
-            ).format(table)
+        columns = {
+            "relevance": "smallint",
+            "unnoted_items": "integer",
+            "unnoted_occurrences": "integer",
+            "unexplained_items": "integer",
+        }
+        added = sql.SQL(", ").join(
+            sql.SQL("ADD COLUMN IF NOT EXISTS {} {} NOT NULL DEFAULT 0").format(
+                sql.Identifier(name), sql.SQL(kind)
+            )
+            for name, kind in columns.items()
         )
-        conn.execute(
-            sql.SQL(
-                "ALTER TABLE {} ALTER COLUMN relevance DROP DEFAULT, "
-                "ALTER COLUMN unnoted_items DROP DEFAULT, "
-                "ALTER COLUMN unnoted_occurrences DROP DEFAULT"
-            ).format(table)
+        settled = sql.SQL(", ").join(
+            sql.SQL("ALTER COLUMN {} DROP DEFAULT").format(sql.Identifier(name))
+            for name in columns
         )
+        for actions in (added, settled):
+            conn.execute(sql.SQL("ALTER TABLE {} ").format(table) + actions)
 
 
 def drop_store(conn: psycopg.Connection, schema: str) -> None:

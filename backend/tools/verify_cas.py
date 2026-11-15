@@ -920,6 +920,8 @@ def change_analysis_invariants(conn, rules):
             SELECT t.branch, t.ordinal, t.path, t.unnoted_items FROM build_transition t
             WHERE t.unnoted_occurrences < t.unnoted_items
                OR t.unnoted_occurrences > t.occurrences
+               OR t.unexplained_items > t.unnoted_items
+               OR t.unexplained_items < 0
                OR t.unnoted_items <> (SELECT count(*) FROM change_transition m
                                       JOIN item_change c ON c.branch = t.branch
                                           AND c.ordinal = t.ordinal AND c.aoid = m.aoid

@@ -21,8 +21,9 @@ Three things are derived, all reproducible from the store and the two files:
 
 ``build_transition`` and ``change_transition``
     The field transitions shared by at least two changed items of a build,
-    and the items that have each; per transition its relevance class and
-    how many of its items no build note explains.
+    and the items that have each; per transition its relevance class, how
+    many of its items no build note explains, and in how many of those no
+    note accounts for the transition itself.
 
 :func:`sync` brings all three in line at the start of an import run and does
 the expensive parts only when a rules file (or the engine) changed;
@@ -55,7 +56,7 @@ from app.core.item_diff import MISC_FIELDS, Transition
 
 # Bump when the diff engine or what is derived from it changes, so stores
 # analysed by the earlier code are analysed again.
-ANALYSIS_VERSION = "2"
+ANALYSIS_VERSION = "3"
 
 # A transition is kept in build_transition when this many items share it.
 MIN_SHARED_ITEMS = 2
@@ -463,17 +464,23 @@ def _sync_notes(
     return by_build
 
 
-def _explaining_note(
-    candidates: Sequence[Tuple[int, Note]], diff: Dict[str, Any]
-) -> Optional[int]:
-    """The id of the first of a build's notes that explains a change."""
+def _noted(
+    candidates: Sequence[Tuple[int, Note]], diff: Dict[str, Any], count: int
+) -> Tuple[Optional[int], List[bool]]:
+    """What a build's notes say of one change: the id of the first note that
+    explains all of it (None when none does), and per transition of
+    ``item_diff.transitions(diff)``, ``count`` of them, whether a note
+    accounts for it."""
+    accounted = [False] * count
     if not candidates:
-        return None
+        return None, accounted
     facts = item_diff.transitions(diff, full_text=True)
     for note_id, note in candidates:
-        if note.explains_change(facts):
-            return note_id
-    return None
+        flags = note.accounts_for(facts)
+        if flags and all(flags):
+            return note_id, flags
+        accounted = [a or b for a, b in zip(accounted, flags, strict=True)]
+    return None, accounted
 
 
 def analyze(
@@ -486,14 +493,22 @@ def analyze(
     by_build = _sync_notes(conn, rules.notes, scope)
     tags: List[Tuple[str, int, int, int]] = []
     counted: Dict[Tuple[str, int], Counted] = defaultdict(dict)
-    # The same count over the changes no note explains.
+    # The same count over the changes no note explains, and over those of
+    # them in which no note accounts for the transition.
     unnoted: Dict[Tuple[str, int], Counted] = defaultdict(dict)
+    unexplained: Dict[Tuple[str, int], Counted] = defaultdict(dict)
     for (branch, ordinal, aoid), diff in ChangeDiffs(conn, changed_rows(conn, scope)):
+        build = (branch, ordinal)
         found = item_diff.transitions(diff)
-        count_transitions(counted[(branch, ordinal)], aoid, found)
-        note_id = _explaining_note(by_build.get((branch, ordinal), ()), diff)
+        count_transitions(counted[build], aoid, found)
+        note_id, accounted = _noted(by_build.get(build, ()), diff, len(found))
         if note_id is None:
-            count_transitions(unnoted[(branch, ordinal)], aoid, found)
+            count_transitions(unnoted[build], aoid, found)
+            count_transitions(
+                unexplained[build],
+                aoid,
+                [t for t, noted in zip(found, accounted, strict=True) if not noted],
+            )
         else:
             tags.append((branch, ordinal, aoid, note_id))
 
@@ -541,8 +556,8 @@ def analyze(
     ]
     with conn.cursor().copy(
         "COPY build_transition (transition_id, branch, ordinal, part, path, old, "
-        "new, items, occurrences, relevance, unnoted_items, unnoted_occurrences) "
-        "FROM STDIN"
+        "new, items, occurrences, relevance, unnoted_items, unnoted_occurrences, "
+        "unexplained_items) FROM STDIN"
     ) as copy:
         for transition_id, (branch, ordinal, entry) in zip(ids, shared):
             transition, aoids, occurrences = entry
@@ -567,6 +582,7 @@ def analyze(
                     ],
                     len(unnoted_aoids),
                     unnoted_occurrences,
+                    len(unexplained[(branch, ordinal)].get(transition, (0, ()))[1]),
                 )
             )
     with conn.cursor().copy(

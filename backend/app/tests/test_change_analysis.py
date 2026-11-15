@@ -450,13 +450,13 @@ def test_sync_recounts_transitions_only_when_the_rules_or_engine_change(
 
 
 def classed(conn, ordinal):
-    """``{path: (relevance, unnoted items, unnoted occurrences)}`` of the
-    shared transitions of one build."""
+    """``{path: (relevance, unnoted items, unnoted occurrences, unexplained
+    items)}`` of the shared transitions of one build."""
     return {
         path: tuple(rest)
         for path, *rest in conn.execute(
-            "SELECT path, relevance, unnoted_items, unnoted_occurrences "
-            "FROM build_transition WHERE ordinal = %s",
+            "SELECT path, relevance, unnoted_items, unnoted_occurrences, "
+            "unexplained_items FROM build_transition WHERE ordinal = %s",
             (ordinal,),
         )
     }
@@ -545,14 +545,63 @@ def test_a_transition_is_also_counted_without_the_changes_a_note_explains(conn):
         ],
     )
 
-    assert classed(conn, 2) == {"name": (TEXT, 3, 3), "stat:74": (ECONOMY, 2, 2)}
+    assert classed(conn, 2) == {
+        "name": (TEXT, 3, 3, 3),
+        "stat:74": (ECONOMY, 2, 2, 2),
+    }
     assert shared(conn, 2)[("stats", "stat:74", 5, 9)] == (2, 2)
 
     change_analysis.sync(conn, rules(RENAME))
 
     # items 1 and 2 are explained; item 3 changed in value as well
-    assert classed(conn, 2) == {"name": (TEXT, 1, 1), "stat:74": (ECONOMY, 2, 2)}
+    # and there the note accounts for the rename, not for the value
+    assert classed(conn, 2) == {
+        "name": (TEXT, 1, 1, 0),
+        "stat:74": (ECONOMY, 2, 2, 2),
+    }
     assert shared(conn, 2)[("text", "name", "Old", "New")] == (3, 3)
+
+
+def test_a_note_accounts_for_what_comes_alongside_only_where_its_event_happened(
+    renumbered,
+):
+    # items 1 to 3 are renumbered (item 3 changes an effect too); items 2, 5
+    # and 6 take the same new icon, which the note lets a renumbering come with
+    load(
+        renumbered,
+        spec("three", 3),
+        items=[
+            item(1, SpellData=wear(modify(16, 5))),
+            item(2, SpellData=wear(modify(17, 5)), stats=[(79, 1)]),
+            item(3, SpellData=wear(modify(18, 5), modify(19, 1))),
+            item(5, stats=[(79, 1)]),
+            item(6, stats=[(79, 1)]),
+        ],
+    )
+    load(
+        renumbered,
+        spec("four", 4),
+        items=[
+            item(1, SpellData=wear(modify(16, 5), event=0)),
+            item(2, SpellData=wear(modify(17, 5), event=0), stats=[(79, 2)]),
+            item(3, SpellData=wear(modify(18, 5), modify(19, 1), event=0), name="X"),
+            item(5, stats=[(79, 2)]),
+            item(6, stats=[(79, 2)]),
+        ],
+    )
+
+    change_analysis.sync(
+        renumbered, rules(RENUMBER.replace('build = "two"', 'build = "four"'))
+    )
+
+    assert noted(renumbered, 4) == {1: "Event renumbered", 2: "Event renumbered"}
+    assert classed(renumbered, 4) == {
+        # item 3 is not explained (it was renamed too), but its renumbering is
+        "event": (COSMETIC, 1, 1, 0),
+        # the icon of item 2 came with its renumbering; items 5 and 6 only
+        # took a new icon
+        "stat:79": (COSMETIC, 2, 2, 2),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -650,11 +699,21 @@ def test_upgrade_gives_an_older_store_the_change_analysis_tables(conn):
     assert conn.execute("SELECT count(*) FROM revision_relevance").fetchone() == (2,)
 
 
-def test_upgrade_gives_an_older_store_the_columns_of_the_patch_notes(renumbered):
+@pytest.mark.parametrize(
+    "missing",
+    [
+        ["relevance", "unnoted_items", "unnoted_occurrences", "unexplained_items"],
+        ["unexplained_items"],
+    ],
+    ids=["all", "the newest"],
+)
+def test_upgrade_gives_an_older_store_the_columns_of_the_patch_notes(
+    renumbered, missing
+):
     schema = renumbered.execute("SELECT current_schema()").fetchone()[0]
     renumbered.execute(
-        "ALTER TABLE build_transition DROP COLUMN relevance, "
-        "DROP COLUMN unnoted_items, DROP COLUMN unnoted_occurrences"
+        "ALTER TABLE build_transition "
+        + ", ".join(f"DROP COLUMN {column}" for column in missing)
     )
     renumbered.execute(
         "UPDATE store_state SET value = 'an earlier engine' "
@@ -665,4 +724,4 @@ def test_upgrade_gives_an_older_store_the_columns_of_the_patch_notes(renumbered)
     cas_store.upgrade_store(renumbered, schema)
     change_analysis.sync(renumbered, rules(RENUMBER))
 
-    assert classed(renumbered, 2) == {"event": (COSMETIC, 0, 0)}
+    assert classed(renumbered, 2) == {"event": (COSMETIC, 0, 0, 0)}

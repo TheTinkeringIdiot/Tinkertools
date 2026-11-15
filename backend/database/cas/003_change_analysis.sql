@@ -40,6 +40,12 @@ CREATE TABLE revision_relevance (
 --                the same two counts over the changes no build note explains
 --                (item_change.note_id IS NULL): what a list that collapses
 --                noted changes shows
+--   unexplained_items
+--                of unnoted_items, the changes in which no note of the build
+--                accounts for this transition (change_rules.Note.accounts_for).
+--                Patch notes that collapse noted changes list a transition
+--                when enough of these share it: a renamed and rebalanced
+--                implant counts for its rebalancing, not for the rename
 CREATE TABLE build_transition (
     transition_id  serial PRIMARY KEY,
     branch         varchar(20) NOT NULL,
@@ -53,6 +59,7 @@ CREATE TABLE build_transition (
     relevance            smallint NOT NULL,
     unnoted_items        integer  NOT NULL,
     unnoted_occurrences  integer  NOT NULL,
+    unexplained_items    integer  NOT NULL,
     FOREIGN KEY (branch, ordinal) REFERENCES build (branch, ordinal) ON DELETE CASCADE
 );
 CREATE INDEX build_transition_build ON build_transition (branch, ordinal, items DESC);

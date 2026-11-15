@@ -47,6 +47,12 @@ and tagged with it, when
 A change that also differs in anything else is not tagged. The notes of a
 build are tried in file order and the first that explains a change tags it.
 
+A note still accounts for part of such a change: the transitions that match
+``explains`` or ``alongside``, in an item where one matches ``explains``. The
+patch notes of a build (``build_transition``) leave out a transition that the
+build's notes account for wherever it occurs: an implant that was renamed and
+rebalanced is listed with its rebalancing, not with the rename.
+
 A pattern is a table with ``path`` and optionally ``part``, ``old`` and
 ``new``:
 
@@ -339,13 +345,20 @@ class Note:
     explains: Tuple[Pattern, ...]
     alongside: Tuple[Pattern, ...] = ()
 
+    def accounts_for(self, transitions: Sequence[Transition]) -> List[bool]:
+        """Per transition of a change (``transitions(diff, full_text=True)``),
+        whether it belongs to the note's event: the event happened to the
+        item (a transition matches ``explains``) and the transition is the
+        event or what comes with it. All False when it did not happen."""
+        if not any(p.matches(t) for t in transitions for p in self.explains):
+            return [False] * len(transitions)
+        patterns = self.explains + self.alongside
+        return [any(p.matches(t) for p in patterns) for t in transitions]
+
     def explains_change(self, transitions: Sequence[Transition]) -> bool:
         """Whether the note explains all of a change with these transitions
         (``transitions(diff, full_text=True)``)."""
-        if not any(p.matches(t) for t in transitions for p in self.explains):
-            return False
-        patterns = self.explains + self.alongside
-        return all(any(p.matches(t) for p in patterns) for t in transitions)
+        return bool(transitions) and all(self.accounts_for(transitions))
 
 
 @dataclass(frozen=True)
