@@ -101,14 +101,14 @@ getPocketBossDrops(id: number): Promise<ApiResponse<SymbiantItem[]>>
 - **implants.py**: Implant lookup by slot and clusters
 - **symbiants.py**, **mobs.py**: Symbiants, mobs and pocket boss drops
 - **perks.py**: Batch perk lookup for profile imports
-- **versions.py**: Game version registry
-- **legacy_item_ids.py**: Internal item id to AOID lookup (transitional)
+- **versions.py**: The builds the API serves
+- **legacy_item_ids.py**: Internal item ids of the old database to AOIDs (transitional; map loaded by the importer)
 - **aosetups.py**: Proxy for AO Setups profile imports
 - **health.py**, **cache.py**: Liveness check, response cache clearing
 
 ### Store Read Layer (`backend/app/store/`)
 
-Every game-data route reads the content-addressed store (PostgreSQL schema `cas`) through this package: `context` (the build a request names, the session), `tables`, `presence` (the revisions of a build, filters, paging), `items` (item loader and the `ItemDetail` document) and `curated` (symbiants, mobs, perks). The module docstring of `backend/app/store/__init__.py` is the guide. `GET /versions` and `POST /legacy-item-ids/resolve` still read `public.game_versions` and the old per-version store through `backend/app/core/database.py`.
+Every game-data route reads the content-addressed store (PostgreSQL schema `cas`) through this package: `context` (the build a request names, the session), `tables`, `presence` (the revisions of a build, filters, paging), `items` (item loader and the `ItemDetail` document) and `curated` (symbiants, mobs, perks). The module docstring of `backend/app/store/__init__.py` is the guide. Nothing reads any other schema: `backend/app/core/database.py` is the engine and no more.
 
 ### Source System
 
@@ -116,15 +116,12 @@ Every game-data route reads the content-addressed store (PostgreSQL schema `cas`
 - Nanocrystals → nanoprograms (from `all_nanos_compacted.csv`); served when the build has the `sources` feature and the crystal is present in the build
 - Mobs → symbiants (from `database/symbiants.csv`); served when the build has the `symbiants` feature
 
-### Data Migration Utilities (`backend/`)
+### Data Utilities (`backend/`)
 
-**update_nanos.py**: Nano source system migration
-- Migrates crystal-nano relationships from CSV
-- Uses DATABASE_URL environment variable
-- Idempotent design (safe to run multiple times)
-- Extensible for future nano data updates
-
-**Other utilities:**
+- `import_cli.py import-cas`: loads the store from extracted client builds and the committed curated files (`backend/IMPORT_README.md`)
+- `extract_builds.py`: extracts client builds with TinkerParse
+- `tools/verify_cas.py`, `tools/golden.py`: verification of the store and of API responses
+- `tools/export_legacy_item_ids.py`, `tools/drop_old_store.sql`: leaving the old store behind
 - `substrain_manager.py`: Substrain ID assignment
 - `compact_nanos.py`: CSV compaction tool
 - `comprehensive_nano_extractor.py`: Database export tool
@@ -373,7 +370,8 @@ Defined in `backend/database/cas/001_store.sql` and `002_curated_and_derived.sql
 - **nano_properties**, **symbiant_items**: Derived from items
 - **nano_overlay**, **perk**, **mob**, **source_type**, **source**, **item_source**: Curated data
 
-The old per-version store (schemas `gd` and `gv_*`, ORM models in `backend/app/models/`) remains until cutover and is read only by the legacy id lookup.
+- **build**: One row per client build; also the list of versions the API serves (presentation from `backend/database/builds.toml`)
+- **legacy_item_id**: Internal item ids of the old database, for the one-time client migration
 
 ### Performance Optimizations
 

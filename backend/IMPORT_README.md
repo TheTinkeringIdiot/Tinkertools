@@ -1,332 +1,178 @@
-# TinkerTools Data Import Utility
+# Loading the TinkerTools database
 
-A standalone utility for importing game data into the TinkerTools database. It is separate from the main FastAPI application and uses the `DATABASE_URL` environment variable to connect to any database.
+Game data lives in one PostgreSQL schema, the content-addressed store (`cas`; design in `docs/plans/content-addressed-store/design.md`, tables in `database/cas/`). The application reads nothing else, and one command writes it: `python import_cli.py import-cas`. This is the guide to loading a database from nothing, checking it, and keeping it current.
 
-## Game versions and the shared store
+## What goes in
 
-TinkerTools serves several snapshots of the game database side by side: live Anarchy Online, Project Rubi-Ka, and historical client builds. Each snapshot is a **game version** with a slug (`ao-2024-02`, `prk-2026-01`, `ao-17-10-5`).
+| Input | Where | Maintained by |
+|---|---|---|
+| Extracted client builds | an extracts folder outside the repository: `index.json` and one `<slug>/{items.json,nanos.json,manifest.json}` per build (`docs/plans/content-addressed-store/extract-contract.md`) | `extract_builds.py` |
+| Nano QL, strains, crystal sources | `all_nanos_compacted.csv` | hand |
+| Perk metadata | `database/perks.json` | hand |
+| Mobs and their drops | `database/symbiants.csv` | hand |
+| How builds are presented: names, dates, the default build, curated features | `database/builds.toml` | hand |
+| What a change means: relevance classes, build notes | `database/change_relevance.toml`, `database/build_notes.toml` | hand |
+| Internal item ids of the old database (optional) | a file you export, see [Legacy item ids](#legacy-item-ids) | `tools/export_legacy_item_ids.py` |
 
-Game content is stored once, in the **shared revision store** (schema `gd`, design.md §12):
+Everything but the extracts and the legacy id file is committed, and the importer reads it from the repository by default.
 
-| where | what |
-|---|---|
-| `gd.items` | one row per distinct item revision; `vids SMALLINT[]` lists the versions holding it, `storage_fp` is the dedup key |
-| `gd.*` | every other content table (`item_stats`, `spells`, `actions`, `attack_defense`, ...), the interned `stat_values` and `criteria`, and `nano_properties` keyed by revision id |
-| `gd.schema_migrations` | which `database/migrations` files the store's content tables carry |
-| `gv_<slug>` | views over `gd` (`items` filtered by the version's vid, the rest passed through), the version's `symbiant_items` materialized view, and its curated real tables: `perks`, `mobs`, `sources`, `source_types`, `item_sources`, `application_cache`, `schema_migrations` |
-| `public.game_versions` | the registry: slug, vid, family, lineage, client build, feature flags, extract provenance (`extract_slug`, `tinkerparse_commit`, `rdb_dat_sha256`) |
-| `public.item_revisions` | a view over `gd.items`: one row per (AOID, version) with the content hashes, for "changed in patch X" |
-| `public.global_migrations` | tracking for `database/global_migrations/*.sql` |
+## Prerequisites
 
-An item that is identical in several versions is one row with several vids. A version's own `items.id` values are revision ids, so an unchanged item has the same id in every version.
+- PostgreSQL 13 or later and an empty database owned by the role in `DATABASE_URL`.
+- The role may create a schema and the extensions `btree_gist` and `pg_trgm` in that database. Both extensions are trusted: `CREATE` on the database is enough, superuser is not needed. The importer creates the schema, the extensions and the tables itself.
+- The extensions' packages are installed on the server (`postgresql-contrib` on Debian and Ubuntu).
+- Python environment and connection:
 
-The API is unchanged: a request's `search_path` is `gv_<slug>, public`, and the views look like the old tables.
+  ```bash
+  cd backend && source venv/bin/activate && set -a && . ./.env.local && set +a
+  ```
 
-### How an import works
+  or `export DATABASE_URL="postgresql://aodbuser:password@localhost:5432/tinkertools"`.
+- The extracts folder on a local disk. Reading it from a network mount is slow and has failed part way.
+- About 2 GB of memory per worker (`--workers`), and 1 GB of disk for the full store (147 builds: 920 MB).
 
-1. Global migrations are applied to `public`.
-2. The dump is loaded into a **staging schema** `gv_stage_<slug>`, built fresh from `database/migrations`, with the same importer code as before.
-3. Curated overlays run in staging: `--nanos-csv` applies `update_nanos.py` (crystal sources, nano QL, strain and substrain). Then `nano_properties` is derived.
-4. Install, in one transaction under an advisory lock (`app/core/shared_store.py`):
-   - a fingerprint (`storage_fp`) is computed for every staged item from its stored rows, so the overlay is part of it;
-   - if there is no store yet, the staging tables become `gd`; otherwise `(aoid, storage_fp)` is matched against `gd.items`: a match reuses the revision, a miss copies the item and its whole tree (stats, actions and criteria, spell data, spells, attack/defense, animation/mesh, nano properties) with fresh ids;
-   - the version's vid is set on exactly the revisions it holds, and curated rows are pointed at revision ids;
-   - the staging schema's content tables are replaced by views, `symbiant_items` is rebuilt, and the schema is renamed to `gv_<slug>`, replacing the previous one;
-   - revisions no version holds any more are garbage-collected.
-5. `gd.items` is vacuumed and the touched tables analyzed (the planner's `vids @>` estimates come from array statistics).
-
-Re-importing a slug is a clean replace: its membership is rebuilt, and revisions only it held are collected. Other versions are never changed. Writes never go to shared rows in place, which is why curated edits must happen in staging.
-
-## Requirements
-
-### Data Files
-
-Default locations are under `backend/database/`; override any of them with a `--*-file` flag (both `~` and environment variables are expanded).
-
-- `items.json` (407 MB) - Item data
-- `nanos.json` (44 MB) - Nano program data
-- `symbiants.csv` (208 KB) - Curated mob and drop-source data (skip with `--no-symbiants`)
-- `perks.json` (411 KB) - Curated perk metadata (skip with `--no-perks`)
-- `all_nanos_compacted.csv` - Curated crystal/strain data, applied with `--nanos-csv`
-
-Curated files are live-era Anarchy Online data. For a private server or an old client build, either supply that version's own copies or omit them; the registry then records the missing features and the UI hides the affected tools.
-
-Use the same curated inputs for every version that should share revisions. The overlay is part of the fingerprint: importing one build with `--nanos-csv` and the next without it makes every overlaid nano a separate revision (the item history, which compares `content_hash` of the raw record, is not affected).
-
-### Environment
+## Load a database from nothing
 
 ```bash
-cd backend && source venv/bin/activate && set -a && . ./.env.local && set +a
-```
-
-or `export DATABASE_URL="postgresql://aodbuser:password@localhost:5432/tinkertools"`.
-
-## Usage
-
-### One-time: convert per-version schemas to the shared store
-
-A database whose versions still have their own tables (before October 2026) must be converted once. Back it up first; afterwards a version is no longer self-contained in its schema.
-
-```bash
-pg_dump -Fc -f tinkertools_pre_shared.dump "$DATABASE_URL"
-python import_cli.py convert-shared --yes
-```
-
-Every registered version is converted in place, in one transaction: the default version first, whose tables become `gd` (it keeps every surrogate id), then the others by sort order (their identical items take its ids; their own revisions get new ids). Then `gd.items` and the curated tables are vacuumed. Re-running it converts whatever is left and refreshes every version's views; it is a no-op on a converted database.
-
-To go back, drop the store and the version schemas (this also drops the `item_revisions` view), then restore:
-
-```bash
-psql "$DATABASE_URL" -c 'DROP SCHEMA gd, gv_ao_2024_02, gv_prk_2026_01 CASCADE'
-pg_restore --clean --if-exists --no-owner -d "$DATABASE_URL" tinkertools_pre_shared.dump
-```
-
-The restored registry predates global migration 002, so run the pre-conversion code against it.
-
-### Extract client builds
-
-`extract_builds.py` runs [TinkerParse](https://github.com/TheTinkeringIdiot/TinkerParse) over client builds and writes the extracts folder. It needs `git`, `dotnet` (.NET 8) and, for archives, `7z`; it does not touch the database.
-
-```bash
-# a new game patch: the installed clients
-python extract_builds.py --extracts-dir ~/projects/AO/extracts --tinkerparse ~/projects/TinkerParse \
-    --live "~/.wine/drive_c/Funcom/Anarchy Online" --prk ~/.prk/drive_c/ProjectRubiKa
-
-# historical builds: 7z archives and folders of unpacked clients, one sub-folder per build number
-python extract_builds.py --extracts-dir ~/projects/AO/extracts --tinkerparse ~/projects/TinkerParse \
-    --archive ~/versions/17.0.0_to_17.10.5 --builds-dir ~/versions/unpacked --work-dir /tmp/extract-work
-```
-
-- The parser is built from one pinned commit (`TINKERPARSE_COMMIT` in the script), whatever the checkout's working tree holds. Content hashes cover parser-generated fields, so change the pin for every build or for none: after changing it, run every source again.
-- A build is named by its client: `version.id` for `--live`, `patch.version` for `--prk`, the folder name otherwise. `18.8.62_EP1` becomes `ao-18-8-62-ep1`.
-- A build whose folder already holds the same client database from the same parser commit is skipped (`--force` parses it again). Parsing is deterministic: a second run writes identical files.
-- Builds with an identical client database are parsed once; the others are indexed as `duplicate`. A client without `ResourceDatabase.dat` and `.idx` is `missing_db`. A build the parser cannot read (no items, or more than 1% of records in error) is `failed` and gets no folder.
-- One build number with two different databases: the later one is parsed under a numbered slug (`ao-16-2-0-2`) and kept only if its items or nanos differ; a repack with the same content is dropped.
-- `index.json` is rewritten after every source. Builds from earlier runs stay in it, so a run with only `--live` adds the new patch to the existing history.
-- Each archive is unpacked once into `--work-dir` (database files only, up to about 45 GB) and removed when its builds are done. Progress goes to `<extracts-dir>/extract.log`.
-
-Then import what was extracted:
-
-### Import extracted client builds
-
-The extractor writes one folder per build plus an index (`.docs/plans/multi-version-support/extract-contract.md`):
-
-```bash
-# every build in index.json
-python import_cli.py import-extracts --extracts-dir ~/projects/AO/extracts
-
-# one build, or several
-python import_cli.py import-extracts --extracts-dir ~/projects/AO/extracts --slug ao-17-10-5 --slug ao-17-10-4
-
-# reload a build that is already installed from the same extract
-python import_cli.py import-extracts --extracts-dir ~/projects/AO/extracts --slug ao-17-10-5 --force
-```
-
-- `extracted` builds load in index order through staging (CSV pipeline). `client_build`, `tinkerparse_commit` and `rdb_dat_sha256` come from the build's `manifest.json`.
-- `duplicate` builds (a client database identical to another build's) load after them: the version is registered, its vid is added to the revisions of its `extract_slug`, and it gets copies of that version's curated rows. Nothing is re-imported. The source must be installed.
-- `failed` and `missing_db` builds are skipped.
-- A build whose registry row already has the same `extract_slug`, `rdb_dat_sha256` and `tinkerparse_commit` is skipped unless `--force`. Re-importing a build also re-points its registered duplicates.
-- Lineage: after the run, each registered build's `parent_slug` is the previous registered build of its family in index order (the first of a family keeps its parent).
-- New rows get a display name like `AO 17.10.5` and a sort order that lists PRK, then AO, newest build first. Existing rows keep their display name, sort order, date, notes, default and enabled flags.
-- Curated data is off by default for extracts. Pass `--perks-file`, `--symbiants-file` and/or `--nanos-csv` to apply them to every build of the run; `features` records what was loaded.
-
-### Content-addressed store (`import-cas`, `tools/verify_cas.py`)
-
-The content-addressed store (`docs/plans/content-addressed-store/design.md`, tables in `database/cas/`) is built next to the shared store, in its own schema (`cas`). Every game-data route of the API reads it (`app/store`); only `GET /versions` and `POST /legacy-item-ids/resolve` still read the registry and the shared store. `import-cas` never writes to `public`, `gd` or a `gv_*` schema; it reads the registry (`public.game_versions`) for display names, release dates (`snapshot_date`), order, flags and features, and brings the stored builds in line with it on every run.
-
-```bash
-# every importable build in index.json, oldest first
 python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --workers 8
-
-# a scratch copy with a few builds
-python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --schema cas_dev \
-    --slug ao-14-2-2 --slug ao-15-0-1 --slug ao-17-10-5
-
-# start over: drops the tables of the schema, keeps the schema
-python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --schema cas_dev --reset --yes
 ```
 
-- The extracts folder, its `index.json`, the manifest of every planned build and the curated files are checked first; if one is missing the command stops before it writes anything.
-- Curated data (`all_nanos_compacted.csv`, `database/perks.json`, `database/symbiants.csv`, or `--nanos-csv`, `--perks-file`, `--symbiants-file`) is synced on every run and applies to every build. A mob that leaves `symbiants.csv` is kept as a retired row, so its id is never given to another mob.
-- Each build is one transaction. Builds already in the store are skipped, so a run that stopped can be repeated and picks up where it stopped. A build older than the newest stored build of its branch is refused: `--reset` and import again to insert one.
-- The newest stored build of each branch is the one served with the curated nano strains; the build before it goes back to its own strains in the transaction that stores the new one.
-- `--workers N` reads and splits N builds ahead of the importer, about 2 GB of memory each; `--workers 0` reads in the importer's process.
-- The change log is classified, noted and counted as it is written, and brought in line with the rules files at the start of every run (see "Change log: relevance, build notes, transitions" below). A store created before those tables existed gets them on its next run.
-- **Never `DROP SCHEMA cas`.** Two extensions, `btree_gist` and `pg_trgm`, live in the schema the first store was created in, and dropping that schema takes them with it, and with them the presence constraint and the trigram indexes of every other store. Use `--reset --yes`, which drops tables only.
-- Every run brings an existing store up to date with the SQL files in place before it imports anything, also when there is nothing to import. That is how a store made earlier gets `pg_trgm` and the two trigram indexes of `part_text` behind substring search (`part_text_name_trgm`, `part_text_desc_trgm`; about 6 s and 46 MB on the full store). Both extensions are trusted: the role needs `CREATE` on the database, not superuser.
+It takes about 9 minutes for the 147 builds of the archive with 8 workers. Add `--legacy-ids-file` when replacing a database whose clients hold internal ids (see below).
 
-Verify after an import (`DATABASE_URL` set as above; the current store is only read):
+What it does, in order:
+
+1. Checks everything it will read before it writes anything: the extracts folder and its index, the manifest of every planned build, the curated files, `builds.toml`, the rules files, the legacy id file if one is given. If one is missing or wrong, it stops.
+2. Creates the schema, the extensions and the tables if they are not there; brings an existing store up to date with the SQL files otherwise.
+3. Makes the curated tables equal to their files, the presentation of stored builds equal to `builds.toml`, and the change log's classification equal to the rules files.
+4. Imports the builds the store does not hold, oldest first within each family, each in one transaction.
+
+Running it again changes nothing that is already right. A run that stopped can be repeated and picks up at the build it stopped on.
+
+Then start the API (`uvicorn app.main:app`); it needs `DATABASE_URL` and nothing else from the database than schema `cas` (`CAS_SCHEMA` names another).
+
+### Options
+
+| option | meaning |
+|---|---|
+| `--extracts-dir DIR` | folder with `index.json` and the build folders (required) |
+| `--slug SLUG` | build to import, repeatable (default: every importable build of the index). A slug outside the index is taken from its folder's manifest |
+| `--schema NAME` | schema of the store (default `cas`) |
+| `--workers N` | builds read and split in parallel, about 2 GB of memory each (default 4; 0 reads in the importer's process) |
+| `--reset --yes` | drop the store's tables in `--schema` and import from scratch |
+| `--builds-file PATH` | default `database/builds.toml` |
+| `--legacy-ids-file PATH` | make the store's map of old internal ids equal to this file; without the option the map is left as it is |
+| `--nanos-csv`, `--perks-file`, `--symbiants-file` | override the curated files (`~` and environment variables are expanded) |
+| `--database-url URL` | override `DATABASE_URL` |
+
+### Rules worth knowing
+
+- Builds of a family are imported oldest first. A build older than the newest stored build of its family is refused: `--reset` and import again to insert one.
+- `duplicate` builds of the index (a client database identical to another build's) are stored without reading any data. `failed` and `missing_db` builds are skipped.
+- The newest stored build of each family is the one served with the curated nano strains; the build before it goes back to its own strains in the transaction that stores the new one.
+- A mob that leaves `symbiants.csv` is kept as a retired row, so its id is never given to another mob.
+- **Never `DROP SCHEMA cas`.** `btree_gist` and `pg_trgm` live in the schema the first store of the database was created in, and dropping that schema takes them with it, and with them the presence constraint and the trigram indexes of every other store in the database. Use `--reset --yes`, which drops tables only.
+
+## Verify
 
 ```bash
-# the store as a whole: projections, presence, change log (classified and noted
-# as the rules files say), strain policy, item counts
-python tools/verify_cas.py --store
+# the store as a whole: search projections against the part documents, presence,
+# change log and strain policy rules, the change log against the rules files,
+# and the item count of every build against its extract's manifest
+python tools/verify_cas.py --store --extracts-dir ~/projects/AO/extracts
 
-# one build against the current store and its raw extract
+# one build, every part document against the raw extract
 python tools/verify_cas.py ao-17-10-5 --extracts-dir ~/projects/AO/extracts
 ```
 
-- Both end with `N difference(s)` and exit 1 unless N is 0; exit 2 means the check could not be run (no store in `--schema`, no extract, a build or `--against` build that is not in its store).
-- A build check needs `--extracts-dir`: effect criteria order, effect descriptions and shop data can only be compared with the raw extract. `--skip-extract` leaves that part out and says so in its last line; it is not a complete check.
-- `--schema NAME` checks another store, `--show N` prints more examples, `--against SLUG` compares with another build of the current store.
+Both end with `N difference(s)` and exit 1 unless N is 0; exit 2 means the check could not be run (no store in `--schema`, no extract, a build the store does not hold). `--schema NAME` checks another store, `--show N` prints more examples. The store is only read.
 
-#### Change log: relevance, build notes, transitions
+Then the application: `GET /api/v1/versions` lists the builds, and `python -m pytest app/tests -q` passes against the loaded database (the tests of real game data read the `cas` store of `DATABASE_URL`).
 
-The diff routes of the API (`GET /changes`, `/compare/{base}`, `/items/{aoid}/timeline`; see `API.md`) read what the importer derives about the change log (`app/core/change_analysis.py`, tables in `database/cas/003_change_analysis.sql`) from two hand-maintained files:
+A change that should not alter API responses is checked against responses captured before it, with `tools/golden.py` (see "Golden comparison" in `app/store/__init__.py`).
 
-| File | Says | Format |
-|---|---|---|
-| `database/change_relevance.toml` | which stats and effect types are gameplay, economy or cosmetic, and how whole-part changes are classed | `id = "name"` under `[stats.<class>]` / `[effects.<class>]`; `unclassified` and unlisted ids take `default` |
-| `database/build_notes.toml` | build-wide events that explain many item changes at once ("implants renamed"), as rules over field transitions | `[[note]]` with `build`, `title`, `body`, `explains`, `alongside` |
+## Add a new build
 
-The rules are stated in the docstring of `app/core/change_rules.py`. To change them, edit a file and run `import-cas` again (it imports nothing if every build is stored):
-
-- `item_change.relevance` is recomputed for the whole log on every run, in one statement, and only rows that differ are written. When `change_relevance.toml` changed, the per-revision digests it is computed from (`revision_relevance`) are rebuilt first.
-- Build notes, the note of each change (`item_change.note_id`) and the shared transitions of each build (`build_transition`, `change_transition`) are recomputed when either file changed (or the diff engine did: `ANALYSIS_VERSION`): a transition is stored with the class `change_relevance.toml` gives its field, with its counts over the changes no note explains, and with the number of those in which no note accounts for the transition itself, which is what the patch notes list by default. A note keeps its id as long as its build and title stay.
-- A note whose build the store does not hold is ignored, so one file serves every store.
-- Measured on the full store (147 builds, 263,959 revisions, 275,750 changes): everything from scratch, as after a change to both files, 54 s. A run with nothing to do only checks the relevance of the log (0.2 s on a store of five builds and 111,000 changes). A new build adds the analysis of its own changes (5 s for the largest step, 14.8.0 with 48,881 changes; 11 s in all for the five builds of a scratch store).
-
-Finding and checking notes:
+After a game patch:
 
 ```bash
-# what the changed items of each build have in common, and what each note catches
+# 1. extract the installed clients into the extracts folder (no database involved)
+python extract_builds.py --extracts-dir ~/projects/AO/extracts --tinkerparse ~/projects/TinkerParse \
+    --live "~/.wine/drive_c/Funcom/Anarchy Online" --prk ~/.prk/drive_c/ProjectRubiKa
+
+# 2. describe the new build: in database/builds.toml, move `default` and the curated
+#    `features` from the old live build's table to a table for the new slug,
+#    and give it a display name and a date
+
+# 3. import: stores the new build and brings the old one's presentation in line
+python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts
+
+# 4. check
+python tools/verify_cas.py --store --extracts-dir ~/projects/AO/extracts
+python tools/verify_cas.py <new-slug> --extracts-dir ~/projects/AO/extracts
+```
+
+The API picks the new build up within a minute (`GAME_VERSION_REGISTRY_TTL`); the family alias (`ao`, `prk`) follows it. Commit `builds.toml`.
+
+`extract_builds.py` needs `git`, `dotnet` (.NET 8) and, for archives, `7z`:
+
+- The parser is built from one pinned commit (`TINKERPARSE_COMMIT` in the script), whatever the checkout's working tree holds. Content hashes cover parser-generated fields, so change the pin for every build or for none: after changing it, extract every source again and import with `--reset`.
+- A build is named by its client: `version.id` for `--live`, `patch.version` for `--prk`, the folder name otherwise. `18.8.62_EP1` becomes `ao-18-8-62-ep1`.
+- A build whose folder already holds the same client database from the same parser commit is skipped (`--force` parses it again). Parsing is deterministic.
+- Builds with an identical client database are parsed once; the others are indexed as `duplicate`. A client without `ResourceDatabase.dat` and `.idx` is `missing_db`. A build the parser cannot read is `failed` and gets no folder.
+- Historical builds come from archives and folders of unpacked clients: `--archive DIR --builds-dir DIR --work-dir DIR`. Each archive is unpacked once into `--work-dir` (up to about 45 GB) and removed when its builds are done. Progress goes to `<extracts-dir>/extract.log`.
+- `index.json` is rewritten after every source and keeps the builds of earlier runs.
+
+## Edit the files and run again
+
+Every committed input is applied by running `import-cas` again. With every build stored it imports nothing and takes seconds.
+
+| File | What an edit changes | Applied |
+|---|---|---|
+| `database/builds.toml` | a build's name, date, list position, whether it is enabled or the default, its curated features, its notes (fields in the docstring of `app/core/cas_extract.py`). A build without a table takes the defaults. `parent` (the build a family forks from) is read only when the build is first imported | to stored builds on every run |
+| `all_nanos_compacted.csv`, `database/perks.json`, `database/symbiants.csv` | curated data of every build | rows that differ are written on every run |
+| `database/change_relevance.toml` | which stats and effect types are gameplay, economy or cosmetic, and how whole-part changes are classed (`id = "name"` under `[stats.<class>]` / `[effects.<class>]`; `unclassified` and unlisted ids take `default`) | `item_change.relevance` is recomputed for the whole log in one statement; the per-revision digests it is computed from are rebuilt first |
+| `database/build_notes.toml` | build-wide events that explain many item changes at once, as rules over field transitions (`[[note]]` with `build`, `title`, `body`, `explains`, `alongside`) | notes, the note of each change and the shared transitions of each build are recomputed when either rules file changed (or the diff engine did: `ANALYSIS_VERSION`) |
+
+The rules of the two change files are stated in the docstring of `app/core/change_rules.py`; the API's diff routes (`GET /changes`, `/compare/{base}`, `/items/{aoid}/timeline`; see `API.md`) read what is derived from them. A note whose build the store does not hold is ignored, and so is a `builds.toml` table for a build that is not extracted, so one set of files serves every store. The store records what it was analysed with; `verify_cas.py --store` reports a store either rules file has moved on from, and the API logs a warning at start-up when its files are not the store's.
+
+Measured on the full store (147 builds, 263,959 revisions, 275,750 changes): the change analysis from scratch, as after a change to both rules files, takes 54 s. A new build adds the analysis of its own changes (5 s for the largest step, 14.8.0 with 48,881 changes).
+
+Finding and checking build notes:
+
+```bash
 python tools/change_candidates.py --min-items 200            # every build
 python tools/change_candidates.py ao-14-8-0 --min-items 100  # one build
 ```
 
-It lists, per build, the field transitions shared by at least that many items, the change shapes (sets of changed fields) shared by that many, and the number of changes each note of `build_notes.toml` explains as the file stands, before any import. `python -m pytest app/tests/test_change_rules_store.py` fails when a stat or effect type occurs in the store's changes and is in no section of `change_relevance.toml`.
+It lists, per build, the field transitions shared by at least that many items, the change shapes shared by that many, and the number of changes each note of `build_notes.toml` explains as the file stands, before any import. `python -m pytest app/tests/test_change_rules_store.py` fails when a stat or effect type occurs in the store's changes and is in no section of `change_relevance.toml`.
 
-### Import a version from dump files
+## Legacy item ids
 
-```bash
-python import_cli.py all --version ao-2024-02 --csv-mode \
-    --items-file ~/ao-data/items.json --nanos-file ~/ao-data/nanos.json \
-    --nanos-csv all_nanos_compacted.csv
-
-python import_cli.py all --version prk-2026-01 --csv-mode \
-    --items-file ~/prk/items.json --nanos-file ~/prk/nanos.json \
-    --nanos-csv all_nanos_compacted.csv \
-    --display-name "Project Rubi-Ka" --family prk --parent ao-2024-02
-```
-
-`--csv-mode` transforms the JSON into CSV files and loads them with PostgreSQL `COPY`. It is roughly 55x faster than the ORM path (`--optimized`, standard) and is the normal way to load a version. Both dev versions were loaded with the crystal/strain overlay; pass `--nanos-csv` when re-importing them, or their nanos become new revisions. `--clear` is accepted but no longer needed: every `all` import replaces the version.
-
-### Individual datasets
-
-`items`, `nanos` and `symbiants` add rows to a version's own tables and only work on a database without the shared store. Against the store they refuse; re-import the whole version with `all`.
-
-### Registry commands
+Before identity moved to the AOID, clients stored internal row ids of the database that served them: nano favorites, symbiant farm lists and symbiant comparison links (all three are ids of `items` rows). A store loaded from the extracts has never issued those ids. Clients translate what they still hold once, through `POST /legacy-item-ids/resolve`, which answers from a copy of `id -> aoid` taken from the old database.
 
 ```bash
-# Every registered version: schema, vid, build, flags (default, disabled, dup of X)
-python import_cli.py versions
+# 1. against the database being replaced, before it is replaced (read-only)
+DATABASE_URL=postgresql://...old... python tools/export_legacy_item_ids.py legacy_item_ids.csv
 
-# Create or update a registry row without importing anything
-python import_cli.py register --version ao-2024-02 --set-default \
-    --display-name "Anarchy Online (Live)" --snapshot-date 2024-02-24
-
-# Remove a version: its vids, its schema and its registry row, then garbage-collect
-python import_cli.py drop-version --version ao-15-0-0 --yes
-
-# Re-derive nano_properties (shared store: for every revision at once)
-python import_cli.py nano-properties --version ao-2024-02
+# 2. against the new database, with the first import or any later run
+python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --legacy-ids-file legacy_item_ids.csv
 ```
 
-`adopt-public` (move a pre-multi-version install from `public` into `gv_<slug>`) only runs on a database without the store; run `convert-shared` after it.
+- The export knows two layouts: a database from before several versions were served (`public.items`; every id is filed under `--family`, default `ao`) and the shared revision store (`gd.items` with `public.game_versions`; each family gets the ids its versions held). If another family was served from a database of its own, export each with its `--family` and concatenate the files, keeping one header line.
+- The file is CSV, `branch,item_id,aoid`. Keep it with the deployment's data, not in the repository: it belongs to one database.
+- The import makes the table equal to the file. A run without the option leaves the table alone.
+- An id is resolved for the family of the requested version, and only when the item is present in that version.
+- Without the file the route answers `{"aoids": {}, "available": false}` for that family. The frontend then keeps the user's stored ids and asks again on the next load, so loading the file later loses nothing; it does not treat the ids as unknown.
+- The old database is the only source of these ids. Export before dropping it.
 
-## Options
+## Removing the old store
 
-### Game version
-
-| option | meaning |
-|---|---|
-| `--version SLUG` | version to operate on (default: `DEFAULT_GAME_VERSION`). Slugs starting with `stage-` are reserved |
-| `--display-name NAME` | name shown in the version selector (default: the slug) |
-| `--family NAME` | selector grouping (default: `prk` for slugs starting with `prk`, else `ao`) |
-| `--parent SLUG` | the snapshot this one follows; sets lineage for item history |
-| `--client-build STR` | client build (default: the `Version` field of the first item record) |
-| `--snapshot-date YYYY-MM-DD` | date of the dump |
-| `--sort-order N` | position in the version selector |
-| `--set-default` | serve this version for requests with no version segment |
-| `--disabled` | register the version but hide it from the API and selector |
-| `--notes TEXT` | provenance notes |
-| `--no-perks` | import without perk metadata |
-| `--no-symbiants` | import without mobs, sources and symbiant drops |
-| `--yes` | confirm a destructive command (`drop-version`, `convert-shared`, `import-cas --reset`) |
-
-### Shared store and extracts
-
-| option | meaning |
-|---|---|
-| `--extracts-dir DIR` | `import-extracts`, `import-cas`: folder with `index.json` and `<slug>/{items.json,nanos.json,manifest.json}` |
-| `--slug SLUG` | `import-extracts`, `import-cas`: build to import, repeatable (default: every build in the index) |
-| `--force` | `import-extracts`: reload builds already installed from the same extract |
-| `--nanos-csv PATH` | curated crystal/strain CSV. `all`, `import-extracts`: applied in staging (`update_nanos.py`), off when not given. `import-cas`: default `all_nanos_compacted.csv` |
-
-### Content-addressed store
-
-| option | meaning |
-|---|---|
-| `--schema NAME` | `import-cas`: schema of the store (default: `cas`) |
-| `--workers N` | `import-cas`: builds read and split in parallel (default: 4; 0 reads in the importer's process) |
-| `--reset` | `import-cas`: drop the store's tables in `--schema` and import from scratch; needs `--yes` |
-
-### Import
-
-| option | meaning |
-|---|---|
-| `--csv-mode` | CSV + `COPY` pipeline, ~55x faster (`all` command only) |
-| `--optimized` | batched ORM importer, 10-20x faster than standard |
-| `--ultra` | experimental, 40-60x faster, data loss possible on crash; requires `--optimized` |
-| `--chunk-size N` | items per chunk in standard mode (default: 100) |
-| `--batch-size N` | batch size for the optimized importer |
-| `--database-url URL` | override `DATABASE_URL` |
-| `--items-file`, `--nanos-file`, `--symbiants-file`, `--perks-file` | override default file locations |
-
-## Content hashes and item history
-
-During import each raw record is hashed (`app/core/content_hash.py`):
-
-- `content_hash` over the whole normalized record,
-- `stats_hash`, `spells_hash`, `actions_hash`, `text_hash` over its parts.
-
-`Version`, `DBType` and the internal nano marker are stripped, and `StatValues` plus the attack/defense stat lists are sorted, so two extractions of the same client hash identically. Criteria and spell arrays keep their order, because reordering them changes what the item requires or does.
-
-The hashes are stored on `items` (migration 007). `public.item_revisions` derives one row per (AOID, version) from `gd.items` and the registry vids; nothing has to be rebuilt after an import. Comparing an AOID's hashes across versions in lineage order gives the patch points where the item changed, and which part of it changed.
-
-`storage_fp`, the dedup key, is different from `content_hash`: it is computed from the stored rows (including curated overlays), so two versions share a revision only if they would show exactly the same item.
-
-## Nano school, professions and level
-
-The `/nanos` endpoints read each nano's school, casting professions, lowest casting level and strain from `nano_properties` (migration 008; `strain` added by 009). The values are derived from the revision alone: `app/core/nano_properties.py` reads the NanoSchool (405) and NanoStrain (75) stats and evaluates the Use action's criteria for every nano.
-
-- **Import**: derived in staging; the install copies the rows of new revisions only (a reused revision already has them).
-- **Re-deriving** after a change to `app/core/nano_properties.py`: `python import_cli.py nano-properties --version <any slug>` rebuilds `gd.nano_properties` for every revision. It is idempotent.
-
-## Migrations
-
-`database/migrations/*.sql` build staging schemas. `gd.schema_migrations` records which of them the store's content tables carry, and an install refuses a staging schema at a different migration level, or whose content tables have columns the merge does not know (`CONTENT_COLUMNS` in `shared_store.py`). A new migration that changes a content table must be applied to `gd` by hand (`SET search_path TO gd`, then record it in `gd.schema_migrations`), `CONTENT_COLUMNS` and the merge SQL updated, and the views refreshed with `convert-shared --yes`. A migration that changes a curated table must be applied to every `gv_*` schema.
-
-## Never write to content tables in place
-
-The per-version views are simple views, so PostgreSQL lets `INSERT`/`UPDATE`/`DELETE` through them into `gd`, where the change would reach every version holding the row. Nothing in the app writes to content tables. `update_nanos.py` refuses to run against a version schema made of views, and `POST /performance/indexes/create` creates its indexes on `gd`.
-
-## Performance notes
-
-- **CSV mode**: full load of items + nanos in about a minute; the merge into the store adds about 30 seconds per version (fingerprints and copy of new revisions).
-- **Storage**: about 4.8 KB per distinct revision plus up to 7 MB of curated tables per version. The two dev versions take 777 MB (1,370 MB as separate schemas).
+A database that still holds the store this one replaced (schemas `gd` and `gv_*`, `public.game_versions`) can be cleared of it with `tools/drop_old_store.sql`, once the legacy ids are exported and a backup is taken. The script's header says what it removes; it is irreversible.
 
 ## Troubleshooting
 
-### Import fails
-- Check `import.log` for detailed error messages. A failed import leaves the version as it was (the install is one transaction) and drops its staging schema.
-- "still use the per-version table layout": run `convert-shared --yes` first.
-- "Migration levels differ" or "has columns ...": see Migrations above.
-- "holds the same AOID more than once": the dump has duplicate records for an AOID; a version must have one item per AOID.
-
-### Data went into the wrong schema
-- Confirm the slug: `python import_cli.py versions`
-- The API resolves a version through `public.game_versions`; a version with a schema but no registry row is invisible to it, and `versions` marks a registry row whose schema is missing as `NO SCHEMA`
-
-### Backups
-- `gd`, `public` and every `gv_*` schema depend on each other; back up and restore the whole database, not single schemas.
+- The import writes `import.log` in the directory it is run from. A failed build leaves the store as it was before that build (one transaction per build); fix the cause and run again.
+- "Extracts folder not found", "No index.json", "No manifest for", "Data file not found", "Builds file not found": an input is missing; nothing was written.
+- "is not newer than ..., the newest build of branch": a build cannot be inserted before stored ones. `--reset --yes` and import everything.
+- `permission denied to create extension`: the role lacks `CREATE` on the database, or the extension's package is not installed on the server.
+- The API answers 404 "Unknown game version": the slug is not a stored, enabled build. `GET /api/v1/versions` lists what is.

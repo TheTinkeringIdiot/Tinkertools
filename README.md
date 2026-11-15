@@ -63,19 +63,16 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ### Database Setup
 
 ```bash
-# Initialize database
-cd database
-./setup.sh
-
-# Run schema tests
-psql -U tinkertools_user -d tinkertools -f tests/test_schema.sql
+# Load the game data from extracted client builds (see backend/IMPORT_README.md)
+cd backend
+python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --workers 8
 ```
 
 ## Tech Stack
 
 - **Frontend**: Vue 3, TypeScript, Vite, TailwindCSS, PrimeVue (Aura theme)
-- **Backend**: FastAPI, SQLAlchemy (async), Pydantic, asyncpg
-- **Database**: PostgreSQL with 23 core tables for game data
+- **Backend**: FastAPI, SQLAlchemy Core, Pydantic, psycopg
+- **Database**: PostgreSQL, game data in a content-addressed store (schema `cas`)
 - **Testing**: Vitest (frontend), pytest (backend)
 
 ## Documentation
@@ -90,8 +87,7 @@ psql -U tinkertools_user -d tinkertools -f tests/test_schema.sql
 
 This is a monorepo containing:
 - `/frontend` - Vue 3 application with TypeScript
-- `/backend` - FastAPI REST API with async PostgreSQL
-- `/database` - Schema, migrations, and test scripts
+- `/backend` - FastAPI REST API, the importer and the store's schema (`backend/database/cas/`)
 - `/docs` - Architecture and design documentation
 
 For detailed architecture information, see the docs folder.

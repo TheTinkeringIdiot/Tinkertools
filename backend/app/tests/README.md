@@ -42,9 +42,5 @@ def test_item_detail_names_the_item(client, store_db, build):
 
 The rules for both kinds are under "Testing" in the docstring of `app/store/__init__.py`.
 
-## Tests of the Old Per-Version Store
-
-`db_session` and the ORM models of `app/models` read the old per-version store. They are for the tests whose subject is that store or code that stays until it is removed (`test_shared_store.py`, `test_models.py`, `test_migration_runner.py`, `test_legacy_item_ids.py`, `test_versions_endpoints.py`). Do not use them in a test of a route that reads the content-addressed store.
-
 ## Coverage
 `pytest.ini` requires 60% coverage and writes reports to `htmlcov/` and `coverage.json`. Pass `--no-cov` to skip them when running a few tests.

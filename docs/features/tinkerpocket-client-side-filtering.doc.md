@@ -73,7 +73,7 @@ def list_symbiants(
     min_ql: Optional[int] = Query(None),
     max_ql: Optional[int] = Query(None),
     # ... many more filters
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_store)
 ) -> PaginatedResponse[SymbiantResponse]:
     # Complex filter logic
     # Count query
@@ -85,7 +85,7 @@ def list_symbiants(
 ```python
 @router.get("", response_model=List[SymbiantResponse])
 def list_symbiants(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_store)
 ) -> List[SymbiantResponse]:
     # Simple query - get ALL symbiants with ordering
     symbiants = (
