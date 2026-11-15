@@ -87,10 +87,12 @@ common subsequence keeps every criterion that stayed (``"op": "same"``), and
 between two kept criteria the old and new runs are aligned by what each
 criterion is: a requirement by the stat it tests (``value1``, under one of
 ``STAT_OPERATORS``), a logical operator (``LOGICAL_OPERATORS``) as such, and
-any other condition by its operator. Two criteria that are the same thing at
-the same place are ``changed`` (old and new given), anything else is
-``removed`` or ``added``: "Pistol >= 852" can become "Pistol >= 900" and AND
-can become OR, but an operator never "becomes" a requirement. One criterion
+any other condition (on target, must be fighting, wearing an item) as a
+condition. Two criteria that are the same kind of thing at the same place are
+``changed`` (old and new given), anything else is ``removed`` or ``added``:
+"Pistol >= 852" can become "Pistol >= 900", AND can become OR and "on target"
+can become "on fighting target", but an operator never "becomes" a
+requirement. One criterion
 inserted in the middle of a list is one ``added`` entry among ``same`` ones,
 and a criterion that moved shows as removed where it was and added where it
 is.
@@ -276,7 +278,7 @@ def _criterion_identity(criterion: Criterion) -> Tuple:
         return ("stat", value1)
     if operator in LOGICAL_OPERATORS:
         return ("logical",)
-    return ("condition", operator)
+    return ("condition", value1)
 
 
 def diff_criteria(

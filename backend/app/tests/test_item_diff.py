@@ -238,15 +238,26 @@ def test_a_logical_operator_replaced_by_another_is_changed_in_place():
     assert ops(diff_criteria(old, new))[2:] == [("changed", [0, 0, 4], [0, 0, 3])]
 
 
-def test_conditions_pair_by_their_operator_not_by_the_stat_they_leave_empty():
-    # 88 with another value is the same condition, changed; "must be
-    # fighting" (45) and "must be flying" (70) are two conditions
+def test_a_condition_replaced_by_another_is_changed_in_place():
+    # the same condition with another value; on target (18) to on fighting
+    # target (110), as 189 nanos of 15.0.x
     assert ops(diff_criteria([[0, 2, 88]], [[0, 3, 88]])) == [
         ("changed", [0, 2, 88], [0, 3, 88])
     ]
-    assert ops(diff_criteria([[0, 0, 45]], [[0, 0, 70]])) == [
+    assert ops(diff_criteria([[0, 0, 18]], [[0, 0, 110]])) == [
+        ("changed", [0, 0, 18], [0, 0, 110])
+    ]
+
+
+def test_a_condition_never_becomes_a_requirement_or_a_logical_operator():
+    # all three leave value1 at 0
+    assert ops(diff_criteria([[0, 0, 45]], [[0, 64, 22]])) == [
         ("removed", [0, 0, 45], None),
-        ("added", None, [0, 0, 70]),
+        ("added", None, [0, 64, 22]),
+    ]
+    assert ops(diff_criteria([[0, 0, 45]], [[0, 0, 42]])) == [
+        ("removed", [0, 0, 45], None),
+        ("added", None, [0, 0, 42]),
     ]
 
 
