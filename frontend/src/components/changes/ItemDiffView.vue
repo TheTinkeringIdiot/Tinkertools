@@ -117,7 +117,7 @@ Cosmetic entries are folded behind one toggle.
           <DiffMark :op="change.change" />
           <div class="min-w-0">
             <span class="item-diff-label">{{ side.label }} {{ statLabel(change.stat) }}:</span>
-            <StatValueChange :change="change" unit="%" />
+            <StatValueChange :change="change" unit="%" :name-values="false" />
           </div>
         </div>
       </template>
@@ -158,7 +158,7 @@ Cosmetic entries are folded behind one toggle.
     >
       <h4 class="item-diff-heading">Effects</h4>
       <div
-        v-for="(event, index) in shownEvents"
+        v-for="(event, index) in listedEvents"
         :key="`${event.event}-${index}`"
         class="item-diff-group"
         data-testid="diff-event"
@@ -244,6 +244,20 @@ Cosmetic entries are folded behind one toggle.
           </div>
         </div>
       </div>
+      <button
+        v-if="effectCount > EFFECT_LIMIT"
+        type="button"
+        class="item-diff-more"
+        data-testid="diff-effects-more"
+        :aria-expanded="allEffects"
+        @click="allEffects = !allEffects"
+      >
+        {{
+          allEffects
+            ? `Show only the first ${EFFECT_LIMIT} effect changes`
+            : `Show all ${effectCount} effect changes`
+        }}
+      </button>
     </section>
 
     <!-- Other -->
@@ -320,7 +334,10 @@ import {
   statLabel,
   withoutCosmeticEffects,
 } from '@/services/diff-format';
-import type { FieldChange, ItemDiff, StatChange } from '@/types/changes';
+import type { EventChange, FieldChange, ItemDiff, StatChange } from '@/types/changes';
+
+/** Effect changes listed before the rest wait behind "Show all". */
+const EFFECT_LIMIT = 10;
 
 const props = withDefaults(
   defineProps<{
@@ -356,6 +373,35 @@ const shownEvents = computed(() =>
     ? props.diff.effects
     : props.diff.effects.filter((e) => !isCosmeticEvent(e)).map(withoutCosmeticEffects)
 );
+const allEffects = ref(false);
+
+function effectEntries(event: EventChange): number {
+  return event.removed.length + event.changed.length + event.added.length;
+}
+
+const effectCount = computed(() =>
+  shownEvents.value.reduce((sum, event) => sum + effectEntries(event), 0)
+);
+
+/** The events to list: all of them, or as many as hold the first EFFECT_LIMIT effect changes. */
+const listedEvents = computed<EventChange[]>(() => {
+  if (allEffects.value || effectCount.value <= EFFECT_LIMIT) return shownEvents.value;
+  const listed: EventChange[] = [];
+  let room = EFFECT_LIMIT;
+  for (const event of shownEvents.value) {
+    if (room <= 0) break;
+    // In the order they are rendered: removed, changed, added.
+    const removed = event.removed.slice(0, room);
+    room -= removed.length;
+    const changed = event.changed.slice(0, room);
+    room -= changed.length;
+    const added = event.added.slice(0, room);
+    room -= added.length;
+    listed.push({ ...event, removed, changed, added });
+  }
+  return listed;
+});
+
 const shownMisc = computed(() =>
   showCosmetic.value ? props.diff.misc : props.diff.misc.filter((c) => !isCosmeticMisc(c))
 );
@@ -467,6 +513,10 @@ function visibleFields(fields: FieldChange[]): FieldChange[] {
 
 .item-diff-effect-criteria {
   @apply mt-1;
+}
+
+.item-diff-more {
+  @apply ml-5 mt-2 text-xs text-primary-600 hover:underline dark:text-primary-400;
 }
 
 .item-diff-cosmetic-toggle {

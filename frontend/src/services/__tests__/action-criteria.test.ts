@@ -229,7 +229,7 @@ describe('action-criteria service', () => {
 
         expect(result.displayValue).toBe(5);
         expect(result.displaySymbol).toBe('≠');
-        expect(result.description).toBe('Profession ≠ 5');
+        expect(result.description).toBe('Profession ≠ Agent');
         expect(result.isStatRequirement).toBe(true);
       });
 
