@@ -5,6 +5,8 @@ Every test diffs small hand-written part documents, shaped as
 app/core/parts.py stores them.
 """
 
+import pytest
+
 from app.core.item_diff import (
     Transition,
     diff_actions,
@@ -18,6 +20,11 @@ from app.core.item_diff import (
     is_empty,
     transitions,
 )
+
+
+def parts_diff(**changed):
+    """A diff with these parts changed and every other part unchanged."""
+    return {**diff_parts({}, {}), **changed}
 
 
 def effect(spell_id=53045, target=2, criteria=(), ticks=(1, 0), **params):
@@ -107,6 +114,23 @@ def test_a_flag_stat_reports_the_bits_set_and_cleared():
         "bits_set": [8],
         "bits_cleared": [2],
     }
+
+
+@pytest.mark.parametrize("stat", [0, 30, 182, 298, 355, 389])
+def test_every_flag_stat_reports_bits_and_counts_them_as_transitions(stat):
+    (change,) = diff_stats([[stat, 0b0101]], [[stat, 0b0110]])
+
+    assert (change["bits_set"], change["bits_cleared"]) == ([2], [1])
+    assert transitions(parts_diff(stats=[change])) == [
+        Transition("stats", f"stat:{stat}:bit:2", 0, 1),
+        Transition("stats", f"stat:{stat}:bit:1", 1, 0),
+    ]
+
+
+def test_a_stat_that_is_no_flag_reports_values_only():
+    (change,) = diff_stats([[354, 5]], [[354, 6]])
+
+    assert "bits_set" not in change and "bits_cleared" not in change
 
 
 def test_a_flag_stat_with_the_sign_bit_reads_as_unsigned():
@@ -282,6 +306,25 @@ def test_effects_of_another_type_or_another_nano_are_never_paired():
 
     assert change["changed"] == []
     assert len(change["removed"]) == len(change["added"]) == 2
+
+
+@pytest.mark.parametrize(
+    "subject", ["Stat", "Skill", "NanoID", "NanoStrain", "Item", "PerkID"]
+)
+def test_effects_acting_on_another_subject_are_never_paired(subject):
+    old = [event(14, effect(53100, Duration=5, **{subject: 1}))]
+    new = [event(14, effect(53100, Duration=9, **{subject: 2}))]
+
+    (change,) = diff_effects(old, new)
+
+    assert change["changed"] == []
+    assert [e["params"][subject] for e in change["removed"]] == [1]
+    assert [e["params"][subject] for e in change["added"]] == [2]
+
+    (same,) = diff_effects(old, [event(14, effect(53100, Duration=9, **{subject: 1}))])
+    assert [pair["fields"] for pair in same["changed"]] == [
+        [{"field": "spell_params.Duration", "old": 5, "new": 9}]
+    ]
 
 
 def test_a_retargeted_effect_is_paired_and_reports_its_target():
