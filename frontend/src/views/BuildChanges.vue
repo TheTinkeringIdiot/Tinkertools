@@ -3,6 +3,10 @@ BuildChanges - "What changed in this version": the change list of the build
 being browsed against the build before it (/<version>/changes), or the net
 difference from any other build (/<version>/compare/<base>).
 
+A comparison always reads from the older build to the newer one, whichever of
+the two is being browsed: the URL keeps the pair as the user chose it, the
+request and everything on the page are ordered by the registry (orderBuilds).
+
 The URL holds the whole view (filters, sort, page), so any view is a link.
 Rows are paged by the API and never loaded all at once.
 -->
@@ -20,6 +24,29 @@ Rows are paged by the API and never loaded all at once.
             <template v-else>What changed in {{ versionLabel }}</template>
           </h1>
           <p
+            v-if="comparison"
+            class="mt-1 text-sm text-surface-600 dark:text-surface-400"
+            data-testid="changes-scope"
+          >
+            From
+            <strong class="build-changes-side" data-testid="compare-older">{{
+              comparison.olderLabel
+            }}</strong>
+            (older) to
+            <strong class="build-changes-side" data-testid="compare-newer">{{
+              comparison.newerLabel
+            }}</strong>
+            (newer): every item that is not the same in both. Added items are only in
+            {{ comparison.newerLabel }}, removed items only in {{ comparison.olderLabel }}.
+            <span v-if="comparison.forkRule" data-testid="compare-fork-rule">
+              {{ comparison.forkRule }}
+            </span>
+            <span v-if="comparison.viewedIsOlder" data-testid="compare-viewed-older">
+              You are browsing {{ comparison.olderLabel }}, the older of the two.
+            </span>
+          </p>
+          <p
+            v-else
             class="mt-1 text-sm text-surface-600 dark:text-surface-400"
             data-testid="changes-scope"
           >
@@ -133,6 +160,8 @@ Rows are paged by the API and never loaded all at once.
           <PatchNotesPanel
             v-if="!compareBase && response.base && version"
             :version="version"
+            :relevance="filters.relevance"
+            :expand-notes="filters.expandNotes"
             @select="onPatchNote"
           />
 
@@ -194,7 +223,7 @@ Rows are paged by the API and never loaded all at once.
 
               <div class="flex flex-wrap items-center gap-3 text-sm">
                 <label
-                  v-if="(response.notes.length || filters.expandNotes) && !filters.transition"
+                  v-if="response.notes.length || filters.expandNotes"
                   class="build-changes-option"
                 >
                   <input
@@ -271,6 +300,7 @@ Rows are paged by the API and never loaded all at once.
                 :change="change"
                 :build="response.build"
                 :base="response.base"
+                :viewed="version"
                 :start-open="filters.showDiffs"
                 :link-comparison="!!compareBase"
               />
@@ -328,7 +358,8 @@ import {
   transitionText,
 } from '@/services/diff-format';
 import { errorMessage, isRequestCancelled } from '@/services/error-message';
-import { buildLabel, sameBuild } from '@/utils/version-order';
+import { getVersion } from '@/composables/useGameVersion';
+import { buildLabel, familyTitle, orderBuilds, sameBuild } from '@/utils/version-order';
 import {
   CHANGE_KINDS,
   RELEVANCE_NAMES,
@@ -350,7 +381,7 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const filtersOpen = ref(false);
 
-/** The older side of a build comparison; null on the build's own change list. */
+/** The build the browsed one is compared with; null on the build's own change list. */
 const compareBase = computed(() => {
   if (route.name !== 'BuildCompare') return null;
   const base = route.params.base;
@@ -371,12 +402,33 @@ const activeCount = computed(() => activeFilterCount(filters.value));
 const summary = computed(() => response.value?.summary ?? null);
 const versionLabel = computed(() => buildLabel(version.value, [response.value?.build]));
 
+/**
+ * The two builds of a comparison, older first. The registry decides which is
+ * which (a fork's builds count as newer than the family they forked from);
+ * the browsed build is the newer side only when the registry says so or
+ * cannot tell.
+ */
+const comparison = computed(() => {
+  if (!compareBase.value || !version.value || sameBuilds.value) return null;
+  const { older, newer } = orderBuilds(version.value, compareBase.value);
+  const known = [response.value?.build, response.value?.base];
+  const olderFamily = getVersion(older)?.family;
+  const newerFamily = getVersion(newer)?.family;
+  return {
+    older,
+    newer,
+    olderLabel: buildLabel(older, known),
+    newerLabel: buildLabel(newer, known),
+    viewedIsOlder: sameBuild(older, version.value),
+    forkRule:
+      olderFamily && newerFamily && olderFamily !== newerFamily
+        ? `${familyTitle(newerFamily)} is a fork of ${familyTitle(olderFamily)}, so its build always counts as the newer one.`
+        : '',
+  };
+});
+
 const scopeText = computed(() => {
   const answered = response.value;
-  if (compareBase.value) {
-    const base = buildLabel(compareBase.value, [answered?.base]);
-    return `Net difference between ${base} and ${versionLabel.value}: every item that is not the same in both.`;
-  }
   if (!answered) return 'Compared with the build before it.';
   if (!answered.base) return 'The oldest build on record.';
   if (answered.base.family !== answered.build.family) {
@@ -386,9 +438,7 @@ const scopeText = computed(() => {
 });
 
 /** Notes collapsed into single lines (none when their changes are listed with the rest). */
-const shownNotes = computed(() =>
-  filters.value.expandNotes || filters.value.transition ? [] : (response.value?.notes ?? [])
-);
+const shownNotes = computed(() => (filters.value.expandNotes ? [] : (response.value?.notes ?? [])));
 
 /** The transition the list is narrowed to, in the shape the patch notes word. */
 const activeTransition = computed<SharedTransition | null>(() => {
@@ -427,7 +477,10 @@ const listCountText = computed(() => {
 // ---------------------------------------------------------------------------
 
 /** Everything a request depends on; a change of scope drops the page shown. */
-const scopeKey = computed(() => `${version.value ?? ''}|${compareBase.value ?? ''}`);
+const scopeKey = computed(
+  () =>
+    `${version.value ?? ''}|${compareBase.value ?? ''}|${comparison.value?.older ?? ''}|${comparison.value?.newer ?? ''}`
+);
 const requestKey = computed(() => `${scopeKey.value}|${queryKey(request.value)}`);
 
 async function load(): Promise<void> {
@@ -442,8 +495,11 @@ async function load(): Promise<void> {
   loading.value = true;
   error.value = null;
   try {
+    const pair = comparison.value;
     const answered = await changesStore.loadChangeList(
-      { version: version.value, base: compareBase.value, query: request.value },
+      pair
+        ? { version: pair.newer, base: pair.older, query: request.value }
+        : { version: version.value, query: request.value },
       CHANNEL
     );
     if (requestKey.value === asked) response.value = answered;
@@ -485,12 +541,18 @@ async function writeFilters(next: ChangeFilters, mode: 'push' | 'replace'): Prom
   await (mode === 'push' ? router.push(target) : router.replace(target));
 }
 
-/** A filter change starts over on the first page. */
+/**
+ * A filter change starts over on the first page. Each change is a step of the
+ * browser history, so Back undoes it; only typing in the search box is not
+ * (a step per pause in typing would bury the page before it).
+ */
 function updateFilters(patch: Partial<ChangeFilters>, options: { keepPage?: boolean } = {}): void {
   const next = { ...(pendingFilters ?? filters.value), ...patch };
   if (!options.keepPage) next.page = 1;
   pendingFilters = next;
-  void writeFilters(next, 'replace').finally(() => {
+  const keys = Object.keys(patch);
+  const typing = keys.length === 1 && keys[0] === 'search';
+  void writeFilters(next, typing ? 'replace' : 'push').finally(() => {
     if (pendingFilters === next) pendingFilters = null;
   });
 }
@@ -511,7 +573,7 @@ function resetFilters(): void {
       expandNotes: filters.value.expandNotes,
       showDiffs: filters.value.showDiffs,
     },
-    'replace'
+    'push'
   );
 }
 
@@ -527,11 +589,16 @@ function onPage(event: PageState): void {
   );
 }
 
-/** A patch note leads to the items it was done to, whatever else is filtered. */
+/**
+ * A patch note leads to the items it was done to, whatever else is filtered.
+ * What the notes were read under stays (relevance, noted changes), so the
+ * list counts what the line counted and the notes do not change under the reader.
+ */
 function onPatchNote(transition: SharedTransition): void {
   updateFilters({
     ...defaultChangeFilters(),
-    relevance: [],
+    relevance: filters.value.relevance,
+    expandNotes: filters.value.expandNotes,
     sort: filters.value.sort,
     pageSize: filters.value.pageSize,
     showDiffs: filters.value.showDiffs,
@@ -561,6 +628,10 @@ function onBasePicked(slug: string | null): void {
 <style scoped>
 .build-changes-summary {
   @apply m-0 mt-3 flex flex-wrap gap-x-6 gap-y-2;
+}
+
+.build-changes-side {
+  @apply font-semibold text-surface-900 dark:text-surface-50;
 }
 
 .build-changes-stat dt {

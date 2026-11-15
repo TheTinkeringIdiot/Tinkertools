@@ -249,8 +249,6 @@ export function changeFiltersToRequest(filters: ChangeFilters): ChangeListQuery 
     request.transition = filters.transition.path;
     if (filters.transition.old !== null) request.transition_old = filters.transition.old;
     if (filters.transition.new !== null) request.transition_new = filters.transition.new;
-    // A transition's items include those a build note explains.
-    request.notes = 'expand';
   }
   return request;
 }

@@ -12,6 +12,7 @@ page at a time.
       data-testid="build-note-toggle"
       :aria-expanded="open"
       :disabled="note.matching === 0"
+      :title="note.matching === 0 ? NOTHING_MATCHES : undefined"
       @click="toggle"
     >
       <i
@@ -23,6 +24,9 @@ page at a time.
       <span class="build-note-count" data-testid="build-note-count">{{ countText }}</span>
     </button>
     <p v-if="note.body" class="build-note-body">{{ note.body }}</p>
+    <p v-if="note.matching === 0" class="build-note-body" data-testid="build-note-hint">
+      {{ NOTHING_MATCHES }}
+    </p>
 
     <div v-if="open" class="build-note-items" data-testid="build-note-items">
       <p v-if="error" class="text-sm text-red-700 dark:text-red-400" role="alert">
@@ -77,6 +81,8 @@ import { errorMessage, isRequestCancelled } from '@/services/error-message';
 import type { BuildNote, ChangeListQuery, ChangeListResponse } from '@/types/changes';
 
 const NOTE_PAGE_SIZE = 25;
+const NOTHING_MATCHES =
+  'None of these changes match the filters, so there is nothing to list. Change the filters to open it.';
 
 const props = defineProps<{
   note: BuildNote;

@@ -118,7 +118,7 @@ describe('change filters in the URL', () => {
       tto: '100',
     });
     expect(parseChangeFilters(query as Record<string, string>)).toEqual(filters);
-    // Its items include those a build note explains.
+    // Noted changes are in or out as on the rest of the page, so the list counts what the line counted.
     expect(changeFiltersToRequest(filters)).toEqual({
       page: 1,
       page_size: 50,
@@ -126,7 +126,6 @@ describe('change filters in the URL', () => {
       transition: 'effect:53089:spell_params.Chance',
       transition_old: '60',
       transition_new: '100',
-      notes: 'expand',
     });
   });
 

@@ -24,8 +24,9 @@ import {
   setCurrentVersion,
   useGameVersion,
 } from '@/composables/useGameVersion';
-import type { ChangeListQuery, ChangeListResponse } from '@/types/changes';
+import type { ChangeListQuery, ChangeListResponse, ItemDiff } from '@/types/changes';
 import {
+  BUILD_1451,
   BUILD_1460,
   BUILD_17105,
   BUILD_PRK,
@@ -36,6 +37,7 @@ import {
   GRAFT_DIFF,
   NOTE_ATTACK_RANGE,
   ROW_ADDED,
+  ROW_CRITTER,
   ROW_GRAFT,
   ROW_REMOVED,
   TRANSITIONS_1460,
@@ -43,6 +45,8 @@ import {
   changeRow,
   compareList,
   compareResult,
+  emptyDiff,
+  longEffectsDiff,
 } from '../helpers/change-fixtures';
 
 const mockApi = vi.mocked(apiClient);
@@ -253,6 +257,110 @@ describe('build change list', () => {
       expect(mockApi.compareItem).not.toHaveBeenCalled();
     });
 
+    it('leaves a diff too large for the page to be loaded when its row is opened', async () => {
+      await router.push('/ao-14-6-0/changes?diffs=1');
+      mockApi.getBuildChanges.mockResolvedValue(
+        changeList({
+          items: [
+            { ...ROW_GRAFT, diff: GRAFT_DIFF },
+            { ...ROW_CRITTER, diff: null, diff_omitted: true },
+          ],
+          total: 2,
+        })
+      );
+      mockApi.compareItem.mockResolvedValue(compareResult('changed', BUILD_1460, BUILD_1451));
+      const page = await mountPage(router, pinia);
+
+      // Every diff the page came with is open; the large one was not fetched for it.
+      expect(page.findAll('[data-testid="item-diff"]')).toHaveLength(1);
+      expect(mockApi.compareItem).not.toHaveBeenCalled();
+      const large = page.find(`[data-testid="change-row"][data-aoid="${CRITTER_AOID}"]`);
+      expect(large.find('[data-testid="change-row-large-diff"]').exists()).toBe(true);
+
+      await large.find('[data-testid="change-row-toggle"]').trigger('click');
+      await flushPromises();
+
+      expect(mockApi.compareItem).toHaveBeenCalledTimes(1);
+      expect(mockApi.compareItem.mock.calls[0][0]).toBe(CRITTER_AOID);
+      expect(large.find('[data-testid="diff-effect-field"]').text()).toContain('Chance');
+      expect(large.find('[data-testid="change-row-large-diff"]').exists()).toBe(false);
+    });
+
+    it('folds a long diff: unchanged conditions and the effects past the first ten', async () => {
+      await router.push('/ao-14-6-0/changes?diffs=1');
+      mockApi.getBuildChanges.mockResolvedValue(
+        changeList({ items: [{ ...ROW_GRAFT, diff: longEffectsDiff(43, 12) }], total: 1 })
+      );
+      const page = await mountPage(router, pinia);
+      const diff = page.find('[data-testid="item-diff"]');
+
+      expect(diff.findAll('[data-testid="diff-effect"]')).toHaveLength(10);
+      const more = diff.find('[data-testid="diff-effects-more"]');
+      expect(more.text()).toBe('Show all 43 effect changes');
+
+      // Of an effect's conditions only the one that changed is listed.
+      const conditions = diff.find('[data-testid="diff-criteria"]');
+      const rows = conditions.findAll('[data-testid="diff-criterion"]');
+      expect(rows).toHaveLength(1);
+      expect(rows[0].attributes('data-op')).toBe('changed');
+      expect(rows[0].text()).toContain('Level ≥ 100');
+      expect(rows[0].text()).toContain('Level ≥ 150');
+      const unchanged = conditions.find('[data-testid="diff-criteria-unchanged"]');
+      expect(unchanged.text()).toBe('Show 12 unchanged');
+
+      await unchanged.trigger('click');
+      expect(conditions.findAll('[data-testid="diff-criterion"]')).toHaveLength(13);
+      // No row is an AND: everything listed is required.
+      expect(conditions.text()).not.toContain('AND');
+
+      await more.trigger('click');
+      expect(diff.findAll('[data-testid="diff-effect"]')).toHaveLength(43);
+    });
+
+    it('names what a number stands for and tells same-named rows apart by AOID', async () => {
+      await router.push('/ao-14-6-0/changes?diffs=1');
+      const diff: ItemDiff = {
+        ...emptyDiff(),
+        stats: [
+          { stat: 440, change: 'changed', old: 118, new: 120, bits_set: null, bits_cleared: null },
+          { stat: 4, change: 'removed', old: 15, new: null, bits_set: null, bits_cleared: null },
+          { stat: 74, change: 'changed', old: 2, new: 7, bits_set: null, bits_cleared: null },
+        ],
+        actions: [
+          {
+            action: 6,
+            change: 'changed',
+            criteria: [
+              { op: 'removed', old: { value1: 60, value2: 15, operator: 24 }, new: null },
+              { op: 'added', old: null, new: { value1: 33, value2: 1, operator: 0 } },
+            ],
+          },
+        ],
+      };
+      mockApi.getBuildChanges.mockResolvedValue(
+        changeList({ items: [{ ...ROW_GRAFT, diff }, changeRow({ aoid: 88806 })], total: 2 })
+      );
+      const page = await mountPage(router, pinia);
+
+      const rows = page.findAll('[data-testid="change-row"]');
+      expect(rows.map((row) => row.find('[data-testid="change-row-aoid"]').text())).toEqual([
+        'AOID 88805',
+        'AOID 88806',
+      ]);
+
+      const initiative = page.find('[data-testid="diff-stat"][data-stat="440"]');
+      expect(initiative.find('del').text()).toBe('MeleeInit');
+      expect(initiative.find('ins').text()).toBe('PhysicalInit');
+      // Names have no difference to show; a number without a name stays a number.
+      expect(initiative.text()).not.toContain('+2');
+      expect(page.find('[data-testid="diff-stat"][data-stat="4"] del').text()).toBe('15');
+      expect(page.find('[data-testid="diff-stat"][data-stat="74"]').text()).toContain('(+5)');
+
+      const criteria = page.findAll('[data-testid="diff-criterion"]').map((row) => row.text());
+      expect(criteria[0]).toContain('Profession ≠ Shade');
+      expect(criteria[1]).toContain('Faction = Clan');
+    });
+
     it('lists added and removed items plainly, a removed one linked to the older build', async () => {
       mockApi.getBuildChanges.mockResolvedValue(
         changeList({
@@ -341,6 +449,19 @@ describe('build change list', () => {
       );
     });
 
+    it('says why a note with nothing to list under the filters cannot be opened', async () => {
+      mockApi.getBuildChanges.mockResolvedValue(
+        changeList({ notes: [{ ...NOTE_ATTACK_RANGE, matching: 0 }] })
+      );
+      const page = await mountPage(router, pinia);
+
+      const note = page.find('[data-testid="build-note"]');
+      expect(note.find('[data-testid="build-note-toggle"]').attributes('disabled')).toBeDefined();
+      expect(note.find('[data-testid="build-note-hint"]').text()).toContain(
+        'None of these changes match the filters'
+      );
+    });
+
     it('can list the noted changes with the rest instead', async () => {
       const page = await mountPage(router, pinia);
 
@@ -363,28 +484,68 @@ describe('build change list', () => {
       });
 
       const notes = page.findAll('[data-testid="patch-note"]').map((note) => note.text());
-      expect(notes[0]).toContain('AttackRange added: 20');
-      expect(notes[0]).toContain('on 2,464 items');
-      expect(notes[2]).toContain('…% chance to cast …: Chance 60% → 100%');
-      expect(notes[2]).toContain('on 760 items');
+      // The first few lines only, so the list below stays on the first screen.
+      expect(notes).toHaveLength(3);
+      // The count is a word apart from the change it counts.
+      expect(notes[0]).toMatch(/^AttackRange added: 20\s+on 2,464 items/);
+      expect(notes[2]).toMatch(/…% chance to cast …: Chance 60% → 100%\s+on 760 items/);
+
+      await page.find('[data-testid="patch-notes-more"]').trigger('click');
+      const all = page.findAll('[data-testid="patch-note"]').map((note) => note.text());
       // A line that only moves an AND is left out; the requirement it joins is the note.
-      expect(notes).toHaveLength(8);
-      expect(notes.some((note) => note.includes('requirement added: AND'))).toBe(false);
+      expect(all).toHaveLength(8);
+      expect(all.some((note) => note.includes('requirement added: AND'))).toBe(false);
+    });
+
+    it('leaves out of the patch notes what the list leaves out', async () => {
+      const page = await mountPage(router, pinia);
+
+      // The default view: gameplay and economy, noted changes collapsed.
+      expect(mockApi.getBuildTransitions).toHaveBeenCalledTimes(1);
+      expect(mockApi.getBuildTransitions.mock.calls[0][0]).toMatchObject({
+        relevance: ['gameplay', 'economy'],
+        notes: 'collapse',
+      });
+
+      await page.find('[data-testid="changes-show-all"]').trigger('click');
+      await flushPromises();
+      expect(last(mockApi.getBuildTransitions.mock.calls)?.[0]).toMatchObject({
+        relevance: ['gameplay', 'economy', 'cosmetic', 'text'],
+        notes: 'collapse',
+      });
+
+      await page.find('[data-testid="changes-expand-notes"]').setValue(true);
+      await flushPromises();
+      expect(last(mockApi.getBuildTransitions.mock.calls)?.[0]).toMatchObject({
+        relevance: ['gameplay', 'economy', 'cosmetic', 'text'],
+        notes: 'expand',
+      });
+      expect(mockApi.getBuildTransitions).toHaveBeenCalledTimes(3);
+    });
+
+    it('reads the patch notes of a filtered view from its URL', async () => {
+      await router.push('/ao-14-6-0/changes?relevance=text&notes=expand');
+      await mountPage(router, pinia);
+
+      expect(mockApi.getBuildTransitions.mock.calls[0][0]).toMatchObject({
+        relevance: ['text'],
+        notes: 'expand',
+      });
     });
 
     it('leads from a patch note to the items it was done to', async () => {
       await router.push('/ao-14-6-0/changes?kind=added&sort=ql');
       const page = await mountPage(router, pinia);
 
+      await page.find('[data-testid="patch-notes-more"]').trigger('click');
       const effectNote = page
         .findAll('[data-testid="patch-note"]')
         .find((note) => note.text().includes('chance to cast'));
       await effectNote!.find('[data-testid="patch-note-filter"]').trigger('click');
       await flushPromises();
 
-      // The other filters give way; the sort stays.
+      // The other filters give way; the sort stays, and so does what the notes were read under.
       expect(router.currentRoute.value.query).toEqual({
-        relevance: 'all',
         sort: 'ql',
         t: 'effect:53089:spell_params.Chance',
         tfrom: '60',
@@ -397,13 +558,13 @@ describe('build change list', () => {
         transition: 'effect:53089:spell_params.Chance',
         transition_old: '60',
         transition_new: '100',
-        notes: 'expand',
+        relevance: ['gameplay', 'economy'],
       });
+      // The patch notes did not change under the reader.
+      expect(mockApi.getBuildTransitions).toHaveBeenCalledTimes(1);
 
       const banner = page.find('[data-testid="changes-transition"]');
       expect(banner.text()).toContain('…% chance to cast …: Chance 60% → 100%');
-      // The notes are not collapsed away from a transition's items.
-      expect(page.find('[data-testid="build-notes"]').exists()).toBe(false);
 
       await page.find('[data-testid="changes-transition-clear"]').trigger('click');
       await flushPromises();
@@ -561,6 +722,43 @@ describe('build change list', () => {
             .element as HTMLInputElement
         ).checked
       ).toBe(true);
+    });
+
+    it('undoes a filter with Back, and typing a name adds no step of its own', async () => {
+      const page = await mountPage(router, pinia);
+
+      await page.find('[data-testid="change-filter-kind"][data-value="removed"]').setValue(true);
+      await flushPromises();
+      await page.find('[data-testid="changes-sort"]').setValue('ql');
+      await flushPromises();
+      expect(router.currentRoute.value.query).toEqual({ kind: 'removed', sort: 'ql' });
+
+      vi.useFakeTimers();
+      await page.find('[data-testid="change-filter-search"]').setValue('Rifle');
+      await vi.advanceTimersByTimeAsync(350);
+      vi.useRealTimers();
+      await flushPromises();
+      expect(router.currentRoute.value.query).toEqual({ kind: 'removed', sort: 'ql', q: 'Rifle' });
+
+      // Back undoes the sort (the typed name went into the same step).
+      router.back();
+      await flushPromises();
+      expect(router.currentRoute.value.name).toBe('BuildChanges');
+      expect(router.currentRoute.value.query).toEqual({ kind: 'removed' });
+      expect((page.find('[data-testid="changes-sort"]').element as HTMLSelectElement).value).toBe(
+        'name'
+      );
+
+      router.back();
+      await flushPromises();
+      expect(router.currentRoute.value.name).toBe('BuildChanges');
+      expect(router.currentRoute.value.query).toEqual({});
+      expect(
+        (
+          page.find('[data-testid="change-filter-kind"][data-value="removed"]')
+            .element as HTMLInputElement
+        ).checked
+      ).toBe(false);
     });
 
     it('waits for a pause in typing before searching by name', async () => {
@@ -741,9 +939,11 @@ describe('build change list', () => {
       expect(options).toMatchObject({ gameVersion: 'ao-14-6-0' });
 
       expect(page.find('h1').text()).toContain('Compare builds');
-      expect(page.find('[data-testid="changes-scope"]').text()).toContain(
-        'Net difference between AO 14.2.2 and AO 14.6.0'
-      );
+      const scope = page.find('[data-testid="changes-scope"]');
+      expect(scope.find('[data-testid="compare-older"]').text()).toBe('AO 14.2.2');
+      expect(scope.find('[data-testid="compare-newer"]').text()).toBe('AO 14.6.0');
+      expect(scope.text()).toContain('every item that is not the same in both');
+      expect(scope.find('[data-testid="compare-viewed-older"]').exists()).toBe(false);
       expect(page.find('[data-testid="summary-total"]').text()).toBe('64,464');
       expect(page.find('[data-testid="changes-count"]').text()).toContain('1-2 of 51,238 changes');
       // A comparison has no build notes and no patch notes.
@@ -773,29 +973,91 @@ describe('build change list', () => {
       });
     });
 
+    it('reads old to new when the build being browsed is the older of the two', async () => {
+      await setCurrentVersion('ao-14-2-2');
+      await router.push('/ao-14-2-2/compare/ao-14-6-0');
+      mockApi.compareBuilds.mockResolvedValue(
+        compareList({ items: [ROW_ADDED, ROW_REMOVED, ROW_CRITTER], total: 3 })
+      );
+      mockApi.compareItem.mockResolvedValue(compareResult('changed'));
+      const page = await mountPage(router, pinia);
+
+      // Asked as 14.6.0 against 14.2.2 although 14.2.2 is browsed; the URL stays as chosen.
+      expect(mockApi.compareBuilds).toHaveBeenCalledTimes(1);
+      const [base, , options] = mockApi.compareBuilds.mock.calls[0];
+      expect(base).toBe('ao-14-2-2');
+      expect(options).toMatchObject({ gameVersion: 'ao-14-6-0' });
+      expect(router.currentRoute.value.fullPath).toBe('/ao-14-2-2/compare/ao-14-6-0');
+
+      const scope = page.find('[data-testid="changes-scope"]');
+      expect(scope.find('[data-testid="compare-older"]').text()).toBe('AO 14.2.2');
+      expect(scope.find('[data-testid="compare-newer"]').text()).toBe('AO 14.6.0');
+      expect(scope.text()).toContain('Added items are only in AO 14.6.0');
+      expect(scope.text()).toContain('removed items only in AO 14.2.2');
+      expect(scope.find('[data-testid="compare-viewed-older"]').text()).toBe(
+        'You are browsing AO 14.2.2, the older of the two.'
+      );
+
+      // An item only the newer build has is not in the build browsed: shown as the newer has it.
+      const link = (kind: string): string | undefined =>
+        page
+          .find(`[data-testid="change-row"][data-kind="${kind}"] [data-testid="change-row-link"]`)
+          .attributes('href');
+      expect(link('added')).toBe('/ao-14-2-2/items/200001?as=ao-14-6-0');
+      expect(link('removed')).toBe('/ao-14-2-2/items/200002');
+      expect(link('changed')).toBe(`/ao-14-2-2/items/${CRITTER_AOID}?compare=ao-14-6-0`);
+
+      // A row's diff runs the same way as the list.
+      await page
+        .find('[data-testid="change-row"][data-kind="changed"] [data-testid="change-row-toggle"]')
+        .trigger('click');
+      await flushPromises();
+      const [, itemBase, itemOptions] = mockApi.compareItem.mock.calls[0];
+      expect(itemBase).toBe('ao-14-2-2');
+      expect(itemOptions).toMatchObject({ gameVersion: 'ao-14-6-0' });
+    });
+
     it('changes the base, compares across the fork, and returns to the own changes', async () => {
       await setCurrentVersion('ao-17-10-5');
       await router.push('/ao-17-10-5/compare/ao-14-6-0');
       mockApi.compareBuilds.mockImplementation(async (base: string) =>
-        compareList({ build: BUILD_17105, base: base === 'prk-0-7-1' ? BUILD_PRK : BUILD_1460 })
+        base === 'ao-17-10-5'
+          ? compareList({ build: BUILD_PRK, base: BUILD_17105 })
+          : compareList({ build: BUILD_17105, base: BUILD_1460 })
       );
       const page = await mountPage(router, pinia);
+      expect(page.find('[data-testid="compare-fork-rule"]').exists()).toBe(false);
 
       await page.find('[data-testid="compare-base-picker"]').setValue('prk-0-7-1');
       await flushPromises();
 
+      // The URL is as chosen; the fork's build is the newer side whichever is browsed.
       expect(router.currentRoute.value.fullPath).toBe('/ao-17-10-5/compare/prk-0-7-1');
       const [base, , options] = last(mockApi.compareBuilds.mock.calls)!;
-      expect(base).toBe('prk-0-7-1');
-      expect(options).toMatchObject({ gameVersion: 'ao-17-10-5' });
-      expect(page.find('[data-testid="changes-scope"]').text()).toContain(
-        'Net difference between Project Rubi-Ka 0.7.1 and AO 17.10.5'
+      expect(base).toBe('ao-17-10-5');
+      expect(options).toMatchObject({ gameVersion: 'prk-0-7-1' });
+      const scope = page.find('[data-testid="changes-scope"]');
+      expect(scope.find('[data-testid="compare-older"]').text()).toBe('AO 17.10.5');
+      expect(scope.find('[data-testid="compare-newer"]').text()).toBe('Project Rubi-Ka 0.7.1');
+      expect(scope.find('[data-testid="compare-fork-rule"]').text()).toBe(
+        'Project Rubi-Ka is a fork of Anarchy Online, so its build always counts as the newer one.'
       );
 
       await page.find('[data-testid="compare-exit"]').trigger('click');
       await flushPromises();
       expect(router.currentRoute.value.fullPath).toBe('/ao-17-10-5/changes');
       expect(mockApi.getBuildChanges).toHaveBeenCalledTimes(1);
+    });
+
+    it('asks the same comparison from either build of a pair', async () => {
+      await setCurrentVersion('prk-0-7-1');
+      await router.push('/prk-0-7-1/compare/ao-14-6-0');
+      mockApi.compareBuilds.mockResolvedValue(compareList({ build: BUILD_PRK, base: BUILD_1460 }));
+      await mountPage(router, pinia);
+
+      const [base, , options] = mockApi.compareBuilds.mock.calls[0];
+      expect(base).toBe('ao-14-6-0');
+      expect(options).toMatchObject({ gameVersion: 'prk-0-7-1' });
     });
 
     it('links a compared row to the item page with the same comparison', async () => {
