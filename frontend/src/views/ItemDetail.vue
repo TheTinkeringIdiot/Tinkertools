@@ -4,8 +4,8 @@ Shows all item data with profile compatibility and comparison options
 -->
 <template>
   <div class="item-detail-page p-6 max-w-7xl mx-auto">
-    <div class="mb-6 flex items-center justify-between">
-      <div class="flex items-center gap-3">
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-wrap items-center gap-3">
         <Button
           icon="pi pi-arrow-left"
           label="Back to Items"
@@ -17,11 +17,28 @@ Shows all item data with profile compatibility and comparison options
         <Badge v-if="displayedItem && currentQl" :value="`QL ${currentQl}`" severity="info" />
         <Badge v-if="item?.is_nano" value="Nano" severity="success" />
 
-        <!-- Patch points at which this item changed -->
-        <ItemHistoryControl
-          :revisions="revisions"
-          :request-version="requestVersion"
-          @select="onHistorySelect"
+        <!-- Builds in which this item changed, and comparison with any build -->
+        <Button
+          v-if="timelineEntries.length > 0"
+          icon="pi pi-history"
+          :label="`History (${timelineEntries.length})`"
+          severity="secondary"
+          :outlined="!historyOpen"
+          size="small"
+          data-testid="item-history-trigger"
+          :aria-expanded="historyOpen"
+          @click="historyOpen = !historyOpen"
+        />
+        <Button
+          v-if="timelineEntries.length > 0"
+          icon="pi pi-arrows-h"
+          label="Compare versions"
+          severity="secondary"
+          :outlined="!compareOpen"
+          size="small"
+          data-testid="item-compare-trigger"
+          :aria-expanded="compareOpen"
+          @click="toggleCompare"
         />
       </div>
 
@@ -70,12 +87,12 @@ Shows all item data with profile compatibility and comparison options
       </span>
       <div class="flex items-center gap-2">
         <Button
-          :label="compareWithCurrent ? 'Hide comparison' : 'Compare with current'"
+          :label="comparingWithCurrent ? 'Hide comparison' : 'Compare with current'"
           icon="pi pi-arrows-h"
           size="small"
           text
           data-testid="item-compare-toggle"
-          @click="toggleCompare"
+          @click="toggleCompareWithCurrent"
         />
         <Button
           :label="`Back to ${currentVersionLabel}`"
@@ -87,6 +104,26 @@ Shows all item data with profile compatibility and comparison options
         />
       </div>
     </div>
+
+    <ItemTimeline
+      v-if="historyOpen && timeline && timelineEntries.length > 0"
+      class="mb-4"
+      :timeline="timeline"
+      :request-version="requestVersion"
+      :is-nano="item?.is_nano ?? false"
+      :item-class="item?.item_class"
+      @peek="onHistorySelect"
+    />
+
+    <ItemVersionCompare
+      v-if="compareOpen"
+      class="mb-4"
+      :aoid="parseInt(itemAoid)"
+      :version="requestVersion"
+      :other="compareVersion"
+      @update:other="setCompareVersion"
+      @close="closeCompare"
+    />
 
     <!-- Shared Item Content -->
     <div v-if="loading" class="flex items-center justify-center h-96">
@@ -103,13 +140,14 @@ Shows all item data with profile compatibility and comparison options
         Not present in {{ currentVersionLabel }}
       </h3>
       <p class="text-surface-500 dark:text-surface-500 mb-4">
-        First appears in {{ firstSeenLabel }}
+        {{ missingExplanation }}
       </p>
       <Button
-        :label="`View in ${firstSeenLabel}`"
+        v-if="lastPresentBuild"
+        :label="`View in ${lastPresentBuild.display_name}`"
         icon="pi pi-eye"
         data-testid="item-missing-view"
-        @click="viewFirstSeen"
+        @click="viewLastPresent"
       />
     </div>
 
@@ -168,14 +206,6 @@ Shows all item data with profile compatibility and comparison options
         </div>
       </div>
 
-      <!-- Snapshot comparison (while peeking) -->
-      <ItemVersionDiff
-        v-if="showDiff"
-        :from-item="item"
-        :to-item="currentVersionItem"
-        :from-label="peekLabel"
-        :to-label="currentVersionLabel"
-      />
       <!-- Item Overview -->
       <div class="grid grid-cols-1 lg:grid-cols-4 gap-3">
         <!-- Item Slots Display and Basic Info -->
@@ -362,17 +392,21 @@ import RawStats from '@/components/items/RawStats.vue';
 import ItemSources from '@/components/items/ItemSources.vue';
 import ItemInterpolationBar from '@/components/items/ItemInterpolationBar.vue';
 import EquipSlotSelector from '@/components/items/EquipSlotSelector.vue';
-import ItemHistoryControl from '@/components/versions/ItemHistoryControl.vue';
-import ItemVersionDiff from '@/components/versions/ItemVersionDiff.vue';
+import ItemTimeline from '@/components/versions/ItemTimeline.vue';
+import ItemVersionCompare from '@/components/versions/ItemVersionCompare.vue';
 import { useToast } from 'primevue/usetoast';
 import { apiClient } from '@/services/api-client';
+import { isRequestCancelled } from '@/services/error-message';
 import { useGameVersion } from '@/composables/useGameVersion';
-import type { ItemRevisionsResponse } from '@/types/game-version';
+import { useChangesStore } from '@/stores/changes';
+import { buildLabel, sameBuild } from '@/utils/version-order';
+import type { BuildRef, ItemTimelineResponse } from '@/types/changes';
 
 const route = useRoute();
 const router = useRouter();
 const itemsStore = useItemsStore();
 const profilesStore = useTinkerProfilesStore();
+const changesStore = useChangesStore();
 const toast = useToast();
 
 // Props
@@ -394,12 +428,13 @@ const validSlots = ref<string[]>([]);
 const {
   dataVersion: currentVersion,
   current: currentGameVersion,
-  versions: gameVersions,
   versionedPath,
 } = useGameVersion();
-const revisions = ref<ItemRevisionsResponse | null>(null);
-const compareWithCurrent = ref(false);
-const currentVersionItem = ref<Item | null>(null);
+const timeline = ref<ItemTimelineResponse | null>(null);
+const timelineEntries = computed(() => timeline.value?.entries ?? []);
+const historyOpen = ref(false);
+/** The comparison panel is open without a build picked yet. */
+const comparePicking = ref(false);
 
 // Interpolation state
 const interpolatedItem = ref<InterpolatedItem | null>(null);
@@ -427,32 +462,57 @@ const peekVersion = computed(() => {
 /** Version the displayed item was actually loaded from. */
 const requestVersion = computed(() => peekVersion.value || currentVersion.value);
 
+/** Builds the timeline names, for versions the registry does not list. */
+const timelineBuilds = computed<BuildRef[]>(() =>
+  timelineEntries.value.flatMap((entry) => (entry.base ? [entry.build, entry.base] : [entry.build]))
+);
+
 function versionLabel(slug: string | null | undefined): string {
-  if (!slug) return 'this version';
-  return (
-    gameVersions.value.find((version) => version.slug === slug)?.display_name ||
-    revisions.value?.revisions.find((point) => point.version_slug === slug)?.display_name ||
-    slug
-  );
+  return buildLabel(slug, timelineBuilds.value);
 }
+
+// ============================================================================
+// Comparison with another build (?compare=<slug>)
+// ============================================================================
+
+/** The build the displayed item is compared with, or null. */
+const compareVersion = computed(() => {
+  const compare = route.query.compare;
+  if (typeof compare !== 'string' || !compare) return null;
+  return sameBuild(compare, requestVersion.value) ? null : compare;
+});
+
+const compareOpen = computed(() => comparePicking.value || !!compareVersion.value);
+
+const comparingWithCurrent = computed(
+  () => !!peekVersion.value && sameBuild(compareVersion.value, currentVersion.value)
+);
 
 const peekLabel = computed(() => versionLabel(peekVersion.value));
 const currentVersionLabel = computed(
   () => currentGameVersion.value?.display_name || currentVersion.value || 'this version'
 );
-const firstSeenLabel = computed(() => versionLabel(revisions.value?.first_seen_in));
 
-/** The item is absent from the browsing version but exists in another one. */
-const missingInCurrent = computed(() => {
-  const history = revisions.value;
-  if (!history || peekVersion.value || item.value) return false;
-  if (!history.first_seen_in || !currentVersion.value) return false;
-  return !history.present_in.includes(currentVersion.value);
+/** The item is absent from the browsing version but has a history elsewhere. */
+const missingInCurrent = computed(
+  () => !peekVersion.value && !item.value && !loading.value && timelineEntries.value.length > 0
+);
+
+/** The newest build that still defines the item. */
+const lastPresentBuild = computed<BuildRef | null>(() => {
+  const newest = timelineEntries.value[0];
+  if (!newest) return null;
+  if (newest.kind === 'removed') return newest.base;
+  return newest.build;
 });
 
-const showDiff = computed(
-  () => compareWithCurrent.value && !!peekVersion.value && !!currentVersionItem.value
-);
+const missingExplanation = computed(() => {
+  const newest = timelineEntries.value[0];
+  if (!newest) return '';
+  if (newest.kind === 'removed') return `Removed in ${newest.build.display_name}`;
+  const oldest = timelineEntries.value[timelineEntries.value.length - 1];
+  return `First appears in ${oldest.build.display_name}`;
+});
 
 // Computed
 const profile = computed(() => profilesStore.activeProfile);
@@ -570,33 +630,21 @@ async function loadItem() {
 }
 
 /**
- * Patch points for this item. Non-blocking: a failure simply hides the
- * history control.
+ * Builds in which this item changed. Non-blocking: a failure simply hides
+ * the history and comparison controls.
  */
-async function loadRevisions() {
+async function loadTimeline() {
   const aoidParam = itemAoid.value;
   if (!aoidParam) {
-    revisions.value = null;
+    timeline.value = null;
     return;
   }
+  const aoid = parseInt(aoidParam);
   try {
-    revisions.value = await apiClient.getItemRevisions(parseInt(aoidParam));
-  } catch {
-    revisions.value = null;
-  }
-}
-
-/** The item as the browsing version defines it, for the comparison table. */
-async function loadCurrentVersionItem() {
-  const aoidParam = itemAoid.value;
-  if (!aoidParam || !peekVersion.value) {
-    currentVersionItem.value = null;
-    return;
-  }
-  try {
-    currentVersionItem.value = await itemsStore.getItem(parseInt(aoidParam));
-  } catch {
-    currentVersionItem.value = null;
+    const response = await changesStore.loadTimeline(aoid, currentVersion.value, 'item-timeline');
+    if (itemAoid.value === aoidParam) timeline.value = response;
+  } catch (err) {
+    if (!isRequestCancelled(err) && itemAoid.value === aoidParam) timeline.value = null;
   }
 }
 
@@ -615,15 +663,39 @@ async function exitPeek() {
   await onHistorySelect(currentVersion.value || '');
 }
 
-async function viewFirstSeen() {
-  const slug = revisions.value?.first_seen_in;
+async function viewLastPresent() {
+  const slug = lastPresentBuild.value?.slug;
   if (slug) await onHistorySelect(slug);
 }
 
+async function setCompareVersion(slug: string | null) {
+  const query: LocationQueryRaw = { ...route.query };
+  if (slug && !sameBuild(slug, requestVersion.value)) {
+    query.compare = slug;
+  } else {
+    delete query.compare;
+  }
+  await router.replace({ name: 'ItemDetail', params: { ...route.params }, query });
+}
+
+async function closeCompare() {
+  comparePicking.value = false;
+  await setCompareVersion(null);
+}
+
 async function toggleCompare() {
-  compareWithCurrent.value = !compareWithCurrent.value;
-  if (compareWithCurrent.value && !currentVersionItem.value) {
-    await loadCurrentVersionItem();
+  if (compareOpen.value) {
+    await closeCompare();
+  } else {
+    comparePicking.value = true;
+  }
+}
+
+async function toggleCompareWithCurrent() {
+  if (comparingWithCurrent.value) {
+    await closeCompare();
+  } else {
+    await setCompareVersion(currentVersion.value);
   }
 }
 
@@ -649,6 +721,7 @@ async function shareItem() {
   const params = new URLSearchParams();
   if (route.query.ql) params.set('ql', String(route.query.ql));
   if (peekVersion.value) params.set('as', peekVersion.value);
+  if (compareVersion.value) params.set('compare', compareVersion.value);
   const queryString = params.toString();
   const url = `${window.location.origin}${versionedPath(`/items/${item.value.aoid}`)}${
     queryString ? `?${queryString}` : ''
@@ -766,7 +839,7 @@ onMounted(async () => {
     await profilesStore.loadProfiles();
   }
   // Both record their own failures
-  await Promise.all([loadItem(), loadRevisions()]);
+  await Promise.all([loadItem(), loadTimeline()]);
 });
 
 // Watch for route changes
@@ -774,9 +847,9 @@ watch(
   () => route.params.aoid,
   async () => {
     if (route.name === 'ItemDetail') {
-      compareWithCurrent.value = false;
-      currentVersionItem.value = null;
-      await Promise.all([loadItem(), loadRevisions()]);
+      comparePicking.value = false;
+      timeline.value = null;
+      await Promise.all([loadItem(), loadTimeline()]);
     }
   }
 );
@@ -786,8 +859,6 @@ watch(
   () => route.query.as,
   async () => {
     if (route.name !== 'ItemDetail') return;
-    compareWithCurrent.value = false;
-    currentVersionItem.value = null;
     await loadItem();
   }
 );
@@ -802,10 +873,10 @@ defineExpose({
   interpolatedItem,
   displayedItem,
   interpolationError,
-  revisions,
+  timeline,
   peekVersion,
   missingInCurrent,
-  compareWithCurrent,
+  compareVersion,
 });
 </script>
 

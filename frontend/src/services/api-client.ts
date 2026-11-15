@@ -27,10 +27,15 @@ import type {
   BatchPerkLookupResponse,
 } from '../types/api';
 import { ErrorCodes } from '../types/api';
+import type { ItemRevisionsBatchResponse } from '../types/game-version';
 import type {
-  ItemRevisionsResponse,
-  ItemRevisionsBatchResponse,
-} from '../types/game-version';
+  BuildTransitionsResponse,
+  ChangeListQuery,
+  ChangeListResponse,
+  ItemCompareResponse,
+  ItemTimelineResponse,
+  TransitionsQuery,
+} from '../types/changes';
 import { API_ROOT, apiBaseFor } from './api-config';
 import { dataVersion, dataSlug } from '../composables/useGameVersion';
 
@@ -126,6 +131,39 @@ class ApiErrorHandler {
         };
     }
   }
+}
+
+/** Options of the cross-version diff requests. */
+export interface DiffRequestOptions {
+  /** Newer side of the comparison; defaults to the version being browsed. */
+  gameVersion?: string;
+  signal?: AbortSignal;
+}
+
+function changeListParams(query: ChangeListQuery): URLSearchParams {
+  const params = new URLSearchParams();
+  if (query.page !== undefined) params.append('page', String(query.page));
+  if (query.page_size !== undefined) params.append('page_size', String(query.page_size));
+  if (query.sort) params.append('sort', query.sort);
+  for (const kind of query.kind ?? []) params.append('kind', kind);
+  for (const part of query.part ?? []) params.append('part', part);
+  for (const relevance of query.relevance ?? []) params.append('relevance', relevance);
+  if (query.is_nano !== undefined) params.append('is_nano', String(query.is_nano));
+  if (query.item_class !== undefined) params.append('item_class', String(query.item_class));
+  if (query.min_ql !== undefined) params.append('min_ql', String(query.min_ql));
+  if (query.max_ql !== undefined) params.append('max_ql', String(query.max_ql));
+  if (query.profession !== undefined) params.append('profession', String(query.profession));
+  if (query.slot !== undefined) params.append('slot', String(query.slot));
+  if (query.search) params.append('search', query.search);
+  if (query.notes) params.append('notes', query.notes);
+  if (query.note_id !== undefined) params.append('note_id', String(query.note_id));
+  if (query.include_diff) params.append('include_diff', 'true');
+  if (query.transition) {
+    params.append('transition', query.transition);
+    if (query.transition_old !== undefined) params.append('transition_old', query.transition_old);
+    if (query.transition_new !== undefined) params.append('transition_new', query.transition_new);
+  }
+  return params;
 }
 
 // ============================================================================
@@ -562,13 +600,98 @@ class TinkerToolsApiClient {
   }
 
   // ============================================================================
-  // Game versions and item change history (cross-version endpoints)
+  // Cross-version diffs
   // ============================================================================
+  //
+  // `gameVersion` is the newer side of a comparison (default: the version
+  // being browsed); `base` the older. A request aborted through `signal`
+  // rejects with the axios cancellation as is (see isRequestCancelled).
 
-  async getItemRevisions(aoid: number): Promise<ItemRevisionsResponse> {
-    const response = await this.get<ItemRevisionsResponse>(`/items/${aoid}/revisions`);
-    return response.data as ItemRevisionsResponse;
+  /** Every build in which an item was added, changed or removed, newest first. */
+  async getItemTimeline(aoid: number, options?: DiffRequestOptions): Promise<ItemTimelineResponse> {
+    return this.getDiff<ItemTimelineResponse>(`/items/${aoid}/timeline`, undefined, options);
   }
+
+  /** One item in `base` and in the request's build. Rejects (Not Found) when neither has it. */
+  async compareItem(
+    aoid: number,
+    base: string,
+    options?: DiffRequestOptions
+  ): Promise<ItemCompareResponse> {
+    return this.getDiff<ItemCompareResponse>(
+      `/items/${aoid}/compare/${encodeURIComponent(dataSlug(base) ?? base)}`,
+      undefined,
+      options
+    );
+  }
+
+  /** What changed in a build against the one before it. */
+  async getBuildChanges(
+    query: ChangeListQuery = {},
+    options?: DiffRequestOptions
+  ): Promise<ChangeListResponse> {
+    return this.getDiff<ChangeListResponse>('/changes', changeListParams(query), options);
+  }
+
+  /** Net difference between build `base` and the request's build. */
+  async compareBuilds(
+    base: string,
+    query: ChangeListQuery = {},
+    options?: DiffRequestOptions
+  ): Promise<ChangeListResponse> {
+    return this.getDiff<ChangeListResponse>(
+      `/compare/${encodeURIComponent(dataSlug(base) ?? base)}`,
+      changeListParams(query),
+      options
+    );
+  }
+
+  /** The field transitions most changed items of a build share. */
+  async getBuildTransitions(
+    query: TransitionsQuery = {},
+    options?: DiffRequestOptions
+  ): Promise<BuildTransitionsResponse> {
+    const params = new URLSearchParams();
+    for (const part of query.part ?? []) params.append('part', part);
+    if (query.min_items !== undefined) params.append('min_items', String(query.min_items));
+    if (query.limit !== undefined) params.append('limit', String(query.limit));
+    return this.getDiff<BuildTransitionsResponse>('/changes/transitions', params, options);
+  }
+
+  private async getDiff<T>(
+    url: string,
+    params: URLSearchParams | undefined,
+    options: DiffRequestOptions | undefined
+  ): Promise<T> {
+    try {
+      const response = await this.client.get<T>(url, {
+        params,
+        signal: options?.signal,
+        ...(options?.gameVersion ? { gameVersion: options.gameVersion } : {}),
+      });
+      return response.data;
+    } catch (error) {
+      const { code, response } = asRequestError(error);
+      if (code === 'ERR_CANCELED') throw error;
+      // These routes answer {"error": "<sentence>", "code": "HTTP_404"}.
+      const detail = (response?.data as { error?: unknown } | undefined)?.error;
+      if (response?.status === 404 && typeof detail === 'string') {
+        const notFound: UserFriendlyError = {
+          type: 'info',
+          title: 'Not Found',
+          message: detail,
+          action: 'Pick another version',
+          recoverable: true,
+        };
+        throw notFound;
+      }
+      throw this.handleError(error);
+    }
+  }
+
+  // ============================================================================
+  // Item revision counts and legacy ids (cross-version endpoints)
+  // ============================================================================
 
   async batchItemRevisions(aoids: number[]): Promise<ItemRevisionsBatchResponse> {
     if (aoids.length === 0) return { items: {} };

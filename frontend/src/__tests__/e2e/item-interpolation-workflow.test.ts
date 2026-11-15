@@ -211,7 +211,7 @@ describe('Item Interpolation Workflow', () => {
       success: true,
       item: interpolatedOtek(ql),
     }));
-    mockApi.getItemRevisions.mockRejectedValue(new Error('no revision history'));
+    mockApi.getItemTimeline.mockRejectedValue(new Error('no item history'));
   });
 
   afterEach(() => {

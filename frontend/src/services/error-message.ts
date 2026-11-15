@@ -18,6 +18,13 @@ export function errorMessage(error: unknown): string {
   return '';
 }
 
+/** True for a request aborted through its AbortSignal. */
+export function isRequestCancelled(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const { code, name } = error as { code?: unknown; name?: unknown };
+  return code === 'ERR_CANCELED' || name === 'CanceledError' || name === 'AbortError';
+}
+
 /** True for the errors the API client throws (see TinkerToolsApiClient.handleError) */
 export function isUserFriendlyError(error: unknown): error is UserFriendlyError {
   return (

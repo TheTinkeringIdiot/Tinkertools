@@ -144,7 +144,18 @@ swaps the version segment of the current route via switchVersion().
         </div>
       </template>
 
-      <div class="border-t border-surface-200 dark:border-surface-700 px-3 py-2">
+      <div
+        class="flex flex-col items-start gap-1 border-t border-surface-200 dark:border-surface-700 px-3 py-2"
+      >
+        <button
+          type="button"
+          class="text-xs text-primary-600 dark:text-primary-400 hover:underline"
+          data-testid="version-changes-link"
+          @click="openChangesPage"
+        >
+          <i class="pi pi-history mr-1" aria-hidden="true"></i>
+          What changed in {{ pillTitle }}?
+        </button>
         <button
           type="button"
           class="text-xs text-primary-600 dark:text-primary-400 hover:underline"
@@ -273,6 +284,11 @@ async function select(version: GameVersion): Promise<void> {
 function openVersionsPage(): void {
   close();
   void router.push({ name: 'GameVersions' });
+}
+
+function openChangesPage(): void {
+  close();
+  void router.push({ name: 'BuildChanges' });
 }
 
 function onDocumentClick(event: MouseEvent): void {

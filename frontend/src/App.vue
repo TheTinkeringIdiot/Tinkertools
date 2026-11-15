@@ -63,6 +63,13 @@ const tools: ToolEntry[] = [
     activeNames: ['BossDetail'],
     feature: 'symbiants',
   },
+  {
+    label: 'What Changed',
+    icon: 'pi pi-history',
+    route: 'BuildChanges',
+    activeNames: ['BuildCompare'],
+    feature: 'items',
+  },
 ];
 
 function isActive(tool: ToolEntry): boolean {

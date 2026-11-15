@@ -258,6 +258,20 @@ describe('GameVersionSelector', () => {
 
     expect(pushSpy).toHaveBeenCalledWith({ name: 'GameVersions' });
   });
+
+  it('leads to what changed in the version being browsed', async () => {
+    const router = stubRouter();
+    const pushSpy = vi.spyOn(router, 'push').mockResolvedValue(undefined);
+    const wrapper = mount(GameVersionSelector, { global: { plugins: [PrimeVue, router] } });
+
+    await wrapper.find('[data-testid="version-pill"]').trigger('click');
+    const link = wrapper.find('[data-testid="version-changes-link"]');
+    expect(link.text()).toContain('What changed in Anarchy Online (Feb 2024)?');
+    await link.trigger('click');
+
+    expect(pushSpy).toHaveBeenCalledWith({ name: 'BuildChanges' });
+    expect(wrapper.find('[data-testid="version-panel"]').exists()).toBe(false);
+  });
 });
 
 describe('VersionSnapshotBanner', () => {
@@ -333,6 +347,7 @@ describe('App navigation tool gating', () => {
     expect(labels).toContain('TinkerNanos');
     expect(labels).toContain('TinkerNukes');
     expect(labels).toContain('TinkerPlants');
+    expect(labels).toContain('What Changed');
   });
 
   it('hides tools the version has no data for', async () => {

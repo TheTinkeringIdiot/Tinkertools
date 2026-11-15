@@ -119,6 +119,18 @@ sources by design rather than by bug.
                 :data-slug="version.slug"
                 @click="browse(version)"
               />
+              <Button
+                label="What changed"
+                icon="pi pi-history"
+                :disabled="!version.enabled"
+                severity="secondary"
+                outlined
+                size="small"
+                class="w-full"
+                data-testid="version-changes"
+                :data-slug="version.slug"
+                @click="router.push({ name: 'BuildChanges', params: { version: version.slug } })"
+              />
             </div>
           </div>
         </template>
@@ -129,6 +141,7 @@ sources by design rather than by bug.
 
 <script setup lang="ts">
 import { onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import Card from 'primevue/card';
 import Tag from 'primevue/tag';
 import Badge from 'primevue/badge';
@@ -154,6 +167,7 @@ const {
   ensureVersionsLoaded,
   switchVersion,
 } = useGameVersion();
+const router = useRouter();
 
 function parentName(version: GameVersion): string {
   if (!version.parent_slug) return 'Original import';
