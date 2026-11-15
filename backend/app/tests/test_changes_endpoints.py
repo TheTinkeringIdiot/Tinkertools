@@ -1,0 +1,819 @@
+"""
+Tests for the cross-version diff routes:
+
+    GET /changes
+    GET /changes/transitions
+    GET /compare/{base}
+    GET /items/{aoid}/timeline
+    GET /items/{aoid}/compare/{base}
+
+Each test fills a throwaway store (the ``store`` fixture) with a few builds of
+hand-made items and asks the API what changed.
+"""
+
+import os
+
+import pytest
+
+from app.tests.fixtures.store_fixtures import criterion, item, modify, nano
+
+pytestmark = pytest.mark.skipif(
+    not os.getenv("DATABASE_URL", "").startswith("postgres"), reason="needs PostgreSQL"
+)
+
+STAT_VALUE = 74  # economy
+STAT_ICON = 79  # cosmetic
+STAT_CAN = 30  # gameplay, flags
+STAT_SLOT = 298
+PROFESSION = 60
+USE, WEAR = 3, 6
+
+
+def wear(*effects, event=14):
+    return [{"Event": event, "Items": list(effects)}]
+
+
+def requires(action, *criteria):
+    return {"Actions": [{"Action": action, "Criteria": list(criteria)}]}
+
+
+def get(store, slug, path, **params):
+    with store.client(slug) as client:
+        response = client.get(f"/api/v1{path}", params=params)
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def changes(store, slug, **params):
+    return get(store, slug, "/changes", **params)
+
+
+def rows(body):
+    """``{aoid: row}`` of a change list."""
+    return {row["aoid"]: row for row in body["items"]}
+
+
+def aoids(body):
+    return [row["aoid"] for row in body["items"]]
+
+
+# ---------------------------------------------------------------------------
+# A small history
+# ---------------------------------------------------------------------------
+
+WRENCH, HAMMER, PLIERS, SAW, DRILL, CHISEL = 100, 200, 300, 400, 500, 600
+
+
+@pytest.fixture
+def history(store):
+    """Four builds of branch ao and a fork from the second.
+
+    one    Wrench, Hammer, Pliers, Saw
+    two    Wrench renamed Spanner; Hammer hits harder (effect); Saw gone;
+           Drill new; Pliers dearer (economy)
+    three  Wrench (Spanner) gets a requirement; Hammer back to what it was;
+           Saw returns; Pliers new icon
+    four   Hammer gone
+    fork   (prk, from two) Hammer stronger still; Chisel new; Drill gone
+    """
+    store.add_build(
+        "one",
+        1,
+        items=[
+            item(WRENCH, name="Wrench", ql=10, stats=[(STAT_CAN, 1)]),
+            item(HAMMER, name="Hammer", ql=50, SpellData=wear(modify(16, 5))),
+            item(PLIERS, name="Pliers", ql=20, stats=[(STAT_VALUE, 100)]),
+            item(SAW, name="Saw", ql=30),
+        ],
+    )
+    store.add_build(
+        "two",
+        2,
+        items=[
+            item(WRENCH, name="Spanner", ql=10, stats=[(STAT_CAN, 1)]),
+            item(HAMMER, name="Hammer", ql=50, SpellData=wear(modify(16, 9))),
+            item(PLIERS, name="Pliers", ql=20, stats=[(STAT_VALUE, 250)]),
+            item(DRILL, name="Drill", ql=200),
+        ],
+    )
+    store.add_build(
+        "three",
+        3,
+        items=[
+            item(
+                WRENCH,
+                name="Spanner",
+                ql=10,
+                stats=[(STAT_CAN, 9)],
+                ActionData=requires(WEAR, criterion(112, 50, 2)),
+            ),
+            item(HAMMER, name="Hammer", ql=50, SpellData=wear(modify(16, 5))),
+            item(
+                PLIERS, name="Pliers", ql=20, stats=[(STAT_VALUE, 250), (STAT_ICON, 7)]
+            ),
+            item(SAW, name="Saw", ql=30),
+            item(DRILL, name="Drill", ql=200),
+        ],
+    )
+    store.add_build(
+        "four",
+        4,
+        items=[
+            item(
+                WRENCH,
+                name="Spanner",
+                ql=10,
+                stats=[(STAT_CAN, 9)],
+                ActionData=requires(WEAR, criterion(112, 50, 2)),
+            ),
+            item(
+                PLIERS, name="Pliers", ql=20, stats=[(STAT_VALUE, 250), (STAT_ICON, 7)]
+            ),
+            item(SAW, name="Saw", ql=30),
+            item(DRILL, name="Drill", ql=200),
+        ],
+    )
+    store.add_build(
+        "fork",
+        1,
+        branch="prk",
+        parent_slug="two",
+        items=[
+            item(WRENCH, name="Spanner", ql=10, stats=[(STAT_CAN, 1)]),
+            item(HAMMER, name="Hammer", ql=50, SpellData=wear(modify(16, 12))),
+            item(PLIERS, name="Pliers", ql=20, stats=[(STAT_VALUE, 250)]),
+            item(CHISEL, name="Chisel", ql=5),
+        ],
+    )
+    return store
+
+
+# ---------------------------------------------------------------------------
+# Item timeline
+# ---------------------------------------------------------------------------
+
+
+def timeline(store, slug, aoid, **params):
+    return get(store, slug, f"/items/{aoid}/timeline", **params)
+
+
+def test_timeline_lists_every_change_of_an_item_newest_first(history):
+    body = timeline(history, "four", WRENCH)
+
+    assert body["aoid"] == WRENCH and body["family"] == "ao"
+    assert [(e["build"]["slug"], e["kind"], e["parts"]) for e in body["entries"]] == [
+        ("three", "changed", ["stats", "actions"]),
+        ("two", "changed", ["text"]),
+        ("one", "added", []),
+    ]
+    assert [e["name"] for e in body["entries"]] == ["Spanner", "Spanner", "Wrench"]
+    assert [e["base"] and e["base"]["slug"] for e in body["entries"]] == [
+        "two",
+        "one",
+        None,
+    ]
+
+
+def test_timeline_entries_carry_the_field_level_diff_of_each_step(history):
+    newest, renamed, added = timeline(history, "four", WRENCH)["entries"]
+
+    assert renamed["diff"]["text"] == [
+        {"field": "name", "old": "Wrench", "new": "Spanner"}
+    ]
+    assert renamed["relevance"] == ["text"]
+    assert newest["diff"]["stats"] == [
+        {
+            "stat": STAT_CAN,
+            "change": "changed",
+            "old": 1,
+            "new": 9,
+            "bits_set": [8],
+            "bits_cleared": [],
+        }
+    ]
+    (action,) = newest["diff"]["actions"]
+    assert (action["action"], action["change"]) == (WEAR, "added")
+    assert action["criteria"] == [
+        {
+            "op": "added",
+            "old": None,
+            "new": {"value1": 112, "value2": 50, "operator": 2},
+        }
+    ]
+    assert newest["relevance"] == ["gameplay"]
+    assert added["diff"] is None and added["relevance"] == ["gameplay"]
+
+
+def test_timeline_without_diffs_when_not_asked_for(history):
+    entries = timeline(history, "four", WRENCH, include_diff="false")["entries"]
+
+    assert [e["diff"] for e in entries] == [None, None, None]
+
+
+def test_timeline_shows_an_item_removed_and_returning(history):
+    saw = timeline(history, "four", SAW)["entries"]
+    hammer = timeline(history, "four", HAMMER)["entries"]
+
+    assert [(e["build"]["slug"], e["kind"]) for e in saw] == [
+        ("three", "added"),
+        ("two", "removed"),
+        ("one", "added"),
+    ]
+    assert [(e["build"]["slug"], e["kind"]) for e in hammer] == [
+        ("four", "removed"),
+        ("three", "changed"),
+        ("two", "changed"),
+        ("one", "added"),
+    ]
+    assert hammer[0]["name"] == "Hammer"
+
+
+def test_timeline_is_the_same_from_any_build_of_the_branch(history):
+    assert timeline(history, "one", HAMMER) == timeline(history, "four", HAMMER)
+
+
+def test_timeline_of_a_fork_continues_into_its_parent_up_to_the_fork(history):
+    entries = timeline(history, "fork", HAMMER)["entries"]
+
+    assert [(e["build"]["slug"], e["build"]["family"], e["kind"]) for e in entries] == [
+        ("fork", "prk", "changed"),
+        ("two", "ao", "changed"),
+        ("one", "ao", "added"),
+    ]
+    assert entries[0]["base"]["slug"] == "two"
+    (pair,) = entries[0]["diff"]["effects"][0]["changed"]
+    assert pair["fields"] == [{"field": "spell_params.Amount", "old": 9, "new": 12}]
+    assert pair["new"]["spell_format"] == "Modify {Stat} {Amount}"
+    assert pair["new"]["spell_params"]["Amount"] == 12
+
+
+def test_timeline_of_an_item_the_fork_never_changed_is_its_parents(history):
+    entries = timeline(history, "fork", WRENCH)["entries"]
+
+    assert [(e["build"]["slug"], e["kind"]) for e in entries] == [
+        ("two", "changed"),
+        ("one", "added"),
+    ]
+
+
+def test_timeline_of_an_unknown_item_is_empty(history):
+    assert timeline(history, "four", 999999)["entries"] == []
+
+
+# ---------------------------------------------------------------------------
+# Build change list
+# ---------------------------------------------------------------------------
+
+
+def test_change_list_is_relative_to_the_previous_build(history):
+    body = changes(history, "two", sort="aoid")
+
+    assert body["build"]["slug"] == "two" and body["base"]["slug"] == "one"
+    assert [(r["aoid"], r["kind"], r["parts"]) for r in body["items"]] == [
+        (WRENCH, "changed", ["text"]),
+        (HAMMER, "changed", ["effects"]),
+        (PLIERS, "changed", ["stats"]),
+        (SAW, "removed", []),
+        (DRILL, "added", []),
+    ]
+    assert body["total"] == 5 and body["pages"] == 1
+
+
+def test_change_rows_carry_what_a_list_line_shows(history):
+    found = rows(changes(history, "two"))
+
+    assert found[WRENCH] == {
+        "aoid": WRENCH,
+        "kind": "changed",
+        "name": "Spanner",
+        "old_name": "Wrench",
+        "ql": 10,
+        "old_ql": None,
+        "item_class": 2,
+        "is_nano": False,
+        "icon": None,
+        "parts": ["text"],
+        "relevance": ["text"],
+        "note_id": None,
+        "diff": None,
+    }
+    assert found[SAW]["name"] == "Saw" and found[SAW]["ql"] == 30
+    assert rows(changes(history, "three"))[PLIERS]["icon"] == 7
+
+
+def test_change_list_classifies_each_change(history):
+    two = rows(changes(history, "two"))
+    three = rows(changes(history, "three"))
+
+    assert two[WRENCH]["relevance"] == ["text"]
+    assert two[HAMMER]["relevance"] == ["gameplay"]
+    assert two[PLIERS]["relevance"] == ["economy"]
+    assert two[SAW]["relevance"] == two[DRILL]["relevance"] == ["gameplay"]
+    assert three[PLIERS]["relevance"] == ["cosmetic"]
+
+
+def test_change_list_summary_counts_the_whole_build_whatever_the_filters(history):
+    body = changes(history, "two", kind="added")
+
+    assert aoids(body) == [DRILL] and body["total"] == 1
+    assert body["summary"] == {
+        "total": 5,
+        "by_kind": {"added": 1, "removed": 1, "changed": 3},
+        "by_part": {
+            "text": 1,
+            "stats": 1,
+            "effects": 1,
+            "actions": 0,
+            "atkdef": 0,
+            "misc": 0,
+        },
+        "by_relevance": {"gameplay": 3, "economy": 1, "cosmetic": 0, "text": 1},
+        "noted": 0,
+    }
+
+
+def test_first_build_of_a_store_adds_everything_and_has_no_base(history):
+    body = changes(history, "one")
+
+    assert body["base"] is None
+    assert {r["kind"] for r in body["items"]} == {"added"}
+    assert body["total"] == 4
+
+
+def test_first_build_of_a_fork_is_relative_to_its_parent(history):
+    body = changes(history, "fork", sort="aoid")
+
+    assert body["base"]["slug"] == "two" and body["base"]["family"] == "ao"
+    assert [(r["aoid"], r["kind"]) for r in body["items"]] == [
+        (HAMMER, "changed"),
+        (DRILL, "removed"),
+        (CHISEL, "added"),
+    ]
+
+
+@pytest.mark.parametrize(
+    "params, expected",
+    [
+        ({"kind": ["added", "removed"]}, [SAW, DRILL]),
+        ({"kind": "changed"}, [WRENCH, HAMMER, PLIERS]),
+        ({"part": "effects"}, [HAMMER]),
+        ({"part": ["text", "stats"]}, [WRENCH, PLIERS]),
+        ({"relevance": "economy"}, [PLIERS]),
+        ({"relevance": ["text", "economy"]}, [WRENCH, PLIERS]),
+        ({"relevance": "gameplay"}, [HAMMER, SAW, DRILL]),
+        ({"min_ql": 30}, [HAMMER, SAW, DRILL]),
+        ({"max_ql": 20}, [WRENCH, PLIERS]),
+        ({"min_ql": 20, "max_ql": 50}, [HAMMER, PLIERS, SAW]),
+        ({"item_class": 2}, [WRENCH, HAMMER, PLIERS, SAW, DRILL]),
+        ({"item_class": 1}, []),
+        ({"is_nano": "true"}, []),
+        ({"search": "span"}, [WRENCH]),
+        ({"search": "wrench"}, [WRENCH]),
+        ({"search": "a"}, [WRENCH, HAMMER, SAW]),
+        ({"search": "100%"}, []),
+    ],
+)
+def test_change_list_filters(history, params, expected):
+    assert aoids(changes(history, "two", sort="aoid", **params)) == expected
+
+
+def test_change_list_rejects_an_unknown_filter_value(history):
+    with history.client("two") as client:
+        assert client.get("/api/v1/changes?kind=renamed").status_code == 422
+        assert client.get("/api/v1/changes?relevance=fun").status_code == 422
+        assert client.get("/api/v1/changes?sort=rev_id").status_code == 422
+
+
+def test_change_list_sorts_by_name_by_default_and_pages(history):
+    by_name = changes(history, "two")
+    by_ql = changes(history, "two", sort="ql")
+    second = changes(history, "two", page=2, page_size=2)
+
+    assert [r["name"] for r in by_name["items"]] == [
+        "Drill",
+        "Hammer",
+        "Pliers",
+        "Saw",
+        "Spanner",
+    ]
+    assert [r["ql"] for r in by_ql["items"]] == [10, 20, 30, 50, 200]
+    assert [r["name"] for r in second["items"]] == ["Pliers", "Saw"]
+    assert (
+        second["total"],
+        second["pages"],
+        second["has_next"],
+        second["has_prev"],
+    ) == (
+        5,
+        3,
+        True,
+        True,
+    )
+
+
+def test_change_list_page_past_the_end_is_empty_with_the_right_total(history):
+    body = changes(history, "two", page=40)
+
+    assert body["items"] == [] and body["total"] == 5
+
+
+def test_change_list_gives_field_level_diffs_when_asked(history):
+    found = rows(changes(history, "two", include_diff="true"))
+
+    assert found[PLIERS]["diff"]["stats"] == [
+        {
+            "stat": STAT_VALUE,
+            "change": "changed",
+            "old": 100,
+            "new": 250,
+            "bits_set": None,
+            "bits_cleared": None,
+        }
+    ]
+    (event,) = found[HAMMER]["diff"]["effects"]
+    assert (event["event"], event["change"]) == (14, "changed")
+    assert event["changed"][0]["fields"] == [
+        {"field": "spell_params.Amount", "old": 5, "new": 9}
+    ]
+    assert found[SAW]["diff"] is None and found[DRILL]["diff"] is None
+
+
+def test_change_list_filters_nanos_professions_and_slots(store):
+    doctor, trader = criterion(PROFESSION, 10, 0), criterion(PROFESSION, 7, 0)
+    store.add_build("one", 1, items=[item(1, name="Old")])
+    store.add_build(
+        "two",
+        2,
+        items=[
+            item(1, name="Old"),
+            item(2, name="Doctor coat", ActionData=requires(USE, doctor)),
+            item(3, name="Left arm", stats=[(STAT_SLOT, 1 << 5)]),
+        ],
+        nanos=[nano(10, use=[doctor]), nano(11, use=[trader])],
+    )
+
+    def found(**params):
+        return aoids(changes(store, "two", sort="aoid", **params))
+
+    assert found(is_nano="true") == [10, 11]
+    assert found(is_nano="false") == [2, 3]
+    assert found(profession=10) == [2, 10]
+    assert found(profession=10, is_nano="true") == [10]
+    assert found(slot=5) == [3]
+
+
+def test_change_list_costs_the_same_queries_whatever_the_page(history):
+    with history.client("two") as client:
+        with history.counting_queries() as small:
+            client.get("/api/v1/changes?page_size=2&include_diff=true")
+        with history.counting_queries() as large:
+            client.get("/api/v1/changes?page_size=200&include_diff=true")
+
+    assert len(small) == len(large)
+
+
+# ---------------------------------------------------------------------------
+# Build notes
+# ---------------------------------------------------------------------------
+
+RENAME_NOTE = """
+[[note]]
+build = "two"
+title = "Tools renamed"
+body = "Every tool got a new name."
+explains = [{ path = "name", old = "Old .*", new = "New .*" }]
+alongside = [{ path = "stat:79" }]
+"""
+
+
+@pytest.fixture
+def renamed(store):
+    """Build two renames three tools; one of them also changes otherwise."""
+    store.add_build(
+        "one",
+        1,
+        items=[
+            item(1, name="Old saw", stats=[(STAT_ICON, 1)]),
+            item(2, name="Old drill"),
+            item(3, name="Old file", stats=[(STAT_VALUE, 5)]),
+            item(4, name="Anvil", stats=[(STAT_ICON, 1)]),
+        ],
+    )
+    store.add_build(
+        "two",
+        2,
+        items=[
+            item(1, name="New saw", stats=[(STAT_ICON, 2)]),
+            item(2, name="New drill"),
+            item(3, name="New file", stats=[(STAT_VALUE, 9)]),
+            item(4, name="Anvil", stats=[(STAT_ICON, 2)]),
+            item(5, name="New lathe"),
+        ],
+    )
+    store.note_changes(RENAME_NOTE)
+    return store
+
+
+def test_a_note_tags_only_the_changes_it_explains_entirely(renamed):
+    body = changes(renamed, "two", notes="expand", sort="aoid")
+    (note,) = body["notes"]
+
+    assert {r["aoid"]: r["note_id"] for r in body["items"]} == {
+        1: note["note_id"],  # renamed, with the icon change the note allows
+        2: note["note_id"],  # renamed
+        3: None,  # renamed, but its value changed too
+        4: None,  # only what may come alongside: not the event itself
+        5: None,  # added
+    }
+    assert note["title"] == "Tools renamed"
+    assert note["body"] == "Every tool got a new name."
+    assert (note["count"], note["matching"]) == (2, 2)
+    assert body["summary"]["noted"] == 2 and body["summary"]["total"] == 5
+
+
+def test_noted_changes_are_collapsed_by_default(renamed):
+    body = changes(renamed, "two", sort="aoid")
+
+    assert aoids(body) == [3, 4, 5]
+    assert body["total"] == 3
+    assert body["notes"][0]["count"] == 2
+    assert body["summary"]["total"] == 5
+
+
+def test_a_note_expands_to_its_changes(renamed):
+    collapsed = changes(renamed, "two")
+    note_id = collapsed["notes"][0]["note_id"]
+
+    body = changes(renamed, "two", note_id=note_id, sort="aoid")
+
+    assert aoids(body) == [1, 2] and body["total"] == 2
+    assert {r["note_id"] for r in body["items"]} == {note_id}
+
+
+def test_note_counts_follow_the_filters(renamed):
+    body = changes(renamed, "two", search="saw")
+
+    assert body["items"] == []
+    assert (body["notes"][0]["count"], body["notes"][0]["matching"]) == (2, 1)
+
+
+def test_a_note_shows_in_the_item_timeline(renamed):
+    newest = get(renamed, "two", "/items/1/timeline")["entries"][0]
+
+    assert newest["note"]["title"] == "Tools renamed"
+    assert newest["note"]["body"] == "Every tool got a new name."
+    assert get(renamed, "two", "/items/3/timeline")["entries"][0]["note"] is None
+
+
+def test_a_build_without_notes_lists_none(renamed):
+    assert changes(renamed, "one")["notes"] == []
+
+
+# ---------------------------------------------------------------------------
+# Compare two builds
+# ---------------------------------------------------------------------------
+
+
+def compare(store, slug, base, **params):
+    return get(store, slug, f"/compare/{base}", **params)
+
+
+def test_compare_is_the_net_difference_and_skips_a_change_and_revert(history):
+    body = compare(history, "three", "one", sort="aoid")
+
+    assert body["build"]["slug"] == "three" and body["base"]["slug"] == "one"
+    # the Hammer changed in two and changed back in three; the Saw left and
+    # returned unchanged
+    assert [(r["aoid"], r["kind"], r["parts"]) for r in body["items"]] == [
+        (WRENCH, "changed", ["text", "stats", "actions"]),
+        (PLIERS, "changed", ["stats"]),
+        (DRILL, "added", []),
+    ]
+    assert body["summary"]["total"] == 3
+    assert body["notes"] == []
+
+
+def test_compare_classifies_the_net_change(history):
+    found = rows(compare(history, "three", "one", include_diff="true"))
+
+    assert found[WRENCH]["relevance"] == ["gameplay", "text"]
+    assert found[WRENCH]["old_name"] == "Wrench"
+    # value 100 -> 250 and a new icon, over two builds
+    assert found[PLIERS]["relevance"] == ["economy", "cosmetic"]
+    assert [c["stat"] for c in found[PLIERS]["diff"]["stats"]] == [
+        STAT_VALUE,
+        STAT_ICON,
+    ]
+    assert found[DRILL]["relevance"] == ["gameplay"]
+
+
+def test_compare_of_adjacent_builds_is_the_change_list(history):
+    listed = changes(history, "two", sort="aoid", include_diff="true")
+    compared = compare(history, "two", "one", sort="aoid", include_diff="true")
+
+    assert compared["items"] == listed["items"]
+    assert compared["summary"] == listed["summary"]
+
+
+def test_compare_runs_in_either_direction(history):
+    body = compare(history, "one", "three", sort="aoid")
+
+    assert [(r["aoid"], r["kind"]) for r in body["items"]] == [
+        (WRENCH, "changed"),
+        (PLIERS, "changed"),
+        (DRILL, "removed"),
+    ]
+    assert rows(body)[WRENCH]["name"] == "Wrench"
+    assert rows(body)[WRENCH]["old_name"] == "Spanner"
+
+
+def test_compare_across_the_fork(history):
+    body = compare(history, "fork", "four", sort="aoid")
+
+    assert body["base"]["family"] == "ao" and body["build"]["family"] == "prk"
+    assert [(r["aoid"], r["kind"]) for r in body["items"]] == [
+        (WRENCH, "changed"),
+        (HAMMER, "added"),
+        (PLIERS, "changed"),
+        (SAW, "removed"),
+        (DRILL, "removed"),
+        (CHISEL, "added"),
+    ]
+
+
+def test_compare_takes_the_filters_of_the_change_list(history):
+    def found(**params):
+        return aoids(compare(history, "three", "one", sort="aoid", **params))
+
+    assert found(kind="added") == [DRILL]
+    assert found(part="actions") == [WRENCH]
+    assert found(relevance="economy") == [PLIERS]
+    assert found(search="wrench") == [WRENCH]
+    assert found(min_ql=100) == [DRILL]
+    assert found(page=2, page_size=2) == [DRILL]
+
+
+def test_compare_a_build_with_itself_is_empty(history):
+    body = compare(history, "three", "three")
+
+    assert body["items"] == [] and body["summary"]["total"] == 0
+
+
+def test_compare_with_an_unknown_build_is_not_found(history):
+    with history.client("three") as client:
+        response = client.get("/api/v1/compare/nope")
+
+    assert response.status_code == 404
+
+
+def test_compare_accepts_a_family_alias_as_base(history):
+    # "ao" is the newest build of the branch: four
+    body = compare(history, "one", "ao")
+
+    assert body["base"]["slug"] == "four"
+
+
+# ---------------------------------------------------------------------------
+# Compare one item
+# ---------------------------------------------------------------------------
+
+
+def compare_item(store, slug, aoid, base):
+    return get(store, slug, f"/items/{aoid}/compare/{base}")
+
+
+def test_item_compare_diffs_the_item_between_two_builds(history):
+    body = compare_item(history, "four", WRENCH, "one")
+
+    assert (body["aoid"], body["kind"]) == (WRENCH, "changed")
+    assert body["base"]["slug"] == "one" and body["build"]["slug"] == "four"
+    assert body["old"]["name"] == "Wrench" and body["new"]["name"] == "Spanner"
+    assert body["parts"] == ["text", "stats", "actions"]
+    assert body["relevance"] == ["gameplay", "text"]
+    assert body["diff"]["text"] == [
+        {"field": "name", "old": "Wrench", "new": "Spanner"}
+    ]
+    assert [c["stat"] for c in body["diff"]["stats"]] == [STAT_CAN]
+
+
+def test_item_compare_of_an_item_changed_and_reverted_is_unchanged(history):
+    body = compare_item(history, "three", HAMMER, "one")
+
+    assert body["kind"] == "unchanged"
+    assert body["parts"] == [] and body["relevance"] == []
+    assert all(changes == [] for changes in body["diff"].values())
+    assert body["old"] == body["new"]
+
+
+def test_item_compare_of_an_item_only_one_build_has(history):
+    added = compare_item(history, "four", DRILL, "one")
+    removed = compare_item(history, "four", HAMMER, "one")
+
+    assert (added["kind"], added["old"], added["diff"]) == ("added", None, None)
+    assert added["new"]["name"] == "Drill" and added["new"]["ql"] == 200
+    assert (removed["kind"], removed["new"], removed["diff"]) == ("removed", None, None)
+    assert removed["old"]["name"] == "Hammer"
+    assert added["relevance"] == removed["relevance"] == ["gameplay"]
+
+
+def test_item_compare_across_the_fork(history):
+    body = compare_item(history, "fork", HAMMER, "three")
+
+    assert body["kind"] == "changed"
+    (pair,) = body["diff"]["effects"][0]["changed"]
+    assert pair["fields"] == [{"field": "spell_params.Amount", "old": 5, "new": 12}]
+
+
+def test_item_compare_of_an_item_neither_build_has_is_not_found(history):
+    with history.client("four") as client:
+        assert client.get(f"/api/v1/items/{CHISEL}/compare/one").status_code == 404
+        assert client.get(f"/api/v1/items/{WRENCH}/compare/nope").status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Shared transitions
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def procs(store):
+    """Three procs go from a 60% to a 100% chance; one of them also gains a
+    stat, as does one other item."""
+
+    def proc(aoid, chance, **extra):
+        effect = {
+            "SpellID": 53089,
+            "Target": 3,
+            "TickCount": 1,
+            "TickInterval": 0,
+            "NanoID": 900 + aoid,
+            "Chance": chance,
+            "Criteria": [],
+            "SpellFormat": "{Chance} chance to cast {NanoID}",
+            "SpellDescription": f"{chance} chance",
+        }
+        return item(aoid, name=f"Proc {aoid}", SpellData=wear(effect), **extra)
+
+    store.add_build(
+        "one", 1, items=[proc(1, 60), proc(2, 60), proc(3, 60), item(4), item(5)]
+    )
+    store.add_build(
+        "two",
+        2,
+        items=[
+            proc(1, 100),
+            proc(2, 100),
+            proc(3, 100, stats=[(287, 20)]),
+            item(4, stats=[(287, 20)]),
+            item(5, name="Unique change"),
+        ],
+    )
+    return store
+
+
+def test_transitions_count_what_changed_items_share(procs):
+    body = get(procs, "two", "/changes/transitions")
+
+    assert body["build"]["slug"] == "two" and body["base"]["slug"] == "one"
+    assert body["transitions"] == [
+        {
+            "part": "effects",
+            "path": "effect:53089:spell_params.Chance",
+            "old": 60,
+            "new": 100,
+            "items": 3,
+            "occurrences": 3,
+            "stat": None,
+            "bit": None,
+            "spell_id": 53089,
+            "action": None,
+            "field": "spell_params.Chance",
+        },
+        {
+            "part": "stats",
+            "path": "stat:287",
+            "old": None,
+            "new": 20,
+            "items": 2,
+            "occurrences": 2,
+            "stat": 287,
+            "bit": None,
+            "spell_id": None,
+            "action": None,
+            "field": None,
+        },
+    ]
+
+
+def test_transitions_filter_by_part_and_size(procs):
+    def paths(**params):
+        body = get(procs, "two", "/changes/transitions", **params)
+        return [entry["path"] for entry in body["transitions"]]
+
+    assert paths(part="stats") == ["stat:287"]
+    assert paths(min_items=3) == ["effect:53089:spell_params.Chance"]
+    assert paths(limit=1) == ["effect:53089:spell_params.Chance"]
+
+
+def test_a_build_with_no_shared_transition_lists_none(procs):
+    assert get(procs, "one", "/changes/transitions")["transitions"] == []
