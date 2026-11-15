@@ -208,6 +208,54 @@ def test_a_requirement_on_another_stat_is_a_removal_and_an_addition():
     ]
 
 
+def test_a_logical_operator_never_becomes_a_requirement():
+    # 14.8.0, item 164512: a list of requirements joined by AND replaced by
+    # one condition on stat 0
+    old = [[274, 4, 24], [112, 851, 2], [0, 0, 4], [158, 851, 2], [0, 0, 4]]
+    new = [[0, 2, 88]]
+
+    assert ops(diff_criteria(old, new)) == [
+        ("removed", [274, 4, 24], None),
+        ("removed", [112, 851, 2], None),
+        ("removed", [0, 0, 4], None),
+        ("removed", [158, 851, 2], None),
+        ("removed", [0, 0, 4], None),
+        ("added", None, [0, 2, 88]),
+    ]
+
+
+def test_a_requirement_on_stat_0_never_becomes_a_logical_operator():
+    assert ops(diff_criteria([[0, 64, 22]], [[0, 0, 4]])) == [
+        ("removed", [0, 64, 22], None),
+        ("added", None, [0, 0, 4]),
+    ]
+
+
+def test_a_logical_operator_replaced_by_another_is_changed_in_place():
+    old = [[112, 50, 2], [54, 10, 2], [0, 0, 4]]
+    new = [[112, 50, 2], [54, 10, 2], [0, 0, 3]]
+
+    assert ops(diff_criteria(old, new))[2:] == [("changed", [0, 0, 4], [0, 0, 3])]
+
+
+def test_conditions_pair_by_their_operator_not_by_the_stat_they_leave_empty():
+    # 88 with another value is the same condition, changed; "must be
+    # fighting" (45) and "must be flying" (70) are two conditions
+    assert ops(diff_criteria([[0, 2, 88]], [[0, 3, 88]])) == [
+        ("changed", [0, 2, 88], [0, 3, 88])
+    ]
+    assert ops(diff_criteria([[0, 0, 45]], [[0, 0, 70]])) == [
+        ("removed", [0, 0, 45], None),
+        ("added", None, [0, 0, 70]),
+    ]
+
+
+def test_a_requirement_whose_operator_changed_is_changed_in_place():
+    assert ops(diff_criteria([[112, 50, 2]], [[112, 50, 1]])) == [
+        ("changed", [112, 50, 2], [112, 50, 1])
+    ]
+
+
 def test_reordered_criteria_show_what_moved_and_keep_the_rest():
     old = [[112, 50, 2], [54, 10, 2], [60, 4, 0]]
     new = [[54, 10, 2], [60, 4, 0], [112, 50, 2]]

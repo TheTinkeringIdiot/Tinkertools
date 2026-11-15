@@ -84,12 +84,16 @@ Diffing criteria
 
 Criteria are evaluated as a sequence, so they are compared as one: a longest
 common subsequence keeps every criterion that stayed (``"op": "same"``), and
-between two kept criteria the old and new runs are aligned by the stat they
-test (``value1``): a criterion testing the same stat at the same place is
-``changed`` (old and new given), anything else is ``removed`` or ``added``.
-One criterion inserted in the middle of a list is one ``added`` entry among
-``same`` ones, and a criterion that moved shows as removed where it was and
-added where it is.
+between two kept criteria the old and new runs are aligned by what each
+criterion is: a requirement by the stat it tests (``value1``, under one of
+``STAT_OPERATORS``), a logical operator (``LOGICAL_OPERATORS``) as such, and
+any other condition by its operator. Two criteria that are the same thing at
+the same place are ``changed`` (old and new given), anything else is
+``removed`` or ``added``: "Pistol >= 852" can become "Pistol >= 900" and AND
+can become OR, but an operator never "becomes" a requirement. One criterion
+inserted in the middle of a list is one ``added`` entry among ``same`` ones,
+and a criterion that moved shows as removed where it was and added where it
+is.
 """
 
 from __future__ import annotations
@@ -119,6 +123,12 @@ FLAG_STATS = frozenset(
         STAT_EXPANSION,
     }
 )
+
+# Criterion operators that compare a stat (``value1``) with a value: equal,
+# less, greater, has bit, not equal, lacks bit. Every other operator is a
+# condition of its own or one of the logical operators that join criteria.
+STAT_OPERATORS = frozenset({0, 1, 2, 22, 24, 107})
+LOGICAL_OPERATORS = frozenset({3, 4, 42})  # OR, AND, NOT
 
 # Parameters that say what an effect acts on.
 SUBJECT_PARAMS = ("Stat", "Skill", "NanoID", "NanoStrain", "Item", "PerkID")
@@ -258,6 +268,17 @@ def _criterion_change(op: str, old: Optional[Criterion], new: Optional[Criterion
     return {"op": op, "old": _criterion(old), "new": _criterion(new)}
 
 
+def _criterion_identity(criterion: Criterion) -> Tuple:
+    """What a criterion is, apart from the value it asks for: two criteria
+    with the same identity at the same place are one criterion that changed."""
+    value1, _, operator = criterion
+    if operator in STAT_OPERATORS:
+        return ("stat", value1)
+    if operator in LOGICAL_OPERATORS:
+        return ("logical",)
+    return ("condition", operator)
+
+
 def diff_criteria(
     old: Optional[Sequence[Criterion]], new: Optional[Sequence[Criterion]]
 ) -> List[Change]:
@@ -272,10 +293,13 @@ def diff_criteria(
             changes += [_criterion_change("same", c, c) for c in before[i1:i2]]
             continue
         gone, come = before[i1:i2], after[j1:j2]
-        by_stat = SequenceMatcher(
-            None, [c[0] for c in gone], [c[0] for c in come], autojunk=False
+        by_identity = SequenceMatcher(
+            None,
+            [_criterion_identity(c) for c in gone],
+            [_criterion_identity(c) for c in come],
+            autojunk=False,
         )
-        for inner, a1, a2, b1, b2 in by_stat.get_opcodes():
+        for inner, a1, a2, b1, b2 in by_identity.get_opcodes():
             if inner == "equal":
                 changes += [
                     _criterion_change("changed", o, n)
