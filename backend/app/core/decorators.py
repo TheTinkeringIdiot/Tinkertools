@@ -18,7 +18,7 @@ from app.core.cache import (
     cache_response,
     CACHE_TTL,
 )
-from app.core.versions import resolve_current_slug
+from app.core.version_middleware import current_version
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ def cached_response(cache_type: str, ttl: Optional[int] = None):
             cache_params = {k: v for k, v in kwargs.items() if k != "db"}
             # Responses differ per game version; the version is not a route
             # kwarg, so it is folded into the key explicitly.
-            cache_params["__game_version"] = resolve_current_slug()
+            cache_params["__game_version"] = current_version.get()
             return cache_key_for_query(
                 f"{func.__module__}.{func.__name__}", **cache_params
             )

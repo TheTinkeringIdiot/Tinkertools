@@ -31,7 +31,6 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence
 
 import pytest
-from fastapi import Request
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Connection
@@ -42,10 +41,13 @@ from sqlalchemy.sql.expression import ClauseElement, Executable, Select
 from app.core import cas_store, change_analysis
 from app.core.cache import cache_service
 from app.core.cas_curated import sync_curated
+from app.core.cas_legacy import sync_legacy_ids
 from app.core.change_rules import ChangeRules, default_rules, parse_notes
 from app.main import app
+from app.store import context
 from app.store.context import (
     Build,
+    BuildRegistry,
     get_build,
     get_store,
     read_builds,
@@ -128,6 +130,11 @@ class ThrowawayStore:
         sync_curated(self._raw, curated_files(self._tmp_path, list(mobs), nanos))
         cas_store.apply_nano_overlay(self._raw)
 
+    def legacy_ids(self, rows: Iterable[tuple]) -> int:
+        """Make ``(branch, internal item id, aoid)`` rows the store's map of
+        the old store's item ids; returns the rows written or removed."""
+        return sync_legacy_ids(self._raw, list(rows))
+
     def note_changes(self, notes: str) -> None:
         """Apply build notes, written as ``build_notes.toml`` is, to the
         change log of the builds loaded so far. Builds are imported with the
@@ -157,26 +164,22 @@ class ThrowawayStore:
         """A test client whose requests read build ``slug`` of this store.
 
         Without ``slug`` each request reads the build its URL names, as in
-        production. The version segment of a URL is resolved by the version
-        registry before the store is asked, so such a test gives its builds
-        slugs the registry knows (``registry.all()``, ``registry.aliases()``).
+        production: version segments, family aliases and the default build
+        are resolved against the builds this store holds now.
         """
-        fixed = self.build(slug) if slug is not None else None
-        known = self.builds()
-
-        def build_of(request: Request) -> Build:
-            found = fixed or resolve_build(known, request.state.game_version)
-            if found is None:
-                raise KeyError(request.state.game_version)
-            return found
-
+        served = context.builds
+        context.builds = BuildRegistry(read=self.builds)
+        context.builds.all()
         app.dependency_overrides[get_store] = lambda: self.db
-        app.dependency_overrides[get_build] = build_of
+        if slug is not None:
+            fixed = self.build(slug)
+            app.dependency_overrides[get_build] = lambda: fixed
         cache_service.clear()
         try:
             with TestClient(app) as client:
                 yield client
         finally:
+            context.builds = served
             app.dependency_overrides.pop(get_store, None)
             app.dependency_overrides.pop(get_build, None)
             cache_service.clear()

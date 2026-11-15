@@ -10,7 +10,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.routes import aosetups
-from app.core.database import get_db
 from app.main import app
 from app.store.context import get_store
 
@@ -52,10 +51,8 @@ def proxy(monkeypatch):
         monkeypatch.setattr(aosetups.httpx, "AsyncClient", outbound)
         return TestClient(app), outbound
 
-    app.dependency_overrides[get_db] = no_database
     app.dependency_overrides[get_store] = no_database
     yield make
-    app.dependency_overrides.pop(get_db, None)
     app.dependency_overrides.pop(get_store, None)
 
 

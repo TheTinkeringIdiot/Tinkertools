@@ -1,5 +1,5 @@
 """
-Pydantic schemas for the game version registry and the cross-version item
+Pydantic schemas for the list of game versions and the cross-version item
 revision index.
 """
 
@@ -10,11 +10,7 @@ from pydantic import BaseModel, Field
 
 
 class GameVersionResponse(BaseModel):
-    """A game data snapshot as exposed to clients.
-
-    ``schema_name`` and the registry timestamps are internal and deliberately
-    omitted.
-    """
+    """A build of the store as exposed to clients."""
 
     slug: str = Field(description="Version slug, used in URLs (e.g. 'ao-18.8')")
     display_name: str = Field(description="Human readable version name")
@@ -41,9 +37,6 @@ class GameVersionResponse(BaseModel):
     is_current: bool = Field(
         False, description="Whether this is the version resolved for this request"
     )
-
-    class Config:
-        from_attributes = True
 
 
 class GameVersionListResponse(BaseModel):

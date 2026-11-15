@@ -197,13 +197,18 @@ describe('API Client', () => {
     function resolveEveryId() {
       mockAxiosInstance.post.mockImplementation(
         async (_url: string, body: { item_ids: number[] }) => ({
-          data: { aoids: Object.fromEntries(body.item_ids.map((id) => [String(id), id + 100000])) },
+          data: {
+            aoids: Object.fromEntries(body.item_ids.map((id) => [String(id), id + 100000])),
+            available: true,
+          },
         })
       );
     }
 
     it('returns the AOIDs keyed by numeric internal id, without the ids the backend omits', async () => {
-      mockAxiosInstance.post.mockResolvedValue({ data: { aoids: { '7': 246817, '9': 100123 } } });
+      mockAxiosInstance.post.mockResolvedValue({
+        data: { aoids: { '7': 246817, '9': 100123 }, available: true },
+      });
 
       const resolved = await apiClient.resolveLegacyItemIds([7, 8, 9], TEST_VERSION);
 
@@ -254,6 +259,22 @@ describe('API Client', () => {
       expect(sent.baseURL).toBe(`${API_ROOT}/${TEST_ALT_VERSION}`);
     });
 
+    it('rejects when the backend holds no ids for the version, instead of resolving nothing', async () => {
+      mockAxiosInstance.post.mockResolvedValue({ data: { aoids: {}, available: false } });
+
+      await expect(apiClient.resolveLegacyItemIds([7, 8], TEST_VERSION)).rejects.toMatchObject({
+        type: 'error',
+      });
+    });
+
+    it('resolves nothing when the backend holds the ids and knows none of those asked for', async () => {
+      mockAxiosInstance.post.mockResolvedValue({ data: { aoids: {}, available: true } });
+
+      const resolved = await apiClient.resolveLegacyItemIds([7, 8], TEST_VERSION);
+
+      expect(resolved.size).toBe(0);
+    });
+
     it('makes no request for an empty list', async () => {
       const resolved = await apiClient.resolveLegacyItemIds([], TEST_VERSION);
 
@@ -263,7 +284,7 @@ describe('API Client', () => {
 
     it('rejects when a request fails, even after earlier ones succeeded', async () => {
       mockAxiosInstance.post
-        .mockResolvedValueOnce({ data: { aoids: { '1': 100001 } } })
+        .mockResolvedValueOnce({ data: { aoids: { '1': 100001 }, available: true } })
         .mockRejectedValueOnce(new AxiosError('Network Error', AxiosError.ERR_NETWORK));
       const ids = Array.from({ length: 1500 }, (_, index) => index + 1);
 
