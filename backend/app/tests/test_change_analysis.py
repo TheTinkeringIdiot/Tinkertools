@@ -165,6 +165,56 @@ def test_a_change_is_classified_by_what_differs(conn, old, new, expected):
     assert two_builds(conn, old, new) == expected
 
 
+@pytest.mark.parametrize(
+    "old, new, expected",
+    [
+        # written out, or dropped, with the constant that says nothing
+        ({}, {"stats": [(74, 0)]}, COSMETIC),
+        ({}, {"stats": [(134, 0)]}, COSMETIC),
+        ({}, {"stats": [(298, 0)]}, COSMETIC),
+        ({"stats": [(6, 15)]}, {}, COSMETIC),
+        ({"stats": [(5, 15)]}, {"stats": [(6, 15)]}, COSMETIC),
+        # the same stats with a value that says something
+        ({}, {"stats": [(74, 5)]}, ECONOMY),
+        ({}, {"stats": [(134, 2)]}, GAMEPLAY),
+        ({"stats": [(6, 14)]}, {}, GAMEPLAY),
+        ({"stats": [(134, 2)]}, {"stats": [(134, 4)]}, GAMEPLAY),
+        ({"stats": [(74, 56)]}, {"stats": [(74, 1)]}, ECONOMY),
+        # the constant of another stat is a value like any other
+        ({}, {"stats": [(134, 15)]}, GAMEPLAY),
+        ({}, {"stats": [(6, 0)]}, GAMEPLAY),
+        # from the constant to a value: the stat's class, and the constant went
+        ({"stats": [(74, 0)]}, {"stats": [(74, 1)]}, ECONOMY | COSMETIC),
+        ({"stats": [(134, 2)]}, {"stats": [(134, 0)]}, GAMEPLAY | COSMETIC),
+    ],
+)
+def test_a_housekeeping_value_that_comes_or_goes_is_cosmetic(conn, old, new, expected):
+    assert two_builds(conn, old, new) == expected
+
+
+def test_a_housekeeping_value_is_one_only_while_the_rules_file_lists_it(conn):
+    load(conn, spec("one", 1), items=[item(1)])
+    load(conn, spec("two", 2), items=[item(1, stats=[(134, 0)])])
+    assert relevance(conn, 2) == {1: COSMETIC}
+
+    change_analysis.sync(conn, rules(edit=lambda t: t.replace("134 = 0 ", "134 = 1 ")))
+
+    assert relevance(conn, 2) == {1: GAMEPLAY}
+
+
+def test_an_effect_rendered_in_other_words_is_not_a_change_of_what_it_does(conn):
+    reworded = dict(modify(16, 5), SpellDescription="Raise 16 by 5")
+
+    found = two_builds(
+        conn,
+        {"SpellData": wear(modify(16, 5))},
+        {"SpellData": wear(reworded, event=0)},
+    )
+
+    # the effect moved to another event and is the effect it was
+    assert found == COSMETIC
+
+
 def test_added_and_removed_items_are_classified_as_the_rules_say(conn):
     load(conn, spec("one", 1), items=[item(1), item(2)])
     load(conn, spec("two", 2), items=[item(2), item(3)])
@@ -523,6 +573,103 @@ def test_a_transition_has_the_class_of_its_field(conn):
     }
 
 
+def line_classes(conn, ordinal):
+    """``{(path, old, new): relevance}`` of the shared transitions of a build."""
+    return {
+        (path, old, new): found
+        for path, old, new, found in conn.execute(
+            "SELECT path, old, new, relevance FROM build_transition WHERE ordinal = %s",
+            (ordinal,),
+        )
+    }
+
+
+def test_an_event_added_or_removed_is_a_gameplay_line_and_a_renumbering_is_not(conn):
+    def pair(first, **fields):
+        return [item(first, **fields), item(first + 1, **fields)]
+
+    worn, used = wear(modify(16, 5)), wear(modify(17, 5), event=5)
+    load(
+        conn,
+        spec("one", 1),
+        items=[
+            *pair(1, SpellData=worn),
+            *pair(3, SpellData=worn + used),
+            *pair(5, SpellData=worn),
+        ],
+    )
+    load(
+        conn,
+        spec("two", 2),
+        items=[
+            *pair(1, SpellData=worn + used),
+            *pair(3, SpellData=worn),
+            *pair(5, SpellData=wear(modify(16, 5), event=0)),
+        ],
+    )
+
+    assert line_classes(conn, 2) == {
+        ("event:5", None, "added"): GAMEPLAY,
+        ("effect:53045", None, 17): GAMEPLAY,
+        ("event:5", "removed", None): GAMEPLAY,
+        ("effect:53045", 17, None): GAMEPLAY,
+        ("event", 14, 0): COSMETIC,
+    }
+    # each line has the class of the changes it leads to
+    assert relevance(conn, 2) == {
+        1: GAMEPLAY,
+        2: GAMEPLAY,
+        3: GAMEPLAY,
+        4: GAMEPLAY,
+        5: COSMETIC,
+        6: COSMETIC,
+    }
+
+
+def test_the_class_of_an_added_or_removed_event_follows_the_rules_file(conn):
+    worn, used = wear(modify(16, 5)), wear(modify(17, 5), event=5)
+    load(conn, spec("one", 1), items=[item(1, SpellData=worn), item(2, SpellData=worn)])
+    load(
+        conn,
+        spec("two", 2),
+        items=[item(1, SpellData=worn + used), item(2, SpellData=worn + used)],
+    )
+
+    change_analysis.sync(
+        conn,
+        rules(
+            edit=lambda t: t.replace(
+                'event_added = "gameplay"', 'event_added = "cosmetic"'
+            )
+        ),
+    )
+
+    assert line_classes(conn, 2)[("event:5", None, "added")] == COSMETIC
+
+
+def test_a_stat_line_is_cosmetic_only_for_the_housekeeping_value(conn):
+    def pair(first, *stats):
+        return [item(first, stats=list(stats)), item(first + 1, stats=list(stats))]
+
+    load(
+        conn,
+        spec("one", 1),
+        items=[*pair(1), *pair(3, (74, 56)), *pair(5, (5, 15)), *pair(7, (74, 0))],
+    )
+    load(
+        conn,
+        spec("two", 2),
+        items=[*pair(1, (74, 0)), *pair(3, (74, 1)), *pair(5), *pair(7, (74, 3))],
+    )
+
+    assert line_classes(conn, 2) == {
+        ("stat:74", None, 0): COSMETIC,
+        ("stat:74", 56, 1): ECONOMY,
+        ("stat:5", 15, None): COSMETIC,
+        ("stat:74", 0, 3): ECONOMY,
+    }
+
+
 def test_a_transition_is_also_counted_without_the_changes_a_note_explains(conn):
     load(
         conn,
@@ -647,7 +794,7 @@ def test_the_verifier_notices_a_relevance_file_changed_since_the_import(
     # the relevance of the log, and the class of every transition
     assert rule_differences(verify_cas, renumbered, reclassed) == 2
     assert verify_cas.misclassified_transitions(renumbered, reclassed) == [
-        ("effects", "event", COSMETIC)
+        ("effects", "event", 14, 0, COSMETIC)
     ]
     assert verify_cas.misclassified_transitions(renumbered, rules(RENUMBER)) == []
 
