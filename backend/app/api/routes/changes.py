@@ -39,6 +39,12 @@ from app.api.schemas.changes import (
 )
 from app.api.services.item_search import common_item_filters
 from app.core.change_rules import relevance_names
+from app.core.cache import (
+    CACHE_TTL,
+    cache_key_for_query,
+    cache_response,
+    get_cached_response,
+)
 from app.core.decorators import cached_response, performance_monitor
 from app.store import page_fields
 from app.store.changes import (
@@ -48,6 +54,7 @@ from app.store.changes import (
     ChangeFilters,
     ChangePage,
     change_response,
+    classify_rows,
     changed_pairs,
     compare_item,
     compared_changes,
@@ -315,15 +322,27 @@ def compare_builds(
     """
     other = _other_build(db, base)
     index = load_build_index(db)
+    filters = query.filters(build)
+    # The summary of a pair of builds is the same for every page and filter.
+    # Once it is known, a request that does not filter on parts or relevance
+    # skips classifying the whole comparison and classifies its page.
+    summary_key = cache_key_for_query("compare_summary", old=other.slug, new=build.slug)
+    summary = get_cached_response(summary_key)
+    page_only = summary is not None and not (filters.parts or filters.relevance)
     found = fetch_changes(
         db,
-        compared_changes(other, build),
-        query.filters(build),
+        compared_changes(other, build, classified=not page_only),
+        filters,
         query.sort,
         query.page,
         query.page_size,
         noted=False,
+        summarized=not page_only,
     )
+    if page_only:
+        found = replace(found, rows=classify_rows(db, found.rows), summary=summary)
+    elif summary is None:
+        cache_response(summary_key, found.summary, CACHE_TTL["changes_compare"])
     return _change_list(
         db, query, found, build, index, index.at(other.branch, other.ordinal).ref()
     )

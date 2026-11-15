@@ -28,7 +28,7 @@ for the rows of a page, never for a whole list.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from sqlalchemy import (
@@ -266,11 +266,20 @@ def _relevance(
 
 
 def compared_changes(
-    base: Build, build: Build, rules: Optional[RelevanceRules] = None
+    base: Build,
+    build: Build,
+    rules: Optional[RelevanceRules] = None,
+    classified: bool = True,
 ) -> Select:
     """The items whose revision in ``build`` is not their revision in
     ``base``, shaped as ``logged_changes``. No build notes: a note belongs to
-    one step of the log."""
+    one step of the log.
+
+    Classifying every change (``parts_changed``, ``relevance``) is half the
+    cost of a large comparison. With ``classified`` false both columns are 0
+    and the rows of a page are classified afterwards by ``classify_rows``:
+    for a request that neither filters on them nor needs the summary.
+    """
     rules = rules or default_rules().relevance
     before, after = t.item_presence.alias("before"), t.item_presence.alias("after")
     old = (
@@ -282,36 +291,93 @@ def compared_changes(
     # The revision a row is listed by is the newer one, the older for a
     # removed item; for a changed item it is the new side of the comparison.
     shown = t.item_revision.alias("shown")
-    old_revision = t.item_revision.alias("old_revision")
-    old_digests = t.revision_relevance.alias("old_digests")
-    new_digests = t.revision_relevance.alias("new_digests")
     kind = case((old.c.rev_id.is_(None), "A"), (new.c.rev_id.is_(None), "R"), else_="C")
+    source = old.join(new, old.c.aoid == new.c.aoid, full=True).join(
+        shown, shown.c.rev_id == func.coalesce(new.c.rev_id, old.c.rev_id)
+    )
+    if classified:
+        old_revision = t.item_revision.alias("old_revision")
+        old_digests = t.revision_relevance.alias("old_digests")
+        new_digests = t.revision_relevance.alias("new_digests")
+        source = (
+            source.outerjoin(old_revision, old_revision.c.rev_id == old.c.rev_id)
+            .outerjoin(old_digests, old_digests.c.rev_id == old.c.rev_id)
+            .outerjoin(new_digests, new_digests.c.rev_id == new.c.rev_id)
+        )
+        parts_changed = case(
+            (kind == "C", _parts_changed(old_revision, shown)), else_=0
+        )
+        relevance = case(
+            (old.c.rev_id.is_(None), rules.bit("added")),
+            (new.c.rev_id.is_(None), rules.bit("removed")),
+            else_=_relevance(rules, old_revision, shown, old_digests, new_digests),
+        )
+    else:
+        parts_changed = relevance = literal(0)
     return (
         select(
             func.coalesce(new.c.aoid, old.c.aoid).label("aoid"),
             kind.label("kind"),
             old.c.rev_id.label("old_rev_id"),
             new.c.rev_id.label("new_rev_id"),
-            case((kind == "C", _parts_changed(old_revision, shown)), else_=0).label(
-                "parts_changed"
-            ),
-            case(
-                (old.c.rev_id.is_(None), rules.bit("added")),
-                (new.c.rev_id.is_(None), rules.bit("removed")),
-                else_=_relevance(rules, old_revision, shown, old_digests, new_digests),
-            ).label("relevance"),
+            parts_changed.label("parts_changed"),
+            relevance.label("relevance"),
             cast(null(), Integer).label("note_id"),
             *_listed_by(shown),
         )
-        .select_from(
-            old.join(new, old.c.aoid == new.c.aoid, full=True)
-            .join(shown, shown.c.rev_id == func.coalesce(new.c.rev_id, old.c.rev_id))
-            .outerjoin(old_revision, old_revision.c.rev_id == old.c.rev_id)
-            .outerjoin(old_digests, old_digests.c.rev_id == old.c.rev_id)
-            .outerjoin(new_digests, new_digests.c.rev_id == new.c.rev_id)
-        )
+        .select_from(source)
         .where(old.c.rev_id.is_distinct_from(new.c.rev_id))
     )
+
+
+def classify_rows(
+    db: Session, rows: Sequence["ChangeRow"], rules: Optional[RelevanceRules] = None
+) -> List["ChangeRow"]:
+    """``rows`` of an unclassified comparison with their parts and relevance,
+    by the rule ``compared_changes`` applies to a whole comparison. One
+    query."""
+    rules = rules or default_rules().relevance
+    pairs = changed_pairs(rows)
+    found: Dict[Tuple[int, int], Tuple[int, int]] = {}
+    if pairs:
+        old, new = t.item_revision.alias("old"), t.item_revision.alias("new")
+        old_digests = t.revision_relevance.alias("old_digests")
+        new_digests = t.revision_relevance.alias("new_digests")
+        found = {
+            (row.old_rev_id, row.new_rev_id): (row.parts_changed, row.relevance)
+            for row in db.execute(
+                select(
+                    old.c.rev_id.label("old_rev_id"),
+                    new.c.rev_id.label("new_rev_id"),
+                    _parts_changed(old, new).label("parts_changed"),
+                    _relevance(rules, old, new, old_digests, new_digests).label(
+                        "relevance"
+                    ),
+                )
+                .select_from(
+                    old.join(new, new.c.aoid == old.c.aoid)
+                    .join(old_digests, old_digests.c.rev_id == old.c.rev_id)
+                    .join(new_digests, new_digests.c.rev_id == new.c.rev_id)
+                )
+                .where(
+                    any_of(old.c.rev_id, [pair[0] for pair in pairs]),
+                    any_of(new.c.rev_id, [pair[1] for pair in pairs]),
+                )
+            )
+        }
+    whole = {"A": rules.bit("added"), "R": rules.bit("removed")}
+    return [
+        (
+            replace(
+                row,
+                parts_changed=found[(row.old_rev_id, row.new_rev_id)][0],
+                relevance=found[(row.old_rev_id, row.new_rev_id)][1],
+            )
+            if row.kind == "C"
+            else replace(row, relevance=whole[row.kind])
+        )
+        for row in rows
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -354,7 +420,7 @@ class ChangeRow:
 class ChangePage:
     rows: List[ChangeRow]
     total: int
-    summary: Dict[str, Any]
+    summary: Optional[Dict[str, Any]]
     # {note_id: (changes of the build, of which match the filters)}
     notes: Dict[int, Tuple[int, int]]
 
@@ -448,10 +514,12 @@ def fetch_changes(
     page: int,
     page_size: int,
     noted: bool = True,
+    summarized: bool = True,
 ) -> ChangePage:
     """Filter ``source`` (``logged_changes`` or ``compared_changes``), count
     it and fetch one page, in one statement. ``noted`` is false for a source
-    without build notes, whose notes are then not counted.
+    without build notes, whose notes are then not counted; ``summarized`` is
+    false for a caller that has the summary of the source already.
 
     A row is listed, filtered and sorted by its newer revision (the older for
     a removed item); a name search also matches the older name. The summary
@@ -569,7 +637,7 @@ def fetch_changes(
     db.execute(text("SET LOCAL work_mem = '64MB'"))
     row = db.execute(
         select(
-            _summary(changes).label("summary"),
+            (_summary(changes) if summarized else null()).label("summary"),
             (_note_counts(changes) if noted else null()).label("notes"),
             (_note_counts(matched) if noted else null()).label("matching"),
             select(func.count())
@@ -584,7 +652,7 @@ def fetch_changes(
     return ChangePage(
         rows=[ChangeRow(*values) for values in row.rows],
         total=row.total,
-        summary=_ordered_summary(row.summary),
+        summary=_ordered_summary(row.summary) if summarized else None,
         notes={
             int(note_id): (count, matching.get(note_id, 0))
             for note_id, count in (row.notes or {}).items()

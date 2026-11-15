@@ -1006,3 +1006,24 @@ def test_a_transition_value_must_be_json_and_needs_a_path(procs):
         alone = client.get("/api/v1/changes?transition_new=20")
 
     assert bad.status_code == 422 and alone.status_code == 422
+
+
+def test_later_pages_of_a_comparison_are_classified_like_the_first(history):
+    """The first request for a pair of builds classifies the whole comparison
+    and keeps its summary; later ones classify only their page."""
+    for base, slug in (("one", "three"), ("four", "fork"), ("three", "one")):
+        fresh = compare(history, slug, base, sort="aoid", include_diff="true")
+        with history.client(slug) as client:
+            client.get(f"/api/v1/compare/{base}")
+            later = client.get(
+                f"/api/v1/compare/{base}?sort=aoid&include_diff=true"
+            ).json()
+            filtered = client.get(
+                f"/api/v1/compare/{base}?sort=aoid&kind=changed&part=stats"
+            ).json()
+
+        assert later == fresh
+        assert filtered["summary"] == fresh["summary"]
+        assert aoids(filtered) == [
+            row["aoid"] for row in fresh["items"] if "stats" in row["parts"]
+        ]
