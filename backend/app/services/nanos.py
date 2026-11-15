@@ -134,8 +134,13 @@ def _text_matches(q: str) -> ColumnElement:
     """The nano's name or description contains ``q``.
 
     The condition is tied to the revision so the pattern is tried on the texts
-    of the build's nanos only: as a plain condition on ``part_text`` it is run
-    over the text of every item of every build before the join.
+    of the build's nanos only. That keeps it off the trigram indexes of
+    ``part_text``, on purpose: a plain condition, which could use them, is
+    answered two to four times faster for a rare term and a term nothing
+    matches, but for a common one ("nano", "the") or one too short for a
+    trigram it is run over the text of every item of every build before the
+    join, two to five times slower than this. Nothing in the term tells the
+    two apart.
     """
     term = f"%{q}%"
     matches = or_(_text.c.name.ilike(term), _text.c.description.ilike(term))

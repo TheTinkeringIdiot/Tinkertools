@@ -140,6 +140,14 @@ Pitfalls
   pattern above all) invites it to walk an index in sort order and hope to
   stop early. Use ``fetch_search_page``, and measure a rare term, a common
   one and one that matches nothing.
+* Substring search. ``column ILIKE '%term%'`` on the name or the description
+  of ``part_text`` is answered from a trigram index when the term is
+  selective, in about a millisecond. Keep the column bare: ``lower(column)``,
+  a concatenation or a CASE around the condition leaves the index unused. A
+  common term, or one without three letters or digits in a row, still reads
+  every text of every build (100 to 500 ms), so measure those two as well.
+  ``app/services/nanos.py`` wraps its match in a CASE on purpose; its
+  docstring has the numbers.
 * A fresh connection pays about 2 ms of planning on the first wide query;
   measure warm.
 * Raw ``text()`` SQL bypasses the schema mapping that lets tests read a

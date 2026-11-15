@@ -7,9 +7,14 @@ items and asks the API which of them a request finds, and in what order.
 """
 
 import os
+import re
 
 import pytest
+from sqlalchemy import select
 
+from app.api.services.item_search import SEARCHABLE_FIELDS, substring_match
+from app.store import tables as t
+from app.store.presence import revisions
 from app.tests.fixtures.store_fixtures import criterion, item, modify, nano
 
 pytestmark = pytest.mark.skipif(
@@ -425,6 +430,114 @@ def test_exact_search_finds_a_substring_of_name_or_description(store):
         assert searched(client, "sword", search_fields="effects") == [1]
         assert searched(client, "sword", search_fields="colour") == [2, 1]
         assert searched(client, "zzz") == []
+
+
+def test_a_substring_match_can_be_answered_from_the_trigram_indexes(store):
+    store.add_build("b1", 1, items=[described(1, "Swordfish", "A fish.")])
+
+    def indexes_read(fields):
+        texts = select(t.part_text.c.text_id).where(substring_match(fields, "sword"))
+        with store.bitmap_scans_only():
+            return set(re.findall(r"part_text_\w+", store.plan(texts)))
+
+    assert indexes_read(["name"]) == {"part_text_name_trgm"}
+    assert indexes_read(["description"]) == {"part_text_desc_trgm"}
+    assert indexes_read(["name", "description"]) == {
+        "part_text_name_trgm",
+        "part_text_desc_trgm",
+    }
+
+
+def test_a_search_finds_the_same_rows_in_the_same_order_through_the_indexes(store):
+    build = store.add_build(
+        "b1",
+        1,
+        items=[
+            described(1, "Swordfish", "A fish.", ql=10, stats=[(298, 4)]),
+            described(2, "Knife", "Shorter than a SWORD.", ql=50),
+            weapon(3, name="Great Sword", ql=90, stats=[(298, 4)]),
+            described(4, "Axe", "Heavy. Of no use to a fish.", ql=90),
+            described(5, "Old Sword", "", SpellData=effects(modify(124, 20))),
+            described(6, "Tiny sword", "100% silk_"),
+            described(7, "Io", "Made of swords."),
+        ],
+        nanos=[
+            item(20, name="Nano Sword", stats=[(405, 1), (75, 5)]),
+            described(21, "Calm", "Sheathes every sword.", stats=[(405, 1), (75, 6)]),
+            item(22, name="Io", stats=[(405, 1), (75, 5)]),
+        ],
+    )
+    items, nanos = "/items/search", "/nanos/search"
+    requests = {
+        "name or description": (items, dict(q="sword")),
+        "every text": (items, dict(q="o")),
+        "common": (items, dict(q="fish")),
+        "rare": (items, dict(q="silk")),
+        "two characters": (items, dict(q="io")),
+        "two words": (items, dict(q="great sword")),
+        "nothing": (items, dict(q="zzyzx")),
+        "wildcards": (items, dict(q="100%_s")),
+        "name": (items, dict(q="SWORD", search_fields="name")),
+        "description": (items, dict(q="Sword", search_fields="description")),
+        "second page": (items, dict(q="sword", page=2, page_size=3)),
+        "slot": (items, dict(q="sword", slot=2)),
+        "quality": (items, dict(q="sword", min_ql=50, max_ql=90)),
+        "weapons": (items, dict(q="sword", weapons="true")),
+        "stat filter": (items, dict(q="sword", stat_filters="modifies:124:>=:20")),
+        "nanos": (nanos, dict(q="sword")),
+        "nanos, two characters": (nanos, dict(q="io")),
+        "nanos of a strain": (nanos, dict(q="sword", strain=5)),
+        "nanos descending": (nanos, dict(q="sword", sort_desc="true")),
+    }
+
+    search = (
+        revisions(build)
+        .join(t.part_text, t.part_text.c.text_id == t.item_revision.c.text_id)
+        .where(substring_match(SEARCHABLE_FIELDS, "sword"))
+    )
+
+    with store.client("b1") as client:
+
+        def answers():
+            answered = {
+                name: found(client, path, **params)
+                for name, (path, params) in requests.items()
+            }
+            strains = client.get("/api/v1/nanos/strains", params={"q": "sword"})
+            return answered, strains.json()
+
+        by_reading_every_text = answers()
+        plan_reading_every_text = store.plan(search)
+        with store.bitmap_scans_only():
+            through_the_indexes = answers()
+            plan_through_the_indexes = store.plan(search)
+
+    assert "_trgm" not in plan_reading_every_text
+    assert "part_text_name_trgm" in plan_through_the_indexes
+    assert "part_text_desc_trgm" in plan_through_the_indexes
+    assert through_the_indexes == by_reading_every_text
+    assert by_reading_every_text[0] == {
+        "name or description": [21, 3, 7, 2, 20, 5, 1, 6],
+        "every text": [4, 21, 3, 7, 22, 2, 20, 5, 1, 6],
+        "common": [4, 1],
+        "rare": [6],
+        "two characters": [7, 22],
+        "two words": [3],
+        "nothing": [],
+        "wildcards": [6],
+        "name": [3, 20, 5, 1, 6],
+        "description": [21, 7, 2],
+        "second page": [2, 20, 5],
+        "slot": [3, 1],
+        "quality": [3, 2],
+        "weapons": [3],
+        "stat filter": [5],
+        "nanos": [21, 20],
+        "nanos, two characters": [22],
+        "nanos of a strain": [20],
+        "nanos descending": [20, 21],
+    }
+    assert [row["id"] for row in by_reading_every_text[1]["strains"]] == [5, 6]
 
 
 def test_exact_search_is_sorted_by_name_then_aoid(store):

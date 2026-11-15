@@ -34,7 +34,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Connection
+from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.expression import ClauseElement, Executable, Select
 
 from app.core import cas_store
 from app.core.cache import cache_service
@@ -65,6 +67,18 @@ ALL_FEATURES = {
     "sources": True,
     "symbiants": True,
 }
+
+
+class _Explain(Executable, ClauseElement):
+    inherit_cache = False
+
+    def __init__(self, statement: Select):
+        self.statement = statement
+
+
+@compiles(_Explain)
+def _compile_explain(element, compiler, **kw):
+    return "EXPLAIN (COSTS OFF) " + compiler.process(element.statement, **kw)
 
 
 class ThrowawayStore:
@@ -135,6 +149,31 @@ class ThrowawayStore:
             app.dependency_overrides.pop(get_store, None)
             app.dependency_overrides.pop(get_build, None)
             cache_service.clear()
+
+    @contextmanager
+    def bitmap_scans_only(self) -> Iterator[None]:
+        """Has the planner read each table on its own through index
+        conditions while the block runs, as it reads a full-size table for a
+        selective condition. A handful of rows is otherwise read whole, or
+        looked up by key from the row it is joined to, whatever indexes the
+        table has."""
+        settings = (
+            "enable_seqscan",
+            "enable_indexscan",
+            "enable_indexonlyscan",
+            "enable_nestloop",
+        )
+        for setting in settings:
+            self._raw.execute(f"SET LOCAL {setting} = off")
+        try:
+            yield
+        finally:
+            for setting in settings:
+                self._raw.execute(f"SET LOCAL {setting} = on")
+
+    def plan(self, statement: Select) -> str:
+        """The plan PostgreSQL makes for ``statement`` on this store."""
+        return "\n".join(self.db.execute(_Explain(statement)).scalars())
 
     @contextmanager
     def counting_queries(self) -> Iterator[List[str]]:

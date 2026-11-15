@@ -267,7 +267,13 @@ def _text_columns(fields: Sequence[str]) -> List[ColumnElement]:
 
 def substring_match(fields: Sequence[str], q: str) -> ColumnElement:
     """``q`` occurs in one of ``fields`` of ``part_text``, whatever the case.
-    Only the name is read when ``fields`` names neither text column."""
+    Only the name is read when ``fields`` names neither text column.
+
+    Each column is matched bare, ``column ILIKE pattern``, which is what the
+    trigram indexes of ``part_text`` answer (``cas_store.TRIGRAM_INDEXES``): a
+    function around the column, or the two columns concatenated, would leave
+    them unused. A term without three letters or digits in a row has no
+    trigram and is still matched by reading every text."""
     pattern = f"%{q}%"
     columns = _text_columns(fields) or [t.part_text.c.name]
     return or_(*(column.ilike(pattern) for column in columns))

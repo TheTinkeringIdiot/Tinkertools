@@ -161,7 +161,7 @@ Narrow tables derived from parts at import, keyed by part hash, so searches run 
 
 Also:
 
-- Text search (substring and full-text with rank) runs on the `text` part: about 129,000 rows instead of 265,000.
+- Text search (substring and full-text with rank) runs on the `text` part: about 129,000 rows instead of 265,000. Substring search has a trigram index (`pg_trgm`) on the name and one on the description; a selective term is answered from them in about a millisecond, a common or very short one still reads every text.
 - Interpolation groups QL variants by exact name + description, which becomes a lookup on `text_hash`.
 - `nano_properties` (school, professions, min level, strain) stays as a projection and gains "caster professions", replacing the ordered-criteria predicate in the nano profession lists.
 - `symbiant_items` stays as a derived table.
@@ -200,7 +200,7 @@ Unrelated to the redesign; listed so they are not lost. None has been reproduced
 - `/items/with-stats` with `logic=or` collects every matching ID in Python, and its declared response type does not match what it returns.
 - `/perks`, `/perks/search` and `/perks/stats` load everything and sort, paginate or count in Python; perk effect extraction issues a query per spell block.
 - `/nanos/profession/{id}/fast` disagrees with `/nanos/profession/{id}` (no NOT-operator exclusion, no sort tiebreak).
-- `/items/search` accepts `search_fields=effects,stats` and ignores them; the default substring search has no trigram index.
+- `/items/search` accepts `search_fields=effects,stats` and ignores them; the default substring search has no trigram index (the new store has them: §4).
 - Interpolated items drop spell criteria, attack/defense and sources.
 
 ## 7. Phasing
