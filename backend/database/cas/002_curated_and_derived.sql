@@ -51,9 +51,8 @@ CREATE TABLE nano_overlay (
 -- that is in the store, at every commit: the importer moves it from the
 -- previous newest build in the transaction that stores a newer one.
 --
--- The exact rule, which reproduces backend/update_nanos.py. For a nano
--- revision with an overlay row, "own" being the revision's own stat 75 and
--- "usable" meaning not absent, not 0 and not 99999:
+-- The exact rule. For a nano revision with an overlay row, "own" being the
+-- revision's own stat 75 and "usable" meaning not absent, not 0 and not 99999:
 --   1. If the build is not overlay_strain_first, own is usable and own differs
 --      from the overlay strain: keep own strain AND own substrain untouched.
 --      Substrain always follows the strain decision; it is never filled in on
