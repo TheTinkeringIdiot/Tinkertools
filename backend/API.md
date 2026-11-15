@@ -554,7 +554,7 @@ The change list of the request's build: every item added, removed or changed rel
     "total": 8650,
     "by_kind": {"added": 968, "removed": 0, "changed": 7682},
     "by_part": {"text": 5211, "stats": 6220, "effects": 3070, "actions": 2525, "atkdef": 78, "misc": 3540},
-    "by_relevance": {"gameplay": 7237, "economy": 1046, "cosmetic": 5844, "text": 5211},
+    "by_relevance": {"gameplay": 6425, "economy": 244, "cosmetic": 5857, "text": 5211},
     "noted": 869
   },
   "notes": [
