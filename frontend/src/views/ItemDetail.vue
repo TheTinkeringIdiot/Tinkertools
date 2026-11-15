@@ -13,7 +13,7 @@ Shows all item data with profile compatibility and comparison options
           outlined
           @click="goBack"
         />
-        <h1 class="text-2xl font-bold">{{ item?.name || 'Loading Item...' }}</h1>
+        <h1 class="text-2xl font-bold" data-testid="item-heading">{{ headingText }}</h1>
         <Badge v-if="displayedItem && currentQl" :value="`QL ${currentQl}`" severity="info" />
         <Badge v-if="item?.is_nano" value="Nano" severity="success" />
 
@@ -399,7 +399,7 @@ import { apiClient } from '@/services/api-client';
 import { isRequestCancelled } from '@/services/error-message';
 import { useGameVersion } from '@/composables/useGameVersion';
 import { useChangesStore } from '@/stores/changes';
-import { buildLabel, sameBuild } from '@/utils/version-order';
+import { buildLabel, registryPosition, sameBuild } from '@/utils/version-order';
 import type { BuildRef, ItemTimelineResponse } from '@/types/changes';
 
 const route = useRoute();
@@ -506,12 +506,43 @@ const lastPresentBuild = computed<BuildRef | null>(() => {
   return newest.build;
 });
 
+/**
+ * Why the browsing version does not have the item, from the step of its
+ * history in effect there: removed before it (and perhaps back later), or
+ * not yet added.
+ */
 const missingExplanation = computed(() => {
-  const newest = timelineEntries.value[0];
-  if (!newest) return '';
+  const entries = timelineEntries.value;
+  if (entries.length === 0) return '';
+  const viewed = registryPosition(currentVersion.value);
+  // Entries are newest first: the first one not newer than the browsed build.
+  const index =
+    viewed === Number.MAX_SAFE_INTEGER
+      ? -1
+      : entries.findIndex((entry) => registryPosition(entry.build.slug) >= viewed);
+  const step = index === -1 ? null : entries[index];
+  if (step?.kind === 'removed') {
+    const returned = entries
+      .slice(0, index)
+      .reverse()
+      .find((entry) => entry.kind === 'added');
+    const removed = `Removed in ${step.build.display_name}`;
+    return returned ? `${removed}, returned in ${returned.build.display_name}` : removed;
+  }
+  if (index === -1 && viewed !== Number.MAX_SAFE_INTEGER) {
+    const oldest = entries[entries.length - 1];
+    return `First appears in ${oldest.build.display_name}`;
+  }
+  const newest = entries[0];
   if (newest.kind === 'removed') return `Removed in ${newest.build.display_name}`;
-  const oldest = timelineEntries.value[timelineEntries.value.length - 1];
-  return `First appears in ${oldest.build.display_name}`;
+  return `First appears in ${entries[entries.length - 1].build.display_name}`;
+});
+
+/** The item's name; for an item this version does not have, the name its history gives it. */
+const headingText = computed(() => {
+  if (item.value?.name) return item.value.name;
+  if (loading.value) return 'Loading Item...';
+  return timelineEntries.value[0]?.name || `Item ${itemAoid.value}`;
 });
 
 // Computed

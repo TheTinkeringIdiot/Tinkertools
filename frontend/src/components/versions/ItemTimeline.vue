@@ -55,7 +55,7 @@ item as that build defines it.
           </button>
           <span v-else class="item-timeline-toggle" aria-hidden="true"></span>
 
-          <div class="min-w-0 flex-1">
+          <div class="item-timeline-main">
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span class="font-medium text-surface-900 dark:text-surface-50">
                 {{ entry.build.display_name }}
@@ -208,6 +208,11 @@ function describe(entry: TimelineEntry, index: number): string {
 
 .item-timeline-row {
   @apply flex flex-wrap items-start gap-2;
+}
+
+/* Wide enough to read; on a narrow screen the peek link wraps under it instead of squeezing it. */
+.item-timeline-main {
+  @apply min-w-0 flex-1 basis-56;
 }
 
 .item-timeline-toggle {
