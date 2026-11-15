@@ -189,15 +189,7 @@ import {
 } from '@/services/game-data';
 import { KIND_LABELS, PART_LABELS, RELEVANCE_LABELS } from '@/services/diff-format';
 import { activeFilterCount, type ChangeFilters } from '@/services/change-filters';
-import {
-  CHANGE_KINDS,
-  PART_NAMES,
-  RELEVANCE_NAMES,
-  type ChangeKind,
-  type ChangeSummary,
-  type PartName,
-  type RelevanceName,
-} from '@/types/changes';
+import { CHANGE_KINDS, PART_NAMES, RELEVANCE_NAMES, type ChangeSummary } from '@/types/changes';
 
 const SEARCH_DELAY_MS = 300;
 
@@ -242,11 +234,8 @@ const slotOptions = computed<Option[]>(() => {
 
 type ListField = 'kind' | 'part' | 'relevance';
 
-function toggleIn(field: 'kind', name: ChangeKind): void;
-function toggleIn(field: 'part', name: PartName): void;
-function toggleIn(field: 'relevance', name: RelevanceName): void;
-function toggleIn(field: ListField, name: string): void {
-  const current = props.filters[field] as string[];
+function toggleIn<F extends ListField>(field: F, name: ChangeFilters[F][number]): void {
+  const current: readonly string[] = props.filters[field];
   const next = current.includes(name)
     ? current.filter((value) => value !== name)
     : [...current, name];

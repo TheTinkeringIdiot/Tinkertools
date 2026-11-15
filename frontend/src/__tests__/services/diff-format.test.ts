@@ -16,8 +16,13 @@ import {
   isCosmeticMisc,
   isCosmeticStat,
   isEmptyDiff,
+  isStructuralTransition,
+  miscValueText,
+  cosmeticEffectCount,
   transitionCount,
+  transitionFromPath,
   transitionText,
+  withoutCosmeticEffects,
 } from '@/services/diff-format';
 import type { DiffEffect, SharedTransition } from '@/types/changes';
 import { CRITTER_DIFF, TRANSITIONS_1460, emptyDiff } from '../helpers/change-fixtures';
@@ -176,13 +181,45 @@ describe('cosmetic entries', () => {
   });
 
   it('follows the relevance the API gives an entry when it gives one', () => {
-    const stat = { stat: 79, change: 'changed' as const, old: 1, new: 2, bits_set: null, bits_cleared: null };
+    const stat = {
+      stat: 79,
+      change: 'changed' as const,
+      old: 1,
+      new: 2,
+      bits_set: null,
+      bits_cleared: null,
+    };
     expect(isCosmeticStat(stat)).toBe(false);
     expect(isCosmeticStat({ ...stat, relevance: 'cosmetic' })).toBe(true);
     expect(isCosmeticMisc({ field: 'shop', old: 1, new: 2, relevance: 'cosmetic' })).toBe(true);
     expect(isCosmeticMisc({ field: 'animation_mesh', old: 1, new: 2, relevance: 'gameplay' })).toBe(
       false
     );
+  });
+
+  it('folds single cosmetic effects out of an event that also changed for real', () => {
+    const real = CRITTER_DIFF.effects[0];
+    const sound = { ...real.changed[0].new, spell_id: 53030, relevance: 'cosmetic' as const };
+    const mixed = { ...real, added: [sound] };
+
+    expect(isCosmeticEvent(mixed)).toBe(false);
+    expect(cosmeticEffectCount(mixed)).toBe(1);
+    expect(withoutCosmeticEffects(mixed).added).toEqual([]);
+    expect(withoutCosmeticEffects(mixed).changed).toEqual(real.changed);
+
+    const onlySound = { ...real, changed: [], added: [sound] };
+    expect(isCosmeticEvent(onlySound)).toBe(true);
+    expect(cosmeticEffectCount(onlySound)).toBe(0);
+    expect(isCosmeticEvent({ ...real, relevance: 'cosmetic' })).toBe(true);
+  });
+
+  it('words the values of the misc part', () => {
+    expect(miscValueText([10090])).toBe('10090');
+    expect(miscValueText({ mesh: [12, 0], animation: [13, 0] })).toBe(
+      'mesh 12, 0; animation 13, 0'
+    );
+    expect(miscValueText(null)).toBe('none');
+    expect(miscValueText([])).toBe('none');
   });
 
   it('knows a diff without entries', () => {
@@ -231,7 +268,13 @@ describe('transitionText', () => {
     ).toBe('Effect removed: Lock skill SensoryImprovement for …s');
     expect(
       transitionText(
-        transition({ part: 'effects', path: 'effect:53089', spell_id: 53089, old: 'none', new: null })
+        transition({
+          part: 'effects',
+          path: 'effect:53089',
+          spell_id: 53089,
+          old: 'none',
+          new: null,
+        })
       )
     ).toBe('Effect removed: …% chance to cast …');
   });
@@ -272,6 +315,31 @@ describe('transitionText', () => {
     expect(transitionText(transition({ part: 'misc', path: 'static_instance' }))).toBe(
       'Client instance id changed'
     );
+  });
+
+  it('rebuilds a transition from its path, as a shared link carries it', () => {
+    for (const listed of TRANSITIONS_1460.transitions) {
+      const rebuilt = transitionFromPath(listed.path, listed.old, listed.new);
+      expect({ ...rebuilt, items: listed.items, occurrences: listed.occurrences }).toEqual(listed);
+      expect(transitionText(rebuilt)).toBe(transitionText(listed));
+    }
+    expect(transitionFromPath('effect:53045:criterion', null, [54, 100, 2])).toMatchObject({
+      part: 'effects',
+      spell_id: 53045,
+      field: null,
+    });
+    expect(transitionFromPath('defense:152', 10, 20)).toMatchObject({ part: 'atkdef', stat: 152 });
+    expect(transitionFromPath('animation_mesh', null, null).part).toBe('misc');
+    expect(transitionFromPath('event:14', null, 'added')).toMatchObject({
+      part: 'effects',
+      spell_id: null,
+    });
+  });
+
+  it('knows the transitions that only move an AND or OR', () => {
+    expect(isStructuralTransition(byPath('action:8:criterion'))).toBe(true);
+    expect(isStructuralTransition(byPath('action:3:criterion'))).toBe(false);
+    expect(isStructuralTransition(byPath('stat:287'))).toBe(false);
   });
 
   it('counts items, and occurrences when an item has the change more than once', () => {

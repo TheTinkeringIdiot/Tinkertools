@@ -9,6 +9,7 @@ import {
   changeFiltersToRequest,
   defaultChangeFilters,
   parseChangeFilters,
+  transitionFilterValues,
 } from '@/services/change-filters';
 
 describe('change filters in the URL', () => {
@@ -46,6 +47,7 @@ describe('change filters in the URL', () => {
       pageSize: 100,
       expandNotes: true,
       showDiffs: true,
+      transition: null,
     };
     const query = changeFiltersToQuery(filters);
     expect(query).toEqual({
@@ -102,6 +104,47 @@ describe('change filters in the URL', () => {
     });
   });
 
+  it('carries one patch note as a filter: its path and both values', () => {
+    const filters = {
+      ...defaultChangeFilters(),
+      relevance: [],
+      transition: { path: 'effect:53089:spell_params.Chance', old: '60', new: '100' },
+    };
+    const query = changeFiltersToQuery(filters);
+    expect(query).toEqual({
+      relevance: 'all',
+      t: 'effect:53089:spell_params.Chance',
+      tfrom: '60',
+      tto: '100',
+    });
+    expect(parseChangeFilters(query as Record<string, string>)).toEqual(filters);
+    // Its items include those a build note explains.
+    expect(changeFiltersToRequest(filters)).toEqual({
+      page: 1,
+      page_size: 50,
+      sort: 'name',
+      transition: 'effect:53089:spell_params.Chance',
+      transition_old: '60',
+      transition_new: '100',
+      notes: 'expand',
+    });
+  });
+
+  it('tells an absent value (JSON null) from any value (left out)', () => {
+    const added = parseChangeFilters({ t: 'stat:287', tfrom: 'null', tto: '20' });
+    expect(added.transition).toEqual({ path: 'stat:287', old: 'null', new: '20' });
+    expect(transitionFilterValues(added.transition!)).toEqual({ old: null, new: 20 });
+    expect(changeFiltersToRequest(added)).toMatchObject({
+      transition_old: 'null',
+      transition_new: '20',
+    });
+
+    const any = parseChangeFilters({ t: 'stat:287', tfrom: 'not json' });
+    expect(any.transition).toEqual({ path: 'stat:287', old: null, new: null });
+    expect(changeFiltersToRequest(any).transition_old).toBeUndefined();
+    expect(transitionFilterValues(any.transition!)).toEqual({ old: undefined, new: undefined });
+  });
+
   it('writes "every change" as relevance=all', () => {
     const everything = { ...defaultChangeFilters(), relevance: [] };
     expect(changeFiltersToQuery(everything)).toEqual({ relevance: 'all' });
@@ -145,5 +188,11 @@ describe('change filters in the URL', () => {
       activeFilterCount({ ...defaultChangeFilters(), kind: ['added'], search: 'x', relevance: [] })
     ).toBe(3);
     expect(activeFilterCount({ ...defaultChangeFilters(), sort: 'ql', page: 4 })).toBe(0);
+    expect(
+      activeFilterCount({
+        ...defaultChangeFilters(),
+        transition: { path: 'stat:2', old: null, new: null },
+      })
+    ).toBe(1);
   });
 });

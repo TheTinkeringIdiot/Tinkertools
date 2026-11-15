@@ -10,8 +10,6 @@ import type { GameVersionFamily } from './game-version';
 export type ChangeKind = 'added' | 'removed' | 'changed';
 export type PartName = 'text' | 'stats' | 'effects' | 'actions' | 'atkdef' | 'misc';
 export type RelevanceName = 'gameplay' | 'economy' | 'cosmetic' | 'text';
-/** Relevance of a single field of a diff (text is a part of its own). */
-export type FieldRelevance = 'gameplay' | 'economy' | 'cosmetic';
 
 export const CHANGE_KINDS: readonly ChangeKind[] = ['added', 'removed', 'changed'];
 export const PART_NAMES: readonly PartName[] = [
@@ -22,7 +20,12 @@ export const PART_NAMES: readonly PartName[] = [
   'atkdef',
   'misc',
 ];
-export const RELEVANCE_NAMES: readonly RelevanceName[] = ['gameplay', 'economy', 'cosmetic', 'text'];
+export const RELEVANCE_NAMES: readonly RelevanceName[] = [
+  'gameplay',
+  'economy',
+  'cosmetic',
+  'text',
+];
 
 export interface BuildRef {
   slug: string;
@@ -51,7 +54,8 @@ export interface FieldChange {
   field: string;
   old: unknown;
   new: unknown;
-  relevance?: FieldRelevance | null;
+  /** Text and misc entries: what the entry adds to the relevance of the change. */
+  relevance?: RelevanceName | null;
 }
 
 export interface StatChange {
@@ -62,7 +66,8 @@ export interface StatChange {
   /** Flag stats only: flag values (1, 2, 4, ...) set now and not before. */
   bits_set: number[] | null;
   bits_cleared: number[] | null;
-  relevance?: FieldRelevance | null;
+  /** What the entry adds to the relevance of the change. */
+  relevance?: RelevanceName | null;
 }
 
 export interface CriterionChange {
@@ -74,6 +79,7 @@ export interface CriterionChange {
 export interface ActionChange {
   action: number;
   change: ChangeKind;
+  relevance?: RelevanceName | null;
   /** The whole criteria sequence, old and new merged in order. */
   criteria: CriterionChange[];
 }
@@ -87,12 +93,14 @@ export interface DiffEffect {
   spell_format: string | null;
   spell_params: Record<string, unknown>;
   criteria: DiffCriterion[];
-  relevance?: FieldRelevance | null;
+  /** Added and removed effects only; a changed effect carries it on the pair. */
+  relevance?: RelevanceName | null;
 }
 
 export interface EffectChange {
   old: DiffEffect;
   new: DiffEffect;
+  relevance?: RelevanceName | null;
   fields: FieldChange[];
   /** Sequence diff of the criteria; null when they are equal. */
   criteria: CriterionChange[] | null;
@@ -102,6 +110,8 @@ export interface EventChange {
   event: number;
   change: ChangeKind | 'renumbered';
   old_event: number | null;
+  /** 'cosmetic' when the effects differ in nothing but the events they hang on. */
+  relevance?: RelevanceName | null;
   added: DiffEffect[];
   removed: DiffEffect[];
   changed: EffectChange[];
@@ -193,6 +203,14 @@ export interface ChangeListQuery {
   notes?: 'collapse' | 'expand';
   note_id?: number;
   include_diff?: boolean;
+  /**
+   * /changes only: the items of one line of /changes/transitions, by its
+   * path. `transition_old` and `transition_new` are the line's values as JSON
+   * text ("60", "null", "[129,30,2]"); left out, any value matches.
+   */
+  transition?: string;
+  transition_old?: string;
+  transition_new?: string;
 }
 
 // ---------------------------------------------------------------------------

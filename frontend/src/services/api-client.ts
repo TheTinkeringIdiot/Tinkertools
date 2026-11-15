@@ -158,6 +158,11 @@ function changeListParams(query: ChangeListQuery): URLSearchParams {
   if (query.notes) params.append('notes', query.notes);
   if (query.note_id !== undefined) params.append('note_id', String(query.note_id));
   if (query.include_diff) params.append('include_diff', 'true');
+  if (query.transition) {
+    params.append('transition', query.transition);
+    if (query.transition_old !== undefined) params.append('transition_old', query.transition_old);
+    if (query.transition_new !== undefined) params.append('transition_new', query.transition_new);
+  }
   return params;
 }
 

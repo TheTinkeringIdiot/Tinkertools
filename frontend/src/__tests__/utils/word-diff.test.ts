@@ -21,14 +21,14 @@ function newText(segments: WordDiffSegment[]): string {
 
 describe('diffWords', () => {
   it('marks only the word that changed', () => {
-    expect(diffWords('locks Sensory Impr for 30 minutes', 'locks Psycho Modi for 30 minutes')).toEqual(
-      [
-        { op: 'same', text: 'locks ' },
-        { op: 'removed', text: 'Sensory Impr' },
-        { op: 'added', text: 'Psycho Modi' },
-        { op: 'same', text: ' for 30 minutes' },
-      ]
-    );
+    expect(
+      diffWords('locks Sensory Impr for 30 minutes', 'locks Psycho Modi for 30 minutes')
+    ).toEqual([
+      { op: 'same', text: 'locks ' },
+      { op: 'removed', text: 'Sensory Impr' },
+      { op: 'added', text: 'Psycho Modi' },
+      { op: 'same', text: ' for 30 minutes' },
+    ]);
   });
 
   it('reports words inserted in the middle as one addition', () => {

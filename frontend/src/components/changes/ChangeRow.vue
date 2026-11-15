@@ -46,7 +46,11 @@ asked for diffs; otherwise it is fetched when the row is first opened.
           </span>
           <ChangeBadges :kind="change.kind" :parts="change.parts" :relevance="change.relevance" />
         </div>
-        <p v-if="change.old_name !== null" class="change-row-meta" data-testid="change-row-old-name">
+        <p
+          v-if="change.old_name !== null"
+          class="change-row-meta"
+          data-testid="change-row-old-name"
+        >
           Was named "{{ change.old_name || '(no name)' }}"
         </p>
       </div>

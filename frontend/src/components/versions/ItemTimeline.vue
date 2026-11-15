@@ -177,7 +177,9 @@ function describe(entry: TimelineEntry, index: number): string {
   if (entry.kind === 'added') {
     const returned = entries.value.slice(index + 1).some((older) => older.kind === 'removed');
     if (returned) return `Returned to the game data${against}`;
-    return entry.base ? `First appears in this build${against}` : 'Present in the oldest build on record';
+    return entry.base
+      ? `First appears in this build${against}`
+      : 'Present in the oldest build on record';
   }
   return `Changed${against}`;
 }

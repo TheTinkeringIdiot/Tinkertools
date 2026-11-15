@@ -30,6 +30,7 @@ import type {
   ChangeKind,
   DiffCriterion,
   DiffEffect,
+  EffectChange,
   EventChange,
   FieldChange,
   ItemDiff,
@@ -291,7 +292,9 @@ export function effectFieldValue(field: string, value: unknown): string {
   if (value === null || value === undefined) return 'none';
   if (field === 'target' && typeof value === 'number') return getTargetName(value);
   if (field === 'tick_interval' && typeof value === 'number') return tickSeconds(value);
-  const name = (field.startsWith(PARAM_PREFIX) ? field.slice(PARAM_PREFIX.length) : field).toLowerCase();
+  const name = (
+    field.startsWith(PARAM_PREFIX) ? field.slice(PARAM_PREFIX.length) : field
+  ).toLowerCase();
   if (typeof value === 'number') {
     if (name.includes('chance')) return `${value}%`;
     if (name === 'stat' || name === 'skill') return statLabel(value);
@@ -339,8 +342,12 @@ export function fieldLabel(field: string): string {
 
 export function miscValueText(value: unknown): string {
   if (value === null || value === undefined) return 'none';
-  if (Array.isArray(value)) return value.length ? value.join(', ') : 'none';
-  if (typeof value === 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return value.length ? value.map(miscValueText).join(', ') : 'none';
+  if (typeof value === 'object') {
+    const entries = Object.entries(value);
+    if (entries.length === 0) return 'none';
+    return entries.map(([key, entry]) => `${key} ${miscValueText(entry)}`).join('; ');
+  }
   return String(value);
 }
 
@@ -362,14 +369,32 @@ export function isCosmeticMisc(change: FieldChange): boolean {
   return change.field !== 'shop';
 }
 
+export function isCosmeticEffect(entry: DiffEffect | EffectChange): boolean {
+  return entry.relevance === 'cosmetic';
+}
+
+/** An event that only moved, or whose every effect entry is cosmetic. */
 export function isCosmeticEvent(event: EventChange): boolean {
-  if (event.change === 'renumbered') return true;
-  const effects = [
-    ...event.added,
-    ...event.removed,
-    ...event.changed.map((pair) => pair.new),
-  ];
-  return effects.length > 0 && effects.every((effect) => effect.relevance === 'cosmetic');
+  if (event.change === 'renumbered' || event.relevance === 'cosmetic') return true;
+  const entries = [...event.added, ...event.removed, ...event.changed];
+  return entries.length > 0 && entries.every(isCosmeticEffect);
+}
+
+/** How many effect entries of an event are cosmetic while the event itself is not. */
+export function cosmeticEffectCount(event: EventChange): number {
+  if (isCosmeticEvent(event)) return 0;
+  return [...event.added, ...event.removed, ...event.changed].filter(isCosmeticEffect).length;
+}
+
+/** The event without its cosmetic effect entries. */
+export function withoutCosmeticEffects(event: EventChange): EventChange {
+  if (cosmeticEffectCount(event) === 0) return event;
+  return {
+    ...event,
+    added: event.added.filter((effect) => !isCosmeticEffect(effect)),
+    removed: event.removed.filter((effect) => !isCosmeticEffect(effect)),
+    changed: event.changed.filter((pair) => !isCosmeticEffect(pair)),
+  };
 }
 
 export function isEmptyDiff(diff: ItemDiff | null | undefined): boolean {
@@ -494,6 +519,75 @@ export function transitionText(transition: SharedTransition): string {
   }
 
   return `${path}: ${arrow(scalarText(old), scalarText(next))}`;
+}
+
+const MISC_PATHS = new Set(['static_instance', 'animation_mesh', 'shop']);
+
+/**
+ * The transition a path and its two values stand for, as /changes/transitions
+ * would list it (without counts): what a link to "the items with this
+ * transition" carries.
+ */
+export function transitionFromPath(
+  path: string,
+  old: TransitionValue,
+  next: TransitionValue
+): SharedTransition {
+  const segments = path.split(':');
+  const head = segments[0];
+  const id = /^\d+$/.test(segments[1] ?? '') ? Number(segments[1]) : null;
+  const transition: SharedTransition = {
+    part: 'effects',
+    path,
+    old,
+    new: next,
+    items: 0,
+    occurrences: 0,
+    stat: null,
+    bit: null,
+    spell_id: null,
+    action: null,
+    field: null,
+  };
+  if (head === 'name' || head === 'description') {
+    transition.part = 'text';
+  } else if (MISC_PATHS.has(head)) {
+    transition.part = 'misc';
+  } else if (head === 'stat') {
+    transition.part = 'stats';
+    transition.stat = id;
+    if (segments[2] === 'bit' && /^\d+$/.test(segments[3] ?? ''))
+      transition.bit = Number(segments[3]);
+  } else if (head === 'attack' || head === 'defense') {
+    transition.part = 'atkdef';
+    transition.stat = id;
+  } else if (head === 'action') {
+    transition.part = 'actions';
+    transition.action = id;
+  } else if (head === 'effect') {
+    transition.spell_id = id;
+    const rest = segments.slice(2).join(':');
+    if (rest && rest !== 'criterion') transition.field = rest;
+  }
+  return transition;
+}
+
+const LOGICAL_OPERATORS = new Set([3, 4, 42]);
+
+function isLogicalTriple(value: TransitionValue): boolean {
+  return value === null || (isCriterionTriple(value) && LOGICAL_OPERATORS.has(value[2]));
+}
+
+/**
+ * A transition that only moves the AND / OR / NOT of a requirement list. It
+ * always comes with the requirement it joins, which is the line worth reading.
+ */
+export function isStructuralTransition(transition: SharedTransition): boolean {
+  return (
+    transition.path.endsWith(':criterion') &&
+    isLogicalTriple(transition.old) &&
+    isLogicalTriple(transition.new)
+  );
 }
 
 /** "on 760 items", with the occurrences when an item has the transition more than once. */

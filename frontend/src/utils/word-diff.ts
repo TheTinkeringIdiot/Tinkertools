@@ -117,7 +117,10 @@ function regroup(segments: WordDiffSegment[]): WordDiffSegment[] {
     } else {
       const next = segments[index + 1];
       const bridges =
-        /^\s+$/.test(segment.text) && (removed !== '' || added !== '') && !!next && next.op !== 'same';
+        /^\s+$/.test(segment.text) &&
+        (removed !== '' || added !== '') &&
+        !!next &&
+        next.op !== 'same';
       if (bridges) {
         removed += segment.text;
         added += segment.text;

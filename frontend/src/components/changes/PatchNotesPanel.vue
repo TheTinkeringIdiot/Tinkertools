@@ -1,8 +1,8 @@
 <!--
 PatchNotesPanel - the field transitions most changed items of a build share,
 in words: "… chance to cast …: Chance 60% → 100% on 760 items". Reads as the
-patch notes of the build. A line leads into the list narrowed to its part
-(the change list has no filter for a single transition).
+patch notes of the build. A line leads into the list of the items it was done
+to.
 -->
 <template>
   <section class="patch-notes" data-testid="patch-notes" aria-label="Patch notes">
@@ -21,7 +21,9 @@ patch notes of the build. A line leads into the list narrowed to its part
         ></i>
         <span class="text-base font-semibold">Patch notes</span>
       </button>
-      <span class="patch-notes-muted">The same change made to many items at once, most items first</span>
+      <span class="patch-notes-muted"
+        >The same change made to many items at once, most items first</span
+      >
     </header>
 
     <template v-if="open">
@@ -53,10 +55,10 @@ patch notes of the build. A line leads into the list narrowed to its part
               type="button"
               class="patch-notes-link"
               data-testid="patch-note-filter"
-              :title="`List the changes to ${PART_LABELS[transition.part].toLowerCase()}`"
-              @click="emit('filter-part', transition.part)"
+              title="List the items this was done to"
+              @click="emit('select', transition)"
             >
-              Show {{ PART_LABELS[transition.part].toLowerCase() }} changes
+              Show these items
             </button>
           </li>
         </ul>
@@ -77,7 +79,7 @@ patch notes of the build. A line leads into the list narrowed to its part
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useChangesStore } from '@/stores/changes';
-import { PART_LABELS, transitionCount, transitionText } from '@/services/diff-format';
+import { isStructuralTransition, transitionCount, transitionText } from '@/services/diff-format';
 import { isRequestCancelled } from '@/services/error-message';
 import type { PartName, SharedTransition } from '@/types/changes';
 
@@ -92,7 +94,7 @@ const props = defineProps<{
   version: string;
 }>();
 
-const emit = defineEmits<{ (event: 'filter-part', part: PartName): void }>();
+const emit = defineEmits<{ (event: 'select', transition: SharedTransition): void }>();
 
 const changesStore = useChangesStore();
 
@@ -115,7 +117,9 @@ async function load(): Promise<void> {
       { version: asked, query: { part: PARTS, limit: LIMIT } },
       CHANNEL
     );
-    if (props.version === asked) transitions.value = response.transitions;
+    if (props.version === asked) {
+      transitions.value = response.transitions.filter((entry) => !isStructuralTransition(entry));
+    }
   } catch (caught) {
     if (isRequestCancelled(caught) || props.version !== asked) return;
     transitions.value = [];

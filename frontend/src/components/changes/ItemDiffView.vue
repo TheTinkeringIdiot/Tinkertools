@@ -14,7 +14,12 @@ Cosmetic entries are folded behind one toggle.
     </p>
 
     <!-- Text -->
-    <section v-if="diff.text.length" class="item-diff-section" data-testid="diff-section" data-part="text">
+    <section
+      v-if="diff.text.length"
+      class="item-diff-section"
+      data-testid="diff-section"
+      data-part="text"
+    >
       <h4 class="item-diff-heading">Text</h4>
       <div
         v-for="change in diff.text"
@@ -38,7 +43,12 @@ Cosmetic entries are folded behind one toggle.
     </section>
 
     <!-- Stats -->
-    <section v-if="shownStats.length" class="item-diff-section" data-testid="diff-section" data-part="stats">
+    <section
+      v-if="shownStats.length"
+      class="item-diff-section"
+      data-testid="diff-section"
+      data-part="stats"
+    >
       <h4 class="item-diff-heading">Stats</h4>
       <div
         v-for="(change, index) in shownStats"
@@ -58,7 +68,9 @@ Cosmetic entries are folded behind one toggle.
               data-testid="diff-flag"
               data-op="added"
             >
-              <ins class="diff-new"><span aria-hidden="true">+ </span>{{ flag(change.stat, bit) }}</ins>
+              <ins class="diff-new"
+                ><span aria-hidden="true">+ </span>{{ flag(change.stat, bit) }}</ins
+              >
               <span class="sr-only"> set</span>
             </span>
             <span
@@ -68,14 +80,19 @@ Cosmetic entries are folded behind one toggle.
               data-testid="diff-flag"
               data-op="removed"
             >
-              <del class="diff-old"><span aria-hidden="true">− </span>{{ flag(change.stat, bit) }}</del>
+              <del class="diff-old"
+                ><span aria-hidden="true">− </span>{{ flag(change.stat, bit) }}</del
+              >
               <span class="sr-only"> cleared</span>
             </span>
-            <span v-if="!(change.bits_set?.length || change.bits_cleared?.length)" class="item-diff-muted">
+            <span
+              v-if="!(change.bits_set?.length || change.bits_cleared?.length)"
+              class="item-diff-muted"
+            >
               {{ change.change === 'removed' ? 'no longer present' : 'no flags set' }}
             </span>
           </template>
-          <StatValueChange v-else :change="change" />
+          <StatValueChange v-else :change="change" :show-delta="!isCosmeticStat(change)" />
           <span v-if="isCosmeticStat(change)" class="item-diff-tag">cosmetic</span>
         </div>
       </div>
@@ -107,7 +124,12 @@ Cosmetic entries are folded behind one toggle.
     </section>
 
     <!-- Requirements -->
-    <section v-if="diff.actions.length" class="item-diff-section" data-testid="diff-section" data-part="actions">
+    <section
+      v-if="diff.actions.length"
+      class="item-diff-section"
+      data-testid="diff-section"
+      data-part="actions"
+    >
       <h4 class="item-diff-heading">Requirements</h4>
       <div
         v-for="(action, index) in diff.actions"
@@ -128,7 +150,12 @@ Cosmetic entries are folded behind one toggle.
     </section>
 
     <!-- Effects -->
-    <section v-if="shownEvents.length" class="item-diff-section" data-testid="diff-section" data-part="effects">
+    <section
+      v-if="shownEvents.length"
+      class="item-diff-section"
+      data-testid="diff-section"
+      data-part="effects"
+    >
       <h4 class="item-diff-heading">Effects</h4>
       <div
         v-for="(event, index) in shownEvents"
@@ -163,6 +190,7 @@ Cosmetic entries are folded behind one toggle.
           >
             <DiffMark op="removed" />
             <del class="diff-old min-w-0"><EffectLine :effect="effect" /></del>
+            <span v-if="isCosmeticEffect(effect)" class="item-diff-tag">cosmetic</span>
           </div>
 
           <div
@@ -175,6 +203,7 @@ Cosmetic entries are folded behind one toggle.
             <DiffMark op="changed" />
             <div class="min-w-0">
               <EffectLine :effect="pair.new" />
+              <span v-if="isCosmeticEffect(pair)" class="item-diff-tag">cosmetic</span>
               <ul class="item-diff-fields">
                 <li
                   v-for="field in visibleFields(pair.fields)"
@@ -208,13 +237,19 @@ Cosmetic entries are folded behind one toggle.
           >
             <DiffMark op="added" />
             <ins class="diff-new min-w-0"><EffectLine :effect="effect" /></ins>
+            <span v-if="isCosmeticEffect(effect)" class="item-diff-tag">cosmetic</span>
           </div>
         </div>
       </div>
     </section>
 
     <!-- Other -->
-    <section v-if="shownMisc.length" class="item-diff-section" data-testid="diff-section" data-part="misc">
+    <section
+      v-if="shownMisc.length"
+      class="item-diff-section"
+      data-testid="diff-section"
+      data-part="misc"
+    >
       <h4 class="item-diff-heading">Other</h4>
       <div
         v-for="change in shownMisc"
@@ -270,6 +305,8 @@ import {
   fieldLabel,
   flagName,
   flagStatLabel,
+  cosmeticEffectCount,
+  isCosmeticEffect,
   isCosmeticEvent,
   isCosmeticMisc,
   isCosmeticStat,
@@ -277,6 +314,7 @@ import {
   isHiddenEffectField,
   miscValueText,
   statLabel,
+  withoutCosmeticEffects,
 } from '@/services/diff-format';
 import type { FieldChange, ItemDiff, StatChange } from '@/types/changes';
 
@@ -299,14 +337,20 @@ const cosmeticEvents = computed(() => props.diff.effects.filter(isCosmeticEvent)
 const cosmeticMisc = computed(() => props.diff.misc.filter(isCosmeticMisc));
 
 const cosmeticCount = computed(
-  () => cosmeticStats.value.length + cosmeticEvents.value.length + cosmeticMisc.value.length
+  () =>
+    cosmeticStats.value.length +
+    cosmeticEvents.value.length +
+    cosmeticMisc.value.length +
+    props.diff.effects.reduce((sum, event) => sum + cosmeticEffectCount(event), 0)
 );
 
 const shownStats = computed(() =>
   showCosmetic.value ? props.diff.stats : props.diff.stats.filter((c) => !isCosmeticStat(c))
 );
 const shownEvents = computed(() =>
-  showCosmetic.value ? props.diff.effects : props.diff.effects.filter((e) => !isCosmeticEvent(e))
+  showCosmetic.value
+    ? props.diff.effects
+    : props.diff.effects.filter((e) => !isCosmeticEvent(e)).map(withoutCosmeticEffects)
 );
 const shownMisc = computed(() =>
   showCosmetic.value ? props.diff.misc : props.diff.misc.filter((c) => !isCosmeticMisc(c))

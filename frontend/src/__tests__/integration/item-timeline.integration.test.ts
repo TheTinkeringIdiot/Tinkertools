@@ -168,9 +168,9 @@ describe('item page: timeline and comparison', () => {
         'Requirements',
         'Other',
       ]);
-      expect(
-        newest.findAll('[data-testid="change-relevance"]').map((chip) => chip.text())
-      ).toEqual(['Gameplay', 'Cosmetic']);
+      expect(newest.findAll('[data-testid="change-relevance"]').map((chip) => chip.text())).toEqual(
+        ['Gameplay', 'Cosmetic']
+      );
 
       const oldest = entries[1];
       expect(oldest.attributes('data-kind')).toBe('added');
@@ -243,6 +243,49 @@ describe('item page: timeline and comparison', () => {
       expect(misc.text()).toContain('Client instance id');
       expect(misc.text()).toContain('10090');
       expect(misc.text()).toContain('11099');
+    });
+
+    it('folds what the API marks cosmetic: an icon swap among real changes', async () => {
+      const step = CRITTER_TIMELINE.entries[0];
+      mockApi.getItemTimeline.mockResolvedValue({
+        ...CRITTER_TIMELINE,
+        entries: [
+          {
+            ...step,
+            diff: {
+              ...step.diff!,
+              stats: [
+                { ...step.diff!.stats[0], relevance: 'gameplay' },
+                {
+                  stat: 79,
+                  change: 'changed',
+                  old: 21134,
+                  new: 114013,
+                  bits_set: null,
+                  bits_cleared: null,
+                  relevance: 'cosmetic',
+                },
+              ],
+            },
+          },
+          CRITTER_TIMELINE.entries[1],
+        ],
+      });
+      const wrapper = await mountItemDetail(router, pinia);
+      await openHistory(wrapper);
+
+      expect(
+        wrapper.findAll('[data-testid="diff-stat"]').map((s) => s.attributes('data-stat'))
+      ).toEqual(['287']);
+      const toggle = wrapper.find('[data-testid="diff-cosmetic-toggle"]');
+      expect(toggle.text()).toContain('Show 2 cosmetic changes');
+
+      await toggle.trigger('click');
+      const icon = wrapper.find('[data-testid="diff-stat"][data-stat="79"]');
+      expect(icon.text()).toContain('Icon');
+      expect(icon.text()).toContain('cosmetic');
+      // An icon id is not a quantity: no "+92879".
+      expect(icon.text()).not.toContain('+');
     });
 
     it('collapses and expands a step', async () => {
@@ -471,7 +514,9 @@ describe('item page: timeline and comparison', () => {
       const plain = wrapper.find('[data-testid="item-compare-plain"]');
       expect(plain.text()).toContain('Not in AO 14.2.2');
       expect(plain.text()).toContain('It exists in AO 14.6.0');
-      expect(wrapper.find('[data-testid="item-compare-result"] [data-testid="item-diff"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-testid="item-compare-result"] [data-testid="item-diff"]').exists()
+      ).toBe(false);
     });
 
     it('says plainly when the item is only in the older build', async () => {
@@ -508,9 +553,7 @@ describe('item page: timeline and comparison', () => {
       const wrapper = await mountItemDetail(router, pinia);
       await pickCompare(wrapper, 'ao-14-2-2');
 
-      expect(wrapper.find('[data-testid="item-compare-error"]').text()).toContain(
-        'is in neither'
-      );
+      expect(wrapper.find('[data-testid="item-compare-error"]').text()).toContain('is in neither');
     });
 
     it('restores a shared comparison from the URL', async () => {

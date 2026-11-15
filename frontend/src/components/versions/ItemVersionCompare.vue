@@ -54,16 +54,17 @@ the left side, whichever of the two the page shows.
       </p>
 
       <p v-if="result.kind === 'added'" class="item-compare-plain" data-testid="item-compare-plain">
-        Not in {{ result.base.display_name }}. It exists in {{ result.build.display_name }} as
-        "{{ result.new?.name }}" (QL {{ result.new?.ql }}).
+        Not in {{ result.base.display_name }}. It exists in {{ result.build.display_name }} as "{{
+          result.new?.name
+        }}" (QL {{ result.new?.ql }}).
       </p>
       <p
         v-else-if="result.kind === 'removed'"
         class="item-compare-plain"
         data-testid="item-compare-plain"
       >
-        In {{ result.base.display_name }} as "{{ result.old?.name }}" (QL {{ result.old?.ql }}).
-        Not in {{ result.build.display_name }}.
+        In {{ result.base.display_name }} as "{{ result.old?.name }}" (QL {{ result.old?.ql }}). Not
+        in {{ result.build.display_name }}.
       </p>
       <p
         v-else-if="result.kind === 'unchanged'"

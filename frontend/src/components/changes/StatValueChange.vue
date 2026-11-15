@@ -9,7 +9,7 @@ or the single value of a stat that was added or removed.
       <span class="diff-arrow" aria-hidden="true"> → </span>
       <span class="sr-only"> became </span>
       <ins class="diff-new">{{ text(change.new) }}</ins>
-      <span v-if="delta" class="item-diff-delta">({{ delta }})</span>
+      <span v-if="delta && showDelta" class="item-diff-delta">({{ delta }})</span>
     </template>
     <ins v-else-if="change.change === 'added'" class="diff-new">{{ text(change.new) }}</ins>
     <del v-else class="diff-old">{{ text(change.old) }}</del>
@@ -20,7 +20,15 @@ or the single value of a stat that was added or removed.
 import { computed } from 'vue';
 import type { StatChange } from '@/types/changes';
 
-const props = withDefaults(defineProps<{ change: StatChange; unit?: string }>(), { unit: '' });
+const props = withDefaults(
+  defineProps<{
+    change: StatChange;
+    unit?: string;
+    /** Off for values that are ids (an icon, a mesh), where a difference means nothing. */
+    showDelta?: boolean;
+  }>(),
+  { unit: '', showDelta: true }
+);
 
 function text(value: number | null): string {
   return value === null ? 'none' : `${value}${props.unit}`;

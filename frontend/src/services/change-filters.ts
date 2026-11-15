@@ -40,6 +40,16 @@ export interface ChangeFilters {
   expandNotes: boolean;
   /** Ask for every row's diff with the page and show them open. */
   showDiffs: boolean;
+  /** Only the items that share one field transition (a line of the patch notes). */
+  transition: TransitionFilter | null;
+}
+
+export interface TransitionFilter {
+  /** Path of the transition, as /changes/transitions names it. */
+  path: string;
+  /** Old and new value as JSON text ("60", "null", "[129,30,2]"); null: any value. */
+  old: string | null;
+  new: string | null;
 }
 
 export const DEFAULT_RELEVANCE: readonly RelevanceName[] = ['gameplay', 'economy'];
@@ -62,6 +72,9 @@ export const CHANGE_FILTER_KEYS: readonly string[] = [
   'size',
   'notes',
   'diffs',
+  't',
+  'tfrom',
+  'tto',
 ];
 const SORTS: readonly ChangeSort[] = ['name', 'aoid', 'ql'];
 const ALL = 'all';
@@ -83,6 +96,7 @@ export function defaultChangeFilters(): ChangeFilters {
     pageSize: DEFAULT_PAGE_SIZE,
     expandNotes: false,
     showDiffs: false,
+    transition: null,
   };
 }
 
@@ -107,6 +121,29 @@ function integer(value: LocationQuery[string] | undefined, minimum: number): num
   if (!/^\d+$/.test(text)) return null;
   const parsed = Number(text);
   return parsed >= minimum ? parsed : null;
+}
+
+/** JSON text as it came, when it is JSON; null otherwise. */
+function jsonText(value: LocationQuery[string] | undefined): string | null {
+  if (value === undefined) return null;
+  const text = first(value);
+  try {
+    JSON.parse(text);
+    return text;
+  } catch {
+    return null;
+  }
+}
+
+/** The values of a transition filter, parsed; undefined for "any value". */
+export function transitionFilterValues(filter: TransitionFilter): {
+  old: unknown;
+  new: unknown;
+} {
+  return {
+    old: filter.old === null ? undefined : JSON.parse(filter.old),
+    new: filter.new === null ? undefined : JSON.parse(filter.new),
+  };
 }
 
 export function parseChangeFilters(query: LocationQuery): ChangeFilters {
@@ -137,6 +174,9 @@ export function parseChangeFilters(query: LocationQuery): ChangeFilters {
     pageSize: pageSize && PAGE_SIZE_OPTIONS.includes(pageSize) ? pageSize : defaults.pageSize,
     expandNotes: first(query.notes) === 'expand',
     showDiffs: first(query.diffs) === '1',
+    transition: first(query.t)
+      ? { path: first(query.t), old: jsonText(query.tfrom), new: jsonText(query.tto) }
+      : null,
   };
 }
 
@@ -180,6 +220,9 @@ export function changeFiltersToQuery(
   set('size', filters.pageSize === DEFAULT_PAGE_SIZE ? null : String(filters.pageSize));
   set('notes', filters.expandNotes ? 'expand' : null);
   set('diffs', filters.showDiffs ? '1' : null);
+  set('t', filters.transition?.path ?? null);
+  set('tfrom', filters.transition?.old ?? null);
+  set('tto', filters.transition?.new ?? null);
   return query;
 }
 
@@ -202,6 +245,13 @@ export function changeFiltersToRequest(filters: ChangeFilters): ChangeListQuery 
   if (filters.search) request.search = filters.search;
   if (filters.expandNotes) request.notes = 'expand';
   if (filters.showDiffs) request.include_diff = true;
+  if (filters.transition) {
+    request.transition = filters.transition.path;
+    if (filters.transition.old !== null) request.transition_old = filters.transition.old;
+    if (filters.transition.new !== null) request.transition_new = filters.transition.new;
+    // A transition's items include those a build note explains.
+    request.notes = 'expand';
+  }
   return request;
 }
 
@@ -219,5 +269,6 @@ export function activeFilterCount(filters: ChangeFilters): number {
     filters.profession !== null,
     filters.slot !== null,
     filters.search !== '',
+    filters.transition !== null,
   ].filter(Boolean).length;
 }

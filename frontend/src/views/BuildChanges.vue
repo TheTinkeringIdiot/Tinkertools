@@ -19,7 +19,10 @@ Rows are paged by the API and never loaded all at once.
             <template v-if="compareBase">Compare builds</template>
             <template v-else>What changed in {{ versionLabel }}</template>
           </h1>
-          <p class="mt-1 text-sm text-surface-600 dark:text-surface-400" data-testid="changes-scope">
+          <p
+            class="mt-1 text-sm text-surface-600 dark:text-surface-400"
+            data-testid="changes-scope"
+          >
             {{ scopeText }}
           </p>
         </div>
@@ -130,8 +133,28 @@ Rows are paged by the API and never loaded all at once.
           <PatchNotesPanel
             v-if="!compareBase && response.base && version"
             :version="version"
-            @filter-part="onPatchNotePart"
+            @select="onPatchNote"
           />
+
+          <p
+            v-if="activeTransition"
+            class="flex flex-wrap items-center gap-2 rounded border border-primary-300 bg-primary-50 p-3 text-sm text-surface-900 dark:border-primary-700 dark:bg-primary-950 dark:text-surface-50"
+            data-testid="changes-transition"
+          >
+            <i class="pi pi-filter" aria-hidden="true"></i>
+            <span class="min-w-0 flex-1">
+              Only the items with this change:
+              <strong class="font-semibold">{{ transitionText(activeTransition) }}</strong>
+            </span>
+            <button
+              type="button"
+              class="text-primary-600 hover:underline dark:text-primary-400"
+              data-testid="changes-transition-clear"
+              @click="updateFilters({ transition: null })"
+            >
+              Show all changes
+            </button>
+          </p>
 
           <!-- Build notes -->
           <section v-if="shownNotes.length" data-testid="build-notes" aria-label="Build notes">
@@ -170,7 +193,10 @@ Rows are paged by the API and never loaded all at once.
               </p>
 
               <div class="flex flex-wrap items-center gap-3 text-sm">
-                <label v-if="response.notes.length || filters.expandNotes" class="build-changes-option">
+                <label
+                  v-if="(response.notes.length || filters.expandNotes) && !filters.transition"
+                  class="build-changes-option"
+                >
                   <input
                     type="checkbox"
                     :checked="filters.expandNotes"
@@ -291,9 +317,16 @@ import {
   changeFiltersToRequest,
   defaultChangeFilters,
   parseChangeFilters,
+  transitionFilterValues,
   type ChangeFilters,
 } from '@/services/change-filters';
-import { KIND_LABELS, KIND_MARKS, RELEVANCE_LABELS } from '@/services/diff-format';
+import {
+  KIND_LABELS,
+  KIND_MARKS,
+  RELEVANCE_LABELS,
+  transitionFromPath,
+  transitionText,
+} from '@/services/diff-format';
 import { errorMessage, isRequestCancelled } from '@/services/error-message';
 import { buildLabel, sameBuild } from '@/utils/version-order';
 import {
@@ -301,7 +334,8 @@ import {
   RELEVANCE_NAMES,
   type ChangeListResponse,
   type ChangeSort,
-  type PartName,
+  type SharedTransition,
+  type TransitionValue,
 } from '@/types/changes';
 
 const CHANNEL = 'change-list';
@@ -323,10 +357,15 @@ const compareBase = computed(() => {
   return typeof base === 'string' && base ? base : null;
 });
 
-const sameBuilds = computed(() => !!compareBase.value && sameBuild(compareBase.value, version.value));
+const sameBuilds = computed(
+  () => !!compareBase.value && sameBuild(compareBase.value, version.value)
+);
 
 const filters = computed(() => parseChangeFilters(route.query));
-const request = computed(() => changeFiltersToRequest(filters.value));
+/** A comparison of two arbitrary builds has no transitions to filter by. */
+const request = computed(() =>
+  changeFiltersToRequest(compareBase.value ? { ...filters.value, transition: null } : filters.value)
+);
 const activeCount = computed(() => activeFilterCount(filters.value));
 
 const summary = computed(() => response.value?.summary ?? null);
@@ -347,7 +386,21 @@ const scopeText = computed(() => {
 });
 
 /** Notes collapsed into single lines (none when their changes are listed with the rest). */
-const shownNotes = computed(() => (filters.value.expandNotes ? [] : (response.value?.notes ?? [])));
+const shownNotes = computed(() =>
+  filters.value.expandNotes || filters.value.transition ? [] : (response.value?.notes ?? [])
+);
+
+/** The transition the list is narrowed to, in the shape the patch notes word. */
+const activeTransition = computed<SharedTransition | null>(() => {
+  const filter = filters.value.transition;
+  if (!filter || compareBase.value) return null;
+  const values = transitionFilterValues(filter);
+  return transitionFromPath(
+    filter.path,
+    (values.old ?? null) as TransitionValue,
+    (values.new ?? null) as TransitionValue
+  );
+});
 
 const hidesByDefault = computed(
   () =>
@@ -434,10 +487,19 @@ async function writeFilters(next: ChangeFilters, mode: 'push' | 'replace'): Prom
 
 /** A filter change starts over on the first page. */
 function updateFilters(patch: Partial<ChangeFilters>, options: { keepPage?: boolean } = {}): void {
-  const next = { ...filters.value, ...patch };
+  const next = { ...(pendingFilters ?? filters.value), ...patch };
   if (!options.keepPage) next.page = 1;
-  void writeFilters(next, 'replace');
+  pendingFilters = next;
+  void writeFilters(next, 'replace').finally(() => {
+    if (pendingFilters === next) pendingFilters = null;
+  });
 }
+
+/**
+ * Filters on their way into the URL. Navigation is asynchronous, so a second
+ * change made before the first has landed builds on this, not on the route.
+ */
+let pendingFilters: ChangeFilters | null = null;
 
 function resetFilters(): void {
   const defaults = defaultChangeFilters();
@@ -465,8 +527,20 @@ function onPage(event: PageState): void {
   );
 }
 
-function onPatchNotePart(part: PartName): void {
-  updateFilters({ part: [part], kind: [], relevance: [] });
+/** A patch note leads to the items it was done to, whatever else is filtered. */
+function onPatchNote(transition: SharedTransition): void {
+  updateFilters({
+    ...defaultChangeFilters(),
+    relevance: [],
+    sort: filters.value.sort,
+    pageSize: filters.value.pageSize,
+    showDiffs: filters.value.showDiffs,
+    transition: {
+      path: transition.path,
+      old: JSON.stringify(transition.old),
+      new: JSON.stringify(transition.new),
+    },
+  });
 }
 
 /** Picking a base compares the two builds; clearing it returns to the build's own changes. */
