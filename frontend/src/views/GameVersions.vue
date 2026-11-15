@@ -30,111 +30,120 @@ sources by design rather than by bug.
     </div>
 
     <div v-else class="space-y-4">
-      <Card
+      <!--
+        A card in plain markup, memoised per row. A version switch then re-renders
+        the two rows it concerns; a Card component per row would re-render all of
+        them (each renders its own slot, which reads the current version).
+      -->
+      <div
         v-for="version in versions"
         :key="version.slug"
+        v-memo="[version, version.slug === currentVersion, versions]"
+        class="p-card p-component"
         data-testid="version-row"
         :data-slug="version.slug"
       >
-        <template #content>
-          <div class="flex flex-col lg:flex-row lg:items-start gap-4">
-            <div class="flex-1 min-w-0">
-              <div class="flex flex-wrap items-center gap-2 mb-2">
-                <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-50">
-                  {{ version.display_name }}
-                </h2>
-                <Tag :value="version.family" severity="secondary" />
-                <Badge
-                  v-if="version.slug === currentVersion"
-                  value="current"
-                  severity="success"
-                  data-testid="version-current-badge"
-                />
-                <Badge
-                  v-if="version.is_default"
-                  value="default"
-                  severity="info"
-                  data-testid="version-default-badge"
-                />
-                <Badge v-if="!version.enabled" value="disabled" severity="danger" />
-              </div>
-
-              <dl class="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-sm">
-                <div>
-                  <dt class="text-surface-500 dark:text-surface-400 text-xs">Slug</dt>
-                  <dd class="font-mono text-surface-800 dark:text-surface-200">
-                    {{ version.slug }}
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-surface-500 dark:text-surface-400 text-xs">Client build</dt>
-                  <dd class="text-surface-800 dark:text-surface-200">
-                    {{ version.client_build || '—' }}
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-surface-500 dark:text-surface-400 text-xs">Snapshot date</dt>
-                  <dd class="text-surface-800 dark:text-surface-200">
-                    {{ version.snapshot_date || '—' }}
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-surface-500 dark:text-surface-400 text-xs">Derived from</dt>
-                  <dd class="text-surface-800 dark:text-surface-200">
-                    {{ parentName(version) }}
-                  </dd>
-                </div>
-              </dl>
-
-              <div class="mt-3">
-                <span class="text-xs text-surface-500 dark:text-surface-400 mr-2">Loaded:</span>
-                <span class="inline-flex flex-wrap gap-1 align-middle">
-                  <Tag
-                    v-for="feature in featureList(version)"
-                    :key="feature.name"
-                    :value="feature.label"
-                    :severity="feature.loaded ? 'success' : 'secondary'"
-                    :class="feature.loaded ? '' : 'opacity-60 line-through'"
-                    :data-testid="`feature-${feature.name}`"
+        <div class="p-card-body">
+          <div class="p-card-content">
+            <div class="flex flex-col lg:flex-row lg:items-start gap-4">
+              <div class="flex-1 min-w-0">
+                <div class="flex flex-wrap items-center gap-2 mb-2">
+                  <h2 class="text-lg font-semibold text-surface-900 dark:text-surface-50">
+                    {{ version.display_name }}
+                  </h2>
+                  <Tag :value="version.family" severity="secondary" />
+                  <Badge
+                    v-if="version.slug === currentVersion"
+                    value="current"
+                    severity="success"
+                    data-testid="version-current-badge"
                   />
-                </span>
+                  <Badge
+                    v-if="version.is_default"
+                    value="default"
+                    severity="info"
+                    data-testid="version-default-badge"
+                  />
+                  <Badge v-if="!version.enabled" value="disabled" severity="danger" />
+                </div>
+
+                <dl class="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-sm">
+                  <div>
+                    <dt class="text-surface-500 dark:text-surface-400 text-xs">Slug</dt>
+                    <dd class="font-mono text-surface-800 dark:text-surface-200">
+                      {{ version.slug }}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt class="text-surface-500 dark:text-surface-400 text-xs">Client build</dt>
+                    <dd class="text-surface-800 dark:text-surface-200">
+                      {{ version.client_build || '—' }}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt class="text-surface-500 dark:text-surface-400 text-xs">Snapshot date</dt>
+                    <dd class="text-surface-800 dark:text-surface-200">
+                      {{ version.snapshot_date || '—' }}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt class="text-surface-500 dark:text-surface-400 text-xs">Derived from</dt>
+                    <dd class="text-surface-800 dark:text-surface-200">
+                      {{ parentName(version) }}
+                    </dd>
+                  </div>
+                </dl>
+
+                <div class="mt-3">
+                  <span class="text-xs text-surface-500 dark:text-surface-400 mr-2">Loaded:</span>
+                  <span class="inline-flex flex-wrap gap-1 align-middle">
+                    <Tag
+                      v-for="feature in featureList(version)"
+                      :key="feature.name"
+                      :value="feature.label"
+                      :severity="feature.loaded ? 'success' : 'secondary'"
+                      :class="feature.loaded ? '' : 'opacity-60 line-through'"
+                      :data-testid="`feature-${feature.name}`"
+                    />
+                  </span>
+                </div>
+
+                <p
+                  v-if="version.notes"
+                  class="mt-3 text-sm text-surface-600 dark:text-surface-400 leading-relaxed"
+                >
+                  {{ version.notes }}
+                </p>
               </div>
 
-              <p
-                v-if="version.notes"
-                class="mt-3 text-sm text-surface-600 dark:text-surface-400 leading-relaxed"
-              >
-                {{ version.notes }}
-              </p>
-            </div>
-
-            <div class="lg:w-40 flex lg:flex-col gap-2">
-              <Button
-                :label="version.slug === currentVersion ? 'Browsing' : 'Browse'"
-                icon="pi pi-arrow-right"
-                :disabled="version.slug === currentVersion || !version.enabled"
-                size="small"
-                class="w-full"
-                data-testid="version-browse"
-                :data-slug="version.slug"
-                @click="browse(version)"
-              />
-              <Button
-                label="What changed"
-                icon="pi pi-history"
-                :disabled="!version.enabled"
-                severity="secondary"
-                outlined
-                size="small"
-                class="w-full"
-                data-testid="version-changes"
-                :data-slug="version.slug"
-                @click="router.push({ name: 'BuildChanges', params: { version: version.slug } })"
-              />
+              <div class="lg:w-40 flex lg:flex-col gap-2">
+                <Button
+                  :label="version.slug === currentVersion ? 'Browsing' : 'Browse'"
+                  icon="pi pi-arrow-right"
+                  :disabled="version.slug === currentVersion || !version.enabled"
+                  size="small"
+                  class="w-full"
+                  data-testid="version-browse"
+                  :data-slug="version.slug"
+                  @click="browse(version)"
+                />
+                <Button
+                  label="What changed"
+                  icon="pi pi-history"
+                  :disabled="!version.enabled"
+                  severity="secondary"
+                  outlined
+                  size="small"
+                  class="w-full"
+                  data-testid="version-changes"
+                  :data-slug="version.slug"
+                  @click="router.push({ name: 'BuildChanges', params: { version: version.slug } })"
+                />
+              </div>
             </div>
           </div>
-        </template>
-      </Card>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -142,7 +151,6 @@ sources by design rather than by bug.
 <script setup lang="ts">
 import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import Card from 'primevue/card';
 import Tag from 'primevue/tag';
 import Badge from 'primevue/badge';
 import Button from 'primevue/button';
@@ -195,5 +203,7 @@ async function browse(version: GameVersion): Promise<void> {
 onMounted(async () => {
   // Never rejects: a failed load is recorded as registryFailed
   await ensureVersionsLoaded();
+  // "What changed" is one click away: have its page ready.
+  void import('@/views/BuildChanges.vue');
 });
 </script>

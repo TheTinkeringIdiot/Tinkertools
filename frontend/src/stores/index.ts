@@ -261,12 +261,45 @@ export async function purgeOtherVersionCaches(version?: string): Promise<void> {
   }
 }
 
+/** Run `task` once the browser has nothing more urgent to do (soon, where it cannot say). */
+function whenIdle(task: () => void): void {
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(() => task(), { timeout: 3000 });
+  } else {
+    setTimeout(task, 0);
+  }
+}
+
+/**
+ * Load the code a version switch runs, ahead of the first switch: the switch
+ * is awaited by the router guard, and must not wait for chunks to download.
+ */
+export async function warmVersionSwitch(): Promise<void> {
+  await Promise.allSettled([
+    import('./app'),
+    import('./items'),
+    import('./symbiants'),
+    import('./pocket-bosses'),
+    import('./pocketBossStore'),
+    import('./nanosStore'),
+    import('./tinkerPlants'),
+    import('../services/offline-manager'),
+    import('../services/interpolation-service'),
+    import('../composables/useNanoNameResolver'),
+    import('../services/cache-manager'),
+    import('../services/weapon-cache'),
+    import('../services/indexed-db-weapon-cache'),
+    import('../services/version-keys'),
+  ]);
+}
+
 /**
  * Hook run on every game version switch, before the new version's route
  * renders (the router guard awaits it): drop in-memory data from the old
  * version and reclaim the storage other versions' caches use. Warming the
- * common datasets is started but not awaited, so navigation is not held up by
- * network requests.
+ * common datasets waits until the new page has had its turn: its requests and
+ * the work on their answers would otherwise compete with the page the user
+ * asked for.
  *
  * Registered once at startup (see main.ts).
  */
@@ -275,7 +308,13 @@ export async function handleGameVersionChange(next: string, previous: string | n
 
   await resetForVersionChange();
   await purgeOtherVersionCaches(next);
-  void preloadCommonData().catch((error) =>
-    console.warn('[stores] Preload after version change failed:', error)
-  );
+  whenIdle(() => {
+    // Only for the version still being browsed: a quick second switch has its own turn.
+    void import('../composables/useGameVersion').then(({ currentVersion }) => {
+      if (currentVersion.value !== next) return;
+      void preloadCommonData().catch((error) =>
+        console.warn('[stores] Preload after version change failed:', error)
+      );
+    });
+  });
 }

@@ -94,3 +94,13 @@ app.component('TriStateCheckbox', TriStateCheckbox);
 app.directive('tooltip', Tooltip);
 
 app.mount('#app');
+
+// The first version switch must not wait for its code to download.
+const warmVersionSwitch = (): void => {
+  void import('./stores').then(({ warmVersionSwitch: warm }) => warm());
+};
+if (typeof requestIdleCallback === 'function') {
+  requestIdleCallback(warmVersionSwitch, { timeout: 5000 });
+} else {
+  setTimeout(warmVersionSwitch, 2000);
+}
