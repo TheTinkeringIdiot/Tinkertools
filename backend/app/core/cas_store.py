@@ -16,7 +16,9 @@ A build is imported in one transaction by :func:`import_build`:
 3. The staged items are compared with the branch's open presence runs: a run
    whose item is gone or has another revision is closed at the previous build,
    and a run is opened for every item that has none with its revision. The
-   same comparison writes the change log.
+   same comparison writes the change log, which app/core/change_analysis.py
+   then classifies by relevance, tags with the build's notes and counts into
+   shared field transitions.
 4. Derived rows are added for what the build brought: symbiant rows for new
    revisions, nano properties for the build's nanos under its strain policy.
 5. The build becomes the one of its branch that is served with the curated
@@ -54,7 +56,8 @@ import psycopg
 from psycopg import sql
 from psycopg.types.json import Jsonb
 
-from app.core import nano_properties
+from app.core import change_analysis, nano_properties
+from app.core.change_rules import ChangeRules, default_rules
 from app.core.parts import PART_NAMES, effect_formats, split_item
 
 logger = logging.getLogger(__name__)
@@ -167,6 +170,12 @@ def upgrade_store(conn: psycopg.Connection, schema: str) -> None:
                 "ALTER TABLE {}.mob ADD COLUMN retired boolean NOT NULL DEFAULT false"
             ).format(sql.Identifier(schema))
         )
+    if not conn.execute(
+        "SELECT 1 FROM pg_tables WHERE schemaname = %s "
+        "AND tablename = 'revision_relevance'",
+        (schema,),
+    ).fetchone():
+        conn.execute((SQL_DIR / "003_change_analysis.sql").read_text(encoding="utf-8"))
 
 
 def drop_store(conn: psycopg.Connection, schema: str) -> None:
@@ -765,9 +774,12 @@ def import_build(
     spec: BuildSpec,
     content: Optional[BuildContent],
     timings: Optional[Timings] = None,
+    rules: Optional[ChangeRules] = None,
 ) -> BuildResult:
     """Import one build. ``content`` is None for a build whose data is the
     extract of the branch's newest build (see :func:`same_as_newest`).
+    ``rules`` classify and note its changes; by default those of the files in
+    the repository (app/core/change_rules.py).
 
     Returns a result with ``imported`` false, and writes nothing, when the
     build is already in the store.
@@ -814,6 +826,10 @@ def import_build(
             newest["ordinal"] if newest else None,
             parent,
             result,
+        )
+    with phase(timings, "change analysis"):
+        change_analysis.analyze_build(
+            conn, spec.branch, spec.ordinal, rules or default_rules()
         )
     with phase(timings, "nano properties"):
         serve_newest_with_overlay(conn, spec.branch)

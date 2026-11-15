@@ -36,9 +36,10 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
-from app.core import cas_store
+from app.core import cas_store, change_analysis
 from app.core.cache import cache_service
 from app.core.cas_curated import sync_curated
+from app.core.change_rules import parse_notes
 from app.main import app
 from app.store.context import (
     Build,
@@ -111,6 +112,12 @@ class ThrowawayStore:
         (``nano_id,ql,crystal_ids,nano_name,strain_id,sub_strain_id``)."""
         sync_curated(self._raw, curated_files(self._tmp_path, list(mobs), nanos))
         cas_store.apply_nano_overlay(self._raw)
+
+    def note_changes(self, notes: str) -> None:
+        """Apply build notes, written as ``build_notes.toml`` is, to the
+        change log of the builds loaded so far. Builds are imported with the
+        notes of the repository's file, which name real builds only."""
+        change_analysis.analyze(self._raw, parse_notes(notes))
 
     def builds(self) -> List[Build]:
         return read_builds(self.db)
