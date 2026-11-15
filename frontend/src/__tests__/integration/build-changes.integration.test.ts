@@ -1102,4 +1102,394 @@ describe('build change list', () => {
       );
     });
   });
+  describe('patch notes under the filters of the page', () => {
+    it('keeps "every change" and "with noted changes" when a patch note is opened', async () => {
+      await router.push('/ao-14-6-0/changes?relevance=all&notes=expand&kind=added');
+      const page = await mountPage(router, pinia);
+
+      await page.find('[data-testid="patch-notes-more"]').trigger('click');
+      const effectNote = page
+        .findAll('[data-testid="patch-note"]')
+        .find((note) => note.text().includes('chance to cast'));
+      await effectNote!.find('[data-testid="patch-note-filter"]').trigger('click');
+      await flushPromises();
+
+      // The line counted every change, noted ones included: so does the list it leads to.
+      expect(router.currentRoute.value.query).toEqual({
+        relevance: 'all',
+        notes: 'expand',
+        t: 'effect:53089:spell_params.Chance',
+        tfrom: '60',
+        tto: '100',
+      });
+      expect(listQuery()).toEqual({
+        page: 1,
+        page_size: 50,
+        sort: 'name',
+        notes: 'expand',
+        transition: 'effect:53089:spell_params.Chance',
+        transition_old: '60',
+        transition_new: '100',
+      });
+    });
+
+    it('keeps a narrowed relevance when a patch note is opened', async () => {
+      await router.push('/ao-14-6-0/changes?relevance=gameplay');
+      const page = await mountPage(router, pinia);
+
+      await page.find('[data-testid="patch-note-filter"]').trigger('click');
+      await flushPromises();
+
+      expect(router.currentRoute.value.query.relevance).toBe('gameplay');
+      expect(router.currentRoute.value.query.notes).toBeUndefined();
+      expect(listQuery().relevance).toEqual(['gameplay']);
+      expect(listQuery().notes).toBeUndefined();
+    });
+
+    it('offers all patch notes from the header of the panel', async () => {
+      const page = await mountPage(router, pinia);
+      const more = page.find('[data-testid="patch-notes"] header [data-testid="patch-notes-more"]');
+
+      expect(more.attributes('aria-expanded')).toBe('false');
+      const collapsed = page.findAll('[data-testid="patch-note"]').length;
+      await more.trigger('click');
+
+      expect(more.attributes('aria-expanded')).toBe('true');
+      expect(more.text()).toBe('Show fewer');
+      expect(page.findAll('[data-testid="patch-note"]').length).toBeGreaterThan(collapsed);
+    });
+  });
+
+  describe('links that ask for what is not there', () => {
+    it('shows the last page for a page past the end, and corrects the URL in place', async () => {
+      mockApi.getBuildChanges.mockImplementation(async (query?: ChangeListQuery) =>
+        (query?.page ?? 1) > 531
+          ? changeList({ items: [], total: 26516, page: query?.page ?? 1, pages: 531 })
+          : changeList({ total: 26516, page: query?.page ?? 1, pages: 531 })
+      );
+      await router.push('/ao-14-6-0/changes?kind=changed');
+      await router.push('/ao-14-6-0/changes?kind=changed&page=99999');
+      const page = await mountPage(router, pinia);
+
+      expect(router.currentRoute.value.query).toEqual({ kind: 'changed', page: '531' });
+      expect(listQuery()).toMatchObject({ page: 531, kind: ['changed'] });
+      const count = page.find('[data-testid="changes-count"]').text();
+      expect(count).toContain('26,501-26,502 of 26,516 changes');
+      expect(count).not.toContain('4,999,901');
+      expect(
+        page.findAll('[data-testid="changes-list"] > [data-testid="change-row"]')
+      ).toHaveLength(2);
+
+      // The correction replaced the bad link: Back leaves it behind.
+      router.back();
+      await flushPromises();
+      expect(router.currentRoute.value.query).toEqual({ kind: 'changed' });
+    });
+
+    it('shows the first page when a filter leaves nothing and the link names a later page', async () => {
+      mockApi.getBuildChanges.mockImplementation(async (query?: ChangeListQuery) =>
+        changeList({ items: [], total: 0, page: query?.page ?? 1, pages: 1 })
+      );
+      await router.push('/ao-14-6-0/changes?q=nothing&page=7');
+      const page = await mountPage(router, pinia);
+
+      expect(router.currentRoute.value.query).toEqual({ q: 'nothing' });
+      expect(page.find('[data-testid="changes-empty"]').exists()).toBe(true);
+      expect(page.find('[data-testid="changes-count"]').text()).toContain('No changes listed');
+    });
+
+    it('says plainly that a base is not a build, without an order of builds or a retry', async () => {
+      await router.push('/ao-14-6-0/compare/nonsense');
+      mockApi.compareBuilds.mockRejectedValue({
+        type: 'info',
+        title: 'Not Found',
+        message: "Unknown game version 'nonsense'",
+        action: 'Pick another version',
+        recoverable: true,
+        status: 404,
+      });
+      const page = await mountPage(router, pinia);
+
+      expect(page.find('[data-testid="changes-scope"]').text()).toBe(
+        '"nonsense" is not a build on record.'
+      );
+      expect(page.find('[data-testid="compare-older"]').exists()).toBe(false);
+      expect(page.text()).not.toContain('(older)');
+      const message = page.find('[data-testid="changes-error"]');
+      expect(message.text()).toContain('No build named "nonsense"');
+      expect(message.text()).toContain('Pick a build to compare AO 14.6.0 with');
+      expect(page.find('[data-testid="changes-retry"]').exists()).toBe(false);
+      // The picker is still there to choose a real one.
+      expect(page.find('[data-testid="compare-base-picker"]').exists()).toBe(true);
+    });
+
+    it('keeps the retry for a comparison that failed for another reason', async () => {
+      await router.push('/ao-14-6-0/compare/ao-14-2-2');
+      mockApi.compareBuilds.mockRejectedValueOnce({
+        type: 'error',
+        title: 'Network Error',
+        message: 'Unable to connect to the server',
+        action: 'Check your internet connection and try again',
+        recoverable: true,
+      });
+      const page = await mountPage(router, pinia);
+
+      expect(page.find('[data-testid="changes-error"]').text()).toContain(
+        'Unable to connect to the server'
+      );
+      expect(page.find('[data-testid="compare-older"]').text()).toBe('AO 14.2.2');
+
+      await page.find('[data-testid="changes-retry"]').trigger('click');
+      await flushPromises();
+      expect(page.findAll('[data-testid="change-row"]')).toHaveLength(2);
+    });
+
+    it('says that a build cannot be compared with itself', async () => {
+      await router.push('/ao-14-6-0/compare/ao-14-6-0');
+      const page = await mountPage(router, pinia);
+
+      const scope = page.find('[data-testid="changes-scope"]').text();
+      expect(scope).toBe('AO 14.6.0 cannot be compared with itself.');
+      expect(scope).not.toContain('the build before it');
+    });
+
+    it('drops a patch note filter on a comparison, which has no patch notes', async () => {
+      await router.push(
+        '/ao-14-6-0/compare/ao-14-2-2?t=effect:53089:spell_params.Chance&tfrom=60&tto=100&kind=changed'
+      );
+      const page = await mountPage(router, pinia);
+
+      const [, query] = mockApi.compareBuilds.mock.calls[0];
+      expect(query).toEqual({
+        page: 1,
+        page_size: 50,
+        sort: 'name',
+        kind: ['changed'],
+        relevance: ['gameplay', 'economy'],
+      });
+      expect(page.find('[data-testid="changes-transition"]').exists()).toBe(false);
+    });
+  });
+
+  describe('typed filters and narrow screens', () => {
+    it('applies a quality level after a pause in typing, as the name filter does', async () => {
+      const page = await mountPage(router, pinia);
+      vi.useFakeTimers();
+
+      const minimum = page.find('[data-testid="change-filter-minql"]');
+      (minimum.element as HTMLInputElement).value = '1';
+      await minimum.trigger('input');
+      (minimum.element as HTMLInputElement).value = '150';
+      await minimum.trigger('input');
+      // Mid-typing nothing is asked for, however long the navigation would take.
+      await vi.advanceTimersByTimeAsync(200);
+      expect(listRequestCount()).toBe(1);
+      expect(router.currentRoute.value.query.minql).toBeUndefined();
+
+      await vi.advanceTimersByTimeAsync(350);
+      vi.useRealTimers();
+      await flushPromises();
+
+      expect(router.currentRoute.value.query.minql).toBe('150');
+      expect(listRequestCount()).toBe(2);
+      expect(listQuery().min_ql).toBe(150);
+    });
+
+    it('applies both quality levels and clears one that is emptied', async () => {
+      await router.push('/ao-14-6-0/changes?minql=100');
+      const page = await mountPage(router, pinia);
+      vi.useFakeTimers();
+
+      const minimum = page.find('[data-testid="change-filter-minql"]');
+      const maximum = page.find('[data-testid="change-filter-maxql"]');
+      (minimum.element as HTMLInputElement).value = '';
+      await minimum.trigger('input');
+      (maximum.element as HTMLInputElement).value = '200';
+      await maximum.trigger('input');
+      await vi.advanceTimersByTimeAsync(350);
+      vi.useRealTimers();
+      await flushPromises();
+
+      expect(router.currentRoute.value.query).toEqual({ maxql: '200' });
+      expect(listQuery().min_ql).toBeUndefined();
+      expect(listQuery().max_ql).toBe(200);
+    });
+
+    it('typing a quality level adds no step of history of its own', async () => {
+      const page = await mountPage(router, pinia);
+      await page.find('[data-testid="changes-sort"]').setValue('ql');
+      await flushPromises();
+
+      await page.find('[data-testid="change-filter-minql"]').setValue('150');
+      await flushPromises();
+      expect(router.currentRoute.value.query).toEqual({ sort: 'ql', minql: '150' });
+
+      router.back();
+      await flushPromises();
+      expect(router.currentRoute.value.query).toEqual({});
+    });
+
+    it('leads from the open filters to the list with the number of results', async () => {
+      const page = await mountPage(router, pinia);
+      const toggle = page.find('[data-testid="changes-filters-toggle"]');
+
+      // Closed: the list is one tap away, with what it holds.
+      expect(page.find('[data-testid="changes-jump"]').text()).toContain('7,781 changes');
+      expect(page.find('[data-testid="changes-show-results"]').exists()).toBe(false);
+
+      await toggle.trigger('click');
+      expect(toggle.attributes('aria-expanded')).toBe('true');
+      await page.find('[data-testid="change-filter-kind"][data-value="added"]').setValue(true);
+      await flushPromises();
+      // Ticking a filter keeps the panel open, with the way out in reach.
+      expect(toggle.attributes('aria-expanded')).toBe('true');
+      const show = page.find('[data-testid="changes-show-results"]');
+      expect(show.text()).toBe('Show 7,781 changes');
+
+      await show.trigger('click');
+      await flushPromises();
+      expect(toggle.attributes('aria-expanded')).toBe('false');
+      expect(page.find('[data-testid="changes-show-results"]').exists()).toBe(false);
+      expect(page.find('[data-testid="change-filters"]').classes()).toContain('hidden');
+    });
+  });
+
+  describe('badges and values of a row', () => {
+    it('shows one Text chip for a text change that matters as text', async () => {
+      mockApi.getBuildChanges.mockResolvedValue(
+        changeList({
+          items: [
+            changeRow({ parts: ['text'], relevance: ['text'] }),
+            changeRow({ aoid: 88806, parts: ['text', 'stats'], relevance: ['gameplay', 'text'] }),
+            changeRow({ aoid: 88807, parts: ['stats'], relevance: ['gameplay', 'cosmetic'] }),
+          ],
+          total: 3,
+        })
+      );
+      const page = await mountPage(router, pinia);
+
+      const chips = page
+        .findAll('[data-testid="changes-list"] > [data-testid="change-row"]')
+        .map((row) =>
+          row
+            .findAll('[data-testid="change-part"], [data-testid="change-relevance"]')
+            .map((chip) => chip.text())
+        );
+      expect(chips).toEqual([
+        ['Text'],
+        ['Text', 'Stats', 'Gameplay'],
+        ['Stats', 'Gameplay', 'Cosmetic'],
+      ]);
+    });
+
+    it('words times, classes and schools as the item page does', async () => {
+      await router.push('/ao-14-6-0/changes?diffs=1');
+      const plain = { bits_set: null, bits_cleared: null };
+      const diff: ItemDiff = {
+        ...emptyDiff(),
+        stats: [
+          { stat: 8, change: 'changed', old: 90000, new: 1440000, ...plain },
+          { stat: 210, change: 'changed', old: 950, new: 650, ...plain },
+          { stat: 294, change: 'changed', old: 600, new: 100, ...plain },
+          { stat: 76, change: 'changed', old: 2, new: 4, ...plain },
+          { stat: 405, change: 'changed', old: 4, new: 1, ...plain },
+          { stat: 298, change: 'added', old: null, new: 0, bits_set: [], bits_cleared: [] },
+        ],
+      };
+      mockApi.getBuildChanges.mockResolvedValue(
+        changeList({ items: [{ ...ROW_GRAFT, diff }], total: 1 })
+      );
+      const page = await mountPage(router, pinia);
+      const stat = (id: number) => page.find(`[data-testid="diff-stat"][data-stat="${id}"]`);
+
+      expect(stat(8).find('del').text()).toBe('15.00m');
+      expect(stat(8).find('ins').text()).toBe('4.00h');
+      expect(stat(8).text()).toContain('(+3.75h)');
+      expect(stat(8).text()).not.toContain('90000');
+      expect(stat(210).text()).toContain('9.50s');
+      expect(stat(210).text()).toContain('6.50s');
+      expect(stat(210).text()).toContain('(−3.00s)');
+      expect(stat(294).text()).toContain('6.00s');
+      expect(stat(294).text()).toContain('1.00s');
+      expect(stat(76).find('del').text()).toBe('Armor');
+      expect(stat(76).find('ins').text()).not.toBe('4');
+      expect(stat(405).find('del').text()).not.toBe('4');
+      expect(stat(405).text()).not.toContain('(−3)');
+      // A flag stat written out with nothing in it says so, not "no flags set" alone.
+      expect(stat(298).text()).toContain('added, with none set');
+      expect(stat(298).text()).not.toContain('no flags set');
+    });
+
+    it('notes on a nano strain entry that the diff shows the raw client value', async () => {
+      await router.push('/ao-14-6-0/changes?diffs=1');
+      const plain = { bits_set: null, bits_cleared: null };
+      const diff: ItemDiff = {
+        ...emptyDiff(),
+        stats: [
+          { stat: 75, change: 'added', old: null, new: 256, ...plain },
+          { stat: 1003, change: 'changed', old: 1, new: 2, ...plain },
+          { stat: 74, change: 'changed', old: 2, new: 7, ...plain },
+        ],
+      };
+      mockApi.getBuildChanges.mockResolvedValue(
+        changeList({ items: [{ ...ROW_GRAFT, diff }], total: 1 })
+      );
+      const page = await mountPage(router, pinia);
+
+      const notes = page.findAll('[data-testid="diff-raw-note"]');
+      expect(notes.map((note) => note.attributes('data-stat'))).toEqual(['75', '1003']);
+      expect(notes[0].text()).toContain("game client's raw value");
+      expect(notes[0].text()).toContain('item page shows the curated strain');
+      // Local to those entries: no other stat carries it.
+      expect(
+        page
+          .find('[data-testid="diff-stat"][data-stat="74"] [data-testid="diff-raw-note"]')
+          .exists()
+      ).toBe(false);
+    });
+
+    it('folds unchanged conditions only when more than three stay and something changed', async () => {
+      await router.push('/ao-14-6-0/changes?diffs=1');
+      const same = (index: number) => {
+        const criterion = { value1: 100 + index, value2: 200, operator: 2 };
+        return { op: 'same' as const, old: criterion, new: criterion };
+      };
+      const changed = {
+        op: 'changed' as const,
+        old: { value1: 54, value2: 99, operator: 2 },
+        new: { value1: 54, value2: 149, operator: 2 },
+      };
+      const action = (id: number, criteria: ItemDiff['actions'][number]['criteria']) => ({
+        action: id,
+        change: 'changed' as const,
+        criteria,
+      });
+      const diff: ItemDiff = {
+        ...emptyDiff(),
+        actions: [
+          action(3, [same(0), same(1), same(2), changed]),
+          action(6, [same(0), same(1), same(2), same(3), changed]),
+          action(8, [same(0), same(1), same(2), same(3), same(4)]),
+        ],
+      };
+      mockApi.getBuildChanges.mockResolvedValue(
+        changeList({ items: [{ ...ROW_GRAFT, diff }], total: 1 })
+      );
+      const page = await mountPage(router, pinia);
+      const list = (id: number) =>
+        page.find(`[data-testid="diff-action"][data-action="${id}"] [data-testid="diff-criteria"]`);
+
+      // Three unchanged: all listed, nothing to unfold.
+      expect(list(3).findAll('[data-testid="diff-criterion"]')).toHaveLength(4);
+      expect(list(3).find('[data-testid="diff-criteria-unchanged"]').exists()).toBe(false);
+      // Four unchanged beside a change: folded to the change.
+      expect(list(6).findAll('[data-testid="diff-criterion"]')).toHaveLength(1);
+      expect(list(6).find('[data-testid="diff-criteria-unchanged"]').text()).toBe(
+        'Show 4 unchanged'
+      );
+      // Nothing changed: folding would leave an empty list, so all five stay.
+      expect(list(8).findAll('[data-testid="diff-criterion"]')).toHaveLength(5);
+      expect(list(8).find('[data-testid="diff-criteria-unchanged"]').exists()).toBe(false);
+    });
+  });
 });

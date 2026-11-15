@@ -518,6 +518,8 @@ export interface UserFriendlyError {
   action: string;
   recoverable: boolean;
   retryAfter?: number;
+  /** HTTP status of the answer, when the server answered that what was asked for does not exist. */
+  status?: number;
 }
 
 // ============================================================================

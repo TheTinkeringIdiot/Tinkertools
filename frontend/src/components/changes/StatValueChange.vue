@@ -18,7 +18,7 @@ or the single value of a stat that was added or removed.
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { hasNamedValues, statValueText } from '@/services/diff-format';
+import { statDeltaText, statValueText } from '@/services/diff-format';
 import type { StatChange } from '@/types/changes';
 
 const props = withDefaults(
@@ -37,11 +37,5 @@ function text(value: number | null): string {
   return statValueText(value, props.nameValues ? props.change.stat : undefined, props.unit);
 }
 
-const delta = computed(() => {
-  const { old: before, new: after } = props.change;
-  if (before === null || after === null || before === after) return '';
-  if (props.nameValues && hasNamedValues(props.change)) return '';
-  const difference = after - before;
-  return `${difference > 0 ? '+' : '−'}${Math.abs(difference)}${props.unit}`;
-});
+const delta = computed(() => statDeltaText(props.change, props.unit, props.nameValues));
 </script>

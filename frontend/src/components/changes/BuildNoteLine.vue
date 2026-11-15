@@ -23,7 +23,19 @@ page at a time.
       <span class="build-note-title">{{ note.title }}</span>
       <span class="build-note-count" data-testid="build-note-count">{{ countText }}</span>
     </button>
-    <p v-if="note.body" class="build-note-body">{{ note.body }}</p>
+    <p v-if="note.body" class="build-note-body">
+      <button
+        type="button"
+        class="build-note-body-text"
+        :class="{ 'build-note-body-clamped': !bodyShown }"
+        data-testid="build-note-body"
+        :aria-expanded="bodyShown"
+        :title="bodyShown ? undefined : 'Show the whole explanation'"
+        @click="bodyOpen = !bodyOpen"
+      >
+        {{ note.body }}
+      </button>
+    </p>
     <p v-if="note.matching === 0" class="build-note-body" data-testid="build-note-hint">
       {{ NOTHING_MATCHES }}
     </p>
@@ -96,6 +108,9 @@ const changesStore = useChangesStore();
 const channel = computed(() => `build-note:${props.note.note_id}`);
 
 const open = ref(false);
+/** The explanation is one line until it, or the note, is opened. */
+const bodyOpen = ref(false);
+const bodyShown = computed(() => bodyOpen.value || open.value);
 const pageNumber = ref(1);
 const page = ref<ChangeListResponse | null>(null);
 const loading = ref(false);
@@ -165,7 +180,15 @@ onBeforeUnmount(() => changesStore.cancel(channel.value));
 
 <style scoped>
 .build-note {
-  @apply border-b border-surface-200 py-2 dark:border-surface-700;
+  @apply border-b border-surface-200 py-1.5 dark:border-surface-700;
+}
+
+.build-note-body-text {
+  @apply block w-full text-left;
+}
+
+.build-note-body-clamped {
+  @apply truncate;
 }
 
 .build-note-line {
@@ -186,7 +209,7 @@ onBeforeUnmount(() => changesStore.cancel(channel.value));
 
 .build-note-body,
 .build-note-muted {
-  @apply text-xs text-surface-500 dark:text-surface-400;
+  @apply text-xs text-surface-600 dark:text-surface-400;
 }
 
 .build-note-body {

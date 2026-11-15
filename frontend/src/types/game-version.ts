@@ -43,11 +43,23 @@ export interface GameVersionListResponse {
 
 export interface ItemRevisionBatchEntry {
   aoid: number;
+  /** Entries on the item's timeline in the browsed version: the number in "History (N)". */
   revision_count: number;
+  /** Those of kind "changed". A backend that predates the field leaves it out. */
+  change_count?: number;
   latest_change_slug: string | null;
   present_in_current: boolean;
 }
 
 export interface ItemRevisionsBatchResponse {
   items: Record<number, ItemRevisionBatchEntry>;
+}
+
+/**
+ * How many builds changed an item after it first appeared. Without
+ * `change_count` the revisions stand in: they count the first appearance too.
+ */
+export function changedBuildCount(entry: ItemRevisionBatchEntry): number {
+  if (typeof entry.change_count === 'number') return Math.max(0, entry.change_count);
+  return Math.max(0, entry.revision_count - 1);
 }

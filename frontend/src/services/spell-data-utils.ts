@@ -6,7 +6,7 @@
  */
 
 import { TEMPLATE_EVENT, TARGET, SPELL_FORMATS } from './game-data';
-import { getStatName, getFlagNameFromBit } from './game-utils';
+import { getStatName, getFlagNameFromBit, getNanoStrainName } from './game-utils';
 import type { SpellData, Spell, Criterion } from '@/types/api';
 import { versionedPath } from '@/composables/useGameVersion';
 
@@ -220,6 +220,9 @@ export function interpolateSpellText(format: string, params: Record<string, unkn
         // For Stat and Skill, display as stat name
         const statName = getStatName(value);
         return statName || `Stat ${value}`;
+      } else if (paramName.toLowerCase() === 'nanostrain' && typeof value === 'number') {
+        // For NanoStrain, display the strain's name as the nano page does
+        return getNanoStrainName(value) || String(value);
       } else if (paramName.toLowerCase().includes('bitnum') && typeof value === 'number') {
         // For BitNum, resolve to flag name using the Stat parameter
         const statId = params.Stat || params.stat;

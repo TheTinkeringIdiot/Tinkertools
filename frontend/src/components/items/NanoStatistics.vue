@@ -234,7 +234,13 @@ Shows essential nano information in a dense, scannable table format
 import { computed } from 'vue';
 import type { Item } from '@/types/api';
 import type { ReadonlyTinkerProfile } from '@/lib/tinkerprofiles/types';
-import { getStatName, getNanoSchoolName, getNanoStrainName } from '@/services/game-utils';
+import {
+  formatCentisecondsToSeconds,
+  formatDuration,
+  getStatName,
+  getNanoSchoolName,
+  getNanoStrainName,
+} from '@/services/game-utils';
 import { SPELL_FORMATS } from '@/services/game-data';
 
 const props = defineProps<{
@@ -418,26 +424,6 @@ function formatRange(range: number | undefined): string {
   if (!range || range === 0) return 'Self';
   if (range === 1) return 'Touch';
   return `${range}m`;
-}
-
-function formatDuration(duration: number | undefined): string {
-  if (!duration || duration === 0) return 'Instant';
-  if (duration === -1) return 'Permanent';
-
-  // Duration is in centiseconds, convert to seconds
-  const seconds = duration / 100;
-
-  if (seconds < 60) return `${seconds.toFixed(2)}s`;
-  if (seconds < 3600) return `${(seconds / 60).toFixed(2)}m`;
-  return `${(seconds / 3600).toFixed(2)}h`;
-}
-
-function formatCentisecondsToSeconds(centiseconds: number | undefined): string {
-  if (!centiseconds || centiseconds === 0) return '0.00s';
-
-  // Convert centiseconds to seconds with 2 decimal places
-  const seconds = centiseconds / 100;
-  return `${seconds.toFixed(2)}s`;
 }
 
 function formatTicks(tickCount: number, tickInterval: number): string {

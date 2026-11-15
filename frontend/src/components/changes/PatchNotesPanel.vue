@@ -21,9 +21,19 @@ to.
         ></i>
         <span class="text-base font-semibold">Patch notes</span>
       </button>
-      <span class="patch-notes-muted"
+      <span class="patch-notes-muted hidden sm:inline"
         >The same change made to many items at once, most items first</span
       >
+      <button
+        v-if="open && transitions.length > COLLAPSED_LINES"
+        type="button"
+        class="patch-notes-link ml-auto"
+        data-testid="patch-notes-more"
+        :aria-expanded="showAll"
+        @click="showAll = !showAll"
+      >
+        {{ showAll ? 'Show fewer' : `Show all ${transitions.length}` }}
+      </button>
     </header>
 
     <template v-if="open">
@@ -63,15 +73,6 @@ to.
             </button>
           </li>
         </ul>
-        <button
-          v-if="transitions.length > COLLAPSED_LINES"
-          type="button"
-          class="patch-notes-link mt-2"
-          data-testid="patch-notes-more"
-          @click="showAll = !showAll"
-        >
-          {{ showAll ? 'Show fewer' : `Show all ${transitions.length}` }}
-        </button>
       </template>
     </template>
   </section>
@@ -170,7 +171,7 @@ onBeforeUnmount(() => changesStore.cancel(CHANNEL));
 
 <style scoped>
 .patch-notes {
-  @apply rounded-lg border border-surface-200 bg-surface-0 p-4 dark:border-surface-700 dark:bg-surface-900;
+  @apply rounded-lg border border-surface-200 bg-surface-0 px-4 py-2 dark:border-surface-700 dark:bg-surface-900;
 }
 
 .patch-notes-header {
@@ -182,15 +183,15 @@ onBeforeUnmount(() => changesStore.cancel(CHANNEL));
 }
 
 .patch-notes-muted {
-  @apply text-xs text-surface-500 dark:text-surface-400;
+  @apply text-xs text-surface-600 dark:text-surface-400;
 }
 
 .patch-notes-list {
-  @apply m-0 mt-2 list-none p-0;
+  @apply m-0 mt-1 list-none p-0;
 }
 
 .patch-notes-line {
-  @apply flex flex-wrap items-baseline gap-x-3 border-t border-surface-200 py-1 text-sm dark:border-surface-700;
+  @apply flex flex-wrap items-baseline gap-x-3 border-t border-surface-200 py-0.5 text-sm dark:border-surface-700;
 }
 
 .patch-notes-text {
@@ -202,6 +203,6 @@ onBeforeUnmount(() => changesStore.cancel(CHANNEL));
 }
 
 .patch-notes-link {
-  @apply whitespace-nowrap text-xs text-primary-600 hover:underline dark:text-primary-400;
+  @apply whitespace-nowrap text-xs text-primary-700 hover:underline dark:text-primary-400;
 }
 </style>

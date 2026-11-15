@@ -14,9 +14,9 @@ Rows are paged by the API and never loaded all at once.
   <div class="build-changes h-full flex flex-col" data-testid="build-changes">
     <!-- Header -->
     <div
-      class="bg-surface-50 dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 p-4"
+      class="bg-surface-50 dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 px-4 py-3"
     >
-      <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+      <div class="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
         <div class="min-w-0">
           <h1 class="text-2xl font-bold text-surface-900 dark:text-surface-50">
             <i class="pi pi-history mr-2" aria-hidden="true"></i>
@@ -24,7 +24,7 @@ Rows are paged by the API and never loaded all at once.
             <template v-else>What changed in {{ versionLabel }}</template>
           </h1>
           <p
-            v-if="comparison"
+            v-if="comparison && !baseUnknown"
             class="mt-1 text-sm text-surface-600 dark:text-surface-400"
             data-testid="changes-scope"
           >
@@ -66,7 +66,7 @@ Rows are paged by the API and never loaded all at once.
           <RouterLink
             v-if="compareBase"
             :to="{ name: 'BuildChanges' }"
-            class="text-sm text-primary-600 hover:underline dark:text-primary-400"
+            class="text-sm text-primary-700 hover:underline dark:text-primary-400"
             data-testid="compare-exit"
           >
             Back to this build's own changes
@@ -103,15 +103,28 @@ Rows are paged by the API and never loaded all at once.
       <aside
         class="border-b border-surface-200 dark:border-surface-700 lg:w-72 lg:flex-none lg:overflow-y-auto lg:border-b-0 lg:border-r"
       >
-        <button
-          type="button"
-          class="flex w-full items-center justify-between p-3 text-sm font-medium lg:hidden"
-          :aria-expanded="filtersOpen"
-          @click="filtersOpen = !filtersOpen"
-        >
-          Filters{{ activeCount ? ` (${activeCount})` : '' }}
-          <i class="pi text-xs" :class="filtersOpen ? 'pi-chevron-up' : 'pi-chevron-down'"></i>
-        </button>
+        <div class="flex items-center gap-3 px-3 lg:hidden">
+          <button
+            type="button"
+            class="flex flex-1 items-center gap-2 py-3 text-left text-sm font-medium"
+            data-testid="changes-filters-toggle"
+            :aria-expanded="filtersOpen"
+            @click="filtersOpen = !filtersOpen"
+          >
+            <i class="pi text-xs" :class="filtersOpen ? 'pi-chevron-up' : 'pi-chevron-down'"></i>
+            Filters{{ activeCount ? ` (${activeCount})` : '' }}
+          </button>
+          <button
+            v-if="response && !filtersOpen"
+            type="button"
+            class="build-changes-link whitespace-nowrap text-sm"
+            data-testid="changes-jump"
+            @click="showResults"
+          >
+            {{ resultsText }}
+            <i class="pi pi-arrow-down text-xs" aria-hidden="true"></i>
+          </button>
+        </div>
         <ChangeFilterPanel
           :class="{ 'hidden lg:block': !filtersOpen }"
           :filters="filters"
@@ -119,15 +132,42 @@ Rows are paged by the API and never loaded all at once.
           @update="updateFilters"
           @reset="resetFilters"
         />
+        <!--
+          On a narrow screen the open panel covers the list: one tap closes it and goes there.
+          The background is a utility class: main.css gives the surface colours to those only.
+        -->
+        <div
+          v-if="filtersOpen"
+          class="build-changes-apply bg-surface-0 dark:bg-surface-950 lg:hidden"
+        >
+          <button
+            type="button"
+            class="build-changes-apply-button"
+            data-testid="changes-show-results"
+            @click="showResults"
+          >
+            {{ loading || !response ? 'Show the changes' : `Show ${resultsText}` }}
+          </button>
+        </div>
       </aside>
 
       <!-- Results -->
-      <main class="min-w-0 flex-1 overflow-y-auto p-4">
+      <main id="changes-results" class="min-w-0 flex-1 overflow-y-auto px-4 py-3">
         <div v-if="sameBuilds" class="py-16 text-center" data-testid="changes-same-build">
           <i class="pi pi-arrows-h mb-4 text-4xl text-surface-400" aria-hidden="true"></i>
           <h3 class="text-lg font-medium text-surface-600 dark:text-surface-400">
             Pick a different build to compare {{ versionLabel }} with
           </h3>
+        </div>
+
+        <div v-else-if="baseUnknown" class="py-16 text-center" data-testid="changes-error">
+          <i class="pi pi-search mb-4 text-4xl text-surface-400" aria-hidden="true"></i>
+          <h3 class="mb-2 text-lg font-medium text-surface-600 dark:text-surface-400">
+            No build named "{{ compareBase }}"
+          </h3>
+          <p class="text-surface-500">
+            Pick a build to compare {{ versionLabel }} with from the list above.
+          </p>
         </div>
 
         <div v-else-if="error && !response" class="py-16 text-center" data-testid="changes-error">
@@ -147,7 +187,7 @@ Rows are paged by the API and never loaded all at once.
           <ProgressSpinner />
         </div>
 
-        <div v-else class="space-y-4">
+        <div v-else class="space-y-3">
           <p
             v-if="!response.base"
             class="rounded border border-surface-200 p-3 text-sm text-surface-700 dark:border-surface-700 dark:text-surface-300"
@@ -177,7 +217,7 @@ Rows are paged by the API and never loaded all at once.
             </span>
             <button
               type="button"
-              class="text-primary-600 hover:underline dark:text-primary-400"
+              class="build-changes-link"
               data-testid="changes-transition-clear"
               @click="updateFilters({ transition: null })"
             >
@@ -187,14 +227,15 @@ Rows are paged by the API and never loaded all at once.
 
           <!-- Build notes -->
           <section v-if="shownNotes.length" data-testid="build-notes" aria-label="Build notes">
-            <h2 class="text-base font-semibold text-surface-900 dark:text-surface-50">
-              Explained in one line
-            </h2>
-            <p class="text-xs text-surface-500 dark:text-surface-400">
-              Build-wide events that account for many changes at once. Their changes are left out of
-              the list below.
-            </p>
-            <ul class="m-0 mt-1 list-none p-0">
+            <div class="flex flex-wrap items-baseline gap-x-3">
+              <h2 class="text-base font-semibold text-surface-900 dark:text-surface-50">
+                Explained in one line
+              </h2>
+              <p class="text-xs text-surface-600 dark:text-surface-400">
+                Build-wide events; their changes are left out of the list below.
+              </p>
+            </div>
+            <ul class="m-0 list-none p-0">
               <BuildNoteLine
                 v-for="note in shownNotes"
                 :key="note.note_id"
@@ -206,14 +247,14 @@ Rows are paged by the API and never loaded all at once.
           </section>
 
           <!-- List header -->
-          <section aria-label="Changes">
-            <div class="flex flex-wrap items-center justify-between gap-3">
+          <section id="changes-list-top" aria-label="Changes" class="scroll-mt-2">
+            <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
               <p class="text-sm text-surface-600 dark:text-surface-400" data-testid="changes-count">
                 {{ listCountText }}
                 <button
                   v-if="hidesByDefault"
                   type="button"
-                  class="ml-2 text-primary-600 hover:underline dark:text-primary-400"
+                  class="build-changes-link ml-2"
                   data-testid="changes-show-all"
                   @click="updateFilters({ relevance: [] })"
                 >
@@ -289,7 +330,7 @@ Rows are paged by the API and never loaded all at once.
 
             <ul
               v-else
-              class="m-0 mt-2 list-none p-0 transition-opacity"
+              class="m-0 mt-1 list-none p-0 transition-opacity"
               :class="{ 'opacity-60': loading }"
               :aria-busy="loading"
               data-testid="changes-list"
@@ -326,7 +367,7 @@ Rows are paged by the API and never loaded all at once.
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter, type LocationQueryRaw } from 'vue-router';
 import Button from 'primevue/button';
 import Paginator, { type PageState } from 'primevue/paginator';
@@ -379,6 +420,8 @@ const { dataVersion: version } = useGameVersion();
 const response = ref<ChangeListResponse | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
+/** HTTP status of a failed request whose answer was "there is no such thing". */
+const errorStatus = ref<number | null>(null);
 const filtersOpen = ref(false);
 
 /** The build the browsed one is compared with; null on the build's own change list. */
@@ -390,6 +433,11 @@ const compareBase = computed(() => {
 
 const sameBuilds = computed(
   () => !!compareBase.value && sameBuild(compareBase.value, version.value)
+);
+
+/** The base named in the URL is not a build the backend knows. */
+const baseUnknown = computed(
+  () => !!compareBase.value && !sameBuilds.value && !response.value && errorStatus.value === 404
 );
 
 const filters = computed(() => parseChangeFilters(route.query));
@@ -428,6 +476,8 @@ const comparison = computed(() => {
 });
 
 const scopeText = computed(() => {
+  if (sameBuilds.value) return `${versionLabel.value} cannot be compared with itself.`;
+  if (baseUnknown.value) return `"${compareBase.value}" is not a build on record.`;
   const answered = response.value;
   if (!answered) return 'Compared with the build before it.';
   if (!answered.base) return 'The oldest build on record.';
@@ -466,11 +516,26 @@ const listCountText = computed(() => {
   const answered = response.value;
   if (!answered) return '';
   const noun = answered.total === 1 ? 'change' : 'changes';
-  if (answered.total === 0) return 'No changes listed';
+  if (answered.total === 0 || answered.items.length === 0) return 'No changes listed';
   const from = (answered.page - 1) * answered.page_size + 1;
   const to = from + answered.items.length - 1;
   return `${count(from)}-${count(to)} of ${count(answered.total)} ${noun}`;
 });
+
+/** "26,516 changes": what the filters leave, for the controls that lead to the list. */
+const resultsText = computed(() => {
+  const total = response.value?.total ?? 0;
+  return `${count(total)} ${total === 1 ? 'change' : 'changes'}`;
+});
+
+/** Close the filters (they cover the list on a narrow screen) and go to the list. */
+async function showResults(): Promise<void> {
+  filtersOpen.value = false;
+  await nextTick();
+  const list =
+    document.getElementById('changes-list-top') ?? document.getElementById('changes-results');
+  if (list && typeof list.scrollIntoView === 'function') list.scrollIntoView({ block: 'start' });
+}
 
 // ---------------------------------------------------------------------------
 // Loading
@@ -489,11 +554,13 @@ async function load(): Promise<void> {
     response.value = null;
     loading.value = false;
     error.value = null;
+    errorStatus.value = null;
     return;
   }
   const asked = requestKey.value;
   loading.value = true;
   error.value = null;
+  errorStatus.value = null;
   try {
     const pair = comparison.value;
     const answered = await changesStore.loadChangeList(
@@ -502,9 +569,18 @@ async function load(): Promise<void> {
         : { version: version.value, query: request.value },
       CHANNEL
     );
-    if (requestKey.value === asked) response.value = answered;
+    if (requestKey.value !== asked) return;
+    const lastPage = Math.max(1, answered.pages);
+    if (answered.page > lastPage) {
+      // A page past the end (an old link, a hand-edited URL): show the last one.
+      await writeFilters({ ...filters.value, page: lastPage }, 'replace');
+      return;
+    }
+    response.value = answered;
   } catch (caught) {
     if (isRequestCancelled(caught) || requestKey.value !== asked) return;
+    const status = (caught as { status?: unknown } | null)?.status;
+    errorStatus.value = typeof status === 'number' ? status : null;
     error.value = errorMessage(caught) || 'The changes could not be loaded.';
   } finally {
     if (requestKey.value === asked) loading.value = false;
@@ -551,11 +627,14 @@ function updateFilters(patch: Partial<ChangeFilters>, options: { keepPage?: bool
   if (!options.keepPage) next.page = 1;
   pendingFilters = next;
   const keys = Object.keys(patch);
-  const typing = keys.length === 1 && keys[0] === 'search';
+  const typing = keys.length === 1 && TYPED_FILTERS.includes(keys[0]);
   void writeFilters(next, typing ? 'replace' : 'push').finally(() => {
     if (pendingFilters === next) pendingFilters = null;
   });
 }
+
+/** Filters typed a character at a time: a step of history per pause would bury the page before. */
+const TYPED_FILTERS = ['search', 'minQl', 'maxQl'];
 
 /**
  * Filters on their way into the URL. Navigation is asynchronous, so a second
@@ -627,7 +706,23 @@ function onBasePicked(slug: string | null): void {
 
 <style scoped>
 .build-changes-summary {
-  @apply m-0 mt-3 flex flex-wrap gap-x-6 gap-y-2;
+  @apply m-0 mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-sm;
+}
+
+.build-changes-stat {
+  @apply flex items-baseline gap-1.5;
+}
+
+.build-changes-link {
+  @apply text-primary-700 hover:underline dark:text-primary-400;
+}
+
+.build-changes-apply {
+  @apply sticky bottom-0 border-t border-surface-200 p-3 dark:border-surface-700;
+}
+
+.build-changes-apply-button {
+  @apply w-full rounded bg-primary-700 px-3 py-2 text-sm font-semibold text-white;
 }
 
 .build-changes-side {
@@ -635,11 +730,11 @@ function onBasePicked(slug: string | null): void {
 }
 
 .build-changes-stat dt {
-  @apply text-xs text-surface-500 dark:text-surface-400;
+  @apply text-xs text-surface-600 dark:text-surface-400;
 }
 
 .build-changes-stat dd {
-  @apply m-0 text-lg font-semibold text-surface-900 dark:text-surface-50;
+  @apply m-0 font-semibold text-surface-900 dark:text-surface-50;
 }
 
 .build-changes-option {

@@ -8,9 +8,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import axios, { type InternalAxiosRequestConfig } from 'axios';
 import { apiClient } from '../../services/api-client';
 import { API_ROOT } from '../../services/api-config';
-import { setCurrentVersion } from '../../composables/useGameVersion';
-import { TEST_VERSION, TEST_ALT_VERSION } from '../helpers/version-fixtures';
+import { setCurrentVersion, versions } from '../../composables/useGameVersion';
+import { TEST_VERSION, TEST_ALT_VERSION, TEST_VERSIONS } from '../helpers/version-fixtures';
 import type { Item, ApiResponse } from '../../types/api';
+import type { ChangeListQuery } from '../../types/changes';
 
 type RequestInterceptor = (config: InternalAxiosRequestConfig) => InternalAxiosRequestConfig;
 type ResponseErrorInterceptor = (error: unknown) => Promise<unknown>;
@@ -306,6 +307,206 @@ describe('API Client', () => {
     it('makes no request for an empty list', async () => {
       expect(await apiClient.batchItemRevisions([])).toEqual({ items: {} });
       expect(mockAxiosInstance.post).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Cross-version diff routes', () => {
+    /** What the transport was asked for: path, query string and the version it is scoped to. */
+    function sentRequest(index = 0): { url: string; query: string; base: string; signal: unknown } {
+      const [url, config] = mockAxiosInstance.get.mock.calls[index] as [
+        string,
+        Partial<InternalAxiosRequestConfig> & { params?: URLSearchParams },
+      ];
+      const scoped = registeredInterceptors.request[0]({
+        headers: new AxiosHeaders(),
+        ...config,
+      });
+      return {
+        url,
+        query: config.params ? config.params.toString() : '',
+        base: scoped.baseURL ?? '',
+        signal: config.signal,
+      };
+    }
+
+    const EVERY_FILTER: ChangeListQuery = {
+      page: 3,
+      page_size: 100,
+      sort: 'ql',
+      kind: ['added', 'changed'],
+      part: ['stats', 'effects'],
+      relevance: ['gameplay', 'economy'],
+      is_nano: false,
+      item_class: 2,
+      min_ql: 50,
+      max_ql: 200,
+      profession: 11,
+      slot: 4,
+      search: 'graft',
+      notes: 'expand',
+      note_id: 4,
+      include_diff: true,
+      transition: 'effect:53089:spell_params.Chance',
+      transition_old: '60',
+      transition_new: '100',
+    };
+
+    const EVERY_FILTER_QUERY =
+      'page=3&page_size=100&sort=ql&kind=added&kind=changed&part=stats&part=effects' +
+      '&relevance=gameplay&relevance=economy&is_nano=false&item_class=2&min_ql=50&max_ql=200' +
+      '&profession=11&slot=4&search=graft&notes=expand&note_id=4&include_diff=true' +
+      '&transition=effect%3A53089%3Aspell_params.Chance&transition_old=60&transition_new=100';
+
+    beforeEach(async () => {
+      // 'ao' is a family alias that follows a build, as the backend registry lists it.
+      versions.value = [
+        ...TEST_VERSIONS,
+        { ...TEST_VERSIONS[0], slug: 'ao', is_default: false, alias_of: TEST_VERSION },
+        { ...TEST_VERSIONS[0], slug: 'ao-14-5-1', is_default: false, sort_order: 5 },
+      ];
+      await setCurrentVersion(TEST_VERSION);
+      mockAxiosInstance.get.mockResolvedValue({ data: { answered: true } });
+    });
+
+    afterEach(() => {
+      versions.value = TEST_VERSIONS;
+    });
+
+    it('asks for the change list of a build with every filter as a query parameter', async () => {
+      const answered = await apiClient.getBuildChanges(EVERY_FILTER, {
+        gameVersion: 'ao-14-5-1',
+      });
+
+      expect(answered).toEqual({ answered: true });
+      expect(mockAxiosInstance.get).toHaveBeenCalledTimes(1);
+      expect(sentRequest()).toMatchObject({
+        url: '/changes',
+        query: EVERY_FILTER_QUERY,
+        base: `${API_ROOT}/ao-14-5-1`,
+      });
+    });
+
+    it('sends nothing it was not asked to filter by', async () => {
+      await apiClient.getBuildChanges({ page: 1, page_size: 50, sort: 'name' });
+
+      expect(sentRequest()).toMatchObject({
+        url: '/changes',
+        query: 'page=1&page_size=50&sort=name',
+        base: `${API_ROOT}/${TEST_VERSION}`,
+      });
+    });
+
+    it('sends the values of a transition only with the transition they belong to', async () => {
+      await apiClient.getBuildChanges({ transition_old: '60', transition_new: '100' });
+      await apiClient.getBuildChanges({ transition: 'stat:287', transition_new: 'null' });
+      await apiClient.getBuildChanges({ include_diff: false, notes: 'collapse' });
+
+      expect(sentRequest(0).query).toBe('');
+      expect(sentRequest(1).query).toBe('transition=stat%3A287&transition_new=null');
+      expect(sentRequest(2).query).toBe('notes=collapse');
+    });
+
+    it('asks the newer build for its comparison with the base, under /compare', async () => {
+      await apiClient.compareBuilds('ao-14-5-1', EVERY_FILTER, { gameVersion: TEST_ALT_VERSION });
+
+      expect(sentRequest()).toMatchObject({
+        url: '/compare/ao-14-5-1',
+        query: EVERY_FILTER_QUERY,
+        base: `${API_ROOT}/${TEST_ALT_VERSION}`,
+      });
+    });
+
+    it('names the base of a build comparison by its build, not by a family alias', async () => {
+      await apiClient.compareBuilds('ao', {}, { gameVersion: TEST_ALT_VERSION });
+
+      expect(sentRequest().url).toBe(`/compare/${TEST_VERSION}`);
+    });
+
+    it('asks for the patch notes with the parts, relevance and notes setting of the page', async () => {
+      await apiClient.getBuildTransitions(
+        {
+          part: ['text', 'stats'],
+          relevance: ['gameplay', 'text'],
+          notes: 'collapse',
+          min_items: 2,
+          limit: 40,
+        },
+        { gameVersion: 'ao-14-5-1' }
+      );
+
+      expect(sentRequest()).toMatchObject({
+        url: '/changes/transitions',
+        query:
+          'part=text&part=stats&relevance=gameplay&relevance=text&notes=collapse&min_items=2&limit=40',
+        base: `${API_ROOT}/ao-14-5-1`,
+      });
+    });
+
+    it('asks for the patch notes of the browsed build with no parameters by default', async () => {
+      await apiClient.getBuildTransitions();
+
+      expect(sentRequest()).toMatchObject({
+        url: '/changes/transitions',
+        query: '',
+        base: `${API_ROOT}/${TEST_VERSION}`,
+      });
+    });
+
+    it("asks for an item's timeline in the version given", async () => {
+      await apiClient.getItemTimeline(271072, { gameVersion: TEST_ALT_VERSION });
+
+      expect(sentRequest()).toMatchObject({
+        url: '/items/271072/timeline',
+        query: '',
+        base: `${API_ROOT}/${TEST_ALT_VERSION}`,
+      });
+    });
+
+    it('compares one item from the newer build, naming the older one in the path', async () => {
+      await apiClient.compareItem(271072, 'ao-14-5-1', { gameVersion: TEST_ALT_VERSION });
+
+      expect(sentRequest()).toMatchObject({
+        url: '/items/271072/compare/ao-14-5-1',
+        query: '',
+        base: `${API_ROOT}/${TEST_ALT_VERSION}`,
+      });
+    });
+
+    it('resolves a family alias given as the base of an item comparison to its build', async () => {
+      await apiClient.compareItem(271072, 'ao', { gameVersion: TEST_ALT_VERSION });
+
+      expect(sentRequest().url).toBe(`/items/271072/compare/${TEST_VERSION}`);
+    });
+
+    it('compares against the browsed version when none is given', async () => {
+      await setCurrentVersion(TEST_ALT_VERSION);
+
+      await apiClient.compareItem(271072, 'ao-14-5-1');
+
+      expect(sentRequest().base).toBe(`${API_ROOT}/${TEST_ALT_VERSION}`);
+    });
+
+    it('hands the abort signal to the transport and lets a cancellation through as is', async () => {
+      const controller = new AbortController();
+      const cancelled = new AxiosError('canceled', AxiosError.ERR_CANCELED);
+      mockAxiosInstance.get.mockRejectedValue(cancelled);
+
+      await expect(apiClient.getBuildChanges({}, { signal: controller.signal })).rejects.toBe(
+        cancelled
+      );
+      expect(sentRequest().signal).toBe(controller.signal);
+    });
+
+    it('reports the sentence a diff route answers a 404 with', async () => {
+      mockAxiosInstance.get.mockRejectedValue({
+        response: { status: 404, data: { error: 'Unknown build nonsense', code: 'HTTP_404' } },
+      });
+
+      await expect(apiClient.compareBuilds('nonsense')).rejects.toMatchObject({
+        type: 'info',
+        title: 'Not Found',
+        message: 'Unknown build nonsense',
+      });
     });
   });
 

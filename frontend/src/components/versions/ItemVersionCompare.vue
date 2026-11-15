@@ -29,7 +29,16 @@ the left side, whichever of the two the page shows.
       </button>
     </header>
 
-    <p v-if="!other" class="item-compare-muted" data-testid="item-compare-hint">
+    <p
+      v-if="!other && sameAsPage"
+      class="item-compare-plain"
+      data-testid="item-compare-same"
+      role="status"
+    >
+      The link asks to compare {{ viewedLabel }} with itself. Pick a different build to see what
+      differs between the two.
+    </p>
+    <p v-else-if="!other" class="item-compare-muted" data-testid="item-compare-hint">
       Pick any other build to see what differs between the two.
     </p>
 
@@ -95,13 +104,18 @@ import { errorMessage, isRequestCancelled } from '@/services/error-message';
 import { buildLabel, orderBuilds, sameBuild } from '@/utils/version-order';
 import type { ItemCompareResponse } from '@/types/changes';
 
-const props = defineProps<{
-  aoid: number;
-  /** Build the item on the page was loaded from. */
-  version: string | null;
-  /** The build to compare it with; null until one is picked. */
-  other: string | null;
-}>();
+const props = withDefaults(
+  defineProps<{
+    aoid: number;
+    /** Build the item on the page was loaded from. */
+    version: string | null;
+    /** The build to compare it with; null until one is picked. */
+    other: string | null;
+    /** The link named the page's own build as the one to compare with. */
+    sameAsPage?: boolean;
+  }>(),
+  { sameAsPage: false }
+);
 
 const emit = defineEmits<{
   (event: 'update:other', slug: string | null): void;

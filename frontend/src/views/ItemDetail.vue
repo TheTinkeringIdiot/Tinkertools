@@ -77,7 +77,7 @@ Shows all item data with profile compatibility and comparison options
 
     <!-- Peek: this item as it was in another snapshot -->
     <div
-      v-if="peekVersion"
+      v-if="showPeekBanner"
       data-testid="item-peek-banner"
       class="mb-4 flex flex-wrap items-center gap-3 rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950 px-4 py-2 text-sm text-amber-900 dark:text-amber-200"
     >
@@ -121,12 +121,13 @@ Shows all item data with profile compatibility and comparison options
       :aoid="parseInt(itemAoid)"
       :version="requestVersion"
       :other="compareVersion"
+      :same-as-page="compareNamesPage"
       @update:other="setCompareVersion"
       @close="closeCompare"
     />
 
     <!-- Shared Item Content -->
-    <div v-if="loading" class="flex items-center justify-center h-96">
+    <div v-if="loading || (notFound && settling)" class="flex items-center justify-center h-96">
       <ProgressSpinner />
     </div>
 
@@ -148,6 +149,30 @@ Shows all item data with profile compatibility and comparison options
         icon="pi pi-eye"
         data-testid="item-missing-view"
         @click="viewLastPresent"
+      />
+    </div>
+
+    <!-- The build asked for has no such item: nothing to retry -->
+    <div v-else-if="absence" class="text-center py-16" data-testid="item-not-found">
+      <i class="pi pi-search text-4xl text-surface-400 mb-4" aria-hidden="true"></i>
+      <h3 class="text-lg font-medium text-surface-600 dark:text-surface-400 mb-2">
+        {{ absence.title }}
+      </h3>
+      <p class="text-surface-500 dark:text-surface-500 mb-4">{{ absence.text }}</p>
+      <Button
+        v-if="peekVersion"
+        :label="`Back to ${currentVersionLabel}`"
+        icon="pi pi-arrow-left"
+        outlined
+        data-testid="item-not-found-back"
+        @click="exitPeek"
+      />
+      <Button
+        v-else-if="elsewhere"
+        :label="`View in ${elsewhere.title}`"
+        icon="pi pi-eye"
+        data-testid="item-not-found-elsewhere"
+        @click="viewElsewhere"
       />
     </div>
 
@@ -396,11 +421,17 @@ import ItemTimeline from '@/components/versions/ItemTimeline.vue';
 import ItemVersionCompare from '@/components/versions/ItemVersionCompare.vue';
 import { useToast } from 'primevue/usetoast';
 import { apiClient } from '@/services/api-client';
-import { isRequestCancelled } from '@/services/error-message';
-import { useGameVersion } from '@/composables/useGameVersion';
+import { errorMessage, isRequestCancelled } from '@/services/error-message';
+import { getVersion, useGameVersion } from '@/composables/useGameVersion';
 import { useChangesStore } from '@/stores/changes';
-import { buildLabel, registryPosition, sameBuild } from '@/utils/version-order';
-import type { BuildRef, ItemTimelineResponse } from '@/types/changes';
+import {
+  buildLabel,
+  familyEntrySlugs,
+  familyTitle,
+  registryPosition,
+  sameBuild,
+} from '@/utils/version-order';
+import type { BuildRef, ItemTimelineResponse, TimelineEntry } from '@/types/changes';
 
 const route = useRoute();
 const router = useRouter();
@@ -418,6 +449,13 @@ const props = defineProps<{
 const item = ref<Item | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
+/** The build asked for answered that it has no such item (or does not exist itself). */
+const notFound = ref(false);
+/** Another game the item exists in, looked up when no build of this one has it. */
+const elsewhere = ref<{ slug: string; title: string; name: string } | null>(null);
+const elsewhereChecked = ref(false);
+/** The item, its timeline and the look elsewhere are still on their way. */
+const settling = ref(false);
 const advancedView = ref(false);
 const equipDialogVisible = ref(false);
 const validSlots = ref<string[]>([]);
@@ -475,14 +513,23 @@ function versionLabel(slug: string | null | undefined): string {
 // Comparison with another build (?compare=<slug>)
 // ============================================================================
 
-/** The build the displayed item is compared with, or null. */
-const compareVersion = computed(() => {
+/** What ?compare= names, whatever it is. */
+const compareParam = computed(() => {
   const compare = route.query.compare;
-  if (typeof compare !== 'string' || !compare) return null;
-  return sameBuild(compare, requestVersion.value) ? null : compare;
+  return typeof compare === 'string' && compare ? compare : null;
 });
 
-const compareOpen = computed(() => comparePicking.value || !!compareVersion.value);
+/** ?compare= names the build already on the page: there is nothing to compare. */
+const compareNamesPage = computed(
+  () => !!compareParam.value && sameBuild(compareParam.value, requestVersion.value)
+);
+
+/** The build the displayed item is compared with, or null. */
+const compareVersion = computed(() => (compareNamesPage.value ? null : compareParam.value));
+
+const compareOpen = computed(
+  () => comparePicking.value || !!compareVersion.value || (compareNamesPage.value && !!item.value)
+);
 
 const comparingWithCurrent = computed(
   () => !!peekVersion.value && sameBuild(compareVersion.value, currentVersion.value)
@@ -498,6 +545,11 @@ const missingInCurrent = computed(
   () => !peekVersion.value && !item.value && !loading.value && timelineEntries.value.length > 0
 );
 
+/** The peek banner describes a snapshot that is on the page (or still may be). */
+const showPeekBanner = computed(
+  () => !!peekVersion.value && (!!item.value || (!loading.value && !notFound.value))
+);
+
 /** The newest build that still defines the item. */
 const lastPresentBuild = computed<BuildRef | null>(() => {
   const newest = timelineEntries.value[0];
@@ -511,10 +563,12 @@ const lastPresentBuild = computed<BuildRef | null>(() => {
  * history in effect there: removed before it (and perhaps back later), or
  * not yet added.
  */
-const missingExplanation = computed(() => {
+const missingExplanation = computed(() => absenceExplanation(currentVersion.value));
+
+function absenceExplanation(build: string | null): string {
   const entries = timelineEntries.value;
   if (entries.length === 0) return '';
-  const viewed = registryPosition(currentVersion.value);
+  const viewed = registryPosition(build);
   // Entries are newest first: the first one not newer than the browsed build.
   const index =
     viewed === Number.MAX_SAFE_INTEGER
@@ -536,6 +590,45 @@ const missingExplanation = computed(() => {
   const newest = entries[0];
   if (newest.kind === 'removed') return `Removed in ${newest.build.display_name}`;
   return `First appears in ${entries[entries.length - 1].build.display_name}`;
+}
+
+/**
+ * What to say when the build asked for has no such item: which build, why
+ * (from the item's history when it has one), and whether another game has it.
+ * Null while there is something else to show.
+ */
+const absence = computed<{ title: string; text: string } | null>(() => {
+  if (!notFound.value || item.value || loading.value || missingInCurrent.value) return null;
+  const id = itemAoid.value;
+  const peek = peekVersion.value;
+  if (peek) {
+    const known = !!getVersion(peek) || timelineBuilds.value.some((build) => build.slug === peek);
+    if (!known) {
+      return {
+        title: `No build named "${peek}"`,
+        text: `The link asks for this item as of "${peek}", which is not a build on record.`,
+      };
+    }
+    return {
+      title: `Not present in ${peekLabel.value}`,
+      text: absenceExplanation(peek) || `${peekLabel.value} has no item with id ${id}.`,
+    };
+  }
+  if (!timeline.value) {
+    return {
+      title: `Not in ${currentVersionLabel.value}`,
+      text: `${currentVersionLabel.value} has no item with id ${id}.`,
+    };
+  }
+  if (!elsewhereChecked.value) return null;
+  const game = familyTitle(timeline.value.family);
+  if (elsewhere.value) {
+    return {
+      title: `Not in ${game}`,
+      text: `No ${game} build has an item with id ${id}. It exists in ${elsewhere.value.title} as "${elsewhere.value.name}".`,
+    };
+  }
+  return { title: 'No such item', text: `No build on record has an item with id ${id}.` };
 });
 
 /** The item's name; for an item this version does not have, the name its history gives it. */
@@ -620,6 +713,7 @@ async function loadItem() {
 
   loading.value = true;
   error.value = null;
+  notFound.value = false;
 
   // Clear stale interpolation state when loading a new item
   interpolatedItem.value = null;
@@ -636,6 +730,7 @@ async function loadItem() {
         item.value = response.data;
       } else {
         item.value = null;
+        notFound.value = true;
         error.value = 'Item not found in this snapshot';
       }
     } else {
@@ -646,18 +741,81 @@ async function loadItem() {
         item.value = null;
         // Check if there's an error in the store
         if (itemsStore.error) {
+          notFound.value = isAbsenceError(itemsStore.error);
           error.value = itemsStore.error.message || 'Failed to load item';
         } else {
+          notFound.value = true;
           error.value = 'Item not found';
         }
       }
     }
   } catch (err) {
     item.value = null;
-    error.value = (err instanceof Error && err.message) || 'Failed to load item';
+    notFound.value = isAbsenceError(err);
+    error.value = errorMessage(err) || 'Failed to load item';
   } finally {
     loading.value = false;
   }
+}
+
+/** The server answered that there is no such item (or no such build): retrying cannot help. */
+function isAbsenceError(caught: unknown): boolean {
+  if (typeof caught !== 'object' || caught === null) return false;
+  const { status, message } = caught as { status?: unknown; message?: unknown };
+  return status === 404 || message === 'Item not found';
+}
+
+/**
+ * For an item no build of the browsed game has: one timeline request per other
+ * game tells whether it exists there (Project Rubi-Ka's own items, or AO items
+ * added after the fork).
+ */
+async function lookElsewhere() {
+  const aoidParam = itemAoid.value;
+  elsewhere.value = null;
+  elsewhereChecked.value = false;
+  if (!notFound.value || peekVersion.value || !timeline.value || timelineEntries.value.length) {
+    return;
+  }
+  let found: { slug: string; title: string; name: string } | null = null;
+  for (const entry of familyEntrySlugs(timeline.value.family)) {
+    try {
+      const other = await changesStore.loadTimeline(parseInt(aoidParam), entry.slug);
+      const newest: TimelineEntry | undefined = other.entries[0];
+      if (newest) {
+        found = { slug: entry.slug, title: familyTitle(entry.family), name: newest.name };
+        break;
+      }
+    } catch {
+      // Not knowing is the same as not offering the link.
+    }
+  }
+  if (itemAoid.value !== aoidParam) return;
+  elsewhere.value = found;
+  elsewhereChecked.value = true;
+}
+
+async function loadPage(parts: { timeline: boolean } = { timeline: true }) {
+  const asked = `${itemAoid.value}|${requestVersion.value ?? ''}`;
+  latestPage = asked;
+  settling.value = true;
+  try {
+    // Both record their own failures
+    await Promise.all([loadItem(), parts.timeline ? loadTimeline() : Promise.resolve()]);
+    await lookElsewhere();
+  } finally {
+    if (latestPage === asked) settling.value = false;
+  }
+}
+
+let latestPage = '';
+
+async function viewElsewhere() {
+  if (!elsewhere.value) return;
+  await router.push({
+    name: 'ItemDetail',
+    params: { ...route.params, version: elsewhere.value.slug },
+  });
 }
 
 /**
@@ -869,8 +1027,7 @@ onMounted(async () => {
   if (!profilesStore.hasProfiles) {
     await profilesStore.loadProfiles();
   }
-  // Both record their own failures
-  await Promise.all([loadItem(), loadTimeline()]);
+  await loadPage();
 });
 
 // Watch for route changes
@@ -880,7 +1037,7 @@ watch(
     if (route.name === 'ItemDetail') {
       comparePicking.value = false;
       timeline.value = null;
-      await Promise.all([loadItem(), loadTimeline()]);
+      await loadPage();
     }
   }
 );
@@ -890,7 +1047,7 @@ watch(
   () => route.query.as,
   async () => {
     if (route.name !== 'ItemDetail') return;
-    await loadItem();
+    await loadPage({ timeline: false });
   }
 );
 

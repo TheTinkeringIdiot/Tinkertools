@@ -73,7 +73,7 @@ type RetryableRequestConfig = InternalAxiosRequestConfig & {
 interface RequestErrorLike {
   code?: string;
   message?: string;
-  response?: { status?: number; data?: { error?: ApiError } };
+  response?: { status?: number; data?: { error?: ApiError | string; detail?: unknown } };
   config?: RetryableRequestConfig;
 }
 
@@ -676,7 +676,7 @@ class TinkerToolsApiClient {
       const { code, response } = asRequestError(error);
       if (code === 'ERR_CANCELED') throw error;
       // These routes answer {"error": "<sentence>", "code": "HTTP_404"}.
-      const detail = (response?.data as { error?: unknown } | undefined)?.error;
+      const detail = response?.data?.error;
       if (response?.status === 404 && typeof detail === 'string') {
         const notFound: UserFriendlyError = {
           type: 'info',
@@ -684,6 +684,7 @@ class TinkerToolsApiClient {
           message: detail,
           action: 'Pick another version',
           recoverable: true,
+          status: 404,
         };
         throw notFound;
       }
@@ -744,8 +745,33 @@ class TinkerToolsApiClient {
   private handleError(error: unknown): UserFriendlyError {
     const { code, message, response } = asRequestError(error);
 
-    if (response?.data?.error) {
-      return ApiErrorHandler.handle(response.data.error);
+    const detail = response?.data?.error;
+    if (detail && typeof detail === 'object') {
+      return ApiErrorHandler.handle(detail);
+    }
+
+    // A plain 404 answers {"error": "<sentence>", "code": "HTTP_404"}; an
+    // unknown version segment answers {"detail": "<sentence>"}.
+    if (response?.status === 404) {
+      const sentence = typeof detail === 'string' ? detail : response.data?.detail;
+      return {
+        type: 'info',
+        title: 'Not Found',
+        message: typeof sentence === 'string' && sentence ? sentence : 'Not found',
+        action: 'Check the link or pick another version',
+        recoverable: true,
+        status: 404,
+      };
+    }
+
+    if (detail) {
+      return {
+        type: 'error',
+        title: 'Unexpected Error',
+        message: 'Something went wrong. Please try again.',
+        action: 'Contact support if the problem persists',
+        recoverable: false,
+      };
     }
 
     // axios reports ERR_NETWORK; NETWORK_ERROR is the older spelling

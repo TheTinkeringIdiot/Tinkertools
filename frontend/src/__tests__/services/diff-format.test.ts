@@ -16,9 +16,11 @@ import {
   isCosmeticEvent,
   isCosmeticMisc,
   isCosmeticStat,
+  isCuratedStat,
   isEmptyDiff,
   isStructuralTransition,
   miscValueText,
+  statDeltaText,
   statValueText,
   cosmeticEffectCount,
   transitionCount,
@@ -26,7 +28,8 @@ import {
   transitionText,
   withoutCosmeticEffects,
 } from '@/services/diff-format';
-import type { DiffEffect, SharedTransition } from '@/types/changes';
+import { getItemClassName, getNanoSchoolName, getNanoStrainName } from '@/services/game-utils';
+import type { DiffEffect, SharedTransition, StatChange } from '@/types/changes';
 import { CRITTER_DIFF, TRANSITIONS_1460, emptyDiff } from '../helpers/change-fixtures';
 
 function transition(overrides: Partial<SharedTransition>): SharedTransition {
@@ -411,5 +414,106 @@ describe('transitionText', () => {
     expect(transitionCount(byPath('action:8:criterion'))).toBe('on 69 items (72 times)');
     expect(transitionCount(transition({ items: 1, occurrences: 1 }))).toBe('on 1 item');
     expect(transitionCount(transition({ items: 3537, occurrences: 3537 }))).toBe('on 3,537 items');
+    expect(transitionCount(transition({ items: 1204, occurrences: 15320 }))).toBe(
+      'on 1,204 items (15,320 times)'
+    );
+  });
+});
+
+describe('values the item page shows in words or with a unit', () => {
+  const stat = (id: number, before: number | null, after: number | null): StatChange => ({
+    stat: id,
+    change: before === null ? 'added' : after === null ? 'removed' : 'changed',
+    old: before,
+    new: after,
+    bits_set: null,
+    bits_cleared: null,
+  });
+
+  it('shows a nano duration as the nano page does, not in centiseconds', () => {
+    expect(statValueText(90000, 8)).toBe('15.00m');
+    expect(statValueText(1440000, 8)).toBe('4.00h');
+    expect(statValueText(4500, 8)).toBe('45.00s');
+    expect(statValueText(0, 8)).toBe('Instant');
+    expect(statDeltaText(stat(8, 90000, 1440000))).toBe('+3.75h');
+    // "Instant" is not a length to measure from.
+    expect(statDeltaText(stat(8, 0, 90000))).toBe('');
+  });
+
+  it('shows attack and recharge delays in seconds', () => {
+    expect(statValueText(950, 210)).toBe('9.50s');
+    expect(statValueText(100, 294)).toBe('1.00s');
+    expect(statDeltaText(stat(210, 950, 650))).toBe('−3.00s');
+    expect(statDeltaText(stat(294, 600, 100))).toBe('−5.00s');
+  });
+
+  it('names an item class, a nano school and a nano strain', () => {
+    expect(getItemClassName(2)).toBeTruthy();
+    expect(statValueText(2, 76)).toBe(getItemClassName(2));
+    expect(statValueText(4, 405)).toBe(getNanoSchoolName(4));
+    expect(statValueText(1, 405)).toBe(getNanoSchoolName(1));
+    expect(getNanoStrainName(1)).toBeTruthy();
+    expect(statValueText(1, 75)).toBe(getNanoStrainName(1));
+    // Named values have no size of change.
+    expect(statDeltaText(stat(76, 2, 4))).toBe('');
+    expect(statDeltaText(stat(405, 4, 1))).toBe('');
+  });
+
+  it('leaves a value no table names as the number it is', () => {
+    expect(statValueText(15, 4)).toBe('15');
+    expect(statValueText(999999, 75)).toBe('999999');
+    expect(statValueText(60, 287)).toBe('60');
+    expect(statDeltaText(stat(287, 20, 60))).toBe('+40');
+    expect(statDeltaText(stat(287, 60, 20))).toBe('−40');
+    expect(statDeltaText(stat(287, 60, 60))).toBe('');
+    expect(statDeltaText(stat(287, null, 60))).toBe('');
+  });
+
+  it('gives a skill percentage its unit and never reads it as a name or a time', () => {
+    expect(statDeltaText(stat(8, 50, 75), '%', false)).toBe('+25%');
+    expect(statDeltaText(stat(76, 2, 4), '%', false)).toBe('+2%');
+  });
+
+  it('words a duration or class change in a patch note the same way', () => {
+    expect(transitionText(transition({ path: 'stat:8', stat: 8, old: 90000, new: 1440000 }))).toBe(
+      'Duration: 15.00m → 4.00h'
+    );
+    expect(transitionText(transition({ path: 'stat:76', stat: 76, old: 2, new: 4 }))).toBe(
+      `ItemClass: ${getItemClassName(2)} → ${getItemClassName(4)}`
+    );
+  });
+
+  it('names the strain an effect resists', () => {
+    const resist: DiffEffect = {
+      spell_id: 53162,
+      target: 2,
+      tick_count: 1,
+      tick_interval: 0,
+      spell_format: null,
+      spell_params: { NanoStrain: 1, Resistance: 50 },
+      criteria: [],
+    };
+    expect(effectText(resist)).toBe(`Resist ${getNanoStrainName(1)} by 50%`);
+    expect(effectText({ ...resist, spell_params: { NanoStrain: 999999, Resistance: 50 } })).toBe(
+      'Resist 999999 by 50%'
+    );
+  });
+
+  it('names the profession or breed a visual-profession requirement compares with', () => {
+    expect(criterionText({ value1: 368, value2: 11, operator: 0 })).toBe(
+      'VisualProfession = NanoTechnician'
+    );
+    expect(criterionText({ value1: 368, value2: 11, operator: 24 })).toBe(
+      'VisualProfession ≠ NanoTechnician'
+    );
+    expect(criterionText({ value1: 367, value2: 2, operator: 0 })).toBe('VisualBreed = Opifex');
+    // A value no table names stays a number.
+    expect(criterionText({ value1: 368, value2: 99, operator: 0 })).toBe('VisualProfession = 99');
+  });
+
+  it('marks the strain stats, which the item page reads from the curated table', () => {
+    expect(isCuratedStat(75)).toBe(true);
+    expect(isCuratedStat(1003)).toBe(true);
+    expect(isCuratedStat(76)).toBe(false);
   });
 });

@@ -232,7 +232,7 @@ function describe(entry: TimelineEntry, index: number): string {
 }
 
 .item-timeline-link {
-  @apply whitespace-nowrap text-xs text-primary-600 hover:underline dark:text-primary-400;
+  @apply whitespace-nowrap text-xs text-primary-700 hover:underline dark:text-primary-400;
 }
 
 .item-timeline-diff {

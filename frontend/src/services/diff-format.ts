@@ -19,6 +19,8 @@ import {
   WORN_ITEM,
 } from './game-data';
 import {
+  formatCentisecondsToSeconds,
+  formatDuration,
   getExpansionName,
   getItemClassName,
   getNanoStrainName,
@@ -192,16 +194,60 @@ export function isFlagChange(change: StatChange): boolean {
   return change.bits_set !== null || change.bits_cleared !== null;
 }
 
+const DURATION_STAT = 8;
+/** Attack and recharge delay: centiseconds, shown in seconds on the item page. */
+const DELAY_STATS = new Set([210, 294]);
+
+/** A stat held in centiseconds, as the item page formats it; undefined for any other stat. */
+function timeText(statId: number | undefined, value: number): string | undefined {
+  if (statId === DURATION_STAT) return formatDuration(value);
+  if (statId !== undefined && DELAY_STATS.has(statId)) return formatCentisecondsToSeconds(value);
+  return undefined;
+}
+
 /**
  * A stat's value in words: the name it stands for where it has one (a
- * profession, a breed, a faction, the stat an initiative or damage type
- * points at), the number otherwise.
+ * profession, a breed, a faction, an item class, a nano school or strain, the
+ * stat an initiative or damage type points at), a time in the unit the item
+ * page shows it in, the number otherwise.
  */
 export function statValueText(value: number | null, statId?: number, unit = ''): string {
   if (value === null) return 'none';
   const name = statId === undefined ? undefined : getStatValueName(statId, value);
-  return name ?? `${value}${unit}`;
+  return name ?? timeText(statId, value) ?? `${value}${unit}`;
 }
+
+/**
+ * "+40" / "−5%" for a stat entry whose values measure something; '' when a
+ * value is missing, both are equal, or they are names. A time is given in the
+ * unit its values are shown in.
+ */
+export function statDeltaText(change: StatChange, unit = '', nameValues = true): string {
+  const { old: before, new: after } = change;
+  if (before === null || after === null || before === after) return '';
+  if (nameValues && hasNamedValues(change)) return '';
+  const difference = after - before;
+  const sign = difference > 0 ? '+' : '−';
+  const size = Math.abs(difference);
+  // "Instant" and "Permanent" are not lengths of time to measure from.
+  if (nameValues && change.stat === DURATION_STAT && (before <= 0 || after <= 0)) return '';
+  const time = nameValues ? timeText(change.stat, size) : undefined;
+  return `${sign}${time ?? `${size}${unit}`}`;
+}
+
+/**
+ * Stats of a nano the item page reads from the curated strain table, not from
+ * the game client: a diff, which compares the client's data, can show a value
+ * the pages of both builds do not.
+ */
+const CURATED_STATS = new Set([75, 1003]);
+
+export function isCuratedStat(statId: number): boolean {
+  return CURATED_STATS.has(statId);
+}
+
+export const CURATED_STAT_NOTE =
+  "The game client's raw value. The item page shows the curated strain, which can differ.";
 
 /** Whether the values of a stat entry are names, where a difference means nothing. */
 export function hasNamedValues(change: StatChange): boolean {

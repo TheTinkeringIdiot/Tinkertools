@@ -46,14 +46,14 @@ Shows items in grid or list view with pagination and compatibility indicators
             @quick-view="showQuickView(item)"
           />
           <span
-            v-if="revisionCount(item) > 1"
-            class="absolute top-1 right-1 inline-flex items-center gap-1 rounded bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 text-xs text-surface-600 dark:text-surface-300"
+            v-if="changeCount(item) > 0"
+            class="absolute right-1 top-1 inline-flex flex-none items-center gap-1 whitespace-nowrap rounded bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 text-xs text-surface-600 dark:text-surface-300"
             data-testid="item-revision-badge"
             :data-aoid="item.aoid"
-            :title="`Changed in ${revisionCount(item)} snapshots`"
+            :title="changedTitle(item)"
           >
-            <i class="pi pi-clock text-xs" aria-hidden="true"></i>
-            {{ revisionCount(item) }}
+            <i class="pi pi-history text-xs" aria-hidden="true"></i>
+            {{ changedText(item) }}
           </span>
         </div>
       </div>
@@ -94,14 +94,14 @@ Shows items in grid or list view with pagination and compatibility indicators
                       <Badge :value="`QL ${item.ql}`" severity="info" />
                       <Badge v-if="item.is_nano" value="Nano" severity="success" />
                       <span
-                        v-if="revisionCount(item) > 1"
-                        class="inline-flex items-center gap-1 rounded bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 text-xs text-surface-600 dark:text-surface-300"
+                        v-if="changeCount(item) > 0"
+                        class="inline-flex flex-none items-center gap-1 whitespace-nowrap rounded bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 text-xs text-surface-600 dark:text-surface-300"
                         data-testid="item-revision-badge"
                         :data-aoid="item.aoid"
-                        :title="`Changed in ${revisionCount(item)} snapshots`"
+                        :title="changedTitle(item)"
                       >
-                        <i class="pi pi-clock text-xs" aria-hidden="true"></i>
-                        {{ revisionCount(item) }}
+                        <i class="pi pi-history text-xs" aria-hidden="true"></i>
+                        {{ changedText(item) }}
                       </span>
                     </div>
 
@@ -252,15 +252,24 @@ const props = defineProps<{
   loading?: boolean;
   pagination?: PaginationInfo;
   comparisonItems?: number[];
-  /** AOID -> number of game snapshots the item's definition changed in. */
-  revisionCounts?: Record<number, number>;
+  /** AOID -> number of builds that changed the item after it first appeared. */
+  changeCounts?: Record<number, number>;
 }>();
 
-/** Items that never changed across snapshots get no badge. */
-function revisionCount(item: Item): number {
+/** Items no build changed since they first appeared get no badge. */
+function changeCount(item: Item): number {
   const aoid = item.aoid;
-  if (!aoid || !props.revisionCounts) return 0;
-  return props.revisionCounts[aoid] || 0;
+  if (!aoid || !props.changeCounts) return 0;
+  return props.changeCounts[aoid] || 0;
+}
+
+function changedText(item: Item): string {
+  const count = changeCount(item);
+  return `Changed in ${count} ${count === 1 ? 'build' : 'builds'}`;
+}
+
+function changedTitle(item: Item): string {
+  return `${changedText(item)} since it first appeared; its page lists them under History`;
 }
 
 const emit = defineEmits<{

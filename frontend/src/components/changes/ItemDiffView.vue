@@ -89,11 +89,19 @@ Cosmetic entries are folded behind one toggle.
               v-if="!(change.bits_set?.length || change.bits_cleared?.length)"
               class="item-diff-muted"
             >
-              {{ change.change === 'removed' ? 'no longer present' : 'no flags set' }}
+              {{ emptyFlagsText(change) }}
             </span>
           </template>
           <StatValueChange v-else :change="change" :show-delta="!isCosmeticStat(change)" />
           <span v-if="isCosmeticStat(change)" class="item-diff-tag">cosmetic</span>
+          <p
+            v-if="isCuratedStat(change.stat)"
+            class="item-diff-note"
+            data-testid="diff-raw-note"
+            :data-stat="change.stat"
+          >
+            {{ CURATED_STAT_NOTE }}
+          </p>
         </div>
       </div>
     </section>
@@ -314,6 +322,7 @@ import EffectLine from './EffectLine.vue';
 import StatValueChange from './StatValueChange.vue';
 import { diffWords, type WordDiffSegment } from '@/utils/word-diff';
 import {
+  CURATED_STAT_NOTE,
   KIND_LABELS,
   actionLabel,
   effectFieldDelta,
@@ -328,6 +337,7 @@ import {
   isCosmeticEvent,
   isCosmeticMisc,
   isCosmeticStat,
+  isCuratedStat,
   isFlagChange,
   isHiddenEffectField,
   miscValueText,
@@ -433,6 +443,13 @@ function flag(statId: number, bit: number): string {
   return flagName(statId, bit, { isNano: props.isNano, itemClass: props.itemClass });
 }
 
+/** A flag stat that came or went with no flag in it. */
+function emptyFlagsText(change: StatChange): string {
+  if (change.change === 'removed') return 'no longer present';
+  if (change.change === 'added') return 'added, with none set';
+  return 'no flags set';
+}
+
 function isAbsent(value: unknown): boolean {
   return value === null || value === undefined || value === '';
 }
@@ -495,6 +512,10 @@ function visibleFields(fields: FieldChange[]): FieldChange[] {
   @apply ml-1 rounded border border-surface-300 px-1 text-xs font-normal text-surface-500 dark:border-surface-600 dark:text-surface-400;
 }
 
+.item-diff-note {
+  @apply m-0 text-xs font-normal text-surface-600 dark:text-surface-400;
+}
+
 .item-diff-delta {
   @apply ml-1 text-xs text-surface-500 dark:text-surface-400;
 }
@@ -516,11 +537,11 @@ function visibleFields(fields: FieldChange[]): FieldChange[] {
 }
 
 .item-diff-more {
-  @apply ml-5 mt-2 text-xs text-primary-600 hover:underline dark:text-primary-400;
+  @apply ml-5 mt-2 text-xs text-primary-700 hover:underline dark:text-primary-400;
 }
 
 .item-diff-cosmetic-toggle {
-  @apply mt-3 flex items-center gap-1 text-xs text-primary-600 hover:underline dark:text-primary-400;
+  @apply mt-3 flex items-center gap-1 text-xs text-primary-700 hover:underline dark:text-primary-400;
 }
 
 .item-diff .diff-old,

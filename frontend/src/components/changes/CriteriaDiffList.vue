@@ -127,7 +127,7 @@ const shown = computed(() =>
 }
 
 .criteria-diff-fold-toggle {
-  @apply flex items-center gap-1 py-0.5 text-xs text-primary-600 hover:underline dark:text-primary-400;
+  @apply flex items-center gap-1 py-0.5 text-xs text-primary-700 hover:underline dark:text-primary-400;
 }
 
 .criteria-diff-operator {
