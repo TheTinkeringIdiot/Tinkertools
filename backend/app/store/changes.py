@@ -44,6 +44,7 @@ from sqlalchemy import (
     null,
     or_,
     select,
+    text,
     true,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -185,18 +186,35 @@ def find_build(db: Session, slug: str) -> Optional[Build]:
 # ---------------------------------------------------------------------------
 
 
+def _listed_by(shown: FromClause) -> List[ColumnElement]:
+    """The columns of the revision a change is listed by, which both sources
+    carry so that filtering and sorting need not look the revision up again."""
+    return [shown.c.ql, shown.c.item_class, shown.c.is_nano, shown.c.text_id]
+
+
 def logged_changes(build: Build) -> Select:
     """The change log of ``build``."""
     c = t.item_change
-    return select(
-        c.c.aoid,
-        c.c.kind,
-        c.c.old_rev_id,
-        c.c.new_rev_id,
-        c.c.parts_changed,
-        c.c.relevance,
-        c.c.note_id,
-    ).where(c.c.branch == build.branch, c.c.ordinal == build.ordinal)
+    shown = t.item_revision.alias("shown")
+    return (
+        select(
+            c.c.aoid,
+            c.c.kind,
+            c.c.old_rev_id,
+            c.c.new_rev_id,
+            c.c.parts_changed,
+            c.c.relevance,
+            c.c.note_id,
+            *_listed_by(shown),
+        )
+        .select_from(
+            c.join(
+                shown,
+                shown.c.rev_id == func.coalesce(c.c.new_rev_id, c.c.old_rev_id),
+            )
+        )
+        .where(c.c.branch == build.branch, c.c.ordinal == build.ordinal)
+    )
 
 
 def _parts_changed(old: FromClause, new: FromClause) -> ColumnElement:
@@ -261,8 +279,10 @@ def compared_changes(
     new = (select(after.c.aoid, after.c.rev_id).where(present(build, after))).subquery(
         "new_presence"
     )
+    # The revision a row is listed by is the newer one, the older for a
+    # removed item; for a changed item it is the new side of the comparison.
+    shown = t.item_revision.alias("shown")
     old_revision = t.item_revision.alias("old_revision")
-    new_revision = t.item_revision.alias("new_revision")
     old_digests = t.revision_relevance.alias("old_digests")
     new_digests = t.revision_relevance.alias("new_digests")
     kind = case((old.c.rev_id.is_(None), "A"), (new.c.rev_id.is_(None), "R"), else_="C")
@@ -272,22 +292,21 @@ def compared_changes(
             kind.label("kind"),
             old.c.rev_id.label("old_rev_id"),
             new.c.rev_id.label("new_rev_id"),
-            case(
-                (kind == "C", _parts_changed(old_revision, new_revision)), else_=0
-            ).label("parts_changed"),
+            case((kind == "C", _parts_changed(old_revision, shown)), else_=0).label(
+                "parts_changed"
+            ),
             case(
                 (old.c.rev_id.is_(None), rules.bit("added")),
                 (new.c.rev_id.is_(None), rules.bit("removed")),
-                else_=_relevance(
-                    rules, old_revision, new_revision, old_digests, new_digests
-                ),
+                else_=_relevance(rules, old_revision, shown, old_digests, new_digests),
             ).label("relevance"),
             cast(null(), Integer).label("note_id"),
+            *_listed_by(shown),
         )
         .select_from(
             old.join(new, old.c.aoid == new.c.aoid, full=True)
+            .join(shown, shown.c.rev_id == func.coalesce(new.c.rev_id, old.c.rev_id))
             .outerjoin(old_revision, old_revision.c.rev_id == old.c.rev_id)
-            .outerjoin(new_revision, new_revision.c.rev_id == new.c.rev_id)
             .outerjoin(old_digests, old_digests.c.rev_id == old.c.rev_id)
             .outerjoin(new_digests, new_digests.c.rev_id == new.c.rev_id)
         )
@@ -428,9 +447,11 @@ def fetch_changes(
     sort: str,
     page: int,
     page_size: int,
+    noted: bool = True,
 ) -> ChangePage:
     """Filter ``source`` (``logged_changes`` or ``compared_changes``), count
-    it and fetch one page, in one statement.
+    it and fetch one page, in one statement. ``noted`` is false for a source
+    without build notes, whose notes are then not counted.
 
     A row is listed, filtered and sorted by its newer revision (the older for
     a removed item); a name search also matches the older name. The summary
@@ -439,7 +460,7 @@ def fetch_changes(
     ``filters.expand_notes`` or ``filters.note_id`` says otherwise.
     """
     changes = source.cte("changes").prefix_with("MATERIALIZED")
-    revision, text = t.item_revision, t.part_text
+    names = t.part_text
     conditions: List[ColumnElement] = list(filters.item_conditions)
     if filters.among is not None:
         conditions.append(changes.c.aoid.in_(filters.among))
@@ -454,19 +475,19 @@ def fetch_changes(
         mask = relevance_mask(sorted(set(filters.relevance)))
         conditions.append(changes.c.relevance.op("&")(mask) != 0)
     if filters.is_nano is not None:
-        conditions.append(revision.c.is_nano == filters.is_nano)
+        conditions.append(changes.c.is_nano == filters.is_nano)
     if filters.item_class is not None:
-        conditions.append(revision.c.item_class == filters.item_class)
+        conditions.append(changes.c.item_class == filters.item_class)
     if filters.min_ql is not None:
-        conditions.append(revision.c.ql >= filters.min_ql)
+        conditions.append(changes.c.ql >= filters.min_ql)
     if filters.max_ql is not None:
-        conditions.append(revision.c.ql <= filters.max_ql)
+        conditions.append(changes.c.ql <= filters.max_ql)
     if filters.search:
         old_revision = t.item_revision.alias("searched_revision")
         old_text = t.part_text.alias("searched_text")
         conditions.append(
             or_(
-                _contains(text.c.name, filters.search),
+                _contains(names.c.name, filters.search),
                 exists().where(
                     old_revision.c.rev_id == changes.c.old_rev_id,
                     changes.c.new_rev_id.isnot(None),
@@ -476,6 +497,19 @@ def fetch_changes(
             )
         )
 
+    # Names are looked up only when they are searched or sorted on, and the
+    # revision only when a filter reads its parts: both joins touch every
+    # change of the source.
+    listed_from: FromClause = changes
+    named = bool(filters.search) or sort == "name"
+    if named:
+        listed_from = listed_from.join(names, names.c.text_id == changes.c.text_id)
+    if filters.item_conditions:
+        listed_from = listed_from.join(
+            t.item_revision,
+            t.item_revision.c.rev_id
+            == func.coalesce(changes.c.new_rev_id, changes.c.old_rev_id),
+        )
     matched = (
         select(
             changes.c.aoid,
@@ -485,16 +519,10 @@ def fetch_changes(
             changes.c.parts_changed,
             changes.c.relevance,
             changes.c.note_id,
-            revision.c.ql,
-            text.c.name,
+            changes.c.ql,
+            (names.c.name if named else cast(null(), String)).label("name"),
         )
-        .select_from(
-            changes.join(
-                revision,
-                revision.c.rev_id
-                == func.coalesce(changes.c.new_rev_id, changes.c.old_rev_id),
-            ).join(text, text.c.text_id == revision.c.text_id)
-        )
+        .select_from(listed_from)
         .where(*conditions)
         .cte("matched")
         .prefix_with("MATERIALIZED")
@@ -506,30 +534,44 @@ def fetch_changes(
     else:
         listed = matched.c.note_id.is_(None)
 
-    order = {"name": [matched.c.name], "ql": [matched.c.ql], "aoid": []}[sort]
+    # The page is cut before its rows are built: a row built for every match
+    # and then sorted costs more than the rest of the statement.
+    keys = {"name": ["name"], "ql": ["ql"], "aoid": []}[sort] + ["aoid"]
+    cut = (
+        select(matched)
+        .where(listed)
+        .order_by(*(matched.c[key] for key in keys))
+        .offset(page_offset(page, page_size))
+        .limit(page_size)
+        .subquery("page")
+    )
     page_rows = (
         select(
             func.jsonb_build_array(
-                matched.c.aoid,
-                matched.c.kind,
-                matched.c.old_rev_id,
-                matched.c.new_rev_id,
-                matched.c.parts_changed,
-                matched.c.relevance,
-                matched.c.note_id,
+                cut.c.aoid,
+                cut.c.kind,
+                cut.c.old_rev_id,
+                cut.c.new_rev_id,
+                cut.c.parts_changed,
+                cut.c.relevance,
+                cut.c.note_id,
             )
         )
-        .where(listed)
-        .order_by(*order, matched.c.aoid)
-        .offset(page_offset(page, page_size))
-        .limit(page_size)
+        .order_by(*(cut.c[key] for key in keys))
         .scalar_subquery()
     )
+    # Two settings for this transaction. The statement is costed high enough
+    # for JIT compilation, which takes longer (over 100 ms measured) than it
+    # saves on a query of this size; and with the default work_mem the two
+    # materialized sets of a large comparison (120,000 rows) spill to disk
+    # and are read back from it by every count and sort.
+    db.execute(text("SET LOCAL jit = off"))
+    db.execute(text("SET LOCAL work_mem = '64MB'"))
     row = db.execute(
         select(
             _summary(changes).label("summary"),
-            _note_counts(changes).label("notes"),
-            _note_counts(matched).label("matching"),
+            (_note_counts(changes) if noted else null()).label("notes"),
+            (_note_counts(matched) if noted else null()).label("matching"),
             select(func.count())
             .select_from(matched)
             .where(listed)

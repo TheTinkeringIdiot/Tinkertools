@@ -322,6 +322,7 @@ def compare_builds(
         query.sort,
         query.page,
         query.page_size,
+        noted=False,
     )
     return _change_list(
         db, query, found, build, index, index.at(other.branch, other.ordinal).ref()

@@ -495,6 +495,149 @@ Get list of symbiants dropped by a specific mob.
 **Query Parameters:**
 - `family` (string): Filter by symbiant family
 
+### Changes between builds
+
+What changed on an item, in a build, or between any two builds. The version segment of the URL names the newer side of every comparison; `{base}` is a build slug or family alias. Stats, skills, actions, events and effect types are numeric ids; `kind`, `parts` and `relevance` are words:
+
+- `kind`: `added`, `removed`, `changed`
+- `parts` (what differs): `text`, `stats`, `effects`, `actions`, `atkdef`, `misc`
+- `relevance` (what the change matters for): `gameplay`, `economy`, `cosmetic`, `text`. It follows from `backend/database/change_relevance.toml`; an added or removed item is `gameplay`.
+
+A build is named in responses as `{"slug", "display_name", "family", "client_build", "snapshot_date"}`.
+
+Responses depend only on the builds named and change only with an import. They are cached by the server for an hour; a client or proxy may cache a response for a pair of explicit build slugs just as long (`Cache-Control: public, max-age=3600` is safe), but not one asked through a family alias (`ao`, `prk`) or without a version, which follows the newest build.
+
+#### GET /api/v1/changes
+The change list of the request's build: every item added, removed or changed relative to the build before it (for a branch's first build, relative to its parent build: PRK 0.7.1 against AO 17.10.5).
+
+**Query Parameters:**
+- `page` (int, default 1), `page_size` (int, default 50, max 200)
+- `sort` (`name` | `aoid` | `ql`, default `name`): ties by AOID
+- `kind`, `part`, `relevance` (repeatable): only changes of one of these kinds, touching one of these parts, relevant to one of these
+- `is_nano` (bool), `item_class` (int), `min_ql`, `max_ql` (int)
+- `profession` (int): only items and nanos whose Use requires this profession
+- `slot` (int): only items worn in this slot (bit position of stat 298, as in `GET /items`)
+- `search` (string): text the new or the old name contains
+- `notes` (`collapse` | `expand`, default `collapse`), `note_id` (int): see below
+- `transition`, `transition_old`, `transition_new`: only the items of one line of `GET /changes/transitions`. `transition` is the line's `path`; the other two are its `old` and `new` as JSON (`60`, `"added"`, `[124,1060,2]`, `null`) and may be left out to take every line of the path
+- `include_diff` (bool, default false): give each changed item of the page its field-level diff
+
+**Response:** a `PaginatedResponse` of change rows, plus `build`, `base`, `summary` and `notes`:
+```json
+{
+  "items": [
+    {
+      "aoid": 88805, "kind": "changed",
+      "name": "Boosted-Graft: Assault Rifle Expertise", "old_name": null,
+      "ql": 12, "old_ql": null, "item_class": 2, "is_nano": false, "icon": 11647,
+      "parts": ["text", "stats", "effects"],
+      "relevance": ["gameplay", "cosmetic", "text"],
+      "note_id": null,
+      "diff": null
+    }
+  ],
+  "total": 92, "page": 1, "page_size": 50, "pages": 2, "has_next": true, "has_prev": false,
+  "build": {"slug": "ao-14-6-0", "display_name": "AO 14.6.0", "family": "ao", "client_build": "14.6.0", "snapshot_date": null},
+  "base": {"slug": "ao-14-5-1", "display_name": "AO 14.5.1", "family": "ao", "client_build": "14.5.1", "snapshot_date": null},
+  "summary": {
+    "total": 8650,
+    "by_kind": {"added": 968, "removed": 0, "changed": 7682},
+    "by_part": {"text": 5211, "stats": 6220, "effects": 3070, "actions": 2525, "atkdef": 78, "misc": 3540},
+    "by_relevance": {"gameplay": 7237, "economy": 1046, "cosmetic": 5844, "text": 5211},
+    "noted": 869
+  },
+  "notes": [
+    {"note_id": 4, "title": "Weapons given an explicit attack range",
+     "body": "Stat 287 (AttackRange) was written out on weapons that had none.",
+     "count": 869, "matching": 0}
+  ]
+}
+```
+- A row is listed by its newer revision (the older one for a removed item); `old_name` and `old_ql` are set only when they differ. `icon` is stat 79.
+- `summary` counts every change of the build, whatever the filters. `base` is null for a build with nothing before it.
+- **Build notes** are build-wide events that explain many changes at once (`backend/database/build_notes.toml`). A change carries a `note_id` only when the note explains all of it. By default such changes are collapsed: left out of `items` and `total`, and counted per note in `notes` (`count`: changes the note explains; `matching`: those that match the request's filters). `notes=expand` lists them with the rest; `note_id=N` lists only that note's.
+
+#### GET /api/v1/compare/{base}
+The net difference between build `base` and the request's build, computed from what each build holds, not by replaying the builds between them: an item that changed and changed back is not listed. Any two builds, in either order, across families (`/api/v1/prk-0-7-1/compare/ao-17-10-5`). Parameters (except `transition*`) and response are those of `GET /changes`; a comparison has no build notes, so `notes` is empty and every `note_id` null.
+
+#### GET /api/v1/changes/transitions
+The field transitions that most changed items of the request's build share, most items first. They read as patch notes.
+
+**Query Parameters:** `part` (repeatable), `min_items` (int, default 2), `limit` (int, default 50, max 500)
+
+**Response:**
+```json
+{
+  "build": {"slug": "ao-14-6-0", "...": "..."},
+  "base": {"slug": "ao-14-5-1", "...": "..."},
+  "transitions": [
+    {"part": "effects", "path": "effect:53089:spell_params.Chance", "old": 60, "new": 100,
+     "items": 760, "occurrences": 760,
+     "stat": null, "bit": null, "spell_id": 53089, "action": null, "field": "spell_params.Chance"}
+  ]
+}
+```
+Only transitions shared by at least two items are kept. `stat`, `bit`, `spell_id`, `action` and `field` repeat the ids in `path`. Paths, with what `old` and `new` hold (null: absent, or particular to each item):
+
+| part | path | old, new |
+|---|---|---|
+| text | `name`, `description` | the words only the old and only the new text have |
+| stats | `stat:<id>` | the values |
+| stats | `stat:<id>:bit:<value>` (flag stats) | 0 and 1 |
+| atkdef | `attack:<id>`, `defense:<id>` | the values |
+| actions | `action:<id>` | `"removed"` as old or `"added"` as new |
+| actions | `action:<id>:criterion` | `[value1, value2, operator]` |
+| effects | `event` | the event ids of a renumbering |
+| effects | `event:<id>` | `"removed"` / `"added"` |
+| effects | `effect:<spell_id>` | the subject (stat, skill, nano id; `"none"`) of a removed (old) or added (new) effect |
+| effects | `effect:<spell_id>:<field>` | the values of `target`, `tick_count`, `tick_interval` or `spell_params.<name>` |
+| effects | `effect:<spell_id>:criterion` | `[value1, value2, operator]` |
+| misc | `static_instance`, `animation_mesh`, `shop` | null |
+
+#### GET /api/v1/items/{aoid}/timeline
+Every build in which the item was added, changed or removed, newest first, along the lineage of the request's version: every build of its family, and for a fork (PRK) the parent family's builds up to the fork. The answer is the same from any build of a family. An item the lineage never had gets `"entries": []`.
+
+**Query Parameters:** `include_diff` (bool, default true)
+
+**Response:**
+```json
+{
+  "aoid": 88393,
+  "family": "ao",
+  "entries": [
+    {
+      "build": {"slug": "ao-14-6-0", "...": "..."},
+      "base": {"slug": "ao-14-5-1", "...": "..."},
+      "kind": "changed",
+      "name": "Hacked Charged Nano Critter - 1H Blunt Weapon Incompetence", "ql": 13,
+      "parts": ["stats", "effects", "actions", "misc"],
+      "relevance": ["gameplay", "cosmetic"],
+      "note": null,
+      "diff": {"text": [], "stats": ["..."], "effects": ["..."], "actions": ["..."], "attack": [], "defense": [], "misc": ["..."]}
+    }
+  ]
+}
+```
+`note` is `{"note_id", "title", "body"}` when a build note explains the entry. `GET /items/{aoid}/revisions` remains for the "changed in" badge; the timeline has more: removals, items that return, relevance and diffs.
+
+#### GET /api/v1/items/{aoid}/compare/{base}
+One item in build `base` and in the request's build.
+
+**Response:** `{"aoid", "build", "base", "kind", "old", "new", "parts", "relevance", "diff"}`. `kind` is `added`, `removed`, `changed` or `unchanged`; `old` and `new` are `{"name", "ql", "item_class", "is_nano", "icon"}` or null where the build lacks the item; `diff` is given when both have it. 404 when neither build has the item or `base` is unknown.
+
+#### The field-level diff
+`diff` has one list per part, empty when the part is the same: `text`, `stats`, `effects`, `actions`, `attack`, `defense`, `misc`. Every entry has a `relevance`, and the `relevance` of the change is the union of its entries' values.
+
+- `text`, `misc`: `{"field", "old", "new", "relevance"}`; fields `name`, `description`, `static_instance`, `animation_mesh`, `shop`.
+- `stats`, `attack`, `defense`: `{"stat", "change", "old", "new", "bits_set", "bits_cleared", "relevance"}`. For the flag stats (0, 30, 182, 298, 355, 389) `bits_set` and `bits_cleared` list the flag values (1, 2, 4, ...) that were set and cleared; they are null for other stats.
+- `actions`: `{"action", "change", "criteria", "relevance"}`. `criteria` is the whole requirement list as a sequence diff: `{"op": "same" | "added" | "removed" | "changed", "old", "new"}` with criteria as `{"value1", "value2", "operator"}`.
+- `effects`: one entry per event that differs: `{"event", "change", "old_event", "relevance", "added", "removed", "changed"}`.
+  - `change` is `added`, `removed`, `changed` or `renumbered` (the same effects under another event id, `old_event`).
+  - `added` and `removed` hold effects shaped as the `spells` of an item's `spell_data`, each with a `relevance`.
+  - `changed` pairs an old with a new effect: `{"old", "new", "fields", "criteria", "relevance"}`, `fields` listing what differs as `{"field", "old", "new"}` (`target`, `tick_count`, `tick_interval`, `spell_params.<name>`) and `criteria` the sequence diff of their criteria, or null.
+  - Two effects are only paired when they have the same effect type and act on the same subject (the `Stat`, `Skill`, `NanoID`, `NanoStrain`, `Item` and `PerkID` parameters); a modifier replaced by a modifier of another stat is one removal and one addition.
+  - An effect that only moved to another event, and an event that was only renumbered, are `cosmetic` when nothing else about the item's effects differs, and have a null `relevance` when something does.
+
 ### Legacy Item IDs
 
 #### POST /api/v1/legacy-item-ids/resolve
