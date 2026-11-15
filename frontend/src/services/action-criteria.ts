@@ -523,6 +523,18 @@ function formatStatDescription(stat: number, value: number, symbol: string): str
       return `${statName} ${symbol} ${value}`;
     }
 
+    case 368: {
+      // VisualProfession
+      const professionName = namesValue && value !== 0 ? getProfessionName(value) : undefined;
+      return `${statName} ${symbol} ${professionName && professionName !== 'Unknown' ? professionName : value}`;
+    }
+
+    case 367: {
+      // VisualBreed
+      const breedName = namesValue && value !== 0 ? getBreedName(value) : undefined;
+      return `${statName} ${symbol} ${breedName && breedName !== 'Unknown' ? breedName : value}`;
+    }
+
     default:
       return `${statName} ${symbol} ${value}`;
   }

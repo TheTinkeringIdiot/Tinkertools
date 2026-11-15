@@ -119,6 +119,12 @@ export function getStatValueName(statId: number, value: number): string | undefi
       return getFactionName(value);
     case 59: // Gender
       return value === 0 ? undefined : getGenderName(value);
+    case 75: // NanoStrain
+      return value === 0 ? undefined : getNanoStrainName(value);
+    case 76: // ItemClass
+      return getItemClassName(value);
+    case 405: // NanoSchool
+      return getNanoSchoolName(value);
     default:
       return STAT_VALUED_STATS.has(statId) && value !== 0 ? getStatName(value) : undefined;
   }
@@ -986,6 +992,31 @@ export function getWeaponStats(stats: Array<{ stat: number; value: number }>): {
  */
 export function getDamageTypeName(damageTypeId: number): string {
   return DAMAGE_TYPES[damageTypeId as keyof typeof DAMAGE_TYPES] || `Type ${damageTypeId}`;
+}
+
+/**
+ * A nano's duration (stat 8, centiseconds) as the nano page shows it:
+ * seconds, minutes or hours, "Instant" for none and "Permanent" for -1.
+ */
+export function formatDuration(duration: number | undefined): string {
+  if (!duration || duration === 0) return 'Instant';
+  if (duration === -1) return 'Permanent';
+
+  // Duration is in centiseconds, convert to seconds
+  const seconds = duration / 100;
+
+  if (seconds < 60) return `${seconds.toFixed(2)}s`;
+  if (seconds < 3600) return `${(seconds / 60).toFixed(2)}m`;
+  return `${(seconds / 3600).toFixed(2)}h`;
+}
+
+/** An attack or recharge delay (stats 294 and 210, centiseconds) in seconds. */
+export function formatCentisecondsToSeconds(centiseconds: number | undefined): string {
+  if (!centiseconds || centiseconds === 0) return '0.00s';
+
+  // Convert centiseconds to seconds with 2 decimal places
+  const seconds = centiseconds / 100;
+  return `${seconds.toFixed(2)}s`;
 }
 
 /**
