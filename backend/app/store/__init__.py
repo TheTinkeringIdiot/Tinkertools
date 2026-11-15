@@ -112,7 +112,12 @@ Writing a route
      is given a case for it.
    * ``diff_revisions`` gives the field-level diffs of the pairs of one page
      in two queries. The engine is ``app/core/item_diff.py``, the relevance of
-     each entry ``app/core/change_rules.with_relevance``.
+     each entry ``app/core/change_rules.with_relevance``. A list passes
+     ``for_list=True`` and gets None for a diff too large for a row
+     (``diff_omitted``); a route that answers for one item gets every diff.
+   * The log is classified at import, a comparison and every diff entry with
+     the rules files as the process read them. ``stale_rules`` tells whether
+     the two agree; the application says so in its log when it starts.
    * A second build named in a request (``/compare/{base}``) is resolved with
      ``find_build(db, slug)``, from the store the session reads, so that a
      test's throwaway store answers; ``load_build_index`` names builds in

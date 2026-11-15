@@ -201,7 +201,12 @@ class ItemChange(BaseModel):
     diff: Optional[ItemDiff] = Field(
         None,
         description="Field-level diff of a changed item; null unless asked for "
-        "(include_diff) and for added and removed items",
+        "(include_diff), for added and removed items, and when diff_omitted",
+    )
+    diff_omitted: bool = Field(
+        False,
+        description="The diff was asked for and is too large for a row of a "
+        "list: fetch it from /items/{aoid}/compare/{base}",
     )
 
 

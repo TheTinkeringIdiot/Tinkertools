@@ -27,6 +27,7 @@ for the rows of a page, never for a whole list.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -50,10 +51,14 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import ColumnElement, FromClause
 
 from app.core import item_diff
+from app.core.change_analysis import STATE_ANALYSIS, STATE_RELEVANCE, analysis_digest
 from app.core.change_rules import (
     CLASSES,
+    NOTES_FILE,
     RELEVANCE_BITS,
+    RELEVANCE_FILE,
     TEXT,
+    ChangeRules,
     RelevanceRules,
     default_rules,
     relevance_mask,
@@ -61,9 +66,11 @@ from app.core.change_rules import (
     with_relevance,
 )
 from app.store import tables as t
-from app.store.context import Build, read_builds, resolve_build
+from app.store.context import Build, read_builds, resolve_build, store_schema
 from app.store.items import criteria_response, load_effect_formats, spell_params
 from app.store.presence import any_of, page_offset, present, text_contains
+
+logger = logging.getLogger(__name__)
 
 STAT_ICON = 79
 
@@ -177,6 +184,52 @@ def find_build(db: Session, slug: str) -> Optional[Build]:
     """The enabled build a slug or family alias names, read from the store
     the session reads."""
     return resolve_build(read_builds(db), slug)
+
+
+# ---------------------------------------------------------------------------
+# The rules the store was analysed with
+# ---------------------------------------------------------------------------
+
+
+def stale_rules(db: Session, rules: Optional[ChangeRules] = None) -> List[str]:
+    """What the importer derived from other rules than ``rules`` (those of
+    this process by default), as phrases for a log; empty when the store and
+    the rules agree.
+
+    The change log is classified, noted and counted at import, with the rules
+    files as they were then (``store_state``); the routes classify
+    comparisons and diff entries with the files as this process read them.
+    """
+    rules = rules or default_rules()
+    state = dict(db.execute(select(t.store_state.c.name, t.store_state.c.value)).all())
+    derived = (
+        (
+            STATE_RELEVANCE,
+            rules.relevance.digest,
+            f"the relevance of the change log ({RELEVANCE_FILE.name})",
+        ),
+        (
+            STATE_ANALYSIS,
+            analysis_digest(rules),
+            f"build notes and shared transitions ({NOTES_FILE.name}, "
+            f"{RELEVANCE_FILE.name}, diff engine)",
+        ),
+    )
+    return [what for name, digest, what in derived if state.get(name) != digest]
+
+
+def warn_of_stale_rules(db: Session, rules: Optional[ChangeRules] = None) -> bool:
+    """Log a warning when the store was not analysed with the rules this
+    process serves by. Returns whether it was."""
+    stale = stale_rules(db, rules)
+    if stale:
+        logger.warning(
+            f"The store '{store_schema(db)}' was analysed with other rules than "
+            f"this process read: {'; '.join(stale)}. Change lists and patch "
+            "notes show the store's, comparisons and diffs this process's. "
+            "Run `python import_cli.py import-cas` and restart."
+        )
+    return bool(stale)
 
 
 # ---------------------------------------------------------------------------
@@ -597,9 +650,13 @@ def load_snapshots(db: Session, rev_ids: Sequence[int]) -> Dict[int, Snapshot]:
 
 
 def change_response(
-    row: ChangeRow, snapshots: Dict[int, Snapshot], diff: Optional[Dict[str, Any]]
+    row: ChangeRow,
+    snapshots: Dict[int, Snapshot],
+    diff: Optional[Dict[str, Any]],
+    diff_omitted: bool = False,
 ) -> Dict[str, Any]:
-    """One change as an ``ItemChange`` document."""
+    """One change as an ``ItemChange`` document. ``diff_omitted``: the diff
+    was asked for and is left out for its size."""
     old = snapshots.get(row.old_rev_id) if row.old_rev_id is not None else None
     new = snapshots.get(row.new_rev_id) if row.new_rev_id is not None else None
     shown = new or old
@@ -618,6 +675,7 @@ def change_response(
         "relevance": relevance_names(row.relevance),
         "note_id": row.note_id,
         "diff": diff,
+        "diff_omitted": diff_omitted,
     }
 
 
@@ -743,25 +801,65 @@ def diff_response(diff: Dict[str, Any], formats: Dict[int, str]) -> Dict[str, An
     }
 
 
+# A diff is left out of a list (``diff_omitted``) when it is too much for a
+# row of a page: when the effects of the two revisions, with their criteria,
+# number more than ``LIST_DIFF_EFFECTS`` (pairing them is quadratic), or when
+# the diff is more than ``LIST_DIFF_BYTES`` of JSON. Measured on the 127,374
+# changed pairs of the change log of 147 builds: five pairs count 1,870
+# effects and criteria or more (the "Enter ... Vehicle" nanos of 17.7.0) and
+# take 150 ms each to diff and 186 KB to send; the next heaviest counts 768
+# and every other pair diffs in under 30 ms. Of the diffs, 99.9% are under
+# 15 KB and six more are over the byte limit (shop inventories, up to 168 KB).
+LIST_DIFF_EFFECTS = 1000
+LIST_DIFF_BYTES = 64 * 1024
+
+
+def _effects_weight(documents: Dict[str, Any]) -> int:
+    """The effects of a revision and their criteria, counted."""
+    return sum(
+        1 + len(effect["criteria"])
+        for event in documents["effects"] or ()
+        for effect in event["effects"]
+    )
+
+
 def diff_revisions(
     db: Session,
     pairs: Sequence[Tuple[int, int]],
     rules: Optional[RelevanceRules] = None,
-) -> Dict[Tuple[int, int], Dict[str, Any]]:
+    for_list: bool = False,
+) -> Dict[Tuple[int, int], Optional[Dict[str, Any]]]:
     """``{(old rev_id, new rev_id): ItemDiff document}`` for these pairs of
-    revisions, in two queries whatever their number."""
+    revisions, in two queries whatever their number.
+
+    With ``for_list`` a diff that is too much for a row of a page (see
+    ``LIST_DIFF_EFFECTS``) is None: the row says so and the diff is asked for
+    by itself (``/items/{aoid}/compare/{base}``).
+    """
     if not pairs:
         return {}
     rules = rules or default_rules().relevance
     documents = load_part_documents(db, sorted({rev for pair in pairs for rev in pair}))
     formats = load_effect_formats(db)
-    return {
-        (old, new): diff_response(
-            with_relevance(item_diff.diff_parts(documents[old], documents[new]), rules),
-            formats,
+    diffs: Dict[Tuple[int, int], Optional[Dict[str, Any]]] = {}
+    for old, new in dict.fromkeys(pairs):
+        before, after = documents[old], documents[new]
+        if (
+            for_list
+            and before["effects"] != after["effects"]
+            and _effects_weight(before) + _effects_weight(after) > LIST_DIFF_EFFECTS
+        ):
+            diffs[(old, new)] = None
+            continue
+        diff = diff_response(
+            with_relevance(item_diff.diff_parts(before, after), rules), formats
         )
-        for old, new in dict.fromkeys(pairs)
-    }
+        if for_list and (
+            len(json.dumps(diff, separators=(",", ":"))) > LIST_DIFF_BYTES
+        ):
+            diff = None
+        diffs[(old, new)] = diff
+    return diffs
 
 
 def changed_pairs(rows: Sequence[ChangeRow]) -> List[Tuple[int, int]]:
@@ -950,8 +1048,9 @@ def load_transitions(
 
     ``relevance`` keeps the transitions of fields of those classes. Unless
     ``expand_notes``, a transition is counted over the changes no build note
-    explains, as the change list is, and one that too few such changes share
-    is left out.
+    explains, as the change list is, and it is left out when the build's
+    notes account for it: when fewer than ``min_items`` such changes have it
+    outside the event of a note.
     """
     bt = t.build_transition
     items, occurrences = (
@@ -972,6 +1071,8 @@ def load_transitions(
         bt.c.ordinal == build.ordinal,
         items >= min_items,
     )
+    if not expand_notes:
+        query = query.where(bt.c.unexplained_items >= min_items)
     if parts:
         query = query.where(bt.c.part.in_(sorted(set(parts))))
     if relevance:

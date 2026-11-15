@@ -19,10 +19,12 @@ again. Here that work is done once:
     place of its name in name order. Revisions are immutable, so the facts
     are loaded once per process (``preload``, at startup) and only added to
     afterwards; 72 bytes a revision, 19 MB for the 264,000 of today's store.
-    The process grows by a little more than that: 23 MB measured (resident
-    size 94 MB before the load, 117 MB after). Loading passes through five
-    times as much (224 MB at the peak), which is handed back to the system
-    when the facts are in place (``_release_freed_memory``).
+    The process grows by more than that: 27 MB measured (resident size
+    97 MB with the application imported, 124 MB with the facts loaded), and
+    a server is at 134 MB when it is ready. Loading passes through far more
+    (224 MB at the peak), which is handed back to the system when the facts
+    are in place (``_release_freed_memory``); kept, it left a server at
+    167 MB.
 
 ``Comparison``
     One pair of builds: every changed item with its kind, both revisions,
@@ -44,6 +46,7 @@ parts of a revision (profession, slot).
 from __future__ import annotations
 
 import ctypes
+import gc
 import logging
 import sys
 import threading
@@ -77,6 +80,7 @@ from app.store.changes import (
     ChangePage,
     ChangeRow,
     name_contains,
+    warn_of_stale_rules,
 )
 from app.store.context import Build, StoreSession, store_schema
 from app.store.presence import page_offset, present, revisions
@@ -298,9 +302,10 @@ def _load_facts(
 
 def _release_freed_memory() -> None:
     """Hand the memory that loading the facts used and freed back to the
-    system. The C library otherwise keeps it for the process: 94 MB of the
-    211 MB the process then holds. Nothing to do where the C library is not
-    glibc."""
+    system: what the driver and the result rows took, which the collector
+    and then the C library would otherwise keep for the process (about
+    90 MB). Nothing to trim where the C library is not glibc."""
+    gc.collect()
     try:
         ctypes.CDLL(None).malloc_trim(0)
     except (AttributeError, OSError):
@@ -342,10 +347,13 @@ facts_of_stores = _FactsOfStores()
 
 def preload() -> None:
     """Load the facts of the store the process serves, so that no request
-    waits for them. Called once, when the application starts; a store that
-    cannot be read is left to the first request."""
+    waits for them, and say so in the log when the store was analysed with
+    other rules files than the process read. Called once, when the
+    application starts; a store that cannot be read is left to the first
+    request."""
     try:
         with StoreSession() as db:
+            warn_of_stale_rules(db)
             facts_of_stores.of(db)
     except Exception as error:
         logger.warning(f"Revision facts not preloaded: {error}")

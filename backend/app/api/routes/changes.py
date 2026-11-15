@@ -48,6 +48,7 @@ from app.store.changes import (
     BuildIndex,
     ChangeFilters,
     ChangePage,
+    ChangeRow,
     change_response,
     changed_pairs,
     compare_item,
@@ -117,7 +118,8 @@ class ChangeQuery:
         ),
         include_diff: bool = Query(
             False,
-            description="Give each changed item of the page its field-level diff",
+            description="Give each changed item of the page its field-level diff "
+            "(a very large one is left out: diff_omitted)",
         ),
     ):
         self.page = page
@@ -208,7 +210,17 @@ def _change_list(
             if rev_id is not None
         ],
     )
-    diffs = diff_revisions(db, changed_pairs(found.rows)) if query.include_diff else {}
+    diffs = (
+        diff_revisions(db, changed_pairs(found.rows), for_list=True)
+        if query.include_diff
+        else {}
+    )
+
+    def row_response(row: ChangeRow) -> Dict[str, Any]:
+        pair = (row.old_rev_id, row.new_rev_id)
+        diff = diffs.get(pair)
+        return change_response(row, snapshots, diff, pair in diffs and diff is None)
+
     notes = [
         {
             **note,
@@ -220,10 +232,7 @@ def _change_list(
     ]
     notes.sort(key=lambda note: (-note["count"], note["note_id"]))
     return ChangeListResponse(
-        items=[
-            change_response(row, snapshots, diffs.get((row.old_rev_id, row.new_rev_id)))
-            for row in found.rows
-        ],
+        items=[row_response(row) for row in found.rows],
         build=index.at(build.branch, build.ordinal).ref(),
         base=base,
         summary=found.summary,

@@ -137,6 +137,12 @@ class ThrowawayStore:
             ChangeRules(relevance=default_rules().relevance, notes=parse_notes(notes)),
         )
 
+    def sync_changes(self, rules: Optional[ChangeRules] = None) -> None:
+        """Bring the change log in line with ``rules`` (the repository's by
+        default) and record what it was analysed with, as every import run
+        does."""
+        change_analysis.sync(self._raw, rules or default_rules())
+
     def builds(self) -> List[Build]:
         return read_builds(self.db)
 
