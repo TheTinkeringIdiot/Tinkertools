@@ -70,6 +70,12 @@ def cached_response(cache_type: str, ttl: Optional[int] = None):
     The key is the endpoint, the game version and every keyword argument but
     ``db``.
 
+    FastAPI does not validate or filter a ``Response`` against the route's
+    ``response_model``, which is left to document the route: the endpoint
+    must return exactly what the model describes (see "Caching" in
+    app/store/__init__.py). The wrapped endpoint carries its cache type as
+    ``cache_type``, by which the test of that rule finds the cached routes.
+
     Args:
         cache_type: A key of CACHE_TTL, which gives the time to live; any
             other name is refused when the endpoint is defined
@@ -127,10 +133,9 @@ def cached_response(cache_type: str, ttl: Optional[int] = None):
             started = time.time()
             return keep(cache_key, func(*args, **kwargs), started)
 
-        if asyncio.iscoroutinefunction(func):
-            return async_wrapper
-        else:
-            return sync_wrapper
+        wrapper = async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
+        wrapper.cache_type = cache_type
+        return wrapper
 
     return decorator
 

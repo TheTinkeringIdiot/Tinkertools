@@ -53,9 +53,9 @@ Writing a route
 
 3. Paging. ``fetch_page`` sorts by the keys you give and then by AOID. Pass
    ``[]`` to sort by AOID alone. Never sort by ``rev_id`` or any other
-   internal id. A query that matches text (a join to ``part_text`` with a
-   pattern or a full-text condition) is paged with ``fetch_search_page``
-   instead, same arguments: it finds the matches once, where ``fetch_page``
+   internal id. A query that matches text (a join to ``part_text`` with
+   ``text_contains`` or a full-text condition) is paged with
+   ``fetch_search_page`` instead, same arguments: it finds the matches once, where ``fetch_page``
    would match them twice and can be planned badly (see its docstring). A
    paged query that is not on ``revisions`` computes its OFFSET with
    ``page_offset``. A page past the end, however far, is an empty page with
@@ -92,19 +92,24 @@ Writing a route
    never given to another mob, with ``retired`` set. Every read of ``mob``
    filters ``~t.mob.c.retired``.
 
-8. Changes between builds. A list of "what differs" is one of two sources of
-   ``app.store.changes``, filtered, counted and paged by ``fetch_changes`` in
-   one statement::
+8. Changes between builds. A list of "what differs" is a ``ChangePage`` from
+   one of two places, with the same filters::
 
-       source = logged_changes(build)            # the change log of a build
-       source = compared_changes(base, build)    # any two builds, from presence
-       found = fetch_changes(db, source, ChangeFilters(kinds=["changed"]),
+       filters = ChangeFilters(kinds=["changed"])
+       # the change log of a build, in one statement
+       found = fetch_changes(db, logged_changes(build), filters,
                              "name", page, page_size)
+       # any two builds, from presence (app.store.comparison)
+       found = compare_page(db, base, build, filters, "name", page, page_size)
        snapshots = load_snapshots(db, [rev ids of found.rows])
        diffs = diff_revisions(db, changed_pairs(found.rows))
 
-   * Relevance and parts of a comparison are computed in the query, from part
-     ids and ``revision_relevance``; never diff a whole list to classify it.
+   * Relevance and parts of a comparison are worked out from part ids and
+     ``revision_relevance``, once for a pair of builds, and kept in memory
+     (``app/store/comparison.py``); never diff a whole list to classify it.
+     A filter added to ``ChangeFilters`` is implemented in both places, and
+     ``test_compare_of_adjacent_builds_filters_and_sorts_as_the_change_list``
+     is given a case for it.
    * ``diff_revisions`` gives the field-level diffs of the pairs of one page
      in two queries. The engine is ``app/core/item_diff.py``, the relevance of
      each entry ``app/core/change_rules.with_relevance``.
@@ -113,6 +118,32 @@ Writing a route
      test's throwaway store answers; ``load_build_index`` names builds in
      responses and knows what each build's change log is relative to.
    * Build notes belong to one step of the log: a comparison has none.
+
+9. Caching. ``cached_response(cache_type)`` under the route decorator keeps
+   the route's serialised body (``app/core/decorators.py``; the type and its
+   time to live are listed in ``CACHE_TTL``). Two things follow.
+
+   * The key is the endpoint, the build and every keyword argument but
+     ``db``, as JSON or else by its ``str``. An argument must therefore say everything
+     that decides the response and nothing that does not: a parameter class
+     gives itself a ``__repr__`` of all its fields (``ChangeQuery``), and a
+     request body is reduced to what the query reads by a dependency, which
+     is then both the query's only input and the key (``WeaponCriteria`` of
+     ``/weapons/analyze``). Never take the ``Request`` as an argument of a
+     cached route: no two are alike. Read it in a dependency of the route
+     decorator (``dependencies=[...]``) instead.
+   * The endpoint's caller gets a finished ``Response``, on a miss as on a
+     hit, and FastAPI neither validates nor filters a ``Response``:
+     ``response_model`` only documents a cached route. The route itself must
+     return exactly what the model declares. Return an instance of the
+     declared model, built by the route (constructing it is the validation;
+     a superset model or a subclass is sent with its extra fields, a dict
+     with whatever it holds). A route that serves too many items to validate
+     each returns documents from the one place that writes the shape
+     (``load_item_documents``). Give every new cached route an example
+     request in ``app/tests/test_response_cache.py``, which checks the body
+     of each cached route against its model, field for field, and fails for
+     a cached route without an example.
 
 Testing
 =======
@@ -165,14 +196,16 @@ Pitfalls
   pattern above all) invites it to walk an index in sort order and hope to
   stop early. Use ``fetch_search_page``, and measure a rare term, a common
   one and one that matches nothing.
-* Substring search. ``column ILIKE '%term%'`` on the name or the description
-  of ``part_text`` is answered from a trigram index when the term is
-  selective, in about a millisecond. Keep the column bare: ``lower(column)``,
-  a concatenation or a CASE around the condition leaves the index unused. A
-  common term, or one without three letters or digits in a row, still reads
-  every text of every build (100 to 500 ms), so measure those two as well.
-  ``app/services/nanos.py`` wraps its match in a CASE on purpose; its
-  docstring has the numbers.
+* Substring search. Match the name or the description of ``part_text``
+  with ``text_contains(texts, field, pattern)``, never with ``ILIKE``: the
+  rows are those of ``field ILIKE pattern``, matched on the lower-case copy
+  the store keeps of each text (``name_lower``, ``description_lower``).
+  ILIKE lowers every text it reads, which costs four times what matching
+  does. A selective term is answered from a trigram index in about a
+  millisecond; keep the condition bare, since a concatenation or a CASE
+  around it leaves the index unused. A common term, or one without three
+  letters or digits in a row, reads every text of every build (30 to 50 ms)
+  and then joins most of a build, so measure those two as well.
 * A fresh connection pays about 2 ms of planning on the first wide query;
   measure warm.
 * Raw ``text()`` SQL bypasses the schema mapping that lets tests read a
@@ -186,9 +219,8 @@ Pitfalls
 * An id or a page number from a request can be any integer. ``any_of``,
   ``none_of`` and ``page_offset`` keep one that no column can hold from
   reaching the database as an error.
-* The response cache keys on the route's arguments and holds the serialised
-  body (``app/core/decorators.py``). In a test with a throwaway store use
-  ``store.client``, which clears it.
+* The response cache outlives a request (point 9). In a test with a
+  throwaway store use ``store.client``, which clears it.
 """
 
 from app.store.context import Build, get_build, get_store
