@@ -159,7 +159,7 @@ Provides search, filtering, comparison and analysis of all AO items with optiona
             :show-compatibility="showCompatibility && profilesStore.hasActiveProfile"
             :loading="searchLoading"
             :pagination="pagination"
-            :revision-counts="revisionCounts"
+            :change-counts="changeCounts"
             @item-click="onItemClick"
             @item-compare="onItemCompare"
             @cast-buff="onItemCastBuff"
@@ -190,6 +190,7 @@ import { useItemsStore } from '@/stores/items';
 import { useToast } from 'primevue/usetoast';
 import { apiClient } from '@/services/api-client';
 import type { Item, ItemSearchQuery } from '@/types/api';
+import { changedBuildCount } from '@/types/game-version';
 
 // Components
 import AdvancedItemSearch from '@/components/items/AdvancedItemSearch.vue';
@@ -212,8 +213,8 @@ const lastAdvancedSearchQuery = ref<ItemSearchQuery | null>(null);
 const sortOption = ref('relevance');
 const searchLoading = ref(false);
 const searchPerformed = ref(false);
-// AOID -> number of snapshots the item changed in, for the history badge
-const revisionCounts = ref<Record<number, number>>({});
+// AOID -> number of builds that changed the item, for the "changed" badge
+const changeCounts = ref<Record<number, number>>({});
 
 // Items composable with default options
 const { performSearch: searchItems, totalItems, pagination, clearSearch: resetSearch } = useItems();
@@ -270,11 +271,11 @@ async function performAdvancedSearch(query: ItemSearchQuery) {
 }
 
 /**
- * One batch call per results page telling which rows changed across snapshots.
+ * One batch call per results page telling which rows later builds changed.
  * A failure just means no badges.
  */
 async function loadRevisionCounts(items: Item[]) {
-  revisionCounts.value = {};
+  changeCounts.value = {};
   const aoids = items.map((item) => item.aoid).filter((aoid): aoid is number => !!aoid);
   if (aoids.length === 0) return;
 
@@ -282,11 +283,11 @@ async function loadRevisionCounts(items: Item[]) {
     const response = await apiClient.batchItemRevisions(aoids);
     const counts: Record<number, number> = {};
     for (const [aoid, entry] of Object.entries(response?.items || {})) {
-      counts[Number(aoid)] = entry.revision_count;
+      counts[Number(aoid)] = changedBuildCount(entry);
     }
-    revisionCounts.value = counts;
+    changeCounts.value = counts;
   } catch {
-    revisionCounts.value = {};
+    changeCounts.value = {};
   }
 }
 
