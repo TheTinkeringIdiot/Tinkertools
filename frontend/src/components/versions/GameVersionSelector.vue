@@ -149,7 +149,7 @@ swaps the version segment of the current route via switchVersion().
       >
         <button
           type="button"
-          class="text-xs text-primary-600 dark:text-primary-400 hover:underline"
+          class="text-xs text-primary-700 dark:text-primary-400 hover:underline"
           data-testid="version-changes-link"
           @click="openChangesPage"
         >
@@ -158,7 +158,7 @@ swaps the version segment of the current route via switchVersion().
         </button>
         <button
           type="button"
-          class="text-xs text-primary-600 dark:text-primary-400 hover:underline"
+          class="text-xs text-primary-700 dark:text-primary-400 hover:underline"
           data-testid="version-page-link"
           @click="openVersionsPage"
         >

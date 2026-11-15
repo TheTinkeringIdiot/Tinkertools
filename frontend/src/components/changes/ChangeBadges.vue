@@ -1,6 +1,7 @@
 <!--
 ChangeBadges - what kind of change a row is, which parts it touches and what it
 matters for. The kind is a word with a sign; parts and relevance are words.
+A change of the text that matters as text is one "Text" chip, not two.
 -->
 <template>
   <span class="change-badges">
@@ -19,11 +20,12 @@ matters for. The kind is a word with a sign; parts and relevance are words.
       class="change-chip"
       data-testid="change-part"
       :data-part="part"
+      :title="`Changed: ${PART_LABELS[part].toLowerCase()}`"
     >
       {{ PART_LABELS[part] }}
     </span>
     <span
-      v-for="name in relevance"
+      v-for="name in shownRelevance"
       :key="`relevance-${name}`"
       class="change-chip change-chip-relevance"
       :class="`change-relevance-${name}`"
@@ -37,16 +39,22 @@ matters for. The kind is a word with a sign; parts and relevance are words.
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { KIND_LABELS, KIND_MARKS, PART_LABELS, RELEVANCE_LABELS } from '@/services/diff-format';
 import type { ChangeKind, PartName, RelevanceName } from '@/types/changes';
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     kind: ChangeKind | 'unchanged';
     parts?: PartName[];
     relevance?: RelevanceName[];
   }>(),
   { parts: () => [], relevance: () => [] }
+);
+
+/** The relevance classes that say more than the parts already do. */
+const shownRelevance = computed(() =>
+  props.relevance.filter((name) => !(name === 'text' && props.parts.includes('text')))
 );
 </script>
 

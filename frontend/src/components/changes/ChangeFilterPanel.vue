@@ -4,7 +4,7 @@ filters it is given and emits the fields that should change; the page writes
 them to the URL.
 -->
 <template>
-  <form class="change-filters" data-testid="change-filters" @submit.prevent="commitSearch">
+  <form class="change-filters" data-testid="change-filters" @submit.prevent="commitTyped">
     <div class="change-filters-head">
       <h2 class="text-sm font-semibold text-surface-900 dark:text-surface-50">Filters</h2>
       <button
@@ -136,25 +136,27 @@ them to the URL.
       <span class="change-filters-label">Quality level</span>
       <div class="flex items-center gap-2">
         <input
+          v-model="minQlText"
           type="number"
           min="1"
           class="change-filters-input"
           placeholder="Min"
           aria-label="Minimum quality level"
-          :value="filters.minQl ?? ''"
           data-testid="change-filter-minql"
-          @change="emit('update', { minQl: numberValue($event) })"
+          @input="scheduleQl"
+          @change="commitQl"
         />
         <span class="text-surface-500" aria-hidden="true">-</span>
         <input
+          v-model="maxQlText"
           type="number"
           min="1"
           class="change-filters-input"
           placeholder="Max"
           aria-label="Maximum quality level"
-          :value="filters.maxQl ?? ''"
           data-testid="change-filter-maxql"
-          @change="emit('update', { maxQl: numberValue($event) })"
+          @input="scheduleQl"
+          @change="commitQl"
         />
       </div>
     </div>
@@ -253,9 +255,57 @@ function typeValue(event: Event): ChangeFilters['type'] {
   return value === 'item' || value === 'nano' ? value : null;
 }
 
-// The name filter is typed, so it is written to the URL after a pause.
+// The name and the quality levels are typed, so they are written to the URL
+// after a pause in typing (and at once on Enter or on leaving the field).
 const searchText = ref(props.filters.search);
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+function qlText(value: number | null): string {
+  return value === null ? '' : String(value);
+}
+
+/** What a quality level field holds: a whole number, or nothing. */
+function qlValue(text: string | number): number | null {
+  const trimmed = String(text).trim();
+  return /^\d+$/.test(trimmed) ? Number(trimmed) : null;
+}
+
+const minQlText = ref<string | number>(qlText(props.filters.minQl));
+const maxQlText = ref<string | number>(qlText(props.filters.maxQl));
+let qlTimer: ReturnType<typeof setTimeout> | null = null;
+
+function commitQl(): void {
+  if (qlTimer) clearTimeout(qlTimer);
+  qlTimer = null;
+  const minQl = qlValue(minQlText.value);
+  const maxQl = qlValue(maxQlText.value);
+  if (minQl !== props.filters.minQl) emit('update', { minQl });
+  if (maxQl !== props.filters.maxQl) emit('update', { maxQl });
+}
+
+function scheduleQl(): void {
+  if (qlTimer) clearTimeout(qlTimer);
+  qlTimer = setTimeout(commitQl, SEARCH_DELAY_MS);
+}
+
+function commitTyped(): void {
+  commitSearch();
+  commitQl();
+}
+
+watch(
+  () => props.filters.minQl,
+  (minQl) => {
+    if (minQl !== qlValue(minQlText.value)) minQlText.value = qlText(minQl);
+  }
+);
+
+watch(
+  () => props.filters.maxQl,
+  (maxQl) => {
+    if (maxQl !== qlValue(maxQlText.value)) maxQlText.value = qlText(maxQl);
+  }
+);
 
 function commitSearch(): void {
   if (searchTimer) clearTimeout(searchTimer);
@@ -278,6 +328,7 @@ watch(
 
 onBeforeUnmount(() => {
   if (searchTimer) clearTimeout(searchTimer);
+  if (qlTimer) clearTimeout(qlTimer);
 });
 </script>
 
@@ -307,14 +358,14 @@ onBeforeUnmount(() => {
 }
 
 .change-filters-count {
-  @apply ml-auto text-xs text-surface-500 dark:text-surface-400;
+  @apply ml-auto text-xs text-surface-600 dark:text-surface-400;
 }
 
 .change-filters-hint {
-  @apply mt-1 text-xs text-surface-500 dark:text-surface-400;
+  @apply mt-1 text-xs text-surface-600 dark:text-surface-400;
 }
 
 .change-filters-link {
-  @apply text-xs text-primary-600 hover:underline dark:text-primary-400;
+  @apply text-xs text-primary-700 hover:underline dark:text-primary-400;
 }
 </style>
