@@ -871,6 +871,39 @@ def changed_pairs(rows: Sequence[ChangeRow]) -> List[Tuple[int, int]]:
 # ---------------------------------------------------------------------------
 
 
+def _along(segments: Sequence[Tuple[str, Optional[int]]]) -> ColumnElement:
+    """The changes of the builds of a lineage (``BuildIndex.lineage``)."""
+    c = t.item_change
+    return or_(
+        *(
+            and_(
+                c.c.branch == name,
+                c.c.ordinal <= last if last is not None else true(),
+            )
+            for name, last in segments
+        )
+    )
+
+
+def timeline_counts(
+    db: Session, index: BuildIndex, branch: str, aoids: Sequence[int]
+) -> Dict[int, Tuple[int, int]]:
+    """``{aoid: (entries, of which of kind changed)}`` of the timelines
+    (``item_timeline``) of these items along the lineage of ``branch``, in one
+    query. An item without an entry is not in the result."""
+    c = t.item_change
+    rows = db.execute(
+        select(
+            c.c.aoid,
+            func.count(),
+            func.count().filter(c.c.kind == KIND_CODES["changed"]),
+        )
+        .where(any_of(c.c.aoid, aoids), _along(index.lineage(branch)))
+        .group_by(c.c.aoid)
+    )
+    return {aoid: (entries, changed) for aoid, entries, changed in rows}
+
+
 def item_timeline(
     db: Session, index: BuildIndex, branch: str, aoid: int
 ) -> List[Tuple[ChangeRow, BuildRow, Optional[Dict[str, Any]]]]:
@@ -893,18 +926,7 @@ def item_timeline(
             t.build_note.c.body,
         )
         .select_from(c.outerjoin(t.build_note, t.build_note.c.note_id == c.c.note_id))
-        .where(
-            any_of(c.c.aoid, [aoid]),
-            or_(
-                *(
-                    and_(
-                        c.c.branch == name,
-                        c.c.ordinal <= last if last is not None else true(),
-                    )
-                    for name, last in segments
-                )
-            ),
-        )
+        .where(any_of(c.c.aoid, [aoid]), _along(segments))
     ).all()
     position = {name: index_ for index_, (name, _) in enumerate(segments)}
     rows.sort(key=lambda row: (position[row.branch], -row.ordinal))

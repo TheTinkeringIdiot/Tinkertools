@@ -4,7 +4,8 @@ Tests for the cross-version change summary of list rows:
     POST /items/revisions/batch
 
 Each test fills a throwaway store (the ``store`` fixture) with a few builds of
-hand-made items and asks the API in how many builds an item changed.
+hand-made items and asks the API how many entries the timeline of an item has
+and which build its definition comes from.
 """
 
 import os
@@ -43,7 +44,7 @@ def summary(store, aoids, slug=None):
 
 
 def changed_in(store, aoid=WRENCH, slug=None):
-    """``(change points, build the requested build's definition is from)``."""
+    """``(timeline entries, build the requested build's definition is from)``."""
     entry = summary(store, [aoid], slug)[str(aoid)]
     return entry["revision_count"], entry["latest_change_slug"]
 
@@ -53,7 +54,7 @@ def changed_in(store, aoid=WRENCH, slug=None):
 # ---------------------------------------------------------------------------
 
 
-def test_an_item_that_never_changed_has_one_point_where_it_first_appears(store):
+def test_an_item_that_never_changed_has_one_entry_where_it_first_appears(store):
     store.add_build("ao-1", 1, items=[])
     store.add_build("ao-2", 2, items=[wrench()])
     store.add_build("ao-3", 3, items=[wrench()])
@@ -63,6 +64,7 @@ def test_an_item_that_never_changed_has_one_point_where_it_first_appears(store):
     assert summary(store, [WRENCH], "ao-1")["100"] == {
         "aoid": WRENCH,
         "revision_count": 1,
+        "change_count": 0,
         "latest_change_slug": None,
         "present_in_current": False,
     }
@@ -107,11 +109,20 @@ def test_every_build_that_changes_the_item_is_counted(store):
     ]
 
 
-def test_a_build_that_only_reorders_or_renumbers_internals_is_no_change(store):
-    store.add_build("ao-1", 1, items=[wrench(amounts=(5, 6), instance=1)])
-    store.add_build("ao-2", 2, items=[wrench(amounts=(6, 5), instance=2)])
+def test_a_build_that_only_reorders_effects_is_no_change(store):
+    store.add_build("ao-1", 1, items=[wrench(amounts=(5, 6))])
+    store.add_build("ao-2", 2, items=[wrench(amounts=(6, 5))])
 
     assert changed_in(store, slug="ao-2") == (1, "ao-1")
+
+
+def test_a_renumbered_row_id_is_an_entry_but_not_where_the_definition_is_from(store):
+    store.add_build("ao-1", 1, items=[wrench(instance=1)])
+    store.add_build("ao-2", 2, items=[wrench(instance=2)])
+
+    # the timeline lists the build (a cosmetic change); the item is as it was
+    assert changed_in(store, slug="ao-2") == (2, "ao-1")
+    assert summary(store, [WRENCH], "ao-2")["100"]["change_count"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -125,7 +136,9 @@ def test_an_item_that_returns_unchanged_has_not_changed(store):
     store.add_build("ao-3", 3, items=[])
     store.add_build("ao-4", 4, items=[wrench()])
 
-    assert changed_in(store, slug="ao-4") == (1, "ao-1")
+    # added, removed and added again: three entries, none of them a change
+    assert changed_in(store, slug="ao-4") == (3, "ao-1")
+    assert summary(store, [WRENCH], "ao-4")["100"]["change_count"] == 0
     assert summary(store, [WRENCH], "ao-3")["100"]["present_in_current"] is False
     assert summary(store, [WRENCH], "ao-4")["100"]["present_in_current"] is True
 
@@ -135,7 +148,7 @@ def test_an_item_that_returns_changed_is_compared_with_what_it_was(store):
     store.add_build("ao-2", 2, items=[])
     store.add_build("ao-3", 3, items=[wrench(stat=11)])
 
-    assert changed_in(store, slug="ao-3") == (2, "ao-3")
+    assert changed_in(store, slug="ao-3") == (3, "ao-3")
 
 
 def test_an_item_no_build_has_never_changed(store):
@@ -146,12 +159,13 @@ def test_an_item_no_build_has_never_changed(store):
         assert summary(store, [aoid], "ao-2")[str(aoid)] == {
             "aoid": aoid,
             "revision_count": 0,
+            "change_count": 0,
             "latest_change_slug": None,
             "present_in_current": False,
         }
 
 
-def test_a_disabled_build_is_not_part_of_the_history(store):
+def test_a_disabled_build_is_not_where_a_definition_is_from(store):
     store.add_build("ao-1", 1, items=[wrench()])
     store.add_build("ao-2", 2, items=[wrench(stat=11)], enabled=False)
     store.add_build("ao-3", 3, items=[wrench(stat=11)])
@@ -205,30 +219,50 @@ def forked(store):
 
 
 def test_a_fork_is_compared_with_the_build_it_forks_from(forked):
-    # first seen in ao-1, changed in ao-3 and, against ao-2, in prk-1
-    assert changed_in(forked, slug="prk-1") == (3, "prk-1")
+    # first seen in ao-1 and changed, against ao-2, in prk-1; ao-3 is after
+    # the fork
+    assert changed_in(forked, slug="prk-1") == (2, "prk-1")
     # the same in the fork as in the build it forks from
     assert changed_in(forked, 200, "prk-1") == (1, "ao-1")
 
 
 def test_a_fork_does_not_inherit_from_builds_after_the_fork(forked):
     # new to the fork although ao-3, after the fork, has it too
-    assert changed_in(forked, 300, "prk-1") == (2, "prk-1")
-    assert changed_in(forked, 300, "ao-3") == (2, "ao-3")
+    assert changed_in(forked, 300, "prk-1") == (1, "prk-1")
+    assert changed_in(forked, 300, "ao-3") == (1, "ao-3")
     assert changed_in(forked, 400, "prk-1") == (1, "prk-1")
 
 
 def test_a_fork_looks_past_the_builds_that_lack_the_item(forked):
-    assert changed_in(forked, 500, "prk-1") == (2, "prk-1")
+    # added in ao-1, removed in ao-2, back and renamed in the fork
+    assert changed_in(forked, 500, "prk-1") == (3, "prk-1")
 
 
-def test_the_requested_build_does_not_change_the_number_of_change_points(forked):
+def test_the_entries_counted_are_those_of_the_family_of_the_requested_build(forked):
     counts = {
         slug: [changed_in(forked, aoid, slug)[0] for aoid in (WRENCH, 200, 300, 400)]
         for slug in ("ao-1", "ao-3", "prk-1")
     }
 
-    assert counts["ao-1"] == counts["ao-3"] == counts["prk-1"] == [3, 1, 2, 1]
+    # the fork's own changes do not count in the family it forked from
+    assert counts["ao-1"] == counts["ao-3"] == [2, 1, 1, 0]
+    assert counts["prk-1"] == [2, 1, 1, 1]
+
+
+@pytest.mark.parametrize("slug", ["ao-1", "ao-2", "ao-3", "prk-1"])
+def test_the_counts_are_those_of_the_timeline_of_the_same_version(forked, slug):
+    aoids = [WRENCH, 200, 300, 400, 500, 999]
+    found = summary(forked, aoids, slug)
+
+    with forked.client(slug) as client:
+        for aoid in aoids:
+            entries = client.get(f"/api/v1/items/{aoid}/timeline").json()["entries"]
+            kinds = [entry["kind"] for entry in entries]
+            assert (
+                found[str(aoid)]["revision_count"],
+                found[str(aoid)]["change_count"],
+            ) == (len(kinds), kinds.count("changed")), (aoid, kinds)
+    assert found["100"]["change_count"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -240,25 +274,29 @@ def test_the_batch_summarises_each_item_for_the_requested_build(forked):
     assert summary(forked, [WRENCH, 200, 400, 999, WRENCH], "ao-3") == {
         "100": {
             "aoid": 100,
-            "revision_count": 3,
+            "revision_count": 2,
+            "change_count": 1,
             "latest_change_slug": "ao-3",
             "present_in_current": True,
         },
         "200": {
             "aoid": 200,
             "revision_count": 1,
+            "change_count": 0,
             "latest_change_slug": "ao-1",
             "present_in_current": True,
         },
         "400": {
             "aoid": 400,
-            "revision_count": 1,
+            "revision_count": 0,
+            "change_count": 0,
             "latest_change_slug": None,
             "present_in_current": False,
         },
         "999": {
             "aoid": 999,
             "revision_count": 0,
+            "change_count": 0,
             "latest_change_slug": None,
             "present_in_current": False,
         },
