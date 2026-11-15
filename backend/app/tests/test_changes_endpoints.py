@@ -211,6 +211,7 @@ def test_timeline_entries_carry_the_field_level_diff_of_each_step(history):
             "relevance": "gameplay",
             "old": 1,
             "new": 9,
+            "housekeeping": False,
             "bits_set": [8],
             "bits_cleared": [],
         }
