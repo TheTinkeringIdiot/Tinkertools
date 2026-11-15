@@ -8,7 +8,8 @@
 -- importer does so when a file changes.
 
 -- One digest per relevance class of what a revision holds in that class: its
--- stats of the class, its effects of the class (whatever event they hang on),
+-- stats of the class (a stat holding its housekeeping value counts as
+-- cosmetic), its effects of the class (whatever event they hang on),
 -- the misc fields of the class, and the actions and attack/defense parts
 -- under the class the rules give them. Two revisions of an item differ in a
 -- class exactly when the digests of that class differ, so the relevance of
@@ -36,6 +37,10 @@ CREATE TABLE revision_relevance (
 --   relevance    the class of the field itself, as a bit of
 --                item_change.relevance: the stat's or effect type's class,
 --                text, or the class the rules give the change as a whole
+--                (change_rules.RelevanceRules.transition_class). It depends
+--                on old and new for a stat added or removed with its
+--                housekeeping value (cosmetic) and for an event added or
+--                removed (event_added, event_removed)
 --   unnoted_items, unnoted_occurrences
 --                the same two counts over the changes no build note explains
 --                (item_change.note_id IS NULL): what a list that collapses
