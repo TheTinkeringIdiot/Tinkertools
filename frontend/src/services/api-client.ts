@@ -653,6 +653,8 @@ class TinkerToolsApiClient {
   ): Promise<BuildTransitionsResponse> {
     const params = new URLSearchParams();
     for (const part of query.part ?? []) params.append('part', part);
+    for (const relevance of query.relevance ?? []) params.append('relevance', relevance);
+    if (query.notes) params.append('notes', query.notes);
     if (query.min_items !== undefined) params.append('min_items', String(query.min_items));
     if (query.limit !== undefined) params.append('limit', String(query.limit));
     return this.getDiff<BuildTransitionsResponse>('/changes/transitions', params, options);
@@ -695,10 +697,16 @@ class TinkerToolsApiClient {
 
   async batchItemRevisions(aoids: number[]): Promise<ItemRevisionsBatchResponse> {
     if (aoids.length === 0) return { items: {} };
-    const response = await this.post<ItemRevisionsBatchResponse>('/items/revisions/batch', {
-      aoids: aoids.slice(0, 500),
-    });
-    return (response.data as ItemRevisionsBatchResponse) ?? { items: {} };
+    try {
+      // The route answers the batch itself, not an ApiResponse envelope.
+      const response = await this.client.post<ItemRevisionsBatchResponse>(
+        '/items/revisions/batch',
+        { aoids: aoids.slice(0, 500) }
+      );
+      return { items: response.data?.items ?? {} };
+    } catch (error) {
+      throw this.handleError(error);
+    }
   }
 
   /**

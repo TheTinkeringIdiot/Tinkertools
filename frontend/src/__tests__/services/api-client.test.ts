@@ -273,6 +273,42 @@ describe('API Client', () => {
     });
   });
 
+  describe('Item Revision Counts', () => {
+    it('returns the counts the batch route answers, keyed by AOID', async () => {
+      // The body exactly as POST /items/revisions/batch sends it: no envelope.
+      mockAxiosInstance.post.mockResolvedValue({
+        data: {
+          items: {
+            '271072': {
+              aoid: 271072,
+              revision_count: 3,
+              latest_change_slug: 'ao-18-8-62-ep1',
+              present_in_current: true,
+            },
+            '1': {
+              aoid: 1,
+              revision_count: 0,
+              latest_change_slug: null,
+              present_in_current: false,
+            },
+          },
+        },
+      });
+
+      const answered = await apiClient.batchItemRevisions([271072, 1]);
+
+      expect(mockAxiosInstance.post.mock.calls[0][0]).toBe('/items/revisions/batch');
+      expect(mockAxiosInstance.post.mock.calls[0][1]).toEqual({ aoids: [271072, 1] });
+      expect(answered.items[271072].revision_count).toBe(3);
+      expect(answered.items[1].revision_count).toBe(0);
+    });
+
+    it('makes no request for an empty list', async () => {
+      expect(await apiClient.batchItemRevisions([])).toEqual({ items: {} });
+      expect(mockAxiosInstance.post).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Error Handling', () => {
     it('should handle network errors', async () => {
       mockAxiosInstance.get.mockRejectedValue(

@@ -11,6 +11,7 @@ import {
   getProfessionName,
   getBreedName,
   getGenderName,
+  getFactionName,
   getFlagNameFromValue,
   getNanoStrainName,
 } from './game-utils';
@@ -478,6 +479,8 @@ export function transformCriterionForDisplay(criterion: Criterion): DisplayCrite
  */
 function formatStatDescription(stat: number, value: number, symbol: string): string {
   const statName = getStatName(stat) || `Stat ${stat}`;
+  // A value that is a name reads as one where it is compared for identity
+  const namesValue = symbol === '=' || symbol === '≠';
 
   // Special formatting for specific stats
   switch (stat) {
@@ -487,8 +490,8 @@ function formatStatDescription(stat: number, value: number, symbol: string): str
     case 60: {
       // Profession
       const professionName = getProfessionName(value);
-      if (professionName && symbol === '=') {
-        return `Profession = ${professionName}`;
+      if (professionName && namesValue) {
+        return `Profession ${symbol} ${professionName}`;
       }
       return `Profession ${symbol} ${value}`;
     }
@@ -496,8 +499,8 @@ function formatStatDescription(stat: number, value: number, symbol: string): str
     case 4: {
       // Breed
       const breedName = getBreedName(value);
-      if (breedName && symbol === '=') {
-        return `Breed = ${breedName}`;
+      if (breedName && namesValue) {
+        return `Breed ${symbol} ${breedName}`;
       }
       return `Breed ${symbol} ${value}`;
     }
@@ -505,10 +508,19 @@ function formatStatDescription(stat: number, value: number, symbol: string): str
     case 59: {
       // Gender
       const genderName = getGenderName(value);
-      if (genderName && symbol === '=') {
-        return `Gender = ${genderName}`;
+      if (genderName && namesValue) {
+        return `Gender ${symbol} ${genderName}`;
       }
       return `Gender ${symbol} ${value}`;
+    }
+
+    case 33: {
+      // Faction
+      const factionName = getFactionName(value);
+      if (factionName && namesValue) {
+        return `${statName} ${symbol} ${factionName}`;
+      }
+      return `${statName} ${symbol} ${value}`;
     }
 
     default:

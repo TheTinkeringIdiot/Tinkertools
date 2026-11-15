@@ -148,6 +148,8 @@ export interface ItemChange {
   note_id: number | null;
   /** Null unless asked for (include_diff) and for added and removed items. */
   diff: ItemDiff | null;
+  /** The diff was asked for but is too large for a list page; fetch it for the row alone. */
+  diff_omitted?: boolean;
 }
 
 export interface BuildNote {
@@ -279,6 +281,8 @@ export interface SharedTransition {
   /** Changed items with this transition. */
   items: number;
   occurrences: number;
+  /** What the line's own field matters for. */
+  relevance?: RelevanceName;
   stat: number | null;
   bit: number | null;
   spell_id: number | null;
@@ -294,6 +298,10 @@ export interface BuildTransitionsResponse {
 
 export interface TransitionsQuery {
   part?: PartName[];
+  /** As on the change list: only the lines of these relevance classes. */
+  relevance?: RelevanceName[];
+  /** 'collapse' leaves out what a build note already explains. */
+  notes?: 'collapse' | 'expand';
   min_items?: number;
   limit?: number;
 }

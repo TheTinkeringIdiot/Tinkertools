@@ -13,6 +13,8 @@ import type {
   BuildTransitionsResponse,
   ChangeListResponse,
   ChangeSummary,
+  CriterionChange,
+  DiffCriterion,
   DiffEffect,
   ItemChange,
   ItemCompareResponse,
@@ -201,6 +203,51 @@ export const GRAFT_DIFF: ItemDiff = {
   defense: [],
   misc: [],
 };
+
+const AND_CRITERION: DiffCriterion = { value1: 0, value2: 0, operator: 4 };
+
+/**
+ * A diff as long as item 262590's in 17.7.0: `effects` changed effects, each
+ * under `unchanged` conditions that stayed (joined by ANDs) and one that
+ * changed (Level ≥ 100 became Level ≥ 150).
+ */
+export function longEffectsDiff(effects = 43, unchanged = 12): ItemDiff {
+  const kept: CriterionChange[] = [];
+  for (let index = 0; index < unchanged; index += 1) {
+    const criterion: DiffCriterion = { value1: 100 + index, value2: 200, operator: 2 };
+    kept.push({ op: 'same', old: criterion, new: criterion });
+    if (index > 0) kept.push({ op: 'same', old: AND_CRITERION, new: AND_CRITERION });
+  }
+  const criteria: CriterionChange[] = [
+    ...kept,
+    {
+      op: 'changed',
+      old: { value1: 54, value2: 99, operator: 2 },
+      new: { value1: 54, value2: 149, operator: 2 },
+    },
+    { op: 'same', old: AND_CRITERION, new: AND_CRITERION },
+  ];
+  return {
+    ...emptyDiff(),
+    effects: [
+      {
+        event: 14,
+        change: 'changed',
+        old_event: null,
+        relevance: null,
+        added: [],
+        removed: [],
+        changed: Array.from({ length: effects }, (_, index) => ({
+          old: procEffect(index + 1),
+          new: procEffect(index + 1),
+          relevance: 'gameplay' as const,
+          fields: [],
+          criteria,
+        })),
+      },
+    ],
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Timeline

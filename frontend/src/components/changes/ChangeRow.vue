@@ -43,9 +43,18 @@ asked for diffs; otherwise it is fetched when the row is first opened.
           <span class="change-row-meta">
             {{ itemClassLabel(change.item_class, change.is_nano) }} · QL
             <template v-if="change.old_ql !== null">{{ change.old_ql }} → </template>{{ change.ql }}
+            ·
+            <span data-testid="change-row-aoid">AOID {{ change.aoid }}</span>
           </span>
           <ChangeBadges :kind="change.kind" :parts="change.parts" :relevance="change.relevance" />
         </div>
+        <p
+          v-if="change.diff_omitted && canOpen && !open"
+          class="change-row-meta"
+          data-testid="change-row-large-diff"
+        >
+          Large diff: loaded when the row is opened.
+        </p>
         <p
           v-if="change.old_name !== null"
           class="change-row-meta"
@@ -84,6 +93,7 @@ import { useChangesStore } from '@/stores/changes';
 import { getIconUrl } from '@/services/game-utils';
 import { itemClassLabel } from '@/services/diff-format';
 import { errorMessage } from '@/services/error-message';
+import { sameBuild } from '@/utils/version-order';
 import type { BuildRef, ItemChange, ItemDiff } from '@/types/changes';
 
 const props = withDefaults(
@@ -91,12 +101,14 @@ const props = withDefaults(
     change: ItemChange;
     build: BuildRef;
     base: BuildRef | null;
+    /** The build being browsed, when it may be the older side (`base`) of a comparison. */
+    viewed?: string | null;
     /** Open the diff from the start (the page shows every diff). */
     startOpen?: boolean;
     /** Link the item page to the same comparison (two arbitrary builds). */
     linkComparison?: boolean;
   }>(),
-  { startOpen: false, linkComparison: false }
+  { viewed: null, startOpen: false, linkComparison: false }
 );
 
 const changesStore = useChangesStore();
@@ -114,15 +126,19 @@ const canOpen = computed(() => props.change.kind === 'changed' && !!props.base);
 const diff = computed(() => props.change.diff ?? fetched.value);
 
 /**
- * The item page in the build being browsed. A removed item is no longer in
- * it, so the link shows it as the older build has it.
+ * The item page in the build being browsed. An item that build does not have
+ * (removed when it is the newer side, added when it is the older) is shown as
+ * the other build has it.
  */
 const itemLink = computed<RouteLocationRaw>(() => {
   const query: Record<string, string> = {};
-  if (props.change.kind === 'removed' && props.base) {
-    query.as = props.base.slug;
-  } else if (props.linkComparison && props.change.kind === 'changed' && props.base) {
-    query.compare = props.base.slug;
+  const viewedIsOlder = !!props.base && sameBuild(props.viewed, props.base.slug);
+  const other = viewedIsOlder ? props.build : props.base;
+  const absentKind = viewedIsOlder ? 'added' : 'removed';
+  if (props.change.kind === absentKind && other) {
+    query.as = other.slug;
+  } else if (props.linkComparison && props.change.kind === 'changed' && other) {
+    query.compare = other.slug;
   }
   return { name: 'ItemDetail', params: { aoid: String(props.change.aoid) }, query };
 });

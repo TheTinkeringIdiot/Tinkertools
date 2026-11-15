@@ -18,7 +18,13 @@ import {
   WEAPON_SLOT,
   WORN_ITEM,
 } from './game-data';
-import { getExpansionName, getItemClassName, getNanoStrainName, getStatName } from './game-utils';
+import {
+  getExpansionName,
+  getItemClassName,
+  getNanoStrainName,
+  getStatName,
+  getStatValueName,
+} from './game-utils';
 import { transformCriterionForDisplay, type DisplayCriterion } from './action-criteria';
 import {
   getEventName,
@@ -186,8 +192,22 @@ export function isFlagChange(change: StatChange): boolean {
   return change.bits_set !== null || change.bits_cleared !== null;
 }
 
-export function statValueText(value: number | null): string {
-  return value === null ? 'none' : String(value);
+/**
+ * A stat's value in words: the name it stands for where it has one (a
+ * profession, a breed, a faction, the stat an initiative or damage type
+ * points at), the number otherwise.
+ */
+export function statValueText(value: number | null, statId?: number, unit = ''): string {
+  if (value === null) return 'none';
+  const name = statId === undefined ? undefined : getStatValueName(statId, value);
+  return name ?? `${value}${unit}`;
+}
+
+/** Whether the values of a stat entry are names, where a difference means nothing. */
+export function hasNamedValues(change: StatChange): boolean {
+  return [change.old, change.new].some(
+    (value) => value !== null && getStatValueName(change.stat, value) !== undefined
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -491,9 +511,11 @@ export function transitionText(transition: SharedTransition): string {
     if (bit !== null) {
       return `${flagStatLabel(stat)}: ${flagName(stat, bit)} ${next === 1 ? 'set' : 'cleared'}`;
     }
-    if (old === null) return `${label} added: ${scalarText(next)}`;
-    if (next === null) return `${label} removed (was ${scalarText(old)})`;
-    return `${label}: ${arrow(scalarText(old), scalarText(next))}`;
+    const worded = (value: TransitionValue): string =>
+      typeof value === 'number' ? statValueText(value, stat) : scalarText(value);
+    if (old === null) return `${label} added: ${worded(next)}`;
+    if (next === null) return `${label} removed (was ${worded(old)})`;
+    return `${label}: ${arrow(worded(old), worded(next))}`;
   }
 
   if (part === 'atkdef' && stat !== null) {

@@ -19,6 +19,7 @@ import {
   isEmptyDiff,
   isStructuralTransition,
   miscValueText,
+  statValueText,
   cosmeticEffectCount,
   transitionCount,
   transitionFromPath,
@@ -94,6 +95,53 @@ describe('criterionText', () => {
   it('names the logical operators of a requirement list', () => {
     expect(criterionText({ value1: 0, value2: 0, operator: 4 })).toBe('AND');
     expect(criterionText({ value1: 0, value2: 0, operator: 3 })).toBe('OR');
+  });
+});
+
+describe('values that have names', () => {
+  it('names a profession, breed or faction a requirement compares with', () => {
+    expect(criterionText({ value1: 60, value2: 15, operator: 24 })).toBe('Profession ≠ Shade');
+    expect(criterionText({ value1: 4, value2: 3, operator: 24 })).toBe('Breed ≠ Nanomage');
+    expect(criterionText({ value1: 33, value2: 1, operator: 0 })).toBe('Faction = Clan');
+    expect(criterionText({ value1: 33, value2: 2, operator: 24 })).toBe('Faction ≠ Omni');
+  });
+
+  it('leaves a number that orders or has no name', () => {
+    expect(criterionText({ value1: 33, value2: 9, operator: 0 })).toBe('Faction = 9');
+    expect(criterionText({ value1: 129, value2: 15, operator: 24 })).toBe(
+      'PsychologicalModification ≠ 15'
+    );
+  });
+
+  it('names the value of a stat that stands for a profession, a breed or another stat', () => {
+    expect(statValueText(15, 60)).toBe('Shade');
+    expect(statValueText(2, 4)).toBe('Opifex');
+    expect(statValueText(1, 33)).toBe('Clan');
+    expect(statValueText(118, 440)).toBe('MeleeInit');
+    expect(statValueText(94, 436)).toBe('RadiationAC');
+    // Breed 15 and Team 15 are not names the game data has.
+    expect(statValueText(15, 4)).toBe('15');
+    expect(statValueText(15, 6)).toBe('15');
+    expect(statValueText(410, 2)).toBe('410');
+    expect(statValueText(null, 60)).toBe('none');
+  });
+
+  it('words a removed stat by the name of its value in a patch note', () => {
+    const removed = (stat: number, old: number): SharedTransition => ({
+      part: 'stats',
+      path: `stat:${stat}`,
+      old,
+      new: null,
+      items: 2,
+      occurrences: 2,
+      stat,
+      bit: null,
+      spell_id: null,
+      action: null,
+      field: null,
+    });
+    expect(transitionText(removed(60, 15))).toBe('Profession removed (was Shade)');
+    expect(transitionText(removed(4, 15))).toBe('Breed removed (was 15)');
   });
 });
 
@@ -260,7 +308,10 @@ describe('transitionText', () => {
     expect(transitionText(byPath('stat:287'))).toBe('AttackRange added: 20');
     expect(transitionText(byPath('stat:2'))).toBe('Mass removed (was 410)');
     expect(transitionText(transition({ path: 'stat:440', stat: 440, old: 118, new: 120 }))).toBe(
-      'InitiativeType: 118 → 120'
+      'InitiativeType: MeleeInit → PhysicalInit'
+    );
+    expect(transitionText(transition({ path: 'stat:436', stat: 436, old: 91, new: 94 }))).toBe(
+      'DamageType2: MeleeAC → RadiationAC'
     );
   });
 

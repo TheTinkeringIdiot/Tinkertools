@@ -201,15 +201,12 @@ describe('item page: timeline and comparison', () => {
 
       // Requirements as a sequence diff, in order, named as the item page names them.
       const criteria = diff.findAll('[data-testid="diff-criterion"]');
-      expect(criteria.map((row) => row.attributes('data-op'))).toEqual([
-        'changed',
-        'changed',
-        'same',
-      ]);
+      // The AND that joins the two is not a row of its own.
+      expect(criteria.map((row) => row.attributes('data-op'))).toEqual(['changed', 'changed']);
       expect(criteria[0].find('del').text()).toBe('PsychologicalModification ≥ 40');
       expect(criteria[0].find('ins').text()).toBe('PsychologicalModification ≥ 66');
       expect(criteria[1].text()).toContain('SensoryImprovement');
-      expect(criteria[2].text()).toContain('AND');
+      expect(diff.find('[data-testid="diff-criteria"]').text()).not.toContain('AND');
       expect(diff.find('[data-testid="diff-action"]').text()).toContain('To use');
 
       // A stat that appeared, by name.
@@ -420,6 +417,38 @@ describe('item page: timeline and comparison', () => {
       await wrapper.find('[data-testid="item-missing-view"]').trigger('click');
       await flushPromises();
       expect(router.currentRoute.value.query.as).toBe('ao-14-2-2');
+    });
+
+    it('explains an item missing from a build between its removal and its return', async () => {
+      await setCurrentVersion('ao-14-5-0');
+      await router.push(`/ao-14-5-0/items/${CRITTER_AOID}`);
+      mockApi.getItem.mockResolvedValue({ success: false });
+      mockApi.getItemTimeline.mockResolvedValue(RETURNED_TIMELINE);
+
+      const wrapper = await mountItemDetail(router, pinia);
+
+      const message = wrapper.find('[data-testid="item-missing-in-version"]');
+      expect(message.text()).toContain('Not present in AO 14.5.0');
+      expect(message.text()).toContain('Removed in AO 14.4.2, returned in AO 14.5.1');
+      expect(message.text()).not.toContain('First appears');
+      // The page is headed by the item's name, not by a loading message.
+      expect(wrapper.find('[data-testid="item-heading"]').text()).toBe(CRITTER_NAME);
+    });
+
+    it('explains an item missing from a build older than its first appearance', async () => {
+      await setCurrentVersion('ao-14-2-2');
+      await router.push(`/ao-14-2-2/items/${CRITTER_AOID}`);
+      mockApi.getItem.mockResolvedValue({ success: false });
+      mockApi.getItemTimeline.mockResolvedValue({
+        ...RETURNED_TIMELINE,
+        entries: RETURNED_TIMELINE.entries.slice(0, 1),
+      });
+
+      const wrapper = await mountItemDetail(router, pinia);
+
+      expect(wrapper.find('[data-testid="item-missing-in-version"]').text()).toContain(
+        'First appears in AO 14.5.1'
+      );
     });
 
     it('shows no history control for an item no build knows', async () => {

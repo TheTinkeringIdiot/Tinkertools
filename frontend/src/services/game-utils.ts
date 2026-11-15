@@ -97,6 +97,34 @@ export function getGenderName(id: number): string | undefined {
 }
 
 /**
+ * Stats whose value is the id of another stat: the initiative a weapon uses,
+ * the armour class its damage is checked against.
+ */
+const STAT_VALUED_STATS = new Set([339, 436, 440]); // DamageType, DamageType2, InitiativeType
+
+/**
+ * Name of a stat's value where the value stands for something that has a
+ * name (a profession, a breed, a faction, a gender, another stat).
+ * Undefined when the stat's values are plain numbers or the value is unknown.
+ */
+export function getStatValueName(statId: number, value: number): string | undefined {
+  switch (statId) {
+    case 60: // Profession
+    case 368: // VisualProfession
+      return value === 0 ? undefined : PROFESSION[value as ProfessionId];
+    case 4: // Breed
+    case 367: // VisualBreed
+      return value === 0 ? undefined : BREED[value as BreedId];
+    case 33: // Faction
+      return getFactionName(value);
+    case 59: // Gender
+      return value === 0 ? undefined : getGenderName(value);
+    default:
+      return STAT_VALUED_STATS.has(statId) && value !== 0 ? getStatName(value) : undefined;
+  }
+}
+
+/**
  * Get NPC family name from ID
  */
 export function getNPCFamilyName(id: number): string | undefined {

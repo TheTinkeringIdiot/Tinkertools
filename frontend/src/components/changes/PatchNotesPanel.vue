@@ -49,7 +49,8 @@ to.
           >
             <span class="min-w-0 flex-1">
               <span class="patch-notes-text">{{ transitionText(transition) }}</span>
-              <span class="patch-notes-count"> {{ transitionCount(transition) }}</span>
+              {{ ' ' }}
+              <span class="patch-notes-count">{{ transitionCount(transition) }}</span>
             </span>
             <button
               type="button"
@@ -78,12 +79,19 @@ to.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { useChangesStore } from '@/stores/changes';
+import { queryKey, useChangesStore } from '@/stores/changes';
 import { isStructuralTransition, transitionCount, transitionText } from '@/services/diff-format';
 import { isRequestCancelled } from '@/services/error-message';
-import type { PartName, SharedTransition } from '@/types/changes';
+import {
+  RELEVANCE_NAMES,
+  type PartName,
+  type RelevanceName,
+  type SharedTransition,
+  type TransitionsQuery,
+} from '@/types/changes';
 
-const COLLAPSED_LINES = 8;
+/** Few enough that the first rows of the list stay on the first screen. */
+const COLLAPSED_LINES = 3;
 const CHANNEL = 'patch-notes';
 /** Everything but the misc part, whose transitions are client bookkeeping. */
 const PARTS: PartName[] = ['text', 'stats', 'effects', 'actions', 'atkdef'];
@@ -92,6 +100,10 @@ const LIMIT = 40;
 const props = defineProps<{
   /** Build whose changes these are. */
   version: string;
+  /** The page's relevance filter; empty: every change, whatever it matters for. */
+  relevance: RelevanceName[];
+  /** The page lists the changes build notes explain with the rest. */
+  expandNotes: boolean;
 }>();
 
 const emit = defineEmits<{ (event: 'select', transition: SharedTransition): void }>();
@@ -108,24 +120,38 @@ const shown = computed(() =>
   showAll.value ? transitions.value : transitions.value.slice(0, COLLAPSED_LINES)
 );
 
+/**
+ * The lines follow the list's filters: what the list leaves out (cosmetic and
+ * text changes by default, changes a build note explains) is left out here.
+ * Both are always sent, so the answer does not rest on the route's defaults.
+ */
+const query = computed<TransitionsQuery>(() => ({
+  part: PARTS,
+  relevance: props.relevance.length ? [...props.relevance] : [...RELEVANCE_NAMES],
+  notes: props.expandNotes ? 'expand' : 'collapse',
+  limit: LIMIT,
+}));
+
+const requestKey = computed(() => `${props.version}|${queryKey(query.value)}`);
+
 async function load(): Promise<void> {
-  const asked = props.version;
+  const asked = requestKey.value;
   loading.value = true;
   error.value = false;
   try {
     const response = await changesStore.loadTransitions(
-      { version: asked, query: { part: PARTS, limit: LIMIT } },
+      { version: props.version, query: query.value },
       CHANNEL
     );
-    if (props.version === asked) {
+    if (requestKey.value === asked) {
       transitions.value = response.transitions.filter((entry) => !isStructuralTransition(entry));
     }
   } catch (caught) {
-    if (isRequestCancelled(caught) || props.version !== asked) return;
+    if (isRequestCancelled(caught) || requestKey.value !== asked) return;
     transitions.value = [];
     error.value = true;
   } finally {
-    if (props.version === asked) loading.value = false;
+    if (requestKey.value === asked) loading.value = false;
   }
 }
 
@@ -134,10 +160,10 @@ watch(
   () => {
     transitions.value = [];
     showAll.value = false;
-    void load();
-  },
-  { immediate: true }
+  }
 );
+
+watch(requestKey, () => void load(), { immediate: true });
 
 onBeforeUnmount(() => changesStore.cancel(CHANNEL));
 </script>
