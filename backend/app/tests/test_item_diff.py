@@ -575,6 +575,51 @@ def test_transitions_report_a_renumbered_event_and_whole_actions():
     ]
 
 
+def test_transitions_tell_a_removed_action_from_an_added_one():
+    use = [{"action": 3, "criteria": [[54, 10, 2]]}]
+
+    assert transitions(diff_parts(parts(actions=use), parts())) == [
+        Transition("actions", "action:3", "removed", None)
+    ]
+    assert transitions(diff_parts(parts(), parts(actions=use))) == [
+        Transition("actions", "action:3", None, "added")
+    ]
+
+
+def test_transitions_name_the_subject_of_an_effect_on_the_side_it_was_on():
+    stun = effect(53122)  # acts on no stat, skill, nano or item
+    old = parts(effects=[event(14, modify(16, 5), stun)])
+    new = parts(effects=[event(14, effect(53121))])
+
+    assert sorted(transitions(diff_parts(old, new)), key=repr) == sorted(
+        [
+            Transition("effects", "effect:53045", 16, None),
+            Transition("effects", "effect:53122", "none", None),
+            Transition("effects", "effect:53121", None, "none"),
+        ],
+        key=repr,
+    )
+
+
+def test_a_text_transition_keeps_up_to_80_letters_of_difference():
+    def renamed(letters):
+        old = parts(text={"name": "Saw", "description": "A tool."})
+        new = parts(text={"name": "Saw", "description": "A " + "x" * letters})
+        return transitions(diff_parts(old, new))
+
+    assert renamed(80) == [Transition("text", "description", "tool.", "x" * 80)]
+    assert renamed(81) == [Transition("text", "description", None, None)]
+
+
+def test_events_with_the_same_effects_are_renumbered_lowest_numbers_first():
+    old = [event(5, modify(16, 5)), event(6, modify(16, 5))]
+    new = [event(1, modify(16, 5)), event(2, modify(16, 5))]
+
+    assert [
+        (e["old_event"], e["event"], e["change"]) for e in diff_effects(old, new)
+    ] == [(5, 1, "renumbered"), (6, 2, "renumbered")]
+
+
 def test_full_text_transitions_carry_the_whole_texts():
     old = parts(text={"name": "A Shining Wrench", "description": ""})
     new = parts(text={"name": "Wrench, Shiny", "description": ""})
