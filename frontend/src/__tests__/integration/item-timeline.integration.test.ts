@@ -400,6 +400,50 @@ describe('item page: timeline and comparison', () => {
       expect(peek.attributes('data-slug')).toBe('ao-14-2-2');
     });
 
+    it('does not mark a removal as the step shown now', async () => {
+      // Removed in 14.4.2 and never back: nothing of it is in effect in 14.6.0.
+      mockApi.getItem.mockResolvedValue({ success: false });
+      mockApi.getItemTimeline.mockResolvedValue({
+        ...RETURNED_TIMELINE,
+        entries: RETURNED_TIMELINE.entries.slice(1),
+      });
+      const wrapper = await mountItemDetail(router, pinia);
+      await openHistory(wrapper);
+
+      expect(wrapper.findAll('[data-testid="item-history-entry"]')).toHaveLength(2);
+      expect(wrapper.findAll('[data-testid="item-history-viewed"]')).toHaveLength(0);
+    });
+
+    it('marks the step in effect when the page shows the item as of an older build', async () => {
+      mockApi.getItemTimeline.mockResolvedValue(RETURNED_TIMELINE);
+      await router.push(`/ao-14-6-0/items/${CRITTER_AOID}?as=ao-14-2-2`);
+      const wrapper = await mountItemDetail(router, pinia);
+      await openHistory(wrapper);
+
+      const viewed = wrapper.findAll('[data-testid="item-history-viewed"]');
+      expect(viewed).toHaveLength(1);
+      expect(
+        wrapper
+          .find('[data-testid="item-history-entry"][data-slug="ao-14-2-2"]')
+          .find('[data-testid="item-history-viewed"]')
+          .exists()
+      ).toBe(true);
+    });
+
+    it('explains an item missing from the very build that removed it', async () => {
+      await setCurrentVersion('ao-14-4-2');
+      await router.push(`/ao-14-4-2/items/${CRITTER_AOID}`);
+      mockApi.getItem.mockResolvedValue({ success: false });
+      mockApi.getItemTimeline.mockResolvedValue(RETURNED_TIMELINE);
+
+      const wrapper = await mountItemDetail(router, pinia);
+
+      const message = wrapper.find('[data-testid="item-missing-in-version"]');
+      expect(message.text()).toContain('Not present in AO 14.4.2');
+      expect(message.text()).toContain('Removed in AO 14.4.2, returned in AO 14.5.1');
+      expect(message.text()).not.toContain('First appears');
+    });
+
     it('offers the last build that has an item missing from this version', async () => {
       mockApi.getItem.mockResolvedValue({ success: false });
       mockApi.getItemTimeline.mockResolvedValue({
@@ -460,7 +504,7 @@ describe('item page: timeline and comparison', () => {
       expect(wrapper.find('[data-testid="item-history-trigger"]').exists()).toBe(false);
       expect(wrapper.find('[data-testid="item-compare-trigger"]').exists()).toBe(false);
       expect(wrapper.find('[data-testid="item-missing-in-version"]').exists()).toBe(false);
-      expect(wrapper.text()).toContain('Item not found');
+      expect(wrapper.find('[data-testid="item-not-found"]').text()).toContain('No such item');
     });
 
     it('keeps the page usable when the timeline cannot be loaded', async () => {
@@ -474,7 +518,192 @@ describe('item page: timeline and comparison', () => {
     });
   });
 
+  describe('an item the build asked for does not have', () => {
+    /** What the API client throws for a 404 of the item route. */
+    const NOT_FOUND = {
+      type: 'info',
+      title: 'Not Found',
+      message: 'Item not found',
+      action: 'Check the link or pick another version',
+      recoverable: true,
+      status: 404,
+    };
+
+    function onlyIn(build: typeof BUILD_PRK, name: string) {
+      return {
+        aoid: CRITTER_AOID,
+        family: build.family,
+        entries: [
+          {
+            build,
+            base: BUILD_17105,
+            kind: 'added' as const,
+            name,
+            ql: 1,
+            parts: [],
+            relevance: ['gameplay' as const],
+            note: null,
+            diff: null,
+          },
+        ],
+      };
+    }
+
+    it('says no build of this game has the item and offers the game that does', async () => {
+      mockApi.getItem.mockRejectedValue(NOT_FOUND);
+      mockApi.getItemTimeline.mockImplementation(async (_aoid, options) =>
+        options?.gameVersion === 'prk-0-7-1'
+          ? onlyIn(BUILD_PRK, '000 - Melee Weapons')
+          : emptyTimeline(CRITTER_AOID)
+      );
+
+      const wrapper = await mountItemDetail(router, pinia);
+
+      const message = wrapper.find('[data-testid="item-not-found"]');
+      expect(message.text()).toContain('Not in Anarchy Online');
+      expect(message.text()).toContain(
+        `No Anarchy Online build has an item with id ${CRITTER_AOID}`
+      );
+      expect(message.text()).toContain('It exists in Project Rubi-Ka as "000 - Melee Weapons"');
+      expect(wrapper.text()).not.toContain('Failed to Load Item');
+      expect(wrapper.text()).not.toContain('Retry');
+      // One look at the other game, no more.
+      expect(mockApi.getItemTimeline.mock.calls.map(([, options]) => options?.gameVersion)).toEqual(
+        ['ao-14-6-0', 'prk-0-7-1']
+      );
+
+      await wrapper.find('[data-testid="item-not-found-elsewhere"]').trigger('click');
+      await flushPromises();
+      expect(router.currentRoute.value.fullPath).toBe(`/prk-0-7-1/items/${CRITTER_AOID}`);
+    });
+
+    it('says there is no such item when no game has it', async () => {
+      mockApi.getItem.mockRejectedValue(NOT_FOUND);
+      mockApi.getItemTimeline.mockResolvedValue(emptyTimeline(CRITTER_AOID));
+
+      const wrapper = await mountItemDetail(router, pinia);
+
+      const message = wrapper.find('[data-testid="item-not-found"]');
+      expect(message.text()).toContain('No such item');
+      expect(message.text()).toContain(`No build on record has an item with id ${CRITTER_AOID}`);
+      expect(wrapper.find('[data-testid="item-not-found-elsewhere"]').exists()).toBe(false);
+      expect(wrapper.text()).not.toContain('Failed to Load Item');
+      expect(wrapper.text()).not.toContain('Retry');
+    });
+
+    it('still says so when the look at the other game fails', async () => {
+      mockApi.getItem.mockRejectedValue(NOT_FOUND);
+      mockApi.getItemTimeline.mockImplementation(async (_aoid, options) => {
+        if (options?.gameVersion === 'prk-0-7-1') throw new Error('unavailable');
+        return emptyTimeline(CRITTER_AOID);
+      });
+
+      const wrapper = await mountItemDetail(router, pinia);
+
+      expect(wrapper.find('[data-testid="item-not-found"]').text()).toContain('No such item');
+    });
+
+    it('keeps the retry for a failure that is not an absence', async () => {
+      mockApi.getItem.mockRejectedValue({
+        type: 'error',
+        title: 'Network Error',
+        message: 'Unable to connect to the server',
+        action: 'Check your internet connection and try again',
+        recoverable: true,
+      });
+      mockApi.getItemTimeline.mockResolvedValue(emptyTimeline(CRITTER_AOID));
+
+      const wrapper = await mountItemDetail(router, pinia);
+
+      expect(wrapper.find('[data-testid="item-not-found"]').exists()).toBe(false);
+      expect(wrapper.text()).toContain('Failed to Load Item');
+      expect(wrapper.text()).toContain('Unable to connect to the server');
+      expect(wrapper.text()).toContain('Retry');
+    });
+
+    it('says a peeked build is not a build, without "As of" above a failure', async () => {
+      mockApi.getItem.mockImplementation(async (_aoid, options) => {
+        if (options?.gameVersion === 'nonsense') {
+          throw { ...NOT_FOUND, message: "Unknown game version 'nonsense'" };
+        }
+        return { success: true, data: makeItem() };
+      });
+      await router.push(`/ao-14-6-0/items/${CRITTER_AOID}?as=nonsense`);
+      const wrapper = await mountItemDetail(router, pinia);
+
+      expect(wrapper.find('[data-testid="item-peek-banner"]').exists()).toBe(false);
+      expect(wrapper.text()).not.toContain('As of nonsense');
+      const message = wrapper.find('[data-testid="item-not-found"]');
+      expect(message.text()).toContain('No build named "nonsense"');
+      expect(message.text()).toContain('not a build on record');
+      expect(wrapper.text()).not.toContain('Retry');
+
+      await wrapper.find('[data-testid="item-not-found-back"]').trigger('click');
+      await flushPromises();
+      expect(router.currentRoute.value.query.as).toBeUndefined();
+      expect(wrapper.find('[data-testid="item-not-found"]').exists()).toBe(false);
+      expect(wrapper.find('h1').text()).toContain(CRITTER_NAME);
+    });
+
+    it('says why a peeked build does not have the item, from its history', async () => {
+      mockApi.getItemTimeline.mockResolvedValue({
+        ...RETURNED_TIMELINE,
+        entries: RETURNED_TIMELINE.entries.slice(0, 1),
+      });
+      mockApi.getItem.mockImplementation(async (_aoid, options) => {
+        if (options?.gameVersion === 'ao-14-2-2') throw NOT_FOUND;
+        return { success: true, data: makeItem() };
+      });
+      await router.push(`/ao-14-6-0/items/${CRITTER_AOID}?as=ao-14-2-2`);
+      const wrapper = await mountItemDetail(router, pinia);
+
+      expect(wrapper.find('[data-testid="item-peek-banner"]').exists()).toBe(false);
+      const message = wrapper.find('[data-testid="item-not-found"]');
+      expect(message.text()).toContain('Not present in AO 14.2.2');
+      expect(message.text()).toContain('First appears in AO 14.5.1');
+      expect(wrapper.find('[data-testid="item-not-found-back"]').exists()).toBe(true);
+    });
+  });
+
   describe('compare with another version', () => {
+    it('says so when the link asks to compare the build on the page with itself', async () => {
+      await router.push(`/ao-14-6-0/items/${CRITTER_AOID}?compare=ao-14-6-0`);
+      const wrapper = await mountItemDetail(router, pinia);
+
+      const same = wrapper.find('[data-testid="item-compare-same"]');
+      expect(same.text()).toContain('compare AO 14.6.0 with itself');
+      expect(same.text()).toContain('Pick a different build');
+      expect(mockApi.compareItem).not.toHaveBeenCalled();
+
+      // Picking a real build compares, and the remark goes.
+      await wrapper.find('[data-testid="item-compare-picker"]').setValue('ao-14-2-2');
+      await flushPromises();
+      expect(wrapper.find('[data-testid="item-compare-same"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="item-compare-result"]').exists()).toBe(true);
+    });
+
+    it('states a change of quality level between the two builds, and only a change', async () => {
+      const changed = compareResult('changed');
+      mockApi.compareItem.mockResolvedValue({
+        ...changed,
+        old: { ...changed.old!, ql: 10 },
+        new: { ...changed.new!, ql: 12 },
+      });
+      const wrapper = await mountItemDetail(router, pinia);
+      await pickCompare(wrapper, 'ao-14-2-2');
+      expect(wrapper.find('[data-testid="item-compare-result"]').text()).toContain(
+        'Quality level 10 → 12'
+      );
+
+      mockApi.compareItem.mockResolvedValue(changed);
+      await wrapper.find('[data-testid="item-compare-picker"]').setValue('ao-14-5-1');
+      await flushPromises();
+      expect(wrapper.find('[data-testid="item-compare-result"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="item-compare-result"]').text()).not.toContain(
+        'Quality level'
+      );
+    });
+
     it('compares the item with a picked older build, older side first', async () => {
       const wrapper = await mountItemDetail(router, pinia);
 

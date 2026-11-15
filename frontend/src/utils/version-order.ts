@@ -59,6 +59,26 @@ export function familyTitle(family: string): string {
   return FAMILY_TITLES[family] ?? family.toUpperCase();
 }
 
+/**
+ * The slug to enter each other game by: its 'latest' alias, else its newest
+ * build. In registry order, without the family given.
+ */
+export function familyEntrySlugs(
+  except: string | null | undefined
+): Array<{ family: string; slug: string }> {
+  const entries: Array<{ family: string; slug: string }> = [];
+  for (const version of versions.value) {
+    if (!version.enabled || version.family === except) continue;
+    const known = entries.find((entry) => entry.family === version.family);
+    if (!known) {
+      entries.push({ family: version.family, slug: version.slug });
+    } else if (version.alias_of && !getVersion(known.slug)?.alias_of) {
+      known.slug = version.slug;
+    }
+  }
+  return entries;
+}
+
 export interface BuildGroup {
   key: string;
   title: string;

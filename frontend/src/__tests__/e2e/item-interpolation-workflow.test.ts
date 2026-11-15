@@ -258,8 +258,8 @@ describe('Item Interpolation Workflow', () => {
     it('reports an item that does not exist', async () => {
       const page = await openItem(999999);
 
-      expect(page.text()).toContain('Failed to Load Item');
-      expect(page.text()).toContain('Item not found');
+      expect(page.text()).toContain('has no item with id 999999');
+      expect(page.text()).not.toContain('Retry');
       expect(page.findComponent(WeaponStats).exists()).toBe(false);
     });
   });
