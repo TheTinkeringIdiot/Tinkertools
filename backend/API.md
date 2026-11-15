@@ -67,12 +67,20 @@ Items are ordered by AOID.
 ```
 
 #### GET /api/v1/items/search
-Search items by name or description.
+Search items by name or description. The response has the shape of `GET /api/v1/items`.
 
 **Query Parameters:**
-- `q` (string, required): Search query
-- `page` (int): Page number
-- `page_size` (int): Items per page
+- `q` (string, required): Search query, at least one character
+- `page` (int): Page number (default: 1)
+- `page_size` (int): Items per page (default: 50, max: 1000)
+- `exact_match` (bool): `true` (default) finds `q` as a substring, whatever the case; `%` and `_` in `q` are wildcards. `false` is a stemmed full-text search in which bare words are ANDed and `"a phrase"`, `OR` and `-word` are understood
+- `search_fields` (string): Comma-separated fields to search, of `name` and `description` (default: both). `effects` and `stats` are accepted and hold no text: named alone they search the name. Unknown names are ignored
+- `weapons` (bool): Only items with attack/defense data (default: false)
+- `min_ql`, `max_ql` (int, 1-999): Quality level range
+- `item_class` (int): Filter by item class
+- `slot`, `profession`, `breed`, `gender`, `faction`, `froob_friendly`, `nodrop`, `stat_bonuses`, `stat_filters`, `strain`: the advanced filters of `GET /api/v1/items`, described at `/docs`
+
+Substring matches are ordered by name. Full-text matches are ordered by rank, best first, or by name when `weapons` is true. Ties end on the AOID.
 
 #### GET /api/v1/items/{aoid}
 Get detailed information about a specific item by its Anarchy Online ID (AOID).
