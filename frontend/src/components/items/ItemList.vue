@@ -47,7 +47,7 @@ Shows items in grid or list view with pagination and compatibility indicators
           />
           <span
             v-if="changeCount(item) > 0"
-            class="item-changed-badge absolute right-1 top-1"
+            class="absolute right-1 top-1 inline-flex flex-none items-center gap-1 whitespace-nowrap rounded bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 text-xs text-surface-600 dark:text-surface-300"
             data-testid="item-revision-badge"
             :data-aoid="item.aoid"
             :title="changedTitle(item)"
@@ -95,7 +95,7 @@ Shows items in grid or list view with pagination and compatibility indicators
                       <Badge v-if="item.is_nano" value="Nano" severity="success" />
                       <span
                         v-if="changeCount(item) > 0"
-                        class="item-changed-badge"
+                        class="inline-flex flex-none items-center gap-1 whitespace-nowrap rounded bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 text-xs text-surface-600 dark:text-surface-300"
                         data-testid="item-revision-badge"
                         :data-aoid="item.aoid"
                         :title="changedTitle(item)"
@@ -438,10 +438,6 @@ function handleIconError(aoid: number) {
 </script>
 
 <style scoped>
-.item-changed-badge {
-  @apply inline-flex flex-none items-center gap-1 whitespace-nowrap rounded bg-surface-100 px-1.5 py-0.5 text-xs text-surface-700 dark:bg-surface-800 dark:text-surface-200;
-}
-
 /* Line clamp utility */
 .line-clamp-2 {
   display: -webkit-box;

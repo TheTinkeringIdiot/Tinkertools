@@ -132,8 +132,14 @@ Rows are paged by the API and never loaded all at once.
           @update="updateFilters"
           @reset="resetFilters"
         />
-        <!-- On a narrow screen the open panel covers the list: one tap closes it and goes there -->
-        <div v-if="filtersOpen" class="build-changes-apply lg:hidden">
+        <!--
+          On a narrow screen the open panel covers the list: one tap closes it and goes there.
+          The background is a utility class: main.css gives the surface colours to those only.
+        -->
+        <div
+          v-if="filtersOpen"
+          class="build-changes-apply bg-surface-0 dark:bg-surface-950 lg:hidden"
+        >
           <button
             type="button"
             class="build-changes-apply-button"
@@ -712,11 +718,11 @@ function onBasePicked(slug: string | null): void {
 }
 
 .build-changes-apply {
-  @apply sticky bottom-0 border-t border-surface-200 bg-surface-0 p-3 dark:border-surface-700 dark:bg-surface-950;
+  @apply sticky bottom-0 border-t border-surface-200 p-3 dark:border-surface-700;
 }
 
 .build-changes-apply-button {
-  @apply w-full rounded bg-primary-700 px-3 py-2 text-sm font-semibold text-white dark:bg-primary-400 dark:text-surface-950;
+  @apply w-full rounded bg-primary-700 px-3 py-2 text-sm font-semibold text-white;
 }
 
 .build-changes-side {
