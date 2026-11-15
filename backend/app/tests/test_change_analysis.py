@@ -26,6 +26,7 @@ from app.tests.test_cas_store import (  # noqa: F401 - conn is a fixture
     load,
     modify,
     spec,
+    verify_cas,
 )
 
 pytestmark = pytest.mark.skipif(
@@ -552,6 +553,78 @@ def test_a_transition_is_also_counted_without_the_changes_a_note_explains(conn):
     # items 1 and 2 are explained; item 3 changed in value as well
     assert classed(conn, 2) == {"name": (TEXT, 1, 1), "stat:74": (ECONOMY, 2, 2)}
     assert shared(conn, 2)[("text", "name", "Old", "New")] == (3, 3)
+
+
+# ---------------------------------------------------------------------------
+# The verifier (tools/verify_cas.py --store)
+# ---------------------------------------------------------------------------
+
+
+def rule_differences(verify_cas, conn, with_rules):
+    """Differences the verifier counts between the store and rules files."""
+    report = verify_cas.Report(show=5)
+    verify_cas.check_change_rules(report, conn, with_rules)
+    return report.differences
+
+
+def test_the_verifier_accepts_a_store_analysed_with_the_rules_files(
+    renumbered, verify_cas
+):
+    change_analysis.sync(renumbered, rules(RENUMBER))
+
+    assert rule_differences(verify_cas, renumbered, rules(RENUMBER)) == 0
+
+
+def test_the_verifier_notices_a_note_whose_rule_changed_since_the_import(
+    renumbered, verify_cas, capsys
+):
+    change_analysis.sync(renumbered, rules(RENUMBER))
+    # title and body as stored; only what the note explains differs
+    edited = RENUMBER.replace('alongside = [{ path = "stat:79" }]', "")
+    assert edited != RENUMBER
+
+    assert rule_differences(verify_cas, renumbered, rules(edited)) == 1
+    assert "no (run import_cli.py import-cas)" in capsys.readouterr().out
+
+
+def test_the_verifier_notices_a_relevance_file_changed_since_the_import(
+    renumbered, verify_cas
+):
+    change_analysis.sync(renumbered, rules(RENUMBER))
+    reclassed = rules(
+        RENUMBER, lambda t: t.replace('event = "cosmetic"', 'event = "gameplay"')
+    )
+
+    # the relevance of the log, and the class of every transition
+    assert rule_differences(verify_cas, renumbered, reclassed) == 2
+    assert verify_cas.misclassified_transitions(renumbered, reclassed) == [
+        ("effects", "event", COSMETIC)
+    ]
+    assert verify_cas.misclassified_transitions(renumbered, rules(RENUMBER)) == []
+
+
+def broken_analysis_rules(verify_cas, conn, with_rules):
+    return {
+        rule
+        for rule, query in verify_cas.change_analysis_invariants(
+            conn, with_rules
+        ).items()
+        if conn.execute(query).fetchall()
+    }
+
+
+def test_the_verifier_notices_transitions_counted_with_other_notes(
+    renumbered, verify_cas
+):
+    change_analysis.sync(renumbered, rules(RENUMBER))
+    assert broken_analysis_rules(verify_cas, renumbered, rules(RENUMBER)) == set()
+
+    renumbered.execute("UPDATE item_change SET note_id = NULL WHERE aoid = 1")
+
+    assert broken_analysis_rules(verify_cas, renumbered, rules(RENUMBER)) == {
+        "shared transitions not counted over the changes without a note as the "
+        "log has them"
+    }
 
 
 # ---------------------------------------------------------------------------

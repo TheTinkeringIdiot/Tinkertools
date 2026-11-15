@@ -63,7 +63,7 @@ import psycopg
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.core import cas_store, change_analysis  # noqa: E402
-from app.core.change_rules import default_rules  # noqa: E402
+from app.core.change_rules import RELEVANCE_BITS, default_rules  # noqa: E402
 from app.core.parts import PART_NAMES, split_item  # noqa: E402
 
 ITEM_PARTS = (
@@ -916,7 +916,29 @@ def change_analysis_invariants(conn, rules):
                              WHERE c.branch = t.branch AND c.ordinal = t.ordinal
                                AND c.kind = 'C')
         """,
+        "shared transitions not counted over the changes without a note as the log has them": """
+            SELECT t.branch, t.ordinal, t.path, t.unnoted_items FROM build_transition t
+            WHERE t.unnoted_occurrences < t.unnoted_items
+               OR t.unnoted_occurrences > t.occurrences
+               OR t.unnoted_items <> (SELECT count(*) FROM change_transition m
+                                      JOIN item_change c ON c.branch = t.branch
+                                          AND c.ordinal = t.ordinal AND c.aoid = m.aoid
+                                          AND c.note_id IS NULL
+                                      WHERE m.transition_id = t.transition_id)
+        """,
     }
+
+
+def misclassified_transitions(conn, rules):
+    """``(part, path, stored relevance)`` of the shared transitions whose
+    class is not what ``change_relevance.toml`` gives their field."""
+    return [
+        (part, path, stored)
+        for part, path, stored in conn.execute(
+            "SELECT DISTINCT part, path, relevance FROM build_transition"
+        )
+        if stored != RELEVANCE_BITS[rules.relevance.transition_class(part, path)]
+    ]
 
 
 def check_change_rules(report, conn, rules):
@@ -940,12 +962,22 @@ def check_change_rules(report, conn, rules):
     report.differences += len(stored ^ defined)
 
     state = dict(conn.execute("SELECT name, value FROM store_state").fetchall())
-    stale = state.get(change_analysis.STATE_RELEVANCE) != rules.relevance.digest
-    print(
-        "  change_relevance.toml applied to the store: "
-        + ("no (run import_cli.py import-cas)" if stale else "yes")
-    )
-    report.differences += stale
+    for what, name, wanted in (
+        (
+            "change_relevance.toml applied to the store",
+            change_analysis.STATE_RELEVANCE,
+            rules.relevance.digest,
+        ),
+        (
+            "build_notes.toml, change_relevance.toml and the diff engine "
+            "applied to the notes and transitions",
+            change_analysis.STATE_ANALYSIS,
+            change_analysis.analysis_digest(rules),
+        ),
+    ):
+        stale = state.get(name) != wanted
+        print(f"  {what}: " + ("no (run import_cli.py import-cas)" if stale else "yes"))
+        report.differences += stale
 
 
 def check_store(report, conn):
@@ -973,6 +1005,14 @@ def check_store(report, conn):
         for row in rows[: report.show]:
             print(f"    {row}")
         report.differences += len(rows)
+    misclassified = misclassified_transitions(conn, rules)
+    print(
+        "  shared transitions whose class is not what change_relevance.toml "
+        f"gives: {len(misclassified)}"
+    )
+    for row in misclassified[: report.show]:
+        print(f"    {row}")
+    report.differences += len(misclassified)
     check_change_rules(report, conn, rules)
 
     report.section("Item count of every build against the current store")
