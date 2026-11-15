@@ -1,15 +1,13 @@
 """
-Tests for cross-version item change history:
+Tests for the cross-version change summary of list rows:
 
-    GET  /items/{aoid}/revisions
     POST /items/revisions/batch
 
 Each test fills a throwaway store (the ``store`` fixture) with a few builds of
-hand-made items and asks the API for an item's history.
+hand-made items and asks the API in how many builds an item changed.
 """
 
 import os
-from datetime import date
 
 import pytest
 
@@ -36,27 +34,18 @@ def wrench(name="Wrench", stat=10, amounts=(5,), requires=50, instance=1, **extr
     )
 
 
-def history(store, aoid=WRENCH, slug=None):
+def summary(store, aoids, slug=None):
     slug = slug or store.builds()[0].slug
-    with store.client(slug) as client:
-        response = client.get(f"/api/v1/items/{aoid}/revisions")
-    assert response.status_code == 200, response.text
-    return response.json()
-
-
-def points(store, aoid=WRENCH, slug=None):
-    """``{slug: changed labels, or "first seen"}`` in the order returned."""
-    return {
-        point["version_slug"]: "first seen" if point["first_seen"] else point["changed"]
-        for point in history(store, aoid, slug)["revisions"]
-    }
-
-
-def summary(store, aoids, slug):
     with store.client(slug) as client:
         response = client.post("/api/v1/items/revisions/batch", json={"aoids": aoids})
     assert response.status_code == 200, response.text
     return response.json()["items"]
+
+
+def changed_in(store, aoid=WRENCH, slug=None):
+    """``(change points, build the requested build's definition is from)``."""
+    entry = summary(store, [aoid], slug)[str(aoid)]
+    return entry["revision_count"], entry["latest_change_slug"]
 
 
 # ---------------------------------------------------------------------------
@@ -69,91 +58,60 @@ def test_an_item_that_never_changed_has_one_point_where_it_first_appears(store):
     store.add_build("ao-2", 2, items=[wrench()])
     store.add_build("ao-3", 3, items=[wrench()])
 
-    data = history(store)
+    assert changed_in(store, slug="ao-3") == (1, "ao-2")
+    assert summary(store, [WRENCH], "ao-3")["100"]["present_in_current"] is True
+    assert summary(store, [WRENCH], "ao-1")["100"] == {
+        "aoid": WRENCH,
+        "revision_count": 1,
+        "latest_change_slug": None,
+        "present_in_current": False,
+    }
 
-    assert data["aoid"] == WRENCH
-    assert points(store) == {"ao-2": "first seen"}
-    assert data["first_seen_in"] == "ao-2"
-    assert data["present_in"] == ["ao-3", "ao-2"]
-    assert data["missing_in"] == ["ao-1"]
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"stat": 11},
+        {"amounts": (6,)},
+        {"requires": 60},
+        {"name": "Spanner"},
+        {
+            "AttackDefenseData": {
+                "Attack": [{"Stat": 112, "RawValue": 100}],
+                "Defense": [],
+            }
+        },
+        {"AnimationMesh": {"Animation": {"Stat": 12, "RawValue": 7}}},
+    ],
+    ids=["stats", "effects", "actions", "text", "attack", "mesh"],
+)
+def test_a_change_of_each_part_is_a_change_point(store, change):
+    store.add_build("ao-1", 1, items=[wrench()])
+    store.add_build("ao-2", 2, items=[wrench(**change)])
+    store.add_build("ao-3", 3, items=[wrench(**change)])
+
+    assert changed_in(store, slug="ao-3") == (2, "ao-2")
 
 
-def test_each_changed_part_is_reported_under_its_label(store):
+def test_every_build_that_changes_the_item_is_counted(store):
     store.add_build("ao-1", 1, items=[wrench()])
     store.add_build("ao-2", 2, items=[wrench(stat=11)])
     store.add_build("ao-3", 3, items=[wrench(stat=11, amounts=(6,))])
-    store.add_build("ao-4", 4, items=[wrench(stat=11, amounts=(6,), requires=60)])
-    store.add_build(
-        "ao-5", 5, items=[wrench("Spanner", stat=11, amounts=(6,), requires=60)]
-    )
-    store.add_build("ao-6", 6, items=[wrench("Spanner")])
+    store.add_build("ao-4", 4, items=[wrench("Spanner")])
 
-    assert points(store) == {
-        "ao-6": ["stats", "spells", "actions"],
-        "ao-5": ["text"],
-        "ao-4": ["actions"],
-        "ao-3": ["spells"],
-        "ao-2": ["stats"],
-        "ao-1": "first seen",
-    }
-
-
-def test_attack_skills_and_the_mesh_count_as_stats(store):
-    attack = {"Attack": [{"Stat": 112, "RawValue": 100}], "Defense": []}
-    mesh = {"Animation": {"Stat": 12, "RawValue": 7}}
-    store.add_build("ao-1", 1, items=[wrench()])
-    store.add_build("ao-2", 2, items=[wrench(AttackDefenseData=attack)])
-    store.add_build(
-        "ao-3",
-        3,
-        items=[wrench(AttackDefenseData=attack, AnimationMesh=mesh)],
-    )
-
-    assert points(store) == {
-        "ao-3": ["stats"],
-        "ao-2": ["stats"],
-        "ao-1": "first seen",
-    }
+    assert [changed_in(store, slug=f"ao-{n}") for n in (1, 2, 3, 4)] == [
+        (4, "ao-1"),
+        (4, "ao-2"),
+        (4, "ao-3"),
+        (4, "ao-4"),
+    ]
 
 
 def test_a_build_that_only_reorders_or_renumbers_internals_is_no_change(store):
     store.add_build("ao-1", 1, items=[wrench(amounts=(5, 6), instance=1)])
     store.add_build("ao-2", 2, items=[wrench(amounts=(6, 5), instance=2)])
 
-    assert points(store) == {"ao-1": "first seen"}
-
-
-def test_a_point_describes_its_build(store):
-    store.add_build(
-        "ao-1",
-        1,
-        items=[wrench()],
-        display_name="AO 1.0",
-        client_build="1.0",
-        released_on=date(2001, 6, 27),
-    )
-    store.add_build("ao-2", 2, items=[wrench(stat=11)])
-
-    assert history(store)["revisions"] == [
-        {
-            "version_slug": "ao-2",
-            "display_name": "ao-2",
-            "family": "ao",
-            "snapshot_date": None,
-            "client_build": None,
-            "changed": ["stats"],
-            "first_seen": False,
-        },
-        {
-            "version_slug": "ao-1",
-            "display_name": "AO 1.0",
-            "family": "ao",
-            "snapshot_date": "2001-06-27",
-            "client_build": "1.0",
-            "changed": [],
-            "first_seen": True,
-        },
-    ]
+    assert changed_in(store, slug="ao-2") == (1, "ao-1")
 
 
 # ---------------------------------------------------------------------------
@@ -167,11 +125,9 @@ def test_an_item_that_returns_unchanged_has_not_changed(store):
     store.add_build("ao-3", 3, items=[])
     store.add_build("ao-4", 4, items=[wrench()])
 
-    data = history(store)
-
-    assert points(store) == {"ao-1": "first seen"}
-    assert data["present_in"] == ["ao-4", "ao-1"]
-    assert data["missing_in"] == ["ao-3", "ao-2"]
+    assert changed_in(store, slug="ao-4") == (1, "ao-1")
+    assert summary(store, [WRENCH], "ao-3")["100"]["present_in_current"] is False
+    assert summary(store, [WRENCH], "ao-4")["100"]["present_in_current"] is True
 
 
 def test_an_item_that_returns_changed_is_compared_with_what_it_was(store):
@@ -179,20 +135,19 @@ def test_an_item_that_returns_changed_is_compared_with_what_it_was(store):
     store.add_build("ao-2", 2, items=[])
     store.add_build("ao-3", 3, items=[wrench(stat=11)])
 
-    assert points(store) == {"ao-3": ["stats"], "ao-1": "first seen"}
+    assert changed_in(store, slug="ao-3") == (2, "ao-3")
 
 
-def test_an_item_no_build_has_gets_an_empty_history(store):
+def test_an_item_no_build_has_never_changed(store):
     store.add_build("ao-1", 1, items=[wrench()])
     store.add_build("ao-2", 2, items=[wrench()])
 
     for aoid in (999, 0, -5, 2**40):
-        assert history(store, aoid) == {
+        assert summary(store, [aoid], "ao-2")[str(aoid)] == {
             "aoid": aoid,
-            "present_in": [],
-            "first_seen_in": None,
-            "revisions": [],
-            "missing_in": ["ao-2", "ao-1"],
+            "revision_count": 0,
+            "latest_change_slug": None,
+            "present_in_current": False,
         }
 
 
@@ -201,11 +156,7 @@ def test_a_disabled_build_is_not_part_of_the_history(store):
     store.add_build("ao-2", 2, items=[wrench(stat=11)], enabled=False)
     store.add_build("ao-3", 3, items=[wrench(stat=11)])
 
-    data = history(store)
-
-    assert points(store) == {"ao-3": ["stats"], "ao-1": "first seen"}
-    assert data["present_in"] == ["ao-3", "ao-1"]
-    assert data["missing_in"] == []
+    assert changed_in(store, slug="ao-3") == (2, "ao-3")
 
 
 # ---------------------------------------------------------------------------
@@ -254,38 +205,30 @@ def forked(store):
 
 
 def test_a_fork_is_compared_with_the_build_it_forks_from(forked):
-    assert points(forked) == {
-        "prk-1": ["text"],
-        "ao-3": ["stats"],
-        "ao-1": "first seen",
-    }
-    assert points(forked, 200) == {"ao-1": "first seen"}
-    assert history(forked, 200)["present_in"] == ["prk-1", "ao-3", "ao-2", "ao-1"]
+    # first seen in ao-1, changed in ao-3 and, against ao-2, in prk-1
+    assert changed_in(forked, slug="prk-1") == (3, "prk-1")
+    # the same in the fork as in the build it forks from
+    assert changed_in(forked, 200, "prk-1") == (1, "ao-1")
 
 
 def test_a_fork_does_not_inherit_from_builds_after_the_fork(forked):
-    assert points(forked, 300) == {"prk-1": "first seen", "ao-3": "first seen"}
-    assert points(forked, 400) == {"prk-1": "first seen"}
+    # new to the fork although ao-3, after the fork, has it too
+    assert changed_in(forked, 300, "prk-1") == (2, "prk-1")
+    assert changed_in(forked, 300, "ao-3") == (2, "ao-3")
+    assert changed_in(forked, 400, "prk-1") == (1, "prk-1")
 
 
 def test_a_fork_looks_past_the_builds_that_lack_the_item(forked):
-    assert points(forked, 500) == {"prk-1": ["text"], "ao-1": "first seen"}
+    assert changed_in(forked, 500, "prk-1") == (2, "prk-1")
 
 
-def test_first_seen_is_the_first_appearance_in_the_viewers_lineage(forked):
-    assert history(forked, 300, "prk-1")["first_seen_in"] == "prk-1"
-    assert history(forked, 300, "ao-3")["first_seen_in"] == "ao-3"
-    assert history(forked, WRENCH, "prk-1")["first_seen_in"] == "ao-1"
-    # The viewer's lineage never had the item: the appearance nearest a root.
-    assert history(forked, 400, "ao-3")["first_seen_in"] == "prk-1"
-    # Two as near: the first by slug.
-    assert history(forked, 300, "ao-1")["first_seen_in"] == "ao-3"
+def test_the_requested_build_does_not_change_the_number_of_change_points(forked):
+    counts = {
+        slug: [changed_in(forked, aoid, slug)[0] for aoid in (WRENCH, 200, 300, 400)]
+        for slug in ("ao-1", "ao-3", "prk-1")
+    }
 
-
-def test_the_requested_build_does_not_change_the_history_itself(forked):
-    as_ao, as_prk = history(forked, WRENCH, "ao-1"), history(forked, WRENCH, "prk-1")
-
-    assert as_ao == as_prk
+    assert counts["ao-1"] == counts["ao-3"] == counts["prk-1"] == [3, 1, 2, 1]
 
 
 # ---------------------------------------------------------------------------
