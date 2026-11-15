@@ -26,6 +26,7 @@ from app.tests.test_cas_store import (  # noqa: F401 - conn is a fixture
     load,
     modify,
     spec,
+    verify_cas,
 )
 
 pytestmark = pytest.mark.skipif(
@@ -321,6 +322,29 @@ alongside = [{ path = "stat:79" }]
     }
 
 
+def test_notes_are_tried_in_file_order_and_a_change_has_one_note(renumbered):
+    catch_all = """
+[[note]]
+build = "two"
+title = "Anything about effects"
+explains = [{ part = "effects", path = "*" }]
+alongside = [{ path = "stat:79" }]
+"""
+    # items 1 and 2 are explained by both notes, item 3 by the catch-all only
+    done = change_analysis.sync(renumbered, rules(RENUMBER + catch_all))
+
+    assert noted(renumbered, 2) == {
+        1: "Event renumbered",
+        2: "Event renumbered",
+        3: "Anything about effects",
+    }
+    assert done["noted"] == 3
+
+    change_analysis.sync(renumbered, rules(catch_all + RENUMBER))
+
+    assert set(noted(renumbered, 2).values()) == {"Anything about effects"}
+
+
 def test_a_note_removed_from_the_file_leaves_the_store(renumbered):
     change_analysis.sync(renumbered, rules(RENUMBER + RENAME))
 
@@ -404,13 +428,252 @@ def test_transitions_count_items_and_occurrences_apart(conn):
     }
 
 
-def test_sync_recounts_transitions_only_when_the_notes_or_engine_change(renumbered):
+def test_sync_recounts_transitions_only_when_the_rules_or_engine_change(
+    renumbered, monkeypatch
+):
     change_analysis.sync(renumbered, rules())
     renumbered.execute("DELETE FROM build_transition")
 
     assert change_analysis.sync(renumbered, rules())["transitions"] == 0
     assert change_analysis.sync(renumbered, rules(RENAME))["transitions"] == 1
     assert shared(renumbered, 2) == {("effects", "event", 14, 0): (2, 2)}
+
+    assert change_analysis.sync(renumbered, rules(RENAME))["transitions"] == 0
+    reclassed = rules(
+        RENAME, lambda t: t.replace('event = "cosmetic"', 'event = "gameplay"')
+    )
+    assert change_analysis.sync(renumbered, reclassed)["transitions"] == 1
+
+    assert change_analysis.sync(renumbered, reclassed)["transitions"] == 0
+    monkeypatch.setattr(change_analysis, "ANALYSIS_VERSION", "next")
+    assert change_analysis.sync(renumbered, reclassed)["transitions"] == 1
+
+
+def classed(conn, ordinal):
+    """``{path: (relevance, unnoted items, unnoted occurrences, unexplained
+    items)}`` of the shared transitions of one build."""
+    return {
+        path: tuple(rest)
+        for path, *rest in conn.execute(
+            "SELECT path, relevance, unnoted_items, unnoted_occurrences, "
+            "unexplained_items FROM build_transition WHERE ordinal = %s",
+            (ordinal,),
+        )
+    }
+
+
+def test_a_transition_has_the_class_of_its_field(conn):
+    def pair(first, **fields):
+        return [item(first, **fields), item(first + 1, **fields)]
+
+    def use(level):
+        actions = [{"Action": 3, "Criteria": [criterion(54, level, 2)]}]
+        return {"ActionData": {"Actions": actions}}
+
+    load(
+        conn,
+        spec("one", 1),
+        items=[
+            *pair(1, name="Old saw"),
+            *pair(3, stats=[(79, 1)]),
+            *pair(5, stats=[(74, 5)]),
+            *pair(7, SpellData=wear(modify(16, 5))),
+            *pair(9, SpellData=wear(float_text("a"))),
+            *pair(11, SpellData=wear(modify(17, 5))),
+            *pair(13, **use(10)),
+            *pair(
+                15,
+                AttackDefenseData={
+                    "Attack": [{"Stat": 100, "RawValue": 50}],
+                    "Defense": [],
+                },
+            ),
+        ],
+    )
+    load(
+        conn,
+        spec("two", 2),
+        items=[
+            *pair(1, name="New saw"),
+            *pair(3, stats=[(79, 2)]),
+            *pair(5, stats=[(74, 9)]),
+            *pair(7, SpellData=wear(modify(16, 9))),
+            *pair(9, SpellData=wear(float_text("b"))),
+            *pair(11, SpellData=wear(modify(17, 5), event=0)),
+            *pair(13, **use(20)),
+            *pair(
+                15,
+                AttackDefenseData={
+                    "Attack": [{"Stat": 100, "RawValue": 60}],
+                    "Defense": [],
+                },
+            ),
+        ],
+    )
+
+    assert {path: row[0] for path, row in classed(conn, 2).items()} == {
+        "name": TEXT,
+        "stat:79": COSMETIC,
+        "stat:74": ECONOMY,
+        "effect:53045:spell_params.Amount": GAMEPLAY,
+        "effect:53057:spell_params.Text": COSMETIC,
+        "event": COSMETIC,
+        "action:3:criterion": GAMEPLAY,
+        "attack:100": GAMEPLAY,
+    }
+
+
+def test_a_transition_is_also_counted_without_the_changes_a_note_explains(conn):
+    load(
+        conn,
+        spec("one", 1),
+        items=[
+            item(1, name="Old saw"),
+            item(2, name="Old drill"),
+            item(3, name="Old file", stats=[(74, 5), (74, 6)]),
+            item(4, stats=[(74, 5)]),
+        ],
+    )
+    load(
+        conn,
+        spec("two", 2),
+        items=[
+            item(1, name="New saw"),
+            item(2, name="New drill"),
+            item(3, name="New file", stats=[(74, 9), (74, 9)]),
+            item(4, stats=[(74, 9)]),
+        ],
+    )
+
+    assert classed(conn, 2) == {
+        "name": (TEXT, 3, 3, 3),
+        "stat:74": (ECONOMY, 2, 2, 2),
+    }
+    assert shared(conn, 2)[("stats", "stat:74", 5, 9)] == (2, 2)
+
+    change_analysis.sync(conn, rules(RENAME))
+
+    # items 1 and 2 are explained; item 3 changed in value as well
+    # and there the note accounts for the rename, not for the value
+    assert classed(conn, 2) == {
+        "name": (TEXT, 1, 1, 0),
+        "stat:74": (ECONOMY, 2, 2, 2),
+    }
+    assert shared(conn, 2)[("text", "name", "Old", "New")] == (3, 3)
+
+
+def test_a_note_accounts_for_what_comes_alongside_only_where_its_event_happened(
+    renumbered,
+):
+    # items 1 to 3 are renumbered (item 3 changes an effect too); items 2, 5
+    # and 6 take the same new icon, which the note lets a renumbering come with
+    load(
+        renumbered,
+        spec("three", 3),
+        items=[
+            item(1, SpellData=wear(modify(16, 5))),
+            item(2, SpellData=wear(modify(17, 5)), stats=[(79, 1)]),
+            item(3, SpellData=wear(modify(18, 5), modify(19, 1))),
+            item(5, stats=[(79, 1)]),
+            item(6, stats=[(79, 1)]),
+        ],
+    )
+    load(
+        renumbered,
+        spec("four", 4),
+        items=[
+            item(1, SpellData=wear(modify(16, 5), event=0)),
+            item(2, SpellData=wear(modify(17, 5), event=0), stats=[(79, 2)]),
+            item(3, SpellData=wear(modify(18, 5), modify(19, 1), event=0), name="X"),
+            item(5, stats=[(79, 2)]),
+            item(6, stats=[(79, 2)]),
+        ],
+    )
+
+    change_analysis.sync(
+        renumbered, rules(RENUMBER.replace('build = "two"', 'build = "four"'))
+    )
+
+    assert noted(renumbered, 4) == {1: "Event renumbered", 2: "Event renumbered"}
+    assert classed(renumbered, 4) == {
+        # item 3 is not explained (it was renamed too), but its renumbering is
+        "event": (COSMETIC, 1, 1, 0),
+        # the icon of item 2 came with its renumbering; items 5 and 6 only
+        # took a new icon
+        "stat:79": (COSMETIC, 2, 2, 2),
+    }
+
+
+# ---------------------------------------------------------------------------
+# The verifier (tools/verify_cas.py --store)
+# ---------------------------------------------------------------------------
+
+
+def rule_differences(verify_cas, conn, with_rules):
+    """Differences the verifier counts between the store and rules files."""
+    report = verify_cas.Report(show=5)
+    verify_cas.check_change_rules(report, conn, with_rules)
+    return report.differences
+
+
+def test_the_verifier_accepts_a_store_analysed_with_the_rules_files(
+    renumbered, verify_cas
+):
+    change_analysis.sync(renumbered, rules(RENUMBER))
+
+    assert rule_differences(verify_cas, renumbered, rules(RENUMBER)) == 0
+
+
+def test_the_verifier_notices_a_note_whose_rule_changed_since_the_import(
+    renumbered, verify_cas, capsys
+):
+    change_analysis.sync(renumbered, rules(RENUMBER))
+    # title and body as stored; only what the note explains differs
+    edited = RENUMBER.replace('alongside = [{ path = "stat:79" }]', "")
+    assert edited != RENUMBER
+
+    assert rule_differences(verify_cas, renumbered, rules(edited)) == 1
+    assert "no (run import_cli.py import-cas)" in capsys.readouterr().out
+
+
+def test_the_verifier_notices_a_relevance_file_changed_since_the_import(
+    renumbered, verify_cas
+):
+    change_analysis.sync(renumbered, rules(RENUMBER))
+    reclassed = rules(
+        RENUMBER, lambda t: t.replace('event = "cosmetic"', 'event = "gameplay"')
+    )
+
+    # the relevance of the log, and the class of every transition
+    assert rule_differences(verify_cas, renumbered, reclassed) == 2
+    assert verify_cas.misclassified_transitions(renumbered, reclassed) == [
+        ("effects", "event", COSMETIC)
+    ]
+    assert verify_cas.misclassified_transitions(renumbered, rules(RENUMBER)) == []
+
+
+def broken_analysis_rules(verify_cas, conn, with_rules):
+    return {
+        rule
+        for rule, query in verify_cas.change_analysis_invariants(
+            conn, with_rules
+        ).items()
+        if conn.execute(query).fetchall()
+    }
+
+
+def test_the_verifier_notices_transitions_counted_with_other_notes(
+    renumbered, verify_cas
+):
+    change_analysis.sync(renumbered, rules(RENUMBER))
+    assert broken_analysis_rules(verify_cas, renumbered, rules(RENUMBER)) == set()
+
+    renumbered.execute("UPDATE item_change SET note_id = NULL WHERE aoid = 1")
+
+    assert broken_analysis_rules(verify_cas, renumbered, rules(RENUMBER)) == {
+        "shared transitions not counted over the changes without a note as the "
+        "log has them"
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -434,3 +697,31 @@ def test_upgrade_gives_an_older_store_the_change_analysis_tables(conn):
 
     assert relevance(conn, 2) == {1: TEXT}
     assert conn.execute("SELECT count(*) FROM revision_relevance").fetchone() == (2,)
+
+
+@pytest.mark.parametrize(
+    "missing",
+    [
+        ["relevance", "unnoted_items", "unnoted_occurrences", "unexplained_items"],
+        ["unexplained_items"],
+    ],
+    ids=["all", "the newest"],
+)
+def test_upgrade_gives_an_older_store_the_columns_of_the_patch_notes(
+    renumbered, missing
+):
+    schema = renumbered.execute("SELECT current_schema()").fetchone()[0]
+    renumbered.execute(
+        "ALTER TABLE build_transition "
+        + ", ".join(f"DROP COLUMN {column}" for column in missing)
+    )
+    renumbered.execute(
+        "UPDATE store_state SET value = 'an earlier engine' "
+        "WHERE name = 'change_analysis'"
+    )
+
+    cas_store.upgrade_store(renumbered, schema)
+    cas_store.upgrade_store(renumbered, schema)
+    change_analysis.sync(renumbered, rules(RENUMBER))
+
+    assert classed(renumbered, 2) == {"event": (COSMETIC, 0, 0, 0)}

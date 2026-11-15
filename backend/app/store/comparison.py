@@ -19,6 +19,12 @@ again. Here that work is done once:
     place of its name in name order. Revisions are immutable, so the facts
     are loaded once per process (``preload``, at startup) and only added to
     afterwards; 72 bytes a revision, 19 MB for the 264,000 of today's store.
+    The process grows by more than that: 27 MB measured (resident size
+    97 MB with the application imported, 124 MB with the facts loaded), and
+    a server is at 134 MB when it is ready. Loading passes through far more
+    (224 MB at the peak), which is handed back to the system when the facts
+    are in place (``_release_freed_memory``); kept, it left a server at
+    167 MB.
 
 ``Comparison``
     One pair of builds: every changed item with its kind, both revisions,
@@ -39,6 +45,8 @@ parts of a revision (profession, slot).
 
 from __future__ import annotations
 
+import ctypes
+import gc
 import logging
 import sys
 import threading
@@ -72,6 +80,7 @@ from app.store.changes import (
     ChangePage,
     ChangeRow,
     name_contains,
+    warn_of_stale_rules,
 )
 from app.store.context import Build, StoreSession, store_schema
 from app.store.presence import page_offset, present, revisions
@@ -86,6 +95,8 @@ STORES_HELD = 2
 # A sort key is the name's rank and the AOID in one integer.
 _AOID_SPAN = 2**32
 _NO_BYTES = literal_column("''::bytea")
+# Revisions read in one row when the facts are loaded.
+_FACTS_CHUNK = 8192
 
 
 def _packed(expression: ColumnElement, wide: bool = False) -> ColumnElement:
@@ -173,9 +184,14 @@ def _signature(db: Session) -> Tuple[Any, ...]:
 def _revisions_after(db: Session, last_rev_id: int) -> List[array]:
     """The columns of ``RevisionFacts`` for the revisions after
     ``last_rev_id``: rev_id, the parts, QL, class, nano flag, the digests and
-    whether there are any."""
+    whether there are any.
+
+    They are read ``_FACTS_CHUNK`` revisions a row. A connection keeps a
+    buffer the size of the largest row it ever received for as long as it
+    stays in the pool: 40 MB when every revision came in one row.
+    """
     revision, digests = t.item_revision, t.revision_relevance
-    row = db.execute(
+    rows = db.execute(
         select(
             _packed(revision.c.rev_id),
             *(
@@ -193,11 +209,14 @@ def _revisions_after(db: Session, last_rev_id: int) -> List[array]:
         )
         .select_from(revision.outerjoin(digests, digests.c.rev_id == revision.c.rev_id))
         .where(revision.c.rev_id > last_rev_id)
-    ).one()
-    integers = len(row) - len(DIGESTS)
-    return [_unpacked(column) for column in row[:integers]] + [
-        _unpacked(column, "q") for column in row[integers:]
-    ]
+        .group_by(revision.c.rev_id / _FACTS_CHUNK)
+    ).all()
+    integers = len(PART_BITS) + 5
+    columns = [array("i") for _ in range(integers)] + [array("q") for _ in DIGESTS]
+    for row in rows:
+        for column, packed in zip(columns, row, strict=True):
+            column.extend(_unpacked(packed, column.typecode))
+    return columns
 
 
 def _name_ranks(db: Session) -> array:
@@ -281,6 +300,18 @@ def _load_facts(
     )
 
 
+def _release_freed_memory() -> None:
+    """Hand the memory that loading the facts used and freed back to the
+    system: what the driver and the result rows took, which the collector
+    and then the C library would otherwise keep for the process (about
+    90 MB). Nothing to trim where the C library is not glibc."""
+    gc.collect()
+    try:
+        ctypes.CDLL(None).malloc_trim(0)
+    except (AttributeError, OSError):
+        pass
+
+
 class _FactsOfStores:
     """The facts of the stores this process reads, by schema."""
 
@@ -298,6 +329,7 @@ class _FactsOfStores:
             if held is None or held.signature != signature:
                 started = time.perf_counter()
                 held = _load_facts(db, signature, held)
+                _release_freed_memory()
                 logger.info(
                     f"Facts of {len(held.ql)} revisions of {schema} "
                     f"({held.size / 1e6:.1f} MB) "
@@ -315,10 +347,13 @@ facts_of_stores = _FactsOfStores()
 
 def preload() -> None:
     """Load the facts of the store the process serves, so that no request
-    waits for them. Called once, when the application starts; a store that
-    cannot be read is left to the first request."""
+    waits for them, and say so in the log when the store was analysed with
+    other rules files than the process read. Called once, when the
+    application starts; a store that cannot be read is left to the first
+    request."""
     try:
         with StoreSession() as db:
+            warn_of_stale_rules(db)
             facts_of_stores.of(db)
     except Exception as error:
         logger.warning(f"Revision facts not preloaded: {error}")

@@ -1,5 +1,5 @@
 """
-Cross-version item change history ("changed in" dropdown).
+Cross-version item change summary (the "changed in" badge of list rows).
 
 The store keeps, per branch, the runs of consecutive builds in which an item
 has one content (``item_presence``). Walking the builds along their lineage
@@ -9,27 +9,23 @@ that has the item yields the builds at which its definition changed.
 The lineage of a build is the builds of its branch before it, in ordinal
 order, continued at the branch's parent build (PRK forks from AO 17.10.5).
 
-Both endpoints answer for every enabled build at once: the version segment in
+The endpoint answers for every enabled build at once: the version segment in
 the URL does not change the builds considered, only which one counts as
-"current" for ``first_seen_in``, ``latest_change_slug`` and
-``present_in_current``.
+"current" for ``latest_change_slug`` and ``present_in_current``.
 
-What counts as a change is what the four labels of ``changed`` cover:
+What counts as a change: the stats part, the attack/defense part, the
+animation mesh, the effects part, the actions part and the text part. A build
+in which only something else differs (the shop data or the static instance id
+of the misc part) is not a change point.
 
-* ``stats``    the stats part, the attack/defense part and the animation mesh
-* ``spells``   the effects part
-* ``actions``  the actions part
-* ``text``     the text part
-
-A build in which only something else differs (the shop data or the static
-instance id of the misc part) is not a change point.
+The full history of one item, with removals, relevance and diffs, is the
+timeline (``app/api/routes/changes.py``).
 """
 
 from __future__ import annotations
 
 from bisect import bisect_right
 from dataclasses import dataclass
-from datetime import date
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from fastapi import APIRouter, Depends
@@ -38,10 +34,8 @@ from sqlalchemy.orm import Session
 
 from app.api.schemas.versions import (
     ItemRevisionBatchEntry,
-    ItemRevisionPoint,
     ItemRevisionsBatchRequest,
     ItemRevisionsBatchResponse,
-    ItemRevisionsResponse,
 )
 from app.store import tables as t
 from app.store.context import Build, get_build, get_store
@@ -49,26 +43,20 @@ from app.store.presence import any_of
 
 router = APIRouter(prefix="/items", tags=["item-revisions"])
 
-# Labels reported in ``changed``, in report order.
-CHANGE_LABELS = ("stats", "spells", "actions", "text")
-
-# What an item is in one build, as far as ``changed`` tells apart: one value
-# per label of CHANGE_LABELS.
+# What an item is in one build, as far as a change point tells apart: its
+# stats (with attack/defense and mesh), effects, actions and text.
 Content = Tuple[Any, Any, Any, Any]
 
 
 @dataclass(frozen=True)
 class HistoryBuild:
-    """A build as the history reports it."""
+    """A build as the history places it."""
 
     build_id: int
     slug: str
     branch: str
     ordinal: int
     sort_order: int
-    display_name: str
-    client_build: Optional[str]
-    released_on: Optional[date]
     parent_build_id: Optional[int]
 
 
@@ -140,9 +128,6 @@ def load_lineage(db: Session) -> Lineage:
             t.build.c.branch,
             t.build.c.ordinal,
             t.build.c.sort_order,
-            t.build.c.display_name,
-            t.build.c.client_build,
-            t.build.c.released_on,
             t.build.c.parent_build_id,
         ).where(t.build.c.enabled)
     )
@@ -223,7 +208,7 @@ class History:
     """One item across the enabled builds."""
 
     present: frozenset  # slugs of the builds that have the item
-    points: List[ItemRevisionPoint]  # change points, display order
+    points: List[str]  # slugs of the change points, display order
 
 
 def compute_history(lineage: Lineage, runs: Runs) -> History:
@@ -232,15 +217,14 @@ def compute_history(lineage: Lineage, runs: Runs) -> History:
     Each build that has the item is compared with the nearest build before it
     in its lineage that has the item too, however many builds lie between: an
     item that leaves and comes back unchanged has not changed. With no such
-    build the item is new to the lineage and the point is ``first_seen``.
-    Otherwise the build is a change point when one of the four labelled
-    contents differs.
+    build the item is new to the lineage, which is a change point; otherwise
+    the build is one when the content differs.
     """
     present = set()
     # The content the item has as of each build: its own, or the one it had
     # in the nearest earlier build of the lineage that has the item.
     inherited: Dict[str, Optional[Content]] = {}
-    changes: Dict[str, Tuple[bool, List[str]]] = {}
+    changed = set()
 
     for build in lineage.oldest_first:
         before = lineage.predecessor[build.slug]
@@ -250,72 +234,23 @@ def compute_history(lineage: Lineage, runs: Runs) -> History:
         if content is None:
             continue
         present.add(build.slug)
-        if previous is None:
-            changes[build.slug] = (True, [])
-        elif content != previous:
-            changes[build.slug] = (
-                False,
-                [
-                    label
-                    for label, new, old in zip(CHANGE_LABELS, content, previous)
-                    if new != old
-                ],
-            )
+        if content != previous:
+            changed.add(build.slug)
 
-    points = [
-        ItemRevisionPoint(
-            version_slug=build.slug,
-            display_name=build.display_name,
-            family=build.branch,
-            snapshot_date=build.released_on,
-            client_build=build.client_build,
-            changed=changes[build.slug][1],
-            first_seen=changes[build.slug][0],
-        )
-        for build in lineage.display_order
-        if build.slug in changes
-    ]
+    points = [build.slug for build in lineage.display_order if build.slug in changed]
     return History(present=frozenset(present), points=points)
 
 
-def _first_seen_in(
-    lineage: Lineage, points: Sequence[ItemRevisionPoint], current_slug: str
-) -> Optional[str]:
-    """Where the item first appears, preferring the current version's lineage.
-
-    Several lineages can each have a ``first_seen`` point (AO and PRK both
-    introduce an item independently). The one that matters to the viewer is the
-    root-most first appearance along their own ancestry. Failing that (the
-    current version's lineage never had the item) fall back to the first
-    appearance closest to a lineage root.
-    """
-    first_seen = [point for point in points if point.first_seen]
-    if not first_seen:
-        return None
-    first_seen_slugs = {point.version_slug for point in first_seen}
-
-    # ancestry() runs nearest-first, so the last match is the root-most ancestor.
-    for slug in reversed(lineage.ancestry(current_slug)):
-        if slug in first_seen_slugs:
-            return slug
-
-    return min(
-        first_seen,
-        key=lambda p: (len(lineage.ancestry(p.version_slug)), p.version_slug),
-    ).version_slug
-
-
 def _latest_change_slug(
-    lineage: Lineage, points: Sequence[ItemRevisionPoint], current_slug: str
+    lineage: Lineage, points: Sequence[str], current_slug: str
 ) -> Optional[str]:
     """The snapshot in which the current version's definition was introduced.
 
     That is the change point on the current version's ancestry closest to it,
     which is the most recent patch the viewer's data reflects.
     """
-    point_slugs = {p.version_slug for p in points}
     for slug in lineage.ancestry(current_slug):
-        if slug in point_slugs:
+        if slug in points:
             return slug
     return None
 
@@ -347,27 +282,3 @@ def get_item_revisions_batch(
         )
 
     return ItemRevisionsBatchResponse(items=items)
-
-
-@router.get("/{aoid}/revisions", response_model=ItemRevisionsResponse)
-def get_item_revisions(
-    aoid: int, db: Session = Depends(get_store), build: Build = Depends(get_build)
-):
-    """
-    Change history for one item across every enabled game version.
-
-    An item no build has returns an empty history and lists every version
-    under ``missing_in``, so the UI can say "not present in this version"
-    rather than erroring.
-    """
-    lineage = load_lineage(db)
-    history = compute_history(lineage, load_runs(db, [aoid]).get(aoid, {}))
-
-    ordered_slugs = [build_.slug for build_ in lineage.display_order]
-    return ItemRevisionsResponse(
-        aoid=aoid,
-        present_in=[slug for slug in ordered_slugs if slug in history.present],
-        first_seen_in=_first_seen_in(lineage, history.points, build.slug),
-        revisions=history.points,
-        missing_in=[slug for slug in ordered_slugs if slug not in history.present],
-    )

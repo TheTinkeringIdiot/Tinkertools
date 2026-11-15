@@ -56,43 +56,6 @@ class GameVersionListResponse(BaseModel):
     total: int = Field(description="Number of versions returned")
 
 
-class ItemRevisionPoint(BaseModel):
-    """One snapshot at which an item's definition changed."""
-
-    version_slug: str = Field(
-        description="Version in which the change is first observed"
-    )
-    display_name: str = Field(description="Human readable version name")
-    family: str = Field(description="Version family")
-    snapshot_date: Optional[date] = Field(
-        None, description="Date the data was captured"
-    )
-    client_build: Optional[str] = Field(None, description="Game client build string")
-    changed: List[str] = Field(
-        default_factory=list,
-        description="Which parts changed: any of 'stats', 'spells', 'actions', 'text'",
-    )
-    first_seen: bool = Field(
-        False, description="Whether the item first appears in this version"
-    )
-
-
-class ItemRevisionsResponse(BaseModel):
-    """Change history for one AOID across every enabled version."""
-
-    aoid: int = Field(description="Item AOID")
-    present_in: List[str] = Field(
-        description="Versions containing this item, display order"
-    )
-    first_seen_in: Optional[str] = Field(
-        None, description="Version in which the item first appears"
-    )
-    revisions: List[ItemRevisionPoint] = Field(
-        description="Change points only, display order"
-    )
-    missing_in: List[str] = Field(description="Enabled versions without this item")
-
-
 class ItemRevisionsBatchRequest(BaseModel):
     """Request a revision summary for a page of items."""
 

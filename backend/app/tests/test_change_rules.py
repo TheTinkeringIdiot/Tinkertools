@@ -171,6 +171,22 @@ def test_what_comes_alongside_is_not_the_event_itself():
     assert not renumbered.explains_change([])
 
 
+def test_a_note_accounts_for_its_part_of_a_change_that_also_differs_otherwise():
+    renumbered, lowered = parse_notes(NOTES).notes
+
+    # the event and what comes with it, not the requirement
+    assert renumbered.accounts_for([RENUMBERED, ICON, LOWERED]) == [True, True, False]
+    assert lowered.accounts_for([RENUMBERED, ICON, LOWERED]) == [False, False, True]
+
+
+def test_a_note_accounts_for_nothing_where_its_event_did_not_happen():
+    renumbered, _ = parse_notes(NOTES).notes
+
+    # an icon comes alongside a renumbering, but nothing was renumbered here
+    assert renumbered.accounts_for([ICON, LOWERED]) == [False, False]
+    assert renumbered.accounts_for([]) == []
+
+
 def test_pattern_values_match_exactly_and_paths_by_wildcard():
     _, lowered = parse_notes(NOTES).notes
 

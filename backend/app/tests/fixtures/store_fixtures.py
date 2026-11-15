@@ -42,7 +42,7 @@ from sqlalchemy.sql.expression import ClauseElement, Executable, Select
 from app.core import cas_store, change_analysis
 from app.core.cache import cache_service
 from app.core.cas_curated import sync_curated
-from app.core.change_rules import parse_notes
+from app.core.change_rules import ChangeRules, default_rules, parse_notes
 from app.main import app
 from app.store.context import (
     Build,
@@ -132,7 +132,16 @@ class ThrowawayStore:
         """Apply build notes, written as ``build_notes.toml`` is, to the
         change log of the builds loaded so far. Builds are imported with the
         notes of the repository's file, which name real builds only."""
-        change_analysis.analyze(self._raw, parse_notes(notes))
+        change_analysis.analyze(
+            self._raw,
+            ChangeRules(relevance=default_rules().relevance, notes=parse_notes(notes)),
+        )
+
+    def sync_changes(self, rules: Optional[ChangeRules] = None) -> None:
+        """Bring the change log in line with ``rules`` (the repository's by
+        default) and record what it was analysed with, as every import run
+        does."""
+        change_analysis.sync(self._raw, rules or default_rules())
 
     def builds(self) -> List[Build]:
         return read_builds(self.db)

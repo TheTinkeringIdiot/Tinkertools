@@ -307,6 +307,32 @@ def upgrade_store(conn: psycopg.Connection, schema: str) -> None:
         (schema,),
     ).fetchone():
         conn.execute((SQL_DIR / "003_change_analysis.sql").read_text(encoding="utf-8"))
+    if not conn.execute(
+        "SELECT 1 FROM information_schema.columns WHERE table_schema = %s "
+        "AND table_name = 'build_transition' AND column_name = 'unexplained_items'",
+        (schema,),
+    ).fetchone():
+        # The change analysis rewrites every row: it runs again because the
+        # engine version changed with these columns.
+        table = sql.Identifier(schema, "build_transition")
+        columns = {
+            "relevance": "smallint",
+            "unnoted_items": "integer",
+            "unnoted_occurrences": "integer",
+            "unexplained_items": "integer",
+        }
+        added = sql.SQL(", ").join(
+            sql.SQL("ADD COLUMN IF NOT EXISTS {} {} NOT NULL DEFAULT 0").format(
+                sql.Identifier(name), sql.SQL(kind)
+            )
+            for name, kind in columns.items()
+        )
+        settled = sql.SQL(", ").join(
+            sql.SQL("ALTER COLUMN {} DROP DEFAULT").format(sql.Identifier(name))
+            for name in columns
+        )
+        for actions in (added, settled):
+            conn.execute(sql.SQL("ALTER TABLE {} ").format(table) + actions)
 
 
 def drop_store(conn: psycopg.Connection, schema: str) -> None:

@@ -13,11 +13,19 @@ comparison of two builds on the real game data.
 """
 
 import json
+import logging
 import os
 from dataclasses import replace
 
 import pytest
 
+from app.core.change_rules import (
+    RELEVANCE_FILE,
+    default_rules,
+    parse_notes,
+    parse_relevance,
+)
+from app.store import comparison
 from app.store.changes import (
     ChangeFilters,
     compare_item as item_comparison,
@@ -25,6 +33,8 @@ from app.store.changes import (
     find_build,
     load_build_index,
     logged_changes,
+    stale_rules,
+    warn_of_stale_rules,
 )
 from app.store.comparison import compare_page
 from app.store.context import read_builds
@@ -310,6 +320,7 @@ def test_change_rows_carry_what_a_list_line_shows(history):
         "relevance": ["text"],
         "note_id": None,
         "diff": None,
+        "diff_omitted": False,
     }
     assert found[SAW]["name"] == "Saw" and found[SAW]["ql"] == 30
     assert rows(changes(history, "three"))[PLIERS]["icon"] == 7
@@ -451,6 +462,94 @@ def test_change_list_gives_field_level_diffs_when_asked(history):
         {"field": "spell_params.Amount", "old": 5, "new": 9}
     ]
     assert found[SAW]["diff"] is None and found[DRILL]["diff"] is None
+
+
+def guarded(amount, criteria):
+    """A modifier behind ``criteria`` requirements."""
+    effect = modify(16, amount)
+    effect["Criteria"] = [criterion(54, level, 2) for level in range(criteria)]
+    return effect
+
+
+@pytest.fixture
+def heavy(store):
+    """Build two changes four items: one a little, one in effects that count
+    1,200 with their criteria, one in a description of 70,000 letters, and
+    one that only renames an item with as many effects."""
+    many = [guarded(5, 5) for _ in range(100)]
+    store.add_build(
+        "one",
+        1,
+        items=[
+            item(1, SpellData=wear(modify(16, 5))),
+            item(2, SpellData=wear(*many)),
+            item(3),
+            item(4, name="Engine", SpellData=wear(*many)),
+        ],
+    )
+    store.add_build(
+        "two",
+        2,
+        items=[
+            item(1, SpellData=wear(modify(16, 9))),
+            item(2, SpellData=wear(*[guarded(9, 5) for _ in range(100)])),
+            item(3, Description="x" * 70_000),
+            item(4, name="Motor", SpellData=wear(*many)),
+        ],
+    )
+    return store
+
+
+def test_a_change_list_leaves_out_a_diff_too_large_for_a_row(heavy):
+    body = rows(changes(heavy, "two", include_diff="true"))
+
+    assert {aoid: row["diff_omitted"] for aoid, row in body.items()} == {
+        1: False,
+        2: True,  # too many effects to diff within a page
+        3: True,  # too many bytes
+        4: False,  # as many effects, but they did not change
+    }
+    assert body[2]["diff"] is None and body[3]["diff"] is None
+    assert body[1]["diff"]["effects"] and body[4]["diff"]["text"]
+    # the row itself is complete
+    assert body[2]["parts"] == ["effects"] and body[2]["relevance"] == ["gameplay"]
+
+
+def test_a_comparison_leaves_out_the_same_diffs(heavy):
+    body = rows(compare(heavy, "two", "one", include_diff="true"))
+
+    assert {aoid: row["diff_omitted"] for aoid, row in body.items()} == {
+        1: False,
+        2: True,
+        3: True,
+        4: False,
+    }
+
+
+def test_no_diff_is_omitted_that_was_not_asked_for(heavy):
+    assert {row["diff_omitted"] for row in changes(heavy, "two")["items"]} == {False}
+
+
+def test_added_and_removed_items_have_no_diff_to_omit(history):
+    body = changes(history, "three", include_diff="true", notes="expand")
+
+    kinds = {row["kind"] for row in body["items"]}
+    assert "added" in kinds or "removed" in kinds
+    assert {
+        (row["diff"], row["diff_omitted"])
+        for row in body["items"]
+        if row["kind"] != "changed"
+    } == {(None, False)}
+
+
+def test_the_comparison_of_one_item_has_the_diff_a_list_leaves_out(heavy):
+    effects = compare_item(heavy, "two", 2, "one")["diff"]["effects"]
+    text = compare_item(heavy, "two", 3, "one")["diff"]["text"]
+    timeline_entry = get(heavy, "two", "/items/2/timeline")["entries"][0]
+
+    assert len(effects[0]["changed"]) == 100
+    assert len(text[0]["new"]) == 70_000
+    assert len(timeline_entry["diff"]["effects"][0]["changed"]) == 100
 
 
 def test_change_list_filters_nanos_professions_and_slots(store):
@@ -934,6 +1033,7 @@ def test_transitions_count_what_changed_items_share(procs):
             "path": "effect:53089:spell_params.Chance",
             "old": 60,
             "new": 100,
+            "relevance": "gameplay",
             "items": 3,
             "occurrences": 3,
             "stat": None,
@@ -947,6 +1047,7 @@ def test_transitions_count_what_changed_items_share(procs):
             "path": "stat:287",
             "old": None,
             "new": 20,
+            "relevance": "gameplay",
             "items": 2,
             "occurrences": 2,
             "stat": 287,
@@ -970,6 +1071,231 @@ def test_transitions_filter_by_part_and_size(procs):
 
 def test_a_build_with_no_shared_transition_lists_none(procs):
     assert get(procs, "one", "/changes/transitions")["transitions"] == []
+
+
+@pytest.fixture
+def patch(store):
+    """Build two renames five tools, which a note explains; two of them also
+    change in value, and two other items only take a new icon."""
+    old = [item(n, name=f"Old tool {n}") for n in (1, 2, 3)]
+    new = [item(n, name=f"New tool {n}") for n in (1, 2, 3)]
+    for n in (4, 5):
+        old.append(item(n, name=f"Old tool {n}", stats=[(STAT_VALUE, 5)]))
+        new.append(item(n, name=f"New tool {n}", stats=[(STAT_VALUE, 9)]))
+    for n in (6, 7):
+        old.append(item(n, name=f"Crate {n}", stats=[(STAT_ICON, 1)]))
+        new.append(item(n, name=f"Crate {n}", stats=[(STAT_ICON, 2)]))
+    store.add_build("one", 1, items=old)
+    store.add_build("two", 2, items=new)
+    store.note_changes("""
+[[note]]
+build = "two"
+title = "Tools renamed"
+explains = [{ path = "name", old = "Old .*", new = "New .*" }]
+""")
+    return store
+
+
+def lines(store, slug, **params):
+    """``{path: (relevance, items, occurrences)}`` of a build's patch notes."""
+    body = get(store, slug, "/changes/transitions", **params)
+    return {
+        line["path"]: (line["relevance"], line["items"], line["occurrences"])
+        for line in body["transitions"]
+    }
+
+
+def test_patch_notes_leave_out_cosmetic_lines_and_what_a_note_explains(patch):
+    # the note accounts for the rename, also on the two tools it does not
+    # explain because their value changed; the icon line is cosmetic
+    assert lines(patch, "two") == {f"stat:{STAT_VALUE}": ("economy", 2, 2)}
+
+
+def test_patch_notes_count_every_change_when_notes_are_expanded(patch):
+    assert lines(patch, "two", notes="expand") == {
+        "name": ("text", 5, 5),
+        f"stat:{STAT_VALUE}": ("economy", 2, 2),
+    }
+
+
+def test_patch_notes_filter_by_the_relevance_of_the_field(patch):
+    every = ["gameplay", "economy", "cosmetic", "text"]
+
+    assert lines(patch, "two", relevance="cosmetic") == {
+        f"stat:{STAT_ICON}": ("cosmetic", 2, 2)
+    }
+    assert list(lines(patch, "two", relevance="economy")) == [f"stat:{STAT_VALUE}"]
+    assert lines(patch, "two", relevance="gameplay") == {}
+    assert lines(patch, "two", relevance="text", notes="expand") == {
+        "name": ("text", 5, 5)
+    }
+    assert len(lines(patch, "two", relevance=every, notes="expand")) == 3
+
+
+def test_a_patch_note_line_counts_every_unexplained_change_that_has_it(store):
+    """Three tools are renamed and take a new icon, which the note lets a
+    rename come with, and one of them changes in value too; two crates only
+    take the icon."""
+    old = [item(n, name=f"Old tool {n}", stats=[(STAT_ICON, 1)]) for n in (1, 2)]
+    new = [item(n, name=f"New tool {n}", stats=[(STAT_ICON, 2)]) for n in (1, 2)]
+    old.append(item(3, name="Old tool 3", stats=[(STAT_ICON, 1), (STAT_VALUE, 5)]))
+    new.append(item(3, name="New tool 3", stats=[(STAT_ICON, 2), (STAT_VALUE, 9)]))
+    for n in (6, 7):
+        old.append(item(n, name=f"Crate {n}", stats=[(STAT_ICON, 1)]))
+        new.append(item(n, name=f"Crate {n}", stats=[(STAT_ICON, 2)]))
+    store.add_build("one", 1, items=old)
+    store.add_build("two", 2, items=new)
+    store.note_changes("""
+[[note]]
+build = "two"
+title = "Tools renamed"
+explains = [{ path = "name", old = "Old .*", new = "New .*" }]
+alongside = [{ path = "stat:79" }]
+""")
+
+    found = lines(store, "two", relevance="cosmetic")
+    listed = changes(store, "two", sort="aoid", transition=f"stat:{STAT_ICON}")
+
+    # two crates share the icon change outside the rename, so it is a line;
+    # it counts tool 3 as well, which the list shows for it
+    assert found == {f"stat:{STAT_ICON}": ("cosmetic", 3, 3)}
+    assert aoids(listed) == [3, 6, 7]
+
+
+def test_a_patch_note_line_too_few_unexplained_changes_share_is_left_out(patch):
+    # a third build renames two tools and nothing else: the note explains both
+    patch.add_build(
+        "three",
+        3,
+        items=[item(1, name="Old tool 1"), item(2, name="Old tool 2")],
+    )
+    patch.add_build(
+        "four",
+        4,
+        items=[item(1, name="New tool 1"), item(2, name="New tool 2")],
+    )
+    patch.note_changes("""
+[[note]]
+build = "four"
+title = "Tools renamed"
+explains = [{ path = "name", old = "Old .*", new = "New .*" }]
+""")
+
+    assert lines(patch, "four") == {}
+    assert lines(patch, "four", notes="expand") == {"name": ("text", 2, 2)}
+    assert lines(patch, "four", notes="expand", min_items=3) == {}
+
+
+@pytest.mark.parametrize("notes", ["collapse", "expand"])
+def test_a_patch_note_line_counts_the_changes_the_list_shows_for_it(patch, notes):
+    every = ["gameplay", "economy", "cosmetic", "text"]
+    body = get(patch, "two", "/changes/transitions", notes=notes, relevance=every)
+    assert len(body["transitions"]) == {"collapse": 2, "expand": 3}[notes]
+
+    for line in body["transitions"]:
+        listed = changes(
+            patch,
+            "two",
+            notes=notes,
+            transition=line["path"],
+            transition_old=json.dumps(line["old"]),
+            transition_new=json.dumps(line["new"]),
+        )
+        assert listed["total"] == line["items"], line
+
+
+def test_patch_notes_reject_an_unknown_relevance_or_notes_value(patch):
+    with patch.client("two") as client:
+        relevance = client.get("/api/v1/changes/transitions?relevance=shiny")
+        notes = client.get("/api/v1/changes/transitions?notes=hide")
+
+    assert relevance.status_code == 422 and notes.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# The rules a store was analysed with
+# ---------------------------------------------------------------------------
+
+OTHER_NOTES = """
+[[note]]
+build = "two"
+title = "Range written out"
+explains = [{ path = "stat:287", old = "absent" }]
+"""
+
+
+def other_rules(notes=None, relevance=None):
+    """The repository's rules with one of the two files edited."""
+    rules = default_rules()
+    if notes is not None:
+        rules = replace(rules, notes=parse_notes(notes))
+    if relevance is not None:
+        edited = relevance(RELEVANCE_FILE.read_text(encoding="utf-8"))
+        rules = replace(rules, relevance=parse_relevance(edited))
+    return rules
+
+
+def event_is_gameplay(text):
+    return text.replace('event = "cosmetic"', 'event = "gameplay"')
+
+
+def test_a_store_analysed_with_the_rules_of_the_process_is_not_stale(procs, caplog):
+    procs.sync_changes()
+
+    with caplog.at_level(logging.WARNING):
+        assert warn_of_stale_rules(procs.db) is False
+    assert stale_rules(procs.db) == []
+    assert caplog.records == []
+
+
+def test_a_store_analysed_with_other_notes_than_the_process_read_is_stale(procs):
+    procs.sync_changes()
+
+    (stale,) = stale_rules(procs.db, other_rules(notes=OTHER_NOTES))
+
+    assert "build_notes.toml" in stale
+
+
+def test_a_store_analysed_with_another_relevance_file_is_stale_twice(procs):
+    procs.sync_changes()
+
+    relevance, analysis = stale_rules(
+        procs.db, other_rules(relevance=event_is_gameplay)
+    )
+
+    assert "change_relevance.toml" in relevance and "change log" in relevance
+    assert "transitions" in analysis
+
+
+def test_a_store_no_import_run_analysed_is_stale(procs):
+    assert len(stale_rules(procs.db)) == 2
+
+
+def test_a_stale_store_is_served_with_a_warning_at_start_up(procs, caplog, monkeypatch):
+    procs.sync_changes(other_rules(notes=OTHER_NOTES))
+    monkeypatch.setattr(comparison, "StoreSession", lambda: procs.db)
+
+    with caplog.at_level(logging.WARNING):
+        comparison.preload()
+
+    (record,) = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert "build_notes.toml" in record.getMessage()
+    assert "import_cli.py import-cas" in record.getMessage()
+    assert procs.schema in record.getMessage()
+    # the store is served all the same
+    assert get(procs, "two", "/changes", notes="expand")["total"] == 5
+
+
+def test_start_up_says_nothing_about_a_store_that_is_current(
+    procs, caplog, monkeypatch
+):
+    procs.sync_changes()
+    monkeypatch.setattr(comparison, "StoreSession", lambda: procs.db)
+
+    with caplog.at_level(logging.WARNING):
+        comparison.preload()
+
+    assert [r for r in caplog.records if r.levelno >= logging.WARNING] == []
 
 
 # ---------------------------------------------------------------------------
@@ -1148,6 +1474,72 @@ explains = [{ path = "stat:287", old = "absent" }]
     assert collapsed["notes"][0]["matching"] == 1
     assert aoids(expanded) == [3, 4]
     assert aoids(with_effects) == [3]
+
+
+@pytest.fixture
+def ranges(store):
+    """Build two sets the range of four weapons to 20: two had 15, two had
+    none. Build three does to two other weapons what build two did, and
+    renames two that build two changed."""
+    store.add_build(
+        "one",
+        1,
+        items=[
+            item(1, stats=[(287, 15)]),
+            item(2, stats=[(287, 15)]),
+            item(3),
+            item(4),
+            item(5, stats=[(287, 15)]),
+            item(6, stats=[(287, 15)]),
+        ],
+    )
+    raised = [item(n, stats=[(287, 20)]) for n in (1, 2, 3, 4)]
+    store.add_build(
+        "two",
+        2,
+        items=raised + [item(5, stats=[(287, 15)]), item(6, stats=[(287, 15)])],
+    )
+    store.add_build(
+        "three",
+        3,
+        items=[
+            item(1, name="Longer rifle", stats=[(287, 20)]),
+            item(2, name="Longer pistol", stats=[(287, 20)]),
+            *raised[2:],
+            item(5, stats=[(287, 20)]),
+            item(6, stats=[(287, 20)]),
+        ],
+    )
+    return store
+
+
+def test_a_transition_filter_tells_lines_of_one_path_apart_by_their_old_value(ranges):
+    def found(**params):
+        return aoids(
+            changes(ranges, "two", sort="aoid", transition="stat:287", **params)
+        )
+
+    assert found(transition_new="20") == [1, 2, 3, 4]
+    assert found(transition_old="15", transition_new="20") == [1, 2]
+    assert found(transition_old="null", transition_new="20") == [3, 4]
+    assert found(transition_old="15") == [1, 2]
+
+
+def test_a_transition_filter_reads_the_lines_of_its_own_build_only(ranges):
+    def found(slug):
+        body = changes(
+            ranges,
+            slug,
+            sort="aoid",
+            transition="stat:287",
+            transition_old="15",
+            transition_new="20",
+        )
+        return aoids(body), body["total"]
+
+    assert found("two") == ([1, 2], 2)
+    # items 1 and 2 changed in build three as well, but not in range
+    assert found("three") == ([5, 6], 2)
 
 
 def test_a_transition_value_must_be_json_and_needs_a_path(procs):

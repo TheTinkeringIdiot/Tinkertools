@@ -114,10 +114,9 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 # Include routers
 app.include_router(health_router, prefix="")
-# Cross-version routers first: item_revisions owns /items/revisions/batch and
-# /items/{aoid}/revisions, and changes owns /items/{aoid}/timeline and
-# /items/{aoid}/compare/{base}, which must not be captured by the
-# /items/{aoid} patterns in items_router.
+# Cross-version routers first: item_revisions owns /items/revisions/batch,
+# and changes owns /items/{aoid}/timeline and /items/{aoid}/compare/{base},
+# which must not be captured by the /items/{aoid} patterns in items_router.
 app.include_router(versions_router, prefix="/api/v1")
 app.include_router(item_revisions_router, prefix="/api/v1")
 app.include_router(changes_router, prefix="/api/v1")

@@ -228,6 +228,10 @@ build_transition = Table(
     Column("new", JSONB),
     Column("items", Integer, nullable=False),
     Column("occurrences", Integer, nullable=False),
+    Column("relevance", SmallInteger, nullable=False),
+    Column("unnoted_items", Integer, nullable=False),
+    Column("unnoted_occurrences", Integer, nullable=False),
+    Column("unexplained_items", Integer, nullable=False),
 )
 
 change_transition = Table(
