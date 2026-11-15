@@ -180,7 +180,7 @@ Also:
   - Requests that failed with a 500 now answer: a ranked search with stat filters, `slot` of 63 or more, a page number beyond any count (an empty page with the right total).
   - Four mob locations lose a stray backslash (`symbiants.csv`).
   - An item's `id` in a response is its AOID.
-- The response cache holds rendered responses, is bounded in bytes (`RESPONSE_CACHE_MAX_BYTES`, 256 MB by default) and evicts the least recently used entry.
+- The response cache holds rendered responses, is bounded in bytes (`RESPONSE_CACHE_MAX_BYTES`, 256 MB by default) and evicts the least recently used entry. The bound is on the cache, not the process: a busy server holds its ready size (130 MB), the bound and 70 to 150 MB of request working memory, about 550 MB with the default (measured; `backend/app/core/cache.py`).
 - Every identifier becomes an AOID. Row IDs for stats, spells, criteria and actions are dropped from responses. `/nanos/{id}`, `/symbiants/{id}`, equipment bonuses and source links move to AOID. Client-side user data (nano favorites, farm progress) moves to AOID with it.
 - Version stays in the URL path (`/api/v1/{slug}/...`), including the family aliases (`ao`, `prk`); it becomes a query parameter internally instead of a schema switch.
 - Responses for a specific revision are immutable and served with long-lived cache headers keyed by revision.

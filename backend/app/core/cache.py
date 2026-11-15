@@ -22,6 +22,37 @@ for that result.
 ``cached_response`` (app/core/decorators.py) stores the serialised body of a
 response, so an entry's size is the memory it holds, give or take the
 ``ENTRY_OVERHEAD`` charged for its key and bookkeeping.
+
+What the bound bounds
+=====================
+
+``max_bytes`` bounds what the cache holds, and it does: with the cache full
+of 200-row diff pages (1,724 entries, measured in the running server) it
+accounted 256.0 MB for 242.5 MB of bodies, 12 comparisons at their real size
+and 0.9 MB of overhead; the keys take 0.23 MB, less than the overhead charged.
+
+It does not bound the process. Building responses takes memory of its own,
+which the C library keeps after it is freed: 4,200 distinct 200-row diff
+pages of twelve comparisons (563 MB of bodies, so the cache evicts 2,500 of
+them), from a server that is at 130 MB when ready:
+
+==========================================  ========  =================
+server and load                             resident  after malloc_trim
+==========================================  ========  =================
+256 MB cache, 4 requests at a time          460 MB    424 MB
+256 MB cache, 16 at a time                  535 MB    454 MB
+the same with ``MALLOC_ARENA_MAX=2``        477 MB    438 MB
+the same with a 64 KB mmap threshold        459 MB    438 MB
+64 MB cache, 16 at a time                   335 MB    267 MB
+==========================================  ========  =================
+
+So a busy server settles at its ready size, plus the cache bound, plus 70 to
+150 MB whatever the bound is: about 75 MB that requests leave in use (warmed
+statement and serialiser caches, fragments of the heaps of the worker
+threads), and up to as much again that is free but kept by the allocator,
+more of it the more requests run at once. Plan for 550 MB with the default
+bound. ``MALLOC_ARENA_MAX=2`` in the server's environment takes 60 MB off
+that at no measured cost.
 """
 
 import hashlib
