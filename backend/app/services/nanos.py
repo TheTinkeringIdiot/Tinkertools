@@ -24,7 +24,6 @@ from sqlalchemy import (
     ColumnElement,
     Select,
     and_,
-    case,
     exists,
     false,
     func,
@@ -53,6 +52,7 @@ from app.store.presence import (
     has_effect,
     nano_policy,
     revisions,
+    text_contains,
 )
 
 TEST_ITEM_PREFIX = "TESTLIVEITEM"
@@ -133,18 +133,18 @@ def _nanos(build: Build) -> Select:
 def _text_matches(q: str) -> ColumnElement:
     """The nano's name or description contains ``q``.
 
-    The condition is tied to the revision so the pattern is tried on the texts
-    of the build's nanos only. That keeps it off the trigram indexes of
-    ``part_text``, on purpose: a plain condition, which could use them, is
-    answered two to four times faster for a rare term and a term nothing
-    matches, but for a common one ("nano", "the") or one too short for a
-    trigram it is run over the text of every item of every build before the
-    join, two to five times slower than this. Nothing in the term tells the
-    two apart.
+    The condition is left bare, so that a rare term and a term nothing
+    matches are answered from the trigram indexes of ``part_text`` (1 to
+    20 ms). A common term ("nano", "the") or one too short for a trigram is
+    run over the text of every item of every build before the join, which
+    costs 35 to 65 ms since the texts are matched in lower case; tying the
+    pattern to the build's nanos instead costs as much for those and 30 to
+    50 ms for every other term.
     """
     term = f"%{q}%"
-    matches = or_(_text.c.name.ilike(term), _text.c.description.ilike(term))
-    return case((_revision.c.is_nano, matches))
+    return or_(
+        text_contains(_text, "name", term), text_contains(_text, "description", term)
+    )
 
 
 def filtered_nanos(

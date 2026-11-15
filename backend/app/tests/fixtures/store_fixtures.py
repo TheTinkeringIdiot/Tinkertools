@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence
 
 import pytest
+from fastapi import Request
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Connection
@@ -143,11 +144,25 @@ class ThrowawayStore:
         return found
 
     @contextmanager
-    def client(self, slug: str) -> Iterator[TestClient]:
-        """A test client whose requests read build ``slug`` of this store."""
-        build = self.build(slug)
+    def client(self, slug: Optional[str] = None) -> Iterator[TestClient]:
+        """A test client whose requests read build ``slug`` of this store.
+
+        Without ``slug`` each request reads the build its URL names, as in
+        production. The version segment of a URL is resolved by the version
+        registry before the store is asked, so such a test gives its builds
+        slugs the registry knows (``registry.all()``, ``registry.aliases()``).
+        """
+        fixed = self.build(slug) if slug is not None else None
+        known = self.builds()
+
+        def build_of(request: Request) -> Build:
+            found = fixed or resolve_build(known, request.state.game_version)
+            if found is None:
+                raise KeyError(request.state.game_version)
+            return found
+
         app.dependency_overrides[get_store] = lambda: self.db
-        app.dependency_overrides[get_build] = lambda: build
+        app.dependency_overrides[get_build] = build_of
         cache_service.clear()
         try:
             with TestClient(app) as client:
@@ -184,11 +199,14 @@ class ThrowawayStore:
 
     @contextmanager
     def counting_queries(self) -> Iterator[List[str]]:
-        """Collects the statements sent to the store while the block runs."""
+        """Collects the statements that read the store while the block runs:
+        everything sent to it but the settings of a transaction (``SET
+        LOCAL``, ``RESET``)."""
         statements: List[str] = []
 
         def record(conn, cursor, statement, parameters, context, executemany):
-            statements.append(statement)
+            if not statement.startswith(("SET LOCAL", "RESET")):
+                statements.append(statement)
 
         event.listen(self._connection, "before_cursor_execute", record)
         try:

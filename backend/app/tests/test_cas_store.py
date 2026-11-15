@@ -987,16 +987,101 @@ def trigram_indexes(conn, schema):
     )
 
 
-def test_a_new_store_has_a_trigram_index_on_the_name_and_on_the_description(conn):
+def test_a_new_store_has_a_trigram_index_on_each_lower_case_text(conn):
     schema = conn.execute("SELECT current_schema()").fetchone()[0]
     operators = cas_store.extension_schema(conn, "pg_trgm")
 
     assert trigram_indexes(conn, schema) == {
-        f"part_text_{short}_trgm": f"CREATE INDEX part_text_{short}_trgm "
-        f"ON {schema}.part_text USING gin ({column} {operators}.gin_trgm_ops)"
+        f"part_text_{short}_lower_trgm": f"CREATE INDEX part_text_{short}_lower_trgm "
+        f"ON {schema}.part_text USING gin ({column}_lower {operators}.gin_trgm_ops)"
         for short, column in (("name", "name"), ("desc", "description"))
     }
     assert operators == cas_store.extension_schema(conn, "btree_gist")
+
+
+def test_a_text_is_stored_with_its_lower_case_form(conn):
+    load(conn, spec("b1", 1), items=[item(1, name="\u00dcber Bau CHARGER Boots")])
+    conn.execute("UPDATE part_text SET description = '\u00c9T\u00c9 100% Silk_'")
+
+    assert conn.execute(
+        "SELECT name_lower, description_lower, name_lower = lower(name), "
+        "description_lower = lower(description) FROM part_text"
+    ).fetchall() == [
+        ("\u00fcber bau charger boots", "\u00e9t\u00e9 100% silk_", True, True)
+    ]
+
+
+def lower_case_columns(conn, schema):
+    """``{column: the expression it is generated from}`` of part_text."""
+    return dict(
+        conn.execute(
+            "SELECT column_name, generation_expression "
+            "FROM information_schema.columns WHERE table_schema = %s "
+            "AND table_name = 'part_text' AND is_generated = 'ALWAYS'",
+            (schema,),
+        ).fetchall()
+    )
+
+
+def test_a_store_made_before_texts_were_kept_in_lower_case_is_brought_up_to_date(
+    conn,
+):
+    schema = conn.execute("SELECT current_schema()").fetchone()[0]
+    operators = cas_store.extension_schema(conn, "pg_trgm")
+    as_created = lower_case_columns(conn, schema), trigram_indexes(conn, schema)
+    for name in as_created[1]:
+        conn.execute(f"DROP INDEX {schema}.{name}")
+    conn.execute(
+        "ALTER TABLE part_text DROP COLUMN name_lower, DROP COLUMN description_lower"
+    )
+    for name, column in (
+        ("part_text_name_trgm", "name"),
+        ("part_text_desc_trgm", "description"),
+    ):
+        conn.execute(
+            f"CREATE INDEX {name} ON part_text USING gin ({column} {operators}.gin_trgm_ops)"
+        )
+    load(
+        conn,
+        spec("b1", 1),
+        items=[item(1, name="\u00dcber SWORD"), item(2, name="Axe")],
+    )
+    texts = "SELECT text_id, hash, name, description FROM part_text ORDER BY text_id"
+    before = table_counts(conn), conn.execute(texts).fetchall()
+
+    cas_store.upgrade_store(conn, schema)
+
+    assert (
+        lower_case_columns(conn, schema),
+        trigram_indexes(conn, schema),
+    ) == as_created
+    assert (table_counts(conn), conn.execute(texts).fetchall()) == before
+    assert conn.execute(
+        "SELECT name_lower FROM part_text ORDER BY text_id"
+    ).fetchall() == [("\u00fcber sword",), ("axe",)]
+    assert set(as_created[0]) <= {
+        row[0]
+        for row in conn.execute(
+            "SELECT attname FROM pg_stats "
+            "WHERE schemaname = %s AND tablename = 'part_text'",
+            (schema,),
+        )
+    }, "the planner has statistics of the new columns"
+    load(
+        conn,
+        spec("b2", 2),
+        items=[item(1, name="\u00dcber SWORD"), item(3, name="Bow")],
+    )
+    assert conn.execute(
+        "SELECT name_lower FROM part_text ORDER BY text_id"
+    ).fetchall() == [("\u00fcber sword",), ("axe",), ("bow",)]
+
+    assert cas_store.ensure_lower_case_texts(conn, schema) == []
+    cas_store.upgrade_store(conn, schema)
+    assert (
+        lower_case_columns(conn, schema),
+        trigram_indexes(conn, schema),
+    ) == as_created
 
 
 def test_a_store_made_before_substring_search_was_indexed_gets_the_indexes(conn):
@@ -1018,9 +1103,11 @@ def test_a_store_made_before_substring_search_was_indexed_gets_the_indexes(conn)
 
 def test_an_upgrade_adds_only_the_trigram_index_that_is_missing(conn):
     schema = conn.execute("SELECT current_schema()").fetchone()[0]
-    conn.execute(f"DROP INDEX {schema}.part_text_desc_trgm")
+    conn.execute(f"DROP INDEX {schema}.part_text_desc_lower_trgm")
 
-    assert cas_store.ensure_trigram_indexes(conn, schema) == ["part_text_desc_trgm"]
+    assert cas_store.ensure_trigram_indexes(conn, schema) == [
+        "part_text_desc_lower_trgm"
+    ]
     assert set(trigram_indexes(conn, schema)) == set(cas_store.TRIGRAM_INDEXES)
 
 

@@ -62,7 +62,14 @@ CREATE TABLE part_text (
     text_id      integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     hash         char(40) NOT NULL UNIQUE,
     name         text NOT NULL,
-    description  text NOT NULL
+    description  text NOT NULL,
+    -- Both texts in lower case, for substring search whatever the case:
+    -- `name_lower LIKE lower(pattern)` is `name ILIKE pattern`, which lowers
+    -- the text it reads under the database's collation for every row of
+    -- every search. That is four fifths of the cost of a search that reads
+    -- every text (220 ms of ILIKE against 50 ms of LIKE on 129,000 texts).
+    name_lower         text GENERATED ALWAYS AS (lower(name)) STORED,
+    description_lower  text GENERATED ALWAYS AS (lower(description)) STORED
 );
 CREATE INDEX part_text_name ON part_text (name);
 CREATE INDEX part_text_name_lower ON part_text (lower(name));
@@ -70,11 +77,12 @@ CREATE INDEX part_text_name_fts ON part_text USING gin (to_tsvector('english', n
 CREATE INDEX part_text_desc_fts ON part_text USING gin (to_tsvector('english', description));
 CREATE INDEX part_text_name_desc_fts ON part_text
     USING gin (to_tsvector('english', name || ' ' || description));
--- Substring search (ILIKE '%term%') reads two more indexes, part_text_name_trgm
--- and part_text_desc_trgm: gin (name gin_trgm_ops) and gin (description
--- gin_trgm_ops). The importer creates them (cas_store.ensure_trigram_indexes),
--- because gin_trgm_ops has to be named with the schema pg_trgm is installed
--- in, which this unqualified file cannot know.
+-- Substring search (LIKE '%term%' on the lower-case columns) reads two more
+-- indexes, part_text_name_lower_trgm and part_text_desc_lower_trgm: gin
+-- (name_lower gin_trgm_ops) and gin (description_lower gin_trgm_ops). The
+-- importer creates them (cas_store.ensure_trigram_indexes), because
+-- gin_trgm_ops has to be named with the schema pg_trgm is installed in, which
+-- this unqualified file cannot know.
 -- Interpolation groups the QL variants of an item by identical name and description.
 CREATE INDEX part_text_variant ON part_text (md5(name), md5(description));
 

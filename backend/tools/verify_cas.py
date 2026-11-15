@@ -1042,7 +1042,13 @@ def open_store(schema):
         )
     }
     missing = sorted(
-        {"build.overlay_strain_first", "mob.retired", "store_state.name"} - columns
+        {
+            "build.overlay_strain_first",
+            "mob.retired",
+            "store_state.name",
+            "part_text.name_lower",
+        }
+        - columns
     )
     if missing:
         fail(

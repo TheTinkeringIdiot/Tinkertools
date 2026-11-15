@@ -57,6 +57,10 @@ part_text = Table(
     Column("hash", String(40), nullable=False),
     Column("name", Text, nullable=False),
     Column("description", Text, nullable=False),
+    # lower(name) and lower(description), kept by the database: what a
+    # substring search matches (app.store.presence.contains)
+    Column("name_lower", Text, nullable=False),
+    Column("description_lower", Text, nullable=False),
 )
 
 part_stats = Table(
@@ -203,6 +207,13 @@ revision_relevance = Table(
     Column("economy", BigInteger, nullable=False),
     Column("cosmetic", BigInteger, nullable=False),
     Column("effects", BigInteger, nullable=False),
+)
+
+store_state = Table(
+    "store_state",
+    metadata,
+    Column("name", String(40), primary_key=True),
+    Column("value", Text, nullable=False),
 )
 
 build_transition = Table(

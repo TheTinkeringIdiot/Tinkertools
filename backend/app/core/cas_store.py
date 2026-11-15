@@ -82,15 +82,20 @@ UNUSABLE_STRAINS = (None, 0, 99999)
 SQL_DIR = Path(__file__).resolve().parents[2] / "database" / "cas"
 _SCHEMA_NAME = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
 
-# Substring search: ``ILIKE '%term%'`` on these columns of part_text is
-# answered from a trigram index. The operator class belongs to pg_trgm, which
-# lives in one schema of the database whichever store is being created, so the
-# indexes are created by ensure_trigram_indexes with its qualified name, not
-# by 001_store.sql.
+# Substring search: ``LIKE '%term%'`` on these columns of part_text, the
+# texts in lower case, is answered from a trigram index. The operator class
+# belongs to pg_trgm, which lives in one schema of the database whichever
+# store is being created, so the indexes are created by ensure_trigram_indexes
+# with its qualified name, not by 001_store.sql.
 TRIGRAM_INDEXES = {
-    "part_text_name_trgm": "name",
-    "part_text_desc_trgm": "description",
+    "part_text_name_lower_trgm": "name_lower",
+    "part_text_desc_lower_trgm": "description_lower",
 }
+# The lower-case columns of part_text and the text each is generated from.
+LOWER_CASE_COLUMNS = {"name_lower": "name", "description_lower": "description"}
+# Trigram indexes on the texts as written, which searches read before the
+# lower-case columns existed and nothing reads now.
+SUPERSEDED_INDEXES = ("part_text_name_trgm", "part_text_desc_trgm")
 
 Timings = Dict[str, float]
 
@@ -230,6 +235,55 @@ def ensure_trigram_indexes(conn: psycopg.Connection, schema: str) -> List[str]:
     return created
 
 
+def ensure_lower_case_texts(conn: psycopg.Connection, schema: str) -> List[str]:
+    """Give part_text the lower-case columns it lacks; returns their names.
+
+    Adding them rewrites the table and its indexes once, during which it
+    cannot be read. The trigram indexes on the texts as written are dropped
+    first: nothing reads them once searches match the lower-case columns. The
+    table is analyzed afterwards, because an import that adds no build does
+    not analyze and the planner knows nothing of a new column until then.
+    """
+    validate_store_schema(schema)
+    existing = {
+        row[0]
+        for row in conn.execute(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = %s AND table_name = 'part_text'",
+            (schema,),
+        )
+    }
+    for name in SUPERSEDED_INDEXES:
+        conn.execute(
+            sql.SQL("DROP INDEX IF EXISTS {}.{}").format(
+                sql.Identifier(schema), sql.Identifier(name)
+            )
+        )
+    missing = [column for column in LOWER_CASE_COLUMNS if column not in existing]
+    if missing:
+        started = time.perf_counter()
+        conn.execute(
+            sql.SQL("ALTER TABLE {}.part_text {}").format(
+                sql.Identifier(schema),
+                sql.SQL(", ").join(
+                    sql.SQL(
+                        "ADD COLUMN {} text GENERATED ALWAYS AS (lower({})) STORED"
+                    ).format(
+                        sql.Identifier(column),
+                        sql.Identifier(LOWER_CASE_COLUMNS[column]),
+                    )
+                    for column in missing
+                ),
+            )
+        )
+        conn.execute(sql.SQL("ANALYZE {}.part_text").format(sql.Identifier(schema)))
+        logger.info(
+            f"Added {', '.join(missing)} to {schema}.part_text "
+            f"in {time.perf_counter() - started:.1f} s"
+        )
+    return missing
+
+
 def upgrade_store(conn: psycopg.Connection, schema: str) -> None:
     """Give a store created from an earlier state of the SQL files what they
     define today. Changes nothing on a store that is up to date."""
@@ -245,6 +299,7 @@ def upgrade_store(conn: psycopg.Connection, schema: str) -> None:
                 "ALTER TABLE {}.mob ADD COLUMN retired boolean NOT NULL DEFAULT false"
             ).format(sql.Identifier(schema))
         )
+    ensure_lower_case_texts(conn, schema)
     ensure_trigram_indexes(conn, schema)
     if not conn.execute(
         "SELECT 1 FROM pg_tables WHERE schemaname = %s "

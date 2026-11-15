@@ -432,6 +432,53 @@ def test_exact_search_finds_a_substring_of_name_or_description(store):
         assert searched(client, "zzz") == []
 
 
+@pytest.mark.parametrize(
+    "q, names",
+    [
+        ("\u00fcber", {"\u00dcber Bau Charger", "\u00fcberall"}),
+        ("\u00dcBER", {"\u00dcber Bau Charger", "\u00fcberall"}),
+        ("\u00e9t\u00e9", {"\u00c9T\u00c9", "L'\u00e9t\u00e9"}),
+        ("stra\u00dfe", {"Stra\u00dfe"}),
+        ("STRASSE", {"STRASSE"}),
+        ("i", {"\u0130stanbul", "istanbul", "Silk_ 100%"}),
+        ("\u0130", {"\u0130stanbul", "istanbul", "Silk_ 100%"}),
+        ("100%", {"Silk_ 100%"}),
+        ("k_", {"Silk_ 100%"}),
+        ("CHARGER", {"\u00dcber Bau Charger"}),
+    ],
+)
+def test_a_substring_match_finds_what_a_case_insensitive_pattern_finds(store, q, names):
+    every_name = [
+        "\u00dcber Bau Charger",
+        "\u00fcberall",
+        "\u00c9T\u00c9",
+        "L'\u00e9t\u00e9",
+        "Stra\u00dfe",
+        "STRASSE",
+        "\u0130stanbul",
+        "istanbul",
+        "Silk_ 100%",
+    ]
+    store.add_build(
+        "b1",
+        1,
+        items=[
+            described(aoid, name, name[::-1]) for aoid, name in enumerate(every_name, 1)
+        ],
+    )
+    texts = t.part_text
+
+    def found(condition):
+        return set(store.db.execute(select(texts.c.name).where(condition)).scalars())
+
+    for field in SEARCHABLE_FIELDS:
+        pattern = f"%{q if field == 'name' else q[::-1]}%"
+        assert found(substring_match([field], pattern.strip("%"))) == found(
+            texts.c[field].ilike(pattern)
+        )
+    assert found(substring_match(["name"], q)) == names
+
+
 def test_a_substring_match_can_be_answered_from_the_trigram_indexes(store):
     store.add_build("b1", 1, items=[described(1, "Swordfish", "A fish.")])
 
@@ -440,11 +487,11 @@ def test_a_substring_match_can_be_answered_from_the_trigram_indexes(store):
         with store.bitmap_scans_only():
             return set(re.findall(r"part_text_\w+", store.plan(texts)))
 
-    assert indexes_read(["name"]) == {"part_text_name_trgm"}
-    assert indexes_read(["description"]) == {"part_text_desc_trgm"}
+    assert indexes_read(["name"]) == {"part_text_name_lower_trgm"}
+    assert indexes_read(["description"]) == {"part_text_desc_lower_trgm"}
     assert indexes_read(["name", "description"]) == {
-        "part_text_name_trgm",
-        "part_text_desc_trgm",
+        "part_text_name_lower_trgm",
+        "part_text_desc_lower_trgm",
     }
 
 
@@ -513,8 +560,8 @@ def test_a_search_finds_the_same_rows_in_the_same_order_through_the_indexes(stor
             plan_through_the_indexes = store.plan(search)
 
     assert "_trgm" not in plan_reading_every_text
-    assert "part_text_name_trgm" in plan_through_the_indexes
-    assert "part_text_desc_trgm" in plan_through_the_indexes
+    assert "part_text_name_lower_trgm" in plan_through_the_indexes
+    assert "part_text_desc_lower_trgm" in plan_through_the_indexes
     assert through_the_indexes == by_reading_every_text
     assert by_reading_every_text[0] == {
         "name or description": [21, 3, 7, 2, 20, 5, 1, 6],

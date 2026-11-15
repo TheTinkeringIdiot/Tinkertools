@@ -8,7 +8,8 @@ of the build, so nothing built on it needs DISTINCT. Filters are added with
 
 * scalar columns of ``item_revision`` (``ql``, ``item_class``, ``is_nano``,
   ``aoid``) directly;
-* name and description by joining ``part_text`` on ``text_id``;
+* name and description by joining ``part_text`` on ``text_id``, a substring
+  whatever the case with ``text_contains``;
 * stats, requirements, effects and attack/defense skills with the EXISTS
   helpers below, which test the revision's part in a search projection;
 * nano school, professions, level and strain by joining ``nano_properties``
@@ -24,7 +25,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from sqlalchemy import (
     ColumnElement,
@@ -38,6 +39,7 @@ from sqlalchemy import (
     nulls_first,
     nulls_last,
     select,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Session
@@ -128,6 +130,25 @@ def has_atkdef(*conditions: ColumnElement) -> ColumnElement:
     )
 
 
+def text_contains(
+    texts: FromClause, field: str, pattern: str, escape: Optional[str] = None
+) -> ColumnElement:
+    """``field`` (``name`` or ``description``) of ``texts``, which is
+    ``part_text`` or an alias of it, matches the LIKE ``pattern`` whatever the
+    case.
+
+    These are the rows of ``field ILIKE pattern``, found another way. ILIKE
+    lowers the text and the pattern under the column's collation and matches
+    the results, for every row it reads on every search; ``part_text`` keeps
+    its texts lowered that way (``name_lower``, ``description_lower``), so
+    only the pattern is lowered here, by the same function, and the match is
+    a comparison of bytes. The trigram indexes are on the lowered columns:
+    keep the condition as this function writes it, since a function around
+    it, or two columns concatenated, leaves them unused.
+    """
+    return texts.c[f"{field}_lower"].like(func.lower(pattern), escape=escape)
+
+
 def nano_policy(build: Build) -> ColumnElement:
     """ON clause joining ``nano_properties`` to the revision as ``build``
     serves it."""
@@ -216,6 +237,11 @@ def fetch_search_page(
     walk the name index of ``part_text`` in the hope of an early end, which a
     rare word turns into reading every text. The total comes back with the
     page whether or not the page has rows.
+
+    A term most texts contain matches most of a build (77,000 revisions of
+    the live build for "nano"). With the default ``work_mem`` the joins that
+    find them and the set aside matches spill to disk, so the transaction is
+    given enough for both, as ``fetch_changes`` does.
     """
     values = [_sorted_value(key) for key in order_by]
     matches = (
@@ -238,6 +264,7 @@ def fetch_search_page(
         .scalar_subquery()
     )
     total = select(func.count()).select_from(matches).scalar_subquery()
+    db.execute(text("SET LOCAL work_mem = '64MB'"))
     row = db.execute(
         select(total.label("total"), func.array(page_ids).label("rev_ids"))
     ).one()

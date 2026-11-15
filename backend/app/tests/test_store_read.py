@@ -28,6 +28,7 @@ from app.store.presence import (
     none_of,
     page_fields,
     revisions,
+    text_contains,
 )
 from app.tests.fixtures.store_fixtures import criterion, item, modify, nano
 
@@ -554,7 +555,7 @@ def test_a_text_search_page_is_matched_sorted_and_counted_in_one_statement(store
     query = (
         revisions(build)
         .join(t.part_text, t.part_text.c.text_id == t.item_revision.c.text_id)
-        .where(name.ilike("%ring%"))
+        .where(text_contains(t.part_text, "name", "%ring%"))
     )
 
     def aoids(order_by, page):
@@ -583,7 +584,7 @@ def test_a_text_search_sorts_nulls_where_the_sort_key_puts_them(store):
     query = (
         revisions(build)
         .join(t.part_text, t.part_text.c.text_id == t.item_revision.c.text_id)
-        .where(t.part_text.c.name.ilike("%ring%"))
+        .where(text_contains(t.part_text, "name", "%ring%"))
     )
 
     def aoids(key):
@@ -602,6 +603,8 @@ def test_a_text_search_sorts_nulls_where_the_sort_key_puts_them(store):
         ("/items/search?q=unit", 2),
         ("/nanos", 1),
         ("/nanos/search?q=nano", 1),
+        ("/nanos/profession/0", 1),
+        ("/nanos/offensive/0", 1),
         ("/symbiants", 2),
         ("/mobs", 2),
     ],
@@ -611,7 +614,24 @@ def test_a_page_number_too_large_to_count_to_is_a_page_past_the_end(store, path,
         item(aoid, name="Active Ocular Symbiant, Artillery Unit Aban", stats=[(298, 2)])
         for aoid in (1, 2)
     ]
-    store.add_build("b1", 1, items=symbiants, nanos=[item(3, name="Nano")])
+    damage = {
+        "SpellID": 53002,
+        "Target": 3,
+        "TickCount": 1,
+        "TickInterval": 0,
+        "Stat": 27,
+        "Amount": -100,
+        "Criteria": [],
+        "SpellFormat": "Hit {Stat} {Amount}",
+        "SpellDescription": "Hit 27 -100",
+    }
+    nuke = item(
+        3,
+        name="Nano",
+        stats=[(75, 5)],
+        SpellData=[{"Event": 0, "Items": [damage]}],
+    )
+    store.add_build("b1", 1, items=symbiants, nanos=[nuke])
     store.curate(mobs=[("Ahpta", "Inferno", 1), ("Cama", "Inferno", 2)])
     separator = "&" if "?" in path else "?"
 

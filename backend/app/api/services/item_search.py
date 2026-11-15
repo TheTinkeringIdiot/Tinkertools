@@ -25,7 +25,7 @@ from sqlalchemy.sql.expression import literal_column
 
 from app.store import tables as t
 from app.store.context import Build
-from app.store.presence import has_effect, has_requirement, has_stat
+from app.store.presence import has_effect, has_requirement, has_stat, text_contains
 
 logger = logging.getLogger(__name__)
 
@@ -261,22 +261,30 @@ def parse_search_fields(search_fields: Optional[str]) -> List[str]:
     return list(SEARCHABLE_FIELDS)
 
 
+def _text_fields(fields: Sequence[str]) -> List[str]:
+    return [field for field in SEARCHABLE_FIELDS if field in fields]
+
+
 def _text_columns(fields: Sequence[str]) -> List[ColumnElement]:
-    return [t.part_text.c[field] for field in SEARCHABLE_FIELDS if field in fields]
+    return [t.part_text.c[field] for field in _text_fields(fields)]
 
 
 def substring_match(fields: Sequence[str], q: str) -> ColumnElement:
     """``q`` occurs in one of ``fields`` of ``part_text``, whatever the case.
     Only the name is read when ``fields`` names neither text column.
 
-    Each column is matched bare, ``column ILIKE pattern``, which is what the
-    trigram indexes of ``part_text`` answer (``cas_store.TRIGRAM_INDEXES``): a
-    function around the column, or the two columns concatenated, would leave
-    them unused. A term without three letters or digits in a row has no
-    trigram and is still matched by reading every text."""
+    Each field is matched on its own with ``text_contains``, which is what
+    the trigram indexes of ``part_text`` answer
+    (``cas_store.TRIGRAM_INDEXES``). A term without three letters or digits
+    in a row has no trigram, and a common one is not worth an index: both are
+    matched by reading every text."""
     pattern = f"%{q}%"
-    columns = _text_columns(fields) or [t.part_text.c.name]
-    return or_(*(column.ilike(pattern) for column in columns))
+    return or_(
+        *(
+            text_contains(t.part_text, field, pattern)
+            for field in _text_fields(fields) or ["name"]
+        )
+    )
 
 
 def full_text_match(
