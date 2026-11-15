@@ -21,10 +21,11 @@ again. Here that work is done once:
     afterwards; 72 bytes a revision, 19 MB for the 264,000 of today's store.
     The process grows by more than that: 27 MB measured (resident size
     97 MB with the application imported, 124 MB with the facts loaded), and
-    a server is at 134 MB when it is ready. Loading passes through far more
-    (224 MB at the peak), which is handed back to the system when the facts
-    are in place (``_release_freed_memory``); kept, it left a server at
-    167 MB.
+    a server is at 134 MB when it is ready. Loading passes through more
+    (170 MB at the peak, read ``_FACTS_CHUNK`` revisions a row; a row a
+    revision took it through 1.7 GB), which is handed back to the system
+    when the facts are in place (``_release_freed_memory``); kept, it left a
+    server at 167 MB.
 
 ``Comparison``
     One pair of builds: every changed item with its kind, both revisions,
@@ -209,7 +210,7 @@ def _revisions_after(db: Session, last_rev_id: int) -> List[array]:
         )
         .select_from(revision.outerjoin(digests, digests.c.rev_id == revision.c.rev_id))
         .where(revision.c.rev_id > last_rev_id)
-        .group_by(revision.c.rev_id / _FACTS_CHUNK)
+        .group_by(revision.c.rev_id // _FACTS_CHUNK)
     ).all()
     integers = len(PART_BITS) + 5
     columns = [array("i") for _ in range(integers)] + [array("q") for _ in DIGESTS]

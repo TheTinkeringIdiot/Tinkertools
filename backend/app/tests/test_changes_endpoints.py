@@ -1559,6 +1559,29 @@ def test_start_up_says_nothing_about_a_store_that_is_current(
     assert [r for r in caplog.records if r.levelno >= logging.WARNING] == []
 
 
+def test_the_facts_of_a_store_are_read_a_chunk_of_revisions_a_row(history, monkeypatch):
+    """One row a revision is 264,000 rows of fifteen values for the real
+    store, which took a server through 1.7 GB when it started."""
+    read = []
+    unpacked = comparison._unpacked
+
+    def recording(packed, typecode="i"):
+        values = unpacked(packed, typecode)
+        read.append(len(values))
+        return values
+
+    monkeypatch.setattr(comparison, "_FACTS_CHUNK", 4)
+    monkeypatch.setattr(comparison, "_unpacked", recording)
+
+    columns = comparison._revisions_after(history.db, 0)
+
+    revisions = len(columns[0])
+    rows = len(read) // len(columns)
+    assert revisions >= 8 and sorted(columns[0]) == sorted(set(columns[0]))
+    assert max(read) == 4
+    assert rows <= revisions // 4 + 1
+
+
 # ---------------------------------------------------------------------------
 # Relevance of each entry of a diff
 # ---------------------------------------------------------------------------
