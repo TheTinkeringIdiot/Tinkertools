@@ -216,8 +216,11 @@ Cosmetic entries are folded behind one toggle.
                   <span class="diff-arrow" aria-hidden="true"> → </span>
                   <span class="sr-only"> became </span>
                   <ins class="diff-new">{{ effectFieldValue(field.field, field.new) }}</ins>
-                  <span v-if="numericDelta(field.old, field.new)" class="item-diff-delta">
-                    ({{ numericDelta(field.old, field.new) }})
+                  <span
+                    v-if="effectFieldDelta(field.field, field.old, field.new)"
+                    class="item-diff-delta"
+                  >
+                    ({{ effectFieldDelta(field.field, field.old, field.new) }})
                   </span>
                 </li>
               </ul>
@@ -299,6 +302,7 @@ import { diffWords, type WordDiffSegment } from '@/utils/word-diff';
 import {
   KIND_LABELS,
   actionLabel,
+  effectFieldDelta,
   effectFieldLabel,
   effectFieldValue,
   eventLabel,
@@ -401,14 +405,6 @@ function wordSegments(change: FieldChange): WordDiffSegment[] {
 
 function visibleFields(fields: FieldChange[]): FieldChange[] {
   return fields.filter((field) => !isHiddenEffectField(field.field));
-}
-
-function numericDelta(before: unknown, after: unknown): string {
-  if (typeof before !== 'number' || typeof after !== 'number') return '';
-  const delta = after - before;
-  if (delta === 0) return '';
-  const rounded = Number.isInteger(delta) ? String(Math.abs(delta)) : Math.abs(delta).toFixed(2);
-  return `${delta > 0 ? '+' : '−'}${rounded}`;
 }
 </script>
 

@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import {
   criterionText,
   effectDetails,
+  effectFieldDelta,
   effectFieldLabel,
   effectFieldValue,
   effectTemplate,
@@ -156,6 +157,19 @@ describe('effect wording', () => {
     expect(effectFieldValue('target', 3)).toBe('Target');
     expect(effectFieldValue('tick_interval', 250)).toBe('2.5s');
     expect(effectFieldValue('spell_params.Amount', null)).toBe('none');
+  });
+
+  it('gives the size of a change for quantities only', () => {
+    expect(effectFieldDelta('spell_params.Chance', 60, 100)).toBe('+40');
+    expect(effectFieldDelta('spell_params.Amount', 12, 7)).toBe('−5');
+    expect(effectFieldDelta('tick_count', 3, 5)).toBe('+2');
+    expect(effectFieldDelta('target', 1, 3)).toBe('');
+    expect(effectFieldDelta('spell_params.Stat', 16, 17)).toBe('');
+    expect(effectFieldDelta('spell_params.ModifierStat', 16, 17)).toBe('');
+    expect(effectFieldValue('spell_params.ModifierStat', 2)).toBe('Mass');
+    expect(effectFieldDelta('spell_params.NanoID', 26337, 26338)).toBe('');
+    expect(effectFieldDelta('spell_params.Amount', 5, 5)).toBe('');
+    expect(effectFieldDelta('spell_params.Text', 'a', 'b')).toBe('');
   });
 });
 

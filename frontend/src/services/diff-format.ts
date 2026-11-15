@@ -297,7 +297,7 @@ export function effectFieldValue(field: string, value: unknown): string {
   ).toLowerCase();
   if (typeof value === 'number') {
     if (name.includes('chance')) return `${value}%`;
-    if (name === 'stat' || name === 'skill') return statLabel(value);
+    if (name.includes('stat') || name === 'skill') return statLabel(value);
     if (name === 'nanostrain') return getNanoStrainName(value) || `Strain ${value}`;
     return String(value);
   }
@@ -306,6 +306,32 @@ export function effectFieldValue(field: string, value: unknown): string {
     return value.Text;
   }
   return JSON.stringify(value);
+}
+
+/** Fields whose numbers name something (a target, a stat, a nano) instead of measuring it. */
+const IDENTIFIER_FIELDS = new Set([
+  'target',
+  'stat',
+  'skill',
+  'nanoid',
+  'nanostrain',
+  'item',
+  'itemid',
+  'perkid',
+  'playfield',
+  'bitnum',
+]);
+
+/** "+40" / "−5" for a field of a changed effect that is a quantity; '' otherwise. */
+export function effectFieldDelta(field: string, before: unknown, after: unknown): string {
+  if (typeof before !== 'number' || typeof after !== 'number' || before === after) return '';
+  const name = (
+    field.startsWith(PARAM_PREFIX) ? field.slice(PARAM_PREFIX.length) : field
+  ).toLowerCase();
+  if (IDENTIFIER_FIELDS.has(name) || name.includes('stat')) return '';
+  const delta = after - before;
+  const size = Number.isInteger(delta) ? String(Math.abs(delta)) : Math.abs(delta).toFixed(2);
+  return `${delta > 0 ? '+' : '−'}${size}`;
 }
 
 /** Parameters that only restate others or carry client bookkeeping. */
