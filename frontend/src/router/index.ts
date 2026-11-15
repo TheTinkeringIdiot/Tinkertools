@@ -97,6 +97,18 @@ const versionedRoutes: RouteRecordRaw[] = [
     meta: { title: 'TinkerTools - Game Versions' },
   },
   {
+    path: 'changes',
+    name: 'BuildChanges',
+    component: () => import('@/views/BuildChanges.vue'),
+    meta: { title: 'TinkerTools - What Changed' },
+  },
+  {
+    path: 'compare/:base([a-z0-9][a-z0-9.-]{0,39})',
+    name: 'BuildCompare',
+    component: () => import('@/views/BuildChanges.vue'),
+    meta: { title: 'TinkerTools - Compare Builds' },
+  },
+  {
     // Unknown path under a version. Not a redirect record: redirects resolve
     // before guards, and the guard must first decide whether the leading
     // segment is a version at all (see beforeEach below).

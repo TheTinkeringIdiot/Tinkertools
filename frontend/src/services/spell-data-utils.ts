@@ -213,8 +213,11 @@ export function interpolateSpellText(format: string, params: Record<string, unkn
         // For Chance, add % symbol after the value
         // The value is stored as the final percentage (0.25 means 0.25%, not 25%)
         return `${value}%`;
-      } else if (paramName.toLowerCase().includes('stat') && typeof value === 'number') {
-        // For Stat, display as stat name
+      } else if (
+        (paramName.toLowerCase().includes('stat') || paramName.toLowerCase() === 'skill') &&
+        typeof value === 'number'
+      ) {
+        // For Stat and Skill, display as stat name
         const statName = getStatName(value);
         return statName || `Stat ${value}`;
       } else if (paramName.toLowerCase().includes('bitnum') && typeof value === 'number') {

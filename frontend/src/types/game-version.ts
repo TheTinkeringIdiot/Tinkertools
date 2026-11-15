@@ -41,26 +41,6 @@ export interface GameVersionListResponse {
   total: number;
 }
 
-export type ItemRevisionChange = 'stats' | 'spells' | 'actions' | 'text';
-
-export interface ItemRevisionPoint {
-  version_slug: string;
-  display_name: string;
-  family: GameVersionFamily;
-  snapshot_date: string | null;
-  client_build: string | null;
-  changed: ItemRevisionChange[];
-  first_seen: boolean;
-}
-
-export interface ItemRevisionsResponse {
-  aoid: number;
-  present_in: string[];
-  first_seen_in: string | null;
-  revisions: ItemRevisionPoint[];
-  missing_in: string[];
-}
-
 export interface ItemRevisionBatchEntry {
   aoid: number;
   revision_count: number;
