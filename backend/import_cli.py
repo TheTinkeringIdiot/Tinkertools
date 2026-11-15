@@ -1309,8 +1309,9 @@ def import_cas(args) -> bool:
     whatever the index lists beyond it.
     """
     import time
-    from app.core import cas_store
+    from app.core import cas_store, change_analysis
     from app.core.cas_curated import CuratedFiles, sync_curated
+    from app.core.change_rules import read_rules
     from app.core.cas_extract import ExtractReader, plan_builds, read_manifest
 
     if args.workers < 0:
@@ -1348,6 +1349,7 @@ def import_cas(args) -> bool:
                 setattr(files, attribute, Path(os.path.expandvars(given)).expanduser())
             if not getattr(files, attribute).exists():
                 raise FileNotFoundError(f"Data file not found: {getattr(files, attribute)}")
+        rules = read_rules()
         conn = cas_store.connect(args.database_url or os.environ["DATABASE_URL"], args.schema)
         planned = plan_builds(root, entries, read_registry(conn))
         conn.commit()
@@ -1385,6 +1387,12 @@ def import_cas(args) -> bool:
         if any(written.values()):
             logger.info("Curated rows written: " + ", ".join(
                 f"{table} {count}" for table, count in written.items() if count))
+        with cas_store.phase(timings, "change analysis"):
+            analysed = change_analysis.sync(conn, rules)
+            conn.commit()
+        if any(analysed.values()):
+            logger.info("Change log brought in line with the rules: " + ", ".join(
+                f"{what} {count}" for what, count in analysed.items() if count))
 
         todo = [spec for spec in specs if spec.slug not in stored]
         # Refuse an out-of-order build before anything is read. A duplicate of
@@ -1410,7 +1418,7 @@ def import_cas(args) -> bool:
                 with cas_store.phase(timings, "read and split (waiting)"):
                     content = reader.next()
             try:
-                result = cas_store.import_build(conn, spec, content, timings)
+                result = cas_store.import_build(conn, spec, content, timings, rules)
                 with cas_store.phase(timings, "commit"):
                     conn.commit()
             finally:

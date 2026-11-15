@@ -38,8 +38,10 @@ then says so and is not a complete check of the build.
 With ``--store`` the store is checked as a whole instead: each search
 projection is derived again in SQL from the part documents, the presence,
 change-log and strain-policy rules of database/cas/001_store.sql and
-002_curated_and_derived.sql are tested, and the item count of every build is
-compared with the current store.
+002_curated_and_derived.sql are tested, the change log is checked against the
+rules files (every entry classified as change_relevance.toml says, notes as
+build_notes.toml defines them, 003_change_analysis.sql), and the item count
+of every build is compared with the current store.
 
 Usage: python tools/verify_cas.py SLUG --extracts-dir DIR [--schema cas]
                                   [--show N] [--against OTHER_SLUG]
@@ -60,7 +62,8 @@ import psycopg
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.core import cas_store  # noqa: E402
+from app.core import cas_store, change_analysis  # noqa: E402
+from app.core.change_rules import default_rules  # noqa: E402
 from app.core.parts import PART_NAMES, split_item  # noqa: E402
 
 ITEM_PARTS = (
@@ -869,6 +872,82 @@ INVARIANTS = {
 }
 
 
+def change_analysis_invariants(conn, rules):
+    """Rules of 003_change_analysis.sql as queries like INVARIANTS: what the
+    importer derives about the change log is what ``rules`` give."""
+    relevance = change_analysis.relevance_sql(rules.relevance).as_string(conn)
+    added, removed = rules.relevance.bit("added"), rules.relevance.bit("removed")
+    return {
+        "change log entries that are not classified": """
+            SELECT branch, ordinal, aoid FROM item_change
+            WHERE relevance IS NULL OR relevance = 0
+        """,
+        "revisions without relevance digests": """
+            SELECT r.rev_id, r.aoid FROM item_revision r
+            WHERE NOT EXISTS (
+                SELECT 1 FROM revision_relevance d WHERE d.rev_id = r.rev_id)
+        """,
+        "change log entries whose relevance is not what change_relevance.toml gives": f"""
+            SELECT c.branch, c.ordinal, c.aoid, c.kind, c.relevance FROM item_change c
+            LEFT JOIN item_revision ro ON ro.rev_id = c.old_rev_id
+            LEFT JOIN item_revision rn ON rn.rev_id = c.new_rev_id
+            LEFT JOIN revision_relevance o ON o.rev_id = c.old_rev_id
+            LEFT JOIN revision_relevance n ON n.rev_id = c.new_rev_id
+            WHERE c.relevance IS DISTINCT FROM
+                  CASE c.kind WHEN 'A' THEN {added} WHEN 'R' THEN {removed}
+                       ELSE {relevance} END
+        """,
+        "change log entries tagged with a note that is not their build's": """
+            SELECT c.branch, c.ordinal, c.aoid, c.note_id FROM item_change c
+            JOIN build_note n ON n.note_id = c.note_id
+            JOIN build b ON b.build_id = n.build_id
+            WHERE b.branch <> c.branch OR b.ordinal <> c.ordinal OR c.kind <> 'C'
+        """,
+        "shared transitions of fewer than two items, or not of the items listed for them": f"""
+            SELECT t.branch, t.ordinal, t.path FROM build_transition t
+            WHERE t.items < {change_analysis.MIN_SHARED_ITEMS}
+               OR t.occurrences < t.items
+               OR t.items <> (SELECT count(*) FROM change_transition m
+                              JOIN item_change c ON c.branch = t.branch
+                                  AND c.ordinal = t.ordinal AND c.aoid = m.aoid
+                                  AND c.kind = 'C'
+                              WHERE m.transition_id = t.transition_id)
+               OR t.items > (SELECT count(*) FROM item_change c
+                             WHERE c.branch = t.branch AND c.ordinal = t.ordinal
+                               AND c.kind = 'C')
+        """,
+    }
+
+
+def check_change_rules(report, conn, rules):
+    """The notes and the digests of the rules files against the store."""
+    stored = set(
+        conn.execute(
+            "SELECT b.slug, n.title, n.body FROM build_note n "
+            "JOIN build b ON b.build_id = n.build_id"
+        ).fetchall()
+    )
+    slugs = {row[0] for row in conn.execute("SELECT slug FROM build")}
+    defined = {
+        (note.build, note.title, note.body)
+        for note in rules.notes.notes
+        if note.build in slugs
+    }
+    print(
+        f"  build notes: {len(stored)} stored, not in build_notes.toml "
+        f"{len(stored - defined)}, missing {len(defined - stored)}"
+    )
+    report.differences += len(stored ^ defined)
+
+    state = dict(conn.execute("SELECT name, value FROM store_state").fetchall())
+    stale = state.get(change_analysis.STATE_RELEVANCE) != rules.relevance.digest
+    print(
+        "  change_relevance.toml applied to the store: "
+        + ("no (run import_cli.py import-cas)" if stale else "yes")
+    )
+    report.differences += stale
+
+
 def check_store(report, conn):
     """Checks that hold for the store as a whole, whatever the build."""
     report.section("Search projections against the part documents (whole store)")
@@ -885,13 +964,16 @@ def check_store(report, conn):
         )
         report.differences += extra + missing
 
+    rules = default_rules()
     report.section("Store rules (whole store)")
-    for rule, query in INVARIANTS.items():
+    invariants = {**INVARIANTS, **change_analysis_invariants(conn, rules)}
+    for rule, query in invariants.items():
         rows = conn.execute(query).fetchall()
         print(f"  {rule}: {len(rows)}")
         for row in rows[: report.show]:
             print(f"    {row}")
         report.differences += len(rows)
+    check_change_rules(report, conn, rules)
 
     report.section("Item count of every build against the current store")
     new = dict(conn.execute("SELECT slug, item_count FROM build").fetchall())
@@ -959,7 +1041,9 @@ def open_store(schema):
             (schema,),
         )
     }
-    missing = sorted({"build.overlay_strain_first", "mob.retired"} - columns)
+    missing = sorted(
+        {"build.overlay_strain_first", "mob.retired", "store_state.name"} - columns
+    )
     if missing:
         fail(
             f"Schema '{schema}' is not a current content-addressed store "

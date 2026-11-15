@@ -8,10 +8,12 @@ Every route that serves game data reads it through this package:
 ``presence``  "the revisions present in this build", filters, pages
 ``items``     revisions as served items (``ItemRecord``, ``ItemDetail``)
 ``curated``   symbiants, mobs and perks of a build
+``changes``   what differs between builds: change log, comparisons, diffs
 
 The store itself is described where it is defined:
 ``backend/database/cas/001_store.sql`` and ``002_curated_and_derived.sql``
-(how QL, strain, feature flags, source names and retired mobs are served) and
+(how QL, strain, feature flags, source names and retired mobs are served),
+``003_change_analysis.sql`` (what the importer derives about changes) and
 the docstring of ``app/core/parts.py`` (the part documents).
 
 Writing a route
@@ -90,6 +92,28 @@ Writing a route
    never given to another mob, with ``retired`` set. Every read of ``mob``
    filters ``~t.mob.c.retired``.
 
+8. Changes between builds. A list of "what differs" is one of two sources of
+   ``app.store.changes``, filtered, counted and paged by ``fetch_changes`` in
+   one statement::
+
+       source = logged_changes(build)            # the change log of a build
+       source = compared_changes(base, build)    # any two builds, from presence
+       found = fetch_changes(db, source, ChangeFilters(kinds=["changed"]),
+                             "name", page, page_size)
+       snapshots = load_snapshots(db, [rev ids of found.rows])
+       diffs = diff_revisions(db, changed_pairs(found.rows))
+
+   * Relevance and parts of a comparison are computed in the query, from part
+     ids and ``revision_relevance``; never diff a whole list to classify it.
+   * ``diff_revisions`` gives the field-level diffs of the pairs of one page
+     in two queries. The engine is ``app/core/item_diff.py``, the relevance of
+     each entry ``app/core/change_rules.with_relevance``.
+   * A second build named in a request (``/compare/{base}``) is resolved with
+     ``find_build(db, slug)``, from the store the session reads, so that a
+     test's throwaway store answers; ``load_build_index`` names builds in
+     responses and knows what each build's change log is relative to.
+   * Build notes belong to one step of the log: a comparison has none.
+
 Testing
 =======
 
@@ -97,7 +121,8 @@ Testing
   (``app/tests/fixtures/store_fixtures.py``): an empty store in its own schema
   inside a transaction that is rolled back, filled through the real importer
   with ``store.add_build`` and ``store.curate``, served by
-  ``store.client(slug)``. This is the default for a new test: several builds
+  ``store.client(slug)``; ``store.note_changes`` applies build notes written
+  for the test. This is the default for a new test: several builds
   of one item, feature flags, an exact page of results, a rule the real data
   cannot show in isolation. ``store.counting_queries()`` shows that a route's
   query count does not grow with its result. ``test_store_read.py`` and

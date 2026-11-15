@@ -2,7 +2,8 @@
 Tables of the content-addressed store, as SQLAlchemy Core tables.
 
 The definitions and the rules for reading each table are in
-``backend/database/cas/001_store.sql`` and ``002_curated_and_derived.sql``;
+``backend/database/cas/001_store.sql``, ``002_curated_and_derived.sql`` and
+``003_change_analysis.sql`` (what is derived about changes);
 this module only names the tables and columns so queries can be composed.
 Indexes and constraints are not repeated here: nothing creates tables from
 this metadata.
@@ -192,6 +193,37 @@ item_change = Table(
     Column("parts_changed", SmallInteger, nullable=False),
     Column("relevance", SmallInteger),
     Column("note_id", Integer),
+)
+
+revision_relevance = Table(
+    "revision_relevance",
+    metadata,
+    Column("rev_id", Integer, primary_key=True),
+    Column("gameplay", BigInteger, nullable=False),
+    Column("economy", BigInteger, nullable=False),
+    Column("cosmetic", BigInteger, nullable=False),
+    Column("effects", BigInteger, nullable=False),
+)
+
+build_transition = Table(
+    "build_transition",
+    metadata,
+    Column("transition_id", Integer, primary_key=True),
+    Column("branch", String(20), nullable=False),
+    Column("ordinal", Integer, nullable=False),
+    Column("part", String(10), nullable=False),
+    Column("path", Text, nullable=False),
+    Column("old", JSONB),
+    Column("new", JSONB),
+    Column("items", Integer, nullable=False),
+    Column("occurrences", Integer, nullable=False),
+)
+
+change_transition = Table(
+    "change_transition",
+    metadata,
+    Column("transition_id", Integer, primary_key=True),
+    Column("aoid", Integer, primary_key=True),
 )
 
 nano_overlay = Table(

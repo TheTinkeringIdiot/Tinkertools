@@ -151,13 +151,15 @@ python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --schema c
 - Each build is one transaction. Builds already in the store are skipped, so a run that stopped can be repeated and picks up where it stopped. A build older than the newest stored build of its branch is refused: `--reset` and import again to insert one.
 - The newest stored build of each branch is the one served with the curated nano strains; the build before it goes back to its own strains in the transaction that stores the new one.
 - `--workers N` reads and splits N builds ahead of the importer, about 2 GB of memory each; `--workers 0` reads in the importer's process.
+- The change log is classified, noted and counted as it is written, and brought in line with the rules files at the start of every run (see "Change log: relevance, build notes, transitions" below). A store created before those tables existed gets them on its next run.
 - **Never `DROP SCHEMA cas`.** Two extensions, `btree_gist` and `pg_trgm`, live in the schema the first store was created in, and dropping that schema takes them with it, and with them the presence constraint and the trigram indexes of every other store. Use `--reset --yes`, which drops tables only.
 - Every run brings an existing store up to date with the SQL files in place before it imports anything, also when there is nothing to import. That is how a store made earlier gets `pg_trgm` and the two trigram indexes of `part_text` behind substring search (`part_text_name_trgm`, `part_text_desc_trgm`; about 6 s and 46 MB on the full store). Both extensions are trusted: the role needs `CREATE` on the database, not superuser.
 
 Verify after an import (`DATABASE_URL` set as above; the current store is only read):
 
 ```bash
-# the store as a whole: projections, presence, change log, strain policy, item counts
+# the store as a whole: projections, presence, change log (classified and noted
+# as the rules files say), strain policy, item counts
 python tools/verify_cas.py --store
 
 # one build against the current store and its raw extract
@@ -167,6 +169,32 @@ python tools/verify_cas.py ao-17-10-5 --extracts-dir ~/projects/AO/extracts
 - Both end with `N difference(s)` and exit 1 unless N is 0; exit 2 means the check could not be run (no store in `--schema`, no extract, a build or `--against` build that is not in its store).
 - A build check needs `--extracts-dir`: effect criteria order, effect descriptions and shop data can only be compared with the raw extract. `--skip-extract` leaves that part out and says so in its last line; it is not a complete check.
 - `--schema NAME` checks another store, `--show N` prints more examples, `--against SLUG` compares with another build of the current store.
+
+#### Change log: relevance, build notes, transitions
+
+The diff routes of the API (`GET /changes`, `/compare/{base}`, `/items/{aoid}/timeline`; see `API.md`) read what the importer derives about the change log (`app/core/change_analysis.py`, tables in `database/cas/003_change_analysis.sql`) from two hand-maintained files:
+
+| File | Says | Format |
+|---|---|---|
+| `database/change_relevance.toml` | which stats and effect types are gameplay, economy or cosmetic, and how whole-part changes are classed | `id = "name"` under `[stats.<class>]` / `[effects.<class>]`; `unclassified` and unlisted ids take `default` |
+| `database/build_notes.toml` | build-wide events that explain many item changes at once ("implants renamed"), as rules over field transitions | `[[note]]` with `build`, `title`, `body`, `explains`, `alongside` |
+
+The rules are stated in the docstring of `app/core/change_rules.py`. To change them, edit a file and run `import-cas` again (it imports nothing if every build is stored):
+
+- `item_change.relevance` is recomputed for the whole log on every run, in one statement, and only rows that differ are written. When `change_relevance.toml` changed, the per-revision digests it is computed from (`revision_relevance`) are rebuilt first.
+- Build notes, the note of each change (`item_change.note_id`) and the shared transitions of each build (`build_transition`, `change_transition`) are recomputed when `build_notes.toml` changed (or the diff engine did: `ANALYSIS_VERSION`). A note keeps its id as long as its build and title stay.
+- A note whose build the store does not hold is ignored, so one file serves every store.
+- Measured on the full store (147 builds, 263,959 revisions, 275,750 changes): everything from scratch, as after a change to both files, 54 s. A run with nothing to do only checks the relevance of the log (0.2 s on a store of five builds and 111,000 changes). A new build adds the analysis of its own changes (5 s for the largest step, 14.8.0 with 48,881 changes; 11 s in all for the five builds of a scratch store).
+
+Finding and checking notes:
+
+```bash
+# what the changed items of each build have in common, and what each note catches
+python tools/change_candidates.py --min-items 200            # every build
+python tools/change_candidates.py ao-14-8-0 --min-items 100  # one build
+```
+
+It lists, per build, the field transitions shared by at least that many items, the change shapes (sets of changed fields) shared by that many, and the number of changes each note of `build_notes.toml` explains as the file stands, before any import. `python -m pytest app/tests/test_change_rules_store.py` fails when a stat or effect type occurs in the store's changes and is in no section of `change_relevance.toml`.
 
 ### Import a version from dump files
 

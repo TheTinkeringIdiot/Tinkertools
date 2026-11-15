@@ -216,4 +216,10 @@ CACHE_TTL = {
     "nanos_profession": 3600,  # 1 hour - whole profession lists, costly to build
     "nanos_offensive": 3600,
     "weapons_analyze": 3600,  # 1 hour - weapon analysis is static game data
+    # Diffs of two builds: immutable until the next import
+    "changes_list": 3600,
+    "changes_compare": 3600,
+    "changes_transitions": 3600,
+    "item_timeline": 3600,
+    "item_compare": 3600,
 }

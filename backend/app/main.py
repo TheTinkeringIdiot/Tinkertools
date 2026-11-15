@@ -9,6 +9,7 @@ from app.core.version_middleware import GameVersionMiddleware
 from app.api.routes.health import router as health_router
 from app.api.routes.versions import router as versions_router
 from app.api.routes.item_revisions import router as item_revisions_router
+from app.api.routes.changes import router as changes_router
 from app.api.routes.items import router as items_router
 from app.api.routes.legacy_item_ids import router as legacy_item_ids_router
 from app.api.routes.implants import router as implants_router
@@ -94,10 +95,12 @@ async def general_exception_handler(request: Request, exc: Exception):
 # Include routers
 app.include_router(health_router, prefix="")
 # Cross-version routers first: item_revisions owns /items/revisions/batch and
-# /items/{aoid}/revisions, which must not be captured by the /items/{aoid}
-# patterns in items_router.
+# /items/{aoid}/revisions, and changes owns /items/{aoid}/timeline and
+# /items/{aoid}/compare/{base}, which must not be captured by the
+# /items/{aoid} patterns in items_router.
 app.include_router(versions_router, prefix="/api/v1")
 app.include_router(item_revisions_router, prefix="/api/v1")
+app.include_router(changes_router, prefix="/api/v1")
 app.include_router(items_router, prefix="/api/v1")
 app.include_router(legacy_item_ids_router, prefix="/api/v1")
 app.include_router(implants_router, prefix="/api/v1")
