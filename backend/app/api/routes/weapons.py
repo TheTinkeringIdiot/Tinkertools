@@ -12,17 +12,22 @@ from sqlalchemy.orm import Session
 from app.core.decorators import cached_response
 from app.api.schemas import ItemDetail
 from app.api.schemas.weapon_analysis import WeaponAnalyzeRequest
-from app.api.services.weapon_filter_service import filter_weapons
+from app.api.services.weapon_filter_service import WeaponCriteria, filter_weapons
 from app.store.context import Build, get_build, get_store
 
 router = APIRouter(prefix="/weapons", tags=["weapons"])
 logger = logging.getLogger(__name__)
 
 
+def weapon_criteria(request: WeaponAnalyzeRequest) -> WeaponCriteria:
+    """The part of the request body that decides the response."""
+    return WeaponCriteria.of(request)
+
+
 @router.post("/analyze", response_model=List[ItemDetail])
 @cached_response("weapons_analyze")
 def analyze_weapons(
-    request: WeaponAnalyzeRequest,
+    character: WeaponCriteria = Depends(weapon_criteria),
     db: Session = Depends(get_store),
     build: Build = Depends(get_build),
 ):
@@ -41,6 +46,10 @@ def analyze_weapons(
     level, with full details (stats, attack_stats, actions, etc.), ordered by
     AOID.
 
+    The level and the skill values of the request are not read: the response
+    is cached under the fields that are (``WeaponCriteria``), so requests that
+    differ in nothing else share it.
+
     Expected result set size: 200-1000 weapons for typical level 220 character.
 
     Performance target: < 500ms response time (REQ-PERF-001)
@@ -48,7 +57,7 @@ def analyze_weapons(
     start_time = time.time()
 
     try:
-        weapons = filter_weapons(db, build, request)
+        weapons = filter_weapons(db, build, character)
         # Rendered once: the cache then holds the finished response, and a
         # list of this size is not validated against the response model again.
         response = JSONResponse(weapons)

@@ -136,6 +136,68 @@ def test_the_skill_values_and_the_level_do_not_filter(store):
     assert offered(store, weapons, level=220) == [1, 2]
 
 
+def test_characters_that_differ_in_nothing_the_query_reads_share_a_cached_analysis(
+    store,
+):
+    store.add_build(
+        "live", 1, items=[weapon(1), weapon(2, attack=[(RIFLE, 100)]), weapon(3)]
+    )
+    both = [{"skill_id": PISTOL, "value": 500}, {"skill_id": RIFLE, "value": 400}]
+    same_character_later = character(
+        level=220,
+        top_weapon_skills=[
+            {"skill_id": RIFLE, "value": 2500},
+            {"skill_id": PISTOL, "value": 2400},
+        ],
+    )
+
+    with store.client("live") as client:
+        first = client.post(
+            "/api/v1/weapons/analyze", json=character(top_weapon_skills=both)
+        )
+        with store.counting_queries() as statements:
+            second = client.post("/api/v1/weapons/analyze", json=same_character_later)
+
+    assert first.status_code == second.status_code == 200
+    assert [row["aoid"] for row in first.json()] == [1, 2, 3]
+    assert second.content == first.content
+    assert statements == []
+
+
+@pytest.mark.parametrize(
+    "change, aoids",
+    [
+        ({"top_weapon_skills": [{"skill_id": RIFLE, "value": 500}]}, [2]),
+        ({"breed_id": OPIFEX}, [1, 2]),
+        ({"profession_id": DOCTOR}, [1, 2, 3, 4]),
+        ({"side": OMNI}, [1, 2, 3, 5]),
+        ({"expansion_bitflag": 1}, [1]),
+    ],
+)
+def test_characters_that_differ_in_what_the_query_reads_do_not_share_an_analysis(
+    store, change, aoids
+):
+    weapons = [
+        weapon(1),
+        weapon(2, attack=[(RIFLE, 100)], wield=(criterion(389, 2, BIT_SET),)),
+        weapon(3, wield=(criterion(4, SOLITUS, EQUALS), criterion(389, 2, BIT_SET))),
+        weapon(4, wield=(criterion(60, DOCTOR, EQUALS), criterion(389, 2, BIT_SET))),
+        weapon(5, stats=[(33, OMNI)], wield=(criterion(389, 2, BIT_SET),)),
+    ]
+    store.add_build("live", 1, items=weapons)
+    both = [{"skill_id": PISTOL, "value": 500}, {"skill_id": RIFLE, "value": 400}]
+    request = character(top_weapon_skills=both)
+
+    with store.client("live") as client:
+        first = client.post("/api/v1/weapons/analyze", json=request)
+        with store.counting_queries() as statements:
+            other = client.post("/api/v1/weapons/analyze", json={**request, **change})
+
+    assert [row["aoid"] for row in first.json()] == [1, 2, 3]
+    assert [row["aoid"] for row in other.json()] == aoids
+    assert statements != []
+
+
 # ---------------------------------------------------------------------------
 # Player weapons
 # ---------------------------------------------------------------------------
