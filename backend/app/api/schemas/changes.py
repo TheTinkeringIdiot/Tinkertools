@@ -340,7 +340,14 @@ class SharedTransition(BaseModel):
         "value2, operator]; null when absent or particular to each item",
     )
     new: Any = Field(None, description="Value after, as ``old``")
-    items: int = Field(description="Changed items with this transition")
+    relevance: RelevanceName = Field(
+        description="What the field matters for: the class of the stat or "
+        "effect type, 'text', or the class of the change as a whole"
+    )
+    items: int = Field(
+        description="Changed items with this transition; with notes=collapse "
+        "(the default) only those no build note explains"
+    )
     occurrences: int = Field(description="Times it occurs in them")
     stat: Optional[int] = Field(
         None, description="The stat or skill id in ``path``, if any"

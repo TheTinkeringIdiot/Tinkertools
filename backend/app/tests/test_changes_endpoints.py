@@ -934,6 +934,7 @@ def test_transitions_count_what_changed_items_share(procs):
             "path": "effect:53089:spell_params.Chance",
             "old": 60,
             "new": 100,
+            "relevance": "gameplay",
             "items": 3,
             "occurrences": 3,
             "stat": None,
@@ -947,6 +948,7 @@ def test_transitions_count_what_changed_items_share(procs):
             "path": "stat:287",
             "old": None,
             "new": 20,
+            "relevance": "gameplay",
             "items": 2,
             "occurrences": 2,
             "stat": 287,
@@ -970,6 +972,115 @@ def test_transitions_filter_by_part_and_size(procs):
 
 def test_a_build_with_no_shared_transition_lists_none(procs):
     assert get(procs, "one", "/changes/transitions")["transitions"] == []
+
+
+@pytest.fixture
+def patch(store):
+    """Build two renames five tools, which a note explains; two of them also
+    change in value, and two other items only take a new icon."""
+    old = [item(n, name=f"Old tool {n}") for n in (1, 2, 3)]
+    new = [item(n, name=f"New tool {n}") for n in (1, 2, 3)]
+    for n in (4, 5):
+        old.append(item(n, name=f"Old tool {n}", stats=[(STAT_VALUE, 5)]))
+        new.append(item(n, name=f"New tool {n}", stats=[(STAT_VALUE, 9)]))
+    for n in (6, 7):
+        old.append(item(n, name=f"Crate {n}", stats=[(STAT_ICON, 1)]))
+        new.append(item(n, name=f"Crate {n}", stats=[(STAT_ICON, 2)]))
+    store.add_build("one", 1, items=old)
+    store.add_build("two", 2, items=new)
+    store.note_changes("""
+[[note]]
+build = "two"
+title = "Tools renamed"
+explains = [{ path = "name", old = "Old .*", new = "New .*" }]
+""")
+    return store
+
+
+def lines(store, slug, **params):
+    """``{path: (relevance, items, occurrences)}`` of a build's patch notes."""
+    body = get(store, slug, "/changes/transitions", **params)
+    return {
+        line["path"]: (line["relevance"], line["items"], line["occurrences"])
+        for line in body["transitions"]
+    }
+
+
+def test_patch_notes_leave_out_cosmetic_lines_and_what_a_note_explains(patch):
+    # the rename is counted on the two tools the note does not explain; the
+    # icon line is cosmetic
+    assert lines(patch, "two") == {
+        "name": ("text", 2, 2),
+        f"stat:{STAT_VALUE}": ("economy", 2, 2),
+    }
+
+
+def test_patch_notes_count_every_change_when_notes_are_expanded(patch):
+    assert lines(patch, "two", notes="expand") == {
+        "name": ("text", 5, 5),
+        f"stat:{STAT_VALUE}": ("economy", 2, 2),
+    }
+
+
+def test_patch_notes_filter_by_the_relevance_of_the_field(patch):
+    every = ["gameplay", "economy", "cosmetic", "text"]
+
+    assert lines(patch, "two", relevance="cosmetic") == {
+        f"stat:{STAT_ICON}": ("cosmetic", 2, 2)
+    }
+    assert list(lines(patch, "two", relevance="economy")) == [f"stat:{STAT_VALUE}"]
+    assert lines(patch, "two", relevance="gameplay") == {}
+    assert len(lines(patch, "two", relevance=every)) == 3
+
+
+def test_a_patch_note_line_too_few_unexplained_changes_share_is_left_out(patch):
+    # a third build renames two tools and nothing else: the note explains both
+    patch.add_build(
+        "three",
+        3,
+        items=[item(1, name="Old tool 1"), item(2, name="Old tool 2")],
+    )
+    patch.add_build(
+        "four",
+        4,
+        items=[item(1, name="New tool 1"), item(2, name="New tool 2")],
+    )
+    patch.note_changes("""
+[[note]]
+build = "four"
+title = "Tools renamed"
+explains = [{ path = "name", old = "Old .*", new = "New .*" }]
+""")
+
+    assert lines(patch, "four") == {}
+    assert lines(patch, "four", notes="expand") == {"name": ("text", 2, 2)}
+    assert lines(patch, "four", notes="expand", min_items=3) == {}
+
+
+@pytest.mark.parametrize("notes", ["collapse", "expand"])
+def test_a_patch_note_line_counts_the_changes_the_list_shows_for_it(patch, notes):
+    every = ["gameplay", "economy", "cosmetic", "text"]
+    body = get(patch, "two", "/changes/transitions", notes=notes, relevance=every)
+    assert len(body["transitions"]) == 3
+
+    for line in body["transitions"]:
+        listed = changes(
+            patch,
+            "two",
+            notes=notes,
+            transition=line["path"],
+            transition_old=json.dumps(line["old"]),
+            transition_new=json.dumps(line["new"]),
+        )
+        assert listed["total"] == line["items"], line
+
+
+def test_patch_notes_reject_an_unknown_relevance_or_notes_value(patch):
+    with patch.client("two") as client:
+        relevance = client.get("/api/v1/changes/transitions?relevance=shiny")
+        notes = client.get("/api/v1/changes/transitions?notes=hide")
+
+    assert relevance.status_code == 422 and notes.status_code == 422
 
 
 # ---------------------------------------------------------------------------
@@ -1148,6 +1259,72 @@ explains = [{ path = "stat:287", old = "absent" }]
     assert collapsed["notes"][0]["matching"] == 1
     assert aoids(expanded) == [3, 4]
     assert aoids(with_effects) == [3]
+
+
+@pytest.fixture
+def ranges(store):
+    """Build two sets the range of four weapons to 20: two had 15, two had
+    none. Build three does to two other weapons what build two did, and
+    renames two that build two changed."""
+    store.add_build(
+        "one",
+        1,
+        items=[
+            item(1, stats=[(287, 15)]),
+            item(2, stats=[(287, 15)]),
+            item(3),
+            item(4),
+            item(5, stats=[(287, 15)]),
+            item(6, stats=[(287, 15)]),
+        ],
+    )
+    raised = [item(n, stats=[(287, 20)]) for n in (1, 2, 3, 4)]
+    store.add_build(
+        "two",
+        2,
+        items=raised + [item(5, stats=[(287, 15)]), item(6, stats=[(287, 15)])],
+    )
+    store.add_build(
+        "three",
+        3,
+        items=[
+            item(1, name="Longer rifle", stats=[(287, 20)]),
+            item(2, name="Longer pistol", stats=[(287, 20)]),
+            *raised[2:],
+            item(5, stats=[(287, 20)]),
+            item(6, stats=[(287, 20)]),
+        ],
+    )
+    return store
+
+
+def test_a_transition_filter_tells_lines_of_one_path_apart_by_their_old_value(ranges):
+    def found(**params):
+        return aoids(
+            changes(ranges, "two", sort="aoid", transition="stat:287", **params)
+        )
+
+    assert found(transition_new="20") == [1, 2, 3, 4]
+    assert found(transition_old="15", transition_new="20") == [1, 2]
+    assert found(transition_old="null", transition_new="20") == [3, 4]
+    assert found(transition_old="15") == [1, 2]
+
+
+def test_a_transition_filter_reads_the_lines_of_its_own_build_only(ranges):
+    def found(slug):
+        body = changes(
+            ranges,
+            slug,
+            sort="aoid",
+            transition="stat:287",
+            transition_old="15",
+            transition_new="20",
+        )
+        return aoids(body), body["total"]
+
+    assert found("two") == ([1, 2], 2)
+    # items 1 and 2 changed in build three as well, but not in range
+    assert found("three") == ([5, 6], 2)
 
 
 def test_a_transition_value_must_be_json_and_needs_a_path(procs):

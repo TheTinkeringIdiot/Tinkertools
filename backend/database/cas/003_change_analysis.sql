@@ -33,6 +33,13 @@ CREATE TABLE revision_relevance (
 -- NULL is a side that does not exist or a value particular to the item.
 --   items        changed items with the transition
 --   occurrences  times it occurs in them
+--   relevance    the class of the field itself, as a bit of
+--                item_change.relevance: the stat's or effect type's class,
+--                text, or the class the rules give the change as a whole
+--   unnoted_items, unnoted_occurrences
+--                the same two counts over the changes no build note explains
+--                (item_change.note_id IS NULL): what a list that collapses
+--                noted changes shows
 CREATE TABLE build_transition (
     transition_id  serial PRIMARY KEY,
     branch         varchar(20) NOT NULL,
@@ -43,6 +50,9 @@ CREATE TABLE build_transition (
     new            jsonb,
     items          integer     NOT NULL,
     occurrences    integer     NOT NULL,
+    relevance            smallint NOT NULL,
+    unnoted_items        integer  NOT NULL,
+    unnoted_occurrences  integer  NOT NULL,
     FOREIGN KEY (branch, ordinal) REFERENCES build (branch, ordinal) ON DELETE CASCADE
 );
 CREATE INDEX build_transition_build ON build_transition (branch, ordinal, items DESC);
@@ -62,7 +72,8 @@ CREATE INDEX item_change_note ON item_change (note_id) WHERE note_id IS NOT NULL
 -- What the derived data was last computed from, so an import run recomputes
 -- it only when a rules file or the diff engine changed.
 --   relevance_rules  digest of change_relevance.toml
---   change_analysis  digest of build_notes.toml and the engine version
+--   change_analysis  digest of build_notes.toml, change_relevance.toml and
+--                    the engine version
 CREATE TABLE store_state (
     name   varchar(40) PRIMARY KEY,
     value  text NOT NULL

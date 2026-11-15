@@ -137,6 +137,25 @@ class RelevanceRules:
         """The relevance bit of a change classified as a whole."""
         return RELEVANCE_BITS[self.changes[change]]
 
+    def transition_class(self, part: str, path: str) -> str:
+        """The class of one field transition
+        (``app.core.item_diff.transitions``): what the line "this field
+        changed on N items" matters for, whatever else those items changed."""
+        if part == "text":
+            return "text"
+        if part == "stats":
+            return self.stat_class(int(path.split(":")[1]))
+        if part == "atkdef":
+            return self.changes["attack_defense"]
+        if part == "actions":
+            return self.changes["actions"]
+        if part == "effects":
+            head, _, rest = path.partition(":")
+            if head == "event":
+                return self.changes["event"]
+            return self.effect_class(int(rest.partition(":")[0]))
+        return self.changes[path]
+
     def knows_stat(self, stat: int) -> bool:
         return stat in self.stats or stat in self.unclassified_stats
 

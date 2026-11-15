@@ -940,29 +940,58 @@ def load_transitions(
     db: Session,
     build: Build,
     parts: Sequence[str],
+    relevance: Sequence[str],
+    expand_notes: bool,
     min_items: int,
     limit: int,
 ) -> List[Dict[str, Any]]:
     """The most shared field transitions of a build's change log, as
-    ``SharedTransition`` documents."""
+    ``SharedTransition`` documents.
+
+    ``relevance`` keeps the transitions of fields of those classes. Unless
+    ``expand_notes``, a transition is counted over the changes no build note
+    explains, as the change list is, and one that too few such changes share
+    is left out.
+    """
     bt = t.build_transition
+    items, occurrences = (
+        (bt.c["items"], bt.c.occurrences)
+        if expand_notes
+        else (bt.c.unnoted_items, bt.c.unnoted_occurrences)
+    )
     query = select(
-        bt.c.part, bt.c.path, bt.c.old, bt.c.new, bt.c["items"], bt.c.occurrences
+        bt.c.part,
+        bt.c.path,
+        bt.c.old,
+        bt.c.new,
+        items.label("items"),
+        occurrences.label("occurrences"),
+        bt.c.relevance,
     ).where(
         bt.c.branch == build.branch,
         bt.c.ordinal == build.ordinal,
-        bt.c["items"] >= min_items,
+        items >= min_items,
     )
     if parts:
         query = query.where(bt.c.part.in_(sorted(set(parts))))
+    if relevance:
+        mask = relevance_mask(sorted(set(relevance)))
+        query = query.where(bt.c.relevance.op("&")(mask) != 0)
     rows = db.execute(
         query.order_by(
-            bt.c["items"].desc(),
-            bt.c.occurrences.desc(),
+            items.desc(),
+            occurrences.desc(),
             bt.c.part,
             bt.c.path,
             cast(bt.c.old, String),
             cast(bt.c.new, String),
         ).limit(limit)
     )
-    return [{**row._mapping, **_path_fields(row.path)} for row in rows]
+    return [
+        {
+            **row._mapping,
+            "relevance": relevance_names(row.relevance)[0],
+            **_path_fields(row.path),
+        }
+        for row in rows
+    ]

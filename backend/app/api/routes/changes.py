@@ -24,7 +24,7 @@ import, hence the response cache.
 
 import json
 from dataclasses import replace
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
@@ -69,6 +69,8 @@ from app.store.context import Build, get_build, get_store
 router = APIRouter(tags=["changes"])
 
 SortKey = Literal["name", "aoid", "ql"]
+# What the patch notes of a build list unless asked otherwise.
+PATCH_NOTE_RELEVANCE: Tuple[RelevanceName, ...] = ("gameplay", "economy", "text")
 
 
 class ChangeQuery:
@@ -296,6 +298,16 @@ def get_build_changes(
 @cached_response("changes_transitions")
 def get_build_transitions(
     part: List[PartName] = Query([], description="Only transitions of these parts"),
+    relevance: List[RelevanceName] = Query(
+        list(PATCH_NOTE_RELEVANCE),
+        description="Only transitions of fields that matter for one of these "
+        "(repeat for several). Default: all but cosmetic",
+    ),
+    notes: Literal["collapse", "expand"] = Query(
+        "collapse",
+        description="collapse: count only the changes no build note explains, "
+        "and leave out a transition too few of them share; expand: count all",
+    ),
     min_items: int = Query(2, ge=2, description="Shared by at least this many items"),
     limit: int = Query(50, ge=1, le=500, description="Number of transitions"),
     db: Session = Depends(get_store),
@@ -305,13 +317,21 @@ def get_build_transitions(
     The field transitions most changed items of the request's build share,
     which read as patch notes: "effect 53089 Chance 60 -> 100 on 760 items".
     Only transitions that at least two items share are kept.
+
+    As the change list, the patch notes leave out what a build note already
+    says: by default ``items`` and ``occurrences`` count the changes no note
+    explains, so a line's ``items`` is the ``total`` of ``/changes`` narrowed
+    to that line with the same ``notes``. Lines about cosmetic fields (an
+    icon, a client row id) are left out unless ``relevance`` asks for them.
     """
     index = load_build_index(db)
     base = index.base_of(build.branch, build.ordinal)
     return BuildTransitionsResponse(
         build=index.at(build.branch, build.ordinal).ref(),
         base=base.ref() if base else None,
-        transitions=load_transitions(db, build, part, min_items, limit),
+        transitions=load_transitions(
+            db, build, part, relevance, notes == "expand", min_items, limit
+        ),
     )
 
 

@@ -321,6 +321,29 @@ alongside = [{ path = "stat:79" }]
     }
 
 
+def test_notes_are_tried_in_file_order_and_a_change_has_one_note(renumbered):
+    catch_all = """
+[[note]]
+build = "two"
+title = "Anything about effects"
+explains = [{ part = "effects", path = "*" }]
+alongside = [{ path = "stat:79" }]
+"""
+    # items 1 and 2 are explained by both notes, item 3 by the catch-all only
+    done = change_analysis.sync(renumbered, rules(RENUMBER + catch_all))
+
+    assert noted(renumbered, 2) == {
+        1: "Event renumbered",
+        2: "Event renumbered",
+        3: "Anything about effects",
+    }
+    assert done["noted"] == 3
+
+    change_analysis.sync(renumbered, rules(catch_all + RENUMBER))
+
+    assert set(noted(renumbered, 2).values()) == {"Anything about effects"}
+
+
 def test_a_note_removed_from_the_file_leaves_the_store(renumbered):
     change_analysis.sync(renumbered, rules(RENUMBER + RENAME))
 
@@ -404,13 +427,131 @@ def test_transitions_count_items_and_occurrences_apart(conn):
     }
 
 
-def test_sync_recounts_transitions_only_when_the_notes_or_engine_change(renumbered):
+def test_sync_recounts_transitions_only_when_the_rules_or_engine_change(
+    renumbered, monkeypatch
+):
     change_analysis.sync(renumbered, rules())
     renumbered.execute("DELETE FROM build_transition")
 
     assert change_analysis.sync(renumbered, rules())["transitions"] == 0
     assert change_analysis.sync(renumbered, rules(RENAME))["transitions"] == 1
     assert shared(renumbered, 2) == {("effects", "event", 14, 0): (2, 2)}
+
+    assert change_analysis.sync(renumbered, rules(RENAME))["transitions"] == 0
+    reclassed = rules(
+        RENAME, lambda t: t.replace('event = "cosmetic"', 'event = "gameplay"')
+    )
+    assert change_analysis.sync(renumbered, reclassed)["transitions"] == 1
+
+    assert change_analysis.sync(renumbered, reclassed)["transitions"] == 0
+    monkeypatch.setattr(change_analysis, "ANALYSIS_VERSION", "next")
+    assert change_analysis.sync(renumbered, reclassed)["transitions"] == 1
+
+
+def classed(conn, ordinal):
+    """``{path: (relevance, unnoted items, unnoted occurrences)}`` of the
+    shared transitions of one build."""
+    return {
+        path: tuple(rest)
+        for path, *rest in conn.execute(
+            "SELECT path, relevance, unnoted_items, unnoted_occurrences "
+            "FROM build_transition WHERE ordinal = %s",
+            (ordinal,),
+        )
+    }
+
+
+def test_a_transition_has_the_class_of_its_field(conn):
+    def pair(first, **fields):
+        return [item(first, **fields), item(first + 1, **fields)]
+
+    def use(level):
+        actions = [{"Action": 3, "Criteria": [criterion(54, level, 2)]}]
+        return {"ActionData": {"Actions": actions}}
+
+    load(
+        conn,
+        spec("one", 1),
+        items=[
+            *pair(1, name="Old saw"),
+            *pair(3, stats=[(79, 1)]),
+            *pair(5, stats=[(74, 5)]),
+            *pair(7, SpellData=wear(modify(16, 5))),
+            *pair(9, SpellData=wear(float_text("a"))),
+            *pair(11, SpellData=wear(modify(17, 5))),
+            *pair(13, **use(10)),
+            *pair(
+                15,
+                AttackDefenseData={
+                    "Attack": [{"Stat": 100, "RawValue": 50}],
+                    "Defense": [],
+                },
+            ),
+        ],
+    )
+    load(
+        conn,
+        spec("two", 2),
+        items=[
+            *pair(1, name="New saw"),
+            *pair(3, stats=[(79, 2)]),
+            *pair(5, stats=[(74, 9)]),
+            *pair(7, SpellData=wear(modify(16, 9))),
+            *pair(9, SpellData=wear(float_text("b"))),
+            *pair(11, SpellData=wear(modify(17, 5), event=0)),
+            *pair(13, **use(20)),
+            *pair(
+                15,
+                AttackDefenseData={
+                    "Attack": [{"Stat": 100, "RawValue": 60}],
+                    "Defense": [],
+                },
+            ),
+        ],
+    )
+
+    assert {path: row[0] for path, row in classed(conn, 2).items()} == {
+        "name": TEXT,
+        "stat:79": COSMETIC,
+        "stat:74": ECONOMY,
+        "effect:53045:spell_params.Amount": GAMEPLAY,
+        "effect:53057:spell_params.Text": COSMETIC,
+        "event": COSMETIC,
+        "action:3:criterion": GAMEPLAY,
+        "attack:100": GAMEPLAY,
+    }
+
+
+def test_a_transition_is_also_counted_without_the_changes_a_note_explains(conn):
+    load(
+        conn,
+        spec("one", 1),
+        items=[
+            item(1, name="Old saw"),
+            item(2, name="Old drill"),
+            item(3, name="Old file", stats=[(74, 5), (74, 6)]),
+            item(4, stats=[(74, 5)]),
+        ],
+    )
+    load(
+        conn,
+        spec("two", 2),
+        items=[
+            item(1, name="New saw"),
+            item(2, name="New drill"),
+            item(3, name="New file", stats=[(74, 9), (74, 9)]),
+            item(4, stats=[(74, 9)]),
+        ],
+    )
+
+    assert classed(conn, 2) == {"name": (TEXT, 3, 3), "stat:74": (ECONOMY, 2, 2)}
+    assert shared(conn, 2)[("stats", "stat:74", 5, 9)] == (2, 2)
+
+    change_analysis.sync(conn, rules(RENAME))
+
+    # items 1 and 2 are explained; item 3 changed in value as well
+    assert classed(conn, 2) == {"name": (TEXT, 1, 1), "stat:74": (ECONOMY, 2, 2)}
+    assert shared(conn, 2)[("text", "name", "Old", "New")] == (3, 3)
 
 
 # ---------------------------------------------------------------------------
@@ -434,3 +575,21 @@ def test_upgrade_gives_an_older_store_the_change_analysis_tables(conn):
 
     assert relevance(conn, 2) == {1: TEXT}
     assert conn.execute("SELECT count(*) FROM revision_relevance").fetchone() == (2,)
+
+
+def test_upgrade_gives_an_older_store_the_columns_of_the_patch_notes(renumbered):
+    schema = renumbered.execute("SELECT current_schema()").fetchone()[0]
+    renumbered.execute(
+        "ALTER TABLE build_transition DROP COLUMN relevance, "
+        "DROP COLUMN unnoted_items, DROP COLUMN unnoted_occurrences"
+    )
+    renumbered.execute(
+        "UPDATE store_state SET value = 'an earlier engine' "
+        "WHERE name = 'change_analysis'"
+    )
+
+    cas_store.upgrade_store(renumbered, schema)
+    cas_store.upgrade_store(renumbered, schema)
+    change_analysis.sync(renumbered, rules(RENUMBER))
+
+    assert classed(renumbered, 2) == {"event": (COSMETIC, 0, 0)}

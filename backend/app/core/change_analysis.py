@@ -21,7 +21,8 @@ Three things are derived, all reproducible from the store and the two files:
 
 ``build_transition`` and ``change_transition``
     The field transitions shared by at least two changed items of a build,
-    and the items that have each.
+    and the items that have each; per transition its relevance class and
+    how many of its items no build note explains.
 
 :func:`sync` brings all three in line at the start of an import run and does
 the expensive parts only when a rules file (or the engine) changed;
@@ -54,7 +55,7 @@ from app.core.item_diff import MISC_FIELDS, Transition
 
 # Bump when the diff engine or what is derived from it changes, so stores
 # analysed by the earlier code are analysed again.
-ANALYSIS_VERSION = "1"
+ANALYSIS_VERSION = "2"
 
 # A transition is kept in build_transition when this many items share it.
 MIN_SHARED_ITEMS = 2
@@ -462,26 +463,39 @@ def _sync_notes(
     return by_build
 
 
+def _explaining_note(
+    candidates: Sequence[Tuple[int, Note]], diff: Dict[str, Any]
+) -> Optional[int]:
+    """The id of the first of a build's notes that explains a change."""
+    if not candidates:
+        return None
+    facts = item_diff.transitions(diff, full_text=True)
+    for note_id, note in candidates:
+        if note.explains_change(facts):
+            return note_id
+    return None
+
+
 def analyze(
-    conn: psycopg.Connection, notes: NoteRules, scope: Scope = None
+    conn: psycopg.Connection, rules: ChangeRules, scope: Scope = None
 ) -> Dict[str, int]:
     """Derive the build notes, the note of every change and the shared
     transitions, for every build or the one in ``scope``. Rewrites
     ``build_transition`` for the builds in scope; writes only the note tags
     that differ. Returns counts for the log."""
-    by_build = _sync_notes(conn, notes, scope)
+    by_build = _sync_notes(conn, rules.notes, scope)
     tags: List[Tuple[str, int, int, int]] = []
     counted: Dict[Tuple[str, int], Counted] = defaultdict(dict)
+    # The same count over the changes no note explains.
+    unnoted: Dict[Tuple[str, int], Counted] = defaultdict(dict)
     for (branch, ordinal, aoid), diff in ChangeDiffs(conn, changed_rows(conn, scope)):
-        count_transitions(counted[(branch, ordinal)], aoid, item_diff.transitions(diff))
-        candidates = by_build.get((branch, ordinal))
-        if not candidates:
-            continue
-        facts = item_diff.transitions(diff, full_text=True)
-        for note_id, note in candidates:
-            if note.explains_change(facts):
-                tags.append((branch, ordinal, aoid, note_id))
-                break
+        found = item_diff.transitions(diff)
+        count_transitions(counted[(branch, ordinal)], aoid, found)
+        note_id = _explaining_note(by_build.get((branch, ordinal), ()), diff)
+        if note_id is None:
+            count_transitions(unnoted[(branch, ordinal)], aoid, found)
+        else:
+            tags.append((branch, ordinal, aoid, note_id))
 
     conn.execute(
         "CREATE TEMP TABLE IF NOT EXISTS change_note_tag (branch varchar(20), "
@@ -527,10 +541,14 @@ def analyze(
     ]
     with conn.cursor().copy(
         "COPY build_transition (transition_id, branch, ordinal, part, path, old, "
-        "new, items, occurrences) FROM STDIN"
+        "new, items, occurrences, relevance, unnoted_items, unnoted_occurrences) "
+        "FROM STDIN"
     ) as copy:
         for transition_id, (branch, ordinal, entry) in zip(ids, shared):
             transition, aoids, occurrences = entry
+            unnoted_occurrences, unnoted_aoids = unnoted[(branch, ordinal)].get(
+                transition, (0, ())
+            )
             copy.write_row(
                 (
                     transition_id,
@@ -542,6 +560,13 @@ def analyze(
                     _json_value(transition.new),
                     len(aoids),
                     occurrences,
+                    RELEVANCE_BITS[
+                        rules.relevance.transition_class(
+                            transition.part, transition.path
+                        )
+                    ],
+                    len(unnoted_aoids),
+                    unnoted_occurrences,
                 )
             )
     with conn.cursor().copy(
@@ -559,8 +584,13 @@ def analyze(
 # ---------------------------------------------------------------------------
 
 
-def _analysis_digest(notes: NoteRules) -> str:
-    return hashlib.sha1(f"{ANALYSIS_VERSION}:{notes.digest}".encode()).hexdigest()
+def analysis_digest(rules: ChangeRules) -> str:
+    """What the notes and transitions of a store were derived from: the
+    engine, ``build_notes.toml`` and, for the class of each transition,
+    ``change_relevance.toml``."""
+    return hashlib.sha1(
+        f"{ANALYSIS_VERSION}:{rules.notes.digest}:{rules.relevance.digest}".encode()
+    ).hexdigest()
 
 
 def _set_state(conn: psycopg.Connection, name: str, value: str) -> None:
@@ -578,7 +608,7 @@ def sync(conn: psycopg.Connection, rules: ChangeRules) -> Dict[str, int]:
     Idempotent. The relevance of every change is checked on each call (one
     statement); the per-revision digests are recomputed only when
     ``change_relevance.toml`` changed, and the notes and transitions only
-    when ``build_notes.toml`` or the engine did. Returns what was written.
+    when either file or the engine did. Returns what was written.
     """
     state = dict(conn.execute("SELECT name, value FROM store_state").fetchall())
     done = {
@@ -593,9 +623,9 @@ def sync(conn: psycopg.Connection, rules: ChangeRules) -> Dict[str, int]:
     done["digests"] = ensure_revision_relevance(conn, rules.relevance)
     done["reclassified"] = classify(conn, rules.relevance)
     _set_state(conn, STATE_RELEVANCE, rules.relevance.digest)
-    if state.get(STATE_ANALYSIS) != _analysis_digest(rules.notes):
-        done.update(analyze(conn, rules.notes))
-        _set_state(conn, STATE_ANALYSIS, _analysis_digest(rules.notes))
+    if state.get(STATE_ANALYSIS) != analysis_digest(rules):
+        done.update(analyze(conn, rules))
+        _set_state(conn, STATE_ANALYSIS, analysis_digest(rules))
     return done
 
 
@@ -605,4 +635,4 @@ def analyze_build(
     """Classify, note and count the changes of one build just imported."""
     ensure_revision_relevance(conn, rules.relevance)
     classify(conn, rules.relevance, (branch, ordinal))
-    analyze(conn, rules.notes, (branch, ordinal))
+    analyze(conn, rules, (branch, ordinal))
