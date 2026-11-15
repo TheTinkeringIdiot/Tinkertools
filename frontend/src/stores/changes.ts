@@ -175,16 +175,6 @@ export const useChangesStore = defineStore('changes', () => {
     );
   }
 
-  function peekChangeList(request: {
-    version?: string | null;
-    base?: string | null;
-    query: ChangeListQuery;
-  }): ChangeListResponse | undefined {
-    const build = buildOf(request.version);
-    const base = request.base ? (dataSlug(request.base) ?? request.base) : null;
-    return lists.get(`list|${build}|${base ?? ''}|${queryKey(request.query)}`);
-  }
-
   function loadTransitions(
     request: { version?: string | null; query?: TransitionsQuery },
     channel?: string
@@ -237,7 +227,6 @@ export const useChangesStore = defineStore('changes', () => {
 
   return {
     loadChangeList,
-    peekChangeList,
     loadTransitions,
     loadTimeline,
     loadItemCompare,
