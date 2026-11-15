@@ -932,14 +932,15 @@ def change_analysis_invariants(conn, rules):
 
 
 def misclassified_transitions(conn, rules):
-    """``(part, path, stored relevance)`` of the shared transitions whose
-    class is not what ``change_relevance.toml`` gives their field."""
+    """``(part, path, old, new, stored relevance)`` of the shared transitions
+    whose class is not what ``change_relevance.toml`` gives their field."""
     return [
-        (part, path, stored)
-        for part, path, stored in conn.execute(
-            "SELECT DISTINCT part, path, relevance FROM build_transition"
+        (part, path, old, new, stored)
+        for part, path, old, new, stored in conn.execute(
+            "SELECT DISTINCT part, path, old, new, relevance FROM build_transition"
         )
-        if stored != RELEVANCE_BITS[rules.relevance.transition_class(part, path)]
+        if stored
+        != RELEVANCE_BITS[rules.relevance.transition_class(part, path, old, new)]
     ]
 
 

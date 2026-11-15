@@ -208,6 +208,65 @@ def test_a_requirement_on_another_stat_is_a_removal_and_an_addition():
     ]
 
 
+def test_a_logical_operator_never_becomes_a_requirement():
+    # 14.8.0, item 164512: a list of requirements joined by AND replaced by
+    # one condition on stat 0
+    old = [[274, 4, 24], [112, 851, 2], [0, 0, 4], [158, 851, 2], [0, 0, 4]]
+    new = [[0, 2, 88]]
+
+    assert ops(diff_criteria(old, new)) == [
+        ("removed", [274, 4, 24], None),
+        ("removed", [112, 851, 2], None),
+        ("removed", [0, 0, 4], None),
+        ("removed", [158, 851, 2], None),
+        ("removed", [0, 0, 4], None),
+        ("added", None, [0, 2, 88]),
+    ]
+
+
+def test_a_requirement_on_stat_0_never_becomes_a_logical_operator():
+    assert ops(diff_criteria([[0, 64, 22]], [[0, 0, 4]])) == [
+        ("removed", [0, 64, 22], None),
+        ("added", None, [0, 0, 4]),
+    ]
+
+
+def test_a_logical_operator_replaced_by_another_is_changed_in_place():
+    old = [[112, 50, 2], [54, 10, 2], [0, 0, 4]]
+    new = [[112, 50, 2], [54, 10, 2], [0, 0, 3]]
+
+    assert ops(diff_criteria(old, new))[2:] == [("changed", [0, 0, 4], [0, 0, 3])]
+
+
+def test_a_condition_replaced_by_another_is_changed_in_place():
+    # the same condition with another value; on target (18) to on fighting
+    # target (110), as 189 nanos of 15.0.x
+    assert ops(diff_criteria([[0, 2, 88]], [[0, 3, 88]])) == [
+        ("changed", [0, 2, 88], [0, 3, 88])
+    ]
+    assert ops(diff_criteria([[0, 0, 18]], [[0, 0, 110]])) == [
+        ("changed", [0, 0, 18], [0, 0, 110])
+    ]
+
+
+def test_a_condition_never_becomes_a_requirement_or_a_logical_operator():
+    # all three leave value1 at 0
+    assert ops(diff_criteria([[0, 0, 45]], [[0, 64, 22]])) == [
+        ("removed", [0, 0, 45], None),
+        ("added", None, [0, 64, 22]),
+    ]
+    assert ops(diff_criteria([[0, 0, 45]], [[0, 0, 42]])) == [
+        ("removed", [0, 0, 45], None),
+        ("added", None, [0, 0, 42]),
+    ]
+
+
+def test_a_requirement_whose_operator_changed_is_changed_in_place():
+    assert ops(diff_criteria([[112, 50, 2]], [[112, 50, 1]])) == [
+        ("changed", [112, 50, 2], [112, 50, 1])
+    ]
+
+
 def test_reordered_criteria_show_what_moved_and_keep_the_rest():
     old = [[112, 50, 2], [54, 10, 2], [60, 4, 0]]
     new = [[54, 10, 2], [60, 4, 0], [112, 50, 2]]
@@ -525,6 +584,51 @@ def test_transitions_report_a_renumbered_event_and_whole_actions():
         Transition("actions", "action:3", None, "added"),
         Transition("effects", "event", 14, 0),
     ]
+
+
+def test_transitions_tell_a_removed_action_from_an_added_one():
+    use = [{"action": 3, "criteria": [[54, 10, 2]]}]
+
+    assert transitions(diff_parts(parts(actions=use), parts())) == [
+        Transition("actions", "action:3", "removed", None)
+    ]
+    assert transitions(diff_parts(parts(), parts(actions=use))) == [
+        Transition("actions", "action:3", None, "added")
+    ]
+
+
+def test_transitions_name_the_subject_of_an_effect_on_the_side_it_was_on():
+    stun = effect(53122)  # acts on no stat, skill, nano or item
+    old = parts(effects=[event(14, modify(16, 5), stun)])
+    new = parts(effects=[event(14, effect(53121))])
+
+    assert sorted(transitions(diff_parts(old, new)), key=repr) == sorted(
+        [
+            Transition("effects", "effect:53045", 16, None),
+            Transition("effects", "effect:53122", "none", None),
+            Transition("effects", "effect:53121", None, "none"),
+        ],
+        key=repr,
+    )
+
+
+def test_a_text_transition_keeps_up_to_80_letters_of_difference():
+    def renamed(letters):
+        old = parts(text={"name": "Saw", "description": "A tool."})
+        new = parts(text={"name": "Saw", "description": "A " + "x" * letters})
+        return transitions(diff_parts(old, new))
+
+    assert renamed(80) == [Transition("text", "description", "tool.", "x" * 80)]
+    assert renamed(81) == [Transition("text", "description", None, None)]
+
+
+def test_events_with_the_same_effects_are_renumbered_lowest_numbers_first():
+    old = [event(5, modify(16, 5)), event(6, modify(16, 5))]
+    new = [event(1, modify(16, 5)), event(2, modify(16, 5))]
+
+    assert [
+        (e["old_event"], e["event"], e["change"]) for e in diff_effects(old, new)
+    ] == [(5, 1, "renumbered"), (6, 2, "renumbered")]
 
 
 def test_full_text_transitions_carry_the_whole_texts():

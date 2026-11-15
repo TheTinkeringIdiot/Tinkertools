@@ -211,6 +211,7 @@ def test_timeline_entries_carry_the_field_level_diff_of_each_step(history):
             "relevance": "gameplay",
             "old": 1,
             "new": 9,
+            "housekeeping": False,
             "bits_set": [8],
             "bits_cleared": [],
         }
@@ -324,6 +325,40 @@ def test_change_rows_carry_what_a_list_line_shows(history):
     }
     assert found[SAW]["name"] == "Saw" and found[SAW]["ql"] == 30
     assert rows(changes(history, "three"))[PLIERS]["icon"] == 7
+
+
+def test_a_row_names_the_old_name_and_ql_only_where_they_differ(store):
+    store.add_build(
+        "one",
+        1,
+        items=[
+            item(1, name="Saw", ql=10),
+            item(2, name="Old drill", ql=10),
+            item(3, name="File", ql=10, stats=[(STAT_VALUE, 1)]),
+        ],
+    )
+    store.add_build(
+        "two",
+        2,
+        items=[
+            item(1, name="Saw", ql=20),
+            item(2, name="New drill", ql=10),
+            item(3, name="File", ql=10, stats=[(STAT_VALUE, 2)]),
+        ],
+    )
+
+    found = rows(changes(store, "two"))
+    compared = rows(compare(store, "two", "one"))
+
+    for listed in (found, compared):
+        assert [
+            (row["name"], row["old_name"], row["ql"], row["old_ql"])
+            for row in (listed[1], listed[2], listed[3])
+        ] == [
+            ("Saw", None, 20, 10),
+            ("New drill", "Old drill", 10, None),
+            ("File", None, 10, None),
+        ]
 
 
 def test_change_list_classifies_each_change(history):
@@ -452,6 +487,7 @@ def test_change_list_gives_field_level_diffs_when_asked(history):
             "relevance": "economy",
             "old": 100,
             "new": 250,
+            "housekeeping": False,
             "bits_set": None,
             "bits_cleared": None,
         }
@@ -550,6 +586,62 @@ def test_the_comparison_of_one_item_has_the_diff_a_list_leaves_out(heavy):
     assert len(effects[0]["changed"]) == 100
     assert len(text[0]["new"]) == 70_000
     assert len(timeline_entry["diff"]["effects"][0]["changed"]) == 100
+
+
+def test_a_diff_is_left_out_for_its_effects_above_1000_with_their_criteria(store):
+    """Items 1 and 2 each change one effect among 83 that stay, which have
+    five requirements each: 498 effects and criteria a revision. With the
+    changed effect and its one requirement, the two revisions of item 1 count
+    exactly 1,000; item 2 gains a second requirement, which makes 1,001. The
+    diff itself is one changed effect either way."""
+
+    def revision(aoid, amount, requirements):
+        changed = modify(17, amount)
+        changed["Criteria"] = [criterion(112, n, 2) for n in range(requirements)]
+        same = [guarded(5, 5) for _ in range(83)]
+        return item(aoid, SpellData=wear(*same, changed))
+
+    store.add_build("one", 1, items=[revision(1, 5, 1), revision(2, 5, 1)])
+    store.add_build("two", 2, items=[revision(1, 9, 1), revision(2, 9, 2)])
+
+    for body in (
+        rows(changes(store, "two", include_diff="true")),
+        rows(compare(store, "two", "one", include_diff="true")),
+    ):
+        assert (body[1]["diff_omitted"], body[2]["diff_omitted"]) == (False, True)
+        assert len(body[1]["diff"]["effects"][0]["changed"]) == 1
+        assert body[2]["diff"] is None
+    # asked for by itself, the diff is as small as the other
+    (event,) = compare_item(store, "two", 2, "one")["diff"]["effects"]
+    assert len(event["changed"]) == 1 and not event["added"] and not event["removed"]
+
+
+def diff_bytes(diff):
+    return len(json.dumps(diff, separators=(",", ":")))
+
+
+def test_a_diff_is_left_out_above_65536_bytes_and_not_at_them(store):
+    # what a description of n letters makes of a diff, measured on a first pair
+    store.add_build("one", 1, items=[item(1), item(2), item(9)])
+    store.add_build("two", 2, items=[item(1), item(2), item(9, Description="x" * 10)])
+    probe = rows(changes(store, "two", include_diff="true"))[9]["diff"]
+    letters = 64 * 1024 - (diff_bytes(probe) - 10)
+
+    store.add_build(
+        "three",
+        3,
+        items=[
+            item(1, Description="x" * letters),
+            item(2, Description="x" * (letters + 1)),
+            item(9, Description="x" * 10),
+        ],
+    )
+
+    body = rows(changes(store, "three", include_diff="true"))
+
+    assert (body[1]["diff_omitted"], body[2]["diff_omitted"]) == (False, True)
+    assert diff_bytes(body[1]["diff"]) == 65536
+    assert body[2]["diff"] is None
 
 
 def test_change_list_filters_nanos_professions_and_slots(store):
@@ -669,6 +761,47 @@ def test_note_counts_follow_the_filters(renamed):
 
     assert body["items"] == []
     assert (body["notes"][0]["count"], body["notes"][0]["matching"]) == (2, 1)
+
+
+def test_notes_are_listed_by_the_number_of_changes_they_explain(store):
+    store.add_build(
+        "one",
+        1,
+        items=[
+            item(1, name="Old saw"),
+            item(2, stats=[(STAT_ICON, 1)]),
+            item(3, stats=[(STAT_ICON, 1)]),
+        ],
+    )
+    store.add_build(
+        "two",
+        2,
+        items=[
+            item(1, name="New saw"),
+            item(2, stats=[(STAT_ICON, 2)]),
+            item(3, stats=[(STAT_ICON, 2)]),
+        ],
+    )
+    store.note_changes("""
+[[note]]
+build = "two"
+title = "Tools renamed"
+explains = [{ path = "name", old = "Old .*", new = "New .*" }]
+
+[[note]]
+build = "two"
+title = "New icons"
+explains = [{ path = "stat:79" }]
+""")
+
+    body = changes(store, "two")
+
+    # the note that explains most comes first, not the first of the file
+    assert [(note["title"], note["count"]) for note in body["notes"]] == [
+        ("New icons", 2),
+        ("Tools renamed", 1),
+    ]
+    assert body["notes"][0]["note_id"] > body["notes"][1]["note_id"]
 
 
 def test_a_note_shows_in_the_item_timeline(renamed):
@@ -968,6 +1101,17 @@ def test_item_compare_of_an_item_only_one_build_has(history):
     assert added["relevance"] == removed["relevance"] == ["gameplay"]
 
 
+def test_item_compare_of_an_item_whose_event_was_only_renumbered_is_cosmetic(store):
+    store.add_build("one", 1, items=[item(1, SpellData=wear(modify(16, 5)))])
+    store.add_build("two", 2, items=[item(1, SpellData=wear(modify(16, 5), event=0))])
+
+    body = compare_item(store, "two", 1, "one")
+
+    assert (body["kind"], body["parts"]) == ("changed", ["effects"])
+    assert body["relevance"] == ["cosmetic"]
+    assert rows(changes(store, "two"))[1]["relevance"] == ["cosmetic"]
+
+
 def test_item_compare_across_the_fork(history):
     body = compare_item(history, "fork", HAMMER, "three")
 
@@ -1067,6 +1211,124 @@ def test_transitions_filter_by_part_and_size(procs):
     assert paths(part="stats") == ["stat:287"]
     assert paths(min_items=3) == ["effect:53089:spell_params.Chance"]
     assert paths(limit=1) == ["effect:53089:spell_params.Chance"]
+
+
+def test_a_flag_line_names_its_stat_and_bit(store):
+    store.add_build(
+        "one", 1, items=[item(1, stats=[(STAT_CAN, 1)]), item(2, stats=[(STAT_CAN, 1)])]
+    )
+    store.add_build(
+        "two", 2, items=[item(1, stats=[(STAT_CAN, 9)]), item(2, stats=[(STAT_CAN, 9)])]
+    )
+
+    (line,) = get(store, "two", "/changes/transitions")["transitions"]
+
+    assert (line["path"], line["old"], line["new"]) == ("stat:30:bit:8", 0, 1)
+    assert (line["stat"], line["bit"], line["items"]) == (STAT_CAN, 8, 2)
+
+
+@pytest.fixture
+def housekept(store):
+    """Build two gives items 1 and 2 a Use event, writes Value 0 out on
+    items 3 and 4, and takes items 5 and 6 from Value 0 to Value 3."""
+    worn, used = wear(modify(16, 5)), wear(modify(17, 5), event=5)
+    store.add_build(
+        "one",
+        1,
+        items=[
+            item(1, SpellData=worn),
+            item(2, SpellData=worn),
+            item(3),
+            item(4),
+            item(5, stats=[(STAT_VALUE, 0)]),
+            item(6, stats=[(STAT_VALUE, 0)]),
+        ],
+    )
+    store.add_build(
+        "two",
+        2,
+        items=[
+            item(1, SpellData=worn + used),
+            item(2, SpellData=worn + used),
+            item(3, stats=[(STAT_VALUE, 0)]),
+            item(4, stats=[(STAT_VALUE, 0)]),
+            item(5, stats=[(STAT_VALUE, 3)]),
+            item(6, stats=[(STAT_VALUE, 3)]),
+        ],
+    )
+    return store
+
+
+def test_an_added_event_is_a_gameplay_line_and_a_housekeeping_value_a_cosmetic_one(
+    housekept,
+):
+    def found(**params):
+        body = get(housekept, "two", "/changes/transitions", **params)
+        return {
+            (line["path"], line["old"], line["new"]): line["relevance"]
+            for line in body["transitions"]
+        }
+
+    assert found() == {
+        ("event:5", None, "added"): "gameplay",
+        ("effect:53045", None, 17): "gameplay",
+        ("stat:74", 0, 3): "economy",
+    }
+    assert found(relevance="cosmetic") == {("stat:74", None, 0): "cosmetic"}
+
+
+@pytest.mark.parametrize("relevance", ["gameplay", "economy", "cosmetic", "text"])
+def test_a_line_leads_to_its_items_under_the_relevance_filter_that_lists_it(
+    housekept, relevance
+):
+    body = get(housekept, "two", "/changes/transitions", relevance=relevance)
+    assert (
+        len(body["transitions"])
+        == {
+            "gameplay": 2,
+            "economy": 1,
+            "cosmetic": 1,
+            "text": 0,
+        }[relevance]
+    )
+
+    for line in body["transitions"]:
+        listed = changes(
+            housekept,
+            "two",
+            relevance=relevance,
+            transition=line["path"],
+            transition_old=json.dumps(line["old"]),
+            transition_new=json.dumps(line["new"]),
+        )
+        assert listed["total"] == line["items"] == 2, line
+
+
+def test_a_housekeeping_value_is_a_cosmetic_entry_of_a_diff(housekept):
+    found = rows(changes(housekept, "two", include_diff="true"))
+    compared = rows(compare(housekept, "two", "one", include_diff="true"))
+
+    assert found[3]["relevance"] == compared[3]["relevance"] == ["cosmetic"]
+    assert found[3]["diff"]["stats"] == [
+        {
+            "stat": STAT_VALUE,
+            "change": "added",
+            "relevance": "cosmetic",
+            "old": None,
+            "new": 0,
+            "housekeeping": True,
+            "bits_set": None,
+            "bits_cleared": None,
+        }
+    ]
+    # the value that says nothing went, and one that says something came
+    assert found[5]["relevance"] == compared[5]["relevance"] == ["economy", "cosmetic"]
+    (entry,) = found[5]["diff"]["stats"]
+    assert (entry["relevance"], entry["housekeeping"]) == ("economy", True)
+    assert compare_item(housekept, "two", 5, "one")["relevance"] == [
+        "economy",
+        "cosmetic",
+    ]
 
 
 def test_a_build_with_no_shared_transition_lists_none(procs):
@@ -1296,6 +1558,29 @@ def test_start_up_says_nothing_about_a_store_that_is_current(
         comparison.preload()
 
     assert [r for r in caplog.records if r.levelno >= logging.WARNING] == []
+
+
+def test_the_facts_of_a_store_are_read_a_chunk_of_revisions_a_row(history, monkeypatch):
+    """One row a revision is 264,000 rows of fifteen values for the real
+    store, which took a server through 1.7 GB when it started."""
+    read = []
+    unpacked = comparison._unpacked
+
+    def recording(packed, typecode="i"):
+        values = unpacked(packed, typecode)
+        read.append(len(values))
+        return values
+
+    monkeypatch.setattr(comparison, "_FACTS_CHUNK", 4)
+    monkeypatch.setattr(comparison, "_unpacked", recording)
+
+    columns = comparison._revisions_after(history.db, 0)
+
+    revisions = len(columns[0])
+    rows = len(read) // len(columns)
+    assert revisions >= 8 and sorted(columns[0]) == sorted(set(columns[0]))
+    assert max(read) == 4
+    assert rows <= revisions // 4 + 1
 
 
 # ---------------------------------------------------------------------------
@@ -1539,6 +1824,39 @@ def test_a_transition_filter_reads_the_lines_of_its_own_build_only(ranges):
 
     assert found("two") == ([1, 2], 2)
     # items 1 and 2 changed in build three as well, but not in range
+    assert found("three") == ([5, 6], 2)
+
+
+def test_a_transition_filter_reads_the_lines_of_its_own_branch_only(ranges):
+    # a fork whose first build has the ordinal of build three and raises the
+    # range of items 1 and 2, which build three changes too, but in name
+    ranges.add_build(
+        "fork",
+        3,
+        branch="prk",
+        parent_slug="one",
+        items=[
+            item(1, stats=[(287, 20)]),
+            item(2, stats=[(287, 20)]),
+            item(3),
+            item(4),
+            item(5, stats=[(287, 15)]),
+            item(6, stats=[(287, 15)]),
+        ],
+    )
+
+    def found(slug):
+        body = changes(
+            ranges,
+            slug,
+            sort="aoid",
+            transition="stat:287",
+            transition_old="15",
+            transition_new="20",
+        )
+        return aoids(body), body["total"]
+
+    assert found("fork") == ([1, 2], 2)
     assert found("three") == ([5, 6], 2)
 
 

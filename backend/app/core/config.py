@@ -17,7 +17,9 @@ class Settings(BaseSettings):
     # PostgreSQL schema of the content-addressed store the API reads.
     CAS_SCHEMA: str = "cas"
     # Most memory the response cache may hold, in bytes (app/core/cache.py).
-    # 0 turns the cache off.
+    # 0 turns the cache off. The process takes more than this: its size when
+    # ready (130 MB) plus up to 150 MB that building responses leaves with the
+    # allocator, 550 MB in all with the default (measured, see cache.py).
     RESPONSE_CACHE_MAX_BYTES: int = 256 * 1024 * 1024
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")

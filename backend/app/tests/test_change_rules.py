@@ -8,13 +8,15 @@ import pytest
 
 from app.core.change_rules import (
     RulesError,
+    diff_relevance,
     parse_notes,
     parse_relevance,
     read_rules,
     relevance_mask,
     relevance_names,
+    with_relevance,
 )
-from app.core.item_diff import Transition
+from app.core.item_diff import Transition, diff_parts
 
 RELEVANCE = """
 default = "gameplay"
@@ -25,6 +27,8 @@ removed = "gameplay"
 actions = "gameplay"
 attack_defense = "gameplay"
 event = "cosmetic"
+event_added = "gameplay"
+event_removed = "gameplay"
 static_instance = "cosmetic"
 animation_mesh = "cosmetic"
 shop = "economy"
@@ -94,6 +98,119 @@ def test_relevance_digest_follows_the_file():
 def test_a_relevance_file_that_cannot_be_used_is_refused(broken, message):
     with pytest.raises(RulesError, match=message):
         parse_relevance(broken)
+
+
+HOUSEKEEPING = RELEVANCE + """
+[housekeeping]
+74 = 0
+6 = 15
+"""
+
+
+def test_a_housekeeping_value_is_cosmetic_and_any_other_value_is_the_stats_class():
+    rules = parse_relevance(HOUSEKEEPING)
+
+    assert rules.value_class(74, 0) == "cosmetic"
+    assert rules.value_class(74, 1) == "economy"
+    assert rules.value_class(6, 15) == "cosmetic"
+    assert rules.value_class(6, 0) == rules.value_class(30, 0) == "gameplay"
+    # added or removed with the value; a change from or to it is the stat's
+    assert rules.stat_change_class(74, None, 0) == "cosmetic"
+    assert rules.stat_change_class(74, 0, None) == "cosmetic"
+    assert rules.stat_change_class(74, None, 5) == "economy"
+    assert rules.stat_change_class(74, 0, 5) == "economy"
+    assert rules.stat_change_class(74, 56, 1) == "economy"
+    assert rules.stat_change_class(30, None, 0) == "gameplay"
+
+
+def test_a_file_without_housekeeping_values_has_none():
+    rules = parse_relevance(RELEVANCE)
+
+    assert rules.housekeeping == {}
+    assert rules.stat_change_class(74, None, 0) == "economy"
+
+
+@pytest.mark.parametrize(
+    "entry, message",
+    [
+        ('74 = "Value"', "not the one value"),
+        ("74 = [0, 1]", "not the one value"),
+        ("74 = true", "not the one value"),
+        ("value = 0", "not a numeric id"),
+    ],
+)
+def test_a_housekeeping_entry_is_one_stat_and_one_value(entry, message):
+    with pytest.raises(RulesError, match=message):
+        parse_relevance(RELEVANCE + "\n[housekeeping]\n" + entry)
+
+
+def test_a_line_has_the_class_of_its_field_and_values():
+    rules = parse_relevance(HOUSEKEEPING)
+
+    def line(part, path, old=None, new=None):
+        return rules.transition_class(part, path, old, new)
+
+    assert line("text", "name", "a", "b") == "text"
+    assert line("stats", "stat:74", 5, 9) == "economy"
+    assert line("stats", "stat:74", None, 0) == "cosmetic"
+    assert line("stats", "stat:74", 0, 3) == "economy"
+    assert line("stats", "stat:30:bit:8", 0, 1) == "gameplay"
+    assert line("atkdef", "attack:100", 1, 2) == "gameplay"
+    assert line("actions", "action:3", None, "added") == "gameplay"
+    assert line("effects", "effect:53057", None, "none") == "cosmetic"
+    assert line("effects", "effect:53045:target", 2, 3) == "gameplay"
+    assert line("effects", "event", 14, 0) == "cosmetic"
+    assert line("effects", "event:14", None, "added") == "gameplay"
+    assert line("effects", "event:14", "removed", None) == "gameplay"
+    assert line("misc", "shop") == "economy"
+
+    def edited(old, new):
+        return parse_relevance(HOUSEKEEPING.replace(old, new))
+
+    added = edited('event_added = "gameplay"', 'event_added = "economy"')
+    removed = edited('event_removed = "gameplay"', 'event_removed = "economy"')
+    assert added.transition_class("effects", "event:1", None, "added") == "economy"
+    assert added.transition_class("effects", "event:1", "removed", None) == "gameplay"
+    assert removed.transition_class("effects", "event:1", "removed", None) == "economy"
+    assert removed.transition_class("effects", "event:1", None, "added") == "gameplay"
+
+
+def test_diff_entries_say_when_a_housekeeping_value_comes_or_goes():
+    rules = parse_relevance(HOUSEKEEPING)
+    diff = diff_parts(
+        {"stats": [[74, 0], [79, 1], [30, 1]]},
+        {"stats": [[74, 7], [6, 15], [79, 2], [30, 3]]},
+    )
+
+    tagged = with_relevance(diff, rules)
+
+    assert {
+        c["stat"]: (c["relevance"], c["housekeeping"]) for c in tagged["stats"]
+    } == {
+        6: ("cosmetic", True),  # written out with the constant
+        30: ("gameplay", False),
+        74: ("economy", True),  # the constant went and a value came
+        79: ("cosmetic", False),
+    }
+
+
+@pytest.mark.parametrize(
+    "old, new, expected",
+    [
+        ([], [[6, 15]], ["cosmetic"]),
+        ([[74, 0]], [], ["cosmetic"]),
+        ([[74, 0]], [[74, 7]], ["economy", "cosmetic"]),
+        ([[74, 5]], [[74, 7]], ["economy"]),
+        ([], [[74, 7]], ["economy"]),
+    ],
+)
+def test_the_relevance_of_a_diff_counts_a_housekeeping_value_as_cosmetic(
+    old, new, expected
+):
+    rules = parse_relevance(HOUSEKEEPING)
+    tagged = with_relevance(diff_parts({"stats": old}, {"stats": new}), rules)
+
+    assert relevance_names(diff_relevance(tagged)) == expected
 
 
 def test_relevance_masks_and_names():
@@ -203,6 +320,42 @@ def test_pattern_values_match_exactly_and_paths_by_wildcard():
         not parse_notes(NOTES)
         .notes[0]
         .explains_change([Transition("effects", "event", 14, 2)])
+    )
+
+
+def test_a_text_pattern_must_match_the_whole_text():
+    renamed = parse_notes("""
+[[note]]
+build = "b"
+title = "Renamed"
+explains = [{ path = "name", old = "Old .*", new = ".* tool" }]
+""").notes[0]
+
+    assert renamed.explains_change([Transition("text", "name", "Old saw", "A tool")])
+    # the pattern occurs in the text, but is not all of it
+    assert not renamed.explains_change(
+        [Transition("text", "name", "Very Old saw", "A tool")]
+    )
+    assert not renamed.explains_change(
+        [Transition("text", "name", "Old saw", "A tool, new")]
+    )
+
+
+def test_the_live_retargeting_note_is_the_one_uniform_event():
+    (note,) = read_rules().notes.of_build("ao-18-8-62-ep1")
+    event = Transition("effects", "effect:53045:target", 2, 3)
+
+    assert note.explains_change([event, event])
+    # any other retargeting is a change of its own
+    for other in (
+        Transition("effects", "effect:53045:target", 3, 2),
+        Transition("effects", "effect:53045:target", 2, 1),
+        Transition("effects", "effect:53002:target", 2, 3),
+    ):
+        assert not note.explains_change([other])
+        assert not note.explains_change([event, other])
+    assert not note.explains_change(
+        [event, Transition("effects", "effect:53045:spell_params.Amount", 5, 6)]
     )
 
 

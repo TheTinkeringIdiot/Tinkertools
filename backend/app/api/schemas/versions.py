@@ -69,7 +69,12 @@ class ItemRevisionBatchEntry(BaseModel):
 
     aoid: int = Field(description="Item AOID")
     revision_count: int = Field(
-        description="Number of change points across all versions"
+        description="Entries of the item's timeline for the request's version "
+        "(GET /items/{aoid}/timeline): the builds of the version's lineage in "
+        "which the item was added, changed or removed"
+    )
+    change_count: int = Field(
+        0, description="Of those entries, the ones of kind 'changed'"
     )
     latest_change_slug: Optional[str] = Field(
         None,

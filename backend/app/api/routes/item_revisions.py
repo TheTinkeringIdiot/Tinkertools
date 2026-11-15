@@ -1,25 +1,30 @@
 """
 Cross-version item change summary (the "changed in" badge of list rows).
 
-The store keeps, per branch, the runs of consecutive builds in which an item
-has one content (``item_presence``). Walking the builds along their lineage
-and comparing each build's content of the item with the nearest earlier build
-that has the item yields the builds at which its definition changed.
+Two things are answered per item, for the version of the request.
+
+``revision_count`` and ``change_count`` count the entries of the item's
+timeline (``GET /items/{aoid}/timeline``, ``app/api/routes/changes.py``) for
+the same version: every build of the version's lineage in which the item was
+added, changed or removed, and those in which it was changed. They are read
+from the change log by the query the timeline uses
+(``app.store.changes.timeline_counts``), so the badge of a row and the
+timeline it opens agree.
+
+``latest_change_slug`` and ``present_in_current`` say which build the
+definition the viewer sees comes from. The store keeps, per branch, the runs
+of consecutive builds in which an item has one content (``item_presence``).
+Walking the enabled builds along their lineage and comparing each build's
+content of the item with the nearest earlier build that has the item yields
+the builds at which its definition changed; the nearest of them on the
+ancestry of the request's version is ``latest_change_slug``. For this, a
+change is one of the stats part, the attack/defense part, the animation mesh,
+the effects part, the actions part or the text part: a build in which only the
+shop data or the static instance id differs did not change the definition,
+though the timeline lists it.
 
 The lineage of a build is the builds of its branch before it, in ordinal
 order, continued at the branch's parent build (PRK forks from AO 17.10.5).
-
-The endpoint answers for every enabled build at once: the version segment in
-the URL does not change the builds considered, only which one counts as
-"current" for ``latest_change_slug`` and ``present_in_current``.
-
-What counts as a change: the stats part, the attack/defense part, the
-animation mesh, the effects part, the actions part and the text part. A build
-in which only something else differs (the shop data or the static instance id
-of the misc part) is not a change point.
-
-The full history of one item, with removals, relevance and diffs, is the
-timeline (``app/api/routes/changes.py``).
 """
 
 from __future__ import annotations
@@ -38,6 +43,7 @@ from app.api.schemas.versions import (
     ItemRevisionsBatchResponse,
 )
 from app.store import tables as t
+from app.store.changes import load_build_index, timeline_counts
 from app.store.context import Build, get_build, get_store
 from app.store.presence import any_of
 
@@ -270,13 +276,16 @@ def get_item_revisions_batch(
     aoids = list(dict.fromkeys(payload.aoids))
     lineage = load_lineage(db)
     runs = load_runs(db, aoids)
+    counts = timeline_counts(db, load_build_index(db), build.branch, aoids)
 
     items: Dict[int, ItemRevisionBatchEntry] = {}
     for aoid in aoids:
         history = compute_history(lineage, runs.get(aoid, {}))
+        entries, changed = counts.get(aoid, (0, 0))
         items[aoid] = ItemRevisionBatchEntry(
             aoid=aoid,
-            revision_count=len(history.points),
+            revision_count=entries,
+            change_count=changed,
             latest_change_slug=_latest_change_slug(lineage, history.points, build.slug),
             present_in_current=build.slug in history.present,
         )

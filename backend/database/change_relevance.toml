@@ -26,9 +26,32 @@ removed = "gameplay"          # an item that disappears
 actions = "gameplay"          # any action or requirement
 attack_defense = "gameplay"   # attack and defense skills
 event = "cosmetic"            # effects moved to another event number, nothing else
+event_added = "gameplay"      # patch-note line: an event added with its effects
+event_removed = "gameplay"    # patch-note line: an event removed with its effects
 static_instance = "cosmetic"  # stat 23, the client's row id
 animation_mesh = "cosmetic"
 shop = "economy"              # shop inventory data
+
+# Housekeeping values, as `stat = value`: the constant with which the client
+# data writes a stat out, or drops it, on items of every kind at once without
+# anything changing for a player. A stat that is added or removed with that
+# value is a cosmetic change; any other value of the stat, and a change from
+# or to another value (ItemClass 2 -> 4, Value 0 -> 1), keeps the class the
+# stat has below. A stat qualifies when the store shows it added or removed
+# with that one constant on hundreds of unrelated items and (nearly) never
+# with another value.
+[housekeeping]
+3 = 15     # AttackSpeed
+4 = 15     # Breed
+5 = 15     # Organization
+6 = 15     # Team
+7 = 15     # State
+30 = 0     # Can: no flags set
+74 = 0     # Value
+76 = 0     # ItemClass
+101 = 0    # MultiMelee
+134 = 0    # MultiRanged
+298 = 0    # Slot: no flags set
 
 [stats.gameplay]
 0 = "None"

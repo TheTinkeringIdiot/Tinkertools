@@ -56,7 +56,7 @@ from app.core.item_diff import MISC_FIELDS, Transition
 
 # Bump when the diff engine or what is derived from it changes, so stores
 # analysed by the earlier code are analysed again.
-ANALYSIS_VERSION = "3"
+ANALYSIS_VERSION = "4"
 
 # A transition is kept in build_transition when this many items share it.
 MIN_SHARED_ITEMS = 2
@@ -116,10 +116,11 @@ def _slices(members: Dict[str, List[Any]]) -> Slices:
 
 
 def stats_slices(rules: RelevanceRules, doc: Optional[Sequence[Sequence[int]]]):
-    """Per class, a digest of the stats of that class."""
+    """Per class, a digest of the stats of that class; a stat that holds its
+    housekeeping value counts under the class of that value."""
     members: Dict[str, List[Any]] = defaultdict(list)
     for stat, value in doc or ():
-        members[rules.stat_class(stat)].append((stat, value))
+        members[rules.value_class(stat, value)].append((stat, value))
     return _slices(members)
 
 
@@ -575,11 +576,7 @@ def analyze(
                     _json_value(transition.new),
                     len(aoids),
                     occurrences,
-                    RELEVANCE_BITS[
-                        rules.relevance.transition_class(
-                            transition.part, transition.path
-                        )
-                    ],
+                    RELEVANCE_BITS[rules.relevance.transition_class(*transition)],
                     len(unnoted_aoids),
                     unnoted_occurrences,
                     len(unexplained[(branch, ordinal)].get(transition, (0, ()))[1]),

@@ -18,7 +18,11 @@ knowingly, until a maintainer decides.
 The relevance of a change from one revision to another is then:
 
 * ``text`` when the name or description differs;
-* the class of every stat whose values differ;
+* the class of every stat whose values differ; a housekeeping value of
+  the stat (``[housekeeping]``, below) is ``cosmetic`` instead, so a stat
+  that comes or goes with that value is a cosmetic change, and one that goes
+  from that value to another is a change of the stat's class and a cosmetic
+  one;
 * the class of every effect type of which the two revisions do not hold the
   same effects, wherever in the item (which event) they are;
 * the class of ``event`` when the effects differ in nothing but the events
@@ -29,6 +33,18 @@ The relevance of a change from one revision to another is then:
   (``static_instance``, ``animation_mesh``, ``shop``);
 * for an item that was added or removed, the class of ``added`` or
   ``removed``.
+
+``[housekeeping]`` lists, as ``stat = value``, the constant with which the
+client data writes a stat out or drops it without anything changing for a
+player: ``76 = 0`` says that ItemClass 0 is as good as no ItemClass. Only that
+value is housekeeping; ItemClass 2 -> 4 keeps the class of the stat.
+
+Patch-note lines (``build_transition``) take the class of their field
+(:meth:`RelevanceRules.transition_class`), by the same rules. Two of them
+have no counterpart above: the line of an event that was added or removed
+with its effects takes the class of ``event_added`` or ``event_removed``
+(the items are classified by the effects that came or went), and the line of
+a renumbering that of ``event``.
 
 ``build_notes.toml``: build notes
 =================================
@@ -95,7 +111,17 @@ RELEVANCE_BITS = {
 CLASSES = ("gameplay", "economy", "cosmetic")
 UNCLASSIFIED = "unclassified"
 # Changes classified as a whole, the keys of ``[changes]``.
-WHOLE_CHANGES = ("added", "removed", "actions", "attack_defense", "event") + MISC_FIELDS
+WHOLE_CHANGES = (
+    "added",
+    "removed",
+    "actions",
+    "attack_defense",
+    "event",
+    "event_added",
+    "event_removed",
+) + MISC_FIELDS
+# The class of a housekeeping value.
+HOUSEKEEPING = "cosmetic"
 
 ABSENT = "absent"
 
@@ -131,10 +157,32 @@ class RelevanceRules:
     unclassified_stats: FrozenSet[int]
     unclassified_effects: FrozenSet[int]
     changes: Mapping[str, str]
+    housekeeping: Mapping[int, int]
     digest: str
 
     def stat_class(self, stat: int) -> str:
         return self.stats.get(stat, self.default)
+
+    def is_housekeeping(self, stat: int, value: Optional[int]) -> bool:
+        """Whether ``value`` is the housekeeping value of ``stat``."""
+        return value is not None and self.housekeeping.get(stat) == value
+
+    def value_class(self, stat: int, value: int) -> str:
+        """The class of a stat holding ``value``."""
+        if self.is_housekeeping(stat, value):
+            return HOUSEKEEPING
+        return self.stat_class(stat)
+
+    def stat_change_class(
+        self, stat: int, old: Optional[int], new: Optional[int]
+    ) -> str:
+        """The class of a stat going from ``old`` to ``new`` (None: absent):
+        that of the stat, unless all that happened is that its housekeeping
+        value came or went."""
+        values = [value for value in (old, new) if value is not None]
+        if values and all(self.is_housekeeping(stat, value) for value in values):
+            return HOUSEKEEPING
+        return self.stat_class(stat)
 
     def effect_class(self, spell_id: int) -> str:
         return self.effects.get(spell_id, self.default)
@@ -143,14 +191,18 @@ class RelevanceRules:
         """The relevance bit of a change classified as a whole."""
         return RELEVANCE_BITS[self.changes[change]]
 
-    def transition_class(self, part: str, path: str) -> str:
+    def transition_class(self, part: str, path: str, old: Any, new: Any) -> str:
         """The class of one field transition
-        (``app.core.item_diff.transitions``): what the line "this field
-        changed on N items" matters for, whatever else those items changed."""
+        (``app.core.item_diff.transitions``): what the line "this field went
+        from ``old`` to ``new`` on N items" matters for, whatever else those
+        items changed."""
         if part == "text":
             return "text"
         if part == "stats":
-            return self.stat_class(int(path.split(":")[1]))
+            _, stat, *bit = path.split(":")
+            if bit:
+                return self.stat_class(int(stat))
+            return self.stat_change_class(int(stat), old, new)
         if part == "atkdef":
             return self.changes["attack_defense"]
         if part == "actions":
@@ -158,7 +210,9 @@ class RelevanceRules:
         if part == "effects":
             head, _, rest = path.partition(":")
             if head == "event":
-                return self.changes["event"]
+                if not rest:
+                    return self.changes["event"]
+                return self.changes["event_added" if old is None else "event_removed"]
             return self.effect_class(int(rest.partition(":")[0]))
         return self.changes[path]
 
@@ -196,6 +250,24 @@ def _ids_by_class(section: Any, where: str) -> Tuple[Dict[int, str], FrozenSet[i
     return classified, frozenset(unclassified)
 
 
+def _housekeeping(section: Any) -> Dict[int, int]:
+    if section is None:
+        return {}
+    if not isinstance(section, dict):
+        raise RulesError("[housekeeping] is not a table")
+    values: Dict[int, int] = {}
+    for key, value in section.items():
+        if not key.isdigit():
+            raise RulesError(f"[housekeeping]: {key!r} is not a numeric id")
+        if type(value) is not int:
+            raise RulesError(
+                f"[housekeeping] {key}: {value!r} is not the one value of the "
+                "stat that is housekeeping"
+            )
+        values[int(key)] = value
+    return values
+
+
 def parse_relevance(text: str) -> RelevanceRules:
     try:
         data = tomllib.loads(text)
@@ -222,6 +294,7 @@ def parse_relevance(text: str) -> RelevanceRules:
             name: _class_of(value, f"[changes] {name}")
             for name, value in changes.items()
         },
+        housekeeping=_housekeeping(data.get("housekeeping")),
         digest=hashlib.sha1(text.encode("utf-8")).hexdigest(),
     )
 
@@ -230,6 +303,12 @@ def with_relevance(diff: Dict[str, Any], rules: RelevanceRules) -> Dict[str, Any
     """A diff of ``app.core.item_diff.diff_parts`` with the relevance class
     of every entry, as ``relevance``: what the entry adds to the relevance of
     the whole change, which is the union of its entries' classes.
+
+    A stat entry in which the stat's housekeeping value comes or goes says
+    so (``housekeeping``): that much of it is cosmetic. When that is all the
+    entry is (the stat added or removed with that value), ``relevance`` is
+    cosmetic; when the stat went from the housekeeping value to another, or
+    back, ``relevance`` is the class of the stat and the entry adds both.
 
     Effects follow the rule of the module docstring: an effect counts under
     the class of its type when the two revisions do not hold it equally
@@ -263,10 +342,19 @@ def with_relevance(diff: Dict[str, Any], rules: RelevanceRules) -> Dict[str, Any
             for entry in entries
         ]
 
+    def of_stat(change: Dict[str, Any]) -> Dict[str, Any]:
+        stat, old, new = change["stat"], change["old"], change["new"]
+        return {
+            **change,
+            "relevance": rules.stat_change_class(stat, old, new),
+            "housekeeping": rules.is_housekeeping(stat, old)
+            or rules.is_housekeeping(stat, new),
+        }
+
     whole = rules.changes
     return {
         "text": tagged(diff["text"], "text"),
-        "stats": tagged(diff["stats"], lambda c: rules.stat_class(c["stat"])),
+        "stats": [of_stat(change) for change in diff["stats"]],
         "actions": tagged(diff["actions"], whole["actions"]),
         "attack": tagged(diff["attack"], whole["attack_defense"]),
         "defense": tagged(diff["defense"], whole["attack_defense"]),
@@ -293,6 +381,8 @@ def diff_relevance(diff: Dict[str, Any]) -> int:
     for part, entries in diff.items():
         for entry in entries:
             names.add(entry["relevance"])
+            if entry.get("housekeeping"):
+                names.add(HOUSEKEEPING)
             if part == "effects":
                 for effects in (entry["added"], entry["removed"], entry["changed"]):
                     names.update(effect["relevance"] for effect in effects)

@@ -67,6 +67,14 @@ class StatChange(BaseModel):
     )
     old: Optional[int] = Field(None, description="Value before; null when added")
     new: Optional[int] = Field(None, description="Value after; null when removed")
+    housekeeping: bool = Field(
+        False,
+        description="Stats only: the old or the new value is the stat's "
+        "housekeeping value (change_relevance.toml: ItemClass 0, Team 15), "
+        "whose coming or going is cosmetic. With relevance 'cosmetic' that is "
+        "all the entry is; with another relevance the stat also took or lost "
+        "a real value",
+    )
     bits_set: Optional[List[int]] = Field(
         None,
         description="Flag stats only (0, 30, 182, 298, 355, 389): the flag values "
