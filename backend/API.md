@@ -509,7 +509,9 @@ What changed on an item, in a build, or between any two builds. The version segm
 
 - `kind`: `added`, `removed`, `changed`
 - `parts` (what differs): `text`, `stats`, `effects`, `actions`, `atkdef`, `misc`
-- `relevance` (what the change matters for): `gameplay`, `economy`, `cosmetic`, `text`. It follows from `backend/database/change_relevance.toml`; an added or removed item is `gameplay`.
+- `relevance` (what the change matters for): `gameplay`, `economy`, `cosmetic`, `text`. It follows from `backend/database/change_relevance.toml`; an added or removed item is `gameplay`. A stat that is added or removed with its housekeeping value (`[housekeeping]` in that file: Value 0, ItemClass 0, Team 15, ...) is `cosmetic`; any other value of the stat keeps the stat's class.
+
+Diffs compare the client's raw data, build against build. A value that the item pages show from curated data instead (the strain of a nano, from the curated nano CSV) can therefore differ from what a diff shows for the same item: the diff shows what the client data of the two builds held.
 
 A build is named in responses as `{"slug", "display_name", "family", "client_build", "snapshot_date"}`.
 
@@ -564,7 +566,7 @@ The change list of the request's build: every item added, removed or changed rel
 ```
 - A row is listed by its newer revision (the older one for a removed item); `old_name` and `old_ql` are set only when they differ. `icon` is stat 79.
 - `summary` counts every change of the build, whatever the filters. `base` is null for a build with nothing before it.
-- `diff_omitted` is true only when the diff was asked for (`include_diff=true`) and is too much for a row of a page: the effects of the two revisions, with their criteria, number more than 1,000, or the diff is more than 64 KB of JSON. In the change log of all 147 builds that is 11 of 127,374 changed items (five vehicle nanos of 17.7.0 at 186 KB each, six shop inventories). The row is otherwise complete; ask for the diff with `GET /items/{aoid}/compare/{base}`, using the `slug` of the response's `base`. Rows without a diff to give (`include_diff=false`, added and removed items) have `diff_omitted: false`.
+- `diff_omitted` is true only when the diff was asked for (`include_diff=true`) and is too much for a row of a page: the effects of the two revisions, with their criteria, number more than 1,000, or the diff is more than 64 KB of JSON. The change log of all 147 builds has 129,630 changed entries, which compare 127,374 distinct pairs of revisions; 11 of those pairs are left out (five vehicle nanos of 17.7.0 at 186 KB each, six shop inventories). The row is otherwise complete; ask for the diff with `GET /items/{aoid}/compare/{base}`, using the `slug` of the response's `base`. Rows without a diff to give (`include_diff=false`, added and removed items) have `diff_omitted: false`.
 - **Build notes** are build-wide events that explain many changes at once (`backend/database/build_notes.toml`). A change carries a `note_id` only when the note explains all of it. By default such changes are collapsed: left out of `items` and `total`, and counted per note in `notes` (`count`: changes the note explains; `matching`: those that match the request's filters). `notes=expand` lists them with the rest; `note_id=N` lists only that note's.
 
 #### GET /api/v1/compare/{base}
@@ -575,7 +577,7 @@ The field transitions that most changed items of the request's build share, most
 
 **Query Parameters:**
 - `part` (repeatable): only transitions of these parts
-- `relevance` (repeatable: `gameplay` | `economy` | `cosmetic` | `text`; default `gameplay`, `economy` and `text`): only transitions of fields that matter for one of these. The class is that of the field itself (the stat, the effect type, the part), whatever else the items changed: an icon or `static_instance` line is `cosmetic` even on items that changed in gameplay too. Unlike on `GET /changes`, leaving the parameter out does filter: name all four classes to list cosmetic lines as well.
+- `relevance` (repeatable: `gameplay` | `economy` | `cosmetic` | `text`; default `gameplay`, `economy` and `text`): only transitions of fields that matter for one of these. The class is that of the field itself (the stat, the effect type, the part), whatever else the items changed: an icon or `static_instance` line is `cosmetic` even on items that changed in gameplay too. Three kinds of line depend on their values: a stat added or removed with its housekeeping value is `cosmetic` (`stat:74` null -> 0) while the same stat with other values has its own class (`stat:74` 56 -> 1 is `economy`); an event added or removed with its effects (`event:<id>`) is `gameplay`; a renumbering (`event`) is `cosmetic`. Unlike on `GET /changes`, leaving the parameter out does filter: name all four classes to list cosmetic lines as well.
 - `notes` (`collapse` | `expand`, default `collapse`): with `collapse` the patch notes leave out what a build note already says. `items` and `occurrences` count only the changes no build note explains, and a transition is left out when the build's notes account for it: when fewer than `min_items` of those changes have it outside the event of a note. A note accounts for the transitions its rule names, in the items its event happened to (`backend/database/build_notes.toml`), so the implants of 14.8.0 that were renamed and rebalanced are listed with their rebalancing and not with the rename. With `expand` every transition is listed and counted over every change.
 - `min_items` (int, default 2), `limit` (int, default 50, max 500)
 
@@ -632,7 +634,26 @@ Every build in which the item was added, changed or removed, newest first, along
   ]
 }
 ```
-`note` is `{"note_id", "title", "body"}` when a build note explains the entry. The "changed in" badge of list rows is fed by `POST /items/revisions/batch`, which counts the builds that changed an item's definition; the timeline has more: removals, items that return, relevance and diffs.
+`note` is `{"note_id", "title", "body"}` when a build note explains the entry.
+
+#### POST /api/v1/items/revisions/batch
+The "changed in" badge of list rows, for up to 500 items in one request.
+
+**Request Body:** `{"aoids": [271072, 121141]}`
+
+**Response:**
+```json
+{
+  "items": {
+    "271072": {"aoid": 271072, "revision_count": 2, "change_count": 1,
+               "latest_change_slug": "ao-18-8-62-ep1", "present_in_current": true}
+  }
+}
+```
+- `revision_count`: the number of `entries` that `GET /items/{aoid}/timeline` returns for the same version: the builds of the version's lineage in which the item was added, changed or removed. Builds of another family after the fork are not counted. 0 for an item the lineage never had.
+- `change_count`: of those entries, the ones of kind `changed` (default 0). An item that was only ever added has `revision_count` 1 and `change_count` 0.
+- `latest_change_slug`: the enabled build that the definition served for the request's version comes from (null when the version does not have the item); a build that changed only the shop data or the static instance id is not one, though the timeline lists it.
+- `present_in_current`: whether the request's version has the item.
 
 #### GET /api/v1/items/{aoid}/compare/{base}
 One item in build `base` and in the request's build.
@@ -643,8 +664,8 @@ One item in build `base` and in the request's build.
 `diff` has one list per part, empty when the part is the same: `text`, `stats`, `effects`, `actions`, `attack`, `defense`, `misc`. Every entry has a `relevance`, and the `relevance` of the change is the union of its entries' values.
 
 - `text`, `misc`: `{"field", "old", "new", "relevance"}`; fields `name`, `description`, `static_instance`, `animation_mesh`, `shop`.
-- `stats`, `attack`, `defense`: `{"stat", "change", "old", "new", "bits_set", "bits_cleared", "relevance"}`. For the flag stats (0, 30, 182, 298, 355, 389) `bits_set` and `bits_cleared` list the flag values (1, 2, 4, ...) that were set and cleared; they are null for other stats.
-- `actions`: `{"action", "change", "criteria", "relevance"}`. `criteria` is the whole requirement list as a sequence diff: `{"op": "same" | "added" | "removed" | "changed", "old", "new"}` with criteria as `{"value1", "value2", "operator"}`.
+- `stats`, `attack`, `defense`: `{"stat", "change", "old", "new", "housekeeping", "bits_set", "bits_cleared", "relevance"}`. For the flag stats (0, 30, 182, 298, 355, 389) `bits_set` and `bits_cleared` list the flag values (1, 2, 4, ...) that were set and cleared; they are null for other stats. `housekeeping` (bool, default false; stats only) is true when `old` or `new` is the stat's housekeeping value. With `relevance: "cosmetic"` that is all the entry is (Value added as 0). With another `relevance` the stat went from that value to a real one or back (Value 0 -> 3): the entry then adds its own class and `cosmetic` to the relevance of the change, the one case in which an entry adds two.
+- `actions`: `{"action", "change", "criteria", "relevance"}`. `criteria` is the whole requirement list as a sequence diff: `{"op": "same" | "added" | "removed" | "changed", "old", "new"}` with criteria as `{"value1", "value2", "operator"}`. `changed` pairs two criteria that are the same thing at the same place: a requirement on the same stat, a logical operator (AND to OR), or a condition with the same operator. An operator is never paired with a requirement; that is one `removed` and one `added`.
 - `effects`: one entry per event that differs: `{"event", "change", "old_event", "relevance", "added", "removed", "changed"}`.
   - `change` is `added`, `removed`, `changed` or `renumbered` (the same effects under another event id, `old_event`).
   - `added` and `removed` hold effects shaped as the `spells` of an item's `spell_data`, each with a `relevance`.
