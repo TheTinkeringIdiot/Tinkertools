@@ -7,16 +7,15 @@
 --
 -- Where curated data applies. A curated fact is served for a build only when
 --   1. the items it names are present in that build, and
---   2. the build's features flag for it is on (build.features, the keys of
---      public.game_versions.features today: items, nanos, perks, sources,
---      symbiants): "perks" for perk, "symbiants" for mob and for sources of
---      type mob, "sources" for sources of type item.
+--   2. the build's features flag for it is on (build.features: items,
+--      nanos, perks, sources, symbiants; set per build in
+--      backend/database/builds.toml): "perks" for perk, "symbiants" for mob
+--      and for sources of type mob, "sources" for sources of type item.
 -- Today "perks" and "symbiants" are on only for the newest AO build and PRK,
 -- and "sources" on every build. An old build therefore answers "not found"
 -- for a perk lookup and lists no mobs even though the perk items and
--- symbiants exist in it. No route reads the flags today: the effect comes
--- from the per-version tables being empty. The new read path has to apply
--- the flags itself.
+-- symbiants exist in it. The read path applies the flags (Build.has in
+-- backend/app/store/context.py).
 --
 -- Inputs, all tracked: backend/database/symbiants.csv for mobs and their
 -- drops, backend/all_nanos_compacted.csv for nano metadata and

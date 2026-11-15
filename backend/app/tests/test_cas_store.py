@@ -23,7 +23,13 @@ import pytest
 
 from app.core import cas_store
 from app.core.cas_curated import CuratedFiles, sync_curated
-from app.core.cas_extract import ExtractReader, plan_builds, read_manifest
+from app.core.cas_extract import (
+    DEFAULT_FEATURES,
+    ExtractReader,
+    plan_builds,
+    read_build_descriptions,
+    read_manifest,
+)
 from app.core.cas_store import (
     BuildSpec,
     StoreError,
@@ -752,21 +758,23 @@ def test_a_duplicate_build_serves_nanos_under_its_own_strain_policy(conn):
     assert nano_served(conn, "live", 10)[:3] == (125, 9, 4)
 
 
-def test_presentation_follows_the_registry_without_touching_content(conn):
+def test_presentation_follows_the_builds_file_without_touching_content(conn):
     build = spec("b1", 1, features={"perks": False})
     load(conn, build, [item(1)])
     before = table_counts(conn)
 
-    build.display_name, build.features, build.is_default = (
+    build.display_name, build.features, build.is_default, build.notes = (
         "Build One",
         {"perks": True},
         True,
+        "Captured from a test server",
     )
     cas_store.update_presentation(conn, build)
 
     assert conn.execute(
-        "SELECT display_name, features, is_default FROM build WHERE slug = 'b1'"
-    ).fetchone() == ("Build One", {"perks": True}, True)
+        "SELECT display_name, features, is_default, notes FROM build "
+        "WHERE slug = 'b1'"
+    ).fetchone() == ("Build One", {"perks": True}, True, "Captured from a test server")
     assert table_counts(conn) == before
 
 
@@ -784,7 +792,7 @@ def test_a_build_is_stored_with_its_release_date(conn):
     assert released_on(conn, "b2") is None
 
 
-def test_the_release_date_follows_the_registry(conn):
+def test_the_release_date_follows_the_builds_file(conn):
     build = spec("b1", 1)
     load(conn, build, [item(1)])
     before = table_counts(conn)
@@ -1297,7 +1305,7 @@ def index_entry(slug, status="extracted", extract_slug=None):
     }
 
 
-def test_builds_are_planned_from_the_index_and_the_registry(tmp_path):
+def test_builds_are_planned_from_the_index_and_the_builds_file(tmp_path):
     for slug in ("ao-1", "ao-3", "prk-1"):
         write_extract(tmp_path, slug, [])
     entries = [
@@ -1307,44 +1315,103 @@ def test_builds_are_planned_from_the_index_and_the_registry(tmp_path):
         index_entry("ao-3"),
         index_entry("prk-1"),
     ]
-    registry = {
-        "ao-3": {
-            "display_name": "Live",
-            "parent_slug": "ao-2",
-            "snapshot_date": date(2024, 2, 24),
-            "sort_order": 7,
-            "enabled": True,
-            "is_default": True,
-            "features": {"perks": True},
-            "notes": None,
-        },
-        "prk-1": {
-            "display_name": "PRK",
-            "parent_slug": "ao-1",
-            "snapshot_date": None,
-            "sort_order": 1,
-            "enabled": True,
-            "is_default": False,
-            "features": {},
-            "notes": None,
-        },
-    }
-    specs = {s.slug: s for s in plan_builds(tmp_path, entries, registry)}
+    builds_file = tmp_path / "builds.toml"
+    builds_file.write_text("""
+        [ao-3]
+        display_name = "Live"
+        parent = "ao-2"
+        released_on = 2024-02-24
+        sort_order = 7
+        default = true
+        features = { perks = true }
+
+        [prk-1]
+        display_name = "PRK"
+        parent = "ao-1"
+        enabled = false
+        notes = "A private server"
+
+        [ao-9]
+        display_name = "Not extracted"
+        """)
+    described = read_build_descriptions(builds_file)
+    specs = {s.slug: s for s in plan_builds(tmp_path, entries, described)}
 
     assert list(specs) == ["ao-1", "ao-2", "ao-3", "prk-1"]
     assert [specs[s].ordinal for s in specs] == [2, 3, 4, 1]
     assert specs["ao-2"].extract_slug == "ao-1"
     assert (specs["ao-3"].display_name, specs["ao-3"].is_default) == ("Live", True)
-    assert specs["ao-3"].features == {"perks": True}
-    assert specs["ao-1"].display_name == "AO 1"
+    assert specs["ao-3"].features == {**DEFAULT_FEATURES, "perks": True}
     assert [specs[s].released_on for s in specs] == [
         None,
         None,
         date(2024, 2, 24),
         None,
     ]
-    assert specs["ao-3"].parent_slug is None
-    assert specs["prk-1"].parent_slug == "ao-1"
+    # Only a parent in another family is a fork point.
+    assert [specs[s].parent_slug for s in specs] == [None, None, None, "ao-1"]
+    assert (specs["prk-1"].enabled, specs["prk-1"].notes) == (
+        False,
+        "A private server",
+    )
+
+
+def test_a_build_the_file_does_not_describe_takes_the_defaults(tmp_path):
+    for slug in ("ao-1", "ao-2", "prk-1"):
+        write_extract(tmp_path, slug, [], client_build=slug.split("-")[1] + ".0")
+    entries = [index_entry("ao-1"), index_entry("ao-2"), index_entry("prk-1")]
+    for entry in entries:
+        entry["build"] = None
+
+    specs = {s.slug: s for s in plan_builds(tmp_path, entries, {})}
+
+    assert [s.display_name for s in specs.values()] == ["AO 1.0", "AO 2.0", "PRK 1.0"]
+    # PRK first, then AO, newest build first
+    assert sorted(specs, key=lambda slug: specs[slug].sort_order) == [
+        "prk-1",
+        "ao-2",
+        "ao-1",
+    ]
+    for planned in specs.values():
+        assert (planned.enabled, planned.is_default) == (True, False)
+        assert planned.features == DEFAULT_FEATURES
+        assert planned.released_on is None and planned.parent_slug is None
+    assert specs["ao-1"].notes == "Client build 1.0, extracted by TinkerParse abc"
+
+
+@pytest.mark.parametrize(
+    "content, complaint",
+    [
+        ("[ao-1\n", "not valid TOML"),
+        ('[ao-1]\ncolour = "red"\n', r"\[ao-1\] has an unknown field 'colour'"),
+        ('[ao-1]\nsort_order = "first"\n', "sort_order must be of type int"),
+        ("[ao-1]\nsort_order = true\n", "sort_order must be of type int"),
+        ('[ao-1]\nreleased_on = "2024-02-24"\n', "released_on must be of type date"),
+        ('[ao-1]\nfeatures = { perks = "yes" }\n', "features.perks must be true"),
+        (
+            "[ao-1]\ndefault = true\n[ao-2]\ndefault = true\n",
+            "only one build can be the default, not ao-1, ao-2",
+        ),
+        ('ao-1 = "Live"\n', "'ao-1' is not a table"),
+    ],
+)
+def test_a_builds_file_that_cannot_be_right_is_refused(tmp_path, content, complaint):
+    builds_file = tmp_path / "builds.toml"
+    builds_file.write_text(content)
+
+    with pytest.raises(StoreError, match=complaint):
+        read_build_descriptions(builds_file)
+
+
+def test_a_missing_builds_file_is_refused(tmp_path):
+    with pytest.raises(StoreError, match="Builds file not found"):
+        read_build_descriptions(tmp_path / "builds.toml")
+
+
+def test_the_committed_builds_file_names_one_default_build():
+    described = read_build_descriptions()
+
+    assert sum(bool(table.get("default")) for table in described.values()) == 1
 
 
 @pytest.fixture
@@ -1442,30 +1509,6 @@ def test_import_cas_refuses_an_extracts_folder_without_an_index(
     expected = "No index.json" if with_folder else "Extracts folder not found"
     assert expected in done.stderr and str(extracts) in done.stderr
     assert "to import" not in done.stderr and "Traceback" not in done.stderr
-
-
-def test_the_registry_is_read_with_everything_a_build_takes_from_it(conn):
-    module_spec = importlib.util.spec_from_file_location(
-        "import_cli", BACKEND / "import_cli.py"
-    )
-    import_cli = importlib.util.module_from_spec(module_spec)
-    module_spec.loader.exec_module(import_cli)
-
-    registry = import_cli.read_registry(conn)
-
-    assert registry, "the development database has a registry"
-    for slug, row in registry.items():
-        assert set(row) >= {
-            "display_name",
-            "snapshot_date",
-            "parent_slug",
-            "sort_order",
-            "enabled",
-            "is_default",
-            "features",
-            "notes",
-        }
-        assert row["snapshot_date"] is None or isinstance(row["snapshot_date"], date)
 
 
 @pytest.fixture(scope="module")

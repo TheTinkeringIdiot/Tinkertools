@@ -2,8 +2,8 @@
 Importer for the content-addressed game data store.
 
 Design: docs/plans/content-addressed-store/design.md section 3. Tables:
-backend/database/cas/001_store.sql and 002_curated_and_derived.sql. Canonical
-part documents and hashes: app/core/parts.py.
+backend/database/cas/*.sql. Canonical part documents and hashes:
+app/core/parts.py.
 
 A build is imported in one transaction by :func:`import_build`:
 
@@ -110,13 +110,12 @@ class StoreError(Exception):
 
 
 def validate_store_schema(schema: str) -> str:
-    """``schema`` if a store may live there; the current store's schemas may not."""
+    """``schema`` if a store may live there: a schema of its own, which
+    ``public`` and the system's schemas are not."""
     if not _SCHEMA_NAME.match(schema):
         raise StoreError(f"Invalid schema name: {schema!r}")
-    if schema in ("public", "gd", "information_schema") or schema.startswith(
-        ("gv_", "pg_")
-    ):
-        raise StoreError(f"Schema {schema!r} belongs to the current store")
+    if schema in ("public", "information_schema") or schema.startswith("pg_"):
+        raise StoreError(f"A store cannot live in schema {schema!r}")
     return schema
 
 
@@ -307,6 +306,12 @@ def upgrade_store(conn: psycopg.Connection, schema: str) -> None:
         (schema,),
     ).fetchone():
         conn.execute((SQL_DIR / "003_change_analysis.sql").read_text(encoding="utf-8"))
+    if not conn.execute(
+        "SELECT 1 FROM pg_tables WHERE schemaname = %s "
+        "AND tablename = 'legacy_item_id'",
+        (schema,),
+    ).fetchone():
+        conn.execute((SQL_DIR / "004_legacy_item_ids.sql").read_text(encoding="utf-8"))
     if not conn.execute(
         "SELECT 1 FROM information_schema.columns WHERE table_schema = %s "
         "AND table_name = 'build_transition' AND column_name = 'unexplained_items'",
@@ -552,7 +557,8 @@ class BuildSpec:
 
 
 # Columns of ``build`` that describe how a build is presented, as opposed to
-# what it contains. They follow the registry on every import run.
+# what it contains. They follow the builds file (app/core/cas_extract.py) on
+# every import run.
 PRESENTATION_COLUMNS = (
     "display_name",
     "released_on",
@@ -560,6 +566,7 @@ PRESENTATION_COLUMNS = (
     "enabled",
     "is_default",
     "features",
+    "notes",
 )
 
 
