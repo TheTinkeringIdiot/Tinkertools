@@ -27,6 +27,7 @@ Rules:
 from __future__ import annotations
 
 import csv
+import json
 import logging
 import re
 from dataclasses import dataclass
@@ -106,10 +107,13 @@ def read_nanos(path: Path) -> Tuple[Rows, List[Tuple[int, int, int, str]]]:
 def read_perks(path: Path) -> Rows:
     """perks.json as ``perk`` rows keyed by AOID.
 
-    Profession and breed names the application does not know are left out, as
-    the importer this replaces did.
+    Profession and breed names the application does not know are left out.
     """
-    from app.core.csv_transformer import load_perk_metadata
+    data = json.loads(path.read_text(encoding="utf-8"))
+    column = {name: index for index, name in enumerate(data["columns"])}
+
+    def field(row: Sequence[Any], name: str) -> Any:
+        return row[column[name]] if name in column else None
 
     def ids(names: Sequence[str], mapper) -> List[int]:
         mapped = []
@@ -121,16 +125,17 @@ def read_perks(path: Path) -> Rows:
         return mapped
 
     rows: Rows = {}
-    for aoid, perk in load_perk_metadata(str(path)).items():
-        rows[(aoid,)] = (
-            perk["name"],
-            perk["name"],
-            perk_validator.validate_counter(perk["counter"]),
-            perk_validator.validate_perk_type(perk["type"]),
-            perk_validator.parse_level_requirement(perk["level"]),
-            perk_validator.parse_level_requirement(perk["aiTitle"]),
-            ids(perk["professions"], perk_validator.map_profession_to_id),
-            ids(perk["breeds"], perk_validator.map_breed_to_id),
+    for row in data["values"]:
+        name = row[column["name"]]
+        rows[(row[column["aoid"]],)] = (
+            name,
+            name,
+            perk_validator.validate_counter(row[column["counter"]]),
+            perk_validator.validate_perk_type(row[column["type"]]),
+            perk_validator.parse_level_requirement(field(row, "level")),
+            perk_validator.parse_level_requirement(field(row, "aiTitle")),
+            ids(field(row, "professions") or [], perk_validator.map_profession_to_id),
+            ids(field(row, "breeds") or [], perk_validator.map_breed_to_id),
         )
     return rows
 
