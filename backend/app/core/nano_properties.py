@@ -7,8 +7,9 @@ the Use action's criteria (action 3), a postfix (RPN) expression such as
 together, negate them, or follow an ``OnTarget`` modifier, where they
 describe the target instead of the caster, so they cannot be answered with a
 simple join. This module evaluates the expression once per nano and the
-importer stores the answers in ``nano_properties`` (migration 008), which the
-``/nanos`` endpoints join and filter on.
+importer stores the answers in ``nano_properties``
+(database/cas/002_curated_and_derived.sql), which the ``/nanos`` endpoints
+join and filter on.
 
 - ``school``: the item's NanoSchool stat (405), 1-5 (see ``NANO_SCHOOLS``).
   0 and the odd 999 mean no school and are stored as NULL.
@@ -28,15 +29,9 @@ or level unless the criteria rule it out whatever those unknowns turn out to be.
 
 from __future__ import annotations
 
-import logging
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-
 from app.core.nano_strains import NANO_STRAINS
-
-logger = logging.getLogger(__name__)
 
 USE_ACTION = 3
 
@@ -278,77 +273,3 @@ def school_id(name_or_id: str) -> Optional[int]:
         if name.casefold() == wanted:
             return sid
     return None
-
-
-_NANOS_SQL = text("""
-    SELECT i.id,
-           (SELECT sv.value FROM item_stats ist
-              JOIN stat_values sv ON sv.id = ist.stat_value_id
-             WHERE ist.item_id = i.id AND sv.stat = :school_stat
-             LIMIT 1) AS school_stat,
-           (SELECT sv.value FROM item_stats ist
-              JOIN stat_values sv ON sv.id = ist.stat_value_id
-             WHERE ist.item_id = i.id AND sv.stat = :strain_stat
-             LIMIT 1) AS strain
-    FROM items i
-    WHERE i.is_nano
-    """)
-
-_USE_CRITERIA_SQL = text("""
-    SELECT a.item_id, c.value1, c.value2, c.operator
-    FROM actions a
-    JOIN items i ON i.id = a.item_id AND i.is_nano
-    LEFT JOIN action_criteria ac ON ac.action_id = a.id
-    LEFT JOIN criteria c ON c.id = ac.criterion_id
-    WHERE a.action = :use_action
-    ORDER BY a.item_id, a.id, ac.order_index
-    """)
-
-
-def compute_all(db: Session) -> List[Dict[str, object]]:
-    """nano_properties rows (item_id, school, professions, min_level, strain)
-    for every nano in the schema."""
-    use_criteria: Dict[int, List[Criterion]] = {}
-    for item_id, stat, value, operator in db.execute(
-        _USE_CRITERIA_SQL, {"use_action": USE_ACTION}
-    ):
-        criteria = use_criteria.setdefault(item_id, [])
-        if stat is not None:
-            criteria.append((stat, value, operator))
-
-    rows = []
-    for item_id, school_stat, strain in db.execute(
-        _NANOS_SQL,
-        {"school_stat": STAT_NANO_SCHOOL, "strain_stat": STAT_NANO_STRAIN},
-    ):
-        school, professions, min_level = derive(school_stat, use_criteria.get(item_id))
-        rows.append(
-            {
-                "item_id": item_id,
-                "school": school,
-                "professions": professions,
-                "min_level": min_level,
-                "strain": strain,
-            }
-        )
-    return rows
-
-
-def populate(db: Session) -> int:
-    """Rebuild ``nano_properties`` for the session's schema. Returns row count.
-
-    The caller commits.
-    """
-    rows = compute_all(db)
-    db.execute(text("DELETE FROM nano_properties"))
-    if rows:
-        db.execute(
-            text(
-                "INSERT INTO nano_properties "
-                "(item_id, school, professions, min_level, strain) "
-                "VALUES (:item_id, :school, :professions, :min_level, :strain)"
-            ),
-            rows,
-        )
-    logger.info(f"Derived nano properties for {len(rows)} nanos")
-    return len(rows)

@@ -60,9 +60,9 @@ Load it with `set -a && . ./.env.local && set +a`.
 Game data lives in the content-addressed store (schema `cas`), built from extracted client builds:
 ```bash
 python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --workers 8
-python tools/verify_cas.py --store
+python tools/verify_cas.py --store --extracts-dir ~/projects/AO/extracts
 ```
-See `IMPORT_README.md` for the extracts, the version registry and the other import commands.
+The importer creates the schema, its extensions and its tables. `IMPORT_README.md` is the guide: prerequisites, verification, adding a build, the files the importer reads, legacy item ids.
 
 ### 6. Start Development Server
 ```bash
@@ -96,7 +96,7 @@ Every route below also exists under `/api/v1/<version>/...` (a build slug from `
 
 ## Architecture
 
-Routes read the store through `app/store` (see the module docstring of `app/store/__init__.py`): a request names a build, queries start from the revisions present in that build, and items are loaded in a constant number of queries. `GET /versions` and `POST /legacy-item-ids/resolve` are the two routes that still read the registry and the old per-version store.
+Routes read the store through `app/store` (see the module docstring of `app/store/__init__.py`): a request names a build, queries start from the revisions present in that build, and items are loaded in a constant number of queries. `GET /versions` lists the store's builds; `POST /legacy-item-ids/resolve` translates internal item ids of the old database from a map the importer loads (`IMPORT_README.md`, "Legacy item ids").
 
 ## Development Commands
 
@@ -190,9 +190,6 @@ Structured logging with configurable levels. Logs include:
 - All user/character data stored client-side only
 - Server contains only static game reference data
 - No user accounts or authentication required
-
-### Old Store
-- The ORM models in `app/models/` and the per-version store they map remain until cutover; only the legacy id lookup and the old importers use them
 
 ## Troubleshooting
 

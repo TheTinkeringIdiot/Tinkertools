@@ -7,16 +7,15 @@
 --
 -- Where curated data applies. A curated fact is served for a build only when
 --   1. the items it names are present in that build, and
---   2. the build's features flag for it is on (build.features, the keys of
---      public.game_versions.features today: items, nanos, perks, sources,
---      symbiants): "perks" for perk, "symbiants" for mob and for sources of
---      type mob, "sources" for sources of type item.
+--   2. the build's features flag for it is on (build.features: items,
+--      nanos, perks, sources, symbiants; set per build in
+--      backend/database/builds.toml): "perks" for perk, "symbiants" for mob
+--      and for sources of type mob, "sources" for sources of type item.
 -- Today "perks" and "symbiants" are on only for the newest AO build and PRK,
 -- and "sources" on every build. An old build therefore answers "not found"
 -- for a perk lookup and lists no mobs even though the perk items and
--- symbiants exist in it. No route reads the flags today: the effect comes
--- from the per-version tables being empty. The new read path has to apply
--- the flags itself.
+-- symbiants exist in it. The read path applies the flags (Build.has in
+-- backend/app/store/context.py).
 --
 -- Inputs, all tracked: backend/database/symbiants.csv for mobs and their
 -- drops, backend/all_nanos_compacted.csv for nano metadata and
@@ -52,9 +51,8 @@ CREATE TABLE nano_overlay (
 -- that is in the store, at every commit: the importer moves it from the
 -- previous newest build in the transaction that stores a newer one.
 --
--- The exact rule, which reproduces backend/update_nanos.py. For a nano
--- revision with an overlay row, "own" being the revision's own stat 75 and
--- "usable" meaning not absent, not 0 and not 99999:
+-- The exact rule. For a nano revision with an overlay row, "own" being the
+-- revision's own stat 75 and "usable" meaning not absent, not 0 and not 99999:
 --   1. If the build is not overlay_strain_first, own is usable and own differs
 --      from the overlay strain: keep own strain AND own substrain untouched.
 --      Substrain always follows the strain decision; it is never filled in on

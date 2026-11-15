@@ -6,7 +6,7 @@ FastAPI routes, schemas, and services for TinkerTools backend API endpoints.
 ## Store Read Path
 Every route that serves game data reads the content-addressed store (schema `cas`) through `app/store`. A route takes `get_store` and `get_build` (`app/store/context.py`), builds lists on `revisions(build)`, pages them with `fetch_page` (or `fetch_search_page` when the query matches text) and loads items with `load_item_details`. The module docstring of `app/store/__init__.py` is the guide to writing a route on the store ("Writing a route", "Testing", "Golden comparison", "Pitfalls"): read it before writing or changing a route.
 
-Two routes do not read the store: `GET /versions` (registry `public.game_versions`) and `POST /legacy-item-ids/resolve` (old per-version store, until cutover). The ORM models in `app/models/` serve those two and the old importers only; do not use them in a store session.
+There is no other store and no ORM: `GET /versions` lists the rows of `build`, and `POST /legacy-item-ids/resolve` reads `legacy_item_id`, the map of the old database's internal item ids that the importer loads from a file. `app/models/` holds only the interpolation models.
 
 ## Key Patterns
 - **One build per request**: the session has no version state; pass `build` to every query

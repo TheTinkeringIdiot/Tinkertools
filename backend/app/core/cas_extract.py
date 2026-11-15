@@ -3,6 +3,30 @@ Reading extracted builds for the content-addressed store.
 
 Layout of the extracts folder: docs/plans/content-addressed-store/extract-contract.md.
 
+``backend/database/builds.toml``: how builds are presented
+==========================================================
+
+What a build contains comes from its extract. How it is presented comes from
+defaults, which a hand-maintained file overrides build by build. A table of
+the file is named by the build's slug and may hold:
+
+``display_name``  name in the version list (default ``<FAMILY> <client build>``)
+``released_on``   date the build was released or captured (default: none)
+``sort_order``    position in the version list (default: per family, newest
+                  build first; see ``SORT_BASE``)
+``enabled``       false hides the build from the API (default true)
+``default``       true for the one build served to requests that name none
+``parent``        the build of another family this family forks from; read
+                  when the build is imported, never changed afterwards
+``features``      curated data the build is served with, merged over
+                  ``DEFAULT_FEATURES`` (``perks``, ``symbiants``, ...)
+``notes``         provenance text (default: client build and extractor)
+
+A build the file does not name takes every default. A table whose build the
+extracts do not hold is ignored, so one file serves every store. Everything
+but ``parent`` follows the file on every import run, also for builds already
+stored (``cas_store.update_presentation``).
+
 Parsing and splitting a build takes far longer than writing it, and most of
 what it produces is already in the store, so builds are read in worker
 processes ahead of the importer (:class:`ExtractReader`). A worker splits one
@@ -15,15 +39,29 @@ from __future__ import annotations
 
 import json
 import multiprocessing
+import tomllib
 from collections import deque
+from datetime import date
 from pathlib import Path
 from typing import Any, Deque, Dict, Iterator, List, Tuple
 
 from app.core.cas_store import BuildContent, BuildSpec, StoreError, split_records
 
 IMPORTABLE = ("extracted", "duplicate")
-# Position in the version list for a build the registry does not know: per
-# family, newest build first.
+BUILDS_FILE = Path(__file__).resolve().parents[2] / "database" / "builds.toml"
+# What a table of the builds file may hold, and the type of each value.
+DESCRIPTION_FIELDS = {
+    "display_name": str,
+    "released_on": date,
+    "sort_order": int,
+    "enabled": bool,
+    "default": bool,
+    "parent": str,
+    "features": dict,
+    "notes": str,
+}
+# Position in the version list unless the builds file gives one: per family,
+# newest build first.
 SORT_BASE = {"prk": 100, "ao": 1000}
 OTHER_SORT_BASE = 5000
 DEFAULT_FEATURES = {
@@ -58,18 +96,51 @@ def read_manifest(root: Path, slug: str) -> Dict[str, Any]:
     return manifest
 
 
+def read_build_descriptions(path: Path = BUILDS_FILE) -> Dict[str, Dict[str, Any]]:
+    """The tables of the builds file by slug, checked (see the module docstring)."""
+    try:
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        raise StoreError(f"Builds file not found: {path}") from None
+    except tomllib.TOMLDecodeError as exc:
+        raise StoreError(f"{path} is not valid TOML: {exc}") from exc
+    for slug, described in data.items():
+        if not isinstance(described, dict):
+            raise StoreError(f"{path}: '{slug}' is not a table")
+        for name, value in described.items():
+            kind = DESCRIPTION_FIELDS.get(name)
+            if kind is None:
+                raise StoreError(f"{path}: [{slug}] has an unknown field '{name}'")
+            # bool is an int to Python; a flag is not a position.
+            if not isinstance(value, kind) or (kind is int and isinstance(value, bool)):
+                raise StoreError(
+                    f"{path}: [{slug}] {name} must be of type {kind.__name__}"
+                )
+        for feature, served in described.get("features", {}).items():
+            if not isinstance(served, bool):
+                raise StoreError(
+                    f"{path}: [{slug}] features.{feature} must be true or false"
+                )
+    defaults = sorted(slug for slug, d in data.items() if d.get("default"))
+    if len(defaults) > 1:
+        raise StoreError(
+            f"{path}: only one build can be the default, not {', '.join(defaults)}"
+        )
+    return data
+
+
 def plan_builds(
-    root: Path, entries: List[Dict[str, Any]], registry: Dict[str, Dict[str, Any]]
+    root: Path, entries: List[Dict[str, Any]], described: Dict[str, Dict[str, Any]]
 ) -> List[BuildSpec]:
     """The ``build`` row of every importable entry of index.json, in index order.
 
-    ``registry`` holds the rows of ``public.game_versions`` by slug; a build it
-    knows takes its display name, release date (the registry's
-    ``snapshot_date``), list position, flags and features from there.
+    ``described`` holds the tables of the builds file by slug
+    (:func:`read_build_descriptions`); a build takes from its table whatever
+    the table gives and a default for the rest.
 
     - ``ordinal`` is the entry's position among all entries of its family, so
       a build that failed to extract keeps its place should it be fixed.
-    - ``parent_slug`` is set only for a build whose registered parent belongs
+    - ``parent_slug`` is set only for a build whose described parent belongs
       to another family: the fork point of a branch.
     """
     family_of = {entry["slug"]: entry["family"] for entry in entries}
@@ -82,19 +153,12 @@ def plan_builds(
         position = [e["slug"] for e in same_family].index(slug)
         extract_slug = entry.get("extract_slug") or slug
         manifest = read_manifest(root, extract_slug)
-        known = registry.get(slug)
+        given = described.get(slug, {})
         build = entry.get("build") or manifest.get("client_build") or slug
-        parent = known.get("parent_slug") if known else None
+        parent = given.get("parent")
         if parent and family_of.get(parent, family) == family:
             parent = None
         commit = manifest.get("tinkerparse_commit")
-        if known:
-            display_name, sort_order = known["display_name"], known["sort_order"]
-        else:
-            display_name = f"{family.upper()} {build}"
-            sort_order = (
-                SORT_BASE.get(family, OTHER_SORT_BASE) + len(same_family) - position
-            )
         if extract_slug != slug:
             client_build = build
             notes = f"Client database identical to {extract_slug}"
@@ -109,21 +173,24 @@ def plan_builds(
                 slug=slug,
                 branch=family,
                 ordinal=position + 1,
-                display_name=display_name,
-                sort_order=sort_order,
-                client_build=client_build,
-                released_on=known.get("snapshot_date") if known else None,
-                parent_slug=parent,
-                enabled=known["enabled"] if known else True,
-                is_default=bool(known and known["is_default"]),
-                features=(
-                    dict(known["features"] or {}) if known else dict(DEFAULT_FEATURES)
+                display_name=given.get("display_name", f"{family.upper()} {build}"),
+                sort_order=given.get(
+                    "sort_order",
+                    SORT_BASE.get(family, OTHER_SORT_BASE)
+                    + len(same_family)
+                    - position,
                 ),
+                client_build=client_build,
+                released_on=given.get("released_on"),
+                parent_slug=parent,
+                enabled=given.get("enabled", True),
+                is_default=given.get("default", False),
+                features={**DEFAULT_FEATURES, **given.get("features", {})},
                 extract_slug=extract_slug,
                 rdb_dat_sha256=entry.get("rdb_dat_sha256")
                 or manifest.get("rdb_dat_sha256"),
                 tinkerparse_commit=commit,
-                notes=(known or {}).get("notes") or notes,
+                notes=given.get("notes", notes),
             )
         )
     return specs

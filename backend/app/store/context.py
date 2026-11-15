@@ -21,7 +21,7 @@ import re
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Iterator, List, Mapping, Optional, TypeVar
+from typing import Callable, Iterator, List, Mapping, Optional, TypeVar
 
 from fastapi import HTTPException, Request
 from sqlalchemy import select
@@ -135,15 +135,29 @@ def resolve_build(builds: List[Build], slug: Optional[str]) -> Optional[Build]:
     return next((b for b in builds if b.branch == slug), None)
 
 
-class BuildRegistry:
-    """In-process copy of the store's builds, re-read after a short time."""
+def _read_served_builds() -> List[Build]:
+    with StoreSession() as db:
+        return read_builds(db)
 
-    def __init__(self, ttl_seconds: Optional[int] = None):
+
+class BuildRegistry:
+    """In-process copy of a store's builds, re-read after a short time.
+
+    ``read`` returns the builds; by default those of the store the
+    application serves.
+    """
+
+    def __init__(
+        self,
+        ttl_seconds: Optional[int] = None,
+        read: Callable[[], List[Build]] = _read_served_builds,
+    ):
         self.ttl = (
             ttl_seconds
             if ttl_seconds is not None
             else settings.GAME_VERSION_REGISTRY_TTL
         )
+        self._read = read
         self._lock = threading.Lock()
         self._builds: List[Build] = []
         self._loaded_at: Optional[float] = None
@@ -155,8 +169,7 @@ class BuildRegistry:
         if self._stale():
             with self._lock:
                 if self._stale():
-                    with StoreSession() as db:
-                        self._builds = read_builds(db)
+                    self._builds = self._read()
                     self._loaded_at = time.monotonic()
         return self._builds
 
@@ -164,6 +177,8 @@ class BuildRegistry:
         return resolve_build(self.all(), slug)
 
 
+# The builds requests are resolved against: by the version middleware, which
+# turns the URL's version segment into a build's slug, and by ``get_build``.
 builds = BuildRegistry()
 
 

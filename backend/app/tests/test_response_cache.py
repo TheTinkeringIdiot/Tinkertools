@@ -17,7 +17,6 @@ import pytest
 from fastapi.routing import APIRoute
 from pydantic import TypeAdapter
 
-from app.core.versions import registry
 from app.main import app
 from app.tests.fixtures.store_fixtures import item
 
@@ -35,20 +34,11 @@ API = "/api/v1"
 
 @pytest.fixture
 def two_builds(store):
-    """A store with two builds whose item 100 differs, named as two builds the
-    version registry knows so that a URL can name either:
+    """A store with two builds whose item 100 differs:
     ``(store, alias of the newer, slug of the newer, slug of the older)``."""
-    aliases = registry.aliases()
-    if not aliases:
-        pytest.skip("needs a version registry with a family alias")
-    alias, newest = next(iter(aliases.items()))
-    others = [version for version in registry.all() if version.slug != newest.slug]
-    if not others:
-        pytest.skip("needs a version registry with two versions")
-    older = others[0].slug
-    store.add_build(older, 1, items=[item(100, name="Wrench")])
-    store.add_build(newest.slug, 2, items=[item(100, name="Spanner")])
-    return store, alias, newest.slug, older
+    store.add_build("ao-1", 1, items=[item(100, name="Wrench")])
+    store.add_build("ao-2", 2, items=[item(100, name="Spanner")])
+    return store, "ao", "ao-2", "ao-1"
 
 
 def test_a_cached_route_answers_each_build_with_its_own_data(two_builds):

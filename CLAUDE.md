@@ -70,19 +70,13 @@ pytest
 
 ### Database (PostgreSQL)
 ```bash
-# Setup database (first time only)
-cd database
-./setup.sh
+# Load or update the game data (creates schema cas, its extensions and tables)
+cd backend && python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --workers 8
 
-# Reset database
-./setup.sh reset
-
-# Create backup
-./backup.sh backup
-
-# Run schema tests
-psql -U tinkertools_user -d tinkertools -f database/tests/test_schema.sql
+# Verify it
+python tools/verify_cas.py --store --extracts-dir ~/projects/AO/extracts
 ```
+`backend/IMPORT_README.md` is the guide. Never `DROP SCHEMA cas`.
 
 ## Claude Code Configuration
 
@@ -115,17 +109,19 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ### Technology Stack
 - **Frontend**: Vue 3, TypeScript, Vite, Vue Router, Pinia, TailwindCSS, PrimeVue (Aura theme)
-- **Backend**: FastAPI, SQLAlchemy (async), Pydantic, asyncpg
-- **Database**: PostgreSQL 12+ with 23 core tables plus caching (includes source system)
+- **Backend**: FastAPI, SQLAlchemy Core (synchronous), Pydantic, psycopg
+- **Database**: PostgreSQL 13+, game data in the content-addressed store (schema `cas`)
 - **Testing**: Vitest (frontend), pytest (backend)
 
 ### Database Schema
-The database follows a legacy-compatible design with:
-- **Core Tables**: items, spells, symbiants, pocket_bosses, stat_values, criteria, source_types, sources
-- **Junction Tables**: For many-to-many relationships (item_stats, spell_criteria, item_sources, etc.)
-- **Source System**: Polymorphic design for tracking item origins (crystals, NPCs, missions, etc.)
+Game data lives in one schema, the content-addressed store (`cas`), defined in `backend/database/cas/*.sql` and loaded by `import_cli.py import-cas` from extracted client builds:
+- **Parts**: each distinct text, stat set, effect set, action set and attack/defense block is stored once, by the hash of its canonical document
+- **Revisions and presence**: an item revision is an AOID plus its parts; `item_presence` says in which run of builds each revision is the item
+- **Builds**: one row per client build, which is also a game version of the API (`/api/v1/{slug}/...`)
+- **Projections and change log**: narrow search tables derived from the parts, and what changed between builds
+- **Curated data**: perks, mobs, sources, nano metadata, keyed by AOID, from committed files
 - **No Timestamps**: Static game data doesn't require audit trails
-- **Optimized Indexes**: B-tree for queries, GIN for full-text search
+- Read through `backend/app/store/` (the guide is its module docstring); design in `docs/plans/content-addressed-store/design.md`
 
 ### Key Performance Requirements
 - Complex stat queries: < 500ms (REQ-PERF-001)
@@ -168,7 +164,7 @@ The database follows a legacy-compatible design with:
 - **API Endpoints**: Follow RESTful conventions with Pydantic models
 - **Vue Components**: Use Composition API with TypeScript
 - **State Management**: Use Pinia stores for shared state
-- **Database Queries**: Use SQLAlchemy ORM with async sessions
+- **Database Queries**: Compose SQLAlchemy Core queries from `backend/app/store/tables.py`, in synchronous sessions (`get_store`)
 - **Error Handling**: Proper HTTP status codes and error messages
 
 ### Testing Strategy

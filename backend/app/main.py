@@ -56,7 +56,7 @@ origins = (
     ["*"] if settings.APP_ENV == "development" else settings.CORS_ORIGINS.split(",")
 )
 
-# Resolves /api/v1/<version>/... to the matching game version schema.
+# Resolves /api/v1/<version>/... to the build the version names.
 # Added before CORS so CORS is the outermost layer.
 app.add_middleware(GameVersionMiddleware, api_prefix="/api/v1")
 

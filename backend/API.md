@@ -35,7 +35,7 @@ Check that the API process is up.
 
 ### Game versions
 
-Every route under `/api/v1` also exists under `/api/v1/<version>`, where `<version>` is a build slug from `GET /api/v1/versions` (`ao-18-8-62-ep1`) or a family alias (`ao`, `prk`). Without the segment the default build is served. An unknown slug is a 404.
+Every route under `/api/v1` also exists under `/api/v1/<version>`, where `<version>` is a build slug from `GET /api/v1/versions` (`ao-18-8-62-ep1`) or a family alias (`ao`, `prk`). Without the segment the default build is served. An unknown slug is a 404 (`{"detail": "Unknown game version '<slug>'"}`). Every response under `/api/v1` names the build it was served from in the `X-Game-Version` header.
 
 ### Items
 
@@ -676,12 +676,15 @@ One item in build `base` and in the request's build.
 ### Legacy Item IDs
 
 #### POST /api/v1/legacy-item-ids/resolve
-Resolve internal item row ids (as issued by a game version) to AOIDs. Up to 1000 ids per request.
+Resolve internal item row ids, as the database before the content-addressed store issued them, to AOIDs. Up to 1000 ids per request. Only the frontend's one-time migration of stored favorites, farm lists and comparison links calls it.
 
 **Request Body:**
 - `item_ids` (int[]): Internal item row ids
 
-**Response:** `{"aoids": {"<item_id>": <aoid>}}`. Ids the game version does not have are omitted.
+**Response:** `{"aoids": {"<item_id>": <aoid>}, "available": true}`.
+
+- An id is looked up among the ids issued for the family of the requested version (`ao`, `prk`), whichever build of the family is asked about, and is answered only when its item is present in that build. Ids that name no such item are omitted.
+- `available` is false when the server holds no ids for the family at all (the map was not loaded: `IMPORT_README.md`, "Legacy item ids"). `aoids` is then empty, which says nothing about the ids asked for: a client keeps them and asks again later.
 
 ## Error Responses
 

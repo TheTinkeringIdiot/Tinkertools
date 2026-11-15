@@ -9,10 +9,10 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     REDIS_URL: str = "redis://localhost:6379/0"
     # Game version served when a request carries no version segment and the
-    # registry has no row flagged is_default.
+    # store has no default build: a build slug or a family alias.
     DEFAULT_GAME_VERSION: str = "ao"
-    # Seconds the in-process game version registry is cached before re-reading
-    # public.game_versions.
+    # Seconds the in-process list of the store's builds is kept before it is
+    # read again (app/store/context.py).
     GAME_VERSION_REGISTRY_TTL: int = 60
     # PostgreSQL schema of the content-addressed store the API reads.
     CAS_SCHEMA: str = "cas"

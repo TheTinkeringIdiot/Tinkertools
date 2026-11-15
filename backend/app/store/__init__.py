@@ -13,8 +13,9 @@ Every route that serves game data reads it through this package:
 The store itself is described where it is defined:
 ``backend/database/cas/001_store.sql`` and ``002_curated_and_derived.sql``
 (how QL, strain, feature flags, source names and retired mobs are served),
-``003_change_analysis.sql`` (what the importer derives about changes) and
-the docstring of ``app/core/parts.py`` (the part documents).
+``003_change_analysis.sql`` (what the importer derives about changes),
+``004_legacy_item_ids.sql`` (internal item ids of the database this store
+replaced) and the docstring of ``app/core/parts.py`` (the part documents).
 
 Writing a route
 ===============
@@ -26,8 +27,6 @@ Writing a route
    The session has no ``search_path`` and no version: pass ``build`` to every
    query. Name the session ``db``: ``cached_response`` leaves a parameter of
    that name out of its cache key, and keeps ``build`` in it, which is right.
-   The ORM models of ``app/models`` describe the old per-version store; they
-   do not belong in a store session.
 
 2. A list. Start from ``revisions(build)``, add filters, let ``fetch_page``
    count and page it, load the page::
@@ -158,7 +157,8 @@ Testing
   inside a transaction that is rolled back, filled through the real importer
   with ``store.add_build`` and ``store.curate``, served by
   ``store.client(slug)``; ``store.note_changes`` applies build notes written
-  for the test. This is the default for a new test: several builds
+  for the test. ``store.client()`` without a slug resolves each request's
+  version segment against the store's own builds, as production does. This is the default for a new test: several builds
   of one item, feature flags, an exact page of results, a rule the real data
   cannot show in isolation. ``store.counting_queries()`` shows that a route's
   query count does not grow with its result. ``test_store_read.py`` and
@@ -167,7 +167,7 @@ Testing
   which reads the development store, and takes the values it expects from the
   same store through this package (the ``store_db`` and ``build`` fixtures of
   ``app/tests/conftest.py``): raw stats and criteria from ``tables``, items
-  from ``load_records``. It never reads the old per-version store.
+  from ``load_records``.
 * Assert what a user of the API sees. Do not mock the session or patch a
   route's helpers.
 

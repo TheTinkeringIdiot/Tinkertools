@@ -1,6 +1,6 @@
 # Content-addressed game data store
 
-Status: direction agreed 2026-11-13; nothing built. Supersedes the storage model in `.docs/plans/multi-version-support/design.md` §2 and §12 (untracked, local only) (schema-per-version, shared revisions with version arrays). The extraction side (`extract-contract.md`) is unchanged.
+Status: built. The store is the only one the application and the importer use since the cutover (stage 5, 2026-11-15); `backend/IMPORT_README.md` is the operating guide. The measurements of §2 describe the store it replaced. Supersedes the storage model in `.docs/plans/multi-version-support/design.md` §2 and §12 (untracked, local only) (schema-per-version, shared revisions with version arrays). The extraction side (`extract-contract.md`) is unchanged.
 
 ## 1. Why
 
@@ -118,7 +118,7 @@ Parts are JSONB documents. Canonical form rules:
 ### 3.2 Revisions and presence
 
 - `item_revision(rev_id, aoid, ql, item_class, is_nano, text_hash, stats_hash, effects_hash, actions_hash, atkdef_hash, misc_hash)`, unique on `(aoid, all hashes)`. Scalar columns exist for filtering and sorting.
-- `build(build_id, family, slug, client_build, ordinal, released_on, parent_build_id, ...)`: one row per build, `ordinal` giving patch order within a family. Replaces `game_versions` plus the per-version schemas.
+- `build(build_id, family, slug, client_build, ordinal, released_on, parent_build_id, ...)`: one row per build, `ordinal` giving patch order within a family. Replaces `game_versions` plus the per-version schemas. How a build is presented (name, date, list position, enabled, default, curated features) comes from `backend/database/builds.toml`, applied on every import run.
 - `item_presence(family_or_branch, aoid, rev_id, from_ordinal, to_ordinal)`: one row per run of consecutive builds in which that revision is the item's content. An import of a new build extends the open range of unchanged items (one bulk update of a single integer, or no write at all if open ranges are stored as "until further notice") and adds rows only for changed, added and removed items.
 - PRK is a branch whose parent is AO 17.10.5: its presence rows start from the fork and reference the same revisions and parts wherever content is identical.
 - Removed items stay addressable: the revision remains, and its range simply ends.
@@ -215,7 +215,7 @@ Unrelated to the redesign; listed so they are not lost. None has been reproduced
 3. **New store and importer.** Parts, revisions, builds, presence ranges, projections, change log, written straight from the extracts. Built alongside the current store so the two can be compared build by build (item counts, per-item content equality after canonicalization).
 4. **Read path.** Port routes family by family (item detail and interpolation first, then search, nanos, weapons, curated-data routes), each checked against the current API's responses for the same build.
 5. **Diff features.** Timeline, build change list, compare view; relevance classification and normalization notes.
-6. **Cutover.** Drop the per-version schemas and the old shared store; update import docs.
+6. **Cutover.** Drop the per-version schemas and the old shared store; update import docs. Done in code: the ORM models, the old importers, the registry and the migrations are removed; build presentation moved to `backend/database/builds.toml` and `cas.build`, the legacy id map to `cas.legacy_item_id` (exported by `backend/tools/export_legacy_item_ids.py`). Dropping the old schemas from a database is `backend/tools/drop_old_store.sql`, run by hand.
 
 Acceptance for 3 and 4 is response equality with the current system on a fixed sample of builds (14.2.2, 15.0.1, 17.10.5, live, PRK), apart from the intended ID changes.
 
@@ -230,14 +230,14 @@ Settled 2026-11-13:
 
 Settled 2026-11-14, at the stage 1 gate:
 
-- Production is loaded by a fresh import. Internal row ids therefore do not carry over, so favorites and farm lists that still hold row ids can only be translated with a map of row id to AOID exported from the production database before cutover. `/legacy-item-ids/resolve` reads that map from stage 5 on; until it exists the route resolves against the current store, which is correct only for the development database.
+- Production is loaded by a fresh import. Internal row ids therefore do not carry over, so favorites and farm lists that still hold row ids can only be translated with a map of row id to AOID exported from the production database before cutover. `/legacy-item-ids/resolve` reads that map (`legacy_item_id`) since stage 5. An id is filed under the family whose database issued it and answered for any build of that family in which its item is present, because the map is older than the builds that follow it. A store loaded without the map answers `available: false`, and the client keeps its ids for a later attempt.
 - The curated inputs are committed: `backend/all_nanos_compacted.csv` and `backend/database/perks.json`, beside `backend/database/symbiants.csv`. The importer reads them from there by default.
 - `GET /symbiants/{aoid}` stays: external utilities call it. `GET /nanos/stats`, `GET /versions/current` and `GET /versions/{slug}` are deleted. A test is not a caller.
 
 Still open:
 
 - Relevance classification: who maintains the stat and effect-type lists, and where they live (data file in the repo is the default).
-- Build dates: source for `released_on` for the historical builds.
+- Build dates: source for `released_on` for the historical builds (they are entered in `backend/database/builds.toml` once known).
 - Whether curated facts need validity ranges at all in the first cut, or one current copy is enough.
 - Serving shape: keep Postgres (default), or precompute per-revision documents to static files behind the API. Deferred until the read path is ported and measured.
 

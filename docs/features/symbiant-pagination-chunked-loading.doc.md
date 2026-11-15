@@ -106,7 +106,7 @@ Users loading the TinkerPocket symbiant view now see progress indicators as data
 def list_symbiants(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(50, ge=1, le=200, description="Items per page"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_store)
 ) -> PaginatedResponse[SymbiantResponse]:
     """
     List symbiants with pagination.

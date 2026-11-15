@@ -4,37 +4,59 @@ ASGI middleware that resolves the game version for a request.
 URL form:  /api/v1/<version-slug>/items/123
 Rewritten: /api/v1/items/123  with request.state.game_version = "<version-slug>"
 
-A request without a version segment (the legacy form) is served from the
-default version. Cross-version endpoints (e.g. /api/v1/versions) are unaffected
-because their first segment is an API route, never a version slug.
+A version is a build of the store (``app.store.context``). The segment may be
+a build's slug or a family alias (``ao``), which names the family's newest
+build; the request is served under the build's own slug either way, and the
+response says which in ``X-Game-Version``. A request without a version segment
+is served from the default build. Cross-version endpoints (e.g.
+/api/v1/versions) are unaffected because their first segment is an API route,
+never a version slug.
 
-A first segment that is neither a registered version nor an API route:
+A first segment that is neither a build nor an API route is answered with 404
+"Unknown game version", so a stale or mistyped slug fails loudly instead of
+silently serving another version's data.
 
-- registry available: 404 "Unknown game version", so a stale or mistyped slug
-  fails loudly instead of silently serving another version's data.
-- registry unavailable (public.game_versions missing, empty or unreadable): the
-  segment is stripped and the request is served from the default version. The
-  frontend always prefixes a slug, so without this fallback a missing registry
-  would take down every API call rather than degrade to the default data.
-  The requested slug is echoed in X-Game-Version-Fallback.
+Requests outside the API prefix are passed through untouched.
 """
 
 from __future__ import annotations
 
 import json
-import logging
+import re
+from contextvars import ContextVar
 from typing import Optional, Set
 
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from app.core.versions import SLUG_RE, current_version, registry
-
-logger = logging.getLogger(__name__)
+from app.core.config import settings
+from app.store import context
 
 VERSION_HEADER = "X-Game-Version"
-FALLBACK_HEADER = "X-Game-Version-Fallback"
+SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{0,39}$")
+
+# Version slug of the current request (None outside a request); part of the
+# response cache's key.
+current_version: ContextVar[Optional[str]] = ContextVar(
+    "current_game_version", default=None
+)
+
+
+def _build_slug(segment: str) -> Optional[str]:
+    """The slug of the build a URL segment names, None when it names none."""
+    build = context.builds.resolve(segment)
+    return build.slug if build else None
+
+
+def _default_slug() -> str:
+    """The slug served to a request that names no version: the default build,
+    else the newest build of the configured family. With neither (an empty
+    store) it is the configured name itself, which no route will find."""
+    build = context.builds.resolve(None) or context.builds.resolve(
+        settings.DEFAULT_GAME_VERSION
+    )
+    return build.slug if build else settings.DEFAULT_GAME_VERSION
 
 
 class GameVersionMiddleware:
@@ -42,7 +64,6 @@ class GameVersionMiddleware:
         self.app = app
         self.prefix = api_prefix.rstrip("/")
         self._route_segments: Optional[Set[str]] = None
-        self._warned_fallback = False
 
     def _api_route_segments(self, scope: Scope) -> Set[str]:
         """First path segments of every route under the API prefix (items, versions, ...)."""
@@ -59,58 +80,34 @@ class GameVersionMiddleware:
         return self._route_segments
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":
+        path: str = scope["path"] if scope["type"] == "http" else ""
+        if not path.startswith(self.prefix + "/"):
             await self.app(scope, receive, send)
             return
 
-        path: str = scope["path"]
-        slug = None
-        fallback_from = None
-
-        if path.startswith(self.prefix + "/"):
-            rest = path[len(self.prefix) + 1 :]
-            segment, _, tail = rest.partition("/")
-            strip = False
-            resolved = (
-                await run_in_threadpool(registry.resolve, segment) if segment else None
-            )
-            if resolved:
-                slug = resolved
-                strip = True
-            elif (
-                segment
-                and SLUG_RE.match(segment)
-                and segment not in self._api_route_segments(scope)
-            ):
-                if await run_in_threadpool(registry.is_available):
-                    await self._unknown_version(send, segment)
-                    return
-                fallback_from = segment
-                strip = True
-                if not self._warned_fallback:
-                    logger.warning(
-                        "Game version registry unavailable; serving %r from the default version",
-                        segment,
-                    )
-                    self._warned_fallback = True
-
-            if strip:
-                new_path = f"{self.prefix}/{tail}" if tail else self.prefix
-                scope["path"] = new_path
-                scope["raw_path"] = new_path.encode("utf-8")
-
-        if slug is None:
-            slug = await run_in_threadpool(registry.default_slug)
+        rest = path[len(self.prefix) + 1 :]
+        segment, _, tail = rest.partition("/")
+        slug = await run_in_threadpool(_build_slug, segment) if segment else None
+        if slug is not None:
+            new_path = f"{self.prefix}/{tail}" if tail else self.prefix
+            scope["path"] = new_path
+            scope["raw_path"] = new_path.encode("utf-8")
+        elif (
+            segment
+            and SLUG_RE.match(segment)
+            and segment not in self._api_route_segments(scope)
+        ):
+            await self._unknown_version(send, segment)
+            return
+        else:
+            slug = await run_in_threadpool(_default_slug)
 
         state = scope.setdefault("state", {})
         state["game_version"] = slug
 
         async def send_with_header(message: Message) -> None:
             if message["type"] == "http.response.start":
-                headers = MutableHeaders(scope=message)
-                headers[VERSION_HEADER] = slug
-                if fallback_from is not None:
-                    headers[FALLBACK_HEADER] = fallback_from
+                MutableHeaders(scope=message)[VERSION_HEADER] = slug
             await send(message)
 
         token = current_version.set(slug)

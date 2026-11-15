@@ -1,0 +1,25 @@
+# How builds are presented: names, dates, the default build, curated features.
+#
+# Read by `python import_cli.py import-cas` on every run (app/core/cas_extract.py
+# documents every field). A build that has no table here takes the defaults:
+# named "<FAMILY> <client build>", listed newest first within its family,
+# enabled, served without perks and without symbiant drops.
+#
+# After a game patch: extract and import the new build, then move `default`
+# and the curated `features` from the old live build's table to the new one's
+# and run the import again. Edits here reach builds already stored.
+
+[prk-0-7-1]
+display_name = "Project Rubi-Ka 0.7.1"
+released_on = 2026-10-28
+# PRK forked from an AO build that is not in the archive; 17.10.5 is the
+# newest one before it.
+parent = "ao-17-10-5"
+features = { perks = true, symbiants = true }
+notes = "Client build 0.7.1, extracted by TinkerParse eb179de3599a. Perk metadata (perks.json) and symbiant drop sources (symbiants.csv) are the AO-curated files applied by AOID; PRK-specific drops are not verified."
+
+[ao-18-8-62-ep1]
+display_name = "Anarchy Online 18.8.62 (Live)"
+released_on = 2026-10-28
+default = true
+features = { perks = true, symbiants = true }

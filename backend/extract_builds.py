@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract game client databases into the folder that ``import_cli.py import-extracts`` reads.
+"""Extract game client databases into the folder that ``import_cli.py import-cas`` reads.
 
 Runs TinkerParse, built from one pinned commit, over client builds and writes
 ``<extracts-dir>/<slug>/{items.json,nanos.json,manifest.json}`` plus ``index.json``.

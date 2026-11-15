@@ -713,6 +713,9 @@ class TinkerToolsApiClient {
   /**
    * AOIDs of internal item ids that were persisted before user data moved to
    * AOIDs, as `gameVersion` knows them. Ids it does not have are left out.
+   * Rejects when the backend holds no ids for that version's family at all
+   * (`available: false`): that is no verdict on the ids asked for, and a
+   * caller that took it for one would discard what the user stored.
    * Only the user data migration (legacy-id-migration.ts) has a use for this.
    */
   async resolveLegacyItemIds(
@@ -723,11 +726,17 @@ class TinkerToolsApiClient {
     const resolved = new Map<number, number>();
     try {
       for (let start = 0; start < internalIds.length; start += chunkSize) {
-        const response = await this.client.post<{ aoids: Record<string, number> }>(
+        const response = await this.client.post<{
+          aoids: Record<string, number>;
+          available: boolean;
+        }>(
           '/legacy-item-ids/resolve',
           { item_ids: internalIds.slice(start, start + chunkSize) },
           { gameVersion }
         );
+        if (!response.data.available) {
+          throw new Error(`The server holds no legacy item ids for ${gameVersion}`);
+        }
         for (const [internalId, aoid] of Object.entries(response.data.aoids)) {
           resolved.set(Number(internalId), aoid);
         }

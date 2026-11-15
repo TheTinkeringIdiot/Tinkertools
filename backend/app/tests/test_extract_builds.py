@@ -1,6 +1,6 @@
 """
 Tests for extract_builds.py, the driver that turns client builds into the
-extracts folder ``import_cli.py import-extracts`` reads.
+extracts folder ``import_cli.py import-cas`` reads.
 
 What matters: every build found ends up in index.json with the right status,
 identical client databases are parsed once, builds are listed in patch order

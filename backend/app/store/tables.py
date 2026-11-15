@@ -2,9 +2,9 @@
 Tables of the content-addressed store, as SQLAlchemy Core tables.
 
 The definitions and the rules for reading each table are in
-``backend/database/cas/001_store.sql``, ``002_curated_and_derived.sql`` and
-``003_change_analysis.sql`` (what is derived about changes);
-this module only names the tables and columns so queries can be composed.
+``backend/database/cas/001_store.sql``, ``002_curated_and_derived.sql``,
+``003_change_analysis.sql`` (what is derived about changes) and
+``004_legacy_item_ids.sql``; this module only names the tables and columns so queries can be composed.
 Indexes and constraints are not repeated here: nothing creates tables from
 this metadata.
 
@@ -43,6 +43,7 @@ build = Table(
     Column("display_name", String(120), nullable=False),
     Column("client_build", String(40)),
     Column("released_on", Date),
+    Column("notes", Text),
     Column("parent_build_id", SmallInteger),
     Column("enabled", Boolean, nullable=False),
     Column("is_default", Boolean, nullable=False),
@@ -329,4 +330,12 @@ item_source = Table(
     Column("max_ql", Integer),
     Column("conditions", Text),
     Column("metadata", JSONB, nullable=False),
+)
+
+legacy_item_id = Table(
+    "legacy_item_id",
+    metadata,
+    Column("branch", String(20), primary_key=True),
+    Column("item_id", Integer, primary_key=True),
+    Column("aoid", Integer, nullable=False),
 )
