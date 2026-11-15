@@ -1,25 +1,24 @@
 """
 Changes between builds: the change log, comparisons, field-level diffs.
 
-Two sources of "what differs between two builds" share one row shape and one
-set of filters:
+"What differs between two builds" comes from one of two places, with one row
+shape (``ChangeRow``), one set of filters (``ChangeFilters``) and one page
+(``ChangePage``):
 
 ``logged_changes(build)``
     the change log of a build (``item_change``): what the import of the build
     found against the build before it, with the relevance and the build note
-    the importer derived.
+    the importer derived. ``fetch_changes`` filters, counts and pages it in
+    one statement.
 
-``compared_changes(base, build)``
+``app.store.comparison.compare_page(db, base, build, ...)``
     the net difference between any two builds, from presence: the revision of
     every item in ``base`` against its revision in ``build``. Nothing is
     replayed, so an item that changed and changed back is not in it. Parts
-    and relevance are computed in the query from the part ids and the
-    per-revision digests of ``revision_relevance``
-    (database/cas/003_change_analysis.sql), by the rule the importer uses for
-    the log.
+    and relevance are worked out from the part ids and the per-revision
+    digests of ``revision_relevance`` (database/cas/003_change_analysis.sql),
+    by the rule the importer uses for the log, once for a pair of builds.
 
-``fetch_changes`` filters, counts and pages either source in one statement:
-the source is the expensive part of a comparison and is evaluated once.
 ``item_timeline`` and ``compare_item`` answer for one item. Field-level diffs
 come from ``app.core.item_diff`` through ``diff_revisions``; they are computed
 for the rows of a page, never for a whole list.
@@ -28,11 +27,10 @@ for the rows of a page, never for a whole list.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from sqlalchemy import (
-    Integer,
     Select,
     String,
     and_,
@@ -65,7 +63,7 @@ from app.core.change_rules import (
 from app.store import tables as t
 from app.store.context import Build, read_builds, resolve_build
 from app.store.items import criteria_response, load_effect_formats, spell_params
-from app.store.presence import any_of, page_offset, present
+from app.store.presence import any_of, page_offset, present, text_contains
 
 STAT_ICON = 79
 
@@ -77,7 +75,7 @@ PART_BITS = {
     "atkdef": 16,
     "misc": 32,
 }
-_PART_COLUMNS = {
+PART_COLUMNS = {
     "text": "text_id",
     "stats": "stats_id",
     "effects": "effects_id",
@@ -187,8 +185,9 @@ def find_build(db: Session, slug: str) -> Optional[Build]:
 
 
 def _listed_by(shown: FromClause) -> List[ColumnElement]:
-    """The columns of the revision a change is listed by, which both sources
-    carry so that filtering and sorting need not look the revision up again."""
+    """The columns of the revision a change is listed by, which the source
+    carries so that filtering and sorting need not look the revision up
+    again."""
     return [shown.c.ql, shown.c.item_class, shown.c.is_nano, shown.c.text_id]
 
 
@@ -223,7 +222,7 @@ def _parts_changed(old: FromClause, new: FromClause) -> ColumnElement:
         (
             case((old.c[column].is_distinct_from(new.c[column]), bit), else_=0)
             for column, bit in (
-                (_PART_COLUMNS[name], PART_BITS[name]) for name in PART_BITS
+                (PART_COLUMNS[name], PART_BITS[name]) for name in PART_BITS
             )
         ),
         literal(0),
@@ -263,121 +262,6 @@ def _relevance(
     for bit in bits[1:]:
         combined = combined.op("|")(bit)
     return combined
-
-
-def compared_changes(
-    base: Build,
-    build: Build,
-    rules: Optional[RelevanceRules] = None,
-    classified: bool = True,
-) -> Select:
-    """The items whose revision in ``build`` is not their revision in
-    ``base``, shaped as ``logged_changes``. No build notes: a note belongs to
-    one step of the log.
-
-    Classifying every change (``parts_changed``, ``relevance``) is half the
-    cost of a large comparison. With ``classified`` false both columns are 0
-    and the rows of a page are classified afterwards by ``classify_rows``:
-    for a request that neither filters on them nor needs the summary.
-    """
-    rules = rules or default_rules().relevance
-    before, after = t.item_presence.alias("before"), t.item_presence.alias("after")
-    old = (
-        select(before.c.aoid, before.c.rev_id).where(present(base, before))
-    ).subquery("old_presence")
-    new = (select(after.c.aoid, after.c.rev_id).where(present(build, after))).subquery(
-        "new_presence"
-    )
-    # The revision a row is listed by is the newer one, the older for a
-    # removed item; for a changed item it is the new side of the comparison.
-    shown = t.item_revision.alias("shown")
-    kind = case((old.c.rev_id.is_(None), "A"), (new.c.rev_id.is_(None), "R"), else_="C")
-    source = old.join(new, old.c.aoid == new.c.aoid, full=True).join(
-        shown, shown.c.rev_id == func.coalesce(new.c.rev_id, old.c.rev_id)
-    )
-    if classified:
-        old_revision = t.item_revision.alias("old_revision")
-        old_digests = t.revision_relevance.alias("old_digests")
-        new_digests = t.revision_relevance.alias("new_digests")
-        source = (
-            source.outerjoin(old_revision, old_revision.c.rev_id == old.c.rev_id)
-            .outerjoin(old_digests, old_digests.c.rev_id == old.c.rev_id)
-            .outerjoin(new_digests, new_digests.c.rev_id == new.c.rev_id)
-        )
-        parts_changed = case(
-            (kind == "C", _parts_changed(old_revision, shown)), else_=0
-        )
-        relevance = case(
-            (old.c.rev_id.is_(None), rules.bit("added")),
-            (new.c.rev_id.is_(None), rules.bit("removed")),
-            else_=_relevance(rules, old_revision, shown, old_digests, new_digests),
-        )
-    else:
-        parts_changed = relevance = literal(0)
-    return (
-        select(
-            func.coalesce(new.c.aoid, old.c.aoid).label("aoid"),
-            kind.label("kind"),
-            old.c.rev_id.label("old_rev_id"),
-            new.c.rev_id.label("new_rev_id"),
-            parts_changed.label("parts_changed"),
-            relevance.label("relevance"),
-            cast(null(), Integer).label("note_id"),
-            *_listed_by(shown),
-        )
-        .select_from(source)
-        .where(old.c.rev_id.is_distinct_from(new.c.rev_id))
-    )
-
-
-def classify_rows(
-    db: Session, rows: Sequence["ChangeRow"], rules: Optional[RelevanceRules] = None
-) -> List["ChangeRow"]:
-    """``rows`` of an unclassified comparison with their parts and relevance,
-    by the rule ``compared_changes`` applies to a whole comparison. One
-    query."""
-    rules = rules or default_rules().relevance
-    pairs = changed_pairs(rows)
-    found: Dict[Tuple[int, int], Tuple[int, int]] = {}
-    if pairs:
-        old, new = t.item_revision.alias("old"), t.item_revision.alias("new")
-        old_digests = t.revision_relevance.alias("old_digests")
-        new_digests = t.revision_relevance.alias("new_digests")
-        found = {
-            (row.old_rev_id, row.new_rev_id): (row.parts_changed, row.relevance)
-            for row in db.execute(
-                select(
-                    old.c.rev_id.label("old_rev_id"),
-                    new.c.rev_id.label("new_rev_id"),
-                    _parts_changed(old, new).label("parts_changed"),
-                    _relevance(rules, old, new, old_digests, new_digests).label(
-                        "relevance"
-                    ),
-                )
-                .select_from(
-                    old.join(new, new.c.aoid == old.c.aoid)
-                    .join(old_digests, old_digests.c.rev_id == old.c.rev_id)
-                    .join(new_digests, new_digests.c.rev_id == new.c.rev_id)
-                )
-                .where(
-                    any_of(old.c.rev_id, [pair[0] for pair in pairs]),
-                    any_of(new.c.rev_id, [pair[1] for pair in pairs]),
-                )
-            )
-        }
-    whole = {"A": rules.bit("added"), "R": rules.bit("removed")}
-    return [
-        (
-            replace(
-                row,
-                parts_changed=found[(row.old_rev_id, row.new_rev_id)][0],
-                relevance=found[(row.old_rev_id, row.new_rev_id)][1],
-            )
-            if row.kind == "C"
-            else replace(row, relevance=whole[row.kind])
-        )
-        for row in rows
-    ]
 
 
 # ---------------------------------------------------------------------------
@@ -425,9 +309,9 @@ class ChangePage:
     notes: Dict[int, Tuple[int, int]]
 
 
-def _contains(column: ColumnElement, text: str) -> ColumnElement:
+def name_contains(texts: FromClause, text: str) -> ColumnElement:
     escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    return column.ilike(f"%{escaped}%", escape="\\")
+    return text_contains(texts, "name", f"%{escaped}%", escape="\\")
 
 
 def _summary(changes: FromClause) -> ColumnElement:
@@ -513,13 +397,9 @@ def fetch_changes(
     sort: str,
     page: int,
     page_size: int,
-    noted: bool = True,
-    summarized: bool = True,
 ) -> ChangePage:
-    """Filter ``source`` (``logged_changes`` or ``compared_changes``), count
-    it and fetch one page, in one statement. ``noted`` is false for a source
-    without build notes, whose notes are then not counted; ``summarized`` is
-    false for a caller that has the summary of the source already.
+    """Filter ``source`` (``logged_changes``), count it and fetch one page,
+    in one statement.
 
     A row is listed, filtered and sorted by its newer revision (the older for
     a removed item); a name search also matches the older name. The summary
@@ -555,12 +435,12 @@ def fetch_changes(
         old_text = t.part_text.alias("searched_text")
         conditions.append(
             or_(
-                _contains(names.c.name, filters.search),
+                name_contains(names, filters.search),
                 exists().where(
                     old_revision.c.rev_id == changes.c.old_rev_id,
                     changes.c.new_rev_id.isnot(None),
                     old_text.c.text_id == old_revision.c.text_id,
-                    _contains(old_text.c.name, filters.search),
+                    name_contains(old_text, filters.search),
                 ),
             )
         )
@@ -631,15 +511,15 @@ def fetch_changes(
     # Two settings for this transaction. The statement is costed high enough
     # for JIT compilation, which takes longer (over 100 ms measured) than it
     # saves on a query of this size; and with the default work_mem the two
-    # materialized sets of a large comparison (120,000 rows) spill to disk
+    # materialized sets of a large change log (45,000 rows) spill to disk
     # and are read back from it by every count and sort.
     db.execute(text("SET LOCAL jit = off"))
     db.execute(text("SET LOCAL work_mem = '64MB'"))
     row = db.execute(
         select(
-            (_summary(changes) if summarized else null()).label("summary"),
-            (_note_counts(changes) if noted else null()).label("notes"),
-            (_note_counts(matched) if noted else null()).label("matching"),
+            _summary(changes).label("summary"),
+            _note_counts(changes).label("notes"),
+            _note_counts(matched).label("matching"),
             select(func.count())
             .select_from(matched)
             .where(listed)
@@ -652,7 +532,7 @@ def fetch_changes(
     return ChangePage(
         rows=[ChangeRow(*values) for values in row.rows],
         total=row.total,
-        summary=_ordered_summary(row.summary) if summarized else None,
+        summary=_ordered_summary(row.summary),
         notes={
             int(note_id): (count, matching.get(note_id, 0))
             for note_id, count in (row.notes or {}).items()

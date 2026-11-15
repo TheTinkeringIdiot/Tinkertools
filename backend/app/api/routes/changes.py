@@ -15,7 +15,8 @@ in either order.
 The change list reads the change log the importer wrote, with the relevance
 and build notes it derived. A comparison is computed from presence, so an item
 that changed and changed back between the two builds is not in it; it has the
-same rows, filters and counts, and no build notes. See ``app/store/changes.py``.
+same rows, filters and counts, and no build notes. See ``app/store/changes.py``
+and ``app/store/comparison.py``.
 
 Responses depend only on the builds named and are immutable until the next
 import, hence the response cache.
@@ -25,7 +26,7 @@ import json
 from dataclasses import replace
 from typing import Any, Dict, List, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.api.schemas.changes import (
@@ -39,12 +40,6 @@ from app.api.schemas.changes import (
 )
 from app.api.services.item_search import common_item_filters
 from app.core.change_rules import relevance_names
-from app.core.cache import (
-    CACHE_TTL,
-    cache_key_for_query,
-    cache_response,
-    get_cached_response,
-)
 from app.core.decorators import cached_response, performance_monitor
 from app.store import page_fields
 from app.store.changes import (
@@ -54,10 +49,8 @@ from app.store.changes import (
     ChangeFilters,
     ChangePage,
     change_response,
-    classify_rows,
     changed_pairs,
     compare_item,
-    compared_changes,
     diff_revisions,
     fetch_changes,
     find_build,
@@ -70,6 +63,7 @@ from app.store.changes import (
     logged_changes,
     part_names,
 )
+from app.store.comparison import compare_page
 from app.store.context import Build, get_build, get_store
 
 router = APIRouter(tags=["changes"])
@@ -171,6 +165,21 @@ def _json_value(name: str, text: Optional[str]) -> Any:
         return json.loads(text)
     except ValueError:
         raise HTTPException(status_code=422, detail=f"{name} is not JSON: {text!r}")
+
+
+TRANSITION_PARAMETERS = ("transition", "transition_old", "transition_new")
+
+
+def _no_transition_filter(request: Request) -> None:
+    """Refuses the transition filter of ``/changes`` on a comparison, which
+    has no shared transitions to filter by."""
+    given = [name for name in TRANSITION_PARAMETERS if name in request.query_params]
+    if given:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{', '.join(given)}: the transition filter exists on /changes "
+            "only; a comparison of two builds cannot be narrowed by it",
+        )
 
 
 def _other_build(db: Session, slug: str) -> Build:
@@ -306,7 +315,11 @@ def get_build_transitions(
     )
 
 
-@router.get("/compare/{base}", response_model=ChangeListResponse)
+@router.get(
+    "/compare/{base}",
+    response_model=ChangeListResponse,
+    dependencies=[Depends(_no_transition_filter)],
+)
 @cached_response("changes_compare")
 @performance_monitor
 def compare_builds(
@@ -322,27 +335,15 @@ def compare_builds(
     """
     other = _other_build(db, base)
     index = load_build_index(db)
-    filters = query.filters(build)
-    # The summary of a pair of builds is the same for every page and filter.
-    # Once it is known, a request that does not filter on parts or relevance
-    # skips classifying the whole comparison and classifies its page.
-    summary_key = cache_key_for_query("compare_summary", old=other.slug, new=build.slug)
-    summary = get_cached_response(summary_key)
-    page_only = summary is not None and not (filters.parts or filters.relevance)
-    found = fetch_changes(
+    found = compare_page(
         db,
-        compared_changes(other, build, classified=not page_only),
-        filters,
+        other,
+        build,
+        query.filters(build),
         query.sort,
         query.page,
         query.page_size,
-        noted=False,
-        summarized=not page_only,
     )
-    if page_only:
-        found = replace(found, rows=classify_rows(db, found.rows), summary=summary)
-    elif summary is None:
-        cache_response(summary_key, found.summary, CACHE_TTL["changes_compare"])
     return _change_list(
         db, query, found, build, index, index.at(other.branch, other.ordinal).ref()
     )

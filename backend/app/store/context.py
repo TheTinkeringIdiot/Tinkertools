@@ -84,6 +84,13 @@ def store_session(connection: Connection, schema: str) -> Session:
     return Session(bind=_in_schema(connection, schema), autoflush=False)
 
 
+def store_schema(db: Session) -> str:
+    """The schema of the store ``db`` reads: what tells one store from
+    another for anything kept between requests."""
+    options = db.get_bind().get_execution_options()
+    return options["schema_translate_map"][t.LOGICAL_SCHEMA]
+
+
 def read_builds(db: Session) -> List[Build]:
     """The enabled builds, newest first within the version list's order."""
     rows = db.execute(

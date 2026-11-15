@@ -8,14 +8,26 @@ Tests for the cross-version diff routes:
     GET /items/{aoid}/compare/{base}
 
 Each test fills a throwaway store (the ``store`` fixture) with a few builds of
-hand-made items and asks the API what changed.
+hand-made items and asks the API what changed. The last section checks the
+comparison of two builds on the real game data.
 """
 
 import json
 import os
+from dataclasses import replace
 
 import pytest
 
+from app.store.changes import (
+    ChangeFilters,
+    compare_item as item_comparison,
+    fetch_changes,
+    find_build,
+    load_build_index,
+    logged_changes,
+)
+from app.store.comparison import compare_page
+from app.store.context import read_builds
 from app.tests.fixtures.store_fixtures import criterion, item, modify, nano
 
 pytestmark = pytest.mark.skipif(
@@ -618,6 +630,130 @@ def test_compare_of_adjacent_builds_is_the_change_list(history):
     assert compared["summary"] == listed["summary"]
 
 
+FILTERS_AND_SORTS = [
+    {},
+    {"sort": "name"},
+    {"sort": "ql"},
+    {"page": 2, "page_size": 2},
+    {"page": 9},
+    {"kind": "changed"},
+    {"kind": ["added", "removed"]},
+    {"part": "effects"},
+    {"part": ["text", "stats"]},
+    {"relevance": "gameplay"},
+    {"relevance": ["economy", "text"]},
+    {"is_nano": "false"},
+    {"is_nano": "true"},
+    {"item_class": 2},
+    {"item_class": 3},
+    {"min_ql": 20},
+    {"max_ql": 20},
+    {"search": "spanner"},
+    {"search": "WRENCH"},
+    {"search": "100%_"},
+    {"slot": 2},
+    {"profession": 5},
+    {"relevance": "gameplay", "search": "a", "sort": "ql"},
+    {"notes": "expand"},
+    {"note_id": 1},
+]
+
+
+@pytest.mark.parametrize("slug, base", [("two", "one"), ("three", "two")])
+def test_compare_of_adjacent_builds_filters_and_sorts_as_the_change_list(
+    history, slug, base
+):
+    with history.client(slug) as client:
+        for params in FILTERS_AND_SORTS:
+            params = {"sort": "aoid", **params}
+            listed = client.get("/api/v1/changes", params=params).json()
+            compared = client.get(f"/api/v1/compare/{base}", params=params).json()
+
+            assert compared["items"] == listed["items"], params
+            assert compared["total"] == listed["total"], params
+            assert compared["pages"] == listed["pages"], params
+            assert compared["summary"] == listed["summary"], params
+
+
+@pytest.mark.parametrize(
+    "slug, base",
+    [
+        ("three", "one"),
+        ("one", "three"),
+        ("four", "one"),
+        ("fork", "four"),
+        ("four", "fork"),
+        ("fork", "one"),
+    ],
+)
+def test_compare_classifies_each_item_as_the_comparison_of_that_item_does(
+    history, slug, base
+):
+    body = compare(history, slug, base, sort="aoid")
+
+    assert body["items"]
+    for row in body["items"]:
+        alone = compare_item(history, slug, row["aoid"], base)
+        assert (row["kind"], row["parts"], row["relevance"]) == (
+            alone["kind"],
+            alone["parts"],
+            alone["relevance"],
+        )
+    assert body["summary"]["by_kind"] == {
+        kind: sum(row["kind"] == kind for row in body["items"])
+        for kind in ("added", "removed", "changed")
+    }
+    for counted, field in (("by_part", "parts"), ("by_relevance", "relevance")):
+        assert body["summary"][counted] == {
+            name: sum(name in row[field] for row in body["items"])
+            for name in body["summary"][counted]
+        }
+
+
+def test_a_comparison_is_worked_out_once_for_every_page_and_filter_of_a_pair(history):
+    requests = [
+        {},
+        {"page": 2, "page_size": 1},
+        {"relevance": "gameplay"},
+        {"part": "stats", "sort": "ql"},
+        {"kind": "added"},
+    ]
+
+    with history.client("three") as client, history.counting_queries() as statements:
+        for params in requests:
+            assert client.get("/api/v1/compare/one", params=params).status_code == 200
+        reading_presence = [s for s in statements if "item_presence" in s]
+        client.get("/api/v1/compare/two")
+
+    assert len(reading_presence) == 1
+    assert len([s for s in statements if "item_presence" in s]) == 2
+
+
+def test_a_comparison_knows_a_build_imported_after_the_last_one(history):
+    assert aoids(compare(history, "four", "three", sort="aoid")) == [HAMMER]
+
+    history.add_build(
+        "five",
+        5,
+        items=[
+            item(WRENCH, name="Spanner", ql=10, stats=[(STAT_CAN, 9)]),
+            item(900, name="Anvil", ql=300, stats=[(STAT_VALUE, 5)]),
+        ],
+    )
+    body = compare(history, "five", "four", sort="aoid")
+
+    assert [(r["aoid"], r["kind"], r["name"]) for r in body["items"]] == [
+        (WRENCH, "changed", "Spanner"),
+        (PLIERS, "removed", "Pliers"),
+        (SAW, "removed", "Saw"),
+        (DRILL, "removed", "Drill"),
+        (900, "added", "Anvil"),
+    ]
+    assert rows(body)[WRENCH]["parts"] == ["actions"]
+    assert aoids(compare(history, "five", "four", min_ql=300)) == [900]
+    assert aoids(compare(history, "five", "four", search="anvil")) == [900]
+
+
 def test_compare_runs_in_either_direction(history):
     body = compare(history, "one", "three", sort="aoid")
 
@@ -667,6 +803,20 @@ def test_compare_with_an_unknown_build_is_not_found(history):
         response = client.get("/api/v1/compare/nope")
 
     assert response.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "parameter", ["transition", "transition_old", "transition_new"]
+)
+def test_compare_refuses_the_transition_filter_of_the_change_list(history, parameter):
+    with history.client("three") as client:
+        response = client.get(f"/api/v1/compare/one?{parameter}=stat:74")
+        unfiltered = client.get("/api/v1/compare/one")
+
+    assert response.status_code == 422
+    assert parameter in response.json()["error"]
+    assert "/changes only" in response.json()["error"]
+    assert unfiltered.status_code == 200
 
 
 def test_compare_accepts_a_family_alias_as_base(history):
@@ -1027,3 +1177,50 @@ def test_later_pages_of_a_comparison_are_classified_like_the_first(history):
         assert aoids(filtered) == [
             row["aoid"] for row in fresh["items"] if "stats" in row["parts"]
         ]
+
+
+# ---------------------------------------------------------------------------
+# Comparisons of the real game data
+# ---------------------------------------------------------------------------
+
+
+def test_the_comparison_with_the_build_before_is_the_real_change_log(store_db, build):
+    before = load_build_index(store_db).base_of(build.branch, build.ordinal)
+    if before is None:
+        pytest.skip("the default build has no build before it")
+    everything = ChangeFilters(expand_notes=True)
+
+    for sort in ("name", "ql", "aoid"):
+        logged = fetch_changes(
+            store_db, logged_changes(build), everything, sort, 1, 200
+        )
+        compared = compare_page(
+            store_db, find_build(store_db, before.slug), build, everything, sort, 1, 200
+        )
+        assert compared.rows == [replace(row, note_id=None) for row in logged.rows]
+        assert compared.total == logged.total
+        assert compared.summary == {**logged.summary, "noted": 0}
+
+
+def test_a_comparison_of_builds_far_apart_classifies_as_one_item_at_a_time(
+    store_db, build
+):
+    oldest = min(
+        (other for other in read_builds(store_db) if other.branch == build.branch),
+        key=lambda other: other.ordinal,
+    )
+    if oldest == build:
+        pytest.skip("the default build is the only one of its branch")
+    changed = ChangeFilters(kinds=["changed"])
+    total = compare_page(store_db, oldest, build, changed, "aoid", 1, 1).total
+    sample = [
+        row
+        for page in (1, total // 40, total // 20)
+        for row in compare_page(
+            store_db, oldest, build, changed, "aoid", max(page, 1), 20
+        ).rows
+    ]
+
+    assert sample
+    for row in sample:
+        assert row == item_comparison(store_db, oldest, build, row.aoid)

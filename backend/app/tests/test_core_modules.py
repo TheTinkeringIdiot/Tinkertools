@@ -267,6 +267,73 @@ class TestCacheService:
         assert len(cache.cache) == 50
         assert cache.total_bytes == cache.max_bytes
 
+    def test_callers_that_miss_a_key_together_compute_its_value_once(self, cache):
+        computing = threading.Event()
+        calls = []
+
+        def compute():
+            calls.append(threading.current_thread().name)
+            computing.wait(timeout=5)
+            return b"x" * 100
+
+        results = []
+        threads = [
+            threading.Thread(
+                target=lambda: results.append(cache.get_or_compute("pair", compute))
+            )
+            for _ in range(8)
+        ]
+        for thread in threads:
+            thread.start()
+        while not calls:
+            time.sleep(0.001)
+        time.sleep(0.05)
+        computing.set()
+        for thread in threads:
+            thread.join()
+
+        assert len(calls) == 1
+        assert results == [b"x" * 100] * 8
+        assert cache.get_or_compute("pair", compute) == b"x" * 100
+        assert len(calls) == 1
+
+    def test_a_computed_value_counts_against_the_byte_budget_by_its_own_size(self):
+        cache = CacheService(max_bytes=room_for(LARGEST_ENTRY_FRACTION, of_size=1000))
+        keys = [f"pair {n}" for n in range(LARGEST_ENTRY_FRACTION)]
+
+        for key in keys:
+            cache.get_or_compute(key, lambda: [key], size_of=lambda value: 1000)
+        assert cache.total_bytes == cache.max_bytes
+        assert cache.get_or_compute(keys[0], lambda: ["never"]) == [keys[0]]
+        cache.get_or_compute("one more", lambda: [], size_of=lambda value: 1000)
+
+        assert held(cache, [*keys, "one more"]) == [keys[0], *keys[2:], "one more"]
+        assert cache.total_bytes == cache.max_bytes
+
+    def test_a_value_too_large_to_keep_is_returned_and_computed_again(self):
+        cache = CacheService(max_bytes=room_for(1, of_size=1000))
+        calls = []
+
+        def compute():
+            calls.append(1)
+            return ["large"]
+
+        for _ in range(2):
+            found = cache.get_or_compute("large", compute, size_of=lambda value: 10**6)
+            assert found == ["large"]
+
+        assert len(calls) == 2
+        assert cache.total_bytes == 0
+
+    def test_a_computation_that_fails_is_tried_again_by_the_next_caller(self, cache):
+        def fail():
+            raise RuntimeError("no database")
+
+        with pytest.raises(RuntimeError):
+            cache.get_or_compute("pair", fail)
+
+        assert cache.get_or_compute("pair", lambda: "value") == "value"
+
 
 class TestCacheModuleFunctions:
     """Test suite for module-level cache functions."""

@@ -15,6 +15,10 @@ exceeds ``max_bytes``:
 A read counts as a use. An expired entry is dropped by the read that finds it
 as well as by the next write.
 
+``get_or_compute`` is for a value that is costly to make and asked for by
+several requests at once: the first to miss computes it and the others wait
+for that result.
+
 ``cached_response`` (app/core/decorators.py) stores the serialised body of a
 response, so an entry's size is the memory it holds, give or take the
 ``ENTRY_OVERHEAD`` charged for its key and bookkeeping.
@@ -25,8 +29,9 @@ import json
 import threading
 import time
 from collections import OrderedDict
+from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Iterator, List, Optional
 
 from app.core.config import settings
 
@@ -80,6 +85,9 @@ class CacheService:
         self._by_ttl: Dict[int, "OrderedDict[str, None]"] = {}
         self.total_bytes = 0
         self.lock = threading.RLock()
+        # Keys being computed by ``get_or_compute``: the lock that whoever
+        # computes holds, and how many callers hold or wait for it.
+        self._computing: Dict[str, List[Any]] = {}
         self.stats = {
             "hits": 0,
             "misses": 0,
@@ -164,6 +172,50 @@ class CacheService:
             self.total_bytes += entry_size
             self.stats["sets"] += 1
             return True
+
+    @contextmanager
+    def _alone(self, key: str) -> Iterator[None]:
+        """Holds the block for one caller per key at a time."""
+        with self.lock:
+            turn = self._computing.setdefault(key, [threading.Lock(), 0])
+            turn[1] += 1
+        try:
+            with turn[0]:
+                yield
+        finally:
+            with self.lock:
+                turn[1] -= 1
+                if not turn[1]:
+                    del self._computing[key]
+
+    def get_or_compute(
+        self,
+        key: str,
+        compute: Callable[[], Any],
+        ttl: Optional[int] = None,
+        size_of: Optional[Callable[[Any], int]] = None,
+    ) -> Any:
+        """The value under ``key``, computed and kept when it is not there.
+
+        Callers that miss the same key at the same time compute once: the
+        first calls ``compute``, the others wait and take its result. If it
+        raises, the next in line tries. ``size_of`` gives the bytes of a
+        value whose size ``set`` cannot know. A value the cache does not
+        keep (too large, or the cache is off) is still returned, and is then
+        computed again by the next caller.
+        """
+        found = self.get(key)
+        if found is not None:
+            return found
+        with self._alone(key):
+            with self.lock:
+                entry = self.cache.get(key)
+                if entry is not None and self._clock() < entry.expires_at:
+                    self.cache.move_to_end(key)
+                    return entry.value
+            value = compute()
+            self.set(key, value, ttl, None if size_of is None else size_of(value))
+            return value
 
     def delete(self, key: str) -> bool:
         """Delete a key from cache."""

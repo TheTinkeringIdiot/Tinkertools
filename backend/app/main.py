@@ -1,7 +1,11 @@
+import threading
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import settings
@@ -20,6 +24,21 @@ from app.api.routes.cache import router as cache_router
 from app.api.routes.aosetups import router as aosetups_router
 from app.api.routes.perks import router as perks_router
 from app.api.routes.weapons import router as weapons_router
+from app.store import comparison
+
+_preloaded = threading.Event()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Has what build comparisons read of every revision in memory before
+    the first request is taken: 0.4 s of loading that the first comparison
+    would otherwise wait for. Once per process."""
+    if not _preloaded.is_set():
+        _preloaded.set()
+        await run_in_threadpool(comparison.preload)
+    yield
+
 
 app = FastAPI(
     title="TinkerTools API",
@@ -27,6 +46,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # CORS - Environment-based origin configuration
