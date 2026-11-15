@@ -976,6 +976,54 @@ def test_a_store_made_before_mobs_could_be_retired_is_brought_up_to_date(
     assert not any(sync_curated(conn, curated_files(tmp_path, both[:1])).values())
 
 
+def trigram_indexes(conn, schema):
+    """``{index name: its definition}`` of the trigram indexes of part_text."""
+    return dict(
+        conn.execute(
+            "SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = %s "
+            "AND tablename = 'part_text' AND indexdef LIKE '%%gin_trgm_ops%%'",
+            (schema,),
+        ).fetchall()
+    )
+
+
+def test_a_new_store_has_a_trigram_index_on_the_name_and_on_the_description(conn):
+    schema = conn.execute("SELECT current_schema()").fetchone()[0]
+    operators = cas_store.extension_schema(conn, "pg_trgm")
+
+    assert trigram_indexes(conn, schema) == {
+        f"part_text_{short}_trgm": f"CREATE INDEX part_text_{short}_trgm "
+        f"ON {schema}.part_text USING gin ({column} {operators}.gin_trgm_ops)"
+        for short, column in (("name", "name"), ("desc", "description"))
+    }
+    assert operators == cas_store.extension_schema(conn, "btree_gist")
+
+
+def test_a_store_made_before_substring_search_was_indexed_gets_the_indexes(conn):
+    schema = conn.execute("SELECT current_schema()").fetchone()[0]
+    load(conn, spec("b1", 1), items=[item(1, name="Sword"), item(2, name="Axe")])
+    as_created = trigram_indexes(conn, schema)
+    for name in as_created:
+        conn.execute(f"DROP INDEX {schema}.{name}")
+    before = table_counts(conn)
+
+    cas_store.upgrade_store(conn, schema)
+
+    assert trigram_indexes(conn, schema) == as_created
+    assert table_counts(conn) == before
+    assert cas_store.ensure_trigram_indexes(conn, schema) == []
+    cas_store.upgrade_store(conn, schema)
+    assert trigram_indexes(conn, schema) == as_created
+
+
+def test_an_upgrade_adds_only_the_trigram_index_that_is_missing(conn):
+    schema = conn.execute("SELECT current_schema()").fetchone()[0]
+    conn.execute(f"DROP INDEX {schema}.part_text_desc_trgm")
+
+    assert cas_store.ensure_trigram_indexes(conn, schema) == ["part_text_desc_trgm"]
+    assert set(trigram_indexes(conn, schema)) == set(cas_store.TRIGRAM_INDEXES)
+
+
 def test_the_id_of_a_removed_mob_is_never_given_to_another(conn, tmp_path):
     sync_curated(
         conn, curated_files(tmp_path, [("Ahpta", "Inferno", 1), ("Beit", "Scheol", 2)])

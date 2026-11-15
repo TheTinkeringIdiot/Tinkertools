@@ -19,6 +19,11 @@
 -- Needed for the no-overlap constraint on item_presence. The extension is
 -- trusted, so the database owner can create it.
 CREATE EXTENSION IF NOT EXISTS btree_gist;
+-- Needed for the trigram indexes on part_text (substring search). Trusted as
+-- well. Both extensions live in the schema of the database's first store:
+-- when btree_gist is already installed, the importer installs pg_trgm next to
+-- it before this file runs (cas_store.ensure_trigram_extension).
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- ---------------------------------------------------------------------------
 -- Builds
@@ -65,6 +70,11 @@ CREATE INDEX part_text_name_fts ON part_text USING gin (to_tsvector('english', n
 CREATE INDEX part_text_desc_fts ON part_text USING gin (to_tsvector('english', description));
 CREATE INDEX part_text_name_desc_fts ON part_text
     USING gin (to_tsvector('english', name || ' ' || description));
+-- Substring search (ILIKE '%term%') reads two more indexes, part_text_name_trgm
+-- and part_text_desc_trgm: gin (name gin_trgm_ops) and gin (description
+-- gin_trgm_ops). The importer creates them (cas_store.ensure_trigram_indexes),
+-- because gin_trgm_ops has to be named with the schema pg_trgm is installed
+-- in, which this unqualified file cannot know.
 -- Interpolation groups the QL variants of an item by identical name and description.
 CREATE INDEX part_text_variant ON part_text (md5(name), md5(description));
 

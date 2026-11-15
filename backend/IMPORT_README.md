@@ -151,7 +151,8 @@ python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --schema c
 - Each build is one transaction. Builds already in the store are skipped, so a run that stopped can be repeated and picks up where it stopped. A build older than the newest stored build of its branch is refused: `--reset` and import again to insert one.
 - The newest stored build of each branch is the one served with the curated nano strains; the build before it goes back to its own strains in the transaction that stores the new one.
 - `--workers N` reads and splits N builds ahead of the importer, about 2 GB of memory each; `--workers 0` reads in the importer's process.
-- **Never `DROP SCHEMA cas`.** The `btree_gist` extension lives in the schema the first store was created in, and dropping that schema takes the extension and the presence constraint of every other store with it. Use `--reset --yes`, which drops tables only.
+- **Never `DROP SCHEMA cas`.** Two extensions, `btree_gist` and `pg_trgm`, live in the schema the first store was created in, and dropping that schema takes them with it, and with them the presence constraint and the trigram indexes of every other store. Use `--reset --yes`, which drops tables only.
+- Every run brings an existing store up to date with the SQL files in place before it imports anything, also when there is nothing to import. That is how a store made earlier gets `pg_trgm` and the two trigram indexes of `part_text` behind substring search (`part_text_name_trgm`, `part_text_desc_trgm`; about 6 s and 46 MB on the full store). Both extensions are trusted: the role needs `CREATE` on the database, not superuser.
 
 Verify after an import (`DATABASE_URL` set as above; the current store is only read):
 

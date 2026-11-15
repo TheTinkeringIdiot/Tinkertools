@@ -79,6 +79,16 @@ UNUSABLE_STRAINS = (None, 0, 99999)
 SQL_DIR = Path(__file__).resolve().parents[2] / "database" / "cas"
 _SCHEMA_NAME = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
 
+# Substring search: ``ILIKE '%term%'`` on these columns of part_text is
+# answered from a trigram index. The operator class belongs to pg_trgm, which
+# lives in one schema of the database whichever store is being created, so the
+# indexes are created by ensure_trigram_indexes with its qualified name, not
+# by 001_store.sql.
+TRIGRAM_INDEXES = {
+    "part_text_name_trgm": "name",
+    "part_text_desc_trgm": "description",
+}
+
 Timings = Dict[str, float]
 
 
@@ -147,9 +157,74 @@ def create_store(conn: psycopg.Connection, schema: str) -> bool:
     )
     if store_exists(conn, schema):
         return False
+    ensure_trigram_extension(conn, schema)
     for path in sorted(SQL_DIR.glob("*.sql")):
         conn.execute(path.read_text(encoding="utf-8"))
+    ensure_trigram_indexes(conn, schema)
     return True
+
+
+def extension_schema(conn: psycopg.Connection, extension: str) -> Optional[str]:
+    """The schema ``extension`` is installed in, None if it is not installed."""
+    row = conn.execute(
+        "SELECT n.nspname FROM pg_extension e "
+        "JOIN pg_namespace n ON n.oid = e.extnamespace WHERE e.extname = %s",
+        (extension,),
+    ).fetchone()
+    return row[0] if row else None
+
+
+def ensure_trigram_extension(conn: psycopg.Connection, schema: str) -> str:
+    """Install pg_trgm unless it is installed; returns the schema it is in.
+
+    It goes where btree_gist is, the schema of the database's first store, so
+    both extensions stay in one schema; ``schema`` when there is none yet.
+    """
+    validate_store_schema(schema)
+    installed = extension_schema(conn, "pg_trgm")
+    if installed:
+        return installed
+    target = extension_schema(conn, "btree_gist") or schema
+    conn.execute(
+        sql.SQL("CREATE EXTENSION IF NOT EXISTS pg_trgm SCHEMA {}").format(
+            sql.Identifier(target)
+        )
+    )
+    return target
+
+
+def ensure_trigram_indexes(conn: psycopg.Connection, schema: str) -> List[str]:
+    """Create the indexes of TRIGRAM_INDEXES the store lacks; returns their
+    names. The table is readable while an index is built."""
+    operators = ensure_trigram_extension(conn, schema)
+    existing = {
+        row[0]
+        for row in conn.execute(
+            "SELECT indexname FROM pg_indexes "
+            "WHERE schemaname = %s AND tablename = 'part_text'",
+            (schema,),
+        )
+    }
+    created = []
+    for name, column in TRIGRAM_INDEXES.items():
+        if name in existing:
+            continue
+        started = time.perf_counter()
+        conn.execute(
+            sql.SQL(
+                "CREATE INDEX {} ON {}.part_text USING gin ({} {}.gin_trgm_ops)"
+            ).format(
+                sql.Identifier(name),
+                sql.Identifier(schema),
+                sql.Identifier(column),
+                sql.Identifier(operators),
+            )
+        )
+        logger.info(
+            f"Created index {schema}.{name} in {time.perf_counter() - started:.1f} s"
+        )
+        created.append(name)
+    return created
 
 
 def upgrade_store(conn: psycopg.Connection, schema: str) -> None:
@@ -167,14 +242,16 @@ def upgrade_store(conn: psycopg.Connection, schema: str) -> None:
                 "ALTER TABLE {}.mob ADD COLUMN retired boolean NOT NULL DEFAULT false"
             ).format(sql.Identifier(schema))
         )
+    ensure_trigram_indexes(conn, schema)
 
 
 def drop_store(conn: psycopg.Connection, schema: str) -> None:
     """Drop every table of ``schema``, keeping the schema itself.
 
-    The schema is kept because the btree_gist extension lives in the first
-    schema a store was created in, and dropping that schema would take the
-    extension and every other store's presence constraint with it.
+    The schema is kept because the btree_gist and pg_trgm extensions live in
+    the first schema a store was created in, and dropping that schema would
+    take them with it, and with them every other store's presence constraint
+    and trigram indexes.
     """
     validate_store_schema(schema)
     tables = conn.execute(
