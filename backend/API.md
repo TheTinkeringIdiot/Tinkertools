@@ -528,7 +528,7 @@ The change list of the request's build: every item added, removed or changed rel
 - `search` (string): text the new or the old name contains
 - `notes` (`collapse` | `expand`, default `collapse`), `note_id` (int): see below
 - `transition`, `transition_old`, `transition_new`: only the items of one line of `GET /changes/transitions`. `transition` is the line's `path`; the other two are its `old` and `new` as JSON (`60`, `"added"`, `[124,1060,2]`, `null`) and may be left out to take every line of the path
-- `include_diff` (bool, default false): give each changed item of the page its field-level diff
+- `include_diff` (bool, default false): give each changed item of the page its field-level diff. A very large diff is left out: the row has `"diff": null, "diff_omitted": true`, and `GET /items/{aoid}/compare/{base}` returns it
 
 **Response:** a `PaginatedResponse` of change rows, plus `build`, `base`, `summary` and `notes`:
 ```json
@@ -541,7 +541,8 @@ The change list of the request's build: every item added, removed or changed rel
       "parts": ["text", "stats", "effects"],
       "relevance": ["gameplay", "cosmetic", "text"],
       "note_id": null,
-      "diff": null
+      "diff": null,
+      "diff_omitted": false
     }
   ],
   "total": 92, "page": 1, "page_size": 50, "pages": 2, "has_next": true, "has_prev": false,
@@ -563,15 +564,20 @@ The change list of the request's build: every item added, removed or changed rel
 ```
 - A row is listed by its newer revision (the older one for a removed item); `old_name` and `old_ql` are set only when they differ. `icon` is stat 79.
 - `summary` counts every change of the build, whatever the filters. `base` is null for a build with nothing before it.
+- `diff_omitted` is true only when the diff was asked for (`include_diff=true`) and is too much for a row of a page: the effects of the two revisions, with their criteria, number more than 1,000, or the diff is more than 64 KB of JSON. In the change log of all 147 builds that is 11 of 127,374 changed items (five vehicle nanos of 17.7.0 at 186 KB each, six shop inventories). The row is otherwise complete; ask for the diff with `GET /items/{aoid}/compare/{base}`, using the `slug` of the response's `base`. Rows without a diff to give (`include_diff=false`, added and removed items) have `diff_omitted: false`.
 - **Build notes** are build-wide events that explain many changes at once (`backend/database/build_notes.toml`). A change carries a `note_id` only when the note explains all of it. By default such changes are collapsed: left out of `items` and `total`, and counted per note in `notes` (`count`: changes the note explains; `matching`: those that match the request's filters). `notes=expand` lists them with the rest; `note_id=N` lists only that note's.
 
 #### GET /api/v1/compare/{base}
-The net difference between build `base` and the request's build, computed from what each build holds, not by replaying the builds between them: an item that changed and changed back is not listed. Any two builds, in either order, across families (`/api/v1/prk-0-7-1/compare/ao-17-10-5`). Parameters (except `transition*`) and response are those of `GET /changes`; a comparison has no build notes, so `notes` is empty and every `note_id` null. The first request for a pair of builds classifies the whole comparison and keeps its `summary`; later pages and filters of the pair classify only their page, unless they filter on `part` or `relevance`. For the farthest pair (14.2.2 against live, 123,224 items) that is 0.5 to 0.9 s once, then under 300 ms per page.
+The net difference between build `base` and the request's build, computed from what each build holds, not by replaying the builds between them: an item that changed and changed back is not listed. Any two builds, in either order, across families (`/api/v1/prk-0-7-1/compare/ao-17-10-5`). Parameters (except `transition*`) and response are those of `GET /changes`, `diff_omitted` included; a comparison has no build notes, so `notes` is empty and every `note_id` null. The first request for a pair of builds classifies the whole comparison and keeps its `summary`; later pages and filters of the pair classify only their page, unless they filter on `part` or `relevance`. For the farthest pair (14.2.2 against live, 123,224 items) that is 0.5 to 0.9 s once, then under 300 ms per page.
 
 #### GET /api/v1/changes/transitions
 The field transitions that most changed items of the request's build share, most items first. They read as patch notes.
 
-**Query Parameters:** `part` (repeatable), `min_items` (int, default 2), `limit` (int, default 50, max 500)
+**Query Parameters:**
+- `part` (repeatable): only transitions of these parts
+- `relevance` (repeatable: `gameplay` | `economy` | `cosmetic` | `text`; default `gameplay`, `economy` and `text`): only transitions of fields that matter for one of these. The class is that of the field itself (the stat, the effect type, the part), whatever else the items changed: an icon or `static_instance` line is `cosmetic` even on items that changed in gameplay too. Unlike on `GET /changes`, leaving the parameter out does filter: name all four classes to list cosmetic lines as well.
+- `notes` (`collapse` | `expand`, default `collapse`): with `collapse` the patch notes leave out what a build note already says. `items` and `occurrences` count only the changes no build note explains, and a transition is left out when the build's notes account for it: when fewer than `min_items` of those changes have it outside the event of a note. A note accounts for the transitions its rule names, in the items its event happened to (`backend/database/build_notes.toml`), so the implants of 14.8.0 that were renamed and rebalanced are listed with their rebalancing and not with the rename. With `expand` every transition is listed and counted over every change.
+- `min_items` (int, default 2), `limit` (int, default 50, max 500)
 
 **Response:**
 ```json
@@ -580,12 +586,12 @@ The field transitions that most changed items of the request's build share, most
   "base": {"slug": "ao-14-5-1", "...": "..."},
   "transitions": [
     {"part": "effects", "path": "effect:53089:spell_params.Chance", "old": 60, "new": 100,
-     "items": 760, "occurrences": 760,
+     "relevance": "gameplay", "items": 760, "occurrences": 760,
      "stat": null, "bit": null, "spell_id": 53089, "action": null, "field": "spell_params.Chance"}
   ]
 }
 ```
-Only transitions shared by at least two items are kept. `stat`, `bit`, `spell_id`, `action` and `field` repeat the ids in `path`. Paths, with what `old` and `new` hold (null: absent, or particular to each item):
+Only transitions shared by at least two items are kept. `relevance` is the class of the line's field. A listed line's `items` is the `total` of `GET /changes` narrowed to it (`transition`, `transition_old`, `transition_new`) with the same `notes` value. `stat`, `bit`, `spell_id`, `action` and `field` repeat the ids in `path`. Paths, with what `old` and `new` hold (null: absent, or particular to each item):
 
 | part | path | old, new |
 |---|---|---|
@@ -626,12 +632,12 @@ Every build in which the item was added, changed or removed, newest first, along
   ]
 }
 ```
-`note` is `{"note_id", "title", "body"}` when a build note explains the entry. `GET /items/{aoid}/revisions` remains for the "changed in" badge; the timeline has more: removals, items that return, relevance and diffs.
+`note` is `{"note_id", "title", "body"}` when a build note explains the entry. The "changed in" badge of list rows is fed by `POST /items/revisions/batch`, which counts the builds that changed an item's definition; the timeline has more: removals, items that return, relevance and diffs.
 
 #### GET /api/v1/items/{aoid}/compare/{base}
 One item in build `base` and in the request's build.
 
-**Response:** `{"aoid", "build", "base", "kind", "old", "new", "parts", "relevance", "diff"}`. `kind` is `added`, `removed`, `changed` or `unchanged`; `old` and `new` are `{"name", "ql", "item_class", "is_nano", "icon"}` or null where the build lacks the item; `diff` is given when both have it. 404 when neither build has the item or `base` is unknown.
+**Response:** `{"aoid", "build", "base", "kind", "old", "new", "parts", "relevance", "diff"}`. `kind` is `added`, `removed`, `changed` or `unchanged`; `old` and `new` are `{"name", "ql", "item_class", "is_nano", "icon"}` or null where the build lacks the item; `diff` is given when both have it, whatever its size. 404 when neither build has the item or `base` is unknown.
 
 #### The field-level diff
 `diff` has one list per part, empty when the part is the same: `text`, `stats`, `effects`, `actions`, `attack`, `defense`, `misc`. Every entry has a `relevance`, and the `relevance` of the change is the union of its entries' values.
