@@ -65,8 +65,9 @@ from app.core.change_rules import (
 )
 from app.core.item_diff import MISC_FIELDS, Transition
 
-# Bump when the diff engine or what is derived from it changes, so stores
-# analysed by the earlier code are analysed again.
+# Bump when the diff engine or what is derived from it changes (the
+# per-revision digests, the classification, the notes, the transitions), so
+# stores analysed by the earlier code are analysed again from the digests up.
 ANALYSIS_VERSION = "5"
 
 # A transition is kept in build_transition when this many items share it.
@@ -616,6 +617,23 @@ def analysis_digest(rules: ChangeRules) -> str:
     ).hexdigest()
 
 
+def relevance_state(relevance: RelevanceRules) -> str:
+    """What the per-revision digests and the relevance of each change were
+    derived from: the engine and ``change_relevance.toml``."""
+    return f"{ANALYSIS_VERSION}:{relevance.digest}"
+
+
+def relevance_is_current(state: Mapping[str, str], relevance: RelevanceRules) -> bool:
+    """Whether a store with these ``store_state`` rows holds the digests and
+    relevance this engine derives from ``relevance``."""
+    recorded = state.get(STATE_RELEVANCE)
+    # Engine 5 recorded the file alone until the engine became part of the
+    # value. Goes with the next ANALYSIS_VERSION.
+    if ANALYSIS_VERSION == "5" and recorded == relevance.digest:
+        return True
+    return recorded == relevance_state(relevance)
+
+
 def _set_state(conn: psycopg.Connection, name: str, value: str) -> None:
     conn.execute(
         "INSERT INTO store_state (name, value) VALUES (%s, %s) "
@@ -630,8 +648,9 @@ def sync(conn: psycopg.Connection, rules: ChangeRules) -> Dict[str, int]:
 
     Idempotent. The relevance of every change is checked on each call (one
     statement); the per-revision digests are recomputed only when
-    ``change_relevance.toml`` changed, and the notes and transitions only
-    when either file or the engine did. Returns what was written.
+    ``change_relevance.toml`` or the engine changed, and the notes and
+    transitions only when either file or the engine did. Returns what was
+    written.
     """
     state = dict(conn.execute("SELECT name, value FROM store_state").fetchall())
     done = {
@@ -641,11 +660,11 @@ def sync(conn: psycopg.Connection, rules: ChangeRules) -> Dict[str, int]:
         "retagged": 0,
         "transitions": 0,
     }
-    if state.get(STATE_RELEVANCE) != rules.relevance.digest:
+    if not relevance_is_current(state, rules.relevance):
         conn.execute("TRUNCATE revision_relevance")
     done["digests"] = ensure_revision_relevance(conn, rules.relevance)
     done["reclassified"] = classify(conn, rules.relevance)
-    _set_state(conn, STATE_RELEVANCE, rules.relevance.digest)
+    _set_state(conn, STATE_RELEVANCE, relevance_state(rules.relevance))
     if state.get(STATE_ANALYSIS) != analysis_digest(rules):
         done.update(analyze(conn, rules))
         _set_state(conn, STATE_ANALYSIS, analysis_digest(rules))

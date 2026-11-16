@@ -450,20 +450,20 @@ def check_change_rules(report, conn, rules):
     report.differences += len(stored ^ defined)
 
     state = dict(conn.execute("SELECT name, value FROM store_state").fetchall())
-    for what, name, wanted in (
+    for what, current in (
         (
-            "change_relevance.toml applied to the store",
-            change_analysis.STATE_RELEVANCE,
-            rules.relevance.digest,
+            "change_relevance.toml and the diff engine applied to the "
+            "relevance of the change log",
+            change_analysis.relevance_is_current(state, rules.relevance),
         ),
         (
             "build_notes.toml, change_relevance.toml and the diff engine "
             "applied to the notes and transitions",
-            change_analysis.STATE_ANALYSIS,
-            change_analysis.analysis_digest(rules),
+            state.get(change_analysis.STATE_ANALYSIS)
+            == change_analysis.analysis_digest(rules),
         ),
     ):
-        stale = state.get(name) != wanted
+        stale = not current
         print(f"  {what}: " + ("no (run import_cli.py import-cas)" if stale else "yes"))
         report.differences += stale
 

@@ -51,7 +51,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import ColumnElement, FromClause
 
 from app.core import item_diff
-from app.core.change_analysis import STATE_ANALYSIS, STATE_RELEVANCE, analysis_digest
+from app.core.change_analysis import (
+    STATE_ANALYSIS,
+    analysis_digest,
+    relevance_is_current,
+)
 from app.core.change_rules import (
     CLASSES,
     NOTES_FILE,
@@ -204,18 +208,16 @@ def stale_rules(db: Session, rules: Optional[ChangeRules] = None) -> List[str]:
     state = dict(db.execute(select(t.store_state.c.name, t.store_state.c.value)).all())
     derived = (
         (
-            STATE_RELEVANCE,
-            rules.relevance.digest,
-            f"the relevance of the change log ({RELEVANCE_FILE.name})",
+            relevance_is_current(state, rules.relevance),
+            f"the relevance of the change log ({RELEVANCE_FILE.name}, diff engine)",
         ),
         (
-            STATE_ANALYSIS,
-            analysis_digest(rules),
+            state.get(STATE_ANALYSIS) == analysis_digest(rules),
             f"build notes and shared transitions ({NOTES_FILE.name}, "
             f"{RELEVANCE_FILE.name}, diff engine)",
         ),
     )
-    return [what for name, digest, what in derived if state.get(name) != digest]
+    return [what for current, what in derived if not current]
 
 
 def warn_of_stale_rules(db: Session, rules: Optional[ChangeRules] = None) -> bool:

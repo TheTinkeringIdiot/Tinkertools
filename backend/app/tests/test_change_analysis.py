@@ -264,6 +264,41 @@ def test_sync_writes_nothing_when_nothing_changed(conn):
     assert set(change_analysis.sync(conn, rules()).values()) == {0}
 
 
+def test_sync_rebuilds_the_digests_when_the_engine_changes(conn, monkeypatch):
+    """The digests come from code as much as from the file: a store analysed
+    by an earlier engine must not keep its digests."""
+    load(conn, spec("one", 1), items=[item(1, stats=[(74, 10)])])
+    load(conn, spec("two", 2), items=[item(1, stats=[(74, 20)])])
+    change_analysis.sync(conn, rules())
+    conn.execute("UPDATE revision_relevance SET economy = 0")
+    assert change_analysis.sync(conn, rules())["digests"] == 0
+
+    monkeypatch.setattr(change_analysis, "ANALYSIS_VERSION", "next")
+    done = change_analysis.sync(conn, rules())
+
+    assert done["digests"] == 2
+    assert relevance(conn, 2) == {1: ECONOMY}
+    assert set(change_analysis.sync(conn, rules()).values()) == {0}
+
+
+def test_a_store_that_recorded_the_relevance_file_alone_keeps_its_digests(conn):
+    """Stores analysed by engine 5 before it recorded itself are current."""
+    load(conn, spec("one", 1), items=[item(1, stats=[(74, 10)])])
+    load(conn, spec("two", 2), items=[item(1, stats=[(74, 20)])])
+    change_analysis.sync(conn, rules())
+    record = "SELECT value FROM store_state WHERE name = 'relevance_rules'"
+    recorded = conn.execute(record).fetchone()
+    conn.execute(
+        "UPDATE store_state SET value = %s WHERE name = 'relevance_rules'",
+        (rules().relevance.digest,),
+    )
+
+    done = change_analysis.sync(conn, rules())
+
+    assert set(done.values()) == {0}
+    assert conn.execute(record).fetchone() == recorded
+
+
 def test_sync_classifies_a_log_that_was_never_classified(conn):
     load(conn, spec("one", 1), items=[item(1, name="A")])
     load(conn, spec("two", 2), items=[item(1, name="B")])
