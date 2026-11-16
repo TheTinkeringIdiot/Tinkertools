@@ -261,6 +261,26 @@ def test_a_condition_never_becomes_a_requirement_or_a_logical_operator():
     ]
 
 
+@pytest.mark.parametrize("operator", [0, 1, 2, 22, 24, 107])
+def test_every_operator_that_tests_a_stat_makes_a_requirement(operator):
+    # a requirement is one criterion while it tests the same stat, and never
+    # the condition (45) that took its place
+    assert ops(diff_criteria([[112, 4, operator]], [[112, 8, operator]])) == [
+        ("changed", [112, 4, operator], [112, 8, operator])
+    ]
+    assert ops(diff_criteria([[112, 4, operator]], [[112, 0, 45]])) == [
+        ("removed", [112, 4, operator], None),
+        ("added", None, [112, 0, 45]),
+    ]
+
+
+def test_a_condition_on_something_else_is_a_removal_and_an_addition():
+    assert ops(diff_criteria([[91, 5, 93]], [[92, 5, 93]])) == [
+        ("removed", [91, 5, 93], None),
+        ("added", None, [92, 5, 93]),
+    ]
+
+
 def test_a_requirement_whose_operator_changed_is_changed_in_place():
     assert ops(diff_criteria([[112, 50, 2]], [[112, 50, 1]])) == [
         ("changed", [112, 50, 2], [112, 50, 1])
