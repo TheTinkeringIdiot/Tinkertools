@@ -444,6 +444,23 @@ def test_change_list_rejects_an_unknown_filter_value(history):
         assert client.get("/api/v1/changes?sort=rev_id").status_code == 422
 
 
+def test_an_item_without_a_name_is_listed_after_every_name(store):
+    store.add_build("one", 1, items=[item(3, name="Awl")])
+    store.add_build(
+        "two",
+        2,
+        items=[item(1, name=""), item(2, name=""), item(3, name="Bradawl"), item(4)],
+    )
+
+    for body in (changes(store, "two"), compare(store, "two", "one")):
+        assert [(r["name"], r["aoid"]) for r in body["items"]] == [
+            ("Bradawl", 3),
+            ("Thing", 4),
+            ("", 1),
+            ("", 2),
+        ]
+
+
 def test_change_list_sorts_by_name_by_default_and_pages(history):
     by_name = changes(history, "two")
     by_ql = changes(history, "two", sort="ql")

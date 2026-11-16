@@ -455,7 +455,8 @@ def fetch_changes(
     in one statement.
 
     A row is listed, filtered and sorted by its newer revision (the older for
-    a removed item); a name search also matches the older name. The summary
+    a removed item); a name search also matches the older name, and a sort by
+    name ends on the items that have none. The summary
     counts every change of the source whatever the filters. Changes explained
     by a build note are left out of the page and of ``total`` unless
     ``filters.expand_notes`` or ``filters.note_id`` says otherwise.
@@ -535,13 +536,17 @@ def fetch_changes(
     else:
         listed = matched.c.note_id.is_(None)
 
+    def order(rows: FromClause) -> List[ColumnElement]:
+        """By name, an item without a name after every name; ties by AOID."""
+        keys = {"name": [rows.c.name == "", rows.c.name], "ql": [rows.c.ql]}
+        return [*keys.get(sort, ()), rows.c.aoid]
+
     # The page is cut before its rows are built: a row built for every match
     # and then sorted costs more than the rest of the statement.
-    keys = {"name": ["name"], "ql": ["ql"], "aoid": []}[sort] + ["aoid"]
     cut = (
         select(matched)
         .where(listed)
-        .order_by(*(matched.c[key] for key in keys))
+        .order_by(*order(matched))
         .offset(page_offset(page, page_size))
         .limit(page_size)
         .subquery("page")
@@ -558,7 +563,7 @@ def fetch_changes(
                 cut.c.note_id,
             )
         )
-        .order_by(*(cut.c[key] for key in keys))
+        .order_by(*order(cut))
         .scalar_subquery()
     )
     # Two settings for this transaction. The statement is costed high enough
