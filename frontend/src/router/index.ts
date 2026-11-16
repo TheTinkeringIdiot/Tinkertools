@@ -2,6 +2,7 @@ import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router';
 import {
   ensureVersionsLoaded,
   isAcceptableVersion,
+  reportUnknownVersion,
   reserveRouteSegments,
   resolveVersion,
   setCurrentVersion,
@@ -134,7 +135,8 @@ const routes: RouteRecordRaw[] = [
 ];
 
 // A legacy bookmark's first segment (/nanos) must never be taken for a version.
-reserveRouteSegments(versionedRoutes.map((route) => route.path.split('/')[0]));
+const routeSegments = new Set(versionedRoutes.map((route) => route.path.split('/')[0]));
+reserveRouteSegments(routeSegments);
 
 const router = createRouter({
   history: createWebHistory(),
@@ -145,6 +147,9 @@ const router = createRouter({
  * Validate the version segment. Paths whose first segment is not a known
  * version (e.g. a pre-version bookmark like /items/123, which matches the
  * `:version` param as "items") are redirected under the resolved version.
+ * A first segment that is no route of ours either named a version the
+ * registry does not have (a removed build, a mistyped link): the visitor gets
+ * the same page of the resolved version and is told so.
  */
 router.beforeEach(async (to) => {
   await ensureVersionsLoaded();
@@ -159,6 +164,20 @@ router.beforeEach(async (to) => {
   }
 
   const version = resolveVersion();
+  if (segment && segment !== version && !routeSegments.has(segment)) {
+    reportUnknownVersion(segment, version);
+    if (to.name && to.name !== 'VersionNotFound') {
+      return {
+        name: to.name,
+        params: { ...to.params, version },
+        query: to.query,
+        hash: to.hash,
+        replace: true,
+      };
+    }
+    return { name: 'Home', params: { version }, replace: true };
+  }
+
   const target = `/${version}${to.fullPath === '/' ? '' : to.fullPath}`;
   if (target === to.fullPath) {
     // Guard against redirect loops if resolution somehow yields the same path.

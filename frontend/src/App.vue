@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import Button from 'primevue/button';
 import Menubar from 'primevue/menubar';
 import Toast from 'primevue/toast';
+import { useToast } from 'primevue/usetoast';
 import { useTheme } from './composables/useTheme';
-import { useGameVersion } from './composables/useGameVersion';
+import { getVersion, unknownVersionRequest, useGameVersion } from './composables/useGameVersion';
 import AccessibilityAnnouncer from './components/shared/AccessibilityAnnouncer.vue';
 import ProfileDropdown from './components/profiles/ProfileDropdown.vue';
 import GlobalItemSearch from './components/shared/GlobalItemSearch.vue';
@@ -17,6 +18,28 @@ const router = useRouter();
 const route = useRoute();
 const { isDark, toggle } = useTheme();
 const { hasFeature } = useGameVersion();
+const toast = useToast();
+
+// A link to a game version that does not exist lands on another one: say so.
+// Watched once mounted, when the Toast below is there to show it.
+onMounted(() => {
+  watch(
+    unknownVersionRequest,
+    (request) => {
+      if (!request) return;
+      toast.add({
+        severity: 'warn',
+        summary: 'Unknown game version',
+        detail: `There is no game version "${request.requested}". Showing ${
+          getVersion(request.shown)?.display_name || request.shown
+        } instead.`,
+        life: 10000,
+      });
+      unknownVersionRequest.value = null;
+    },
+    { immediate: true }
+  );
+});
 
 const themeIcon = computed(() => (isDark.value ? 'pi pi-sun' : 'pi pi-moon'));
 const themeLabel = computed(() => (isDark.value ? 'Switch to Light Mode' : 'Switch to Dark Mode'));

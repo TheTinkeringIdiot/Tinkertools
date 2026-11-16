@@ -56,6 +56,22 @@ export function reserveRouteSegments(segments: Iterable<string>): void {
   }
 }
 
+/**
+ * A link named a game version the registry does not have, and the visitor was
+ * taken to `shown` instead. Set by the router guard; the app shell tells the
+ * visitor and clears it.
+ */
+export interface UnknownVersionRequest {
+  requested: string;
+  shown: string;
+}
+
+const unknownVersionRequest = ref<UnknownVersionRequest | null>(null);
+
+export function reportUnknownVersion(requested: string, shown: string): void {
+  unknownVersionRequest.value = { requested, shown };
+}
+
 type VersionChangeListener = (next: string, previous: string | null) => void | Promise<void>;
 const changeListeners = new Set<VersionChangeListener>();
 
@@ -332,4 +348,4 @@ export function useGameVersion(): GameVersionState {
 }
 
 // Direct access for non-component code (api-client, cache keys).
-export { currentVersion, dataVersion, versions };
+export { currentVersion, dataVersion, versions, unknownVersionRequest };
