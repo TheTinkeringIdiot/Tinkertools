@@ -32,13 +32,15 @@ import { apiClient } from '@/services/api-client';
 
 // Symbiant slot ids are implant-slot bit flags, eye (2) through feet (8192).
 const IMPLANT_SLOT_FLAGS = Array.from({ length: 13 }, (_, i) => 2 ** (i + 1));
-import { isBackendAvailable } from '../helpers/backend-check';
+import { browseLiveBackendVersion, isBackendAvailable } from '../helpers/backend-check';
 import { createAppPinia } from '../helpers/integration-test-utils';
 
 // Top-level await: skipIf is evaluated while tests are collected.
 const BACKEND_AVAILABLE = await isBackendAvailable();
 
 describe.skipIf(!BACKEND_AVAILABLE)('SymbiantsStore Integration Tests', () => {
+  browseLiveBackendVersion();
+
   beforeEach(async () => {
     createAppPinia();
     // Every test starts from an empty IndexedDB cache

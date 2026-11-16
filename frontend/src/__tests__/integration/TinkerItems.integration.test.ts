@@ -17,7 +17,7 @@ import { apiClient } from '@/services/api-client';
 import { useItemsStore } from '@/stores/items';
 import { versionedPath } from '@/composables/useGameVersion';
 import type { Criterion } from '@/types/api';
-import { isBackendAvailable } from '../helpers/backend-check';
+import { browseLiveBackendVersion, isBackendAvailable } from '../helpers/backend-check';
 import { appGlobals } from '../helpers/app-globals';
 import { createTestRouter } from '../helpers/vue-test-utils';
 import { itemSearchForm } from '../helpers/item-search-page';
@@ -35,6 +35,8 @@ function firstRequirementValues(item: { actions: { criteria: Criterion[] }[] }):
 }
 
 describe.skipIf(!BACKEND_AVAILABLE)('TinkerItems Full Integration', () => {
+  browseLiveBackendVersion();
+
   let pinia: Pinia;
 
   beforeEach(() => {

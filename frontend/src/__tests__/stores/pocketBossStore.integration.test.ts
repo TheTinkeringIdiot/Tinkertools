@@ -10,12 +10,14 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import { usePocketBossStore } from '@/stores/pocketBossStore';
-import { isBackendAvailable } from '../helpers/backend-check';
+import { browseLiveBackendVersion, isBackendAvailable } from '../helpers/backend-check';
 
 // Top-level await: skipIf is evaluated while tests are collected.
 const BACKEND_AVAILABLE = await isBackendAvailable();
 
 describe.skipIf(!BACKEND_AVAILABLE)('PocketBossStore Integration Tests', () => {
+  browseLiveBackendVersion();
+
   beforeEach(() => {
     setActivePinia(createPinia());
   });

@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { defaultNanoFilters, useNanosStore } from '@/stores/nanosStore';
 import { apiClient } from '@/services/api-client';
 import { versionKey } from '@/services/version-keys';
-import { isBackendAvailable } from '../helpers/backend-check';
+import { browseLiveBackendVersion, isBackendAvailable } from '../helpers/backend-check';
 import { createAppPinia } from '../helpers/integration-test-utils';
 
 // Top-level await: skipIf is evaluated while tests are collected.
@@ -248,6 +248,8 @@ describe('NanosStore school, profession and level', () => {
 });
 
 describe.skipIf(!BACKEND_AVAILABLE)('NanosStore with backend', () => {
+  browseLiveBackendVersion();
+
   let store: ReturnType<typeof useNanosStore>;
 
   beforeEach(() => {

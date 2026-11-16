@@ -16,12 +16,14 @@ import ConfirmationService from 'primevue/confirmationservice';
 import TinkerNanos from '@/views/TinkerNanos.vue';
 import { useNanosStore } from '@/stores/nanosStore';
 import { createTestRouter } from '../helpers/vue-test-utils';
-import { isBackendAvailable } from '../helpers/backend-check';
+import { browseLiveBackendVersion, isBackendAvailable } from '../helpers/backend-check';
 
 // Top-level await: skipIf is evaluated while tests are collected.
 const BACKEND_AVAILABLE = await isBackendAvailable();
 
 describe.skipIf(!BACKEND_AVAILABLE)('TinkerNanos Backend Integration', () => {
+  browseLiveBackendVersion();
+
   let wrapper: VueWrapper;
 
   beforeEach(async () => {

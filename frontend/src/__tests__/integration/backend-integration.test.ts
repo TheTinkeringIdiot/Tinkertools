@@ -9,15 +9,15 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useNanosStore } from '@/stores/nanosStore';
-import { apiBaseFor } from '@/services/api-config';
-import { isBackendAvailable } from '../helpers/backend-check';
+import { browseLiveBackendVersion, isBackendAvailable } from '../helpers/backend-check';
 import { createAppPinia } from '../helpers/integration-test-utils';
-import { TEST_VERSION } from '../helpers/version-fixtures';
 
 // Top-level await: describe.skipIf reads this while tests are collected.
 const BACKEND_AVAILABLE = await isBackendAvailable();
 
 describe.skipIf(!BACKEND_AVAILABLE)('Backend Integration Tests', () => {
+  browseLiveBackendVersion();
+
   let store: ReturnType<typeof useNanosStore>;
 
   beforeEach(() => {
@@ -44,7 +44,7 @@ describe.skipIf(!BACKEND_AVAILABLE)('Backend Integration Tests', () => {
 
     // Verify nano structure matches what we expect
     const firstNano = store.nanos[0];
-    expect(firstNano).toHaveProperty('id');
+    expect(firstNano).toHaveProperty('aoid');
     expect(firstNano).toHaveProperty('name');
     expect(firstNano.qualityLevel).toEqual(expect.any(Number)); // mapped from the backend's ql
     expect(firstNano).toHaveProperty('school');

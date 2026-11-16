@@ -12,7 +12,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { useItemsStore } from '../stores/items';
 import type { ItemSearchQuery, PaginationInfo } from '../types/api';
-import { isBackendAvailable } from './helpers/backend-check';
+import { browseLiveBackendVersion, isBackendAvailable } from './helpers/backend-check';
 
 // Top-level await: describe.skipIf reads this while tests are collected.
 const BACKEND_AVAILABLE = await isBackendAvailable();
@@ -26,6 +26,8 @@ async function searchPage(query: ItemSearchQuery) {
 }
 
 describe.skipIf(!BACKEND_AVAILABLE)('Pagination Integration Tests', () => {
+  browseLiveBackendVersion();
+
   beforeEach(() => {
     setActivePinia(createPinia());
   });

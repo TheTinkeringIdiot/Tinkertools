@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { isBackendAvailable, getBackendUrl } from '../helpers/backend-check';
-import { TEST_VERSION } from '../helpers/version-fixtures';
+import { LIVE_BACKEND_VERSION } from '../helpers/version-fixtures';
 import type {
   Item,
   InterpolationInfo,
@@ -21,7 +21,7 @@ import type {
 } from '@/types/api';
 
 // Real backend URL for integration testing: item data is served per game version
-const BACKEND_URL = `${getBackendUrl()}/api/v1/${TEST_VERSION}`;
+const BACKEND_URL = `${getBackendUrl()}/api/v1/${LIVE_BACKEND_VERSION}`;
 
 // Top-level await: describe.skipIf reads this while tests are collected.
 const BACKEND_AVAILABLE = await isBackendAvailable();

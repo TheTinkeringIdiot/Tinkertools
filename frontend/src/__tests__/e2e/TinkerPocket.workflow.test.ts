@@ -13,13 +13,15 @@ import { usePocketBossStore } from '@/stores/pocketBossStore';
 import { useSymbiantsStore } from '@/stores/symbiants';
 import { apiClient } from '@/services/api-client';
 import type { Symbiant } from '@/types/api';
-import { isBackendAvailable } from '../helpers/backend-check';
+import { browseLiveBackendVersion, isBackendAvailable } from '../helpers/backend-check';
 import { createAppPinia } from '../helpers/integration-test-utils';
 
 // Top-level await: skipIf is evaluated while tests are collected.
 const BACKEND_AVAILABLE = await isBackendAvailable();
 
 describe.skipIf(!BACKEND_AVAILABLE)('TinkerPocket Workflow', () => {
+  browseLiveBackendVersion();
+
   let pocketBossStore: ReturnType<typeof usePocketBossStore>;
   let symbiantStore: ReturnType<typeof useSymbiantsStore>;
 
