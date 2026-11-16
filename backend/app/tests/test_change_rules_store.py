@@ -140,11 +140,28 @@ def test_the_stored_relevance_of_every_change_is_the_union_of_its_diff_entries(c
     if stored and all(value is None for value in stored.values()):
         pytest.skip("the store's change log is not classified yet")
     rows = change_analysis.changed_rows(conn)
+    effects = change_analysis._documents(
+        conn,
+        "effects",
+        (ids[EFFECTS] for _, old, new in rows for ids in (old, new)),
+    )
     differing = [
         (key, stored[key], found)
         for key, found in (
-            (key, diff_relevance(with_relevance(diff, rules)))
-            for key, diff in change_analysis.ChangeDiffs(conn, rows)
+            (
+                key,
+                diff_relevance(
+                    with_relevance(
+                        diff,
+                        rules,
+                        effects.get(old[EFFECTS]),
+                        effects.get(new[EFFECTS]),
+                    )
+                ),
+            )
+            for (key, old, new), (_, diff) in zip(
+                rows, change_analysis.ChangeDiffs(conn, rows), strict=True
+            )
         )
         if stored[key] != found
     ]
@@ -155,36 +172,49 @@ def test_the_stored_relevance_of_every_change_is_the_union_of_its_diff_entries(c
 
 def test_a_patch_note_line_has_a_class_that_each_of_its_items_has(conn):
     """A line of the patch notes listed under one relevance must lead to its
-    items under the same filter: every item of a shared transition has the
-    class of the transition in its relevance.
-
-    One kind of line cannot keep that promise, and only that kind may break
-    it: an effect that an item lost in one event and gained in another. The
-    item's effects are what they were, so its change is cosmetic (``event``),
-    while its lines say "effect removed", "effect added" and "event added",
-    which are gameplay lines on the items that really lost or gained the
-    effect.
+    items under the same filter, and say of them what their own diffs say:
+    every item of a shared transition has the class of the transition in its
+    relevance. An effect that an item lost in one event and gained in
+    another is "effect removed" and "effect added" in both places, and of
+    the effect's class in both.
     """
     if conn.execute("SELECT count(*) FROM build_transition").fetchone()[0] == 0:
         pytest.skip("the store's change log is not analysed yet")
     broken = conn.execute("""
-        SELECT t.part,
-               CASE WHEN t.path ~ '^event:[0-9]+$' THEN 'event:<id>'
-                    WHEN t.path ~ '^effect:[0-9]+$' THEN 'effect:<id>'
-                    ELSE t.path END AS line,
-               count(DISTINCT t.transition_id), count(*)
+        SELECT s.slug, t.path, t.old, t.new, t.relevance, count(*)
         FROM build_transition t
+        JOIN build s ON s.branch = t.branch AND s.ordinal = t.ordinal
         JOIN change_transition m ON m.transition_id = t.transition_id
         JOIN item_change c ON c.branch = t.branch AND c.ordinal = t.ordinal
                           AND c.aoid = m.aoid
         WHERE c.relevance & t.relevance = 0
-        GROUP BY 1, 2
+        GROUP BY 1, 2, 3, 4, 5
         """).fetchall()
-    lines = conn.execute("SELECT count(*) FROM build_transition").fetchone()[0]
 
-    assert {(part, line) for part, line, _, _ in broken} <= {
-        ("effects", "event:<id>"),
-        ("effects", "effect:<id>"),
-    }, broken
-    # 35 of 17,446 lines when this was written
-    assert sum(found for _, _, found, _ in broken) <= lines // 200, broken
+    assert not broken, f"{len(broken)} lines, e.g. {broken[:5]}"
+
+
+def test_the_live_retargeting_is_a_note_and_a_line_that_add_up(conn):
+    """The note of the live build tags the items that were only retargeted;
+    the patch notes keep one line for the retargeting of every other item,
+    so that the two account for all of it."""
+    live = "ao-18-8-62-ep1"
+    found = conn.execute(
+        """
+        SELECT t.items, t.unnoted_items, t.unexplained_items,
+               (SELECT count(*) FROM item_change c
+                WHERE c.branch = t.branch AND c.ordinal = t.ordinal
+                  AND c.note_id IS NOT NULL)
+        FROM build_transition t
+        JOIN build s ON s.branch = t.branch AND s.ordinal = t.ordinal
+        WHERE s.slug = %s AND t.path = 'effect:53045:target'
+          AND t.old = '2' AND t.new = '3'
+        """,
+        (live,),
+    ).fetchone()
+    if found is None:
+        pytest.skip(f"the store does not hold {live}, or is not analysed yet")
+    items, unnoted, unexplained, noted = found
+
+    assert (items, noted) == (128, 33)
+    assert unnoted == unexplained == items - noted

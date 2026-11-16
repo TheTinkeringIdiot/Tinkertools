@@ -9,15 +9,16 @@
 
 -- One digest per relevance class of what a revision holds in that class: its
 -- stats of the class (a stat holding its housekeeping value counts as
--- cosmetic), its effects of the class (whatever event they hang on),
--- the misc fields of the class, and the actions and attack/defense parts
+-- cosmetic), its effects of the class as its events group them (whatever
+-- the numbers of the events), the misc fields of the class, and the actions and attack/defense parts
 -- under the class the rules give them. Two revisions of an item differ in a
 -- class exactly when the digests of that class differ, so the relevance of
 -- the change between any two revisions is a comparison of four numbers:
 --   gameplay, economy, cosmetic   differ -> that class
 --   text_id of the revisions      differs -> text
---   effects_id differs but `effects` (all effects, without their events)
---   does not                      -> the class the rules give `event`
+--   effects_id differs but `effects` (the effects of every class, grouped
+--   by event without the event numbers) does not
+--                                 -> the class the rules give `event`
 -- This is how item_change.relevance is filled, and how a comparison of two
 -- arbitrary builds is classified without reading a part.
 CREATE TABLE revision_relevance (
@@ -39,8 +40,7 @@ CREATE TABLE revision_relevance (
 --                text, or the class the rules give the change as a whole
 --                (change_rules.RelevanceRules.transition_class). It depends
 --                on old and new for a stat added or removed with its
---                housekeeping value (cosmetic) and for an event added or
---                removed (event_added, event_removed)
+--                housekeeping value (cosmetic)
 --   unnoted_items, unnoted_occurrences
 --                the same two counts over the changes no build note explains
 --                (item_change.note_id IS NULL): what a list that collapses

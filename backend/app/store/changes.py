@@ -857,7 +857,13 @@ def diff_revisions(
             diffs[(old, new)] = None
             continue
         diff = diff_response(
-            with_relevance(item_diff.diff_parts(before, after), rules), formats
+            with_relevance(
+                item_diff.diff_parts(before, after),
+                rules,
+                before["effects"],
+                after["effects"],
+            ),
+            formats,
         )
         if for_list and (
             len(json.dumps(diff, separators=(",", ":"))) > LIST_DIFF_BYTES

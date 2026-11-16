@@ -27,8 +27,6 @@ removed = "gameplay"
 actions = "gameplay"
 attack_defense = "gameplay"
 event = "cosmetic"
-event_added = "gameplay"
-event_removed = "gameplay"
 static_instance = "cosmetic"
 animation_mesh = "cosmetic"
 shop = "economy"
@@ -160,19 +158,10 @@ def test_a_line_has_the_class_of_its_field_and_values():
     assert line("effects", "effect:53057", None, "none") == "cosmetic"
     assert line("effects", "effect:53045:target", 2, 3) == "gameplay"
     assert line("effects", "event", 14, 0) == "cosmetic"
-    assert line("effects", "event:14", None, "added") == "gameplay"
-    assert line("effects", "event:14", "removed", None) == "gameplay"
+    # an event without effects that came or went, as a renumbering
+    assert line("effects", "event:14", None, "added") == "cosmetic"
+    assert line("effects", "event:14", "removed", None) == "cosmetic"
     assert line("misc", "shop") == "economy"
-
-    def edited(old, new):
-        return parse_relevance(HOUSEKEEPING.replace(old, new))
-
-    added = edited('event_added = "gameplay"', 'event_added = "economy"')
-    removed = edited('event_removed = "gameplay"', 'event_removed = "economy"')
-    assert added.transition_class("effects", "event:1", None, "added") == "economy"
-    assert added.transition_class("effects", "event:1", "removed", None) == "gameplay"
-    assert removed.transition_class("effects", "event:1", "removed", None) == "economy"
-    assert removed.transition_class("effects", "event:1", None, "added") == "gameplay"
 
 
 def test_diff_entries_say_when_a_housekeeping_value_comes_or_goes():
@@ -182,7 +171,7 @@ def test_diff_entries_say_when_a_housekeeping_value_comes_or_goes():
         {"stats": [[74, 7], [6, 15], [79, 2], [30, 3]]},
     )
 
-    tagged = with_relevance(diff, rules)
+    tagged = with_relevance(diff, rules, None, None)
 
     assert {
         c["stat"]: (c["relevance"], c["housekeeping"]) for c in tagged["stats"]
@@ -208,9 +197,120 @@ def test_the_relevance_of_a_diff_counts_a_housekeeping_value_as_cosmetic(
     old, new, expected
 ):
     rules = parse_relevance(HOUSEKEEPING)
-    tagged = with_relevance(diff_parts({"stats": old}, {"stats": new}), rules)
+    tagged = with_relevance(
+        diff_parts({"stats": old}, {"stats": new}), rules, None, None
+    )
 
     assert relevance_names(diff_relevance(tagged)) == expected
+
+
+def effect(spell_id, stat):
+    return {
+        "spell_id": spell_id,
+        "target": 2,
+        "tick_count": 1,
+        "tick_interval": 0,
+        "params": {"Stat": stat},
+        "criteria": [],
+        "description": f"{spell_id} on {stat}",
+    }
+
+
+def event(number, *effects):
+    return {"event": number, "effects": list(effects)}
+
+
+def effects_relevance(old, new):
+    """The tagged effects entries of the diff of two effects parts, and the
+    relevance of the change."""
+    rules = parse_relevance(RELEVANCE)
+    tagged = with_relevance(
+        diff_parts({"effects": old}, {"effects": new}), rules, old, new
+    )
+    return tagged["effects"], relevance_names(diff_relevance(tagged))
+
+
+USE, WEAR = 0, 14
+HEALTH, SENSE, TEXT_EFFECT = effect(53045, 1), effect(53045, 20), effect(53057, 0)
+
+
+def test_an_effect_moved_to_another_event_has_the_class_of_its_type():
+    # 15.7.0, item 251755: Modify MaxHealth leaves Use and joins Wear
+    entries, relevance = effects_relevance(
+        [event(USE, HEALTH), event(WEAR, SENSE)], [event(WEAR, HEALTH, SENSE)]
+    )
+
+    assert relevance == ["gameplay"]
+    assert [(e["event"], e["change"], e["relevance"]) for e in entries] == [
+        (USE, "removed", None),
+        (WEAR, "changed", None),
+    ]
+    assert [e["relevance"] for e in entries[0]["removed"]] == ["gameplay"]
+    assert [e["relevance"] for e in entries[1]["added"]] == ["gameplay"]
+
+
+def test_an_effect_moved_out_of_an_event_that_stays_has_the_class_of_its_type():
+    _, relevance = effects_relevance(
+        [event(USE, HEALTH, SENSE)], [event(USE, SENSE), event(WEAR, HEALTH)]
+    )
+
+    assert relevance == ["gameplay"]
+
+
+def test_a_moved_effect_counts_under_its_own_class_only():
+    entries, relevance = effects_relevance(
+        [event(USE, HEALTH, TEXT_EFFECT), event(WEAR, SENSE)],
+        [event(USE, HEALTH), event(WEAR, SENSE, TEXT_EFFECT)],
+    )
+
+    assert relevance == ["cosmetic"]
+    assert [e["relevance"] for e in entries[0]["removed"]] == ["cosmetic"]
+
+
+def test_an_event_under_a_new_number_is_the_class_of_event():
+    entries, relevance = effects_relevance(
+        [event(WEAR, HEALTH, SENSE)], [event(USE, HEALTH, SENSE)]
+    )
+
+    assert relevance == ["cosmetic"]
+    assert [(e["change"], e["relevance"]) for e in entries] == [
+        ("renumbered", "cosmetic")
+    ]
+
+
+def test_events_that_trade_their_effects_are_renumbered_events():
+    entries, relevance = effects_relevance(
+        [event(USE, HEALTH), event(WEAR, SENSE)],
+        [event(USE, SENSE), event(WEAR, HEALTH)],
+    )
+
+    assert relevance == ["cosmetic"]
+    assert {e["relevance"] for e in entries} == {"cosmetic"}
+    assert {
+        effect["relevance"] for e in entries for effect in e["added"] + e["removed"]
+    } == {"cosmetic"}
+
+
+def test_a_renumbered_event_adds_nothing_where_an_effect_also_changed():
+    entries, relevance = effects_relevance(
+        [event(WEAR, HEALTH), event(1, SENSE)],
+        [event(USE, HEALTH), event(1, effect(53045, 21))],
+    )
+
+    assert relevance == ["gameplay"]
+    assert [(e["change"], e["relevance"]) for e in entries] == [
+        ("renumbered", None),
+        ("changed", None),
+    ]
+
+
+def test_an_empty_event_that_comes_is_the_class_of_event():
+    entries, relevance = effects_relevance(
+        [event(USE, HEALTH)], [event(USE, HEALTH), event(WEAR)]
+    )
+
+    assert relevance == ["cosmetic"]
+    assert [(e["change"], e["relevance"]) for e in entries] == [("added", "cosmetic")]
 
 
 def test_relevance_masks_and_names():
@@ -294,6 +394,17 @@ def test_a_note_accounts_for_its_part_of_a_change_that_also_differs_otherwise():
     # the event and what comes with it, not the requirement
     assert renumbered.accounts_for([RENUMBERED, ICON, LOWERED]) == [True, True, False]
     assert lowered.accounts_for([RENUMBERED, ICON, LOWERED]) == [False, False, True]
+
+
+def test_a_note_that_is_not_partial_accounts_for_whole_changes_only():
+    whole = parse_notes(NOTES.replace("]\nalongside", "]\npartial = false\nalongside"))
+    renumbered = whole.notes[0]
+
+    assert renumbered.accounts_for([RENUMBERED, ICON]) == [True, True]
+    assert renumbered.explains_change([RENUMBERED, ICON])
+    assert renumbered.accounts_for([RENUMBERED, ICON, LOWERED]) == [False] * 3
+    with pytest.raises(RulesError, match="partial is true or false"):
+        parse_notes(NOTES.replace("]\nalongside", "]\npartial = 0\nalongside"))
 
 
 def test_a_note_accounts_for_nothing_where_its_event_did_not_happen():

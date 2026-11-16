@@ -36,7 +36,17 @@ from __future__ import annotations
 import hashlib
 import json
 from collections import Counter, defaultdict
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+)
 
 import psycopg
 from psycopg import sql
@@ -51,12 +61,13 @@ from app.core.change_rules import (
     Note,
     NoteRules,
     RelevanceRules,
+    effect_groups,
 )
 from app.core.item_diff import MISC_FIELDS, Transition
 
 # Bump when the diff engine or what is derived from it changes, so stores
 # analysed by the earlier code are analysed again.
-ANALYSIS_VERSION = "4"
+ANALYSIS_VERSION = "5"
 
 # A transition is kept in build_transition when this many items share it.
 MIN_SHARED_ITEMS = 2
@@ -109,10 +120,9 @@ Slices = Tuple[int, ...]
 _EMPTY: Slices = (0,) * len(CLASSES)
 
 
-def _slices(members: Dict[str, List[Any]]) -> Slices:
-    return tuple(
-        _digest(sorted(members[name])) if members.get(name) else 0 for name in CLASSES
-    )
+def _slices(members: Mapping[str, List[Any]]) -> Slices:
+    """``members`` hold each class's content in a canonical order."""
+    return tuple(_digest(members[name]) if members.get(name) else 0 for name in CLASSES)
 
 
 def stats_slices(rules: RelevanceRules, doc: Optional[Sequence[Sequence[int]]]):
@@ -121,20 +131,13 @@ def stats_slices(rules: RelevanceRules, doc: Optional[Sequence[Sequence[int]]]):
     members: Dict[str, List[Any]] = defaultdict(list)
     for stat, value in doc or ():
         members[rules.value_class(stat, value)].append((stat, value))
-    return _slices(members)
+    return _slices({name: sorted(found) for name, found in members.items()})
 
 
 def effects_slices(rules: RelevanceRules, doc: Optional[Sequence[Dict[str, Any]]]):
-    """Per class, a digest of the effects whose type has that class, without
-    the event they hang on and without their rendered description."""
-    members: Dict[str, List[Any]] = defaultdict(list)
-    for event in doc or ():
-        for effect in event["effects"]:
-            content = {k: v for k, v in effect.items() if k != "description"}
-            members[rules.effect_class(effect["spell_id"])].append(
-                json.dumps(content, sort_keys=True, separators=(",", ":"))
-            )
-    return _slices(members)
+    """Per class, a digest of the effects whose type has that class as the
+    events group them (``change_rules.effect_groups``)."""
+    return _slices(effect_groups(rules, doc))
 
 
 def misc_slices(rules: RelevanceRules, doc: Optional[Dict[str, Any]]):
@@ -145,7 +148,7 @@ def misc_slices(rules: RelevanceRules, doc: Optional[Dict[str, Any]]):
             members[rules.changes[name]].append(
                 json.dumps([name, doc[name]], sort_keys=True)
             )
-    return _slices(members)
+    return _slices({name: sorted(found) for name, found in members.items()})
 
 
 def revision_digests(
@@ -409,9 +412,16 @@ def shared_transitions(
     return shared
 
 
+def says_what_changed(transition: Transition) -> bool:
+    """Whether a transition is worth a line: not a text whose old and new
+    words are left out for their length, which says only that the text
+    differs, as the change list does."""
+    return transition.part != "text" or (transition.old, transition.new) != (None, None)
+
+
 def count_transitions(counted: Counted, aoid: int, found: List[Transition]) -> None:
-    """Add the transitions of one item to ``counted``."""
-    for transition, occurrences in Counter(found).items():
+    """Add the transitions of one item that say what changed to ``counted``."""
+    for transition, occurrences in Counter(filter(says_what_changed, found)).items():
         entry = counted.setdefault(transition, [0, []])
         entry[0] += occurrences
         entry[1].append(aoid)
