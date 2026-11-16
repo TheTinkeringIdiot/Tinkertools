@@ -318,6 +318,26 @@ describe('User data keyed by AOID', () => {
       expect(localStorage.getItem(internalIdBackupKey(FAVORITES_BASE, TEST_VERSION))).toBe(backup);
     });
 
+    it('adds to the backup when the list is migrated a second time', async () => {
+      localStorage.setItem(favoritesKey(), JSON.stringify([11, 999]));
+      backendResolves({ 11: 246660, 12: 29246 });
+      const store = useNanosStore();
+      await migrationSettles();
+
+      // A tab still running the old application stores its list again
+      localStorage.setItem(favoritesKey(), JSON.stringify([12, 998]));
+      store.resetForVersionChange();
+      await migrationSettles();
+
+      expect(store.favorites).toEqual([29246]);
+      expect(stored(internalIdBackupKey(FAVORITES_BASE, TEST_VERSION))).toEqual({
+        internalIds: [11, 999, 12, 998],
+        unresolved: [999, 998],
+        resolvedAgainst: TEST_VERSION,
+        resolvedAgainstBuild: TEST_VERSION,
+      });
+    });
+
     it('leaves the stored ids untouched while the backend cannot be reached, then migrates', async () => {
       localStorage.setItem(favoritesKey(), JSON.stringify([11, 12]));
       vi.mocked(apiClient.resolveLegacyItemIds).mockRejectedValue(new Error('offline'));

@@ -607,6 +607,19 @@ describe('API Client', () => {
       });
     });
 
+    it('reports a 404 whose detail is not a sentence as not found', async () => {
+      mockAxiosInstance.get.mockRejectedValue({
+        response: { status: 404, data: { detail: [{ loc: ['path', 'aoid'], msg: 'no' }] } },
+      });
+
+      await expect(apiClient.getItem(1)).rejects.toMatchObject({
+        type: 'info',
+        title: 'Not Found',
+        message: 'Not found',
+        status: 404,
+      });
+    });
+
     it('does not take another failure that carries a sentence for a 404', async () => {
       mockAxiosInstance.get.mockRejectedValue({
         response: { status: 400, data: { error: 'Bad request', code: 'HTTP_400' } },
