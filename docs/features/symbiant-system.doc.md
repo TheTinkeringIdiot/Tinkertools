@@ -41,6 +41,7 @@ Users can query symbiants by family type (Artillery, Control, Extermination, Inf
 - `backend/app/core/cas_store.py` - derives `symbiant_items` rows for new item revisions
 - `backend/app/core/cas_curated.py` - `read_symbiants` and `sync_curated`: mobs, their sources and drops from the CSV
 - `backend/database/symbiants.csv` - Source data (no header row)
+- `backend/database/mob_ids.csv` - The id of every boss (`mob_id,name`); lines are added, never changed or removed
 
 #### Database
 - `backend/database/cas/002_curated_and_derived.sql` - `symbiant_items`, `mob`, `source_type`, `source`, `item_source`, with the rules for serving them
@@ -52,7 +53,7 @@ Users can query symbiants by family type (Artillery, Control, Extermination, Inf
 ### Storage
 
 - **`symbiant_items`** (derived): one row per item revision whose name matches `Symbiant.*Unit (Aban|Alpha|Beta)$`, with `aoid`, `name`, `ql`, `slot_id` (the highest value of stat 298) and `family`. Rows are served by presence of the revision in the requested build.
-- **`mob`** (curated): one row per boss of `symbiants.csv`, identified by its name. A mob's id is part of the API and of stored farm progress, so it never changes: a mob that leaves the file is kept as a retired row and is not served.
+- **`mob`** (curated): one row per boss of `symbiants.csv`, identified by its name. A mob's id is part of the API and of stored farm progress, so it never changes: the ids are written down in `mob_ids.csv` and the importer takes them from there, and a mob that leaves `symbiants.csv` is kept as a retired row and is not served.
 - **`source` / `item_source`** (curated): a mob is a source of type `mob`; `item_source` links an item's AOID to its sources. A link applies in a build when the item is present in it and the build has the `symbiants` feature (`backend/database/builds.toml`).
 
 The same mob can appear on several lines of the CSV (one per dropped symbiant); it is stored once, and each line becomes a drop.

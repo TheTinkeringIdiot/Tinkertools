@@ -35,7 +35,7 @@ Check that the API process is up.
 
 ### Game versions
 
-Every route under `/api/v1` also exists under `/api/v1/<version>`, where `<version>` is a build slug from `GET /api/v1/versions` (`ao-18-8-62-ep1`) or a family alias (`ao`, `prk`). Without the segment the default build is served. An unknown slug is a 404 (`{"detail": "Unknown game version '<slug>'"}`). Every response under `/api/v1` names the build it was served from in the `X-Game-Version` header.
+Every route under `/api/v1` also exists under `/api/v1/<version>`, where `<version>` is a build slug from `GET /api/v1/versions` (`ao-18-8-62-ep1`) or a family alias (`ao`, `prk`). Without the segment the default build is served. An unknown slug is a 404 (`{"detail": "Unknown game version '<slug>'"}`). While the database cannot be reached, requests keep resolving their version and `GET /api/v1/versions` keeps answering from the list read last; an API that has read no list yet answers 503 (`{"detail": "The game versions cannot be read: the database is unavailable"}`). Every response under `/api/v1` names the build it was served from in the `X-Game-Version` header.
 
 ### Items
 

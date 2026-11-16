@@ -10,6 +10,7 @@ Game data lives in one PostgreSQL schema, the content-addressed store (`cas`; de
 | Nano QL, strains, crystal sources | `all_nanos_compacted.csv` | hand |
 | Perk metadata | `database/perks.json` | hand |
 | Mobs and their drops | `database/symbiants.csv` | hand |
+| The id of every mob | `database/mob_ids.csv` | hand, one line added per new mob |
 | How builds are presented: names, dates, the default build, curated features | `database/builds.toml` | hand |
 | What a change means: relevance classes, build notes | `database/change_relevance.toml`, `database/build_notes.toml` | hand |
 | Internal item ids of the old database (optional) | a file you export, see [Ids that clients hold](#ids-that-clients-hold) | `tools/export_legacy_item_ids.py` |
@@ -29,7 +30,7 @@ Everything but the extracts and the legacy id file is committed, and the importe
 
   or `export DATABASE_URL="postgresql://aodbuser:password@localhost:5432/tinkertools"`.
 - The extracts folder on a local disk. Reading it from a network mount is slow and has failed part way.
-- About 2 GB of memory per worker (`--workers`), and 1 GB of disk for the full store (147 builds: 920 MB).
+- About 2 GB of memory per worker (`--workers`), and 1 GB of disk for the full store (147 builds: 934 MB with indexes when last measured, 979 MB the time before).
 
 ## Load a database from nothing
 
@@ -41,7 +42,7 @@ It takes about 9 minutes for the 147 builds of the archive with 8 workers. Add `
 
 What it does, in order:
 
-1. Checks everything it will read before it writes anything: the extracts folder and its index, the manifest of every planned build, the curated files, `builds.toml`, the rules files, the legacy id file if one is given. If one is missing or wrong, it stops.
+1. Checks everything it will read before it writes anything: the extracts folder and its index, the manifest of every planned build, the curated files, `builds.toml`, the rules files, the legacy id file if one is given, and with that file whether the store will hold the newest build of each family it names. If one is missing or wrong, it stops.
 2. Creates the schema, the extensions and the tables if they are not there; brings an existing store up to date with the SQL files otherwise.
 3. Makes the curated tables equal to their files, the presentation of stored builds equal to `builds.toml`, and the change log's classification equal to the rules files.
 4. Imports the builds the store does not hold, oldest first within each family, each in one transaction.
@@ -58,13 +59,13 @@ Then start the API (`uvicorn app.main:app`); it needs `DATABASE_URL` and nothing
 | option | meaning |
 |---|---|
 | `--extracts-dir DIR` | folder with `index.json` and the build folders (required) |
-| `--slug SLUG` | build to import, repeatable (default: every importable build of the index). A slug outside the index is taken from its folder's manifest |
+| `--slug SLUG` | build to import, repeatable (default: every importable build of the index). A slug outside the index is taken from its folder's manifest. With `--legacy-ids-file` the selection must leave no family of the file without its newest build |
 | `--schema NAME` | schema of the store (default `cas`) |
 | `--workers N` | builds read and split in parallel, about 2 GB of memory each (default 4; 0 reads in the importer's process) |
 | `--reset --yes` | drop the store's tables in `--schema`, the legacy id map with them, and import from scratch. Stop the API first and give `--legacy-ids-file` again |
 | `--builds-file PATH` | default `database/builds.toml` |
-| `--legacy-ids-file PATH` | make the store's map of old internal ids equal to this file; without the option the map is left as it is |
-| `--nanos-csv`, `--perks-file`, `--symbiants-file` | override the curated files (`~` and environment variables are expanded) |
+| `--legacy-ids-file PATH` | make the store's map of old internal ids equal to this file; without the option the map is left as it is. Refused, before anything is written, unless the newest importable build of every family in the file is stored or among the builds of this run |
+| `--nanos-csv`, `--perks-file`, `--symbiants-file`, `--mob-ids-file` | override the curated files (`~` and environment variables are expanded) |
 | `--database-url URL` | override `DATABASE_URL` |
 
 ### Rules worth knowing
@@ -72,7 +73,8 @@ Then start the API (`uvicorn app.main:app`); it needs `DATABASE_URL` and nothing
 - Builds of a family are imported oldest first. A build older than the newest stored build of its family is refused: `--reset` and import again to insert one (with the API stopped).
 - `duplicate` builds of the index (a client database identical to another build's) are stored without reading any data. `failed` and `missing_db` builds are skipped.
 - The newest stored build of each family is the one served with the curated nano strains; the build before it goes back to its own strains in the transaction that stores the new one.
-- A mob that leaves `symbiants.csv` is kept as a retired row, so its id is never given to another mob.
+- A mob has the id `database/mob_ids.csv` gives its name, in every store and after every `--reset`, whatever the order of `symbiants.csv`. To add a mob, add its rows to `symbiants.csv` and a line with the next unused id to `mob_ids.csv`; the importer stops and names the line when it is missing. Never change or remove a line: browsers hold these ids. The importer refuses a file that would give a stored mob another id, or a stored id to another mob.
+- A mob that leaves `symbiants.csv` is kept as a retired row while the store exists and keeps its line in `mob_ids.csv`, so its id is never given to another mob. A store loaded from nothing has no row for it.
 - **Never `DROP SCHEMA cas`.** `btree_gist` and `pg_trgm` live in the schema the first store of the database was created in, and dropping that schema takes them with it, and with them the presence constraint and the trigram indexes of every other store in the database. Use `--reset --yes`, which drops tables only.
 
 ## Verify
@@ -132,8 +134,8 @@ Every committed input is applied by running `import-cas` again. With every build
 | File | What an edit changes | Applied |
 |---|---|---|
 | `database/builds.toml` | a build's name, date, list position, whether it is enabled or the default, its curated features, its notes (fields in the docstring of `app/core/cas_extract.py`). A build without a table takes the defaults. `parent` (the build a family forks from) is read only when the build is first imported | to stored builds on every run |
-| `all_nanos_compacted.csv`, `database/perks.json`, `database/symbiants.csv` | curated data of every build | rows that differ are written on every run |
-| `database/change_relevance.toml` | which stats and effect types are gameplay, economy or cosmetic, and how whole-part changes are classed (`id = "name"` under `[stats.<class>]` / `[effects.<class>]`; `unclassified` and unlisted ids take `default`) | `item_change.relevance` is recomputed for the whole log in one statement; the per-revision digests it is computed from are rebuilt first |
+| `all_nanos_compacted.csv`, `database/perks.json`, `database/symbiants.csv`, `database/mob_ids.csv` | curated data of every build | rows that differ are written on every run |
+| `database/change_relevance.toml` | which stats and effect types are gameplay, economy or cosmetic, and how whole-part changes are classed (`id = "name"` under `[stats.<class>]` / `[effects.<class>]`; `unclassified` and unlisted ids take `default`) | `item_change.relevance` is recomputed for the whole log in one statement; the per-revision digests it is computed from are rebuilt first, as they are when the diff engine changed (`ANALYSIS_VERSION`) |
 | `database/build_notes.toml` | build-wide events that explain many item changes at once, as rules over field transitions (`[[note]]` with `build`, `title`, `body`, `explains`, `alongside`, `partial`) | notes, the note of each change and the shared transitions of each build are recomputed when either rules file changed (or the diff engine did: `ANALYSIS_VERSION`) |
 
 The rules of the two change files are stated in the docstring of `app/core/change_rules.py`; the API's diff routes (`GET /changes`, `/compare/{base}`, `/items/{aoid}/timeline`; see `API.md`) read what is derived from them. A note whose build the store does not hold is ignored, and so is a `builds.toml` table for a build that is not extracted, so one set of files serves every store. The store records what it was analysed with; `verify_cas.py --store` reports a store either rules file has moved on from, and the API logs a warning at start-up when its files are not the store's.
@@ -183,13 +185,15 @@ python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --legacy-i
 
 ### Mob ids
 
-`cas.mob` numbers mobs in the order they first appear in `database/symbiants.csv`, and a mob that leaves the file keeps its id. If the old database numbered them differently, farm progress would tick the wrong bosses without any error. Check, against any loaded store (the two databases need not be the same one):
+`cas.mob` numbers mobs as `database/mob_ids.csv` says, and a mob that leaves `symbiants.csv` keeps its id. The committed ids are those of the development database. If the old database numbered its mobs differently, farm progress would tick the wrong bosses without any error. Check, against any loaded store (the two databases need not be the same one):
 
 ```bash
 python tools/verify_cas.py --legacy-mobs-file legacy_mobs.csv
 ```
 
-It ends with `N difference(s)` and exits 1 unless N is 0: an old id the store does not have, or one that names a mob of another name there. Mobs only the store has are new and are not differences. On the development database all 159 match. **Production has not been checked.** If it differs, do not cut over: nothing translates mob ids yet, and that would have to be written first (the file is what it would be written from).
+It ends with `N difference(s)` and exits 1 unless N is 0: an old id the store does not have, or one that names a mob of another name there. Mobs only the store has are new and are not differences. On the development database all 159 match. **Production has not been checked.** If it differs, do not cut over. Mob ids are not translated; the store has to number its mobs as production did. `legacy_mobs.csv` has the two columns of `database/mob_ids.csv`: give the differing mobs production's ids there, keeping every id and every name on one line only, import with `--reset --yes` (the importer refuses to renumber a loaded store), and check again. This has not been needed or rehearsed, and it renumbers the mobs of every store loaded from the repository afterwards, development's included.
+
+A `--reset` reproduces the ids, since they come from the file and not from the order of `symbiants.csv`; the check can be repeated at any time against the same `legacy_mobs.csv`.
 
 ## Production cutover
 
@@ -201,7 +205,7 @@ Production today is the application of before the store: one game version, its t
 Before the day, production untouched and serving:
 
 1. **Export the ids** from production with the command of [Ids that clients hold](#ids-that-clients-hold), run from a checkout of this code. Compare what it prints with `SELECT count(*) FROM items WHERE aoid IS NOT NULL` and `SELECT count(*) FROM mobs`. Copy both files off the server. Do not re-import the old database afterwards: that would issue new ids.
-2. **Check the mob ids** against a loaded store, for example development's: `python tools/verify_cas.py --legacy-mobs-file legacy_mobs.csv` must report 0 differences. Otherwise stop here.
+2. **Check the mob ids** against a loaded store, for example development's: `python tools/verify_cas.py --legacy-mobs-file legacy_mobs.csv` must report 0 differences. Otherwise stop here and see [Mob ids](#mob-ids).
 3. **Put the extracts folder on a local disk** of the machine that will run the import (40 GB with all 147 builds). The import needs the folder, this repository and `DATABASE_URL`, not the application server.
 
 On the day:
@@ -250,17 +254,22 @@ psql "$DATABASE_URL" -f tools/drop_old_store.sql                    # report onl
 psql "$DATABASE_URL" -v confirm=drop -f tools/drop_old_store.sql    # drop what the report listed
 ```
 
-- Without `confirm=drop` it lists what it would drop, how many of the old store's item and mob ids the new store does not hold, and how many other sessions are connected, and drops nothing.
-- It knows the two layouts the export knows. On production's (tables in `public`) it drops the tables of the old schema that exist and the materialized view `symbiant_items`, in one transaction and without `CASCADE`: if anything else depends on them it fails and drops nothing. What else is in `public` is left and listed. On development's it drops the `gv_*` schemas, `gd`, `public.item_revisions`, `public.game_versions` and `public.global_migrations`.
-- It refuses (exit status 3, nothing dropped) when schema `cas` has no enabled build, when it finds neither layout or both, when a `gv_*` schema is not in `public.game_versions`, and when an id of the old store is missing from the new one: an item id not in `cas.legacy_item_id` with the same AOID, or on production's layout a mob id that does not name the same mob in `cas.mob`. `-v skip_id_checks=yes` drops regardless; `-v store=NAME` names a store in another schema.
+- Without `confirm=drop` it lists what it would drop, how many of the old store's item ids the new store's map lacks per family, how many of its mob ids name another mob or none in the new store, and how many other sessions are connected, and drops nothing.
+- It knows the two layouts the export knows. On production's (tables in `public`) it drops the tables of the old schema that exist and the materialized view `symbiant_items`, in one transaction and without `CASCADE`: if anything else depends on them it fails and drops nothing. What else is in `public` is left and listed. On development's it drops the `gv_*` schemas, `gd`, `public.item_revisions`, `public.game_versions` and `public.global_migrations`. There the schemas go one transaction each and with `CASCADE`, which also drops what depends on them from other schemas; the report lists the views and foreign keys it finds of that kind, and looks for no other kind.
+- An item id is looked up under its family, as the API does. Development's layout names its families. Production's does not, so the script takes its ids to be of family `ao` and prints that; `-v family=NAME` says otherwise and must be the `--family` the ids were exported with. A map loaded under another family is reported as missing every id.
+- Mob ids are compared on production's layout only. When the old store has no `mobs` table, or on development's layout, the report says that they were not checked.
+- It refuses (exit status 3, nothing dropped) when schema `cas` has no enabled build or lacks `legacy_item_id` or `mob`, when it finds neither layout or both, when a `gv_*` schema is not in `public.game_versions`, and when an id of the old store is missing from the new one: an item id not in `cas.legacy_item_id` under its family with the same AOID, or a mob id that does not name the same mob in `cas.mob`. `-v skip_id_checks=yes` drops regardless of the ids; `-v store=NAME` names a store in another schema.
 - It cannot tell whether an old application still runs against the database. Such an application fails once its tables are gone.
-- It has been exercised on hand-made tables of both layouts, not on a copy of production. Run the report there first and read the list.
+- It has been exercised on hand-made tables of both layouts in scratch schemas, not on a copy of production and, since development's old store was dropped with an earlier version of it, not on a real old store as it stands. Run the report first and read the list.
 
 ## Troubleshooting
 
 - The import writes `import.log` in the directory it is run from. A failed build leaves the store as it was before that build (one transaction per build); fix the cause and run again.
 - "Extracts folder not found", "No index.json", "No manifest for", "Data file not found", "Builds file not found": an input is missing; nothing was written.
 - "is not newer than ..., the newest build of branch": a build cannot be inserted before stored ones. Stop the API, `--reset --yes` and import everything (with `--legacy-ids-file`: the reset empties the map), then start the API again; responses it cached before the reset are otherwise served until they expire.
+- "--legacy-ids-file needs the newest build of every family it names": the run would have left the map in a store whose newest build of that family is an older one, against which browsers drop ids for good. Nothing was written. Add the build to the `--slug` selection, or load the map in a later run.
+- "Mob '...' has no id: add the line ...": a mob was added to `symbiants.csv` without a line in `database/mob_ids.csv`. Add the line the message gives and commit both files.
+- "has id N in the store and M in mob_ids.csv", "gives id N to ..., and the store holds it for ...": the id file contradicts the ids the store has served. Correct the file. Only when the store's ids are the wrong ones, `--reset --yes`.
 - `permission denied to create extension`: the role lacks `CREATE` on the database, or the extension's package is not installed on the server.
 - The API answers 404 "Unknown game version": the slug is not a stored, enabled build. `GET /api/v1/versions` lists what is.
-- The API answers 503 "The game versions cannot be read": it could not read `cas.build` and holds no earlier copy of the list (database down, wrong `CAS_SCHEMA`, store not created). With a copy it keeps serving it and logs a warning each time a read fails (every `BUILD_REGISTRY_TTL` seconds).
+- The API answers 503 "The game versions cannot be read": it could not read `cas.build` and holds no earlier copy of the list (database down, wrong `CAS_SCHEMA`, store not created). With a copy it keeps serving it and logs a warning each time a read fails (every `BUILD_REGISTRY_TTL` seconds); `GET /versions` answers from the list it read last in the same way.

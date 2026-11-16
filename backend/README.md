@@ -22,7 +22,7 @@ The TinkerTools API serves as the backend for six web-based utilities:
 
 ## Prerequisites
 
-- Python 3.9+
+- Python 3.11+
 - PostgreSQL 13+
 - Virtual environment tool (venv, conda, etc.)
 

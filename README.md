@@ -27,7 +27,7 @@ TinkerTools is a collection of six specialized tools designed to help Anarchy On
 
 - Node.js 18+
 - Python 3.11+
-- PostgreSQL 12+
+- PostgreSQL 13+
 
 ### Frontend Development
 
@@ -52,11 +52,11 @@ source backend/venv/bin/activate
 # Install dependencies
 pip install -r backend/requirements.txt
 
-# Copy environment config
-cp backend/.env.example backend/.env.local
+# Create backend/.env.local with DATABASE_URL (see backend/README.md)
 
 # Start API server (http://localhost:8000)
 cd backend
+set -a && . ./.env.local && set +a
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
