@@ -254,10 +254,6 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
         }
       }
 
-      if (allSymbiantsData.length === 0) {
-        throw new Error('No symbiant data received');
-      }
-
       // Clear old data and store new data in Pinia
       symbiants.value.clear();
       allSymbiantsData.forEach((symbiant) => {
@@ -265,6 +261,10 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
       });
 
       lastFetch.value = Date.now();
+
+      // A game version from before symbiants has none. That is an answer, not
+      // a failure, but not one to keep for the cache's 30 days.
+      if (allSymbiantsData.length === 0) return allSymbiantsData;
 
       // Write complete dataset to IndexedDB cache
       try {

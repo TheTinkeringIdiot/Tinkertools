@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter, useRoute, type LocationQueryRaw } from 'vue-router';
 import { useTinkerProfilesStore } from '@/stores/tinkerProfiles';
+import { useGameVersion } from '@/composables/useGameVersion';
 import { useSymbiantsStore } from '@/stores/symbiants';
 import { usePocketBossStore } from '@/stores/pocketBossStore';
 import { mapProfileToStats } from '@/utils/profile-stats-mapper';
@@ -91,6 +92,14 @@ const FAMILY_OPTIONS = [
 ];
 
 // Computed Properties
+const { current: gameVersion } = useGameVersion();
+const versionName = computed(() => gameVersion.value?.display_name || 'This game version');
+
+const versionHasNoBosses = computed(
+  () =>
+    pocketBossStore.pocketBosses.length === 0 && !pocketBossStore.loading && !pocketBossStore.error
+);
+
 const activeProfile = computed(() => profileStore.activeProfile);
 
 const characterStats = computed(() => {
@@ -391,7 +400,8 @@ onMounted(async () => {
 
   if (props.view === 'symbiants') {
     if (symbiantsStore.isDataStale || symbiantsStore.symbiantsCount === 0) {
-      await symbiantsStore.loadAllSymbiants();
+      // A failure is kept by the store and shown below with a Retry button
+      await symbiantsStore.loadAllSymbiants().catch(() => {});
     }
   } else if (props.view === 'bosses') {
     await loadBosses();
@@ -605,9 +615,13 @@ watch(
       <div v-else-if="symbiantsStore.error" class="flex flex-col justify-center items-center py-12">
         <i class="pi pi-exclamation-circle text-4xl text-red-500 mb-3"></i>
         <p class="text-lg text-red-600 dark:text-red-400 mb-4">
-          {{ symbiantsStore.error }}
+          {{ symbiantsStore.error.message }}
         </p>
-        <Button label="Retry" icon="pi pi-refresh" @click="symbiantsStore.loadAllSymbiants(true)" />
+        <Button
+          label="Retry"
+          icon="pi pi-refresh"
+          @click="symbiantsStore.loadAllSymbiants(true).catch(() => {})"
+        />
       </div>
 
       <!-- Results -->
@@ -672,6 +686,17 @@ watch(
               />
             </div>
           </div>
+        </div>
+
+        <!-- Nothing in this game version -->
+        <div v-else-if="symbiantsStore.symbiantsCount === 0" class="text-center py-12">
+          <i class="pi pi-inbox text-4xl text-surface-400 mb-4"></i>
+          <p class="text-lg text-surface-600 dark:text-surface-400">
+            {{ versionName }} has no symbiants
+          </p>
+          <p class="text-sm text-surface-500 dark:text-surface-500">
+            Pick another game version to browse them
+          </p>
         </div>
 
         <!-- Empty State -->
@@ -787,7 +812,16 @@ watch(
         :rows-per-page-options="[10, 20, 50]"
       >
         <template #empty>
-          <div class="text-center py-12">
+          <div v-if="versionHasNoBosses" class="text-center py-12">
+            <i class="pi pi-inbox text-4xl text-surface-400 mb-4"></i>
+            <p class="text-lg text-surface-600 dark:text-surface-400">
+              {{ versionName }} has no pocket bosses
+            </p>
+            <p class="text-sm text-surface-500 dark:text-surface-500">
+              Pick another game version to browse them
+            </p>
+          </div>
+          <div v-else class="text-center py-12">
             <i class="pi pi-search text-4xl text-surface-400 mb-4"></i>
             <p class="text-lg text-surface-600 dark:text-surface-400">No pocket bosses found</p>
             <p class="text-sm text-surface-500 dark:text-surface-500">Try adjusting your filters</p>
