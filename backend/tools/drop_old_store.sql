@@ -22,23 +22,35 @@
 --     public.game_versions and public.global_migrations. Each schema is
 --     dropped in a transaction of its own: together they hold far more
 --     relations than one transaction can lock (max_locks_per_transaction).
---     A run that stops part way can be repeated.
+--     A run that stops part way can be repeated: the schemas dropped before
+--     it stopped stay dropped. DROP SCHEMA needs CASCADE, and CASCADE also
+--     drops what depends on those schemas from outside them. The report
+--     lists the views and foreign keys of other schemas that would go this
+--     way; other kinds of dependents are not searched for.
 --
--- Nothing else is touched: not the new store, not any other schema, not the
--- extensions.
+-- The new store and the extensions are not touched, and on the single-version
+-- layout nothing outside the list is.
 --
 -- The script refuses, with exit status 3 and nothing dropped, when
 --   * the new store's schema (-v store=NAME, default cas) holds no enabled
---     build: nothing would be left to serve;
+--     build, or lacks the tables the ids are checked against (legacy_item_id,
+--     mob): nothing would be left to serve;
 --   * the database holds neither layout, or both;
 --   * a gv_ schema is not listed in public.game_versions: it may not be the
 --     old store's;
 --   * an item id of the old store is not in the new store's legacy_item_id
---     with the same AOID, or (single version) a mob id of the old store does
---     not name a mob of the same name in the new store. Clients hold those
---     ids, and the old tables are the only source of them: export and load
---     them first (IMPORT_README.md, "Legacy item ids" and "Mob ids"), or pass
---     -v skip_id_checks=yes to drop regardless.
+--     under its family with the same AOID, or (single version) a mob id of
+--     the old store does not name a mob of the same name in the new store.
+--     Clients hold those ids, and the old tables are the only source of them:
+--     export and load them first (IMPORT_README.md, "Legacy item ids" and
+--     "Mob ids"), or pass -v skip_id_checks=yes to drop regardless.
+--
+-- The family of an item id is the key the API looks it up under. The shared
+-- store names its families (public.game_versions). A single-version database
+-- does not say which family it served: it is taken to be `ao`, or what
+-- -v family=NAME says, which must be the --family its ids were exported with.
+-- The report prints the family. Mob ids are checked on the single-version
+-- layout only, and the report says when they were not.
 --
 -- It does not know whether an application of before the cutover still runs
 -- against this database; such an application fails once its tables are gone.
@@ -67,6 +79,10 @@
 \else
     \set skip_id_checks no
 \endif
+\if :{?family}
+\else
+    \set family ao
+\endif
 
 SET lock_timeout = '30s';
 
@@ -92,12 +108,22 @@ $$;
 -- ---------------------------------------------------------------------------
 
 SELECT :'store' <> :'old_public' AND :'store' <> :'old_shared'
+       AND :'store' NOT LIKE :'old_version_like'
        AND pg_temp.kind(:'store', 'build') = 'r' AS has_store \gset
 \if :has_store
 \else
     SELECT pg_temp.refuse(format(
         'schema %s holds no content-addressed store: nothing would be left to serve',
         :'store'));
+\endif
+SELECT count(*) > 0 AS lacks_tables,
+       coalesce(string_agg(name, ', ' ORDER BY name), '') AS lacking
+FROM unnest(ARRAY['legacy_item_id', 'mob']) AS name
+WHERE pg_temp.kind(:'store', name) <> 'r' \gset
+\if :lacks_tables
+    SELECT pg_temp.refuse(format(
+        'schema %s is not a current content-addressed store (no table %s): '
+        'run import_cli.py import-cas on it first', :'store', :'lacking'));
 \endif
 SELECT EXISTS (SELECT 1 FROM :"store".build WHERE enabled) AS serves \gset
 \if :serves
@@ -136,6 +162,8 @@ SELECT to_regnamespace(quote_ident(:'old_shared')) IS NOT NULL
 
 -- What will go: `object` is reported, `statement` is run, both in `ord` order.
 CREATE TEMP TABLE doomed (ord serial, object text, statement text);
+-- What CASCADE would drop outside the old store (shared layout only).
+CREATE TEMP TABLE dependents (object text);
 
 \if :shared_layout
     SELECT pg_temp.kind(:'old_public', 'game_versions') = 'r' AS has_registry \gset
@@ -182,6 +210,35 @@ CREATE TEMP TABLE doomed (ord serial, object text, statement text);
            format('DROP TABLE %I.%I', :'old_public', name)
     FROM unnest(ARRAY['game_versions', 'global_migrations']) AS name
     WHERE pg_temp.kind(:'old_public', name) = 'r';
+
+    CREATE TEMP TABLE old_schemas AS
+    SELECT oid FROM pg_namespace
+    WHERE nspname LIKE :'old_version_like' OR nspname = :'old_shared';
+
+    INSERT INTO dependents (object)
+    SELECT DISTINCT format('%s %I.%I',
+                           CASE v.relkind WHEN 'm' THEN 'materialized view'
+                                          ELSE 'view' END,
+                           vn.nspname, v.relname)
+    FROM pg_depend d
+    JOIN pg_rewrite r ON r.oid = d.objid
+    JOIN pg_class v ON v.oid = r.ev_class
+    JOIN pg_namespace vn ON vn.oid = v.relnamespace
+    JOIN pg_class o ON o.oid = d.refobjid
+    WHERE d.classid = 'pg_rewrite'::regclass
+      AND d.refclassid = 'pg_class'::regclass
+      AND o.relnamespace IN (SELECT oid FROM old_schemas)
+      AND v.relnamespace NOT IN (SELECT oid FROM old_schemas)
+      AND NOT (vn.nspname = :'old_public' AND v.relname = 'item_revisions')
+    UNION
+    SELECT format('foreign key %I of table %I.%I', c.conname, n.nspname, t.relname)
+    FROM pg_constraint c
+    JOIN pg_class t ON t.oid = c.conrelid
+    JOIN pg_namespace n ON n.oid = t.relnamespace
+    JOIN pg_class o ON o.oid = c.confrelid
+    WHERE c.contype = 'f'
+      AND o.relnamespace IN (SELECT oid FROM old_schemas)
+      AND t.relnamespace NOT IN (SELECT oid FROM old_schemas);
 \endif
 
 \if :single_layout
@@ -221,36 +278,41 @@ CREATE TEMP TABLE doomed (ord serial, object text, statement text);
 -- The ids clients hold
 -- ---------------------------------------------------------------------------
 
+-- (family, item id, aoid) as tools/export_legacy_item_ids.py exports them.
+CREATE TEMP TABLE old_ids (branch text, item_id integer, aoid integer);
+\set families_named false
 \if :single_layout
-    \set old_items_schema :old_public
+    INSERT INTO old_ids
+    SELECT :'family', id, aoid FROM :"old_public".items WHERE aoid IS NOT NULL;
 \else
-    \set old_items_schema :old_shared
-\endif
-SELECT pg_temp.kind(:'old_items_schema', 'items') = 'r' AS has_old_items,
-       pg_temp.kind(:'store', 'legacy_item_id') = 'r' AS has_map,
-       :'single_layout'::boolean
-           AND pg_temp.kind(:'old_public', 'mobs') = 'r' AS has_old_mobs \gset
-
-\if :has_old_items
-    \if :has_map
-        SELECT count(*) AS old_items
-        FROM :"old_items_schema".items
-        WHERE aoid IS NOT NULL \gset
-        SELECT count(*) AS unmapped
-        FROM :"old_items_schema".items i
-        WHERE i.aoid IS NOT NULL
-          AND NOT EXISTS (SELECT 1 FROM :"store".legacy_item_id l
-                          WHERE l.item_id = i.id AND l.aoid = i.aoid) \gset
-    \else
-        SELECT count(*) AS old_items, count(*) AS unmapped
-        FROM :"old_items_schema".items
-        WHERE aoid IS NOT NULL \gset
+    SELECT pg_temp.kind(:'old_shared', 'items') = 'r' AS has_old_items \gset
+    \if :has_old_items
+        \if :has_registry
+            \set families_named true
+            INSERT INTO old_ids
+            SELECT f.family, i.id, i.aoid
+            FROM :"old_shared".items i
+            JOIN (SELECT family, array_agg(vid) AS vids
+                  FROM :"old_public".game_versions
+                  WHERE vid IS NOT NULL GROUP BY family) f ON i.vids && f.vids
+            WHERE i.aoid IS NOT NULL;
+        \else
+            INSERT INTO old_ids
+            SELECT :'family', id, aoid FROM :"old_shared".items WHERE aoid IS NOT NULL;
+        \endif
     \endif
-\else
-    \set old_items 0
-    \set unmapped 0
 \endif
 
+CREATE TEMP TABLE id_check AS
+SELECT o.branch, count(*) AS ids, count(*) FILTER (WHERE l.item_id IS NULL) AS unmapped
+FROM old_ids o
+LEFT JOIN :"store".legacy_item_id l
+       ON l.branch = o.branch AND l.item_id = o.item_id AND l.aoid = o.aoid
+GROUP BY o.branch;
+SELECT coalesce(sum(unmapped), 0) AS unmapped FROM id_check \gset
+
+SELECT :'single_layout'::boolean
+           AND pg_temp.kind(:'old_public', 'mobs') = 'r' AS has_old_mobs \gset
 \if :has_old_mobs
     SELECT count(*) AS old_mobs FROM :"old_public".mobs \gset
     SELECT count(*) AS mobs_differing
@@ -258,7 +320,6 @@ SELECT pg_temp.kind(:'old_items_schema', 'items') = 'r' AS has_old_items,
     WHERE NOT EXISTS (SELECT 1 FROM :"store".mob m
                       WHERE m.mob_id = o.id AND m.name = o.name) \gset
 \else
-    \set old_mobs 0
     \set mobs_differing 0
 \endif
 
@@ -275,9 +336,31 @@ WHERE datname = current_database()
 \echo Database :DBNAME - new store in schema :store
 \echo Old store, to be dropped:
 SELECT '  ' || object FROM doomed WHERE object IS NOT NULL ORDER BY ord;
-\echo Item ids of the old store: :old_items - of them not in legacy_item_id of the new store with the same AOID: :unmapped
+SELECT count(*) > 0 AS has_dependents FROM dependents \gset
+\if :has_dependents
+    \echo Outside the old store, dropped with it because they depend on it (CASCADE):
+    SELECT '  ' || object FROM dependents ORDER BY object;
+\endif
+\if :families_named
+    \echo Item ids of the old store, by family as :old_public.game_versions names it:
+\else
+    \echo Item ids of the old store, taken to be of family :family (-v family=NAME says otherwise):
+\endif
+SELECT format('  %s: %s ids - of them not in legacy_item_id of the new store '
+              'under that family with the same AOID: %s', branch, ids, unmapped)
+FROM id_check ORDER BY branch;
+SELECT NOT EXISTS (SELECT 1 FROM id_check) AS no_ids \gset
+\if :no_ids
+    \echo '  none'
+\endif
 \if :has_old_mobs
     \echo Mob ids of the old store: :old_mobs - of them not naming the same mob in the new store: :mobs_differing
+\else
+    \if :single_layout
+        \echo Mob ids: not checked, the old store has no table :old_public.mobs
+    \else
+        \echo Mob ids: not checked on this layout (its mobs are in the version schemas). Compare them with tools/verify_cas.py --legacy-mobs-file
+    \endif
 \endif
 \echo Other sessions connected to this database: :other_sessions
 
