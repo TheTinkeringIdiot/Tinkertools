@@ -9,7 +9,14 @@
  *
  * The check must be awaited at the top level of the test file: skipIf is
  * evaluated while tests are collected, before any beforeAll hook runs.
+ *
+ * Inside that describe, call browseLiveBackendVersion(): every test starts on
+ * the seeded TEST_VERSION, which no real backend serves.
  */
+
+import { beforeEach } from 'vitest';
+import { setCurrentVersion } from '@/composables/useGameVersion';
+import { LIVE_BACKEND_VERSION } from './version-fixtures';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
@@ -35,6 +42,11 @@ export async function isBackendAvailable(): Promise<boolean> {
   }
 
   return backendAvailable;
+}
+
+/** Make the tests of the enclosing describe browse a version the real backend serves. */
+export function browseLiveBackendVersion(): void {
+  beforeEach(() => setCurrentVersion(LIVE_BACKEND_VERSION));
 }
 
 /**

@@ -25,7 +25,7 @@
 import {
   currentVersion,
   dataVersion,
-  legacyDataVersion,
+  knownLegacyDataVersion,
   VERSION_SLUG_PATTERN,
 } from '@/composables/useGameVersion';
 
@@ -175,24 +175,31 @@ export function purgeLocalStoragePrefix(prefix: string): number {
   return doomed.length;
 }
 
+/** Joins a pre-version value with the one already stored for its version. */
+export type LegacyValueMerge = (legacy: string, existing: string) => string;
+
 /**
  * One-time migration: move the un-namespaced key written before versions
  * existed to `slug` (default: the active build), rather than dropping it.
  * Callers decide that `slug` is the version the data belongs to; for user
  * data that is adoptLegacyUserData's job.
  *
- * No-op when the versioned key already exists or the legacy key is absent.
+ * No-op when the legacy key is absent. When the versioned key already exists
+ * it wins and the legacy value is dropped, unless `merge` is given to join the
+ * two (user data must not be dropped; a cache can be).
  */
-export function adoptLegacyKey(base: string, slug?: string): boolean {
+export function adoptLegacyKey(base: string, slug?: string, merge?: LegacyValueMerge): boolean {
   const storage = safeLocalStorage();
   if (!storage) return false;
   try {
     const legacy = storage.getItem(base);
     if (legacy === null) return false;
     const target = versionKey(base, slug);
-    if (storage.getItem(target) !== null) {
+    const existing = storage.getItem(target);
+    if (existing !== null) {
+      if (merge) storage.setItem(target, merge(legacy, existing));
       storage.removeItem(base);
-      return false;
+      return merge !== undefined;
     }
     storage.setItem(target, legacy);
     storage.removeItem(base);
@@ -207,12 +214,15 @@ export function adoptLegacyKey(base: string, slug?: string): boolean {
  * existed belongs to legacyDataVersion() and to no other version, the same
  * rule profiles follow. It is adopted when that version is the one being
  * browsed; on any other version the un-namespaced key is left where it is, so
- * its ids are never read against a database that did not issue them.
+ * its ids are never read against a database that did not issue them. The same
+ * goes for a visit on which that version cannot be told (the registry did not
+ * load): the data waits, and `merge` joins it with whatever was saved for the
+ * version in the meantime.
  */
-export function adoptLegacyUserData(base: string): boolean {
+export function adoptLegacyUserData(base: string, merge: LegacyValueMerge): boolean {
   const slug = currentVersion.value;
-  if (slug === null || slug !== legacyDataVersion()) return false;
-  return adoptLegacyKey(base, slug);
+  if (slug === null || slug !== knownLegacyDataVersion()) return false;
+  return adoptLegacyKey(base, slug, merge);
 }
 
 // ============================================================================

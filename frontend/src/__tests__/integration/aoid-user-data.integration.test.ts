@@ -4,14 +4,17 @@
  * Nano favorites and the symbiant farm list are read and written as AOIDs,
  * and what players stored before that (internal row ids) is migrated once:
  *
- *   - ids the backend resolves become AOIDs;
- *   - ids it cannot resolve are left out, the original list is kept under a
- *     backup key, and the player is told once;
+ *   - ids the backend resolves become AOIDs, and the original list is kept
+ *     under a backup key;
+ *   - ids it cannot resolve are left out and the player is told once;
+ *   - an entry that is no id at all is treated the same, and does not hold up
+ *     the rest;
  *   - a migrated list is never migrated again;
  *   - nothing is lost while the backend cannot be reached;
  *   - what the player changes while the backend is answering stands;
  *   - data saved before game versions existed goes to the version it was
- *     saved against, whichever version is browsed first.
+ *     saved against, whichever version is browsed first, and waits while that
+ *     version cannot be told.
  *
  * Real stores and real storage; only the API client is mocked.
  */
@@ -43,7 +46,7 @@ vi.mock('idb-keyval', () => {
 
 import { setupIntegrationTest } from '../helpers/integration-test-utils';
 import { TEST_VERSION, TEST_ALT_VERSION, TEST_VERSIONS } from '../helpers/version-fixtures';
-import { setCurrentVersion, versions } from '@/composables/useGameVersion';
+import { setCurrentVersion, useGameVersion, versions } from '@/composables/useGameVersion';
 import { apiClient } from '@/services/api-client';
 import { internalIdBackupKey } from '@/services/legacy-id-migration';
 import { versionKey } from '@/services/version-keys';
@@ -170,8 +173,51 @@ describe('User data keyed by AOID', () => {
       expect(apiClient.resolveLegacyItemIds).toHaveBeenCalledWith([11, 12], TEST_VERSION);
       expect(store.favorites).toEqual([246660, 29246]);
       expect(stored(favoritesKey())).toEqual({ version: 2, aoids: [246660, 29246] });
-      expect(localStorage.getItem(internalIdBackupKey(FAVORITES_BASE, TEST_VERSION))).toBeNull();
       expect(notices).toEqual([]);
+    });
+
+    it('keeps the original ids in a backup key even when every one is resolved', async () => {
+      localStorage.setItem(favoritesKey(), JSON.stringify([11, 12]));
+      backendResolves({ 11: 246660, 12: 29246 });
+      useNanosStore();
+
+      await migrationSettles();
+
+      expect(stored(internalIdBackupKey(FAVORITES_BASE, TEST_VERSION))).toEqual({
+        internalIds: [11, 12],
+        unresolved: [],
+        resolvedAgainst: TEST_VERSION,
+        resolvedAgainstBuild: TEST_VERSION,
+      });
+    });
+
+    it('migrates the rest of a list that holds an entry which is no id', async () => {
+      localStorage.setItem(favoritesKey(), JSON.stringify([11, 13.5, 12]));
+      backendResolves({ 11: 246660, 12: 29246 });
+      const store = useNanosStore();
+
+      await migrationSettles();
+
+      // The backend rejects a whole request over one such entry: it is not asked about it
+      expect(apiClient.resolveLegacyItemIds).toHaveBeenCalledWith([11, 12], TEST_VERSION);
+      expect(store.favorites).toEqual([246660, 29246]);
+      expect(stored(favoritesKey())).toEqual({ version: 2, aoids: [246660, 29246] });
+      expect(stored(internalIdBackupKey(FAVORITES_BASE, TEST_VERSION))).toEqual({
+        internalIds: [11, 13.5, 12],
+        unresolved: [13.5],
+        resolvedAgainst: TEST_VERSION,
+        resolvedAgainstBuild: TEST_VERSION,
+      });
+      expect(notices.map((notice) => notice.detail)).toEqual([
+        '1 of your 3 favorite nanos could not be carried over to this version of TinkerTools.',
+      ]);
+
+      // Nothing is left to ask about on a later visit
+      vi.mocked(apiClient.resolveLegacyItemIds).mockClear();
+      store.resetForVersionChange();
+      await migrationSettles();
+
+      expect(apiClient.resolveLegacyItemIds).not.toHaveBeenCalled();
     });
 
     it('keeps the original list in a backup key when an id cannot be resolved', async () => {
@@ -361,6 +407,85 @@ describe('User data keyed by AOID', () => {
         expect(store.favorites).toEqual([246660, 29246]);
         expect(localStorage.getItem(FAVORITES_BASE)).toBeNull();
         expect(stored(favoritesKey(TEST_ALT_VERSION))).toEqual({ version: 2, aoids: [777] });
+      });
+
+      describe('on a visit where the list of game versions could not be loaded', () => {
+        const { defaultVersion, registryFailed } = useGameVersion();
+        const loadedRegistry = { default: defaultVersion.value, failed: registryFailed.value };
+
+        /** What a failed `GET /versions` leaves: any well-formed slug is browsed on trust. */
+        function registryIsUnavailable() {
+          versions.value = [];
+          defaultVersion.value = null;
+          registryFailed.value = true;
+        }
+
+        function registryIsBack() {
+          versions.value = TEST_VERSIONS;
+          defaultVersion.value = loadedRegistry.default;
+          registryFailed.value = loadedRegistry.failed;
+        }
+
+        afterEach(registryIsBack);
+
+        it('are not filed under the version that happens to be browsed', async () => {
+          localStorage.setItem(FAVORITES_BASE, JSON.stringify([11, 12]));
+          backendResolves({ 11: 246660, 12: 29246 });
+          registryIsUnavailable();
+
+          // Nothing says which version the ids belong to, and this one is not theirs
+          await setCurrentVersion(TEST_ALT_VERSION);
+          const store = useNanosStore();
+          await migrationSettles();
+
+          expect(store.favorites).toEqual([]);
+          expect(apiClient.resolveLegacyItemIds).not.toHaveBeenCalled();
+          expect(stored(FAVORITES_BASE)).toEqual([11, 12]);
+          expect(localStorage.getItem(favoritesKey(TEST_ALT_VERSION))).toBeNull();
+        });
+
+        it('join what was saved for their version in the meantime', async () => {
+          localStorage.setItem(FAVORITES_BASE, JSON.stringify([11, 12]));
+          backendResolves({ 11: 246660, 12: 29246 });
+          registryIsUnavailable();
+
+          const store = useNanosStore();
+          await migrationSettles();
+          store.addToFavorites(500);
+
+          expect(stored(FAVORITES_BASE)).toEqual([11, 12]);
+
+          // The next visit, with the versions known again
+          registryIsBack();
+          store.resetForVersionChange();
+          await migrationSettles();
+
+          expect(store.favorites).toEqual([246660, 29246, 500]);
+          expect(stored(favoritesKey())).toEqual({ version: 2, aoids: [246660, 29246, 500] });
+          expect(localStorage.getItem(FAVORITES_BASE)).toBeNull();
+        });
+
+        it('keeps farm progress saved before and during it', async () => {
+          const FARMED_BEFORE = 1;
+          const FARMED_DURING = 3;
+          localStorage.setItem(
+            FARM_PROGRESS_BASE,
+            JSON.stringify({ farmedBossIds: [FARMED_BEFORE], version: 1 })
+          );
+          registryIsUnavailable();
+
+          const store = useSymbiantsStore();
+          store.loadFarmProgress();
+          expect(store.isBossFarmed(FARMED_BEFORE)).toBe(false);
+          store.toggleBossFarmed(FARMED_DURING);
+
+          registryIsBack();
+          store.resetForVersionChange();
+
+          expect(store.isBossFarmed(FARMED_BEFORE)).toBe(true);
+          expect(store.isBossFarmed(FARMED_DURING)).toBe(true);
+          expect(localStorage.getItem(FARM_PROGRESS_BASE)).toBeNull();
+        });
       });
     });
 

@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
 import { useSymbiantsStore } from '@/stores/symbiants';
 import { apiClient } from '@/services/api-client';
-import { legacyDataVersion } from '@/composables/useGameVersion';
+import { knownLegacyDataVersion } from '@/composables/useGameVersion';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Tag from 'primevue/tag';
@@ -190,6 +190,10 @@ function getCellClass(
 const SLOT_PARAMS = ['a1', 'a2', 'a3'];
 const LEGACY_SLOT_PARAMS = ['s1', 's2', 's3'];
 
+// An old link that could not be translated on this visit stays in the URL, so
+// that opening it again retries, until the visitor selects something else.
+let untranslatedLink = false;
+
 function slotIds(params: string[]): (number | null)[] {
   return params.map((param) => {
     const raw = route.query[param];
@@ -208,7 +212,9 @@ const onCompareTab = computed(() => route.name === 'TinkerPocket' && route.query
 /** Make the URL name the selection, keeping the parameters that are not slots */
 function updateUrl() {
   const query = { ...route.query };
-  [...SLOT_PARAMS, ...LEGACY_SLOT_PARAMS].forEach((param) => delete query[param]);
+  untranslatedLink = untranslatedLink && !hasIds(selectedAoids());
+  const replaced = untranslatedLink ? SLOT_PARAMS : [...SLOT_PARAMS, ...LEGACY_SLOT_PARAMS];
+  replaced.forEach((param) => delete query[param]);
 
   selectedAoids().forEach((aoid, index) => {
     if (aoid !== null) query[SLOT_PARAMS[index]] = aoid.toString();
@@ -239,14 +245,27 @@ function describeSlots(slots: number[]): string {
 async function loadFromLegacyUrl() {
   const internalIds = slotIds(LEGACY_SLOT_PARAMS);
 
-  let aoids = new Map<number, number>();
+  let aoids: Map<number, number>;
   try {
+    const issuedBy = knownLegacyDataVersion();
+    if (issuedBy === null) throw new Error('The game version the link was made on is not known');
     aoids = await apiClient.resolveLegacyItemIds(
       internalIds.filter((id): id is number => id !== null),
-      legacyDataVersion()
+      issuedBy
     );
   } catch (error) {
+    // No verdict on the link: the server could not be asked, or holds no ids yet
     console.warn('[SymbiantCompare] Could not translate an old comparison link:', error);
+    untranslatedLink = true;
+    showSelection([]);
+    toast.add({
+      severity: 'warn',
+      summary: 'Outdated comparison link',
+      detail:
+        'This link was made with an older version of TinkerTools and could not be converted right now. Reload the page to try again.',
+      life: 10000,
+    });
+    return;
   }
 
   const notLoaded: number[] = [];

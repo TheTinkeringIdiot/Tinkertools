@@ -14,6 +14,7 @@ import { get, set, del } from 'idb-keyval';
 import { useToast } from 'primevue/usetoast';
 import {
   droppedEntriesMessage,
+  mergeAoidLists,
   migratePendingIds,
   readAoidList,
   showAoids,
@@ -71,6 +72,20 @@ function legacyFarmListIds(value: unknown): number[] | null {
   if (!value || typeof value !== 'object') return null;
   const ids = (value as { symbiantIds?: unknown }).symbiantIds;
   return Array.isArray(ids) && ids.every((id) => typeof id === 'number') ? ids : null;
+}
+
+function farmedBossIdsOf(raw: string): number[] {
+  const ids = (JSON.parse(raw) as Partial<FarmProgressStorage> | null)?.farmedBossIds;
+  return Array.isArray(ids) ? ids : [];
+}
+
+/** Progress saved before game versions existed, joined with what its version has since */
+function mergeFarmProgress(legacy: string, existing: string): string {
+  const merged: FarmProgressStorage = {
+    farmedBossIds: Array.from(new Set([...farmedBossIdsOf(legacy), ...farmedBossIdsOf(existing)])),
+    version: 1,
+  };
+  return JSON.stringify(merged);
 }
 
 export const useSymbiantsStore = defineStore('symbiants', () => {
@@ -239,10 +254,6 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
         }
       }
 
-      if (allSymbiantsData.length === 0) {
-        throw new Error('No symbiant data received');
-      }
-
       // Clear old data and store new data in Pinia
       symbiants.value.clear();
       allSymbiantsData.forEach((symbiant) => {
@@ -250,6 +261,10 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
       });
 
       lastFetch.value = Date.now();
+
+      // A game version from before symbiants has none. That is an answer, not
+      // a failure, but not one to keep for the cache's 30 days.
+      if (allSymbiantsData.length === 0) return allSymbiantsData;
 
       // Write complete dataset to IndexedDB cache
       try {
@@ -616,7 +631,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
   function loadFarmList(): void {
     const slug = browsingVersionSlug();
     const storageKey = versionKey(FARM_LIST_BASE, slug);
-    adoptLegacyUserData(FARM_LIST_BASE);
+    adoptLegacyUserData(FARM_LIST_BASE, mergeAoidLists(legacyFarmListIds));
     showAoids(farmListAoids, readAoidList(storageKey, legacyFarmListIds).aoids);
 
     void migratePendingIds({
@@ -654,7 +669,7 @@ export const useSymbiantsStore = defineStore('symbiants', () => {
    */
   function loadFarmProgress(): void {
     try {
-      adoptLegacyUserData(FARM_PROGRESS_BASE);
+      adoptLegacyUserData(FARM_PROGRESS_BASE, mergeFarmProgress);
       const saved = localStorage.getItem(userDataKey(FARM_PROGRESS_BASE));
       if (saved) {
         const data: FarmProgressStorage = JSON.parse(saved);

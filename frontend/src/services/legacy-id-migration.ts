@@ -15,8 +15,11 @@
  *   3. When the answer arrives the stored value is read again, and the only
  *      change made to it is "these pending ids become these AOIDs". Whatever
  *      was added, removed, cleared or replaced during the lookup, in this tab
- *      or another, is therefore kept. If any id could not be resolved, the
- *      original ids are kept under a backup key and the user is told once.
+ *      or another, is therefore kept. The original ids are kept under a
+ *      backup key, so a list resolved from the wrong data can be restored by
+ *      hand; if any id could not be resolved the user is told once. An entry
+ *      that is no id at all (a fraction, say) counts as one that could not be
+ *      resolved and does not hold up the rest.
  *
  * localStorage is the single source of truth throughout: every change to a
  * list goes through `writeAoids` or `replaceAoidList`, and callers refresh
@@ -51,9 +54,9 @@ interface StoredAoidList {
 /** Picks the internal ids out of a value in an older shape; null when it is not one. */
 export type LegacyIdReader = (value: unknown) => number[] | null;
 
-/** What is left behind when some stored ids could not be resolved. */
+/** What is left behind when stored ids are replaced by AOIDs. */
 export interface InternalIdBackup {
-  /** Every internal id that was looked up, as it was stored */
+  /** Every entry that was migrated, as it was stored */
   internalIds: number[];
   /** The ones no item of `resolvedAgainst` has, and so are not in the migrated list */
   unresolved: number[];
@@ -79,6 +82,9 @@ export interface MigrationTarget {
 
 const isNumberList = (value: unknown): value is number[] =>
   Array.isArray(value) && value.every((entry) => typeof entry === 'number');
+
+/** Whether a stored entry can be an internal item id at all. */
+const isItemId = (value: number): boolean => Number.isSafeInteger(value) && value > 0;
 
 const unique = (values: number[]): number[] => Array.from(new Set(values));
 
@@ -138,6 +144,21 @@ export function replaceAoidList(storageKey: string, aoids: number[]): void {
 }
 
 /**
+ * Joins a list saved before game versions existed with the one its version
+ * already has, so that neither's entries are lost (see adoptLegacyUserData).
+ */
+export function mergeAoidLists(legacyIds: LegacyIdReader) {
+  return (legacyRaw: string, currentRaw: string): string => {
+    const legacy = parseAoidList(legacyRaw, legacyIds);
+    const current = parseAoidList(currentRaw, legacyIds);
+    return serializeAoidList({
+      aoids: unique([...legacy.aoids, ...current.aoids]),
+      pendingInternalIds: unique([...legacy.pendingInternalIds, ...current.pendingInternalIds]),
+    });
+  };
+}
+
+/**
  * Puts a list read from storage on show, unless the same list already is.
  * Replacing a list with an equal one would re-render everything that depends
  * on it (every row of the symbiant table, for the farm list) for nothing.
@@ -149,8 +170,8 @@ export function showAoids(shown: { value: number[] }, stored: number[]): void {
 }
 
 /**
- * Where the original ids of `base` are kept for `slug` when some could not be
- * resolved. Deliberately not a version key of `base`, so nothing that sweeps
+ * Where the original ids of `base` are kept for `slug` once they have been
+ * migrated. Deliberately not a version key of `base`, so nothing that sweeps
  * `base` keys touches it.
  */
 export function internalIdBackupKey(base: string, slug: string): string {
@@ -160,6 +181,20 @@ export function internalIdBackupKey(base: string, slug: string): string {
 /** The text of the notice shown when a migration left entries out. */
 export function droppedEntriesMessage(dropped: number, total: number, entries: string): string {
   return `${dropped} of your ${total} ${entries} could not be carried over to this version of TinkerTools.`;
+}
+
+/** The backup an earlier migration of the same list left, so a later one adds to it. */
+function readBackup(backupKey: string): InternalIdBackup | null {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(backupKey) ?? 'null');
+    if (!value || typeof value !== 'object') return null;
+    const backup = value as Partial<InternalIdBackup>;
+    return isNumberList(backup.internalIds) && isNumberList(backup.unresolved)
+      ? (backup as InternalIdBackup)
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 const inFlight = new Map<string, Promise<void>>();
@@ -191,7 +226,8 @@ export function migratePendingIds(target: MigrationTarget): Promise<void> | null
 async function resolveAndStore(target: MigrationTarget, lookedUp: number[]): Promise<void> {
   let resolved: Map<number, number>;
   try {
-    resolved = await apiClient.resolveLegacyItemIds(lookedUp, target.slug);
+    // The backend refuses a whole request over one entry that is not an id
+    resolved = await apiClient.resolveLegacyItemIds(lookedUp.filter(isItemId), target.slug);
   } catch (error) {
     console.warn(
       `[legacy-id-migration] Could not migrate ${target.storageKey}; will retry on next load:`,
@@ -215,19 +251,21 @@ async function resolveAndStore(target: MigrationTarget, lookedUp: number[]): Pro
   };
 
   try {
+    const backupKey = internalIdBackupKey(target.base, target.slug);
+    const earlier = readBackup(backupKey);
+    const backup: InternalIdBackup = {
+      internalIds: unique([...(earlier?.internalIds ?? []), ...settled]),
+      unresolved: unique([...(earlier?.unresolved ?? []), ...unresolved]),
+      resolvedAgainst: target.slug,
+      resolvedAgainstBuild: dataSlug(target.slug) ?? target.slug,
+    };
+    // Backup first: if it cannot be written, the original stays where it is
+    localStorage.setItem(backupKey, JSON.stringify(backup));
     if (unresolved.length > 0) {
-      const backup: InternalIdBackup = {
-        internalIds: settled,
-        unresolved,
-        resolvedAgainst: target.slug,
-        resolvedAgainstBuild: dataSlug(target.slug) ?? target.slug,
-      };
-      // Backup first: if it cannot be written, the original stays where it is
-      localStorage.setItem(internalIdBackupKey(target.base, target.slug), JSON.stringify(backup));
       console.warn(
         `[legacy-id-migration] ${unresolved.length} of ${settled.length} stored ids of ` +
           `${target.storageKey} match no item of ${target.slug}; the original list is kept under ` +
-          internalIdBackupKey(target.base, target.slug)
+          backupKey
       );
     }
     localStorage.setItem(target.storageKey, serializeAoidList(migrated));

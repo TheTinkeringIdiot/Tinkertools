@@ -12,6 +12,13 @@ import type { GameVersion, GameVersionListResponse } from '@/types/game-version'
 export const TEST_VERSION = 'ao-2024-02';
 export const TEST_ALT_VERSION = 'prk';
 
+/**
+ * The version tests against a real backend browse (the ones under
+ * `describe.skipIf(!BACKEND_AVAILABLE)`): the family alias every backend's
+ * registry serves. TEST_VERSION exists only in the seeded registry below.
+ */
+export const LIVE_BACKEND_VERSION = 'ao';
+
 function version(overrides: Partial<GameVersion> & Pick<GameVersion, 'slug'>): GameVersion {
   return {
     display_name: overrides.slug,

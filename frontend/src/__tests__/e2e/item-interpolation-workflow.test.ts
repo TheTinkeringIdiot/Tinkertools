@@ -76,7 +76,7 @@ function otekAt(aoid: number, ql: number): Item {
     actions: [
       createAction({
         action: WIELD_ACTION,
-        criteria: [createCriterion(ONE_HAND_EDGED, requirementAt(ql), 2, 1)],
+        criteria: [createCriterion(ONE_HAND_EDGED, requirementAt(ql), 2)],
       }),
     ],
   });

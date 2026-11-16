@@ -109,12 +109,7 @@ export function createStatValues(entries: Array<[number, number]>): StatValue[] 
 /**
  * Create a Criterion object
  */
-export function createCriterion(
-  value1: number,
-  value2: number,
-  operator: number = 0,
-  id?: number
-): Criterion {
+export function createCriterion(value1: number, value2: number, operator: number = 0): Criterion {
   return {
     value1,
     value2,

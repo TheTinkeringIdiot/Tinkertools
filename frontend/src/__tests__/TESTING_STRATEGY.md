@@ -213,19 +213,25 @@ These tests **require a real backend** and should only run when the backend is a
 **Pattern**:
 
 ```typescript
-import { isBackendAvailable } from '../helpers/backend-check';
+import { browseLiveBackendVersion, isBackendAvailable } from '../helpers/backend-check';
 
 // Top-level await: `describe.skipIf` reads the flag while the file is being
 // collected, before any `beforeAll` runs, so the check must finish first.
 const BACKEND_AVAILABLE = await isBackendAvailable();
 
 describe.skipIf(!BACKEND_AVAILABLE)('My Backend Tests', () => {
+  // Tests start on the seeded TEST_VERSION, which no real backend serves
+  browseLiveBackendVersion();
+
   it('should fetch real data', async () => {
-    const response = await fetch('http://localhost:8000/api/v1/items');
+    const response = await fetch('http://localhost:8000/api/v1/ao/items');
     expect(response.ok).toBe(true);
   });
 });
 ```
+
+To run them against a backend elsewhere:
+`BACKEND_URL=http://localhost:8043 VITE_API_BASE_URL=http://localhost:8043/api/v1 npx vitest run <files>`.
 
 Do not set the flag in `beforeAll`: by then the suite has already been
 skipped (or not), so such a suite never runs, even with a backend.

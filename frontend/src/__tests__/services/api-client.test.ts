@@ -527,6 +527,8 @@ describe('API Client', () => {
         type: 'info',
         title: 'Not Found',
         message: 'Unknown build nonsense',
+        // Item pages tell "not in this version" from a failure by this
+        status: 404,
       });
     });
   });
@@ -562,6 +564,58 @@ describe('API Client', () => {
         type: 'info',
         title: 'Not Found',
         recoverable: true,
+      });
+    });
+
+    it('reports the sentence a route answers a plain 404 with', async () => {
+      mockAxiosInstance.get.mockRejectedValue({
+        response: { status: 404, data: { error: 'Item 999 not found', code: 'HTTP_404' } },
+      });
+
+      await expect(apiClient.getItem(999)).rejects.toEqual({
+        type: 'info',
+        title: 'Not Found',
+        message: 'Item 999 not found',
+        action: 'Check the link or pick another version',
+        recoverable: true,
+        status: 404,
+      });
+    });
+
+    it('reports the sentence an unknown game version is answered with', async () => {
+      mockAxiosInstance.get.mockRejectedValue({
+        response: { status: 404, data: { detail: "Unknown game version 'ao-99-9-9'" } },
+      });
+
+      await expect(apiClient.getItem(1)).rejects.toMatchObject({
+        type: 'info',
+        title: 'Not Found',
+        message: "Unknown game version 'ao-99-9-9'",
+        recoverable: true,
+        status: 404,
+      });
+    });
+
+    it('reports a 404 that says nothing as not found, not as a failure', async () => {
+      mockAxiosInstance.get.mockRejectedValue({ response: { status: 404, data: {} } });
+
+      await expect(apiClient.getItem(1)).rejects.toMatchObject({
+        type: 'info',
+        title: 'Not Found',
+        message: 'Not found',
+        status: 404,
+      });
+    });
+
+    it('does not take another failure that carries a sentence for a 404', async () => {
+      mockAxiosInstance.get.mockRejectedValue({
+        response: { status: 400, data: { error: 'Bad request', code: 'HTTP_400' } },
+      });
+
+      await expect(apiClient.getItem(1)).rejects.toMatchObject({
+        type: 'error',
+        title: 'Unexpected Error',
+        recoverable: false,
       });
     });
 

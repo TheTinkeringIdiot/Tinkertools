@@ -4,7 +4,8 @@
  * The compare view names its selection in the URL (a1..a3, AOIDs), so a copied
  * link shows the same comparison to whoever opens it. Links made before AOIDs
  * (s1..s3, internal ids) are translated; what cannot be translated is reported
- * to the visitor instead of silently showing an empty comparison.
+ * to the visitor instead of silently showing an empty comparison, and a link
+ * that could not be looked up at all is kept so that it can be tried again.
  *
  * Real component, stores and router; only the API client is mocked.
  */
@@ -247,15 +248,63 @@ describe('Symbiant comparison links', () => {
       ]);
     });
 
-    it('tells the visitor when the lookup fails', async () => {
-      vi.mocked(apiClient.resolveLegacyItemIds).mockRejectedValue(new Error('offline'));
+    describe('that cannot be translated on this visit', () => {
+      const TRY_AGAIN =
+        'This link was made with an older version of TinkerTools and could not be converted right now. Reload the page to try again.';
 
-      const view = await open('/pocket?tab=compare&s1=86188&s2=90001');
+      /** What the API client does on a network failure, and when the server holds no ids yet */
+      function lookupFails() {
+        vi.mocked(apiClient.resolveLegacyItemIds).mockRejectedValue(new Error('offline'));
+      }
 
-      expect(view.text()).toContain('Select Symbiants to Compare');
-      expect(notices.map((notice) => notice.detail)).toEqual([
-        'This link was made with an older version of TinkerTools. Symbiants 1 and 2 could not be loaded.',
-      ]);
+      it('stays in the URL, and the visitor is told to try again', async () => {
+        lookupFails();
+
+        const view = await open('/pocket?tab=compare&s1=86188&s2=90001');
+
+        expect(view.text()).toContain('Select Symbiants to Compare');
+        expect(query()).toEqual({ tab: 'compare', s1: '86188', s2: '90001' });
+        expect(notices.map((notice) => notice.detail)).toEqual([TRY_AGAIN]);
+      });
+
+      it('is translated when opened again once the lookup works', async () => {
+        lookupFails();
+        const failed = await open('/pocket?tab=compare&s1=86188&s2=90001');
+        const kept = router.currentRoute.value.fullPath;
+        failed.unmount();
+        notices.length = 0;
+
+        backendResolves({ 86188: 219135, 90001: 235792 });
+        const view = await open(kept.replace(`/${TEST_VERSION}`, ''));
+
+        expect(view.text()).toContain(OCULAR.name);
+        expect(view.text()).toContain(THIGH.name);
+        expect(query()).toEqual({ tab: 'compare', a1: '219135', a2: '235792' });
+        expect(notices).toEqual([]);
+      });
+
+      it('survives a change of tab', async () => {
+        lookupFails();
+        await open('/pocket?tab=compare&s1=86188');
+
+        await router.replace({ query: { ...query(), tab: 'symbiants' } });
+        await flushPromises();
+        await router.replace({ query: { ...query(), tab: 'compare' } });
+        await flushPromises();
+
+        expect(query()).toEqual({ tab: 'compare', s1: '86188' });
+      });
+
+      it('gives way to a selection the visitor makes instead', async () => {
+        lookupFails();
+        const view = await open('/pocket?tab=compare&s1=86188&s2=90001');
+
+        useSymbiantsStore().addToComparison(BRAIN);
+        await flushPromises();
+
+        expect(view.text()).toContain(BRAIN.name);
+        expect(query()).toEqual({ tab: 'compare', a1: '219140' });
+      });
     });
   });
 });
