@@ -510,7 +510,7 @@ What changed on an item, in a build, or between any two builds. The version segm
 
 - `kind`: `added`, `removed`, `changed`
 - `parts` (what differs): `text`, `stats`, `effects`, `actions`, `atkdef`, `misc`
-- `relevance` (what the change matters for): `gameplay`, `economy`, `cosmetic`, `text`. It follows from `backend/database/change_relevance.toml`; an added or removed item is `gameplay`. A stat that is added or removed with its housekeeping value (`[housekeeping]` in that file: Value 0, ItemClass 0, Team 15, ...) is `cosmetic`; any other value of the stat keeps the stat's class.
+- `relevance` (what the change matters for): `gameplay`, `economy`, `cosmetic`, `text`. It follows from `backend/database/change_relevance.toml`; an added or removed item is `gameplay`. A stat that is added or removed with its housekeeping value (`[housekeeping]` in that file: Value 0, ItemClass 0, Team 15, ...) is `cosmetic`; any other value of the stat keeps the stat's class. Effects are compared as the events group them, whatever the events' numbers: an effect that moves from one event to another (a modifier that applied on Use and now applies on Wear) is a change of its effect type's class, an event that only takes another number is `cosmetic`.
 
 Diffs compare the client's raw data, build against build. A value that the item pages show from curated data instead (the strain of a nano, from the curated nano CSV) can therefore differ from what a diff shows for the same item: the diff shows what the client data of the two builds held.
 
@@ -578,8 +578,8 @@ The field transitions that most changed items of the request's build share, most
 
 **Query Parameters:**
 - `part` (repeatable): only transitions of these parts
-- `relevance` (repeatable: `gameplay` | `economy` | `cosmetic` | `text`; default `gameplay`, `economy` and `text`): only transitions of fields that matter for one of these. The class is that of the field itself (the stat, the effect type, the part), whatever else the items changed: an icon or `static_instance` line is `cosmetic` even on items that changed in gameplay too. Three kinds of line depend on their values: a stat added or removed with its housekeeping value is `cosmetic` (`stat:74` null -> 0) while the same stat with other values has its own class (`stat:74` 56 -> 1 is `economy`); an event added or removed with its effects (`event:<id>`) is `gameplay`; a renumbering (`event`) is `cosmetic`. Unlike on `GET /changes`, leaving the parameter out does filter: name all four classes to list cosmetic lines as well.
-- `notes` (`collapse` | `expand`, default `collapse`): with `collapse` the patch notes leave out what a build note already says. `items` and `occurrences` count only the changes no build note explains, and a transition is left out when the build's notes account for it: when fewer than `min_items` of those changes have it outside the event of a note. A note accounts for the transitions its rule names, in the items its event happened to (`backend/database/build_notes.toml`), so the implants of 14.8.0 that were renamed and rebalanced are listed with their rebalancing and not with the rename. With `expand` every transition is listed and counted over every change.
+- `relevance` (repeatable: `gameplay` | `economy` | `cosmetic` | `text`; default `gameplay`, `economy` and `text`): only transitions of fields that matter for one of these. The class is that of the field itself (the stat, the effect type, the part), whatever else the items changed: an icon or `static_instance` line is `cosmetic` even on items that changed in gameplay too. One kind of line depends on its values: a stat added or removed with its housekeeping value is `cosmetic` (`stat:74` null -> 0) while the same stat with other values has its own class (`stat:74` 56 -> 1 is `economy`). A renumbering (`event`) and an empty event added or removed (`event:<id>`) are `cosmetic`; an event that comes or goes with effects has no line of its own, its effects have theirs. Unlike on `GET /changes`, leaving the parameter out does filter: name all four classes to list cosmetic lines as well.
+- `notes` (`collapse` | `expand`, default `collapse`): with `collapse` the patch notes leave out what a build note already says. `items` and `occurrences` count only the changes no build note explains, and a transition is left out when the build's notes account for it: when fewer than `min_items` of those changes have it outside the event of a note. A note accounts for the transitions its rule names, in the items its event happened to (`backend/database/build_notes.toml`), so the implants of 14.8.0 that were renamed and rebalanced are listed with their rebalancing and not with the rename. A note marked `partial = false` in that file accounts only for the changes it explains entirely: the line of its transition stays, counting the changes that have it and something else besides. With `expand` every transition is listed and counted over every change.
 - `min_items` (int, default 2), `limit` (int, default 50, max 500)
 
 **Response:**
@@ -605,7 +605,7 @@ Only transitions shared by at least two items are kept. `relevance` is the class
 | actions | `action:<id>` | `"removed"` as old or `"added"` as new |
 | actions | `action:<id>:criterion` | `[value1, value2, operator]` |
 | effects | `event` | the event ids of a renumbering |
-| effects | `event:<id>` | `"removed"` / `"added"` |
+| effects | `event:<id>` | `"removed"` / `"added"`, for an event without effects |
 | effects | `effect:<spell_id>` | the subject (stat, skill, nano id; `"none"`) of a removed (old) or added (new) effect |
 | effects | `effect:<spell_id>:<field>` | the values of `target`, `tick_count`, `tick_interval` or `spell_params.<name>` |
 | effects | `effect:<spell_id>:criterion` | `[value1, value2, operator]` |
@@ -672,7 +672,7 @@ One item in build `base` and in the request's build.
   - `added` and `removed` hold effects shaped as the `spells` of an item's `spell_data`, each with a `relevance`.
   - `changed` pairs an old with a new effect: `{"old", "new", "fields", "criteria", "relevance"}`, `fields` listing what differs as `{"field", "old", "new"}` (`target`, `tick_count`, `tick_interval`, `spell_params.<name>`) and `criteria` the sequence diff of their criteria, or null.
   - Two effects are only paired when they have the same effect type and act on the same subject (the `Stat`, `Skill`, `NanoID`, `NanoStrain`, `Item` and `PerkID` parameters); a modifier replaced by a modifier of another stat is one removal and one addition.
-  - An effect that only moved to another event, and an event that was only renumbered, are `cosmetic` when nothing else about the item's effects differs, and have a null `relevance` when something does.
+  - An effect entry has the class of its effect type when the events of the two revisions do not hold the same effects of that class: an effect added, removed, changed, or moved from one event to another. Where they do, only the numbering of events differs: the entry, like that of a renumbered event, is `cosmetic` when that is so for every class, and has a null `relevance` when another class differs.
 
 ### Legacy Item IDs
 
