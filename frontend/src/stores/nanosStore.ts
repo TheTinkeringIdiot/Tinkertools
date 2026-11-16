@@ -11,6 +11,7 @@ import {
 } from '@/services/version-keys';
 import {
   droppedEntriesMessage,
+  mergeAoidLists,
   migratePendingIds,
   readAoidList,
   showAoids,
@@ -645,7 +646,7 @@ export const useNanosStore = defineStore('nanos', () => {
   const loadFavorites = (): void => {
     const slug = browsingVersionSlug();
     const storageKey = versionKey(FAVORITES_BASE, slug);
-    adoptLegacyUserData(FAVORITES_BASE);
+    adoptLegacyUserData(FAVORITES_BASE, mergeAoidLists(legacyFavoriteIds));
     showAoids(favorites, readAoidList(storageKey, legacyFavoriteIds).aoids);
 
     void migratePendingIds({

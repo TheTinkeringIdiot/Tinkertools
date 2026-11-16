@@ -206,12 +206,18 @@ function pickVersion(): string {
  * that default. Falls back to the current version when neither is known.
  */
 export function legacyDataVersion(): string {
+  return knownLegacyDataVersion() ?? resolveVersion();
+}
+
+/**
+ * legacyDataVersion() without the fallback: null when the registry could not
+ * be loaded and nothing is configured. Data that is moved or translated for
+ * good (favorites, farm lists, old comparison links) waits for a visit on
+ * which this is known, rather than be filed under whatever is being browsed.
+ */
+export function knownLegacyDataVersion(): string | null {
   return (
-    hostnameDefault() ??
-    registryDefault.value ??
-    defaultSlugOf(versions.value) ??
-    envDefault() ??
-    resolveVersion()
+    hostnameDefault() ?? registryDefault.value ?? defaultSlugOf(versions.value) ?? envDefault()
   );
 }
 
