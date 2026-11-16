@@ -597,7 +597,7 @@ def test_an_event_that_comes_or_goes_is_told_by_its_effects_and_classed_by_them(
             *pair(3, SpellData=worn + used),
             *pair(5, SpellData=worn),
             *pair(7, SpellData=worn),
-            *pair(9, SpellData=worn + wear(event=5)),
+            *pair(9, SpellData=worn + wear(event=6)),
         ],
     )
     load(
@@ -607,18 +607,19 @@ def test_an_event_that_comes_or_goes_is_told_by_its_effects_and_classed_by_them(
             *pair(1, SpellData=worn + used),
             *pair(3, SpellData=worn),
             *pair(5, SpellData=wear(modify(16, 5), event=0)),
-            *pair(7, SpellData=worn + wear(event=5)),
+            *pair(7, SpellData=worn + wear(event=6)),
             *pair(9, SpellData=worn),
         ],
     )
 
-    # no line says "event 5 added" beside the line of the effect it came with
+    # event 5 came and went with an effect, and only the effect's lines say
+    # so; event 6 came and went empty, which only a line of its own can say
     assert line_classes(conn, 2) == {
         ("effect:53045", None, 17): GAMEPLAY,
         ("effect:53045", 17, None): GAMEPLAY,
         ("event", 14, 0): COSMETIC,
-        ("event:5", None, "added"): COSMETIC,
-        ("event:5", "removed", None): COSMETIC,
+        ("event:6", None, "added"): COSMETIC,
+        ("event:6", "removed", None): COSMETIC,
     }
     # each line has the class of the changes it leads to
     assert relevance(conn, 2) == {
