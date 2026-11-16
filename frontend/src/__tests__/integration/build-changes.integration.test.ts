@@ -47,6 +47,8 @@ import {
   compareResult,
   emptyDiff,
   longEffectsDiff,
+  manyTransitions,
+  transitionsRoute,
 } from '../helpers/change-fixtures';
 
 const mockApi = vi.mocked(apiClient);
@@ -1146,17 +1148,172 @@ describe('build change list', () => {
       expect(listQuery().notes).toBeUndefined();
     });
 
-    it('offers all patch notes from the header of the panel', async () => {
+    it('opens the patch notes from the header of the panel, and closes them again', async () => {
       const page = await mountPage(router, pinia);
-      const more = page.find('[data-testid="patch-notes"] header [data-testid="patch-notes-more"]');
+      const header = page.find('[data-testid="patch-notes"] header');
 
-      expect(more.attributes('aria-expanded')).toBe('false');
-      const collapsed = page.findAll('[data-testid="patch-note"]').length;
-      await more.trigger('click');
+      expect(header.find('[data-testid="patch-notes-shown"]').text()).toBe('3 of 8');
+      expect(header.find('[data-testid="patch-notes-fewer"]').exists()).toBe(false);
+      await header.find('[data-testid="patch-notes-more"]').trigger('click');
 
-      expect(more.attributes('aria-expanded')).toBe('true');
-      expect(more.text()).toBe('Show fewer');
-      expect(page.findAll('[data-testid="patch-note"]').length).toBeGreaterThan(collapsed);
+      expect(page.findAll('[data-testid="patch-note"]')).toHaveLength(8);
+      expect(header.find('[data-testid="patch-notes-shown"]').text()).toBe('All 8 shown');
+      // Everything is on screen: one way back, and nothing more to ask for.
+      expect(page.find('[data-testid="patch-notes-more"]').exists()).toBe(false);
+      expect(page.find('[data-testid="patch-notes-more-below"]').exists()).toBe(false);
+
+      await header.find('[data-testid="patch-notes-fewer"]').trigger('click');
+      expect(page.findAll('[data-testid="patch-note"]')).toHaveLength(3);
+      expect(header.find('[data-testid="patch-notes-more"]').exists()).toBe(true);
+    });
+
+    it('lists the patch notes of the parts ticked under "What changed"', async () => {
+      mockApi.getBuildTransitions.mockImplementation(
+        transitionsRoute(TRANSITIONS_1460.transitions)
+      );
+      const page = await mountPage(router, pinia);
+      const parts = () =>
+        page.findAll('[data-testid="patch-note"]').map((note) => note.attributes('data-part'));
+
+      expect(parts()).toEqual(['stats', 'stats', 'effects']);
+
+      await page.find('[data-testid="change-filter-part"][data-value="effects"]').setValue(true);
+      await flushPromises();
+
+      // The panel describes the slice the list shows: effect lines only.
+      expect(listQuery().part).toEqual(['effects']);
+      expect(parts()).toEqual(['effects', 'effects']);
+      expect(page.find('[data-testid="patch-notes"]').text()).toContain('chance to cast');
+      expect(page.find('[data-testid="patch-notes"]').text()).not.toContain('AttackRange');
+
+      await page.find('[data-testid="change-filter-part"][data-value="effects"]').setValue(false);
+      await flushPromises();
+      expect(parts()).toEqual(['stats', 'stats', 'effects']);
+    });
+
+    it('says so when no line is shared in the parts ticked', async () => {
+      mockApi.getBuildTransitions.mockImplementation(
+        transitionsRoute(TRANSITIONS_1460.transitions)
+      );
+      await router.push('/ao-14-6-0/changes?part=misc');
+      const page = await mountPage(router, pinia);
+
+      expect(page.find('[data-testid="patch-notes-empty"]').text()).toContain(
+        'No change of this kind'
+      );
+    });
+
+    it('keeps the parts ticked when a patch note is opened', async () => {
+      mockApi.getBuildTransitions.mockImplementation(
+        transitionsRoute(TRANSITIONS_1460.transitions)
+      );
+      await router.push('/ao-14-6-0/changes?part=effects&kind=added');
+      const page = await mountPage(router, pinia);
+
+      await page.find('[data-testid="patch-note-filter"]').trigger('click');
+      await flushPromises();
+
+      expect(router.currentRoute.value.query).toMatchObject({
+        part: 'effects',
+        t: 'effect:53089:spell_params.Chance',
+      });
+      expect(router.currentRoute.value.query.kind).toBeUndefined();
+      // The patch notes did not change under the reader.
+      expect(mockApi.getBuildTransitions).toHaveBeenCalledTimes(1);
+      expect(page.findAll('[data-testid="patch-note"]')).toHaveLength(2);
+    });
+
+    it('brings further patch notes on screen until none remain', async () => {
+      mockApi.getBuildTransitions.mockImplementation(transitionsRoute(manyTransitions(180)));
+      const page = await mountPage(router, pinia);
+      const notes = () => page.findAll('[data-testid="patch-note"]');
+      const shownText = () => page.find('[data-testid="patch-notes-shown"]').text();
+      const retargeting = () => notes().find((note) => note.attributes('data-part') === 'effects');
+
+      expect(notes()).toHaveLength(3);
+      expect(shownText()).toBe('First 3 shown');
+
+      // The first step lists what the page already holds.
+      await page.find('[data-testid="patch-notes-more"]').trigger('click');
+      expect(notes()).toHaveLength(40);
+      expect(shownText()).toBe('First 40 shown');
+      expect(mockApi.getBuildTransitions).toHaveBeenCalledTimes(1);
+      expect(retargeting()).toBeUndefined();
+
+      // The next one reaches the line ranked 56th.
+      await page.find('[data-testid="patch-notes-more-below"]').trigger('click');
+      await flushPromises();
+      expect(notes()).toHaveLength(140);
+      expect(retargeting()!.text()).toContain('on 95 items (656 times)');
+      expect(notes()[139].text()).toContain('AttackRange added: 140');
+
+      await page.find('[data-testid="patch-notes-more"]').trigger('click');
+      await flushPromises();
+      expect(notes()).toHaveLength(180);
+      expect(shownText()).toBe('All 180 shown');
+      expect(page.find('[data-testid="patch-notes-foot"]').text()).toBe('All 180 shown');
+      expect(page.find('[data-testid="patch-notes-more"]').exists()).toBe(false);
+      expect(page.find('[data-testid="patch-notes-more-below"]').exists()).toBe(false);
+    });
+
+    it('offers nothing more when the first lines are all there are', async () => {
+      mockApi.getBuildTransitions.mockImplementation(transitionsRoute(manyTransitions(40)));
+      const page = await mountPage(router, pinia);
+
+      expect(page.find('[data-testid="patch-notes-shown"]').text()).toBe('3 of 40');
+      await page.find('[data-testid="patch-notes-more"]').trigger('click');
+
+      expect(page.findAll('[data-testid="patch-note"]')).toHaveLength(40);
+      expect(page.find('[data-testid="patch-notes-more"]').exists()).toBe(false);
+      expect(mockApi.getBuildTransitions).toHaveBeenCalledTimes(1);
+    });
+
+    it('starts over from the first lines when the filters change', async () => {
+      mockApi.getBuildTransitions.mockImplementation(transitionsRoute(manyTransitions(180)));
+      const page = await mountPage(router, pinia);
+      await page.find('[data-testid="patch-notes-more"]').trigger('click');
+      await page.find('[data-testid="patch-notes-more"]').trigger('click');
+      await flushPromises();
+      expect(page.findAll('[data-testid="patch-note"]')).toHaveLength(140);
+
+      await page.find('[data-testid="change-filter-part"][data-value="stats"]').setValue(true);
+      await flushPromises();
+
+      expect(page.findAll('[data-testid="patch-note"]')).toHaveLength(40);
+      expect(page.find('[data-testid="patch-notes-more"]').exists()).toBe(true);
+    });
+
+    it('keeps the lines on screen when further ones cannot be loaded, and retries', async () => {
+      const route = transitionsRoute(manyTransitions(180));
+      mockApi.getBuildTransitions.mockImplementation(route);
+      const page = await mountPage(router, pinia);
+      await page.find('[data-testid="patch-notes-more"]').trigger('click');
+
+      mockApi.getBuildTransitions.mockRejectedValueOnce(new Error('transitions unavailable'));
+      await page.find('[data-testid="patch-notes-more"]').trigger('click');
+      await flushPromises();
+
+      expect(page.findAll('[data-testid="patch-note"]')).toHaveLength(40);
+      expect(page.find('[data-testid="patch-notes-more-error"]').exists()).toBe(true);
+
+      await page.find('[data-testid="patch-notes-more-below"]').trigger('click');
+      await flushPromises();
+      expect(page.findAll('[data-testid="patch-note"]')).toHaveLength(140);
+      expect(page.find('[data-testid="patch-notes-more-error"]').exists()).toBe(false);
+    });
+
+    it('says where the route stops giving lines', async () => {
+      mockApi.getBuildTransitions.mockImplementation(transitionsRoute(manyTransitions(620)));
+      const page = await mountPage(router, pinia);
+      for (let step = 0; step < 6; step += 1) {
+        await page.find('[data-testid="patch-notes-more"]').trigger('click');
+        await flushPromises();
+      }
+
+      expect(page.findAll('[data-testid="patch-note"]')).toHaveLength(500);
+      expect(page.find('[data-testid="patch-notes-capped"]').text()).toContain('What changed');
+      expect(page.find('[data-testid="patch-notes-more"]').exists()).toBe(false);
+      expect(last(mockApi.getBuildTransitions.mock.calls)?.[0]?.limit).toBe(500);
     });
   });
 

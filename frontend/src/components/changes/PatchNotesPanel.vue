@@ -24,29 +24,51 @@ to.
       <span class="patch-notes-muted hidden sm:inline"
         >The same change made to many items at once, most items first</span
       >
-      <button
-        v-if="open && transitions.length > COLLAPSED_LINES"
-        type="button"
-        class="patch-notes-link ml-auto"
-        data-testid="patch-notes-more"
-        :aria-expanded="showAll"
-        @click="showAll = !showAll"
+      <span
+        v-if="open && lines.length > COLLAPSED_LINES"
+        class="patch-notes-controls ml-auto"
+        data-testid="patch-notes-controls"
       >
-        {{ showAll ? 'Show fewer' : `Show all ${transitions.length}` }}
-      </button>
+        <span class="patch-notes-muted" data-testid="patch-notes-shown" aria-live="polite">{{
+          shownText
+        }}</span>
+        <button
+          v-if="canShowMore"
+          type="button"
+          class="patch-notes-link"
+          data-testid="patch-notes-more"
+          :disabled="loading"
+          @click="showMore"
+        >
+          Show more
+        </button>
+        <button
+          v-if="expanded"
+          type="button"
+          class="patch-notes-link"
+          data-testid="patch-notes-fewer"
+          @click="expanded = false"
+        >
+          Show fewer
+        </button>
+      </span>
     </header>
 
     <template v-if="open">
       <p v-if="error" class="patch-notes-muted" data-testid="patch-notes-error">
         The patch notes could not be loaded.
-        <button type="button" class="underline" @click="load">Retry</button>
+        <button type="button" class="underline" @click="load(FIRST_LINES)">Retry</button>
       </p>
-      <p v-else-if="loading && !transitions.length" class="patch-notes-muted">
+      <p v-else-if="loading && !lines.length" class="patch-notes-muted">
         <i class="pi pi-spin pi-spinner mr-1" aria-hidden="true"></i>
         Loading...
       </p>
-      <p v-else-if="!transitions.length" class="patch-notes-muted" data-testid="patch-notes-empty">
-        No change is shared by several items in this build.
+      <p v-else-if="!lines.length" class="patch-notes-muted" data-testid="patch-notes-empty">
+        {{
+          part.length
+            ? 'No change of this kind is shared by several items in this build.'
+            : 'No change is shared by several items in this build.'
+        }}
       </p>
       <template v-else>
         <ul class="patch-notes-list">
@@ -73,6 +95,28 @@ to.
             </button>
           </li>
         </ul>
+        <!-- The same step where a long list ends, so reading on does not mean scrolling back. -->
+        <p v-if="expanded" class="patch-notes-foot" data-testid="patch-notes-foot">
+          <span v-if="moreFailed" role="alert" data-testid="patch-notes-more-error">
+            More lines could not be loaded.
+          </span>
+          <span v-else-if="capped" data-testid="patch-notes-capped">
+            No more than {{ MAX_LINES }} lines are listed. Tick fewer boxes under "What changed" or
+            "Matters for" to reach the others.
+          </span>
+          <span v-else>{{ shownText }}</span>
+          <button
+            v-if="canShowMore"
+            type="button"
+            class="patch-notes-link"
+            data-testid="patch-notes-more-below"
+            :disabled="loading"
+            @click="showMore"
+          >
+            <i v-if="loading" class="pi pi-spin pi-spinner mr-1" aria-hidden="true"></i>
+            {{ moreFailed ? 'Retry' : 'Show more' }}
+          </button>
+        </p>
       </template>
     </template>
   </section>
@@ -94,13 +138,19 @@ import {
 /** Few enough that the first rows of the list stay on the first screen. */
 const COLLAPSED_LINES = 3;
 const CHANNEL = 'patch-notes';
-/** Everything but the misc part, whose transitions are client bookkeeping. */
+/** Without a choice of the page: everything but the misc part, which is client bookkeeping. */
 const PARTS: PartName[] = ['text', 'stats', 'effects', 'actions', 'atkdef'];
-const LIMIT = 40;
+/** Lines of the first request, then of each further step. */
+const FIRST_LINES = 40;
+const STEP_LINES = 100;
+/** The most the route gives in one answer; it has no way to ask for the lines after them. */
+const MAX_LINES = 500;
 
 const props = defineProps<{
   /** Build whose changes these are. */
   version: string;
+  /** The page's "What changed" filter; empty: every part worth a line. */
+  part: PartName[];
   /** The page's relevance filter; empty: every change, whatever it matters for. */
   relevance: RelevanceName[];
   /** The page lists the changes build notes explain with the rest. */
@@ -112,59 +162,101 @@ const emit = defineEmits<{ (event: 'select', transition: SharedTransition): void
 const changesStore = useChangesStore();
 
 const open = ref(true);
-const showAll = ref(false);
-const transitions = ref<SharedTransition[]>([]);
+/** Past the first few lines: everything loaded is listed. */
+const expanded = ref(false);
+const lines = ref<SharedTransition[]>([]);
+/** The route has lines after the ones loaded. */
+const more = ref(false);
+/** Lines the last answer was asked for. */
+const loadedSize = ref(FIRST_LINES);
 const loading = ref(false);
 const error = ref(false);
+const moreFailed = ref(false);
+let lastRequest = 0;
 
 const shown = computed(() =>
-  showAll.value ? transitions.value : transitions.value.slice(0, COLLAPSED_LINES)
+  expanded.value ? lines.value : lines.value.slice(0, COLLAPSED_LINES)
 );
 
+/** The route gave all it can and may hold more. */
+const capped = computed(() => more.value && loadedSize.value >= MAX_LINES);
+
+const canShowMore = computed(() => !expanded.value || (more.value && !capped.value));
+
+const shownText = computed(() => {
+  const count = shown.value.length.toLocaleString('en-US');
+  if (more.value) return `First ${count} shown`;
+  const total = lines.value.length.toLocaleString('en-US');
+  return shown.value.length === lines.value.length ? `All ${total} shown` : `${count} of ${total}`;
+});
+
 /**
- * The lines follow the list's filters: what the list leaves out (cosmetic and
- * text changes by default, changes a build note explains) is left out here.
- * Both are always sent, so the answer does not rest on the route's defaults.
+ * The lines follow the list's filters: what the list leaves out (parts not
+ * ticked, cosmetic and text changes by default, changes a build note
+ * explains) is left out here. All are always sent, so the answer does not
+ * rest on the route's defaults.
  */
 const query = computed<TransitionsQuery>(() => ({
-  part: PARTS,
+  part: props.part.length ? [...props.part] : PARTS,
   relevance: props.relevance.length ? [...props.relevance] : [...RELEVANCE_NAMES],
   notes: props.expandNotes ? 'expand' : 'collapse',
-  limit: LIMIT,
 }));
 
 const requestKey = computed(() => `${props.version}|${queryKey(query.value)}`);
 
-async function load(): Promise<void> {
-  const asked = requestKey.value;
+/**
+ * Ask for the `size` most shared lines. One more is asked for than is listed
+ * (while the route allows): its presence is the only sign that lines remain.
+ */
+async function load(size: number): Promise<void> {
+  const request = ++lastRequest;
+  const further = size > FIRST_LINES && lines.value.length > 0;
   loading.value = true;
   error.value = false;
+  moreFailed.value = false;
   try {
     const response = await changesStore.loadTransitions(
-      { version: props.version, query: query.value },
+      { version: props.version, query: { ...query.value, limit: Math.min(size + 1, MAX_LINES) } },
       CHANNEL
     );
-    if (requestKey.value === asked) {
-      transitions.value = response.transitions.filter((entry) => !isStructuralTransition(entry));
-    }
+    if (request !== lastRequest) return;
+    const answered = response.transitions;
+    more.value = size < MAX_LINES ? answered.length > size : answered.length === MAX_LINES;
+    lines.value = answered.slice(0, size).filter((entry) => !isStructuralTransition(entry));
+    loadedSize.value = size;
   } catch (caught) {
-    if (isRequestCancelled(caught) || requestKey.value !== asked) return;
-    transitions.value = [];
-    error.value = true;
+    if (isRequestCancelled(caught) || request !== lastRequest) return;
+    if (further) {
+      moreFailed.value = true;
+    } else {
+      lines.value = [];
+      more.value = false;
+      error.value = true;
+    }
   } finally {
-    if (requestKey.value === asked) loading.value = false;
+    if (request === lastRequest) loading.value = false;
   }
+}
+
+/** The lines already loaded first; then a further step from the route. */
+function showMore(): void {
+  if (!expanded.value) {
+    expanded.value = true;
+    return;
+  }
+  void load(Math.min(loadedSize.value + STEP_LINES, MAX_LINES));
 }
 
 watch(
   () => props.version,
   () => {
-    transitions.value = [];
-    showAll.value = false;
+    lines.value = [];
+    more.value = false;
+    expanded.value = false;
   }
 );
 
-watch(requestKey, () => void load(), { immediate: true });
+watch(requestKey, () => void load(FIRST_LINES), { immediate: true });
 
 onBeforeUnmount(() => changesStore.cancel(CHANNEL));
 </script>
@@ -180,6 +272,14 @@ onBeforeUnmount(() => changesStore.cancel(CHANNEL));
 
 .patch-notes-toggle {
   @apply flex items-center gap-2;
+}
+
+.patch-notes-controls {
+  @apply flex flex-wrap items-baseline gap-x-3;
+}
+
+.patch-notes-foot {
+  @apply m-0 flex flex-wrap items-baseline gap-x-3 border-t border-surface-200 pt-1 text-xs text-surface-600 dark:border-surface-700 dark:text-surface-400;
 }
 
 .patch-notes-muted {
@@ -203,6 +303,6 @@ onBeforeUnmount(() => changesStore.cancel(CHANNEL));
 }
 
 .patch-notes-link {
-  @apply whitespace-nowrap text-xs text-primary-700 hover:underline dark:text-primary-400;
+  @apply whitespace-nowrap text-xs text-primary-700 hover:underline disabled:cursor-wait disabled:opacity-60 dark:text-primary-400;
 }
 </style>
