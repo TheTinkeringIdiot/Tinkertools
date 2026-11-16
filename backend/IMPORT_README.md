@@ -111,7 +111,7 @@ python tools/verify_cas.py --store --extracts-dir ~/projects/AO/extracts
 python tools/verify_cas.py <new-slug> --extracts-dir ~/projects/AO/extracts
 ```
 
-The API picks the new build up within a minute (`GAME_VERSION_REGISTRY_TTL`); the family alias (`ao`, `prk`) follows it. Commit `builds.toml`.
+The API picks the new build up within a minute (`BUILD_REGISTRY_TTL`); the family alias (`ao`, `prk`) follows it. Commit `builds.toml`.
 
 `extract_builds.py` needs `git`, `dotnet` (.NET 8) and, for archives, `7z`:
 
