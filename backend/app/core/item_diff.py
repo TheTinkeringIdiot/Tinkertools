@@ -655,7 +655,10 @@ def transitions(
     actions    ``action:<id>:criterion``           the criterion triples
     effects    ``event``                           the event numbers of a
                                                    renumbering
-    effects    ``event:<id>``                      ``added`` or ``removed``
+    effects    ``event:<id>``                      ``added`` or ``removed``,
+                                                   for an event without
+                                                   effects (those of any
+                                                   other are the lines below)
     effects    ``effect:<spell_id>``               the subject (stat, skill,
                                                    nano, ...) of an effect
                                                    that was removed (``old``)
@@ -712,11 +715,11 @@ def transitions(
                 Transition("effects", "event", event["old_event"], event["event"])
             )
             continue
-        if event["change"] == "added":
+        if event["change"] == "added" and not event["added"]:
             found.append(
                 Transition("effects", f"event:{event['event']}", None, "added")
             )
-        elif event["change"] == "removed":
+        elif event["change"] == "removed" and not event["removed"]:
             found.append(
                 Transition("effects", f"event:{event['event']}", "removed", None)
             )

@@ -444,6 +444,23 @@ def test_change_list_rejects_an_unknown_filter_value(history):
         assert client.get("/api/v1/changes?sort=rev_id").status_code == 422
 
 
+def test_an_item_without_a_name_is_listed_after_every_name(store):
+    store.add_build("one", 1, items=[item(3, name="Awl")])
+    store.add_build(
+        "two",
+        2,
+        items=[item(1, name=""), item(2, name=""), item(3, name="Bradawl"), item(4)],
+    )
+
+    for body in (changes(store, "two"), compare(store, "two", "one")):
+        assert [(r["name"], r["aoid"]) for r in body["items"]] == [
+            ("Bradawl", 3),
+            ("Thing", 4),
+            ("", 1),
+            ("", 2),
+        ]
+
+
 def test_change_list_sorts_by_name_by_default_and_pages(history):
     by_name = changes(history, "two")
     by_ql = changes(history, "two", sort="ql")
@@ -1259,7 +1276,7 @@ def housekept(store):
     return store
 
 
-def test_an_added_event_is_a_gameplay_line_and_a_housekeeping_value_a_cosmetic_one(
+def test_an_added_event_is_told_by_its_effects_and_a_housekeeping_value_is_cosmetic(
     housekept,
 ):
     def found(**params):
@@ -1270,7 +1287,6 @@ def test_an_added_event_is_a_gameplay_line_and_a_housekeeping_value_a_cosmetic_o
         }
 
     assert found() == {
-        ("event:5", None, "added"): "gameplay",
         ("effect:53045", None, 17): "gameplay",
         ("stat:74", 0, 3): "economy",
     }
@@ -1285,7 +1301,7 @@ def test_a_line_leads_to_its_items_under_the_relevance_filter_that_lists_it(
     assert (
         len(body["transitions"])
         == {
-            "gameplay": 2,
+            "gameplay": 1,
             "economy": 1,
             "cosmetic": 1,
             "text": 0,
@@ -1647,7 +1663,7 @@ def test_the_relevance_of_a_change_is_the_union_of_its_entries(history):
     assert checked >= 10
 
 
-def test_effects_that_only_move_between_events_are_cosmetic_entries(store):
+def test_a_renumbered_event_is_cosmetic_and_a_moved_effect_is_not(store):
     """Item 1 only has its event renumbered; item 2 is renumbered and gets a
     stronger effect; item 3 changes its float text and nothing else; item 4
     moves one effect to another event and keeps the other."""
@@ -1685,14 +1701,23 @@ def test_effects_that_only_move_between_events_are_cosmetic_entries(store):
     added, removed = found[2]["diff"]["effects"]
     assert removed["relevance"] is None and added["relevance"] is None
     assert {e["spell_params"]["Stat"]: e["relevance"] for e in added["added"]} == {
-        16: None,  # the same effect, moved
+        16: "gameplay",
         17: "gameplay",
     }
 
     assert found[3]["relevance"] == ["cosmetic"]
     assert found[3]["diff"]["effects"][0]["changed"][0]["relevance"] == "cosmetic"
 
-    assert found[4]["relevance"] == ["cosmetic"]
+    assert found[4]["relevance"] == ["gameplay"]
+    kept, moved = found[4]["diff"]["effects"]
+    assert (moved["event"], moved["change"], moved["relevance"]) == (
+        14,
+        "changed",
+        None,
+    )
+    assert [e["relevance"] for e in moved["removed"]] == ["gameplay"]
+    assert [e["relevance"] for e in kept["added"]] == ["gameplay"]
+    assert compare_item(store, "two", 4, "one")["relevance"] == ["gameplay"]
     for row in found.values():
         assert entry_relevance(row["diff"]) == row["relevance"]
 

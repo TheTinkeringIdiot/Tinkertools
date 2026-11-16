@@ -225,7 +225,9 @@ def _name_ranks(db: Session) -> array:
 
     The names are read in the order of their index: sorting 129,000 names
     under the database's collation takes three times as long, and the
-    planner, which does not know the table is in memory, would sort.
+    planner, which does not know the table is in memory, would sort. The
+    empty name, first in that order, is ranked after every name, as
+    ``fetch_changes`` sorts it.
     """
     texts = t.part_text
     ranked = select(
@@ -245,6 +247,10 @@ def _name_ranks(db: Session) -> array:
     by_text = array("i", bytes(4 * (max(text_ids, default=0) + 1)))
     for text_id, rank in zip(text_ids, ranks):
         by_text[text_id] = rank
+    unnamed = db.execute(select(texts.c.text_id).where(texts.c.name == "")).scalars()
+    last = max(ranks, default=0) + 1
+    for text_id in unnamed:
+        by_text[text_id] = last
     return by_text
 
 

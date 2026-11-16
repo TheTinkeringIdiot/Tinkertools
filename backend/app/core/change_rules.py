@@ -23,10 +23,13 @@ The relevance of a change from one revision to another is then:
   that comes or goes with that value is a cosmetic change, and one that goes
   from that value to another is a change of the stat's class and a cosmetic
   one;
-* the class of every effect type of which the two revisions do not hold the
-  same effects, wherever in the item (which event) they are;
-* the class of ``event`` when the effects differ in nothing but the events
-  they hang on (an event renumbered, an empty event added);
+* the class of every effect type of which the events of the two revisions
+  do not hold the same effects: an effect added, removed or changed, and an
+  effect moved from one event to another (a modifier that applied on Use and
+  now applies on Wear). Events are compared by what they hold, not by their
+  number (:func:`effect_groups`);
+* the class of ``event`` when the events hold what they held and the effects
+  part differs all the same (an event renumbered, an empty event added);
 * the class of ``actions`` when any action or requirement differs, and of
   ``attack_defense`` when the attack or defense skills differ;
 * the class of each field of the misc part that differs
@@ -40,11 +43,9 @@ player: ``76 = 0`` says that ItemClass 0 is as good as no ItemClass. Only that
 value is housekeeping; ItemClass 2 -> 4 keeps the class of the stat.
 
 Patch-note lines (``build_transition``) take the class of their field
-(:meth:`RelevanceRules.transition_class`), by the same rules. Two of them
-have no counterpart above: the line of an event that was added or removed
-with its effects takes the class of ``event_added`` or ``event_removed``
-(the items are classified by the effects that came or went), and the line of
-a renumbering that of ``event``.
+(:meth:`RelevanceRules.transition_class`), by the same rules; the line of a
+renumbering and that of an empty event added or removed take the class of
+``event``.
 
 ``build_notes.toml``: build notes
 =================================
@@ -69,6 +70,11 @@ patch notes of a build (``build_transition``) leave out a transition that the
 build's notes account for wherever it occurs: an implant that was renamed and
 rebalanced is listed with its rebalancing, not with the rename.
 
+A note with ``partial = false`` speaks only of the changes it explains
+entirely ("retargeted, nothing else changed") and accounts for nothing in any
+other change: the patch notes keep the line of its transition for the changes
+it does not tag.
+
 A pattern is a table with ``path`` and optionally ``part``, ``old`` and
 ``new``:
 
@@ -85,16 +91,16 @@ A pattern is a table with ``path`` and optionally ``part``, ``old`` and
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import tomllib
-from collections import Counter
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Sequence, Tuple
 
-from app.core.item_diff import MISC_FIELDS, Transition, effect_content
+from app.core.item_diff import MISC_FIELDS, Transition
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "database"
 RELEVANCE_FILE = DATA_DIR / "change_relevance.toml"
@@ -117,8 +123,6 @@ WHOLE_CHANGES = (
     "actions",
     "attack_defense",
     "event",
-    "event_added",
-    "event_removed",
 ) + MISC_FIELDS
 # The class of a housekeeping value.
 HOUSEKEEPING = "cosmetic"
@@ -210,9 +214,7 @@ class RelevanceRules:
         if part == "effects":
             head, _, rest = path.partition(":")
             if head == "event":
-                if not rest:
-                    return self.changes["event"]
-                return self.changes["event_added" if old is None else "event_removed"]
+                return self.changes["event"]
             return self.effect_class(int(rest.partition(":")[0]))
         return self.changes[path]
 
@@ -299,10 +301,39 @@ def parse_relevance(text: str) -> RelevanceRules:
     )
 
 
-def with_relevance(diff: Dict[str, Any], rules: RelevanceRules) -> Dict[str, Any]:
+def effect_groups(
+    rules: RelevanceRules, doc: Optional[Sequence[Dict[str, Any]]]
+) -> Dict[str, List[List[str]]]:
+    """Per class, the effects of an effects part whose type has that class as
+    its events group them: one list of effects per event that holds any,
+    without the number of the event and without the rendered descriptions.
+
+    Two revisions differ in a class when these differ. An effect that moves
+    from one event to another changes them; an event that takes another
+    number does not."""
+    groups: Dict[str, List[List[str]]] = {}
+    for event in doc or ():
+        members: Dict[str, List[str]] = {}
+        for effect in event["effects"]:
+            content = {k: v for k, v in effect.items() if k != "description"}
+            members.setdefault(rules.effect_class(effect["spell_id"]), []).append(
+                json.dumps(content, sort_keys=True, separators=(",", ":"))
+            )
+        for name, effects in members.items():
+            groups.setdefault(name, []).append(sorted(effects))
+    return {name: sorted(events) for name, events in groups.items()}
+
+
+def with_relevance(
+    diff: Dict[str, Any],
+    rules: RelevanceRules,
+    old_effects: Optional[Sequence[Dict[str, Any]]],
+    new_effects: Optional[Sequence[Dict[str, Any]]],
+) -> Dict[str, Any]:
     """A diff of ``app.core.item_diff.diff_parts`` with the relevance class
     of every entry, as ``relevance``: what the entry adds to the relevance of
     the whole change, which is the union of its entries' classes.
+    ``old_effects`` and ``new_effects`` are the effects parts the diff is of.
 
     A stat entry in which the stat's housekeeping value comes or goes says
     so (``housekeeping``): that much of it is cosmetic. When that is all the
@@ -310,28 +341,23 @@ def with_relevance(diff: Dict[str, Any], rules: RelevanceRules) -> Dict[str, Any
     cosmetic; when the stat went from the housekeeping value to another, or
     back, ``relevance`` is the class of the stat and the entry adds both.
 
-    Effects follow the rule of the module docstring: an effect counts under
-    the class of its type when the two revisions do not hold it equally
-    often, wherever it hangs. An effect that only moved to another event, and
-    an event that was only renumbered, have the class of ``event`` when
-    nothing else about the item's effects differs, and ``None`` when
-    something does: the change is then classified by what really differs.
+    Effects follow the rule of the module docstring. An effect entry has the
+    class of its type when the events of the two revisions do not hold the
+    same effects of that class (:func:`effect_groups`), which is so for an
+    effect added, removed, changed or moved to another event. Where they do,
+    all that differs is how events are numbered: the entry, like the entry
+    of a renumbered event, has the class of ``event`` when that is true of
+    every class, and ``None`` when another class differs and the change is
+    classified by that.
     """
-    net: Counter = Counter()
-    for event in diff["effects"]:
-        for effect in event["added"]:
-            net[effect_content(effect)] += 1
-        for effect in event["removed"]:
-            net[effect_content(effect)] -= 1
-        for pair in event["changed"]:
-            net[effect_content(pair["new"])] += 1
-            net[effect_content(pair["old"])] -= 1
-    moved = None if any(net.values()) else rules.changes["event"]
+    before = effect_groups(rules, old_effects)
+    after = effect_groups(rules, new_effects)
+    differing = {name for name in CLASSES if before.get(name) != after.get(name)}
+    renumbered = None if differing else rules.changes["event"]
 
-    def of_effect(*effects: Dict[str, Any]) -> Optional[str]:
-        if any(net[effect_content(effect)] for effect in effects):
-            return rules.effect_class(effects[0]["spell_id"])
-        return moved
+    def of_effect(effect: Dict[str, Any]) -> Optional[str]:
+        name = rules.effect_class(effect["spell_id"])
+        return name if name in differing else renumbered
 
     def tagged(entries: List[Dict[str, Any]], relevance: Any) -> List[Dict[str, Any]]:
         return [
@@ -362,11 +388,11 @@ def with_relevance(diff: Dict[str, Any], rules: RelevanceRules) -> Dict[str, Any
         "effects": [
             {
                 **event,
-                "relevance": moved,
+                "relevance": renumbered,
                 "added": tagged(event["added"], of_effect),
                 "removed": tagged(event["removed"], of_effect),
                 "changed": tagged(
-                    event["changed"], lambda pair: of_effect(pair["new"], pair["old"])
+                    event["changed"], lambda pair: of_effect(pair["new"])
                 ),
             }
             for event in diff["effects"]
@@ -434,16 +460,22 @@ class Note:
     body: Optional[str]
     explains: Tuple[Pattern, ...]
     alongside: Tuple[Pattern, ...] = ()
+    # False: the note accounts for nothing in a change it does not explain
+    partial: bool = True
 
     def accounts_for(self, transitions: Sequence[Transition]) -> List[bool]:
         """Per transition of a change (``transitions(diff, full_text=True)``),
         whether it belongs to the note's event: the event happened to the
         item (a transition matches ``explains``) and the transition is the
-        event or what comes with it. All False when it did not happen."""
+        event or what comes with it. All False when it did not happen, and
+        for a note that is not ``partial`` when anything else happened too."""
         if not any(p.matches(t) for t in transitions for p in self.explains):
             return [False] * len(transitions)
         patterns = self.explains + self.alongside
-        return [any(p.matches(t) for p in patterns) for t in transitions]
+        flags = [any(p.matches(t) for p in patterns) for t in transitions]
+        if not self.partial and not all(flags):
+            return [False] * len(transitions)
+        return flags
 
     def explains_change(self, transitions: Sequence[Transition]) -> bool:
         """Whether the note explains all of a change with these transitions
@@ -520,6 +552,9 @@ def parse_notes(text: str) -> NoteRules:
         )
         if not explains:
             raise RulesError(f"{where}: explains needs at least one pattern")
+        partial = raw.get("partial", True)
+        if type(partial) is not bool:
+            raise RulesError(f"{where}: partial is true or false")
         notes.append(
             Note(
                 build=raw["build"],
@@ -530,6 +565,7 @@ def parse_notes(text: str) -> NoteRules:
                     _pattern(p, f"{where} alongside")
                     for p in raw.get("alongside") or []
                 ),
+                partial=partial,
             )
         )
     return NoteRules(

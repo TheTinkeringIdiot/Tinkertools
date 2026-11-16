@@ -584,7 +584,7 @@ def line_classes(conn, ordinal):
     }
 
 
-def test_an_event_added_or_removed_is_a_gameplay_line_and_a_renumbering_is_not(conn):
+def test_an_event_that_comes_or_goes_is_told_by_its_effects_and_classed_by_them(conn):
     def pair(first, **fields):
         return [item(first, **fields), item(first + 1, **fields)]
 
@@ -596,6 +596,8 @@ def test_an_event_added_or_removed_is_a_gameplay_line_and_a_renumbering_is_not(c
             *pair(1, SpellData=worn),
             *pair(3, SpellData=worn + used),
             *pair(5, SpellData=worn),
+            *pair(7, SpellData=worn),
+            *pair(9, SpellData=worn + wear(event=5)),
         ],
     )
     load(
@@ -605,46 +607,72 @@ def test_an_event_added_or_removed_is_a_gameplay_line_and_a_renumbering_is_not(c
             *pair(1, SpellData=worn + used),
             *pair(3, SpellData=worn),
             *pair(5, SpellData=wear(modify(16, 5), event=0)),
+            *pair(7, SpellData=worn + wear(event=5)),
+            *pair(9, SpellData=worn),
         ],
     )
 
+    # no line says "event 5 added" beside the line of the effect it came with
     assert line_classes(conn, 2) == {
-        ("event:5", None, "added"): GAMEPLAY,
         ("effect:53045", None, 17): GAMEPLAY,
-        ("event:5", "removed", None): GAMEPLAY,
         ("effect:53045", 17, None): GAMEPLAY,
         ("event", 14, 0): COSMETIC,
+        ("event:5", None, "added"): COSMETIC,
+        ("event:5", "removed", None): COSMETIC,
     }
     # each line has the class of the changes it leads to
     assert relevance(conn, 2) == {
-        1: GAMEPLAY,
-        2: GAMEPLAY,
-        3: GAMEPLAY,
-        4: GAMEPLAY,
-        5: COSMETIC,
-        6: COSMETIC,
+        **dict.fromkeys((1, 2, 3, 4), GAMEPLAY),
+        **dict.fromkeys((5, 6, 7, 8, 9, 10), COSMETIC),
     }
 
 
-def test_the_class_of_an_added_or_removed_event_follows_the_rules_file(conn):
-    worn, used = wear(modify(16, 5)), wear(modify(17, 5), event=5)
-    load(conn, spec("one", 1), items=[item(1, SpellData=worn), item(2, SpellData=worn)])
+def test_an_effect_moved_between_events_is_a_change_of_its_class(conn):
+    # 15.7.0, item 251755: a modifier leaves Use (0) and joins Wear (14);
+    # stat 5 = 15 goes and 4 = 15 comes with it, which is housekeeping
+    load(
+        conn,
+        spec("one", 1),
+        items=[
+            item(
+                1,
+                stats=[(5, 15)],
+                SpellData=wear(modify(1, 130), event=0) + wear(modify(16, 5)),
+            ),
+            item(2, SpellData=wear(modify(16, 5), float_text("Ow"))),
+            item(3, SpellData=wear(modify(16, 5)) + wear(modify(17, 5), event=0)),
+        ],
+    )
     load(
         conn,
         spec("two", 2),
-        items=[item(1, SpellData=worn + used), item(2, SpellData=worn + used)],
+        items=[
+            item(1, stats=[(4, 15)], SpellData=wear(modify(1, 130), modify(16, 5))),
+            item(2, SpellData=wear(modify(16, 5)) + wear(float_text("Ow"), event=0)),
+            item(3, SpellData=wear(modify(17, 5)) + wear(modify(16, 5), event=0)),
+        ],
     )
 
-    change_analysis.sync(
+    assert relevance(conn, 2) == {
+        1: GAMEPLAY | COSMETIC,
+        # a cosmetic effect moved; two events traded numbers
+        2: COSMETIC,
+        3: COSMETIC,
+    }
+
+
+def test_a_text_too_long_to_quote_has_no_line(conn):
+    def described(first, text):
+        return [item(first, Description=text), item(first + 1, Description=text)]
+
+    load(conn, spec("one", 1), items=described(1, "A tool.") + described(3, "A tool."))
+    load(
         conn,
-        rules(
-            edit=lambda t: t.replace(
-                'event_added = "gameplay"', 'event_added = "cosmetic"'
-            )
-        ),
+        spec("two", 2),
+        items=described(1, "A " + "x" * 81) + described(3, "A saw."),
     )
 
-    assert line_classes(conn, 2)[("event:5", None, "added")] == COSMETIC
+    assert shared(conn, 2) == {("text", "description", "tool.", "saw."): (2, 2)}
 
 
 def test_a_stat_line_is_cosmetic_only_for_the_housekeeping_value(conn):
@@ -707,6 +735,42 @@ def test_a_transition_is_also_counted_without_the_changes_a_note_explains(conn):
         "stat:74": (ECONOMY, 2, 2, 2),
     }
     assert shared(conn, 2)[("text", "name", "Old", "New")] == (3, 3)
+
+
+def test_a_note_that_is_not_partial_leaves_its_line_to_the_changes_it_does_not_tag(
+    conn,
+):
+    # live: 33 items were only retargeted and are the note's; the retargeting
+    # of the items that changed otherwise too stays a line of the patch notes
+    load(
+        conn,
+        spec("one", 1),
+        items=[
+            item(1, name="Old saw"),
+            item(2, name="Old drill"),
+            item(3, name="Old file", stats=[(74, 5)]),
+            item(4, name="Old rasp", stats=[(74, 5)]),
+        ],
+    )
+    load(
+        conn,
+        spec("two", 2),
+        items=[
+            item(1, name="New saw"),
+            item(2, name="New drill"),
+            item(3, name="New file", stats=[(74, 9)]),
+            item(4, name="New rasp", stats=[(74, 9)]),
+        ],
+    )
+
+    change_analysis.sync(conn, rules(RENAME + "partial = false\n"))
+
+    assert set(noted(conn, 2)) == {1, 2}
+    assert classed(conn, 2) == {
+        "name": (TEXT, 2, 2, 2),
+        "stat:74": (ECONOMY, 2, 2, 2),
+    }
+    assert shared(conn, 2)[("text", "name", "Old", "New")] == (4, 4)
 
 
 def test_a_note_accounts_for_what_comes_alongside_only_where_its_event_happened(
