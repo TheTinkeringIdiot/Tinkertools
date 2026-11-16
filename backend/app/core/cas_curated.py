@@ -3,22 +3,27 @@ Curated data of the content-addressed store: nano metadata, perks, mobs,
 sources and item-source links.
 
 The inputs are hand-maintained files (backend/all_nanos_compacted.csv,
-backend/database/perks.json, backend/database/symbiants.csv). They are stored
-once, keyed by AOID, for every build; which facts a build is served with is
-decided at read time (002_curated_and_derived.sql states the rules).
+backend/database/perks.json, backend/database/symbiants.csv and
+backend/database/mob_ids.csv). They are stored once, keyed by AOID, for every
+build; which facts a build is served with is decided at read time
+(002_curated_and_derived.sql states the rules).
 
 :func:`sync_curated` makes the tables equal to the files and writes only the
 rows that differ, so it runs at the start of every import.
 
 Rules:
 
-- A ``mob_id`` belongs to one mob name for ever. A mob keeps its id whatever
-  the file order; a mob new to the store gets the next id after the highest
-  one ever given. On an empty store that is the order of first appearance in
-  the file.
-- A mob that leaves the file is not deleted: its row is marked ``retired`` and
-  it loses its source and its drops. Should its name return to the file, it is
-  the same mob again, with the same id.
+- A ``mob_id`` belongs to one mob name for ever: clients keep mob ids. The
+  ids are written down in mob_ids.csv (``mob_id,name``), so a store loaded
+  from nothing numbers its mobs as every store before it did, whatever the
+  order of symbiants.csv. A mob of symbiants.csv without a line there is
+  refused, and so is a line that contradicts what the store holds. Lines are
+  added, never changed or removed.
+- A mob that leaves symbiants.csv is not deleted: its row is marked
+  ``retired`` and it loses its source and its drops. Should its name return to
+  the file, it is the same mob again, with the same id. A store loaded from
+  nothing has no row for such a mob; its line in mob_ids.csv keeps the id
+  from being given to another.
 - A source of type 'item' is a nanocrystal named by the nano CSV. Its name is
   not stored: it is the crystal item's name in the build being served.
 - When the nano CSV lists a crystal twice for one nano, the first counts.
@@ -47,6 +52,9 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_NANOS_CSV = BACKEND_DIR / "all_nanos_compacted.csv"
 DEFAULT_PERKS_JSON = BACKEND_DIR / "database" / "perks.json"
 DEFAULT_SYMBIANTS_CSV = BACKEND_DIR / "database" / "symbiants.csv"
+DEFAULT_MOB_IDS_CSV = BACKEND_DIR / "database" / "mob_ids.csv"
+
+MOB_IDS_HEADER = ["mob_id", "name"]
 
 SOURCE_TYPE_ITEM = 1
 SOURCE_TYPE_MOB = 3
@@ -67,6 +75,7 @@ class CuratedFiles:
     nanos_csv: Path = DEFAULT_NANOS_CSV
     perks_json: Path = DEFAULT_PERKS_JSON
     symbiants_csv: Path = DEFAULT_SYMBIANTS_CSV
+    mob_ids_csv: Path = DEFAULT_MOB_IDS_CSV
 
 
 # ---------------------------------------------------------------------------
@@ -181,6 +190,31 @@ def read_symbiants(path: Path) -> Tuple[List[Dict[str, Any]], List[Tuple[int, st
     return list(mobs.values()), list(drops)
 
 
+def read_mob_ids(path: Path) -> Dict[str, int]:
+    """mob_ids.csv as ``{mob name: mob id}``: every id and every name once."""
+    ids: Dict[str, int] = {}
+    with open(path, "r", encoding="utf-8", newline="") as handle:
+        reader = csv.reader(handle)
+        if next(reader, None) != MOB_IDS_HEADER:
+            raise StoreError(
+                f"{path.name}: the first line must be {','.join(MOB_IDS_HEADER)}"
+            )
+        for number, row in enumerate(reader, 2):
+            if (
+                len(row) != 2
+                or not re.fullmatch("[1-9][0-9]{0,8}", row[0])
+                or not row[1]
+            ):
+                raise StoreError(f"{path.name} row {number}: expected mob_id,name")
+            if row[1] in ids or int(row[0]) in ids.values():
+                raise StoreError(
+                    f"{path.name} row {number}: an id belongs to one mob and a "
+                    f"mob has one id"
+                )
+            ids[row[1]] = int(row[0])
+    return ids
+
+
 # ---------------------------------------------------------------------------
 # Writing
 # ---------------------------------------------------------------------------
@@ -253,13 +287,17 @@ MOB_COLUMNS = (
 )
 
 
-def _mob_rows(conn: psycopg.Connection, mobs: List[Dict[str, Any]]) -> Rows:
+def _mob_rows(
+    conn: psycopg.Connection, files: CuratedFiles, mobs: List[Dict[str, Any]]
+) -> Rows:
     """Every ``mob`` row the table must hold, by id, in :data:`MOB_COLUMNS`.
 
-    The file's mobs keep the id stored for their name or take the next id
-    after the highest stored one. Stored mobs the file no longer names stay as
-    they are, retired, so their ids are never given out again.
+    A mob of symbiants.csv has the id mob_ids.csv gives its name. Stored mobs
+    symbiants.csv no longer names stay as they are, retired. What would give
+    a stored id to another mob, or a stored mob another id, is refused.
     """
+    ids = read_mob_ids(files.mob_ids_csv)
+    ids_file, mobs_file = files.mob_ids_csv.name, files.symbiants_csv.name
     stored = {
         row[1]: row
         for row in conn.execute(
@@ -268,16 +306,24 @@ def _mob_rows(conn: psycopg.Connection, mobs: List[Dict[str, Any]]) -> Rows:
             )
         )
     }
-    next_id = max((row[0] for row in stored.values()), default=0) + 1
+    taken = [*ids.values(), *(row[0] for row in stored.values())]
     rows: Rows = {}
     for mob in mobs:
-        known = stored.pop(mob["name"], None)
-        if known is not None:
-            mob_id = known[0]
-        else:
-            mob_id, next_id = next_id, next_id + 1
-        rows[(mob_id,)] = (
-            mob["name"],
+        name = mob["name"]
+        if name not in ids:
+            raise StoreError(
+                f"Mob '{name}' of {mobs_file} has no id: add the line "
+                f"'{max(taken, default=0) + 1},{name}' to {ids_file}"
+            )
+        known = stored.pop(name, None)
+        if known is not None and known[0] != ids[name]:
+            raise StoreError(
+                f"Mob '{name}' has id {known[0]} in the store and {ids[name]} in "
+                f"{ids_file}. Clients hold the store's id: correct the file, or "
+                f"import with --reset to renumber the store's mobs"
+            )
+        rows[(ids[name],)] = (
+            name,
             mob["level"],
             mob["playfield"],
             mob["location"],
@@ -287,6 +333,12 @@ def _mob_rows(conn: psycopg.Connection, mobs: List[Dict[str, Any]]) -> Rows:
             False,
         )
     for mob_id, *columns in stored.values():
+        if (mob_id,) in rows:
+            raise StoreError(
+                f"{ids_file} gives id {mob_id} to '{rows[(mob_id,)][0]}', and the "
+                f"store holds it for '{columns[0]}', which left {mobs_file}: an "
+                f"id is not given to another mob"
+            )
         rows[(mob_id,)] = tuple(columns[:-1]) + (True,)
     return rows
 
@@ -327,7 +379,7 @@ def sync_curated(conn: psycopg.Connection, files: CuratedFiles) -> Dict[str, int
         ),
     }
 
-    mob_rows = _mob_rows(conn, mobs)
+    mob_rows = _mob_rows(conn, files, mobs)
     served_mobs = {mob_id: row for (mob_id,), row in mob_rows.items() if not row[-1]}
     sources: Rows = {
         (SOURCE_TYPE_MOB, mob_id): (row[0], {}) for mob_id, row in served_mobs.items()

@@ -22,7 +22,12 @@ import psycopg
 import pytest
 
 from app.core import cas_store
-from app.core.cas_curated import CuratedFiles, sync_curated
+from app.core.cas_curated import (
+    CuratedFiles,
+    read_mob_ids,
+    read_symbiants,
+    sync_curated,
+)
 from app.core.cas_extract import (
     DEFAULT_FEATURES,
     ExtractReader,
@@ -814,9 +819,20 @@ def test_the_release_date_follows_the_builds_file(conn):
 NANO_HEADER = "nano_id,ql,crystal_ids,nano_name,strain_id,sub_strain_id\n"
 
 
-def curated_files(tmp_path, mobs, nanos=""):
+def curated_files(tmp_path, mobs, nanos="", mob_ids=None):
     """Curated input files; ``mobs`` is a list of (boss, playfield, item aoid)
-    or (boss, playfield, item aoid, level)."""
+    or (boss, playfield, item aoid, level).
+
+    ``mob_ids`` is the text of the id file after its header. Without it the
+    file is kept as its maintainer keeps it: the lines an earlier call in
+    ``tmp_path`` wrote stay, and a boss new to it is added with the next id."""
+    ids_file = tmp_path / "mob_ids.csv"
+    if mob_ids is None:
+        ids = read_mob_ids(ids_file) if ids_file.exists() else {}
+        for boss, *_ in mobs:
+            ids.setdefault(boss, max(ids.values(), default=0) + 1)
+        mob_ids = "".join(f"{mob_id},{boss}\n" for boss, mob_id in ids.items())
+    ids_file.write_text("mob_id,name\n" + mob_ids)
     symbiants = tmp_path / "symbiants.csv"
     symbiants.write_text(
         "".join(
@@ -848,7 +864,12 @@ def curated_files(tmp_path, mobs, nanos=""):
             }
         )
     )
-    return CuratedFiles(nanos_csv=nanos_csv, perks_json=perks, symbiants_csv=symbiants)
+    return CuratedFiles(
+        nanos_csv=nanos_csv,
+        perks_json=perks,
+        symbiants_csv=symbiants,
+        mob_ids_csv=ids_file,
+    )
 
 
 def mob_ids(conn):
@@ -869,17 +890,90 @@ def mob_drops(conn):
     )
 
 
-def test_mobs_are_numbered_in_order_of_first_appearance(conn, tmp_path):
+def test_a_mob_has_the_id_the_id_file_gives_it(conn, tmp_path):
     files = curated_files(
         tmp_path,
         [("Ahpta", "Inferno", 1), ("Beit", "Scheol", 2), ("Ahpta", "Inferno", 3)],
+        mob_ids="7,Ahpta\n2,Beit\n5,Gone long ago\n",
     )
     sync_curated(conn, files)
 
-    assert mob_ids(conn) == {"Ahpta": 1, "Beit": 2}
+    assert mob_ids(conn) == {"Ahpta": 7, "Beit": 2}
     assert conn.execute(
-        "SELECT level, playfield, location, mob_names FROM mob WHERE mob_id = 1"
+        "SELECT level, playfield, location, mob_names FROM mob WHERE mob_id = 7"
     ).fetchone() == (125, "Inferno", "Somewhere", ["Minion", "Other"])
+
+
+def test_a_store_loaded_again_from_nothing_numbers_its_mobs_as_before(conn, tmp_path):
+    """Clients hold mob ids, and a store can be dropped and imported again
+    after symbiants.csv was reordered and lost a mob."""
+    schema = conn.execute("SELECT current_schema()").fetchone()[0]
+    first = [("Ahpta", "Inferno", 1), ("Beit", "Scheol", 2), ("Cama", "Adonis", 3)]
+    sync_curated(conn, curated_files(tmp_path, first))
+    before = mob_ids(conn)
+
+    cas_store.drop_store(conn, schema)
+    cas_store.create_store(conn, schema)
+    cas_store.upgrade_store(conn, schema)
+    sync_curated(conn, curated_files(tmp_path, [first[2], first[1]]))
+
+    assert before == {"Ahpta": 1, "Beit": 2, "Cama": 3}
+    assert mob_ids(conn) == {"Beit": 2, "Cama": 3}
+    # the mob that left keeps its id in the id file: a new one takes the next
+    sync_curated(conn, curated_files(tmp_path, [("Dalja", "Penumbra", 4), first[1]]))
+    assert mob_ids(conn) == {"Beit": 2, "Dalja": 4}
+
+
+def test_a_mob_without_an_id_is_refused_with_the_line_to_add(conn, tmp_path):
+    sync_curated(conn, curated_files(tmp_path, [("Ahpta", "Inferno", 1)]))
+    files = curated_files(
+        tmp_path,
+        [("Ahpta", "Inferno", 1), ("Beit", "Scheol", 2)],
+        mob_ids="1,Ahpta\n4,Gone long ago\n",
+    )
+
+    with pytest.raises(StoreError, match="add the line '5,Beit' to mob_ids.csv"):
+        sync_curated(conn, files)
+
+
+@pytest.mark.parametrize(
+    "mob_ids, complaint",
+    [
+        ("2,Ahpta\n1,Beit\n", "Mob 'Ahpta' has id 1 in the store and 2 in"),
+        ("1,Ahpta\n2,Cama\n", "gives id 2 to 'Cama', and the store holds it for"),
+    ],
+)
+def test_an_id_file_that_renumbers_the_stores_mobs_is_refused(
+    conn, tmp_path, mob_ids, complaint
+):
+    """The second file gives a new mob the id of one that left symbiants.csv."""
+    sync_curated(
+        conn, curated_files(tmp_path, [("Ahpta", "Inferno", 1), ("Beit", "Scheol", 2)])
+    )
+    mobs = [("Ahpta", "Inferno", 1), ("Beit", "Scheol", 2)]
+    if "Cama" in mob_ids:
+        mobs[1] = ("Cama", "Adonis", 3)
+
+    with pytest.raises(StoreError, match=complaint):
+        sync_curated(conn, curated_files(tmp_path, mobs, mob_ids=mob_ids))
+
+
+@pytest.mark.parametrize(
+    "mob_ids",
+    ["1,Ahpta\n1,Beit\n", "1,Ahpta\n2,Ahpta\n", "0,Ahpta\n", "one,Ahpta\n", "1\n"],
+)
+def test_an_id_file_that_cannot_be_right_is_refused(conn, tmp_path, mob_ids):
+    files = curated_files(tmp_path, [("Ahpta", "Inferno", 1)], mob_ids=mob_ids)
+
+    with pytest.raises(StoreError, match="mob_ids.csv row"):
+        sync_curated(conn, files)
+
+
+def test_every_mob_of_the_committed_file_has_a_committed_id():
+    files = CuratedFiles()
+    mobs, _ = read_symbiants(files.symbiants_csv)
+
+    assert {mob["name"] for mob in mobs} <= set(read_mob_ids(files.mob_ids_csv))
 
 
 def test_mob_text_is_stored_as_written(conn, tmp_path):

@@ -12,7 +12,7 @@ This tool writes that copy; ``import_cli.py import-cas --legacy-ids-file``
 loads it; ``POST /legacy-item-ids/resolve`` answers from it.
 
 Clients also hold mob ids (farm progress, links to a boss), and those are not
-translated: the new store numbers mobs in the order of symbiants.csv and is
+translated: the new store numbers mobs as database/mob_ids.csv says and is
 expected to give every mob the id it had. ``--mobs-file`` writes the old
 database's ``mob_id,name`` so that expectation can be checked against the new
 store, wherever it is: ``python tools/verify_cas.py --legacy-mobs-file``.

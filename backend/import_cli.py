@@ -20,10 +20,11 @@ command loads it, from nothing or on top of what is there:
         --slug ao-14-2-2 --slug ao-15-0-1 --slug ao-17-10-5
 
 Besides the extracts it reads committed files: the curated data
-(all_nanos_compacted.csv, database/perks.json, database/symbiants.csv), how
-builds are presented (database/builds.toml) and the rules of the change log
-(database/change_relevance.toml, database/build_notes.toml). It needs nothing
-else from the database than the schema it writes. IMPORT_README.md is the guide.
+(all_nanos_compacted.csv, database/perks.json, database/symbiants.csv,
+database/mob_ids.csv), how builds are presented (database/builds.toml) and the
+rules of the change log (database/change_relevance.toml,
+database/build_notes.toml). It needs nothing else from the database than the
+schema it writes. IMPORT_README.md is the guide.
 """
 
 import argparse
@@ -142,6 +143,7 @@ def import_cas(args) -> bool:
             ("nanos_csv", args.nanos_csv),
             ("perks_json", args.perks_file),
             ("symbiants_csv", args.symbiants_file),
+            ("mob_ids_csv", args.mob_ids_file),
         ):
             if given:
                 setattr(files, attribute, given_path(given))
@@ -378,6 +380,12 @@ def main():
         type=str,
         default=None,
         help="Mobs and their drops (default: backend/database/symbiants.csv)",
+    )
+    parser.add_argument(
+        "--mob-ids-file",
+        type=str,
+        default=None,
+        help="The id of every mob (default: backend/database/mob_ids.csv)",
     )
     parser.add_argument(
         "--database-url",

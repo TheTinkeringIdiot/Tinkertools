@@ -252,6 +252,7 @@ def importer(tmp_path, monkeypatch):
                 nanos_csv=str(files.nanos_csv),
                 perks_file=str(files.perks_json),
                 symbiants_file=str(files.symbiants_csv),
+                mob_ids_file=str(files.mob_ids_csv),
                 database_url=None,
             )
         )
