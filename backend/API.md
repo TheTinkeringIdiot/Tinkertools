@@ -35,7 +35,7 @@ Check that the API process is up.
 
 ### Game versions
 
-Every route under `/api/v1` also exists under `/api/v1/<version>`, where `<version>` is a build slug from `GET /api/v1/versions` (`ao-18-8-62-ep1`) or a family alias (`ao`, `prk`). Without the segment the default build is served. An unknown slug is a 404 (`{"detail": "Unknown game version '<slug>'"}`). Every response under `/api/v1` names the build it was served from in the `X-Game-Version` header.
+Every route under `/api/v1` also exists under `/api/v1/<version>`, where `<version>` is a build slug from `GET /api/v1/versions` (`ao-18-8-62-ep1`) or a family alias (`ao`, `prk`). Without the segment the default build is served. An unknown slug is a 404 (`{"detail": "Unknown game version '<slug>'"}`). While the database cannot be reached, requests keep resolving their version and `GET /api/v1/versions` keeps answering from the list read last; an API that has read no list yet answers 503 (`{"detail": "The game versions cannot be read: the database is unavailable"}`). Every response under `/api/v1` names the build it was served from in the `X-Game-Version` header.
 
 ### Items
 
@@ -580,7 +580,8 @@ The field transitions that most changed items of the request's build share, most
 - `part` (repeatable): only transitions of these parts
 - `relevance` (repeatable: `gameplay` | `economy` | `cosmetic` | `text`; default `gameplay`, `economy` and `text`): only transitions of fields that matter for one of these. The class is that of the field itself (the stat, the effect type, the part), whatever else the items changed: an icon or `static_instance` line is `cosmetic` even on items that changed in gameplay too. One kind of line depends on its values: a stat added or removed with its housekeeping value is `cosmetic` (`stat:74` null -> 0) while the same stat with other values has its own class (`stat:74` 56 -> 1 is `economy`). A renumbering (`event`) and an empty event added or removed (`event:<id>`) are `cosmetic`; an event that comes or goes with effects has no line of its own, its effects have theirs. Unlike on `GET /changes`, leaving the parameter out does filter: name all four classes to list cosmetic lines as well.
 - `notes` (`collapse` | `expand`, default `collapse`): with `collapse` the patch notes leave out what a build note already says. `items` and `occurrences` count only the changes no build note explains, and a transition is left out when the build's notes account for it: when fewer than `min_items` of those changes have it outside the event of a note. A note accounts for the transitions its rule names, in the items its event happened to (`backend/database/build_notes.toml`), so the implants of 14.8.0 that were renamed and rebalanced are listed with their rebalancing and not with the rename. A note marked `partial = false` in that file accounts only for the changes it explains entirely: the line of its transition stays, counting the changes that have it and something else besides. With `expand` every transition is listed and counted over every change.
-- `min_items` (int, default 2), `limit` (int, default 50, max 500)
+- `min_items` (int, default 2): only transitions shared by at least this many items
+- `limit` (int, default 50, max 500), `offset` (int, default 0): the lines from position `offset` on, at most `limit` of them. The order is fixed (most items first, then most occurrences, then part, path and values), so pages neither repeat nor skip a line and lines beyond the 500 of one request are reached with `offset`
 
 **Response:**
 ```json
@@ -591,10 +592,11 @@ The field transitions that most changed items of the request's build share, most
     {"part": "effects", "path": "effect:53089:spell_params.Chance", "old": 60, "new": 100,
      "relevance": "gameplay", "items": 760, "occurrences": 760,
      "stat": null, "bit": null, "spell_id": 53089, "action": null, "field": "spell_params.Chance"}
-  ]
+  ],
+  "total": 212
 }
 ```
-Only transitions shared by at least two items are kept. `relevance` is the class of the line's field. A listed line's `items` is the `total` of `GET /changes` narrowed to it (`transition`, `transition_old`, `transition_new`) with the same `notes` value. `stat`, `bit`, `spell_id`, `action` and `field` repeat the ids in `path`. Paths, with what `old` and `new` hold (null: absent, or particular to each item):
+`total` is the number of lines under the request's `part`, `relevance`, `notes` and `min_items`, whatever its `limit` and `offset`. Only transitions shared by at least two items are kept. `relevance` is the class of the line's field. A listed line's `items` is the `total` of `GET /changes` narrowed to it (`transition`, `transition_old`, `transition_new`) with the same `notes` value. `stat`, `bit`, `spell_id`, `action` and `field` repeat the ids in `path`. Paths, with what `old` and `new` hold (null: absent, or particular to each item):
 
 | part | path | old, new |
 |---|---|---|

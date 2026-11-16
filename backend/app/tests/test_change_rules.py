@@ -465,9 +465,11 @@ def test_the_live_retargeting_note_is_the_one_uniform_event():
     ):
         assert not note.explains_change([other])
         assert not note.explains_change([event, other])
-    assert not note.explains_change(
-        [event, Transition("effects", "effect:53045:spell_params.Amount", 5, 6)]
-    )
+    amount = Transition("effects", "effect:53045:spell_params.Amount", 5, 6)
+    assert not note.explains_change([event, amount])
+    # the note says "nothing else changed": it takes no part of a change that
+    # is more than the retargeting, whose line then counts the whole item
+    assert note.accounts_for([event, amount]) == [False, False]
 
 
 @pytest.mark.parametrize(

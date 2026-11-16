@@ -137,16 +137,18 @@ CREATE INDEX perk_series ON perk (perk_series, counter);
 -- ---------------------------------------------------------------------------
 
 -- mob_id is part of the API (/mobs/{mob_id}) and of players' stored farm
--- progress, so it must stay the same across imports. The ids in use today are
--- the order of first appearance in backend/database/symbiants.csv, identical
--- on the newest AO build and PRK. The importer keeps those ids: a mob already
--- known keeps its id whatever the file order, and a new mob gets the next id
--- after the highest one ever given.
+-- progress, so it must stay the same across imports, a store dropped and
+-- loaded again included. The ids are therefore written down, one line per
+-- mob name, in backend/database/mob_ids.csv, and the importer takes them from
+-- there. It refuses a mob of backend/database/symbiants.csv without a line,
+-- and a line that contradicts the ids this table holds.
 --
--- An id is never given to another mob. A mob that leaves the file is therefore
--- not deleted: its row stays with retired = true, and its source row and item
--- links are removed. A mob is identified by its name, so a retired mob whose
--- name returns to the file is served again under its old id.
+-- An id is never given to another mob. A mob that leaves symbiants.csv is
+-- therefore not deleted: its row stays with retired = true, and its source
+-- row and item links are removed. A mob is identified by its name, so a
+-- retired mob whose name returns to the file is served again under its old
+-- id. A store loaded from nothing has no row for a mob that left; the line in
+-- mob_ids.csv is what keeps its id out of use.
 --
 -- Retired mobs are not served. Every read of this table filters on
 -- NOT retired: a retired mob is absent from /mobs and every list or count

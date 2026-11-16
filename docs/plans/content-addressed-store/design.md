@@ -231,7 +231,7 @@ Settled 2026-11-13:
 Settled 2026-11-14, at the stage 1 gate:
 
 - Production is loaded by a fresh import. Internal row ids therefore do not carry over, so favorites and farm lists that still hold row ids can only be translated with a map of row id to AOID exported from the production database before cutover. `/legacy-item-ids/resolve` reads that map (`legacy_item_id`) since stage 5. An id is filed under the family whose database issued it and answered for any build of that family in which its item is present, because the map is older than the builds that follow it. A store loaded without the map answers `available: false`, and the client keeps its ids for a later attempt.
-- The curated inputs are committed: `backend/all_nanos_compacted.csv` and `backend/database/perks.json`, beside `backend/database/symbiants.csv`. The importer reads them from there by default.
+- The curated inputs are committed: `backend/all_nanos_compacted.csv` and `backend/database/perks.json`, beside `backend/database/symbiants.csv` and `backend/database/mob_ids.csv` (the id of every mob, so that a store loaded again numbers them as before). The importer reads them from there by default.
 - `GET /symbiants/{aoid}` stays: external utilities call it. `GET /nanos/stats`, `GET /versions/current` and `GET /versions/{slug}` are deleted. A test is not a caller.
 
 Still open:

@@ -34,6 +34,7 @@ import argparse
 import csv
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -449,20 +450,20 @@ def check_change_rules(report, conn, rules):
     report.differences += len(stored ^ defined)
 
     state = dict(conn.execute("SELECT name, value FROM store_state").fetchall())
-    for what, name, wanted in (
+    for what, current in (
         (
-            "change_relevance.toml applied to the store",
-            change_analysis.STATE_RELEVANCE,
-            rules.relevance.digest,
+            "change_relevance.toml and the diff engine applied to the "
+            "relevance of the change log",
+            change_analysis.relevance_is_current(state, rules.relevance),
         ),
         (
             "build_notes.toml, change_relevance.toml and the diff engine "
             "applied to the notes and transitions",
-            change_analysis.STATE_ANALYSIS,
-            change_analysis.analysis_digest(rules),
+            state.get(change_analysis.STATE_ANALYSIS)
+            == change_analysis.analysis_digest(rules),
         ),
     ):
-        stale = state.get(name) != wanted
+        stale = not current
         print(f"  {what}: " + ("no (run import_cli.py import-cas)" if stale else "yes"))
         report.differences += stale
 
@@ -556,9 +557,15 @@ def read_legacy_mobs(path):
         if next(reader, None) != ["mob_id", "name"]:
             fail(f"{path}: the first line must be mob_id,name")
         for number, line in enumerate(reader, start=2):
-            if len(line) != 2 or not line[0].isdigit() or int(line[0]) in mobs:
+            if (
+                len(line) != 2
+                or not re.fullmatch("[0-9]+", line[0])
+                or int(line[0]) in mobs
+            ):
                 fail(f"{path}, line {number}: expected mob_id,name, each id once")
             mobs[int(line[0])] = line[1]
+    if not mobs:
+        fail(f"{path} lists no mob: the export read an empty or the wrong table")
     return mobs
 
 

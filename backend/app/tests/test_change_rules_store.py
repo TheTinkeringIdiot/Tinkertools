@@ -8,7 +8,10 @@ diff stage: the engine reproduces the figures of the hand-verified prototype
 ``change_relevance.toml`` knows every stat and effect type that occurs in a
 change.
 
-A build the store does not hold skips its test.
+A test is skipped, with the reason, when the store does not hold its build,
+and those that read what the importer derived (``analysed``) when the store
+was not analysed with the rules of this checkout: its relevance, notes and
+lines then answer to other rules and say nothing about these.
 """
 
 import os
@@ -37,6 +40,37 @@ def conn():
         connection.close()
 
 
+@pytest.fixture(scope="module")
+def analysed(conn):
+    """The store, analysed by the importer with the rules files and the
+    engine of this checkout."""
+    rules = default_rules()
+    state = dict(conn.execute("SELECT name, value FROM store_state").fetchall())
+    if not (
+        change_analysis.relevance_is_current(state, rules.relevance)
+        and state.get(change_analysis.STATE_ANALYSIS)
+        == change_analysis.analysis_digest(rules)
+    ):
+        pytest.skip(
+            f"store '{settings.CAS_SCHEMA}' was not analysed with the rules files "
+            f"and diff engine of this checkout, so what it derived cannot be "
+            f"checked against them: run import_cli.py import-cas "
+            f"--schema {settings.CAS_SCHEMA}"
+        )
+    return conn
+
+
+def build_of(conn, slug):
+    """``(branch, ordinal)`` of a build; skips the test when the store does
+    not hold it."""
+    build = conn.execute(
+        "SELECT branch, ordinal FROM build WHERE slug = %s", (slug,)
+    ).fetchone()
+    if build is None:
+        pytest.skip(f"store '{settings.CAS_SCHEMA}' does not hold {slug}")
+    return tuple(build)
+
+
 # positions of the stats and effects parts among a row's part ids
 STATS, EFFECTS = 1, 2
 
@@ -56,12 +90,7 @@ def only_parts(rows, *positions):
 def effect_changes(conn, slug):
     """``[transitions of the effects part]`` per item of build ``slug`` whose
     effects part differs from the build before."""
-    build = conn.execute(
-        "SELECT branch, ordinal FROM build WHERE slug = %s", (slug,)
-    ).fetchone()
-    if build is None:
-        pytest.skip(f"the store does not hold {slug}")
-    rows = only_parts(change_analysis.changed_rows(conn, tuple(build)), EFFECTS)
+    rows = only_parts(change_analysis.changed_rows(conn, build_of(conn, slug)), EFFECTS)
     return [
         item_diff.transitions(diff)
         for _, diff in change_analysis.ChangeDiffs(conn, rows)
@@ -126,10 +155,13 @@ def test_every_stat_and_effect_type_in_a_change_is_in_the_relevance_file(conn):
     assert not unknown_effects, f"effect types not listed: {unknown_effects}"
 
 
-def test_the_stored_relevance_of_every_change_is_the_union_of_its_diff_entries(conn):
+def test_the_stored_relevance_of_every_change_is_the_union_of_its_diff_entries(
+    analysed,
+):
     """The importer classifies a change from per-revision digests, in SQL;
     the API tags each entry of a field-level diff. The two must agree on
     every changed item of the store."""
+    conn = analysed
     rules = default_rules().relevance
     stored = {
         tuple(key): relevance
@@ -137,8 +169,6 @@ def test_the_stored_relevance_of_every_change_is_the_union_of_its_diff_entries(c
             "SELECT branch, ordinal, aoid, relevance FROM item_change WHERE kind = 'C'"
         )
     }
-    if stored and all(value is None for value in stored.values()):
-        pytest.skip("the store's change log is not classified yet")
     rows = change_analysis.changed_rows(conn)
     effects = change_analysis._documents(
         conn,
@@ -170,7 +200,7 @@ def test_the_stored_relevance_of_every_change_is_the_union_of_its_diff_entries(c
     assert not differing, f"{len(differing)} differ, e.g. {differing[:5]}"
 
 
-def test_a_patch_note_line_has_a_class_that_each_of_its_items_has(conn):
+def test_a_patch_note_line_has_a_class_that_each_of_its_items_has(analysed):
     """A line of the patch notes listed under one relevance must lead to its
     items under the same filter, and say of them what their own diffs say:
     every item of a shared transition has the class of the transition in its
@@ -178,9 +208,7 @@ def test_a_patch_note_line_has_a_class_that_each_of_its_items_has(conn):
     another is "effect removed" and "effect added" in both places, and of
     the effect's class in both.
     """
-    if conn.execute("SELECT count(*) FROM build_transition").fetchone()[0] == 0:
-        pytest.skip("the store's change log is not analysed yet")
-    broken = conn.execute("""
+    broken = analysed.execute("""
         SELECT s.slug, t.path, t.old, t.new, t.relevance, count(*)
         FROM build_transition t
         JOIN build s ON s.branch = t.branch AND s.ordinal = t.ordinal
@@ -194,27 +222,34 @@ def test_a_patch_note_line_has_a_class_that_each_of_its_items_has(conn):
     assert not broken, f"{len(broken)} lines, e.g. {broken[:5]}"
 
 
-def test_the_live_retargeting_is_a_note_and_a_line_that_add_up(conn):
+# Items of the archive's live build with a Modify effect retargeted from 2 to
+# 3, and those of them the note tags because nothing else changed, as counted
+# when the note was written. They describe that build's data and nothing else.
+LIVE_RETARGETED_ITEMS, LIVE_ONLY_RETARGETED_ITEMS = 128, 33
+
+
+def test_the_live_retargeting_is_a_note_and_a_line_that_add_up(analysed):
     """The note of the live build tags the items that were only retargeted;
     the patch notes keep one line for the retargeting of every other item,
     so that the two account for all of it."""
-    live = "ao-18-8-62-ep1"
-    found = conn.execute(
+    branch, ordinal = build_of(analysed, "ao-18-8-62-ep1")
+    found = analysed.execute(
         """
         SELECT t.items, t.unnoted_items, t.unexplained_items,
                (SELECT count(*) FROM item_change c
                 WHERE c.branch = t.branch AND c.ordinal = t.ordinal
                   AND c.note_id IS NOT NULL)
         FROM build_transition t
-        JOIN build s ON s.branch = t.branch AND s.ordinal = t.ordinal
-        WHERE s.slug = %s AND t.path = 'effect:53045:target'
+        WHERE t.branch = %s AND t.ordinal = %s AND t.path = 'effect:53045:target'
           AND t.old = '2' AND t.new = '3'
         """,
-        (live,),
+        (branch, ordinal),
     ).fetchone()
-    if found is None:
-        pytest.skip(f"the store does not hold {live}, or is not analysed yet")
-    items, unnoted, unexplained, noted = found
 
-    assert (items, noted) == (128, 33)
+    assert found is not None, "the live build has no line for the retargeting"
+    items, unnoted, unexplained, noted = found
+    # what holds whatever the data: the line counts the items the note left
+    assert noted > 0
     assert unnoted == unexplained == items - noted
+    # the content of this store's live build
+    assert (items, noted) == (LIVE_RETARGETED_ITEMS, LIVE_ONLY_RETARGETED_ITEMS)

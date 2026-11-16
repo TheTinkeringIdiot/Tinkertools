@@ -3,6 +3,7 @@ The versions the API serves (GET /versions) and how a request's version is
 resolved (GameVersionMiddleware), on a store whose builds the test makes.
 """
 
+from contextlib import contextmanager
 from datetime import date
 
 import pytest
@@ -265,6 +266,21 @@ class UnreliableStore:
         return self.store.builds()
 
 
+@contextmanager
+def database_down(store):
+    """Has every statement of the store's session fail as a lost database
+    connection does, while the block runs."""
+
+    def refuse(*args, **kwargs):
+        raise OperationalError("SELECT ...", {}, Exception("connection refused"))
+
+    execute, store.db.execute = store.db.execute, refuse
+    try:
+        yield
+    finally:
+        store.db.execute = execute
+
+
 class TestBuildListUnavailable:
     """What requests get when the store's builds cannot be read."""
 
@@ -322,6 +338,29 @@ class TestBuildListUnavailable:
             assert response.status_code == 503
             assert "database is unavailable" in response.json()["detail"]
         assert health.status_code == 200
+
+    def test_the_version_list_read_last_is_served_while_the_store_is_down(
+        self, versions
+    ):
+        with versions.client() as client:
+            before = listed(client, "/api/v1/ao-18.7/versions")
+            versions.add_build("ao-18.9", 3, items=[item(100)])
+            with database_down(versions):
+                during = client.get("/api/v1/ao-18.7/versions")
+                elsewhere = client.get("/api/v1/prk/versions")
+            after = listed(client)
+
+        assert during.status_code == 200
+        assert during.json() == before
+        assert current_versions(elsewhere.json()) == ["prk"]
+        assert "ao-18.9" in [v["slug"] for v in after["versions"]]
+
+    def test_without_a_version_list_read_earlier_the_answer_is_503(self, versions):
+        with versions.client() as client, database_down(versions):
+            response = client.get("/api/v1/versions")
+
+        assert response.status_code == 503
+        assert response.json() == {"detail": context.BUILDS_UNAVAILABLE}
 
     def test_a_first_read_that_fails_is_tried_again(self, versions):
         read = UnreliableStore(versions)

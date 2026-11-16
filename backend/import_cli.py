@@ -20,10 +20,11 @@ command loads it, from nothing or on top of what is there:
         --slug ao-14-2-2 --slug ao-15-0-1 --slug ao-17-10-5
 
 Besides the extracts it reads committed files: the curated data
-(all_nanos_compacted.csv, database/perks.json, database/symbiants.csv), how
-builds are presented (database/builds.toml) and the rules of the change log
-(database/change_relevance.toml, database/build_notes.toml). It needs nothing
-else from the database than the schema it writes. IMPORT_README.md is the guide.
+(all_nanos_compacted.csv, database/perks.json, database/symbiants.csv,
+database/mob_ids.csv), how builds are presented (database/builds.toml) and the
+rules of the change log (database/change_relevance.toml,
+database/build_notes.toml). It needs nothing else from the database than the
+schema it writes. IMPORT_README.md is the guide.
 """
 
 import argparse
@@ -78,6 +79,9 @@ def import_cas(args) -> bool:
     API serving the schema answers for an id as soon as the map has rows, and
     an id whose item the newest stored build lacks is one the client drops for
     good: with the map in place before the builds, that would be most ids.
+    For the same reason a run that would leave the store without the newest
+    build of a family the file names (``--slug`` with older builds only) is
+    refused before anything is written.
 
     The nano strain policy follows the store: after every commit the newest
     stored build of each branch is the one served with the curated strains,
@@ -139,6 +143,7 @@ def import_cas(args) -> bool:
             ("nanos_csv", args.nanos_csv),
             ("perks_json", args.perks_file),
             ("symbiants_csv", args.symbiants_file),
+            ("mob_ids_csv", args.mob_ids_file),
         ):
             if given:
                 setattr(files, attribute, given_path(given))
@@ -162,8 +167,31 @@ def import_cas(args) -> bool:
         if unknown:
             raise ValueError(f"No importable extract for: {', '.join(sorted(unknown))}")
         conn = cas_store.connect(database_url, args.schema)
+        if legacy_ids is not None:
+            # (slug, family) of the builds the store will hold after this run
+            held = {(spec.slug, spec.branch) for spec in specs}
+            if not args.reset and cas_store.store_exists(conn, args.schema):
+                held.update(conn.execute("SELECT slug, branch FROM build").fetchall())
+            newest = {spec.branch: spec.slug for spec in planned}
+            for family in sorted({row[0] for row in legacy_ids}):
+                if family not in {branch for _, branch in held}:
+                    raise ValueError(
+                        f"{legacy_file} holds ids of family '{family}', and the "
+                        f"store would hold no build of it after this run"
+                    )
+                if family in newest and (newest[family], family) not in held:
+                    raise ValueError(
+                        f"--legacy-ids-file needs the newest build of every "
+                        f"family it names in the store, and {newest[family]} "
+                        f"('{family}') is neither stored nor selected: clients "
+                        f"would drop the ids of items an older build lacks. "
+                        f"Select it too, or leave out --legacy-ids-file until "
+                        f"it is imported"
+                    )
     except (cas_store.StoreError, FileNotFoundError, ValueError) as e:
         logger.error(str(e))
+        if conn is not None:
+            conn.close()
         return False
 
     reader = None
@@ -352,6 +380,12 @@ def main():
         type=str,
         default=None,
         help="Mobs and their drops (default: backend/database/symbiants.csv)",
+    )
+    parser.add_argument(
+        "--mob-ids-file",
+        type=str,
+        default=None,
+        help="The id of every mob (default: backend/database/mob_ids.csv)",
     )
     parser.add_argument(
         "--database-url",

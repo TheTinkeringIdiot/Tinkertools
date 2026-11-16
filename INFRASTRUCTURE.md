@@ -114,7 +114,7 @@ Every game-data route reads the content-addressed store (PostgreSQL schema `cas`
 
 **Item origins, as the store serves them** (`source_type`, `source`, `item_source` in `backend/database/cas/002_curated_and_derived.sql`):
 - Nanocrystals → nanoprograms (from `all_nanos_compacted.csv`); served when the build has the `sources` feature and the crystal is present in the build
-- Mobs → symbiants (from `database/symbiants.csv`); served when the build has the `symbiants` feature
+- Mobs → symbiants (from `database/symbiants.csv`, mob ids from `database/mob_ids.csv`); served when the build has the `symbiants` feature
 
 ### Data Utilities (`backend/`)
 

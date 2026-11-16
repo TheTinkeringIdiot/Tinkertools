@@ -319,6 +319,9 @@ def get_build_transitions(
     ),
     min_items: int = Query(2, ge=2, description="Shared by at least this many items"),
     limit: int = Query(50, ge=1, le=500, description="Number of transitions"),
+    offset: int = Query(
+        0, ge=0, description="Transitions to skip: the position of the first one"
+    ),
     db: Session = Depends(get_store),
     build: Build = Depends(get_build),
 ):
@@ -332,15 +335,21 @@ def get_build_transitions(
     explains, so a line's ``items`` is the ``total`` of ``/changes`` narrowed
     to that line with the same ``notes``. Lines about cosmetic fields (an
     icon, a client row id) are left out unless ``relevance`` asks for them.
+
+    ``total`` is the number of lines under the request's ``part``,
+    ``relevance``, ``notes`` and ``min_items``; ``offset`` and ``limit`` page
+    through them in one fixed order.
     """
     index = load_build_index(db)
     base = index.base_of(build.branch, build.ordinal)
+    transitions, total = load_transitions(
+        db, build, part, relevance, notes == "expand", min_items, limit, offset
+    )
     return BuildTransitionsResponse(
         build=index.at(build.branch, build.ordinal).ref(),
         base=base.ref() if base else None,
-        transitions=load_transitions(
-            db, build, part, relevance, notes == "expand", min_items, limit
-        ),
+        transitions=transitions,
+        total=total,
     )
 
 

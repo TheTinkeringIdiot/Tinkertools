@@ -51,7 +51,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import ColumnElement, FromClause
 
 from app.core import item_diff
-from app.core.change_analysis import STATE_ANALYSIS, STATE_RELEVANCE, analysis_digest
+from app.core.change_analysis import (
+    STATE_ANALYSIS,
+    analysis_digest,
+    relevance_is_current,
+)
 from app.core.change_rules import (
     CLASSES,
     NOTES_FILE,
@@ -204,18 +208,16 @@ def stale_rules(db: Session, rules: Optional[ChangeRules] = None) -> List[str]:
     state = dict(db.execute(select(t.store_state.c.name, t.store_state.c.value)).all())
     derived = (
         (
-            STATE_RELEVANCE,
-            rules.relevance.digest,
-            f"the relevance of the change log ({RELEVANCE_FILE.name})",
+            relevance_is_current(state, rules.relevance),
+            f"the relevance of the change log ({RELEVANCE_FILE.name}, diff engine)",
         ),
         (
-            STATE_ANALYSIS,
-            analysis_digest(rules),
+            state.get(STATE_ANALYSIS) == analysis_digest(rules),
             f"build notes and shared transitions ({NOTES_FILE.name}, "
             f"{RELEVANCE_FILE.name}, diff engine)",
         ),
     )
-    return [what for name, digest, what in derived if state.get(name) != digest]
+    return [what for current, what in derived if not current]
 
 
 def warn_of_stale_rules(db: Session, rules: Optional[ChangeRules] = None) -> bool:
@@ -1075,9 +1077,12 @@ def load_transitions(
     expand_notes: bool,
     min_items: int,
     limit: int,
-) -> List[Dict[str, Any]]:
+    offset: int = 0,
+) -> Tuple[List[Dict[str, Any]], int]:
     """The most shared field transitions of a build's change log, as
-    ``SharedTransition`` documents.
+    ``SharedTransition`` documents: ``limit`` of them from position
+    ``offset``, and how many there are in all. Their order is total, so
+    pages neither repeat nor skip a line.
 
     ``relevance`` keeps the transitions of fields of those classes. Unless
     ``expand_notes``, a transition is counted over the changes no build note
@@ -1091,35 +1096,43 @@ def load_transitions(
         if expand_notes
         else (bt.c.unnoted_items, bt.c.unnoted_occurrences)
     )
-    query = select(
-        bt.c.part,
-        bt.c.path,
-        bt.c.old,
-        bt.c.new,
-        items.label("items"),
-        occurrences.label("occurrences"),
-        bt.c.relevance,
-    ).where(
+    conditions = [
         bt.c.branch == build.branch,
         bt.c.ordinal == build.ordinal,
         items >= min_items,
-    )
+    ]
     if not expand_notes:
-        query = query.where(bt.c.unexplained_items >= min_items)
+        conditions.append(bt.c.unexplained_items >= min_items)
     if parts:
-        query = query.where(bt.c.part.in_(sorted(set(parts))))
+        conditions.append(bt.c.part.in_(sorted(set(parts))))
     if relevance:
         mask = relevance_mask(sorted(set(relevance)))
-        query = query.where(bt.c.relevance.op("&")(mask) != 0)
+        conditions.append(bt.c.relevance.op("&")(mask) != 0)
+    total = db.execute(
+        select(func.count()).select_from(bt).where(*conditions)
+    ).scalar_one()
     rows = db.execute(
-        query.order_by(
+        select(
+            bt.c.part,
+            bt.c.path,
+            bt.c.old,
+            bt.c.new,
+            items.label("items"),
+            occurrences.label("occurrences"),
+            bt.c.relevance,
+        )
+        .where(*conditions)
+        .order_by(
             items.desc(),
             occurrences.desc(),
             bt.c.part,
             bt.c.path,
             cast(bt.c.old, String),
             cast(bt.c.new, String),
-        ).limit(limit)
+            bt.c.transition_id,
+        )
+        .limit(limit)
+        .offset(offset)
     )
     return [
         {
@@ -1128,4 +1141,4 @@ def load_transitions(
             **_path_fields(row.path),
         }
         for row in rows
-    ]
+    ], total
