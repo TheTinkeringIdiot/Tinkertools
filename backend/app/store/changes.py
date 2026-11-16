@@ -1077,9 +1077,12 @@ def load_transitions(
     expand_notes: bool,
     min_items: int,
     limit: int,
-) -> List[Dict[str, Any]]:
+    offset: int = 0,
+) -> Tuple[List[Dict[str, Any]], int]:
     """The most shared field transitions of a build's change log, as
-    ``SharedTransition`` documents.
+    ``SharedTransition`` documents: ``limit`` of them from position
+    ``offset``, and how many there are in all. Their order is total, so
+    pages neither repeat nor skip a line.
 
     ``relevance`` keeps the transitions of fields of those classes. Unless
     ``expand_notes``, a transition is counted over the changes no build note
@@ -1093,35 +1096,43 @@ def load_transitions(
         if expand_notes
         else (bt.c.unnoted_items, bt.c.unnoted_occurrences)
     )
-    query = select(
-        bt.c.part,
-        bt.c.path,
-        bt.c.old,
-        bt.c.new,
-        items.label("items"),
-        occurrences.label("occurrences"),
-        bt.c.relevance,
-    ).where(
+    conditions = [
         bt.c.branch == build.branch,
         bt.c.ordinal == build.ordinal,
         items >= min_items,
-    )
+    ]
     if not expand_notes:
-        query = query.where(bt.c.unexplained_items >= min_items)
+        conditions.append(bt.c.unexplained_items >= min_items)
     if parts:
-        query = query.where(bt.c.part.in_(sorted(set(parts))))
+        conditions.append(bt.c.part.in_(sorted(set(parts))))
     if relevance:
         mask = relevance_mask(sorted(set(relevance)))
-        query = query.where(bt.c.relevance.op("&")(mask) != 0)
+        conditions.append(bt.c.relevance.op("&")(mask) != 0)
+    total = db.execute(
+        select(func.count()).select_from(bt).where(*conditions)
+    ).scalar_one()
     rows = db.execute(
-        query.order_by(
+        select(
+            bt.c.part,
+            bt.c.path,
+            bt.c.old,
+            bt.c.new,
+            items.label("items"),
+            occurrences.label("occurrences"),
+            bt.c.relevance,
+        )
+        .where(*conditions)
+        .order_by(
             items.desc(),
             occurrences.desc(),
             bt.c.part,
             bt.c.path,
             cast(bt.c.old, String),
             cast(bt.c.new, String),
-        ).limit(limit)
+            bt.c.transition_id,
+        )
+        .limit(limit)
+        .offset(offset)
     )
     return [
         {
@@ -1130,4 +1141,4 @@ def load_transitions(
             **_path_fields(row.path),
         }
         for row in rows
-    ]
+    ], total

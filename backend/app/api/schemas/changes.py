@@ -381,3 +381,7 @@ class BuildTransitionsResponse(BaseModel):
     build: BuildRef
     base: Optional[BuildRef] = None
     transitions: List[SharedTransition] = Field(description="Most items first")
+    total: int = Field(
+        description="Transitions under the request's part, relevance, notes "
+        "and min_items, whatever its limit and offset"
+    )

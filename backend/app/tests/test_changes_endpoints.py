@@ -1374,6 +1374,57 @@ explains = [{ path = "name", old = "Old .*", new = "New .*" }]
     return store
 
 
+@pytest.fixture
+def many_lines(store):
+    """Build two gives items 1 and 2 seven stats, one of them the economy's
+    Value, and items 1 to 3 a new name: eight lines, seven of them shared by
+    as many items as each other."""
+    gained = [(stat, 5) for stat in (287, 288, 289, 290, 291, 292, STAT_VALUE)]
+    store.add_build("one", 1, items=[item(n, name="Old tool") for n in (1, 2, 3)])
+    store.add_build(
+        "two",
+        2,
+        items=[
+            item(1, name="New tool", stats=gained),
+            item(2, name="New tool", stats=gained),
+            item(3, name="New tool"),
+        ],
+    )
+    return store
+
+
+def test_transitions_are_paged_in_one_order_and_counted(many_lines):
+    def page(**params):
+        return get(many_lines, "two", "/changes/transitions", **params)
+
+    whole = page(limit=500)
+    pages = [page(limit=3, offset=offset) for offset in (0, 3, 6, 9)]
+
+    assert len(whole["transitions"]) == whole["total"] == 8
+    assert [len(p["transitions"]) for p in pages] == [3, 3, 2, 0]
+    assert [line for p in pages for line in p["transitions"]] == whole["transitions"]
+    assert {p["total"] for p in pages} == {8}
+    assert whole["transitions"][0]["path"] == "name"
+
+
+@pytest.mark.parametrize(
+    "params, total",
+    [
+        ({"part": "stats"}, 7),
+        ({"part": "text"}, 1),
+        ({"relevance": "economy"}, 1),
+        ({"relevance": ["gameplay", "economy"]}, 7),
+        ({"min_items": 3}, 1),
+        ({"notes": "expand"}, 8),
+    ],
+)
+def test_the_total_of_transitions_follows_the_filters(many_lines, params, total):
+    body = get(many_lines, "two", "/changes/transitions", limit=2, **params)
+
+    assert body["total"] == total
+    assert len(body["transitions"]) == min(total, 2)
+
+
 def lines(store, slug, **params):
     """``{path: (relevance, items, occurrences)}`` of a build's patch notes."""
     body = get(store, slug, "/changes/transitions", **params)
