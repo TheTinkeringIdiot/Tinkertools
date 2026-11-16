@@ -36,12 +36,6 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent))
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler("import.log")],
-)
-
 logger = logging.getLogger(__name__)
 
 EXTRACT_STATUSES = {"extracted", "duplicate", "failed", "missing_db"}
@@ -79,6 +73,11 @@ def import_cas(args) -> bool:
     files. Builds load in index order, each in its own transaction; builds
     already in the store are skipped, so the command can be re-run and picks
     up where it stopped.
+
+    The legacy id map is written last, once every planned build is stored. An
+    API serving the schema answers for an id as soon as the map has rows, and
+    an id whose item the newest stored build lacks is one the client drops for
+    good: with the map in place before the builds, that would be most ids.
 
     The nano strain policy follows the store: after every commit the newest
     stored build of each branch is the one served with the curated strains,
@@ -195,14 +194,6 @@ def import_cas(args) -> bool:
                     f"{table} {count}" for table, count in written.items() if count
                 )
             )
-        if legacy_ids is not None:
-            with cas_store.phase(timings, "legacy ids"):
-                changed = sync_legacy_ids(conn, legacy_ids)
-                conn.commit()
-            logger.info(
-                f"Legacy item ids: {len(legacy_ids)} in the file, "
-                f"{changed} written or removed"
-            )
         with cas_store.phase(timings, "change analysis"):
             analysed = change_analysis.sync(conn, rules)
             conn.commit()
@@ -259,6 +250,14 @@ def import_cas(args) -> bool:
                     f"new parts {sum(result.new_parts.values())}"
                 )
 
+        if legacy_ids is not None:
+            with cas_store.phase(timings, "legacy ids"):
+                changed = sync_legacy_ids(conn, legacy_ids)
+                conn.commit()
+            logger.info(
+                f"Legacy item ids: {len(legacy_ids)} in the file, "
+                f"{changed} written or removed"
+            )
         if todo or legacy_ids is not None:
             with cas_store.phase(timings, "analyze"):
                 cas_store.analyze(conn, args.schema)
@@ -361,6 +360,11 @@ def main():
         help="Database to write (default: the DATABASE_URL variable)",
     )
     args = parser.parse_args()
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[logging.StreamHandler(), logging.FileHandler("import.log")],
+    )
 
     try:
         success = import_cas(args)

@@ -5,7 +5,9 @@ The internal item ids of the old store: the map clients migrate with
 (tools/export_legacy_item_ids.py).
 """
 
+import argparse
 import importlib.util
+import json
 import os
 import uuid
 from pathlib import Path
@@ -18,7 +20,9 @@ from app.core import cas_store
 from app.core.cas_legacy import read_legacy_ids
 from app.core.cas_store import StoreError
 from app.store import tables as t
-from app.tests.fixtures.store_fixtures import item
+from app.tests.fixtures.store_fixtures import curated_files, item
+from app.tests.test_cas_store import index_entry, write_extract
+import import_cli
 
 URL = "/api/v1/legacy-item-ids/resolve"
 BACKEND = Path(__file__).resolve().parents[2]
@@ -187,6 +191,66 @@ def test_a_legacy_id_file_that_cannot_be_right_is_refused(tmp_path, content, com
 
     with pytest.raises(StoreError, match=complaint):
         read_legacy_ids(path)
+
+
+class Unpublished(psycopg.Connection):
+    """A connection that commits nothing: it notes what each commit would have
+    shown other sessions, as ``(builds stored, ids in the map)``."""
+
+    def commit(self):
+        self.published.append(
+            self.execute(
+                "SELECT (SELECT count(*) FROM build), "
+                "(SELECT count(*) FROM legacy_item_id)"
+            ).fetchone()
+        )
+
+    def close(self):
+        pass
+
+
+def test_an_import_shows_the_map_only_once_every_build_is_stored(tmp_path, monkeypatch):
+    extracts = tmp_path / "extracts"
+    extracts.mkdir()
+    write_extract(extracts, "ao-1", [item(100), item(300)])
+    write_extract(extracts, "ao-2", [item(100), item(200)])
+    write_extract(extracts, "prk-1", [item(555)])
+    slugs = ["ao-1", "ao-2", "prk-1"]
+    (extracts / "index.json").write_text(json.dumps([index_entry(s) for s in slugs]))
+    legacy = tmp_path / "legacy.csv"
+    legacy.write_text("branch,item_id,aoid\nao,1,100\nao,2,200\nprk,1,555\n")
+    files = curated_files(tmp_path, [])
+    schema = f"cas_test_{uuid.uuid4().hex[:12]}"
+    connection = Unpublished.connect(cas_store.libpq_url(os.environ["DATABASE_URL"]))
+    connection.published = []
+    cas_store.use_schema(connection, schema)
+    monkeypatch.setattr(cas_store, "connect", lambda url, schema: connection)
+    try:
+        imported = import_cli.import_cas(
+            argparse.Namespace(
+                extracts_dir=str(extracts),
+                slug=None,
+                schema=schema,
+                workers=0,
+                reset=False,
+                yes=False,
+                builds_file=None,
+                legacy_ids_file=str(legacy),
+                nanos_csv=str(files.nanos_csv),
+                perks_file=str(files.perks_json),
+                symbiants_file=str(files.symbiants_csv),
+                database_url=None,
+            )
+        )
+        stored = connection.execute("SELECT count(*) FROM legacy_item_id").fetchone()
+    finally:
+        connection.rollback()
+        psycopg.Connection.close(connection)
+
+    assert imported and stored == (3,)
+    # other sessions saw the store fill up, and no id before the last build
+    assert {builds for builds, ids in connection.published} == {0, 1, 2, 3}
+    assert {builds for builds, ids in connection.published if ids} == {3}
 
 
 # ---------------------------------------------------------------------------
