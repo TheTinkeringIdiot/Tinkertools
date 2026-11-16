@@ -231,7 +231,9 @@ describe.skipIf(!BACKEND_AVAILABLE)('My Backend Tests', () => {
 ```
 
 To run them against a backend elsewhere:
-`BACKEND_URL=http://localhost:8043 VITE_API_BASE_URL=http://localhost:8043/api/v1 npx vitest run <files>`.
+`BACKEND_URL=http://localhost:8043 npx vitest run <files>`. The one variable
+moves both the availability check and the API client (see
+[Backend Availability Check](#backend-availability-check)).
 
 Do not set the flag in `beforeAll`: by then the suite has already been
 skipped (or not), so such a suite never runs, even with a backend.
@@ -254,21 +256,25 @@ const url = getBackendUrl();
 
 **How it works**:
 
-1. Makes a lightweight request to `/api/v1/health` endpoint
+1. Makes a lightweight request to the backend's `/health` endpoint
 2. 2-second timeout to fail fast
 3. Caches result to avoid repeated checks
 4. Returns `true` if backend responds OK, `false` otherwise
 
 ### Configuration
 
-Backend URL is configured via environment variable:
+The backend is named by one environment variable, `BACKEND_URL` (default
+`http://localhost:8000`). The test configuration in `vite.config.ts` derives
+from it both addresses the tests use:
 
-```bash
-# In vitest.config.ts
+```typescript
 test: {
   env: {
-    VITE_BACKEND_URL: process.env.BACKEND_URL || 'http://localhost:8000'
-  }
+    // helpers/backend-check.ts: availability check and direct fetches
+    VITE_BACKEND_URL: BACKEND_URL || 'http://localhost:8000',
+    // services/api-config.ts: the API client; set only when BACKEND_URL is given
+    VITE_API_BASE_URL: `${BACKEND_URL}/api/v1`,
+  },
 }
 ```
 
@@ -277,6 +283,9 @@ To run tests with a different backend URL:
 ```bash
 BACKEND_URL=http://my-backend:8000 npm test
 ```
+
+An explicit `VITE_API_BASE_URL` is kept as given. This is test configuration
+only: the application takes its API address from `VITE_API_BASE_URL` alone.
 
 ## Test Execution
 
