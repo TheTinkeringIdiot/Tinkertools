@@ -294,6 +294,8 @@ export interface BuildTransitionsResponse {
   build: BuildRef;
   base: BuildRef | null;
   transitions: SharedTransition[];
+  /** Lines under the request's filters, whatever its limit and offset. */
+  total: number;
 }
 
 export interface TransitionsQuery {
@@ -304,4 +306,6 @@ export interface TransitionsQuery {
   notes?: 'collapse' | 'expand';
   min_items?: number;
   limit?: number;
+  /** Position of the first line asked for; the order is fixed, so pages join up. */
+  offset?: number;
 }

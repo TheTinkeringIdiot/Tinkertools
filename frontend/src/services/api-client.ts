@@ -657,6 +657,7 @@ class TinkerToolsApiClient {
     if (query.notes) params.append('notes', query.notes);
     if (query.min_items !== undefined) params.append('min_items', String(query.min_items));
     if (query.limit !== undefined) params.append('limit', String(query.limit));
+    if (query.offset) params.append('offset', String(query.offset));
     return this.getDiff<BuildTransitionsResponse>('/changes/transitions', params, options);
   }
 

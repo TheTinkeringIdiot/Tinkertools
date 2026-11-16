@@ -200,6 +200,7 @@ Rows are paged by the API and never loaded all at once.
           <PatchNotesPanel
             v-if="!compareBase && response.base && version"
             :version="version"
+            :part="filters.part"
             :relevance="filters.relevance"
             :expand-notes="filters.expandNotes"
             @select="onPatchNote"
@@ -670,12 +671,13 @@ function onPage(event: PageState): void {
 
 /**
  * A patch note leads to the items it was done to, whatever else is filtered.
- * What the notes were read under stays (relevance, noted changes), so the
+ * What the notes were read under stays (parts, relevance, noted changes), so the
  * list counts what the line counted and the notes do not change under the reader.
  */
 function onPatchNote(transition: SharedTransition): void {
   updateFilters({
     ...defaultChangeFilters(),
+    part: filters.value.part,
     relevance: filters.value.relevance,
     expandNotes: filters.value.expandNotes,
     sort: filters.value.sort,

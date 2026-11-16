@@ -41,8 +41,8 @@ import {
   type IntegrationTestContext,
 } from '../helpers/integration-test-utils';
 import { createTestRouter } from '../helpers/vue-test-utils';
-import { TEST_VERSION, TEST_ALT_VERSION } from '../helpers/version-fixtures';
-import { setCurrentVersion } from '@/composables/useGameVersion';
+import { TEST_VERSION, TEST_ALT_VERSION, TEST_VERSIONS } from '../helpers/version-fixtures';
+import { setCurrentVersion, useGameVersion, versions } from '@/composables/useGameVersion';
 import { apiClient } from '@/services/api-client';
 import { useSymbiantsStore } from '@/stores/symbiants';
 import SymbiantCompare from '@/components/pocket/SymbiantCompare.vue';
@@ -265,6 +265,29 @@ describe('Symbiant comparison links', () => {
         expect(view.text()).toContain('Select Symbiants to Compare');
         expect(query()).toEqual({ tab: 'compare', s1: '86188', s2: '90001' });
         expect(notices.map((notice) => notice.detail)).toEqual([TRY_AGAIN]);
+      });
+
+      it('is not looked up while the version it was made on is unknown', async () => {
+        const { defaultVersion, registryFailed } = useGameVersion();
+        const loaded = { default: defaultVersion.value, failed: registryFailed.value };
+        backendResolves({ 86188: 219135, 90001: 235792 });
+        // What a failed `GET /versions` leaves
+        versions.value = [];
+        defaultVersion.value = null;
+        registryFailed.value = true;
+
+        try {
+          const view = await open('/pocket?tab=compare&s1=86188&s2=90001');
+
+          expect(apiClient.resolveLegacyItemIds).not.toHaveBeenCalled();
+          expect(view.text()).toContain('Select Symbiants to Compare');
+          expect(query()).toEqual({ tab: 'compare', s1: '86188', s2: '90001' });
+          expect(notices.map((notice) => notice.detail)).toEqual([TRY_AGAIN]);
+        } finally {
+          versions.value = TEST_VERSIONS;
+          defaultVersion.value = loaded.default;
+          registryFailed.value = loaded.failed;
+        }
       });
 
       it('is translated when opened again once the lookup works', async () => {

@@ -20,6 +20,8 @@ import type {
   ItemCompareResponse,
   ItemDiff,
   ItemTimelineResponse,
+  SharedTransition,
+  TransitionsQuery,
 } from '@/types/changes';
 
 // ---------------------------------------------------------------------------
@@ -642,4 +644,59 @@ export const TRANSITIONS_1460: BuildTransitionsResponse = {
       field: null,
     },
   ],
+  total: 9,
 };
+
+/**
+ * `count` lines of one build, most items first: stat lines, with the
+ * retargeting of an effect on 95 items as the 56th (as on the live build,
+ * where it lies below the first batch of the patch notes).
+ */
+export function manyTransitions(count: number): SharedTransition[] {
+  return Array.from({ length: count }, (_, index): SharedTransition => {
+    const base = { bit: null, action: null };
+    if (index === 55) {
+      return {
+        ...base,
+        part: 'effects',
+        path: 'effect:53045:target',
+        old: 2,
+        new: 3,
+        items: 95,
+        occurrences: 656,
+        stat: null,
+        spell_id: 53045,
+        field: 'target',
+      };
+    }
+    const items = 10000 - index * 10;
+    return {
+      ...base,
+      part: 'stats',
+      path: 'stat:287',
+      old: null,
+      new: index + 1,
+      items,
+      occurrences: items,
+      stat: 287,
+      spell_id: null,
+      field: null,
+    };
+  });
+}
+
+/** Answers as GET /changes/transitions does: the lines of the parts asked for, a page at a time. */
+export function transitionsRoute(
+  all: SharedTransition[]
+): (query?: TransitionsQuery) => Promise<BuildTransitionsResponse> {
+  return async (query) => {
+    const matching = all.filter((line) => !query?.part?.length || query.part.includes(line.part));
+    const offset = query?.offset ?? 0;
+    return {
+      build: BUILD_1460,
+      base: BUILD_1451,
+      transitions: matching.slice(offset, offset + (query?.limit ?? 50)),
+      total: matching.length,
+    };
+  };
+}
