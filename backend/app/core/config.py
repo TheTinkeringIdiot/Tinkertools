@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     DEFAULT_GAME_VERSION: str = "ao"
     # Seconds the in-process list of the store's builds is kept before it is
     # read again (app/store/context.py).
-    GAME_VERSION_REGISTRY_TTL: int = 60
+    BUILD_REGISTRY_TTL: int = 60
     # PostgreSQL schema of the content-addressed store the API reads.
     CAS_SCHEMA: str = "cas"
     # Most memory the response cache may hold, in bytes (app/core/cache.py).

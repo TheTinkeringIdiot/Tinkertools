@@ -27,6 +27,8 @@ Modified the profession filtering subquery to:
 
 ### Implementation Details
 
+The snippets show the fix as it was made, against the relational schema of the time. The rule is unchanged in the content-addressed store: `_names_profession` in `backend/app/services/nanos.py` applies it to the `requirement` rows of a nano's Use action.
+
 **Before (Incorrect):**
 ```python
 profession_subquery = (

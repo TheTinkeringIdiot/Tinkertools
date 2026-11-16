@@ -4,6 +4,7 @@
 **Date:** 2025-01-11
 **Component:** TinkerPocket Symbiants
 **Type:** Architecture Change
+**Since changed:** the endpoint is paginated again and the frontend loads it in chunks (`symbiant-pagination-chunked-loading.doc.md`); filtering is still done in the browser. The backend snippets below show the code of the time, written against the relational schema that the content-addressed store replaced.
 
 ---
 

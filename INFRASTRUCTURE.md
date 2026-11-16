@@ -362,15 +362,13 @@ interface PaginatedResponse<T> extends ApiResponse<T[]> {
 
 Defined in `backend/database/cas/001_store.sql` and `002_curated_and_derived.sql`; the part documents are described in `backend/app/core/parts.py`.
 
-- **build**: One row per client build (branch, ordinal, display fields, feature flags)
+- **build**: One row per client build (branch, ordinal, display fields, feature flags); also the list of versions the API serves, presented as `backend/database/builds.toml` says
 - **item_revision**: One row per distinct content of an item; points to its parts
 - **part_text / part_stats / part_effects / part_actions / part_atkdef / part_misc**: De-duplicated part documents
 - **item_presence**: Runs of consecutive builds in which an item has one revision
 - **stat_entry / requirement / effect_entry / atkdef_entry**: Search projections of the parts
 - **nano_properties**, **symbiant_items**: Derived from items
 - **nano_overlay**, **perk**, **mob**, **source_type**, **source**, **item_source**: Curated data
-
-- **build**: One row per client build; also the list of versions the API serves (presentation from `backend/database/builds.toml`)
 - **legacy_item_id**: Internal item ids of the old database, for the one-time client migration
 
 ### Performance Optimizations

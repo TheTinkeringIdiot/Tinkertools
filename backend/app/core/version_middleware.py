@@ -14,7 +14,8 @@ never a version slug.
 
 A first segment that is neither a build nor an API route is answered with 404
 "Unknown game version", so a stale or mistyped slug fails loudly instead of
-silently serving another version's data.
+silently serving another version's data. When the store's builds cannot be
+read at all, the answer is 503.
 
 Requests outside the API prefix are passed through untouched.
 """
@@ -87,20 +88,24 @@ class GameVersionMiddleware:
 
         rest = path[len(self.prefix) + 1 :]
         segment, _, tail = rest.partition("/")
-        slug = await run_in_threadpool(_build_slug, segment) if segment else None
-        if slug is not None:
-            new_path = f"{self.prefix}/{tail}" if tail else self.prefix
-            scope["path"] = new_path
-            scope["raw_path"] = new_path.encode("utf-8")
-        elif (
-            segment
-            and SLUG_RE.match(segment)
-            and segment not in self._api_route_segments(scope)
-        ):
-            await self._unknown_version(send, segment)
+        try:
+            slug = await run_in_threadpool(_build_slug, segment) if segment else None
+            if slug is not None:
+                new_path = f"{self.prefix}/{tail}" if tail else self.prefix
+                scope["path"] = new_path
+                scope["raw_path"] = new_path.encode("utf-8")
+            elif (
+                segment
+                and SLUG_RE.match(segment)
+                and segment not in self._api_route_segments(scope)
+            ):
+                await self._answer(send, 404, f"Unknown game version '{segment}'")
+                return
+            else:
+                slug = await run_in_threadpool(_default_slug)
+        except context.BuildsUnavailable:
+            await self._answer(send, 503, context.BUILDS_UNAVAILABLE)
             return
-        else:
-            slug = await run_in_threadpool(_default_slug)
 
         state = scope.setdefault("state", {})
         state["game_version"] = slug
@@ -117,14 +122,12 @@ class GameVersionMiddleware:
             current_version.reset(token)
 
     @staticmethod
-    async def _unknown_version(send: Send, segment: str) -> None:
-        body = json.dumps({"detail": f"Unknown game version '{segment}'"}).encode(
-            "utf-8"
-        )
+    async def _answer(send: Send, status: int, detail: str) -> None:
+        body = json.dumps({"detail": detail}).encode("utf-8")
         await send(
             {
                 "type": "http.response.start",
-                "status": 404,
+                "status": status,
                 "headers": [
                     (b"content-type", b"application/json"),
                     (b"content-length", str(len(body)).encode("ascii")),

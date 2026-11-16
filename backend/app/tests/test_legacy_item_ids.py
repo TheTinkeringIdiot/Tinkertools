@@ -5,7 +5,9 @@ The internal item ids of the old store: the map clients migrate with
 (tools/export_legacy_item_ids.py).
 """
 
+import argparse
 import importlib.util
+import json
 import os
 import uuid
 from pathlib import Path
@@ -15,10 +17,18 @@ import pytest
 from sqlalchemy import select
 
 from app.core import cas_store
+from app.core.cas_curated import sync_curated
 from app.core.cas_legacy import read_legacy_ids
 from app.core.cas_store import StoreError
 from app.store import tables as t
-from app.tests.fixtures.store_fixtures import item
+from app.tests.fixtures.store_fixtures import curated_files, item
+from app.tests.test_cas_store import (  # noqa: F401 - conn, verify_cas: fixtures
+    conn,
+    index_entry,
+    verify_cas,
+    write_extract,
+)
+import import_cli
 
 URL = "/api/v1/legacy-item-ids/resolve"
 BACKEND = Path(__file__).resolve().parents[2]
@@ -189,6 +199,66 @@ def test_a_legacy_id_file_that_cannot_be_right_is_refused(tmp_path, content, com
         read_legacy_ids(path)
 
 
+class Unpublished(psycopg.Connection):
+    """A connection that commits nothing: it notes what each commit would have
+    shown other sessions, as ``(builds stored, ids in the map)``."""
+
+    def commit(self):
+        self.published.append(
+            self.execute(
+                "SELECT (SELECT count(*) FROM build), "
+                "(SELECT count(*) FROM legacy_item_id)"
+            ).fetchone()
+        )
+
+    def close(self):
+        pass
+
+
+def test_an_import_shows_the_map_only_once_every_build_is_stored(tmp_path, monkeypatch):
+    extracts = tmp_path / "extracts"
+    extracts.mkdir()
+    write_extract(extracts, "ao-1", [item(100), item(300)])
+    write_extract(extracts, "ao-2", [item(100), item(200)])
+    write_extract(extracts, "prk-1", [item(555)])
+    slugs = ["ao-1", "ao-2", "prk-1"]
+    (extracts / "index.json").write_text(json.dumps([index_entry(s) for s in slugs]))
+    legacy = tmp_path / "legacy.csv"
+    legacy.write_text("branch,item_id,aoid\nao,1,100\nao,2,200\nprk,1,555\n")
+    files = curated_files(tmp_path, [])
+    schema = f"cas_test_{uuid.uuid4().hex[:12]}"
+    connection = Unpublished.connect(cas_store.libpq_url(os.environ["DATABASE_URL"]))
+    connection.published = []
+    cas_store.use_schema(connection, schema)
+    monkeypatch.setattr(cas_store, "connect", lambda url, schema: connection)
+    try:
+        imported = import_cli.import_cas(
+            argparse.Namespace(
+                extracts_dir=str(extracts),
+                slug=None,
+                schema=schema,
+                workers=0,
+                reset=False,
+                yes=False,
+                builds_file=None,
+                legacy_ids_file=str(legacy),
+                nanos_csv=str(files.nanos_csv),
+                perks_file=str(files.perks_json),
+                symbiants_file=str(files.symbiants_csv),
+                database_url=None,
+            )
+        )
+        stored = connection.execute("SELECT count(*) FROM legacy_item_id").fetchone()
+    finally:
+        connection.rollback()
+        psycopg.Connection.close(connection)
+
+    assert imported and stored == (3,)
+    # other sessions saw the store fill up, and no id before the last build
+    assert {builds for builds, ids in connection.published} == {0, 1, 2, 3}
+    assert {builds for builds, ids in connection.published if ids} == {3}
+
+
 # ---------------------------------------------------------------------------
 # The export from an old store
 # ---------------------------------------------------------------------------
@@ -262,3 +332,105 @@ def test_a_shared_store_exports_a_revision_for_each_family_that_holds_it(
         ("prk", 11, 100),
         ("prk", 12, 200),
     ]
+
+
+# ---------------------------------------------------------------------------
+# Mob ids, which clients keep and nothing translates
+# ---------------------------------------------------------------------------
+
+
+def exported_mobs(export, old_database, tmp_path, mobs):
+    """The mob file an old database holding ``mobs`` exports."""
+    old, schema = old_database
+    old.execute(f"CREATE TABLE {schema}.mobs (id integer, name text, level integer)")
+    for mob_id, name in mobs:
+        old.execute(f"INSERT INTO {schema}.mobs VALUES (%s, %s, 1)", (mob_id, name))
+    path = tmp_path / "mobs.csv"
+    assert export.write_mobs(
+        export.read_mobs(old, export.mobs_schema(old, schema)), path
+    ) == len(mobs)
+    return path
+
+
+def mob_differences(verify_cas, conn, path):
+    report = verify_cas.Report(show=5)
+    verify_cas.check_legacy_mobs(report, conn, verify_cas.read_legacy_mobs(path))
+    return report.differences
+
+
+def test_a_store_that_numbers_the_mobs_as_the_old_database_did_passes(
+    export, old_database, conn, verify_cas, tmp_path
+):
+    path = exported_mobs(
+        export, old_database, tmp_path, [(2, "Beit, the Second"), (1, "Ahpta")]
+    )
+    sync_curated(
+        conn,
+        curated_files(
+            tmp_path,
+            [("Ahpta", "Inferno", 1), ('"Beit, the Second"', "Scheol", 2)]
+            + [("Cama", "Adonis", 3)],
+        ),
+    )
+
+    assert mob_differences(verify_cas, conn, path) == 0
+
+
+def test_mob_ids_that_would_name_another_mob_or_none_are_reported(
+    export, old_database, conn, verify_cas, tmp_path, capsys
+):
+    path = exported_mobs(
+        export, old_database, tmp_path, [(1, "Beit"), (2, "Ahpta"), (7, "Gone")]
+    )
+    sync_curated(
+        conn, curated_files(tmp_path, [("Ahpta", "Inferno", 1), ("Beit", "Scheol", 2)])
+    )
+
+    assert mob_differences(verify_cas, conn, path) == 3
+    printed = capsys.readouterr().out
+    assert "1: was 'Beit', is 'Ahpta'" in printed
+    assert "7: 'Gone'" in printed
+
+
+def test_a_shared_store_exports_the_mobs_of_its_default_version(export, old_database):
+    old, schema = old_database
+    versions = {"old": f"{schema}_a", "live": f"{schema}_b"}
+    old.execute(
+        f"CREATE TABLE {schema}.game_versions (schema_name text, is_default boolean)"
+    )
+    for slug, version_schema in versions.items():
+        old.execute(f"CREATE SCHEMA {version_schema}")
+        old.execute(f"CREATE TABLE {version_schema}.mobs (id integer, name text)")
+        old.execute(f"INSERT INTO {version_schema}.mobs VALUES (1, %s)", (slug,))
+        old.execute(
+            f"INSERT INTO {schema}.game_versions VALUES (%s, %s)",
+            (version_schema, slug == "live"),
+        )
+
+    found = export.mobs_schema(old, schema)
+
+    assert found == versions["live"]
+    assert export.read_mobs(old, found).fetchall() == [(1, "live")]
+
+
+def test_a_database_without_mobs_is_not_exported_as_if_it_had_none(
+    export, old_database
+):
+    old, schema = old_database
+
+    with pytest.raises(export.UnknownLayout, match="mobs"):
+        export.mobs_schema(old, schema)
+
+
+@pytest.mark.parametrize(
+    "content",
+    ["id,name\n1,Ahpta\n", "mob_id,name\none,Ahpta\n", "mob_id,name\n1,A\n1,B\n"],
+)
+def test_a_mob_file_that_cannot_be_right_is_refused(verify_cas, tmp_path, content):
+    path = tmp_path / "mobs.csv"
+    path.write_text(content)
+
+    with pytest.raises(SystemExit) as stopped:
+        verify_cas.read_legacy_mobs(path)
+
+    assert stopped.value.code == 2

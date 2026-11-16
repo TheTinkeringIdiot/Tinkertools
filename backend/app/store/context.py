@@ -17,6 +17,7 @@ test (``store_session``).
 
 from __future__ import annotations
 
+import logging
 import re
 import threading
 import time
@@ -25,12 +26,15 @@ from typing import Callable, Iterator, List, Mapping, Optional, TypeVar
 
 from fastapi import HTTPException, Request
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
 from app.core.database import engine
 from app.store import tables as t
+
+logger = logging.getLogger(__name__)
 
 _SCHEMA_NAME = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
 
@@ -140,11 +144,17 @@ def _read_served_builds() -> List[Build]:
         return read_builds(db)
 
 
+class BuildsUnavailable(Exception):
+    """The store's builds could not be read and no earlier copy is held."""
+
+
 class BuildRegistry:
     """In-process copy of a store's builds, re-read after a short time.
 
     ``read`` returns the builds; by default those of the store the
-    application serves.
+    application serves. When the store cannot be read, the copy already held
+    is served for another period; with no copy, :class:`BuildsUnavailable` is
+    raised and the next call reads again.
     """
 
     def __init__(
@@ -153,9 +163,7 @@ class BuildRegistry:
         read: Callable[[], List[Build]] = _read_served_builds,
     ):
         self.ttl = (
-            ttl_seconds
-            if ttl_seconds is not None
-            else settings.GAME_VERSION_REGISTRY_TTL
+            ttl_seconds if ttl_seconds is not None else settings.BUILD_REGISTRY_TTL
         )
         self._read = read
         self._lock = threading.Lock()
@@ -169,13 +177,24 @@ class BuildRegistry:
         if self._stale():
             with self._lock:
                 if self._stale():
-                    self._builds = self._read()
+                    try:
+                        self._builds = self._read()
+                    except SQLAlchemyError as error:
+                        if self._loaded_at is None:
+                            raise BuildsUnavailable() from error
+                        logger.warning(
+                            "The store's builds could not be read; serving the "
+                            "list read earlier: %s",
+                            error,
+                        )
                     self._loaded_at = time.monotonic()
         return self._builds
 
     def resolve(self, slug: Optional[str]) -> Optional[Build]:
         return resolve_build(self.all(), slug)
 
+
+BUILDS_UNAVAILABLE = "The game versions cannot be read: the database is unavailable"
 
 # The builds requests are resolved against: by the version middleware, which
 # turns the URL's version segment into a build's slug, and by ``get_build``.

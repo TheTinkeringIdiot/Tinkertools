@@ -48,7 +48,6 @@ backend/*nano*analyzer*.py
 backend/*strain*matcher*.py
 
 # Database artifacts
-database/migrations/versions/*.py
 database/dumps/
 
 # ConPort local data

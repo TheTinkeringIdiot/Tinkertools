@@ -65,6 +65,7 @@ Items are ordered by AOID.
   "has_prev": false
 }
 ```
+A `page` beyond `pages` is not an error, here or on any other paginated route: `items` is empty and `has_next` is false.
 
 #### GET /api/v1/items/search
 Search items by name or description. The response has the shape of `GET /api/v1/items`.
@@ -509,7 +510,7 @@ What changed on an item, in a build, or between any two builds. The version segm
 
 - `kind`: `added`, `removed`, `changed`
 - `parts` (what differs): `text`, `stats`, `effects`, `actions`, `atkdef`, `misc`
-- `relevance` (what the change matters for): `gameplay`, `economy`, `cosmetic`, `text`. It follows from `backend/database/change_relevance.toml`; an added or removed item is `gameplay`. A stat that is added or removed with its housekeeping value (`[housekeeping]` in that file: Value 0, ItemClass 0, Team 15, ...) is `cosmetic`; any other value of the stat keeps the stat's class.
+- `relevance` (what the change matters for): `gameplay`, `economy`, `cosmetic`, `text`. It follows from `backend/database/change_relevance.toml`; an added or removed item is `gameplay`. A stat that is added or removed with its housekeeping value (`[housekeeping]` in that file: Value 0, ItemClass 0, Team 15, ...) is `cosmetic`; any other value of the stat keeps the stat's class. Effects are compared as the events group them, whatever the events' numbers: an effect that moves from one event to another (a modifier that applied on Use and now applies on Wear) is a change of its effect type's class, an event that only takes another number is `cosmetic`.
 
 Diffs compare the client's raw data, build against build. A value that the item pages show from curated data instead (the strain of a nano, from the curated nano CSV) can therefore differ from what a diff shows for the same item: the diff shows what the client data of the two builds held.
 
@@ -566,7 +567,7 @@ The change list of the request's build: every item added, removed or changed rel
 ```
 - A row is listed by its newer revision (the older one for a removed item); `old_name` and `old_ql` are set only when they differ. `icon` is stat 79.
 - `summary` counts every change of the build, whatever the filters. `base` is null for a build with nothing before it.
-- `diff_omitted` is true only when the diff was asked for (`include_diff=true`) and is too much for a row of a page: the effects of the two revisions, with their criteria, number more than 1,000, or the diff is more than 64 KB of JSON. The change log of all 147 builds has 129,630 changed entries, which compare 127,374 distinct pairs of revisions; 11 of those pairs are left out (five vehicle nanos of 17.7.0 at 186 KB each, six shop inventories). The row is otherwise complete; ask for the diff with `GET /items/{aoid}/compare/{base}`, using the `slug` of the response's `base`. Rows without a diff to give (`include_diff=false`, added and removed items) have `diff_omitted: false`.
+- `diff_omitted` is true only when the diff was asked for (`include_diff=true`) and is too much for a row of a page: the effects of the two revisions, with their criteria, number more than 1,000, or the diff is more than 64 KB of JSON. The change log of all 147 builds has 129,630 changed entries, which compare 127,374 distinct pairs of revisions; 11 of those pairs are left out (five vehicle nanos of 17.7.0 at 186 KB each, five shop inventories and one item with a great many effects). The row is otherwise complete; ask for the diff with `GET /items/{aoid}/compare/{base}`, using the `slug` of the response's `base`. Rows without a diff to give (`include_diff=false`, added and removed items) have `diff_omitted: false`.
 - **Build notes** are build-wide events that explain many changes at once (`backend/database/build_notes.toml`). A change carries a `note_id` only when the note explains all of it. By default such changes are collapsed: left out of `items` and `total`, and counted per note in `notes` (`count`: changes the note explains; `matching`: those that match the request's filters). `notes=expand` lists them with the rest; `note_id=N` lists only that note's.
 
 #### GET /api/v1/compare/{base}
@@ -577,8 +578,8 @@ The field transitions that most changed items of the request's build share, most
 
 **Query Parameters:**
 - `part` (repeatable): only transitions of these parts
-- `relevance` (repeatable: `gameplay` | `economy` | `cosmetic` | `text`; default `gameplay`, `economy` and `text`): only transitions of fields that matter for one of these. The class is that of the field itself (the stat, the effect type, the part), whatever else the items changed: an icon or `static_instance` line is `cosmetic` even on items that changed in gameplay too. Three kinds of line depend on their values: a stat added or removed with its housekeeping value is `cosmetic` (`stat:74` null -> 0) while the same stat with other values has its own class (`stat:74` 56 -> 1 is `economy`); an event added or removed with its effects (`event:<id>`) is `gameplay`; a renumbering (`event`) is `cosmetic`. Unlike on `GET /changes`, leaving the parameter out does filter: name all four classes to list cosmetic lines as well.
-- `notes` (`collapse` | `expand`, default `collapse`): with `collapse` the patch notes leave out what a build note already says. `items` and `occurrences` count only the changes no build note explains, and a transition is left out when the build's notes account for it: when fewer than `min_items` of those changes have it outside the event of a note. A note accounts for the transitions its rule names, in the items its event happened to (`backend/database/build_notes.toml`), so the implants of 14.8.0 that were renamed and rebalanced are listed with their rebalancing and not with the rename. With `expand` every transition is listed and counted over every change.
+- `relevance` (repeatable: `gameplay` | `economy` | `cosmetic` | `text`; default `gameplay`, `economy` and `text`): only transitions of fields that matter for one of these. The class is that of the field itself (the stat, the effect type, the part), whatever else the items changed: an icon or `static_instance` line is `cosmetic` even on items that changed in gameplay too. One kind of line depends on its values: a stat added or removed with its housekeeping value is `cosmetic` (`stat:74` null -> 0) while the same stat with other values has its own class (`stat:74` 56 -> 1 is `economy`). A renumbering (`event`) and an empty event added or removed (`event:<id>`) are `cosmetic`; an event that comes or goes with effects has no line of its own, its effects have theirs. Unlike on `GET /changes`, leaving the parameter out does filter: name all four classes to list cosmetic lines as well.
+- `notes` (`collapse` | `expand`, default `collapse`): with `collapse` the patch notes leave out what a build note already says. `items` and `occurrences` count only the changes no build note explains, and a transition is left out when the build's notes account for it: when fewer than `min_items` of those changes have it outside the event of a note. A note accounts for the transitions its rule names, in the items its event happened to (`backend/database/build_notes.toml`), so the implants of 14.8.0 that were renamed and rebalanced are listed with their rebalancing and not with the rename. A note marked `partial = false` in that file accounts only for the changes it explains entirely: the line of its transition stays, counting the changes that have it and something else besides. With `expand` every transition is listed and counted over every change.
 - `min_items` (int, default 2), `limit` (int, default 50, max 500)
 
 **Response:**
@@ -604,7 +605,7 @@ Only transitions shared by at least two items are kept. `relevance` is the class
 | actions | `action:<id>` | `"removed"` as old or `"added"` as new |
 | actions | `action:<id>:criterion` | `[value1, value2, operator]` |
 | effects | `event` | the event ids of a renumbering |
-| effects | `event:<id>` | `"removed"` / `"added"` |
+| effects | `event:<id>` | `"removed"` / `"added"`, for an event without effects |
 | effects | `effect:<spell_id>` | the subject (stat, skill, nano id; `"none"`) of a removed (old) or added (new) effect |
 | effects | `effect:<spell_id>:<field>` | the values of `target`, `tick_count`, `tick_interval` or `spell_params.<name>` |
 | effects | `effect:<spell_id>:criterion` | `[value1, value2, operator]` |
@@ -652,7 +653,7 @@ The "changed in" badge of list rows, for up to 500 items in one request.
 ```
 - `revision_count`: the number of `entries` that `GET /items/{aoid}/timeline` returns for the same version: the builds of the version's lineage in which the item was added, changed or removed. Builds of another family after the fork are not counted. 0 for an item the lineage never had.
 - `change_count`: of those entries, the ones of kind `changed` (default 0). An item that was only ever added has `revision_count` 1 and `change_count` 0.
-- `latest_change_slug`: the enabled build that the definition served for the request's version comes from (null when the version does not have the item); a build that changed only the shop data or the static instance id is not one, though the timeline lists it.
+- `latest_change_slug`: the enabled build that the definition served for the request's version comes from. For an item the version no longer has (`present_in_current: false`) it is the build that introduced the last definition the item had on the way to the version; it is null only when no build up to the version ever had the item. A build that changed only the shop data or the static instance id is not one, though the timeline lists it.
 - `present_in_current`: whether the request's version has the item.
 
 #### GET /api/v1/items/{aoid}/compare/{base}
@@ -671,7 +672,7 @@ One item in build `base` and in the request's build.
   - `added` and `removed` hold effects shaped as the `spells` of an item's `spell_data`, each with a `relevance`.
   - `changed` pairs an old with a new effect: `{"old", "new", "fields", "criteria", "relevance"}`, `fields` listing what differs as `{"field", "old", "new"}` (`target`, `tick_count`, `tick_interval`, `spell_params.<name>`) and `criteria` the sequence diff of their criteria, or null.
   - Two effects are only paired when they have the same effect type and act on the same subject (the `Stat`, `Skill`, `NanoID`, `NanoStrain`, `Item` and `PerkID` parameters); a modifier replaced by a modifier of another stat is one removal and one addition.
-  - An effect that only moved to another event, and an event that was only renumbered, are `cosmetic` when nothing else about the item's effects differs, and have a null `relevance` when something does.
+  - An effect entry has the class of its effect type when the events of the two revisions do not hold the same effects of that class: an effect added, removed, changed, or moved from one event to another. Where they do, only the numbering of events differs: the entry, like that of a renumbered event, is `cosmetic` when that is so for every class, and has a null `relevance` when another class differs.
 
 ### Legacy Item IDs
 
@@ -683,6 +684,7 @@ Resolve internal item row ids, as the database before the content-addressed stor
 
 **Response:** `{"aoids": {"<item_id>": <aoid>}, "available": true}`.
 
+- The version segment of the path says whose ids are meant (`POST /api/v1/prk/legacy-item-ids/resolve`); without it the default build is asked. 404 for an unknown version, 422 for more than 1000 ids or an id that is not an integer.
 - An id is looked up among the ids issued for the family of the requested version (`ao`, `prk`), whichever build of the family is asked about, and is answered only when its item is present in that build. Ids that name no such item are omitted.
 - `available` is false when the server holds no ids for the family at all (the map was not loaded: `IMPORT_README.md`, "Legacy item ids"). `aoids` is then empty, which says nothing about the ids asked for: a client keeps them and asks again later.
 

@@ -46,7 +46,7 @@ Perks are curated data of the content-addressed store: one row of `perk` per per
 1. **JSON Source Processing**: Raw perk data loaded from JSON files
 2. **Data Validation**: Each field validated using PerkValidator functions
 3. **Type Conversion**: String values converted to appropriate database types
-4. **Database Insertion**: Validated data inserted into perks table
+4. **Database Insertion**: The store's `perk` table is made equal to the validated rows
 5. **Error Reporting**: Validation failures logged with detailed messages
 
 ## Validation Rules
@@ -90,8 +90,8 @@ Perks are curated data of the content-addressed store: one row of `perk` per per
 - Consistent error response formats
 
 ### Test Infrastructure
-- `backend/tests/test_perk_import.py` - Import system tests
-- `backend/tests/test_perk_api.py` - API endpoint tests
+- `backend/app/tests/test_cas_store.py` - Import of the perk file (`test_perks_keep_the_professions_the_application_knows`)
+- `backend/app/tests/test_perk_endpoints.py`, `test_curated_endpoints.py` - API endpoint tests
 - Comprehensive test coverage for validation scenarios
 
 ## Usage Examples

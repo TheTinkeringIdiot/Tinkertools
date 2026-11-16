@@ -3,9 +3,9 @@
 -- Run like 001_store.sql, after it.
 --
 -- Clients used to persist the old store's internal item row ids (nano
--- favorites, symbiant farm lists, symbiant comparison links). This store never
--- issues such ids; POST /legacy-item-ids/resolve translates the ones clients
--- still hold from this table.
+-- favorites, symbiant comparison links). This store never issues such ids;
+-- POST /legacy-item-ids/resolve translates the ones clients still hold from
+-- this table.
 --
 -- The rows are not derived from the extracts. They are a copy taken from the
 -- database that issued the ids (backend/tools/export_legacy_item_ids.py) and

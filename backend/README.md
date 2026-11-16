@@ -23,7 +23,7 @@ The TinkerTools API serves as the backend for six web-based utilities:
 ## Prerequisites
 
 - Python 3.9+
-- PostgreSQL 12+
+- PostgreSQL 13+
 - Virtual environment tool (venv, conda, etc.)
 
 ## Local Development Setup
@@ -164,6 +164,10 @@ pip install -r requirements.txt
 # Run with Gunicorn
 gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000
 ```
+
+**Memory per worker.** Every worker is a process with a response cache of its own (`RESPONSE_CACHE_MAX_BYTES`, default 256 MB). A busy worker settles at about 130 MB when ready, plus the cache bound, plus up to 150 MB the allocator keeps: **550 MB with the default** (measured; `app/core/cache.py` has the figures). Size the host as workers x that, so `-w 4` needs 2.2 GB for the API alone, or lower the bound: 64 MB gives about 335 MB per worker. `MALLOC_ARENA_MAX=2` in the environment takes about 60 MB off each. Workers do not share cached responses, so each warms up on its own.
+
+Replacing the production database of before the content-addressed store: `IMPORT_README.md`, "Production cutover". The deployment scripts and configuration have not been updated for it yet.
 
 ## Monitoring and Observability
 

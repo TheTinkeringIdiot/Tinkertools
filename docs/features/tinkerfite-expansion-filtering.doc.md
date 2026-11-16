@@ -161,6 +161,7 @@ All use the same two-subquery exclusion pattern:
 - Default to Paid (127) if AccountType missing from profile
 
 ### Verification Queries
+Written against the relational schema of the time; the content-addressed store keeps requirements in `cas.requirement`.
 ```sql
 -- Find weapons with expansion requirements (operator 22)
 SELECT i.name, c.value2 AS required_expansion

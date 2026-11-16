@@ -6,8 +6,11 @@ resolved (GameVersionMiddleware), on a store whose builds the test makes.
 from datetime import date
 
 import pytest
+from sqlalchemy.exc import OperationalError
 
 from app.core.config import settings
+from app.store import context
+from app.store.context import BuildRegistry
 from app.tests.fixtures.store_fixtures import item
 
 
@@ -218,6 +221,19 @@ class TestVersionResolution:
 
         assert data["current"] == "ao-2"
 
+    def test_the_default_build_is_served_before_the_configured_family(self, store):
+        store.add_build("ao-1", 1, items=[item(100, name="Wrench")], is_default=True)
+        store.add_build("ao-2", 2, items=[item(100, name="Spanner")])
+        assert settings.DEFAULT_GAME_VERSION == "ao"
+
+        with store.client() as client:
+            unnamed = client.get("/api/v1/items/100")
+            family = client.get("/api/v1/ao/items/100")
+
+        assert unnamed.headers["X-Game-Version"] == "ao-1"
+        assert unnamed.json()["name"] == "Wrench"
+        assert family.json()["name"] == "Spanner"
+
     def test_an_empty_store_knows_no_version(self, store):
         with store.client() as client:
             named = client.get("/api/v1/ao-1/items/100")
@@ -233,6 +249,89 @@ class TestVersionResolution:
 
         assert response.status_code == 200
         assert "X-Game-Version" not in response.headers
+
+
+class UnreliableStore:
+    """Reads a store's builds until ``down`` is set, then fails as a lost
+    database connection does."""
+
+    def __init__(self, store=None):
+        self.store = store
+        self.down = store is None
+
+    def __call__(self):
+        if self.down:
+            raise OperationalError("SELECT ...", {}, Exception("connection refused"))
+        return self.store.builds()
+
+
+class TestBuildListUnavailable:
+    """What requests get when the store's builds cannot be read."""
+
+    def test_the_last_list_read_keeps_being_served(self, versions, monkeypatch):
+        read = UnreliableStore(versions)
+
+        with versions.client() as client:
+            monkeypatch.setattr(context, "builds", BuildRegistry(0, read))
+            before = client.get("/api/v1/ao-18.7/items/100")
+            read.down = True
+            named = client.get("/api/v1/ao-18.7/items/100")
+            unnamed = client.get("/api/v1/items/100")
+
+        assert [r.status_code for r in (before, named, unnamed)] == [200, 200, 200]
+        assert unnamed.headers["X-Game-Version"] == "ao-18.8"
+
+    def test_the_list_is_read_again_once_the_store_is_back(self, versions):
+        read = UnreliableStore(versions)
+        registry = BuildRegistry(0, read)
+        registry.all()
+        read.down = True
+        versions.add_build("ao-18.9", 3, items=[item(100)])
+
+        assert registry.resolve("ao-18.9") is None
+        read.down = False
+        assert registry.resolve("ao-18.9").slug == "ao-18.9"
+
+    def test_a_list_kept_through_a_failure_is_kept_for_a_full_period(
+        self, versions, monkeypatch
+    ):
+        now = [1000.0]
+        monkeypatch.setattr(context.time, "monotonic", lambda: now[0])
+        read = UnreliableStore(versions)
+        registry = BuildRegistry(60, read)
+        registry.all()
+        now[0] += 61
+        read.down = True
+        registry.all()
+        read.down = False
+        versions.add_build("ao-18.9", 3, items=[item(100)])
+
+        now[0] += 30
+        assert registry.resolve("ao-18.9") is None
+        now[0] += 31
+        assert registry.resolve("ao-18.9").slug == "ao-18.9"
+
+    def test_without_a_list_the_api_answers_503(self, client, monkeypatch):
+        monkeypatch.setattr(context, "builds", BuildRegistry(0, UnreliableStore()))
+
+        named = client.get("/api/v1/ao/items/100")
+        unnamed = client.get("/api/v1/items/100")
+        health = client.get("/health")
+
+        for response in (named, unnamed):
+            assert response.status_code == 503
+            assert "database is unavailable" in response.json()["detail"]
+        assert health.status_code == 200
+
+    def test_a_first_read_that_fails_is_tried_again(self, versions):
+        read = UnreliableStore(versions)
+        read.down = True
+        registry = BuildRegistry(60, read)
+        with pytest.raises(context.BuildsUnavailable):
+            registry.all()
+
+        read.down = False
+        assert registry.resolve("ao-18.7").slug == "ao-18.7"
 
 
 class TestFamilyAlias:

@@ -669,7 +669,6 @@ After deploying this fix:
 
 ## Related Documentation
 - Action criteria service: `frontend/src/services/action-criteria.ts`
-- Symbiant profile filtering: `docs/features/symbiant-profile-filtering.doc.md`
 - Requirements checking patterns: (internal documentation)
 - TinkerPocket architecture: `docs/internal/09_tinkerpocket_design.md`
 - Test files:
