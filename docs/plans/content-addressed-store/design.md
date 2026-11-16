@@ -63,7 +63,7 @@ Other waste:
 
 ### 2.4 Spell-effect diff prototype
 
-`prototype/spelldiff.py` matches effects between two builds (exact content, then effect type + target + stat/nano/skill, then looser fallbacks) and reports field-level differences. A full build-to-build comparison runs in about 1.5 s.
+A prototype matched effects between two builds of the old store (exact content, then effect type + target + stat/nano/skill, then looser fallbacks) and reported field-level differences; a full build-to-build comparison ran in about 1.5 s. It read `gd` and went with it; its matching became `backend/app/core/item_diff.py`.
 
 | Step | Items with different `spells_hash` | Reordered only | Real changes |
 |---|---|---|---|

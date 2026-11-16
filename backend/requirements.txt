@@ -4,7 +4,6 @@ gunicorn==23.0.0
 sqlalchemy==2.0.32
 pydantic==2.8.2
 pydantic-settings==2.4.0
-alembic==1.13.2
 python-dotenv==1.2.2
 redis==5.0.7
 typing-extensions==4.12.2

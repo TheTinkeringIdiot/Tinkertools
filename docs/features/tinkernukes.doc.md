@@ -575,13 +575,7 @@ All filtering happens in one query on the nano revisions of the build; the page 
 ```
 
 ### Database Schema
-- **items**: id, aoid, name, ql, item_class, description, is_nano
-- **spell_data**: id, spell_data_id, item_id
-- **spells**: id, spell_id, target, spell_params (JSONB: MinValue, MaxValue, ModifierStat, Stat)
-- **spell_criteria**: spell_id, criterion_id
-- **criteria**: id, value1 (skill ID), value2 (required value)
-- **item_stats**: item_id, stat_value_id
-- **stat_values**: id, stat, value
+Offensive nanos are read from the content-addressed store (schema `cas`, `backend/database/cas/001_store.sql`): `item_revision` and `item_presence` for the nanos of a build, `effect_entry` for the damage effects (target, effect type, subject stat; their parameters are in the `part_effects` documents), `requirement` for the casting requirements and `stat_entry` for the nano's own stats. The query is `offensive_nanos` in `backend/app/services/nanos.py`.
 
 ### API Endpoints
 - `GET /api/v1/nanos/offensive/{profession_id}`: Fetch offensive nanos for profession

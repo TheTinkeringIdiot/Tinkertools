@@ -65,6 +65,7 @@ Items are ordered by AOID.
   "has_prev": false
 }
 ```
+A `page` beyond `pages` is not an error, here or on any other paginated route: `items` is empty and `has_next` is false.
 
 #### GET /api/v1/items/search
 Search items by name or description. The response has the shape of `GET /api/v1/items`.
@@ -566,7 +567,7 @@ The change list of the request's build: every item added, removed or changed rel
 ```
 - A row is listed by its newer revision (the older one for a removed item); `old_name` and `old_ql` are set only when they differ. `icon` is stat 79.
 - `summary` counts every change of the build, whatever the filters. `base` is null for a build with nothing before it.
-- `diff_omitted` is true only when the diff was asked for (`include_diff=true`) and is too much for a row of a page: the effects of the two revisions, with their criteria, number more than 1,000, or the diff is more than 64 KB of JSON. The change log of all 147 builds has 129,630 changed entries, which compare 127,374 distinct pairs of revisions; 11 of those pairs are left out (five vehicle nanos of 17.7.0 at 186 KB each, six shop inventories). The row is otherwise complete; ask for the diff with `GET /items/{aoid}/compare/{base}`, using the `slug` of the response's `base`. Rows without a diff to give (`include_diff=false`, added and removed items) have `diff_omitted: false`.
+- `diff_omitted` is true only when the diff was asked for (`include_diff=true`) and is too much for a row of a page: the effects of the two revisions, with their criteria, number more than 1,000, or the diff is more than 64 KB of JSON. The change log of all 147 builds has 129,630 changed entries, which compare 127,374 distinct pairs of revisions; 11 of those pairs are left out (five vehicle nanos of 17.7.0 at 186 KB each, five shop inventories, and one item whose effects alone come to 67 KB). The row is otherwise complete; ask for the diff with `GET /items/{aoid}/compare/{base}`, using the `slug` of the response's `base`. Rows without a diff to give (`include_diff=false`, added and removed items) have `diff_omitted: false`.
 - **Build notes** are build-wide events that explain many changes at once (`backend/database/build_notes.toml`). A change carries a `note_id` only when the note explains all of it. By default such changes are collapsed: left out of `items` and `total`, and counted per note in `notes` (`count`: changes the note explains; `matching`: those that match the request's filters). `notes=expand` lists them with the rest; `note_id=N` lists only that note's.
 
 #### GET /api/v1/compare/{base}
@@ -652,7 +653,7 @@ The "changed in" badge of list rows, for up to 500 items in one request.
 ```
 - `revision_count`: the number of `entries` that `GET /items/{aoid}/timeline` returns for the same version: the builds of the version's lineage in which the item was added, changed or removed. Builds of another family after the fork are not counted. 0 for an item the lineage never had.
 - `change_count`: of those entries, the ones of kind `changed` (default 0). An item that was only ever added has `revision_count` 1 and `change_count` 0.
-- `latest_change_slug`: the enabled build that the definition served for the request's version comes from (null when the version does not have the item); a build that changed only the shop data or the static instance id is not one, though the timeline lists it.
+- `latest_change_slug`: the enabled build that the definition served for the request's version comes from. For an item the version no longer has (`present_in_current: false`) it is the build that introduced the last definition the item had on the way to the version; it is null only when no build up to the version ever had the item. A build that changed only the shop data or the static instance id is not one, though the timeline lists it.
 - `present_in_current`: whether the request's version has the item.
 
 #### GET /api/v1/items/{aoid}/compare/{base}
@@ -683,6 +684,7 @@ Resolve internal item row ids, as the database before the content-addressed stor
 
 **Response:** `{"aoids": {"<item_id>": <aoid>}, "available": true}`.
 
+- The version segment of the path says whose ids are meant (`POST /api/v1/prk/legacy-item-ids/resolve`); without it the default build is asked. 404 for an unknown version, 422 for more than 1000 ids or an id that is not an integer.
 - An id is looked up among the ids issued for the family of the requested version (`ao`, `prk`), whichever build of the family is asked about, and is answered only when its item is present in that build. Ids that name no such item are omitted.
 - `available` is false when the server holds no ids for the family at all (the map was not loaded: `IMPORT_README.md`, "Legacy item ids"). `aoids` is then empty, which says nothing about the ids asked for: a client keeps them and asks again later.
 

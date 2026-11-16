@@ -85,7 +85,7 @@ def list_symbiants(
 **Rationale:**
 - Current symbiant database: ~600 total items across all families
 - Setting limit to 2000 provides headroom for future content
-- Server can handle this load (materialized view query ~100-200ms)
+- Server can handle this load (the symbiant query took ~100-200ms when this was written)
 - Only used when profile filtering is active
 
 #### `/home/quigley/projects/Tinkertools/frontend/src/services/action-criteria.ts`
@@ -170,7 +170,7 @@ Server-side filters (family, slot, QL, text) are still applied to reduce dataset
 - **Acceptable because:** Fetch happens once, subsequent changes are instant
 
 ### Server Load
-- **Database query:** Materialized view with indexes (~100-200ms for 600 rows)
+- **Database query:** ~100-200ms for 600 rows when this was written (then a materialized view; `symbiant_items` is now a table of the store)
 - **JSON serialization:** ~50-100ms for 600 symbiants with actions
 - **Total:** ~150-300ms (well under REQ-PERF-001 requirement of <500ms)
 
