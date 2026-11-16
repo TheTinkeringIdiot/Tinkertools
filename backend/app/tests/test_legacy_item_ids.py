@@ -215,7 +215,12 @@ class Unpublished(psycopg.Connection):
         pass
 
 
-def test_an_import_shows_the_map_only_once_every_build_is_stored(tmp_path, monkeypatch):
+@pytest.fixture
+def importer(tmp_path, monkeypatch):
+    """Runs the import command on an extracts folder of two AO builds and a
+    PRK build, against a store of its own that is rolled back afterwards:
+    ``run(legacy id file text, slugs)`` returns whether the import succeeded.
+    ``run.connection.published`` lists what each commit would have shown."""
     extracts = tmp_path / "extracts"
     extracts.mkdir()
     write_extract(extracts, "ao-1", [item(100), item(300)])
@@ -224,39 +229,84 @@ def test_an_import_shows_the_map_only_once_every_build_is_stored(tmp_path, monke
     slugs = ["ao-1", "ao-2", "prk-1"]
     (extracts / "index.json").write_text(json.dumps([index_entry(s) for s in slugs]))
     legacy = tmp_path / "legacy.csv"
-    legacy.write_text("branch,item_id,aoid\nao,1,100\nao,2,200\nprk,1,555\n")
     files = curated_files(tmp_path, [])
     schema = f"cas_test_{uuid.uuid4().hex[:12]}"
     connection = Unpublished.connect(cas_store.libpq_url(os.environ["DATABASE_URL"]))
     connection.published = []
     cas_store.use_schema(connection, schema)
     monkeypatch.setattr(cas_store, "connect", lambda url, schema: connection)
-    try:
-        imported = import_cli.import_cas(
+
+    def run(legacy_ids=None, slug=None):
+        if legacy_ids is not None:
+            legacy.write_text("branch,item_id,aoid\n" + legacy_ids)
+        return import_cli.import_cas(
             argparse.Namespace(
                 extracts_dir=str(extracts),
-                slug=None,
+                slug=slug,
                 schema=schema,
                 workers=0,
                 reset=False,
                 yes=False,
                 builds_file=None,
-                legacy_ids_file=str(legacy),
+                legacy_ids_file=None if legacy_ids is None else str(legacy),
                 nanos_csv=str(files.nanos_csv),
                 perks_file=str(files.perks_json),
                 symbiants_file=str(files.symbiants_csv),
                 database_url=None,
             )
         )
-        stored = connection.execute("SELECT count(*) FROM legacy_item_id").fetchone()
+
+    run.connection = connection
+    run.schema = schema
+    run.map = lambda: connection.execute(
+        "SELECT branch, item_id, aoid FROM legacy_item_id ORDER BY 1, 2"
+    ).fetchall()
+    try:
+        yield run
     finally:
         connection.rollback()
         psycopg.Connection.close(connection)
 
-    assert imported and stored == (3,)
+
+def test_an_import_shows_the_map_only_once_every_build_is_stored(importer):
+    imported = importer("ao,1,100\nao,2,200\nprk,1,555\n")
+
+    published = importer.connection.published
+    assert imported and len(importer.map()) == 3
     # other sessions saw the store fill up, and no id before the last build
-    assert {builds for builds, ids in connection.published} == {0, 1, 2, 3}
-    assert {builds for builds, ids in connection.published if ids} == {3}
+    assert {builds for builds, ids in published} == {0, 1, 2, 3}
+    assert {builds for builds, ids in published if ids} == {3}
+
+
+def test_the_map_is_refused_while_the_newest_build_of_its_family_is_not_stored(
+    importer, caplog
+):
+    """Clients translate their ids against the newest build and drop those
+    whose item it lacks: here id 2, whose item ao-1 does not have yet."""
+    imported = importer("ao,1,100\nao,2,200\n", slug=["ao-1", "prk-1"])
+
+    assert not imported
+    assert "ao-2" in caplog.text and "neither stored nor selected" in caplog.text
+    # nothing was written, not even the store's tables
+    assert importer.connection.published == []
+    assert not cas_store.store_exists(importer.connection, importer.schema)
+
+
+def test_the_map_is_loaded_with_a_selection_once_the_newest_builds_are_stored(
+    importer,
+):
+    assert importer(slug=["ao-1", "ao-2"])
+    assert importer("ao,1,100\n", slug=["ao-1"])
+
+    assert importer.map() == [("ao", 1, 100)]
+
+
+def test_ids_of_a_family_the_store_will_not_hold_are_refused(importer, caplog):
+    imported = importer("ao,1,100\nprk,1,555\n", slug=["ao-1", "ao-2"])
+
+    assert not imported
+    assert "family 'prk'" in caplog.text
+    assert importer.connection.published == []
 
 
 # ---------------------------------------------------------------------------
@@ -424,7 +474,13 @@ def test_a_database_without_mobs_is_not_exported_as_if_it_had_none(
 
 @pytest.mark.parametrize(
     "content",
-    ["id,name\n1,Ahpta\n", "mob_id,name\none,Ahpta\n", "mob_id,name\n1,A\n1,B\n"],
+    [
+        "id,name\n1,Ahpta\n",
+        "mob_id,name\none,Ahpta\n",
+        "mob_id,name\n1,A\n1,B\n",
+        "mob_id,name\n\u00b2,Ahpta\n",
+        "mob_id,name\n",
+    ],
 )
 def test_a_mob_file_that_cannot_be_right_is_refused(verify_cas, tmp_path, content):
     path = tmp_path / "mobs.csv"

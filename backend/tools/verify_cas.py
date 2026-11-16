@@ -34,6 +34,7 @@ import argparse
 import csv
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -556,9 +557,15 @@ def read_legacy_mobs(path):
         if next(reader, None) != ["mob_id", "name"]:
             fail(f"{path}: the first line must be mob_id,name")
         for number, line in enumerate(reader, start=2):
-            if len(line) != 2 or not line[0].isdigit() or int(line[0]) in mobs:
+            if (
+                len(line) != 2
+                or not re.fullmatch("[0-9]+", line[0])
+                or int(line[0]) in mobs
+            ):
                 fail(f"{path}, line {number}: expected mob_id,name, each id once")
             mobs[int(line[0])] = line[1]
+    if not mobs:
+        fail(f"{path} lists no mob: the export read an empty or the wrong table")
     return mobs
 
 

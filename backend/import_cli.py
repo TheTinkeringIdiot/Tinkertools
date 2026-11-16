@@ -78,6 +78,9 @@ def import_cas(args) -> bool:
     API serving the schema answers for an id as soon as the map has rows, and
     an id whose item the newest stored build lacks is one the client drops for
     good: with the map in place before the builds, that would be most ids.
+    For the same reason a run that would leave the store without the newest
+    build of a family the file names (``--slug`` with older builds only) is
+    refused before anything is written.
 
     The nano strain policy follows the store: after every commit the newest
     stored build of each branch is the one served with the curated strains,
@@ -162,8 +165,31 @@ def import_cas(args) -> bool:
         if unknown:
             raise ValueError(f"No importable extract for: {', '.join(sorted(unknown))}")
         conn = cas_store.connect(database_url, args.schema)
+        if legacy_ids is not None:
+            # (slug, family) of the builds the store will hold after this run
+            held = {(spec.slug, spec.branch) for spec in specs}
+            if not args.reset and cas_store.store_exists(conn, args.schema):
+                held.update(conn.execute("SELECT slug, branch FROM build").fetchall())
+            newest = {spec.branch: spec.slug for spec in planned}
+            for family in sorted({row[0] for row in legacy_ids}):
+                if family not in {branch for _, branch in held}:
+                    raise ValueError(
+                        f"{legacy_file} holds ids of family '{family}', and the "
+                        f"store would hold no build of it after this run"
+                    )
+                if family in newest and (newest[family], family) not in held:
+                    raise ValueError(
+                        f"--legacy-ids-file needs the newest build of every "
+                        f"family it names in the store, and {newest[family]} "
+                        f"('{family}') is neither stored nor selected: clients "
+                        f"would drop the ids of items an older build lacks. "
+                        f"Select it too, or leave out --legacy-ids-file until "
+                        f"it is imported"
+                    )
     except (cas_store.StoreError, FileNotFoundError, ValueError) as e:
         logger.error(str(e))
+        if conn is not None:
+            conn.close()
         return False
 
     reader = None
