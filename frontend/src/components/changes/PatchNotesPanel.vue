@@ -57,7 +57,7 @@ to.
     <template v-if="open">
       <p v-if="error" class="patch-notes-muted" data-testid="patch-notes-error">
         The patch notes could not be loaded.
-        <button type="button" class="underline" @click="load(FIRST_LINES)">Retry</button>
+        <button type="button" class="underline" @click="load(true)">Retry</button>
       </p>
       <p v-else-if="loading && !lines.length" class="patch-notes-muted">
         <i class="pi pi-spin pi-spinner mr-1" aria-hidden="true"></i>
@@ -100,11 +100,10 @@ to.
           <span v-if="moreFailed" role="alert" data-testid="patch-notes-more-error">
             More lines could not be loaded.
           </span>
-          <span v-else-if="capped" data-testid="patch-notes-capped">
-            No more than {{ MAX_LINES }} lines are listed. Tick fewer boxes under "What changed" or
-            "Matters for" to reach the others.
+          <span v-else data-testid="patch-notes-foot-shown">{{ shownText }}</span>
+          <span v-if="hidden > 0" data-testid="patch-notes-hidden">
+            {{ hiddenText }}
           </span>
-          <span v-else>{{ shownText }}</span>
           <button
             v-if="canShowMore"
             type="button"
@@ -140,11 +139,15 @@ const COLLAPSED_LINES = 3;
 const CHANNEL = 'patch-notes';
 /** Without a choice of the page: everything but the misc part, which is client bookkeeping. */
 const PARTS: PartName[] = ['text', 'stats', 'effects', 'actions', 'atkdef'];
-/** Lines of the first request, then of each further step. */
+/** Lines of the first request. */
 const FIRST_LINES = 40;
-const STEP_LINES = 100;
-/** The most the route gives in one answer; it has no way to ask for the lines after them. */
-const MAX_LINES = 500;
+/**
+ * Lines of a further step: as many again as are loaded, so a build with
+ * thousands of lines is gone through in a few steps, within what one answer
+ * of the route holds.
+ */
+const MIN_STEP_LINES = 100;
+const MAX_STEP_LINES = 500;
 
 const props = defineProps<{
   /** Build whose changes these are. */
@@ -164,31 +167,51 @@ const changesStore = useChangesStore();
 const open = ref(true);
 /** Past the first few lines: everything loaded is listed. */
 const expanded = ref(false);
-const lines = ref<SharedTransition[]>([]);
-/** The route has lines after the ones loaded. */
-const more = ref(false);
-/** Lines the last answer was asked for. */
-const loadedSize = ref(FIRST_LINES);
+/** The lines the route gave so far, in its order. */
+const fetched = ref<SharedTransition[]>([]);
+/** Lines the route has under the filters, the ones not loaded yet included. */
+const total = ref(0);
 const loading = ref(false);
 const error = ref(false);
 const moreFailed = ref(false);
 let lastRequest = 0;
 
+const lines = computed(() => fetched.value.filter((entry) => !isStructuralTransition(entry)));
+
 const shown = computed(() =>
   expanded.value ? lines.value : lines.value.slice(0, COLLAPSED_LINES)
 );
 
-/** The route gave all it can and may hold more. */
-const capped = computed(() => more.value && loadedSize.value >= MAX_LINES);
+/** Lines the route gave that are not worth listing (isStructuralTransition). */
+const hidden = computed(() => fetched.value.length - lines.value.length);
 
-const canShowMore = computed(() => !expanded.value || (more.value && !capped.value));
+/** Lines the route has after the ones loaded. */
+const unloaded = computed(() => Math.max(0, total.value - fetched.value.length));
 
+const canShowMore = computed(() => !expanded.value || unloaded.value > 0);
+
+function count(value: number): string {
+  return value.toLocaleString('en-US');
+}
+
+/**
+ * Both numbers are exact: the lines on screen, and the lines not on screen
+ * yet (loaded or not). The route counts the lines this panel leaves out too,
+ * so "more" is said of lines to go through, and hiddenText accounts for the
+ * ones that were passed over.
+ */
 const shownText = computed(() => {
-  const count = shown.value.length.toLocaleString('en-US');
-  if (more.value) return `First ${count} shown`;
-  const total = lines.value.length.toLocaleString('en-US');
-  return shown.value.length === lines.value.length ? `All ${total} shown` : `${count} of ${total}`;
+  const remaining = lines.value.length - shown.value.length + unloaded.value;
+  if (remaining === 0) return `All ${count(lines.value.length)} shown`;
+  if (unloaded.value === 0) return `${count(shown.value.length)} of ${count(lines.value.length)}`;
+  return `${count(shown.value.length)} shown, ${count(remaining)} more`;
 });
+
+const hiddenText = computed(
+  () =>
+    `${count(hidden.value)} ${hidden.value === 1 ? 'line that only regroups' : 'lines that only regroup'} ` +
+    'requirements (AND, OR) left out.'
+);
 
 /**
  * The lines follow the list's filters: what the list leaves out (parts not
@@ -205,33 +228,38 @@ const query = computed<TransitionsQuery>(() => ({
 const requestKey = computed(() => `${props.version}|${queryKey(query.value)}`);
 
 /**
- * Ask for the `size` most shared lines. One more is asked for than is listed
- * (while the route allows): its presence is the only sign that lines remain.
+ * The first lines of the filters (`restart`), or the step after the ones
+ * loaded. The route's order is fixed, so the steps join up.
  */
-async function load(size: number): Promise<void> {
+async function load(restart: boolean): Promise<void> {
   const request = ++lastRequest;
-  const further = size > FIRST_LINES && lines.value.length > 0;
+  const offset = restart ? 0 : fetched.value.length;
+  const limit = restart
+    ? FIRST_LINES
+    : Math.min(MAX_STEP_LINES, Math.max(MIN_STEP_LINES, fetched.value.length));
   loading.value = true;
   error.value = false;
   moreFailed.value = false;
   try {
     const response = await changesStore.loadTransitions(
-      { version: props.version, query: { ...query.value, limit: Math.min(size + 1, MAX_LINES) } },
+      {
+        version: props.version,
+        query: { ...query.value, limit, offset },
+      },
       CHANNEL
     );
     if (request !== lastRequest) return;
-    const answered = response.transitions;
-    more.value = size < MAX_LINES ? answered.length > size : answered.length === MAX_LINES;
-    lines.value = answered.slice(0, size).filter((entry) => !isStructuralTransition(entry));
-    loadedSize.value = size;
+    fetched.value = restart ? response.transitions : [...fetched.value, ...response.transitions];
+    // An empty step: the store changed under the reader; there is nothing after this.
+    total.value = response.transitions.length ? response.total : fetched.value.length;
   } catch (caught) {
     if (isRequestCancelled(caught) || request !== lastRequest) return;
-    if (further) {
-      moreFailed.value = true;
-    } else {
-      lines.value = [];
-      more.value = false;
+    if (restart) {
+      fetched.value = [];
+      total.value = 0;
       error.value = true;
+    } else {
+      moreFailed.value = true;
     }
   } finally {
     if (request === lastRequest) loading.value = false;
@@ -244,19 +272,19 @@ function showMore(): void {
     expanded.value = true;
     return;
   }
-  void load(Math.min(loadedSize.value + STEP_LINES, MAX_LINES));
+  void load(false);
 }
 
 watch(
   () => props.version,
   () => {
-    lines.value = [];
-    more.value = false;
+    fetched.value = [];
+    total.value = 0;
     expanded.value = false;
   }
 );
 
-watch(requestKey, () => void load(FIRST_LINES), { immediate: true });
+watch(requestKey, () => void load(true), { immediate: true });
 
 onBeforeUnmount(() => changesStore.cancel(CHANNEL));
 </script>

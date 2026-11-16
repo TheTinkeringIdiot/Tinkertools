@@ -1158,6 +1158,10 @@ describe('build change list', () => {
 
       expect(page.findAll('[data-testid="patch-note"]')).toHaveLength(8);
       expect(header.find('[data-testid="patch-notes-shown"]').text()).toBe('All 8 shown');
+      // The route counts 9: the one that only moves an AND is accounted for, not listed.
+      expect(page.find('[data-testid="patch-notes-hidden"]').text()).toBe(
+        '1 line that only regroups requirements (AND, OR) left out.'
+      );
       // Everything is on screen: one way back, and nothing more to ask for.
       expect(page.find('[data-testid="patch-notes-more"]').exists()).toBe(false);
       expect(page.find('[data-testid="patch-notes-more-below"]').exists()).toBe(false);
@@ -1231,12 +1235,12 @@ describe('build change list', () => {
       const retargeting = () => notes().find((note) => note.attributes('data-part') === 'effects');
 
       expect(notes()).toHaveLength(3);
-      expect(shownText()).toBe('First 3 shown');
+      expect(shownText()).toBe('3 shown, 177 more');
 
       // The first step lists what the page already holds.
       await page.find('[data-testid="patch-notes-more"]').trigger('click');
       expect(notes()).toHaveLength(40);
-      expect(shownText()).toBe('First 40 shown');
+      expect(shownText()).toBe('40 shown, 140 more');
       expect(mockApi.getBuildTransitions).toHaveBeenCalledTimes(1);
       expect(retargeting()).toBeUndefined();
 
@@ -1246,12 +1250,16 @@ describe('build change list', () => {
       expect(notes()).toHaveLength(140);
       expect(retargeting()!.text()).toContain('on 95 items (656 times)');
       expect(notes()[139].text()).toContain('AttackRange added: 140');
+      expect(shownText()).toBe('140 shown, 40 more');
+      // Only the lines after the ones on screen were asked for.
+      expect(last(mockApi.getBuildTransitions.mock.calls)?.[0]).toMatchObject({ offset: 40 });
 
       await page.find('[data-testid="patch-notes-more"]').trigger('click');
       await flushPromises();
       expect(notes()).toHaveLength(180);
       expect(shownText()).toBe('All 180 shown');
       expect(page.find('[data-testid="patch-notes-foot"]').text()).toBe('All 180 shown');
+      expect(mockApi.getBuildTransitions).toHaveBeenCalledTimes(3);
       expect(page.find('[data-testid="patch-notes-more"]').exists()).toBe(false);
       expect(page.find('[data-testid="patch-notes-more-below"]').exists()).toBe(false);
     });
@@ -1302,18 +1310,67 @@ describe('build change list', () => {
       expect(page.find('[data-testid="patch-notes-more-error"]').exists()).toBe(false);
     });
 
-    it('says where the route stops giving lines', async () => {
+    it('goes on past the 500 lines of one answer until every line is shown', async () => {
       mockApi.getBuildTransitions.mockImplementation(transitionsRoute(manyTransitions(620)));
       const page = await mountPage(router, pinia);
-      for (let step = 0; step < 6; step += 1) {
-        await page.find('[data-testid="patch-notes-more"]').trigger('click');
-        await flushPromises();
-      }
+      expect(page.find('[data-testid="patch-notes-shown"]').text()).toBe('3 shown, 617 more');
 
-      expect(page.findAll('[data-testid="patch-note"]')).toHaveLength(500);
-      expect(page.find('[data-testid="patch-notes-capped"]').text()).toContain('What changed');
+      const more = () => page.find('[data-testid="patch-notes-more"]');
+      let clicks = 0;
+      while (more().exists()) {
+        await more().trigger('click');
+        await flushPromises();
+        clicks += 1;
+      }
+      // Each step brings as many lines again as are on screen: few steps for a long list.
+      expect(clicks).toBe(5);
+
+      const notes = page.findAll('[data-testid="patch-note"]');
+      expect(notes).toHaveLength(620);
+      // No line twice, none skipped: the steps join up.
+      expect(new Set(notes.map((note) => note.text())).size).toBe(620);
+      expect(last(notes)!.text()).toContain('AttackRange added: 620');
+      expect(page.find('[data-testid="patch-notes-shown"]').text()).toBe('All 620 shown');
       expect(page.find('[data-testid="patch-notes-more"]').exists()).toBe(false);
-      expect(last(mockApi.getBuildTransitions.mock.calls)?.[0]?.limit).toBe(500);
+    });
+
+    it('stops offering more when a step comes back empty', async () => {
+      // The store was imported anew meanwhile: the count of the first answer no longer holds.
+      const route = transitionsRoute(manyTransitions(40));
+      mockApi.getBuildTransitions.mockImplementation(async (query) => ({
+        ...(await route(query)),
+        total: 90,
+      }));
+      const page = await mountPage(router, pinia);
+      await page.find('[data-testid="patch-notes-more"]').trigger('click');
+      expect(page.find('[data-testid="patch-notes-shown"]').text()).toBe('40 shown, 50 more');
+
+      await page.find('[data-testid="patch-notes-more"]').trigger('click');
+      await flushPromises();
+
+      expect(page.find('[data-testid="patch-notes-shown"]').text()).toBe('All 40 shown');
+      expect(page.find('[data-testid="patch-notes-more"]').exists()).toBe(false);
+    });
+
+    it('counts what is on screen and accounts for the lines it leaves out', async () => {
+      const all = manyTransitions(60);
+      all[10] = { ...last(TRANSITIONS_1460.transitions)!, items: all[10].items };
+      mockApi.getBuildTransitions.mockImplementation(transitionsRoute(all));
+      const page = await mountPage(router, pinia);
+      const shownText = () => page.find('[data-testid="patch-notes-shown"]').text();
+
+      // 60 lines by the route's count; one of the first 40 only moves an AND.
+      expect(shownText()).toBe('3 shown, 56 more');
+      await page.find('[data-testid="patch-notes-more"]').trigger('click');
+      expect(page.findAll('[data-testid="patch-note"]')).toHaveLength(39);
+      expect(shownText()).toBe('39 shown, 20 more');
+      expect(page.find('[data-testid="patch-notes-hidden"]').text()).toContain('1 line that only');
+
+      await page.find('[data-testid="patch-notes-more"]').trigger('click');
+      await flushPromises();
+      expect(page.findAll('[data-testid="patch-note"]')).toHaveLength(59);
+      expect(shownText()).toBe('All 59 shown');
+      expect(page.find('[data-testid="patch-notes-hidden"]').text()).toContain('1 line that only');
     });
   });
 

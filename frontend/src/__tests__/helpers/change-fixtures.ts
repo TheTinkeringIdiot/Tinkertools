@@ -644,6 +644,7 @@ export const TRANSITIONS_1460: BuildTransitionsResponse = {
       field: null,
     },
   ],
+  total: 9,
 };
 
 /**
@@ -684,15 +685,18 @@ export function manyTransitions(count: number): SharedTransition[] {
   });
 }
 
-/** Answers as GET /changes/transitions does: the lines of the parts asked for, up to `limit`. */
+/** Answers as GET /changes/transitions does: the lines of the parts asked for, a page at a time. */
 export function transitionsRoute(
   all: SharedTransition[]
 ): (query?: TransitionsQuery) => Promise<BuildTransitionsResponse> {
-  return async (query) => ({
-    build: BUILD_1460,
-    base: BUILD_1451,
-    transitions: all
-      .filter((line) => !query?.part?.length || query.part.includes(line.part))
-      .slice(0, query?.limit ?? 50),
-  });
+  return async (query) => {
+    const matching = all.filter((line) => !query?.part?.length || query.part.includes(line.part));
+    const offset = query?.offset ?? 0;
+    return {
+      build: BUILD_1460,
+      base: BUILD_1451,
+      transitions: matching.slice(offset, offset + (query?.limit ?? 50)),
+      total: matching.length,
+    };
+  };
 }

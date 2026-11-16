@@ -463,6 +463,15 @@ describe('API Client', () => {
       });
     });
 
+    it('asks for a later step of the patch notes by its offset', async () => {
+      await apiClient.getBuildTransitions({ limit: 100, offset: 40 });
+
+      expect(sentRequest()).toMatchObject({
+        url: '/changes/transitions',
+        query: 'limit=100&offset=40',
+      });
+    });
+
     it('asks for the patch notes of the browsed build with no parameters by default', async () => {
       await apiClient.getBuildTransitions();
 
