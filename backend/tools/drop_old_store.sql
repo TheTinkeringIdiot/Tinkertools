@@ -233,12 +233,14 @@ SELECT pg_temp.kind(:'old_items_schema', 'items') = 'r' AS has_old_items,
 
 \if :has_old_items
     \if :has_map
-        SELECT count(*) AS old_items,
-               count(*) FILTER (WHERE NOT EXISTS (
-                   SELECT 1 FROM :"store".legacy_item_id l
-                   WHERE l.item_id = i.id AND l.aoid = i.aoid)) AS unmapped
+        SELECT count(*) AS old_items
+        FROM :"old_items_schema".items
+        WHERE aoid IS NOT NULL \gset
+        SELECT count(*) AS unmapped
         FROM :"old_items_schema".items i
-        WHERE i.aoid IS NOT NULL \gset
+        WHERE i.aoid IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM :"store".legacy_item_id l
+                          WHERE l.item_id = i.id AND l.aoid = i.aoid) \gset
     \else
         SELECT count(*) AS old_items, count(*) AS unmapped
         FROM :"old_items_schema".items
@@ -250,11 +252,11 @@ SELECT pg_temp.kind(:'old_items_schema', 'items') = 'r' AS has_old_items,
 \endif
 
 \if :has_old_mobs
-    SELECT count(*) AS old_mobs,
-           count(*) FILTER (WHERE NOT EXISTS (
-               SELECT 1 FROM :"store".mob m
-               WHERE m.mob_id = o.id AND m.name = o.name)) AS mobs_differing
-    FROM :"old_public".mobs o \gset
+    SELECT count(*) AS old_mobs FROM :"old_public".mobs \gset
+    SELECT count(*) AS mobs_differing
+    FROM :"old_public".mobs o
+    WHERE NOT EXISTS (SELECT 1 FROM :"store".mob m
+                      WHERE m.mob_id = o.id AND m.name = o.name) \gset
 \else
     \set old_mobs 0
     \set mobs_differing 0
