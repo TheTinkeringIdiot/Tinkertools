@@ -18,13 +18,20 @@ Not checked by either mode: what the store derives or curates beyond the part
 documents (nano properties, symbiant rows, perks, mobs, sources) is covered by
 the importer's and the routes' tests, not by a second implementation here.
 
+Mob ids (``--legacy-mobs-file FILE``): clients keep mob ids in their browser
+(farm progress, links to a boss). FILE is the ``mob_id,name`` list written by
+tools/export_legacy_item_ids.py --mobs-file against the database the store
+replaces; every id in it must name a mob of the same name in the store.
+
 Usage: python tools/verify_cas.py SLUG --extracts-dir DIR [--schema cas] [--show N]
        python tools/verify_cas.py --store [--extracts-dir DIR] [--schema cas]
+       python tools/verify_cas.py --legacy-mobs-file FILE [--schema cas]
 Exit status is 1 if anything differs, 2 if the check cannot be run (no store,
 no extract, a build the store does not hold, bad arguments).
 """
 
 import argparse
+import csv
 import json
 import os
 import sys
@@ -541,6 +548,45 @@ def compare_extract(report, documents, extracts, extract_slug):
     report.differences += len(wrong_ql)
 
 
+def read_legacy_mobs(path):
+    """``{mob id: name}`` of a file written by export_legacy_item_ids.py."""
+    mobs = {}
+    with path.open(newline="", encoding="utf-8") as handle:
+        reader = csv.reader(handle)
+        if next(reader, None) != ["mob_id", "name"]:
+            fail(f"{path}: the first line must be mob_id,name")
+        for number, line in enumerate(reader, start=2):
+            if len(line) != 2 or not line[0].isdigit() or int(line[0]) in mobs:
+                fail(f"{path}, line {number}: expected mob_id,name, each id once")
+            mobs[int(line[0])] = line[1]
+    return mobs
+
+
+def check_legacy_mobs(report, conn, old):
+    """Every mob id of the old database (``{id: name}``) must name a mob of
+    that name in the store. Mobs only the store has are new and take nothing
+    away from anyone."""
+    report.section("Mob ids clients hold against the store's mobs")
+    stored = dict(conn.execute("SELECT mob_id, name FROM mob"))
+    absent = {mob_id: name for mob_id, name in old.items() if mob_id not in stored}
+    renamed = {
+        mob_id: (name, stored[mob_id])
+        for mob_id, name in old.items()
+        if mob_id in stored and stored[mob_id] != name
+    }
+    print(
+        f"  old database {len(old)}, store {len(stored)}, "
+        f"same id and name {len(old) - len(absent) - len(renamed)}"
+    )
+    print(f"  ids the store does not have: {len(absent)}")
+    for mob_id in sorted(absent)[: report.show]:
+        print(f"    {mob_id}: {absent[mob_id]!r}")
+    print(f"  ids that name another mob in the store: {len(renamed)}")
+    for mob_id in sorted(renamed)[: report.show]:
+        print(f"    {mob_id}: was {renamed[mob_id][0]!r}, is {renamed[mob_id][1]!r}")
+    report.differences += len(absent) + len(renamed)
+
+
 def fail(message):
     """End the run: the check could not be made."""
     print(f"error: {message}", file=sys.stderr)
@@ -602,18 +648,34 @@ def main():
         help="extracts folder; required for a build, whose every part document "
         "is compared with the raw extract",
     )
+    parser.add_argument(
+        "--legacy-mobs-file",
+        default=None,
+        help="check the mob ids of the database the store replaces instead: "
+        "the file written by export_legacy_item_ids.py --mobs-file",
+    )
     parser.add_argument("--show", type=int, default=3, help="examples per difference")
     args = parser.parse_args()
 
-    if bool(args.slug) == args.store:
-        parser.error("give a build slug or --store")
+    if sum((bool(args.slug), args.store, bool(args.legacy_mobs_file))) != 1:
+        parser.error("give a build slug, --store or --legacy-mobs-file")
     if args.slug and not args.extracts_dir:
         parser.error("a build is checked against its extract: give --extracts-dir DIR")
     extracts = Path(args.extracts_dir).expanduser() if args.extracts_dir else None
     if extracts is not None and not extracts.is_dir():
         fail(f"Extracts folder not found: {extracts}")
+    old_mobs = None
+    if args.legacy_mobs_file:
+        mobs_file = Path(args.legacy_mobs_file).expanduser()
+        if not mobs_file.is_file():
+            fail(f"Mob file not found: {mobs_file}")
+        old_mobs = read_legacy_mobs(mobs_file)
     conn = open_store(args.schema)
     report = Report(args.show)
+    if old_mobs is not None:
+        check_legacy_mobs(report, conn, old_mobs)
+        print(f"\nmob ids, store {args.schema}: {report.differences} difference(s)")
+        return 1 if report.differences else 0
     if args.store:
         check_store(report, conn, extracts)
         print(f"\nstore {args.schema}: {report.differences} difference(s)")
