@@ -34,6 +34,7 @@ import {
 } from '@/composables/useGameVersion';
 import { versionKey, versionPrefix } from '@/services/version-keys';
 import { cacheManager } from '@/services/cache-manager';
+import { apiClient } from '@/services/api-client';
 import { resetAllStores, purgeOtherVersionCaches, handleGameVersionChange } from '@/stores';
 import { useItemsStore } from '@/stores/items';
 import { useNanosStore } from '@/stores/nanosStore';
@@ -284,6 +285,57 @@ describe('Game version switch', () => {
       expect(nanosStore.nanos.map((n) => n.name)).toEqual(['PRK Nano']);
       expect(localStorage.getItem(versionKey(NANOS_CACHE_BASE, TEST_ALT_VERSION))).not.toBeNull();
       expect(localStorage.getItem(versionKey(NANOS_CACHE_BASE, TEST_VERSION))).toBeNull();
+    });
+
+    describe('warming the common datasets', () => {
+      const emptyPage = {
+        items: [],
+        total: 0,
+        page: 1,
+        page_size: 100,
+        pages: 0,
+        has_next: false,
+        has_prev: false,
+      };
+
+      beforeEach(() => {
+        vi.mocked(apiClient.searchSymbiants).mockResolvedValue(emptyPage);
+        vi.mocked(apiClient.searchPocketBosses).mockResolvedValue(emptyPage);
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+      });
+
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
+
+      /** The hook defers the warm-up until the new page has had its turn. */
+      const pageHasHadItsTurn = () => new Promise((resolve) => setTimeout(resolve, 20));
+
+      it('loads symbiants and pocket bosses of the version switched to, after the switch', async () => {
+        await setCurrentVersion(TEST_ALT_VERSION);
+        await handleGameVersionChange(TEST_ALT_VERSION, TEST_VERSION);
+
+        // The switch itself does not wait for them
+        expect(apiClient.searchSymbiants).not.toHaveBeenCalled();
+
+        await vi.waitFor(() => {
+          expect(apiClient.searchSymbiants).toHaveBeenCalled();
+          expect(apiClient.searchPocketBosses).toHaveBeenCalled();
+        });
+        expect(currentVersion.value).toBe(TEST_ALT_VERSION);
+      });
+
+      it('loads nothing for a version the user has already left again', async () => {
+        await setCurrentVersion(TEST_ALT_VERSION);
+        await handleGameVersionChange(TEST_ALT_VERSION, TEST_VERSION);
+        // A quick second switch, before the first one's warm-up ran
+        await setCurrentVersion(TEST_VERSION);
+
+        await pageHasHadItsTurn();
+
+        expect(apiClient.searchSymbiants).not.toHaveBeenCalled();
+        expect(apiClient.searchPocketBosses).not.toHaveBeenCalled();
+      });
     });
 
     it('waits for listeners before setCurrentVersion resolves', async () => {
