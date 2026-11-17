@@ -64,7 +64,7 @@ Then start the API (`uvicorn app.main:app`); it needs `DATABASE_URL` and nothing
 | `--workers N` | builds read and split in parallel, about 2 GB of memory each (default 4; 0 reads in the importer's process) |
 | `--reset --yes` | drop the store's tables in `--schema`, the legacy id map with them, and import from scratch. Stop the API first and give `--legacy-ids-file` again |
 | `--builds-file PATH` | default `database/builds.toml` |
-| `--legacy-ids-file PATH` | make the store's map of old internal ids equal to this file; without the option the map is left as it is. Refused, before anything is written, unless the newest importable build of every family in the file is stored or among the builds of this run |
+| `--legacy-ids-file PATH` | make the store's map of old internal ids equal to this file (repeatable: to the files together); without the option the map is left as it is. Refused, before anything is written, unless the newest importable build of every family in the file is stored or among the builds of this run |
 | `--nanos-csv`, `--perks-file`, `--symbiants-file`, `--mob-ids-file` | override the curated files (`~` and environment variables are expanded) |
 | `--database-url URL` | override `DATABASE_URL` |
 
@@ -166,7 +166,7 @@ DATABASE_URL=postgresql://...old... python tools/export_legacy_item_ids.py \
     legacy_item_ids.csv --mobs-file legacy_mobs.csv
 ```
 
-The export knows two layouts: a database from before several versions were served (`public.items`, `public.mobs`; every item id is filed under `--family`, default `ao`) and the shared revision store of development (`gd.items` with `public.game_versions`; each family gets the ids its versions held, and the mobs are those of the default version). If another family was served from a database of its own, export each with its `--family` and concatenate the id files, keeping one header line. It prints the number of ids per family and of mobs; exit status 2 means the database has neither layout.
+The export knows two layouts: a database from before several versions were served (`public.items`, `public.mobs`; every item id is filed under `--family`, default `ao`) and the shared revision store of development (`gd.items` with `public.game_versions`; each family gets the ids its versions held, and the mobs are those of the default version). If another family was served from a database of its own, as in production, export each with its `--family` and load the id files together: `--legacy-ids-file` is repeatable (or concatenate them, keeping one header line). It prints the number of ids per family and of mobs; exit status 2 means the database has neither layout.
 
 ### Legacy item ids
 
@@ -181,7 +181,7 @@ python import_cli.py load-legacy-ids --legacy-ids-file legacy_item_ids.csv
 ```
 
 - The file is CSV, `branch,item_id,aoid`.
-- The import makes the table equal to the file, after the builds. A run without the option leaves the table alone.
+- The import makes the table equal to the file, after the builds; with the option given several times, to the files taken together, and an id listed in two of them is refused. Ids in none of the files are removed, so one family's file alone removes the other family's ids. A run without the option leaves the table alone.
 - `load-legacy-ids` makes the table equal to the file in a store it does not import into (`--schema`, `--builds-file` and `--database-url` as for the import). It has no index of extracts to tell the newest build from, so it refuses when the store lacks a build that `database/builds.toml` describes, or holds no build of a family the file names. On a server it is run through `scripts/deploy/stack.sh legacy-ids` (`../DEPLOYMENT.md`).
 - An id is resolved for the family of the requested version, and only when the item is present in that version.
 - Without the file the route answers `{"aoids": {}, "available": false}` for that family. The frontend then keeps the user's stored ids and asks again on the next load, so loading the file later loses nothing; it does not treat the ids as unknown.
@@ -195,37 +195,40 @@ python import_cli.py load-legacy-ids --legacy-ids-file legacy_item_ids.csv
 python tools/verify_cas.py --legacy-mobs-file legacy_mobs.csv
 ```
 
-It ends with `N difference(s)` and exits 1 unless N is 0: an old id the store does not have, or one that names a mob of another name there. Mobs only the store has are new and are not differences. On the development database all 159 match. **Production has not been checked.** On a server the check is `./stack.sh mob-ids legacy_mobs.csv` (`../DEPLOYMENT.md`). If it differs, do not cut over. Mob ids are not translated; the store has to number its mobs as production did. `legacy_mobs.csv` has the two columns of `database/mob_ids.csv`: give the differing mobs production's ids there, keeping every id and every name on one line only, import with `--reset --yes` (the importer refuses to renumber a loaded store), check again, and dump and restore the store for the server. This has not been needed or rehearsed, and it renumbers the mobs of every store loaded from the repository afterwards, development's included.
+It ends with `N difference(s)` and exits 1 unless N is 0: an old id the store does not have, or one that names a mob of another name there. Mobs only the store has are new and are not differences. On the development database all 159 match. Production's two databases match as well (159 and 162 mobs). On a server the check is `./stack.sh mob-ids FILE...` (`../DEPLOYMENT.md`). If it differs, do not cut over. Mob ids are not translated; the store has to number its mobs as production did. `legacy_mobs.csv` has the two columns of `database/mob_ids.csv`: give the differing mobs production's ids there, keeping every id and every name on one line only, import with `--reset --yes` (the importer refuses to renumber a loaded store), check again, and dump and restore the store for the server. This has not been needed or rehearsed, and it renumbers the mobs of every store loaded from the repository afterwards, development's included.
 
 A `--reset` reproduces the ids, since they come from the file and not from the order of `symbiants.csv`; the check can be repeated at any time against the same `legacy_mobs.csv`.
 
 ## Production cutover
 
-Production today is the application of before the store: one game version, its tables in `public` (`items`, `item_stats`, `mobs`, ...), no `cas` schema, on its own server. It is not upgraded in place. A new server runs the container stack of `../DEPLOYMENT.md`, its database is restored from a dump of the development store, and the domains move last. The old production database is used for one thing: the two exports of the ids that browsers hold. Nothing is imported on either server.
-
-Two things are **not done yet**:
-
-- **The export has not been run against a production database.** `tools/export_legacy_item_ids.py` reads `public.items` and `public.mobs` with queries written from the schema on `main`; its tests use hand-made tables of that shape, and the only real database it has run against is development's shared store.
-- **Production's mob ids have not been checked** against the store ([Mob ids](#mob-ids)).
+Production today is the application of before the store, on DigitalOcean App Platform with one managed PostgreSQL cluster that holds a database per family (AO and PRK), each one game version with its tables in `public` (`items`, `item_stats`, `mobs`, ...) and no `cas` schema. It is not upgraded in place. A new server runs the container stack of `../DEPLOYMENT.md`, its database is restored from a dump of the development store, and the domains move last. The old production databases are used for one thing: the exports of the ids that browsers hold. Nothing is imported on either side.
 
 In this order:
 
-1. **Deploy the stack on the new server and restore the store**: `../DEPLOYMENT.md`, "Deploy with Coolify" steps 1 to 7. The site works under the server's address; the old production is untouched and serving.
-2. **Export the ids** from the old production database with the command of [Ids that clients hold](#ids-that-clients-hold), run from a checkout of this code with `DATABASE_URL` naming that database (it only reads, and the database may be serving). Compare what it prints with `SELECT count(*) FROM items WHERE aoid IS NOT NULL` and `SELECT count(*) FROM mobs` there. Keep both files off the servers. Do not re-import the old database afterwards: that would issue new ids.
-3. **Check the mob ids** on the new server: `./stack.sh mob-ids legacy_mobs.csv` must report 0 differences. Otherwise stop here and see [Mob ids](#mob-ids); the domains stay where they are.
-4. **Load the map** on the new server: `./stack.sh legacy-ids legacy_item_ids.csv`. `./stack.sh status` then shows the counts per family that the export printed, and `POST /api/v1/ao/legacy-item-ids/resolve` with `{"item_ids": [<an id from the file>]}` answers `"available": true` and the AOID of the file.
-5. **Move the domains** to the new server. Browsers translate their stored ids on their first load from it.
-6. **Retire the old server**, days later, once nothing is missed. Keep the two CSV files.
+1. **Export the ids** from both old production databases. This is done; the files are `prod_legacy_item_ids_ao.csv` (131,807 ids), `prod_legacy_item_ids_prk.csv` (130,690 ids), `prod_legacy_mobs_ao.csv` and `prod_legacy_mobs_prk.csv`. For the record, per database, from a checkout of this code (it only reads, and the database may be serving):
 
-Going back is possible at any point: the old server is not changed by any step, so the domains can be pointed at it again. A browser that has already translated its ids against the new server holds AOIDs, which the old application does not read; that part does not go back.
+   ```bash
+   DATABASE_URL=postgresql://...old AO...  python tools/export_legacy_item_ids.py prod_legacy_item_ids_ao.csv  --family ao  --mobs-file prod_legacy_mobs_ao.csv
+   DATABASE_URL=postgresql://...old PRK... python tools/export_legacy_item_ids.py prod_legacy_item_ids_prk.csv --family prk --mobs-file prod_legacy_mobs_prk.csv
+   ```
 
-Steps 3 and 4 need the export of step 2 and nothing else. Until the map is loaded the new server answers `"available": false` and browsers keep their ids, so the domains can move before step 4 without loss, but not before step 3.
+   Keep the files off the servers. Do not re-import an old database afterwards: that would issue new ids.
+2. **Check the mob ids** against the development store, which is what the server will hold: `python tools/verify_cas.py --legacy-mobs-file FILE` for each mobs file. Done: 0 differences for both. Had it differed: [Mob ids](#mob-ids), and the domains stay where they are.
+3. **Deploy the stack on the new server and restore the store**: `../DEPLOYMENT.md`, "Deploy with Coolify" steps 1 to 7. The site works under the server's address; the old production is untouched and serving.
+4. **Check the mob ids again**, on the server's own store: `./stack.sh mob-ids prod_legacy_mobs_ao.csv prod_legacy_mobs_prk.csv` must report 0 differences for each.
+5. **Load the map** on the new server, both files in one call: `./stack.sh legacy-ids prod_legacy_item_ids_ao.csv prod_legacy_item_ids_prk.csv`. `./stack.sh status` then shows the counts above per family, and `POST /api/v1/ao/legacy-item-ids/resolve` with `{"item_ids": [<an id from the AO file>]}` answers `"available": true` and the AOID of the file; the same under `/api/v1/prk/` with the PRK file.
+6. **Move the domains** to the new server. Browsers translate their stored ids on their first load from it.
+7. **Retire the old application and its databases**, days later, once nothing is missed. Keep the four CSV files.
+
+Going back is possible at any point: the old production is not changed by any step, so the domains can be pointed at it again. A browser that has already translated its ids against the new server holds AOIDs, which the old application does not read; that part does not go back.
+
+Until the map is loaded the new server answers `"available": false` and browsers keep their ids, so step 6 before step 5 loses nothing. Step 6 before step 4 is not safe.
 
 ## Back up
 
 What cannot be made again, and so must be kept somewhere other than the database server:
 
-- `legacy_item_ids.csv` and `legacy_mobs.csv`: once the old database is gone they are the only record of its ids.
+- The exported id files (`legacy_item_ids.csv` and `legacy_mobs.csv`; for production one pair per family): once the old database is gone they are the only record of its ids.
 - The extracts folder: the store is built from it. Without it the store cannot be rebuilt or given a new build's predecessor.
 - The repository holds the rest (curated files, `builds.toml`, the rules files).
 

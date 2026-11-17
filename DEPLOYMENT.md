@@ -84,30 +84,30 @@ The containers are found by their Compose service names. When the host runs more
 
 ### Ids that browsers hold
 
-Users' data lives in their browsers, and some of it names rows of the database that served them (`backend/IMPORT_README.md`, "Ids that clients hold"). Both kinds of id come from the production database being replaced and are exported from it once, read-only, with `backend/tools/export_legacy_item_ids.py`.
+Users' data lives in their browsers, and some of it names rows of the database that served them (`backend/IMPORT_README.md`, "Ids that clients hold"). Both kinds of id come from the production being replaced and are exported from it once, read-only, with `backend/tools/export_legacy_item_ids.py`. The old production has a database per family, so there are two exports, and they are done: `prod_legacy_item_ids_ao.csv` (131,807 ids), `prod_legacy_item_ids_prk.csv` (130,690 ids), `prod_legacy_mobs_ao.csv` and `prod_legacy_mobs_prk.csv`.
 
-**Internal item ids** are translated through the map in `cas.legacy_item_id`. Load production's export into the running stack:
+**Internal item ids** are translated through the map in `cas.legacy_item_id`. Load production's exports into the running stack, both in one call:
 
 ```bash
-./stack.sh legacy-ids legacy_item_ids.csv
+./stack.sh legacy-ids prod_legacy_item_ids_ao.csv prod_legacy_item_ids_prk.csv
 ```
 
-- It copies the file into the `api` container and runs `python import_cli.py load-legacy-ids --legacy-ids-file ...` there, which makes the table equal to the file. No extracts are needed. It takes 6 seconds for 392,348 ids, and no restart: the route reads the table on every request.
+- It copies the files into the `api` container and runs `python import_cli.py load-legacy-ids --legacy-ids-file ... --legacy-ids-file ...` there, which makes the table equal to the files taken together. **Ids that are in none of the files given are removed**, so one family's file alone would remove the other family's ids: always give both. No extracts are needed. It takes 6 seconds for the 262,497 ids, and no restart: the route reads the table on every request.
 - It refuses, writing nothing, when the store holds no build of a family the file names, or lacks a build that `backend/database/builds.toml` of the deployed code describes: browsers translate against the newest build and drop for good the ids of items it lacks, so the map must not be loaded into a store that is behind.
 - Until the map is loaded, `POST /api/v1/<version>/legacy-item-ids/resolve` answers `"available": false`. The frontend then keeps the ids it holds and asks again on the next load. Loading the map late loses nothing; loading the wrong map does.
 - A later `stack.sh restore` carries the map over. It is loaded once.
 
-**Mob ids** are not translated; the store must number its mobs as production did. Check with the mobs file of the same export:
+**Mob ids** are not translated; the store must number its mobs as production did. Check with the mobs files of the same exports:
 
 ```bash
-./stack.sh mob-ids legacy_mobs.csv      # must end with "0 difference(s)"
+./stack.sh mob-ids prod_legacy_mobs_ao.csv prod_legacy_mobs_prk.csv      # "0 difference(s)" for each
 ```
 
-It runs `python tools/verify_cas.py --legacy-mobs-file ...` in the `api` container and only reads. The same check can be run on the development machine before a dump is taken, against the development store, whose mobs the dump carries. If it reports differences, do not point the domains at the new server: `backend/IMPORT_README.md`, "Mob ids".
+It runs `python tools/verify_cas.py --legacy-mobs-file ...` in the `api` container for each file and only reads; its exit status is 1 when any file differs. The same check has been run on the development machine against the development store, whose mobs the dump carries, and passes for both files. If it reports differences, do not point the domains at the new server: `backend/IMPORT_README.md`, "Mob ids".
 
 ### No backup job
 
-The server holds no user data: profiles, favourites and progress live in the users' browsers. Everything in `db` is game reference data that the dump reproduces, and the dump is reproduced by the importer from the extracts. So there is no database backup job, and none is needed. What must be kept, off the server: the two export files (`legacy_item_ids.csv`, `legacy_mobs.csv`), which are the only record of the old database's ids once it is gone, and on the development machine the extracts folder.
+The server holds no user data: profiles, favourites and progress live in the users' browsers. Everything in `db` is game reference data that the dump reproduces, and the dump is reproduced by the importer from the extracts. So there is no database backup job, and none is needed. What must be kept, off the server: the four export files, which are the only record of the old databases' ids once they are gone, and on the development machine the extracts folder.
 
 ## Run it locally
 
@@ -123,7 +123,7 @@ Then `http://localhost:8088`. The first `up` builds both images (about a minute)
 
 The server: one VPS (2 vCPU, 7.7 GB RAM, Ubuntu), firewall open on 22, 80 and 443. The stack takes about 2 GB with a warm database and two busy API workers; a restore needs about 1 GB of free disk on top of the store.
 
-Steps in Coolify's UI. Names of fields differ between Coolify versions: where a step says *verify in the UI*, check what your version shows instead of trusting the wording here.
+Steps in Coolify's UI (the server runs v4.7.5; these steps were written without access to it). Names of fields differ between Coolify versions: where a step says *verify in the UI*, check what your version shows instead of trusting the wording here.
 
 1. **Add the repository as a source.** A GitHub App for a private repository, or the public repository URL.
 2. **New resource** from that repository, on the branch to deploy. **Build pack: Docker Compose.** Base directory `/`, Docker Compose location `/docker-compose.yml`.
@@ -132,7 +132,7 @@ Steps in Coolify's UI. Names of fields differ between Coolify versions: where a 
 5. **Leave the stack on its own network** (do not enable "Connect to predefined network", *verify in the UI*): `web` finds the backend under the name `api` and the backend finds `db`, and those names must mean this stack's containers.
 6. **Deploy.** All three services must become healthy. The site loads; the API answers 503 for game versions until the store is restored.
 7. **Load the store**: [Restore it](#restore-it-server-or-any-host-running-the-stack). Then `./stack.sh status`.
-8. **Load the legacy id map and check the mob ids** once the two exports from the old production database exist: [Ids that browsers hold](#ids-that-browsers-hold).
+8. **Check the mob ids and load the legacy id map** from the exports of the old production: [Ids that browsers hold](#ids-that-browsers-hold).
 9. **Point DNS** of both hostnames at the server, last. Coolify's proxy obtains the certificates once the names resolve to it.
 
 Later deployments (a push to the branch, or "Redeploy") rebuild `api` and `web`; the volume `db_data` and with it the store stay. *Verify in the UI* that the resource's persistent storage lists the volume before relying on that.
