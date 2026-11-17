@@ -68,6 +68,16 @@ cd backend
 python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --workers 8
 ```
 
+## Production
+
+```bash
+cp .env.example .env          # set POSTGRES_PASSWORD
+docker compose up -d --build  # db, api and web; the site is on http://localhost:8088
+scripts/deploy/stack.sh restore tinkertools-store.dump   # load the game data from a dump
+```
+
+Three containers (`docker-compose.yml`): PostgreSQL, the API under gunicorn, and Caddy serving the built frontend and proxying `/api`. The server's database is restored from a dump of the development store rather than imported. [DEPLOYMENT.md](DEPLOYMENT.md) is the guide: settings, the dump and restore procedure, and the steps to deploy with Coolify.
+
 ## Tech Stack
 
 - **Frontend**: Vue 3, TypeScript, Vite, TailwindCSS, PrimeVue (Aura theme)
@@ -78,6 +88,7 @@ python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --workers 
 ## Documentation
 
 - **[CLAUDE.md](CLAUDE.md)** - Detailed development guide and commands
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - The container stack, loading a server's data, Coolify
 - **[Requirements](docs/Requirements.md)** - Complete feature requirements (47 total)
 - **[Work Plan](docs/work_plan.md)** - Implementation tasks and roadmap
 - **[Database](DATABASE.md)** - Schema documentation and design

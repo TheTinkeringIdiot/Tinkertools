@@ -1,6 +1,6 @@
 # Loading the TinkerTools database
 
-Game data lives in one PostgreSQL schema, the content-addressed store (`cas`; design in `docs/plans/content-addressed-store/design.md`, tables in `database/cas/`). The application reads nothing else, and one command writes it: `python import_cli.py import-cas`. This is the guide to loading a database from nothing, checking it, keeping it current, and replacing the production database of before the store ([Production cutover](#production-cutover)).
+Game data lives in one PostgreSQL schema, the content-addressed store (`cas`; design in `docs/plans/content-addressed-store/design.md`, tables in `database/cas/`). The application reads nothing else, and one command writes it: `python import_cli.py import-cas`. This is the guide to loading a database from nothing, checking it, keeping it current, and replacing the production database of before the store ([Production cutover](#production-cutover)). A server is not loaded this way: it gets a dump of the store loaded here (`../DEPLOYMENT.md`).
 
 ## What goes in
 
@@ -175,10 +175,14 @@ Clients translate the item ids they still hold once, through `POST /legacy-item-
 ```bash
 # against the new database, with the first import or any later run
 python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --legacy-ids-file legacy_item_ids.csv
+
+# into a store that is already loaded, without extracts: a server restored from a dump
+python import_cli.py load-legacy-ids --legacy-ids-file legacy_item_ids.csv
 ```
 
 - The file is CSV, `branch,item_id,aoid`.
 - The import makes the table equal to the file, after the builds. A run without the option leaves the table alone.
+- `load-legacy-ids` makes the table equal to the file in a store it does not import into (`--schema`, `--builds-file` and `--database-url` as for the import). It has no index of extracts to tell the newest build from, so it refuses when the store lacks a build that `database/builds.toml` describes, or holds no build of a family the file names. On a server it is run through `scripts/deploy/stack.sh legacy-ids` (`../DEPLOYMENT.md`).
 - An id is resolved for the family of the requested version, and only when the item is present in that version.
 - Without the file the route answers `{"aoids": {}, "available": false}` for that family. The frontend then keeps the user's stored ids and asks again on the next load, so loading the file later loses nothing; it does not treat the ids as unknown.
 - A file from another database resolves ids to the wrong items, and a browser that got an answer for every id keeps no copy of what it held. Load only the file exported from the database the store replaces.
@@ -191,42 +195,31 @@ python import_cli.py import-cas --extracts-dir ~/projects/AO/extracts --legacy-i
 python tools/verify_cas.py --legacy-mobs-file legacy_mobs.csv
 ```
 
-It ends with `N difference(s)` and exits 1 unless N is 0: an old id the store does not have, or one that names a mob of another name there. Mobs only the store has are new and are not differences. On the development database all 159 match. **Production has not been checked.** If it differs, do not cut over. Mob ids are not translated; the store has to number its mobs as production did. `legacy_mobs.csv` has the two columns of `database/mob_ids.csv`: give the differing mobs production's ids there, keeping every id and every name on one line only, import with `--reset --yes` (the importer refuses to renumber a loaded store), and check again. This has not been needed or rehearsed, and it renumbers the mobs of every store loaded from the repository afterwards, development's included.
+It ends with `N difference(s)` and exits 1 unless N is 0: an old id the store does not have, or one that names a mob of another name there. Mobs only the store has are new and are not differences. On the development database all 159 match. **Production has not been checked.** On a server the check is `./stack.sh mob-ids legacy_mobs.csv` (`../DEPLOYMENT.md`). If it differs, do not cut over. Mob ids are not translated; the store has to number its mobs as production did. `legacy_mobs.csv` has the two columns of `database/mob_ids.csv`: give the differing mobs production's ids there, keeping every id and every name on one line only, import with `--reset --yes` (the importer refuses to renumber a loaded store), check again, and dump and restore the store for the server. This has not been needed or rehearsed, and it renumbers the mobs of every store loaded from the repository afterwards, development's included.
 
 A `--reset` reproduces the ids, since they come from the file and not from the order of `symbiants.csv`; the check can be repeated at any time against the same `legacy_mobs.csv`.
 
 ## Production cutover
 
-Production today is the application of before the store: one game version, its tables in `public` (`items`, `item_stats`, `mobs`, ...), no `cas` schema. This is the order to replace it in. Two things are **not done yet**:
+Production today is the application of before the store: one game version, its tables in `public` (`items`, `item_stats`, `mobs`, ...), no `cas` schema, on its own server. It is not upgraded in place. A new server runs the container stack of `../DEPLOYMENT.md`, its database is restored from a dump of the development store, and the domains move last. The old production database is used for one thing: the two exports of the ids that browsers hold. Nothing is imported on either server.
 
-- **The deployment scripts and configuration have not been updated for the new store.** The steps below name what must happen, not the commands of the production host. Settings production does not have yet, all with defaults (`app/core/config.py`): `DEFAULT_GAME_VERSION`, `CAS_SCHEMA`, `BUILD_REGISTRY_TTL` and `RESPONSE_CACHE_MAX_BYTES`; see "Production Deployment" in `README.md` for what the last means for the number of workers. Requirements that went: `alembic`, `asyncpg`, `ijson`, `psutil`, `rich`.
-- **The export has not been run against a production database.** `tools/export_legacy_item_ids.py` reads `public.items` and `public.mobs` with queries written from the schema on `main`; its tests use hand-made tables of that shape, and the only real database it has run against is development's shared store. Rehearse steps 1 and 2 on a copy of production before the day. The same holds for `tools/drop_old_store.sql` on that layout (step 9).
+Two things are **not done yet**:
 
-Before the day, production untouched and serving:
+- **The export has not been run against a production database.** `tools/export_legacy_item_ids.py` reads `public.items` and `public.mobs` with queries written from the schema on `main`; its tests use hand-made tables of that shape, and the only real database it has run against is development's shared store.
+- **Production's mob ids have not been checked** against the store ([Mob ids](#mob-ids)).
 
-1. **Export the ids** from production with the command of [Ids that clients hold](#ids-that-clients-hold), run from a checkout of this code. Compare what it prints with `SELECT count(*) FROM items WHERE aoid IS NOT NULL` and `SELECT count(*) FROM mobs`. Copy both files off the server. Do not re-import the old database afterwards: that would issue new ids.
-2. **Check the mob ids** against a loaded store, for example development's: `python tools/verify_cas.py --legacy-mobs-file legacy_mobs.csv` must report 0 differences. Otherwise stop here and see [Mob ids](#mob-ids).
-3. **Put the extracts folder on a local disk** of the machine that will run the import (40 GB with all 147 builds). The import needs the folder, this repository and `DATABASE_URL`, not the application server.
+In this order:
 
-On the day:
+1. **Deploy the stack on the new server and restore the store**: `../DEPLOYMENT.md`, "Deploy with Coolify" steps 1 to 7. The site works under the server's address; the old production is untouched and serving.
+2. **Export the ids** from the old production database with the command of [Ids that clients hold](#ids-that-clients-hold), run from a checkout of this code with `DATABASE_URL` naming that database (it only reads, and the database may be serving). Compare what it prints with `SELECT count(*) FROM items WHERE aoid IS NOT NULL` and `SELECT count(*) FROM mobs` there. Keep both files off the servers. Do not re-import the old database afterwards: that would issue new ids.
+3. **Check the mob ids** on the new server: `./stack.sh mob-ids legacy_mobs.csv` must report 0 differences. Otherwise stop here and see [Mob ids](#mob-ids); the domains stay where they are.
+4. **Load the map** on the new server: `./stack.sh legacy-ids legacy_item_ids.csv`. `./stack.sh status` then shows the counts per family that the export printed, and `POST /api/v1/ao/legacy-item-ids/resolve` with `{"item_ids": [<an id from the file>]}` answers `"available": true` and the AOID of the file.
+5. **Move the domains** to the new server. Browsers translate their stored ids on their first load from it.
+6. **Retire the old server**, days later, once nothing is missed. Keep the two CSV files.
 
-4. **Back up** the production database: `pg_dump -Fc -f before_cutover.dump "$DATABASE_URL"`. Keep it off the server. It is the only undo for step 9.
-5. **Stop the API.**
-6. **Deploy the backend** of this code and install `requirements.txt`. Do not start it. The role in `DATABASE_URL` needs `CREATE` on the database (see [Prerequisites](#prerequisites)).
-7. **Import**, with the map: `python import_cli.py import-cas --extracts-dir DIR --workers 8 --legacy-ids-file legacy_item_ids.csv`. About 9 minutes. It writes schema `cas` only; the old tables in `public` are not read or changed.
-8. **Verify**, then start:
-   - `python tools/verify_cas.py --store --extracts-dir DIR` and `python tools/verify_cas.py <live slug> --extracts-dir DIR`: 0 differences each.
-   - `python tools/verify_cas.py --legacy-mobs-file legacy_mobs.csv`: 0 differences, now against production's own store.
-   - `SELECT branch, count(*) FROM cas.legacy_item_id GROUP BY branch` gives the counts the export printed.
-   - Start the API. `GET /health`, `GET /api/v1/versions`, an item page; `POST /api/v1/ao/legacy-item-ids/resolve` with `{"item_ids": [<an id from the file>]}` answers `"available": true` and the AOID of the file.
-   - Deploy the frontend, after the backend: it needs the new API. Browsers translate their stored ids on their first load.
-9. **Drop the old tables**, days later, once nothing is missed: [Removing the old store](#removing-the-old-store). Keep the two CSV files and the dump after that too.
+Going back is possible at any point: the old server is not changed by any step, so the domains can be pointed at it again. A browser that has already translated its ids against the new server holds AOIDs, which the old application does not read; that part does not go back.
 
-Going back is possible until step 9: stop the API, deploy the old backend and frontend, start. The old tables are as they were. Browsers that loaded the new frontend have by then rewritten their stored lists as AOIDs, which the old frontend was not written for, so go back early or not at all.
-
-The import of step 7 writes nothing the old application reads, so it could run while the old API still serves and shorten the stop to the switch of code. That has not been rehearsed.
-
-A new, empty database instead of the same one works the same way: steps 1 to 8 with `DATABASE_URL` naming the new database from step 6 on, and in place of step 9 the old database is dropped whole (`DROP DATABASE`) once the dump is safe.
+Steps 3 and 4 need the export of step 2 and nothing else. Until the map is loaded the new server answers `"available": false` and browsers keep their ids, so the domains can move before step 4 without loss, but not before step 3.
 
 ## Back up
 
@@ -236,18 +229,22 @@ What cannot be made again, and so must be kept somewhere other than the database
 - The extracts folder: the store is built from it. Without it the store cannot be rebuilt or given a new build's predecessor.
 - The repository holds the rest (curated files, `builds.toml`, the rules files).
 
-The store itself is rebuilt from those in about 9 minutes ([Load a database from nothing](#load-a-database-from-nothing)) and comes out the same: a from-nothing import has been compared with the development store, digest by digest. That is the recovery procedure. A dump is a convenience on top of it, and the undo before something irreversible:
+The store itself is rebuilt from those in about 9 minutes ([Load a database from nothing](#load-a-database-from-nothing)) and comes out the same: a from-nothing import has been compared with the development store, digest by digest. That is the recovery procedure for the development database.
+
+A server is not backed up at all. Its database is a copy of the development store, made with `../scripts/deploy/dump-store.sh` and loaded with `../scripts/deploy/stack.sh restore` (`../DEPLOYMENT.md`, "The data"), and can be made again from the development store at any time. That dump holds schema `cas` with its two extensions and leaves the legacy id map out, which a server gets from its own export. The restored store has been compared with the development store through the API (`tools/golden.py`, 977 of 977 responses).
+
+A dump of the whole development database is the undo before something irreversible there:
 
 ```bash
 pg_dump -Fc -f tinkertools.dump "$DATABASE_URL"                    # the whole database
 pg_restore --no-owner -d "$EMPTY_DATABASE_URL" tinkertools.dump   # into an empty database
 ```
 
-Dump the whole database, not schema `cas` alone: the extensions the store's constraint and indexes depend on are objects of the database and are left out of a schema dump. Restoring a dump has not been rehearsed for this store; the import has.
+A plain `pg_dump --schema=cas` is not enough: the extensions the store's constraint and indexes depend on are objects of the database and are left out unless they are named (`--extension`, as `dump-store.sh` does).
 
 ## Removing the old store
 
-`tools/drop_old_store.sql` removes the old store from a database that also holds the new one. It is irreversible; take the dump first.
+`tools/drop_old_store.sql` removes the old store from a database that also holds the new one. It is irreversible; take the dump first. The production cutover above does not need it: the old production database is never given a store, and goes with its server.
 
 ```bash
 psql "$DATABASE_URL" -f tools/drop_old_store.sql                    # report only
