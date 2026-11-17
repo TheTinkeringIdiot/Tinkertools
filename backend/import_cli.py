@@ -70,6 +70,32 @@ def read_extract_index(root: Path) -> list:
     return entries
 
 
+def read_legacy_id_files(given) -> tuple:
+    """The rows of one legacy id file or of several, and how to name them in
+    a message. Several files are one map: an export per family, when each
+    family was served from a database of its own."""
+    from app.core.cas_legacy import read_legacy_ids
+    from app.core.cas_store import StoreError
+
+    paths = [
+        given_path(text) for text in ([given] if isinstance(given, str) else given)
+    ]
+    rows, seen = [], {}
+    for path in paths:
+        if not path.is_file():
+            raise FileNotFoundError(f"Legacy id file not found: {path}")
+        read = read_legacy_ids(path)
+        for row in read:
+            if row[:2] in seen:
+                raise StoreError(
+                    f"{path}: id {row[1]} of {row[0]} is also listed in "
+                    f"{seen[row[:2]]}"
+                )
+        seen.update((row[:2], path) for row in read)
+        rows.extend(read)
+    return rows, ", ".join(str(path) for path in paths)
+
+
 def import_cas(args) -> bool:
     """Import builds from an extracts folder into the content-addressed store.
 
@@ -102,7 +128,7 @@ def import_cas(args) -> bool:
         read_build_descriptions,
         read_manifest,
     )
-    from app.core.cas_legacy import read_legacy_ids, sync_legacy_ids
+    from app.core.cas_legacy import sync_legacy_ids
     from app.core.change_rules import read_rules
 
     if args.workers < 0:
@@ -163,10 +189,7 @@ def import_cas(args) -> bool:
         )
         legacy_ids = None
         if args.legacy_ids_file:
-            legacy_file = given_path(args.legacy_ids_file)
-            if not legacy_file.is_file():
-                raise FileNotFoundError(f"Legacy id file not found: {legacy_file}")
-            legacy_ids = read_legacy_ids(legacy_file)
+            legacy_ids, legacy_file = read_legacy_id_files(args.legacy_ids_file)
         planned = plan_builds(root, entries, described)
         specs = [spec for spec in planned if not args.slug or spec.slug in args.slug]
         unknown = set(args.slug or []) - {spec.slug for spec in specs}
@@ -324,7 +347,7 @@ def load_legacy_ids(args) -> bool:
     """
     from app.core import cas_store
     from app.core.cas_extract import BUILDS_FILE, read_build_descriptions
-    from app.core.cas_legacy import read_legacy_ids, sync_legacy_ids
+    from app.core.cas_legacy import sync_legacy_ids
 
     if not args.legacy_ids_file:
         logger.error("--legacy-ids-file is required")
@@ -335,10 +358,7 @@ def load_legacy_ids(args) -> bool:
         return False
     conn = None
     try:
-        legacy_file = given_path(args.legacy_ids_file)
-        if not legacy_file.is_file():
-            raise FileNotFoundError(f"Legacy id file not found: {legacy_file}")
-        legacy_ids = read_legacy_ids(legacy_file)
+        legacy_ids, legacy_file = read_legacy_id_files(args.legacy_ids_file)
         described = read_build_descriptions(
             given_path(args.builds_file) if args.builds_file else BUILDS_FILE
         )
@@ -433,11 +453,12 @@ def main():
     )
     parser.add_argument(
         "--legacy-ids-file",
-        type=str,
+        action="append",
         default=None,
         help="Internal item ids of the old store, as written by "
-        "tools/export_legacy_item_ids.py. The store's map is made equal to the "
-        "file; without the option the map is left as it is",
+        "tools/export_legacy_item_ids.py (repeatable: one file per family "
+        "that had a database of its own). The store's map is made equal to "
+        "the files together; without the option the map is left as it is",
     )
     parser.add_argument(
         "--nanos-csv",

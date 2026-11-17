@@ -5,10 +5,12 @@
 #
 #   stack.sh restore DUMP       load or replace the store from a dump written by
 #                               dump-store.sh
-#   stack.sh legacy-ids CSV     make the map of old internal item ids equal to a
-#                               file of tools/export_legacy_item_ids.py
-#   stack.sh mob-ids CSV        check the store's mob ids against the mobs file
-#                               of the same export (reads only)
+#   stack.sh legacy-ids CSV...  make the map of old internal item ids equal to
+#                               the files of tools/export_legacy_item_ids.py,
+#                               taken together: give every family's file in
+#                               one call, since ids not in the files are removed
+#   stack.sh mob-ids CSV...     check the store's mob ids against each mobs file
+#                               of the same exports (reads only)
 #   stack.sh verify             check the store's rules with tools/verify_cas.py
 #                               --store (reads only, about a minute)
 #   stack.sh status             the builds and the size of the map now served
@@ -156,11 +158,13 @@ restore() {
   status
 }
 
-# copy_in FILE NAME: put a file into the api container, print its path there.
+# copy_in FILE: put a file into the api container, print its path there.
 copy_in() {
   [ -f "$1" ] || die "File not found: $1"
-  docker exec -i "$api" sh -c "cat > /tmp/$2" <"$1"
-  echo "/tmp/$2"
+  local inside
+  inside="/tmp/$(basename "$1")"
+  docker exec -i "$api" sh -c 'cat > "$1"' sh "$inside" <"$1"
+  echo "$inside"
 }
 
 case "${1:-}" in
@@ -169,15 +173,23 @@ case "${1:-}" in
     restore "$2"
     ;;
   legacy-ids)
-    [ $# -eq 2 ] || die "usage: stack.sh legacy-ids CSV"
-    inside="$(copy_in "$2" legacy_item_ids.csv)"
-    docker exec "$api" python import_cli.py load-legacy-ids --schema "$schema" --legacy-ids-file "$inside"
+    [ $# -ge 2 ] || die "usage: stack.sh legacy-ids CSV..."
+    files=()
+    for file in "${@:2}"; do
+      files+=(--legacy-ids-file "$(copy_in "$file")")
+    done
+    docker exec "$api" python import_cli.py load-legacy-ids --schema "$schema" "${files[@]}"
     status
     ;;
   mob-ids)
-    [ $# -eq 2 ] || die "usage: stack.sh mob-ids CSV"
-    inside="$(copy_in "$2" legacy_mobs.csv)"
-    docker exec "$api" python tools/verify_cas.py --schema "$schema" --legacy-mobs-file "$inside"
+    [ $# -ge 2 ] || die "usage: stack.sh mob-ids CSV..."
+    different=0
+    for file in "${@:2}"; do
+      inside="$(copy_in "$file")"
+      echo "== $file"
+      docker exec "$api" python tools/verify_cas.py --schema "$schema" --legacy-mobs-file "$inside" || different=1
+    done
+    exit "$different"
     ;;
   verify)
     docker exec "$api" python tools/verify_cas.py --schema "$schema" --store
@@ -186,6 +198,6 @@ case "${1:-}" in
     status
     ;;
   *)
-    die "usage: stack.sh restore DUMP | legacy-ids CSV | mob-ids CSV | verify | status"
+    die "usage: stack.sh restore DUMP | legacy-ids CSV... | mob-ids CSV... | verify | status"
     ;;
 esac

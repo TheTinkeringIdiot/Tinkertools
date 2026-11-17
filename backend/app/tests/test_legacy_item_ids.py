@@ -336,6 +336,32 @@ def test_a_loaded_store_takes_the_map_without_extracts(importer):
     assert importer.map() == [("ao", 2, 200)]
 
 
+def test_an_export_per_family_is_loaded_as_one_map(importer, tmp_path):
+    """Each family had a database of its own: loading the two files together
+    keeps both, where loading one would remove the other's ids."""
+    assert importer()
+    ao, prk = tmp_path / "ao.csv", tmp_path / "prk.csv"
+    ao.write_text("branch,item_id,aoid\nao,1,100\n")
+    prk.write_text("branch,item_id,aoid\nprk,1,555\n")
+    builds = tmp_path / "builds.toml"
+    builds.write_text("")
+
+    def load(*files):
+        return import_cli.load_legacy_ids(
+            argparse.Namespace(
+                schema=importer.schema,
+                builds_file=str(builds),
+                legacy_ids_file=[str(file) for file in files],
+                database_url=None,
+            )
+        )
+
+    assert load(ao, prk)
+    assert importer.map() == [("ao", 1, 100), ("prk", 1, 555)]
+    assert not load(ao, ao)
+    assert importer.map() == [("ao", 1, 100), ("prk", 1, 555)]
+
+
 def test_a_store_older_than_its_builds_file_does_not_take_the_map(importer, caplog):
     """The builds file describes ao-2 and the store stops at ao-1: clients
     would translate against ao-1 and drop id 2."""
