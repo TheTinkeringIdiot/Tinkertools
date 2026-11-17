@@ -1,0 +1,38 @@
+# The web service: the built frontend, and /api proxied to the backend so the
+# browser talks to one origin. Plain HTTP on one port; TLS and the public
+# hostnames belong to the proxy in front (Coolify's).
+{
+	admin off
+	auto_https off
+}
+
+:80 {
+	encode zstd gzip
+
+	handle /healthz {
+		respond 200
+	}
+
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	# Vite names these after their content: cache for good. One that is not
+	# there is a 404, not the application: a browser holding an old
+	# index.html must not be served HTML as a script.
+	handle /assets/* {
+		root * /srv
+		@exists file
+		header @exists Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	# Everything else is the application or a file beside it. index.html
+	# names the current assets and must not be kept.
+	handle {
+		root * /srv
+		header Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}

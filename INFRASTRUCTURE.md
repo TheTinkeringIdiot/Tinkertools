@@ -119,6 +119,7 @@ Every game-data route reads the content-addressed store (PostgreSQL schema `cas`
 ### Data Utilities (`backend/`)
 
 - `import_cli.py import-cas`: loads the store from extracted client builds and the committed curated files (`backend/IMPORT_README.md`)
+- `import_cli.py load-legacy-ids`: loads the map of old internal item ids into a store restored from a dump (`DEPLOYMENT.md`)
 - `extract_builds.py`: extracts client builds with TinkerParse
 - `tools/verify_cas.py`, `tools/golden.py`: verification of the store and of API responses
 - `tools/export_legacy_item_ids.py`, `tools/drop_old_store.sql`: leaving the old store behind
@@ -467,10 +468,24 @@ Defined in `backend/database/cas/001_store.sql` and `002_curated_and_derived.sql
 - Development and production optimizations
 
 **Environment Variables:**
-- `VITE_API_BASE_URL`: Backend API base URL (default: `http://localhost:8000/api/v1`)
+- `VITE_API_BASE_URL`: Backend API base URL (default: `http://localhost:8000/api/v1`; `/api/v1` in the deployed image)
+- `VITE_VERSION_HOSTNAME_MAP`: JSON object of hostnames to the game family a first visit opens (deployed image: `{"prk.tinkeringidiot.com":"prk"}`)
 - `VITE_ICON_BASE_URL`: Icon CDN base URL including folder path (default: `https://cdn.tinkeringidiot.com/aoicons`)
 - `DATABASE_URL`: PostgreSQL connection string
 - `SQL_DEBUG`: Enable SQL query logging
+
+---
+
+## 🚢 Deployment
+
+One container stack, `docker-compose.yml`, for a workstation and for the server (Coolify, Docker Compose build pack). **`DEPLOYMENT.md` is the guide.**
+
+- **`db`**: `postgres:16`, the store in a named volume; loaded by restoring a dump of the development store, never by importing
+- **`api`**: `backend/Dockerfile`, gunicorn with uvicorn workers (`API_WORKERS`, default 2)
+- **`web`**: `frontend/Dockerfile`, Caddy (`deploy/Caddyfile`) serving the built frontend with SPA fallback and proxying `/api` to `api`; the only service the outside reaches, for every hostname
+- **Settings**: environment variables with defaults, listed in `.env.example`
+- **Data commands**: `scripts/deploy/dump-store.sh` (development machine) and `scripts/deploy/stack.sh restore | legacy-ids | mob-ids | verify | status` (the host running the stack)
+- **CI**: `.github/workflows/ci.yml` (frontend type-check, lint and tests; backend formatting; a build of both images)
 
 ---
 
