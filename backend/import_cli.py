@@ -25,6 +25,12 @@ database/mob_ids.csv), how builds are presented (database/builds.toml) and the
 rules of the change log (database/change_relevance.toml,
 database/build_notes.toml). It needs nothing else from the database than the
 schema it writes. IMPORT_README.md is the guide.
+
+A second command needs no extracts. It makes the map of old internal ids of a
+loaded store equal to a file, on a server whose store was restored from a dump
+(DEPLOYMENT.md):
+
+    python import_cli.py load-legacy-ids --legacy-ids-file legacy_item_ids.csv
 """
 
 import argparse
@@ -306,18 +312,89 @@ def import_cas(args) -> bool:
     return True
 
 
+def load_legacy_ids(args) -> bool:
+    """Make the legacy id map of a loaded store equal to a file.
+
+    For a store that was not imported where it is served (restored from a
+    dump), so there is no extracts folder to tell which build is the newest.
+    The builds file stands in for the index: a build it describes and the
+    store lacks means the store is older than this code, and clients would
+    drop the ids of items only the missing build has. The map is then
+    refused, as it is for a family the store holds no build of.
+    """
+    from app.core import cas_store
+    from app.core.cas_extract import BUILDS_FILE, read_build_descriptions
+    from app.core.cas_legacy import read_legacy_ids, sync_legacy_ids
+
+    if not args.legacy_ids_file:
+        logger.error("--legacy-ids-file is required")
+        return False
+    database_url = args.database_url or os.environ.get("DATABASE_URL")
+    if not database_url:
+        logger.error("DATABASE_URL is not set")
+        return False
+    conn = None
+    try:
+        legacy_file = given_path(args.legacy_ids_file)
+        if not legacy_file.is_file():
+            raise FileNotFoundError(f"Legacy id file not found: {legacy_file}")
+        legacy_ids = read_legacy_ids(legacy_file)
+        described = read_build_descriptions(
+            given_path(args.builds_file) if args.builds_file else BUILDS_FILE
+        )
+        conn = cas_store.connect(database_url, args.schema)
+        if not cas_store.store_exists(conn, args.schema):
+            raise ValueError(f"Schema {args.schema} holds no store")
+        stored = dict(conn.execute("SELECT slug, branch FROM build").fetchall())
+        for family in sorted({row[0] for row in legacy_ids}):
+            if family not in stored.values():
+                raise ValueError(
+                    f"{legacy_file} holds ids of family '{family}', and the "
+                    f"store holds no build of it"
+                )
+        missing = sorted(set(described) - set(stored))
+        if missing:
+            raise ValueError(
+                f"The builds file describes {', '.join(missing)}, which the "
+                f"store does not hold: clients would drop the ids of items an "
+                f"older build lacks. Load a store that holds every described "
+                f"build first"
+            )
+        changed = sync_legacy_ids(conn, legacy_ids)
+        conn.commit()
+        cas_store.analyze(conn, args.schema)
+        conn.commit()
+    except (cas_store.StoreError, FileNotFoundError, ValueError) as e:
+        logger.error(str(e))
+        return False
+    finally:
+        if conn is not None:
+            conn.close()
+    logger.info(
+        f"Legacy item ids: {len(legacy_ids)} in the file, {changed} written or removed"
+    )
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="TinkerTools data import",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    parser.add_argument("command", choices=["import-cas"], help="Command to run")
+    parser.add_argument(
+        "command",
+        choices=["import-cas", "load-legacy-ids"],
+        help="import-cas: import builds from an extracts folder. "
+        "load-legacy-ids: make the map of old internal ids of a loaded store "
+        "equal to --legacy-ids-file, without extracts",
+    )
     parser.add_argument(
         "--extracts-dir",
         type=str,
         default=None,
-        help="Folder holding index.json and one <slug>/ per build (required)",
+        help="Folder holding index.json and one <slug>/ per build "
+        "(required for import-cas)",
     )
     parser.add_argument(
         "--slug",
@@ -394,14 +471,20 @@ def main():
         help="Database to write (default: the DATABASE_URL variable)",
     )
     args = parser.parse_args()
+    handlers = [logging.StreamHandler()]
+    if args.command == "import-cas":
+        handlers.append(logging.FileHandler("import.log"))
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.StreamHandler(), logging.FileHandler("import.log")],
+        handlers=handlers,
     )
 
     try:
-        success = import_cas(args)
+        if args.command == "load-legacy-ids":
+            success = load_legacy_ids(args)
+        else:
+            success = import_cas(args)
     except KeyboardInterrupt:
         logger.info("Import interrupted")
         sys.exit(1)

@@ -257,6 +257,22 @@ def importer(tmp_path, monkeypatch):
             )
         )
 
+    def load(legacy_ids, described=()):
+        """The command that loads the map into a store without extracts;
+        ``described`` are the builds its builds file has a table for."""
+        legacy.write_text("branch,item_id,aoid\n" + legacy_ids)
+        builds = tmp_path / "builds.toml"
+        builds.write_text("".join(f"[{slug}]\n" for slug in described))
+        return import_cli.load_legacy_ids(
+            argparse.Namespace(
+                schema=schema,
+                builds_file=str(builds),
+                legacy_ids_file=str(legacy),
+                database_url=None,
+            )
+        )
+
+    run.load = load
     run.connection = connection
     run.schema = schema
     run.map = lambda: connection.execute(
@@ -308,6 +324,39 @@ def test_ids_of_a_family_the_store_will_not_hold_are_refused(importer, caplog):
     assert not imported
     assert "family 'prk'" in caplog.text
     assert importer.connection.published == []
+
+
+def test_a_loaded_store_takes_the_map_without_extracts(importer):
+    assert importer()
+
+    assert importer.load("ao,1,100\nprk,1,555\n", described=["ao-2", "prk-1"])
+    assert importer.map() == [("ao", 1, 100), ("prk", 1, 555)]
+    # equal to the file, as with the import
+    assert importer.load("ao,2,200\n", described=["ao-2"])
+    assert importer.map() == [("ao", 2, 200)]
+
+
+def test_a_store_older_than_its_builds_file_does_not_take_the_map(importer, caplog):
+    """The builds file describes ao-2 and the store stops at ao-1: clients
+    would translate against ao-1 and drop id 2."""
+    assert importer(slug=["ao-1", "prk-1"])
+
+    assert not importer.load("ao,1,100\nao,2,200\n", described=["ao-2", "prk-1"])
+    assert "describes ao-2" in caplog.text
+    assert importer.map() == []
+
+
+def test_a_store_without_a_build_of_the_family_does_not_take_its_ids(importer, caplog):
+    assert importer(slug=["ao-1", "ao-2"])
+
+    assert not importer.load("ao,1,100\nprk,1,555\n")
+    assert "family 'prk'" in caplog.text
+    assert importer.map() == []
+
+
+def test_a_database_without_a_store_does_not_take_the_map(importer, caplog):
+    assert not importer.load("ao,1,100\n")
+    assert "holds no store" in caplog.text
 
 
 # ---------------------------------------------------------------------------
